@@ -30,6 +30,8 @@
 #define UNMOUNTFS 9
 #define CHECKMOUNT 10
 #define UNMOUNTALL 11
+#define PIN 12
+#define UNPIN 13
 #define CLOUDSTAT 23
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

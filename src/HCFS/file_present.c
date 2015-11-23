@@ -23,6 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/file.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "super_block.h"
@@ -35,6 +36,8 @@
 #include "xattr_ops.h"
 #include "metaops.h"
 #include "path_reconstruct.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 /************************************************************************
 *
@@ -77,7 +80,7 @@ errcode_handle:
 *
 *************************************************************************/
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		unsigned long *ret_gen)
+		unsigned long *ret_gen, char *ret_pin_status)
 {
 	struct stat returned_stat;
 	int ret_code;
@@ -99,14 +102,17 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		if (ret_code < 0)
 			goto error_handling;
 
-		if (ret_gen != NULL) {
+		if (ret_gen != NULL || ret_pin_status != NULL) {
 			if (S_ISREG(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_file_data(
 						this_inode, NULL, &filemeta,
 						NULL, 0, temp_entry);
 				if (ret_code < 0)
 					goto error_handling;
-				*ret_gen = filemeta.generation;
+				if (ret_pin_status)
+					*ret_pin_status = filemeta.local_pin;
+				if (ret_gen)
+					*ret_gen = filemeta.generation;
 			}
 			if (S_ISDIR(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_dir_data(
@@ -114,7 +120,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 						NULL, temp_entry);
 				if (ret_code < 0)
 					goto error_handling;
-				*ret_gen = dirmeta.generation;
+				if (ret_pin_status)
+					*ret_pin_status = dirmeta.local_pin;
+				if (ret_gen)
+					*ret_gen = dirmeta.generation;
 			}
 			if (S_ISLNK(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_symlink_data(
@@ -122,7 +131,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 						temp_entry);
 				if (ret_code < 0)
 					goto error_handling;
-				*ret_gen = symlinkmeta.generation;
+				if (ret_pin_status)
+					*ret_pin_status = symlinkmeta.local_pin;
+				if (ret_gen)
+					*ret_gen = symlinkmeta.generation;
 			}
 		}
 
@@ -156,6 +168,19 @@ error_handling:
 	return ret_code;
 }
 
+/* Remove entry when this child inode fail to create meta */
+static inline int dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
+	const char *childname, mode_t child_mode)
+{
+	META_CACHE_ENTRY_STRUCT *tmp_bodyptr;
+
+	tmp_bodyptr = meta_cache_lock_entry(parent_inode);
+	dir_remove_entry(parent_inode, child_inode, childname, child_mode,
+		tmp_bodyptr);
+	meta_cache_unlock_entry(tmp_bodyptr);
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: mknod_update_meta
@@ -173,45 +198,25 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			struct stat *this_stat, unsigned long this_gen,
 			ino_t root_ino)
 {
-	int ret_val;
+	int ret_val, ret, errcode;
+	size_t ret_size;
 	FILE_META_TYPE this_meta;
+	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
-
-	this_meta.generation = this_gen;
-	this_meta.metaver = CURRENT_META_VER;
-	this_meta.source_arch = ARCH_CODE;
-	this_meta.root_inode = root_ino;
-#ifdef _ANDROID_ENV_
-	ret_val = pathlookup_write_parent(self_inode, parent_inode);
-	if (ret_val < 0)
-		return ret_val;
-#endif
-
-	/* Store the inode and file meta of the new file to meta cache */
-	body_ptr = meta_cache_lock_entry(self_inode);
-	if (body_ptr == NULL)
-		return -ENOMEM;
-
-	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
-							NULL, 0, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	ret_val = meta_cache_close_file(body_ptr);
-	if (ret_val < 0) {
-		meta_cache_unlock_entry(body_ptr);
-		return ret_val;
-	}
-	ret_val = meta_cache_unlock_entry(body_ptr);
-
-	if (ret_val < 0)
-		return ret_val;
+	char pin_status;
+	DIR_META_TYPE parent_meta;
 
 	/* Add "self_inode" to its parent "parent_inode" */
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
+		&parent_meta, NULL, body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
 	if (ret_val < 0)
@@ -225,8 +230,64 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	ret_val = meta_cache_unlock_entry(body_ptr);
 
-	return 0;
+	/* Init file meta */
+	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
+	this_meta.generation = this_gen;
+	this_meta.metaver = CURRENT_META_VER;
+        this_meta.source_arch = ARCH_CODE;
+	this_meta.root_inode = root_ino;
+	this_meta.local_pin = pin_status;
+	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
+		selfname, pin_status == TRUE? "PIN" : "UNPIN");
 
+	/* Store the inode and file meta of the new file to meta cache */
+	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return -ENOMEM;
+	}
+
+	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
+							NULL, 0, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
+
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
+	memset(&file_stats, 0, sizeof(FILE_STATS_TYPE));
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
+
+	if (ret_val < 0)
+		return ret_val;
+
+	/* Add path lookup table */
+#ifdef _ANDROID_ENV_
+	ret_val = pathlookup_write_parent(self_inode, parent_inode);
+	if (ret_val < 0)
+		return ret_val;
+#endif
+
+	return 0;
+errcode_handle:
+	dir_remove_fail_node(parent_inode, self_inode,
+				selfname, this_stat->st_mode);
+	ret_val = errcode;
 error_handling:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
@@ -254,48 +315,20 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	DIR_ENTRY_PAGE temppage;
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
-	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
-
-	/* Initialize new directory object and save the meta to meta cache */
-	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
-	this_meta.tree_walk_list_head = this_meta.root_entry_page;
-	this_meta.generation = this_gen;
-	this_meta.metaver = CURRENT_META_VER;
-        this_meta.source_arch = ARCH_CODE;
-	this_meta.root_inode = root_ino;
-#ifdef _ANDROID_ENV_
-	ret_val = pathlookup_write_parent(self_inode, parent_inode);
-	if (ret_val < 0)
-		return ret_val;
-#endif
-
-	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
-						this_meta.root_entry_page);
-	if (ret_val < 0)
-		return ret_val;
-
-	body_ptr = meta_cache_lock_entry(self_inode);
-	if (body_ptr == NULL)
-		return -ENOMEM;
-
-	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
-							&temppage, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	ret_val = meta_cache_close_file(body_ptr);
-	if (ret_val < 0) {
-		meta_cache_unlock_entry(body_ptr);
-		return ret_val;
-	}
-	ret_val = meta_cache_unlock_entry(body_ptr);
-
-	if (ret_val < 0)
-		return ret_val;
+	char pin_status;
+	DIR_META_TYPE parent_meta;
 
 	/* Save the new entry to its parent and update meta */
 	body_ptr = meta_cache_lock_entry(parent_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
+
+	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
+		&parent_meta, NULL, body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
 	if (ret_val < 0)
@@ -310,6 +343,58 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	if (ret_val < 0)
 		return ret_val;
+
+	/* Init dir meta and page */
+	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+
+	/* Initialize new directory object and save the meta to meta cache */
+	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+	this_meta.tree_walk_list_head = this_meta.root_entry_page;
+	this_meta.generation = this_gen;
+	this_meta.metaver = CURRENT_META_VER;
+        this_meta.source_arch = ARCH_CODE;
+	this_meta.root_inode = root_ino;
+	this_meta.local_pin = pin_status;
+	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
+		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
+						this_meta.root_entry_page);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return ret_val;
+	}
+
+	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return -ENOMEM;
+	}
+
+	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
+							&temppage, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
+	ret_val = meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		return ret_val;
+
+#ifdef _ANDROID_ENV_
+	ret_val = pathlookup_write_parent(self_inode, parent_inode);
+	if (ret_val < 0)
+		return ret_val;
+#endif
 
 	return 0;
 
@@ -482,49 +567,21 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	SYMLINK_META_TYPE symlink_meta;
 	ino_t parent_inode, self_inode;
 	int ret_code;
+	char pin_status;
+	DIR_META_TYPE parent_meta;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
 
-	/* Prepare symlink meta */
-	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
-	symlink_meta.link_len = strlen(link);
-	symlink_meta.generation = generation;
-	symlink_meta.metaver = CURRENT_META_VER;
-        symlink_meta.source_arch = ARCH_CODE;
-	symlink_meta.root_inode = root_ino;
-#ifdef _ANDROID_ENV_
-	ret_code = pathlookup_write_parent(self_inode, parent_inode);
-	if (ret_code < 0)
-		return ret_code;
-#endif
-	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
-
-	/* Update self meta data */
-	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
-	if (self_meta_cache_entry == NULL)
-		return -ENOMEM;
-
-	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
-		&symlink_meta, self_meta_cache_entry);
-	if (ret_code < 0) {
-		meta_cache_close_file(self_meta_cache_entry);
-		meta_cache_unlock_entry(self_meta_cache_entry);
-		return ret_code;
-	}
-
-	ret_code = meta_cache_close_file(self_meta_cache_entry);
-	if (ret_code < 0) {
-		meta_cache_unlock_entry(self_meta_cache_entry);
-		return ret_code;
-	}
-	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
-	if (ret_code < 0)
-		return ret_code;
-
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
 	   because it had been locked before calling this function. Just need to
 	   open meta file. */
+	ret_code = meta_cache_lookup_dir_data(parent_inode, NULL,
+		&parent_meta, NULL, parent_meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
@@ -541,6 +598,51 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
+
+	/* Prepare symlink meta */
+	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
+	symlink_meta.link_len = strlen(link);
+	symlink_meta.generation = generation;
+	symlink_meta.metaver = CURRENT_META_VER;
+        symlink_meta.source_arch = ARCH_CODE;
+	symlink_meta.root_inode = root_ino;
+	symlink_meta.local_pin = pin_status;
+	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
+	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
+		name, pin_status == TRUE? "PIN" : "UNPIN");
+
+	/* Update self meta data */
+	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
+	if (self_meta_cache_entry == NULL) {
+		dir_remove_entry(parent_inode, self_inode, name,
+			this_stat->st_mode, parent_meta_cache_entry);
+		return -ENOMEM;
+	}
+
+	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
+		&symlink_meta, self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_close_file(self_meta_cache_entry);
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		dir_remove_entry(parent_inode, self_inode, name,
+			this_stat->st_mode, parent_meta_cache_entry);
+		return ret_code;
+	}
+
+	ret_code = meta_cache_close_file(self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		return ret_code;
+	}
+	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+
+#ifdef _ANDROID_ENV_
+	ret_code = pathlookup_write_parent(self_inode, parent_inode);
+	if (ret_code < 0)
+		return ret_code;
+#endif
 
 	return 0;
 }
@@ -699,7 +801,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	parent_inode = parent_meta_cache_entry->inode_num;
 
 	/* Fetch stat and generation */
-	ret_val = fetch_inode_stat(link_inode, link_stat, generation);
+	ret_val = fetch_inode_stat(link_inode, link_stat, generation, NULL);
 	if (ret_val < 0)
 		return ret_val;
 
@@ -758,3 +860,276 @@ error_handle:
 	meta_cache_unlock_entry(link_meta_cache_entry);
 	return ret_val;
 }
+
+/*
+ * Helper used in pinning inode. This function will deduct pinning space from
+ * reserved pinned size. If reserved pinned size is insufficient, then it will
+ * increase system pinned space.
+ */
+int increase_pinned_size(long long *reserved_pinned_size,
+		long long file_size)
+{
+	int ret;
+
+	ret = 0;
+	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
+	if (*reserved_pinned_size <= 0) { /* Need more space than expectation */
+		ret = 0;
+		sem_wait(&(hcfs_system->access_sem));
+		if (hcfs_system->systemdata.pinned_size -
+			(*reserved_pinned_size) <= MAX_PINNED_LIMIT) {
+			hcfs_system->systemdata.pinned_size -=
+				(*reserved_pinned_size);
+			*reserved_pinned_size = 0;
+
+		} else {
+			ret = -ENOSPC;
+			*reserved_pinned_size += file_size; /* Recover */
+		}
+		sem_post(&(hcfs_system->access_sem));
+	}
+
+	write_log(10, "Debug: file size = %lld, reserved pinned size = %lld,"
+		" system pinned size = %lld\n, in %s", file_size,
+		*reserved_pinned_size,
+		hcfs_system->systemdata.pinned_size, __func__);
+
+	return ret;
+}
+
+/**
+ * pin_inode
+ *
+ * Change local pin flag in meta cache to "TRUE" and set pin_status
+ * in super block to ST_PINNING in case of regfile, ST_PIN for dir/ symlink.
+ * When a regfile is set to ST_PINNING, it will be pushed into pinning queue
+ * and all blocks will be fetched from cloud by other thread.
+ *
+ * @param this_inode The inode number that should be pinned.
+ * @param reserved_pinned_size The reserved pinned quota had been deducted.
+ *
+ * @return 0 on success, 1 on case that regfile/symlink had been pinned,
+ *         otherwise negative error code.
+ */
+int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
+{
+	int ret;
+	struct stat tempstat;
+	ino_t *dir_node_list, *nondir_node_list;
+	long long count, num_dir_node, num_nondir_node;
+
+	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
+	if (ret < 0)
+		return ret;
+
+
+	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
+	if (ret < 0) {
+		return ret;
+
+	} else if (ret > 0) {
+	/* Do not need to change pinned size */
+		write_log(5, "Debug: inode %"PRIu64" had been pinned\n",
+							(uint64_t)this_inode);
+	} else { /* Succeed in pinning */
+		/* Change pinned size if succeding in pinning this inode. */
+		if (S_ISREG(tempstat.st_mode)) {
+			ret = increase_pinned_size(reserved_pinned_size,
+					tempstat.st_size);
+			if (ret == -ENOSPC) {
+				/* Roll back local_pin because the size
+				had not been added to system pinned size */
+				change_pin_flag(this_inode,
+					tempstat.st_mode, FALSE);
+				return ret;
+			}
+		}
+
+		ret = super_block_mark_pin(this_inode, tempstat.st_mode);
+		if (ret < 0)
+			return ret;
+	}
+
+
+	/* After pinning self, pin all its children for dir */
+	if (S_ISREG(tempstat.st_mode)) {
+		return ret;
+
+	} else if (S_ISLNK(tempstat.st_mode)) {
+		return ret;
+
+	} else { /* expand dir */
+		num_dir_node = 0;
+		num_nondir_node = 0;
+		dir_node_list = NULL;
+		nondir_node_list = NULL;
+		ret = collect_dir_children(this_inode, &dir_node_list,
+			&num_dir_node, &nondir_node_list, &num_nondir_node);
+		if (ret < 0)
+			return ret;
+
+		/* first pin regfile & symlink */
+		ret = 0;
+		for (count = 0; count < num_nondir_node; count++) {
+			ret = pin_inode(nondir_node_list[count],
+				reserved_pinned_size);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(nondir_node_list);
+			free(dir_node_list);
+			return ret; /* Return fail */
+		}
+		free(nondir_node_list);
+
+		/* pin dir */
+		ret = 0;
+		for (count = 0; count < num_dir_node; count++) {
+			ret = pin_inode(dir_node_list[count],
+				reserved_pinned_size);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(dir_node_list);
+			return ret; /* Retuan fail */
+		}
+		free(dir_node_list);
+	}
+
+	return 0;
+}
+
+/*
+ * This function will deduct pinned space from reserved_release_size. If space
+ * is insufficient, it will decrease system pinned size.
+ */
+int decrease_pinned_size(long long *reserved_release_size, long long file_size)
+{
+	*reserved_release_size -= file_size;
+	if (*reserved_release_size < 0) {
+		sem_wait(&(hcfs_system->access_sem));
+
+		hcfs_system->systemdata.pinned_size += (*reserved_release_size);
+		*reserved_release_size = 0;
+		if (hcfs_system->systemdata.pinned_size <= 0)
+			hcfs_system->systemdata.pinned_size = 0;
+
+		sem_post(&(hcfs_system->access_sem));
+	}
+
+	write_log(10, "Debug: file size = %lld, reserved release size = %lld,"
+		" system pinned size = %lld\n, in %s", file_size,
+		*reserved_release_size,
+		hcfs_system->systemdata.pinned_size, __func__);
+
+	return 0;
+}
+
+
+/**
+ * unpin_inode
+ *
+ * Unpin an pinned file so that it can be paged out and release more
+ * available space. An inode will be check pin flag in meta cache
+ * and then let pin_status in super block entry be ST_UNPIN if succeeds
+ * in unpinning this inode. In case that inode is a regfile with
+ * pin_status "ST_PINNING", it will be dequeued from pinning queue in
+ * "super_block_unpin". When inode is a dir, all of its children will
+ * be unpinned recursively.
+ *
+ * @param this_inode The inode number that should be unpinned.
+ * @param reserved_release_size The reserved pinned quota being
+ *        going to release.
+ *
+ * @return 0 on success, 1 on case that regfile/symlink had been unpinned,
+ *         otherwise negative error code.
+ */
+
+int unpin_inode(ino_t this_inode, long long *reserved_release_size)
+{
+	int ret;
+	struct stat tempstat;
+	ino_t *dir_node_list, *nondir_node_list;
+	long long count, num_dir_node, num_nondir_node;
+
+	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
+	if (ret < 0)
+		return ret;
+
+
+	ret = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to unpin inode %"PRIu64"."
+			" Code %d\n", (uint64_t)-ret);
+		return ret;
+
+	} else if (ret > 0) {
+	/* Do not need to change pinned size */
+		write_log(5, "Debug: inode %"PRIu64" had been unpinned\n",
+			(uint64_t)this_inode);
+
+	} else { /* Succeed in unpinning */
+
+		/* Deduct from reserved size */
+		if (S_ISREG(tempstat.st_mode)) {
+			 decrease_pinned_size(reserved_release_size,
+			 		tempstat.st_size);
+		}
+
+		ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
+		if (ret < 0)
+			return ret;
+	}
+
+	/* After unpinning itself, unpin all its children for dir */
+	if (S_ISREG(tempstat.st_mode)) {
+		return ret;
+
+	} else if (S_ISLNK(tempstat.st_mode)) {
+		return ret;
+
+	} else { /* expand dir */
+		num_dir_node = 0;
+		num_nondir_node = 0;
+		dir_node_list = NULL;
+		nondir_node_list = NULL;
+		ret = collect_dir_children(this_inode, &dir_node_list,
+			&num_dir_node, &nondir_node_list, &num_nondir_node);
+		if (ret < 0)
+			return ret;
+
+		/* first unpin regfile & symlink */
+		ret = 0;
+		for (count = 0; count < num_nondir_node; count++) {
+			ret = unpin_inode(nondir_node_list[count],
+				reserved_release_size);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(nondir_node_list);
+			free(dir_node_list);
+			return ret;
+		}
+		free(nondir_node_list);
+
+		/* unpin dir */
+		ret = 0;
+		for (count = 0; count < num_dir_node; count++) {
+			ret = unpin_inode(dir_node_list[count],
+				reserved_release_size);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(dir_node_list);
+			return ret;
+		}
+		free(dir_node_list);
+	}
+
+	return 0;
+}
+

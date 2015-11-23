@@ -1,6 +1,7 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <fuse/fuse_lowlevel.h>
 #include <inttypes.h>
 
@@ -21,6 +22,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (dir_meta_ptr)
+		dir_meta_ptr->local_pin = pin_flag_in_meta;
 
 	switch(this_inode) {
 	case INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2:
@@ -48,7 +51,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		dir_meta_ptr->entry_page_gc_list = 0;
 		dir_meta_ptr->tree_walk_list_head = sizeof(DIR_ENTRY_PAGE);
 		dir_meta_ptr->total_children = to_verified_meta.total_children;
-		inode_stat->st_nlink = to_verified_stat.st_nlink;
+		if (inode_stat)
+			inode_stat->st_nlink = to_verified_stat.st_nlink;
 		return 0;
 	}
 }
@@ -60,7 +64,7 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 	if (dir_meta_ptr)
 		to_verified_meta = *dir_meta_ptr;
 	
-	if (dir_meta_ptr)
+	if (inode_stat)
 		to_verified_stat = *inode_stat;
 	
 	return 0;
@@ -136,7 +140,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 
-	
+	file_meta_ptr->local_pin = pin_flag_in_meta;	
 	switch(this_inode) {
        	case INO_DIRECT_SUCCESS:
 		file_meta_ptr->direct = sizeof(FILE_META_TYPE);
@@ -308,7 +312,7 @@ int write_log(int level, char *format, ...)
 	va_list alist;
 
 	va_start(alist, format);
-	vprintf(format, alist);
+	//vprintf(format, alist);
 	va_end(alist);
 	return 0;
 }
@@ -335,13 +339,34 @@ int fetch_stat_path(char *pathname, ino_t this_inode)
         snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
         return 0;
 }
+
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	if (pathlookup_write_parent_success == TRUE)
+		return 0;
+	else
+		return -EIO;
+}
+
 int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
+{
+	if (delete_pathcache_node_success == TRUE)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
+        const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
 {
 	return 0;
 }
 
-int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+        SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (symlink_meta_ptr)
+		symlink_meta_ptr->local_pin = pin_flag_in_meta;
 	return 0;
 }
 

@@ -49,4 +49,12 @@ int get_block_dirty_status(char *path, FILE *fptr, char *status);
 /* Will copy the filename of ddt meta file to pathname */
 int fetch_ddt_path(char *pathname, unsigned char last_char);
 
+int fetch_error_download_path(char *path, ino_t inode);
+
+void get_system_size(long long *cache_size, long long *pinned_size);
+
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta);
+
 #endif  /* GW20_SRC_UTILS_H_ */

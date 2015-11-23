@@ -70,9 +70,9 @@ void monitor_loop(void)
 			ret_val = hcfs_test_backend(&monitor_curl_handle);
 
 			if ((ret_val >= 200) && (ret_val <= 299))
-				hcfs_system->backend_status_is_online = 1;
+				hcfs_system->backend_status_is_online = TRUE;
 			else
-				hcfs_system->backend_status_is_online = 0;
+				hcfs_system->backend_status_is_online = FALSE;
 
 			clock_gettime(CLOCK_REALTIME, &test_stop);
 			test_duration = diff_time(test_start, test_stop);

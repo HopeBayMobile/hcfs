@@ -2,6 +2,7 @@ extern "C" {
 #include <fcntl.h>
 #include <errno.h>
 #include <semaphore.h>
+#include <stdint.h>
 #include "mock_param.h"
 #include "super_block.h"
 #include "global.h"
@@ -889,7 +890,7 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	generation = 0;
 
 	/* Run */
-	ret_node = super_block_new_inode(&expected_stat, &generation);
+	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
 	/* Inode 1 is reserved, so start from 2 */
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since system is empty
 
@@ -903,6 +904,7 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 
 	EXPECT_EQ(2, sb_entry.this_index); // inode == 1
 	EXPECT_EQ(1, sb_entry.generation); // It is first time to be created
+	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(1, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
 		sizeof(struct stat)));
@@ -941,7 +943,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 	
 	/* Run */
-	ret_node = super_block_new_inode(&expected_stat, &generation);
+	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
 	/* Verify */	
@@ -957,6 +959,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 
 	EXPECT_EQ(2, sb_entry.this_index); // inode == 1
 	EXPECT_EQ(2, sb_entry.generation); // generation++
+	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(2, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
 		sizeof(struct stat)));
@@ -985,7 +988,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 
 	/* Run */
-	ret_node = super_block_new_inode(&expected_stat, &generation);
+	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
 	/* Verify */	
@@ -1001,6 +1004,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 
 	EXPECT_EQ(2, sb_entry.this_index); // inode == 1
 	EXPECT_EQ(2, sb_entry.generation); // generation++
+	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(2, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
 		sizeof(struct stat)));
@@ -1522,4 +1526,550 @@ TEST_F(super_block_share_releaseTest, ReleaseSuccess)
 
 /*
 	End of unittest of super_block_share_release()
- */	
+ */
+
+/* Unittest for super_block_finish_pinning */
+class super_block_finish_pinningTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_finish_pinningTest, StatusIsUNPIN_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_UNPIN;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	EXPECT_EQ(0, super_block_finish_pinning(inode));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_finish_pinningTest, StatusIsPIN_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PIN;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	EXPECT_EQ(0, super_block_finish_pinning(inode));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_finish_pinningTest, StatusIsDEL_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_DEL;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	EXPECT_EQ(0, super_block_finish_pinning(inode));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_finish_pinningTest, StatusIsPINNING_ChangeToPIN)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t max_inode = 10;
+	ino_t inode_marked_pin = 5;
+
+	for (ino_t inode = 3; inode < max_inode; inode++) {
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		sb_entry.pin_status = ST_UNPIN;
+		pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY));
+		super_block_share_locking();
+		pin_ll_enqueue(inode, &sb_entry); /* Enqueue */
+		super_block_share_release();
+	}
+
+	/* Run */
+	EXPECT_EQ(0, super_block_finish_pinning(inode_marked_pin));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode_marked_pin - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, verified_entry.pin_ll_next);
+	EXPECT_EQ(0, verified_entry.pin_ll_prev);
+	EXPECT_EQ(ST_PIN, verified_entry.pin_status);
+}
+
+/* End of unittest for super_block_finish_pinning */
+
+/* Unittest for super_block_mark_pin */
+class super_block_mark_pinTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_mark_pinTest, StatusIsPIN_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		offset);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_pin(inode, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_pinTest, StatusIsPINNING_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PINNING;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		offset);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_pin(inode, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_pinTest, StatusIsDEL_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_DEL;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		offset);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_pin(inode, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_pinTest, StatusIsUNPIN_MarkToPIN_CaseDir)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_UNPIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			offset);
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_pin(inode, S_IFDIR));
+
+	/* Verify */
+	sb_entry.pin_status = ST_PIN;
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_pinTest, StatusIsUNPIN_MarkToPIN_CaseRegfile)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 123;
+	for (ino_t this_inode = 3; this_inode <= 10; this_inode++) {
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		sb_entry.pin_status = ST_UNPIN;
+		offset = sizeof(SUPER_BLOCK_HEAD) + (this_inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		
+		pin_ll_enqueue(this_inode, &sb_entry); /* Enqueue */
+	}
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_UNPIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_pin(inode, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), sizeof(SUPER_BLOCK_HEAD) +
+		(inode - 1) * sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(ST_PINNING, verified_entry.pin_status);
+	EXPECT_EQ(0, verified_entry.pin_ll_next);
+	EXPECT_EQ(10, verified_entry.pin_ll_prev);
+	EXPECT_EQ(sys_super_block->head.last_pin_inode, inode);
+}
+/* End of unittest for super_block_mark_pin */
+
+/* Unittest for super_block_mark_unpin */
+class super_block_mark_unpinTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_mark_unpinTest, StatusIsUNPIN_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_UNPIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		offset);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_unpin(inode, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_unpinTest, StatusIsDEL_DoNothing)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_DEL;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		offset);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_unpin(inode, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_unpinTest, StatusIsUNPIN_ChangeToPIN)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+		sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		offset);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_unpin(inode, S_IFREG));
+
+	/* Verify */
+	sb_entry.pin_status = ST_UNPIN;
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY), offset);
+	EXPECT_EQ(0, memcmp(&sb_entry, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY)));
+}
+
+TEST_F(super_block_mark_unpinTest, StatusIsPINNING_ChangeToPIN)
+{
+	SUPER_BLOCK_ENTRY sb_entry, verified_entry;
+	ino_t max_inode = 10;
+	ino_t inode_marked_unpin = 5;
+
+	for (ino_t inode = 3; inode < max_inode; inode++) {
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		sb_entry.pin_status = ST_UNPIN;
+		pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY));
+
+		pin_ll_enqueue(inode, &sb_entry); /*Enqueue & set to "pinning"*/
+	}
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_unpin(inode_marked_unpin, S_IFREG));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &verified_entry,
+		sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + (inode_marked_unpin - 1) *
+		sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, verified_entry.pin_ll_next);
+	EXPECT_EQ(0, verified_entry.pin_ll_prev);
+	EXPECT_EQ(ST_UNPIN, verified_entry.pin_status);
+}
+
+/* End of unittest for super_block_mark_unpin */
+
+/* Unittest for pin_ll_enqueue */
+class pin_ll_enqueueTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(pin_ll_enqueueTest, StatusIsNotUNPIN)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+
+	/* Run */
+	EXPECT_EQ(ST_PIN, pin_ll_enqueue(inode, &sb_entry));
+}
+
+TEST_F(pin_ll_enqueueTest, EnqueueManyTimes_Success)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	off_t offset;
+	long long now_pos;
+	ino_t now_inode, expected_inode;
+
+	for (ino_t inode = 2; inode <= 20; inode ++) {
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		sb_entry.pin_status = ST_UNPIN;
+		sb_entry.this_index = inode;
+		offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pwrite(sys_super_block->iofptr, &sb_entry,
+				sizeof(SUPER_BLOCK_ENTRY), offset);
+		pin_ll_enqueue(inode, &sb_entry);
+	}
+	EXPECT_EQ(19, sys_super_block->head.num_pinning_inodes);
+
+	/* Verify from first to last one*/
+	now_inode = sys_super_block->head.first_pin_inode;
+	expected_inode = 2;
+	while(now_inode) {
+		ASSERT_EQ(expected_inode, now_inode);
+		expected_inode++;
+
+		offset = sizeof(SUPER_BLOCK_HEAD) + (now_inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pread(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		now_inode = sb_entry.pin_ll_next;
+	}
+	EXPECT_EQ(21, expected_inode);
+
+	/* Verify from last to first one */
+	now_inode = sys_super_block->head.last_pin_inode;
+	expected_inode = 20;
+	while(now_inode) {
+		ASSERT_EQ(expected_inode, now_inode);
+		expected_inode--;
+
+		offset = sizeof(SUPER_BLOCK_HEAD) + (now_inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pread(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		now_inode = sb_entry.pin_ll_prev;
+	}
+	EXPECT_EQ(1, expected_inode);
+}
+/* End of unittest for pin_ll_enqueue */
+
+/* Unittest for pin_ll_dequeue */
+class pin_ll_dequeueTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(pin_ll_dequeueTest, StatusIsNotPINNING)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PIN;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+
+	/* Run */
+	EXPECT_EQ(ST_PIN, pin_ll_dequeue(inode, &sb_entry));
+}
+
+TEST_F(pin_ll_dequeueTest, InodeNotInQueue)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode;
+	off_t offset;
+
+	inode = 5;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.pin_status = ST_PINNING;
+	offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+	pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+
+	/* Run */
+	EXPECT_EQ(-EIO, pin_ll_dequeue(inode, &sb_entry));
+}
+
+TEST_F(pin_ll_dequeueTest, DequeueSuccess)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	off_t offset;
+	long long now_pos;
+	ino_t now_inode, expected_inode;
+	int num_inode, ret;
+
+	/* Run enqueue */
+	for (ino_t inode = 2; inode <= 20; inode ++) {
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		sb_entry.pin_status = ST_UNPIN;
+		sb_entry.this_index = inode;
+		offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pwrite(sys_super_block->iofptr, &sb_entry,
+				sizeof(SUPER_BLOCK_ENTRY), offset);
+		pin_ll_enqueue(inode, &sb_entry);
+	}
+
+	EXPECT_EQ(2, sys_super_block->head.first_pin_inode);
+	EXPECT_EQ(20, sys_super_block->head.last_pin_inode);
+	
+	/* Dequeue half inodes and verify */
+	num_inode = 19;
+	for (ino_t inode = 10; inode <= 20; inode++) {
+		offset = sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pread(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		ret = pin_ll_dequeue(inode, &sb_entry);
+		ASSERT_EQ(0, ret);
+
+		num_inode--;
+		pread(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		ASSERT_EQ(num_inode, sys_super_block->head.num_pinning_inodes);
+		ASSERT_EQ(0, sb_entry.pin_ll_next);
+		ASSERT_EQ(0, sb_entry.pin_ll_prev);
+	}
+	EXPECT_EQ(2, sys_super_block->head.first_pin_inode);
+	EXPECT_EQ(9, sys_super_block->head.last_pin_inode);
+
+	/* Verify queue structure (from first one) */
+	now_inode = sys_super_block->head.first_pin_inode;
+	expected_inode = 2;
+	while(now_inode) {
+		ASSERT_EQ(expected_inode, now_inode);
+		expected_inode++;
+
+		offset = sizeof(SUPER_BLOCK_HEAD) + (now_inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pread(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		now_inode = sb_entry.pin_ll_next;
+	}
+	EXPECT_EQ(10, expected_inode);
+
+	/* Verify queue structure (from last one) */
+	now_inode = sys_super_block->head.last_pin_inode;
+	expected_inode = 9;
+	while(now_inode) {
+		ASSERT_EQ(expected_inode, now_inode);
+		expected_inode--;
+
+		offset = sizeof(SUPER_BLOCK_HEAD) + (now_inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY);
+		pread(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY), offset);
+		now_inode = sb_entry.pin_ll_prev;
+	}
+	EXPECT_EQ(1, expected_inode);
+}
+
+/* End of unittest for pin_ll_dequeue */

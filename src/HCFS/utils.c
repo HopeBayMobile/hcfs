@@ -1170,3 +1170,56 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 errcode_handle:
 	return errcode;
 }
+
+/**
+ * fetch_error_download_path
+ *
+ * Fetch an error path employed to record error when failing to download block.
+ *
+ * @param path  A char type pointer used to get this path.
+ * @param inode  Inode number of this block failing to download.
+ *
+ * @return 0
+ */
+int fetch_error_download_path(char *path, ino_t inode)
+{
+
+	snprintf(path, 200, "/dev/shm/download_error_inode_%"PRIu64"",
+			(uint64_t)inode);
+
+	return 0;
+}
+
+void get_system_size(long long *cache_size, long long *pinned_size)
+{
+	sem_wait(&(hcfs_system->access_sem));
+	if (cache_size)
+		*cache_size = hcfs_system->systemdata.cache_size;
+	if (pinned_size)
+		*pinned_size = hcfs_system->systemdata.pinned_size;
+	sem_post(&(hcfs_system->access_sem));
+}
+
+/* Helper for updating per-file statistics in fuseop.c */
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FILE_STATS_TYPE meta_stats;
+
+	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	meta_stats.num_blocks += num_blocks_delta;
+	meta_stats.num_cached_blocks += num_cached_blocks_delta;
+	meta_stats.cached_size += cached_size_delta;
+	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	return 0;
+errcode_handle:
+	return errcode;
+}
+

@@ -98,6 +98,7 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	char local_pin;
 } DIR_META_TYPE;
 
 /* Defining the structure for a page of directory entries */
@@ -150,7 +151,15 @@ typedef struct {
 	ino_t root_inode;
 	long long upload_seq;
 	long long size_last_upload;
+	char local_pin;
 } FILE_META_TYPE;
+
+/* The structure for keeping statistics for a file */
+typedef struct {
+	long long num_blocks;
+	long long num_cached_blocks;
+	long long cached_size;
+} FILE_STATS_TYPE;
 
 /* Defining the structure of symbolic link meta */
 typedef struct {
@@ -162,6 +171,7 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	char local_pin;
 } SYMLINK_META_TYPE;
 
 /*END META definition*/
@@ -171,6 +181,7 @@ typedef struct {
 	long long system_size;
 	long long cache_size;
 	long long cache_blocks;
+	long long pinned_size;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {

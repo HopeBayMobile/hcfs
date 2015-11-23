@@ -24,6 +24,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 			dir_meta_ptr->next_xattr_page = 0;
 		if (this_inode == INO_DIR_XATTR_PAGE_EXIST)
 			dir_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
+		dir_meta_ptr->local_pin = 1;
 	}
 
 	return 0;
@@ -44,24 +45,37 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
+	META_CACHE_ENTRY_STRUCT *ptr;
+
+	ptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	ptr->fptr = NULL;
 	/* Don't care the return value except NULL. It is not used. */
-	return 1; 
+	return ptr; 
 }
 
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	free(target_ptr);
+
 	return 0;
 }
 
 
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (body_ptr->fptr == NULL)
+		body_ptr->fptr = fopen(MOCK_META_PATH, "w+");
 	return 0;
 }
 
 
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	if (target_ptr->fptr != NULL) {
+		fclose(target_ptr->fptr);
+		target_ptr->fptr = NULL;
+	}
+
 	return 0;
 }
 
@@ -190,8 +204,48 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	}
 	return 0;
 }
+
 int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
 
+int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
+{
+	if (this_inode == 1) /* Case of failure */
+		return -ENOMEM;
+	if (this_inode == 2)
+		return 1; /* Case of the same flag as old one */
+	return 0;
+}
+
+int collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
+	long long *num_dir_node, ino_t **nondir_node_list,
+	long long *num_nondir_node)
+{
+	*num_dir_node = 0;
+	*num_nondir_node = 0;
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+	if (collect_dir_children_flag == TRUE) {
+		*dir_node_list = malloc(sizeof(ino_t));
+		*num_dir_node = 1;
+		(*dir_node_list)[0] = INO_LNK; /* Directly return 0 at next layer */
+
+		*nondir_node_list = malloc(sizeof(ino_t));
+		*num_nondir_node = 1;
+		(*nondir_node_list)[0] = INO_LNK; /* Directly return 0 at next layer */
+	}
+
+	return 0;
+}
+
+int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
+{
+	return 0;
+}
+
+int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
+{
+	return 0;
+}

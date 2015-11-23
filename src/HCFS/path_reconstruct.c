@@ -268,7 +268,7 @@ errcode_handle:
 	meta_cache_unlock_entry(cache_entry);
 	return errcode;
 }
-			
+
 /************************************************************************
 *
 * Function name: lookup_name
@@ -452,7 +452,7 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
 		errcode = -ENOMEM;
 		write_log(0, "Out of Memory\n");
 		goto errcode_handle;
-	} 
+	}
 
 	tmpbuf[0] = '\0';
 	*result = tmpbuf;

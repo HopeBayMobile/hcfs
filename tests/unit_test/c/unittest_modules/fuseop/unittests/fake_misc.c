@@ -359,7 +359,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	return 0;
 }
-int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
+int fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
+		long long block_no)
 {
 	char tempbuf[1024];
 	int tmp_len;
@@ -821,3 +822,34 @@ int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 	return 0;
 }
 
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+		long long num_cached_blocks_delta,
+		long long cached_size_delta)
+{
+	return 0;
+}
+
+int init_pin_scheduler()
+{
+	return 0;
+}
+
+int destroy_pin_scheduler()
+{
+	return 0;
+}
+
+int init_download_control()
+{
+	return 0;
+}
+
+int destroy_download_control()
+{
+	return 0;
+}
+
+int super_block_mark_dirty(ino_t this_inode)
+{
+	return 0;
+}

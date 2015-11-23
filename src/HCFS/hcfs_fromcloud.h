@@ -24,6 +24,13 @@
 #include <pthread.h>
 #endif
 
+#define MAX_DL_CONCURRENCY 16
+#define READ_BLOCK 0
+#define PIN_BLOCK 1
+
+
+extern SYSTEM_CONF_STRUCT system_config;
+
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
@@ -31,13 +38,37 @@ typedef struct {
 	int entry_index;
 } PREFETCH_STRUCT_TYPE;
 
+typedef struct {
+	ino_t this_inode;
+	long long block_no;
+	off_t page_pos;
+	char dl_error;
+	char active;
+} DOWNLOAD_BLOCK_INFO;
+
+typedef struct {
+	sem_t ctl_op_sem;
+	sem_t dl_th_sem;
+	pthread_t download_thread[MAX_DL_CONCURRENCY];
+	pthread_t manager_thread;
+	DOWNLOAD_BLOCK_INFO block_info[MAX_DL_CONCURRENCY];
+	int active_th;
+} DOWNLOAD_THREAD_CTL;
+
+DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int fetch_from_cloud(FILE *fptr,
+int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		unsigned char *obj_id);
 #else
 		ino_t this_inode, long long block_no);
 #endif
+
+void download_block_manager();
+int init_download_control();
+int destroy_download_control();
+void fetch_backend_block(void *ptr);
+int fetch_pinned_blocks(ino_t inode);
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/11~12 Jiahong added header for this file, and revising coding style.
 * 2015/6/3 Jiahong added error handling
+* 2015/10/22 Kewei added mechanism skipping pinned inodes.
 *
 **************************************************************************/
 
@@ -27,6 +28,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 #include "hcfs_cachebuild.h"
 #include "params.h"
@@ -112,8 +114,17 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		current_block = 0;
 
 		FREAD(&temphead_stat, sizeof(struct stat), 1, metafptr);
-
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
+
+		/* Skip if inode is pinned */
+		if (temphead.local_pin == TRUE) {
+			write_log(10, "Debug: inode %"PRIu64" is pinned. "
+				"Skip to page it out.\n", (uint64_t)this_inode);
+			flock(fileno(metafptr), LOCK_UN);
+			fclose(metafptr);
+			return 0;
+		}
+
 		total_blocks = (temphead_stat.st_size +
 					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
 
@@ -189,6 +200,13 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					goto errcode_handle;
 				}
 				sync_hcfs_system_data(FALSE);
+				ret = update_file_stats(metafptr, 0, -1,
+						-(tempstat.st_size));
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+
 				sem_post(&(hcfs_system->access_sem));
 				ret = super_block_mark_dirty(this_inode);
 				if (ret < 0) {
@@ -201,6 +219,10 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					(CACHE_HARD_LIMIT - CACHE_DELTA))
 				notify_sleep_on_cache();
 
+			/* If cache size < soft limit, take a break and wait
+			for exceeding soft limit. Stop paging out these blocks
+			if cache size is still < soft limit after 5 mins.
+			Otherwise lock meta and remove next block. */
 			if (hcfs_system->systemdata.cache_size <
 						CACHE_SOFT_LIMIT) {
 				flock(fileno(metafptr), LOCK_UN);
@@ -237,6 +259,17 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					break;
 
 				flock(fileno(metafptr), LOCK_EX);
+
+				/* Check pin status before paging blocks out */
+				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+				FREAD(&temphead, sizeof(FILE_META_TYPE),
+					1, metafptr);
+				if (temphead.local_pin == TRUE) {
+					write_log(10, "Debug: inode %"PRIu64" "
+						"is pinned when paging it out. "
+						"Stop\n", (uint64_t)this_inode);
+					break;
+				}
 
 				/*If meta file does not exist, do nothing*/
 				if (access(thismetapath, F_OK) < 0)

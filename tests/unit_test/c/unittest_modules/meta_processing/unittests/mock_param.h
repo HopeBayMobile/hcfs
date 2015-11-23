@@ -72,6 +72,12 @@ char delete_pathcache_node_success;
 /* link_update_meta() */
 #define INO_TOO_MANY_LINKS 279348
 
+/* pin_inode() */
+char collect_dir_children_flag;
+
+/* change_pin_falg */
+char pin_flag_in_meta;
+
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0
 	INO_SEEK_DIR_ENTRY_NOTFOUND - meta_cache_seek_dir_entry() return 0 and result_index<0

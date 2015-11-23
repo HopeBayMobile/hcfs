@@ -73,6 +73,9 @@ typedef struct {
 #define CACHE_HARD_LIMIT system_config.cache_hard_limit
 #define CACHE_DELTA system_config.cache_update_delta
 
+#define MAX_PINNED_RATIO 0.8
+#define MAX_PINNED_LIMIT (CACHE_HARD_LIMIT * MAX_PINNED_RATIO)
+
 #define MAX_BLOCK_SIZE system_config.max_block_size
 
 #define MAX_META_MEM_CACHE_ENTRIES 5000

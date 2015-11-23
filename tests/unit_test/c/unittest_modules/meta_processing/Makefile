@@ -46,7 +46,7 @@ CXX = gcc
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
 #TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
-TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest
+TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest pin_scheduling_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -61,10 +61,11 @@ clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : setup $(TESTS)
-	#./metaops_unittest wait keiwei's fix
+	./metaops_unittest
 	./file_present_unittest
 	./super_block_unittest
 	./lookup_count_unittest
+	./pin_scheduling_unittest
 #	./xattr_ops_unittest
 ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
@@ -159,6 +160,20 @@ lookup_count_unittest.o : $(UNITTEST_DIR)/lookup_count_unittest.cc $(GTEST_HEADE
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/lookup_count_unittest.cc
 
 lookup_count_unittest : lookup_count_mock_function.o lookup_count.o lookup_count_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+
+# pin_scheduling.c
+pin_scheduling.o : $(USER_DIR)/pin_scheduling.c $(USER_DIR)/pin_scheduling.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/pin_scheduling.c
+
+pin_scheduling_mock_function.o : $(UNITTEST_DIR)/pin_scheduling_mock_function.c $(UNITTEST_DIR)/mock_param.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pin_scheduling_mock_function.c
+
+pin_scheduling_unittest.o : $(UNITTEST_DIR)/pin_scheduling_unittest.cc $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pin_scheduling_unittest.cc
+
+pin_scheduling_unittest : pin_scheduling_mock_function.o pin_scheduling.o pin_scheduling_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
 

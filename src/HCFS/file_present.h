@@ -25,7 +25,7 @@
 #include "xattr_ops.h"
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		unsigned long *ret_gen);
+		unsigned long *ret_gen, char *ret_pin_status);
 
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
@@ -53,5 +53,14 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry);
+
+int increase_pinned_size(long long *reserved_pinned_size,
+		long long file_size);
+
+int decrease_pinned_size(long long *reserved_release_size,
+		long long file_size);
+
+int pin_inode(ino_t this_inode, long long *reserved_pinned_size);
+int unpin_inode(ino_t this_inode, long long *reserved_release_size);
 
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */

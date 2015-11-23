@@ -22,6 +22,7 @@
 * 2015/5/25, 5/26  Jiahong adding error handling
 * 2015/6/29 Kewei finished xattr operations.
 * 2015/7/7 Kewei began to add ops about symbolic link
+* 2015/11/5 Jiahong adding changes for per-file statistics
 *
 **************************************************************************/
 
@@ -82,6 +83,7 @@
 #include "lookup_count.h"
 #include "FS_manager.h"
 #include "path_reconstruct.h"
+#include "pin_scheduling.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -159,6 +161,7 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 #endif
 	}
 }
+
 /* Helper function for checking permissions.
    Inputs: fuse_req_t req, struct stat *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
@@ -581,7 +584,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	if (hit_inode > 0) {
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL);
+		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL, NULL);
 		if (ret_code < 0) {
 			fuse_reply_err(req, -ret_code);
 			return;
@@ -639,6 +642,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 	unsigned long this_generation;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -660,7 +664,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -715,7 +720,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			local_pin);
 
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
@@ -785,6 +791,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 	unsigned long this_gen;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -796,7 +803,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -850,7 +858,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
 
-	self_inode = super_block_new_inode(&this_stat, &this_gen);
+	self_inode = super_block_new_inode(&this_stat, &this_gen, local_pin);
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
 		return;
@@ -918,7 +926,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -989,7 +997,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1084,7 +1092,7 @@ a directory (for NFS) */
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
 	write_log(10, "Debug lookup parent mode %d\n", parent_stat.st_mode);
 	if (ret_val < 0) {
@@ -1133,7 +1141,7 @@ a directory (for NFS) */
 	this_inode = temp_dentry.d_ino;
 	output_param.ino = (fuse_ino_t) this_inode;
 	ret_val = fetch_inode_stat(this_inode, &(output_param.attr),
-			&this_gen);
+			&this_gen, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1266,7 +1274,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode1, &parent_stat1, NULL);
+	ret_val = fetch_inode_stat(parent_inode1, &parent_stat1, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1298,7 +1306,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode2, &parent_stat2, NULL);
+	ret_val = fetch_inode_stat(parent_inode2, &parent_stat2, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1614,7 +1622,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			long long page_index, long long old_last_block,
-			ino_t inode_index)
+			ino_t inode_index, FILE *metafptr)
 {
 	int block_count;
 	char thisblockpath[1024];
@@ -1622,11 +1630,13 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	off_t cache_block_size;
 	off_t total_deleted_cache;
 	long long total_deleted_blocks;
-	int ret_val, errcode;
+	long long total_deleted_fileblocks;
+	int ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
 
 	total_deleted_cache = 0;
 	total_deleted_blocks = 0;
+	total_deleted_fileblocks = 0;
 
 	write_log(10, "Debug truncate_delete_block, start %d, old_last %lld,",
 		start_index, old_last_block);
@@ -1666,10 +1676,12 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 
 			total_deleted_cache += (long long) cache_block_size;
 			total_deleted_blocks += 1;
+			total_deleted_fileblocks++;
 			break;
 		case ST_CLOUD:
 			tmpentry->status =
 				ST_TODELETE;
+			total_deleted_fileblocks++;
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
@@ -1686,6 +1698,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 				total_deleted_blocks += 1;
 			}
 			tmpentry->status = ST_TODELETE;
+			total_deleted_fileblocks++;
 			break;
 		case ST_CtoL:
 			ret_val = fetch_block_path(thisblockpath, inode_index,
@@ -1695,18 +1708,28 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			if (access(thisblockpath, F_OK) == 0)
 				unlink(thisblockpath);
 			tmpentry->status = ST_TODELETE;
+			total_deleted_fileblocks++;
 			break;
 		default:
 			break;
 		}
 	}
-	if (total_deleted_blocks > 0)
+	if (total_deleted_blocks > 0) {
 		change_system_meta(0, -total_deleted_cache,
 				-total_deleted_blocks);
+		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
+				-total_deleted_blocks, -total_deleted_cache);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
 
 	write_log(10, "Debug truncate_delete_block end\n");
 
 	return 0;
+errcode_handle:
+	return errcode;
 }
 
 /* Helper function for hfuse_truncate. This will truncate the last block
@@ -1723,8 +1746,12 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	struct stat tempstat;
 	off_t old_block_size, new_block_size;
 	int ret, errcode;
+	long long cache_delta;
+	long long cache_block_delta;
 	BLOCK_ENTRY *last_block_entry;
 
+	cache_delta = 0;
+	cache_block_delta = 0;
 	/*Offset not on the boundary of the block. Will need to truncate the
 	last block*/
 	ret = truncate_wait_full_cache(this_inode, filestat, tempfilemeta,
@@ -1798,10 +1825,11 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_unlock_entry(*body_ptr);
 
 #if (DEDUP_ENABLE)
-			ret = fetch_from_cloud(blockfptr, last_block_entry->obj_id);
+			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+					last_block_entry->obj_id);
 #else
-			ret = fetch_from_cloud(blockfptr, filestat->st_ino,
-					last_block);
+			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+					filestat->st_ino, last_block);
 
 #endif
 			if (ret < 0) {
@@ -1855,6 +1883,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 				}
 
 				change_system_meta(0, tempstat.st_size, 1);
+				cache_delta += tempstat.st_size;
+				cache_block_delta += 1;
 			}
 		} else {
 			if (stat(thisblockpath, &tempstat) == 0) {
@@ -1885,9 +1915,20 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		change_system_meta(0, new_block_size - old_block_size, 0);
+		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
+		ret = meta_cache_open_file(*body_ptr);
+		if (ret < 0)
+			return ret;
+		ret = update_file_stats((*body_ptr)->fptr, 0,
+				cache_block_delta, cache_delta);
+		if (ret < 0) {
+			meta_cache_close_file(*body_ptr);
+			return ret;
+		}
+
 	} else {
 		if (last_block_entry->status == ST_NONE)
 			return 0;
@@ -1944,9 +1985,19 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		change_system_meta(0, new_block_size - old_block_size, 0);
+		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
+		ret = meta_cache_open_file(*body_ptr);
+		if (ret < 0)
+			return ret;
+		ret = update_file_stats((*body_ptr)->fptr, 0,
+				cache_block_delta, cache_delta);
+		if (ret < 0) {
+			meta_cache_close_file(*body_ptr);
+			return ret;
+		}
 	}
 	return 0;
 }
@@ -1983,7 +2034,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
-	long long temp_trunc_size;
+	long long temp_trunc_size, sizediff;
 	ssize_t ret_ssize;
 	MOUNT_T *tmpptr;
 	size_t ret_size;
@@ -2014,6 +2065,24 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		return 0;
 	}
 
+	if ((tempfilemeta.local_pin == TRUE) &&
+	    (filestat->st_size < offset)) {
+		/* If this is a pinned file and we want to extend the file,
+		need to find out if pinned space is still available for this
+		extension */
+		/* If pinned space is available, add the amount of changes
+		to the total usage first */
+		sizediff = (long long) offset - filestat->st_size;
+		sem_wait(&(hcfs_system->access_sem));
+		if ((hcfs_system->systemdata.pinned_size + sizediff)
+			> MAX_PINNED_LIMIT) {
+			sem_post(&(hcfs_system->access_sem));
+			return -ENOSPC;
+		}
+		hcfs_system->systemdata.pinned_size += sizediff;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	/*If need to extend, only need to change st_size. Do that later.*/
 	if (filestat->st_size > offset) {
 		if (offset == 0) {
@@ -2034,8 +2103,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			filepos = seek_page(*body_ptr, last_page, 0);
 		else
 			filepos = 0;
-		if (filepos < 0)
-			return filepos;
+		if (filepos < 0) {
+			errcode = filepos;
+			goto errcode_handle;
+		}
 
 		current_page = last_page;
 
@@ -2048,8 +2119,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			ret = meta_cache_lookup_file_data(this_inode, NULL,
 				NULL, &temppage, filepos,
 				*body_ptr);
-			if (ret < 0)
-				return ret;
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 
 			/* Do the actual handling here*/
 			last_index = last_block %
@@ -2062,19 +2135,29 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 					&temppage, filepos,
 					body_ptr, last_index,
 					last_block, offset);
-				if (ret < 0)
-					return ret;
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 
 			/*Delete the rest of blocks in this same page
 			as well*/
-			ret = truncate_delete_block(&temppage, last_index+1,
-				current_page, old_last_block,
-				filestat->st_ino);
+			ret = meta_cache_open_file(*body_ptr);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
+			}
+			ret = truncate_delete_block(&temppage, last_index+1,
+				current_page, old_last_block,
+				filestat->st_ino, (*body_ptr)->fptr);
+			if (ret < 0) {
+				write_log(0, "IO error in truncate. Data may ");
+				write_log(0, "not be consistent\n");
+				errcode = ret;
+				goto errcode_handle;
 			}
 
 			ret = meta_cache_update_file_data(this_inode, NULL,
@@ -2083,7 +2166,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 		}
 
@@ -2099,7 +2183,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (filepos < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return filepos;
+				errcode = filepos;
+				goto errcode_handle;
 			}
 
 			/* Skipping pages that do not exist */
@@ -2111,16 +2196,25 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 
-			ret = truncate_delete_block(&temppage, 0,
-				current_page, old_last_block,
-				filestat->st_ino);
+			ret = meta_cache_open_file(*body_ptr);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
+			}
+			ret = truncate_delete_block(&temppage, 0,
+				current_page, old_last_block,
+				filestat->st_ino, (*body_ptr)->fptr);
+			if (ret < 0) {
+				write_log(0, "IO error in truncate. Data may ");
+				write_log(0, "not be consistent\n");
+				errcode = ret;
+				goto errcode_handle;
 			}
 
 			ret = meta_cache_update_file_data(this_inode, NULL,
@@ -2128,7 +2222,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 		}
 		write_log(10, "Debug truncate update xattr\n");
@@ -2138,7 +2233,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		if (ret < 0) {
 			write_log(0, "IO error in truncate. Data may ");
 			write_log(0, "not be consistent\n");
-			return ret;
+			errcode = ret;
+			goto errcode_handle;
 		}
 
 		/* First read from meta file, if need
@@ -2212,7 +2308,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				write_log(0, "not be consistent. ");
 				write_log(0, "Code %d, %s\n", errcode,
 						strerror(errcode));
-				return -EIO;
+				errcode = -EIO;
+				goto errcode_handle;
 			}
 		} else {
 			if (ret_ssize < 0) {
@@ -2221,7 +2318,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				write_log(0, "not be consistent. ");
 				write_log(0, "Code %d, %s\n", errcode,
 						strerror(errcode));
-				return -EIO;
+				errcode = -EIO;
+				goto errcode_handle;
 			}
 		}
 #endif /* _ANDROID_ENV_ */
@@ -2232,7 +2330,18 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	if (ret < 0) {
 		write_log(0, "IO error in truncate. Data may ");
 		write_log(0, "not be consistent\n");
-		return ret;
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	if ((tempfilemeta.local_pin == TRUE) &&
+	    (offset < filestat->st_size)) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -=
+			(long long)(offset - filestat->st_size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
 	}
 
 	/* Update file and system meta here */
@@ -2248,6 +2357,17 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	return 0;
 errcode_handle:
+	/* If an error occurs, need to revert the changes to pinned size */
+	if ((tempfilemeta.local_pin == TRUE) &&
+	    (offset > filestat->st_size)) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -=
+			(long long)(offset - filestat->st_size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	return errcode;
 }
 
@@ -2279,7 +2399,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL);
+	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -2508,9 +2628,11 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		}
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[eindex].obj_id);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				tpage->block_entries[eindex].obj_id);
 #else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				this_inode, bindex);
 #endif
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
@@ -2565,19 +2687,21 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			ret = meta_cache_update_file_data(fh_ptr->thisinode,
 					NULL, NULL, tpage, page_fpos,
 					fh_ptr->meta_cache_ptr);
-			if (ret < 0) {
-				fh_ptr->meta_cache_locked = FALSE;
-				meta_cache_close_file(tmpptr);
-				meta_cache_unlock_entry(tmpptr);
-				if (fh_ptr->blockfptr != NULL) {
-					fclose(fh_ptr->blockfptr);
-					fh_ptr->blockfptr = NULL;
-				}
-				return ret;
-			}
+			if (ret < 0)
+				goto error_handling;
 
 			/* Update system meta to reflect correct cache size */
 			change_system_meta(0, tempstat2.st_size, 1);
+			ret = meta_cache_open_file(tmpptr);
+			if (ret < 0)
+				goto error_handling;
+			ret = update_file_stats(tmpptr->fptr, 0,
+					1, tempstat2.st_size);
+			if (ret < 0)
+				goto error_handling;
+			ret = super_block_mark_dirty(fh_ptr->thisinode);
+			if (ret < 0)
+				goto error_handling;
 		}
 	}
 	fh_ptr->meta_cache_locked = FALSE;
@@ -2586,6 +2710,15 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	fh_ptr->opened_block = bindex;
 
 	return 0;
+error_handling:
+	fh_ptr->meta_cache_locked = FALSE;
+	meta_cache_close_file(tmpptr);
+	meta_cache_unlock_entry(tmpptr);
+	if (fh_ptr->blockfptr != NULL) {
+		fclose(fh_ptr->blockfptr);
+		fh_ptr->blockfptr = NULL;
+	}
+	return ret;
 }
 
 /* Function for reading from a single block for read operation. Will fetch
@@ -3022,6 +3155,7 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	char thisblockpath[400];
 	struct stat tempstat2;
 	int ret, errcode;
+	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
 	if (ret < 0)
@@ -3083,9 +3217,11 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[bindex].obj_id);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				tpage->block_entries[bindex].obj_id);
 #else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				this_inode, bindex);
 #endif
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
@@ -3140,8 +3276,15 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				}
 				return ret;
 			}
-
+			tmpptr = fh_ptr->meta_cache_ptr;
 			change_system_meta(0, tempstat2.st_size, 1);
+			ret = meta_cache_open_file(tmpptr);
+			if (ret < 0)
+				goto error_handling;
+			ret = update_file_stats(tmpptr->fptr, 0,
+					1, tempstat2.st_size);
+			if (ret < 0)
+				goto error_handling;
 		}
 	} else {
 		if (stat(thisblockpath, &tempstat2) == 0) {
@@ -3172,6 +3315,12 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	fclose(fh_ptr->blockfptr);
 
 	return 0;
+error_handling:
+	if (fh_ptr->blockfptr != NULL) {
+		fclose(fh_ptr->blockfptr);
+		fh_ptr->blockfptr = NULL;
+	}
+	return ret;
 }
 
 /* Function for writing to a single block for write operation. Will fetch
@@ -3188,6 +3337,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	long long entry_index;
 	int ret, errnum, errcode;
 	long long tmpcachesize, tmpdiff;
+	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
@@ -3316,7 +3466,21 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				return 0;
 			}
 
+			tmpptr = fh_ptr->meta_cache_ptr;
 			change_system_meta(0, 0, 1);
+			ret = meta_cache_open_file(tmpptr);
+			if (ret < 0) {
+				sem_post(&(fh_ptr->block_sem));
+				*reterr = ret;
+				return 0;
+			}
+			ret = update_file_stats(tmpptr->fptr, 1,
+					1, 0);
+			if (ret < 0) {
+				sem_post(&(fh_ptr->block_sem));
+				*reterr = ret;
+				return 0;
+			}
 			break;
 		case ST_LDISK:
 			break;
@@ -3391,8 +3555,24 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size)
+	if (old_cache_size != new_cache_size){
 		change_system_meta(0, new_cache_size - old_cache_size, 0);
+
+		tmpptr = fh_ptr->meta_cache_ptr;
+		ret = meta_cache_open_file(tmpptr);
+		if (ret < 0) {
+			sem_post(&(fh_ptr->block_sem));
+			*reterr = ret;
+			return 0;
+		}
+		ret = update_file_stats(tmpptr->fptr, 0,
+					0, new_cache_size - old_cache_size);
+		if (ret < 0) {
+			sem_post(&(fh_ptr->block_sem));
+			*reterr = ret;
+			return 0;
+		}
+	}
 
 	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
 	sem_post(&(fh_ptr->block_sem));
@@ -3430,6 +3610,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	int ret, errcode;
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
+	FILE_META_TYPE thisfilemeta;
+	long long sizediff, amount_preallocated;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -3480,6 +3662,31 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 	fh_ptr->meta_cache_locked = TRUE;
 
+	/* If the file is pinned, need to change the pinned_size
+	first if necessary */
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
+			&thisfilemeta, NULL, 0, fh_ptr->meta_cache_ptr);
+	if (ret < 0) {
+		fh_ptr->meta_cache_locked = FALSE;
+		meta_cache_close_file(fh_ptr->meta_cache_ptr);
+		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+		fuse_reply_err(req, -ret);
+		return;
+	}
+
+	amount_preallocated = 0;
+	if ((thisfilemeta.local_pin == TRUE) &&
+	    ((offset + size) > temp_stat.st_size)) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size +=
+			(long long) ((offset + size) - temp_stat.st_size);
+		amount_preallocated =
+			(long long) ((offset + size) - temp_stat.st_size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	for (block_index = start_block; block_index <= end_block;
 							block_index++) {
 		current_offset = (offset+total_bytes_written) % MAX_BLOCK_SIZE;
@@ -3499,8 +3706,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 				meta_cache_close_file(fh_ptr->meta_cache_ptr);
 				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			}
-			fuse_reply_err(req, -errcode);
-			return;
+			goto errcode_handle;
 		}
 
 		total_bytes_written += this_bytes_written;
@@ -3512,14 +3718,32 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	/*Update and flush file meta*/
 
-	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL,
-					NULL, 0, fh_ptr->meta_cache_ptr);
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
+			&thisfilemeta, NULL, 0, fh_ptr->meta_cache_ptr);
 	if (ret < 0) {
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-		fuse_reply_err(req, -ret);
-		return;
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	if ((thisfilemeta.local_pin == TRUE) &&
+	    ((temp_stat.st_size < (offset + size)) &&
+	     (size > total_bytes_written))) {
+		/* If size written not equal to as planned, need
+		to change pinned_size */
+		/* If offset + total_bytes_written < st_size, substract
+		the difference between size and st_size */
+		if (offset + total_bytes_written < temp_stat.st_size)
+			sizediff = (offset + size) - temp_stat.st_size;
+		else
+			sizediff = size - total_bytes_written;
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -= sizediff;
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
 	}
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
@@ -3557,6 +3781,19 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 	fuse_reply_write(req, total_bytes_written);
+	return;
+errcode_handle:
+	/* If op failed and size won't be extended, revert the preallocated
+	pinned space */
+	if (amount_preallocated > 0) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -= amount_preallocated;
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+	fuse_reply_err(req, -errcode);
+	return;
 }
 
 /************************************************************************
@@ -3732,7 +3969,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 
 	thisinode = real_ino(req, ino);
 
-	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL);
+	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -4252,7 +4489,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 
 	thisinode = real_ino(req, ino);
 
-	ret_val = fetch_inode_stat(thisinode, &thisstat, NULL);
+	ret_val = fetch_inode_stat(thisinode, &thisstat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -4357,6 +4594,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int result_index;
 	int errcode;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -4391,7 +4629,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -4446,7 +4685,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	this_stat.st_gid = temp_context->gid;
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			local_pin);
 	if (self_inode < 1) {
 		errcode = -ENOSPC;
 		goto error_handle;
@@ -5050,7 +5290,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -5164,6 +5404,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	unsigned long this_generation;
 	long long fh;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	parent_inode = real_ino(req, parent);
 
@@ -5183,7 +5424,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Check parent type */
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -5235,7 +5477,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
-	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			local_pin);
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
@@ -5371,6 +5614,8 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
+	init_download_control();
+	init_pin_scheduler();
 	/* TODO: Ensure that the above is finished before any operation
 		can start */
 	while (hcfs_system->system_going_down == FALSE)
@@ -5378,6 +5623,8 @@ int hook_fuse(int argc, char **argv)
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();
+	destroy_download_control();
+	destroy_pin_scheduler();
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));

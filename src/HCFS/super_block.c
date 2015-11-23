@@ -32,6 +32,8 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -85,6 +87,14 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	ssize_t ret_val;
 	int errcode;
 
+	if (this_inode <= 0) {
+		errcode = EINVAL;
+		write_log(0,
+			"Error in %s, inode number is %"PRIu64". Code %d,"
+			" %s\n", __func__, (uint64_t)this_inode, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 	ret_val = pread(sys_super_block->iofptr, inode_ptr, SB_ENTRY_SIZE,
 			SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (ret_val < 0) {
@@ -509,6 +519,9 @@ int super_block_to_delete(ino_t this_inode)
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 	if (ret_val >= 0) {
+		if (tempentry.pin_status == ST_PINNING) {
+			pin_ll_dequeue(this_inode, &tempentry);
+		}
 		if (tempentry.status != TO_BE_DELETED) {
 			ret_val = ll_dequeue(this_inode, &tempentry);
 			if (ret_val < 0) {
@@ -526,6 +539,7 @@ int super_block_to_delete(ino_t this_inode)
 		tempmode = tempentry.inode_stat.st_mode;
 		memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
 		tempentry.inode_stat.st_mode = tempmode;
+		tempentry.pin_status = ST_DEL;
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 
 		if (ret_val >= 0) {
@@ -908,7 +922,7 @@ int super_block_reclaim_fullscan(void)
 *
 *************************************************************************/
 ino_t super_block_new_inode(struct stat *in_stat,
-				unsigned long *ret_generation)
+				unsigned long *ret_generation, char local_pin)
 {
 	ssize_t retsize;
 	ino_t this_inode;
@@ -962,6 +976,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 
 	/*Update the new super inode entry*/
 	memset(&tempentry, 0, SB_ENTRY_SIZE);
+	tempentry.pin_status = (local_pin == TRUE ? ST_PIN : ST_UNPIN);
 	tempentry.this_index = this_inode;
 	tempentry.generation = this_generation;
 	if (ret_generation != NULL)
@@ -1296,3 +1311,269 @@ int super_block_exclusive_release(void)
 	sem_post(&(sys_super_block->exclusive_lock_sem));
 	return 0;
 }
+
+/**
+ * Mark pin_status from ST_PINNING to ST_PIN
+ *
+ * This function is used when a file in super block pinning queue
+ * finishes fetching all block from cloud to local. If the pin_status
+ * is still ST_PINNING, it is dequeued from pinning queue and pin_status
+ * will be changed to ST_PIN. In case that pin_status is ST_UNPIN,
+ * ST_PIN, ST_DEL, ignore them and do nothing.
+ *
+ * @param this_inode Inode number to be mark as ST_PIN
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int super_block_finish_pinning(ino_t this_inode)
+{
+	SUPER_BLOCK_ENTRY this_entry;
+	int ret;
+
+	super_block_exclusive_locking();
+
+	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;
+	}
+	switch (this_entry.pin_status) {
+	case ST_PINNING:
+		ret = pin_ll_dequeue(this_inode, &this_entry);
+		if (ret < 0)
+			break;
+		this_entry.pin_status = ST_PIN;
+		ret = write_super_block_entry(this_inode, &this_entry);
+		break;
+	case ST_UNPIN: /* It may be unpinned by others when pinnning */
+	case ST_PIN: /* What happened? */
+		write_log(5, "inode %"PRIu64 "is ST_PIN in %s",
+				(uint64_t)this_inode, __func__);
+	case ST_DEL: /* It may be deleted by others */
+		break;
+	}
+
+	super_block_exclusive_release();
+
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+/**
+ * Let status of an inode be ST_PIN or ST_PINNING
+ *
+ * If the inode number with status ST_UNPIN, then it will be push into
+ * pinning queue and set pin_status as ST_PINNING when it is a regfile.
+ * Otherwise pin_status will be directly set to ST_PIN.
+ *
+ * @param this_inode Inode number to be handled
+ * @param this_mode Mode of "this_inode"
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
+{
+	SUPER_BLOCK_ENTRY this_entry;
+	int ret;
+
+	super_block_exclusive_locking();
+	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;
+	}
+
+	switch (this_entry.pin_status) {
+	case ST_UNPIN:
+		if (S_ISREG(this_mode)) {
+			/* Enqueue and set as ST_PINNING */
+			ret = pin_ll_enqueue(this_inode, &this_entry);
+			this_entry.pin_status = ST_PINNING;
+		} else {
+			this_entry.pin_status = ST_PIN;
+		}
+		ret = write_super_block_entry(this_inode, &this_entry);
+		break;
+	case ST_DEL: /* It may be deleted by others */
+	case ST_PINNING: /* It may be pinned by others */
+	case ST_PIN: /* It may be pinned by others */
+		break;
+	}
+	super_block_exclusive_release();
+
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+/**
+ * Let status of an inode be ST_UNPIN
+ *
+ * If pin_status is ST_PINNING, it means the inode is in pinning queue, so
+ * dequeue from the pinning queue and set status to ST_UNPIN. On the other
+ * hand, ST_PIN means all blocks of the file are local, so just change the
+ * status to ST_UNPIN directly.
+ *
+ * @param this_inode Inode number to be handled
+ * @param this_mode Mode of "this_inode"
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
+{
+	SUPER_BLOCK_ENTRY this_entry;
+	int ret;
+
+	super_block_exclusive_locking();
+	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;
+	}
+
+	switch (this_entry.pin_status) {
+	case ST_PINNING: /* regfile in pinning queue */
+		/* Enqueue and set as ST_UNPIN */
+		ret = pin_ll_dequeue(this_inode, &this_entry);
+		this_entry.pin_status = ST_UNPIN;
+		ret = write_super_block_entry(this_inode, &this_entry);
+		if (!S_ISREG(this_mode)) {
+			write_log(2, "Error: why non-regfile has pin status"
+				" ST_PINNING? In %s\n", __func__);
+		}
+		break;
+	case ST_PIN: /* Case dir, symlnk, or regfile with all local blocks */
+		this_entry.pin_status = ST_UNPIN;
+		ret = write_super_block_entry(this_inode, &this_entry);
+		break;
+	case ST_DEL: /* To be deleted */
+	case ST_UNPIN: /* It had been unpinned */
+		break;
+	}
+	super_block_exclusive_release();
+
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
+{
+	SUPER_BLOCK_ENTRY last_entry;
+	int ret;
+
+	/* Return pin-status if this status is not UNPIN */
+	if (this_entry->pin_status != ST_UNPIN) {
+		return this_entry->pin_status;
+	}
+
+	if (sys_super_block->head.last_pin_inode == 0) {
+		this_entry->pin_ll_next = 0;
+		this_entry->pin_ll_prev = 0;
+		this_entry->pin_status = ST_PINNING; /* Pinning */
+		ret = write_super_block_entry(this_inode, this_entry);
+		if (ret < 0)
+			goto error_handling;
+
+		sys_super_block->head.first_pin_inode = this_inode;
+		sys_super_block->head.last_pin_inode = this_inode;
+
+	} else {
+		this_entry->pin_ll_next = 0;
+		this_entry->pin_ll_prev = sys_super_block->head.last_pin_inode;
+		this_entry->pin_status = ST_PINNING; /* Pinning */
+		ret = write_super_block_entry(this_inode, this_entry);
+		if (ret < 0)
+			goto error_handling;
+
+		ret = read_super_block_entry(
+			sys_super_block->head.last_pin_inode, &last_entry);
+		last_entry.pin_ll_next = this_inode;
+		ret = write_super_block_entry(
+			sys_super_block->head.last_pin_inode, &last_entry);
+		if (ret < 0)
+			goto error_handling;
+
+		sys_super_block->head.last_pin_inode = this_inode;
+	}
+
+	sys_super_block->head.num_pinning_inodes++;
+	ret = write_super_block_head();
+	if (ret < 0)
+		goto error_handling;
+
+	return 0;
+
+error_handling:
+	return ret;
+}
+
+int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
+{
+	SUPER_BLOCK_ENTRY prev_entry, next_entry;
+	ino_t prev_inode, next_inode;
+	int ret;
+
+	/* Return pin-status if this status is not PINNING */
+	if (this_entry->pin_status != ST_PINNING) {
+		return this_entry->pin_status;
+	}
+
+	prev_inode = this_entry->pin_ll_prev;
+	next_inode = this_entry->pin_ll_next;
+	if ((next_inode == 0) && (prev_inode == 0) &&
+		(sys_super_block->head.first_pin_inode != this_inode)) {
+		write_log(0, "Error: Inode %"PRIu64" is not in pinning "
+			"queue but be requested to dequeue. In %s\n",
+			(uint64_t)this_inode, __func__);
+		return -EIO;
+	}
+
+	/* Handle prev pointer */
+	if (prev_inode != 0) {
+		ret = read_super_block_entry(prev_inode, &prev_entry);
+		if (ret < 0)
+			goto error_handling;
+		prev_entry.pin_ll_next = next_inode;
+		ret = write_super_block_entry(prev_inode, &prev_entry);
+		if (ret < 0)
+			goto error_handling;
+	} else {
+		sys_super_block->head.first_pin_inode = next_inode;
+	}
+
+	/* Handle next pointer */
+	if (next_inode != 0) {
+		ret = read_super_block_entry(next_inode, &next_entry);
+		if (ret < 0)
+			goto error_handling;
+		next_entry.pin_ll_prev = prev_inode;
+		ret = write_super_block_entry(next_inode, &next_entry);
+		if (ret < 0)
+			goto error_handling;
+	} else {
+		sys_super_block->head.last_pin_inode = prev_inode;
+	}
+
+	/* Handle itself */
+	this_entry->pin_ll_next = 0;
+	this_entry->pin_ll_prev = 0;
+	ret = write_super_block_entry(this_inode, this_entry);
+	if (ret < 0)
+		goto error_handling;
+
+	sys_super_block->head.num_pinning_inodes--;
+	ret = write_super_block_head();
+	if (ret < 0)
+		goto error_handling;
+
+	return 0;
+
+error_handling:
+	return ret;
+}
+

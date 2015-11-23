@@ -10,6 +10,8 @@ extern "C"{
 #include "hcfs_fromcloud.h"
 #include "fuseop.h"
 #include "mock_params.h"
+#include "meta_mem_cache.h"
+#include "utils.h"
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
@@ -19,6 +21,9 @@ class fromcloudEnvironment : public ::testing::Environment {
   char *workpath, *tmppath;
 
   virtual void SetUp() {
+    OPEN_BLOCK_PATH_FAIL = FALSE;
+    OPEN_META_PATH_FAIL = FALSE;
+    FETCH_BACKEND_BLOCK_TESTING = FALSE;
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
 
@@ -88,9 +93,9 @@ protected:
 
 		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int *)block_no);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, 1, *(int *)block_no);
+		ret = fetch_from_cloud(fptr, READ_BLOCK, 1, *(int *)block_no);
 		fclose(fptr);
-		unlink(tmp_filename);	
+		unlink(tmp_filename);
 		return NULL;
 	}
 	std::string expected_objname[100]; // Expected answer list
@@ -118,11 +123,11 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 	for (int i = 0 ; i < num_obj ; i++) {
 		char tmp_filename[20];
 		block_no[i] = (i + 1)*5;
-		EXPECT_EQ(0, pthread_create(&tid[i], NULL, 
+		EXPECT_EQ(0, pthread_create(&tid[i], NULL,
 			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
-		
+
 		sprintf(tmp_filename, "data_%d_%d", 1, block_no[i]); // Expected value
-		expected_objname[expected_obj_counter++] = std::string(tmp_filename); 
+		expected_objname[expected_obj_counter++] = std::string(tmp_filename);
 	}
 	sleep(1);
 
@@ -182,11 +187,11 @@ TEST_F(prefetch_blockTest, BlockStatus_is_neither_STCLOUD_STCtoL)
 
 	/* Run */
 	prefetch_block(prefetch_ptr);
-	
+
 	/* Check answer */
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_blocks);
-	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK));	
+	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK));
 	unlink("/tmp/testHCFS/tmp_meta");
 	unlink("/tmp/testHCFS/tmp_block");
 }
@@ -200,7 +205,7 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	int meta_fpos;
 	char xattr_result;
 	int ret, errcode;
-	
+
 	entry_index = prefetch_ptr->entry_index;
 	meta_fpos = prefetch_ptr->page_start_fpos;
 	mock_page.num_entries = 1;
@@ -228,22 +233,345 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	}
 	EXPECT_EQ(1, ret);
 	EXPECT_EQ('F', xattr_result); // xattr
-	metafptr = fopen("/tmp/testHCFS/tmp_meta", "r");	
+	metafptr = fopen("/tmp/testHCFS/tmp_meta", "r");
 	fseek(metafptr, meta_fpos, SEEK_SET);
 	fread(&result_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
 	EXPECT_EQ(ST_BOTH, result_page.block_entries[entry_index].status); // status
-		
+
 	unlink("/tmp/testHCFS/tmp_meta");
 	unlink("/tmp/testHCFS/tmp_block");
 }
 
 TEST_F(prefetch_blockTest, PrefetchFail)
 {
-	/* Does prefetch_block fail? It seems that fetch_from_cloud() never return with failure  */	
+	/* Does prefetch_block fail? It seems that fetch_from_cloud() never return with failure  */
 }
 
 /*
 	End of unittest of prefetch_block()
 */
 
+/* Unittest for download_block_manager */
+class download_block_managerTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
+		sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
+		sem_init(&(download_thread_ctl.dl_th_sem), 0,
+				MAX_DL_CONCURRENCY);
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+void mock_thread_fn()
+{
+	return NULL;
+}
+
+TEST_F(download_block_managerTest, CollectThreadsSuccess)
+{
+	hcfs_system->system_going_down = FALSE;
+
+	/* Create download_block_manager */
+	pthread_create(&(download_thread_ctl.manager_thread), NULL,
+			(void *)&download_block_manager, NULL);
+
+	for (int i = 0; i < MAX_DL_CONCURRENCY / 2; i++) {
+		download_thread_ctl.block_info[i].dl_error = FALSE;
+		download_thread_ctl.block_info[i].active = TRUE;
+		sem_wait(&(download_thread_ctl.ctl_op_sem));
+		pthread_create(&(download_thread_ctl.download_thread[i]),
+				NULL, mock_thread_fn, NULL);
+		download_thread_ctl.active_th++;
+		sem_post(&(download_thread_ctl.ctl_op_sem));
+	}
+
+	hcfs_system->system_going_down = TRUE;
+	sleep(1);
+
+	pthread_join(download_thread_ctl.manager_thread, NULL);
+
+	/* Verify */
+	EXPECT_EQ(0, download_thread_ctl.active_th);
+	for (int i = 0; i < MAX_DL_CONCURRENCY; i++) {
+		ASSERT_EQ(FALSE,
+			download_thread_ctl.block_info[i].active);
+	}
+}
+
+TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
+{
+	hcfs_system->system_going_down = FALSE;
+
+	/* Create download_block_manager */
+	pthread_create(&(download_thread_ctl.manager_thread), NULL,
+			(void *)&download_block_manager, NULL);
+
+	for (int i = 0; i < MAX_DL_CONCURRENCY; i++) {
+		download_thread_ctl.block_info[i].active = TRUE;
+		download_thread_ctl.block_info[i].dl_error = TRUE;
+		download_thread_ctl.block_info[i].this_inode = i;
+		sem_wait(&(download_thread_ctl.ctl_op_sem));
+		pthread_create(&(download_thread_ctl.download_thread[i]),
+				NULL, mock_thread_fn, NULL);
+		download_thread_ctl.active_th++;
+		sem_post(&(download_thread_ctl.ctl_op_sem));
+	}
+
+	hcfs_system->system_going_down = TRUE;
+	sleep(1);
+
+	pthread_join(download_thread_ctl.manager_thread, NULL);
+
+	/* Verify */
+	EXPECT_EQ(0, download_thread_ctl.active_th);
+	for (int i = 0; i < MAX_DL_CONCURRENCY; i++) {
+		char error_path[200];
+
+		fetch_error_download_path(error_path, (ino_t)i);
+		EXPECT_EQ(FALSE,
+			download_thread_ctl.block_info[i].active);
+		EXPECT_EQ(0, access(error_path, F_OK));
+		unlink(error_path);
+	}
+}
+
+/* End of unittest for download_block_manager */
+
+/* Unittest for fetch_pinned_blocks */
+class fetch_pinned_blocksTest : public ::testing::Test {
+protected:
+	char metapath[200];
+
+	void SetUp()
+	{
+		MAX_BLOCK_SIZE = 100;
+		CACHE_FULL = FALSE;
+
+		fetch_meta_path(metapath, 0);
+		if (access(metapath, F_OK) == 0)
+			unlink(metapath);
+		
+		hcfs_system->system_going_down = FALSE;
+		init_download_control();
+	}
+
+	void TearDown()
+	{
+		CACHE_FULL = FALSE;
+		
+		fetch_meta_path(metapath, 0);
+		if (access(metapath, F_OK) == 0)
+			unlink(metapath);
+	
+		hcfs_system->system_going_down = TRUE;
+		destroy_download_control();
+	}
+};
+
+TEST_F(fetch_pinned_blocksTest, MetaNotExist)
+{
+	ino_t inode;
+
+	inode = 5;
+
+	/* Test */
+	EXPECT_EQ(-ENOENT, fetch_pinned_blocks(inode));
+}
+
+TEST_F(fetch_pinned_blocksTest, NotRegfile_DirectlyReturn)
+{
+	ino_t inode;
+	FILE *fptr;
+	struct stat tmpstat;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	memset(&tmpstat, 0 , sizeof(struct stat));
+	tmpstat.st_mode = S_IFDIR;
+	fptr = fopen(metapath, "w+");
+	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fclose(fptr);
+
+	/* Test */
+	EXPECT_EQ(0, fetch_pinned_blocks(inode));
+
+	/* Recover */
+	unlink(metapath);
+}
+
+TEST_F(fetch_pinned_blocksTest, SystemGoingDown)
+{
+	ino_t inode;
+	FILE *fptr;
+	struct stat tmpstat;
+	FILE_META_TYPE filemeta;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	memset(&tmpstat, 0 , sizeof(struct stat));
+	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
+	tmpstat.st_mode = S_IFREG;
+	tmpstat.st_size = 5;
+	fptr = fopen(metapath, "w+");
+	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	fclose(fptr);
+
+	hcfs_system->system_going_down = TRUE;
+
+	/* Test */
+	EXPECT_EQ(-ESHUTDOWN, fetch_pinned_blocks(inode));
+
+	/* Recover */
+	unlink(metapath);
+}
+
+TEST_F(fetch_pinned_blocksTest, InodeBeUnpinned)
+{
+	ino_t inode;
+	FILE *fptr;
+	struct stat tmpstat;
+	FILE_META_TYPE filemeta;
+	BLOCK_ENTRY_PAGE tmppage;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	memset(&tmpstat, 0 , sizeof(struct stat));
+	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
+	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+	tmpstat.st_mode = S_IFREG;
+	tmpstat.st_size = 5;
+	tmppage.block_entries[0].status = ST_LDISK;
+	filemeta.local_pin = FALSE;
+
+	fptr = fopen(metapath, "w+");
+	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	fwrite(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	fclose(fptr);
+
+	/* Test */
+	EXPECT_EQ(-EPERM, fetch_pinned_blocks(inode));
+
+	/* Recover */
+	unlink(metapath);
+}
+
+TEST_F(fetch_pinned_blocksTest, BlockStatusIsLocal)
+{
+	ino_t inode;
+	FILE *fptr;
+	struct stat tmpstat;
+	FILE_META_TYPE filemeta;
+	BLOCK_ENTRY_PAGE tmppage;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	memset(&tmpstat, 0 , sizeof(struct stat));
+	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
+	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+	tmpstat.st_mode = S_IFREG;
+	tmpstat.st_size = 5;
+	tmppage.block_entries[0].status = ST_LDISK;
+	filemeta.local_pin = TRUE;
+
+	fptr = fopen(metapath, "w+");
+	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	fwrite(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	fclose(fptr);
+
+	/* Test */
+	EXPECT_EQ(0, fetch_pinned_blocks(inode));
+
+	/* Recover */
+	unlink(metapath);
+}
+
+/* End of unittest for fetch_pinned_blocks */
+
+/* Unittest for fetch_backend_block */
+class fetch_backend_blockTest : public ::testing::Test {
+protected:
+	char metapath[300];
+	void SetUp()
+	{
+		OPEN_BLOCK_PATH_FAIL = FALSE;
+		OPEN_META_PATH_FAIL = FALSE;
+    		FETCH_BACKEND_BLOCK_TESTING = TRUE;
+
+		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
+		download_thread_ctl.block_info[0].this_inode = 1;
+		download_thread_ctl.block_info[0].block_no = 0;
+		download_thread_ctl.block_info[0].dl_error = FALSE;
+
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1); 
+		sem_init(&pin_download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE / 2);
+	}
+
+	void TearDown()
+	{
+		if (access(metapath, F_OK) == 0)
+			unlink(metapath);
+	}
+};
+
+TEST_F(fetch_backend_blockTest, FailToOpenBlockPath)
+{
+	pthread_t tid;
+
+	OPEN_BLOCK_PATH_FAIL = TRUE;
+
+	/* Test */
+	pthread_create(&tid, NULL, fetch_backend_block,
+		&(download_thread_ctl.block_info[0]));
+	pthread_join(tid, NULL);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, download_thread_ctl.block_info[0].dl_error);
+}
+
+TEST_F(fetch_backend_blockTest, BlockStatusIsLDISK)
+{
+	pthread_t tid;
+
+	NOW_STATUS = ST_CLOUD;
+	OPEN_META_PATH_FAIL = TRUE;
+
+	/* Test */
+	pthread_create(&tid, NULL, fetch_backend_block,
+		&(download_thread_ctl.block_info[0]));
+	pthread_join(tid, NULL);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, download_thread_ctl.block_info[0].dl_error);
+}
+
+TEST_F(fetch_backend_blockTest, FetchSuccess)
+{
+	pthread_t tid;
+
+	NOW_STATUS = ST_CLOUD;
+	fetch_meta_path(metapath, 0);
+	mknod(metapath, 0700, 0);
+
+	/* Test */
+	pthread_create(&tid, NULL, fetch_backend_block,
+		&(download_thread_ctl.block_info[0]));
+	pthread_join(tid, NULL);
+
+	/* Verify */
+	EXPECT_EQ(FALSE, download_thread_ctl.block_info[0].dl_error);
+
+	unlink(metapath);
+}
+
+/* End of unittest for fetch_backend_block */
