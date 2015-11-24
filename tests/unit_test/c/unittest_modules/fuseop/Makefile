@@ -58,7 +58,9 @@ all : setup $(TESTS)
 
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
-	-sudo umount /tmp/test_fuse
+# Normally, temp fuse FS for testing will be unmounted at the end of the test,
+# so an additional umount is not needed. If the unittests crashes, please keep
+# the mounted mountpoint for debug purpose and umount it after it is done.
 
 test : setup $(TESTS)
 	./fuseop_unittest

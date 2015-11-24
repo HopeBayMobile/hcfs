@@ -111,6 +111,7 @@ class fuseopEnvironment : public ::testing::Environment {
     memset(system_fh_table.entry_table_flags, 0, sizeof(char) * 100);
     system_fh_table.entry_table = (FH_ENTRY *) malloc(sizeof(FH_ENTRY) * 100);
     memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) * 100);
+    sem_init(&(pathlookup_data_lock), 0, 1);
 
     _mount_test_fuse(&unittest_mount);
   }

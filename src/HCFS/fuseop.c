@@ -1502,6 +1502,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		}
 	}
 
+	write_log(10, "Debug: Start updating dir entries\n");
+
 	/* If newpath exists, replace the entry and rmdir/unlink
 		the old target */
 	if (old_target_inode > 0) {
@@ -1631,6 +1633,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+	write_log(10, "Debug: Finished updating dir entries\n");
 
 	if ((S_ISDIR(self_mode)) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,

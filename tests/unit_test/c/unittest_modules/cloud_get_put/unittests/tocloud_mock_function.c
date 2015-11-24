@@ -187,3 +187,21 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
+
+off_t check_file_size(const char *path)
+{
+	struct stat block_stat;
+	int errcode;
+
+	errcode = stat(path, &block_stat);
+	if (errcode == 0)
+		return block_stat.st_size;
+	errcode = errno;
+	write_log(0, "Error when checking file size. Code %d, %s\n",
+			errcode, strerror(errcode));
+	return -errcode;
+}
+int sync_hcfs_system_data(char need_lock)
+{
+	return 0;
+}

@@ -153,4 +153,13 @@ void destroy_pathlookup(void)
 {
 	return;
 }
-
+int init_dirstat_lookup()
+{
+	return 0;
+}
+void destroy_dirstat_lookup()
+{
+}
+void init_sync_stat_control(void)
+{
+}

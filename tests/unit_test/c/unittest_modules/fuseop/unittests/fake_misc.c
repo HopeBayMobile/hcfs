@@ -15,6 +15,7 @@
 #include "xattr_ops.h"
 #include "global.h"
 #include "mount_manager.h"
+#include "dir_statistics.h"
 
 #include "fake_misc.h"
 
@@ -843,6 +844,32 @@ int init_download_control()
 	return 0;
 }
 int destroy_download_control()
+{
+	return 0;
+}
+
+int reset_dirstat_lookup(ino_t thisinode)
+{
+	return 0;
+}
+int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
+			  ino_t parent_inode2)
+{
+	return 0;
+}
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 {
 	return 0;
 }
