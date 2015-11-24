@@ -83,9 +83,8 @@ functional_test )
 	fi
 	;;
 docker_host )
-	if ! hash docker || [[ $(sudo docker version | grep -E -c "Version:.*1\.9\.0") -ne 2 ]]; then
-		echo `sudo docker version`
-		echo "Install/upgrade Docker"
+	if ! hash docker; then
+		echo "Install Docker"
 		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 		curl https://get.docker.com | sudo sh
 	fi
