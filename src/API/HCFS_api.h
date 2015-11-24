@@ -168,5 +168,11 @@ void HCFS_dir_status(char **json_res, char *pathname);
  */
 void HCFS_file_status(char **json_res, char *pathname);
 
+/*Reset xfer
+ * @json_res result string in json format.
+ *
+ * To reset the value of upload/download statistic.
+ */
+void HCFS_reset_xfer(char **json_res);
 
 #endif  /* GW20_HCFS_API_H_ */

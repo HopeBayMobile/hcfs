@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "hcfs_stat.h"
+
 #include "global.h"
 #include "utils.h"
 
@@ -102,12 +104,10 @@ int get_xfer_usage(long long *xfer_up, long long *xfer_down)
 		return fd;
 
 	code = GETXFERSTAT;
-	cmd_len = 1;
-	buf[0] = 0;
+	cmd_len = 0;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	if (reply_len > sizeof(int)) {

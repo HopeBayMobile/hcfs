@@ -16,6 +16,7 @@
 #include "global.h"
 #include "pin_ops.h"
 #include "hcfs_stat.h"
+#include "hcfs_sys.h"
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 
@@ -117,7 +118,7 @@ int process_request(int thread_idx)
 		break;
 
 	case CHECKDIRSTAT:
-		printf("Check dir stat");
+		printf("Check dir stat\n");
 		ret_len = 0;
 		ret_code = check_dir_status(largebuf, arg_len,
 					       &num_local, &num_cloud,
@@ -194,6 +195,13 @@ int process_request(int thread_idx)
 
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, res_buf, ret_len, 0);
+
+	case RESETXFERSTAT:
+		printf("Reset xfer\n");
+		ret_len = 0;
+		ret_code = reset_xfer_usage();
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
 	}
 
 	printf("Get API code - %d from fd - %d\n", api_code, fd);

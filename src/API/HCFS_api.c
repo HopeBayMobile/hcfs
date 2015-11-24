@@ -161,11 +161,13 @@ void HCFS_get_config(char **json_res, char *key)
 	ret_code = -1;
 	while (fgets(buf, sizeof(buf), conf) != NULL) {
 		tmp_ptr = line = strdup(buf);
-		token = strsep(&line, " = ");
+		token = strsep(&line, " =");
 		if (strcmp(upper_key, token) == 0) {
-			token = strsep(&line, " = ");
+			token = strsep(&line, " =");
+			token = strsep(&line, " ");
+			token = strsep(&line, "\n");
 			data = json_object();
-			json_object_set_new(data, key, json_string(line));
+			json_object_set_new(data, key, json_string(token));
 			_json_response(json_res, TRUE, 0, data);
 			free(tmp_ptr);
 			ret_code = 0;
@@ -489,6 +491,33 @@ void HCFS_file_status(char **json_res, char *pathname)
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 	size_msg = send(fd, pathname, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+void HCFS_reset_xfer(char **json_res)
+{
+
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = RESETXFERSTAT;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);

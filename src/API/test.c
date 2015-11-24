@@ -64,9 +64,14 @@ int main()
 	free(res8);
 
 	char *res9;
-	HCFS_get_config(&res9, "swift_url");
+	HCFS_get_config(&res9, "swift_account");
 	printf("res9 - %s\n", res9);
 	free(res9);
+
+	char *res10;
+	HCFS_reset_xfer(&res10);
+	printf("res10 - %s\n", res10);
+	free(res10);
 }
 
 
