@@ -23,6 +23,7 @@
 * 2015/6/29 Kewei finished xattr operations.
 * 2015/7/7 Kewei began to add ops about symbolic link
 * 2015/11/5 Jiahong adding changes for per-file statistics
+* 2015/11/24 Jethro adding
 *
 **************************************************************************/
 
@@ -441,6 +442,7 @@ Android external storage */
 uid_t lookup_pkg(char *pkgname)
 {
 /* TODO: This is now a fake. Need to link to real function */
+	UNUSED(pkgname);
 	return 1010;
 }
 
@@ -579,10 +581,13 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	struct stat tmp_stat;
 	MOUNT_T *tmpptr;
 
+	UNUSED(fi);
+
 	write_log(10, "Debug getattr inode %ld\n", ino);
 	hit_inode = real_ino(req, ino);
 
-	write_log(10, "Debug getattr hit inode %" PRIu64 "\n", (uint64_t)hit_inode);
+	write_log(10, "Debug getattr hit inode %" PRIu64 "\n",
+		  (uint64_t)hit_inode);
 
 	if (hit_inode > 0) {
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -718,8 +723,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_dev = dev;
 	this_stat.st_nlink = 1;
 
-        self_mode = mode | S_IFREG;
-        this_stat.st_mode = self_mode;
+	self_mode = mode | S_IFREG;
+	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 
@@ -860,8 +865,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_nlink = 2; /*One pointed by the parent, another by self*/
 
-        self_mode = mode | S_IFDIR;
-        this_stat.st_mode = self_mode;
+	self_mode = mode | S_IFDIR;
+	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
@@ -1153,8 +1158,8 @@ a directory (for NFS) */
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
 
-	write_log(10,
-		"Debug lookup %" PRIu64 ", %s, %d\n", (uint64_t)parent_inode, selfname, ret_val);
+	write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+		  (uint64_t)parent_inode, selfname, ret_val);
 
 	if (ret_val < 0) {
 		ret_val = -ret_val;
@@ -1592,7 +1597,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				return;
 			}
 		}
-
 	}
 #endif
 	_cleanup_rename(body_ptr, old_target_ptr,
@@ -2051,7 +2055,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 /* If need to truncate some block that's ST_CtoL or ST_CLOUD, download it
 *  first, mod it, then set to ST_LDISK*/
 
-	FILE_META_TYPE tempfilemeta, truncfilemeta;
+	FILE_META_TYPE tempfilemeta;
 	int ret, errcode;
 	long long last_block, last_page, old_last_block;
 	long long current_page, old_last_page;
@@ -2059,7 +2063,9 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
 	long long temp_trunc_size, sizediff;
+#ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
+#endif
 	MOUNT_T *tmpptr;
 	size_t ret_size;
 	FILE *truncfptr;
@@ -2403,24 +2409,23 @@ errcode_handle:
 *       Summary: Open the regular file pointed by "ino", and put file
 *                handle info to the structure pointed by "file_info".
 *
-*************************************************************************/
-/**                File open operation
+*                File open operation
 *
 *                No creation (O_CREAT, O_EXCL) and by default also no
-* truncation (O_TRUNC) flags will be passed to open(). If an
-* application specifies O_TRUNC, fuse first calls truncate()
-* and then open(). Only if 'atomic_o_trunc' has been
-* specified and kernel version is 2.6.24 or later, O_TRUNC is
-* passed on to open.
+*                truncation (O_TRUNC) flags will be passed to open(). If
+*                an application specifies O_TRUNC, fuse first calls
+*                truncate() and then open(). Only if 'atomic_o_trunc' has
+*                been specified and kernel version is 2.6.24 or later,
+*                O_TRUNC is passed on to open.
 *
 *                Unless the 'default_permissions' mount option is given,
-* open should check if the operation is permitted for the
-* given flags. Optionally open may also return an arbitrary
-* filehandle in the fuse_file_info structure, which will be
-* passed to all file operations.
+*                open should check if the operation is permitted for the
+*                given flags. Optionally open may also return an
+*                arbitrary filehandle in the fuse_file_info structure,
+*                which will be passed to all file operations.
 *
 *                Changed in version 2.2
-*/
+*************************************************************************/
 void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
@@ -2962,18 +2967,17 @@ errcode_handle:
 *                "offset". Returned data is sent via fuse_reply_buf.
 *                File handle is provided by the structure in "file_info".
 *
-*************************************************************************/
-/**                Read data from an open file
+*                Read data from an open file
 *
-*                Read should return exactly the number of bytes requested except
-* on EOF or error, otherwise the rest of the data will be
-* substituted with zeroes.	 An exception to this is when the
-* 'direct_io' mount option is specified, in which case the return
-* value of the read system call will reflect the return value of
-* this operation.
+*                Read should return exactly the number of bytes requested
+*                except on EOF or error, otherwise the rest of the data
+*                will be substituted with zeroes.	 An exception to
+*                this is when the 'direct_io' mount option is specified,
+*                in which case the return value of the read system call
+*                will reflect the return value of this operation.
 *
 *                Changed in version 2.2
-*/
+*************************************************************************/
 void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	size_t size_org, off_t offset, struct fuse_file_info *file_info)
 {
@@ -3154,11 +3158,11 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 	int ret;
 
 	/* Adding cache check for new or deleted blocks */
-        while ((((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
-                ((temppage->block_entries[entry_index]).status == ST_CtoL)) ||
-                (((temppage->block_entries[entry_index]).status
-                                                        == ST_TODELETE) ||
-                ((temppage->block_entries[entry_index]).status == ST_NONE))) {
+	while (
+	    (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
+	     ((temppage->block_entries[entry_index]).status == ST_CtoL)) ||
+	    (((temppage->block_entries[entry_index]).status == ST_TODELETE) ||
+	     ((temppage->block_entries[entry_index]).status == ST_NONE))) {
 
 		write_log(10,
 			"Debug write checking if need to wait for cache\n");
@@ -3607,7 +3611,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size){
+	if (old_cache_size != new_cache_size) {
 		change_system_meta(0, new_cache_size - old_cache_size, 0);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
@@ -3647,15 +3651,15 @@ errcode_handle:
 *                "offset", from the buffer pointed by "buf". File handle
 *                is provided by the structure in "file_info".
 *
-*************************************************************************/
-/**                Write data to an open file
+*                Write data to an open file
 *
-*                Write should return exactly the number of bytes requested
-* except on error.	 An exception to this is when the 'direct_io'
-* mount option is specified (see read operation).
+*                Write should return exactly the number of bytes
+*                requested except on error.	 An exception to this is
+*                when the 'direct_io' mount option is specified (see read
+*                operation).
 *
 *                Changed in version 2.2
-*/
+*************************************************************************/
 void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		size_t size, off_t offset, struct fuse_file_info *file_info)
 {
@@ -3853,7 +3857,6 @@ errcode_handle:
 		sem_post(&(hcfs_system->access_sem));
 	}
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -3866,7 +3869,7 @@ errcode_handle:
 void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
-	ino_t thisinode;
+	/* ino_t thisinode; */
 	MOUNT_T *tmpptr;
 	long long system_size, num_inodes;
 
@@ -3875,7 +3878,7 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: Different statistics for different filesystems */
 	write_log(10, "Debug statfs\n");
 
-	thisinode = real_ino(req, ino);
+	/* thisinode = */real_ino(req, ino);
 
 	buf = malloc(sizeof(struct statvfs));
 	if (buf == NULL) {
@@ -3893,18 +3896,17 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (system_size > (50*powl(1024, 3)))
-		buf->f_blocks = (((system_size - 1)
-						/ 4096) + 1) * 2;
+	if (system_size > (50 * powl(1024, 3)))
+		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
 	else
 		buf->f_blocks = (25*powl(1024, 2));
 
 	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
 	else
-		buf->f_bfree = buf->f_blocks -
-			(((system_size - 1)
-						/ 4096) + 1);
+		buf->f_bfree = buf->f_blocks - (((system_size - 1) / 4096) + 1);
+	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
+	 * if runs into negative value */
 	if (buf->f_bfree < 0)
 		buf->f_bfree = 0;
 	buf->f_bavail = buf->f_bfree;
@@ -3917,11 +3919,13 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		buf->f_files = 2000000;
 
 	buf->f_ffree = buf->f_files - num_inodes;
+	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
+	 * if runs into negative value */
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
 
 #ifdef STAT_VFS_H
-        buf->f_namelen = MAX_FILENAME_LEN;
+	buf->f_namelen = MAX_FILENAME_LEN;
 #else
 	buf->f_favail = buf->f_ffree;
 	buf->f_namemax = MAX_FILENAME_LEN;
@@ -3942,36 +3946,38 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 *       Summary: Flush the file content. Not used now as cache mode is not
 *                write back.
 *
-*************************************************************************/
-/**                Possibly flush cached data
+*                Possibly flush cached data
 *
 *                BIG NOTE: This is not equivalent to fsync().  It's not a
-* request to sync dirty data.
+*                request to sync dirty data.
 *
-*                Flush is called on each close() of a file descriptor.  So if a
-* filesystem wants to return write errors in close() and the file
-* has cached dirty data, this is a good place to write back data
-* and return any errors.  Since many applications ignore close()
-* errors this is not always useful.
+*                Flush is called on each close() of a file descriptor.
+*                So if a filesystem wants to return write errors in
+*                close() and the file has cached dirty data, this is a
+*                good place to write back data and return any errors.
+*                Since many applications ignore close() errors this is
+*                not always useful.
 *
-*                NOTE: The flush() method may be called more than once for each
-* open().	This happens if more than one file descriptor refers
-* to an opened file due to dup(), dup2() or fork() calls.	It is
-* not possible to determine if a flush is final, so each flush
-* should be treated equally.  Multiple write-flush sequences are
-* relatively rare, so this shouldn't be a problem.
+*                NOTE: The flush() method may be called more than once
+*                for each open().	This happens if more than one
+*                file descriptor refers to an opened file due to dup(),
+*                dup2() or fork() calls.	It is not possible to
+*                determine if a flush is final, so each flush should be
+*                treated equally.  Multiple write-flush sequences are
+*                relatively rare, so this shouldn't be a problem.
 *
-*                Filesystems shouldn't assume that flush will always be called
-* after some writes, or that if will be called at all.
-*
-*                Changed in version 2.2
-*/
+*                Filesystems shouldn't assume that flush will always be
+*                called after some writes, or that if will be called at
+*                all.
+*************************************************************************/
 void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
 				struct fuse_file_info *file_info)
 {
-	ino_t thisinode;
+	/* ino_t thisinode; */
 
-	thisinode = real_ino(req, ino);
+	UNUSED(ino);
+	UNUSED(file_info);
+	/* thisinode = */real_ino(req, ino);
 
 	fuse_reply_err(req, 0);
 }
@@ -3983,21 +3989,21 @@ void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
 *                struct fuse_file_info *file_info
 *       Summary: Close the file handle pointed by "file_info".
 *
+*                Release an open file
+*
+*                Release is called when there are no more references to
+*                an open file: all file descriptors are closed and all
+*                memory mappings are unmapped.
+*
+*                For every open() call there will be exactly one
+*                release() call with the same flags and file descriptor.
+*                It is possible to have a file opened more than once, in
+*                which case only the last release will mean, that no more
+*                reads/writes will happen on the file.  The return value
+*                of release is ignored.
+*
+*                Changed in version 2.2
 *************************************************************************/
-/**                Release an open file
-*
-*                Release is called when there are no more references to an open
-*                file: all file descriptors are closed and all memory mappings
-* are unmapped.
-*
-*                For every open() call there will be exactly one release() call
-*                with the same flags and file descriptor.	 It is possible to
-* have a file opened more than once, in which case only the last
-* release will mean, that no more reads/writes will happen on the
-* file.  The return value of release is ignored.
-*
-* Changed in version 2.2
-*/
 void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
@@ -4005,10 +4011,7 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 
 	thisinode = real_ino(req, ino);
 
-	if (file_info->fh < 0) {
-		fuse_reply_err(req, EBADF);
-		return;
-	}
+	/* file_info->fh is uint64_t */
 
 	if (file_info->fh >= MAX_OPEN_FILE_ENTRIES) {
 		fuse_reply_err(req, EBADF);
@@ -4037,20 +4040,22 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 *                struct fuse_file_info *file_info
 *       Summary: Conduct "fsync". Do nothing now (see hfuse_flush).
 *
-*************************************************************************/
-/**                Synchronize file contents
+*                Synchronize file contents
 *
-*                If the datasync parameter is non-zero, then only the user data
-* should be flushed, not the meta data.
+*                If the datasync parameter is non-zero, then only the
+*                user data should be flushed, not the meta data.
 *
 *                Changed in version 2.2
-*/
+*************************************************************************/
 void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 					struct fuse_file_info *file_info)
 {
-	ino_t thisinode;
+	/* ino_t thisinode; */
 
-	thisinode = real_ino(req, ino);
+	UNUSED(ino);
+	UNUSED(isdatasync);
+	UNUSED(file_info);
+	/* thisinode = */real_ino(req, ino);
 
 	fuse_reply_err(req, 0);
 }
@@ -4062,17 +4067,16 @@ void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 *                struct fuse_file_info *file_info
 *       Summary: Check permission and open directory for access.
 *
-*************************************************************************/
-/**                Open directory
+*                Open directory
 *
 *                Unless the 'default_permissions' mount option is given,
-* this method should check if opendir is permitted for this
-* directory. Optionally opendir may also return an arbitrary
-* filehandle in the fuse_file_info structure, which will be
-* passed to readdir, closedir and fsyncdir.
+*                this method should check if opendir is permitted for
+*                this directory. Optionally opendir may also return an
+*                arbitrary filehandle in the fuse_file_info structure,
+*                which will be passed to readdir, closedir and fsyncdir.
 *
 *                Introduced in version 2.3
-*/
+*************************************************************************/
 static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
@@ -4127,28 +4131,29 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 *                implementation can return partial results and continue
 *                reading in follow-up calls.
 *
-*************************************************************************/
-/**                Read directory
+*                Read directory
 *
-*                This supersedes the old getdir() interface.  New applications
-* should use this.
+*                This supersedes the old getdir() interface.  New
+*                applications should use this.
 *
-*                The filesystem may choose between two modes of operation:
+*                The filesystem may choose between two modes of
+*                operation:
 *
-*                1) The readdir implementation ignores the offset parameter, and
-* passes zero to the filler function's offset.  The filler
-* function will not return '1' (unless an error happens), so the
-* whole directory is read in a single readdir operation.  This
-* works just like the old getdir() method.
+*                1) The readdir implementation ignores the offset
+*                parameter, and passes zero to the filler function's
+*                offset.  The filler function will not return '1' (unless
+*                an error happens), so the whole directory is read in a
+*                single readdir operation.  This works just like the old
+*                getdir() method.
 *
-*                2) The readdir implementation keeps track of the offsets of the
-* directory entries.  It uses the offset parameter and always
-* passes non-zero offset to the filler function.  When the buffer
-* is full (or an error happens) the filler function will return
-* '1'.
+*                2) The readdir implementation keeps track of the offsets
+*                of the directory entries.  It uses the offset parameter
+*                and always passes non-zero offset to the filler
+*                function.  When the buffer is full (or an error happens)
+*                the filler function will return '1'.
 *
 *                Introduced in version 2.3
-*/
+*************************************************************************/
 void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			off_t offset, struct fuse_file_info *file_info)
 {
@@ -4169,6 +4174,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	size_t entry_size, ret_size;
 	int ret, errcode;
 
+	UNUSED(file_info);
 	gettimeofday(&tmp_time1, NULL);
 
 	this_inode = real_ino(req, ino);
@@ -4335,11 +4341,13 @@ errcode_handle:
 *
 *************************************************************************/
 void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
-					struct fuse_file_info *file_info)
+			 struct fuse_file_info *file_info)
 {
 	ino_t thisinode;
 
+	UNUSED(file_info);
 	thisinode = real_ino(req, ino);
+	UNUSED(thisinode);
 
 	fuse_reply_err(req, 0);
 }
@@ -4350,21 +4358,19 @@ void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
 *        Inputs: void *userdata, struct fuse_conn_info *conn
 *       Summary: Initiate a FUSE mount
 *
-*************************************************************************/
-/**
 *                Initialize filesystem
 *
-*                The return value will passed in the private_data field of
-* fuse_context to all file operations and as a parameter to the
-* destroy() method.
+*                The return value will passed in the private_data field
+*                of fuse_context to all file operations and as a
+*                parameter to the destroy() method.
 *
-*                Introduced in version 2.3
-*                Changed in version 2.6
-*/
+*                Introduced in version 2.3 Changed in version 2.6
+*************************************************************************/
 void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 {
 	MOUNT_T *tmpptr;
 
+	UNUSED(conn);
 	tmpptr = (MOUNT_T *)userdata;
 	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
 
@@ -4377,20 +4383,18 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 *        Inputs: void *userdata
 *       Summary: Destroy a FUSE mount
 *
+*                Clean up filesystem
+*
+*                Called on filesystem exit.
+*                Introduced in version 2.3
 *************************************************************************/
-/**
-* Clean up filesystem
-*
-* Called on filesystem exit.
-*
-* Introduced in version 2.3
-*/
 void hfuse_ll_destroy(void *userdata)
 {
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
-	write_log(10, "Unmounting FS with root inode %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
+	write_log(10, "Unmounting FS with root inode %" PRIu64 "\n",
+		  (uint64_t)tmpptr->f_ino);
 }
 
 /************************************************************************
@@ -4401,13 +4405,11 @@ void hfuse_ll_destroy(void *userdata)
 *       Summary: Set attribute for a filesystem object. This includes
 *                routines such as chmod, chown, truncate, utimens.
 *
-*************************************************************************/
-/**
 *                Set file attributes
 *
-*                In the 'attr' argument only members indicated by the 'to_set'
-* bitmask contain valid values.  Other members contain undefined
-* values.
+*                In the 'attr' argument only members indicated by the
+*                'to_set' bitmask contain valid values.  Other members
+*                contain undefined values.
 *
 *                If the setattr was invoked from the ftruncate() system
 *                call under Linux kernel versions 2.6.15 or later, the
@@ -4429,7 +4431,7 @@ void hfuse_ll_destroy(void *userdata)
 *
 *                Changed in version 2.5:
 *                    file information filled in for ftruncate
-*/
+*************************************************************************/
 void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int to_set, struct fuse_file_info *fi)
 {
@@ -4440,6 +4442,8 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
+
+	UNUSED(fi);
 
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
 
@@ -4903,7 +4907,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	this_stat.st_nlink = 1;
 	this_stat.st_size = strlen(link);
 
-        this_stat.st_mode = S_IFLNK | 0777;
+	this_stat.st_mode = S_IFLNK | 0777;
 
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
@@ -4978,12 +4982,11 @@ error_handle:
 *
 *                The buffer should be filled with a null terminated
 *                string.  The buffer size argument includes the space for
-*                the terminating null character. 
+*                the terminating null character.
 *                If the linkname is too long to fit in the buffer, it
 *                should be truncated.
 *
 *                The return value should be 0 for success.
-*/
 *************************************************************************/
 static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 {
@@ -5059,6 +5062,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 *                value with new value.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	const char *value, size_t size, int flag)
 {
@@ -5110,8 +5114,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: setxattr Permission denied "
-			"(WRITE needed)\n");
+		write_log(0, "Error: setxattr Permission denied ");
+		write_log(0, "(WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5151,6 +5155,7 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5161,6 +5166,7 @@ error_handle:
 *                If name is not found, reply error.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	size_t size)
 {
@@ -5208,8 +5214,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
-		write_log(0, "Error: getxattr permission denied "
-			"(READ needed)\n");
+		write_log(0, "Error: getxattr permission denied ");
+		write_log(0, "(READ needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5278,6 +5284,7 @@ error_handle:
 		free(value);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5289,6 +5296,7 @@ error_handle:
 *                filled with all names separated by null character.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 {
 	XATTR_PAGE *xattr_page;
@@ -5303,8 +5311,9 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	key_buf = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
-	write_log(10, "Debug listxattr: Begin listxattr, "
-		"given buffer size = %d\n", size);
+	write_log(10,
+		  "Debug listxattr: Begin listxattr, given buffer size = %d\n",
+		  size);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -5380,6 +5389,7 @@ error_handle:
 		free(key_buf);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5390,6 +5400,7 @@ error_handle:
 *                error if attribute is not found.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	const char *name)
 {
@@ -5434,8 +5445,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: removexattr Permission denied"
-			" (WRITE needed)\n");
+		write_log(
+		    0, "Error: removexattr Permission denied (WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5475,6 +5486,7 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5625,14 +5637,14 @@ error_handle:
 *                reply the fuse entry about the file and fuse file info "fi".
 *
 *                Create and open a file
-*  
+*
 *                If the file does not exist, first create it with the
 *                specified mode, and then open it.
-*  
+*
 *                If this method is not implemented or under Linux kernel
 *                versions earlier than 2.6.15, the mknod() and open()
 *                methods will be called instead.
-*  
+*
 *                Introduced in version 2.5
 *************************************************************************/
 static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
@@ -5712,8 +5724,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = 0;
 	this_stat.st_nlink = 1;
-        self_mode = mode | S_IFREG;
-        this_stat.st_mode = self_mode;
+	self_mode = mode | S_IFREG;
+	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
@@ -5847,6 +5859,7 @@ void *mount_multi_thread(void *ptr)
 		unmount_event(tmpptr->f_name);
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
+	return 0;
 }
 void *mount_single_thread(void *ptr)
 {
@@ -5864,6 +5877,7 @@ void *mount_single_thread(void *ptr)
 		unmount_event(tmpptr->f_name);
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
+	return 0;
 }
 
 int hook_fuse(int argc, char **argv)
@@ -5900,4 +5914,3 @@ int hook_fuse(int argc, char **argv)
 
 	return 0;
 }
-
