@@ -2704,6 +2704,10 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+
+		if (hcfs_system->backend_status_is_online == FALSE)
+			return -EPERM;
+
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
 				return -EBUSY;
@@ -2735,6 +2739,9 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 	int ret;
 	PREFETCH_STRUCT_TYPE *temp_prefetch;
 	pthread_t prefetch_thread;
+
+	if (hcfs_system->backend_status_is_online == FALSE)
+		return -EPERM;
 
 	if ((eindex+1) >= MAX_BLOCK_ENTRIES_PER_PAGE)
 		return 0;
@@ -2771,6 +2778,10 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	struct stat tempstat2;
 	int ret, errcode;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
+
+	/* Check network status */
+	if (hcfs_system->backend_status_is_online == FALSE)
+		return -EPERM;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
 	if (ret < 0)
@@ -2845,6 +2856,26 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->blockfptr = NULL;
 			}
+
+			/* Recover status */
+			fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+			meta_cache_lookup_file_data(fh_ptr->thisinode,
+				NULL, NULL, tpage, page_fpos,
+				fh_ptr->meta_cache_ptr);
+			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
+				(tpage->block_entries[eindex]).status =
+								ST_CLOUD;
+				meta_cache_update_file_data(fh_ptr->thisinode,
+					NULL, NULL, tpage, page_fpos,
+					fh_ptr->meta_cache_ptr);
+				/* Unlink this block */
+				if (access(thisblockpath, F_OK) == 0)
+					unlink(thisblockpath);
+			}
+			meta_cache_close_file(fh_ptr->meta_cache_ptr);
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
 			return ret;
 		}
 
@@ -3028,6 +3059,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			return 0;
 		}
 
+		/* return -EPERM when failing to fetching from cloud */
 		ret = read_prefetch_cache(&temppage, entry_index,
 			this_inode, bindex, this_page_fpos);
 		if (ret < 0) {
@@ -3048,7 +3080,8 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			break;
 		case ST_CLOUD:
 		case ST_CtoL:
-			/*Download from backend */
+			/* Download from backend */
+			/* return -EPERM when failing to fetching from cloud */
 			ret = read_fetch_backend(this_inode,
 				bindex, fh_ptr, &temppage,
 				this_page_fpos, entry_index);
@@ -3347,6 +3380,11 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 			write_log(10, "debug write waiting on full cache\n");
 			sleep_on_cache_full();
+			if (hcfs_system->backend_status_is_online == FALSE) {
+				*reterr = -EPERM;
+				return 0;
+			}
+			
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);

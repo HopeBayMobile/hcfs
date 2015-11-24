@@ -120,7 +120,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				"Skip to page it out.\n", (uint64_t)this_inode);
 			flock(fileno(metafptr), LOCK_UN);
 			fclose(metafptr);
-			return 0;
+			return 1;
 		}
 
 		total_blocks = (temphead_stat.st_size +
@@ -296,6 +296,18 @@ errcode_handle:
 	return errcode;
 }
 
+
+int _check_cache_replace(long long *num_removed_inode)
+{
+	if (*num_removed_inode == 0) {
+		if (hcfs_system->backend_status_is_online == FALSE)
+			notify_sleep_on_cache();
+	}
+
+	*num_removed_inode = 0;
+	return 0;
+}
+
 /*TODO: For scanning caches, only need to check one block subfolder a time,
 and scan for mtime greater than the last update time for uploads, and scan
 for atime for cache replacement*/
@@ -329,11 +341,13 @@ void run_cache_loop(void)
 	time_t node_time;
 	CACHE_USAGE_NODE *this_cache_node;
 	int ret;
+	long long num_removed_inode;
 
 	ret = -1;
 	while (ret < 0) {
 		if (hcfs_system->system_going_down == TRUE)
 			break;
+		num_removed_inode = 0;
 		ret = build_cache_usage();
 		if (ret < 0) {
 			write_log(0, "Error in cache mgmt.\n");
@@ -355,6 +369,7 @@ void run_cache_loop(void)
 				break;
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
+				_check_cache_replace(&num_removed_inode);
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -371,6 +386,7 @@ void run_cache_loop(void)
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
+					_check_cache_replace(&num_removed_inode);
 					ret = build_cache_usage();
 					if (ret < 0) {
 						write_log(0,
@@ -436,6 +452,8 @@ void run_cache_loop(void)
 								&seconds_slept);
 			if (ret < 0)
 				sleep(10);
+			else if (ret == 0)
+				num_removed_inode++;
 		}
 		if (hcfs_system->system_going_down == TRUE)
 			break;
@@ -452,6 +470,7 @@ void run_cache_loop(void)
 					sleep(10);
 					continue;
 				}
+				num_removed_inode = 0;
 				gettimeofday(&builttime, NULL);
 				seconds_slept = 0;
 				e_index = 0;
