@@ -83,7 +83,7 @@ void monitor_loop(void)
 			    test_duration.tv_sec +
 				test_start.tv_nsec / 1000000000.0);
 		}
-		/* wait 0.1 second */
+		/* wait 1 second */
 		ret_val = nanosleep(&sleep_time, NULL);
 		if (ret_val == -1 && errno == EINTR) {
 			write_log(2, "[Backend Monitor] interrupted\n");
