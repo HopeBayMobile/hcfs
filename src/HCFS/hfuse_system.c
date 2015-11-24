@@ -329,6 +329,8 @@ int main(int argc, char **argv)
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
+		sem_init(&pin_download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE / 2);
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
 	}
@@ -370,6 +372,8 @@ int main(int argc, char **argv)
 		open_log("fuse.log");
 		write_log(2, "\nStart logging fuse\n");
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&pin_download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE / 2);
 		sem_init(&download_curl_control_sem, 0, 1);
 
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)

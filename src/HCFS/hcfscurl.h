@@ -43,6 +43,7 @@ CURL_HANDLE download_curl_handles[MAX_DOWNLOAD_CURL_HANDLE];
 short curl_handle_mask[MAX_DOWNLOAD_CURL_HANDLE];
 sem_t download_curl_control_sem;
 sem_t download_curl_sem;
+sem_t pin_download_curl_sem;
 
 /* Swift collections */
 

@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 #include "hcfs_cachebuild.h"
 #include "params.h"
@@ -117,13 +118,8 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 
 		/* Skip if inode is pinned */
 		if (temphead.local_pin == TRUE) {
-#ifdef ARM_32bit_
-			write_log(10, "Debug: inode %lld is pinned."
-				" Skip to page it out.\n", this_inode);
-#else
-			write_log(10, "Debug: inode %ld is pinned."
-				" Skip to page it out.\n", this_inode);
-#endif
+			write_log(10, "Debug: inode %"PRIu64" is pinned. "
+				"Skip to page it out.\n", (uint64_t)this_inode);
 			flock(fileno(metafptr), LOCK_UN);
 			fclose(metafptr);
 			return 0;
@@ -264,21 +260,15 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					break;
 
 				flock(fileno(metafptr), LOCK_EX);
-				
+
 				/* Check pin status before paging blocks out */
 				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 				FREAD(&temphead, sizeof(FILE_META_TYPE),
 					1, metafptr);
 				if (temphead.local_pin == TRUE) {
-#ifdef ARM_32bit
-					write_log(10, "Debug: inode %lld is "
-						"pinned when paging it out."
-						" Stop\n");
-#else
-					write_log(10, "Debug: inode %ld is "
-						"pinned when paging it out."
-						" Stop\n");
-#endif
+					write_log(10, "Debug: inode %"PRIu64" "
+						"is pinned when paging it out. "
+						"Stop\n", (uint64_t)this_inode);
 					break;
 				}
 

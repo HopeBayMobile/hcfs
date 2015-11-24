@@ -73,7 +73,7 @@ char delete_pathcache_node_success;
 #define INO_TOO_MANY_LINKS 279348
 
 /* pin_inode() */
-char fetch_pin_blocks_success;
+char collect_dir_children_flag;
 
 /* change_pin_falg */
 char pin_flag_in_meta;

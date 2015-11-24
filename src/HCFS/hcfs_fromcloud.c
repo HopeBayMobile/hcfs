@@ -47,7 +47,7 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr,
+int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		     unsigned char *obj_id)
 #else
@@ -69,7 +69,10 @@ int fetch_from_cloud(FILE *fptr,
 	sprintf(objname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 #endif
 
+	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
+		sem_wait(&pin_download_curl_sem);
 	sem_wait(&download_curl_sem);
+
 	FSEEK(fptr, 0, SEEK_SET);
 	FTRUNCATE(fileno(fptr), 0);
 
@@ -132,6 +135,9 @@ int fetch_from_cloud(FILE *fptr,
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
+
+	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
+		sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 
@@ -227,11 +233,11 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(
-		    blockfptr, temppage.block_entries[entry_index].obj_id);
+		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+			temppage.block_entries[entry_index].obj_id);
 #else
-		ret =
-		    fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+			ptr->this_inode, ptr->block_no);
 #endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
@@ -429,8 +435,8 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	fetch_meta_path(metapath, block_info->this_inode);
 	if (access(metapath, F_OK) < 0) {
 		meta_cache_unlock_entry(meta_cache_entry);
-		write_log(2, "Warn: meta %"FMT_INO_T" does not exist. In %s\n",
-			block_info->this_inode, __func__);
+		write_log(2, "Warn: meta %"PRIu64" does not exist. In %s\n",
+			(uint64_t)block_info->this_inode, __func__);
 		return -ENOENT;
 	}
 
@@ -478,7 +484,18 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	return 0;
 }
 
-static void _fetch_block(void *ptr)
+/**
+ * fetch_backend_block
+ *
+ * This function aims to download a block from cloud and modify status
+ * from ST_CLOUD to ST_LDISK. It may directly return when this block
+ * is downloaded by other threads.
+ *
+ * @param ptr A pointer with type DOWNLOAD_BLOCK_INFO.
+ *
+ * @return none.
+ */
+void fetch_backend_block(void *ptr)
 {
 	char block_path[400];
 	FILE *block_fptr;
@@ -514,30 +531,32 @@ static void _fetch_block(void *ptr)
 
 	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to modify block status in %s."
-			" Code %d", __func__, ret);	
 		/* When file is removed, unlink this empty block directly
 		because status of this block is st_cloud */
-		if (ret == -ENOENT) 
+		if (ret == -ENOENT)
 			unlink(block_path);
-
+		else
+			write_log(0, "Error: Fail to modify block status in %s."
+				" Code %d", __func__, ret);
 		goto thread_error;
-	
-	} else if (ret > 0) { /* Status does not match ST_CLOUD */
+
+	} else if (ret > 0) {
+		/* Status does not match ST_CLOUD, it may be
+		modified by another one */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
 	}
 
 	/* Fetch block from cloud */
-	ret = fetch_from_cloud(block_fptr, block_info->this_inode,
+	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, block_info->this_inode,
 						block_info->block_no);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;
 	}
 
-	/* TODO: Check if error handling here is fixed later 
+	/* TODO: Check if error handling here is fixed later
 	(a block delete op can happen due to a truncate and that's not
 	an error) */
 	/* Update dirty status and system meta */
@@ -555,26 +574,29 @@ static void _fetch_block(void *ptr)
 		}
 
 		ret = _modify_block_status(block_info, ST_CtoL, ST_CLOUD, 0);
-		if (ret < 0) /* IO error */
+		if (ret < 0) /* IO/memory error */
 			goto thread_error;
 
 		if (ret == 0) { /* Block disappear? Fetch again later */
-			write_log(0, "Error: block_%"FMT_INO_T"_%lld "
+			write_log(0, "Error: block_%"PRIu64"_%lld "
 				"disappered. Fetch again later\n",
-				block_info->this_inode, block_info->block_no);
+				(uint64_t)block_info->this_inode,
+				block_info->block_no);
 			goto thread_error;
 
-		} else if (ret = ST_TODELETE) { /* Block is truncated. Finish */
-			write_log(5, "block_%"FMT_INO_T"_%lld is truncated when"
-				" pinning in %s\n", block_info->this_inode,
+		} else if (ret == ST_TODELETE) { /* Block is truncated. Finish */
+			write_log(5, "block_%"PRIu64"_%lld is truncated when"
+				" pinning in %s\n",
+				(uint64_t)block_info->this_inode,
 				block_info->block_no, __func__);
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
 			return;
 
 		} else { /* Strange.. */
-			write_log(5, "block_%"FMT_INO_T"_%lld has status%d when"
-				" pinning in %s\n", block_info->this_inode,
+			write_log(5, "block_%"PRIu64"_%lld has status %d when"
+				" pinning in %s\n",
+				(uint64_t)block_info->this_inode,
 				block_info->block_no, ret, __func__);
 			goto thread_error;
 		}
@@ -585,10 +607,15 @@ static void _fetch_block(void *ptr)
 	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH,
 				blockstat.st_size);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to modify block status in %s."
-			" Code %d", __func__, ret);
+		if (ret == -ENOENT)
+			write_log(5, "Fail to modify block status in %s because"
+				" meta is removed. Code %d", __func__, ret);
+		else
+			write_log(0, "Error: Fail to modify block status in %s."
+				" Code %d", __func__, ret);
 		goto thread_error;
-	} else if (ret > 0){ /* Status does not match ST_CtoL */
+	} else if (ret > 0) {
+		/* Status does not match ST_CtoL. It may be truncated */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
@@ -599,7 +626,7 @@ static void _fetch_block(void *ptr)
 
 	ret = super_block_mark_dirty(block_info->this_inode);
 	if (ret < 0)
-		goto thread_error;
+		block_info->dl_error = TRUE;
 
 	return;
 
@@ -645,8 +672,8 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (filemeta.local_pin == FALSE) {
 		flock(fileno(fptr), LOCK_UN);
-		write_log(5, "Warning: Inode %"FMT_INO_T" is detected to be unpinned"
-			" in pin-process.\n", inode);
+		write_log(5, "Warning: Inode %"PRIu64" is detected to be "
+			"unpinned in pin-process.\n", (uint64_t)inode);
 		return -EPERM;
 	}
 
@@ -667,7 +694,7 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;
 		pthread_create(&(download_thread_ctl.download_thread[which_th]),
-				NULL, (void *)&_fetch_block,
+				NULL, (void *)&fetch_backend_block,
 				(void *)&(download_thread_ctl.block_info[which_th]));
 
 		download_thread_ctl.active_th++;
@@ -682,6 +709,16 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * fetch_pinned_blocks
+ *
+ * Given a inode, arrange those blocks with status ST_CLOUD to be downloaded.
+ * When system is going shutdown, it will rapidly stop and return.
+ *
+ * @param inode The inode number to be pinned.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int fetch_pinned_blocks(ino_t inode)
 {
 	char metapath[300];
@@ -706,20 +743,22 @@ int fetch_pinned_blocks(ino_t inode)
 	fptr = fopen(metapath, "r+");
 	if (fptr == NULL) {
 		write_log(2, "Cannot open %s in %s\n", metapath, __func__);
-		return 0;
+		return -ENOENT;
 	}
 
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
+	if (!S_ISREG(tempstat.st_mode)) { /* It is not a regfile? wtf */
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return 0;
+	}
 	/* Do not need to re-load meta in loop because just need to check those
 	blocks that existing before setting local_pin = true.*/
 	FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
-
-	if (!S_ISREG(tempstat.st_mode))
-		return 0;
 
 	total_size = tempstat.st_size;
 	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
@@ -742,7 +781,7 @@ int fetch_pinned_blocks(ino_t inode)
 		}
 
 		get_system_size(&cache_size, NULL);
-		if (cache_size > CACHE_HARD_LIMIT) {
+		if (cache_size >= CACHE_HARD_LIMIT) {
 			write_log(0, "Error: Cache space is full.\n");
 			ret_code = -ENOSPC;
 			break;
@@ -765,7 +804,6 @@ int fetch_pinned_blocks(ino_t inode)
 			blkno, page_pos);
 		if (ret_code < 0)
 			break;
-
 	}
 
 	fclose(fptr);
@@ -787,8 +825,10 @@ int fetch_pinned_blocks(ino_t inode)
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 		nanosleep(&time_to_sleep, NULL);
 	}
-	
+
 	if (hcfs_system->system_going_down == TRUE) {
+		if (access(error_path, F_OK) == 0)
+			unlink(error_path);
 		return ret_code;
 	}
 	/* Check cache size again */
@@ -802,12 +842,14 @@ int fetch_pinned_blocks(ino_t inode)
 
 	/* Delete error object */
 	if (access(error_path, F_OK) == 0) {
-		write_log(0, "Error: Fail to pin inode %"FMT_INO_T"\n", inode);
+		write_log(0, "Error: Fail to pin inode %"PRIu64"\n",
+			(uint64_t)inode);
 		if (ret_code == 0)
 			ret_code = -EIO;
-		UNLINK(error_path);
+		unlink(error_path);
 	}
 
+	/* If meta is removed, don't care errors above */
 	if (access(metapath, F_OK) < 0)
 		ret_code = -ENOENT;
 

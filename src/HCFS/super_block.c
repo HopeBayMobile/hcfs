@@ -33,6 +33,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -89,8 +90,8 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (this_inode <= 0) {
 		errcode = EINVAL;
 		write_log(0,
-			"Error in %s, inode number is %"FMT_INO_T". Code %d,"
-			" %s\n", __func__, this_inode, errcode,
+			"Error in %s, inode number is %"PRIu64". Code %d,"
+			" %s\n", __func__, (uint64_t)this_inode, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -1334,7 +1335,7 @@ int super_block_finish_pinning(ino_t this_inode)
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
-		return ret;	
+		return ret;
 	}
 	switch (this_entry.pin_status) {
 	case ST_PINNING:
@@ -1346,15 +1347,17 @@ int super_block_finish_pinning(ino_t this_inode)
 		break;
 	case ST_UNPIN: /* It may be unpinned by others when pinnning */
 	case ST_PIN: /* What happened? */
+		write_log(5, "inode %"PRIu64 "is ST_PIN in %s",
+				(uint64_t)this_inode, __func__);
 	case ST_DEL: /* It may be deleted by others */
 		break;
 	}
-	
+
 	super_block_exclusive_release();
 
 	if (ret < 0)
 		return ret;
-	
+
 	return 0;
 }
 
@@ -1371,7 +1374,7 @@ int super_block_finish_pinning(ino_t this_inode)
  * @return 0 on success, otherwise negative error code.
  */
 int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
-{	
+{
 	SUPER_BLOCK_ENTRY this_entry;
 	int ret;
 
@@ -1379,7 +1382,7 @@ int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
-		return ret;	
+		return ret;
 	}
 
 	switch (this_entry.pin_status) {
@@ -1428,7 +1431,7 @@ int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
-		return ret;	
+		return ret;
 	}
 
 	switch (this_entry.pin_status) {
@@ -1497,7 +1500,7 @@ int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 
 		sys_super_block->head.last_pin_inode = this_inode;
 	}
-	
+
 	sys_super_block->head.num_pinning_inodes++;
 	ret = write_super_block_head();
 	if (ret < 0)
@@ -1524,9 +1527,9 @@ int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 	next_inode = this_entry->pin_ll_next;
 	if ((next_inode == 0) && (prev_inode == 0) &&
 		(sys_super_block->head.first_pin_inode != this_inode)) {
-		write_log(0, "Error: Inode %ju is not in pinning "
+		write_log(0, "Error: Inode %"PRIu64" is not in pinning "
 			"queue but be requested to dequeue. In %s\n",
-			(uintmax_t)this_inode, __func__);
+			(uint64_t)this_inode, __func__);
 		return -EIO;
 	}
 
@@ -1535,7 +1538,7 @@ int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 		ret = read_super_block_entry(prev_inode, &prev_entry);
 		if (ret < 0)
 			goto error_handling;
-		prev_entry.pin_ll_next = next_inode;	
+		prev_entry.pin_ll_next = next_inode;
 		ret = write_super_block_entry(prev_inode, &prev_entry);
 		if (ret < 0)
 			goto error_handling;
@@ -1548,11 +1551,11 @@ int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 		ret = read_super_block_entry(next_inode, &next_entry);
 		if (ret < 0)
 			goto error_handling;
-		next_entry.pin_ll_prev = prev_inode;		
+		next_entry.pin_ll_prev = prev_inode;
 		ret = write_super_block_entry(next_inode, &next_entry);
 		if (ret < 0)
 			goto error_handling;
-	} else {	
+	} else {
 		sys_super_block->head.last_pin_inode = prev_inode;
 	}
 
@@ -1571,6 +1574,6 @@ int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 	return 0;
 
 error_handling:
-	return ret;	
+	return ret;
 }
 

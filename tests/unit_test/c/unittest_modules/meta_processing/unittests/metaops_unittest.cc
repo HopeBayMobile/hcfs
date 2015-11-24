@@ -1127,6 +1127,7 @@ protected:
 	}
 };
 
+/* Code is removed from actual_delete_inode
 #ifdef _ANDROID_ENV_
 TEST_F(actual_delete_inodeTest, FailIn_pathlookup_write_parent)
 {
@@ -1151,7 +1152,7 @@ TEST_F(actual_delete_inodeTest, FailIn_delete_pathcache_node)
 	delete_pathcache_node_success = TRUE;
 }
 #endif
-
+*/
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess)
 {
 	MOUNT_T mount_t;
@@ -1616,3 +1617,127 @@ TEST_F(change_pin_flagTest, PinLinkSuccess)
 }
 
 /* End of unittest for change_pin_flag() */
+
+/* Unittest for collect_dir_children */
+class collect_dir_childrenTest : public ::testing::Test {
+protected:
+	long long num_dir_node, num_nondir_node;
+	ino_t *dir_node_list, *nondir_node_list;
+	
+	void SetUp()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			rmdir(MOCK_META_PATH);
+		mkdir(MOCK_META_PATH, 0700);
+	}
+
+	void TearDown()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			rmdir(MOCK_META_PATH);
+	}
+};
+
+TEST_F(collect_dir_childrenTest, MetaNotExist)
+{
+	ino_t inode;
+
+	inode = 5;
+	EXPECT_EQ(-ENOENT, collect_dir_children(inode, &dir_node_list,
+		&num_dir_node, &nondir_node_list, &num_nondir_node));
+}
+
+TEST_F(collect_dir_childrenTest, NoChildren)
+{
+	ino_t inode;
+	char metapath[300];
+	FILE *fptr;
+	struct stat tempstat;
+	DIR_META_TYPE dirmeta;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	fptr = fopen(metapath, "w+");
+	memset(&tempstat, 0, sizeof(struct stat));
+	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
+	fwrite(&tempstat, 1, sizeof(struct stat), fptr);
+	fwrite(&dirmeta, 1, sizeof(DIR_META_TYPE), fptr);
+	fclose(fptr);
+
+	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
+		&num_dir_node, &nondir_node_list, &num_nondir_node));
+
+	/* Verify */
+	EXPECT_EQ(0, num_dir_node);
+	EXPECT_EQ(0, num_nondir_node);
+	EXPECT_EQ(NULL, dir_node_list);
+	EXPECT_EQ(NULL, nondir_node_list);
+
+	unlink(metapath);
+}
+
+TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
+{
+	ino_t inode, child_inode;
+	char metapath[300];
+	FILE *fptr;
+	struct stat tempstat;
+	DIR_META_TYPE dirmeta;
+	DIR_ENTRY_PAGE temppage;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	fptr = fopen(metapath, "w+");
+	memset(&tempstat, 0, sizeof(struct stat));
+	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
+	dirmeta.total_children = 2;
+	dirmeta.tree_walk_list_head = sizeof(struct stat) +
+				sizeof(DIR_META_TYPE);
+	fwrite(&tempstat, 1, sizeof(struct stat), fptr);
+	fwrite(&dirmeta, 1, sizeof(DIR_META_TYPE), fptr);
+
+	/* First page */
+	temppage.num_entries = 10;
+	child_inode = 1;
+	for (int i = 0; i < 10; i++, child_inode++) {
+		strcpy(temppage.dir_entries[i].d_name, "aaa");
+		temppage.dir_entries[i].d_ino = child_inode;
+		temppage.dir_entries[i].d_type = child_inode % 2 ?
+						D_ISDIR : D_ISREG;
+	}
+	temppage.tree_walk_next = sizeof(struct stat) +
+		sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
+	fwrite(&temppage, 1, sizeof(DIR_ENTRY_PAGE), fptr);
+
+	/* Second page */
+	temppage.num_entries = 10;
+	for (int i = 0; i < 10; i++, child_inode++) {
+		strcpy(temppage.dir_entries[i].d_name, "aaa");
+		temppage.dir_entries[i].d_ino = child_inode;
+		temppage.dir_entries[i].d_type = child_inode % 2 ?
+						D_ISDIR : D_ISREG;
+	}
+	temppage.tree_walk_next = 0;
+	fwrite(&temppage, 1, sizeof(DIR_ENTRY_PAGE), fptr);
+
+	fclose(fptr);
+
+	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
+		&num_dir_node, &nondir_node_list, &num_nondir_node));
+
+	/* Verify */
+	EXPECT_EQ(10, num_dir_node);
+	EXPECT_EQ(10, num_nondir_node);
+
+	child_inode = 1;
+	for (int i = 0; i < num_dir_node; i++, child_inode += 2)
+		EXPECT_EQ(child_inode, dir_node_list[i]);
+
+	child_inode = 2;
+	for (int i = 0; i < num_nondir_node; i++, child_inode += 2)
+		EXPECT_EQ(child_inode, nondir_node_list[i]);
+
+	unlink(metapath);
+}
+
+/* End of unittest for collect_dir_children */

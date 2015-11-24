@@ -56,7 +56,7 @@ filetables.o: filetables.c fuseop.h
 hcfscurl.o: hcfscurl.c hcfscurl.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfscurl.c
 
-hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h 
+hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_tocloud.c
 
 hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h

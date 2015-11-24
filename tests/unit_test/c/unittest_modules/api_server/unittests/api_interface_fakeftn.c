@@ -79,15 +79,6 @@ int mount_status(char *fsname)
 	return 0;
 }
 
-int pin_inode(ino_t thisinode)
-{
-	return 0;
-}
-int unpin_inode(ino_t thisinode)
-{
-	return 0;
-}
-
 int search_mount(char *fsname, MOUNT_T **mt_info)
 {
 	return -ENOENT;
@@ -153,3 +144,16 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return NULL;
 }
 
+int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
+{
+	if (PIN_INODE_ROLLBACK == TRUE)
+		return -EIO;
+	return 0;
+}
+
+int unpin_inode(ino_t this_inode, long long *reserved_release_size)
+{
+	if (UNPIN_INODE_FAIL == TRUE)
+		return -EIO;
+	return 0;
+}
