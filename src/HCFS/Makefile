@@ -44,7 +44,7 @@ hcfs: $(OBJS)
 -include $(OBJS:.o=.d)
 
 # compile and generate dependency info
-$(OBJS_DIR)%.o: %.c
+$(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)$*.o
 	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)$*.d
 	@mv -f $(OBJS_DIR)$*.d $(OBJS_DIR)$*.d.tmp
@@ -52,6 +52,9 @@ $(OBJS_DIR)%.o: %.c
 	@sed -e 's/.*://' -e 's/\\$$//' < $(OBJS_DIR)$*.d.tmp | fmt -1 | \
 		sed -e 's/^ *//' -e 's/$$/:/' >> $(OBJS_DIR)$*.d
 	@rm -f $(OBJS_DIR)$/*.d.tmp
+
+$(OBJS_DIR):
+	mkdir $@
 
 clean:
 	rm -rf hcfs $(OBJS_DIR)*.o $(OBJS_DIR)*.d
