@@ -17,8 +17,11 @@ pin_ops.o: pin_ops.c pin_ops.h
 hcfs_stat.o: hcfs_stat.c hcfs_stat.h
 	$(CC) -c hcfs_stat.c
 
-utils.p: utils.c utils.h
+utils.o: utils.c utils.h
 	$(CC) -c utils.c
+
+publish: doc
+	sudo cp -r doc /mnt/nas/CloudDataSolution/Gateway_2.0/
 
 doc: HCFS_api.c HCFS_api.h
 	cldoc generate -c -- --basedir . --type html --static --merge docs  --output doc HCFS_api.h

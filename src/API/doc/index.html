@@ -22,6 +22,11 @@
             </ul>
             <div class="subtitle">Functions</div>
             <ul>
+                <li><a href="#HCFS_dir_status">HCFS_dir_status<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Dir status</p>
+                    </div>
+                </li>
                 <li><a href="#HCFS_file_status">HCFS_file_status<span class="counter"></span></a>
                     <div class="brief">
                         <p>File status</p>
@@ -100,6 +105,59 @@
             </div>
             <h2 data-cldoc-dynamic="1" id="functions">Functions</h2>
             <div class="functions">
+                <div class="function">
+                    <div class="declaration" id="HCFS_dir_status">
+                        <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                        </div>
+                        <table class="declaration">
+                            <tbody>
+                                <tr>
+                                    <td class="identifier">HCFS_dir_status</td>
+                                    <td class="open_paren">(</td>
+                                    <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                    </td>
+                                    <td class="argument_name">json_res,</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2"></td>
+                                    <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                    </td>
+                                    <td class="argument_name">pathname</td>
+                                    <td class="close_paren">)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="doc">
+                        <p>To get the status of (pathname).</p>
+                        <p>Return data dict in json_res -</p>
+                        <pre><code class="lang-json">data: {
+    num_local: num,
+    num_cloud: num,
+    num_hybrid: num,
+}</code></pre>
+                    </div>
+                    <table class="arguments">
+                        <tbody>
+                            <tr id="HCFS_dir_status::json_res">
+                                <td>json_res</td>
+                                <td>
+                                    <div class="doc">
+                                        <p>result string in json format.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr id="HCFS_dir_status::pathname">
+                                <td>pathname</td>
+                                <td>
+                                    <div class="doc">
+                                        <p>target pathname.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
                 <div class="function">
                     <div class="declaration" id="HCFS_file_status">
                         <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
@@ -626,8 +684,8 @@
     cloud_total: Bytes,
     cloud_used: Bytes,
     cache_total: Bytes,
+    cache_used: Bytes,
     cache_dirty: Bytes,
-    cache_clean: Bytes,
     pin_max: Bytes,
     pin_total: Bytes,
     xfer_up: Bytes,

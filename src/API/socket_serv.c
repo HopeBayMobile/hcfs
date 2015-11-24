@@ -43,6 +43,8 @@ int process_request(int thread_idx)
 	long long cloud_usage;
 	long long cache_total, cache_used, cache_dirty;
 	long long pin_max, pin_total;
+	long long xfer_up, xfer_down;
+	long long num_local, num_cloud, num_hybrid;
 	char buf_reused;
 	char buf[512];
 	char res_buf[512];
@@ -114,6 +116,32 @@ int process_request(int thread_idx)
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
 
+	case CHECKDIRSTAT:
+		printf("Check dir stat");
+		ret_len = 0;
+		ret_code = check_dir_status(largebuf, arg_len,
+					       &num_local, &num_cloud,
+					       &num_hybrid);
+
+		if (ret_code < 0) {
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, &ret_code, sizeof(int), 0);
+		}
+
+		memcpy(&(res_buf[ret_len]), &num_local, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &num_cloud, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &num_hybrid, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, res_buf, ret_len, 0);
+
+		break;
+
 	case CHECKLOC:
 		printf("Check file loc\n");
 		ret_code = check_file_loc(largebuf, arg_len);
@@ -133,7 +161,8 @@ int process_request(int thread_idx)
 		ret_len = 0;
 		ret_code = get_hcfs_stat(&cloud_usage, &cache_total,
 					 &cache_used, &cache_dirty,
-					 &pin_max, &pin_total);
+					 &pin_max, &pin_total,
+					 &xfer_up, &xfer_down);
 		if (ret_code < 0) {
 			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
@@ -155,6 +184,12 @@ int process_request(int thread_idx)
 		ret_len += sizeof(long long);
 
 		memcpy(&(res_buf[ret_len]), &pin_total, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &xfer_up, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &xfer_down, sizeof(long long));
 		ret_len += sizeof(long long);
 
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);

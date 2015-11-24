@@ -67,7 +67,7 @@ int get_cache_usage(long long *cache_total, long long *cache_used,
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = _get_usage_val(GETCACHESIZE, cache_dirty);
+	ret_code = _get_usage_val(GETDIRTYCACHESIZE, cache_dirty);
 	if (ret_code < 0)
 		return ret_code;
 
@@ -90,9 +90,42 @@ int get_pin_usage(long long *pin_max, long long *pin_total)
 	return 0;
 }
 
+int get_xfer_usage(long long *xfer_up, long long *xfer_down)
+{
+
+	int fd, ret_code, size_msg;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	char buf[1];
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = GETXFERSTAT;
+	cmd_len = 1;
+	buf[0] = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	if (reply_len > sizeof(int)) {
+		size_msg = recv(fd, xfer_down, sizeof(long long), 0);
+		size_msg = recv(fd, xfer_up, sizeof(long long), 0);
+	} else {
+		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+		return ret_code;
+	}
+
+	close(fd);
+	return 0;
+}
+
 int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
 		  long long *cache_used, long long *cache_dirty,
-		  long long *pin_max, long long *pin_total)
+		  long long *pin_max, long long *pin_total,
+		  long long *xfer_up, long long *xfer_down)
 {
 
 	int ret_code;
@@ -109,10 +142,9 @@ int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
 	if (ret_code < 0)
 		return ret_code;
 
+	get_xfer_usage(xfer_up, xfer_down);
+	if (ret_code < 0)
+		return ret_code;
+
 	return 0;
-}
-
-int get_xfer_usage()
-{
-
 }

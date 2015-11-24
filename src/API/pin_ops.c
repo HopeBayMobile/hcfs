@@ -252,6 +252,48 @@ int check_pin_status(char *buf, unsigned int arg_len)
 	return ret_code;
 }
 
+int check_dir_status(char *buf, unsigned int arg_len,
+			long long *num_local, long long *num_cloud,
+			long long *num_hybrid)
+{
+
+	int fd, size_msg, count, ret_code;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	char path[400];
+	ino_t tmp_inode;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = CHECKDIRSTAT;
+	cmd_len = sizeof(ino_t);
+
+	memcpy(path, &(buf[0]), arg_len);
+
+	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	if (ret_code < 0) {
+		close(fd);
+		return ret_code;
+	}
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &tmp_inode, sizeof(ino_t), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	if (reply_len > sizeof(unsigned int)) {
+		size_msg = recv(fd, num_local, sizeof(long long), 0);
+		size_msg = recv(fd, num_cloud, sizeof(long long), 0);
+		size_msg = recv(fd, num_hybrid, sizeof(long long), 0);
+	} else {
+		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	}
+
+	close(fd);
+	return ret_code;
+}
+
 int check_file_loc(char *buf, unsigned int arg_len)
 {
 

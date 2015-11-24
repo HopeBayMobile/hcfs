@@ -38,24 +38,6 @@ int main()
 	printf("%s\n", res3);
 	free(res3);
 
-	long long cloud_usage = 0;
-	get_cloud_usage(&cloud_usage);
-	printf("%lld\n", cloud_usage);
-
-	long long cache_total = 0;
-	long long cache_used = 0;
-	long long cache_dirty = 0;
-	get_cache_usage(&cache_total, &cache_used, &cache_dirty);
-	printf("%lld\n", cache_total);
-	printf("%lld\n", cache_used);
-	printf("%lld\n", cache_dirty);
-
-	long long pin_max = 0;
-	long long pin_total = 0;
-	get_pin_usage(&pin_max, &pin_total);
-	printf("%lld\n", pin_max);
-	printf("%lld\n", pin_total);
-
 	char *res4;
 	HCFS_pin_status(&res4, pin_path);
 	printf("%s\n", res4);
@@ -70,6 +52,21 @@ int main()
 	HCFS_stat(&res6);
 	printf("%s\n", res6);
 	free(res6);
+
+	char *res7;
+	HCFS_dir_status(&res7, pin_path2);
+	printf("%s\n", res7);
+	free(res7);
+
+	char *res8;
+	HCFS_set_config(&res8, "swift_account", "test");
+	printf("res8 - %s\n", res8);
+	free(res8);
+
+	char *res9;
+	HCFS_get_config(&res9, "swift_url");
+	printf("res9 - %s\n", res9);
+	free(res9);
 }
 
 

@@ -143,6 +143,23 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
  */
 void HCFS_pin_status(char **json_res, char *pathname);
 
+/*Dir status
+ * @json_res result string in json format.
+ * @pathname target pathname.
+ *
+ * To get the status of (pathname).
+ *
+ * Return data dict in json_res -
+ * ```json
+ * data: {
+ *     num_local: num,
+ *     num_cloud: num,
+ *     num_hybrid: num,
+ * }
+ * ```
+ */
+void HCFS_dir_status(char **json_res, char *pathname);
+
 /*File status
  * @json_res result string in json format.
  * @pathname target pathname.
