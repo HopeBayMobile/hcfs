@@ -230,7 +230,7 @@ static inline int _upload_terminate_thread(int index)
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
 #if (DEDUP_ENABLE)
-					// Store hash in block meta too
+					/* Store hash in block meta too */
 					memcpy(tmp_entry->obj_id, blk_obj_id,
 					       OBJID_LENGTH);
 #endif
@@ -379,7 +379,7 @@ void collect_finished_upload_threads(void *ptr)
 			sem_post(&(sync_ctl.sync_op_sem));
 
 #if (DEDUP_ENABLE)
-			// Reset uploaded flag for upload thread
+			/* Reset uploaded flag for upload thread */
 			upload_ctl.upload_threads[count].is_upload = FALSE;
 #endif
 			upload_ctl.threads_in_use[count] = FALSE;
@@ -414,7 +414,8 @@ void init_sync_control(void)
 
 void init_upload_control(void)
 {
-	int count, ret_val;
+	int count;
+	/* int ret_val; */
 
 	memset(&upload_ctl, 0, sizeof(UPLOAD_THREAD_CONTROL));
 	memset(&upload_curl_handles, 0,
@@ -564,7 +565,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	struct timespec time_to_sleep;
 	BLOCK_ENTRY *tmp_entry;
 	long long temp_trunc_size;
+#ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
+#endif
 	size_t ret_size;
 	char sync_error;
 	int count1;
@@ -581,7 +584,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	ret = fetch_meta_path(thismetapath, this_inode);
 
-	write_log(10, "Sync inode %" PRIu64 ", mode %d\n", (uint64_t)ptr->inode, ptr->this_mode);
+	write_log(10, "Sync inode %" PRIu64 ", mode %d\n", (uint64_t)ptr->inode,
+		  ptr->this_mode);
 	if (ret < 0) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -1467,6 +1471,7 @@ void upload_loop(void)
 	int ret_val, ret;
 	char do_something;
 	char is_start_check;
+	char wait_backend = FALSE;
 
 	init_upload_control();
 	init_sync_control();
@@ -1495,6 +1500,25 @@ void upload_loop(void)
 		}
 
 		is_start_check = FALSE;
+
+		/* sleep until backend is back */
+		if (hcfs_system->backend_status_is_online == FALSE) {
+			sleep(1);
+			if (wait_backend == FALSE) {
+				write_log(10,
+					  "Debug: %s sleep (backend offline)\n",
+					  __func__);
+				wait_backend = TRUE;
+			}
+			continue;
+		} else {
+			if (wait_backend == TRUE) {
+				write_log(10,
+					  "Debug: %s resume (backend online)\n",
+					  __func__);
+				wait_backend = FALSE;
+			}
+		}
 
 		/* Get first dirty inode or next inode */
 		sem_wait(&(sync_ctl.sync_queue_sem));
