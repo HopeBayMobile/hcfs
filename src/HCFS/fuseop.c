@@ -3315,7 +3315,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 		if (fh_ptr->meta_cache_ptr == NULL) {
-			fuse_reply_err(req, -ENOMEM);
+			fuse_reply_err(req, ENOMEM);
 			free(buf);
 			return;
 		}
@@ -4588,7 +4588,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
 		meta_cache_remove(this_inode);
-		fuse_reply_err(req, -ret_val);
+		fuse_reply_err(req, ret_val);
 		return;
 	}
 
