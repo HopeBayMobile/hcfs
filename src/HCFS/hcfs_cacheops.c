@@ -297,14 +297,22 @@ errcode_handle:
 }
 
 
-int _check_cache_replace(long long *num_removed_inode)
+static int _check_cache_replace_result(long long *num_removed_inode)
 {
+	/* If number of removed inodes = 0, and cache size is full, and
+	 * backend is offline, then wake them up and tell them cannot
+	 * do this action.
+	 */
 	if (*num_removed_inode == 0) { /* No inodes be removed */
 		if ((hcfs_system->systemdata.cache_size >
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
 			(hcfs_system->backend_status_is_online == FALSE))
+			/* Wake them up */
 			notify_sleep_on_cache(-EPERM);
 	}
+
+	if (hcfs_system->backend_status_is_online == FALSE)
+		sleep(1);
 
 	*num_removed_inode = 0;
 	return 0;
@@ -371,7 +379,7 @@ void run_cache_loop(void)
 				break;
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
-				_check_cache_replace(&num_removed_inode);
+				_check_cache_replace_result(&num_removed_inode);
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -388,7 +396,7 @@ void run_cache_loop(void)
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
-					_check_cache_replace(&num_removed_inode);
+					_check_cache_replace_result(&num_removed_inode);
 					ret = build_cache_usage();
 					if (ret < 0) {
 						write_log(0,

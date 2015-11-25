@@ -1124,6 +1124,12 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
 
 	fclose(fptr);
+	if (new_fptr == NULL) {
+		if (data != NULL)
+			free(data);
+		return -EIO;
+	}
+
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
