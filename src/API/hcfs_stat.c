@@ -14,19 +14,16 @@ int _get_usage_val(unsigned int api_code, long long *res_val)
 	int fd, ret_code, size_msg;
 	unsigned int code, cmd_len, reply_len;
 	long long ll_ret_code;
-	char buf[1];
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
 		return fd;
 
 	code = api_code;
-	cmd_len = 1;
-	buf[0] = 0;
+	cmd_len = 0;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ll_ret_code, sizeof(long long), 0);
@@ -46,12 +43,35 @@ int _get_usage_val(unsigned int api_code, long long *res_val)
 int get_cloud_usage(long long *cloud_usage)
 {
 
-	int ret_code;
+	int fd, ret_code, size_msg;
+	unsigned int code, cmd_len, reply_len;
+	long long ll_ret_code;
+	char buf[1];
 
-	ret_code = _get_usage_val(GETCLOUDSIZE, cloud_usage);
-	if (ret_code < 0)
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = GETCLOUDSIZE;
+	cmd_len = 1;
+	buf[0] = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ll_ret_code, sizeof(long long), 0);
+
+	if (ll_ret_code < 0) {
+		*cloud_usage = 0;
+		ret_code = (int)ll_ret_code;
+		close(fd);
 		return ret_code;
+	}
 
+	*cloud_usage = ll_ret_code;
+	close(fd);
 	return 0;
 }
 
@@ -114,6 +134,7 @@ int get_xfer_usage(long long *xfer_up, long long *xfer_down)
 		size_msg = recv(fd, xfer_up, sizeof(long long), 0);
 	} else {
 		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+		close(fd);
 		return ret_code;
 	}
 
@@ -141,8 +162,6 @@ int get_cloud_stat(int *cloud_stat)
 	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	*cloud_stat = ret_code;
-	printf("cloud stat - %d\n", cloud_stat);
-
 	close(fd);
 	return 0;
 }
@@ -168,11 +187,11 @@ int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
 	if (ret_code < 0)
 		return ret_code;
 
-	get_xfer_usage(xfer_up, xfer_down);
+	ret_code = get_xfer_usage(xfer_up, xfer_down);
 	if (ret_code < 0)
 		return ret_code;
 
-	get_cloud_stat(cloud_stat);
+	ret_code = get_cloud_stat(cloud_stat);
 	if (ret_code < 0)
 		return ret_code;
 

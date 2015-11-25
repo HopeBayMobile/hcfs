@@ -62,8 +62,9 @@ int _get_path_stat(char *pathname, ino_t *inode, long long *total_size)
 		*inode = stat_buf.st_ino;
 		if (total_size != NULL)
 			_walk_folder(pathname, total_size);
-	} else
+	} else {
 		return -1;
+	}
 
 	return 0;
 
@@ -226,6 +227,11 @@ int check_pin_status(char *buf, unsigned int arg_len)
 	char path[400];
 	ino_t tmp_inode;
 
+
+	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	if (ret_code < 0)
+		return ret_code;
+
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
 		return fd;
@@ -234,12 +240,6 @@ int check_pin_status(char *buf, unsigned int arg_len)
 	cmd_len = sizeof(ino_t);
 
 	memcpy(path, &(buf[0]), arg_len);
-
-	ret_code = _get_path_stat(path, &tmp_inode, NULL);
-	if (ret_code < 0) {
-		close(fd);
-		return ret_code;
-	}
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -262,6 +262,11 @@ int check_dir_status(char *buf, unsigned int arg_len,
 	char path[400];
 	ino_t tmp_inode;
 
+
+	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	if (ret_code < 0)
+		return ret_code;
+
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
 		return fd;
@@ -270,12 +275,6 @@ int check_dir_status(char *buf, unsigned int arg_len,
 	cmd_len = sizeof(ino_t);
 
 	memcpy(path, &(buf[0]), arg_len);
-
-	ret_code = _get_path_stat(path, &tmp_inode, NULL);
-	if (ret_code < 0) {
-		close(fd);
-		return ret_code;
-	}
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -302,6 +301,11 @@ int check_file_loc(char *buf, unsigned int arg_len)
 	char path[400];
 	ino_t tmp_inode;
 
+
+	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	if (ret_code < 0)
+		return ret_code;
+
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
 		return fd;
@@ -310,12 +314,6 @@ int check_file_loc(char *buf, unsigned int arg_len)
 	cmd_len = sizeof(ino_t);
 
 	memcpy(path, &(buf[0]), arg_len);
-
-	ret_code = _get_path_stat(path, &tmp_inode, NULL);
-	if (ret_code < 0) {
-		close(fd);
-		return ret_code;
-	}
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);

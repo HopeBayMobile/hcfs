@@ -55,7 +55,6 @@ int _validate_config_key(char *key)
 {
 
 	int idx, num_keys;
-
 	char *keys[] = {\
 		"swift_account",\
 		"swift_user",\
@@ -64,6 +63,7 @@ int _validate_config_key(char *key)
 		"swift_container",\
 		"swift_protocol"\
 	};
+
 
 	num_keys = sizeof(keys) / sizeof(keys[0]);
 
@@ -166,9 +166,11 @@ void HCFS_get_config(char **json_res, char *key)
 			token = strsep(&line, " =");
 			token = strsep(&line, " ");
 			token = strsep(&line, "\n");
+
 			data = json_object();
 			json_object_set_new(data, key, json_string(token));
 			_json_response(json_res, TRUE, 0, data);
+
 			free(tmp_ptr);
 			ret_code = 0;
 			break;

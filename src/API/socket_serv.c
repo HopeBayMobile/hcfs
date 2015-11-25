@@ -201,12 +201,16 @@ int process_request(int thread_idx)
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, res_buf, ret_len, 0);
 
+		break;
+
 	case RESETXFERSTAT:
 		printf("Reset xfer\n");
 		ret_len = 0;
 		ret_code = reset_xfer_usage();
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
+
+		break;
 	}
 
 	printf("Get API code - %d from fd - %d\n", api_code, fd);
