@@ -187,6 +187,7 @@ void HCFS_stat(char **json_res)
 {
 
 	int fd, status, size_msg, ret_code;
+	int cloud_stat;
 	unsigned int code, reply_len, cmd_len, buf_idx;
 	long long cloud_usage;
 	long long cache_total, cache_used, cache_dirty;
@@ -240,6 +241,9 @@ void HCFS_stat(char **json_res)
 		memcpy(&xfer_down, &(buf[buf_idx]), sizeof(long long));
 		buf_idx += sizeof(long long);
 
+		memcpy(&cloud_stat, &(buf[buf_idx]), sizeof(int));
+		buf_idx += sizeof(int);
+
 		data = json_object();
 		json_object_set_new(data, "cloud_used", json_integer(cloud_usage));
 		json_object_set_new(data, "cache_total", json_integer(cache_total));
@@ -249,6 +253,7 @@ void HCFS_stat(char **json_res)
 		json_object_set_new(data, "pin_total", json_integer(pin_total));
 		json_object_set_new(data, "xfer_up", json_integer(xfer_up));
 		json_object_set_new(data, "xfer_down", json_integer(xfer_down));
+		json_object_set_new(data, "cloud_conn", json_boolean(cloud_stat));
 
 		_json_response(json_res, TRUE, ret_code, data);
 	}

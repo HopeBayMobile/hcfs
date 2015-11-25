@@ -25,52 +25,52 @@ int main()
 
 	char *res1;
 	HCFS_pin_path(&res1, pin_path);
-	printf("%s\n", res1);
+	printf("pin path - %s\n", res1);
 	free(res1);
 
 	char *res2;
 	HCFS_unpin_path(&res2, pin_path2);
-	printf("%s\n", res2);
+	printf("unpin path - %s\n", res2);
 	free(res2);
 
 	char *res3;
 	HCFS_unpin_app(&res3, pin_path2, pin_path3, pin_path3, pin_path5);
-	printf("%s\n", res3);
+	printf("unpin app - %s\n", res3);
 	free(res3);
 
 	char *res4;
 	HCFS_pin_status(&res4, pin_path);
-	printf("%s\n", res4);
+	printf("pin status - %s\n", res4);
 	free(res4);
 
 	char *res5;
 	HCFS_file_status(&res5, pin_path);
-	printf("%s\n", res5);
+	printf("file status - %s\n", res5);
 	free(res5);
 
 	char *res6;
 	HCFS_stat(&res6);
-	printf("%s\n", res6);
+	printf("stat - %s\n", res6);
 	free(res6);
 
 	char *res7;
 	HCFS_dir_status(&res7, pin_path2);
-	printf("%s\n", res7);
+	printf("dir stat - %s\n", res7);
 	free(res7);
 
 	char *res8;
 	HCFS_set_config(&res8, "swift_account", "test");
-	printf("res8 - %s\n", res8);
+	printf("set config - %s\n", res8);
 	free(res8);
 
 	char *res9;
 	HCFS_get_config(&res9, "swift_account");
-	printf("res9 - %s\n", res9);
+	printf("get config - %s\n", res9);
 	free(res9);
 
 	char *res10;
 	HCFS_reset_xfer(&res10);
-	printf("res10 - %s\n", res10);
+	printf("reset xfer - %s\n", res10);
 	free(res10);
 }
 

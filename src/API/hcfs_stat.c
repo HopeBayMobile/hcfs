@@ -12,7 +12,7 @@ int _get_usage_val(unsigned int api_code, long long *res_val)
 {
 
 	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	unsigned int code, cmd_len, reply_len;
 	long long ll_ret_code;
 	char buf[1];
 
@@ -96,8 +96,7 @@ int get_xfer_usage(long long *xfer_up, long long *xfer_down)
 {
 
 	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
-	char buf[1];
+	unsigned int code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -122,10 +121,37 @@ int get_xfer_usage(long long *xfer_up, long long *xfer_down)
 	return 0;
 }
 
+int get_cloud_stat(int *cloud_stat)
+{
+
+	int fd, ret_code, size_msg;
+	unsigned int code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = CLOUDSTAT;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	*cloud_stat = ret_code;
+	printf("cloud stat - %d\n", cloud_stat);
+
+	close(fd);
+	return 0;
+}
+
 int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
 		  long long *cache_used, long long *cache_dirty,
 		  long long *pin_max, long long *pin_total,
-		  long long *xfer_up, long long *xfer_down)
+		  long long *xfer_up, long long *xfer_down,
+		  int *cloud_stat)
 {
 
 	int ret_code;
@@ -143,6 +169,10 @@ int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
 		return ret_code;
 
 	get_xfer_usage(xfer_up, xfer_down);
+	if (ret_code < 0)
+		return ret_code;
+
+	get_cloud_stat(cloud_stat);
 	if (ret_code < 0)
 		return ret_code;
 

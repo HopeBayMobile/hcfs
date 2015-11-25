@@ -39,8 +39,8 @@ int process_request(int thread_idx)
 {
 
 	int fd, ret_code, to_recv, buf_idx;
+	int cloud_stat;
 	unsigned int api_code, arg_len, ret_len;
-	ssize_t size_msg, msg_len;
 	long long cloud_usage;
 	long long cache_total, cache_used, cache_dirty;
 	long long pin_max, pin_total;
@@ -50,6 +50,7 @@ int process_request(int thread_idx)
 	char buf[512];
 	char res_buf[512];
 	char *largebuf;
+	ssize_t size_msg, msg_len;
 
 	msg_len = 0;
 	ret_len = 0;
@@ -163,7 +164,8 @@ int process_request(int thread_idx)
 		ret_code = get_hcfs_stat(&cloud_usage, &cache_total,
 					 &cache_used, &cache_dirty,
 					 &pin_max, &pin_total,
-					 &xfer_up, &xfer_down);
+					 &xfer_up, &xfer_down,
+					 &cloud_stat);
 		if (ret_code < 0) {
 			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
@@ -192,6 +194,9 @@ int process_request(int thread_idx)
 
 		memcpy(&(res_buf[ret_len]), &xfer_down, sizeof(long long));
 		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &cloud_stat, sizeof(int));
+		ret_len += sizeof(int);
 
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, res_buf, ret_len, 0);
