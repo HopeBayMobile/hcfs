@@ -53,6 +53,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 
 int backup_FS_database(void);
 int restore_FS_database(void);
+int prepare_FS_database_backup(void);
 
 #endif  /* GW20_HCFS_FS_MANAGER_H_ */
 

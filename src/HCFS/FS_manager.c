@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/file.h>
 #include <fcntl.h>
 
 #include "macro.h"
@@ -121,7 +122,7 @@ int init_fs_manager(void)
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
 					sizeof(DIR_META_TYPE), 16);
 
-		ret = backup_FS_database();
+		ret = prepare_FS_database_backup();
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -521,7 +522,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	memcpy(ret_entry, &temp_entry, sizeof(DIR_ENTRY));
 
 	/* TODO: return handling for backup database */
-	backup_FS_database();
+	prepare_FS_database_backup();
 	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
@@ -837,19 +838,19 @@ errcode_handle:
 
 /************************************************************************
 *
-* Function name: backup_FS_database
+* Function name: prepare_FS_database_backup
 *        Inputs: None
-*       Summary: Upload FS backup to backend.
+*       Summary: Write DB to a tmp file for backup to backend.
 *          Note: Assume that the op_lock is locked when calling
 *
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int backup_FS_database(void)
+int prepare_FS_database_backup(void)
 {
+	char tmppath[METAPATHLEN];
 	FILE *fptr;
 	int ret, errcode;
-	CURL_HANDLE upload_handle;
 	char buf[4096];
 	size_t ret_size;
 	ssize_t ret_ssize;
@@ -857,9 +858,100 @@ int backup_FS_database(void)
 
 	if (CURRENT_BACKEND == NONE)
 		return 0;
-	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+
+	snprintf(tmppath, METAPATHLEN, "%s/fsmgr_upload", METAPATH);
 
 	/* Assume that the access lock is locked already */
+
+	fptr = NULL;
+	if (access(tmppath, F_OK) == 0)
+		fptr = fopen(tmppath, "r+");
+	else
+		fptr = fopen(tmppath, "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	flock(fileno(fptr), LOCK_EX);
+	setbuf(fptr, NULL);
+	FTRUNCATE(fileno(fptr), 0);
+
+	curpos = 0;
+	ret_ssize = 0;
+	while (!feof(fptr)) {
+		PREAD(fs_mgr_head->FS_list_fh, buf, 4096, curpos);
+		if (ret_ssize <= 0)
+			break;
+		curpos += ret_ssize;
+		FWRITE(buf, 1, (size_t) ret_ssize, fptr);
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:
+	if (fptr != NULL)
+		fclose(fptr);
+
+	unlink(tmppath);
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: backup_FS_database
+*        Inputs: None
+*       Summary: Upload FS backup to backend if the temp backup file exists.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int backup_FS_database(void)
+{
+	char tmppath[METAPATHLEN];
+	FILE *fptr, *tmpdbfptr;
+	int ret, errcode;
+	CURL_HANDLE upload_handle;
+	char buf[4096];
+	size_t ret_size;
+	ssize_t ret_ssize;
+	off_t ret_pos;
+
+	if (CURRENT_BACKEND == NONE)
+		return 0;
+	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+
+	snprintf(tmppath, METAPATHLEN, "%s/fsmgr_upload", METAPATH);
+
+	/* Check if temp db exists and needs to be uploaded */
+	if (access(tmppath, F_OK) != 0)
+		return 0;
+
+	tmpdbfptr = NULL;
+	tmpdbfptr = fopen(tmppath, "r");
+	if (tmpdbfptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	flock(fileno(tmpdbfptr), LOCK_EX);
+	/* Check if file size is zero. If so, do nothing */
+	FSEEK(tmpdbfptr, 0, SEEK_END);
+	FTELL(tmpdbfptr);
+	if (ret_pos == 0) {
+		/* Empty file, do nothing */
+		flock(fileno(tmpdbfptr), LOCK_UN);
+		fclose(tmpdbfptr);
+		return 0;
+	}
+	FSEEK(tmpdbfptr, 0, SEEK_SET);
+
 	fptr = NULL;
 	fptr = fopen("/tmp/FSmgr_upload", "w");
 	if (fptr == NULL) {
@@ -869,31 +961,22 @@ int backup_FS_database(void)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	curpos = 0;
 	ret_ssize = 0;
 	while (!feof(fptr)) {
-		PREAD(fs_mgr_head->FS_list_fh, buf, 4096, curpos);
-		if (ret_ssize <= 0)
+		FREAD(buf, 1, 4096, tmpdbfptr);
+		if (ret_size == 0)
 			break;
-		curpos += ret_ssize;
-		FWRITE(buf, 1, ret_ssize, fptr);
+		FWRITE(buf, 1, ret_size, fptr);
 	}
-
+	flock(fileno(tmpdbfptr), LOCK_UN);
+	fclose(tmpdbfptr);
 	fclose(fptr);
 
 	fptr = NULL;
 	snprintf(upload_handle.id, 256, "FSmgr_upload");
 	upload_handle.curl_backend = NONE;
 	upload_handle.curl = NULL;
-	/* Do not actually init backend until needed */
-/*
-	ret = hcfs_init_backend(&upload_handle);
-	if ((ret < 200) || (ret > 299)) {
-		errcode = -EIO;
-		write_log(0, "Error in backing up FS database\n");
-		goto errcode_handle;
-	}
-*/
+
 	fptr = fopen("/tmp/FSmgr_upload", "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -913,6 +996,7 @@ int backup_FS_database(void)
 
 	unlink("/tmp/FSmgr_upload");
 	hcfs_destroy_backend(&upload_handle);
+	unlink(tmppath);
 	return 0;
 
 errcode_handle:

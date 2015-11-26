@@ -187,3 +187,7 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
+int backup_FS_database(void)
+{
+	return 0;
+}
