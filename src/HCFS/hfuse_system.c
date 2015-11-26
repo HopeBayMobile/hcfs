@@ -87,6 +87,7 @@ int init_hcfs_system_data(void)
 
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 1, 1);
+	sem_init(&(hcfs_system->fuse_sem), 1, 0);
 	sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
