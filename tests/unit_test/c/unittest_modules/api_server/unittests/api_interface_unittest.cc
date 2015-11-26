@@ -29,6 +29,7 @@ class init_api_interfaceTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    sem_init(&(hcfs_system->fuse_sem), 0, 0);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
    }

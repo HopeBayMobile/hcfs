@@ -27,6 +27,7 @@ class init_fs_managerTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     METAPATH = (char *)malloc(sizeof(char)*100);
@@ -36,6 +37,8 @@ class init_fs_managerTest : public ::testing::Test {
     if (access(METAPATH, F_OK) != 0)
       mkdir(METAPATH, 0700);
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
    }
 
   virtual void TearDown() {
@@ -47,6 +50,7 @@ class init_fs_managerTest : public ::testing::Test {
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
     unlink(tmpmgrpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -122,6 +126,7 @@ class destroy_fs_managerTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     METAPATH = (char *)malloc(sizeof(char)*100);
@@ -131,10 +136,13 @@ class destroy_fs_managerTest : public ::testing::Test {
     if (access(METAPATH, F_OK) != 0)
       mkdir(METAPATH, 0700);
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
    }
 
   virtual void TearDown() {
     unlink(tmpmgrpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -172,6 +180,8 @@ class add_filesystemTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   char tmpsyncpath[100];
+  char tmpbackuppath[100];
+
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -185,6 +195,9 @@ class add_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     entry_in_database = FALSE;
     snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
@@ -202,6 +215,7 @@ class add_filesystemTest : public ::testing::Test {
     snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
     rmdir(tmpsyncpath);
     unlink(tmpmgrpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -381,6 +395,7 @@ class delete_filesystemTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   char tmpsyncpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -396,6 +411,9 @@ class delete_filesystemTest : public ::testing::Test {
       unlink(tmpmgrpath);
     snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
     mkdir(tmpsyncpath, 0700);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     sem_init(&(mount_mgr.mount_lock), 0, 1);
 
@@ -412,6 +430,7 @@ class delete_filesystemTest : public ::testing::Test {
     unlink(tmpmgrpath);
     snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
     rmdir(tmpsyncpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -555,6 +574,7 @@ class check_filesystemTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   char tmpsyncpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -568,6 +588,9 @@ class check_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
     mkdir(tmpsyncpath, 0700);
@@ -585,6 +608,7 @@ class check_filesystemTest : public ::testing::Test {
     unlink(tmpmgrpath);
     snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
     rmdir(tmpsyncpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -688,6 +712,7 @@ class list_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -701,6 +726,9 @@ class list_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
 
    }
@@ -714,6 +742,7 @@ class list_filesystemTest : public ::testing::Test {
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
     unlink(tmpmgrpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -916,6 +945,7 @@ class backup_FS_databaseTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -929,6 +959,9 @@ class backup_FS_databaseTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     failedcurlinit = FALSE;
     failedput = FALSE;
@@ -944,6 +977,7 @@ class backup_FS_databaseTest : public ::testing::Test {
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
     unlink(tmpmgrpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);
@@ -953,10 +987,16 @@ class backup_FS_databaseTest : public ::testing::Test {
 
 TEST_F(backup_FS_databaseTest, CannotCreate) {
   int ret;
+  FILE *tmpfptr;
 
   mknod("/tmp/FSmgr_upload", S_IFREG | 0400, 0);
 
   ret = init_fs_manager();
+  EXPECT_EQ(0, ret);
+  tmpfptr = fopen(tmpbackuppath, "w");
+  fprintf(tmpfptr, "test data\n");
+  fclose(tmpfptr);
+  ret = backup_FS_database();
   EXPECT_EQ(-EACCES, ret);
   unlink("/tmp/FSmgr_upload");
  }
@@ -974,6 +1014,8 @@ TEST_F(backup_FS_databaseTest, UploadDone) {
   tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
 
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  ret = prepare_FS_database_backup();
+  EXPECT_EQ(0, ret);
 
   ret = backup_FS_database();
   EXPECT_EQ(0, ret);
@@ -1007,6 +1049,9 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
   failedcurlinit = TRUE;
 
+  ret = prepare_FS_database_backup();
+  EXPECT_EQ(0, ret);
+
   ret = backup_FS_database();
   EXPECT_EQ(-EIO, ret);
 
@@ -1035,6 +1080,8 @@ TEST_F(backup_FS_databaseTest, FailedPut) {
 
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
   failedput = TRUE;
+  ret = prepare_FS_database_backup();
+  EXPECT_EQ(0, ret);
 
   ret = backup_FS_database();
   EXPECT_EQ(-EIO, ret);
@@ -1058,6 +1105,7 @@ class restore_FS_databaseTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -1071,6 +1119,9 @@ class restore_FS_databaseTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     failedcurlinit = FALSE;
     failedget = FALSE;
@@ -1080,6 +1131,7 @@ class restore_FS_databaseTest : public ::testing::Test {
 
   virtual void TearDown() {
     unlink(tmpmgrpath);
+    unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
     free(METAPATH);

@@ -1478,7 +1478,10 @@ void upload_loop(void)
 
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
-			for (sleep_count = 0; sleep_count < 30; sleep_count++) {
+			/* Backup FS db if needed at the beginning of a round
+			of to-upload inode scanning */
+			backup_FS_database();
+			for (sleep_count = 0; sleep_count < 10; sleep_count++) {
 				/*Sleep for a while if we are not really
 					in a hurry*/
 				if (hcfs_system->systemdata.cache_size <
@@ -1551,11 +1554,8 @@ void upload_loop(void)
 		} else {
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
-		if (ino_check == 0) {
-			if (do_something == FALSE)
-				sleep(5);
+		if (ino_check == 0)
 			is_start_check = TRUE;
-		}
 	}
 
 	pthread_join(upload_ctl.upload_handler_thread, NULL);

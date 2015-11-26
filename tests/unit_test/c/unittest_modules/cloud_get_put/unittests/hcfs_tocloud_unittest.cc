@@ -4,6 +4,8 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <inttypes.h>
+#include <errno.h>
+#include <string.h>
 #include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
@@ -21,7 +23,13 @@ class uploadEnvironment : public ::testing::Environment {
   virtual void SetUp() {
     int shm_key;
 
-    shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
+    shm_key = shmget(5678, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
+    if (shm_key < 0) {
+      int errcode;
+      errcode = errno;
+      printf("Error %d %s\n", errcode, strerror(errcode));
+      return;
+    }
     hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
 
 //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
