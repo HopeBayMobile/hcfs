@@ -304,15 +304,13 @@ static int _check_cache_replace_result(long long *num_removed_inode)
 	 * do this action.
 	 */
 	if (*num_removed_inode == 0) { /* No inodes be removed */
-		if ((hcfs_system->systemdata.cache_size >
+		if ((hcfs_system->systemdata.cache_size >=
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
 			(hcfs_system->backend_status_is_online == FALSE))
 			/* Wake them up */
 			notify_sleep_on_cache(-EPERM);
-	}
-
-	if (hcfs_system->backend_status_is_online == FALSE)
 		sleep(1);
+	}
 
 	*num_removed_inode = 0;
 	return 0;
@@ -509,6 +507,11 @@ void run_cache_loop(void)
 int sleep_on_cache_full(void)
 {
 	int cache_replace_status;
+
+	/* Check cache replacement status */
+	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
+	if (cache_replace_status < 0)
+		return cache_replace_status;
 
 	sem_post(&(hcfs_system->num_cache_sleep_sem)); /* Count++ */
 	sem_wait(&(hcfs_system->check_cache_sem)); /* Sleep a while */
