@@ -61,6 +61,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	int ret, errcode;
 	long tmplen;
 
+	if (hcfs_system->backend_status_is_online == FALSE)
+		return -EPERM;
+
 #if (DEDUP_ENABLE)
 	/* Get objname by obj_id */
 	obj_id_to_string(obj_id, obj_id_str);
