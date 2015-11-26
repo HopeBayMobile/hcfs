@@ -98,6 +98,6 @@ docker_host )
 	;;
 esac
 
-awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > awk_tmp
-sudo mv -f awk_tmp "$configfile"
+awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
+sudo mv -f /tmp/awk_tmp "$configfile"
 md5sum --tag "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
