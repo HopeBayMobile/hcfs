@@ -25,7 +25,7 @@ void *monitor_loop(void *ptr);
 #else
 void monitor_loop(void);
 #endif
-struct timespec diff_time(struct timespec start, struct timespec end);
+float diff_time(struct timespec start, struct timespec end);
 void update_backend_status(int status, struct timespec *status_time);
 
 #endif  /* SRC_HCFS_MONITOR_H_ */

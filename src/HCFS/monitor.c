@@ -47,12 +47,11 @@ void monitor_loop(void)
 {
 	const struct timespec sleep_time = {1, 0}; /* sleep 1 second */
 	struct timespec *last_time = &hcfs_system->backend_status_last_time;
-	struct timespec test_start;
+	struct timespec loop_start_time;
 	struct timespec test_stop;
-	struct timespec backend_idle_time;
-	struct timespec test_duration;
+	float test_duration;
+	float idle_time;
 	int32_t ret_val;
-	uint8_t status;
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 	prctl(PR_SET_NAME, "monitor_loop");
@@ -64,24 +63,24 @@ void monitor_loop(void)
 	write_log(2, "[Backend Monitor] Start monitor loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {
-		clock_gettime(CLOCK_REALTIME, &test_start);
-		backend_idle_time = diff_time(*last_time, test_start);
-		if (backend_idle_time.tv_sec >= MONITOR_INTERVAL) {
+		clock_gettime(CLOCK_REALTIME, &loop_start_time);
+		idle_time = diff_time(*last_time, loop_start_time);
 
+		if (idle_time >= MONITOR_INTERVAL) {
 			ret_val = hcfs_test_backend(&monitor_curl_handle);
-			status = ((ret_val >= 200) && (ret_val <= 299)) ? 1 : 0;
-			update_backend_status(status, &test_start);
+			if ((ret_val >= 200) && (ret_val <= 299))
+				update_backend_status(TRUE, &loop_start_time);
+			else
+				update_backend_status(FALSE, &loop_start_time);
 
 			/* Generate log */
 			clock_gettime(CLOCK_REALTIME, &test_stop);
-			test_duration = diff_time(test_start, test_stop);
-			write_log(
-			    10,
+			test_duration = diff_time(loop_start_time, test_stop);
+			write_log(10,
 			    "[Backend Monitor] backend is %s, test time %f\n",
 			    hcfs_system->backend_status_is_online ? "online"
 								  : "offline",
-			    test_duration.tv_sec +
-				test_start.tv_nsec / 1000000000.0);
+			    test_duration);
 		}
 		/* wait 1 second */
 		ret_val = nanosleep(&sleep_time, NULL);
@@ -103,21 +102,13 @@ void monitor_loop(void)
  *        Inputs: timespec start
  *                timespec end
  *       Summary: Calculate time duration between [start] and [end]
- *  Return value: Type timespec, duration between [start] and [end]
+ *  Return value: float, duration between [start] and [end]
  *
  *************************************************************************/
-struct timespec diff_time(struct timespec start, struct timespec end)
+inline float diff_time(struct timespec start, struct timespec end)
 {
-	struct timespec temp;
-
-	if ((end.tv_nsec - start.tv_nsec) < 0) {
-		temp.tv_sec = end.tv_sec - start.tv_sec - 1;
-		temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
-	} else {
-		temp.tv_sec = end.tv_sec - start.tv_sec;
-		temp.tv_nsec = end.tv_nsec - start.tv_nsec;
-	}
-	return temp;
+	return end.tv_sec - start.tv_sec +
+	       0.000000001 * (end.tv_nsec - start.tv_nsec);
 }
 
 /**************************************************************************

@@ -1222,20 +1222,3 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 errcode_handle:
 	return errcode;
 }
-
-/************************************************************************
-*
-* Function name: neg
-*        Inputs: int input
-*       Summary: Return negative value of input.
-*  Return value: return same if input is negative, return negative value
-*                if input is postive.
-*
-*************************************************************************/
-inline int neg(int value)
-{
-	if (value > 0)
-		return -value;
-	else
-		return value;
-}

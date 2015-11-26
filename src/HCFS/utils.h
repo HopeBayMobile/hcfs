@@ -60,5 +60,4 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
 			long long cached_size_delta);
 
-inline int neg(int value);
 #endif  /* SRC_HCFS_UTILS_H_ */
