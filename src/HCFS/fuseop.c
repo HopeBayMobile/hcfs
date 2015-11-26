@@ -581,6 +581,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	UNUSED(fi);
 
 	write_log(10, "Debug getattr inode %ld\n", ino);
+	gettimeofday(&tmp_time1, NULL);
 	hit_inode = real_ino(req, ino);
 
 	write_log(10, "Debug getattr hit inode %" PRIu64 "\n",
