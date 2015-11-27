@@ -1776,7 +1776,9 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 				"debug truncate waiting on full cache\n");
 			meta_cache_close_file(*body_ptr);
 			meta_cache_unlock_entry(*body_ptr);
-			sleep_on_cache_full();
+			ret_val = sleep_on_cache_full();
+			if (ret_val < 0) 
+				return ret_val;
 
 			/*Re-read status*/
 			*body_ptr = meta_cache_lock_entry(this_inode);
@@ -2714,8 +2716,11 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			/*Sleep if cache already full*/
 			sem_post(&(fh_ptr->block_sem));
 			write_log(10, "debug read waiting on full cache\n");
-			sleep_on_cache_full();
+			ret = sleep_on_cache_full();
 			sem_wait(&(fh_ptr->block_sem));
+			if (ret < 0)
+				return ret;
+
 			/*Re-read status*/
 			ret = read_lookup_meta(fh_ptr, temppage,
 					this_page_fpos);
@@ -2740,13 +2745,14 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 	PREFETCH_STRUCT_TYPE *temp_prefetch;
 	pthread_t prefetch_thread;
 
-	if (hcfs_system->backend_status_is_online == FALSE)
-		return -EPERM;
-
 	if ((eindex+1) >= MAX_BLOCK_ENTRIES_PER_PAGE)
 		return 0;
 	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
 		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
+
+		if (hcfs_system->backend_status_is_online == FALSE)
+			return -EPERM;
+
 		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
 		if (temp_prefetch == NULL) {
 			write_log(0, "Error cannot open prefetch\n");
@@ -3379,12 +3385,10 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 			write_log(10, "debug write waiting on full cache\n");
-			sleep_on_cache_full();
-			if (hcfs_system->backend_status_is_online == FALSE) {
-				*reterr = -EPERM;
-				return 0;
-			}
-			
+			ret = sleep_on_cache_full();
+			if (ret < 0)
+				return ret;
+
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
@@ -3660,7 +3664,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 			write_log(10, "debug write waiting on full cache\n");
-			sleep_on_cache_full();
+			ret = sleep_on_cache_full();
+			if (ret < 0) {
+				*reterr = -EPERM;
+				return 0;
+			}
+
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);

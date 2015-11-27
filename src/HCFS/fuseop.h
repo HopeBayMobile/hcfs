@@ -189,6 +189,7 @@ typedef struct {
 	long long dirty_cache_size;
 	long long xfer_size_download;
 	long long xfer_size_upload;
+	int cache_replace_status;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {
@@ -202,6 +203,7 @@ typedef struct {
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;
 	sem_t check_next_sem;
+	sem_t check_cache_replace_status_sem;
 } SYSTEM_DATA_HEAD;
 
 SYSTEM_DATA_HEAD *hcfs_system;

@@ -216,7 +216,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 /*Adding a delta threshold to avoid thrashing at hard limit boundary*/
 			if (hcfs_system->systemdata.cache_size <
 					(CACHE_HARD_LIMIT - CACHE_DELTA))
-				notify_sleep_on_cache();
+				notify_sleep_on_cache(0);
 
 			/* If cache size < soft limit, take a break and wait
 			for exceeding soft limit. Stop paging out these blocks
@@ -299,9 +299,11 @@ errcode_handle:
 
 int _check_cache_replace(long long *num_removed_inode)
 {
-	if (*num_removed_inode == 0) {
-		if (hcfs_system->backend_status_is_online == FALSE)
-			notify_sleep_on_cache();
+	if (*num_removed_inode == 0) { /* No inodes be removed */
+		if ((hcfs_system->systemdata.cache_size >
+			CACHE_HARD_LIMIT - CACHE_DELTA) &&
+			(hcfs_system->backend_status_is_online == FALSE))
+			notify_sleep_on_cache(-EPERM);
 	}
 
 	*num_removed_inode = 0;
@@ -483,7 +485,7 @@ void run_cache_loop(void)
 			seconds_slept++;
 		}
 	}
-	notify_sleep_on_cache();
+	notify_sleep_on_cache(-ESHUTDOWN);
 }
 
 /************************************************************************
@@ -496,12 +498,18 @@ void run_cache_loop(void)
 *  Return value: None
 *
 *************************************************************************/
-void sleep_on_cache_full(void)
+int sleep_on_cache_full(void)
 {
-	sem_post(&(hcfs_system->num_cache_sleep_sem));
-	sem_wait(&(hcfs_system->check_cache_sem));
-	sem_wait(&(hcfs_system->num_cache_sleep_sem));
+	int cache_replace_status;
+
+	sem_post(&(hcfs_system->num_cache_sleep_sem)); /* Count++ */
+	sem_wait(&(hcfs_system->check_cache_sem)); /* Sleep a while */
+	sem_wait(&(hcfs_system->num_cache_sleep_sem)); /* Count-- */
+	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
+	sem_post(&(hcfs_system->check_cache_replace_status_sem)); /*Get status*/
 	sem_post(&(hcfs_system->check_next_sem));
+
+	return cache_replace_status;
 }
 
 /************************************************************************
@@ -513,9 +521,13 @@ void sleep_on_cache_full(void)
 *  Return value: None
 *
 *************************************************************************/
-void notify_sleep_on_cache(void)
+void notify_sleep_on_cache(int cache_replace_status)
 {
 	int num_cache_sleep_sem_value;
+
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.cache_replace_status = cache_replace_status;
+	sem_post(&(hcfs_system->access_sem));
 
 	while (TRUE) {
 		sem_getvalue(&(hcfs_system->num_cache_sleep_sem),
@@ -523,7 +535,8 @@ void notify_sleep_on_cache(void)
 
 		/*If still have threads/processes waiting on cache full*/
 		if (num_cache_sleep_sem_value > 0) {
-			sem_post(&(hcfs_system->check_cache_sem));
+			sem_post(&(hcfs_system->check_cache_sem)); /* Wake up */
+			sem_wait(&(hcfs_system->check_cache_replace_status_sem));
 			sem_wait(&(hcfs_system->check_next_sem));
 		} else {
 			break;
