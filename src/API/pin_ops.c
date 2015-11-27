@@ -253,8 +253,8 @@ int check_pin_status(char *buf, unsigned int arg_len)
 }
 
 int check_dir_status(char *buf, unsigned int arg_len,
-			long long *num_local, long long *num_cloud,
-			long long *num_hybrid)
+		     long long *num_local, long long *num_cloud,
+		     long long *num_hybrid)
 {
 
 	int fd, size_msg, count, ret_code;

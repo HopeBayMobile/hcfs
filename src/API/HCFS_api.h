@@ -175,4 +175,11 @@ void HCFS_file_status(char **json_res, char *pathname);
  */
 void HCFS_reset_xfer(char **json_res);
 
+/*Secret function
+ * @json_res result string in json format.
+ *
+ * To reboot.
+ */
+void HCFS_reboot(char **json_res);
+
 #endif  /* GW20_HCFS_API_H_ */

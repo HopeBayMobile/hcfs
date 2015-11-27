@@ -59,12 +59,14 @@ int main()
 	free(res7);
 
 	char *res8;
-	HCFS_set_config(&res8, "swift_account", "test");
+	char key[500] = "swift_user";
+	char value[500] = "tester3";
+	HCFS_set_config(&res8, key, value);
 	printf("set config - %s\n", res8);
 	free(res8);
 
 	char *res9;
-	HCFS_get_config(&res9, "swift_account");
+	HCFS_get_config(&res9, "swift_user");
 	printf("get config - %s\n", res9);
 	free(res9);
 
@@ -72,6 +74,11 @@ int main()
 	HCFS_reset_xfer(&res10);
 	printf("reset xfer - %s\n", res10);
 	free(res10);
+
+	char *res11;
+	HCFS_reboot(&res11);
+	printf("reboot - %s\n", res11);
+	free(res11);
 }
 
 

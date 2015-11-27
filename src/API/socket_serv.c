@@ -4,11 +4,12 @@
 #include <sys/uio.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <dirent.h>
 #include <errno.h>
 #include <pthread.h>
+#include <libgen.h>
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 
 #include "socket_serv.h"
@@ -47,9 +48,8 @@ int process_request(int thread_idx)
 	long long xfer_up, xfer_down;
 	long long num_local, num_cloud, num_hybrid;
 	char buf_reused;
-	char buf[512];
-	char res_buf[512];
-	char *largebuf;
+	char buf[512], res_buf[512];
+	char *largebuf, *value;
 	ssize_t size_msg, msg_len;
 
 	msg_len = 0;
@@ -158,6 +158,29 @@ int process_request(int thread_idx)
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
 
+	case SETCONFIG:
+		printf("Set config\n");
+		ret_code = set_hcfs_config(largebuf, arg_len);
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
+	case GETCONFIG:
+		printf("Get config\n");
+		ret_code = get_hcfs_config(largebuf, arg_len, &value);
+		if (ret_code < 0) {
+			ret_len = 0;
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, &ret_code, sizeof(int), 0);
+		} else {
+			ret_len = strlen(value);
+			memcpy(res_buf, value, ret_len);
+			free(value);
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, res_buf, ret_len, 0);
+		}
+		break;
+
 	case GETSTAT:
 		printf("Get statistics\n");
 		ret_len = 0;
@@ -211,6 +234,18 @@ int process_request(int thread_idx)
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 
 		break;
+
+	case SYSREBOOT:
+		printf("Reboot\n");
+		ret_len = 0;
+		ret_code = 0;
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+
+		// Force to call reboot
+		system("reboot");
+
+		break;
 	}
 
 	printf("Get API code - %d from fd - %d\n", api_code, fd);
@@ -228,6 +263,8 @@ int init_server()
 
 	int sock_fd, sock_flag;
 	int new_sock_fd, thread_idx, ret_code, count;
+	char sock_path[200];
+	char *sock_dir;
 	struct sockaddr_un addr;
 	struct timespec timer;
 
@@ -235,6 +272,17 @@ int init_server()
 	for (count = 0; count < MAX_THREAD; count++) {
 		thread_pool[count].fd = 0;
 		thread_pool[count].in_used = FALSE;
+	}
+
+	strcpy(sock_path, API_SOCK_PATH);
+
+	/* To wait api socket path ready */
+	sock_dir = dirname(sock_path);
+	while (1) {
+		if (access(sock_dir, F_OK | W_OK) == 0)
+			break;
+		else
+			sleep(1);
 	}
 
 	if (access(API_SOCK_PATH, F_OK) == 0)
@@ -295,7 +343,6 @@ int init_server()
 
 int main()
 {
-
 	init_server();
 	return 0;
 }

@@ -51,138 +51,75 @@ int _api_socket_conn()
 	return fd;
 }
 
-int _validate_config_key(char *key)
-{
-
-	int idx, num_keys;
-	char *keys[] = {\
-		"swift_account",\
-		"swift_user",\
-		"swift_pass",\
-		"swift_url",\
-		"swift_container",\
-		"swift_protocol"\
-	};
-
-
-	num_keys = sizeof(keys) / sizeof(keys[0]);
-
-	for (idx = 0; idx < num_keys; idx++) {
-		if (strcmp(keys[idx], key) == 0)
-			return 0;
-	}
-	return -1;
-}
-
-/* TODO - Need to validate input value, maybe need regular expression? */
 void HCFS_set_config(char **json_res, char *key, char *value)
 {
 
-	int idx, ret_code;
-	char tmp_path[100];
-	char buf[300];
-	char upper_key[100];
-	char *tmp_ptr, *line, *token;
-	FILE *conf, *tmp_conf;
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+	ssize_t path_len;
+	char buf[1000];
 
-
-	ret_code = _validate_config_key(key);
-	if (ret_code < 0) {
-		_json_response(json_res, FALSE, EINVAL, NULL);
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
 		return;
 	}
 
-	memcpy(upper_key, key, sizeof(upper_key));
-	for (idx = 0; idx < strlen(key); idx++)
-		upper_key[idx] = toupper(upper_key[idx]);
+	code = SETCONFIG;
+	cmd_len = 0;
 
-	snprintf(tmp_path, sizeof(tmp_path),"%s.%s",
-		CONF_PATH, "tmp");
+	CONCAT_PIN_ARG(key);
+	CONCAT_PIN_ARG(value)
 
-	conf = fopen(CONF_PATH, "r");
-	if (conf == NULL) {
-		_json_response(json_res, FALSE, errno, NULL);
-		return;
-	}
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
 
-	tmp_conf = fopen(tmp_path, "w");
-	if (tmp_conf == NULL) {
-		_json_response(json_res, FALSE, errno, NULL);
-		return;
-	}
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
-	while (fgets(buf, sizeof(buf), conf) != NULL) {
-		tmp_ptr = line = strdup(buf);
-		token = strsep(&line, " = ");
-		if (strcmp(upper_key, token) == 0)
-			snprintf(buf, sizeof(buf), "%s = %s\n", token, value);
-		fputs(buf, tmp_conf);
-		free(tmp_ptr);
-	}
-
-	fclose(conf);
-	fclose(tmp_conf);
-
-	ret_code = rename(tmp_path, CONF_PATH);
 	if (ret_code < 0)
-		_json_response(json_res, FALSE, errno, NULL);
+		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
-		_json_response(json_res, TRUE, 0, NULL);
+		_json_response(json_res, TRUE, ret_code, NULL);
 }
 
 void HCFS_get_config(char **json_res, char *key)
 {
 
-	int idx, ret_code;
-	char tmp_path[100];
-	char buf[300];
-	char upper_key[100];
-	char *tmp_ptr, *line, *token;
-	FILE *conf, *tmp_conf;
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+	ssize_t path_len;
+	char buf[1000];
+	char value[500];
 	json_t *data;
 
-
-	ret_code = _validate_config_key(key);
-	if (ret_code < 0) {
-		_json_response(json_res, FALSE, EINVAL, NULL);
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
 		return;
 	}
 
-	memcpy(upper_key, key, sizeof(upper_key));
-	for (idx = 0; idx < strlen(key); idx++)
-		upper_key[idx] = toupper(upper_key[idx]);
+	code = GETCONFIG;
+	cmd_len = 0;
 
-	conf = fopen(CONF_PATH, "r");
-	if (conf == NULL) {
-		_json_response(json_res, FALSE, errno, NULL);
-		return;
+	CONCAT_PIN_ARG(key);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	if (reply_len == 0) {
+		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	} else {
+		size_msg = recv(fd, value, reply_len, 0);
+		value[reply_len] = 0;
+		data = json_object();
+		json_object_set_new(data, key, json_string(value));
+		_json_response(json_res, TRUE, 0, data);
 	}
-
-	ret_code = -1;
-	while (fgets(buf, sizeof(buf), conf) != NULL) {
-		tmp_ptr = line = strdup(buf);
-		token = strsep(&line, " =");
-		if (strcmp(upper_key, token) == 0) {
-			token = strsep(&line, " =");
-			token = strsep(&line, " ");
-			token = strsep(&line, "\n");
-
-			data = json_object();
-			json_object_set_new(data, key, json_string(token));
-			_json_response(json_res, TRUE, 0, data);
-
-			free(tmp_ptr);
-			ret_code = 0;
-			break;
-		}
-
-		free(tmp_ptr);
-	}
-
-	fclose(conf);
-
-	if (ret_code < 0)
-		_json_response(json_res, FALSE, ENOENT, NULL);
 }
 
 void HCFS_stat(char **json_res)
@@ -533,4 +470,28 @@ void HCFS_reset_xfer(char **json_res)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+void HCFS_reboot(char **json_res)
+{
+
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = SYSREBOOT;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	_json_response(json_res, TRUE, ret_code, NULL);
 }

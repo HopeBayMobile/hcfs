@@ -2,13 +2,13 @@ CC = gcc
 CPPFLAGS =
 CFLAGS = -lpthread
 
-socket_serv: socket_serv.c pin_ops.o hcfs_stat.o hcfs_sys.o utils.o test
+socket_serv: socket_serv.c pin_ops.o hcfs_stat.o hcfs_sys.o utils.o marco.h test
 	$(CC) socket_serv.c pin_ops.o hcfs_stat.o hcfs_sys.o utils.o $(CFLAGS) -o sock_serv
 
 test: test.c HCFS_api.o
 	$(CC) test.c HCFS_api.o -ljansson -o test
 
-HCFS_api.o: HCFS_api.c HCFS_api.h
+HCFS_api.o: HCFS_api.c HCFS_api.h marco.h
 	$(CC) -c HCFS_api.c
 
 pin_ops.o: pin_ops.c pin_ops.h

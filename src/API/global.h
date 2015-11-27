@@ -49,6 +49,9 @@
 #define GETXFERSTAT 25
 #define RESETXFERSTAT 26
 
+#define SETCONFIG 48
+#define GETCONFIG 49
 #define GETSTAT 50
+#define SYSREBOOT 51
 
 #endif  /* GW20_API_GLOBAL_H_ */
