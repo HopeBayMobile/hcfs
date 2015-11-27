@@ -307,12 +307,13 @@ int main(int argc, char **argv)
 #endif
 		break;
 	case CLOUDSTAT:
-		if(status == -1)
+		if (status == -1)
 			break;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		cmd_len = 0;
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		printf("backend is %s\n", retcode ? "online" : "offline");
 		break;

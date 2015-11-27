@@ -10,8 +10,8 @@
 * 2015/2/13 Jiahong added header for this file, and revising coding style.
 *
 **************************************************************************/
-#ifndef GW20_HCFS_MONITOR_H_
-#define GW20_HCFS_MONITOR_H_
+#ifndef SRC_HCFS_MONITOR_H_
+#define SRC_HCFS_MONITOR_H_
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,6 +25,7 @@ void *monitor_loop(void *ptr);
 #else
 void monitor_loop(void);
 #endif
-struct timespec diff_time(struct timespec start, struct timespec end);
+float diff_time(struct timespec start, struct timespec end);
+void update_backend_status(int status, struct timespec *status_time);
 
-#endif  /* GW20_HCFS_MONITOR_H_ */
+#endif  /* SRC_HCFS_MONITOR_H_ */

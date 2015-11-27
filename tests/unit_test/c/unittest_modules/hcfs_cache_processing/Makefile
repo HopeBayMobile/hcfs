@@ -137,7 +137,3 @@ cacheops_mock_function.o : $(UNITTEST_DIR)/cacheops_mock_function.c $(UNITTEST_D
 
 hcfs_cacheops_unittest : hcfs_cacheops_unittest.o hcfs_cacheops.o cacheops_mock_function.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-
-
-
-

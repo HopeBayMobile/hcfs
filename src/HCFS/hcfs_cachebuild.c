@@ -34,8 +34,6 @@
 #include "global.h"
 #include "utils.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /************************************************************************
 *
 * Function name: cache_usage_hash_init

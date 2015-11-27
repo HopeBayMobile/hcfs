@@ -23,6 +23,7 @@
 * 2015/6/29 Kewei finished xattr operations.
 * 2015/7/7 Kewei began to add ops about symbolic link
 * 2015/11/5 Jiahong adding changes for per-file statistics
+* 2015/11/24 Jethro adding
 *
 **************************************************************************/
 
@@ -86,8 +87,6 @@
 #include "pin_scheduling.h"
 #include "dir_statistics.h"
 #include "parent_lookup.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
@@ -445,6 +444,7 @@ Android external storage */
 uid_t lookup_pkg(char *pkgname)
 {
 /* TODO: This is now a fake. Need to link to real function */
+	UNUSED(pkgname);
 	return 1010;
 }
 
@@ -578,10 +578,13 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	struct stat tmp_stat;
 	MOUNT_T *tmpptr;
 
+	UNUSED(fi);
+
 	write_log(10, "Debug getattr inode %ld\n", ino);
 	hit_inode = real_ino(req, ino);
 
-	write_log(10, "Debug getattr hit inode %" PRIu64 "\n", (uint64_t)hit_inode);
+	write_log(10, "Debug getattr hit inode %" PRIu64 "\n",
+		  (uint64_t)hit_inode);
 
 	if (hit_inode > 0) {
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -711,8 +714,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_dev = dev;
 	this_stat.st_nlink = 1;
 
-        self_mode = mode | S_IFREG;
-        this_stat.st_mode = self_mode;
+	self_mode = mode | S_IFREG;
+	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 
@@ -847,8 +850,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_nlink = 2; /*One pointed by the parent, another by self*/
 
-        self_mode = mode | S_IFDIR;
-        this_stat.st_mode = self_mode;
+	self_mode = mode | S_IFDIR;
+	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
@@ -1147,8 +1150,8 @@ a directory (for NFS) */
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
 
-	write_log(10,
-		"Debug lookup %" PRIu64 ", %s, %d\n", (uint64_t)parent_inode, selfname, ret_val);
+	write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+		  (uint64_t)parent_inode, selfname, ret_val);
 
 	if (ret_val < 0) {
 		ret_val = -ret_val;
@@ -2243,7 +2246,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 /* If need to truncate some block that's ST_CtoL or ST_CLOUD, download it
 *  first, mod it, then set to ST_LDISK*/
 
-	FILE_META_TYPE tempfilemeta, truncfilemeta;
+	FILE_META_TYPE tempfilemeta;
 	int ret, errcode;
 	long long last_block, last_page, old_last_block;
 	long long current_page, old_last_page;
@@ -2251,7 +2254,9 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
 	long long temp_trunc_size, sizediff;
+#ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
+#endif
 	MOUNT_T *tmpptr;
 	size_t ret_size;
 	FILE *truncfptr;
@@ -3319,11 +3324,11 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 	int ret;
 
 	/* Adding cache check for new or deleted blocks */
-        while ((((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
-                ((temppage->block_entries[entry_index]).status == ST_CtoL)) ||
-                (((temppage->block_entries[entry_index]).status
-                                                        == ST_TODELETE) ||
-                ((temppage->block_entries[entry_index]).status == ST_NONE))) {
+	while (
+	    (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
+	     ((temppage->block_entries[entry_index]).status == ST_CtoL)) ||
+	    (((temppage->block_entries[entry_index]).status == ST_TODELETE) ||
+	     ((temppage->block_entries[entry_index]).status == ST_NONE))) {
 
 		write_log(10,
 			"Debug write checking if need to wait for cache\n");
@@ -4023,7 +4028,6 @@ errcode_handle:
 		sem_post(&(hcfs_system->access_sem));
 	}
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -4036,7 +4040,7 @@ errcode_handle:
 void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
-	ino_t thisinode;
+	/* ino_t thisinode; */
 	MOUNT_T *tmpptr;
 	long long system_size, num_inodes;
 
@@ -4045,7 +4049,7 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: Different statistics for different filesystems */
 	write_log(10, "Debug statfs\n");
 
-	thisinode = real_ino(req, ino);
+	/* thisinode = */real_ino(req, ino);
 
 	buf = malloc(sizeof(struct statvfs));
 	if (buf == NULL) {
@@ -4063,18 +4067,17 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (system_size > (50*powl(1024, 3)))
-		buf->f_blocks = (((system_size - 1)
-						/ 4096) + 1) * 2;
+	if (system_size > (50 * powl(1024, 3)))
+		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
 	else
 		buf->f_blocks = (25*powl(1024, 2));
 
 	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
 	else
-		buf->f_bfree = buf->f_blocks -
-			(((system_size - 1)
-						/ 4096) + 1);
+		buf->f_bfree = buf->f_blocks - (((system_size - 1) / 4096) + 1);
+	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
+	 * if runs into negative value */
 	if (buf->f_bfree < 0)
 		buf->f_bfree = 0;
 	buf->f_bavail = buf->f_bfree;
@@ -4087,11 +4090,13 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		buf->f_files = 2000000;
 
 	buf->f_ffree = buf->f_files - num_inodes;
+	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
+	 * if runs into negative value */
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
 
 #ifdef STAT_VFS_H
-        buf->f_namelen = MAX_FILENAME_LEN;
+	buf->f_namelen = MAX_FILENAME_LEN;
 #else
 	buf->f_favail = buf->f_ffree;
 	buf->f_namemax = MAX_FILENAME_LEN;
@@ -4116,9 +4121,11 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
 				struct fuse_file_info *file_info)
 {
-	ino_t thisinode;
+	/* ino_t thisinode; */
 
-	thisinode = real_ino(req, ino);
+	UNUSED(ino);
+	UNUSED(file_info);
+	/* thisinode = */real_ino(req, ino);
 
 	fuse_reply_err(req, 0);
 }
@@ -4138,10 +4145,7 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 
 	thisinode = real_ino(req, ino);
 
-	if (file_info->fh < 0) {
-		fuse_reply_err(req, EBADF);
-		return;
-	}
+	/* file_info->fh is uint64_t */
 
 	if (file_info->fh >= MAX_OPEN_FILE_ENTRIES) {
 		fuse_reply_err(req, EBADF);
@@ -4174,9 +4178,12 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 					struct fuse_file_info *file_info)
 {
-	ino_t thisinode;
+	/* ino_t thisinode; */
 
-	thisinode = real_ino(req, ino);
+	UNUSED(ino);
+	UNUSED(isdatasync);
+	UNUSED(file_info);
+	/* thisinode = */real_ino(req, ino);
 
 	fuse_reply_err(req, 0);
 }
@@ -4264,6 +4271,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	size_t entry_size, ret_size;
 	int ret, errcode;
 
+	UNUSED(file_info);
 	gettimeofday(&tmp_time1, NULL);
 
 	this_inode = real_ino(req, ino);
@@ -4430,11 +4438,13 @@ errcode_handle:
 *
 *************************************************************************/
 void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
-					struct fuse_file_info *file_info)
+			 struct fuse_file_info *file_info)
 {
 	ino_t thisinode;
 
+	UNUSED(file_info);
 	thisinode = real_ino(req, ino);
+	UNUSED(thisinode);
 
 	fuse_reply_err(req, 0);
 }
@@ -4450,6 +4460,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 {
 	MOUNT_T *tmpptr;
 
+	UNUSED(conn);
 	tmpptr = (MOUNT_T *)userdata;
 	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
 
@@ -4468,7 +4479,8 @@ void hfuse_ll_destroy(void *userdata)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
-	write_log(10, "Unmounting FS with root inode %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
+	write_log(10, "Unmounting FS with root inode %" PRIu64 "\n",
+		  (uint64_t)tmpptr->f_ino);
 }
 
 /************************************************************************
@@ -4490,6 +4502,8 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
+
+	UNUSED(fi);
 
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
 
@@ -4909,7 +4923,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	this_stat.st_nlink = 1;
 	this_stat.st_size = strlen(link);
 
-        this_stat.st_mode = S_IFLNK | 0777;
+	this_stat.st_mode = S_IFLNK | 0777;
 
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
@@ -5055,6 +5069,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 *                value with new value.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	const char *value, size_t size, int flag)
 {
@@ -5106,8 +5121,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: setxattr Permission denied "
-			"(WRITE needed)\n");
+		write_log(0, "Error: setxattr Permission denied ");
+		write_log(0, "(WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5147,6 +5162,7 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5157,6 +5173,7 @@ error_handle:
 *                If name is not found, reply error.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	size_t size)
 {
@@ -5204,8 +5221,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
-		write_log(0, "Error: getxattr permission denied "
-			"(READ needed)\n");
+		write_log(0, "Error: getxattr permission denied ");
+		write_log(0, "(READ needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5274,6 +5291,7 @@ error_handle:
 		free(value);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5285,6 +5303,7 @@ error_handle:
 *                filled with all names separated by null character.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 {
 	XATTR_PAGE *xattr_page;
@@ -5299,8 +5318,9 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	key_buf = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
-	write_log(10, "Debug listxattr: Begin listxattr, "
-		"given buffer size = %d\n", size);
+	write_log(10,
+		  "Debug listxattr: Begin listxattr, given buffer size = %d\n",
+		  size);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -5376,6 +5396,7 @@ error_handle:
 		free(key_buf);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5386,6 +5407,7 @@ error_handle:
 *                error if attribute is not found.
 *
 *************************************************************************/
+#ifndef _ANDROID_ENV_
 static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	const char *name)
 {
@@ -5430,8 +5452,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: removexattr Permission denied"
-			" (WRITE needed)\n");
+		write_log(
+		    0, "Error: removexattr Permission denied (WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5471,6 +5493,7 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
+# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5698,8 +5721,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = 0;
 	this_stat.st_nlink = 1;
-        self_mode = mode | S_IFREG;
-        this_stat.st_mode = self_mode;
+	self_mode = mode | S_IFREG;
+	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
@@ -5813,6 +5836,7 @@ void *mount_multi_thread(void *ptr)
 		unmount_event(tmpptr->f_name);
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
+	return 0;
 }
 void *mount_single_thread(void *ptr)
 {
@@ -5830,6 +5854,7 @@ void *mount_single_thread(void *ptr)
 		unmount_event(tmpptr->f_name);
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
+	return 0;
 }
 
 int hook_fuse(int argc, char **argv)
@@ -5866,4 +5891,3 @@ int hook_fuse(int argc, char **argv)
 
 	return 0;
 }
-

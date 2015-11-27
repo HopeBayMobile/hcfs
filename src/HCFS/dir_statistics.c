@@ -24,8 +24,7 @@
 #include "macro.h"
 #include "path_reconstruct.h"
 #include "parent_lookup.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
+#include "utils.h"
 
 /************************************************************************
 *

@@ -30,9 +30,9 @@ CURL_HANDLE monitor_curl_handle;
  *
  * Function name: monitor_loop
  *        Inputs: void *arg
- *       Summary: Main function for checking cloud connection status.
+ *       Summary: Main function for checking backend connection status.
  *                Upon successful return, this function return 1. which
- *                means cloud storage is reachable and user auth to
+ *                means backend storage is reachable and user auth to
  *                storage is valid.
  *                If a connection error is encountered, a zero value is
  *                returned.
@@ -47,10 +47,10 @@ void monitor_loop(void)
 {
 	const struct timespec sleep_time = {1, 0}; /* sleep 1 second */
 	struct timespec *last_time = &hcfs_system->backend_status_last_time;
-	struct timespec test_start;
+	struct timespec loop_start_time;
 	struct timespec test_stop;
-	struct timespec backend_idle_time;
-	struct timespec test_duration;
+	float test_duration;
+	float idle_time;
 	int32_t ret_val;
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -63,30 +63,26 @@ void monitor_loop(void)
 	write_log(2, "[Backend Monitor] Start monitor loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {
-		clock_gettime(CLOCK_REALTIME, &test_start);
-		backend_idle_time = diff_time(*last_time, test_start);
-		if (backend_idle_time.tv_sec >= MONITOR_INTERVAL) {
+		clock_gettime(CLOCK_REALTIME, &loop_start_time);
+		idle_time = diff_time(*last_time, loop_start_time);
 
+		if (idle_time >= MONITOR_INTERVAL) {
 			ret_val = hcfs_test_backend(&monitor_curl_handle);
-
 			if ((ret_val >= 200) && (ret_val <= 299))
-				hcfs_system->backend_status_is_online = TRUE;
+				update_backend_status(TRUE, &loop_start_time);
 			else
-				hcfs_system->backend_status_is_online = FALSE;
+				update_backend_status(FALSE, &loop_start_time);
 
+			/* Generate log */
 			clock_gettime(CLOCK_REALTIME, &test_stop);
-			test_duration = diff_time(test_start, test_stop);
-			write_log(
-			    10,
+			test_duration = diff_time(loop_start_time, test_stop);
+			write_log(10,
 			    "[Backend Monitor] backend is %s, test time %f\n",
 			    hcfs_system->backend_status_is_online ? "online"
 								  : "offline",
-			    test_duration.tv_sec +
-				test_start.tv_nsec / 1000000000.0);
-			last_time->tv_sec = test_start.tv_sec;
-			last_time->tv_nsec = test_start.tv_nsec;
+			    test_duration);
 		}
-		/* wait 0.1 second */
+		/* wait 1 second */
 		ret_val = nanosleep(&sleep_time, NULL);
 		if (ret_val == -1 && errno == EINTR) {
 			write_log(2, "[Backend Monitor] interrupted\n");
@@ -106,19 +102,39 @@ void monitor_loop(void)
  *        Inputs: timespec start
  *                timespec end
  *       Summary: Calculate time duration between [start] and [end]
- *  Return value: Type timespec, duration between [start] and [end]
+ *  Return value: float, duration between [start] and [end]
  *
  *************************************************************************/
-struct timespec diff_time(struct timespec start, struct timespec end)
+inline float diff_time(struct timespec start, struct timespec end)
 {
-	struct timespec temp;
+	return end.tv_sec - start.tv_sec +
+	       0.000000001 * (end.tv_nsec - start.tv_nsec);
+}
 
-	if ((end.tv_nsec - start.tv_nsec) < 0) {
-		temp.tv_sec = end.tv_sec - start.tv_sec - 1;
-		temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
-	} else {
-		temp.tv_sec = end.tv_sec - start.tv_sec;
-		temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+/**************************************************************************
+ *
+ * Function name: update_backend_status
+ *        Inputs: int status, struct timespec *status_time
+ *       Summary: Update hcfs_system->backend_status_is_online and access
+ *                time.
+ *                int status:
+ *                    use 1 when status is online, otherwise 0.
+ *                struct timespec *status_time:
+ *                    time at curl request performed, set to NULL to use
+ *                    current time.
+ *  Return value: None (void)
+ *
+ *************************************************************************/
+void update_backend_status(int status, struct timespec *status_time)
+{
+	struct timespec *last_time = &hcfs_system->backend_status_last_time;
+	struct timespec current_time;
+
+	hcfs_system->backend_status_is_online = status ? 1 : 0;
+	if (status_time == NULL) {
+		clock_gettime(CLOCK_REALTIME, &current_time);
+		status_time = &current_time;
 	}
-	return temp;
+	last_time->tv_sec = status_time->tv_sec;
+	last_time->tv_nsec = status_time->tv_nsec;
 }

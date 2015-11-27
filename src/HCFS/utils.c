@@ -628,7 +628,9 @@ int validate_system_config(void)
 {
 	FILE *fptr;
 	char pathname[400];
+#ifndef _ANDROID_ENV_
 	char tempval[10];
+#endif
 	int ret_val;
 	int errcode;
 
@@ -641,18 +643,18 @@ int validate_system_config(void)
 
 	/* Write log to current path if log path is invalid */
 	if (LOG_PATH != NULL) {
-		if(access(LOG_PATH, F_OK) != 0) {
-			write_log(0, "Cannot access log path %s. Default"
-				" write log to current path\n", LOG_PATH);
+		if (access(LOG_PATH, F_OK) != 0) {
+			write_log(0, "Cannot access log path %s. %s", LOG_PATH,
+				  "Default write log to current path\n");
 			LOG_PATH = NULL;
 		} else {
 			sprintf(pathname, "%s/testfile", LOG_PATH);
 			fptr = fopen(pathname, "w");
 			if (fptr == NULL) {
 				errcode = errno;
-				write_log(0, "Error when testing log dir"
-					" writing. Code %d, %s\n",
-					errcode, strerror(errcode));
+				write_log(0, "%s Code %d, %s\n",
+					  "Error when testing log dir writing.",
+					  errcode, strerror(errcode));
 				write_log(0, "Write to current path\n");
 				LOG_PATH = NULL;
 			} else {
@@ -754,8 +756,8 @@ int validate_system_config(void)
 		return -1;
 	}
 	if (CACHE_HARD_LIMIT < (CACHE_SOFT_LIMIT + CACHE_DELTA)) {
-		write_log(0, "cache_hard_limit >= \
-				cache_soft_limit + cache_delta\n");
+		write_log(0, "%s%s", "cache_hard_limit >= ",
+			  "cache_soft_limit + cache_delta\n");
 		return -1;
 	}
 
@@ -976,17 +978,15 @@ int set_block_dirty_status(char *path, FILE *fptr, char status)
 
 #else
 	if (path != NULL) {
-		if (status == TRUE) {
+		if (status == TRUE)
 			SETXATTR(path, "user.dirty", "T", 1, 0);
-		} else {
+		else
 			SETXATTR(path, "user.dirty", "F", 1, 0);
-		}
 	} else if (fptr != NULL) {
-		if (status == TRUE) {
+		if (status == TRUE)
 			FSETXATTR(fileno(fptr), "user.dirty", "T", 1, 0);
-		} else {
+		else
 			FSETXATTR(fileno(fptr), "user.dirty", "F", 1, 0);
-		}
 	} else {
 		/* Cannot set block dirty status */
 		write_log(0, "Unexpected error\n");
@@ -1282,4 +1282,3 @@ int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 errcode_handle:
 	return errcode;
 }
-

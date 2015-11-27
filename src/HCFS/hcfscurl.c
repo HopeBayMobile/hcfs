@@ -34,8 +34,9 @@
 #include "macro.h"
 #include "global.h"
 #include "fuseop.h"
+#include "monitor.h"
+#include "utils.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
 #define MAX_RETRIES 5
 
 /************************************************************************
@@ -255,10 +256,11 @@ errcode_handle:
 /************************************************************************
  *
  * Function name: parse_http_header_coding_meta
- *        Inputs: HCFS_object_meta *object_meta, char* httpheader, int
- header_len
- *       Summary: Parse the HTTP header for general requests and return write to
-		  object_meta
+ *        Inputs: HCFS_object_meta *object_meta
+ *                char* httpheader,
+ *                int header_len
+ *       Summary: Parse the HTTP header for general requests and return
+ *                write to object_meta
  *  Return value: 0 for success otherwise indicates an error
  *
  *************************************************************************/
@@ -430,6 +432,7 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -744,6 +747,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -859,6 +863,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -956,6 +961,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -1055,6 +1061,8 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
+
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(swift_header_fptr);
@@ -1272,7 +1280,9 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -1897,7 +1907,9 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -2013,7 +2025,9 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -2130,7 +2144,10 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
 	HTTP_PERFORM_RETRY(curl);
+	update_backend_status((res == CURLE_OK), NULL);
+
 	if (res != CURLE_OK) {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(S3_header_fptr);

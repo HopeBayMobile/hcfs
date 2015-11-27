@@ -40,8 +40,6 @@
 #include "file_present.h"
 #include "utils.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
@@ -499,9 +497,9 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 			if (hcfs_system->systemdata.pinned_size < 0)
 				hcfs_system->systemdata.pinned_size = 0;
 			sem_post(&(hcfs_system->access_sem));
-			write_log(10, "Debug: After roll back, now system "
-				"pinned size is %lld\n",
-				hcfs_system->systemdata.pinned_size);
+			write_log(10, "Debug: After roll back, %s%lld\n",
+				  "now system pinned size is ",
+				  hcfs_system->systemdata.pinned_size);
 
 			return retcode;
 		}
@@ -530,7 +528,7 @@ int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
 {
 	int retcode;
 	long long zero_reserved_size;
-	unsigned int count, count2;
+	unsigned int count;
 
 	retcode = 0;
 	zero_reserved_size = 0; /* There is no reserved size when unpin */
@@ -759,7 +757,7 @@ void api_module(void *index)
 	DIR_STATS_TYPE tmpstat;
 
 	long long reserved_pinned_size;
-	unsigned int num_inode, i;
+	unsigned int num_inode;
 	ino_t *pinned_list, *unpinned_list;
 
 	timer.tv_sec = 0;
@@ -881,15 +879,16 @@ void api_module(void *index)
 				write_log(5, "No pinned space available\n");
 				retcode = -ENOSPC;
 				break;
-			} else {
-				hcfs_system->systemdata.pinned_size +=
-					reserved_pinned_size;
 			}
+			/* else */
+			hcfs_system->systemdata.pinned_size +=
+			    reserved_pinned_size;
 			sem_post(&(hcfs_system->access_sem));
-			write_log(10, "Debug: Preallocate pinned size %lld. "
-				"Now system pinned size %lld\n",
-				reserved_pinned_size,
-				hcfs_system->systemdata.pinned_size);
+			write_log(
+			    10,
+			    "Debug: Preallocate pinned size %lld. %s %lld\n",
+			    reserved_pinned_size, "Now system pinned size",
+			    hcfs_system->systemdata.pinned_size);
 
 			/* Prepare inode array */
 			memcpy(&num_inode, largebuf + sizeof(long long),
@@ -1181,8 +1180,8 @@ void api_module(void *index)
 			retcode = (int)hcfs_system->backend_status_is_online;
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(ret_len), 0);
+				send(fd1, &retcode, sizeof(retcode), 0);
 			}
 			break;
 		default:

@@ -31,6 +31,8 @@
 #include "params.h"
 #include "dedup_table.h"
 
+extern struct fuse_lowlevel_ops hfuse_ops;
+
 /*BEGIN META definition*/
 
 /* Defining parameters for B-tree operations (dir entries). */

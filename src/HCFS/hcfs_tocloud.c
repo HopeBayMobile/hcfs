@@ -61,8 +61,6 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
 /* Don't need to collect return code for the per-inode sync thread, as

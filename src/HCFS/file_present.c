@@ -41,8 +41,6 @@
 #include "dir_statistics.h"
 #include "parent_lookup.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /************************************************************************
 *
 * Function name: meta_forget_inode

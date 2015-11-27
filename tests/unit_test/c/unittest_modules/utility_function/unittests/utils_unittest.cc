@@ -833,4 +833,3 @@ TEST_F(validate_system_configTest, MissingS3Config) {
 
  }
 /* End of the test case for the function validate_system_config*/
-

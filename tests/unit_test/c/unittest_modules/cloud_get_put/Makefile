@@ -172,5 +172,3 @@ clouddelete_mock_function.o : $(UNITTEST_DIR)/clouddelete_mock_function.c
 
 hcfs_clouddelete_unittest : clouddelete_mock_function.o hcfs_clouddelete.o hcfs_clouddelete_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-
-

@@ -47,8 +47,6 @@
 #include "FS_manager.h"
 #endif
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 static inline void logerr(int errcode, char *msg)
 {
 	if (errcode > 0)

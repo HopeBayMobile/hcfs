@@ -189,4 +189,3 @@ pin_scheduling_unittest : pin_scheduling_mock_function.o pin_scheduling.o pin_sc
 
 #xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
 #	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-

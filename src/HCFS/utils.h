@@ -11,11 +11,14 @@
 *
 **************************************************************************/
 
-#ifndef GW20_SRC_UTILS_H_
-#define GW20_SRC_UTILS_H_
+#ifndef SRC_HCFS_UTILS_H_
+#define SRC_HCFS_UTILS_H_
 
 #include <sys/types.h>
 #include <stdio.h>
+#include "params.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 #include "dir_statistics.h"
 
@@ -62,4 +65,4 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 /* Function for checking if a file is local, cloud, or hybrid */
 int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
-#endif  /* GW20_SRC_UTILS_H_ */
+#endif  /* SRC_HCFS_UTILS_H_ */
