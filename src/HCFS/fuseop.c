@@ -1155,8 +1155,7 @@ a directory (for NFS) */
 		  (uint64_t)parent_inode, selfname, ret_val);
 
 	if (ret_val < 0) {
-		ret_val = -ret_val;
-		fuse_reply_err(req, ret_val);
+		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
@@ -1778,7 +1777,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 			meta_cache_close_file(*body_ptr);
 			meta_cache_unlock_entry(*body_ptr);
 			ret_val = sleep_on_cache_full();
-			if (ret_val < 0) 
+			if (ret_val < 0)
 				return ret_val;
 
 			/*Re-read status*/
