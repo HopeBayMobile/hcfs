@@ -112,7 +112,13 @@ void HCFS_get_config(char **json_res, char *key)
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	if (reply_len == 0) {
 		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
-		_json_response(json_res, FALSE, -ret_code, NULL);
+		if (ret_code == 1) {
+			data = json_object();
+			json_object_set_new(data, key, json_string(""));
+			_json_response(json_res, TRUE, 0, data);
+		} else {
+			_json_response(json_res, FALSE, -ret_code, NULL);
+		}
 	} else {
 		size_msg = recv(fd, value, reply_len, 0);
 		value[reply_len] = 0;

@@ -168,16 +168,16 @@ int process_request(int thread_idx)
 	case GETCONFIG:
 		printf("Get config\n");
 		ret_code = get_hcfs_config(largebuf, arg_len, &value);
-		if (ret_code < 0) {
-			ret_len = 0;
-			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-			size_msg = send(fd, &ret_code, sizeof(int), 0);
-		} else {
+		if (ret_code == 0) {
 			ret_len = strlen(value);
 			memcpy(res_buf, value, ret_len);
 			free(value);
 			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 			size_msg = send(fd, res_buf, ret_len, 0);
+		} else {
+			ret_len = 0;
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
 		break;
 

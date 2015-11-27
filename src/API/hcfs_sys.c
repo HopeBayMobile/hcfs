@@ -53,12 +53,14 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	msg_len += sizeof(ssize_t);
 
 	memcpy(key, &(arg_buf[msg_len]), str_len);
+	key[str_len] = 0;
 	msg_len += str_len;
 
 	memcpy(&str_len, &(arg_buf[msg_len]), sizeof(ssize_t));
 	msg_len += sizeof(ssize_t);
 
 	memcpy(value, &(arg_buf[msg_len]), str_len);
+	value[str_len] = 0;
 	msg_len += str_len;
 
 	if (msg_len != arg_len)
@@ -124,6 +126,7 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 	msg_len += sizeof(ssize_t);
 
 	memcpy(key, &(arg_buf[msg_len]), str_len);
+	key[str_len] = 0;
 	msg_len += str_len;
 
 	printf("key is %s\n", key);
@@ -157,11 +160,15 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 			token = strsep(&line, " ");
 			token = strsep(&line, "\n");
 
-			*value = malloc(strlen(token)*sizeof(char));
-			strcpy(*value, token);
+			if (strlen(token) > 0) {
+				*value = malloc((strlen(token) + 1) * sizeof(char));
+				strcpy(*value, token);
+				ret_code = 0;
+			} else {
+				ret_code = 1;
+			}
 
 			free(tmp_ptr);
-			ret_code = 0;
 			break;
 		}
 
@@ -173,7 +180,7 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 	if (ret_code < 0)
 		return -EINVAL;
 	else
-		return 0;
+		return ret_code;
 }
 
 int reset_xfer_usage()
