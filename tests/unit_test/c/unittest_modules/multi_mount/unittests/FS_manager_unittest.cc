@@ -179,7 +179,9 @@ class add_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpsyncpath[100];
   char tmpbackuppath[100];
+
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -198,6 +200,8 @@ class add_filesystemTest : public ::testing::Test {
 
     treesplit = FALSE;
     entry_in_database = FALSE;
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    mkdir(tmpsyncpath, 0700);
    }
 
   virtual void TearDown() {
@@ -208,6 +212,8 @@ class add_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    rmdir(tmpsyncpath);
     unlink(tmpmgrpath);
     unlink(tmpbackuppath);
     rmdir(METAPATH);
@@ -388,6 +394,7 @@ class delete_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpsyncpath[100];
   char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
@@ -402,6 +409,8 @@ class delete_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    mkdir(tmpsyncpath, 0700);
     snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
              METAPATH);
 
@@ -419,6 +428,8 @@ class delete_filesystemTest : public ::testing::Test {
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
     unlink(tmpmgrpath);
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    rmdir(tmpsyncpath);
     unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
@@ -562,6 +573,7 @@ class check_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpsyncpath[100];
   char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
@@ -580,6 +592,8 @@ class check_filesystemTest : public ::testing::Test {
              METAPATH);
 
     treesplit = FALSE;
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    mkdir(tmpsyncpath, 0700);
 
    }
 
@@ -592,6 +606,8 @@ class check_filesystemTest : public ::testing::Test {
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
     unlink(tmpmgrpath);
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    rmdir(tmpsyncpath);
     unlink(tmpbackuppath);
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");

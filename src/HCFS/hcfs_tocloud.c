@@ -57,6 +57,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "metaops.h"
 #include "dedup_table.h"
 #include "utils.h"
+#include "hfuse_system.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -136,6 +137,8 @@ static inline int _upload_terminate_thread(int index)
 	size_t tmp_size, ret_size;
 	DELETE_THREAD_TYPE *tmp_del;
 	char need_delete_object;
+	SYSTEM_DATA_TYPE *statptr;
+	off_t cache_block_size;
 
 	if (upload_ctl.threads_in_use[index] == 0)
 		return 0;
@@ -243,6 +246,16 @@ static inline int _upload_terminate_thread(int index)
 						errcode = ret;
 						goto errcode_handle;
 					}
+					cache_block_size =
+						check_file_size(blockpath);
+					sem_wait(&(hcfs_system->access_sem));
+					statptr = &(hcfs_system->systemdata);
+					statptr->dirty_cache_size -=
+						cache_block_size;
+					if (statptr->dirty_cache_size < 0)
+						statptr->dirty_cache_size = 0;
+					sem_post(&(hcfs_system->access_sem));
+
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 					       metafptr);
@@ -441,6 +454,7 @@ void init_sync_stat_control(void)
 
 	FS_stat_path = (char *)malloc(METAPATHLEN);
 	fname = (char *)malloc(METAPATHLEN);
+
 	snprintf(FS_stat_path, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
 	if (access(FS_stat_path, F_OK) == -1) {
 		MKDIR(FS_stat_path, 0700);
@@ -455,9 +469,9 @@ void init_sync_stat_control(void)
 		}
 		tmpptr = NULL;
 		ret = readdir_r(dirp, &tmp_entry, &tmpptr);
-		/* Delete all previously cached FS stat */
+		/* Delete all existing temp FS stat */
 		while ((ret == 0) && (tmpptr != NULL)) {
-			if (strncmp(tmp_entry.d_name, "FSstat", 6) == 0) {
+			if (strncmp(tmp_entry.d_name, "tmpFSstat", 9) == 0) {
 				snprintf(fname, METAPATHLEN - 1, "%s/%s",
 					 FS_stat_path, tmp_entry.d_name);
 				unlink(fname);
@@ -465,7 +479,7 @@ void init_sync_stat_control(void)
 			ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		}
 		closedir(dirp);
-	}
+	} 
 
 	memset(&(sync_stat_ctl.statcurl), 0, sizeof(CURL_HANDLE));
 	sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
@@ -1456,7 +1470,7 @@ void upload_loop(void)
 
 	init_upload_control();
 	init_sync_control();
-	init_sync_stat_control();
+/*	init_sync_stat_control(); */
 	is_start_check = TRUE;
 
 	write_log(2, "Start upload loop\n");
@@ -1545,6 +1559,10 @@ void upload_loop(void)
 
 	pthread_join(upload_ctl.upload_handler_thread, NULL);
 	pthread_join(sync_ctl.sync_handler_thread, NULL);
+
+#ifdef _ANDROID_ENV_
+	return NULL;
+#endif
 }
 
 /************************************************************************
@@ -1560,11 +1578,11 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta)
 {
 	int ret, errcode;
-	char fname[METAPATHLEN];
+	char fname[METAPATHLEN], tmpname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
 	long long system_size, num_inodes;
-	char is_fopen;
+	char is_fopen, is_backedup;
 	size_t ret_size;
 
 	write_log(10, "Debug entering update backend stat\n");
@@ -1574,7 +1592,28 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 			METAPATH, (uint64_t)root_inode);
+        snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%" PRIu64,
+                 METAPATH, (uint64_t)root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "", (uint64_t)root_inode);
+
+	/* If updating backend statistics for the first time, delete local
+	copy for this volume */
+	/* Note: tmpname is used as a tag to indicate whether the update
+	occurred for the first time. It is also a backup of the old cached
+	statistics since the last system shutdown for this volume */
+
+	is_backedup = FALSE;
+	if (access(tmpname, F_OK) != 0) {
+		errcode = errno;
+		if (errno == ENOENT) {
+			if (access(fname, F_OK) == 0) {
+				rename(fname, tmpname);
+				is_backedup = TRUE;
+			} else {
+				MKNOD(tmpname, S_IFREG | 0700, 0);
+			}
+		}
+	}
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
@@ -1588,6 +1627,8 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			errcode = -errcode;
 			goto errcode_handle;
 		}
+		setbuf(fptr, NULL);
+		flock(fileno(fptr), LOCK_EX);
 		is_fopen = TRUE;
 		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl),
 				      NULL);
@@ -1596,16 +1637,22 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			errcode = 0;
 		} else if (ret != 404) {
 			errcode = -EIO;
+			/* If cannot download the previous backed-up copy,
+			revert to the cached one */
+			if (is_backedup == TRUE)
+				rename(tmpname, fname);
 			goto errcode_handle;
 		} else {
 			/* Not found, init a new one */
 			write_log(10, "Debug update stat: nothing stored\n");
-			fseek(fptr, 0, SEEK_SET);
+			FTRUNCATE(fileno(fptr), 0);
+			FSEEK(fptr, 0, SEEK_SET);
 			system_size = 0;
 			num_inodes = 0;
-			fwrite(&system_size, sizeof(long long), 1, fptr);
-			fwrite(&num_inodes, sizeof(long long), 1, fptr);
+			FWRITE(&system_size, sizeof(long long), 1, fptr);
+			FWRITE(&num_inodes, sizeof(long long), 1, fptr);
 		}
+		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
 	}
@@ -1617,6 +1664,8 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 		errcode = -errcode;
 		goto errcode_handle;
 	}
+	setbuf(fptr, NULL);
+	flock(fileno(fptr), LOCK_EX);
 	is_fopen = TRUE;
 	FREAD(&system_size, sizeof(long long), 1, fptr);
 	FREAD(&num_inodes, sizeof(long long), 1, fptr);
@@ -1629,6 +1678,20 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&system_size, sizeof(long long), 1, fptr);
 	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+
+	/* TODO: Perhaps need to backup sum of backend data to backend as well
+	*/
+	/* Change statistics for summary statistics */
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.backend_size += system_size_delta;
+	if (hcfs_system->systemdata.backend_size < 0)
+		hcfs_system->systemdata.backend_size = 0;
+	hcfs_system->systemdata.backend_inodes += num_inodes_delta;
+	if (hcfs_system->systemdata.backend_inodes < 0)
+		hcfs_system->systemdata.backend_inodes = 0;
+	sync_hcfs_system_data(FALSE);
+	sem_post(&(hcfs_system->access_sem));
+
 	FSEEK(fptr, 0, SEEK_SET);
 	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
 	if ((ret < 200) || (ret > 299)) {
@@ -1636,6 +1699,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 		goto errcode_handle;
 	}
 
+	flock(fileno(fptr), LOCK_UN);
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	fclose(fptr);
 	is_fopen = FALSE;
@@ -1643,8 +1707,10 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	return 0;
 
 errcode_handle:
-	sem_post(&(sync_stat_ctl.stat_op_sem));
-	if (is_fopen == TRUE)
+	if (is_fopen == TRUE) {
+		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
+	}
+	sem_post(&(sync_stat_ctl.stat_op_sem));
 	return errcode;
 }

@@ -3,6 +3,7 @@ extern "C" {
 #include "file_present.h"
 #include "meta_mem_cache.h"
 #include "global.h"
+#include "path_reconstruct.h"
 #include <errno.h>
 }
 #include "gtest/gtest.h"
@@ -102,6 +103,7 @@ class mknod_update_metaTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		sem_init(&(pathlookup_data_lock), 0, 1);
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
 	}
@@ -141,6 +143,7 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	struct stat tmp_stat;
+	int ret;
 
 	tmp_stat.st_mode = S_IFREG;
 
@@ -162,6 +165,7 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 	struct stat tmp_stat;
 
 	tmp_stat.st_mode = S_IFDIR;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
@@ -174,6 +178,7 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	struct stat tmp_stat;
 
 	tmp_stat.st_mode = S_IFDIR;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
 }
@@ -185,6 +190,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	struct stat tmp_stat;
 
 	tmp_stat.st_mode = S_IFDIR;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
@@ -206,6 +212,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_REGFILE;
 	mock_entry.d_type = D_ISREG;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode,
 		&mock_entry));
@@ -219,6 +226,7 @@ TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_REGFILE;
 	mock_entry.d_type = D_ISREG;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
 			&mock_entry));
@@ -232,6 +240,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_LNK;
 	mock_entry.d_type = D_ISLNK;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode,
 			&mock_entry));
@@ -245,6 +254,7 @@ TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_LNK;
 	mock_entry.d_type = D_ISLNK;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
 			&mock_entry));
@@ -262,6 +272,7 @@ TEST(rmdir_update_metaTest, ChildrenNonempty)
 {
 	ino_t self_inode = INO_CHILDREN_IS_NONEMPTY;
 	ino_t parent_inode = 1;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
@@ -271,6 +282,7 @@ TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
 {
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
@@ -280,6 +292,7 @@ TEST(rmdir_update_metaTest, FunctionWorkSuccess)
 {
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
@@ -311,6 +324,7 @@ protected:
 			unlink(mock_meta_path);
 
 		mock_meta_entry->fptr = fopen(mock_meta_path, "wr+");
+		mock_meta_entry->meta_opened = TRUE;
 		fseek(mock_meta_entry->fptr, 0, SEEK_SET);
 		fwrite(&mock_xattr_page, sizeof(XATTR_PAGE),
 			1, mock_meta_entry->fptr);
@@ -465,6 +479,7 @@ protected:
 		mock_parent_entry = (META_CACHE_ENTRY_STRUCT *)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(mock_parent_entry, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		sem_init(&(pathlookup_data_lock), 0, 1);
 	}
 
 	void TearDown()
@@ -522,6 +537,7 @@ protected:
 		mock_parent_entry = (META_CACHE_ENTRY_STRUCT *)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(mock_parent_entry, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		sem_init(&(pathlookup_data_lock), 0, 1);
 	}
 
 	void TearDown()

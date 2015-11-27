@@ -375,7 +375,7 @@ TEST_F(api_moduleTest, TerminateTest) {
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
  }
 
-/* Test CREATEFS API call */ 
+/* Test CREATEVOL API call */ 
 TEST_F(api_moduleTest, CreateFSTest) {
 
   int ret_val, errcode;
@@ -390,7 +390,7 @@ TEST_F(api_moduleTest, CreateFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = CREATEFS;
+  code = CREATEVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -410,7 +410,7 @@ TEST_F(api_moduleTest, CreateFSTest) {
   ASSERT_EQ(TRUE, CREATEDFS);
   EXPECT_STREQ("123456789", recvFSname);
  }
-/* Test DELETEFS API call */ 
+/* Test DELETEVOL API call */ 
 TEST_F(api_moduleTest, DeleteFSTest) {
 
   int ret_val, errcode;
@@ -425,7 +425,7 @@ TEST_F(api_moduleTest, DeleteFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = DELETEFS;
+  code = DELETEVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -445,7 +445,7 @@ TEST_F(api_moduleTest, DeleteFSTest) {
   ASSERT_EQ(TRUE, DELETEDFS);
   EXPECT_STREQ("123456789", recvFSname);
  }
-/* Test CHECKFS API call */ 
+/* Test CHECKVOL API call */ 
 TEST_F(api_moduleTest, CheckFSTest) {
 
   int ret_val, errcode;
@@ -460,7 +460,7 @@ TEST_F(api_moduleTest, CheckFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = CHECKFS;
+  code = CHECKVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -480,7 +480,7 @@ TEST_F(api_moduleTest, CheckFSTest) {
   ASSERT_EQ(TRUE, CHECKEDFS);
   EXPECT_STREQ("123456789", recvFSname);
  }
-/* Test LISTFS API call */ 
+/* Test LISTVOL API call */ 
 TEST_F(api_moduleTest, ListFSTestNoFS) {
 
   int ret_val, errcode;
@@ -497,7 +497,7 @@ TEST_F(api_moduleTest, ListFSTestNoFS) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = LISTFS;
+  code = LISTVOL;
   cmd_len = 0;
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(unsigned int), 0);
@@ -511,7 +511,7 @@ TEST_F(api_moduleTest, ListFSTestNoFS) {
   ASSERT_EQ(TRUE, LISTEDFS);
  }
 
-/* Test LISTFS API call */ 
+/* Test LISTVOL API call */ 
 TEST_F(api_moduleTest, ListFSTestOneFS) {
 
   int ret_val, errcode;
@@ -530,7 +530,7 @@ TEST_F(api_moduleTest, ListFSTestOneFS) {
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
 
-  code = LISTFS;
+  code = LISTVOL;
   cmd_len = 0;
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(unsigned int), 0);
@@ -547,7 +547,7 @@ TEST_F(api_moduleTest, ListFSTestOneFS) {
   ASSERT_EQ(TRUE, LISTEDFS);
  }
 
-/* Test MOUNTFS API call */ 
+/* Test MOUNTVOL API call */ 
 TEST_F(api_moduleTest, MountFSTest) {
 
   int ret_val, errcode;
@@ -564,7 +564,7 @@ TEST_F(api_moduleTest, MountFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = MOUNTFS;
+  code = MOUNTVOL;
   cmd_len = 20 + sizeof(int);
   fsname_len = 10;
   snprintf(tmpstr, 10, "123456789");
@@ -593,7 +593,7 @@ TEST_F(api_moduleTest, MountFSTest) {
   EXPECT_STREQ("123456789", recvmpname);
  }
 
-/* Test UNMOUNTFS API call */ 
+/* Test UNMOUNTVOL API call */ 
 TEST_F(api_moduleTest, UnmountFSTest) {
 
   int ret_val, errcode;
@@ -609,7 +609,7 @@ TEST_F(api_moduleTest, UnmountFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = UNMOUNTFS;
+  code = UNMOUNTVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");

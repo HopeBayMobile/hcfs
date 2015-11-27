@@ -98,7 +98,7 @@
 #define FTELL(A)\
 	{\
 		errcode = 0;\
-		ret_pos = ftell(A);\
+		ret_pos = (int64_t) ftell(A);\
 		if (ret_pos < 0) {\
 			errcode = errno;\
 			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
@@ -182,6 +182,8 @@
 			errcode = -errcode;\
 			goto errcode_handle;\
 		} \
+		if (ret_ssize == 0)\
+			memset(B, 0, C);\
 	}
 
 #define PWRITE(A, B, C, D)\

@@ -1127,6 +1127,7 @@ protected:
 	}
 };
 
+/* Code is removed from actual_delete_inode
 #ifdef _ANDROID_ENV_
 TEST_F(actual_delete_inodeTest, FailIn_pathlookup_write_parent)
 {
@@ -1151,7 +1152,7 @@ TEST_F(actual_delete_inodeTest, FailIn_delete_pathcache_node)
 	delete_pathcache_node_success = TRUE;
 }
 #endif
-
+*/
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess)
 {
 	MOUNT_T mount_t;

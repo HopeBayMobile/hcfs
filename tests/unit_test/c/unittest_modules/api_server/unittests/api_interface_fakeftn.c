@@ -5,6 +5,11 @@
 #include <errno.h>
 #include "fuseop.h"
 #include "global.h"
+#include "mount_manager.h"
+#include "meta_mem_cache.h"
+#include "dir_statistics.h"
+
+SYSTEM_CONF_STRUCT system_config;
 
 int write_log(int level, char *format, ...)
 {
@@ -72,6 +77,71 @@ int mount_status(char *fsname)
 	CHECKEDMOUNT = TRUE;
 	strcpy(recvFSname, fsname);
 	return 0;
+}
+
+int search_mount(char *fsname, MOUNT_T **mt_info)
+{
+	return -ENOENT;
+}
+
+int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
+{
+	return -ENOENT;
+}
+
+int fetch_meta_path(char *pathname, ino_t this_inode)
+{
+	return -EIO;
+}
+
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+	return -EIO;
+}
+
+int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
+{
+	return -EIO;
+}
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
+		unsigned long *ret_gen, char *ret_pin_status)
+{
+	return -EIO;
+}
+
+int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+{
+	return -EIO;
+}
+int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
+	META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
+{
+	return NULL;
 }
 
 int pin_inode(ino_t this_inode, long long *reserved_pinned_size)

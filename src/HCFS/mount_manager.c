@@ -612,7 +612,8 @@ int mount_FS(char *fsname, char *mp)
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
-	}	ret = do_mount_FS(mp, new_info);
+	}
+	ret = do_mount_FS(mp, new_info);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

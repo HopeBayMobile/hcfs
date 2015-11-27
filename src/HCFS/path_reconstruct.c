@@ -22,6 +22,8 @@
 #include "meta_mem_cache.h"
 #include "fuseop.h"
 #include "macro.h"
+#include "parent_lookup.h"
+#include "global.h"
 #include "utils.h"
 
 /************************************************************************
@@ -547,6 +549,8 @@ int init_pathlookup()
 {
 	int ret, errcode;
 	char pathname[METAPATHLEN+10];
+	BOOL need_init;
+	ssize_t ret_ssize;
 
 	ret = sem_init(&(pathlookup_data_lock), 0, 1);
 	if (ret < 0) {
@@ -559,7 +563,7 @@ int init_pathlookup()
 
 	snprintf(pathname, METAPATHLEN, "%s/pathlookup_db", METAPATH);
 	if (access(pathname, F_OK) != 0) {
-		MKNOD(pathname, S_IFREG | 0600, 0)
+		MKNOD(pathname, S_IFREG | 0600, 0);
 	}
 	pathlookup_data_fptr = fopen(pathname, "r+");
 	if (pathlookup_data_fptr == NULL) {
@@ -570,6 +574,33 @@ int init_pathlookup()
 		goto errcode_handle;
 	}
 	setbuf(pathlookup_data_fptr, NULL);
+
+	need_init = FALSE;
+	snprintf(pathname, METAPATHLEN, "%s/parentlookup2_db", METAPATH);
+	if (access(pathname, F_OK) != 0) {
+		MKNOD(pathname, S_IFREG | 0600, 0);
+		need_init = TRUE;
+	}
+	plookup2_fptr = fopen(pathname, "r+");
+	if (plookup2_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "Unexpected error in init: %d (%s)\n", errcode,
+			strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	setbuf(plookup2_fptr, NULL);
+	if (need_init == TRUE) {
+		/* Init the parent lookup secondary db if just created */
+		memset(&parent_lookup_head, 0, sizeof(PLOOKUP_HEAD_T));
+		PWRITE(fileno(plookup2_fptr), &parent_lookup_head,
+		       sizeof(PLOOKUP_HEAD_T), 0);
+	} else {
+		/* Otherwise read from database */
+		PREAD(fileno(plookup2_fptr), &parent_lookup_head,
+		       sizeof(PLOOKUP_HEAD_T), 0);
+	}
+
 	return 0;
 errcode_handle:
 	return errcode;
@@ -586,6 +617,7 @@ errcode_handle:
 void destroy_pathlookup()
 {
 	fclose(pathlookup_data_fptr);
+	fclose(plookup2_fptr);
 	sem_destroy(&(pathlookup_data_lock));
 	return;
 }
@@ -594,14 +626,15 @@ void destroy_pathlookup()
 *
 * Function name: pathlookup_write_parent
 *        Inputs: ino_t self_inode, ino_t parent_inode
-*       Summary: Writes the parent inode to a file in metastorage
+*       Summary: Writes the parent inode to a file in metastorage, and reset
+*                haveothers to FALSE.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
-	ino_t tmpinode;
+	PRIMARY_PARENT_T tmpparent;
 	int errcode, ret;
 	ssize_t ret_ssize;
 
@@ -614,9 +647,11 @@ int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 		return errcode;
 	}
 
-	filepos = (off_t) ((self_inode - 1) * sizeof(ino_t));
-	tmpinode = parent_inode;
-	PWRITE(fileno(pathlookup_data_fptr), &tmpinode, sizeof(ino_t), filepos);
+	filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
+	tmpparent.parentinode = parent_inode;
+	tmpparent.haveothers = FALSE;
+	PWRITE(fileno(pathlookup_data_fptr), &tmpparent,
+	       sizeof(PRIMARY_PARENT_T), filepos);
 
 	sem_post(&(pathlookup_data_lock));
 	return 0;
@@ -637,7 +672,7 @@ errcode_handle:
 int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr)
 {
 	off_t filepos;
-	ino_t tmpinode;
+	PRIMARY_PARENT_T tmpparent;
 	int errcode, ret;
 	ssize_t ret_ssize;
 
@@ -650,11 +685,12 @@ int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr)
 		return errcode;
 	}
 
-	filepos = (off_t) ((self_inode - 1) * sizeof(ino_t));
-	PREAD(fileno(pathlookup_data_fptr), &tmpinode, sizeof(ino_t), filepos);
-
+	filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
+	memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
+	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
+	       sizeof(PRIMARY_PARENT_T), filepos);
+	*parentptr = tmpparent.parentinode;
 	sem_post(&(pathlookup_data_lock));
-	*parentptr = tmpinode;
 	return 0;
 errcode_handle:
 	sem_post(&(pathlookup_data_lock));

@@ -20,6 +20,8 @@
 
 extern SYSTEM_CONF_STRUCT system_config;
 
+#include "dir_statistics.h"
+
 /*BEGIN string utility definition*/
 
 /*Will copy the filename of the meta file to pathname*/
@@ -44,7 +46,8 @@ int validate_system_config(void);
 off_t check_file_size(const char *path);
 
 int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta);
+		long long cache_size_delta, long long cache_blocks_delta,
+		long long dirty_cache_delta);
 
 int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
@@ -58,6 +61,8 @@ void get_system_size(long long *cache_size, long long *pinned_size);
 
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta);
+			long long cached_size_delta, ino_t thisinode);
+/* Function for checking if a file is local, cloud, or hybrid */
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
 #endif  /* SRC_HCFS_UTILS_H_ */

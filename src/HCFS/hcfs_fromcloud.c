@@ -105,6 +105,8 @@ int fetch_from_cloud(FILE *fptr, char action_from,
                                  &(download_curl_handles[which_curl_handle]),
                                  object_meta);
 
+	/* TODO: Should process failed get here */
+
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	fseek(get_fptr, 0, SEEK_END);
 	tmplen = ftell(get_fptr);
@@ -258,7 +260,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 			       metafptr);
 			ret = update_file_stats(metafptr, 0, 1,
-						tempstat.st_size);
+						tempstat.st_size,
+						ptr->this_inode);
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
@@ -467,7 +470,8 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 			return ret;
 		}
 		ret = update_file_stats(meta_cache_entry->fptr, 0,
-					1, cache_size_delta);
+					1, cache_size_delta,
+					block_info->this_inode);
 		if (ret < 0) {
 			return ret;
 		}
@@ -558,7 +562,7 @@ void fetch_backend_block(void *ptr)
 	/* Update dirty status and system meta */
 	if (stat(block_path, &blockstat) == 0) {
 		set_block_dirty_status(NULL, block_fptr, FALSE);
-		change_system_meta(0, blockstat.st_size, 1);
+		change_system_meta(0, blockstat.st_size, 1, 0);
 		write_log(10, "Debug: Now cache size %lld",
 			hcfs_system->systemdata.cache_size);
 	} else {

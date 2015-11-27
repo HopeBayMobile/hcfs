@@ -4,6 +4,8 @@
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <inttypes.h>
+#include <errno.h>
+#include <string.h>
 #include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
@@ -21,12 +23,19 @@ class uploadEnvironment : public ::testing::Environment {
   virtual void SetUp() {
     int shm_key;
 
-    shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
+    shm_key = shmget(5678, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
+    if (shm_key < 0) {
+      int errcode;
+      errcode = errno;
+      printf("Error %d %s\n", errcode, strerror(errcode));
+      return;
+    }
     hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
 
 //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
     sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
+    sem_init(&(hcfs_system->access_sem), 0, 1);
 
     workpath = NULL;
     tmppath = NULL;
@@ -118,11 +127,17 @@ TEST_F(init_sync_stat_controlTest, InitCleanup) {
   EXPECT_EQ(0, ret);
 
   ret = access(tmppath2, F_OK);
-  ASSERT_NE(0, ret);
+  ASSERT_EQ(0, ret);
 
 
   /* Cleanup */
+  unlink(tmppath2);
   rmdir(tmppath);
+  ret = access(tmppath, F_OK);
+  EXPECT_NE(0, ret);
+
+  ret = access(tmppath2, F_OK);
+  ASSERT_NE(0, ret);
  }
 
 /* End of the test case for the function update_backend_stat */
@@ -523,6 +538,8 @@ protected:
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
+		snprintf(tmppath2, 199, "%s/tmpFSstat10", tmppath);
+		unlink(tmppath2);
 		rmdir(tmppath);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
@@ -742,6 +759,8 @@ protected:
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
+		snprintf(tmppath2, 199, "%s/tmpFSstat10", tmppath);
+		unlink(tmppath2);
 		rmdir(tmppath);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
@@ -891,17 +910,22 @@ TEST_F(update_backend_statTest, EmptyStat) {
 
   /* Cleanup */
   unlink(tmppath2);
+  snprintf(tmppath2, 199, "%s/tmpFSstat14", tmppath);
+  unlink(tmppath2);
+
   rmdir(tmppath);
  }
 TEST_F(update_backend_statTest, UpdateExistingStat) {
   char tmppath[200];
   char tmppath2[200];
+  char tmppath3[200];
   int ret;
   FILE *fptr;
   long long sys_size, num_ino;
 
   snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
   snprintf(tmppath2, 199, "%s/FSstat14", tmppath);
+  snprintf(tmppath3, 199, "%s/tmpFSstat14", tmppath);
 
   ret = access(tmppath, F_OK);
   ASSERT_NE(0, ret);
@@ -916,6 +940,10 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   sys_size = 7687483;
   num_ino = 34334;
   fptr = fopen(tmppath2, "w");
+  fwrite(&sys_size, sizeof(long long), 1, fptr);
+  fwrite(&num_ino, sizeof(long long), 1, fptr);
+  fclose(fptr);
+  fptr = fopen(tmppath3, "w");
   fwrite(&sys_size, sizeof(long long), 1, fptr);
   fwrite(&num_ino, sizeof(long long), 1, fptr);
   fclose(fptr);
@@ -938,6 +966,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
 
   /* Cleanup */
   unlink(tmppath2);
+  unlink(tmppath3);
   rmdir(tmppath);
  }
 
@@ -986,6 +1015,8 @@ TEST_F(update_backend_statTest, UpdateLessThanZero) {
 
   /* Cleanup */
   unlink(tmppath2);
+  snprintf(tmppath2, 199, "%s/tmpFSstat14", tmppath);
+  unlink(tmppath2);
   rmdir(tmppath);
  }
 
@@ -1027,6 +1058,8 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
   EXPECT_EQ(34334 - 101, num_ino);
 
   /* Cleanup */
+  unlink(tmppath2);
+  snprintf(tmppath2, 199, "%s/tmpFSstat14", tmppath);
   unlink(tmppath2);
   rmdir(tmppath);
  }

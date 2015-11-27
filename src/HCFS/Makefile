@@ -34,7 +34,9 @@ OBJS_F := objmeta.o \
 	dedup_table.o \
 	path_reconstruct.o \
 	pin_scheduling.o \
-	monitor.o
+	monitor.o \
+	dir_statistics.o \
+	parent_lookup.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)

@@ -308,9 +308,14 @@ int main(int argc, char **argv)
 	if (ret_val < 0)
 		exit(-1);
 
-/* TODO: error handling for log files */
+	/* TODO: error handling for log files */
+	init_sync_stat_control();
+
 #ifdef _ANDROID_ENV_
 	ret_val = init_pathlookup();
+	if (ret_val < 0)
+		exit(ret_val);
+	ret_val = init_dirstat_lookup();
 	if (ret_val < 0)
 		exit(ret_val);
 
@@ -339,8 +344,16 @@ int main(int argc, char **argv)
 		pthread_join(monitor_loop_thread, NULL);
 	}
 	close_log();
+	destroy_dirstat_lookup();
 	destroy_pathlookup();
 #else
+	ret_val = init_pathlookup();
+	if (ret_val < 0)
+		exit(ret_val);
+	ret_val = init_dirstat_lookup();
+	if (ret_val < 0)
+		exit(ret_val);
+
 	/* Start up children */
 	for (proc_idx = 0; proc_idx < CHILD_NUM; ++proc_idx) {
 		this_pid = fork();
@@ -370,6 +383,9 @@ int main(int argc, char **argv)
 		for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
 			waitpid(child_pids[proc_idx], NULL, 0);
 		close_log();
+		destroy_dirstat_lookup();
+		destroy_pathlookup();
+
 		break;
 	/* children processed begin */
 	case 1:

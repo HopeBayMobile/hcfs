@@ -60,9 +60,11 @@ pip-log.txt
 backend_upload_log
 cache_maintain_log
 fuse_log
+hcfs_android_log
 
 # Build 
 /src/CLI_utils/HCFSvol
+/src/CLI_utils/pin_test
 /src/HCFS/hcfs
 /src/HCFS/hcfs.log
 /src/HCFS/obj

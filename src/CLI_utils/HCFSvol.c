@@ -32,6 +32,9 @@ int main(int argc, char **argv)
 	char buf[4096];
 	DIR_ENTRY *tmp;
 	char *ptr;
+	ino_t tmpino;
+	long long num_local, num_cloud, num_hybrid, retllcode;
+	long long downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
 	int first_size, rest_size;
 
@@ -39,24 +42,52 @@ int main(int argc, char **argv)
 		printf("Invalid number of arguments\n");
 		exit(-EPERM);
 	}
-	if (strcasecmp(argv[1], "create") == 0)
-		code = CREATEFS;
-	else if (strcasecmp(argv[1], "delete") == 0)
-		code = DELETEFS;
+	if (strcasecmp(argv[1], "create") == 0) {
+		if (argc < 4) {
+			printf("Usage: HCFSvol create <Vol name> internal/external\n");
+			exit(-EINVAL);
+		}
+		code = CREATEVOL;
+	} else if (strcasecmp(argv[1], "delete") == 0)
+		code = DELETEVOL;
 	else if (strcasecmp(argv[1], "check") == 0)
-		code = CHECKFS;
+		code = CHECKVOL;
 	else if (strcasecmp(argv[1], "list") == 0)
-		code = LISTFS;
+		code = LISTVOL;
 	else if (strcasecmp(argv[1], "terminate") == 0)
 		code = TERMINATE;
 	else if (strcasecmp(argv[1], "mount") == 0)
-		code = MOUNTFS;
+		code = MOUNTVOL;
 	else if (strcasecmp(argv[1], "unmount") == 0)
-		code = UNMOUNTFS;
+		code = UNMOUNTVOL;
 	else if (strcasecmp(argv[1], "checkmount") == 0)
 		code = CHECKMOUNT;
 	else if (strcasecmp(argv[1], "unmountall") == 0)
 		code = UNMOUNTALL;
+	else if (strcasecmp(argv[1], "checknode") == 0)
+		code = CHECKDIRSTAT;
+	else if (strcasecmp(argv[1], "volsize") == 0)
+		code = GETVOLSIZE;
+	else if (strcasecmp(argv[1], "cloudsize") == 0)
+		code = GETCLOUDSIZE;
+	else if (strcasecmp(argv[1], "pinsize") == 0)
+		code = GETPINSIZE;
+	else if (strcasecmp(argv[1], "cachesize") == 0)
+		code = GETCACHESIZE;
+	else if (strcasecmp(argv[1], "location") == 0)
+		code = CHECKLOC;
+	else if (strcasecmp(argv[1], "ispin") == 0)
+		code = CHECKPIN;
+	else if (strcasecmp(argv[1], "maxpinsize") == 0)
+		code = GETMAXPINSIZE;
+	else if (strcasecmp(argv[1], "maxcachesize") == 0)
+		code = GETMAXCACHESIZE;
+	else if (strcasecmp(argv[1], "dirtysize") == 0)
+		code = GETDIRTYCACHESIZE;
+	else if (strcasecmp(argv[1], "getxfer") == 0)
+		code = GETXFERSTAT;
+	else if (strcasecmp(argv[1], "resetxfer") == 0)
+		code = RESETXFERSTAT;
 	else if (strcasecmp(argv[1], "cloudstat") == 0)
 		code = CLOUDSTAT;
 	else
@@ -74,6 +105,7 @@ int main(int argc, char **argv)
 	switch (code) {
 	case TERMINATE:
 	case UNMOUNTALL:
+	case RESETXFERSTAT:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -86,7 +118,26 @@ int main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	case CREATEFS:
+	case GETPINSIZE:
+	case GETCACHESIZE:
+	case GETMAXPINSIZE:
+	case GETMAXCACHESIZE:
+	case GETDIRTYCACHESIZE:
+		cmd_len = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retllcode, sizeof(long long), 0);
+		if (retllcode < 0) {
+			retcode = (int) retllcode;
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		} else {
+			printf("Returned value is %d\n", retllcode);
+		}
+		break;
+	case CREATEVOL:
 #ifdef _ANDROID_ENV_
 		cmd_len = strlen(argv[2]) + 2;
 		strncpy(buf, argv[2], sizeof(buf));
@@ -112,9 +163,9 @@ int main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 #endif
-	case DELETEFS:
-	case CHECKFS:
-	case UNMOUNTFS:
+	case DELETEVOL:
+	case CHECKVOL:
+	case UNMOUNTVOL:
 	case CHECKMOUNT:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
@@ -130,7 +181,77 @@ int main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	case MOUNTFS:
+	case GETVOLSIZE:
+	case GETCLOUDSIZE:
+		if (argc >= 3) {
+			cmd_len = strlen(argv[2]) + 1;
+			strcpy(buf, argv[2]);
+		} else {
+			cmd_len = 1;
+			buf[0] = 0;
+		}
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retllcode, sizeof(long long), 0);
+		if (retllcode < 0) {
+			retcode = (int) retllcode;
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		} else {
+			printf("Returned value is %lld\n", retllcode);
+		}
+		break;
+	case CHECKDIRSTAT:
+		tmpino = atol(argv[2]);
+		cmd_len = sizeof(ino_t);
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &tmpino, sizeof(ino_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		if (reply_len == (3 * sizeof(long long))) {
+			size_msg = recv(fd, &num_local, sizeof(long long), 0);
+			size_msg = recv(fd, &num_cloud, sizeof(long long), 0);
+			size_msg = recv(fd, &num_hybrid, sizeof(long long), 0);
+			printf("Reply len %d\n", reply_len);
+			printf("Num: local %lld, cloud %lld, hybrid %lld\n",
+				num_local, num_cloud, num_hybrid);
+		} else {
+			size_msg = recv(fd, &retcode, sizeof(int), 0);
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		}
+		break;
+	case GETXFERSTAT:
+		cmd_len = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &downxfersize, sizeof(long long), 0);
+		size_msg = recv(fd, &upxfersize, sizeof(long long), 0);
+		printf("Reply len %d\n", reply_len);
+		printf("Download %lld bytes, upload %lld bytes\n",
+				downxfersize, upxfersize);
+		break;
+	case CHECKLOC:
+	case CHECKPIN:
+		tmpino = atol(argv[2]);
+		cmd_len = sizeof(ino_t);
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &tmpino, sizeof(ino_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
+
+	case MOUNTVOL:
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);
 		fsname_len = strlen(argv[2]) + 1;
 		memcpy(buf, &fsname_len, sizeof(int));
@@ -151,7 +272,7 @@ int main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	case LISTFS:
+	case LISTVOL:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);

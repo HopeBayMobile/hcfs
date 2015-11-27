@@ -8,6 +8,7 @@
 #include "meta_mem_cache.h"
 #include "params.h"
 #include "global.h"
+#include "dir_statistics.h"
 
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
@@ -45,18 +46,18 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	META_CACHE_ENTRY_STRUCT *ptr;
+	META_CACHE_ENTRY_STRUCT *tmpptr;
 
-	ptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-	ptr->fptr = NULL;
-	/* Don't care the return value except NULL. It is not used. */
-	return ptr; 
+	tmpptr = (META_CACHE_ENTRY_STRUCT *)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	tmpptr->fptr = NULL;
+	tmpptr->meta_opened = FALSE;
+	return tmpptr;
 }
 
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	free(target_ptr);
-
 	return 0;
 }
 
@@ -204,7 +205,6 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	}
 	return 0;
 }
-
 int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
@@ -249,3 +249,26 @@ int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 {
 	return 0;
 }
+
+int reset_dirstat_lookup(ino_t thisinode)
+{
+	return 0;
+}
+
+int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+int lookup_add_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+

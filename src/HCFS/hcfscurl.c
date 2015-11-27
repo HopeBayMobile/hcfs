@@ -26,6 +26,7 @@
 #include <curl/curl.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 #include "b64encode.h"
 #include "params.h"
@@ -798,7 +799,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char header_filename[100];
 	int ret_val, ret, errcode;
 	int num_retries;
-	long ret_pos;
+	int64_t ret_pos;
 
 	sprintf(header_filename, "/dev/shm/swiftputhead%s.tmp",
 		curl_handle->id);
@@ -883,6 +884,13 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	fclose(swift_header_fptr);
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
+
+	if (_http_is_success(ret_val)) {
+		/* Update xfer statistics if successful */
+		sem_wait(&(hcfs_system->access_sem));
+		(hcfs_system->systemdata).xfer_size_upload += objsize;
+		sem_post(&(hcfs_system->access_sem));
+	}
 
 	return ret_val;
 
@@ -1651,13 +1659,12 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-/* TODO: Fix handling in reauthing in SWIFT.
-	Now will try to reauth for any HTTP error*/
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *object_meta)
 {
 	int ret_val, num_retries;
 	int ret, errcode;
+	int64_t ret_pos;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1711,9 +1718,24 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		ret_val = -1;
 		break;
 	}
+	/* Truncate output if not successful */
+	if (!_http_is_success(ret_val)) {
+		FTRUNCATE(fileno(fptr), 0);
+	} else {
+		/* Update xfer statistics if successful */
+		sem_wait(&(hcfs_system->access_sem));
+		FSEEK(fptr, 0, SEEK_END);
+		FTELL(fptr);
+		FSEEK(fptr, 0, SEEK_SET);
+		(hcfs_system->systemdata).xfer_size_download += ret_pos;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	return ret_val;
 
 errcode_handle:
+	/* Truncate output if not successful */
+	FTRUNCATE(fileno(fptr), 0);
 	return -1;
 }
 
@@ -1811,7 +1833,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char S3_signature[200];
 	int ret_val, ret, errcode;
 	char resource[200];
-	long ret_pos;
+	int64_t ret_pos;
 	int num_retries;
 
 	sprintf(header_filename, "/dev/shm/s3puthead%s.tmp", curl_handle->id);
@@ -1910,6 +1932,12 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	fclose(S3_header_fptr);
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
+	if (_http_is_success(ret_val)) {
+		/* Update xfer statistics if successful */
+		sem_wait(&(hcfs_system->access_sem));
+		(hcfs_system->systemdata).xfer_size_upload += objsize;
+		sem_post(&(hcfs_system->access_sem));
+	}
 
 	return ret_val;
 

@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/7/1 Jiahong created this file
+* 2015/11/27 Jiahong modifying format for inode printout
 *
 **************************************************************************/
 
@@ -22,6 +23,8 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <fcntl.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "macro.h"
 #include "fuseop.h"
@@ -169,6 +172,48 @@ void destroy_fs_manager(void)
 	fs_mgr_path = NULL;
 }
 
+/* Helper function for initializing a file for collecting statistics for
+data stored at backend */
+int _init_backend_stat(ino_t root_inode)
+{
+	int ret, errcode;
+	char fname[METAPATHLEN];
+	FILE *fptr;
+	long long system_size, num_inodes;
+	size_t ret_size;
+	char is_fopen;
+
+	is_fopen = FALSE;
+
+	write_log(10, "Debug creating backend stat file\n");
+
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+		 METAPATH, (uint64_t)root_inode);
+	write_log(10, "Creating stat for backend\n");
+	fptr = fopen(fname, "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "Open error in %s. Code %d, %s\n",
+			  __func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	is_fopen = TRUE;
+	FSEEK(fptr, 0, SEEK_SET);
+	system_size = 0;
+	num_inodes = 0;
+	FWRITE(&system_size, sizeof(long long), 1, fptr);
+	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+	fclose(fptr);
+	is_fopen = FALSE;
+
+	return 0;
+errcode_handle:
+	if (is_fopen)
+		fclose(fptr);
+	return errcode;
+}
+
 /* Helper function for allocating a new inode as root */
 ino_t _create_root_inode(void)
 {
@@ -182,7 +227,7 @@ ino_t _create_root_inode(void)
 	char temppath[METAPATHLEN];
 	int ret, errcode;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 	unsigned long this_gen;
 	FS_STAT_T tmp_stat;
 
@@ -239,13 +284,19 @@ ino_t _create_root_inode(void)
 	this_meta.local_pin = DEFAULT_PIN;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 	this_meta.metaver = CURRENT_META_VER;
-#ifdef _ANDROID_ENV_
+
+	/* Init parent lookup. Root inode does not have a parent */
 	ret = pathlookup_write_parent(root_inode, 0);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
-#endif
+	/* Init the dir stat for this node */
+	ret = reset_dirstat_lookup(root_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
@@ -280,6 +331,13 @@ ino_t _create_root_inode(void)
 
 	fclose(statfptr);
 	statfptr = NULL;
+
+	/* Create stat file for backend statistics */
+	ret = _init_backend_stat(root_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	fclose(metafptr);
 	metafptr = NULL;
@@ -765,7 +823,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	DIR_META_TYPE tmp_head;
 	int errcode;
 	ssize_t ret_ssize;
-	unsigned long num_walked;
+	int64_t num_walked;
 	long long next_node_pos;
 	int count;
 

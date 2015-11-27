@@ -167,3 +167,7 @@ PATH_CACHE * init_pathcache(ino_t root_inode)
 {
 	return NULL;
 }
+int reset_dirstat_lookup(ino_t thisinode)
+{
+	return 0;
+}

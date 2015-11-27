@@ -87,10 +87,10 @@ int write_log(int level, char *format, ...)
 
 	return 0;
 }
-
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-		long long num_cached_blocks_delta,
-		long long cached_size_delta)
+			long long num_cached_blocks_delta,
+			long long cached_size_delta, ino_t thisinode)
 {
 	return 0;
 }
+

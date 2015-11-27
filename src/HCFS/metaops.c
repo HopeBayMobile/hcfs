@@ -28,6 +28,7 @@
 #include <dirent.h>
 #include <semaphore.h>
 #include <sys/mman.h>
+#include <stdint.h>
 #include <inttypes.h>
 
 #include "global.h"
@@ -107,7 +108,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 	size_t ret_size;
 	int sem_val;
 	char no_need_rewrite;
-	long ret_pos;
+	int64_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
 
@@ -712,7 +713,7 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 	PTR_ENTRY_PAGE tmp_ptr_page;
 	int count, ret, errcode;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
 
@@ -872,7 +873,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 	int count, ret, errcode;
 	BLOCK_ENTRY_PAGE temppage;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
 
@@ -1021,7 +1022,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	FILE_META_TYPE temp_meta;
 	int which_indirect;
 	int ret, errcode;
-	long ret_pos;
+	int64_t ret_pos;
 
 	/* First check if meta cache is locked */
 	/* Create page here */
@@ -1203,19 +1204,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	char rootpath[METAPATHLEN];
 	FILE *fptr;
 	FS_STAT_T tmpstat;
-#ifdef _ANDROID_ENV_
-	ret = pathlookup_write_parent(this_inode, 0);
-	if (ret < 0)
-		return ret;
-	if (mptr != NULL) {
-		if (mptr->volume_type == ANDROID_EXTERNAL) {
-			ret = delete_pathcache_node(mptr->vol_path_cache,
-							this_inode);
-			if (ret < 0)
-				return ret;
-		}
-	}
-#endif
+	SYSTEM_DATA_TYPE *statptr;
+
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
@@ -1339,9 +1329,20 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 						check_file_size(thisblockpath);
 				UNLINK(thisblockpath);
 				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_size -=
+				statptr = &(hcfs_system->systemdata);
+				statptr->cache_size -=
 						(long long) cache_block_size;
-				hcfs_system->systemdata.cache_blocks -= 1;
+				if (statptr->cache_size < 0)
+					statptr->cache_size = 0;
+				if ((block_status == ST_LDISK) ||
+				    (block_status == ST_LtoC))
+					statptr->dirty_cache_size -=
+						(long long) cache_block_size;
+				if (statptr->dirty_cache_size < 0)
+					statptr->dirty_cache_size = 0;
+				statptr->cache_blocks -= 1;
+				if (statptr->cache_blocks < 0)
+					statptr->cache_blocks = 0;
 				sem_post(&(hcfs_system->access_sem));
 			}
 		}
@@ -1354,6 +1355,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		}
 
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
+		if (hcfs_system->systemdata.system_size < 0)
+			hcfs_system->systemdata.system_size = 0;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 		if (mptr != NULL) {
