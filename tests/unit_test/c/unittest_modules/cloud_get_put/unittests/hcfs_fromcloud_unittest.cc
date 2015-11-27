@@ -1,3 +1,4 @@
+#define __STDC_FORMAT_MACROS
 #include <semaphore.h>
 #include <string>
 #include <errno.h>
@@ -74,6 +75,8 @@ protected:
 		objname_list = (char **)malloc(sizeof(char *)*num_obj);
 		for (int i = 0 ; i < num_obj ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char)*40);
+
+		hcfs_system->backend_status_is_online = TRUE;
 	}
 	virtual void TearDown()
 	{
@@ -114,6 +117,12 @@ int objname_cmp(const void *s1, const void *s2)
 	return block1 - block2;
 }
 
+TEST_F(fetch_from_cloudTest, BackendOffline)
+{
+	hcfs_system->backend_status_is_online = FALSE;
+
+	EXPECT_EQ(-EPERM, fetch_from_cloud(NULL, 0, 0, 0));
+}
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
 	pthread_t tid[num_obj];
@@ -164,6 +173,8 @@ protected:
 		sem_init(&download_curl_control_sem, 0, 1);
 		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
+
+		hcfs_system->backend_status_is_online = TRUE;
 	}
 	virtual void TearDown()
 	{
