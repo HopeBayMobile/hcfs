@@ -47,8 +47,17 @@
 out blocks and sync to cloud, and how this may interact with meta
 sync in upload process */
 
-/* Helper function for removing local cached block for blocks that
-has been synced to backend already */
+/*
+ * Helper function for removing local cached block for blocks that
+ * has been synced to backend already.
+ *
+ * @param this_inode The inode to be removed
+ * @param builttime Builttime of last cache usage.
+ * @param seconds_slept Total sleeping time accumulating up to now. 
+ *
+ * @return 0 on succeeding in removing the inode, 1 on skipping the inode,
+ *         otherwise negative error code.
+ */
 int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 							long *seconds_slept)
 {
@@ -307,7 +316,7 @@ static int _check_cache_replace_result(long long *num_removed_inode)
 		if ((hcfs_system->systemdata.cache_size >=
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
 			(hcfs_system->backend_status_is_online == FALSE))
-			/* Wake them up */
+			/* Wake them up and tell them cannot do this action */
 			notify_sleep_on_cache(-EPERM);
 		sleep(1);
 	}
