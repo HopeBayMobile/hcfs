@@ -586,7 +586,7 @@ int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
 	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
 	      sizeof(PRIMARY_PARENT_T), filepos);
 
-	if (tmpparent.parentinode != parent_inode1) {
+	if (tmpparent.parentinode == parent_inode1) {
 		/* Replace the parent */
 		tmpparent.parentinode = parent_inode2;
 		PWRITE(fileno(pathlookup_data_fptr), &tmpparent,

@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/6/10 Jiahong created this file, and moved prototype here.
+* 2015/11/27 Jiahong modified format for inode printout
 *
 **************************************************************************/
 
@@ -389,8 +390,8 @@ long long get_cloud_size(int arg_len, char *largebuf)
 
 	/* Fetch from stat file if not mounted */
 
-	snprintf(temppath, METAPATHLEN - 1, "%s/FS_sync/FSstat%"FMT_INO_T,
-		 METAPATH, temp_entry.d_ino);
+	snprintf(temppath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64,
+		 METAPATH, (uint64_t)temp_entry.d_ino);
 	write_log(10, "Checking for FS stat in backend\n");
 	statfptr = fopen(temppath, "r");
 	if (statfptr == NULL) {
@@ -566,7 +567,8 @@ int check_location_handle(int arg_len, char *largebuf)
 		return -EINVAL;
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
-	write_log(10, "Debug API: checkpin inode %"FMT_INO_T"\n", target_inode);
+	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
+	          (uint64_t)target_inode);
 	errcode = fetch_meta_path(metapath, target_inode);
 	if (errcode < 0)
 		return errcode;
@@ -621,7 +623,8 @@ int checkpin_handle(int arg_len, char *largebuf)
 	char is_local_pin;
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
-	write_log(10, "Debug API: checkpin inode %"FMT_INO_T"\n", target_inode);
+	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
+	          (uint64_t)target_inode);
 	retcode = fetch_meta_path(metapath, target_inode);
 	if (retcode < 0)
 		return retcode;
@@ -686,7 +689,8 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 		return -EINVAL;
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
-	write_log(10, "Debug API: target inode %"FMT_INO_T"\n", target_inode);
+	write_log(10, "Debug API: target inode %" PRIu64 "\n",
+	          (uint64_t)target_inode);
 	retcode = fetch_meta_path(metapath, target_inode);
 	if (retcode < 0) {
 		tmpstats->num_local = retcode;

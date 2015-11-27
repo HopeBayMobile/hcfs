@@ -62,11 +62,4 @@
 
 #define DEFAULT_PIN TRUE
 
-/* Print format for ino_t is different in raspberry pi */
-#ifdef ARM_32bit_
-#define FMT_INO_T "lld"
-#else
-#define FMT_INO_T "ld"
-#endif
-
 #endif  /* GW20_SRC_GLOBAL_H_ */

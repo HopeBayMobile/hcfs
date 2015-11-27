@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/7/1 Jiahong created this file
+* 2015/11/27 Jiahong modifying format for inode printout
 *
 **************************************************************************/
 
@@ -23,6 +24,7 @@
 #include <sys/file.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "macro.h"
 #include "fuseop.h"
@@ -187,8 +189,8 @@ int _init_backend_stat(ino_t root_inode)
 
 	write_log(10, "Debug creating backend stat file\n");
 
-	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%"FMT_INO_T,
-		 METAPATH, root_inode);
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+		 METAPATH, (uint64_t)root_inode);
 	write_log(10, "Creating stat for backend\n");
 	fptr = fopen(fname, "w");
 	if (fptr == NULL) {

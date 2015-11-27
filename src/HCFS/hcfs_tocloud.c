@@ -57,6 +57,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "metaops.h"
 #include "dedup_table.h"
 #include "utils.h"
+#include "hfuse_system.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -1560,6 +1561,10 @@ void upload_loop(void)
 
 	pthread_join(upload_ctl.upload_handler_thread, NULL);
 	pthread_join(sync_ctl.sync_handler_thread, NULL);
+
+#ifdef _ANDROID_ENV_
+	return NULL;
+#endif
 }
 
 /************************************************************************
@@ -1589,8 +1594,8 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 			METAPATH, (uint64_t)root_inode);
-        snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%"FMT_INO_T,
-                 METAPATH, root_inode);
+        snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%" PRIu64,
+                 METAPATH, (uint64_t)root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "", (uint64_t)root_inode);
 
 	/* If updating backend statistics for the first time, delete local
