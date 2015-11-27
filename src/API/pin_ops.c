@@ -52,7 +52,7 @@ int _get_path_stat(char *pathname, ino_t *inode, long long *total_size)
 
 	ret_code = stat(pathname, &stat_buf);
 	if (ret_code < 0)
-		return ret_code;
+		return -errno;
 
 	if (S_ISREG(stat_buf.st_mode)) {
 		*inode = stat_buf.st_ino;
@@ -228,6 +228,7 @@ int check_pin_status(char *buf, unsigned int arg_len)
 	ino_t tmp_inode;
 
 
+	memcpy(path, &(buf[0]), arg_len);
 	ret_code = _get_path_stat(path, &tmp_inode, NULL);
 	if (ret_code < 0)
 		return ret_code;
@@ -238,8 +239,6 @@ int check_pin_status(char *buf, unsigned int arg_len)
 
 	code = CHECKPIN;
 	cmd_len = sizeof(ino_t);
-
-	memcpy(path, &(buf[0]), arg_len);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -263,6 +262,7 @@ int check_dir_status(char *buf, unsigned int arg_len,
 	ino_t tmp_inode;
 
 
+	memcpy(path, &(buf[0]), arg_len);
 	ret_code = _get_path_stat(path, &tmp_inode, NULL);
 	if (ret_code < 0)
 		return ret_code;
@@ -273,8 +273,6 @@ int check_dir_status(char *buf, unsigned int arg_len,
 
 	code = CHECKDIRSTAT;
 	cmd_len = sizeof(ino_t);
-
-	memcpy(path, &(buf[0]), arg_len);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -302,6 +300,7 @@ int check_file_loc(char *buf, unsigned int arg_len)
 	ino_t tmp_inode;
 
 
+	memcpy(path, &(buf[0]), arg_len);
 	ret_code = _get_path_stat(path, &tmp_inode, NULL);
 	if (ret_code < 0)
 		return ret_code;
@@ -312,8 +311,6 @@ int check_file_loc(char *buf, unsigned int arg_len)
 
 	code = CHECKLOC;
 	cmd_len = sizeof(ino_t);
-
-	memcpy(path, &(buf[0]), arg_len);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);

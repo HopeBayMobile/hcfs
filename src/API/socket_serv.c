@@ -154,6 +154,7 @@ int process_request(int thread_idx)
 	case CHECKPIN:
 		printf("Check pin status\n");
 		ret_code = check_pin_status(largebuf, arg_len);
+		printf("ret_code is %d\n", ret_code);
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
