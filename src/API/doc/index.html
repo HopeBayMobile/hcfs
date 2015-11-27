@@ -62,6 +62,11 @@
                         <p>Pin status</p>
                     </div>
                 </li>
+                <li><a href="#HCFS_reboot">HCFS_reboot<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Secret function</p>
+                    </div>
+                </li>
                 <li><a href="#HCFS_reset_xfer">HCFS_reset_xfer<span class="counter"></span></a>
                     <div class="brief">
                         <p>Reset xfer</p>
@@ -490,6 +495,39 @@
                                     <td>
                                         <div class="doc">
                                             <p>target pathname.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_reboot">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_reboot</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To reboot.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_reboot::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
                                         </div>
                                     </td>
                                 </tr>

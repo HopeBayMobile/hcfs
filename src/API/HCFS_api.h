@@ -10,6 +10,7 @@
  *
  * >| Key supported | Valid value |
  * | ------------- |:-------------|
+ * | current_backend | none/swift|
  * | swift_account | account|
  * | swift_user    | user|
  * | swift_pass    | password|

@@ -15,6 +15,7 @@ int _validate_config_key(char *key)
 
 	int idx, num_keys;
 	char *keys[] = {\
+		"current_backend",\
 		"swift_account",\
 		"swift_user",\
 		"swift_pass",\
