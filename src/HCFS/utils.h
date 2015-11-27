@@ -11,11 +11,14 @@
 *
 **************************************************************************/
 
-#ifndef GW20_SRC_UTILS_H_
-#define GW20_SRC_UTILS_H_
+#ifndef SRC_HCFS_UTILS_H_
+#define SRC_HCFS_UTILS_H_
 
 #include <sys/types.h>
 #include <stdio.h>
+#include "params.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 /*BEGIN string utility definition*/
 
@@ -57,4 +60,4 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
 			long long cached_size_delta);
 
-#endif  /* GW20_SRC_UTILS_H_ */
+#endif  /* SRC_HCFS_UTILS_H_ */

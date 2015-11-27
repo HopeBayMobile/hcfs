@@ -9,17 +9,17 @@
 *.so
 
 # Packages
-*.egg
-*.egg-info
-dist
-build
-eggs
-parts
-bin
-var
-sdist
-lib
-lib64
+/*.egg
+/*.egg-info
+/dist
+/build
+/eggs
+/parts
+/bin
+/var
+/sdist
+/lib
+/lib64
 
 # Installer logs
 pip-log.txt
@@ -44,7 +44,7 @@ pip-log.txt
 /tmp
 
 # Virtualenv
-.venv
+/.venv
 
 # Translations
 *.mo
@@ -65,3 +65,4 @@ fuse_log
 /src/CLI_utils/HCFSvol
 /src/HCFS/hcfs
 /src/HCFS/hcfs.log
+/src/HCFS/obj

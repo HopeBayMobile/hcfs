@@ -29,8 +29,6 @@
 #include "path_reconstruct.h"
 #endif
 
-extern struct fuse_lowlevel_ops hfuse_ops;
-
 /************************************************************************
 *
 * Function name: search_mount

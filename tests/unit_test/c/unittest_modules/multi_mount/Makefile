@@ -130,4 +130,3 @@ mount_manager_unittest.o : $(UNITTEST_DIR)/mount_manager_unittest.cc \
 
 mount_manager_unittest : mount_manager.o mount_manager_fakeftn.o mount_manager_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-

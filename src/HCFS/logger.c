@@ -27,8 +27,7 @@
 
 #include "params.h"
 #include "global.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
+#include "utils.h"
 
 int open_log(char *filename)
 {

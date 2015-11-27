@@ -53,8 +53,6 @@ additional pending meta or block deletion for this inode to finish.*/
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 static DSYNC_THREAD_TYPE dsync_thread_info[MAX_DSYNC_CONCURRENCY];
 
 CURL_HANDLE delete_curl_handles[MAX_DELETE_CONCURRENCY];
