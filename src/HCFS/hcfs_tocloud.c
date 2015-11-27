@@ -1514,24 +1514,23 @@ void upload_loop(void)
 
 		is_start_check = FALSE;
 
+		/* log about sleep & resume */
+		if (hcfs_system->backend_status_is_online == FALSE &&
+		    wait_backend == FALSE) {
+			write_log(
+			    10, "Debug: upload_loop sleep (backend offline)\n");
+			wait_backend = TRUE;
+		} else if (hcfs_system->backend_status_is_online == TRUE &&
+			   wait_backend == TRUE) {
+			write_log(
+			    10, "Debug: upload_loop resume (backend online)\n");
+			wait_backend = FALSE;
+		}
 		/* sleep until backend is back */
 		if (hcfs_system->backend_status_is_online == FALSE) {
 			sleep(1);
-			if (wait_backend == FALSE) {
-				write_log(10,
-					  "Debug: %s sleep (backend offline)\n",
-					  __func__);
-				wait_backend = TRUE;
-			}
 			is_start_check = TRUE;
 			continue;
-		} else {
-			if (wait_backend == TRUE) {
-				write_log(10,
-					  "Debug: %s resume (backend online)\n",
-					  __func__);
-				wait_backend = FALSE;
-			}
 		}
 
 		/* Get first dirty inode or next inode */
