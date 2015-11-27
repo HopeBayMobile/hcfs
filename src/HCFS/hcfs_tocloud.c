@@ -480,7 +480,7 @@ void init_sync_stat_control(void)
 			ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		}
 		closedir(dirp);
-	} 
+	}
 
 	memset(&(sync_stat_ctl.statcurl), 0, sizeof(CURL_HANDLE));
 	sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
@@ -1475,7 +1475,6 @@ void upload_loop(void)
 	int count, sleep_count;
 	char in_sync;
 	int ret_val, ret;
-	char do_something;
 	char is_start_check;
 	char wait_backend = FALSE;
 
@@ -1492,18 +1491,26 @@ void upload_loop(void)
 			of to-upload inode scanning */
 			backup_FS_database();
 			for (sleep_count = 0; sleep_count < 10; sleep_count++) {
+				/* Break if system going down */
+				if (hcfs_system->system_going_down == TRUE)
+					break;
+
 				/*Sleep for a while if we are not really
-					in a hurry*/
-				if (hcfs_system->systemdata.cache_size <
-				    CACHE_SOFT_LIMIT)
+				in a hurry*/
+				if ((hcfs_system->systemdata.cache_size <
+				    CACHE_SOFT_LIMIT) ||
+				    (hcfs_system->systemdata.dirty_cache_size
+				    <= 0))
 					sleep(1);
 				else
 					break;
 			}
 
 			ino_check = 0;
-			do_something = FALSE;
 		}
+		/* Break if system going down */
+		if (hcfs_system->system_going_down == TRUE)
+			break;
 
 		is_start_check = FALSE;
 
@@ -1516,6 +1523,7 @@ void upload_loop(void)
 					  __func__);
 				wait_backend = TRUE;
 			}
+			is_start_check = TRUE;
 			continue;
 		} else {
 			if (wait_backend == TRUE) {
@@ -1574,7 +1582,6 @@ void upload_loop(void)
 				ret_val = _sync_mark(
 				    ino_sync, tempentry.inode_stat.st_mode,
 				    sync_threads);
-				do_something = TRUE;
 				sem_post(&(sync_ctl.sync_op_sem));
 			} else { /*If already syncing to cloud*/
 				sem_post(&(sync_ctl.sync_op_sem));

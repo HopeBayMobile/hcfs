@@ -1,3 +1,4 @@
+#define __STDC_FORMAT_MACROS
 #include "gtest/gtest.h"
 #include <stddef.h>
 #include <attr/xattr.h>
@@ -750,6 +751,10 @@ protected:
 			objname_list[i] = (char *)malloc(sizeof(char) * 20);
 
 		sem_init(&objname_counter_sem, 0, 1);
+
+		hcfs_system->backend_status_is_online = TRUE;
+		CACHE_SOFT_LIMIT = 100000;
+		hcfs_system->systemdata.cache_size = 0;
 	}
 
 	void TearDown()
@@ -832,6 +837,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
+	hcfs_system->systemdata.dirty_cache_size = 100;
 
 	/* Set first_dirty_inode to be uploaded */
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));

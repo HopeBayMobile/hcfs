@@ -76,6 +76,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
+	hcfs_system->systemdata.dirty_cache_size = 0;
 	return 200;
 }
 
