@@ -317,7 +317,7 @@ static int _check_cache_replace_result(long long *num_removed_inode)
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
 			(hcfs_system->backend_status_is_online == FALSE))
 			/* Wake them up and tell them cannot do this action */
-			notify_sleep_on_cache(-EPERM);
+			notify_sleep_on_cache(-EIO);
 		sleep(1);
 	}
 

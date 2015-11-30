@@ -2708,7 +2708,7 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
 
 		if (hcfs_system->backend_status_is_online == FALSE)
-			return -EPERM;
+			return -EIO;
 
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
@@ -2751,7 +2751,7 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
 
 		if (hcfs_system->backend_status_is_online == FALSE)
-			return -EPERM;
+			return -EIO;
 
 		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
 		if (temp_prefetch == NULL) {
@@ -2787,7 +2787,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 
 	/* Check network status */
 	if (hcfs_system->backend_status_is_online == FALSE)
-		return -EPERM;
+		return -EIO;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
 	if (ret < 0)
@@ -3666,7 +3666,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			write_log(10, "debug write waiting on full cache\n");
 			ret = sleep_on_cache_full();
 			if (ret < 0) {
-				*reterr = -EPERM;
+				*reterr = ret;
 				return 0;
 			}
 
