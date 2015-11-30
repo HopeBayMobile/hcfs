@@ -19,12 +19,13 @@
 #include <sys/stat.h>
 
 #include "fuseop.h"
+#include "hcfscurl.h"
 
 #ifdef _ANDROID_ENV_
 #include <pthread.h>
 #endif
 
-#define MAX_DL_CONCURRENCY 16
+#define MAX_PIN_DL_CONCURRENCY ((MAX_DOWNLOAD_CURL_HANDLE) / 2)
 #define READ_BLOCK 0
 #define PIN_BLOCK 1
 
@@ -49,9 +50,9 @@ typedef struct {
 typedef struct {
 	sem_t ctl_op_sem;
 	sem_t dl_th_sem;
-	pthread_t download_thread[MAX_DL_CONCURRENCY];
+	pthread_t download_thread[MAX_PIN_DL_CONCURRENCY];
 	pthread_t manager_thread;
-	DOWNLOAD_BLOCK_INFO block_info[MAX_DL_CONCURRENCY];
+	DOWNLOAD_BLOCK_INFO block_info[MAX_PIN_DL_CONCURRENCY];
 	int active_th;
 } DOWNLOAD_THREAD_CTL;
 
