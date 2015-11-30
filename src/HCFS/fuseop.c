@@ -3065,7 +3065,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			return 0;
 		}
 
-		/* return -EPERM when failing to fetching from cloud */
+		/* return -EIO when failing to fetching from cloud */
 		ret = read_prefetch_cache(&temppage, entry_index,
 			this_inode, bindex, this_page_fpos);
 		if (ret < 0) {
@@ -3087,7 +3087,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 		case ST_CLOUD:
 		case ST_CtoL:
 			/* Download from backend */
-			/* return -EPERM when failing to fetching from cloud */
+			/* return -EIO when failing to fetching from cloud */
 			ret = read_fetch_backend(this_inode,
 				bindex, fh_ptr, &temppage,
 				this_page_fpos, entry_index);
