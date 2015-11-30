@@ -121,8 +121,9 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 {
 	hcfs_system->backend_status_is_online = FALSE;
 
-	EXPECT_EQ(-EPERM, fetch_from_cloud(NULL, 0, 0, 0));
+	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, 0, 0));
 }
+
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
 	pthread_t tid[num_obj];
