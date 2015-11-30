@@ -1512,6 +1512,15 @@ void upload_loop(void)
 				if (hcfs_system->system_going_down == TRUE)
 					break;
 
+				/* Avoid busy polling */
+				if ((sys_super_block->head.num_dirty <=
+				    sync_ctl.total_active_sync_threads) ||
+				    (sync_ctl.total_active_sync_threads ==
+				    MAX_SYNC_CONCURRENCY)) {
+					sleep(1);
+					continue;
+				}
+
 				/*Sleep for a while if we are not really
 				in a hurry*/
 				if ((hcfs_system->systemdata.cache_size <

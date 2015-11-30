@@ -52,6 +52,8 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 			this_inode; // Record the inode number to verify.
 		shm_verified_data->record_inode_counter++;
 		sem_post(&shm_verified_data->record_inode_sem);
+
+		sys_super_block->head.num_dirty--;
 		printf("Test: inode %d is updated\n", this_inode);
 	}
 	return 0;

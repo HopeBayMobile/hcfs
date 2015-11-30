@@ -842,6 +842,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	/* Set first_dirty_inode to be uploaded */
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
 	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
+	sys_super_block->head.num_dirty = max_objname_num;
 
 	/* Create a thread to run upload_loop() */
 	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
