@@ -593,7 +593,7 @@ int invalidate_pathname_cache_entry(const char *path)
 	return 0;
 }
 
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return;
 }
