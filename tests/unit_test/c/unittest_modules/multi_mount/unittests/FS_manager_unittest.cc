@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <ftw.h>
 
 #include <unistd.h>
 #include <string.h>
@@ -20,6 +21,22 @@ extern "C" {
 #include "gtest/gtest.h"
 
 SYSTEM_CONF_STRUCT system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 /* Begin of the test case for the function init_fs_manager */
 
@@ -49,10 +66,7 @@ class init_fs_managerTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -141,10 +155,7 @@ class destroy_fs_managerTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    unlink(tmpmgrpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -212,12 +223,7 @@ class add_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
-    rmdir(tmpsyncpath);
-    unlink(tmpmgrpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -427,12 +433,7 @@ class delete_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
-    rmdir(tmpsyncpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -605,12 +606,7 @@ class check_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
-    rmdir(tmpsyncpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -741,10 +737,7 @@ class list_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -976,10 +969,7 @@ class backup_FS_databaseTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -1130,10 +1120,7 @@ class restore_FS_databaseTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    unlink(tmpmgrpath);
-    unlink(tmpbackuppath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
