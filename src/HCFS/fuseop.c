@@ -3900,6 +3900,10 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	write_log(10, "Write details: %d, %lld, %lld\n", thisfilemeta.local_pin,
+	          offset, size);
+	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.st_size,
+	          hcfs_system->systemdata.pinned_size, MAX_PINNED_LIMIT);
 	amount_preallocated = 0;
 	if ((thisfilemeta.local_pin == TRUE) &&
 	    ((offset + size) > temp_stat.st_size)) {
