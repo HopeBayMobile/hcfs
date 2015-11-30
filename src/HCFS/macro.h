@@ -10,8 +10,8 @@
 *
 **************************************************************************/
 
-#ifndef GW20_HCFS_MACRO_H_
-#define GW20_HCFS_MACRO_H_
+#ifndef SRC_HCFS_MACRO_H_
+#define SRC_HCFS_MACRO_H_
 
 #include "logger.h"
 
@@ -23,7 +23,7 @@
 		ret = fseek(A, B, C);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -36,7 +36,7 @@
 		ret = fsync(A);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -49,7 +49,7 @@
 		ret = ftruncate(A, B);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -62,7 +62,7 @@
 		ret = setxattr(A, B, C, D, E);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -75,7 +75,7 @@
 		ret = fsetxattr(A, B, C, D, E);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -88,7 +88,7 @@
 		ret_pos = lseek(A, B, C);\
 		if (ret_pos == (off_t) -1) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -101,7 +101,7 @@
 		ret_pos = (int64_t) ftell(A);\
 		if (ret_pos < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -114,7 +114,7 @@
 		ret = unlink(A);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -127,7 +127,7 @@
 		ret = mkdir(A, B);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -140,7 +140,7 @@
 		ret = mknod(A, B, C);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -163,7 +163,7 @@
 	do {\
 		errcode = 0;\
 		ret_size = fwrite(A, B, C, D);\
-		if (((ssize_t)ret_size < C) && (ferror(D) != 0)) {\
+		if (((ssize_t)ret_size < (ssize_t)C) && (ferror(D) != 0)) {\
 			clearerr(D);\
 			write_log(0, "IO error in %s.\n", __func__);\
 			errcode = -EIO;\
@@ -177,7 +177,7 @@
 		ret_ssize = pread(A, B, C, D);\
 		if (ret_ssize < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -192,7 +192,7 @@
 		ret_ssize = pwrite(A, B, C, D);\
 		if (ret_ssize < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
@@ -206,12 +206,12 @@
 		ret_num = strtol(A, &endptr, 10);\
 		errcode = errno;\
 		if (errcode != 0) {\
-			write_log(0, "Conversion error in %s. Code %d, %s\n",\
+			write_log(0, "Conversion error in %s. Code %d, %s\n", \
 				__func__, errcode, strerror(errcode));\
 			goto errcode_handle;\
 		} \
 		if ((endptr != 0) && (*endptr != '\0')) {\
-			write_log(0, "Conversion error in %s.\n",\
+			write_log(0, "Conversion error in %s.\n", \
 				__func__);\
 			goto errcode_handle;\
 		} \
@@ -232,4 +232,4 @@
 		} \
 	} while (0)
 
-#endif  /* GW20_HCFS_MACRO_H_ */
+#endif  /* SRC_HCFS_MACRO_H_ */

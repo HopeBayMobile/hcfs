@@ -1582,8 +1582,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			tmpstat.num_local = -tmpstat.num_local;
 			tmpstat.num_cloud = -tmpstat.num_cloud;
 			tmpstat.num_hybrid = -tmpstat.num_hybrid;
-			ret_val = update_dirstat_parent(parent_inode2,
-						        &tmpstat);
+			ret_val =
+			    update_dirstat_parent(parent_inode2, &tmpstat);
 			if (ret_val < 0) {
 				sem_post(&(pathlookup_data_lock));
 				_cleanup_rename(body_ptr, old_target_ptr,
@@ -1699,7 +1699,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 		/* Change the parent lookup for source inode */
 		ret_val = lookup_replace_parent(self_inode, parent_inode1,
-		                                parent_inode2);
+						parent_inode2);
 		if (ret_val < 0) {
 			sem_post(&(pathlookup_data_lock));
 			_cleanup_rename(body_ptr, old_target_ptr,
@@ -1919,8 +1919,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	}
 	if (total_deleted_blocks > 0) {
 		change_system_meta(0, -total_deleted_cache,
-		                   -total_deleted_blocks,
-		                   -total_deleted_dirty_cache);
+				   -total_deleted_blocks,
+				   -total_deleted_dirty_cache);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				inode_index);
@@ -2090,7 +2090,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 				}
 
 				change_system_meta(0, tempstat.st_size, 1,
-				                   tempstat.st_size);
+						   tempstat.st_size);
 				cache_delta += tempstat.st_size;
 				cache_block_delta += 1;
 			}
@@ -3828,9 +3828,9 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size){
+	if (old_cache_size != new_cache_size) {
 		change_system_meta(0, new_cache_size - old_cache_size, 0,
-				new_cache_size - old_cache_size);
+				   new_cache_size - old_cache_size);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
