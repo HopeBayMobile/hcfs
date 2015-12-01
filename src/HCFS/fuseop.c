@@ -4124,32 +4124,42 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
 	if (system_size > (50 * powl(1024, 3)))
+		/* when system_size is large than 53,687,091,200.
+		   f_blocks start from 26,214,402 */
 		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
 	else
+		/* f_blocks = 26,214,400 */
 		buf->f_blocks = (25*powl(1024, 2));
 
 	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
 	else
+		/* we have assigned double size of system blocks, so it
+		 * will keep being postive after subtracting */
 		buf->f_bfree = buf->f_blocks - (((system_size - 1) / 4096) + 1);
-	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
-	 * if runs into negative value */
-	if (buf->f_bfree < 0)
-		buf->f_bfree = 0;
+
 	buf->f_bavail = buf->f_bfree;
 
 	write_log(10, "Debug statfs, checking inodes\n");
 
+	/* mekes f_files larger than num_inodes, if num_inodes >
+	 * 9223372036854775807, num_inodes*2 overflows */
 	if (num_inodes > 1000000)
 		buf->f_files = (num_inodes * 2);
 	else
 		buf->f_files = 2000000;
 
-	buf->f_ffree = buf->f_files - num_inodes;
-	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
-	 * if runs into negative value */
-	if (buf->f_ffree < 0)
+	if (num_inodes < 0) {
+		/* when FS_stat.num_inodes >= 9223372036854775808,
+		 * num_inodes will become negative here and system free
+		 * inode will gets reset */
+		buf->f_ffree = buf->f_files;
+	} else if (buf->f_files < num_inodes) {
+		/* over used inodes */
 		buf->f_ffree = 0;
+	} else {
+		buf->f_ffree = buf->f_files - num_inodes;
+	}
 
 #ifdef STAT_VFS_H
 	buf->f_namelen = MAX_FILENAME_LEN;
