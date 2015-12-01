@@ -2863,6 +2863,22 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				fh_ptr->blockfptr = NULL;
 			}
 
+			return ret;
+		}
+
+#if (DEDUP_ENABLE)
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				tpage->block_entries[eindex].obj_id);
+#else
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				this_inode, bindex);
+#endif
+		if (ret < 0) {
+			if (fh_ptr->blockfptr != NULL) {
+				fclose(fh_ptr->blockfptr);
+				fh_ptr->blockfptr = NULL;
+			}
+
 			/* Recover status */
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
@@ -2882,21 +2898,6 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
-			return ret;
-		}
-
-#if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				tpage->block_entries[eindex].obj_id);
-#else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				this_inode, bindex);
-#endif
-		if (ret < 0) {
-			if (fh_ptr->blockfptr != NULL) {
-				fclose(fh_ptr->blockfptr);
-				fh_ptr->blockfptr = NULL;
-			}
 			return ret;
 		}
 
@@ -3068,11 +3069,8 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 		/* return -EIO when failing to fetching from cloud */
 		ret = read_prefetch_cache(&temppage, entry_index,
 			this_inode, bindex, this_page_fpos);
-		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
-			*reterr = ret;
-			return 0;
-		}
+		if (ret < 0)
+			write_log(5, "Fail to prefetch block. Code %d\n", -ret);
 
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
