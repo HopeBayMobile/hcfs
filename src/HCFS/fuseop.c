@@ -3603,7 +3603,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		old_cache_size = check_file_size(thisblockpath);
 		tmpcachesize = hcfs_system->systemdata.cache_size;
 		tmpdiff = (offset + (off_t) size) - old_cache_size;
-		write_log(10, "%zd, %lld, %lld, %lld, %lld\n", size,
+		write_log(10, "%zu, %lld, %lld, %lld, %lld\n", size,
 			(off_t) size, tmpdiff, offset, old_cache_size);
 		if ((tmpdiff > 0) &&
 			((tmpdiff + tmpcachesize) > CACHE_HARD_LIMIT)) {
@@ -3841,7 +3841,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	FILE_META_TYPE thisfilemeta;
 	long long sizediff, amount_preallocated;
 
-	write_log(10, "Debug write: size %zd, offset %lld\n", size,
+	write_log(10, "Debug write: size %zu, offset %lld\n", size,
 	          offset);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -3905,7 +3905,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
-	write_log(10, "Write details: %d, %lld, %zd\n", thisfilemeta.local_pin,
+	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
 	          offset, size);
 	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.st_size,
 	          hcfs_system->systemdata.pinned_size, MAX_PINNED_LIMIT);
