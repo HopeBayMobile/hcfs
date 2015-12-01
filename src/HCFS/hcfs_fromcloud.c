@@ -113,10 +113,10 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	fseek(get_fptr, 0, SEEK_END);
 	tmplen = ftell(get_fptr);
-	get_fptr_data = calloc(tmplen + 10, sizeof(unsigned char));
+	get_fptr_data = calloc(tmplen + 10, sizeof(char));
 	rewind(get_fptr);
 	len =
-	    fread(get_fptr_data, sizeof(unsigned char), tmplen, get_fptr);
+	    fread(get_fptr_data, sizeof(char), tmplen, get_fptr);
 #endif
 
 	fclose(get_fptr);
@@ -128,7 +128,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	OPENSSL_free(key);
 #endif
 
-	decode_to_fd(fptr, object_key, (unsigned char *)get_fptr_data, len,
+	decode_to_fd(fptr, object_key, (char *)get_fptr_data, len,
 		     object_meta->enc_alg, object_meta->comp_alg);
 
 	free_object_meta(object_meta);
