@@ -45,7 +45,7 @@ CXX = gcc
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest monitor_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.

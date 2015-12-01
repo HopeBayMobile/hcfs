@@ -25,6 +25,7 @@
 #include "macro.h"
 
 CURL_HANDLE monitor_curl_handle;
+int monitoring_interval = 60;
 
 /**************************************************************************
  *
@@ -66,7 +67,7 @@ void monitor_loop(void)
 		clock_gettime(CLOCK_REALTIME, &loop_start_time);
 		idle_time = diff_time(*last_time, loop_start_time);
 
-		if (idle_time >= MONITOR_INTERVAL) {
+		if (idle_time >= monitoring_interval) {
 			ret_val = hcfs_test_backend(&monitor_curl_handle);
 			if ((ret_val >= 200) && (ret_val <= 299))
 				update_backend_status(TRUE, &loop_start_time);
@@ -83,11 +84,7 @@ void monitor_loop(void)
 			    test_duration);
 		}
 		/* wait 1 second */
-		ret_val = nanosleep(&sleep_time, NULL);
-		if (ret_val == -1 && errno == EINTR) {
-			write_log(2, "[Backend Monitor] interrupted\n");
-			break;
-		}
+		nanosleep(&sleep_time, NULL);
 	}
 #ifdef _ANDROID_ENV_
 	return NULL;
