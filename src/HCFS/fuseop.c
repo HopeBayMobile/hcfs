@@ -3213,9 +3213,9 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	/* Decide the true maximum bytes to read */
 	/* If read request will exceed the size of the file, need to
 	*  reduce the size of request */
-	if (temp_stat.st_size < (offset+size_org)) {
+	if (temp_stat.st_size < (offset+ (off_t)size_org)) {
 		if (temp_stat.st_size > offset)
-			size = (temp_stat.st_size - offset);
+			size = (size_t) (temp_stat.st_size - offset);
 		else
 			size = 0;
 	} else {
@@ -3235,7 +3235,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	*  the read */
 	/* Block indexing starts at zero */
 	start_block = (offset / MAX_BLOCK_SIZE);
-	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
+	end_block = ((offset+ ((off_t)size) -1) / MAX_BLOCK_SIZE);
 
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
@@ -3253,8 +3253,8 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		target_bytes_read = MAX_BLOCK_SIZE - current_offset;
 
 		/*Do not need to read that much*/
-		if ((size - total_bytes_read) < target_bytes_read)
-			target_bytes_read = size - total_bytes_read;
+		if (((off_t)size - total_bytes_read) < target_bytes_read)
+			target_bytes_read = (off_t)size - total_bytes_read;
 
 		this_bytes_read = _read_block(&buf[total_bytes_read],
 				target_bytes_read, block_index, current_offset,
@@ -3602,7 +3602,9 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	if (access(thisblockpath, F_OK) == 0) {
 		old_cache_size = check_file_size(thisblockpath);
 		tmpcachesize = hcfs_system->systemdata.cache_size;
-		tmpdiff = (offset + size) - old_cache_size;
+		tmpdiff = (offset + (off_t) size) - old_cache_size;
+		write_log(10, "%zu, %lld, %lld, %lld, %lld\n", size,
+			(off_t) size, tmpdiff, offset, old_cache_size);
 		if ((tmpdiff > 0) &&
 			((tmpdiff + tmpcachesize) > CACHE_HARD_LIMIT)) {
 			/* Need to sleep for full here or return ENOSPC */
@@ -3828,7 +3830,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	FH_ENTRY *fh_ptr;
 	long long start_block, end_block;
 	long long block_index;
-	size_t total_bytes_written;
+	off_t total_bytes_written;
 	size_t this_bytes_written;
 	off_t current_offset;
 	size_t target_bytes_written;
@@ -3838,6 +3840,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
 	long long sizediff, amount_preallocated;
+
+	write_log(10, "Debug write: size %zu, offset %lld\n", size,
+	          offset);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -3863,7 +3868,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	*  the write */
 	/* Block indexing starts at zero */
 	start_block = (offset / MAX_BLOCK_SIZE);
-	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
+	end_block = ((offset+ ((off_t)size)-1) / MAX_BLOCK_SIZE);
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
 
@@ -3900,11 +3905,17 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
+	          offset, size);
+	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.st_size,
+	          hcfs_system->systemdata.pinned_size, MAX_PINNED_LIMIT);
 	amount_preallocated = 0;
 	if ((thisfilemeta.local_pin == TRUE) &&
-	    ((offset + size) > temp_stat.st_size)) {
+	    ((offset + (off_t)size) > temp_stat.st_size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		sizediff = (long long) ((offset + size) - temp_stat.st_size);
+		sizediff = (long long) ((offset + (off_t)size) - temp_stat.st_size);
+		write_log(10, "Write details: %lld, %lld\n", sizediff,
+		          (off_t) size);
 		if ((hcfs_system->systemdata.pinned_size + sizediff)
 			> MAX_PINNED_LIMIT) {
 			sem_post(&(hcfs_system->access_sem));
@@ -3944,7 +3955,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			goto errcode_handle;
 		}
 
-		total_bytes_written += this_bytes_written;
+		total_bytes_written += (off_t) this_bytes_written;
 
 		/*Terminate if cannot write as much as we want*/
 		if (this_bytes_written < target_bytes_written)
@@ -3964,16 +3975,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 
 	if ((thisfilemeta.local_pin == TRUE) &&
-	    ((temp_stat.st_size < (offset + size)) &&
-	     (size > total_bytes_written))) {
+	    ((temp_stat.st_size < (offset + (off_t)size)) &&
+	     (((off_t) size) > total_bytes_written))) {
 		/* If size written not equal to as planned, need
 		to change pinned_size */
 		/* If offset + total_bytes_written < st_size, substract
 		the difference between size and st_size */
 		if (offset + total_bytes_written < temp_stat.st_size)
-			sizediff = (offset + size) - temp_stat.st_size;
+			sizediff = (offset + (off_t) size) - temp_stat.st_size;
 		else
-			sizediff = size - total_bytes_written;
+			sizediff = ((off_t)size) - total_bytes_written;
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size -= sizediff;
 		if (hcfs_system->systemdata.pinned_size < 0)
