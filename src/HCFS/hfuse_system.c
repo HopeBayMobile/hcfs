@@ -400,8 +400,10 @@ int main(int argc, char **argv)
 
 		hook_fuse(argc, argv);
 		write_log(2, "Waiting for subprocesses to terminate\n");
-		for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
-			waitpid(child_pids[proc_idx], NULL, 0);
+		if (CURRENT_BACKEND != NONE) {
+			for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
+				waitpid(child_pids[proc_idx], NULL, 0);
+		}
 		close_log();
 		destroy_dirstat_lookup();
 		destroy_pathlookup();
