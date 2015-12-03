@@ -49,11 +49,7 @@ hcfs: $(OBJS)
 $(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)$*.o
 	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)$*.d
-	@mv -f $(OBJS_DIR)$*.d $(OBJS_DIR)$*.d.tmp
-	@sed -e 's|.*:|$(OBJS_DIR)$*.o:|' < $(OBJS_DIR)$*.d.tmp > $(OBJS_DIR)$*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $(OBJS_DIR)$*.d.tmp | fmt -1 | \
-		sed -e 's/^ *//' -e 's/$$/:/' >> $(OBJS_DIR)$*.d
-	@rm -f $(OBJS_DIR)$/*.d.tmp
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(OBJS_DIR)$*.d
 
 $(OBJS_DIR):
 	mkdir $@
