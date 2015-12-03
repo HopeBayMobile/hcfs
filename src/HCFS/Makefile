@@ -40,7 +40,7 @@ OBJS_F := objmeta.o \
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs -lfuse -lcurl -pthread -lssl -lcrypto
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs -lfuse -lcurl -pthread -lssl -lcrypto -lm
 
 # pull in dependency info for *existing* .o files
 -include $(OBJS:.o=.d)
