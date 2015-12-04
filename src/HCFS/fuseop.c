@@ -4596,7 +4596,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
 		meta_cache_remove(this_inode);
-		fuse_reply_err(req, ret_val);
+		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
