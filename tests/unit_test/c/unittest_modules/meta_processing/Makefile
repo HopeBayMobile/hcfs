@@ -48,6 +48,9 @@ CXX = gcc
 #TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
 TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest pin_scheduling_unittest
 
+.PHONY: $(DO_TESTS)
+DO_TESTS = $(TESTS:%=test-%)
+
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
@@ -60,16 +63,13 @@ all : setup $(TESTS)
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test : setup $(TESTS)
-	./metaops_unittest
-	./file_present_unittest
-	./super_block_unittest
-	./lookup_count_unittest
-	./pin_scheduling_unittest
-#	./xattr_ops_unittest
+test : setup $(DO_TESTS)
 ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
 endif
+
+$(DO_TESTS): $(TESTS)
+	./$(@:test-%=%)
 
 .PHONY : setup
 setup :
