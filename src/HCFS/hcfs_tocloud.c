@@ -459,7 +459,6 @@ void init_sync_stat_control(void)
 	fname = (char *)malloc(METAPATHLEN);
 
 	snprintf(FS_stat_path, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
-	write_log(10, "Debug: FS_stat_path: %s\n", FS_stat_path);
 
 	if (access(FS_stat_path, F_OK) == -1) {
 		MKDIR(FS_stat_path, 0700);
