@@ -40,7 +40,7 @@ OBJS_F := objmeta.o \
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs -lfuse -lcurl -pthread -lssl -lcrypto
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs -lfuse -lcurl -pthread -lssl -lcrypto -lm
 
 # pull in dependency info for *existing* .o files
 -include $(OBJS:.o=.d)
@@ -49,11 +49,7 @@ hcfs: $(OBJS)
 $(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
 	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)$*.o
 	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)$*.d
-	@mv -f $(OBJS_DIR)$*.d $(OBJS_DIR)$*.d.tmp
-	@sed -e 's|.*:|$(OBJS_DIR)$*.o:|' < $(OBJS_DIR)$*.d.tmp > $(OBJS_DIR)$*.d
-	@sed -e 's/.*://' -e 's/\\$$//' < $(OBJS_DIR)$*.d.tmp | fmt -1 | \
-		sed -e 's/^ *//' -e 's/$$/:/' >> $(OBJS_DIR)$*.d
-	@rm -f $(OBJS_DIR)$/*.d.tmp
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(OBJS_DIR)$*.d
 
 $(OBJS_DIR):
 	mkdir $@

@@ -23,7 +23,7 @@ sudo chown -R $USER:$USER $HOME/.ccache || :
 
 # oclint-report.xml
 #       OCLint with Bear
-bear make -C $srcdir
+bear make -j4 -C $srcdir
 /oclint-0.8.1/bin/oclint-json-compilation-database . -- -report-type pmd -o $WORKSPACE/oclint-report.xml || :
 sed -i "s@file name=\"@&src/HCFS/@g" $WORKSPACE/oclint-report.xml
 
@@ -36,6 +36,10 @@ if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
 fi
 sed -i "s@$WORKSPACE/@@g" $WORKSPACE/cpd-result.xml
 
+# Run unit test
+cd $testdir/unit_test
+./run_unittests
+
 # cloc-result.xml
 #        Publish SLOCCount analysis results
 cloc --by-file --xml --out=$WORKSPACE/cloc-result.xml $srcdir
@@ -46,18 +50,22 @@ sed -i "s@$WORKSPACE/@@g" $WORKSPACE/cloc-result.xml
 mono /CCM.exe $srcdir /xml > $WORKSPACE/ccm-result.xml
 sed -i "s@<file>/@<file>src/HCFS/@g" $WORKSPACE/ccm-result.xml
 
-# Run unit test
-cd $testdir/unit_test
-./run_unittests
-
 # hb_clint.xml
 #         Cehck code style
-$testdir/code_checking/hb_clint.py `find $srcdir -name '*.[ch]'` 2>&1 | tee $WORKSPACE/hb_clint.xml
+find $srcdir -name "*.c" -or -name "*.cpp" | parallel --jobs 4 $testdir/code_checking/hb_clint.py {} >& $WORKSPACE/hb_clint.xml || :
 sed -i "s@$WORKSPACE/@@g" $WORKSPACE/hb_clint.xml
 
-# No report
+# checkpatch - No report
 #         Cehck code style
-$testdir/code_checking/checkpatch.pl --terse --no-tree --no-signoff -f `find $srcdir -name '*.[ch]'` || :
+#$testdir/code_checking/checkpatch.pl --terse --no-tree --no-signoff -f `find $srcdir -name '*.[ch]'` || :
+find $srcdir -name "*.c" -or -name "*.cpp" | parallel --jobs 4 $testdir/code_checking/checkpatch.pl --terse --no-tree --no-signoff -f {} || :
+
+# clangScanBuildReports/
+#         Clang Scan-Build Results
+rm -rf ${WORKSPACE}/clangScanBuildReports
+cd $srcdir
+make clean
+scan-build-3.5 -o ${WORKSPACE}/clangScanBuildReports make -j4
 
 # coverage.xml
 #         Unit test coverage report
