@@ -61,6 +61,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	int ret, errcode;
 	long tmplen;
 
+	if (hcfs_system->backend_status_is_online == FALSE)
+		return -EIO;
+
 #if (DEDUP_ENABLE)
 	/* Get objname by obj_id */
 	obj_id_to_string(obj_id, obj_id_str);
@@ -110,10 +113,10 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	fseek(get_fptr, 0, SEEK_END);
 	tmplen = ftell(get_fptr);
-	get_fptr_data = calloc(tmplen + 10, sizeof(unsigned char));
+	get_fptr_data = calloc(tmplen + 10, sizeof(char));
 	rewind(get_fptr);
 	len =
-	    fread(get_fptr_data, sizeof(unsigned char), tmplen, get_fptr);
+	    fread(get_fptr_data, sizeof(char), tmplen, get_fptr);
 #endif
 
 	fclose(get_fptr);
@@ -125,7 +128,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	OPENSSL_free(key);
 #endif
 
-	decode_to_fd(fptr, object_key, (unsigned char *)get_fptr_data, len,
+	decode_to_fd(fptr, object_key, (char *)get_fptr_data, len,
 		     object_meta->enc_alg, object_meta->comp_alg);
 
 	free_object_meta(object_meta);
@@ -306,7 +309,7 @@ int init_download_control()
 {
 	memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 	sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
-	sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_DL_CONCURRENCY);
+	sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_PIN_DL_CONCURRENCY);
 
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 		(void *)&download_block_manager, NULL);
@@ -366,7 +369,7 @@ void download_block_manager()
 			continue;
 		}
 
-		for (t_idx = 0; t_idx < MAX_DL_CONCURRENCY; t_idx++) {
+		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY; t_idx++) {
 			/* Skip if non-active */
 			if (download_thread_ctl.block_info[t_idx].active ==
 								FALSE)
@@ -640,7 +643,7 @@ thread_error:
 static inline int _select_thread()
 {
 	int count;
-	for (count = 0; count < MAX_DL_CONCURRENCY; count++) {
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++) {
 		if (download_thread_ctl.block_info[count].active == FALSE)
 			break;
 	}
@@ -814,7 +817,7 @@ int fetch_pinned_blocks(ino_t inode)
 			hcfs_system->system_going_down == FALSE) {
 		all_thread_terminate = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		for (t_idx = 0; t_idx < MAX_DL_CONCURRENCY ; t_idx++) {
+		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY ; t_idx++) {
 			temp_info = &(download_thread_ctl.block_info[t_idx]);
 			if ((temp_info->active == TRUE) &&
 				(temp_info->this_inode == inode)) {

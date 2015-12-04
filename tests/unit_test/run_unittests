@@ -14,7 +14,7 @@ $WORKSPACE/utils/install_ccache.bash
 # Unit test
 cd $UNITTEST_DIR
 
-if type -a colormake; then
+if type -a colormake >/dev/null 2>&1; then
 	make=colormake
 else
 	make=make
@@ -22,6 +22,6 @@ fi
 
 $make clean
 $make
-TERM=xterm-color make -k GTEST_COLOR=yes NOGCOVR=1 test
+TERM=xterm-color make GTEST_COLOR=yes NOGCOVR=1 test
 
 gcovr -r $WORKSPACE/src .

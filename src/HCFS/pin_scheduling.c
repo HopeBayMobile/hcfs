@@ -80,6 +80,8 @@ void pinning_loop()
 		super_block_share_release();
 
 		/* Begin to pin this inode */
+		write_log(10, "Debug: Begin to pin inode %"PRIu64"\n",
+			(uint64_t)now_inode);
 		rest_times = 0;
 		ret = fetch_pinned_blocks(now_inode);
 		if (ret < 0) {
@@ -113,6 +115,10 @@ void pinning_loop()
 			write_log(0, "Error: Fail to mark inode%"PRIu64" as"
 				" finishing pinning. Code %d\n",
 				(uint64_t)now_inode, -ret);
+		} else {
+			write_log(10, "Debug: Succeeding in marking "
+				"inode %"PRIu64" as finishing pinning.\n",
+				(uint64_t)now_inode);
 		}
 	}
 

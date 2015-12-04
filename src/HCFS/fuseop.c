@@ -581,6 +581,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	UNUSED(fi);
 
 	write_log(10, "Debug getattr inode %ld\n", ino);
+	gettimeofday(&tmp_time1, NULL);
 	hit_inode = real_ino(req, ino);
 
 	write_log(10, "Debug getattr hit inode %" PRIu64 "\n",
@@ -1154,8 +1155,7 @@ a directory (for NFS) */
 		  (uint64_t)parent_inode, selfname, ret_val);
 
 	if (ret_val < 0) {
-		ret_val = -ret_val;
-		fuse_reply_err(req, ret_val);
+		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
@@ -1582,8 +1582,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			tmpstat.num_local = -tmpstat.num_local;
 			tmpstat.num_cloud = -tmpstat.num_cloud;
 			tmpstat.num_hybrid = -tmpstat.num_hybrid;
-			ret_val = update_dirstat_parent(parent_inode2,
-						        &tmpstat);
+			ret_val =
+			    update_dirstat_parent(parent_inode2, &tmpstat);
 			if (ret_val < 0) {
 				sem_post(&(pathlookup_data_lock));
 				_cleanup_rename(body_ptr, old_target_ptr,
@@ -1699,7 +1699,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 		/* Change the parent lookup for source inode */
 		ret_val = lookup_replace_parent(self_inode, parent_inode1,
-		                                parent_inode2);
+						parent_inode2);
 		if (ret_val < 0) {
 			sem_post(&(pathlookup_data_lock));
 			_cleanup_rename(body_ptr, old_target_ptr,
@@ -1776,7 +1776,9 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 				"debug truncate waiting on full cache\n");
 			meta_cache_close_file(*body_ptr);
 			meta_cache_unlock_entry(*body_ptr);
-			sleep_on_cache_full();
+			ret_val = sleep_on_cache_full();
+			if (ret_val < 0)
+				return ret_val;
 
 			/*Re-read status*/
 			*body_ptr = meta_cache_lock_entry(this_inode);
@@ -1917,8 +1919,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	}
 	if (total_deleted_blocks > 0) {
 		change_system_meta(0, -total_deleted_cache,
-		                   -total_deleted_blocks,
-		                   -total_deleted_dirty_cache);
+				   -total_deleted_blocks,
+				   -total_deleted_dirty_cache);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				inode_index);
@@ -2088,7 +2090,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 				}
 
 				change_system_meta(0, tempstat.st_size, 1,
-				                   tempstat.st_size);
+						   tempstat.st_size);
 				cache_delta += tempstat.st_size;
 				cache_block_delta += 1;
 			}
@@ -2704,14 +2706,21 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+
+		if (hcfs_system->backend_status_is_online == FALSE)
+			return -EIO;
+
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
 				return -EBUSY;
 			/*Sleep if cache already full*/
 			sem_post(&(fh_ptr->block_sem));
 			write_log(10, "debug read waiting on full cache\n");
-			sleep_on_cache_full();
+			ret = sleep_on_cache_full();
 			sem_wait(&(fh_ptr->block_sem));
+			if (ret < 0)
+				return ret;
+
 			/*Re-read status*/
 			ret = read_lookup_meta(fh_ptr, temppage,
 					this_page_fpos);
@@ -2740,6 +2749,10 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		return 0;
 	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
 		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
+
+		if (hcfs_system->backend_status_is_online == FALSE)
+			return -EIO;
+
 		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
 		if (temp_prefetch == NULL) {
 			write_log(0, "Error cannot open prefetch\n");
@@ -2771,6 +2784,10 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	struct stat tempstat2;
 	int ret, errcode;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
+
+	/* Check network status */
+	if (hcfs_system->backend_status_is_online == FALSE)
+		return -EIO;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
 	if (ret < 0)
@@ -2845,6 +2862,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->blockfptr = NULL;
 			}
+
 			return ret;
 		}
 
@@ -2860,6 +2878,26 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->blockfptr = NULL;
 			}
+
+			/* Recover status */
+			fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+			meta_cache_lookup_file_data(fh_ptr->thisinode,
+				NULL, NULL, tpage, page_fpos,
+				fh_ptr->meta_cache_ptr);
+			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
+				(tpage->block_entries[eindex]).status =
+								ST_CLOUD;
+				meta_cache_update_file_data(fh_ptr->thisinode,
+					NULL, NULL, tpage, page_fpos,
+					fh_ptr->meta_cache_ptr);
+				/* Unlink this block */
+				if (access(thisblockpath, F_OK) == 0)
+					unlink(thisblockpath);
+			}
+			meta_cache_close_file(fh_ptr->meta_cache_ptr);
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
 			return ret;
 		}
 
@@ -3028,13 +3066,11 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			return 0;
 		}
 
+		/* return -EIO when failing to fetching from cloud */
 		ret = read_prefetch_cache(&temppage, entry_index,
 			this_inode, bindex, this_page_fpos);
-		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
-			*reterr = ret;
-			return 0;
-		}
+		if (ret < 0)
+			write_log(5, "Fail to prefetch block. Code %d\n", -ret);
 
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
@@ -3048,7 +3084,8 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			break;
 		case ST_CLOUD:
 		case ST_CtoL:
-			/*Download from backend */
+			/* Download from backend */
+			/* return -EIO when failing to fetching from cloud */
 			ret = read_fetch_backend(this_inode,
 				bindex, fh_ptr, &temppage,
 				this_page_fpos, entry_index);
@@ -3276,7 +3313,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 		if (fh_ptr->meta_cache_ptr == NULL) {
-			fuse_reply_err(req, -ENOMEM);
+			fuse_reply_err(req, ENOMEM);
 			free(buf);
 			return;
 		}
@@ -3346,7 +3383,10 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 			write_log(10, "debug write waiting on full cache\n");
-			sleep_on_cache_full();
+			ret = sleep_on_cache_full();
+			if (ret < 0)
+				return ret;
+
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
@@ -3622,7 +3662,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 			write_log(10, "debug write waiting on full cache\n");
-			sleep_on_cache_full();
+			ret = sleep_on_cache_full();
+			if (ret < 0) {
+				*reterr = ret;
+				return 0;
+			}
+
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
@@ -3781,9 +3826,9 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size){
+	if (old_cache_size != new_cache_size) {
 		change_system_meta(0, new_cache_size - old_cache_size, 0,
-				new_cache_size - old_cache_size);
+				   new_cache_size - old_cache_size);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
@@ -4079,32 +4124,42 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
 	if (system_size > (50 * powl(1024, 3)))
+		/* when system_size is large than 53,687,091,200.
+		   f_blocks start from 26,214,402 */
 		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
 	else
+		/* f_blocks = 26,214,400 */
 		buf->f_blocks = (25*powl(1024, 2));
 
 	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
 	else
+		/* we have assigned double size of system blocks, so it
+		 * will keep being postive after subtracting */
 		buf->f_bfree = buf->f_blocks - (((system_size - 1) / 4096) + 1);
-	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
-	 * if runs into negative value */
-	if (buf->f_bfree < 0)
-		buf->f_bfree = 0;
+
 	buf->f_bavail = buf->f_bfree;
 
 	write_log(10, "Debug statfs, checking inodes\n");
 
+	/* mekes f_files larger than num_inodes, if num_inodes >
+	 * 9223372036854775807, num_inodes*2 overflows */
 	if (num_inodes > 1000000)
 		buf->f_files = (num_inodes * 2);
 	else
 		buf->f_files = 2000000;
 
-	buf->f_ffree = buf->f_files - num_inodes;
-	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
-	 * if runs into negative value */
-	if (buf->f_ffree < 0)
+	if (num_inodes < 0) {
+		/* when FS_stat.num_inodes >= 9223372036854775808,
+		 * num_inodes will become negative here and system free
+		 * inode will gets reset */
+		buf->f_ffree = buf->f_files;
+	} else if (buf->f_files < num_inodes) {
+		/* over used inodes */
 		buf->f_ffree = 0;
+	} else {
+		buf->f_ffree = buf->f_files - num_inodes;
+	}
 
 #ifdef STAT_VFS_H
 	buf->f_namelen = MAX_FILENAME_LEN;

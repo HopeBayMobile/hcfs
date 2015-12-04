@@ -40,9 +40,8 @@ int init_dirstat_lookup()
 	char pathname[METAPATHLEN+10];
 
 	snprintf(pathname, METAPATHLEN, "%s/dirstat_lookup_db", METAPATH);
-	if (access(pathname, F_OK) != 0) {
-		MKNOD(pathname, S_IFREG | 0600, 0)
-	}
+	if (access(pathname, F_OK) != 0)
+		MKNOD(pathname, S_IFREG | 0600, 0);
 	dirstat_lookup_data_fptr = fopen(pathname, "r+");
 	if (dirstat_lookup_data_fptr == NULL) {
 		errcode = errno;

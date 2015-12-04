@@ -52,6 +52,8 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 			this_inode; // Record the inode number to verify.
 		shm_verified_data->record_inode_counter++;
 		sem_post(&shm_verified_data->record_inode_sem);
+
+		sys_super_block->head.num_dirty--;
 		printf("Test: inode %d is updated\n", this_inode);
 	}
 	return 0;
@@ -76,6 +78,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
+	hcfs_system->systemdata.dirty_cache_size = 0;
 	return 200;
 }
 

@@ -45,7 +45,7 @@ CXX = gcc
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest monitor_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -172,3 +172,21 @@ clouddelete_mock_function.o : $(UNITTEST_DIR)/clouddelete_mock_function.c
 
 hcfs_clouddelete_unittest : clouddelete_mock_function.o hcfs_clouddelete.o hcfs_clouddelete_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+
+# monitor testing
+monitor.o : $(USER_DIR)/monitor.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/monitor.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/monitor.c
+
+monitor_unittest.o : $(UNITTEST_DIR)/monitor_unittest.cc \
+                      $(USER_DIR)/monitor.h $(USER_DIR)/monitor.c \
+		      $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/monitor_unittest.cc
+
+monitor_mock_function.o : $(UNITTEST_DIR)/monitor_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/monitor_mock_function.c
+
+monitor_unittest : monitor_mock_function.o monitor.o monitor_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+

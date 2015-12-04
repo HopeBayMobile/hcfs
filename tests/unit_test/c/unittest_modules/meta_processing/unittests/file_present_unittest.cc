@@ -204,6 +204,18 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	Unittest of unlink_update_meta()
  */
 
+class unlink_update_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+	void TearDown()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+	}
+};
+
 TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 {
 	DIR_ENTRY mock_entry;
@@ -486,6 +498,8 @@ protected:
 	{
 		if (mock_parent_entry)
 			free(mock_parent_entry);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
 	}
 };
 
@@ -544,6 +558,8 @@ protected:
 	{
 		if (mock_parent_entry)
 			free(mock_parent_entry);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
 	}
 };
 
@@ -636,6 +652,8 @@ protected:
 	void TearDown()
 	{
 		free(hcfs_system);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
 	}
 };
 
@@ -702,6 +720,8 @@ protected:
 	void TearDown()
 	{
 		free(hcfs_system);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
 	}
 };
 

@@ -20,8 +20,8 @@
 
 #include "fuseop.h"
 
-void sleep_on_cache_full(void);
-void notify_sleep_on_cache(void);
+int sleep_on_cache_full(void);
+void notify_sleep_on_cache(int cache_replace_status);
 #ifdef _ANDROID_ENV_
 void *run_cache_loop(void *ptr);
 #else

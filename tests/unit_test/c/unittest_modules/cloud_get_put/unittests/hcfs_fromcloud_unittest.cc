@@ -1,3 +1,4 @@
+#define __STDC_FORMAT_MACROS
 #include <semaphore.h>
 #include <string>
 #include <errno.h>
@@ -74,6 +75,8 @@ protected:
 		objname_list = (char **)malloc(sizeof(char *)*num_obj);
 		for (int i = 0 ; i < num_obj ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char)*40);
+
+		hcfs_system->backend_status_is_online = TRUE;
 	}
 	virtual void TearDown()
 	{
@@ -112,6 +115,13 @@ int objname_cmp(const void *s1, const void *s2)
 	sscanf(name1, "data_%d_%d", &inode1, &block1);
 	sscanf(name2, "data_%d_%d", &inode2, &block2);
 	return block1 - block2;
+}
+
+TEST_F(fetch_from_cloudTest, BackendOffline)
+{
+	hcfs_system->backend_status_is_online = FALSE;
+
+	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, 0, 0));
 }
 
 TEST_F(fetch_from_cloudTest, FetchSuccess)
@@ -164,6 +174,8 @@ protected:
 		sem_init(&download_curl_control_sem, 0, 1);
 		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
+
+		hcfs_system->backend_status_is_online = TRUE;
 	}
 	virtual void TearDown()
 	{
@@ -260,7 +272,7 @@ protected:
 		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 		sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
 		sem_init(&(download_thread_ctl.dl_th_sem), 0,
-				MAX_DL_CONCURRENCY);
+				MAX_PIN_DL_CONCURRENCY);
 	}
 
 	void TearDown()
@@ -281,7 +293,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 			(void *)&download_block_manager, NULL);
 
-	for (int i = 0; i < MAX_DL_CONCURRENCY / 2; i++) {
+	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
 		download_thread_ctl.block_info[i].dl_error = FALSE;
 		download_thread_ctl.block_info[i].active = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
@@ -298,7 +310,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 
 	/* Verify */
 	EXPECT_EQ(0, download_thread_ctl.active_th);
-	for (int i = 0; i < MAX_DL_CONCURRENCY; i++) {
+	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		ASSERT_EQ(FALSE,
 			download_thread_ctl.block_info[i].active);
 	}
@@ -312,7 +324,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 			(void *)&download_block_manager, NULL);
 
-	for (int i = 0; i < MAX_DL_CONCURRENCY; i++) {
+	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].active = TRUE;
 		download_thread_ctl.block_info[i].dl_error = TRUE;
 		download_thread_ctl.block_info[i].this_inode = i;
@@ -330,7 +342,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 
 	/* Verify */
 	EXPECT_EQ(0, download_thread_ctl.active_th);
-	for (int i = 0; i < MAX_DL_CONCURRENCY; i++) {
+	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		char error_path[200];
 
 		fetch_error_download_path(error_path, (ino_t)i);
