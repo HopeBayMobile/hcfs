@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern int MONITOR_INTERVAL;
 #ifdef _ANDROID_ENV_
 void *monitor_loop(void *ptr);
 #else

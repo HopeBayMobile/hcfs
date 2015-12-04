@@ -23,9 +23,11 @@
 #include "logger.h"
 #include "hcfscurl.h"
 #include "macro.h"
+#include "params.h"
 
 CURL_HANDLE monitor_curl_handle;
-int monitoring_interval = 60;
+/* let it can be changed during unittest*/
+int monitoring_interval = MONITORING_INTERVAL;
 
 /**************************************************************************
  *
