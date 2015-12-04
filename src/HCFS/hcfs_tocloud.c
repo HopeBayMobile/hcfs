@@ -1477,6 +1477,22 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	return count;
 }
 
+static inline void _write_upload_loop_status_log(char *wait_backend_status)
+{
+	/* log about sleep & resume */
+	if (hcfs_system->backend_status_is_online == FALSE &&
+			*wait_backend_status == FALSE) {
+		write_log(
+			10, "Debug: upload_loop sleep (backend offline)\n");
+		*wait_backend_status = TRUE;
+	} else if (hcfs_system->backend_status_is_online == TRUE &&
+			*wait_backend_status == TRUE) {
+		write_log(
+			10, "Debug: upload_loop resume (backend online)\n");
+		*wait_backend_status = FALSE;
+	}
+}
+
 #ifdef _ANDROID_ENV_
 void *upload_loop(void *ptr)
 #else
@@ -1490,7 +1506,7 @@ void upload_loop(void)
 	char in_sync;
 	int ret_val, ret;
 	char is_start_check;
-	char wait_backend = FALSE;
+	char wait_backend_status = FALSE;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -1513,10 +1529,8 @@ void upload_loop(void)
 					break;
 
 				/* Avoid busy polling */
-				if ((sys_super_block->head.num_dirty <=
-				    sync_ctl.total_active_sync_threads) ||
-				    (sync_ctl.total_active_sync_threads ==
-				    MAX_SYNC_CONCURRENCY)) {
+				if (sys_super_block->head.num_dirty <=
+				    sync_ctl.total_active_sync_threads) {
 					sleep(1);
 					continue;
 				}
@@ -1534,33 +1548,30 @@ void upload_loop(void)
 
 			ino_check = 0;
 		}
-		/* Break if system going down */
+		/* Break immediately if system going down */
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 
 		is_start_check = FALSE;
 
 		/* log about sleep & resume */
-		if (hcfs_system->backend_status_is_online == FALSE &&
-		    wait_backend == FALSE) {
-			write_log(
-			    10, "Debug: upload_loop sleep (backend offline)\n");
-			wait_backend = TRUE;
-		} else if (hcfs_system->backend_status_is_online == TRUE &&
-			   wait_backend == TRUE) {
-			write_log(
-			    10, "Debug: upload_loop resume (backend online)\n");
-			wait_backend = FALSE;
-		}
+		_write_upload_loop_status_log(&wait_backend_status);
+
 		/* sleep until backend is back */
 		if (hcfs_system->backend_status_is_online == FALSE) {
 			sleep(1);
-			is_start_check = TRUE;
 			continue;
 		}
 
-		/* Get first dirty inode or next inode */
+		/* Get first dirty inode or next inode. Before getting dirty
+		 * inode, it should get the queue lock and check whether
+		 * system is going down. */
 		sem_wait(&(sync_ctl.sync_queue_sem));
+		if (hcfs_system->system_going_down == TRUE) {
+			sem_post(&(sync_ctl.sync_queue_sem));
+			break;
+		}
+
 		super_block_exclusive_locking();
 		if (ino_check == 0)
 			ino_check = sys_super_block->head.first_dirty_inode;
