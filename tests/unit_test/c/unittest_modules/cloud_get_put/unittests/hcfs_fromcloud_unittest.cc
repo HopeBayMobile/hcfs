@@ -77,6 +77,7 @@ protected:
 			objname_list[i] = (char *)malloc(sizeof(char)*40);
 
 		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_paused = FALSE;
 	}
 	virtual void TearDown()
 	{
@@ -120,6 +121,7 @@ int objname_cmp(const void *s1, const void *s2)
 TEST_F(fetch_from_cloudTest, BackendOffline)
 {
 	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->sync_paused = TRUE;
 
 	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, 0, 0));
 }
@@ -176,6 +178,7 @@ protected:
 			curl_handle_mask[i] = FALSE;
 
 		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_paused = FALSE;
 	}
 	virtual void TearDown()
 	{

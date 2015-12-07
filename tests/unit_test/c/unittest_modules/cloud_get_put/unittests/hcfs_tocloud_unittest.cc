@@ -753,6 +753,7 @@ protected:
 		sem_init(&objname_counter_sem, 0, 1);
 
 		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_paused = FALSE;
 		CACHE_SOFT_LIMIT = 100000;
 		hcfs_system->systemdata.cache_size = 0;
 	}
