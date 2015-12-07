@@ -2707,7 +2707,7 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
 
-		if (hcfs_system->backend_status_is_online == FALSE)
+		if (hcfs_system->backend_is_online == FALSE)
 			return -EIO;
 
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
@@ -2750,7 +2750,7 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
 		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
 
-		if (hcfs_system->backend_status_is_online == FALSE)
+		if (hcfs_system->backend_is_online == FALSE)
 			return -EIO;
 
 		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
@@ -2786,7 +2786,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Check network status */
-	if (hcfs_system->backend_status_is_online == FALSE)
+	if (hcfs_system->backend_is_online == FALSE)
 		return -EIO;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);

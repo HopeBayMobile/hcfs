@@ -59,7 +59,7 @@ void pinning_loop()
 	rest_times = 0;
 	while (hcfs_system->system_going_down == FALSE) {
 		/* Check backend status */
-		if (hcfs_system->backend_status_is_online == FALSE) {
+		if (hcfs_system->backend_is_online == FALSE) {
 			write_log(10, "Debug: backend offline. pinning"
 				" manager takes a break\n");
 			_sleep_a_while(rest_times);

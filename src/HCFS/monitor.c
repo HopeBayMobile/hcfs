@@ -81,7 +81,7 @@ void monitor_loop(void)
 			test_duration = diff_time(loop_start_time, test_stop);
 			write_log(10,
 			    "[Backend Monitor] backend is %s, test time %f\n",
-			    hcfs_system->backend_status_is_online ? "online"
+			    hcfs_system->backend_is_online ? "online"
 								  : "offline",
 			    test_duration);
 		}
@@ -114,7 +114,7 @@ inline float diff_time(struct timespec start, struct timespec end)
  *
  * Function name: update_backend_status
  *        Inputs: int status, struct timespec *status_time
- *       Summary: Update hcfs_system->backend_status_is_online and access
+ *       Summary: Update hcfs_system->backend_is_online and access
  *                time.
  *                int status:
  *                    use 1 when status is online, otherwise 0.
@@ -129,7 +129,7 @@ void update_backend_status(int status, struct timespec *status_time)
 	struct timespec *last_time = &hcfs_system->backend_status_last_time;
 	struct timespec current_time;
 
-	hcfs_system->backend_status_is_online = status ? 1 : 0;
+	hcfs_system->backend_is_online = status ? 1 : 0;
 	if (status_time == NULL) {
 		clock_gettime(CLOCK_REALTIME, &current_time);
 		status_time = &current_time;

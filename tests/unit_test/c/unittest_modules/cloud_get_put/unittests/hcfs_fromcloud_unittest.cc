@@ -76,7 +76,7 @@ protected:
 		for (int i = 0 ; i < num_obj ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char)*40);
 
-		hcfs_system->backend_status_is_online = TRUE;
+		hcfs_system->backend_is_online = TRUE;
 	}
 	virtual void TearDown()
 	{
@@ -119,7 +119,7 @@ int objname_cmp(const void *s1, const void *s2)
 
 TEST_F(fetch_from_cloudTest, BackendOffline)
 {
-	hcfs_system->backend_status_is_online = FALSE;
+	hcfs_system->backend_is_online = FALSE;
 
 	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, 0, 0));
 }
@@ -175,7 +175,7 @@ protected:
 		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
 
-		hcfs_system->backend_status_is_online = TRUE;
+		hcfs_system->backend_is_online = TRUE;
 	}
 	virtual void TearDown()
 	{

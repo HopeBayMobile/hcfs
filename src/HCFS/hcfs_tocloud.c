@@ -1480,12 +1480,12 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 static inline void _write_upload_loop_status_log(char *wait_backend_status)
 {
 	/* log about sleep & resume */
-	if (hcfs_system->backend_status_is_online == FALSE &&
+	if (hcfs_system->backend_is_online == FALSE &&
 			*wait_backend_status == FALSE) {
 		write_log(
 			10, "Debug: upload_loop sleep (backend offline)\n");
 		*wait_backend_status = TRUE;
-	} else if (hcfs_system->backend_status_is_online == TRUE &&
+	} else if (hcfs_system->backend_is_online == TRUE &&
 			*wait_backend_status == TRUE) {
 		write_log(
 			10, "Debug: upload_loop resume (backend online)\n");
@@ -1558,7 +1558,7 @@ void upload_loop(void)
 		_write_upload_loop_status_log(&wait_backend_status);
 
 		/* sleep until backend is back */
-		if (hcfs_system->backend_status_is_online == FALSE) {
+		if (hcfs_system->backend_is_online == FALSE) {
 			sleep(1);
 			continue;
 		}

@@ -1177,7 +1177,7 @@ void api_module(void *index)
 			break;
 		case CLOUDSTAT:
 			/* Terminate the system */
-			retcode = (int)hcfs_system->backend_status_is_online;
+			retcode = (int)hcfs_system->backend_is_online;
 			if (retcode == 0) {
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(ret_len), 0);

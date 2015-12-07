@@ -196,7 +196,7 @@ typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
 	uint8_t system_going_down;
-	uint8_t backend_status_is_online;
+	uint8_t backend_is_online;
 	struct timespec backend_status_last_time;
 	sem_t fuse_sem;
 	sem_t access_sem;

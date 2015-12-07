@@ -34,7 +34,7 @@ protected:
 
 TEST_F(pinning_loopTest, WorkNormally)
 {
-	hcfs_system->backend_status_is_online = TRUE;
+	hcfs_system->backend_is_online = TRUE;
 	sys_super_block->head.num_pinning_inodes = 1;
 	sys_super_block->head.first_pin_inode = 3;
 
