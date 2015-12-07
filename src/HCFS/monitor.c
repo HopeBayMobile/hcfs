@@ -153,15 +153,21 @@ void update_backend_status(int status, struct timespec *status_time)
 	struct timespec current_time;
 
 	hcfs_system->backend_is_online = status ? TRUE : FALSE;
+	update_sync_state();
 
-	if (status == FALSE || hcfs_system->sync_manual_switch == FALSE)
-		hcfs_system->sync_paused = TRUE;
-	else
-		hcfs_system->sync_paused = FALSE;
 	if (status_time == NULL) {
 		clock_gettime(CLOCK_REALTIME, &current_time);
 		status_time = &current_time;
 	}
 	last_time->tv_sec = status_time->tv_sec;
 	last_time->tv_nsec = status_time->tv_nsec;
+}
+
+inline void update_sync_state(void)
+{
+	if (hcfs_system->backend_is_online == FALSE ||
+	    hcfs_system->sync_manual_switch == FALSE)
+		hcfs_system->sync_paused = TRUE;
+	else
+		hcfs_system->sync_paused = FALSE;
 }

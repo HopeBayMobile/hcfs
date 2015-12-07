@@ -39,6 +39,7 @@
 #include "dir_statistics.h"
 #include "file_present.h"
 #include "utils.h"
+#include "monitor.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -1184,6 +1185,7 @@ void api_module(void *index)
 		case SETSYNCSWITCH:
 			memcpy(&sync_switch, largebuf, sizeof(unsigned int));
 			hcfs_system->sync_manual_switch = (sync_switch == TRUE);
+			update_sync_state();
 			retcode = 0;
 			ret_len = sizeof(retcode);
 			send(fd1, &ret_len, sizeof(ret_len), 0);
