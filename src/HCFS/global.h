@@ -19,6 +19,8 @@
 #define BOOL uint8_t
 #define TRUE 1
 #define FALSE 0
+#define ON 1
+#define OFF 0
 
 /* Defines the version of the current meta defs */
 #define CURRENT_META_VER 3
