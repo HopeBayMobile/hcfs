@@ -49,10 +49,11 @@ static inline void _write_monitor_loop_status_log(float duration)
 		backend_is_online = hcfs_system->backend_is_online;
 		sync_manual_switch = hcfs_system->sync_manual_switch;
 		sync_paused = hcfs_system->sync_paused;
-		write_log(10, "%s backend %s (time %f), sync switch %s: %s\n",
-			  "Debug: [Monitor]",
-			  backend_is_online ? " online" : "offline", duration,
-			  sync_manual_switch ? " on" : "off",
+		write_log(10, "Debug: [Monitor] backend [%s] (time %.3f)\n",
+			  backend_is_online ? "online" : "offline", duration);
+		write_log(10, "Debug: [Monitor] sync switch [%s]\n",
+			  sync_manual_switch ? "on" : "off");
+		write_log(10, "Debug: [Monitor] hcfs sync state [%s]\n",
 			  sync_paused ? "paused" : "syncing");
 	}
 }
