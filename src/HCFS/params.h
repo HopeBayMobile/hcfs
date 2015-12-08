@@ -21,6 +21,7 @@ typedef struct {
 	char *superblock_name;
 	char *unclaimed_name;
 	char *hcfssystem_name;
+	char *hcfspausesync_name;
 	long long cache_soft_limit;
 	long long cache_hard_limit;
 	long long cache_update_delta;
@@ -68,6 +69,7 @@ typedef struct {
 #define SUPERBLOCK system_config.superblock_name
 #define UNCLAIMEDFILE system_config.unclaimed_name
 #define HCFSSYSTEM system_config.hcfssystem_name
+#define HCFSPAUSESYNC system_config.hcfspausesync_name
 
 #define CACHE_SOFT_LIMIT system_config.cache_soft_limit
 #define CACHE_HARD_LIMIT system_config.cache_hard_limit

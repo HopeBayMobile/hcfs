@@ -735,7 +735,7 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 not following protocol won't crash the system */
 void api_module(void *index)
 {
-	int fd1;
+	int fd1, pause_file;
 	ssize_t size_msg, msg_len;
 	struct timespec timer;
 	struct timeval start_time, end_time;
@@ -1187,6 +1187,15 @@ void api_module(void *index)
 			hcfs_system->sync_manual_switch = (sync_switch == TRUE);
 			update_sync_state();
 			retcode = 0;
+			pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+
+			if (sync_switch == ON && pause_file)
+				retcode = unlink(HCFSPAUSESYNC);
+			if (sync_switch == OFF && !pause_file)
+				retcode =
+				    mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
+			if (retcode == -1)
+				retcode = -errno;
 			ret_len = sizeof(retcode);
 			send(fd1, &ret_len, sizeof(ret_len), 0);
 			send(fd1, &retcode, sizeof(retcode), 0);
