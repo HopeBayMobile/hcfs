@@ -56,6 +56,7 @@ typedef struct {
 	char threads_in_use[MAX_DELETE_CONCURRENCY];
 	char threads_created[MAX_DELETE_CONCURRENCY];
 	char threads_finished[MAX_DELETE_CONCURRENCY];
+	char threads_error[MAX_DELETE_CONCURRENCY];
 	int total_active_delete_threads;
 } DELETE_THREAD_CONTROL;
 

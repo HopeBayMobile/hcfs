@@ -708,19 +708,25 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
 	int which_curl;
 	int which_index;
+	int ret;
 
 	which_curl = delete_thread_ptr->which_curl;
 	which_index = delete_thread_ptr->which_index;
 	if (delete_thread_ptr->is_block == TRUE)
-		do_block_delete(delete_thread_ptr->inode,
+		ret = do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
 #if (DEDUP_ENABLE)
 			delete_thread_ptr->obj_id,
 #endif
 			&(delete_curl_handles[which_curl]));
 	else
-		do_meta_delete(delete_thread_ptr->inode,
+		ret = do_meta_delete(delete_thread_ptr->inode,
 			&(delete_curl_handles[which_curl]));
+
+	if (ret < 0)
+		delete_ctl.threads_error[which_index] = TRUE;
+	else
+		delete_ctl.threads_error[which_index] = FALSE;
 
 	delete_ctl.threads_finished[which_index] = TRUE;
 }
