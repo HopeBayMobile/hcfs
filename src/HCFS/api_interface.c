@@ -721,6 +721,25 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 	return retcode;
 }
 
+int set_sync_switch_handle(int sync_switch)
+{
+	int retcode = 0;
+	int pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+
+	hcfs_system->sync_manual_switch = (sync_switch == TRUE) ? ON : OFF;
+	update_sync_state();
+
+	if (sync_switch == TRUE && pause_file)
+		retcode = unlink(HCFSPAUSESYNC);
+	if (sync_switch != TRUE && !pause_file)
+		retcode = mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
+	if (retcode == -1) {
+		write_log(5, "%s: %s\n", __func__, strerror(errno));
+		retcode = -errno;
+	}
+	return retcode;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -735,7 +754,7 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 not following protocol won't crash the system */
 void api_module(void *index)
 {
-	int fd1, pause_file;
+	int fd1;
 	ssize_t size_msg, msg_len;
 	struct timespec timer;
 	struct timeval start_time, end_time;
@@ -1184,21 +1203,12 @@ void api_module(void *index)
 			break;
 		case SETSYNCSWITCH:
 			memcpy(&sync_switch, largebuf, sizeof(unsigned int));
-			hcfs_system->sync_manual_switch = (sync_switch == TRUE);
-			update_sync_state();
-			retcode = 0;
-			pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
-
-			if (sync_switch == ON && pause_file)
-				retcode = unlink(HCFSPAUSESYNC);
-			if (sync_switch == OFF && !pause_file)
-				retcode =
-				    mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
-			if (retcode == -1)
-				retcode = -errno;
-			ret_len = sizeof(retcode);
-			send(fd1, &ret_len, sizeof(ret_len), 0);
-			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = set_sync_switch_handle(sync_switch);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
 			break;
 		case GETSYNCSWITCH:
 			retcode = (int)hcfs_system->sync_manual_switch;
