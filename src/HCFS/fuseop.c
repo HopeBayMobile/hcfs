@@ -2750,7 +2750,7 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
 		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
 
-		if (hcfs_system->sync_paused == FALSE)
+		if (hcfs_system->sync_paused)
 			return -EIO;
 
 		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
@@ -2786,7 +2786,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Check network status */
-	if (hcfs_system->sync_paused == FALSE)
+	if (hcfs_system->sync_paused)
 		return -EIO;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);

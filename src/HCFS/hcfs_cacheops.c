@@ -315,7 +315,7 @@ static int _check_cache_replace_result(long long *num_removed_inode)
 	if (*num_removed_inode == 0) { /* No inodes be removed */
 		if ((hcfs_system->systemdata.cache_size >=
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
-			(hcfs_system->sync_paused == TRUE))
+			(hcfs_system->sync_paused))
 			/* Wake them up and tell them cannot do this action */
 			notify_sleep_on_cache(-EIO);
 		sleep(1);

@@ -59,7 +59,7 @@ void pinning_loop()
 	rest_times = 0;
 	while (hcfs_system->system_going_down == FALSE) {
 		/* Check backend status */
-		if (hcfs_system->sync_paused == TRUE) {
+		if (hcfs_system->sync_paused) {
 			write_log(10, "Debug: sync paused. pinning"
 				" manager takes a break\n");
 			_sleep_a_while(rest_times);

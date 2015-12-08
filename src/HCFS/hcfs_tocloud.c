@@ -1553,7 +1553,7 @@ void upload_loop(void)
 		_write_upload_loop_status_log(&sync_paused_status);
 
 		/* sleep until backend is back */
-		if (hcfs_system->sync_paused == TRUE) {
+		if (hcfs_system->sync_paused) {
 			sleep(1);
 			continue;
 		}
