@@ -812,15 +812,21 @@ void delete_loop(void)
 	inode_to_check = 0;
 	while (hcfs_system->system_going_down == FALSE) {
 
-		/* Sleep 5 secs if there is not any dsync inode */
 		if (inode_to_check == 0) {
+		/* Sleep 5 secs if backend is online and system is running */
 			for (sleep_count = 0; sleep_count < 5; sleep_count++) {
-				if (hcfs_system->backend_status_is_online ==
-						FALSE)
+				if ((hcfs_system->backend_status_is_online ==
+					FALSE) ||
+					(hcfs_system->system_going_down ==
+					TRUE))
 					break;
 				sleep(1);
 			}
 		}
+		/* Terminate immediately if system is going down */
+		if (hcfs_system->system_going_down == TRUE)
+			break;
+
 		/* sleep and continue if backend is offline */
 		if (hcfs_system->backend_status_is_online == FALSE) {
 			sleep(1);
