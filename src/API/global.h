@@ -18,7 +18,7 @@
 #define FALSE 0
 
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
-#define API_SOCK_PATH "/dev/shm/hcfs_api_sock"
+#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfs_api_sock"
 
 /* List of API codes */
 #define TERMINATE 0

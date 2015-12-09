@@ -29,7 +29,7 @@ int main()
 	free(res1);
 
 	char *res2;
-	HCFS_unpin_path(&res2, pin_path2);
+	HCFS_unpin_path(&res2, pin_path);
 	printf("unpin path - %s\n", res2);
 	free(res2);
 

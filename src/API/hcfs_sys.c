@@ -157,15 +157,21 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 		token = strsep(&line, " =");
 		if (strcmp(upper_key, token) == 0) {
 			token = strsep(&line, " =");
+			if (strlen(token) <= 0) {
+				ret_code = 1;
+				free(tmp_ptr);
+				break;
+			}
+
 			token = strsep(&line, " ");
 			token = strsep(&line, "\n");
 
-			if (strlen(token) > 0) {
+			if (strlen(token) <= 0) {
+				ret_code = 1;
+			} else {
 				*value = malloc((strlen(token) + 1) * sizeof(char));
 				strcpy(*value, token);
 				ret_code = 0;
-			} else {
-				ret_code = 1;
 			}
 
 			free(tmp_ptr);
