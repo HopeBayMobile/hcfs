@@ -721,8 +721,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
 	gettimeofday(&tmp_time1, NULL);
 
-	/* Reject if not creating a regular file */
-	if (!S_ISREG(mode)) {
+	/* Reject if not creating a regular file or fifo */
+	if (!S_ISFILE(mode)) {
 		fuse_reply_err(req, EPERM);
 		return;
 	}
@@ -782,7 +782,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_dev = dev;
 	this_stat.st_nlink = 1;
 
-	self_mode = mode | S_IFREG;
+	self_mode = mode;
 	this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/

@@ -15,6 +15,8 @@
 
 #include "logger.h"
 
+#define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode))
+
 #define UNUSED(x) ((void)x)
 
 #define FSEEK(A, B, C)\

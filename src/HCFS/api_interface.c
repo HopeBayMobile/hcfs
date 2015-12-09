@@ -639,7 +639,7 @@ int checkpin_handle(int arg_len, char *largebuf)
 	if (retcode < 0)
 		goto error_handling;
 
-	if (S_ISREG(thisstat.st_mode)) {
+	if (S_ISFILE(thisstat.st_mode)) {
 		retcode = meta_cache_lookup_file_data(target_inode, NULL,
 						&filemeta, NULL, 0, thisptr);
 		if (retcode < 0)

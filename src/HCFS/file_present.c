@@ -105,7 +105,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 			goto error_handling;
 
 		if (ret_gen != NULL || ret_pin_status != NULL) {
-			if (S_ISREG(returned_stat.st_mode)) {
+			if (S_ISFILE(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_file_data(
 						this_inode, NULL, &filemeta,
 						NULL, 0, temp_entry);
