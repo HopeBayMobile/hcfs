@@ -980,7 +980,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	write_log(10, "Debug datasync: inode %" PRIu64 ", block %lld\n",
 		  (uint64_t)this_inode, block_no);
 	snprintf(curl_handle->id, sizeof(curl_handle->id),
-		 "upload_blk_%" PRIu64 "_%lld", this_inode, block_no);
+		 "upload_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1119,7 +1119,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	snprintf(objname, sizeof(objname), "meta_%" PRIu64 "",
 		 (uint64_t)this_inode);
 	write_log(10, "Debug datasync: objname %s, inode %" PRIu64 "\n",
-		  objname, this_inode);
+		  objname, (uint64_t)this_inode);
 	snprintf(curl_handle->id, sizeof(curl_handle->id),
 		 "upload_meta_%" PRIu64 "", (uint64_t)this_inode);
 	fptr = fopen(filename, "r");
