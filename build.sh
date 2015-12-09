@@ -1,16 +1,26 @@
 #/bin/bash
 
+LOCAL_PATH=`pwd`
+
+NDK_BUILD="/Users/fangyuxun/Android/android-ndk-r10e/ndk-build"
+
 echo "=== Start to build HCFS ==="
-cp src/HCFS/*.c build/HCFS/jni/
-cp src/HCFS/*.h build/HCFS/jni/
-~/Android/android-ndk-r10e/ndk-build
+src_path=$LOCAL_PATH"/build/HCFS/jni/"
+cp $LOCAL_PATH/src/HCFS/*.c $src_path
+cp $LOCAL_PATH/src/HCFS/*.h $src_path
+cd $src_path
+$NDK_BUILD
 
 echo "=== Start to build HCFS CLI ==="
-cp src/CLI_utils/*.c build/HCFS_CLI/jni/
-cp src/CLI_utils/*.h build/HCFS_CLI/jni/
-~/Android/android-ndk-r10e/ndk-build
+src_path=$LOCAL_PATH"/build/HCFS_CLI/jni/"
+cp $LOCAL_PATH/src/CLI_utils/*.c $src_path
+cp $LOCAL_PATH/src/CLI_utils/*.h $src_path
+cd $src_path
+$NDK_BUILD
 
 echo "=== Start to build API Server ==="
-cp src/API/*.c build/API_SERV/jni/
-cp src/API/*.h build/API_SERV/jni/
-~/Android/android-ndk-r10e/ndk-build
+src_path=$LOCAL_PATH"/build/API_SERV/jni/"
+cp $LOCAL_PATH/src/API/*.c $src_path
+cp $LOCAL_PATH/src/API/*.h $src_path
+cd $src_path
+$NDK_BUILD
