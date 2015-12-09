@@ -47,6 +47,9 @@ CXX = gcc
 # created to the list.
 TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest monitor_unittest
 
+.PHONY: $(DO_TESTS)
+DO_TESTS = $(TESTS:%=test-%)
+
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
@@ -59,13 +62,13 @@ all : setup $(TESTS)
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno tmpdir
 
-test : setup $(TESTS)
-	./hcfs_fromcloud_unittest
-	./hcfs_tocloud_unittest
-	./hcfs_clouddelete_unittest
+test : setup $(DO_TESTS)
 ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
 endif
+
+$(DO_TESTS): $(TESTS)
+	./$(@:test-%=%)
 
 .PHONY : setup
 setup :

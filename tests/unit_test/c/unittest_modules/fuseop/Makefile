@@ -47,6 +47,9 @@ CXX = gcc
 # created to the list.
 TESTS = fuseop_unittest 
 
+.PHONY: $(DO_TESTS)
+DO_TESTS = $(TESTS:%=test-%)
+
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
@@ -63,11 +66,13 @@ clean :
 # and the cleanup should be done only when necessary. (In fuseop
 # unittest the test FS will be unmounted at the end of the test).
 
-test : setup $(TESTS)
-	./fuseop_unittest
+test : setup $(DO_TESTS)
 ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
 endif
+
+$(DO_TESTS): $(TESTS)
+	./$(@:test-%=%)
 
 .PHONY : setup
 setup :

@@ -8,20 +8,19 @@ WORKSPACE="$( cd "$UNITTEST_DIR/../.." && pwd )"
 
 # Install dependencies
 $WORKSPACE/utils/setup_dev_env.sh -vm unit_test
-$WORKSPACE/utils/install_ccache.bash
 . $WORKSPACE/utils/env_config.sh
 
 # Unit test
 cd $UNITTEST_DIR
 
 if type -a colormake >/dev/null 2>&1; then
-	make=colormake
+	make="colormake"
 else
-	make=make
+	make="make"
 fi
+make="TERM=xterm-color $make GTEST_COLOR=yes NOGCOVR=1"
 
-$make clean
-$make
-TERM=xterm-color make GTEST_COLOR=yes NOGCOVR=1 test
+eval $make clean
+eval $make test
 
 gcovr -r $WORKSPACE/src .
