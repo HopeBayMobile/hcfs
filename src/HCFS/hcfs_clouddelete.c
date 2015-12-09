@@ -772,12 +772,6 @@ void delete_loop(void)
 
 	inode_to_check = 0;
 	while (hcfs_system->system_going_down == FALSE) {
-		if (hcfs_system->backend_status_is_online == FALSE) {
-			inode_to_check = 0;
-			sleep(1);
-			continue;
-		}
-
 		if (inode_to_check == 0)
 			sleep(5);
 
