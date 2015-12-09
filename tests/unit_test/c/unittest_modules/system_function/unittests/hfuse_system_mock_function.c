@@ -163,3 +163,6 @@ void destroy_dirstat_lookup()
 void init_sync_stat_control(void)
 {
 }
+inline void update_sync_state(void)
+{
+}

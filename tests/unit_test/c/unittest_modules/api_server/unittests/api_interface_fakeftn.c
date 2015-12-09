@@ -157,3 +157,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 		return -EIO;
 	return 0;
 }
+
+inline void update_sync_state(void)
+{
+}
