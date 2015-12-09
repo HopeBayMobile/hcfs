@@ -17,6 +17,8 @@
 #include <errno.h>
 #include <string.h>
 #include <limits.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "logger.h"
 #include "meta_mem_cache.h"
@@ -312,8 +314,8 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 		goto errcode_handle;
 	}
 
-	write_log(10, "Debug parent lookup %lld %lld\n", thisinode,
-				parentinode);
+	write_log(10, "Debug parent lookup %" PRIu64 " %" PRIu64 "\n",
+	          (uint64_t) thisinode, (uint64_t) parentinode);
 	ret = search_inode(parentinode, thisinode, &tmpentry);
 	if (ret < 0) {
 		errcode = ret;
@@ -362,6 +364,9 @@ int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 	PATH_LOOKUP cachenode;
 	ino_t parent_inode;
 	int ret, pathlen, errcode;
+
+	write_log(10, "Debug path iterate %" PRIu64 "\n",
+		  (uint64_t) thisinode);
 
 	ret = lookup_name(cacheptr, thisinode, &cachenode);
 
