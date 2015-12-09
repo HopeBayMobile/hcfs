@@ -35,6 +35,9 @@ class uploadEnvironment : public ::testing::Environment {
 
 //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
     sem_init(&(hcfs_system->access_sem), 0, 1);
 
@@ -628,6 +631,9 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	mock_thread_type.which_index = 0;
 
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 
 	/* Run tested function */
 	init_upload_control();
@@ -675,8 +681,10 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	FILE *metaptr;
 
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 	/* Mock data */
-	hcfs_system->system_going_down = FALSE;
 	write_mock_meta_file(metapath, total_page, ST_TODELETE);
 
 	system_config.max_block_size = 1000;
@@ -786,6 +794,9 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	BLOCK_ENTRY_PAGE mock_block_page;
 
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 
 	/* Write something into meta, int the unittest, only test
 	   the case that upload dir meta because regfile case has

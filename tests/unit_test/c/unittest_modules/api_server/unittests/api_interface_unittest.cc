@@ -29,6 +29,9 @@ class init_api_interfaceTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     sem_init(&(hcfs_system->fuse_sem), 0, 0);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
@@ -102,6 +105,9 @@ class destroy_api_interfaceTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
    }
@@ -166,6 +172,9 @@ class api_moduleTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     sem_init(&(hcfs_system->access_sem), 0, 1);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
@@ -938,6 +947,9 @@ class api_server_monitorTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
     for (count = 0; count < 20; count++)

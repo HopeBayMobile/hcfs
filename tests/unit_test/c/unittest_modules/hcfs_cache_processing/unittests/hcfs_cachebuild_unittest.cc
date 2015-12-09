@@ -22,6 +22,9 @@ protected:
 		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 	}
 
 	void TearDown()
