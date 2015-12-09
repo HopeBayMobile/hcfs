@@ -59,5 +59,5 @@ sudo -u jenkins /utils/setup_dev_env.sh -v -m functional_test
 sudo -u jenkins /utils/setup_dev_env.sh -v -m unit_test
 sudo -u jenkins /utils/install_ccache.bash
 apt-get clean
-rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /etc/service/sshd/down
+rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 popd
