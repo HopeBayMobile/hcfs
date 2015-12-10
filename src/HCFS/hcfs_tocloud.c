@@ -882,7 +882,7 @@ store in some other file */
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
-		printf("schedule sync meta ret - %d\n", ret);
+		write_log(10, "schedule sync meta ret - %d\n", ret);
 		if (ret < 0)
 			sync_error = TRUE;
 		flock(fileno(metafptr), LOCK_UN);

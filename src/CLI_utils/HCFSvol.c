@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		} else {
-			printf("Returned value is %d\n", retllcode);
+			printf("Returned value is %lld\n", retllcode);
 		}
 		break;
 	case CREATEVOL:

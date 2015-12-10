@@ -79,6 +79,9 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	int ret, errcode;
 	size_t ret_size;
 
+	write_log(10, "Beging remove sync block inode %" PRIu64 "\n",
+	          (uint64_t)this_inode);
+
 	ret = super_block_read(this_inode, &tempentry);
 
 	if (ret < 0)
@@ -379,13 +382,18 @@ void run_cache_loop(void)
 	do_something = FALSE;
 
 	while (hcfs_system->system_going_down == FALSE) {
+		write_log(10, "Start one round of cache replacement\n");
+		write_log(10, "Cache size is %lld\n",
+		          hcfs_system->systemdata.cache_size);
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
+			write_log(10, "Need to throw out something\n");
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
+				write_log(10, "Recomputing cache usage\n");
 				_check_cache_replace_result(&num_removed_inode);
 				ret = build_cache_usage();
 				if (ret < 0) {
@@ -403,6 +411,7 @@ void run_cache_loop(void)
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
+					write_log(10, "Recomputing cache usage part 2\n");
 					_check_cache_replace_result(&num_removed_inode);
 					ret = build_cache_usage();
 					if (ret < 0) {
@@ -427,6 +436,7 @@ void run_cache_loop(void)
 			/* skip empty bucket */
 			if (inode_cache_usage_hash[e_index] == NULL) {
 				e_index++;
+				write_log(10, "Skipping, part 1\n");
 				continue;
 			}
 
@@ -434,6 +444,7 @@ void run_cache_loop(void)
 			if (inode_cache_usage_hash[e_index]->clean_cache_size
 									<= 0) {
 				e_index++;
+				write_log(10, "Skipping, part 2\n");
 				continue;
 			}
 
@@ -449,6 +460,7 @@ void run_cache_loop(void)
 							->last_mod_time;
 				if ((currenttime.tv_sec - node_time) < 300) {
 					e_index++;
+					write_log(10, "Skipping, part 3\n");
 					continue;
 				}
 			}
@@ -456,6 +468,8 @@ void run_cache_loop(void)
 
 			this_inode =
 				inode_cache_usage_hash[e_index]->this_inode;
+			write_log(10, "Preparing to remove blocks in %" PRIu64 "\n",
+			          (uint64_t)this_inode);
 
 			this_cache_node =
 				return_cache_usage_node(
@@ -479,6 +493,9 @@ void run_cache_loop(void)
 			gettimeofday(&currenttime, NULL);
 			/*Rebuild cache usage every five minutes if cache usage
 			not near full*/
+			write_log(10, "Checking cache size %lld, %lld\n",
+			          hcfs_system->systemdata.cache_size,
+			          CACHE_SOFT_LIMIT);
 			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
 							(seconds_slept > 300)) {
 				ret = build_cache_usage();
@@ -501,6 +518,9 @@ void run_cache_loop(void)
 		}
 	}
 	notify_sleep_on_cache(-ESHUTDOWN);
+#ifdef _ANDROID_ENV_
+	return NULL;
+#endif
 }
 
 /************************************************************************
