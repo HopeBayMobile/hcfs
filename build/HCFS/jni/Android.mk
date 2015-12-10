@@ -27,55 +27,61 @@ LOCAL_LDFLAGS += -pie -fPIE
 include $(BUILD_STATIC_LIBRARY)
 #include $(BUILD_SHARED_LIBRARY)
 
-#include $(CLEAR_VARS)
-#LOCAL_MODULE    := libcurl
-#LOCAL_SRC_FILES := libs/libcurl.so
-#include $(PREBUILT_SHARED_LIBRARY)
-#
-#include $(CLEAR_VARS)
-#LOCAL_MODULE    := libssl
-#LOCAL_SRC_FILES := libs/libssl.so
-#include $(PREBUILT_SHARED_LIBRARY)
-#
-#include $(CLEAR_VARS)
-#LOCAL_MODULE:= libcrypto
-#LOCAL_SRC_FILES := libs/libcrypto.so
-#include $(PREBUILT_SHARED_LIBRARY)
+include $(CLEAR_VARS)
+LOCAL_MODULE    := libcurl
+LOCAL_SRC_FILES := libs/libcurl.so
+include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := liblz4
-LOCAL_C_INCLUDES := lz4/lz4.c \
-                    lz4/lz4frame.c \
-                    lz4/lz4hc.c \
-                    lz4/xxhash.c \
-                    programs/lz4io.c\
-
-LOCAL_SRC_FILES := $(LOCAL_PATH)/lz4
-LOCAL_MODULE_TAGS := optional
-LOCAL_CFLAGS += -pie -fPIE
-LOCAL_LDFLAGS += -pie -fPIE
-include $(BUILT_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE:= libcurl
-LOCAL_SRC_FILES := libs/libcurl.a
-LOCAL_CFLAGS += -pie -fPIE
-LOCAL_LDFLAGS += -pie -fPIE
-include $(PREBUILT_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE:= libssl
-LOCAL_SRC_FILES := libs/libssl.a
-LOCAL_CFLAGS += -pie -fPIE
-LOCAL_LDFLAGS += -pie -fPIE
-include $(PREBUILT_STATIC_LIBRARY)
+LOCAL_MODULE    := libssl
+LOCAL_SRC_FILES := libs/libssl.so
+include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE:= libcrypto
-LOCAL_SRC_FILES := libs/libcrypto.a
-LOCAL_CFLAGS += -pie -fPIE
-LOCAL_LDFLAGS += -pie -fPIE
-include $(PREBUILT_STATIC_LIBRARY)
+LOCAL_SRC_FILES := libs/libcrypto.so
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE:= liblz4
+LOCAL_SRC_FILES := libs/liblz4.so
+include $(PREBUILT_SHARED_LIBRARY)
+
+#include $(CLEAR_VARS)
+#LOCAL_MODULE := liblz4
+#LOCAL_C_INCLUDES := $(LOCAL_PATH)/lz4
+#LOCAL_C_FILES := lz4/lz4.c \
+#                 lz4/lz4frame.c \
+#                 lz4/lz4hc.c \
+#                 lz4/xxhash.c \
+#                 programs/lz4io.c\
+#
+#LOCAL_MODULE_TAGS := optional
+#LOCAL_CFLAGS += -pie -fPIE
+#LOCAL_LDFLAGS += -pie -fPIE
+#include $(BUILT_STATIC_LIBRARY)
+#include $(BUILD_SHARED_LIBRARY)
+
+#include $(CLEAR_VARS)
+#LOCAL_MODULE:= libcurl
+#LOCAL_SRC_FILES := libs/libcurl.a
+#LOCAL_CFLAGS += -pie -fPIE
+#LOCAL_LDFLAGS += -pie -fPIE
+#include $(PREBUILT_STATIC_LIBRARY)
+#
+#include $(CLEAR_VARS)
+#LOCAL_MODULE:= libssl
+#LOCAL_SRC_FILES := libs/libssl.a
+#LOCAL_CFLAGS += -pie -fPIE
+#LOCAL_LDFLAGS += -pie -fPIE
+#include $(PREBUILT_STATIC_LIBRARY)
+#
+#include $(CLEAR_VARS)
+#LOCAL_MODULE:= libcrypto
+#LOCAL_SRC_FILES := libs/libcrypto.a
+#LOCAL_CFLAGS += -pie -fPIE
+#LOCAL_LDFLAGS += -pie -fPIE
+#include $(PREBUILT_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_CFLAGS    := -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -DDEDUP_ENABLE=0 -DSTAT_VFS_H="<fuse/sys/statvfs.h>"
