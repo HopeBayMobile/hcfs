@@ -29,7 +29,7 @@ CURL_HANDLE monitor_curl_handle;
 /* let it can be changed during unittest*/
 int monitoring_interval = MONITORING_INTERVAL;
 
-static inline void _write_monitor_loop_status_log(float duration)
+void _write_monitor_loop_status_log(float duration)
 {
 	static BOOL init = TRUE;
 	static BOOL backend_is_online;

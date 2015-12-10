@@ -11,6 +11,7 @@ extern "C" {
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
 extern int hcfs_test_backend_register;
+extern int hcfs_test_backend_sleep_nsec;
 extern int monitoring_interval;
 
 class monitorTest : public ::testing::Test {
@@ -104,4 +105,14 @@ TEST_F(monitorTest, Update_Backend_Status_Without_Timestamp) {
 	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
 	ASSERT_NE(0, hcfs_system->backend_status_last_time.tv_sec);
 	ASSERT_NE(0, hcfs_system->backend_status_last_time.tv_nsec);
+}
+
+TEST_F(monitorTest, Write_Log_With_Time) {
+	_write_monitor_loop_status_log(0);
+	fflush(stdout);
+}
+
+TEST_F(monitorTest, Write_Log_Without_Time) {
+	_write_monitor_loop_status_log(1.2345);
+	fflush(stdout);
 }
