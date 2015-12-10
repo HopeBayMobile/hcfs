@@ -849,9 +849,11 @@ store in some other file */
 	if (!access(thismetapath, F_OK)) {
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
-		if (S_ISREG(ptr->this_mode)) {
+		if (S_ISFILE(ptr->this_mode)) {
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			      metafptr);
+			root_inode = tempfilemeta.root_inode;
+			upload_seq = tempfilemeta.upload_seq;
 			tempfilemeta.size_last_upload = tempfilestat.st_size;
 			tempfilemeta.upload_seq++;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);

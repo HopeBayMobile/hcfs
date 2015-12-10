@@ -123,8 +123,11 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 
 	temp_entry.d_ino = child_inode;
 	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", childname);
-	if (S_ISREG(child_mode))
+	if (S_ISFILE(child_mode)) {
 		temp_entry.d_type = D_ISREG;
+		if (S_ISFIFO(child_mode)) /* Add special type */
+			temp_entry.sp_type = D_FIFO;
+	}
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
 	if (S_ISLNK(child_mode))
@@ -358,8 +361,11 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 
 	temp_entry.d_ino = child_inode;
 	strcpy(temp_entry.d_name, childname);
-	if (S_ISREG(child_mode))
+	if (S_ISFILE(child_mode)) {
 		temp_entry.d_type = D_ISREG;
+		if (S_ISFIFO(child_mode)) /* Add special type */
+			temp_entry.sp_type = D_FIFO;
+	}
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
 	if (S_ISLNK(child_mode))
@@ -503,17 +509,26 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		if (ret_val < 0)
 			return ret_val;
 		tpage.dir_entries[count].d_ino = new_inode;
-		if (S_ISREG(new_mode)) {
+		if (S_ISFILE(new_mode)) {
 			write_log(10, "Debug: change to type REG\n");
 			tpage.dir_entries[count].d_type = D_ISREG;
-		}
-		if (S_ISLNK(new_mode)) {
+			if (S_ISFIFO(new_mode))
+				tpage.dir_entries[count].sp_type = D_FIFO;
+			else
+				tpage.dir_entries[count].sp_type = 0;
+
+		} else if (S_ISLNK(new_mode)) {
 			write_log(10, "Debug: change to type LNK\n");
 			tpage.dir_entries[count].d_type = D_ISLNK;
-		}
-		if (S_ISDIR(new_mode)) {
+
+		} else if (S_ISDIR(new_mode)) {
 			write_log(10, "Debug: change to type DIR\n");
 			tpage.dir_entries[count].d_type = D_ISDIR;
+
+		} else {
+			write_log(0, "Error: Invalid rename type in %s\n",
+					__func__);
+			return -EPERM;
 		}
 
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
@@ -1536,7 +1551,7 @@ int startup_finish_delete(void)
 				closedir(dirp);
 				return ret;
 			}
-			if (S_ISREG(tmpstat.st_mode))
+			if (S_ISFILE(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISREG,
 						root_inode, NULL);
 			if (S_ISDIR(tmpstat.st_mode))
@@ -1620,8 +1635,8 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 	}
 
 	ret_code = 0;
-	/* Case regfile */
-	if (S_ISREG(this_mode)) {
+	/* Case regfile & fifo file */
+	if (S_ISFILE(this_mode)) {
 		ret = meta_cache_lookup_file_data(this_inode, NULL, &file_meta,
 				NULL, 0, meta_cache_entry);
 		if (ret < 0) {

@@ -468,8 +468,12 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	/* Remove entry */
 	if (this_entry->d_type == D_ISREG) {
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, S_IFREG, parent_ptr);
+		if (this_entry->sp_type == D_FIFO)
+			ret_val = dir_remove_entry(parent_inode, this_inode,
+				this_entry->d_name, S_IFIFO, parent_ptr);
+		else
+			ret_val = dir_remove_entry(parent_inode, this_inode,
+				this_entry->d_name, S_IFREG, parent_ptr);
 	}
 	if (this_entry->d_type == D_ISLNK) {
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
@@ -803,21 +807,22 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = filemeta.next_xattr_page;
-	}
-	if (S_ISDIR(stat_data.st_mode)) {
+	} else if (S_ISDIR(stat_data.st_mode)) {
 		ret_code = meta_cache_lookup_dir_data(this_inode, NULL,
 			&dirmeta, NULL, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = dirmeta.next_xattr_page;
-	}
-	if (S_ISLNK(stat_data.st_mode)) {
+	} else if (S_ISLNK(stat_data.st_mode)) {
 		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL,
 			&symlinkmeta, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = symlinkmeta.next_xattr_page;
+	} else { /* fifo, socket... */
+		return -EPERM;
 	}
+
 
 	/* It is used to prevent user from forgetting to open meta file */
 	ret_code = meta_cache_open_file(meta_cache_entry);
@@ -1087,8 +1092,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	}
 
 
-	/* After pinning self, pin all its children for dir */
-	if (S_ISREG(tempstat.st_mode)) {
+	/* After pinning self, pin all its children for dir.
+	 * file(reg, fifo, socket) can be directly returned. */
+	if (S_ISFILE(tempstat.st_mode)) {
 		return ret;
 
 	} else if (S_ISLNK(tempstat.st_mode)) {
@@ -1220,7 +1226,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 	}
 
 	/* After unpinning itself, unpin all its children for dir */
-	if (S_ISREG(tempstat.st_mode)) {
+	if (S_ISFILE(tempstat.st_mode)) {
 		return ret;
 
 	} else if (S_ISLNK(tempstat.st_mode)) {

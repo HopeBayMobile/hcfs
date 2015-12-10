@@ -76,6 +76,10 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define D_ISREG 1
 #define D_ISLNK 2
 
+/* Define special file type */
+#define D_NONE 0
+#define D_FIFO 1
+
 /* Define constants for timestamp changes */
 #define ATIME 4
 #define MTIME 2
@@ -87,6 +91,9 @@ typedef struct {
 	ino_t d_ino;
 	char d_name[MAX_FILENAME_LEN+1];
 	char d_type;
+	char sp_type; /* Special file type when d_type == D_ISREG.
+	                 This field is 0 when regular file, D_FIFO when
+	                 it is fifo file. */
 } DIR_ENTRY;
 
 /* Defining the structure of directory object meta */

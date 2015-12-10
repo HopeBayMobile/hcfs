@@ -387,7 +387,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		mlock = FALSE;
 	}
 
-	if (S_ISREG(ptr->this_mode)) {
+	if (S_ISFILE(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);

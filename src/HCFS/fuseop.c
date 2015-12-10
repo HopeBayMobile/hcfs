@@ -1249,7 +1249,7 @@ a directory (for NFS) */
 	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
 			(uint64_t)this_inode, this_gen);
 
-	if (S_ISREG((output_param.attr).st_mode))
+	if (S_ISFILE((output_param.attr).st_mode))
 		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
 				1, D_ISREG);
 	if (S_ISDIR((output_param.attr).st_mode))
@@ -4500,10 +4500,15 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 
+			if (temp_page.dir_entries[count].d_type == D_ISREG) {
+				if (temp_page.dir_entries[count].sp_type ==
+						D_FIFO)
+					tempstat.st_mode = S_IFIFO;
+				else
+					tempstat.st_mode = S_IFREG;
+			}
 			if (temp_page.dir_entries[count].d_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
-			if (temp_page.dir_entries[count].d_type == D_ISREG)
-				tempstat.st_mode = S_IFREG;
 			if (temp_page.dir_entries[count].d_type == D_ISLNK)
 				tempstat.st_mode = S_IFLNK;
 
@@ -5741,14 +5746,17 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) link_inode;
 	memcpy(&(tmp_param.attr), &link_stat, sizeof(struct stat));
-	if (S_ISREG(link_stat.st_mode))
+	if (S_ISFILE(link_stat.st_mode))
 		ret_val = lookup_increase(tmpptr->lookup_table,
 			link_inode, 1, D_ISREG);
-	if (S_ISLNK(link_stat.st_mode))
+	else if (S_ISLNK(link_stat.st_mode))
 		ret_val = lookup_increase(tmpptr->lookup_table,
 			link_inode, 1, D_ISLNK);
-	if (S_ISDIR(link_stat.st_mode))
+	else if (S_ISDIR(link_stat.st_mode))
 		ret_val = -EISDIR;
+	else
+		ret_val = -EPERM;
+
 	if (ret_val < 0) {
 		write_log(0, "Fail to increase lookup count\n");
 		fuse_reply_err(req, -ret_val);
