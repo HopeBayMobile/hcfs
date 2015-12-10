@@ -79,7 +79,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	int ret, errcode;
 	size_t ret_size;
 
-	write_log(10, "Beging remove sync block inode %" PRIu64 "\n",
+	write_log(10, "Begin remove sync block inode %" PRIu64 "\n",
 	          (uint64_t)this_inode);
 
 	ret = super_block_read(this_inode, &tempentry);
