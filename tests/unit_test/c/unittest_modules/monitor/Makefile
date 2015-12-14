@@ -53,17 +53,6 @@ CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
 # created to the list.
 TESTS = monitor_unittest
 
-# Builds a sample test.  A test should link with either gtest.a or
-# gtest_main.a, depending on whether it defines its own main()
-# function.
-
-# monitor unittest
-NEW_OBJS := $(addprefix $(OBJ_DIR)/, monitor.o monitor_unittest.o monitor_mock_function.o)
-OBJS := $(OBJS) $(NEW_OBJS)
-monitor_unittest: $(NEW_OBJS) $(OBJ_DIR)/gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $^ -o $@ -lstdc++ -lpthread
-
-
 # House-keeping build targets.
 all : setup $(TESTS)
 
@@ -133,3 +122,13 @@ $(OBJ_DIR)/%.o: %.cc | $(OBJ_DIR)
 
 $(OBJ_DIR):
 	mkdir $@
+
+# Builds a sample test.  A test should link with either gtest.a or
+# gtest_main.a, depending on whether it defines its own main()
+# function.
+
+# monitor unittest
+NEW_OBJS := $(addprefix $(OBJ_DIR)/, monitor.o monitor_unittest.o monitor_mock_function.o)
+OBJS := $(OBJS) $(NEW_OBJS)
+monitor_unittest: $(NEW_OBJS) $(OBJ_DIR)/gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $^ -o $@ -lstdc++ -lpthread
