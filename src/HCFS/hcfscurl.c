@@ -422,6 +422,7 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
@@ -735,6 +736,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
@@ -849,6 +851,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 1L);
 	curl_easy_setopt(curl, CURLOPT_READDATA, (void *)&put_control);
@@ -948,6 +951,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
@@ -1049,6 +1053,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
@@ -1272,6 +1277,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, S3_list_body_fptr);

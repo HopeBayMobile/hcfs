@@ -279,8 +279,10 @@ int build_cache_usage(void)
 			closedir(dirptr);
 			continue;
 		}
+		write_log(10, "count is now %d\n", count);
 
 		while (direntptr != NULL) {
+			write_log(10, "count is now %d\n", count);
 			write_log(10, "Scanning file name %s\n",
 			          temp_dirent.d_name);
 			if (hcfs_system->system_going_down == TRUE)
@@ -298,6 +300,8 @@ int build_cache_usage(void)
 				}
 				continue;
 			}
+			write_log(10, "Count is now %d, %lu, %lu\n", count,
+			          (unsigned long)&count, (unsigned long)&blockno);
 			write_log(10, "Block file for %" PRIu64 " %lld\n",
 			          (uint64_t)this_inode, blockno);
 			ret = fetch_block_path(thisblockpath, this_inode,
@@ -306,6 +310,7 @@ int build_cache_usage(void)
 				errcode = ret;
 				break;
 			}
+			write_log(10, "Debug %s, %d\n", thisblockpath, count);
 			ret = stat(thisblockpath, &tempstat);
 
 			if (ret != 0) {
@@ -319,6 +324,7 @@ int build_cache_usage(void)
 			}
 
 			write_log(10, "Fetching cache usage node\n");
+			write_log(10, "count is now %d\n", count);
 			tempnode = return_cache_usage_node(this_inode);
 			if (tempnode == NULL) {
 				write_log(10, "Not found. Alloc a new one\n");
@@ -348,12 +354,14 @@ int build_cache_usage(void)
 							tempstat.st_size;
 
 			write_log(10, "Inserting the node\n");
+			write_log(10, "count is now %d\n", count);
 			insert_cache_usage_node(this_inode, tempnode);
 			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
 			if (ret > 0) {
 				errcode = ret;
 				break;
 			}
+			write_log(10, "count is now %d\n", count);
 		}
 
 		if (errcode > 0) {

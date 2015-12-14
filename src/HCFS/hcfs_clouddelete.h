@@ -23,8 +23,8 @@
 #include "hcfscurl.h"
 #include "dedup_table.h"
 
-#define MAX_DELETE_CONCURRENCY 16
-#define MAX_DSYNC_CONCURRENCY 16
+#define MAX_DELETE_CONCURRENCY 8
+#define MAX_DSYNC_CONCURRENCY 4
 
 typedef struct {
 	ino_t inode;

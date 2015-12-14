@@ -26,8 +26,8 @@
 #include "fuseop.h"
 #include "dedup_table.h"
 
-#define MAX_UPLOAD_CONCURRENCY 16
-#define MAX_SYNC_CONCURRENCY 16
+#define MAX_UPLOAD_CONCURRENCY 8
+#define MAX_SYNC_CONCURRENCY 4
 
 typedef struct {
 	off_t page_filepos;
