@@ -24,4 +24,4 @@ SLAVE_ID=$(sudo docker run -d -t \
 		docker:5000/docker_hcfs_test_slave)
 
 # Running auto test
-docker exec $SLAVE_ID sudo -u jenkins run-parts --exit-on-error --verbose $docker_workspace/tests/docker_scrips
+docker exec $SLAVE_ID sudo -H -u jenkins run-parts --exit-on-error --verbose $docker_workspace/tests/docker_scrips

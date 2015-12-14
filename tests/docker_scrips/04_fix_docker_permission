@@ -19,7 +19,7 @@ if [[ $OLDUID != $NEWUID || $OLDGID != $NEWGID ]]; then
 	else
 		sudo groupmod -g $NEWGID jenkins
 	fi
-	sudo chown -R $NEWUID:$NEWGID $HOME
+	sudo chown -R $NEWUID:$NEWGID /var/jenkins/workspace/HCFS/
 	ls -l $WORKSPACE
 fi
 
