@@ -42,7 +42,7 @@ typedef struct {
 
 typedef struct{
 	int *record_handle_inode; // Recorded in inode array when inode is called
-	int record_inode_counter; 
+	int record_inode_counter;
 	sem_t record_inode_sem;
 } LoopToVerifiedData;
 
