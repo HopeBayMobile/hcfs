@@ -49,12 +49,24 @@ CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
 	    -DARM_32bit_ \
 	    -D_ANDROID_ENV_
 
-# All tests produced by this Makefile.  Remember to add new tests you
-# created to the list.
-TESTS = monitor_unittest
+define ADDTEST
+TESTS += $1
+$(eval NEW_OBJS := $(addprefix $(OBJ_DIR)/, $2))
+$(eval OBJS += $(NEW_OBJS))
+$1: $(NEW_OBJS) $(OBJ_DIR)/gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread
+endef
 
 # House-keeping build targets.
-all : setup $(TESTS)
+
+# mentioning default target first, finalizing it at end of file.
+all :
+
+# All tests produced by this Makefile.
+
+# monitor unittest
+$(eval $(call ADDTEST, monitor_unittest, \
+	monitor.o monitor_unittest.o monitor_mock_function.o))
 
 clean :
 	rm -rf $(TESTS) *.gcda *.gcov $(OBJ_DIR)/*
@@ -123,12 +135,5 @@ $(OBJ_DIR)/%.o: %.cc | $(OBJ_DIR)
 $(OBJ_DIR):
 	mkdir $@
 
-# Builds a sample test.  A test should link with either gtest.a or
-# gtest_main.a, depending on whether it defines its own main()
-# function.
-
-# monitor unittest
-NEW_OBJS := $(addprefix $(OBJ_DIR)/, monitor.o monitor_unittest.o monitor_mock_function.o)
-OBJS := $(OBJS) $(NEW_OBJS)
-monitor_unittest: $(NEW_OBJS) $(OBJ_DIR)/gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $^ -o $@ -lstdc++ -lpthread
+# finalizing the default targets
+all : setup $(TESTS)
