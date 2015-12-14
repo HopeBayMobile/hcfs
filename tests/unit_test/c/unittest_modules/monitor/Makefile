@@ -30,7 +30,7 @@ CPPFLAGS += -isystem $(GTEST_DIR)/include $(EXTRACPPFLAGS)
 # Search paths for headers
 CPPFLAGS += -iquote$(USER_DIR)
 # Search paths for source
-VPATH = $(OBJ_DIR):$(USER_DIR)
+vpath	%.c	$(USER_DIR)
 
 # gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CC	=	gcc
@@ -69,7 +69,7 @@ $(eval $(call ADDTEST, monitor_unittest, \
 	monitor.o monitor_unittest.o monitor_mock_function.o))
 
 clean :
-	rm -rf $(TESTS) *.gcda *.gcov $(OBJ_DIR)/*
+	rm -rf $(TESTS) *.gcda *.gcov $(OBJ_DIR)
 
 setup :
 	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
@@ -123,13 +123,13 @@ $(OBJ_DIR)/gtest_main.a : $(OBJ_DIR)/gtest-all.o $(OBJ_DIR)/gtest_main.o
 
 # compile and generate dependency info
 $(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $(OBJ_DIR)/$*.o
-	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $(OBJ_DIR)/$*.d
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $(@:%.o=%.d)
 	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(@:%.o=%.d)
 
 $(OBJ_DIR)/%.o: %.cc | $(OBJ_DIR)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $(OBJ_DIR)/$*.o
-	@$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< > $(OBJ_DIR)/$*.d
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+	@$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< > $(@:%.o=%.d)
 	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(@:%.o=%.d)
 
 $(OBJ_DIR):
