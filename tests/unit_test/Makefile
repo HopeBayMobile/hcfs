@@ -1,7 +1,7 @@
-DIRS := $(wildcard c/unittest_modules/*/.)
+DIRS := $(wildcard c/unittest_modules/*)
 BUILDDIRS = $(DIRS:%=build-%)
 CLEANDIRS = $(DIRS:%=clean-%)
-TESTDIRS = $(DIRS:%=test-%)
+TESTSUCCESS = $(DIRS:%=%/.success)
 
 all: $(BUILDDIRS)
 $(DIRS): $(BUILDDIRS)
@@ -11,14 +11,15 @@ $(BUILDDIRS):
 clean: $(CLEANDIRS)
 $(CLEANDIRS):
 	$(MAKE) -C $(@:clean-%=%) clean
+	@rm -f $(@:clean-%=%)/.success
 
-test: all $(TESTDIRS)
+test: $(BUILDDIRS) $(TESTSUCCESS)
 
-$(TESTDIRS):
-	$(MAKE) -C $(@:test-%=%) test
+$(TESTSUCCESS):
+	$(MAKE) -C $(@:%/.success=%) test
+	touch $@
 
 .PHONY: subdirs $(DIRS)
 .PHONY: subdirs $(BUILDDIRS)
 .PHONY: subdirs $(CLEANDIRS)
-.PHONY: subdirs $(TESTDIRS)
 .PHONY: all clean test
