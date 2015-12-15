@@ -14,8 +14,13 @@
 #ifndef GW20_SRC_GLOBAL_H_
 #define GW20_SRC_GLOBAL_H_
 
+#include <stdint.h>
+
+#define BOOL uint8_t
 #define TRUE 1
 #define FALSE 0
+#define ON 1
+#define OFF 0
 
 /* Defines the version of the current meta defs */
 #define CURRENT_META_VER 3
@@ -56,15 +61,11 @@
 #define GETDIRTYCACHESIZE 24
 #define GETXFERSTAT 25
 #define RESETXFERSTAT 26
+#define SETSYNCSWITCH 27
+#define GETSYNCSWITCH 28
+#define GETSYNCSTAT 29
 #define RELOADCONFIG 30
 
 #define DEFAULT_PIN TRUE
-
-/* Print format for ino_t is different in raspberry pi */
-#ifdef ARM_32bit_
-#define FMT_INO_T "lld"
-#else
-#define FMT_INO_T "ld"
-#endif
 
 #endif  /* GW20_SRC_GLOBAL_H_ */
