@@ -44,6 +44,7 @@
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
+int api_server_monitor_time = API_SERVER_MONITOR_TIME;
 
 /************************************************************************
 *
@@ -1298,7 +1299,7 @@ void api_server_monitor(void)
 	waittime.tv_nsec = 0;
 
 	while (hcfs_system->system_going_down == FALSE) {
-		sleep(5);
+		sleep(api_server_monitor_time);
 		/* Using timed wait to handle system shutdown event */
 		ret = sem_timedwait(&(api_server->job_lock), &waittime);
 		if (ret < 0)

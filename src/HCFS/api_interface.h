@@ -30,6 +30,7 @@
 #define PROCESS_WINDOW 30
 #define INCREASE_RATIO 0.8
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
+#define API_SERVER_MONITOR_TIME 5
 
 /* Message format for an API request:
 	(From the first byte)
