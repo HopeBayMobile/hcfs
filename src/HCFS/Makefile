@@ -1,6 +1,6 @@
 CC = gcc
 CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
-CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -Wall -Wextra
+CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -lsqlite3 -Wall -Wextra
 
 # [Autodependencies with GNU make]
 # http://scottmcpeak.com/autodepend/autodepend.html
