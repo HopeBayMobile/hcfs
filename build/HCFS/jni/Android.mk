@@ -47,49 +47,16 @@ LOCAL_MODULE:= liblz4
 LOCAL_SRC_FILES := libs/liblz4.so
 include $(PREBUILT_SHARED_LIBRARY)
 
-#include $(CLEAR_VARS)
-#LOCAL_MODULE := liblz4
-#LOCAL_C_INCLUDES := $(LOCAL_PATH)/lz4
-#LOCAL_C_FILES := lz4/lz4.c \
-#                 lz4/lz4frame.c \
-#                 lz4/lz4hc.c \
-#                 lz4/xxhash.c \
-#                 programs/lz4io.c\
-#
-#LOCAL_MODULE_TAGS := optional
-#LOCAL_CFLAGS += -pie -fPIE
-#LOCAL_LDFLAGS += -pie -fPIE
-#include $(BUILT_STATIC_LIBRARY)
-#include $(BUILD_SHARED_LIBRARY)
-
-#include $(CLEAR_VARS)
-#LOCAL_MODULE:= libcurl
-#LOCAL_SRC_FILES := libs/libcurl.a
-#LOCAL_CFLAGS += -pie -fPIE
-#LOCAL_LDFLAGS += -pie -fPIE
-#include $(PREBUILT_STATIC_LIBRARY)
-#
-#include $(CLEAR_VARS)
-#LOCAL_MODULE:= libssl
-#LOCAL_SRC_FILES := libs/libssl.a
-#LOCAL_CFLAGS += -pie -fPIE
-#LOCAL_LDFLAGS += -pie -fPIE
-#include $(PREBUILT_STATIC_LIBRARY)
-#
-#include $(CLEAR_VARS)
-#LOCAL_MODULE:= libcrypto
-#LOCAL_SRC_FILES := libs/libcrypto.a
-#LOCAL_CFLAGS += -pie -fPIE
-#LOCAL_LDFLAGS += -pie -fPIE
-#include $(PREBUILT_STATIC_LIBRARY)
+include $(CLEAR_VARS)
+LOCAL_MODULE:= libsqlite
+LOCAL_SRC_FILES := libs/libsqlite.so
+include $(PREBUILT_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_CFLAGS    := -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -DDEDUP_ENABLE=0 -DSTAT_VFS_H="<fuse/sys/statvfs.h>"
-LOCAL_CFLAGS += -pie -fPIE
+LOCAL_CFLAGS += -pie -fPIE -Wall -Wextra
 LOCAL_LDFLAGS += -pie -fPIE
 LOCAL_MODULE    := hcfs
-#LOCAL_SRC_FILES := fusexmp.c
-#LOCAL_SRC_FILES := ndkNative.cpp
 LOCAL_SRC_FILES := mount_manager.c \
                    FS_manager.c \
                    dir_entry_btree.c \
@@ -118,11 +85,12 @@ LOCAL_SRC_FILES := mount_manager.c \
                    pin_scheduling.c \
                    monitor.c \
                    dir_statistics.c \
-                   parent_lookup.c
-                   
- 
-LOCAL_STATIC_LIBRARIES := libfuse libcurl libssl libcrypto liblz4
-#LOCAL_STATIC_LIBRARIES := libfuse
-##LOCAL_SHARED_LIBRARIES := libcurl libssl libcrypto
+                   parent_lookup.c \
+                   objmeta.c \
+                   dedup_table.c
+
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/sqlite3
+LOCAL_STATIC_LIBRARIES := libfuse
+LOCAL_SHARED_LIBRARIES := libcurl libssl libcrypto liblz4 libsqlite
 include $(BUILD_EXECUTABLE)
 
