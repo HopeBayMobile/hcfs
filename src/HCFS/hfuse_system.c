@@ -348,8 +348,11 @@ int main(int argc, char **argv)
 
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
-	
-	init_backend_related_module();
+
+	/* Init backend related services */
+	if (CURRENT_BACKEND != NONE)
+		init_backend_related_module();
+
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
