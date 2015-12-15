@@ -607,7 +607,7 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 
 	sprintf(objname, "meta_%" PRIu64 "", (uint64_t)this_inode);
 	write_log(10, "Debug meta deletion: objname %s, inode %" PRIu64 "\n",
-						objname, this_inode);
+						objname, (uint64_t)this_inode);
 	sprintf(curl_handle->id, "delete_meta_%" PRIu64 "", (uint64_t)this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
 	/* Already retried in get object if necessary */
@@ -668,7 +668,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		write_log(10,
 			"Debug delete object: objname %s, inode %" PRIu64 ", block %lld\n",
 			objname, (uint64_t)this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%lld", this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))
