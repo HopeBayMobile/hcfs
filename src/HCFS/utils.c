@@ -35,6 +35,10 @@
 #include "hfuse_system.h"
 #include "macro.h"
 #include "logger.h"
+#include "hcfs_tocloud.h"
+#include "hcfs_clouddelete.h"
+#include "hcfs_cacheops.h"
+#include "monitor.h"
 
 SYSTEM_CONF_STRUCT *system_config;
 
@@ -269,6 +273,8 @@ int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
 	int tmp_len;
 	int errcode;
 
+	memset(config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
 	fptr = fopen(config_path, "r");
 
 	if (fptr == NULL) {
@@ -279,9 +285,9 @@ int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
 		return -1;
 	}
 
-	CURRENT_BACKEND = -1;
-	LOG_LEVEL = 0;
-	LOG_PATH = NULL;
+	config->current_backend = -1;
+	config->log_level = 0;
+	config->log_path = NULL;
 
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
@@ -1295,18 +1301,101 @@ errcode_handle:
 	return errcode;
 }
 
-int reload_system_config(char *config_path)
+int _check_config(const SYSTEM_CONF_STRUCT *new_config)
 {
-	int ret;
+	if (CURRENT_BACKEND == NONE) /* Always ok when backend is now none */
+		return 0;
+	else
+		if (CURRENT_BACKEND != new_config->current_backend)
+			return -EPERM;
 
-	if (CURRENT_BACKEND != NONE)
+	switch (new_config->current_backend) {
+	case SWIFT:
+		if (strcmp(SWIFT_ACCOUNT, new_config->swift_account))
+			return -EPERM;
+		if (strcmp(SWIFT_USER, new_config->swift_user))
+			return -EPERM;
+		if (strcmp(SWIFT_PASS, new_config->swift_pass))
+			return -EPERM;
+		if (strcmp(SWIFT_URL, new_config->swift_url))
+			return -EPERM;
+		if (strcmp(SWIFT_CONTAINER, new_config->swift_container))
+			return -EPERM;
+		if (strcmp(SWIFT_PROTOCOL, new_config->swift_protocol))
+			return -EPERM;
+		break;
+	case S3:
+		if (strcmp(S3_ACCESS, new_config->s3_access))
+			return -EPERM;
+		if (strcmp(S3_SECRET, new_config->s3_secret))
+			return -EPERM;
+		if (strcmp(S3_URL, new_config->s3_url))
+			return -EPERM;
+		if (strcmp(S3_BUCKET, new_config->s3_bucket))
+			return -EPERM;
+		if (strcmp(S3_PROTOCOL, new_config->s3_protocol))
+			return -EPERM;
+		if (strcmp(S3_BUCKET_URL, new_config->s3_bucket_url))
+			return -EPERM;
+		break;
+	case NONE:
+		return -EPERM;
+		break;
+	}
+
+	/* Check block size */
+	if (MAX_BLOCK_SIZE != new_config->max_block_size)
 		return -EPERM;
 
-	ret = read_system_config(config_path, system_config);
-	if (ret < 0)
+	return 0;
+}
+
+int reload_system_config(const char *config_path)
+{
+	int ret, count;
+	char enable_related_module;
+	SYSTEM_CONF_STRUCT *temp_config, *new_config;
+
+	write_log(10, "config path: %s\n", config_path);
+	new_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+	if (new_config == NULL)
+		return -ENOMEM;
+
+	ret = read_system_config(config_path, new_config);
+	if (ret < 0) {
+		free(new_config);
 		return ret;
-/*
-	if (CURRENT_BACKEND != NONE) {
-		
-	}*/
+	}
+
+	ret = validate_system_config(new_config);
+	if (ret < 0) {
+		free(new_config);
+		return ret;
+	}
+
+	ret = _check_config(new_config);
+	if (ret < 0) {
+		free(new_config);
+		return ret;
+	}	
+
+	enable_related_module = FALSE;
+	if ((CURRENT_BACKEND == NONE) && (new_config->current_backend != NONE))
+		enable_related_module = TRUE;
+
+	temp_config = system_config;
+	system_config = new_config;
+	free(temp_config);
+
+	/* Init backend related threads */
+	if (enable_related_module == TRUE) {
+		ret = prepare_FS_database_backup();
+		if (ret < 0) {
+			write_log(0, "Error: Fail to prepare FS backup."
+				" Code %d\n", -ret);
+		}
+		init_backend_related_module();
+	}
+
+	return 0;
 }

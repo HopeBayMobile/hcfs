@@ -226,6 +226,25 @@ int _init_download_curl(int count)
 	return 0;
 }
 
+
+void init_backend_related_module()
+{
+	int count;
+	
+	if (CURRENT_BACKEND != NONE) {
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
+		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
+		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
+			_init_download_curl(count);
+	}
+
+}
+
 /************************************************************************
 *
 * Function name: main
@@ -240,16 +259,6 @@ int main(int argc, char **argv)
 	CURL_HANDLE curl_handle;
 	int ret_val;
 	struct rlimit nofile_limit;
-	pthread_t delete_loop_thread;
-	pthread_t monitor_loop_thread;
-#ifdef _ANDROID_ENV_
-	pthread_t upload_loop_thread;
-	pthread_t cache_loop_thread;
-#else
-	pid_t child_pids[CHILD_NUM];
-	pid_t this_pid;
-	int proc_idx;
-#endif /* _ANDROID_ENV_ */
 	int count;
 
 	logptr = NULL;
@@ -330,17 +339,8 @@ int main(int argc, char **argv)
 
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
-	if (CURRENT_BACKEND != NONE) {
-		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
-		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
-		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
-		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
-		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&download_curl_control_sem, 0, 1);
-		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
-		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
-			_init_download_curl(count);
-	}
+	
+	init_backend_related_module();
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
@@ -350,6 +350,7 @@ int main(int argc, char **argv)
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(upload_loop_thread, NULL);
 		pthread_join(monitor_loop_thread, NULL);
+		write_log(10, "Debug: All threads terminated\n");
 	}
 	close_log();
 	destroy_dirstat_lookup();
