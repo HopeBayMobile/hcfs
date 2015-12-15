@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include "params.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 #include "dir_statistics.h"
 
@@ -40,8 +40,8 @@ int fetch_todelete_path(char *pathname, ino_t this_inode);
 
 /*END string utility definition*/
 
-int read_system_config(char *config_path);
-int validate_system_config(void);
+int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config);
+int validate_system_config(SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 

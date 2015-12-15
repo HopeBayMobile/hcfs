@@ -262,12 +262,17 @@ int main(int argc, char **argv)
 
 	/* TODO: Selection of backend type via configuration */
 
-	ret_val = read_system_config(DEFAULT_CONFIG_PATH);
+	system_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+	if (system_config == NULL) {
+		write_log(0, "Error: Out of mem\n");
+		exit(-1);
+	}
+	ret_val = read_system_config(DEFAULT_CONFIG_PATH, system_config);
 
 	if (ret_val < 0)
 		exit(-1);
 
-	ret_val = validate_system_config();
+	ret_val = validate_system_config(system_config);
 
 	if (ret_val < 0)
 		exit(-1);

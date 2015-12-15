@@ -36,7 +36,7 @@
 #include "macro.h"
 #include "logger.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 
 /************************************************************************
 *
@@ -260,7 +260,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int read_system_config(char *config_path)
+int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
@@ -350,44 +350,44 @@ int read_system_config(char *config_path)
 					"Log level cannot be less than zero.");
 				return -1;
 			}
-			LOG_LEVEL = temp_val;
+			config->log_level = temp_val;
 			continue;
 		}
 
 		if (strcasecmp(argname, "log_path") == 0) {
-			LOG_PATH = (char *) malloc(strlen(argval) + 10);
-			if (LOG_PATH == NULL) {
+			config->log_path = (char *) malloc(strlen(argval) + 10);
+			if (config->log_path == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
 
-			strcpy(LOG_PATH, argval);
+			strcpy(config->log_path, argval);
 			continue;
 		}
 
 		if (strcasecmp(argname, "metapath") == 0) {
-			METAPATH = (char *) malloc(strlen(argval) + 10);
-			if (METAPATH == NULL) {
+			config->metapath = (char *) malloc(strlen(argval) + 10);
+			if (config->metapath == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			strcpy(METAPATH, argval);
+			strcpy(config->metapath, argval);
 			continue;
 		}
 		if (strcasecmp(argname, "blockpath") == 0) {
-			BLOCKPATH = (char *) malloc(strlen(argval) + 10);
-			if (BLOCKPATH == NULL) {
+			config->blockpath = (char *) malloc(strlen(argval) + 10);
+			if (config->blockpath == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
 
-			strcpy(BLOCKPATH, argval);
+			strcpy(config->blockpath, argval);
 			continue;
 		}
 		if (strcasecmp(argname, "cache_soft_limit") == 0) {
@@ -398,7 +398,7 @@ int read_system_config(char *config_path)
 				write_log(0, "Number conversion error\n");
 				return -1;
 			}
-			CACHE_SOFT_LIMIT = temp_val;
+			config->cache_soft_limit = temp_val;
 			continue;
 		}
 		if (strcasecmp(argname, "cache_hard_limit") == 0) {
@@ -409,7 +409,7 @@ int read_system_config(char *config_path)
 				write_log(0, "Number conversion error\n");
 				return -1;
 			}
-			CACHE_HARD_LIMIT = temp_val;
+			config->cache_hard_limit = temp_val;
 			continue;
 		}
 		if (strcasecmp(argname, "cache_delta") == 0) {
@@ -420,7 +420,7 @@ int read_system_config(char *config_path)
 				write_log(0, "Number conversion error\n");
 				return -1;
 			}
-			CACHE_DELTA = temp_val;
+			config->cache_update_delta = temp_val;
 			continue;
 		}
 		if (strcasecmp(argname, "max_block_size") == 0) {
@@ -431,18 +431,18 @@ int read_system_config(char *config_path)
 				write_log(0, "Number conversion error\n");
 				return -1;
 			}
-			MAX_BLOCK_SIZE = temp_val;
+			config->max_block_size = temp_val;
 			continue;
 		}
 		if (strcasecmp(argname, "current_backend") == 0) {
-			CURRENT_BACKEND = -1;
+			config->current_backend = -1;
 			if (strcasecmp(argval, "SWIFT") == 0)
-				CURRENT_BACKEND = SWIFT;
+				config->current_backend = SWIFT;
 			if (strcasecmp(argval, "S3") == 0)
-				CURRENT_BACKEND = S3;
+				config->current_backend = S3;
 			if (strcasecmp(argval, "NONE") == 0)
-				CURRENT_BACKEND = NONE;
-			if (CURRENT_BACKEND == -1) {
+				config->current_backend = NONE;
+			if (config->current_backend == -1) {
 				fclose(fptr);
 				write_log(0, "Unsupported backend\n");
 				return -1;
@@ -450,63 +450,63 @@ int read_system_config(char *config_path)
 			continue;
 		}
 		if (strcasecmp(argname, "swift_account") == 0) {
-			SWIFT_ACCOUNT = (char *) malloc(strlen(argval) + 10);
-			if (SWIFT_ACCOUNT == NULL) {
+			config->swift_account = (char *) malloc(strlen(argval) + 10);
+			if (config->swift_account == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
 
-			snprintf(SWIFT_ACCOUNT, strlen(argval) + 10,
+			snprintf(config->swift_account, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_user") == 0) {
-			SWIFT_USER = (char *) malloc(strlen(argval) + 10);
-			if (SWIFT_USER == NULL) {
+			config->swift_user = (char *) malloc(strlen(argval) + 10);
+			if (config->swift_user == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(SWIFT_USER, strlen(argval) + 10,
+			snprintf(config->swift_user, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_pass") == 0) {
-			SWIFT_PASS = (char *) malloc(strlen(argval) + 10);
-			if (SWIFT_PASS == NULL) {
+			config->swift_pass = (char *) malloc(strlen(argval) + 10);
+			if (config->swift_pass == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(SWIFT_PASS, strlen(argval) + 10,
+			snprintf(config->swift_pass, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_url") == 0) {
-			SWIFT_URL = (char *) malloc(strlen(argval) + 10);
-			if (SWIFT_URL == NULL) {
+			config->swift_url = (char *) malloc(strlen(argval) + 10);
+			if (config->swift_url == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(SWIFT_URL, strlen(argval) + 10,
+			snprintf(config->swift_url, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_container") == 0) {
-			SWIFT_CONTAINER = (char *) malloc(strlen(argval) + 10);
-			if (SWIFT_CONTAINER == NULL) {
+			config->swift_container = (char *) malloc(strlen(argval) + 10);
+			if (config->swift_container == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(SWIFT_CONTAINER, strlen(argval) + 10,
+			snprintf(config->swift_container, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
@@ -517,62 +517,62 @@ int read_system_config(char *config_path)
 				write_log(0, "Unsupported protocol\n");
 				return -1;
 			}
-			SWIFT_PROTOCOL = (char *) malloc(strlen(argval) + 10);
-			if (SWIFT_PROTOCOL == NULL) {
+			config->swift_protocol = (char *) malloc(strlen(argval) + 10);
+			if (config->swift_protocol == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(SWIFT_PROTOCOL, strlen(argval) + 10,
+			snprintf(config->swift_protocol, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_access") == 0) {
-			S3_ACCESS = (char *) malloc(strlen(argval) + 10);
-			if (S3_ACCESS == NULL) {
+			config->s3_access = (char *) malloc(strlen(argval) + 10);
+			if (config->s3_access == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(S3_ACCESS, strlen(argval) + 10,
+			snprintf(config->s3_access, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_secret") == 0) {
-			S3_SECRET = (char *) malloc(strlen(argval) + 10);
-			if (S3_SECRET == NULL) {
+			config->s3_secret = (char *) malloc(strlen(argval) + 10);
+			if (config->s3_secret == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(S3_SECRET, strlen(argval) + 10,
+			snprintf(config->s3_secret, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_url") == 0) {
-			S3_URL = (char *) malloc(strlen(argval) + 10);
-			if (S3_URL == NULL) {
+			config->s3_url = (char *) malloc(strlen(argval) + 10);
+			if (config->s3_url == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(S3_URL, strlen(argval) + 10,
+			snprintf(config->s3_url, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_bucket") == 0) {
-			S3_BUCKET = (char *) malloc(strlen(argval) + 10);
-			if (S3_BUCKET == NULL) {
+			config->s3_bucket = (char *) malloc(strlen(argval) + 10);
+			if (config->s3_bucket == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(S3_BUCKET, strlen(argval) + 10,
+			snprintf(config->s3_bucket, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
@@ -583,31 +583,31 @@ int read_system_config(char *config_path)
 				write_log(0, "Unsupported protocol\n");
 				return -1;
 			}
-			S3_PROTOCOL = (char *) malloc(strlen(argval) + 10);
-			if (S3_PROTOCOL == NULL) {
+			config->s3_protocol = (char *) malloc(strlen(argval) + 10);
+			if (config->s3_protocol == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				fclose(fptr);
 				return -1;
 			}
-			snprintf(S3_PROTOCOL, strlen(argval) + 10,
+			snprintf(config->s3_protocol, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 	}
 
-	if (((S3_URL != NULL) && (S3_PROTOCOL != NULL))
-				&& (S3_BUCKET != NULL)) {
-		tmp_len = strlen(S3_URL) + strlen(S3_PROTOCOL)
-					+ strlen(S3_BUCKET) + 20;
-		S3_BUCKET_URL = (char *) malloc(tmp_len);
-		if (S3_BUCKET_URL == NULL) {
+	if (((config->s3_url != NULL) && (config->s3_protocol != NULL))
+				&& (config->s3_bucket != NULL)) {
+		tmp_len = strlen(config->s3_url) + strlen(config->s3_protocol)
+					+ strlen(config->s3_bucket) + 20;
+		config->s3_bucket_url = (char *) malloc(tmp_len);
+		if (config->s3_bucket_url == NULL) {
 			write_log(0, "Out of memory when reading config\n");
 			fclose(fptr);
 			return -1;
 		}
-		snprintf(S3_BUCKET_URL, tmp_len, "%s://%s.%s",
-				S3_PROTOCOL, S3_BUCKET, S3_URL);
+		snprintf(config->s3_bucket_url, tmp_len, "%s://%s.%s",
+				config->s3_protocol, config->s3_bucket, config->s3_url);
 	}
 
 
@@ -624,7 +624,7 @@ int read_system_config(char *config_path)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int validate_system_config(void)
+int validate_system_config(SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char pathname[400];
@@ -636,19 +636,19 @@ int validate_system_config(void)
 
 	/* Validating system path settings */
 
-	if (CURRENT_BACKEND < 0) {
+	if (config->current_backend < 0) {
 		write_log(0, "Backend selection does not exist\n");
 		return -1;
 	}
 
 	/* Write log to current path if log path is invalid */
-	if (LOG_PATH != NULL) {
-		if (access(LOG_PATH, F_OK) != 0) {
-			write_log(0, "Cannot access log path %s. %s", LOG_PATH,
-				  "Default write log to current path\n");
-			LOG_PATH = NULL;
+	if (config->log_path != NULL) {
+		if (access(config->log_path, F_OK) != 0) {
+			write_log(0, "Cannot access log path %s. %s", config->log_path,
+				"Default write log to current path\n");
+			config->log_path = NULL;
 		} else {
-			sprintf(pathname, "%s/testfile", LOG_PATH);
+			sprintf(pathname, "%s/testfile", config->log_path);
 			fptr = fopen(pathname, "w");
 			if (fptr == NULL) {
 				errcode = errno;
@@ -656,7 +656,7 @@ int validate_system_config(void)
 					  "Error when testing log dir writing.",
 					  errcode, strerror(errcode));
 				write_log(0, "Write to current path\n");
-				LOG_PATH = NULL;
+				config->log_path = NULL;
 			} else {
 				fclose(fptr);
 				unlink(pathname);
@@ -664,17 +664,17 @@ int validate_system_config(void)
 		}
 	}
 
-	if (access(METAPATH, F_OK) != 0) {
+	if (access(config->metapath, F_OK) != 0) {
 		write_log(0, "Meta path does not exist. Aborting\n");
 		return -1;
 	}
 
-	if (access(BLOCKPATH, F_OK) != 0) {
+	if (access(config->blockpath, F_OK) != 0) {
 		write_log(0, "Block cache path does not exist. Aborting\n");
 		return -1;
 	}
 
-	sprintf(pathname, "%s/testfile", BLOCKPATH);
+	sprintf(pathname, "%s/testfile", config->blockpath);
 
 	fptr = fopen(pathname, "w");
 	if (fptr == NULL) {
@@ -712,29 +712,29 @@ int validate_system_config(void)
 
 	unlink(pathname);
 
-	SUPERBLOCK = (char *) malloc(strlen(METAPATH) + 20);
-	if (SUPERBLOCK == NULL) {
+	config->superblock_name = (char *) malloc(strlen(config->metapath) + 20);
+	if (config->superblock_name == NULL) {
 		write_log(0, "Out of memory\n");
 		return -1;
 	}
-	snprintf(SUPERBLOCK, strlen(METAPATH) + 20, "%s/superblock",
-			METAPATH);
+	snprintf(config->superblock_name, strlen(config->metapath) + 20, "%s/superblock",
+			config->metapath);
 
-	UNCLAIMEDFILE = (char *) malloc(strlen(METAPATH) + 20);
-	if (UNCLAIMEDFILE == NULL) {
+	config->unclaimed_name = (char *) malloc(strlen(config->metapath) + 20);
+	if (config->unclaimed_name == NULL) {
 		write_log(0, "Out of memory\n");
 		return -1;
 	}
-	snprintf(UNCLAIMEDFILE, strlen(METAPATH) + 20, "%s/unclaimedlist",
-			METAPATH);
+	snprintf(config->unclaimed_name, strlen(config->metapath) + 20, "%s/unclaimedlist",
+			config->metapath);
 
-	HCFSSYSTEM = (char *) malloc(strlen(METAPATH) + 20);
-	if (HCFSSYSTEM == NULL) {
+	config->hcfssystem_name = (char *) malloc(strlen(config->metapath) + 20);
+	if (config->hcfssystem_name == NULL) {
 		write_log(0, "Out of memory\n");
 		return -1;
 	}
-	snprintf(HCFSSYSTEM, strlen(METAPATH) + 20, "%s/hcfssystemfile",
-			METAPATH);
+	snprintf(config->hcfssystem_name, strlen(config->metapath) + 20, "%s/hcfssystemfile",
+			config->metapath);
 
 	HCFSPAUSESYNC = (char *)malloc(strlen(METAPATH) + 20);
 	if (HCFSPAUSESYNC == NULL) {
@@ -750,20 +750,20 @@ int validate_system_config(void)
 	/* TODO: For cache size, perhaps need to check against space
 		already used on the target disk (or adjust dynamically).*/
 
-	if (MAX_BLOCK_SIZE <= 0) {
+	if (config->max_block_size <= 0) {
 		write_log(0, "Block size cannot be zero or less\n");
 		return -1;
 	}
-	if (CACHE_DELTA < MAX_BLOCK_SIZE) {
+	if (config->cache_update_delta < config->max_block_size) {
 		write_log(0, "cache_delta must be at least max_block_size\n");
 		return -1;
 	}
-	if (CACHE_SOFT_LIMIT < MAX_BLOCK_SIZE) {
+	if (config->cache_soft_limit < config->max_block_size) {
 		write_log(0,
 			"cache_soft_limit must be at least max_block_size\n");
 		return -1;
 	}
-	if (CACHE_HARD_LIMIT < (CACHE_SOFT_LIMIT + CACHE_DELTA)) {
+	if (config->cache_hard_limit < (config->cache_soft_limit + config->cache_update_delta)) {
 		write_log(0, "%s%s", "cache_hard_limit >= ",
 			  "cache_soft_limit + cache_delta\n");
 		return -1;
@@ -774,61 +774,61 @@ int validate_system_config(void)
 	/* TODO: Maybe move format checking of backend settings here, and
 		also connection testing. */
 
-	if (CURRENT_BACKEND == SWIFT) {
-		if (SWIFT_ACCOUNT == NULL) {
+	if (config->current_backend == SWIFT) {
+		if (config->swift_account == NULL) {
 			write_log(0,
 				"Swift account missing from configuration\n");
 			return -1;
 		}
-		if (SWIFT_USER == NULL) {
+		if (config->swift_user == NULL) {
 			write_log(0,
 				"Swift user missing from configuration\n");
 			return -1;
 		}
-		if (SWIFT_PASS == NULL) {
+		if (config->swift_pass == NULL) {
 			write_log(0,
 				"Swift password missing from configuration\n");
 			return -1;
 		}
-		if (SWIFT_URL == NULL) {
+		if (config->swift_url == NULL) {
 			write_log(0,
 				"Swift URL missing from configuration\n");
 			return -1;
 		}
-		if (SWIFT_CONTAINER == NULL) {
+		if (config->swift_container == NULL) {
 			write_log(0,
 				"Swift container missing from configuration\n");
 			return -1;
 		}
-		if (SWIFT_PROTOCOL == NULL) {
+		if (config->swift_protocol == NULL) {
 			write_log(0,
 				"Swift protocol missing from configuration\n");
 			return -1;
 		}
 	}
 
-	if (CURRENT_BACKEND == S3) {
-		if (S3_ACCESS == NULL) {
+	if (config->current_backend == S3) {
+		if (config->s3_access == NULL) {
 			write_log(0,
 				"S3 access key missing from configuration\n");
 			return -1;
 		}
-		if (S3_SECRET == NULL) {
+		if (config->s3_secret == NULL) {
 			write_log(0,
 				"S3 secret key missing from configuration\n");
 			return -1;
 		}
-		if (S3_URL == NULL) {
+		if (config->s3_url == NULL) {
 			write_log(0,
 				"S3 URL missing from configuration\n");
 			return -1;
 		}
-		if (S3_BUCKET == NULL) {
+		if (config->s3_bucket == NULL) {
 			write_log(0,
 				"S3 bucket missing from configuration\n");
 			return -1;
 		}
-		if (S3_PROTOCOL == NULL) {
+		if (config->s3_protocol == NULL) {
 			write_log(0,
 				"S3 protocol missing from configuration\n");
 			return -1;
@@ -836,11 +836,14 @@ int validate_system_config(void)
 	}
 
 	write_log(10, "%s %s\n%s %s\n%s %s\n%s %s\n%s %s\n", "METAPATH",
-		  METAPATH, "BLOCKPATH", BLOCKPATH, "SUPERBLOCK", SUPERBLOCK,
-		  "UNCLAIMEDFILE", UNCLAIMEDFILE, "HCFSSYSTEM", HCFSSYSTEM);
+		  config->metapath, "BLOCKPATH", config->blockpath,
+		  "SUPERBLOCK", config->superblock_name,
+		  "UNCLAIMEDFILE", config->unclaimed_name,
+		  "HCFSSYSTEM", config->hcfssystem_name);
 	write_log(10,
-		"%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT,
-					CACHE_DELTA, MAX_BLOCK_SIZE);
+		"%lld %lld %lld %lld\n", config->cache_soft_limit,
+		config->cache_hard_limit, config->cache_update_delta,
+		config->max_block_size);
 
 	return 0;
 }
@@ -1290,4 +1293,20 @@ int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 errcode_handle:
 	return errcode;
+}
+
+int reload_system_config(char *config_path)
+{
+	int ret;
+
+	if (CURRENT_BACKEND != NONE)
+		return -EPERM;
+
+	ret = read_system_config(config_path, system_config);
+	if (ret < 0)
+		return ret;
+/*
+	if (CURRENT_BACKEND != NONE) {
+		
+	}*/
 }
