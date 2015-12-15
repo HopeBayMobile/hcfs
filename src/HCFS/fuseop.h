@@ -28,6 +28,7 @@
 
 #include <fuse/fuse_opt.h>
 
+#include "global.h"
 #include "params.h"
 #include "dedup_table.h"
 
@@ -195,15 +196,18 @@ typedef struct {
 typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
-	uint8_t system_going_down;
-	uint8_t backend_status_is_online;
-	struct timespec backend_status_last_time;
 	sem_t fuse_sem;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;
 	sem_t check_next_sem;
 	sem_t check_cache_replace_status_sem;
+	/* system state controllers */
+	BOOL system_going_down;
+	BOOL backend_is_online;
+	BOOL sync_manual_switch;
+	BOOL sync_paused;
+	struct timespec backend_status_last_time;
 } SYSTEM_DATA_HEAD;
 
 SYSTEM_DATA_HEAD *hcfs_system;

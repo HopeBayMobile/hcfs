@@ -736,6 +736,14 @@ int validate_system_config(void)
 	snprintf(HCFSSYSTEM, strlen(METAPATH) + 20, "%s/hcfssystemfile",
 			METAPATH);
 
+	HCFSPAUSESYNC = (char *)malloc(strlen(METAPATH) + 20);
+	if (HCFSPAUSESYNC == NULL) {
+		write_log(0, "Out of memory\n");
+		return -1;
+	}
+	snprintf(HCFSPAUSESYNC, strlen(METAPATH) + 20, "%s/hcfspausesync",
+		 METAPATH);
+
 	/* Validating cache and block settings */
 	/* TODO: If system already created, need to check if block size
 		is changed, or just use existing block size. */
@@ -827,8 +835,9 @@ int validate_system_config(void)
 		}
 	}
 
-	write_log(10, "%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH, BLOCKPATH,
-					SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
+	write_log(10, "%s %s\n%s %s\n%s %s\n%s %s\n%s %s\n", "METAPATH",
+		  METAPATH, "BLOCKPATH", BLOCKPATH, "SUPERBLOCK", SUPERBLOCK,
+		  "UNCLAIMEDFILE", UNCLAIMEDFILE, "HCFSSYSTEM", HCFSSYSTEM);
 	write_log(10,
 		"%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT,
 					CACHE_DELTA, MAX_BLOCK_SIZE);

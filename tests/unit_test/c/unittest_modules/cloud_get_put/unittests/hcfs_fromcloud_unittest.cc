@@ -27,6 +27,9 @@ class fromcloudEnvironment : public ::testing::Environment {
     FETCH_BACKEND_BLOCK_TESTING = FALSE;
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
 
     workpath = NULL;
     tmppath = NULL;
@@ -76,7 +79,8 @@ protected:
 		for (int i = 0 ; i < num_obj ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char)*40);
 
-		hcfs_system->backend_status_is_online = TRUE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_paused = FALSE;
 	}
 	virtual void TearDown()
 	{
@@ -119,7 +123,8 @@ int objname_cmp(const void *s1, const void *s2)
 
 TEST_F(fetch_from_cloudTest, BackendOffline)
 {
-	hcfs_system->backend_status_is_online = FALSE;
+	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->sync_paused = TRUE;
 
 	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, 0, 0));
 }
@@ -175,7 +180,8 @@ protected:
 		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
 
-		hcfs_system->backend_status_is_online = TRUE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_paused = FALSE;
 	}
 	virtual void TearDown()
 	{
@@ -288,6 +294,9 @@ void mock_thread_fn()
 TEST_F(download_block_managerTest, CollectThreadsSuccess)
 {
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 
 	/* Create download_block_manager */
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
@@ -319,6 +328,9 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 {
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 
 	/* Create download_block_manager */
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
@@ -370,6 +382,9 @@ protected:
 			unlink(metapath);
 		
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 		init_download_control();
 	}
 

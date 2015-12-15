@@ -29,6 +29,40 @@ CURL_HANDLE monitor_curl_handle;
 /* let it can be changed during unittest*/
 int monitoring_interval = MONITORING_INTERVAL;
 
+void _write_monitor_loop_status_log(float duration)
+{
+	static BOOL init = TRUE;
+	static BOOL backend_is_online;
+	static BOOL sync_manual_switch;
+	static BOOL sync_paused;
+
+	if (init) {
+		backend_is_online = !hcfs_system->backend_is_online;
+		sync_manual_switch = !hcfs_system->sync_manual_switch;
+		sync_paused = !hcfs_system->sync_paused;
+		init = FALSE;
+	}
+	/* log about sleep & resume */
+	if (backend_is_online != hcfs_system->backend_is_online ||
+	    sync_manual_switch != hcfs_system->sync_manual_switch ||
+	    sync_paused != hcfs_system->sync_paused) {
+		backend_is_online = hcfs_system->backend_is_online;
+		sync_manual_switch = hcfs_system->sync_manual_switch;
+		sync_paused = hcfs_system->sync_paused;
+		if (duration)
+			write_log(10, "%s backend [%s] (time %.3f)\n",
+				  "Debug: [Monitor]",
+				  backend_is_online ? "online" : "offline",
+				  duration);
+		else
+			write_log(10, "Debug: [Monitor] backend [%s]\n",
+				  backend_is_online ? "online" : "offline");
+		write_log(10, "Debug: [Monitor] sync switch [%s]\n",
+			  sync_manual_switch ? "on" : "off");
+		write_log(10, "Debug: [Monitor] hcfs sync state [%s]\n",
+			  sync_paused ? "paused" : "syncing");
+	}
+}
 /**************************************************************************
  *
  * Function name: monitor_loop
@@ -63,12 +97,13 @@ void monitor_loop(void)
 	monitor_curl_handle.curl_backend = NONE;
 	monitor_curl_handle.curl = NULL;
 
-	write_log(2, "[Backend Monitor] Start monitor loop\n");
+	write_log(2, "[Monitor] Start monitor loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {
 		clock_gettime(CLOCK_REALTIME, &loop_start_time);
 		idle_time = diff_time(*last_time, loop_start_time);
 
+		test_duration = 0;
 		if (idle_time >= monitoring_interval) {
 			ret_val = hcfs_test_backend(&monitor_curl_handle);
 			if ((ret_val >= 200) && (ret_val <= 299))
@@ -76,15 +111,10 @@ void monitor_loop(void)
 			else
 				update_backend_status(FALSE, &loop_start_time);
 
-			/* Generate log */
 			clock_gettime(CLOCK_REALTIME, &test_stop);
 			test_duration = diff_time(loop_start_time, test_stop);
-			write_log(10,
-			    "[Backend Monitor] backend is %s, test time %f\n",
-			    hcfs_system->backend_status_is_online ? "online"
-								  : "offline",
-			    test_duration);
 		}
+		_write_monitor_loop_status_log(test_duration);
 		/* wait 1 second */
 		nanosleep(&sleep_time, NULL);
 	}
@@ -114,7 +144,7 @@ inline float diff_time(struct timespec start, struct timespec end)
  *
  * Function name: update_backend_status
  *        Inputs: int status, struct timespec *status_time
- *       Summary: Update hcfs_system->backend_status_is_online and access
+ *       Summary: Update hcfs_system->backend_is_online and access
  *                time.
  *                int status:
  *                    use 1 when status is online, otherwise 0.
@@ -129,11 +159,22 @@ void update_backend_status(int status, struct timespec *status_time)
 	struct timespec *last_time = &hcfs_system->backend_status_last_time;
 	struct timespec current_time;
 
-	hcfs_system->backend_status_is_online = status ? 1 : 0;
+	hcfs_system->backend_is_online = status ? TRUE : FALSE;
+	update_sync_state();
+
 	if (status_time == NULL) {
 		clock_gettime(CLOCK_REALTIME, &current_time);
 		status_time = &current_time;
 	}
 	last_time->tv_sec = status_time->tv_sec;
 	last_time->tv_nsec = status_time->tv_nsec;
+}
+
+inline void update_sync_state(void)
+{
+	if (hcfs_system->backend_is_online == FALSE ||
+	    hcfs_system->sync_manual_switch == FALSE)
+		hcfs_system->sync_paused = TRUE;
+	else
+		hcfs_system->sync_paused = FALSE;
 }

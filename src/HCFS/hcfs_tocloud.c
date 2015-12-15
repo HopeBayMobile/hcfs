@@ -1479,19 +1479,14 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	return count;
 }
 
-static inline void _write_upload_loop_status_log(char *wait_backend_status)
+static inline void _write_upload_loop_status_log(char *sync_paused_status)
 {
 	/* log about sleep & resume */
-	if (hcfs_system->backend_status_is_online == FALSE &&
-			*wait_backend_status == FALSE) {
-		write_log(
-			10, "Debug: upload_loop sleep (backend offline)\n");
-		*wait_backend_status = TRUE;
-	} else if (hcfs_system->backend_status_is_online == TRUE &&
-			*wait_backend_status == TRUE) {
-		write_log(
-			10, "Debug: upload_loop resume (backend online)\n");
-		*wait_backend_status = FALSE;
+	if (hcfs_system->sync_paused != *sync_paused_status) {
+		*sync_paused_status = hcfs_system->sync_paused;
+		write_log(10, "Debug: upload_loop %s (sync %s)\n",
+			  *sync_paused_status ? "sleep" : "resume",
+			  *sync_paused_status ? "paused" : "start");
 	}
 }
 
@@ -1508,7 +1503,7 @@ void upload_loop(void)
 	char in_sync;
 	int ret_val, ret;
 	char is_start_check;
-	char wait_backend_status = FALSE;
+	char sync_paused_status = FALSE;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -1557,10 +1552,10 @@ void upload_loop(void)
 		is_start_check = FALSE;
 
 		/* log about sleep & resume */
-		_write_upload_loop_status_log(&wait_backend_status);
+		_write_upload_loop_status_log(&sync_paused_status);
 
 		/* sleep until backend is back */
-		if (hcfs_system->backend_status_is_online == FALSE) {
+		if (hcfs_system->sync_paused) {
 			sleep(1);
 			continue;
 		}

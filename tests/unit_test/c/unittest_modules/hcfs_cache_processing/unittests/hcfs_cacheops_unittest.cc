@@ -167,6 +167,9 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 	CACHE_SOFT_LIMIT = 1;
 	hcfs_system->systemdata.cache_size = CURRENT_CACHE_SIZE; 
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 	hcfs_system->systemdata.cache_blocks = CURRENT_BLOCK_NUM;
 	printf("Test: Generate mock data (cache usage & block file).\n");
 	init_mock_cache_usage();

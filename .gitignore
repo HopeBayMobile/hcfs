@@ -6,6 +6,7 @@
 # C extensions
 *.a
 *.o
+*.d
 *.so
 
 # Packages

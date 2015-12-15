@@ -61,7 +61,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	int ret, errcode;
 	long tmplen;
 
-	if (hcfs_system->backend_status_is_online == FALSE)
+	if (hcfs_system->sync_paused)
 		return -EIO;
 
 #if (DEDUP_ENABLE)

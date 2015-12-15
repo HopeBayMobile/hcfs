@@ -90,6 +90,12 @@ int main(int argc, char **argv)
 		code = RESETXFERSTAT;
 	else if (strcasecmp(argv[1], "cloudstat") == 0)
 		code = CLOUDSTAT;
+	else if (strcasecmp(argv[1], "setsyncswitch") == 0)
+		code = SETSYNCSWITCH;
+	else if (strcasecmp(argv[1], "getsyncswitch") == 0)
+		code = GETSYNCSWITCH;
+	else if (strcasecmp(argv[1], "getsyncstat") == 0)
+		code = GETSYNCSTAT;
 	else
 		code = -1;
 	if (code < 0) {
@@ -123,6 +129,9 @@ int main(int argc, char **argv)
 	case GETMAXPINSIZE:
 	case GETMAXCACHESIZE:
 	case GETDIRTYCACHESIZE:
+	case CLOUDSTAT:
+	case GETSYNCSWITCH:
+	case GETSYNCSTAT:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -306,16 +315,23 @@ int main(int argc, char **argv)
 			printf("%s\n", tmp[count].d_name);
 #endif
 		break;
-	case CLOUDSTAT:
-		if (status == -1)
-			break;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		cmd_len = 0;
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	case SETSYNCSWITCH:
+		if (strcasecmp(argv[2], "on") == 0) {
+			status = TRUE;
+		} else if (strcasecmp(argv[2], "off") == 0) {
+			status = FALSE;
+		} else {
+			printf("Unsupported switch arg: %s, should be on/off\n", argv[2]);
+			exit(-ENOTSUP);
+		}
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
-		printf("backend is %s\n", retcode ? "online" : "offline");
+		cmd_len = sizeof(status);
+		size_msg = send(fd, &code, sizeof(code), 0);
+		size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+		size_msg = send(fd, &status, sizeof(status), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
+		size_msg = recv(fd, &retcode, sizeof(retcode), 0);
 		break;
 	default:
 		break;

@@ -92,7 +92,9 @@ int init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
-	hcfs_system->backend_status_is_online = FALSE;
+	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
+	update_sync_state(); /* compute hcfs_system->sync_paused */
 
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {

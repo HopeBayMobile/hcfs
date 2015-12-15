@@ -40,6 +40,8 @@ sed -i "s@$WORKSPACE/@@g" $WORKSPACE/cpd-result.xml
 cd $testdir/unit_test
 ./run_unittests
 
+ccache -s $HOME/.ccache
+
 # cloc-result.xml
 #        Publish SLOCCount analysis results
 cloc --by-file --xml --out=$WORKSPACE/cloc-result.xml $srcdir

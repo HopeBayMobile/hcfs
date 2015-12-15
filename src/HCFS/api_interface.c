@@ -39,10 +39,12 @@
 #include "dir_statistics.h"
 #include "file_present.h"
 #include "utils.h"
+#include "monitor.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
+int api_server_monitor_time = API_SERVER_MONITOR_TIME;
 
 /************************************************************************
 *
@@ -328,8 +330,7 @@ long long get_vol_size(int arg_len, char *largebuf)
 	statfptr = fopen(temppath, "r+");
 	if (statfptr == NULL) {
 		ret = (long long) errno;
-		write_log(0, "IO error %d (%s)\n", ret,
-		          strerror(ret));
+		write_log(0, "IO error %d (%s)\n", ret, strerror(ret));
 		llretval = (long long) -ret;
 		goto error_handling;
 	}
@@ -394,8 +395,7 @@ long long get_cloud_size(int arg_len, char *largebuf)
 	statfptr = fopen(temppath, "r");
 	if (statfptr == NULL) {
 		ret = (long long) errno;
-		write_log(0, "IO error %d (%s)\n", ret,
-		          strerror(ret));
+		write_log(0, "IO error %d (%s)\n", ret, strerror(ret));
 		llretval = (long long) -ret;
 		goto error_handling;
 	}
@@ -566,7 +566,7 @@ int check_location_handle(int arg_len, char *largebuf)
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
-	          (uint64_t)target_inode);
+		  (uint64_t)target_inode);
 	errcode = fetch_meta_path(metapath, target_inode);
 	if (errcode < 0)
 		return errcode;
@@ -622,7 +622,7 @@ int checkpin_handle(int arg_len, char *largebuf)
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
-	          (uint64_t)target_inode);
+		  (uint64_t)target_inode);
 	retcode = fetch_meta_path(metapath, target_inode);
 	if (retcode < 0)
 		return retcode;
@@ -688,7 +688,7 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: target inode %" PRIu64 "\n",
-	          (uint64_t)target_inode);
+		  (uint64_t)target_inode);
 	retcode = fetch_meta_path(metapath, target_inode);
 	if (retcode < 0) {
 		tmpstats->num_local = retcode;
@@ -719,6 +719,27 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 	}
 	write_log(10, "Dir stat lookup %lld, %lld, %lld\n",
 		tmpstats->num_local, tmpstats->num_cloud, tmpstats->num_hybrid);
+	return retcode;
+}
+
+int set_sync_switch_handle(int sync_switch)
+{
+	int retcode = 0;
+	int pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+
+	hcfs_system->sync_manual_switch = (sync_switch == TRUE) ? ON : OFF;
+	update_sync_state();
+
+	if (sync_switch == TRUE && pause_file)
+		retcode = unlink(HCFSPAUSESYNC);
+	if (sync_switch != TRUE && !pause_file)
+		retcode = mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
+	if (retcode == -1) {
+		retcode = -errno;
+		write_log(0, "%s @ %s: %s\n",
+			  "Failed to manipulate pause syncing file", __func__,
+			  strerror(errno));
+	}
 	return retcode;
 }
 
@@ -759,6 +780,7 @@ void api_module(void *index)
 	long long reserved_pinned_size;
 	unsigned int num_inode;
 	ino_t *pinned_list, *unpinned_list;
+	unsigned int sync_switch;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -1176,13 +1198,34 @@ void api_module(void *index)
 			}
 			break;
 		case CLOUDSTAT:
-			/* Terminate the system */
-			retcode = (int)hcfs_system->backend_status_is_online;
+			retcode = (int)hcfs_system->backend_is_online;
+			ret_len = sizeof(retcode);
+			send(fd1, &ret_len, sizeof(ret_len), 0);
+			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = 0;
+			break;
+		case SETSYNCSWITCH:
+			memcpy(&sync_switch, largebuf, sizeof(unsigned int));
+			retcode = set_sync_switch_handle(sync_switch);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(ret_len), 0);
-				send(fd1, &retcode, sizeof(retcode), 0);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
 			}
+			break;
+		case GETSYNCSWITCH:
+			retcode = (int)hcfs_system->sync_manual_switch;
+			ret_len = sizeof(retcode);
+			send(fd1, &ret_len, sizeof(ret_len), 0);
+			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = 0;
+			break;
+		case GETSYNCSTAT:
+			retcode = (int)!hcfs_system->sync_paused;
+			ret_len = sizeof(retcode);
+			send(fd1, &ret_len, sizeof(ret_len), 0);
+			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = 0;
 			break;
 		default:
 			retcode = ENOTSUP;
@@ -1258,7 +1301,7 @@ void api_server_monitor(void)
 	waittime.tv_nsec = 0;
 
 	while (hcfs_system->system_going_down == FALSE) {
-		sleep(5);
+		sleep(api_server_monitor_time);
 		/* Using timed wait to handle system shutdown event */
 		ret = sem_timedwait(&(api_server->job_lock), &waittime);
 		if (ret < 0)

@@ -105,6 +105,9 @@ class fuseopEnvironment : public ::testing::Environment {
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     fail_open_files = FALSE;
 
     system_fh_table.entry_table_flags = (char *) malloc(sizeof(char) * 100);

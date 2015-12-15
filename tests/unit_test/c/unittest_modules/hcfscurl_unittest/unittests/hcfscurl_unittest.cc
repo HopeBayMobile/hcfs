@@ -148,6 +148,9 @@ protected:
 		let_retry = FALSE;
 		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 	}
 
 	void TearDown()
@@ -309,6 +312,10 @@ protected:
 		fptr = fopen(objpath, "w+");
 		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->access_sem), 1, 1);
 	}
 
 	void TearDown()
@@ -458,6 +465,9 @@ protected:
 		fptr = fopen(objpath, "w+");
 		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 		curl_handle->curl_backend = SWIFT;
 	}
 
@@ -601,6 +611,9 @@ protected:
 		objname = "here_is_obj";
 		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 	}
 
 	void TearDown()

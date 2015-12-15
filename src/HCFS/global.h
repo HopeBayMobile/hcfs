@@ -19,6 +19,8 @@
 #define BOOL uint8_t
 #define TRUE 1
 #define FALSE 0
+#define ON 1
+#define OFF 0
 
 /* Defines the version of the current meta defs */
 #define CURRENT_META_VER 3
@@ -59,6 +61,9 @@
 #define GETDIRTYCACHESIZE 24
 #define GETXFERSTAT 25
 #define RESETXFERSTAT 26
+#define SETSYNCSWITCH 27
+#define GETSYNCSWITCH 28
+#define GETSYNCSTAT 29
 
 #define DEFAULT_PIN TRUE
 
