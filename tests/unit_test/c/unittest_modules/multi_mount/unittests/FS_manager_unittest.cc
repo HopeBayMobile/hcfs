@@ -20,7 +20,25 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
+
+class FS_managerEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const metaops_env =
+	::testing::AddGlobalTestEnvironment(new FS_managerEnvironment);
+
 
 static int do_delete (const char *fpath, const struct stat *sb,
 		int tflag, struct FTW *ftwbuf)

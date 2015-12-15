@@ -72,6 +72,7 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (test_data.tohandle_counter == test_data.num_inode) {
 		inode_ptr->status = TO_BE_DELETED;
 		inode_ptr->util_ll_next = 0;
+		sys_super_block->head.first_to_delete_inode = 0;
 	} else {
 		inode_ptr->status = TO_BE_DELETED;
 		inode_ptr->util_ll_next = test_data.to_handle_inode[test_data.tohandle_counter];

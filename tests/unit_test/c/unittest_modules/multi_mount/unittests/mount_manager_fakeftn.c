@@ -12,7 +12,7 @@
 struct fuse_chan {
 	int test
 } tmpchan;
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 void temp_init(void *userdata, struct fuse_conn_info *conn)
 {

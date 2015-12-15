@@ -226,6 +226,33 @@ int _init_download_curl(int count)
 	return 0;
 }
 
+/**
+ * init_backend_related_module
+ *
+ * Initialize and create cache_loop_thread, delete_loop_thread,
+ * upload_loop_thread, monitor_loop_thread. This function should be called
+ * after setting up backend info.
+ *
+ * @return None
+ */ 
+void init_backend_related_module()
+{
+	int count;
+	
+	if (CURRENT_BACKEND != NONE) {
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
+		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
+		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
+			_init_download_curl(count);
+	}
+
+}
+
 /************************************************************************
 *
 * Function name: main
@@ -240,16 +267,6 @@ int main(int argc, char **argv)
 	CURL_HANDLE curl_handle;
 	int ret_val;
 	struct rlimit nofile_limit;
-	pthread_t delete_loop_thread;
-	pthread_t monitor_loop_thread;
-#ifdef _ANDROID_ENV_
-	pthread_t upload_loop_thread;
-	pthread_t cache_loop_thread;
-#else
-	pid_t child_pids[CHILD_NUM];
-	pid_t this_pid;
-	int proc_idx;
-#endif /* _ANDROID_ENV_ */
 	int count;
 
 	logptr = NULL;
@@ -262,12 +279,18 @@ int main(int argc, char **argv)
 
 	/* TODO: Selection of backend type via configuration */
 
-	ret_val = read_system_config(DEFAULT_CONFIG_PATH);
+	system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+	if (system_config == NULL) {
+		write_log(0, "Error: Out of mem\n");
+		exit(-1);
+	}
+	ret_val = read_system_config(DEFAULT_CONFIG_PATH, system_config);
 
 	if (ret_val < 0)
 		exit(-1);
 
-	ret_val = validate_system_config();
+	ret_val = validate_system_config(system_config);
 
 	if (ret_val < 0)
 		exit(-1);
@@ -325,17 +348,11 @@ int main(int argc, char **argv)
 
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
-	if (CURRENT_BACKEND != NONE) {
-		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
-		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
-		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
-		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
-		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&download_curl_control_sem, 0, 1);
-		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
-		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
-			_init_download_curl(count);
-	}
+
+	/* Init backend related services */
+	if (CURRENT_BACKEND != NONE)
+		init_backend_related_module();
+
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
@@ -345,6 +362,7 @@ int main(int argc, char **argv)
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(upload_loop_thread, NULL);
 		pthread_join(monitor_loop_thread, NULL);
+		write_log(10, "Debug: All threads terminated\n");
 	}
 	close_log();
 	destroy_dirstat_lookup();
@@ -358,14 +376,17 @@ int main(int argc, char **argv)
 		exit(ret_val);
 
 	/* Start up children */
-	for (proc_idx = 0; proc_idx < CHILD_NUM; ++proc_idx) {
-		this_pid = fork();
-		if (this_pid != 0) {
-			child_pids[proc_idx] = this_pid;
-			continue;
+	proc_idx = 0;
+	if (CURRENT_BACKEND != NONE) {
+		for (proc_idx = 0; proc_idx < CHILD_NUM; ++proc_idx) {
+			this_pid = fork();
+			if (this_pid != 0) {
+				child_pids[proc_idx] = this_pid;
+				continue;
+			}
+			/* exit with proc_idx from 0 to CHILD_NUM */
+			break;
 		}
-		/* exit with proc_idx from 0 to CHILD_NUM */
-		break;
 	}
 
 	switch (proc_idx) {
@@ -382,8 +403,10 @@ int main(int argc, char **argv)
 
 		hook_fuse(argc, argv);
 		write_log(2, "Waiting for subprocesses to terminate\n");
-		for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
-			waitpid(child_pids[proc_idx], NULL, 0);
+		if (CURRENT_BACKEND != NONE) {
+			for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
+				waitpid(child_pids[proc_idx], NULL, 0);
+		}
 		close_log();
 		destroy_dirstat_lookup();
 		destroy_pathlookup();

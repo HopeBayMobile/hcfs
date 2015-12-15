@@ -96,6 +96,8 @@ int main(int argc, char **argv)
 		code = GETSYNCSWITCH;
 	else if (strcasecmp(argv[1], "getsyncstat") == 0)
 		code = GETSYNCSTAT;
+	else if (strcasecmp(argv[1], "reloadconfig") == 0)
+		code = RELOADCONFIG;
 	else
 		code = -1;
 	if (code < 0) {
@@ -112,6 +114,7 @@ int main(int argc, char **argv)
 	case TERMINATE:
 	case UNMOUNTALL:
 	case RESETXFERSTAT:
+	case RELOADCONFIG:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);

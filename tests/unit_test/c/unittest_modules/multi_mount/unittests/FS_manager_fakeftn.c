@@ -7,7 +7,7 @@
 #include "FS_manager_unittest.h"
 #include "path_reconstruct.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 int write_log(int level, char *format, ...)
 {

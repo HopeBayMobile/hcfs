@@ -20,7 +20,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 
 void init_mock_system_config()
 {
-	system_config.blockpath = malloc(sizeof(char) * 100);
+	system_config->blockpath = malloc(sizeof(char) * 100);
 	strcpy(BLOCKPATH, "testpatterns");
 }
 

@@ -6,6 +6,25 @@ extern "C" {
 #include <gtest/gtest.h>
 #include "mock_params.h"
 
+
+class hcfscurlEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const hcfscurl_env =
+	::testing::AddGlobalTestEnvironment(new hcfscurlEnvironment);
+
+
 class parse_http_header :public ::testing::Test {
 protected:
     char httpheader[1000];
@@ -151,6 +170,7 @@ protected:
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
 	void TearDown()
@@ -469,6 +489,7 @@ protected:
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		curl_handle->curl_backend = SWIFT;
+		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
 	void TearDown()
@@ -614,6 +635,7 @@ protected:
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
 	void TearDown()

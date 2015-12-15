@@ -1227,6 +1227,14 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(retcode), 0);
 			retcode = 0;
 			break;
+		case RELOADCONFIG:
+			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(ret_len), 0);
+				send(fd1, &retcode, sizeof(retcode), 0);
+			}
+			break;
 		default:
 			retcode = ENOTSUP;
 			break;

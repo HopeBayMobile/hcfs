@@ -160,4 +160,9 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 
 inline void update_sync_state(void)
 {
+	return;
+}
+int reload_system_config(const char *config_path)
+{
+	return 0;
 }

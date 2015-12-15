@@ -832,7 +832,7 @@ int fetch_pinned_blocks(ino_t inode)
 	if (hcfs_system->system_going_down == TRUE) {
 		if (access(error_path, F_OK) == 0)
 			unlink(error_path);
-		return ret_code;
+		return -ESHUTDOWN;
 	}
 	/* Check cache size again */
 	if (ret_code == 0) {

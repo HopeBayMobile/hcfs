@@ -30,7 +30,7 @@
 #define PIN_BLOCK 1
 
 
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 typedef struct {
 	ino_t this_inode;

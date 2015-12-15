@@ -9,6 +9,25 @@ extern "C" {
 #include "gtest/gtest.h"
 #include "mock_param.h"
 fuse_req_t req1;
+
+class file_presentEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const env =
+	::testing::AddGlobalTestEnvironment(new file_presentEnvironment);
+
+
 /*
 	Unittest of meta_forget_inode()
  */

@@ -459,6 +459,7 @@ void init_sync_stat_control(void)
 	fname = (char *)malloc(METAPATHLEN);
 
 	snprintf(FS_stat_path, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
+
 	if (access(FS_stat_path, F_OK) == -1) {
 		MKDIR(FS_stat_path, 0700);
 	} else {
@@ -882,9 +883,11 @@ store in some other file */
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
-		write_log(10, "schedule sync meta ret - %d\n", ret);
-		if (ret < 0)
+		if (ret < 0) {
+			write_log(0, "Error: schedule_sync_meta fails."
+					" Code %d\n", -ret);
 			sync_error = TRUE;
+		}
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 

@@ -16,7 +16,7 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 
 /* Begin of the test case for the function open_log */
 
@@ -25,6 +25,8 @@ class open_logTest : public ::testing::Test {
   char tmpfilename[25];
   int outfileno, errfileno;
   virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
     snprintf(tmpfilename, 25, "/tmp/testlog");
     logptr = NULL;
     outfileno = dup(fileno(stdout));
@@ -42,6 +44,7 @@ class open_logTest : public ::testing::Test {
       sem_destroy(&(logptr->logsem));
       free(logptr);
     }
+    free(system_config);
    }
 
  };
@@ -80,6 +83,8 @@ class write_logTest : public ::testing::Test {
   char tmpfilename[25];
   int outfileno, errfileno;
   virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
     snprintf(tmpfilename, 25, "/tmp/testlog");
     logptr = NULL;
     outfileno = dup(fileno(stdout));
@@ -95,6 +100,7 @@ class write_logTest : public ::testing::Test {
       free(logptr);
      }
     unlink(tmpfilename);
+    free(system_config);
    }
 
  };
