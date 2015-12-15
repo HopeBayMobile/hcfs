@@ -58,6 +58,7 @@
 #include <attr/xattr.h>
 #endif
 #include <inttypes.h>
+#include <sqlite3.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
