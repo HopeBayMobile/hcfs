@@ -9,6 +9,23 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
+class superblockEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const metaops_env =
+	::testing::AddGlobalTestEnvironment(new superblockEnvironment);
+
 class MallocSuperBlockBaseClass : public ::testing::Test {
 protected:	
 	char *sb_path;

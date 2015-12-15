@@ -1,3 +1,4 @@
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include "gtest/gtest.h"
 #include "mock_params.h"
@@ -171,6 +172,9 @@ class dsync_single_inodeTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
 	}
 	virtual void TearDown()
@@ -179,6 +183,7 @@ protected:
 		sem_destroy(&(sync_ctl.sync_op_sem));
 		destroy_objname_buffer(expected_num_objname);
 		free(mock_thread_info);
+		free(system_config);
 	}
 	void init_objname_buffer(unsigned num_objname)
 	{
@@ -330,6 +335,11 @@ TEST(delete_loopTest, DeleteSuccess)
 	void *res;
 	int size_objname;
 
+	system_config = (SYSTEM_CONF_STRUCT *)
+		malloc(sizeof(SYSTEM_CONF_STRUCT));
+	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+	hcfs_system->backend_status_is_online = TRUE;
+	
 	size_objname = 50;
 	objname_counter = 0;
 	objname_list = (char **)malloc(sizeof(char *) * 100);
@@ -368,6 +378,7 @@ TEST(delete_loopTest, DeleteSuccess)
 	free(test_data.to_handle_inode);
 	free(to_verified_data.record_handle_inode);
 	free(sys_super_block);
+	free(system_config);
 }
 /*
 	End of unittest of delete_loop()

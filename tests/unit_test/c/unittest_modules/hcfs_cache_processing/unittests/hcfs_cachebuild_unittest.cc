@@ -214,6 +214,9 @@ protected:
 	{
 		BaseClassForCacheUsageArray::SetUp();
 
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		init_mock_system_config();
 		if (!access(BLOCKPATH, F_OK))
 			delete_mock_dir(BLOCKPATH);
@@ -226,6 +229,7 @@ protected:
 			free(answer_node_list[i]);
 		delete_mock_dir(BLOCKPATH);
 		rmdir(BLOCKPATH);
+		free(system_config);
 
 		BaseClassForCacheUsageArray::TearDown();
 	}

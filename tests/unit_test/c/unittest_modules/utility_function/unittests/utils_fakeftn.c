@@ -13,3 +13,12 @@ int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 	return 0;
 }
 
+int prepare_FS_database_backup(void)
+{
+	return 0;
+}
+
+void init_backend_related_module()
+{
+	return;
+}

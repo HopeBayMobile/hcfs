@@ -374,6 +374,9 @@ protected:
 
 	void SetUp()
 	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		MAX_BLOCK_SIZE = 100;
 		CACHE_FULL = FALSE;
 
@@ -398,6 +401,7 @@ protected:
 	
 		hcfs_system->system_going_down = TRUE;
 		destroy_download_control();
+		free(system_config);
 	}
 };
 

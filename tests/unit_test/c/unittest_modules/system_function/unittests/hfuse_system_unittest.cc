@@ -12,6 +12,24 @@ extern "C" {
 #include "hfuse_system.c"
 }
 
+class hfuse_systemEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const env =
+	::testing::AddGlobalTestEnvironment(new hfuse_systemEnvironment);
+
+
 /*
 	Unittest for init_hcfs_system_data()
  */

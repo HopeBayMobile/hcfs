@@ -226,7 +226,15 @@ int _init_download_curl(int count)
 	return 0;
 }
 
-
+/**
+ * init_backend_related_module
+ *
+ * Initialize and create cache_loop_thread, delete_loop_thread,
+ * upload_loop_thread, monitor_loop_thread. This function should be called
+ * after setting up backend info.
+ *
+ * @return None
+ */ 
 void init_backend_related_module()
 {
 	int count;
@@ -271,7 +279,8 @@ int main(int argc, char **argv)
 
 	/* TODO: Selection of backend type via configuration */
 
-	system_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+	system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
 	if (system_config == NULL) {
 		write_log(0, "Error: Out of mem\n");
 		exit(-1);
@@ -364,14 +373,17 @@ int main(int argc, char **argv)
 		exit(ret_val);
 
 	/* Start up children */
-	for (proc_idx = 0; proc_idx < CHILD_NUM; ++proc_idx) {
-		this_pid = fork();
-		if (this_pid != 0) {
-			child_pids[proc_idx] = this_pid;
-			continue;
+	proc_idx = 0;
+	if (CURRENT_BACKEND != NONE) {
+		for (proc_idx = 0; proc_idx < CHILD_NUM; ++proc_idx) {
+			this_pid = fork();
+			if (this_pid != 0) {
+				child_pids[proc_idx] = this_pid;
+				continue;
+			}
+			/* exit with proc_idx from 0 to CHILD_NUM */
+			break;
 		}
-		/* exit with proc_idx from 0 to CHILD_NUM */
-		break;
 	}
 
 	switch (proc_idx) {

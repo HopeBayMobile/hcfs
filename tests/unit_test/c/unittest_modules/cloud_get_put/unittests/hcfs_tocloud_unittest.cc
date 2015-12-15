@@ -26,14 +26,14 @@ class uploadEnvironment : public ::testing::Environment {
 
     shm_key = shmget(5678, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
     if (shm_key < 0) {
-      int errcode;
-      errcode = errno;
-      printf("Error %d %s\n", errcode, strerror(errcode));
-      return;
+	    int errcode;
+	    errcode = errno;
+	    printf("Error %d %s\n", errcode, strerror(errcode));
+	    return;
     }
     hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
 
-//    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
@@ -45,17 +45,21 @@ class uploadEnvironment : public ::testing::Environment {
     tmppath = NULL;
     no_backend_stat = TRUE;
     if (access("/tmp/testHCFS", F_OK) != 0) {
-      workpath = get_current_dir_name();
-      tmppath = (char *)malloc(strlen(workpath)+20);
-      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
-      if (access(tmppath, F_OK) != 0)
-        mkdir(tmppath, 0700);
-      symlink(tmppath, "/tmp/testHCFS");
-     }
+	    workpath = get_current_dir_name();
+	    tmppath = (char *)malloc(strlen(workpath)+20);
+	    snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+	    if (access(tmppath, F_OK) != 0)
+		    mkdir(tmppath, 0700);
+	    symlink(tmppath, "/tmp/testHCFS");
+    }
+    system_config = (SYSTEM_CONF_STRUCT *)
+	    malloc(sizeof(SYSTEM_CONF_STRUCT));
+    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
     METAPATH = (char *) malloc(METAPATHLEN);
     snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
     if (access(METAPATH, F_OK) < 0)
-      mkdir(METAPATH, 0744);
+	    mkdir(METAPATH, 0744);
 
   }
 
@@ -69,6 +73,7 @@ class uploadEnvironment : public ::testing::Environment {
       free(tmppath);
     rmdir(METAPATH);
     free(METAPATH);
+    free(system_config);
   }
 };
 
@@ -625,7 +630,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	/* Mock data */
 	write_mock_meta_file(metapath, total_page, ST_LDISK);
 
-	system_config.max_block_size = 100;
+	system_config->max_block_size = 100;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
@@ -687,7 +692,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	/* Mock data */
 	write_mock_meta_file(metapath, total_page, ST_TODELETE);
 
-	system_config.max_block_size = 1000;
+	system_config->max_block_size = 1000;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;

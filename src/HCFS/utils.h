@@ -65,4 +65,6 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 /* Function for checking if a file is local, cloud, or hybrid */
 int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
+int reload_system_config(const char *config_path);
+
 #endif  /* SRC_HCFS_UTILS_H_ */

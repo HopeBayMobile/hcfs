@@ -28,7 +28,24 @@ static const ino_t self_inode = 10;
 static const ino_t parent_inode = 5;
 
 extern int DELETE_DIR_ENTRY_BTREE_RESULT;
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
+
+class metaopsEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const metaops_env =
+	::testing::AddGlobalTestEnvironment(new metaopsEnvironment);
 
 /*
 	Unittest of init_dir_page()

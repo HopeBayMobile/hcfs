@@ -12,10 +12,9 @@
 #include "mount_manager.h"
 #include "global.h"
 
+
 /* Global vars*/
 int DELETE_DIR_ENTRY_BTREE_RESULT = 1;
-
-SYSTEM_CONF_STRUCT system_config;
 
 /* mock functions - meta_mem_cache*/
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,

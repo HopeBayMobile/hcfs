@@ -33,7 +33,7 @@ extern "C" {
 
 #include "fake_misc.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 extern struct fuse_lowlevel_ops hfuse_ops;
 MOUNT_T unittest_mount;
 
@@ -92,15 +92,17 @@ class fuseopEnvironment : public ::testing::Environment {
       symlink(tmppath, "/tmp/testHCFS");
      }
 
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     sem_init(&(hcfs_system->access_sem), 0, 1);
     sys_super_block = (SUPER_BLOCK_CONTROL *)
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
     memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
-    system_config.max_block_size = 2097152;
-    system_config.cache_hard_limit = 3200000;
-    system_config.cache_soft_limit = 3200000;
-    system_config.current_backend = 1;
+    system_config->max_block_size = 2097152;
+    system_config->cache_hard_limit = 3200000;
+    system_config->cache_soft_limit = 3200000;
+    system_config->current_backend = 1;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
@@ -142,6 +144,7 @@ class fuseopEnvironment : public ::testing::Environment {
     free(system_fh_table.entry_table);
     free(sys_super_block);
     free(hcfs_system);
+    free(system_config);
 
     unlink("/tmp/testHCFS");
     rmdir(tmppath);

@@ -10,7 +10,7 @@ extern "C" {
 #endif
 }
 
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 class enc : public testing::Test
 {
@@ -19,13 +19,16 @@ class enc : public testing::Test
 	int input_size;
 	virtual void SetUp()
 	{
-		system_config.max_block_size = 1024;
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		system_config->max_block_size = 1024;
 		input =
-		    (char *)calloc(sizeof(char), system_config.max_block_size);
-		input_size = system_config.max_block_size;
+		    (char *)calloc(sizeof(char), system_config->max_block_size);
+		input_size = system_config->max_block_size;
 		RAND_bytes((unsigned char *)input, input_size);
 	}
-	virtual void TearDown() { free(input); }
+	virtual void TearDown() { free(input); free(system_config); }
 };
 
 #ifndef _ANDROID_ENV_
@@ -36,13 +39,16 @@ class compress : public testing::Test
 	int input_size;
 	virtual void SetUp()
 	{
-		system_config.max_block_size = 1024;
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		system_config->max_block_size = 1024;
 		input =
-		    (char *)calloc(sizeof(char), system_config.max_block_size);
-		input_size = system_config.max_block_size;
+		    (char *)calloc(sizeof(char), system_config->max_block_size);
+		input_size = system_config->max_block_size;
 		RAND_bytes((unsigned char *)input, input_size);
 	}
-	virtual void TearDown() { free(input); }
+	virtual void TearDown() { free(input); free(system_config); }
 };
 
 TEST_F(compress, compress)

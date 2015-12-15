@@ -1301,55 +1301,68 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Helper function subjecting to check whether new system config is invalid.
+ */
 int _check_config(const SYSTEM_CONF_STRUCT *new_config)
 {
 	if (CURRENT_BACKEND == NONE) /* Always ok when backend is now none */
 		return 0;
-	else
+	else /* When current backend is s3/swift... */
 		if (CURRENT_BACKEND != new_config->current_backend)
-			return -EPERM;
+			return -EINVAL;
 
 	switch (new_config->current_backend) {
 	case SWIFT:
 		if (strcmp(SWIFT_ACCOUNT, new_config->swift_account))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(SWIFT_USER, new_config->swift_user))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(SWIFT_PASS, new_config->swift_pass))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(SWIFT_URL, new_config->swift_url))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(SWIFT_CONTAINER, new_config->swift_container))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(SWIFT_PROTOCOL, new_config->swift_protocol))
-			return -EPERM;
+			return -EINVAL;
 		break;
 	case S3:
 		if (strcmp(S3_ACCESS, new_config->s3_access))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(S3_SECRET, new_config->s3_secret))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(S3_URL, new_config->s3_url))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(S3_BUCKET, new_config->s3_bucket))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(S3_PROTOCOL, new_config->s3_protocol))
-			return -EPERM;
+			return -EINVAL;
 		if (strcmp(S3_BUCKET_URL, new_config->s3_bucket_url))
-			return -EPERM;
+			return -EINVAL;
 		break;
 	case NONE:
-		return -EPERM;
+		return -EINVAL;
 		break;
 	}
 
 	/* Check block size */
 	if (MAX_BLOCK_SIZE != new_config->max_block_size)
-		return -EPERM;
+		return -EINVAL;
 
 	return 0;
 }
 
+/**
+ * reload_system_config
+ *
+ * Reload hcfs configuration file. The main purpose of this function is to
+ * setup backend information from NONE to swift/s3.
+ *
+ * @param config_path Path of config file
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int reload_system_config(const char *config_path)
 {
 	int ret, count;
@@ -1373,12 +1386,15 @@ int reload_system_config(const char *config_path)
 		return ret;
 	}
 
+	/* Compare old config and new config*/
 	ret = _check_config(new_config);
 	if (ret < 0) {
 		free(new_config);
 		return ret;
-	}	
+	}
 
+	/* Create backend related threads when backend status from
+	 * none to s3/swift */
 	enable_related_module = FALSE;
 	if ((CURRENT_BACKEND == NONE) && (new_config->current_backend != NONE))
 		enable_related_module = TRUE;

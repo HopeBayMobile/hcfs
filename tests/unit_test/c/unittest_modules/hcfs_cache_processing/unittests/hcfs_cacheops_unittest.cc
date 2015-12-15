@@ -49,6 +49,9 @@ protected:
 		sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0); 
 		sem_init(&(hcfs_system->check_cache_sem), 1, 0); 
 		sem_init(&(hcfs_system->check_next_sem), 1, 0);
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
 	}
 	
@@ -73,6 +76,7 @@ protected:
 		}
 		
 		free(hcfs_system);
+		free(system_config);
 	}
 	
 	void init_mock_cache_usage()

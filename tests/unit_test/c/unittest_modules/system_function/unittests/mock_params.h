@@ -1,7 +1,7 @@
 #include "params.h"
 #include "global.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 char hcfs_list_container_success;
 char hcfs_init_backend_success;
 
