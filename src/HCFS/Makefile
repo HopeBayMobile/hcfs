@@ -1,6 +1,7 @@
 CC = gcc
 CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
-CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -lsqlite3 -Wall -Wextra
+CFLAGS = -g -pthread -Wall -Wextra
+LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3
 
 # [Autodependencies with GNU make]
 # http://scottmcpeak.com/autodepend/autodepend.html
@@ -40,7 +41,7 @@ OBJS_F := objmeta.o \
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs -lfuse -lcurl -pthread -lssl -lcrypto -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LFLAGS)
 
 # pull in dependency info for *existing* .o files
 -include $(OBJS:.o=.d)
