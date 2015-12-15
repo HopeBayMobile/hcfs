@@ -735,8 +735,10 @@ int set_sync_switch_handle(int sync_switch)
 	if (sync_switch != TRUE && !pause_file)
 		retcode = mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
 	if (retcode == -1) {
-		write_log(5, "%s: %s\n", __func__, strerror(errno));
 		retcode = -errno;
+		write_log(0, "%s @ %s: %s\n",
+			  "Failed to manipulate pause syncing file", __func__,
+			  strerror(errno));
 	}
 	return retcode;
 }

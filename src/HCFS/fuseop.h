@@ -208,7 +208,6 @@ typedef struct {
 	BOOL sync_manual_switch;
 	BOOL sync_paused;
 	struct timespec backend_status_last_time;
-
 } SYSTEM_DATA_HEAD;
 
 SYSTEM_DATA_HEAD *hcfs_system;
