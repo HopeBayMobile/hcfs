@@ -451,11 +451,10 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 	if (!argv[0])
 		return -1;
 
-        uid_len = strlen(argv[0]);
-        *uid = malloc(sizeof(char) * (uid_len + 1));
-        snprintf(*uid, uid_len + 1, "%s", argv[0]);
-        return 0;
-
+	uid_len = strlen(argv[0]);
+	*uid = malloc(sizeof(char) * (uid_len + 1));
+	snprintf(*uid, uid_len + 1, "%s", argv[0]);
+	return 0;
 }
 
 /*
