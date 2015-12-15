@@ -338,7 +338,7 @@ TEST(delete_loopTest, DeleteSuccess)
 	system_config = (SYSTEM_CONF_STRUCT *)
 		malloc(sizeof(SYSTEM_CONF_STRUCT));
 	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
-	hcfs_system->backend_status_is_online = TRUE;
+	hcfs_system->backend_is_online = TRUE;
 	
 	size_objname = 50;
 	objname_counter = 0;
@@ -361,7 +361,7 @@ TEST(delete_loopTest, DeleteSuccess)
 
 	/* Create a thread to run delete_loop() */
 	ASSERT_EQ(0, pthread_create(&thread, NULL, delete_loop, NULL));
-	sleep(10);
+	sleep(20);
 
 	/* Check answer */
 	EXPECT_EQ(test_data.num_inode, to_verified_data.record_inode_counter);

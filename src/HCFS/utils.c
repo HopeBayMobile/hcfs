@@ -742,13 +742,13 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config)
 	snprintf(config->hcfssystem_name, strlen(config->metapath) + 20, "%s/hcfssystemfile",
 			config->metapath);
 
-	HCFSPAUSESYNC = (char *)malloc(strlen(METAPATH) + 20);
-	if (HCFSPAUSESYNC == NULL) {
+	config->hcfspausesync_name = (char *)malloc(strlen(config->metapath) + 20);
+	if (config->hcfspausesync_name == NULL) {
 		write_log(0, "Out of memory\n");
 		return -1;
 	}
-	snprintf(HCFSPAUSESYNC, strlen(METAPATH) + 20, "%s/hcfspausesync",
-		 METAPATH);
+	snprintf(config->hcfspausesync_name, strlen(config->metapath) + 20, "%s/hcfspausesync",
+		 config->metapath);
 
 	/* Validating cache and block settings */
 	/* TODO: If system already created, need to check if block size
