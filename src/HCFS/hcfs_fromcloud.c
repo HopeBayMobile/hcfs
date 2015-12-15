@@ -837,7 +837,7 @@ int fetch_pinned_blocks(ino_t inode)
 	/* Check cache size again */
 	if (ret_code == 0) {
 		get_system_size(&cache_size, NULL);
-		if (cache_size > CACHE_HARD_LIMIT) {
+		if (cache_size >= CACHE_HARD_LIMIT) {
 			write_log(0, "Error: Cache space is full.\n");
 			ret_code = -ENOSPC;
 		}

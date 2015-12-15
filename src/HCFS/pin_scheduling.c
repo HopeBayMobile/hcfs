@@ -49,18 +49,34 @@ int destroy_pin_scheduler()
 	return 0;
 }
 
+static void _sec_nonblock_sleep(long long secs)
+{
+	int i;
+
+	for (i = 0; i < secs; i++) {
+		if (hcfs_system->system_going_down == TRUE)
+			break;
+		else
+			sleep(1);
+	}
+
+	return;
+}
+
 void _sleep_a_while(long long rest_times)
 {
 	long long level;
 
 	level = rest_times / 60;
 	if (level < 5)
-		sleep(level+1);
+		_sec_nonblock_sleep(level+1);
 	else
-		sleep(5);
+		_sec_nonblock_sleep(5);
+
+	return;
 }
 
-void pinning_collector()
+void pinning_collect()
 {
 	int idx;
 	struct timespec time_to_sleep;
@@ -84,13 +100,17 @@ void pinning_collector()
 		/* Collect threads */
 		sem_wait(&(pinning_scheduler.ctl_op_sem));
 		for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++) {
-			if (pinning_scheduler.pinning_inodes[idx] == 0)
+			if (pinning_scheduler.thread_active[idx] == FALSE)
 				continue;
 			sem_post(&(pinning_scheduler.ctl_op_sem));
 			pthread_join(pinning_scheduler.pinning_file_tid[idx],
 					NULL);
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
-			pinning_scheduler.pinning_inodes = 0;
+
+			/* Recycle this thread */
+			pinning_scheduler.thread_active[idx] = FALSE;
+			memset(&(pinning_scheduler.pinning_info[idx]), 0,
+				sizeof(PINNING_INFO));
 			pinning_scheduler.total_active_pinning--;
 
 			/* Post a semaphore */
@@ -104,15 +124,23 @@ void pinning_collector()
 
 void pinning_worker(void *ptr)
 {
+	PINNING_INFO *pinning_info;
 	ino_t this_inode;
+	int ret;
 
-	this_inode = *(ino_t *)ptr;
+	pinning_info = (PINNING_INFO *)ptr;
+	this_inode = pinning_info->this_inode;
+
 	ret = fetch_pinned_blocks(this_inode);
 	if (ret < 0) {
 		if (ret == -ENOSPC) { /* Retry it later */
 			write_log(4, "Warn: No space available to pin"
 					" inode %"PRIu64"\n",
 					(uint64_t)this_inode);
+
+			sem_wait(&(pinning_scheduler.ctl_op_sem));
+			pinning_scheduler.deep_sleep = TRUE;
+			sem_post(&(pinning_scheduler.ctl_op_sem));
 			//sleep(5);
 		} else if (ret == -EIO) { /* Retry it later */
 			write_log(0, "Error: IO error when pinning"
@@ -125,18 +153,17 @@ void pinning_worker(void *ptr)
 					"deleted when pinning\n",
 					(uint64_t)this_inode);
 		} else if (ret == -ENOTCONN) {
-			// TODO: error handling in case of disconnection
+			/* error handling in case of disconnection */
 		} else if (ret == -ESHUTDOWN) {
 			/* When system going down, do not mark finish
 			   and directly leave the loop */
-			return;
 		}
 		return; /* Do not dequeue when failing in pinning */
 	}
 
 	ret = super_block_finish_pinning(this_inode);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to mark inode%"PRIu64" as"
+		write_log(0, "Error: Fail to mark inode %"PRIu64" as"
 				" finishing pinning. Code %d\n",
 				(uint64_t)this_inode, -ret);
 	} else {
@@ -145,6 +172,7 @@ void pinning_worker(void *ptr)
 				(uint64_t)this_inode);
 	}
 
+	return;
 }
 
 void pinning_loop()
@@ -152,11 +180,12 @@ void pinning_loop()
 	ino_t now_inode;
 	long long rest_times;
 	int ret, i, t_idx;
-	char found, start_pinning;
+	char found, start_from_head;
 	SUPER_BLOCK_ENTRY sb_entry;
 
 	rest_times = 0;
-	start_pinning = TRUE;
+	start_from_head = TRUE;
+
 	/**** Begin to find some inodes and pin them ****/
 	while (hcfs_system->system_going_down == FALSE) {
 		/* Check backend status */
@@ -176,24 +205,38 @@ void pinning_loop()
 			continue;
 		}
 
-		if (start_pinning == TRUE) {
+		/* Deeply sleeping is caused by thread error (ENOSPC) */
+		if (pinning_scheduler.deep_sleep == TRUE) {
+			_sec_nonblock_sleep(5); /* Sleep 5 secs */
+			sem_wait(&(pinning_scheduler.ctl_op_sem));
+			pinning_scheduler.deep_sleep = FALSE;
+			sem_post(&(pinning_scheduler.ctl_op_sem));
+		}
+
+		if (start_from_head == TRUE) {
+			/* Sleep 1 sec if inodes are now being handled */
 			if (sys_super_block->head.num_pinning_inodes <=
 				pinning_scheduler.total_active_pinning) {
 				sleep(1);
 				continue;
 			}
 			now_inode = sys_super_block->head.first_pin_inode;
-			start_pinning = FALSE;
+			start_from_head = FALSE;
 		}
 
-		/* Check whether this inode is handled */
+		/* Get a semaphore and begin to pin now_inode */
 		sem_wait(&(pinning_scheduler.pinning_sem));
+		if (hcfs_system->system_going_down == TRUE) {
+			sem_post(&(pinning_scheduler.pinning_sem));
+			break;
+		}
+		/* Check whether this inode is handled */
 		while (now_inode) {
 			found = FALSE;
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
 			for (i = 0; i < MAX_PINNING_FILE_CONCURRENCY; i++) {
-				if (pinning_scheduler.pinning_inodes[i] ==
-						now_inode) {
+				if (pinning_scheduler.pinning_info[i].this_inode
+					== now_inode) {
 					found = TRUE;
 					break;
 				}
@@ -202,14 +245,13 @@ void pinning_loop()
 			if (found == TRUE) { /* Pin next file */
 				super_block_read(now_inode, &sb_entry);
 				now_inode = sb_entry.pin_ll_next;
-				if (now_inode == 0) /* Start from head */
-					start_pinning = TRUE;
 			} else {
 				break;
 			}
 		}
-		if (start_pinning == TRUE) {
+		if (now_inode == 0) {
 			sem_post(&(pinning_scheduler.pinning_sem));
+			start_from_head = TRUE;
 			continue;
 		}
 
@@ -220,14 +262,22 @@ void pinning_loop()
 	
 		sem_wait(&(pinning_scheduler.ctl_op_sem));
 		for (i = 0; i < MAX_PINNING_FILE_CONCURRENCY; i++) {
-			if (pinning_scheduler.pinning_inodes[i] == 0) {
+			if (pinning_scheduler.thread_active[i] == FALSE) {
 				t_idx = i;
 				break;
 			}
 		}
+		pinning_scheduler.pinning_info[t_idx].this_inode = now_inode;
 		pthread_create(&pinning_scheduler.pinning_file_tid[t_idx], NULL,
-				(void *)&pinning_worker, NULL);
+				(void *)&pinning_worker,
+				(void *)&pinning_scheduler.pinning_info[t_idx]);
+		pinning_scheduler.thread_active[i] = TRUE;
+		pinning_scheduler.total_active_pinning++;
 		sem_post(&(pinning_scheduler.ctl_op_sem));
+
+		/* Find next inode to be pinned */
+		super_block_read(now_inode, &sb_entry);
+		now_inode = sb_entry.pin_ll_next;
 	}
 	/**** End of while loop ****/
 
