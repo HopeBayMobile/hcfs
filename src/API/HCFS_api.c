@@ -56,7 +56,7 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 
 	int fd, status, size_msg, ret_code;
 	unsigned int code, reply_len, cmd_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[1000];
 
 	fd = _api_socket_conn();
@@ -68,8 +68,8 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 	code = SETCONFIG;
 	cmd_len = 0;
 
-	CONCAT_PIN_ARG(key);
-	CONCAT_PIN_ARG(value)
+	CONCAT_ARGS(key);
+	CONCAT_ARGS(value)
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -89,7 +89,7 @@ void HCFS_get_config(char **json_res, char *key)
 
 	int fd, status, size_msg, ret_code;
 	unsigned int code, reply_len, cmd_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[1000];
 	char value[500];
 	json_t *data;
@@ -103,7 +103,7 @@ void HCFS_get_config(char **json_res, char *key)
 	code = GETCONFIG;
 	cmd_len = 0;
 
-	CONCAT_PIN_ARG(key);
+	CONCAT_ARGS(key);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -215,7 +215,7 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 
 	int fd, size_msg, ret_code;
 	unsigned int code, cmd_len, reply_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[500];
 
 	fd = _api_socket_conn();
@@ -228,7 +228,7 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 	cmd_len = 0;
 
 	/* Append paths to socket msg */
-	CONCAT_PIN_ARG(pin_path);
+	CONCAT_ARGS(pin_path);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -249,7 +249,7 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 
 	int fd, status, size_msg, ret_code;
 	unsigned int code, reply_len, cmd_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[1000];
 
 	fd = _api_socket_conn();
@@ -262,10 +262,10 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 	cmd_len = 0;
 
 	/* Append paths to socket msg */
-	CONCAT_PIN_ARG(app_path)
-	CONCAT_PIN_ARG(data_path)
-	CONCAT_PIN_ARG(sd0_path)
-	CONCAT_PIN_ARG(sd1_path)
+	CONCAT_ARGS(app_path)
+	CONCAT_ARGS(data_path)
+	CONCAT_ARGS(sd0_path)
+	CONCAT_ARGS(sd1_path)
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -286,7 +286,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 
 	int fd, size_msg, ret_code;
 	unsigned int code, cmd_len, reply_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[500];
 
 	fd = _api_socket_conn();
@@ -299,7 +299,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 	cmd_len = 0;
 
 	/* Append paths to socket msg */
-	CONCAT_PIN_ARG(pin_path);
+	CONCAT_ARGS(pin_path);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -321,7 +321,7 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 
 	int fd, status, size_msg, ret_code;
 	unsigned int code, reply_len, cmd_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[1000];
 
 	fd = _api_socket_conn();
@@ -334,10 +334,10 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 	cmd_len = 0;
 
 	/* Append paths to socket msg */
-	CONCAT_PIN_ARG(app_path)
-	CONCAT_PIN_ARG(data_path)
-	CONCAT_PIN_ARG(sd0_path)
-	CONCAT_PIN_ARG(sd1_path)
+	CONCAT_ARGS(app_path)
+	CONCAT_ARGS(data_path)
+	CONCAT_ARGS(sd0_path)
+	CONCAT_ARGS(sd1_path)
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -514,7 +514,7 @@ void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
 
 	int fd, status, size_msg, ret_code;
 	unsigned int code, reply_len, cmd_len;
-	ssize_t path_len;
+	ssize_t str_len;
 	char buf[1000];
 	char value[500];
 	json_t *data;
@@ -527,7 +527,7 @@ void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
 
 	code = QUERYPKGUID;
 
-	CONCAT_PIN_ARG(pkg_name);
+	CONCAT_ARGS(pkg_name);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);

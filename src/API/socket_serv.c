@@ -18,6 +18,7 @@
 #include "pin_ops.h"
 #include "hcfs_stat.h"
 #include "hcfs_sys.h"
+#include "marco.h"
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 
@@ -130,18 +131,12 @@ int process_request(int thread_idx)
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
 
-		memcpy(&(res_buf[ret_len]), &num_local, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &num_cloud, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &num_hybrid, sizeof(long long));
-		ret_len += sizeof(long long);
+		READ_LL_ARGS(num_local);
+		READ_LL_ARGS(num_cloud);
+		READ_LL_ARGS(num_hybrid);
 
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, res_buf, ret_len, 0);
-
 		break;
 
 	case CHECKLOC:
@@ -195,36 +190,20 @@ int process_request(int thread_idx)
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
 
-		memcpy(&(res_buf[ret_len]), &cloud_usage, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &cache_total, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &cache_used, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &cache_dirty, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &pin_max, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &pin_total, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &xfer_up, sizeof(long long));
-		ret_len += sizeof(long long);
-
-		memcpy(&(res_buf[ret_len]), &xfer_down, sizeof(long long));
-		ret_len += sizeof(long long);
+		READ_LL_ARGS(cloud_usage);
+		READ_LL_ARGS(cache_total);
+		READ_LL_ARGS(cache_used);
+		READ_LL_ARGS(cache_dirty);
+		READ_LL_ARGS(pin_max);
+		READ_LL_ARGS(pin_total);
+		READ_LL_ARGS(xfer_up);
+		READ_LL_ARGS(xfer_down);
 
 		memcpy(&(res_buf[ret_len]), &cloud_stat, sizeof(int));
 		ret_len += sizeof(int);
 
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, res_buf, ret_len, 0);
-
 		break;
 
 	case RESETXFERSTAT:
@@ -233,7 +212,6 @@ int process_request(int thread_idx)
 		ret_code = reset_xfer_usage();
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
-
 		break;
 
 	case SYSREBOOT:
@@ -245,7 +223,6 @@ int process_request(int thread_idx)
 
 		// Force to call reboot
 		system("reboot");
-
 		break;
 
 	case QUERYPKGUID:
@@ -265,7 +242,6 @@ int process_request(int thread_idx)
 			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
-
 		break;
 
 	}

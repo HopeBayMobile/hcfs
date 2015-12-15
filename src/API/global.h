@@ -20,7 +20,8 @@
 #define CONF_PATH "/etc/hcfs.conf"
 #define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
-#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfs_api_sock"
+//#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfs_api_sock"
+#define API_SOCK_PATH "/dev/shm/hcfs_api_sock"
 
 /* List of API codes */
 #define TERMINATE 0
@@ -50,6 +51,10 @@
 #define GETDIRTYCACHESIZE 24
 #define GETXFERSTAT 25
 #define RESETXFERSTAT 26
+#define SETSYNCSWITCH 27
+#define GETSYNCSWITCH 28
+#define GETSYNCSTAT 29
+#define RELOADCONFIG 30
 
 #define SETCONFIG 48
 #define GETCONFIG 49
