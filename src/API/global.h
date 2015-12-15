@@ -17,6 +17,8 @@
 #define TRUE 1
 #define FALSE 0
 
+#define CONF_PATH "/etc/hcfs.conf"
+#define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
 #define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfs_api_sock"
 
@@ -53,5 +55,6 @@
 #define GETCONFIG 49
 #define GETSTAT 50
 #define SYSREBOOT 51
+#define QUERYPKGUID 52
 
 #endif  /* GW20_API_GLOBAL_H_ */

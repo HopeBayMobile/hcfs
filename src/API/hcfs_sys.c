@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sqlite3.h>
 
 #include "hcfs_sys.h"
 
@@ -154,10 +155,10 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 	ret_code = -1;
 	while (fgets(buf, sizeof(buf), conf) != NULL) {
 		tmp_ptr = line = strdup(buf);
-		token = strsep(&line, " =");
+		token = strsep(&line, " ");
 		if (strcmp(upper_key, token) == 0) {
 			token = strsep(&line, " =");
-			if (strlen(token) <= 0) {
+			if (strlen(line) <= 1) {
 				ret_code = 1;
 				free(tmp_ptr);
 				break;
@@ -167,6 +168,7 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 			token = strsep(&line, "\n");
 
 			if (strlen(token) <= 0) {
+				printf("run here11\n");
 				ret_code = 1;
 			} else {
 				*value = malloc((strlen(token) + 1) * sizeof(char));
@@ -211,4 +213,67 @@ int reset_xfer_usage()
 	close(fd);
 
 	return ret_code;
+}
+
+static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
+{
+
+	size_t uid_len;
+	char **uid = (char **)data;
+
+	uid_len = argv[0] ? strlen(argv[0]) : strlen("NULL");
+	*uid = malloc(sizeof(char) * (uid_len + 1));
+	snprintf(*uid, uid_len + 1, "%s", argv[0]);
+
+	return 0;
+}
+
+int query_pkg_uid(char *arg_buf, unsigned int arg_len, char **uid)
+{
+
+	int idx, ret_code;
+	unsigned int msg_len;
+	ssize_t str_len;
+	char pkg_name[400];
+	char sql[1000];
+	sqlite3 *db;
+	char *sql_err = 0;
+
+
+	msg_len = 0;
+	str_len = 0;
+	memcpy(&str_len, &(arg_buf[msg_len]), sizeof(ssize_t));
+	msg_len += sizeof(ssize_t);
+
+	memcpy(pkg_name, &(arg_buf[msg_len]), str_len);
+	pkg_name[str_len] = 0;
+	msg_len += str_len;
+
+	printf("pkg name is %s\n", pkg_name);
+
+	if (msg_len != arg_len) {
+		printf("Arg len is different\n");
+		return -EINVAL;
+	}
+
+	snprintf(sql, sizeof(sql), "SELECT uid from uid WHERE package_name='%s'", pkg_name);
+
+	ret_code = sqlite3_open(DB_PATH, &db);
+	if (ret_code != 0) {
+	        printf("FAIL - err is %s\n", sqlite3_errmsg(db));
+		return ret_code;
+	}
+
+	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb, (void *)uid, &sql_err);
+	if( ret_code != SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", sql_err);
+		sqlite3_free(sql_err);
+	}
+
+	sqlite3_close(db);
+
+	if (ret_code == 0 && *uid == NULL)
+		return -ENOENT;
+	else
+		return ret_code;
 }

@@ -1,15 +1,15 @@
 CC = gcc
 CPPFLAGS =
-CFLAGS = -lpthread
+CFLAGS = -lpthread -lsqlite3
 
-socket_serv: socket_serv.c pin_ops.o hcfs_stat.o hcfs_sys.o utils.o marco.h test
+socket_serv: socket_serv.c pin_ops.o hcfs_stat.o hcfs_sys.o utils.o global.h marco.h test
 	$(CC) socket_serv.c pin_ops.o hcfs_stat.o hcfs_sys.o utils.o $(CFLAGS) -o sock_serv
+
+HCFS_api.o: HCFS_api.c HCFS_api.h global.h marco.h
+	$(CC) -c HCFS_api.c
 
 test: test.c HCFS_api.o
 	$(CC) test.c HCFS_api.o -ljansson -o test
-
-HCFS_api.o: HCFS_api.c HCFS_api.h marco.h
-	$(CC) -c HCFS_api.c
 
 pin_ops.o: pin_ops.c pin_ops.h
 	$(CC) -c pin_ops.c

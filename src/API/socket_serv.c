@@ -122,8 +122,8 @@ int process_request(int thread_idx)
 		printf("Check dir stat\n");
 		ret_len = 0;
 		ret_code = check_dir_status(largebuf, arg_len,
-					       &num_local, &num_cloud,
-					       &num_hybrid);
+					    &num_local, &num_cloud,
+					    &num_hybrid);
 
 		if (ret_code < 0) {
 			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
@@ -247,6 +247,27 @@ int process_request(int thread_idx)
 		system("reboot");
 
 		break;
+
+	case QUERYPKGUID:
+		printf("Query pkg uid\n");
+		ret_len = 0;
+
+		ret_code = query_pkg_uid(largebuf, arg_len, &value);
+		if (ret_code == 0) {
+			ret_len = strlen(value);
+			memcpy(res_buf, value, ret_len);
+			free(value);
+			printf("%s\n", res_buf);
+			printf("%d\n", ret_len);
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, res_buf, ret_len, 0);
+		} else {
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, &ret_code, sizeof(int), 0);
+		}
+
+		break;
+
 	}
 
 	printf("Get API code - %d from fd - %d\n", api_code, fd);

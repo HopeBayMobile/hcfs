@@ -115,16 +115,21 @@ void HCFS_get_config(char **json_res, char *key)
 		if (ret_code == 1) {
 			data = json_object();
 			json_object_set_new(data, key, json_string(""));
+
 			_json_response(json_res, TRUE, 0, data);
+			json_decref(data);
 		} else {
 			_json_response(json_res, FALSE, -ret_code, NULL);
 		}
 	} else {
 		size_msg = recv(fd, value, reply_len, 0);
 		value[reply_len] = 0;
+
 		data = json_object();
 		json_object_set_new(data, key, json_string(value));
+
 		_json_response(json_res, TRUE, 0, data);
+		json_decref(data);
 	}
 }
 
@@ -201,6 +206,7 @@ void HCFS_stat(char **json_res)
 		json_object_set_new(data, "cloud_conn", json_boolean(cloud_stat));
 
 		_json_response(json_res, TRUE, ret_code, data);
+		json_decref(data);
 	}
 }
 
@@ -420,6 +426,7 @@ void HCFS_dir_status(char **json_res, char *pathname)
 		json_object_set_new(data, "num_hybrid", json_integer(num_hybrid));
 
 		_json_response(json_res, TRUE, ret_code, data);
+		json_decref(data);
 	}
 }
 
@@ -500,4 +507,44 @@ void HCFS_reboot(char **json_res)
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
 	_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
+{
+
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+	ssize_t path_len;
+	char buf[1000];
+	char value[500];
+	json_t *data;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = QUERYPKGUID;
+
+	CONCAT_PIN_ARG(pkg_name);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	if (reply_len == 0) {
+		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	} else {
+		size_msg = recv(fd, value, reply_len, 0);
+		value[reply_len] = 0;
+		data = json_object();
+		json_object_set_new(data, "uid", json_string(value));
+
+		_json_response(json_res, TRUE, 0, data);
+		json_decref(data);
+	}
+
 }

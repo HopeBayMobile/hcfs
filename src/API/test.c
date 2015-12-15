@@ -75,6 +75,12 @@ int main()
 	printf("reset xfer - %s\n", res10);
 	free(res10);
 
+	char *res11;
+	HCFS_get_pkg_uid(&res11, "com.hopebaytech.hcfsmgmt");
+	printf("query uid - %s\n", res11);
+	free(res11);
+
+
 }
 
 
