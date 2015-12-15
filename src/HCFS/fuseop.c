@@ -471,7 +471,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char *data;
 	char *sql_err = 0;
 	char sql[500];
-	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
+	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
 	snprintf(sql, sizeof(sql),
 		 "SELECT uid from uid WHERE package_name='%s'",
@@ -481,7 +481,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 		write_log(10, "Query pkg uid err (open db) - db file not existed\n");
 		return -1;
 
-	ret_code = sqlite3_open(DB_PATH, &db);
+	ret_code = sqlite3_open(db_path, &db);
 	if (ret_code != SQLITE_OK) {
 		write_log(10, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
 		return -1;
