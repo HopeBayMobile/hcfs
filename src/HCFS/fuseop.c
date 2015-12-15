@@ -473,13 +473,17 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char sql[500];
 	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
+	/* Return uid 0 if error occurred */
+	*uid = 0;
+
 	snprintf(sql, sizeof(sql),
 		 "SELECT uid from uid WHERE package_name='%s'",
 		 pkgname);
 
-	if (access(db_path, F_OK) != 0)
+	if (access(db_path, F_OK) != 0) {
 		write_log(10, "Query pkg uid err (open db) - db file not existed\n");
 		return -1;
+	}
 
 	ret_code = sqlite3_open(db_path, &db);
 	if (ret_code != SQLITE_OK) {
@@ -498,6 +502,12 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	}
 
 	sqlite3_close(db);
+
+	if (data == NULL) {
+		write_log(10, "Query pkg uid err (sql statement) - pkg not found\n");
+		return -1;
+	}
+
 	*uid = (uid_t)atoi(data);
 	free(data);
 	return 0;
