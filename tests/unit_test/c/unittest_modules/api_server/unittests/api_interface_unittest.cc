@@ -715,6 +715,37 @@ TEST_F(api_moduleTest, CheckMountTest) {
   EXPECT_STREQ("123456789", recvFSname);
  }
 
+/* Test UNMOUNTALL API call */
+TEST_F(api_moduleTest, UnmountAllTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+
+  UNMOUNTEDALL = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = UNMOUNTALL;
+  cmd_len = 0;
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, UNMOUNTEDALL);
+ }
 
 TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
 
