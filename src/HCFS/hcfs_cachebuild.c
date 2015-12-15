@@ -251,7 +251,10 @@ int build_cache_usage(void)
 	if (ret < 0)
 		return ret;
 
+	write_log(10, "Initialized cache usage hash table\n");
+
 	for (count = 0; count < NUMSUBDIR; count++) {
+		write_log(10, "Now processing subfolder %d\n", count);
 		sprintf(blockpath, "%s/sub_%d", BLOCKPATH, count);
 
 		if (access(blockpath, F_OK) < 0)
@@ -276,14 +279,19 @@ int build_cache_usage(void)
 			closedir(dirptr);
 			continue;
 		}
+		write_log(10, "count is now %d\n", count);
 
 		while (direntptr != NULL) {
+			write_log(10, "count is now %d\n", count);
+			write_log(10, "Scanning file name %s\n",
+			          temp_dirent.d_name);
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
 			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%lld",
-							&this_inode, &blockno);
+			             (uint64_t *)&this_inode, &blockno);
 			if (ret != 2) {
+				write_log(10, "Scan file does not match\n");
 				ret = readdir_r(dirptr, &temp_dirent,
 					&direntptr);
 				if (ret > 0) {
@@ -292,12 +300,17 @@ int build_cache_usage(void)
 				}
 				continue;
 			}
+			write_log(10, "Count is now %d, %lu, %lu\n", count,
+			          (unsigned long)&count, (unsigned long)&blockno);
+			write_log(10, "Block file for %" PRIu64 " %lld\n",
+			          (uint64_t)this_inode, blockno);
 			ret = fetch_block_path(thisblockpath, this_inode,
 						blockno);
 			if (ret < 0) {
 				errcode = ret;
 				break;
 			}
+			write_log(10, "Debug %s, %d\n", thisblockpath, count);
 			ret = stat(thisblockpath, &tempstat);
 
 			if (ret != 0) {
@@ -310,8 +323,11 @@ int build_cache_usage(void)
 				continue;
 			}
 
+			write_log(10, "Fetching cache usage node\n");
+			write_log(10, "count is now %d\n", count);
 			tempnode = return_cache_usage_node(this_inode);
 			if (tempnode == NULL) {
+				write_log(10, "Not found. Alloc a new one\n");
 				tmp_size = sizeof(CACHE_USAGE_NODE);
 				tempnode = malloc(tmp_size);
 				memset(tempnode, 0, tmp_size);
@@ -337,12 +353,15 @@ int build_cache_usage(void)
 				tempnode->clean_cache_size +=
 							tempstat.st_size;
 
+			write_log(10, "Inserting the node\n");
+			write_log(10, "count is now %d\n", count);
 			insert_cache_usage_node(this_inode, tempnode);
 			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
 			if (ret > 0) {
 				errcode = ret;
 				break;
 			}
+			write_log(10, "count is now %d\n", count);
 		}
 
 		if (errcode > 0) {

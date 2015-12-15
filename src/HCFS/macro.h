@@ -151,9 +151,10 @@
 	do {\
 		errcode = 0;\
 		ret_size = fread(A, B, C, D);\
-		if ((ret_size < C) && (ferror(D) != 0)) {\
+		if ((ret_size < C) && ((errcode = ferror(D)) != 0)) {\
 			clearerr(D);\
-			write_log(0, "IO error in %s.\n", __func__);\
+			write_log(0, "IO error in %s. Code %d\n", __func__,\
+			          errcode);\
 			errcode = -EIO;\
 			goto errcode_handle;\
 		} \
@@ -163,9 +164,11 @@
 	do {\
 		errcode = 0;\
 		ret_size = fwrite(A, B, C, D);\
-		if (((ssize_t)ret_size < (ssize_t)C) && (ferror(D) != 0)) {\
+		if (((ssize_t)ret_size < (ssize_t)C) &&\
+		    ((errcode = ferror(D)) != 0)) {\
 			clearerr(D);\
-			write_log(0, "IO error in %s.\n", __func__);\
+			write_log(0, "IO error in %s. Code %d\n", __func__,\
+			          errcode);\
 			errcode = -EIO;\
 			goto errcode_handle;\
 		} \

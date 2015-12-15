@@ -882,7 +882,7 @@ store in some other file */
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
-		printf("schedule sync meta ret - %d\n", ret);
+		write_log(10, "schedule sync meta ret - %d\n", ret);
 		if (ret < 0)
 			sync_error = TRUE;
 		flock(fileno(metafptr), LOCK_UN);
@@ -1192,6 +1192,8 @@ errcode_handle:
 	if (count1 < MAX_SYNC_CONCURRENCY)
 		sync_ctl.threads_error[count1] = TRUE;
 	upload_ctl.threads_finished[which_index] = TRUE;
+	/* Unlink the temp file if we terminates uploading */
+	unlink(thread_ptr->tempfilename);
 	sem_post(&(sync_ctl.sync_op_sem));
 }
 

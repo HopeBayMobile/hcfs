@@ -1529,7 +1529,7 @@ int startup_finish_delete(void)
 
 	while (tmpptr != NULL) {
 		ret_val = sscanf(tmpent.d_name, "inode%" PRIu64 "_%" PRIu64 "",
-				&tmp_ino, &root_inode);
+				(uint64_t *)&tmp_ino, (uint64_t *)&root_inode);
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL, NULL);
 			if (ret < 0) {
