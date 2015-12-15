@@ -441,11 +441,66 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 #ifdef _ANDROID_ENV_
 /* Internal function for generating the ownership / permission for
 Android external storage */
-uid_t lookup_pkg(char *pkgname)
+static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 {
-/* TODO: This is now a fake. Need to link to real function */
-	UNUSED(pkgname);
-	return 1010;
+
+	size_t uid_len;
+	char **uid = (char**)data;
+
+	if (!argv[0])
+		return -1;
+
+        uid_len = strlen(argv[0]);
+        *uid = malloc(sizeof(char) * (uid_len + 1));
+        snprintf(*uid, uid_len + 1, "%s", argv[0]);
+        return 0;
+
+}
+
+/*
+ * Helper function for querying uid of input (pkgname),
+ * result uid will be stored in (uid).
+ *
+ * @return - 0 for success, otherwise -1.
+ */
+int lookup_pkg(char *pkgname, uid_t *uid)
+{
+
+	sqlite3 *db;
+	int ret_code;
+	char *data;
+	char *sql_err = 0;
+	char sql[500];
+	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
+
+	snprintf(sql, sizeof(sql),
+		 "SELECT uid from uid WHERE package_name='%s'",
+		 pkgname);
+
+	if (access(db_path, F_OK) != 0)
+		write_log(10, "Query pkg uid err (open db) - db file not existed\n");
+		return -1;
+
+	ret_code = sqlite3_open(DB_PATH, &db);
+	if (ret_code != SQLITE_OK) {
+		write_log(10, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
+		return -1;
+	}
+
+	/* Sql statement */
+	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb,
+	                        (void *)&data, &sql_err);
+	if( ret_code != SQLITE_OK ){
+		write_log(10, "Query pkg uid err (sql statement) - %s\n", sql_err);
+		sqlite3_free(sql_err);
+		sqlite3_close(db);
+		return -1;
+	}
+
+	sqlite3_close(db);
+	*uid = (uid_t)atoi(data);
+	free(data);
+	return 0;
 }
 
 int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
@@ -521,7 +576,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 				} else {
 					/* If this is a package folder */
 					/* Need to lookup package uid */
-					tmpuid = lookup_pkg(tmptok_prev);
+					lookup_pkg(tmptok_prev, &tmpuid);
 					thisstat->st_uid = tmpuid;
 					thisstat->st_gid = 1028;
 					newpermission = 0770;
@@ -536,7 +591,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 			break;
 		}
 		if (count == 3) {
-			tmpuid = lookup_pkg(tmptok_prev);
+			lookup_pkg(tmptok_prev, &tmpuid);
 			thisstat->st_uid = tmpuid;
 			thisstat->st_gid = 1028;
 			newpermission = 0770;
