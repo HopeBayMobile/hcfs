@@ -796,7 +796,7 @@ int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
 
 static BOOL _sleep_wakeup()
 {
-	if ((hcfs_system->backend_status_is_online == FALSE) ||
+	if ((hcfs_system->sync_paused == TRUE) ||
 		(hcfs_system->system_going_down == TRUE))
 		return TRUE;
 	else
@@ -824,7 +824,7 @@ void delete_loop(void)
 	inode_to_check = 0;
 	while (hcfs_system->system_going_down == FALSE) {
 		/* sleep and continue if backend is offline */
-		if (hcfs_system->backend_status_is_online == FALSE) {
+		if (hcfs_system->sync_paused == TRUE) {
 			sleep(1);
 			continue;
 		}
