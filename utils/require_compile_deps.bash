@@ -6,4 +6,5 @@ packages+=" libfuse-dev"
 packages+=" libcurl4-openssl-dev"
 packages+=" liblz4-dev"
 packages+=" libssl-dev"
+packages+=" libsqlite3-dev"
 echo $packages
