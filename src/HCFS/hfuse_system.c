@@ -279,8 +279,11 @@ int main(int argc, char **argv)
 
 	/* TODO: Selection of backend type via configuration */
 
-	system_config = (SYSTEM_CONF_STRUCT *)
-			malloc(sizeof(SYSTEM_CONF_STRUCT));
+	/* skip malloc if already did (in unittest) */
+	if (system_config == NULL) {
+		system_config =
+		    (SYSTEM_CONF_STRUCT *)malloc(sizeof(SYSTEM_CONF_STRUCT));
+	}
 	if (system_config == NULL) {
 		write_log(0, "Error: Out of mem\n");
 		exit(-1);

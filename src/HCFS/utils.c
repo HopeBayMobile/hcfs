@@ -40,7 +40,7 @@
 #include "hcfs_cacheops.h"
 #include "monitor.h"
 
-SYSTEM_CONF_STRUCT *system_config;
+SYSTEM_CONF_STRUCT *system_config = NULL;
 
 /************************************************************************
 *
