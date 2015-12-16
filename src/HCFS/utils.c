@@ -1415,3 +1415,16 @@ int reload_system_config(const char *config_path)
 
 	return 0;
 }
+
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+{
+	unsigned int count;
+
+	for (count = 0; count < secs; count++) {
+		if (wakeup_condition() == TRUE)
+			break;
+		sleep(1);
+	}
+
+	return;
+}

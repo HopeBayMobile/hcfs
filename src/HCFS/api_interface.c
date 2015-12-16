@@ -481,7 +481,7 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 		retcode = pin_inode(pinned_list[count], &total_reserved_size);
 		if (retcode < 0) {
 			/* Roll back */
-			total_reserved_size = total_reserved_size_bak;
+			//total_reserved_size = total_reserved_size_bak;
 			for (count2 = 0; count2 <= count; count2++) {
 				write_log(5, "Fail to pin, Roll back inode %"
 					PRIu64"\n",

@@ -546,8 +546,10 @@ errcode_handle:
 		return;
 	}
 
-	if (hcfs_system->system_going_down == TRUE)
+	if (hcfs_system->system_going_down == TRUE) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 		return;
+	}
 
 	/* Delete meta */
 	sem_wait(&(delete_ctl.delete_queue_sem));
@@ -620,7 +622,7 @@ errcode_handle:
 	super_block_reclaim();
 
 	dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-
+	return;
 }
 
 /************************************************************************
@@ -791,6 +793,16 @@ int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
 *  Return value: None
 *
 *************************************************************************/
+
+static BOOL _sleep_wakeup()
+{
+	if ((hcfs_system->backend_status_is_online == FALSE) ||
+		(hcfs_system->system_going_down == TRUE))
+		return TRUE;
+	else
+		return FALSE;
+}
+
 #ifdef _ANDROID_ENV_
 void *delete_loop(void *ptr)
 #else
@@ -811,30 +823,24 @@ void delete_loop(void)
 
 	inode_to_check = 0;
 	while (hcfs_system->system_going_down == FALSE) {
-
-		if (inode_to_check == 0) {
-		/* Sleep 5 secs if backend is online and system is running */
-			for (sleep_count = 0; sleep_count < 5; sleep_count++) {
-				if ((hcfs_system->backend_status_is_online ==
-					FALSE) ||
-					(hcfs_system->system_going_down ==
-					TRUE))
-					break;
-				sleep(1);
-			}
-		}
-		/* Terminate immediately if system is going down */
-		if (hcfs_system->system_going_down == TRUE)
-			break;
-
 		/* sleep and continue if backend is offline */
 		if (hcfs_system->backend_status_is_online == FALSE) {
 			sleep(1);
 			continue;
 		}
 
+		/* Sleep 5 secs if backend is online and system is running */
+		if (inode_to_check == 0)
+			nonblock_sleep(5, _sleep_wakeup);
+
 		/* Get the first to-delete inode if inode_to_check is none. */
 		sem_wait(&(dsync_ctl.dsync_queue_sem));
+		/* Terminate immediately if system is going down */
+		if (hcfs_system->system_going_down == TRUE) {
+			sem_post(&(dsync_ctl.dsync_queue_sem));
+			break;
+		}
+
 		super_block_share_locking();
 		if (inode_to_check == 0)
 			inode_to_check =
