@@ -86,6 +86,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 
 	tmp_conf = fopen(tmp_path, "w");
 	if (tmp_conf == NULL) {
+		fclose(conf);
 		return -errno;
 	}
 
@@ -184,6 +185,30 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 		return -EINVAL;
 	else
 		return ret_code;
+}
+
+int reload_hcfs_config()
+{
+
+	int fd, ret_code, size_msg;
+	unsigned int code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = RELOADCONFIG;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	close(fd);
+
+	return ret_code;
 }
 
 int toggle_cloud_sync(char *arg_buf, unsigned int arg_len)

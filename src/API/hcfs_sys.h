@@ -5,6 +5,8 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len);
 
 int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value);
 
+int reload_hcfs_config();
+
 int toggle_cloud_sync(char *arg_buf, unsigned int arg_len);
 
 int get_sync_status();

@@ -76,7 +76,7 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -111,7 +111,7 @@ void HCFS_get_config(char **json_res, char *key)
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int), 0);
 		if (ret_code == 1) {
 			data = json_object();
 			json_object_set_new(data, key, json_string(""));
@@ -160,7 +160,7 @@ void HCFS_stat(char **json_res)
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
 		size_msg = recv(fd, buf, reply_len, 0);
@@ -194,6 +194,34 @@ void HCFS_stat(char **json_res)
 	}
 }
 
+void HCFS_reload_config(char **json_res)
+{
+
+	int fd, size_msg, ret_code;
+	unsigned int code, cmd_len, reply_len;
+	ssize_t str_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = RELOADCONFIG;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
 void HCFS_toggle_sync(char **json_res, int enabled)
 {
 
@@ -215,7 +243,7 @@ void HCFS_toggle_sync(char **json_res, int enabled)
 	size_msg = send(fd, &enabled, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -244,7 +272,7 @@ void HCFS_get_sync_status(char **json_res)
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0) {
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -282,7 +310,7 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -319,7 +347,7 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -353,7 +381,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -391,7 +419,7 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -420,7 +448,7 @@ void HCFS_pin_status(char **json_res, char *pathname)
 	size_msg = send(fd, pathname, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -455,24 +483,19 @@ void HCFS_dir_status(char **json_res, char *pathname)
 		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
-		ret_code = 0;
 		size_msg = recv(fd, buf, reply_len, 0);
+		buf_idx = 0;
 
-		memcpy(&num_local, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&num_cloud, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&num_hybrid, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
+		READ_LL_ARGS(num_local);
+		READ_LL_ARGS(num_cloud);
+		READ_LL_ARGS(num_hybrid);
 
 		data = json_object();
 		json_object_set_new(data, "num_local", json_integer(num_local));
 		json_object_set_new(data, "num_cloud", json_integer(num_cloud));
 		json_object_set_new(data, "num_hybrid", json_integer(num_hybrid));
 
-		_json_response(json_res, TRUE, ret_code, data);
+		_json_response(json_res, TRUE, 0, data);
 		json_decref(data);
 	}
 }
@@ -497,7 +520,7 @@ void HCFS_file_status(char **json_res, char *pathname)
 	size_msg = send(fd, pathname, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -524,7 +547,7 @@ void HCFS_reset_xfer(char **json_res)
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -551,7 +574,7 @@ void HCFS_reboot(char **json_res)
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	_json_response(json_res, TRUE, ret_code, NULL);
 }
@@ -582,7 +605,7 @@ void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
 		size_msg = recv(fd, value, reply_len, 0);

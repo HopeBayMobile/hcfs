@@ -230,6 +230,14 @@ int process_request(int thread_idx)
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
 
+	case RELOADCONFIG:
+		printf("Reload config");
+		ret_len = 0;
+		ret_code = reload_hcfs_config();
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
 	case SYSREBOOT:
 		printf("Reboot\n");
 		ret_len = 0;

@@ -81,7 +81,7 @@ int main()
 	free(res11);
 
 	char *res12;
-	HCFS_toggle_sync(&res12, 0);
+	HCFS_toggle_sync(&res12, 1);
 	printf("toggle sync - %s\n", res12);
 	free(res12);
 
