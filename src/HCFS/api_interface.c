@@ -484,12 +484,14 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 			unused_reserved_size = total_reserved_size;
 
 			/* First return the unused reserved size */
-			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->systemdata.pinned_size -=
-				unused_reserved_size;
-			if (hcfs_system->systemdata.pinned_size < 0)
-				hcfs_system->systemdata.pinned_size = 0;
-			sem_post(&(hcfs_system->access_sem));
+			if (unused_reserved_size > 0) {
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->systemdata.pinned_size -=
+					unused_reserved_size;
+				if (hcfs_system->systemdata.pinned_size < 0)
+					hcfs_system->systemdata.pinned_size = 0;
+				sem_post(&(hcfs_system->access_sem));
+			}
 
 			/* Roll back */
 			zero_size = 0;
