@@ -12,10 +12,16 @@
 		} \
 	}
 
-#define READ_LL_ARGS(A)\
+#define CONCAT_LL_ARGS(A)\
 	{\
 		memcpy(&(res_buf[ret_len]), &A, sizeof(long long));\
 		ret_len += sizeof(long long);\
+	}
+
+#define READ_LL_ARGS(A)\
+	{\
+		memcpy(&A, &(buf[buf_idx]), sizeof(long long));\
+		buf_idx += sizeof(long long);\
 	}
 
 #endif  /* GW20_API_MARCO_H_ */

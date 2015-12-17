@@ -80,7 +80,15 @@ int main()
 	printf("query uid - %s\n", res11);
 	free(res11);
 
+	char *res12;
+	HCFS_toggle_sync(&res12, 0);
+	printf("toggle sync - %s\n", res12);
+	free(res12);
 
+	char *res13;
+	HCFS_get_sync_status(&res13);
+	printf("sync status - %s\n", res13);
+	free(res13);
 }
 
 

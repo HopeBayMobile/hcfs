@@ -166,29 +166,77 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 
 			token = strsep(&line, " ");
 			token = strsep(&line, "\n");
-
 			if (strlen(token) <= 0) {
-				printf("run here11\n");
 				ret_code = 1;
 			} else {
 				*value = malloc((strlen(token) + 1) * sizeof(char));
 				strcpy(*value, token);
 				ret_code = 0;
 			}
-
 			free(tmp_ptr);
 			break;
 		}
-
 		free(tmp_ptr);
 	}
-
 	fclose(conf);
 
 	if (ret_code < 0)
 		return -EINVAL;
 	else
 		return ret_code;
+}
+
+int toggle_cloud_sync(char *arg_buf, unsigned int arg_len)
+{
+
+	int fd, ret_code, size_msg, enabled;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+
+	memcpy(&enabled, arg_buf, sizeof(int));
+	if (enabled != 0 && enabled != 1)
+		return -EINVAL;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = SETSYNCSWITCH;
+	cmd_len = sizeof(int);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &enabled, sizeof(int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+int get_sync_status()
+{
+
+	int fd, ret_code, size_msg;
+	unsigned int code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = GETSYNCSWITCH;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	close(fd);
+
+	return ret_code;
 }
 
 int reset_xfer_usage()
@@ -215,6 +263,7 @@ int reset_xfer_usage()
 	return ret_code;
 }
 
+/* Callback function for sql statement */
 static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 {
 
@@ -260,13 +309,13 @@ int query_pkg_uid(char *arg_buf, unsigned int arg_len, char **uid)
 
 	ret_code = sqlite3_open(DB_PATH, &db);
 	if (ret_code != 0) {
-	        printf("FAIL - err is %s\n", sqlite3_errmsg(db));
+	        printf("Failed to open sqlite db - err is %s\n", sqlite3_errmsg(db));
 		return ret_code;
 	}
 
 	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb, (void *)uid, &sql_err);
 	if( ret_code != SQLITE_OK ){
-		fprintf(stderr, "SQL error: %s\n", sql_err);
+		printf("Failed to execute sql statement - err is %s\n", sql_err);
 		sqlite3_free(sql_err);
 	}
 

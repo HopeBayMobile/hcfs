@@ -42,9 +42,14 @@
                         <p>Get config</p>
                     </div>
                 </li>
-                <li><a href="#HCFS_get_property">HCFS_get_property<span class="counter"></span></a>
+                <li><a href="#HCFS_get_pkg_uid">HCFS_get_pkg_uid<span class="counter"></span></a>
                     <div class="brief">
-                        <p>Get property</p>
+                        <p>Query package uid</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_get_sync_status">HCFS_get_sync_status<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Sync status</p>
                     </div>
                 </li>
                 <li><a href="#HCFS_pin_app">HCFS_pin_app<span class="counter"></span></a>
@@ -77,14 +82,14 @@
                         <p>Set config</p>
                     </div>
                 </li>
-                <li><a href="#HCFS_set_property">HCFS_set_property<span class="counter"></span></a>
-                    <div class="brief">
-                        <p>Set property</p>
-                    </div>
-                </li>
                 <li><a href="#HCFS_stat">HCFS_stat<span class="counter"></span></a>
                     <div class="brief">
                         <p>Statistic</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_toggle_sync">HCFS_toggle_sync<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Toggle sync</p>
                     </div>
                 </li>
                 <li><a href="#HCFS_unpin_app">HCFS_unpin_app<span class="counter"></span></a>
@@ -95,16 +100,6 @@
                 <li><a href="#HCFS_unpin_path">HCFS_unpin_path<span class="counter"></span></a>
                     <div class="brief">
                         <p>Unpin file</p>
-                    </div>
-                </li>
-                <li><a href="#HCFS_vol_mount">HCFS_vol_mount<span class="counter"></span></a>
-                    <div class="brief">
-                        <p>Volume mount</p>
-                    </div>
-                </li>
-                <li><a href="#HCFS_vol_umount">HCFS_vol_umount<span class="counter"></span></a>
-                    <div class="brief">
-                        <p>Volume umount</p>
                     </div>
                 </li>
             </ul>
@@ -272,13 +267,13 @@
                         </table>
                     </div>
                     <div class="function">
-                        <div class="declaration" id="HCFS_get_property">
+                        <div class="declaration" id="HCFS_get_pkg_uid">
                             <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
                             </div>
                             <table class="declaration">
                                 <tbody>
                                     <tr>
-                                        <td class="identifier">HCFS_get_property</td>
+                                        <td class="identifier">HCFS_get_pkg_uid</td>
                                         <td class="open_paren">(</td>
                                         <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
                                         </td>
@@ -288,18 +283,18 @@
                                         <td colspan="2"></td>
                                         <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
                                         </td>
-                                        <td class="argument_name">key</td>
+                                        <td class="argument_name">pkg_name</td>
                                         <td class="close_paren">)</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                         <div class="doc">
-                            <p>To get value of property for HCFS. (Supported keys are listed in <a href="#HCFS_set_property">HCFS_set_property</a>.)</p>
+                            <p>To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.</p>
                         </div>
                         <table class="arguments">
                             <tbody>
-                                <tr id="HCFS_get_property::json_res">
+                                <tr id="HCFS_get_pkg_uid::json_res">
                                     <td>json_res</td>
                                     <td>
                                         <div class="doc">
@@ -307,11 +302,48 @@
                                         </div>
                                     </td>
                                 </tr>
-                                <tr id="HCFS_get_property::key">
-                                    <td>key</td>
+                                <tr id="HCFS_get_pkg_uid::pkg_name">
+                                    <td>pkg_name</td>
                                     <td>
                                         <div class="doc">
-                                            <p>property of HCFS configuration.</p>
+                                            <p>target package</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_get_sync_status">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_get_sync_status</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To get status of cloud sync.</p>
+                            <p>Return data dict in json_res -</p>
+                            <pre><code class="lang-json">data: {
+    enabled: boolean,
+}</code></pre>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_get_sync_status::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -608,6 +640,10 @@
                                     </thead>
                                     <tbody>
                                         <tr>
+                                            <td>current_backend</td>
+                                            <td align="left">none/swift</td>
+                                        </tr>
+                                        <tr>
                                             <td>swift_account</td>
                                             <td align="left">account</td>
                                         </tr>
@@ -665,87 +701,6 @@
                         </table>
                     </div>
                     <div class="function">
-                        <div class="declaration" id="HCFS_set_property">
-                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
-                            </div>
-                            <table class="declaration">
-                                <tbody>
-                                    <tr>
-                                        <td class="identifier">HCFS_set_property</td>
-                                        <td class="open_paren">(</td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
-                                        </td>
-                                        <td class="argument_name">json_res,</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
-                                        </td>
-                                        <td class="argument_name">key,</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
-                                        </td>
-                                        <td class="argument_name">value</td>
-                                        <td class="close_paren">)</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="doc">
-                            <p>To set property with value for HCFS.</p>
-                            <blockquote>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Key supported</th>
-                                            <th align="left">Valid value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>cloudsync</td>
-                                            <td align="left">on/off</td>
-                                        </tr>
-                                        <tr>
-                                            <td>clouddl</td>
-                                            <td align="left">on/off</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </blockquote>
-                        </div>
-                        <table class="arguments">
-                            <tbody>
-                                <tr id="HCFS_set_property::json_res">
-                                    <td>json_res</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>result string in json format.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="HCFS_set_property::key">
-                                    <td>key</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>property of HCFS configuration.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="HCFS_set_property::value">
-                                    <td>value</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>value for input key.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="function">
                         <div class="declaration" id="HCFS_stat">
                             <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
                             </div>
@@ -785,6 +740,53 @@
                                     <td>
                                         <div class="doc">
                                             <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_toggle_sync">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_toggle_sync</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">int</span></span>
+                                        </td>
+                                        <td class="argument_name">enabled</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To toggle if hcfs can/can't sync data in local cache to cloud storage.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_toggle_sync::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_toggle_sync::enabled">
+                                    <td>enabled</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>1 to turn on sync, 0 to turn off sync.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -921,114 +923,6 @@
                                     <td>
                                         <div class="doc">
                                             <p>a valid pathname (cloud be a file or a directory).</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="function">
-                        <div class="declaration" id="HCFS_vol_mount">
-                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
-                            </div>
-                            <table class="declaration">
-                                <tbody>
-                                    <tr>
-                                        <td class="identifier">HCFS_vol_mount</td>
-                                        <td class="open_paren">(</td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
-                                        </td>
-                                        <td class="argument_name">json_res,</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
-                                        </td>
-                                        <td class="argument_name">vol_name,</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
-                                        </td>
-                                        <td class="argument_name">mpt</td>
-                                        <td class="close_paren">)</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="doc">
-                            <p>To mount HCFS volume.</p>
-                        </div>
-                        <table class="arguments">
-                            <tbody>
-                                <tr id="HCFS_vol_mount::json_res">
-                                    <td>json_res</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>result string in json format.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="HCFS_vol_mount::vol_name">
-                                    <td>vol_name</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>target volume name.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="HCFS_vol_mount::mpt">
-                                    <td>mpt</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>target mountpoint.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="function">
-                        <div class="declaration" id="HCFS_vol_umount">
-                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
-                            </div>
-                            <table class="declaration">
-                                <tbody>
-                                    <tr>
-                                        <td class="identifier">HCFS_vol_umount</td>
-                                        <td class="open_paren">(</td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
-                                        </td>
-                                        <td class="argument_name">json_res,</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
-                                        </td>
-                                        <td class="argument_name">vol_name</td>
-                                        <td class="close_paren">)</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="doc">
-                            <p>To unmount HCFS volume.</p>
-                        </div>
-                        <table class="arguments">
-                            <tbody>
-                                <tr id="HCFS_vol_umount::json_res">
-                                    <td>json_res</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>result string in json format.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="HCFS_vol_umount::vol_name">
-                                    <td>vol_name</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>target volume name.</p>
                                         </div>
                                     </td>
                                 </tr>

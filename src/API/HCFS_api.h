@@ -28,6 +28,13 @@ void HCFS_set_config(char **json_res, char *key, char *value);
  */
 void HCFS_get_config(char **json_res, char *key);
 
+/*Reload config
+ * @json_res result string in json format.
+ *
+ * Reload HCFS configuration file. Backend can be changed from NONE to NONE/SWIFT/S3.
+ */
+void HCFS_reload_config(char **json_res);
+
 /*Statistic
  * @json_res result string in json format.
  *
@@ -63,7 +70,7 @@ void HCFS_stat(char **json_res);
  * | cloudsync     | on/off|
  * | clouddl       | on/off|
  */
-void HCFS_set_property(char **json_res, char *key, char *value);
+//void HCFS_set_property(char **json_res, char *key, char *value);
 
 /*Get property
  * @json_res result string in json format.
@@ -71,7 +78,29 @@ void HCFS_set_property(char **json_res, char *key, char *value);
  *
  * To get value of property for HCFS. (Supported keys are listed in <HCFS_set_property>.)
  */
-void HCFS_get_property(char **json_res, char *key);
+//void HCFS_get_property(char **json_res, char *key);
+
+/*Toggle sync
+ * @json_res result string in json format.
+ * @enabled 1 to turn on sync, 0 to turn off sync.
+ *
+ * To toggle if hcfs can/can't sync data in local cache to cloud storage.
+ */
+void HCFS_toggle_sync(char **json_res, int enabled);
+
+/*Sync status
+ * @json_res result string in json format.
+ *
+ * To get status of cloud sync.
+ *
+ * Return data dict in json_res -
+ * ```json
+ * data: {
+ *     enabled: boolean,
+ * }
+ * ```
+ */
+void HCFS_get_sync_status(char **json_res);
 
 /*Volume mount
  * @json_res result string in json format.
@@ -80,7 +109,7 @@ void HCFS_get_property(char **json_res, char *key);
  *
  * To mount HCFS volume.
  */
-void HCFS_vol_mount(char **json_res, char *vol_name, char *mpt);
+//void HCFS_vol_mount(char **json_res, char *vol_name, char *mpt);
 
 /*Volume umount
  * @json_res result string in json format.
@@ -88,7 +117,7 @@ void HCFS_vol_mount(char **json_res, char *vol_name, char *mpt);
  *
  * To unmount HCFS volume.
  */
-void HCFS_vol_umount(char **json_res, char *vol_name);
+//void HCFS_vol_umount(char **json_res, char *vol_name);
 
 /*Pin file
  * @json_res result string in json format.
@@ -185,6 +214,7 @@ void HCFS_reboot(char **json_res);
 
 /*Query package uid
  * @json_res result string in json format.
+ * @pkg_name target package
  *
  * To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.
  */

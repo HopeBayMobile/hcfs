@@ -131,9 +131,9 @@ int process_request(int thread_idx)
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
 
-		READ_LL_ARGS(num_local);
-		READ_LL_ARGS(num_cloud);
-		READ_LL_ARGS(num_hybrid);
+		CONCAT_LL_ARGS(num_local);
+		CONCAT_LL_ARGS(num_cloud);
+		CONCAT_LL_ARGS(num_hybrid);
 
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, res_buf, ret_len, 0);
@@ -190,14 +190,14 @@ int process_request(int thread_idx)
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
 
-		READ_LL_ARGS(cloud_usage);
-		READ_LL_ARGS(cache_total);
-		READ_LL_ARGS(cache_used);
-		READ_LL_ARGS(cache_dirty);
-		READ_LL_ARGS(pin_max);
-		READ_LL_ARGS(pin_total);
-		READ_LL_ARGS(xfer_up);
-		READ_LL_ARGS(xfer_down);
+		CONCAT_LL_ARGS(cloud_usage);
+		CONCAT_LL_ARGS(cache_total);
+		CONCAT_LL_ARGS(cache_used);
+		CONCAT_LL_ARGS(cache_dirty);
+		CONCAT_LL_ARGS(pin_max);
+		CONCAT_LL_ARGS(pin_total);
+		CONCAT_LL_ARGS(xfer_up);
+		CONCAT_LL_ARGS(xfer_down);
 
 		memcpy(&(res_buf[ret_len]), &cloud_stat, sizeof(int));
 		ret_len += sizeof(int);
@@ -210,6 +210,22 @@ int process_request(int thread_idx)
 		printf("Reset xfer\n");
 		ret_len = 0;
 		ret_code = reset_xfer_usage();
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
+	case SETSYNCSWITCH:
+		printf("Set sync\n");
+		ret_len = 0;
+		ret_code = toggle_cloud_sync(largebuf, arg_len);
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
+	case GETSYNCSWITCH:
+		printf("Get sync\n");
+		ret_len = 0;
+		ret_code = get_sync_status();
 		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
@@ -234,8 +250,6 @@ int process_request(int thread_idx)
 			ret_len = strlen(value);
 			memcpy(res_buf, value, ret_len);
 			free(value);
-			printf("%s\n", res_buf);
-			printf("%d\n", ret_len);
 			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 			size_msg = send(fd, res_buf, ret_len, 0);
 		} else {

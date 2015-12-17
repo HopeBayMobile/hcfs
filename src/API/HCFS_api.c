@@ -163,33 +163,17 @@ void HCFS_stat(char **json_res)
 		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
-		ret_code = 0;
 		size_msg = recv(fd, buf, reply_len, 0);
-
 		buf_idx = 0;
-		memcpy(&cloud_usage, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
 
-		memcpy(&cache_total, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&cache_used, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&cache_dirty, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&pin_max, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&pin_total, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&xfer_up, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
-
-		memcpy(&xfer_down, &(buf[buf_idx]), sizeof(long long));
-		buf_idx += sizeof(long long);
+		READ_LL_ARGS(cloud_usage);
+		READ_LL_ARGS(cache_total);
+		READ_LL_ARGS(cache_used);
+		READ_LL_ARGS(cache_dirty);
+		READ_LL_ARGS(pin_max);
+		READ_LL_ARGS(pin_total);
+		READ_LL_ARGS(xfer_up);
+		READ_LL_ARGS(xfer_down);
 
 		memcpy(&cloud_stat, &(buf[buf_idx]), sizeof(int));
 		buf_idx += sizeof(int);
@@ -205,7 +189,70 @@ void HCFS_stat(char **json_res)
 		json_object_set_new(data, "xfer_down", json_integer(xfer_down));
 		json_object_set_new(data, "cloud_conn", json_boolean(cloud_stat));
 
-		_json_response(json_res, TRUE, ret_code, data);
+		_json_response(json_res, TRUE, 0, data);
+		json_decref(data);
+	}
+}
+
+void HCFS_toggle_sync(char **json_res, int enabled)
+{
+
+	int fd, size_msg, ret_code;
+	unsigned int code, cmd_len, reply_len;
+	ssize_t str_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = SETSYNCSWITCH;
+	cmd_len = sizeof(int);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &enabled, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+void HCFS_get_sync_status(char **json_res)
+{
+
+	int fd, size_msg, ret_code;
+	unsigned int code, cmd_len, reply_len;
+	ssize_t str_len;
+	json_t *data;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = GETSYNCSWITCH;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0) {
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	} else {
+		data = json_object();
+		json_object_set_new(data, "enabled", json_boolean(ret_code));
+
+		_json_response(json_res, TRUE, 0, data);
 		json_decref(data);
 	}
 }
