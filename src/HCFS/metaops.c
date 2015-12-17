@@ -528,7 +528,7 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		} else {
 			write_log(0, "Error: Invalid rename type in %s\n",
 					__func__);
-			return -EPERM;
+			return -EINVAL;
 		}
 
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
@@ -1696,6 +1696,9 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 				goto error_handling;
 			}
 		}
+	} else {
+		write_log(0, "Error: Invalid type in %s\n", __func__);
+		ret_code = -EINVAL;
 	}
 
 	meta_cache_close_file(meta_cache_entry);

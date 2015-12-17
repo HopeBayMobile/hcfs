@@ -389,6 +389,12 @@ TEST_F(change_dir_entry_inodeTest, ChangeREGOK)
 		"/mock/target/name", new_inode, S_IFREG, body_ptr));
 }
 
+TEST_F(change_dir_entry_inodeTest, ChangeFIFOOK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFIFO, body_ptr));
+}
+
 TEST_F(change_dir_entry_inodeTest, ChangeLNKOK) 
 {	
 	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
@@ -1595,6 +1601,24 @@ TEST_F(change_pin_flagTest, PinRegfileSuccess)
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
 	pin_flag_in_meta = FALSE; 
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinFIFOfileSuccess)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFIFO, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinSocketfileSuccess)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(-EINVAL, change_pin_flag(inode, S_IFSOCK, TRUE));
 }
 
 TEST_F(change_pin_flagTest, DirHadBeenPinned)

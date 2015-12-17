@@ -90,13 +90,17 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		inode_stat->st_nlink = 1;
 		inode_stat->st_size = NUM_BLOCKS * MOCK_BLOCK_SIZE;
 		if (this_inode == INO_REGFILE || 
-			this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
+			this_inode == INO_REGFILE_XATTR_PAGE_EXIST) {
 			inode_stat->st_mode = S_IFREG;
-		else if (this_inode == INO_DIR || 
-			this_inode == INO_DIR_XATTR_PAGE_EXIST)
+		} else if (this_inode == INO_DIR || 
+			this_inode == INO_DIR_XATTR_PAGE_EXIST) {
 			inode_stat->st_mode = S_IFDIR;
-		else
+		} else if (this_inode == INO_FIFO) {
+			inode_stat->st_mode = S_IFIFO;
+			inode_stat->st_size = 0;
+		} else {
 			inode_stat->st_mode = S_IFLNK;
+		}
 	}
 
 	if (file_meta_ptr) {

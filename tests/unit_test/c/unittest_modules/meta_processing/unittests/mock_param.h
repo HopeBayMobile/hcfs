@@ -48,6 +48,7 @@ char delete_pathcache_node_success;
 
 /* fetch_inode_stat() & fetch_xattr_page() */
 #define INO_REGFILE 12213
+#define INO_FIFO 34534
 #define INO_DIR 9403
 #define INO_LNK 8234
 #define INO_DIR_XATTR_PAGE_EXIST 14423

@@ -1078,7 +1078,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			ret = increase_pinned_size(reserved_pinned_size,
 					tempstat.st_size);
 			if (ret == -ENOSPC) {
-				/* Roll back local_pin because the size
+				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
 				change_pin_flag(this_inode,
 					tempstat.st_mode, FALSE);
@@ -1091,9 +1091,8 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			return ret;
 	}
 
-
 	/* After pinning self, pin all its children for dir.
-	 * file(reg, fifo, socket) can be directly returned. */
+	 * Files(reg, fifo, socket) can be directly returned. */
 	if (S_ISFILE(tempstat.st_mode)) {
 		return ret;
 
