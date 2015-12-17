@@ -7,7 +7,8 @@
 *           scheduling to pin files.
 *
 * Revision History
-* 2015/11/6 Kewei create this file.
+* 2015/11/6 Kewei created this file.
+* 2015/12/15 Kewei added multi-threads policy in pinning_loop().
 *
 **************************************************************************/
 
@@ -76,6 +77,16 @@ void _sleep_a_while(long long rest_times)
 	return;
 }
 
+/**
+ * pinning_collect
+ *
+ * This is a thread collector for the purpose of joinning those pinning
+ * threads that finished their works.
+ *
+ * @param None
+ *
+ * @return None
+ */
 void pinning_collect()
 {
 	int idx;
@@ -122,6 +133,17 @@ void pinning_collect()
 	}
 }
 
+/**
+ * pinning_worker
+ *
+ * This function aims to call "fetch_pinned_blocks()" and appropriately handle
+ * the error when failing. If succeeding in fetch all blocks, then call
+ * "super_block_finish_pinning()" so that dequeue the inode from pinning queue.
+ *
+ * @param ptr A pointer points to needed data when pinning
+ *
+ * @return None
+ */
 void pinning_worker(void *ptr)
 {
 	PINNING_INFO *pinning_info;
@@ -141,22 +163,17 @@ void pinning_worker(void *ptr)
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
 			pinning_scheduler.deep_sleep = TRUE;
 			sem_post(&(pinning_scheduler.ctl_op_sem));
-			//sleep(5);
+
 		} else if (ret == -EIO) { /* Retry it later */
 			write_log(0, "Error: IO error when pinning"
 					" inode %"PRIu64". Try it later\n",
 					(uint64_t)this_inode);
-			//sleep(5);
-		} else if (ret == -ENOENT) {
+
+		} else if (ret == -ENOENT) { /* It is dequeued and deleted */
 			/* It was deleted and dequeued */
 			write_log(10, "Debug: Inode %"PRIu64" is "
 					"deleted when pinning\n",
 					(uint64_t)this_inode);
-		} else if (ret == -ENOTCONN) {
-			/* error handling in case of disconnection */
-		} else if (ret == -ESHUTDOWN) {
-			/* When system going down, do not mark finish
-			   and directly leave the loop */
 		}
 		return; /* Do not dequeue when failing in pinning */
 	}
@@ -175,6 +192,16 @@ void pinning_worker(void *ptr)
 	return;
 }
 
+/**
+ * pinning_loop
+ *
+ * This main loop is in purpose to poll the pinning queue and create threads
+ * to pin all of those inodes when they are in this queue.
+ *
+ * @param None
+ *
+ * @return None
+ */ 
 void pinning_loop()
 {
 	ino_t now_inode;
@@ -215,12 +242,15 @@ void pinning_loop()
 
 		if (start_from_head == TRUE) {
 			/* Sleep 1 sec if inodes are now being handled */
+			super_block_share_locking();
 			if (sys_super_block->head.num_pinning_inodes <=
 				pinning_scheduler.total_active_pinning) {
+				super_block_share_release();
 				sleep(1);
 				continue;
 			}
 			now_inode = sys_super_block->head.first_pin_inode;
+			super_block_share_release();
 			start_from_head = FALSE;
 		}
 
@@ -230,7 +260,7 @@ void pinning_loop()
 			sem_post(&(pinning_scheduler.pinning_sem));
 			break;
 		}
-		/* Check whether this inode is handled */
+		/* Check whether this inode is now being handled */
 		while (now_inode) {
 			found = FALSE;
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
@@ -243,13 +273,19 @@ void pinning_loop()
 			}
 			sem_post(&(pinning_scheduler.ctl_op_sem));
 			if (found == TRUE) { /* Pin next file */
-				super_block_read(now_inode, &sb_entry);
+				ret = super_block_read(now_inode, &sb_entry);
+				if (ret < 0) {
+					write_log(0, "Error: Fail to read sb "
+						"entry. Code %d\n", -ret);
+					now_inode = 0;
+					break;
+				}
 				now_inode = sb_entry.pin_ll_next;
 			} else {
 				break;
 			}
 		}
-		if (now_inode == 0) {
+		if (now_inode == 0) { /* End of pinning queue */
 			sem_post(&(pinning_scheduler.pinning_sem));
 			start_from_head = TRUE;
 			continue;
@@ -271,13 +307,19 @@ void pinning_loop()
 		pthread_create(&pinning_scheduler.pinning_file_tid[t_idx], NULL,
 				(void *)&pinning_worker,
 				(void *)&pinning_scheduler.pinning_info[t_idx]);
-		pinning_scheduler.thread_active[i] = TRUE;
+		pinning_scheduler.thread_active[t_idx] = TRUE;
 		pinning_scheduler.total_active_pinning++;
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 
 		/* Find next inode to be pinned */
-		super_block_read(now_inode, &sb_entry);
-		now_inode = sb_entry.pin_ll_next;
+		ret = super_block_read(now_inode, &sb_entry);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to read sb "
+					"entry. Code %d\n", -ret);
+			now_inode = 0;
+		} else {
+			now_inode = sb_entry.pin_ll_next;
+		}
 	}
 	/**** End of while loop ****/
 

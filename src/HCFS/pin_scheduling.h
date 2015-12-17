@@ -13,7 +13,7 @@
 #include <pthread.h>
 #include "hcfs_fromcloud.h"
 
-#define MAX_PINNING_FILE_CONCURRENCY MAX_PIN_DL_CONCURRENCY
+#define MAX_PINNING_FILE_CONCURRENCY ((MAX_PIN_DL_CONCURRENCY) / 2)
 
 typedef struct {
 	ino_t this_inode;
