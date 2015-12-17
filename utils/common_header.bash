@@ -4,7 +4,7 @@ source $WORKSPACE/utils/trace_error.bash
 set -e
 
 function install_pkg (){
-	[[ "$flags" =~ "x" ]] && flag_x="-x" || flag_x="+x"
+	[[ "$-" =~ "x" ]] && flag_x="-x" || flag_x="+x"
 	set +x
 	for pkg in $packages;
 	do
@@ -23,5 +23,5 @@ function install_pkg (){
 		install=""
 		force_install=""
 	fi
-	set $flag_x
+	eval set $flag_x
 }

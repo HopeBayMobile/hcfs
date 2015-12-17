@@ -1,10 +1,9 @@
 #!/bin/bash
-
+set -x
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $here
 
-source $WORKSPACE/utils/common_header.bash
 
 configfile="$WORKSPACE/utils/env_config.sh"
 if [[ -f /.dockerinit && "$USER" = jenkins ]]; then
@@ -17,15 +16,15 @@ OPTIND=1         # Reset in case getopts has been used previously in the shell.
 
 # Initialize our own variables:
 output_file=""
-verbose=${verbose-0}
+export verbose=${verbose:=0}
 
 while getopts ":vm:" opt; do
 	case $opt in
 	m)
-		setup_dev_env_mode=$OPTARG
+		export setup_dev_env_mode=$OPTARG
 		;;
 	v)
-		verbose=1
+		export verbose=1
 		;;
 	\?)
 		echo "Invalid option: -$OPTARG" >&2
@@ -37,6 +36,8 @@ while getopts ":vm:" opt; do
 		;;
 	esac
 done
+
+source $WORKSPACE/utils/common_header.bash
 
 setup_status_file="${here}/.setup_$setup_dev_env_mode"
 if md5sum --quiet -c "$setup_status_file"; then
@@ -96,8 +97,13 @@ docker_host )
 	fi
 	install_pkg
 	;;
+* )
+	source ./require_compile_deps.bash
+	install_pkg
+	;;
 esac
 
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
 sudo mv -f /tmp/awk_tmp "$configfile"
-md5sum --tag "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
+sudo chmod "$configfile" --reference="${BASH_SOURCE[0]}"
+md5sum "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
