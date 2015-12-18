@@ -7,7 +7,7 @@ export CCACHE_COMPILERCHECK := content
 all : ccache
 
 ccache :
-	$(CCACHE) -M 10G
+	@$(CCACHE) -M 10G
 
 .PHONY: ccache
 endif
