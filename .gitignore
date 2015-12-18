@@ -72,3 +72,5 @@ hcfs_android_log
 
 # Build Process
 .ndk_path
+/build/obj
+/build/libs

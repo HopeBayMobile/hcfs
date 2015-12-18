@@ -41,8 +41,8 @@ LOCAL_CFLAGS    := -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DC
 LOCAL_CFLAGS += -pie -fPIE -Wall -Wextra
 LOCAL_LDFLAGS += -pie -fPIE
 LOCAL_MODULE    := hcfs
-LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)/../../src/HCFS/*.c)
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/sqlite3
+LOCAL_SRC_FILES := $(wildcard HCFS-src/*.c)
+LOCAL_C_INCLUDES := sqlite3
 LOCAL_STATIC_LIBRARIES := libfuse
 LOCAL_SHARED_LIBRARIES := libcurl libssl libcrypto liblz4 libsqlite
 include $(BUILD_EXECUTABLE)
