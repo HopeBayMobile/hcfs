@@ -57,7 +57,7 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	objname_counter++;
 	sem_post(&objname_counter_sem);
 
-	return 0;
+	return 200;
 }
 
 int super_block_share_locking(void)
@@ -115,3 +115,8 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+{
+	sleep(secs);
+	return;
+}

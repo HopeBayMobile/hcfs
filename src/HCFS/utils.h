@@ -21,6 +21,7 @@
 extern SYSTEM_CONF_STRUCT *system_config;
 
 #include "dir_statistics.h"
+#include "global.h"
 
 /*BEGIN string utility definition*/
 
@@ -66,5 +67,7 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
 int reload_system_config(const char *config_path);
+
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
 
 #endif  /* SRC_HCFS_UTILS_H_ */

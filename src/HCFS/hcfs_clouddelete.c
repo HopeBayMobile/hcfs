@@ -76,6 +76,7 @@ static inline void _dsync_terminate_thread(int index)
 			dsync_ctl.threads_in_use[index] = 0;
 			dsync_ctl.threads_created[index] = FALSE;
 			dsync_ctl.threads_finished[index] = FALSE;
+			dsync_ctl.threads_error[index] = FALSE;
 			dsync_ctl.total_active_dsync_threads--;
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		 }
@@ -123,6 +124,7 @@ void collect_finished_dsync_threads(void *ptr)
 static inline void _delete_terminate_thread(int index)
 {
 	int ret;
+	int dsync_index;
 
 	if (((delete_ctl.threads_in_use[index] != 0) &&
 		(delete_ctl.delete_threads[index].is_block == TRUE)) &&
@@ -130,9 +132,16 @@ static inline void _delete_terminate_thread(int index)
 			(delete_ctl.threads_created[index] == TRUE))) {
 		ret = pthread_join(delete_ctl.threads_no[index], NULL);
 		if (ret == 0) {
+			/* Mark error on dsync_ctl.threads_error when failed */
+			if (delete_ctl.threads_error[index] == TRUE) {
+				dsync_index =
+					delete_ctl.delete_threads[index].dsync_index;
+				dsync_ctl.threads_error[dsync_index] = TRUE;
+			}
 			delete_ctl.threads_in_use[index] = FALSE;
 			delete_ctl.threads_created[index] = FALSE;
 			delete_ctl.threads_finished[index] = FALSE;
+			delete_ctl.threads_error[index] = FALSE;
 			delete_ctl.total_active_delete_threads--;
 			sem_post(&(delete_ctl.delete_queue_sem));
 		}
@@ -261,7 +270,8 @@ void init_delete_control(void)
 }
 
 /* Helper function for marking a delete thread as in use */
-static inline int _use_delete_thread(int index, char is_blk_flag,
+static inline int _use_delete_thread(int index, int dsync_index,
+				char is_blk_flag,
 #if (DEDUP_ENABLE)
 				ino_t this_inode, long long blockno,
 				unsigned char *obj_id)
@@ -285,6 +295,7 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	}
 	delete_ctl.delete_threads[index].which_curl = index;
 	delete_ctl.delete_threads[index].which_index = index;
+	delete_ctl.delete_threads[index].dsync_index = dsync_index;
 
 	delete_ctl.total_active_delete_threads++;
 
@@ -312,7 +323,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DIR_META_TYPE tempdirmeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	BLOCK_ENTRY_PAGE temppage;
-	int curl_id, which_index;
+	int curl_id, which_dsync_index;
 	long long current_index;
 	long long page_pos, which_page, current_page;
 	long long count, block_count;
@@ -338,6 +349,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	mlock = FALSE;
 	this_inode = ptr->inode;
+	which_dsync_index = ptr->which_index;
 	system_size_change = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
@@ -467,11 +479,13 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 								count++) {
 #if (DEDUP_ENABLE)
 					ret_val = _use_delete_thread(count,
-						TRUE, ptr->inode, block_count,
+						which_dsync_index, TRUE,
+						ptr->inode, block_count,
 						temppage.block_entries[current_index].obj_id);
 #else
 					ret_val = _use_delete_thread(count,
-						TRUE, ptr->inode, block_count);
+						which_dsync_index, TRUE,
+						ptr->inode, block_count);
 #endif
 					if (ret_val == 0) {
 						curl_id = count;
@@ -489,6 +503,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				mlock = FALSE;
 			}
+
+			/* Check error and delete next time */
+			if (dsync_ctl.threads_error[which_dsync_index] == TRUE)
+				break;
 		}
 		/* Block deletion should be done here. Check if all delete
 		threads for this inode has returned before starting meta
@@ -522,8 +540,16 @@ errcode_handle:
 		fclose(metafptr);
 	}
 
-	if (hcfs_system->system_going_down == TRUE)
+	/* Check threads error */
+	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 		return;
+	}
+
+	if (hcfs_system->system_going_down == TRUE) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		return;
+	}
 
 	/* Delete meta */
 	sem_wait(&(delete_ctl.delete_queue_sem));
@@ -531,9 +557,11 @@ errcode_handle:
 	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
 #if (DEDUP_ENABLE)
-		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, NULL);
+		ret_val = _use_delete_thread(count, which_dsync_index,
+				FALSE, ptr->inode, -1, NULL);
 #else
-		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1);
+		ret_val = _use_delete_thread(count, which_dsync_index,
+				FALSE, ptr->inode, -1);
 #endif
 		if (ret_val == 0) {
 			curl_id = count;
@@ -578,6 +606,13 @@ errcode_handle:
 		else
 			break;
 	}
+
+	/* Check threads error */
+	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		return;
+	}
+
 	/* Update FS stat in the backend if updated previously */
 	if (upload_seq > 0)
 		update_backend_stat(root_inode, -system_size_change, -1);
@@ -586,9 +621,8 @@ errcode_handle:
 	super_block_delete(this_inode);
 	super_block_reclaim();
 
-	which_index = ptr->which_index;
-	dsync_ctl.threads_finished[which_index] = TRUE;
-
+	dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+	return;
 }
 
 /************************************************************************
@@ -671,7 +705,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
-		if ((ret_val >= 200) && (ret_val <= 299))
+		if (((ret_val >= 200) && (ret_val <= 299)) || (ret_val == 404))
 			ret = 0;
 		else
 			ret = -EIO;
@@ -708,19 +742,25 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
 	int which_curl;
 	int which_index;
+	int ret;
 
 	which_curl = delete_thread_ptr->which_curl;
 	which_index = delete_thread_ptr->which_index;
 	if (delete_thread_ptr->is_block == TRUE)
-		do_block_delete(delete_thread_ptr->inode,
+		ret = do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
 #if (DEDUP_ENABLE)
 			delete_thread_ptr->obj_id,
 #endif
 			&(delete_curl_handles[which_curl]));
 	else
-		do_meta_delete(delete_thread_ptr->inode,
+		ret = do_meta_delete(delete_thread_ptr->inode,
 			&(delete_curl_handles[which_curl]));
+
+	if (ret < 0)
+		delete_ctl.threads_error[which_index] = TRUE;
+	else
+		delete_ctl.threads_error[which_index] = FALSE;
 
 	delete_ctl.threads_finished[which_index] = TRUE;
 }
@@ -753,6 +793,16 @@ int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
 *  Return value: None
 *
 *************************************************************************/
+
+static BOOL _sleep_wakeup()
+{
+	if ((hcfs_system->sync_paused == TRUE) ||
+		(hcfs_system->system_going_down == TRUE))
+		return TRUE;
+	else
+		return FALSE;
+}
+
 #ifdef _ANDROID_ENV_
 void *delete_loop(void *ptr)
 #else
@@ -762,6 +812,7 @@ void delete_loop(void)
 	ino_t inode_to_dsync, inode_to_check;
 	SUPER_BLOCK_ENTRY tempentry;
 	int count;
+	short sleep_count;
 	char in_dsync;
 	int ret_val;
 
@@ -772,11 +823,24 @@ void delete_loop(void)
 
 	inode_to_check = 0;
 	while (hcfs_system->system_going_down == FALSE) {
+		/* sleep and continue if backend is offline */
+		if (hcfs_system->sync_paused == TRUE) {
+			sleep(1);
+			continue;
+		}
+
+		/* Sleep 5 secs if backend is online and system is running */
 		if (inode_to_check == 0)
-			sleep(5);
+			nonblock_sleep(5, _sleep_wakeup);
 
 		/* Get the first to-delete inode if inode_to_check is none. */
 		sem_wait(&(dsync_ctl.dsync_queue_sem));
+		/* Terminate immediately if system is going down */
+		if (hcfs_system->system_going_down == TRUE) {
+			sem_post(&(dsync_ctl.dsync_queue_sem));
+			break;
+		}
+
 		super_block_share_locking();
 		if (inode_to_check == 0)
 			inode_to_check =

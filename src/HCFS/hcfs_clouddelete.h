@@ -35,6 +35,7 @@ typedef struct {
 	char is_block;
 	int which_curl;
 	int which_index;
+	int dsync_index;
 } DELETE_THREAD_TYPE;
 
 typedef struct {
@@ -56,6 +57,7 @@ typedef struct {
 	char threads_in_use[MAX_DELETE_CONCURRENCY];
 	char threads_created[MAX_DELETE_CONCURRENCY];
 	char threads_finished[MAX_DELETE_CONCURRENCY];
+	char threads_error[MAX_DELETE_CONCURRENCY];
 	int total_active_delete_threads;
 } DELETE_THREAD_CONTROL;
 
@@ -68,6 +70,7 @@ typedef struct {
 	ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
 	char threads_created[MAX_DSYNC_CONCURRENCY];
 	char threads_finished[MAX_DSYNC_CONCURRENCY];
+	char threads_error[MAX_DSYNC_CONCURRENCY];
 	int total_active_dsync_threads;
 } DSYNC_THREAD_CONTROL;
 
