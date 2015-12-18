@@ -435,7 +435,7 @@ TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
 	mock_meta_entry->inode_num = INO_FIFO;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
 
-	EXPECT_EQ(-EPERM, ret);
+	EXPECT_EQ(-EINVAL, ret);
 	EXPECT_EQ(0, xattr_pos);
 }
 

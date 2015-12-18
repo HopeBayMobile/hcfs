@@ -1618,7 +1618,7 @@ TEST_F(change_pin_flagTest, PinSocketfileSuccess)
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
 	pin_flag_in_meta = FALSE; 
-	EXPECT_EQ(-EINVAL, change_pin_flag(inode, S_IFSOCK, TRUE));
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFSOCK, TRUE));
 }
 
 TEST_F(change_pin_flagTest, DirHadBeenPinned)
