@@ -79,6 +79,7 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 /* Define special file type */
 #define D_NONE 0
 #define D_FIFO 1
+#define D_SOCK 2
 
 /* Define constants for timestamp changes */
 #define ATIME 4

@@ -127,6 +127,8 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 		temp_entry.d_type = D_ISREG;
 		if (S_ISFIFO(child_mode)) /* Add special type */
 			temp_entry.sp_type = D_FIFO;
+		else if (S_ISSOCK(child_mode))
+			temp_entry.sp_type = D_SOCK;
 	}
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
@@ -365,6 +367,8 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 		temp_entry.d_type = D_ISREG;
 		if (S_ISFIFO(child_mode)) /* Add special type */
 			temp_entry.sp_type = D_FIFO;
+		else if (S_ISSOCK(child_mode))
+			temp_entry.sp_type = D_SOCK;
 	}
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
@@ -514,6 +518,8 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 			tpage.dir_entries[count].d_type = D_ISREG;
 			if (S_ISFIFO(new_mode))
 				tpage.dir_entries[count].sp_type = D_FIFO;
+			else if (S_ISSOCK(new_mode))
+				tpage.dir_entries[count].sp_type = D_SOCK;
 			else
 				tpage.dir_entries[count].sp_type = 0;
 

@@ -471,6 +471,9 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 		if (this_entry->sp_type == D_FIFO)
 			ret_val = dir_remove_entry(parent_inode, this_inode,
 				this_entry->d_name, S_IFIFO, parent_ptr);
+		else if (this_entry->sp_type == D_SOCK)
+			ret_val = dir_remove_entry(parent_inode, this_inode,
+				this_entry->d_name, S_IFSOCK, parent_ptr);
 		else
 			ret_val = dir_remove_entry(parent_inode, this_inode,
 				this_entry->d_name, S_IFREG, parent_ptr);
@@ -820,7 +823,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			return ret_code;
 		*xattr_pos = symlinkmeta.next_xattr_page;
 	} else { /* fifo, socket... */
-		return -EPERM;
+		return -EINVAL;
 	}
 
 

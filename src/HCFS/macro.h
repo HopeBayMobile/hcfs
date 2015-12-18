@@ -15,7 +15,7 @@
 
 #include "logger.h"
 
-#define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode))
+#define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode) || S_ISSOCK(mode))
 
 #define UNUSED(x) ((void)x)
 

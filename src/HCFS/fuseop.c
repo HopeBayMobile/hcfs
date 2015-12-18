@@ -4504,6 +4504,9 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				if (temp_page.dir_entries[count].sp_type ==
 						D_FIFO)
 					tempstat.st_mode = S_IFIFO;
+				else if (temp_page.dir_entries[count].sp_type ==
+						D_SOCK)
+					tempstat.st_mode = S_IFSOCK;
 				else
 					tempstat.st_mode = S_IFREG;
 			}
