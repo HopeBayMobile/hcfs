@@ -11,4 +11,4 @@ APP_ABI := armeabi
 #APP_ABI := arm64-v8a x86_64 mips64 armeabi armeabi-v7a x86 mips
 #APP_MODULES := libfuse libssl libcrypto libcurl hcfs
 #NDK_TOOLCHAIN_VERSION := clang
- 
+APP_BUILD_SCRIPT := Android.mk 

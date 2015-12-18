@@ -6,26 +6,10 @@ LOCAL_ALLOW_UNDEFINED_SYMBOLS := true
 include $(CLEAR_VARS)
 LOCAL_CFLAGS	:= -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D__MULTI_THREAD
 LOCAL_MODULE    := libfuse
-LOCAL_SRC_FILES := cuse_lowlevel.c \
-                   fuse.c \
-                   fuse_kern_chan.c \
-                   fuse_loop.c \
-                   fuse_loop_mt.c \
-                   fuse_lowlevel.c \
-                   fuse_mt.c \
-                   fuse_opt.c \
-                   fuse_session.c \
-                   fuse_signals.c \
-                   helper.c \
-                   mount.c \
-                   mount_util.c \
-                   ulockmgr.c
-
-LOCAL_C_INCLUDES := jni/fuse
+LOCAL_SRC_FILES := $(wildcard libfuse/*.c)
+LOCAL_C_INCLUDES := fuse
 LOCAL_CFLAGS += -pie -fPIE
-LOCAL_LDFLAGS += -pie -fPIE
 include $(BUILD_STATIC_LIBRARY)
-#include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libcurl
@@ -57,38 +41,7 @@ LOCAL_CFLAGS    := -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DC
 LOCAL_CFLAGS += -pie -fPIE -Wall -Wextra
 LOCAL_LDFLAGS += -pie -fPIE
 LOCAL_MODULE    := hcfs
-LOCAL_SRC_FILES := mount_manager.c \
-                   FS_manager.c \
-                   dir_entry_btree.c \
-                   api_interface.c \
-                   logger.c \
-                   meta_mem_cache.c \
-                   file_present.c \
-                   fuseop.c \
-                   super_block.c \
-                   utils.c \
-                   hfuse_system.c \
-                   metaops.c \
-                   filetables.c \
-                   hcfscurl.c \
-                   hcfs_tocloud.c \
-                   hcfs_fromcloud.c \
-                   hcfs_cacheops.c \
-                   hcfs_cachebuild.c \
-                   hcfs_clouddelete.c \
-                   lookup_count.c \
-                   b64encode.c \
-                   xattr_ops.c \
-                   enc.c \
-                   path_reconstruct.c \
-                   compress.c \
-                   pin_scheduling.c \
-                   monitor.c \
-                   dir_statistics.c \
-                   parent_lookup.c \
-                   objmeta.c \
-                   dedup_table.c
-
+LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)/../../src/HCFS/*.c)
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/sqlite3
 LOCAL_STATIC_LIBRARIES := libfuse
 LOCAL_SHARED_LIBRARIES := libcurl libssl libcrypto liblz4 libsqlite
