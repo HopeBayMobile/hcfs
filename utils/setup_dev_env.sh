@@ -105,5 +105,5 @@ esac
 
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
 sudo mv -f /tmp/awk_tmp "$configfile"
-sudo chmod "$configfile" --reference="${BASH_SOURCE[0]}"
 md5sum "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
+sudo chmod --reference="${BASH_SOURCE[0]}" "$configfile" "$setup_status_file"
