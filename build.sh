@@ -1,8 +1,13 @@
 #/bin/bash
 
 LOCAL_PATH=`pwd`
-
-NDK_BUILD="/Users/fangyuxun/Android/android-ndk-r10e/ndk-build"
+source $LOCAL_PATH/.ndk_path
+if ! type -P ndk-build && [[ -z "$NDK_BUILD" ]]; then
+	echo "Cannot find path of ndk-build."
+	echo "Please set ndk-build path as following:"
+	echo "echo NDK_BUILD=[NDK_PATH/ndk-build] > $LOCAL_PATH/.ndk_path"
+	exit 1
+fi
 
 echo "=== Start to build HCFS ==="
 src_path=$LOCAL_PATH"/build/HCFS/jni/"
