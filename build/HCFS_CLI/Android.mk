@@ -1,6 +1,6 @@
 # Copyright (C) 2012 Seth Huang<seth.hg@gmail.com>
 #
-LOCAL_PATH := $(call my-dir)
+LOCAL_PATH := $(dir $(call this-makefile))
 
 #include $(CLEAR_VARS)
 

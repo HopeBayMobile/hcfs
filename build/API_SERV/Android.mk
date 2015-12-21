@@ -1,14 +1,16 @@
-LOCAL_PATH := $(abspath $(call my-dir))
+LOCAL_PATH := $(dir $(call this-makefile))
+
+LIBS_PATH := mylibs/$(TARGET_ARCH_ABI)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libjansson
-LOCAL_SRC_FILES := mylibs/$(TARGET_ARCH_ABI)/libjansson.so
+LOCAL_SRC_FILES := $(LIBS_PATH)/libjansson.so
 include $(PREBUILT_SHARED_LIBRARY)
 
 ifeq "$(INCLUDE_SQLITE)" ""
   include $(CLEAR_VARS)
   LOCAL_MODULE    := libsqlite
-  LOCAL_SRC_FILES := mylibs/$(TARGET_ARCH_ABI)/libsqlite.so
+  LOCAL_SRC_FILES := $(LIBS_PATH)/libsqlite.so
   include $(PREBUILT_SHARED_LIBRARY)
 endif
 export INCLUDE_SQLITE := 1
@@ -18,7 +20,7 @@ LOCAL_ARM_MODE := arm
 LOCAL_MODULE    := HCFS_api
 LOCAL_SRC_FILES := $(addprefix API/, HCFS_api.c)
 LOCAL_SHARED_LIBRARIES = libjansson
-LOCAL_C_INCLUDES = $(LOCAL_PATH)
+LOCAL_C_INCLUDES = jansson_config.h jansson.h
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
@@ -27,7 +29,7 @@ LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
 LOCAL_SRC_FILES  := $(addprefix API/, socket_serv.c pin_ops.c utils.c hcfs_stat.c hcfs_sys.c)
 LOCAL_SHARED_LIBRARIES = libsqlite
-LOCAL_C_INCLUDES := $(LOCAL_PATH)
+LOCAL_C_INCLUDES := sqlite3.h
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
@@ -36,5 +38,4 @@ LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
 LOCAL_SRC_FILES  := $(addprefix API/, test.c HCFS_api.c utils.c)
 LOCAL_SHARED_LIBRARIES = libjansson
-LOCAL_C_INCLUDES := $(LOCAL_PATH)
 include $(BUILD_EXECUTABLE)
