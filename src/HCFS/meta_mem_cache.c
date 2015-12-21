@@ -344,7 +344,7 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	/* TODO Right now, may not set meta_dirty to TRUE if only changes
 			pages */
 	if (body_ptr->meta_dirty == TRUE) {
-		if (S_ISREG(body_ptr->this_stat.st_mode)) {
+		if (S_ISFILE(body_ptr->this_stat.st_mode)) {
 			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
 			FWRITE((body_ptr->file_meta), sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);

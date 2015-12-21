@@ -75,6 +75,8 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define D_ISDIR 0
 #define D_ISREG 1
 #define D_ISLNK 2
+#define D_ISFIFO 3
+#define D_ISSOCK 4
 
 /* Define constants for timestamp changes */
 #define ATIME 4

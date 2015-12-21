@@ -82,6 +82,21 @@ TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 	EXPECT_EQ(GENERATION_NUM, gen);
 }
 
+TEST(fetch_inode_statTest, FetchFIFOFileGenerationSuccess)
+{
+	struct stat inode_stat;
+	unsigned long gen;
+	ino_t inode = INO_FIFO;
+
+	gen = 0;
+
+	/* Run */
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen, NULL));
+
+	/* Verify */
+	EXPECT_EQ(GENERATION_NUM, gen);
+}
+
 TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 {
 	struct stat inode_stat;
@@ -227,15 +242,19 @@ class unlink_update_metaTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+		sem_init(&(pathlookup_data_lock), 0, 1);
 	}
 	void TearDown()
 	{
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
+		sem_destroy(&(pathlookup_data_lock));
 	}
 };
 
-TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
+TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
@@ -243,13 +262,12 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_REGFILE;
 	mock_entry.d_type = D_ISREG;
-	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode,
 		&mock_entry));
 }
 
-TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
+TEST_F(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
@@ -257,13 +275,25 @@ TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_REGFILE;
 	mock_entry.d_type = D_ISREG;
-	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
 			&mock_entry));
 }
 
-TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
+TEST_F(unlink_update_metaTest, UnlinkUpdateFIFOfileMetaSuccess)
+{
+	DIR_ENTRY mock_entry;
+	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
+
+	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
+	mock_entry.d_ino = INO_FIFO;
+	mock_entry.d_type = D_ISFIFO;
+
+	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
+			&mock_entry));
+}
+
+TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
@@ -271,13 +301,12 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_LNK;
 	mock_entry.d_type = D_ISLNK;
-	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode,
 			&mock_entry));
 }
 
-TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
+TEST_F(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
@@ -285,7 +314,6 @@ TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_LNK;
 	mock_entry.d_type = D_ISLNK;
-	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
 			&mock_entry));
@@ -395,6 +423,19 @@ TEST_F(fetch_xattr_pageTest, XattrPageNULL)
 	ret = fetch_xattr_page(mock_meta_entry, NULL, NULL);
 
 	EXPECT_EQ(-ENOMEM, ret);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
+{
+	int ret;
+	long long xattr_pos;
+
+	xattr_pos = 0;
+	mock_meta_entry->inode_num = INO_FIFO;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(-EINVAL, ret);
+	EXPECT_EQ(0, xattr_pos);
 }
 
 TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
@@ -665,6 +706,7 @@ protected:
 		CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 			malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->systemdata.pinned_size = 0;
 		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
@@ -690,11 +732,27 @@ TEST_F(pin_inodeTest, FailIn_change_pin_flag)
 	EXPECT_EQ(-ENOMEM, pin_inode(inode, &mock_reserved_size));
 }
 
+TEST_F(pin_inodeTest, PinRegfile_ENOSPC)
+{
+	ino_t inode = INO_REGFILE;
+
+	CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
+	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size));
+}
+
 TEST_F(pin_inodeTest, PinRegfileSuccess)
 {
 	ino_t inode = INO_REGFILE;
 
-	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size));
+	CACHE_HARD_LIMIT = NUM_BLOCKS * MOCK_BLOCK_SIZE * 2;
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinFIFOSuccess)
+{
+	ino_t inode = INO_FIFO;
+
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
 }
 
 TEST_F(pin_inodeTest, PinSymlinkSuccess)
@@ -761,6 +819,13 @@ TEST_F(unpin_inodeTest, FailIn_change_pin_flag)
 TEST_F(unpin_inodeTest, UnpinRegfileSuccess)
 {
 	ino_t inode = INO_REGFILE;
+
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, UnpinFIFOSuccess)
+{
+	ino_t inode = INO_FIFO;
 
 	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
 }

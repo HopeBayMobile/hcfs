@@ -105,7 +105,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 			goto error_handling;
 
 		if (ret_gen != NULL || ret_pin_status != NULL) {
-			if (S_ISREG(returned_stat.st_mode)) {
+			if (S_ISFILE(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_file_data(
 						this_inode, NULL, &filemeta,
 						NULL, 0, temp_entry);
@@ -453,6 +453,7 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	META_CACHE_ENTRY_STRUCT *parent_ptr, *self_ptr;
 	DIR_STATS_TYPE tmpstat;
 	char entry_type;
+	mode_t this_mode;
 
 	this_inode = this_entry->d_ino;
 
@@ -466,23 +467,42 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 
 	entry_type = this_entry->d_type;
 	/* Remove entry */
-	if (this_entry->d_type == D_ISREG) {
+	ret_val = 0;
+	switch (entry_type) {
+	case D_ISREG:
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, S_IFREG, parent_ptr);
-	}
-	if (this_entry->d_type == D_ISLNK) {
+		this_mode = S_IFREG;
+		break;
+	case D_ISFIFO:
+		write_log(10, "Debug unlink_update_meta(): remove fifo.\n");
+		this_mode = S_IFIFO;
+		break;
+	case D_ISSOCK:
+		write_log(10, "Debug unlink_update_meta(): remove socket.\n");
+		this_mode = S_IFSOCK;
+		break;
+	case D_ISLNK:
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, S_IFLNK, parent_ptr);
-	}
-	if (this_entry->d_type == D_ISDIR) {
+		this_mode = S_IFLNK;
+		break;
+	case D_ISDIR:
 		write_log(0, "Error in unlink_update_meta(): unlink a dir.\n");
 		ret_val = -EISDIR;
+		break;
+	default:
+		ret_val = -EINVAL;
 	}
+
 	if (ret_val < 0)
 		goto error_handling;
 
+	/* Remove entry */
+	ret_val = dir_remove_entry(parent_inode, this_inode,
+			this_entry->d_name, this_mode, parent_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
+	/* unlock meta cache */
 	ret_val = meta_cache_close_file(parent_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(parent_ptr);
@@ -803,21 +823,22 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = filemeta.next_xattr_page;
-	}
-	if (S_ISDIR(stat_data.st_mode)) {
+	} else if (S_ISDIR(stat_data.st_mode)) {
 		ret_code = meta_cache_lookup_dir_data(this_inode, NULL,
 			&dirmeta, NULL, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = dirmeta.next_xattr_page;
-	}
-	if (S_ISLNK(stat_data.st_mode)) {
+	} else if (S_ISLNK(stat_data.st_mode)) {
 		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL,
 			&symlinkmeta, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = symlinkmeta.next_xattr_page;
+	} else { /* fifo, socket... */
+		return -EINVAL;
 	}
+
 
 	/* It is used to prevent user from forgetting to open meta file */
 	ret_code = meta_cache_open_file(meta_cache_entry);
@@ -1073,7 +1094,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			ret = increase_pinned_size(reserved_pinned_size,
 					tempstat.st_size);
 			if (ret == -ENOSPC) {
-				/* Roll back local_pin because the size
+				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
 				change_pin_flag(this_inode,
 					tempstat.st_mode, FALSE);
@@ -1086,9 +1107,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			return ret;
 	}
 
-
-	/* After pinning self, pin all its children for dir */
-	if (S_ISREG(tempstat.st_mode)) {
+	/* After pinning self, pin all its children for dir.
+	 * Files(reg, fifo, socket) can be directly returned. */
+	if (S_ISFILE(tempstat.st_mode)) {
 		return ret;
 
 	} else if (S_ISLNK(tempstat.st_mode)) {
@@ -1220,7 +1241,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 	}
 
 	/* After unpinning itself, unpin all its children for dir */
-	if (S_ISREG(tempstat.st_mode)) {
+	if (S_ISFILE(tempstat.st_mode)) {
 		return ret;
 
 	} else if (S_ISLNK(tempstat.st_mode)) {

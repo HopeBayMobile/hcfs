@@ -468,7 +468,8 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 		long long total_reserved_size)
 {
 	int retcode, count, count2;
-	long long total_reserved_size_bak;
+	long long total_reserved_size_bak, zero_size;
+	long long unused_reserved_size;
 
 	retcode = 0;
 
@@ -480,23 +481,28 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 			(uint64_t)pinned_list[count], total_reserved_size);
 		retcode = pin_inode(pinned_list[count], &total_reserved_size);
 		if (retcode < 0) {
+			unused_reserved_size = total_reserved_size;
+
+			/* First return the unused reserved size */
+			if (unused_reserved_size > 0) {
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->systemdata.pinned_size -=
+					unused_reserved_size;
+				if (hcfs_system->systemdata.pinned_size < 0)
+					hcfs_system->systemdata.pinned_size = 0;
+				sem_post(&(hcfs_system->access_sem));
+			}
+
 			/* Roll back */
-			total_reserved_size = total_reserved_size_bak;
-			for (count2 = 0; count2 <= count; count2++) {
+			zero_size = 0;
+			for (count2 = 0; count2 < num_inode; count2++) {
 				write_log(5, "Fail to pin, Roll back inode %"
 					PRIu64"\n",
 					(uint64_t)pinned_list[count2]);
 				unpin_inode(pinned_list[count2],
-							&total_reserved_size);
+							&zero_size);
 			}
 
-			/* Give pinned space back */
-			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->systemdata.pinned_size -=
-					total_reserved_size_bak;
-			if (hcfs_system->systemdata.pinned_size < 0)
-				hcfs_system->systemdata.pinned_size = 0;
-			sem_post(&(hcfs_system->access_sem));
 			write_log(10, "Debug: After roll back, %s%lld\n",
 				  "now system pinned size is ",
 				  hcfs_system->systemdata.pinned_size);
@@ -639,7 +645,7 @@ int checkpin_handle(int arg_len, char *largebuf)
 	if (retcode < 0)
 		goto error_handling;
 
-	if (S_ISREG(thisstat.st_mode)) {
+	if (S_ISFILE(thisstat.st_mode)) {
 		retcode = meta_cache_lookup_file_data(target_inode, NULL,
 						&filemeta, NULL, 0, thisptr);
 		if (retcode < 0)

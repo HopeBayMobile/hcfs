@@ -34,7 +34,7 @@ int init_pin_scheduler()
 int destroy_pin_scheduler()
 {
 	pthread_join(pinning_scheduler.pinning_manager, NULL);
-	write_log(10, "Debug: Terminate pinning scheduler thread\n");
+	write_log(10, "Debug: Pinning scheduler thread terminated\n");
 
 	return 0;
 }
