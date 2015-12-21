@@ -18,7 +18,7 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
 
   $(NDK_CONFIG) :
   ifeq "$(wildcard $(NDK_BUILD))" ""
-	$(error NDK_BUILD is not set)
+	$(error filepath NDK_BUILD is not set)
   else
 	@echo "export NDK_BUILD=$(NDK_BUILD)" > "$(NDK_CONFIG)"
   endif
