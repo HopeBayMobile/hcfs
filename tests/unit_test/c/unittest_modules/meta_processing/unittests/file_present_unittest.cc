@@ -287,8 +287,7 @@ TEST_F(unlink_update_metaTest, UnlinkUpdateFIFOfileMetaSuccess)
 
 	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
 	mock_entry.d_ino = INO_FIFO;
-	mock_entry.d_type = D_ISREG;
-	mock_entry.sp_type = D_FIFO;
+	mock_entry.d_type = D_ISFIFO;
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
 			&mock_entry));

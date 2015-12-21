@@ -4403,6 +4403,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	off_t buf_pos;
 	size_t entry_size, ret_size;
 	int ret, errcode;
+	char this_type;
 
 	UNUSED(file_info);
 	gettimeofday(&tmp_time1, NULL);
@@ -4499,21 +4500,17 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 								count++) {
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
-
-			if (temp_page.dir_entries[count].d_type == D_ISREG) {
-				if (temp_page.dir_entries[count].sp_type ==
-						D_FIFO)
-					tempstat.st_mode = S_IFIFO;
-				else if (temp_page.dir_entries[count].sp_type ==
-						D_SOCK)
-					tempstat.st_mode = S_IFSOCK;
-				else
-					tempstat.st_mode = S_IFREG;
-			}
-			if (temp_page.dir_entries[count].d_type == D_ISDIR)
+			this_type = temp_page.dir_entries[count].d_type;
+			if (this_type == D_ISREG)
+				tempstat.st_mode = S_IFREG;
+			else if (this_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
-			if (temp_page.dir_entries[count].d_type == D_ISLNK)
+			else if (this_type == D_ISLNK)
 				tempstat.st_mode = S_IFLNK;
+			else if (this_type == D_ISFIFO)
+				tempstat.st_mode = S_IFIFO;
+			else if (this_type == D_ISSOCK)
+				tempstat.st_mode = S_IFSOCK;
 
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);

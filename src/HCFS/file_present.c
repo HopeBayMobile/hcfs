@@ -453,6 +453,7 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	META_CACHE_ENTRY_STRUCT *parent_ptr, *self_ptr;
 	DIR_STATS_TYPE tmpstat;
 	char entry_type;
+	mode_t this_mode;
 
 	this_inode = this_entry->d_ino;
 
@@ -466,30 +467,42 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 
 	entry_type = this_entry->d_type;
 	/* Remove entry */
-	if (this_entry->d_type == D_ISREG) {
+	ret_val = 0;
+	switch (entry_type) {
+	case D_ISREG:
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
-		if (this_entry->sp_type == D_FIFO)
-			ret_val = dir_remove_entry(parent_inode, this_inode,
-				this_entry->d_name, S_IFIFO, parent_ptr);
-		else if (this_entry->sp_type == D_SOCK)
-			ret_val = dir_remove_entry(parent_inode, this_inode,
-				this_entry->d_name, S_IFSOCK, parent_ptr);
-		else
-			ret_val = dir_remove_entry(parent_inode, this_inode,
-				this_entry->d_name, S_IFREG, parent_ptr);
-	}
-	if (this_entry->d_type == D_ISLNK) {
+		this_mode = S_IFREG;
+		break;
+	case D_ISFIFO:
+		write_log(10, "Debug unlink_update_meta(): remove fifo.\n");
+		this_mode = S_IFIFO;
+		break;
+	case D_ISSOCK:
+		write_log(10, "Debug unlink_update_meta(): remove socket.\n");
+		this_mode = S_IFSOCK;
+		break;
+	case D_ISLNK:
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, S_IFLNK, parent_ptr);
-	}
-	if (this_entry->d_type == D_ISDIR) {
+		this_mode = S_IFLNK;
+		break;
+	case D_ISDIR:
 		write_log(0, "Error in unlink_update_meta(): unlink a dir.\n");
 		ret_val = -EISDIR;
+		break;
+	default:
+		ret_val = -EINVAL;
 	}
+
 	if (ret_val < 0)
 		goto error_handling;
 
+	/* Remove entry */
+	ret_val = dir_remove_entry(parent_inode, this_inode,
+			this_entry->d_name, this_mode, parent_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
+	/* unlock meta cache */
 	ret_val = meta_cache_close_file(parent_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(parent_ptr);

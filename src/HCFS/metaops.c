@@ -123,17 +123,16 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 
 	temp_entry.d_ino = child_inode;
 	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", childname);
-	if (S_ISFILE(child_mode)) {
+	if (S_ISREG(child_mode))
 		temp_entry.d_type = D_ISREG;
-		if (S_ISFIFO(child_mode)) /* Add special type */
-			temp_entry.sp_type = D_FIFO;
-		else if (S_ISSOCK(child_mode))
-			temp_entry.sp_type = D_SOCK;
-	}
-	if (S_ISDIR(child_mode))
+	else if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
-	if (S_ISLNK(child_mode))
+	else if (S_ISLNK(child_mode))
 		temp_entry.d_type = D_ISLNK;
+	else if (S_ISFIFO(child_mode))
+		temp_entry.d_type = D_ISFIFO;
+	else if (S_ISSOCK(child_mode))
+		temp_entry.d_type = D_ISSOCK;
 
 	/* Load parent meta from meta cache */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -363,17 +362,16 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 
 	temp_entry.d_ino = child_inode;
 	strcpy(temp_entry.d_name, childname);
-	if (S_ISFILE(child_mode)) {
+	if (S_ISREG(child_mode))
 		temp_entry.d_type = D_ISREG;
-		if (S_ISFIFO(child_mode)) /* Add special type */
-			temp_entry.sp_type = D_FIFO;
-		else if (S_ISSOCK(child_mode))
-			temp_entry.sp_type = D_SOCK;
-	}
-	if (S_ISDIR(child_mode))
+	else if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
-	if (S_ISLNK(child_mode))
+	else if (S_ISLNK(child_mode))
 		temp_entry.d_type = D_ISLNK;
+	else if (S_ISFIFO(child_mode))
+		temp_entry.d_type = D_ISFIFO;
+	else if (S_ISSOCK(child_mode))
+		temp_entry.d_type = D_ISSOCK;
 
 	/* Initialize B-tree deletion by first loading the root of B-tree */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -513,15 +511,9 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		if (ret_val < 0)
 			return ret_val;
 		tpage.dir_entries[count].d_ino = new_inode;
-		if (S_ISFILE(new_mode)) {
+		if (S_ISREG(new_mode)) {
 			write_log(10, "Debug: change to type REG\n");
 			tpage.dir_entries[count].d_type = D_ISREG;
-			if (S_ISFIFO(new_mode))
-				tpage.dir_entries[count].sp_type = D_FIFO;
-			else if (S_ISSOCK(new_mode))
-				tpage.dir_entries[count].sp_type = D_SOCK;
-			else
-				tpage.dir_entries[count].sp_type = 0;
 
 		} else if (S_ISLNK(new_mode)) {
 			write_log(10, "Debug: change to type LNK\n");
@@ -531,6 +523,14 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 			write_log(10, "Debug: change to type DIR\n");
 			tpage.dir_entries[count].d_type = D_ISDIR;
 
+		} else if (S_ISFIFO(new_mode)) {
+			write_log(10, "Debug: change to type FIFO\n");
+			tpage.dir_entries[count].d_type = D_ISFIFO;
+
+		} else if (S_ISSOCK(new_mode)) {
+			write_log(10, "Debug: change to type SOCK\n");
+			tpage.dir_entries[count].d_type = D_ISSOCK;
+		
 		} else {
 			write_log(0, "Error: Invalid rename type in %s\n",
 					__func__);
