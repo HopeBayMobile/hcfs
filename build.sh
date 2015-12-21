@@ -23,7 +23,7 @@ function parse_options()
 	while getopts "d:h" opt; do
 		case "$opt" in
 		d)
-			NDK_PATH="$OPTARG"
+			export NDK_BUILD="$OPTARG"
 			;;
 		h)
 			usage
@@ -39,23 +39,24 @@ function parse_options()
 	shift $OPTIND || true
 	ORIG_ARGV=("$@")
 
-	if [[ "$NDK_PATH" = "" ]]; then
-		if type -P ndk-build; then
-			:
+	if [[ "$NDK_BUILD" = "" ]]; then
+		if /usr/bin/which ndk-build; then
+			export NDK_BUILD=`/usr/bin/which ndk-build`
+		else
+			echo "ERROR: please specify filepath of ndk-build with -d."
+			exit 1
 		fi
-		echo "ERROR: please specify Android-ndk directory with -d."
-		exit 1
 	fi
 }
 
-if [ -f "$LOCAL_PATH/build/.ndk_path" ]; then
-	source $LOCAL_PATH/build/.ndk_path
+if [ -f "$LOCAL_PATH/build/.ndk_build" ]; then
+	source $LOCAL_PATH/build/.ndk_build
 fi
 parse_options "$@"
 
-echo export NDK_PATH="$NDK_PATH" > $LOCAL_PATH/build/.ndk_path
-export PATH=$NDK_PATH:$PATH
-hash -r
+if [ -f "$NDK_BUILD" ]; then
+	echo export NDK_BUILD="$NDK_BUILD" > $LOCAL_PATH/build/.ndk_build
+fi
 
 cd $LOCAL_PATH"/build/"
 make
