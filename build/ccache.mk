@@ -1,5 +1,7 @@
+ifeq ($(CCACHE_MK_INCLUDED),)
+
 CCACHE := /usr/bin/ccache
-ifneq ("$(wildcard $(CCACHE))","")
+ifneq ($(wildcard $(CCACHE)),)
 export USE_CCACHE := 1
 export NDK_CCACHE := $(CCACHE)
 export CCACHE_CPP2 := yes
@@ -11,3 +13,6 @@ ccache :
 
 .PHONY: ccache
 endif
+
+endif
+export CCACHE_MK_INCLUDED := 1

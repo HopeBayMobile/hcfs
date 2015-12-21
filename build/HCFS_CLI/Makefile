@@ -1,6 +1,5 @@
-ifneq ($(USE_CCACHE), 1)
 -include ../ccache.mk
-endif
+-include ../android-ndk.mk
 
 export NDK_PROJECT_PATH := .
 export NDK_OUT := ../obj

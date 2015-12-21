@@ -1,31 +1,73 @@
 #/bin/bash
 
-LOCAL_PATH=`pwd`
-source $LOCAL_PATH/.ndk_path
-if ! type -P ndk-build && [[ -z "$NDK_BUILD" ]]; then
-	echo "Cannot find path of ndk-build."
-	echo "Please set ndk-build path as following:"
-	echo "echo NDK_BUILD=[NDK_PATH/ndk-build] > $LOCAL_PATH/.ndk_path"
-	exit 1
+LOCAL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd $LOCAL_PATH
+
+function usage()
+{
+	echo "Usage: ./build.sh [OPTIONS]"
+	echo "Build Android Libraries."
+	echo
+	echo "Required options:"
+	echo "  -d DIR     Path to Android-ndk directory"
+	echo
+	echo "Optional options:"
+	echo "  -h         Show usage"
+}
+
+function parse_options()
+{
+	local OPTIND=1
+	local ORIG_ARGV
+	local opt
+	while getopts "d:h" opt; do
+		case "$opt" in
+		d)
+			NDK_PATH="$OPTARG"
+			;;
+		h)
+			usage
+			exit
+			;;
+		*)
+			return 1
+			;;
+		esac
+	done
+
+	(( OPTIND -= 1 )) || true
+	shift $OPTIND || true
+	ORIG_ARGV=("$@")
+
+	if [[ "$NDK_PATH" = "" ]]; then
+		if type -P ndk-build; then
+			:
+		fi
+		echo "ERROR: please specify Android-ndk directory with -d."
+		exit 1
+	fi
+}
+
+if [ -f "$LOCAL_PATH/build/.ndk_path" ]; then
+	source $LOCAL_PATH/build/.ndk_path
 fi
+parse_options "$@"
+
+echo export NDK_PATH="$NDK_PATH" > $LOCAL_PATH/build/.ndk_path
+export PATH=$NDK_PATH:$PATH
+hash -r
 
 echo "=== Start to build HCFS ==="
-src_path=$LOCAL_PATH"/build/HCFS/jni/"
-cp $LOCAL_PATH/src/HCFS/*.c $src_path
-cp $LOCAL_PATH/src/HCFS/*.h $src_path
+src_path=$LOCAL_PATH"/build/HCFS/"
 cd $src_path
-$NDK_BUILD
+make
 
 echo "=== Start to build HCFS CLI ==="
-src_path=$LOCAL_PATH"/build/HCFS_CLI/jni/"
-cp $LOCAL_PATH/src/CLI_utils/*.c $src_path
-cp $LOCAL_PATH/src/CLI_utils/*.h $src_path
+src_path=$LOCAL_PATH"/build/HCFS_CLI/"
 cd $src_path
-$NDK_BUILD
+make
 
 echo "=== Start to build API Server ==="
-src_path=$LOCAL_PATH"/build/API_SERV/jni/"
-cp $LOCAL_PATH/src/API/*.c $src_path
-cp $LOCAL_PATH/src/API/*.h $src_path
+src_path=$LOCAL_PATH"/build/API_SERV/"
 cd $src_path
-$NDK_BUILD
+make
