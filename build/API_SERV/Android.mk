@@ -1,14 +1,17 @@
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH := $(abspath $(call my-dir))
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := libjansson
-LOCAL_SRC_FILES := $(LOCAL_PATH)/mylibs/$(TARGET_ARCH_ABI)/libjansson.so
+LOCAL_SRC_FILES := mylibs/$(TARGET_ARCH_ABI)/libjansson.so
 include $(PREBUILT_SHARED_LIBRARY)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE    := libsqlite
-LOCAL_SRC_FILES := $(LOCAL_PATH)/mylibs/$(TARGET_ARCH_ABI)/libsqlite.so
-include $(PREBUILT_SHARED_LIBRARY)
+ifeq "$(INCLUDE_SQLITE)" ""
+  include $(CLEAR_VARS)
+  LOCAL_MODULE    := libsqlite
+  LOCAL_SRC_FILES := mylibs/$(TARGET_ARCH_ABI)/libsqlite.so
+  include $(PREBUILT_SHARED_LIBRARY)
+endif
+export INCLUDE_SQLITE := 1
 
 include $(CLEAR_VARS)
 LOCAL_ARM_MODE := arm

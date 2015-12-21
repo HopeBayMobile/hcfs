@@ -1,14 +1,13 @@
+all :
 -include ccache.mk
 -include android-ndk.mk
 
-PROJS = HCFS HCFS_CLI API_SERV
+export NDK_PROJECT_PATH := $(abspath .)
+export NDK_OUT := $(abspath ./obj)
+export NDK_LIBS_OUT := $(abspath ./libs)
 
-all : $(PROJS)
-
-$(PROJS) :
-	make -C $@
+all : setup
+	ndk-build NDK_APPLICATION_MK=Application.mk
 
 clean :
 	rm -rf libs obj
-
-.PHONY : $(PROJS)
