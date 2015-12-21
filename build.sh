@@ -57,17 +57,5 @@ echo export NDK_PATH="$NDK_PATH" > $LOCAL_PATH/build/.ndk_path
 export PATH=$NDK_PATH:$PATH
 hash -r
 
-echo "=== Start to build HCFS ==="
-src_path=$LOCAL_PATH"/build/HCFS/"
-cd $src_path
-make
-
-echo "=== Start to build HCFS CLI ==="
-src_path=$LOCAL_PATH"/build/HCFS_CLI/"
-cd $src_path
-make
-
-echo "=== Start to build API Server ==="
-src_path=$LOCAL_PATH"/build/API_SERV/"
-cd $src_path
+cd $LOCAL_PATH"/build/"
 make

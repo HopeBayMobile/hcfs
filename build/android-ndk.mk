@@ -20,7 +20,7 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
   ifeq "$(NDK_PATH)" ""
 	$(error NDK_PATH is not set)
   else
-	@echo "export NDK_PATH:=$(NDK_PATH)" > "$(NDK_CONFIG)"
+	@echo "export NDK_PATH = $(NDK_PATH)" > "$(NDK_CONFIG)"
   endif
   
   .PHONY : setup
