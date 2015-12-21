@@ -11,3 +11,7 @@ all : setup
 
 clean :
 	rm -rf libs obj
+
+.PHONY : setup
+
+
