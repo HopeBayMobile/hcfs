@@ -250,10 +250,10 @@ void init_delete_control(void)
 /* Helper function for marking a delete thread as in use */
 static inline int _use_delete_thread(int index, char is_blk_flag,
 #if (DEDUP_ENABLE)
-				ino_t this_inode, long long blockno,
-				unsigned char *obj_id)
+		ino_t this_inode, long long blockno, long long seq,
+		unsigned char *obj_id)
 #else
-				ino_t this_inode, long long blockno)
+		ino_t this_inode, long long blockno, long long seq)
 #endif
 {
 	if (delete_ctl.threads_in_use[index] != FALSE)
@@ -263,6 +263,7 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	delete_ctl.threads_created[index] = FALSE;
 	delete_ctl.delete_threads[index].is_block = is_blk_flag;
 	delete_ctl.delete_threads[index].inode = this_inode;
+	delete_ctl.delete_threads[index].seq = seq;
 	if (is_blk_flag == TRUE) {
 #if (DEDUP_ENABLE)
 		memcpy(delete_ctl.delete_threads[index].obj_id, obj_id, OBJID_LENGTH);
@@ -316,6 +317,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char mlock, backend_mlock;
 	long long system_size_change;
 	long long upload_seq;
+	long long block_seq;
 	ino_t root_inode;
 	char is_meta_on_cloud;
 
@@ -448,6 +450,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 			block_status =
 				temppage.block_entries[current_index].status;
+			block_seq = MAX(
+				temppage.block_entries[current_index].seqnum[0],
+				temppage.block_entries[current_index].seqnum[1]);
 
 			/* Delete backend object if uploaded */
 			if ((block_status != ST_NONE) && 
@@ -459,11 +464,15 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 								count++) {
 #if (DEDUP_ENABLE)
 					ret_val = _use_delete_thread(count,
-						TRUE, ptr->inode, block_count,
+						TRUE, ptr->inode,
+						block_count,
+						block_seq,
 						temppage.block_entries[current_index].obj_id);
 #else
 					ret_val = _use_delete_thread(count,
-						TRUE, ptr->inode, block_count);
+						TRUE, ptr->inode,
+						block_count,
+						block_seq);
 #endif
 					if (ret_val == 0) {
 						curl_id = count;
@@ -526,9 +535,9 @@ errcode_handle:
 	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
 #if (DEDUP_ENABLE)
-		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, NULL);
+		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, 0, NULL);
 #else
-		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1);
+		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, 0);
 #endif
 		if (ret_val == 0) {
 			curl_id = count;
@@ -657,18 +666,18 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
 #elif defined(ARM_32bit_)
 	sprintf(objname, "data_%lld_%lld_%lld", this_inode, block_no, seq);
-	write_log(10,
-		"Debug delete object: objname %s, inode %lld, block %lld\n",
-					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+	//write_log(10,
+	//	"Debug delete object: objname %s, inode %lld, block %lld\n",
+	//				objname, this_inode, block_no);
+	//sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
 	/* Force to delete */
 	ddt_ret = 0;
 #else
 	sprintf(objname, "data_%ld_%lld_%lld", this_inode, block_no, seq);
-	write_log(10,
-		"Debug delete object: objname %s, inode %ld, block %lld\n",
-					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
+	//write_log(10,
+	//	"Debug delete object: objname %s, inode %ld, block %lld\n",
+	//				objname, this_inode, block_no);
+	//sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
 	/* Force to delete */
 	ddt_ret = 0;
 #endif
@@ -678,12 +687,12 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 		write_log(10,
 			"Debug delete object: objname %s, inode %lld, block %lld\n",
 						objname, this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%lld_%lld_%lld", this_inode, block_no, seq);
 #else
 		write_log(10,
 			"Debug delete object: objname %s, inode %ld, block %lld\n",
 						objname, this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%ld_%lld_%lld", this_inode, block_no, seq);
 #endif
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
@@ -727,7 +736,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	which_curl = delete_thread_ptr->which_curl;
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
-			delete_thread_ptr->blockno, 0, 
+			delete_thread_ptr->blockno, delete_thread_ptr->seq, 
 #if (DEDUP_ENABLE)
 			delete_thread_ptr->obj_id,
 #endif

@@ -22,7 +22,7 @@ typedef struct {
 typedef struct {
 	char finish_uploading;
 	char block_exist; /*first bit means toupload block, second means cloud*/
-#ifdef DEDUP_ENABLE
+#if DEDUP_ENABLE
 	unsigned char to_upload_objid[OBJID_LENGTH];
 	unsigned char backend_objid[OBJID_LENGTH];
 #else
@@ -55,7 +55,7 @@ int get_progress_info(int fd, long long block_index,
 int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
-#ifdef DEDUP_ENABLE
+#if DEDUP_ENABLE
 int set_progress_info(int fd, long long block_index,
 	const char *toupload_exist, const char *backend_exist,
 	const unsigned char *toupload_objid, const unsigned char *backend_objid,

@@ -30,6 +30,7 @@
 typedef struct {
 	ino_t inode;
 	long long blockno;
+	long long seq;
 #if (DEDUP_ENABLE)
 	unsigned char obj_id[OBJID_LENGTH];
 #endif

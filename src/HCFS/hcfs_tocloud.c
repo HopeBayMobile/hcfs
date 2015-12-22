@@ -178,6 +178,7 @@ static inline int _upload_terminate_thread(int index)
 	off_t page_filepos;
 	long long e_index;
 	long long blockno;
+	long long toupload_block_seq;
 	BLOCK_ENTRY_PAGE temppage;
 	char is_delete;
 	BLOCK_ENTRY *tmp_entry;
@@ -240,6 +241,7 @@ static inline int _upload_terminate_thread(int index)
 	e_index = upload_ctl.upload_threads[index].page_entry_index;
 	blockno = upload_ctl.upload_threads[index].blockno;
 	progress_fd = upload_ctl.upload_threads[index].progress_fd;
+	toupload_block_seq = upload_ctl.upload_threads[index].seq;
 
 	/* Terminate directly whenthread is used to delete old data on cloud */
 	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {
@@ -298,14 +300,10 @@ static inline int _upload_terminate_thread(int index)
 		blk_obj_id, NULL, &finish_uploading);
 
 #else
-	memset(&temp_block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
-	temp_block_uploading_status.finish_uploading = TRUE;
-	temp_block_uploading_status.to_upload_seq = 0; /* temp */
-	SET_TOUPLOAD_BLOCK_EXIST(temp_block_uploading_status.block_exist);
 	toupload_exist = TRUE;
 	finish_uploading = TRUE;
-	set_progress_info(progress_fd, blockno, &temp_block_uploading_status,
-		TOUPLOAD_BLOCKS);
+	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
+		&toupload_block_seq, NULL, &finish_uploading);
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
 #endif
 	fetch_toupload_block_path(toupload_blockpath, this_inode, blockno, 0);
@@ -736,7 +734,7 @@ static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 
 
 
-#ifdef DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 static inline int _choose_deleted_block(char delete_which_one, 
 	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
 {
@@ -792,9 +790,9 @@ static inline int _choose_deleted_block(char delete_which_one,
 	if (delete_which_one == TOUPLOAD_BLOCKS) {
 		if (finish_uploading == FALSE)
 			return -1;
-		if (to_upload_seq == backend_seq)
+		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == FALSE)
 			return -1;
-		if (to_upload_seq == 0)
+		if (to_upload_seq == backend_seq)
 			return -1;
 
 		*block_seq = to_upload_seq;
@@ -802,8 +800,8 @@ static inline int _choose_deleted_block(char delete_which_one,
 	}
 
 	if (delete_which_one == BACKEND_BLOCKS) {
-		if (backend_seq == 0)
-			return -1;
+		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
+			return -1;		
 		if (to_upload_seq == backend_seq)
 			return -1;
 
@@ -908,6 +906,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	ino_t root_inode;
 	long long backend_size;
 	long long size_diff;
+	long long toupload_block_seq;
 	int progress_fd;
 	char first_upload, is_local_meta_deleted;
 	BLOCK_UPLOADING_STATUS temp_uploading_status;
@@ -1112,6 +1111,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			}
 			tmp_entry = &(toupload_temppage.block_entries[e_index]);
 			toupload_block_status = tmp_entry->status;
+			toupload_block_seq = MAX(tmp_entry->seqnum[0],
+							tmp_entry->seqnum[1]);
 			/*TODO: error handling here if cannot read correctly*/
 
 			/* Lock local meta. Read local meta and update status.
@@ -1156,13 +1157,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						TRUE,
 						tmp_entry->obj_id,
 						ptr->inode, block_count,
-						0, page_pos,
+						toupload_block_seq, page_pos,
 						e_index, progress_fd,
 						FALSE);
 #else
 				which_curl = _select_upload_thread(TRUE, FALSE,
 						ptr->inode, block_count,
-						0, page_pos,
+						toupload_block_seq, page_pos,
 						e_index, progress_fd,
 						FALSE);
 #endif
@@ -1188,13 +1189,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						TRUE,
 						tmp_entry->obj_id,
 						ptr->inode, block_count,
-						0, page_pos,
+						toupload_block_seq, page_pos,
 						e_index, progress_fd,
 						FALSE);
 #else
 				which_curl = _select_upload_thread(TRUE, FALSE,
 						ptr->inode, block_count,
-						0, page_pos,
+						toupload_block_seq, page_pos,
 						e_index, progress_fd,
 						FALSE);
 #endif
@@ -1222,7 +1223,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(local_metafptr), LOCK_UN);
 				set_progress_info(progress_fd, block_count,
 					TRUE, 0, 0);*/
-#if (DEDUP_ENABLE)
+//#if (DEDUP_ENABLE)
 				if (local_block_status == ST_TODELETE) {
 					memset(tmp_entry, 0,
 							sizeof(BLOCK_ENTRY));
@@ -1240,7 +1241,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				set_progress_info(progress_fd, block_count,
 					&toupload_exist, NULL, NULL, NULL,
 					&finish_uploading);
-#else
+/*#else
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
@@ -1251,7 +1252,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						FALSE);
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
-#endif
+#endif*/
 				continue;	
 			}
 
@@ -1272,18 +1273,15 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 				finish_uploading = TRUE;
 				toupload_exist = TRUE;
-#ifdef DEDUP_ENABLE
-				set_progress_info(progress_fd,
-						block_count, &toupload_exist,
-						NULL, tmp_entry->obj_id, NULL,
-						&finish_uploading);	
-#else
-				memset(&temp_uploading_status, 0,
-					sizeof(BLOCK_UPLOADING_STATUS));
-				temp_uploading_status.to_upload_seq = 0; /*temp*/
+#if DEDUP_ENABLE
 				set_progress_info(progress_fd,
 					block_count, &toupload_exist, NULL,
-					&temp_block_uploading_status.to_upload_seq, NULL,
+					tmp_entry->obj_id, NULL,
+					&finish_uploading);	
+#else
+				set_progress_info(progress_fd,
+					block_count, &toupload_exist, NULL,
+					&toupload_block_seq, NULL,
 					&finish_uploading);
 #endif
 			}
@@ -1464,10 +1462,12 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	DDT_BTREE_NODE tree_root, result_node;
 	DDT_BTREE_META ddt_meta;
 
-#ifdef ARM_32bit_
+#if (DEDUP_ENABLE)
 	sprintf(curl_handle->id, "upload_blk_%lld_%lld", this_inode, block_no);
+#elif ARM_32bit_
+	sprintf(curl_handle->id, "upload_blk_%lld_%lld_%lld", this_inode, block_no, seq);
 #else
-	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
+	sprintf(curl_handle->id, "upload_blk_%ld_%lld_%lld", this_inode, block_no, seq);
 #endif
 
 	fptr = fopen(filename, "r");
@@ -1524,6 +1524,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		/* Find a same object in cloud
 		 * Just increase the refcount of the origin block
 		 */
+#if DEDUP_ENABLE
 		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
 						objname);
 
@@ -1536,6 +1537,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 			return ret;
 		}
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
+#endif
 
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
@@ -1688,7 +1690,7 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	int which_curl, ret, count1;
 
 	which_curl = thread_ptr->which_curl;
-	if (thread_ptr->is_block == TRUE)
+	if (thread_ptr->is_block == TRUE) {
 #if (DEDUP_ENABLE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
 					thread_ptr->seq,
@@ -1699,6 +1701,8 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 					thread_ptr->seq,
 					&(upload_curl_handles[which_curl]));
 #endif
+	}
+
 	if (ret < 0)
 		goto errcode_handle;
 
