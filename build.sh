@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 LOCAL_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $LOCAL_PATH
