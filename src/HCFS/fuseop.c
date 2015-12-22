@@ -2968,8 +2968,9 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		}
 
 		long long now_seq;
-		now_seq = MAX(temppage.block_entries[entry_index].seqnum[0], 
-			temppage.block_entries[entry_index].seqnum[1]);
+		/*now_seq = MAX(temppage.block_entries[entry_index].seqnum[0], 
+			temppage.block_entries[entry_index].seqnum[1]);*/
+		now_seq = 0;
 
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:

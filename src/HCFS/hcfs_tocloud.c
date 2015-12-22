@@ -1016,6 +1016,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			PREAD(fileno(backend_metafptr), &tempfilestat,
 				sizeof(struct stat), 0);
 			backend_size = tempfilestat.st_size;
+			write_log(10, "Debug: backend meta size = %lld\n",
+					backend_size);
 			total_backend_blocks = (backend_size == 0) ? 
 				0 : (backend_size - 1) / MAX_BLOCK_SIZE + 1;
 			ret = init_progress_info(progress_fd,
@@ -1126,8 +1128,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			}
 			tmp_entry = &(toupload_temppage.block_entries[e_index]);
 			toupload_block_status = tmp_entry->status;
-			toupload_block_seq = MAX(tmp_entry->seqnum[0],
-							tmp_entry->seqnum[1]);
+			/*toupload_block_seq = MAX(tmp_entry->seqnum[0],
+							tmp_entry->seqnum[1]);*/
+			toupload_block_seq = 0;
 			/*TODO: error handling here if cannot read correctly*/
 
 			/* Lock local meta. Read local meta and update status.
@@ -1151,8 +1154,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			tmp_entry = &(local_temppage.
 					block_entries[e_index]);
 			local_block_status = tmp_entry->status;
-			local_block_seq = MAX(tmp_entry->seqnum[0],
-						tmp_entry->seqnum[1]);
+			/*local_block_seq = MAX(tmp_entry->seqnum[0],
+						tmp_entry->seqnum[1]);*/
+			local_block_seq = 0;
 
 			/*** Case 1: Local is dirty. Update status & upload ***/
 			if (toupload_block_status == ST_LDISK) {
@@ -2040,7 +2044,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					break;
 				}
 				ret = check_and_copy_file(local_metapath,
-					toupload_metapath, directly_copy);
+					toupload_metapath);
 				if (ret < 0)
 					break;
 			}

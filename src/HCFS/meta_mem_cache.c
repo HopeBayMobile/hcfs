@@ -1611,11 +1611,6 @@ int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	return 0;
 }
 
-inline char is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
-{
-	return body_ptr->uploading_info.is_uploading;
-}
-
 int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	long long bindex, long long seq)
 {
@@ -1636,41 +1631,7 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		fetch_block_path(local_bpath, inode, bindex);
 		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
 		write_log(10, "Debug: begin to copy block in %s", __func__);
-		ret = check_and_copy_file(local_bpath, toupload_bpath,
-			block_copy);
-		if (ret < 0) {
-			if (ret != -EEXIST) {
-				write_log(0, "Error: Copy block error in %s",
-				__func__);
-				return ret;
-			}
-		}
-		return ret;
-	}
-}
-
-int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
-	long long bindex, long long seq)
-{
-	char toupload_bpath[500], local_bpath[500];
-	char inode_uploading;
-	int progress_fd;
-	int ret;
-
-	inode_uploading = body_ptr->uploading_info.is_uploading;
-	progress_fd = body_ptr->uploading_info.progress_list_fd;
-
-	if (inode_uploading == FALSE) {
-		return 0;
-	} else if ((inode_uploading == TRUE) && 
-		(did_block_finish_uploading(progress_fd, bindex) == TRUE)) {
-		return 0;
-	} else {
-		fetch_block_path(local_bpath, inode, bindex);
-		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
-		write_log(10, "Debug: begin to copy block in %s", __func__);
-		ret = check_and_copy_file(local_bpath, toupload_bpath,
-			block_copy);
+		ret = check_and_copy_file(local_bpath, toupload_bpath);
 		if (ret < 0) {
 			if (ret != -EEXIST) {
 				write_log(0, "Error: Copy block error in %s",

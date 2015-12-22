@@ -67,13 +67,7 @@ int fetch_from_cloud(FILE *fptr,
 #elif ARM_32bit_
 	sprintf(objname, "data_%lld_%lld_0", this_inode, block_no);
 #else
-	sprintf(objname, "data_%ld_%lld_%lld", this_inode, block_no, seqnum);
-	/* Tag temp file for download here */
-	ret = fetch_dltmp_path(pathname, this_inode, block_no);
-	if (ret < 0)
-		return ret;
-	write_log(10, "Debug: dltmp path = %s\n", pathname);
-	MKNOD(pathname, S_IFREG | 0600, 0);
+	sprintf(objname, "data_%ld_%lld_%lld", this_inode, block_no, 0); // seqnum
 #endif
 
 	sem_wait(&download_curl_sem);

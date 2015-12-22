@@ -450,9 +450,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 			block_status =
 				temppage.block_entries[current_index].status;
-			block_seq = MAX(
+			block_seq = 0;/*MAX(
 				temppage.block_entries[current_index].seqnum[0],
-				temppage.block_entries[current_index].seqnum[1]);
+				temppage.block_entries[current_index].seqnum[1]);*/
 
 			/* Delete backend object if uploaded */
 			if ((block_status != ST_NONE) && 
