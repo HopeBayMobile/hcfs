@@ -1,6 +1,6 @@
 LOCAL_PATH := $(dir $(call this-makefile))
 
-LIBS_PATH := mylibs/$(TARGET_ARCH_ABI)
+LIBS_PATH := prebuilt/$(TARGET_ARCH_ABI)
 LOCAL_ALLOW_UNDEFINED_SYMBOLS := true
 
 include $(CLEAR_VARS)
@@ -41,8 +41,8 @@ LOCAL_CFLAGS    := -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DC
 LOCAL_CFLAGS    += -pie -fPIE -Wall -Wextra
 LOCAL_LDFLAGS   += -pie -fPIE
 LOCAL_MODULE    := hcfs
-LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)HCFS-src/*.c)
-LOCAL_C_INCLUDES := $(LOCAL_PATH)sqlite3/
+LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)src/*.c)
+LOCAL_C_INCLUDES := include/sqlite3 include
 LOCAL_SHARED_LIBRARIES := libfuse libcurl libssl libcrypto liblz4 libsqlite
 include $(BUILD_EXECUTABLE)
 
