@@ -22,7 +22,7 @@ typedef struct {
 typedef struct {
 	char finish_uploading;
 	char block_exist; /*first bit means toupload block, second means cloud*/
-#if DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 	unsigned char to_upload_objid[OBJID_LENGTH];
 	unsigned char backend_objid[OBJID_LENGTH];
 #else

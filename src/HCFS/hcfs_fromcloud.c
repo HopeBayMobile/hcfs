@@ -67,7 +67,13 @@ int fetch_from_cloud(FILE *fptr,
 #elif ARM_32bit_
 	sprintf(objname, "data_%lld_%lld_0", this_inode, block_no);
 #else
-	sprintf(objname, "data_%ld_%lld_0", this_inode, block_no);
+	sprintf(objname, "data_%ld_%lld_%lld", this_inode, block_no, seqnum);
+	/* Tag temp file for download here */
+	ret = fetch_dltmp_path(pathname, this_inode, block_no);
+	if (ret < 0)
+		return ret;
+	write_log(10, "Debug: dltmp path = %s\n", pathname);
+	MKNOD(pathname, S_IFREG | 0600, 0);
 #endif
 
 	sem_wait(&download_curl_sem);
@@ -95,6 +101,24 @@ int fetch_from_cloud(FILE *fptr,
 				 &(download_curl_handles[which_curl_handle]));
 
 	fclose(get_fptr);
+
+	sem_wait(&download_curl_control_sem);
+	curl_handle_mask[which_curl_handle] = FALSE;
+	sem_post(&download_curl_sem);
+	sem_post(&download_curl_control_sem);
+
+	/* Already retried in get object if necessary */
+	write_log(10, "Debug: In %s, ret status = %d\n", __func__, status);
+	if ((status >= 200) && (status <= 299))
+		ret = 0;
+	else
+		ret = -EIO;
+
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	unsigned char *key = NULL;
 #if ENCRYPT_ENABLE
 	key = get_key();

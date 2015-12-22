@@ -304,6 +304,14 @@ static inline int _upload_terminate_thread(int index)
 	finish_uploading = TRUE;
 	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
 		&toupload_block_seq, NULL, &finish_uploading);
+	//write_log(10, "Debug: finish uploading, block%ld_%lld_%lld", this_inode, blockno, toupload_block_seq);
+	//BLOCK_UPLOADING_STATUS tmp_status;
+	//BLOCK_UPLOADING_PAGE tmp_page;
+	//get_progress_info(progress_fd, blockno, &tmp_status);
+	//pread(progress_fd, &tmp_page, sizeof(BLOCK_UPLOADING_PAGE), sizeof(PROGRESS_META));
+	
+	//write_log(10, "Debug: finish uploading, block%ld_%lld_%lld, sizeof progressmeta = %d", 
+	//	this_inode, blockno, tmp_page.status_entry[blockno].to_upload_seq, sizeof(PROGRESS_META));
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
 #endif
 	fetch_toupload_block_path(toupload_blockpath, this_inode, blockno, 0);
@@ -787,6 +795,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
 
+	write_log(10, "Debug: toupload_seq = %lld, backend_seq = %lld\n", to_upload_seq, backend_seq);
 	if (delete_which_one == TOUPLOAD_BLOCKS) {
 		if (finish_uploading == FALSE)
 			return -1;
@@ -906,7 +915,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	ino_t root_inode;
 	long long backend_size;
 	long long size_diff;
-	long long toupload_block_seq;
+	long long toupload_block_seq, local_block_seq;
 	int progress_fd;
 	char first_upload, is_local_meta_deleted;
 	BLOCK_UPLOADING_STATUS temp_uploading_status;
@@ -1118,7 +1127,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			/* Lock local meta. Read local meta and update status.
 			   This should be read again even in the same page pos
 			   because someone may modify it. */
-
 			if (is_local_meta_deleted == FALSE) {
 				flock(fileno(local_metafptr), LOCK_EX);
 				if (access(local_metapath, F_OK) < 0) {
@@ -1137,10 +1145,17 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			tmp_entry = &(local_temppage.
 					block_entries[e_index]);
 			local_block_status = tmp_entry->status;
+			local_block_seq = MAX(tmp_entry->seqnum[0],
+						tmp_entry->seqnum[1]);
 
 			/*** Case 1: Local is dirty. Update status & upload ***/
 			if (toupload_block_status == ST_LDISK) {
-				if (local_block_status != ST_TODELETE) {
+				/* Important: Update status if this block is
+				not deleted or is NOT newer than to-upload
+				version. */
+				if ((local_block_status != ST_TODELETE) &&
+					(local_block_seq == toupload_block_seq)) {
+
 					tmp_entry->status = ST_LtoC;
 					/* Update local meta */
 					FSEEK_ADHOC_SYNC_LOOP(local_metafptr,

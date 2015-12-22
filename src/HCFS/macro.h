@@ -112,8 +112,8 @@
 		ret = mknod(A, B, C);\
 		if (ret < 0) {\
 			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
-				errcode, strerror(errcode));\
+			write_log(0, "IO error in %s. Code %d, %s, %d\n", __func__,\
+				errcode, strerror(errcode), __LINE__);\
 			errcode = -errcode;\
 			goto errcode_handle;\
 		} \

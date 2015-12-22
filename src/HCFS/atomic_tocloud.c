@@ -396,8 +396,7 @@ int set_progress_info(int fd, long long block_index,
 	if (finish)
 		block_uploading_status->finish_uploading = *finish;
 
-	PWRITE(fd, &block_uploading_status,
-		sizeof(BLOCK_UPLOADING_STATUS), offset);
+	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
 	if (block_uploading_status->finish_uploading == TRUE)
@@ -407,6 +406,7 @@ int set_progress_info(int fd, long long block_index,
 	return 0;
 
 errcode_handle:
+	flock(fd, LOCK_UN);
 	return errcode;
 }
 #endif
