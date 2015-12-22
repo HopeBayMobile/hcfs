@@ -1645,7 +1645,6 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	unsigned char *key = get_key();
 	unsigned char *data = NULL;
 	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
-	//FILE *new_fptr = fptr;
 
 	fclose(fptr);
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
