@@ -2967,6 +2967,10 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			return 0;
 		}
 
+		long long now_seq;
+		now_seq = MAX(temppage.block_entries[entry_index].seqnum[0], 
+			temppage.block_entries[entry_index].seqnum[1]);
+
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
 		case ST_TODELETE:
@@ -3003,9 +3007,11 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			change_system_meta(0, 0, 1);
 			break;
 		case ST_LDISK:
+			meta_cache_check_uploading(fh_ptr->meta_cache_ptr, this_inode, bindex, now_seq);
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
+			meta_cache_check_uploading(fh_ptr->meta_cache_ptr, this_inode, bindex, now_seq);
 			(temppage).block_entries[entry_index].status = ST_LDISK;
 			ret = setxattr(thisblockpath, "user.dirty", "T", 1, 0);
 			if (ret < 0) {

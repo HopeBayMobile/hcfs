@@ -442,7 +442,7 @@ static inline int _upload_terminate_thread(int index)
 	return 0;
 
 errcode_handle:
-#ifdef DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 	if (is_toupload_meta_lock == TRUE) {
 		flock(fileno(toupload_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);	
@@ -1294,7 +1294,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 				finish_uploading = TRUE;
 				toupload_exist = TRUE;
-#if DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 				set_progress_info(progress_fd,
 					block_count, &toupload_exist, NULL,
 					tmp_entry->obj_id, NULL,
@@ -1374,14 +1374,15 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			size_diff = 0;
 		}
 
+		flock(fileno(local_metafptr), LOCK_UN);
+		fclose(local_metafptr);
+		fclose(toupload_metafptr);
+
 		write_log(10, "Debug: Now inode %ld has upload_seq = %lld\n", ptr->inode, upload_seq);
 		ret = schedule_sync_meta(toupload_metapath, which_curl);
 
 		if (ret < 0)
 			sync_error = TRUE;
-		flock(fileno(local_metafptr), LOCK_UN);
-		fclose(local_metafptr);
-		fclose(toupload_metafptr);
 
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
 		/*TODO: Need to check if metafile still exists.
@@ -1436,7 +1437,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	if (S_ISREG(ptr->this_mode)) {
 	/* Delete old block data on backend and wait for those threads */
-		delete_backend_blocks(progress_fd, total_backend_blocks, 
+		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, BACKEND_BLOCKS);
 	}
 
@@ -1545,7 +1546,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		/* Find a same object in cloud
 		 * Just increase the refcount of the origin block
 		 */
-#if DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
 						objname);
 
@@ -1644,6 +1645,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	unsigned char *key = get_key();
 	unsigned char *data = NULL;
 	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
+	//FILE *new_fptr = fptr;
 
 	fclose(fptr);
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
@@ -1999,7 +2001,7 @@ void dispatch_delete_block(int which_curl)
 static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			     SYNC_THREAD_TYPE *sync_threads)
 {
-	int count, ret;
+	int count, ret, errcode;
 	int progress_fd;
 	char progress_file_path[300];
 	char toupload_metapath[300], local_metapath[300];
@@ -2026,17 +2028,22 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				sync_threads[count].is_revert = FALSE;
 			}
 
-			/* Copy meta */
-			fetch_toupload_meta_path(toupload_metapath, this_inode);
-			fetch_meta_path(local_metapath, this_inode);
-			ret = check_and_copy_file(local_metapath,
-				toupload_metapath, directly_copy);
-			if (ret < 0) {
-				if (ret != -EEXIST)
+			/* Copy meta if it does not revert uploading */
+			if (sync_ctl.is_revert[count] == FALSE) {
+				fetch_toupload_meta_path(toupload_metapath,
+					this_inode);
+				fetch_meta_path(local_metapath, this_inode);
+				if (access(toupload_metapath, F_OK) == 0) {
+					write_log(0, "Error: cannot copy since "
+						"%s exists", toupload_metapath);
+					UNLINK(toupload_metapath);
+					ret = -1;
 					break;
-				else
-					write_log(10, "Debug: meta_%ld exists, "
-						"revert uploading", this_inode);
+				}
+				ret = check_and_copy_file(local_metapath,
+					toupload_metapath, directly_copy);
+				if (ret < 0)
+					break;
 			}
 
 			/* Notify fuse process that it is going to upload */
@@ -2085,6 +2092,9 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	}
 
 	return ret;
+
+errcode_handle:
+	return errcode;
 }
 
 void upload_loop(void)

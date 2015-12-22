@@ -523,8 +523,9 @@ int init_progress_info(int fd, long long backend_blocks,
 
 		/* Skip if status is todelete or none */
 		cloud_status = block_page.block_entries[e_index].status;
-		if ((cloud_status == ST_NONE) || (cloud_status == ST_TODELETE))
+		if ((cloud_status == ST_NONE) || (cloud_status == ST_TODELETE)) {
 			continue;
+		}
 			
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
@@ -537,7 +538,7 @@ int init_progress_info(int fd, long long backend_blocks,
 		block_uploading_status.backend_seq = 
 			MAX(block_page.block_entries[e_index].seqnum[0],
 			block_page.block_entries[e_index].seqnum[1]);
-		write_log(10, "Debug: init progress file block%ld_%lld", block, block_uploading_status.backend_seq);
+		write_log(10, "Debug: init progress file block%lld_%lld", block, block_uploading_status.backend_seq);
 #endif
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
 		offset = create_status_page(fd, block);
@@ -745,6 +746,7 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 		fclose(src_ptr);
 		return -errcode;
 	}
+	setbuf(tar_ptr, NULL);
 
 	/* Copy */
 	FSEEK(src_ptr, 0, SEEK_SET);
@@ -803,6 +805,7 @@ char did_block_finish_uploading(int fd, long long blockno)
  * Following are some crash points:
  * 1. open progress info file
  * 2. copy from local meta to to-upload meta
+ *    - Communicate to fuse process and tag inode as uploading
  * 3. download backend meta
  * 4. init all backend block (seq or obj-id)
  * 5. unlink downloaded meta

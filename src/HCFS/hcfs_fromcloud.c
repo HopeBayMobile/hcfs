@@ -321,7 +321,7 @@ int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	sem_post(&download_curl_control_sem);
 
 	write_log(10, "Debug: Begin to download meta. Inode %ld\n", inode);
-#ifdef ENCRYPT_ENABLE
+#if (ENCRYPT_ENABLE)
 	char  *get_fptr_data = NULL;
 	size_t len = 0;
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
@@ -332,7 +332,7 @@ int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	ret = hcfs_get_object(*backend_fptr, backend_meta_name,
 		&(download_curl_handles[curl_idx]));
 #endif
-#ifdef ENCRYPT_ENABLE
+#if (ENCRYPT_ENABLE)
 	fclose(get_fptr);
 	unsigned char *key = get_key();
 	decrypt_to_fd(*backend_fptr, key, get_fptr_data, len);
