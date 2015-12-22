@@ -111,6 +111,7 @@ static inline void _sync_terminate_thread(int index)
 	int ret;
 	int tag_ret;
 	ino_t inode;
+	char toupload_metapath[300];
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    (sync_ctl.threads_created[index] == TRUE)) {
@@ -126,6 +127,11 @@ static inline void _sync_terminate_thread(int index)
 						inode, __func__);
 			}
 			close_progress_info(sync_ctl.progress_fd[index], inode);
+
+			fetch_toupload_meta_path(toupload_metapath, inode);
+			if (access(toupload_metapath, F_OK) == 0) {
+				unlink(toupload_metapath);
+			}
 
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
@@ -945,8 +951,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	/* Copy local meta, -EEXIST means it has been copied */
-	if (is_revert == FALSE) {
-		ret = check_and_copy_file(local_metapath, toupload_metapath);
+	/*if (is_revert == FALSE) {
+		ret = check_and_copy_file(local_metapath, toupload_metapath, directly_copy);
 		if (ret < 0) {
 			if (ret != -EEXIST) {
 				super_block_update_transit(ptr->inode,
@@ -954,7 +960,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				return;
 			}
 		}
-	}
+	}*/
 
 	/* Open temp meta to be uploaded */
 	toupload_metafptr = fopen(toupload_metapath, "r");
@@ -1996,6 +2002,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	int count, ret;
 	int progress_fd;
 	char progress_file_path[300];
+	char toupload_metapath[300], local_metapath[300];
 
 	ret = -1;
 
@@ -2018,6 +2025,20 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				sync_ctl.is_revert[count] = FALSE;
 				sync_threads[count].is_revert = FALSE;
 			}
+
+			/* Copy meta */
+			fetch_toupload_meta_path(toupload_metapath, this_inode);
+			fetch_meta_path(local_metapath, this_inode);
+			ret = check_and_copy_file(local_metapath,
+				toupload_metapath, directly_copy);
+			if (ret < 0) {
+				if (ret != -EEXIST)
+					break;
+				else
+					write_log(10, "Debug: meta_%ld exists, "
+						"revert uploading", this_inode);
+			}
+
 			/* Notify fuse process that it is going to upload */
 			ret = tag_status_on_fuse(this_inode, TRUE, progress_fd);
 			if (ret < 0) {
