@@ -28,7 +28,7 @@ UNITTEST_DIR = $(realpath ./unittests)
 CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
 
 # Flags passed to C and C++ compilers
-CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
+CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -fpermissive \
 	    -D_FILE_OFFSET_BITS=64 \
 	    -DDEDUP_ENABLE=0 \
 	    -DENCRYPT_ENABLE=1 \
