@@ -63,7 +63,7 @@ void _sleep_a_while(long long rest_times)
 	if (level < 5)
 		nonblock_sleep(level+1, _pinning_wakeup_fn);
 	else
-		nonblock_sleep(5, _pinning_wakeup);
+		nonblock_sleep(5, _pinning_wakeup_fn);
 
 	return;
 }
@@ -225,7 +225,7 @@ void pinning_loop()
 
 		/* Deeply sleeping is caused by thread error (ENOSPC) */
 		if (pinning_scheduler.deep_sleep == TRUE) {
-			nonblock_sleep(5, _pinning_wakeup); /* Sleep 5 secs */
+			nonblock_sleep(5, _pinning_wakeup_fn);/* Sleep 5 secs */
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
 			pinning_scheduler.deep_sleep = FALSE;
 			sem_post(&(pinning_scheduler.ctl_op_sem));
