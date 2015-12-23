@@ -1871,7 +1871,8 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			long long page_index, long long old_last_block,
-			ino_t inode_index, FILE *metafptr)
+			ino_t inode_index, FILE *metafptr,
+			FILE_META_TYPE *filemeta)
 {
 	int block_count;
 	char thisblockpath[1024];
@@ -1983,6 +1984,9 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		default:
 			break;
 		}
+
+		/* Update block seq */
+		tmpentry->seqnum = filemeta->finished_seq;
 	}
 	if (total_deleted_blocks > 0) {
 		change_system_meta(0, -total_deleted_cache,
@@ -2442,7 +2446,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, old_last_block,
-				filestat->st_ino, (*body_ptr)->fptr);
+				filestat->st_ino, (*body_ptr)->fptr, &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -2499,7 +2503,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			ret = truncate_delete_block(&temppage, 0,
 				current_page, old_last_block,
-				filestat->st_ino, (*body_ptr)->fptr);
+				filestat->st_ino, (*body_ptr)->fptr, &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -3914,6 +3918,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		}
 	}
 
+	/* Update block seq num */
+	ret = update_block_seq(fh_ptr->meta_cache_ptr, this_page_fpos,
+			entry_index, bindex);
+	if (ret < 0)
+		goto errcode_handle;
+
 	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
 	sem_post(&(fh_ptr->block_sem));
 
@@ -4017,6 +4027,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
 	          offset, size);
 	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.st_size,
@@ -4133,6 +4144,12 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 		fuse_reply_err(req, -ret);
 		return;
+	}
+
+	ret = update_meta_seq(fh_ptr->meta_cache_ptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
 	}
 
 	fh_ptr->meta_cache_locked = FALSE;
@@ -4842,6 +4859,14 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 				sizeof(struct timespec));
 #endif
 		}
+	}
+
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		fuse_reply_err(req, -ret_val);
+		return;
 	}
 
 	ret_val = meta_cache_update_file_data(this_inode, &newstat,

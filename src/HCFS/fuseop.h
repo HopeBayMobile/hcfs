@@ -103,6 +103,7 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	long long finished_seq;
 	char local_pin;
 } DIR_META_TYPE;
 
@@ -129,6 +130,7 @@ typedef struct {
 #if (DEDUP_ENABLE)
 	unsigned char obj_id[OBJID_LENGTH];
 #endif
+	long long seqnum;
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
@@ -155,6 +157,7 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	long long finished_seq;
 	long long size_last_upload;
 	char local_pin;
 } FILE_META_TYPE;

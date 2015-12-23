@@ -1924,3 +1924,67 @@ errcode_handle:
 	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
 	return errcode;
 }
+
+int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
+{
+	int ret;
+	ino_t this_inode;
+	FILE_META_TYPE filemeta;
+	DIR_META_TYPE dirmeta;
+	SYMLINK_META_TYPE symmeta;
+
+	this_inode = bptr->inode_num;
+
+	if (S_ISFILE(bptr->this_stat.st_mode)) {
+		ret = meta_cache_lookup_file_data(this_inode, NULL, &filemeta,
+				NULL, 0, bptr);
+		if (ret < 0)
+			return ret;
+		filemeta.finished_seq += 1;
+		ret = meta_cache_update_file_data(this_inode, NULL, &filemeta,
+				NULL, 0, bptr);
+		if (ret < 0)
+			return ret;
+	} else if (S_ISDIR(bptr->this_stat.st_mode)) {
+		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
+				NULL, bptr);
+		if (ret < 0)
+			return ret;
+		dirmeta.finished_seq += 1;
+		ret = meta_cache_update_dir_data(this_inode, NULL, &dirmeta,
+				NULL, bptr);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
+		off_t page_fpos, long long eindex, long long bindex)
+{
+	FILE_META_TYPE filemeta;
+	BLOCK_ENTRY_PAGE bentry_page;
+	int ret;
+
+	if (!S_ISREG(bptr->this_stat.st_mode))
+		return -EINVAL;
+
+	ret = meta_cache_lookup_file_data(bptr->inode_num, NULL, &filemeta,
+			&bentry_page, page_fpos, bptr);
+	if (ret < 0)
+		return ret;
+
+	/* Update seqnum */
+	bentry_page.block_entries[eindex].seqnum = filemeta.finished_seq;
+
+	ret = meta_cache_update_file_data(bptr->inode_num, NULL, NULL,
+			&bentry_page, page_fpos, bptr);
+	if (ret < 0)
+		return ret;
+
+	write_log(10, "Debug: block %"PRIu64"_%lld now seq is %lld",
+		bptr->inode_num, bindex, filemeta.finished_seq);
+
+	return 0;
+}
