@@ -1646,9 +1646,14 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 			  strerror(errcode));
 		return -errcode;
 	}
-	unsigned char *key = get_key();
+	unsigned char *key = NULL;
 	unsigned char *data = NULL;
-	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
+
+#ifdef ENCRYPT_ENABLE
+	key = get_key();
+#endif
+	FILE *new_fptr = transform_fd(fptr, key, &data,
+			ENCRYPT_ENABLE, COMPRESS_ENABLE);
 
 	fclose(fptr);
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
@@ -1657,7 +1662,9 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 		ret = 0;
 	else
 		ret = -EIO;
-	fclose(new_fptr);
+
+	if (fptr != new_fptr)
+		fclose(new_fptr);
 	if (data != NULL)
 		free(data);
 	return ret;
