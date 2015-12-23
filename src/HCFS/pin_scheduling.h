@@ -12,8 +12,16 @@
 
 #include <pthread.h>
 
+#define MAX_PINNING_FILE_CONCURRENCY MAX_PIN_DL_CONCURRENCY
+
 typedef struct {
 	pthread_t pinning_manager;
+	pthread_t pinning_collector; /* Collect threads */
+	pthread_t pinning_file_tid[MAX_PINNING_FILE_CONCURRENCY];
+	ino_t pinning_inodes[MAX_PINNING_FILE_CONCURRENCY];
+	sem_t pinning_sem;
+	sem_t ctl_op_sem;
+	int total_active_pinning;
 } PINNING_SCHEDULER;
 
 PINNING_SCHEDULER pinning_scheduler;
