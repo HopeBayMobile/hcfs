@@ -52,3 +52,8 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	return 0;
 }
+
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+{
+	return;
+}

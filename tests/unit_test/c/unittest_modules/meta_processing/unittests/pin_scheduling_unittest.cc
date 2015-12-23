@@ -48,7 +48,7 @@ int compare (const void * a, const void * b)
 TEST_F(pinning_loopTest, WorkNormally)
 {
 	/* Generate mock data */
-	hcfs_system->backend_status_is_online = TRUE;
+	hcfs_system->sync_paused = FALSE;
 	for (int i = 0; i < TOTAL_MOCK_INODES; i++) {
 		mock_inodes[i] = (i + 1) * 15;
 	}

@@ -50,18 +50,9 @@ int destroy_pin_scheduler()
 	return 0;
 }
 
-static void _sec_nonblock_sleep(long long secs)
+static BOOL _pinning_wakeup_fn()
 {
-	int i;
-
-	for (i = 0; i < secs; i++) {
-		if (hcfs_system->system_going_down == TRUE)
-			break;
-		else
-			sleep(1);
-	}
-
-	return;
+	return hcfs_system->system_going_down;
 }
 
 void _sleep_a_while(long long rest_times)
@@ -70,9 +61,9 @@ void _sleep_a_while(long long rest_times)
 
 	level = rest_times / 60;
 	if (level < 5)
-		_sec_nonblock_sleep(level+1);
+		nonblock_sleep(level+1, _pinning_wakeup_fn);
 	else
-		_sec_nonblock_sleep(5);
+		nonblock_sleep(5, _pinning_wakeup);
 
 	return;
 }
@@ -234,7 +225,7 @@ void pinning_loop()
 
 		/* Deeply sleeping is caused by thread error (ENOSPC) */
 		if (pinning_scheduler.deep_sleep == TRUE) {
-			_sec_nonblock_sleep(5); /* Sleep 5 secs */
+			nonblock_sleep(5, _pinning_wakeup); /* Sleep 5 secs */
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
 			pinning_scheduler.deep_sleep = FALSE;
 			sem_post(&(pinning_scheduler.ctl_op_sem));
