@@ -179,6 +179,7 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	long long finished_seq;
 	char local_pin;
 } SYMLINK_META_TYPE;
 

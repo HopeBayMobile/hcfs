@@ -1436,12 +1436,28 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	ret_val = update_meta_seq(parent1_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_entry(parent1_ptr);
+		meta_cache_unlock_entry(parent1_ptr);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	if (parent_inode1 != parent_inode2) {
 		parent2_ptr = meta_cache_lock_entry(parent_inode2);
 		if (parent2_ptr == NULL) { /* Cannot lock (cannot allocate) */
 			meta_cache_close_file(parent1_ptr);
 			meta_cache_unlock_entry(parent1_ptr);
 			fuse_reply_err(req, ENOMEM);
+			return;
+		}
+
+		ret_val = update_meta_seq(parent2_ptr);
+		if (ret_val < 0) {
+			meta_cache_close_entry(parent2_ptr);
+			meta_cache_unlock_entry(parent2_ptr);
+			fuse_reply_err(req, -ret_val);
 			return;
 		}
 	} else {
@@ -1491,7 +1507,17 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				parent1_ptr, parent2_ptr);
 		fuse_reply_err(req, ENOMEM);
 		return;
+	}	
+
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		meta_cache_remove(self_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
 	}
+
 	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
 			NULL, NULL, 0, body_ptr);
 
@@ -1528,6 +1554,17 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 
+		ret_val = update_meta_seq(old_target_ptr);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			meta_cache_remove(old_target_inode);
+
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
 		ret_val = meta_cache_lookup_file_data(old_target_inode,
 					&old_target_stat, NULL, NULL,
 						0, old_target_ptr);
@@ -1541,6 +1578,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
+
 	}
 
 	self_mode = tempstat.st_mode;
@@ -5110,6 +5148,12 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 
+	ret_val = update_meta_seq(parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+
 	ret_val = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(parent_meta_cache_entry);
@@ -5747,6 +5791,12 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	/* Increase nlink and add "newname" to parent dir */
 	ret_val = link_update_meta(link_inode, newname, &link_stat,
 		&this_generation, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+
+	ret_val = update_meta_seq(parent_meta_cache_entry);
 	if (ret_val < 0) {
 		errcode = ret_val;
 		goto error_handle;

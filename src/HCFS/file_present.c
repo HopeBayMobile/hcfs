@@ -213,6 +213,13 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
 	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
 		&parent_meta, NULL, body_ptr);
 	if (ret_val < 0)
@@ -340,6 +347,10 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
 	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
 		&parent_meta, NULL, body_ptr);
 	if (ret_val < 0)
@@ -462,6 +473,10 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	if (parent_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(parent_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
 	self_ptr = meta_cache_lock_entry(this_inode);
 	if (self_ptr == NULL)
 		return -ENOMEM;
@@ -528,6 +543,13 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 			meta_cache_unlock_entry(self_ptr);
 			return ret_val;
 		}
+	}
+
+	ret_val = update_meta_seq(self_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(self_ptr);
+		meta_cache_unlock_entry(self_ptr);
+		return ret_val;
 	}
 
 	ret_val = meta_cache_close_file(self_ptr);
@@ -597,12 +619,17 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
+	/* Get meta and check whether it is empty */
 	body_ptr = meta_cache_lock_entry(this_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
 	ret_val = meta_cache_lookup_dir_data(this_inode, NULL, &tempmeta,
 							NULL, body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
+	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -630,13 +657,19 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
 		return ret_val;
 	}
 	ret_val = meta_cache_unlock_entry(body_ptr);
-
 	if (ret_val < 0)
 		return ret_val;
 
