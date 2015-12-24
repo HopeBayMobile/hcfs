@@ -396,7 +396,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	if (fs_mgr_head->num_FS <= 0) {
-		ftruncate(fs_mgr_head->FS_list_fh, sizeof(DIR_META_TYPE));
+		ftruncate(fs_mgr_head->FS_list_fh, sizeof(DIR_META_TYPE) + 16);
 		tmp_head.total_children = 0;
 		fs_mgr_head->num_FS = 0;
 		tmp_head.root_entry_page = sizeof(DIR_META_TYPE) + 16;
