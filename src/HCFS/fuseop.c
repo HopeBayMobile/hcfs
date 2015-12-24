@@ -1438,7 +1438,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	ret_val = update_meta_seq(parent1_ptr);
 	if (ret_val < 0) {
-		meta_cache_close_entry(parent1_ptr);
+		meta_cache_close_file(parent1_ptr);
 		meta_cache_unlock_entry(parent1_ptr);
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1455,7 +1455,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 		ret_val = update_meta_seq(parent2_ptr);
 		if (ret_val < 0) {
-			meta_cache_close_entry(parent2_ptr);
+			meta_cache_close_file(parent2_ptr);
 			meta_cache_unlock_entry(parent2_ptr);
 			fuse_reply_err(req, -ret_val);
 			return;

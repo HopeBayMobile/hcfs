@@ -1939,25 +1939,46 @@ int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 		ret = meta_cache_lookup_file_data(this_inode, NULL, &filemeta,
 				NULL, 0, bptr);
 		if (ret < 0)
-			return ret;
+			goto error_handling;
 		filemeta.finished_seq += 1;
 		ret = meta_cache_update_file_data(this_inode, NULL, &filemeta,
 				NULL, 0, bptr);
 		if (ret < 0)
-			return ret;
+			goto error_handling;
+	
 	} else if (S_ISDIR(bptr->this_stat.st_mode)) {
 		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
 				NULL, bptr);
 		if (ret < 0)
-			return ret;
+			goto error_handling;
 		dirmeta.finished_seq += 1;
 		ret = meta_cache_update_dir_data(this_inode, NULL, &dirmeta,
 				NULL, bptr);
 		if (ret < 0)
-			return ret;
+			goto error_handling;
+	
+	} else if (S_ISLNK(bptr->this_stat.st_mode)) {
+		ret = meta_cache_lookup_symlink_data(this_inode, NULL, &symmeta,
+				bptr);
+		if (ret < 0)
+			goto error_handling;
+		symmeta.finished_seq += 1;
+		ret = meta_cache_update_symlink_data(this_inode, NULL, &symmeta,
+				bptr);
+		if (ret < 0)
+			goto error_handling;
+	
+	} else {
+		ret = -EINVAL;
+		goto error_handling;
 	}
 
 	return 0;
+
+error_handling:
+	write_log(0, "Error: Fail to update meta seq number. Code %d in %s\n",
+			-ret, __func__);
+	return ret;
 }
 
 int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
