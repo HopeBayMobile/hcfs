@@ -57,11 +57,11 @@ static BOOL _pinning_wakeup_fn()
 
 void _sleep_a_while(long long rest_times)
 {
-	long long level;
+	unsigned int level;
 
 	level = rest_times / 60;
 	if (level < 5)
-		nonblock_sleep(level+1, _pinning_wakeup_fn);
+		nonblock_sleep(level + 1, _pinning_wakeup_fn);
 	else
 		nonblock_sleep(5, _pinning_wakeup_fn);
 
