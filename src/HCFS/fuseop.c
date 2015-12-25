@@ -2471,6 +2471,14 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 					errcode = ret;
 					goto errcode_handle;
 				}
+
+				/* Update block seq number */
+				ret = update_block_seq(*body_ptr, filepos,
+						last_index, last_block);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 
 			/*Delete the rest of blocks in this same page
@@ -2482,6 +2490,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				errcode = ret;
 				goto errcode_handle;
 			}
+
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, old_last_block,
 				filestat->st_ino, (*body_ptr)->fptr, &tempfilemeta);
@@ -3959,8 +3968,10 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	/* Update block seq num */
 	ret = update_block_seq(fh_ptr->meta_cache_ptr, this_page_fpos,
 			entry_index, bindex);
-	if (ret < 0)
+	if (ret < 0) {
+		errcode = ret;
 		goto errcode_handle;
+	}
 
 	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
 	sem_post(&(fh_ptr->block_sem));

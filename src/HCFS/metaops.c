@@ -1945,7 +1945,9 @@ int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 				NULL, 0, bptr);
 		if (ret < 0)
 			goto error_handling;
-	
+		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
+				this_inode, filemeta.finished_seq);
+
 	} else if (S_ISDIR(bptr->this_stat.st_mode)) {
 		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
 				NULL, bptr);
@@ -1956,6 +1958,8 @@ int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 				NULL, bptr);
 		if (ret < 0)
 			goto error_handling;
+		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
+				this_inode, dirmeta.finished_seq);
 	
 	} else if (S_ISLNK(bptr->this_stat.st_mode)) {
 		ret = meta_cache_lookup_symlink_data(this_inode, NULL, &symmeta,
@@ -1967,6 +1971,8 @@ int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 				bptr);
 		if (ret < 0)
 			goto error_handling;
+		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
+				this_inode, symmeta.finished_seq);
 	
 	} else {
 		ret = -EINVAL;
@@ -1981,8 +1987,8 @@ error_handling:
 	return ret;
 }
 
-int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
-		off_t page_fpos, long long eindex, long long bindex)
+int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
+		long long eindex, long long bindex)
 {
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE bentry_page;

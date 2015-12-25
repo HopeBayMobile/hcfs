@@ -66,4 +66,8 @@ int collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 	long long *num_dir_node, ino_t **nondir_node_list,
 	long long *num_nondir_node);
 
+int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr);
+
+int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
+		long long eindex, long long bindex);
 #endif /* GW20_HCFS_METAOPS_H_ */

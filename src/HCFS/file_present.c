@@ -384,6 +384,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.local_pin = pin_status;
+	this_meta.finished_seq = 0;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
 		selfname, pin_status == TRUE? "PIN" : "UNPIN");
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
@@ -545,13 +546,6 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 		}
 	}
 
-	ret_val = update_meta_seq(self_ptr);
-	if (ret_val < 0) {
-		meta_cache_close_file(self_ptr);
-		meta_cache_unlock_entry(self_ptr);
-		return ret_val;
-	}
-
 	ret_val = meta_cache_close_file(self_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(self_ptr);
@@ -626,10 +620,6 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 
 	ret_val = meta_cache_lookup_dir_data(this_inode, NULL, &tempmeta,
 							NULL, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-
-	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -761,6 +751,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
 	symlink_meta.local_pin = pin_status;
+	symlink_meta.finished_seq = 0;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
 		name, pin_status == TRUE? "PIN" : "UNPIN");
