@@ -19,7 +19,6 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 
@@ -32,13 +31,13 @@
 #include "utils.h"
 #include "atomic_tocloud.h"
 
-/* If cache lock not locked, return -1*/
+/* If cache lock not locked, return -EINVAL*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
 	{ \
 		int sem_val; \
 		sem_getvalue((ptr_sem), &sem_val); \
 		if (sem_val > 0) \
-			return -1; \
+			return -EINVAL; \
 	}
 /* TODO: Consider whether want to use write-back mode for meta caching */
 
@@ -351,7 +350,7 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	/* TODO Right now, may not set meta_dirty to TRUE if only changes
 			pages */
 	if (body_ptr->meta_dirty == TRUE) {
-		if (S_ISREG(body_ptr->this_stat.st_mode)) {
+		if (S_ISFILE(body_ptr->this_stat.st_mode)) {
 			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
 			FWRITE((body_ptr->file_meta), sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);

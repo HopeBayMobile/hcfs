@@ -19,6 +19,7 @@ extern "C" {
 #include "fuseop.h"
 #include "params.h"
 #include "metaops.h"
+#include "FS_manager.h"
 }
 #include "gtest/gtest.h"
 
@@ -27,7 +28,24 @@ static const ino_t self_inode = 10;
 static const ino_t parent_inode = 5;
 
 extern int DELETE_DIR_ENTRY_BTREE_RESULT;
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
+
+class metaopsEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const metaops_env =
+	::testing::AddGlobalTestEnvironment(new metaopsEnvironment);
 
 /*
 	Unittest of init_dir_page()
@@ -369,6 +387,12 @@ TEST_F(change_dir_entry_inodeTest, ChangeREGOK)
 {	
 	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
 		"/mock/target/name", new_inode, S_IFREG, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, ChangeFIFOOK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFIFO, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeLNKOK) 
@@ -1064,6 +1088,9 @@ TEST_F(seek_page2Test, QuadrupleIndirectPageSuccess)
 class actual_delete_inodeTest : public ::testing::Test {
 protected:
 	FILE *meta_fp;
+	FILE *statfptr;
+	FS_STAT_T tmp_stat;
+	char statpath[100];
 
 	void SetUp()
 	{
@@ -1078,14 +1105,26 @@ protected:
 
 		snprintf(markdelete_path, 100, "%s/markdelete/inode%d", METAPATH, 
 			INO_DELETE_FILE_BLOCK);
-		mknod(markdelete_path, S_IFREG, 0); 	
+		mknod(markdelete_path, S_IFREG, 0); 
+		snprintf(statpath, 100, "%s/stat%ld", METAPATH, ROOT_INODE);
+		statfptr = fopen(statpath, "w");
+		memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+		tmp_stat.num_inodes = 1;
+
+		fwrite(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+		fsync(fileno(statfptr));
+
+		fclose(statfptr);
+	
 	}
 
 	void TearDown()
 	{
 		char thismetapath[100];
 		char thisblockpath[100];
-		
+
+		unlink(statpath);
+
 		/* delete meta */
 		fetch_meta_path(thismetapath, INO_DELETE_FILE_BLOCK);
 		if (!access(thismetapath, F_OK))
@@ -1111,6 +1150,32 @@ protected:
 	}
 };
 
+/* Code is removed from actual_delete_inode
+#ifdef _ANDROID_ENV_
+TEST_F(actual_delete_inodeTest, FailIn_pathlookup_write_parent)
+{
+	MOUNT_T mount_t;
+
+	pathlookup_write_parent_success = FALSE;
+	EXPECT_EQ(-EIO, actual_delete_inode(INO_DELETE_DIR, D_ISDIR,
+		ROOT_INODE, &mount_t));
+
+	pathlookup_write_parent_success = TRUE;
+}
+
+TEST_F(actual_delete_inodeTest, FailIn_delete_pathcache_node)
+{
+	MOUNT_T mount_t;
+
+	mount_t.volume_type = ANDROID_EXTERNAL;
+	delete_pathcache_node_success = FALSE;
+	EXPECT_EQ(-EINVAL, actual_delete_inode(INO_DELETE_DIR, D_ISDIR,
+		ROOT_INODE, &mount_t));
+
+	delete_pathcache_node_success = TRUE;
+}
+#endif
+*/
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess)
 {
 	MOUNT_T mount_t;
@@ -1415,14 +1480,28 @@ TEST(disk_checkdeleteTest, InodeNotExist_Return0)
 class startup_finish_deleteTest : public ::testing::Test {
 protected:
 	int num_inode;
-	
+	FILE *statfptr;
+	FS_STAT_T tmp_stat;
+	char statpath[100];
+
 	void SetUp()
 	{
-	
+		METAPATH = "testpatterns";
+		snprintf(statpath, 100, "%s/stat%ld", METAPATH, ROOT_INODE);
+		statfptr = fopen(statpath, "w");
+		memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+		tmp_stat.num_inodes = 1;
+
+		fwrite(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+		fsync(fileno(statfptr));
+
+		fclose(statfptr);
+
 	}
 
 	void TearDown()
 	{
+		unlink(statpath);
 		for (int i = 0 ; i < num_inode ; i++) {
 			char pathname[200];
 			sprintf(pathname, "testpatterns/markdelete/inode%d_%d",
@@ -1486,3 +1565,220 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 /*
 	End of unittest of startup_finish_delete()
  */
+
+/* Unittest for change_pin_flag() */
+class change_pin_flagTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(change_pin_flagTest, MetaCacheLockFail)
+{
+	ino_t inode = INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL;
+
+	EXPECT_EQ(-ENOMEM, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, RegfileHadBeenPinned)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = TRUE; 
+	EXPECT_EQ(1, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinRegfileSuccess)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinFIFOfileSuccess)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFIFO, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinSocketfileSuccess)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFSOCK, TRUE));
+}
+
+TEST_F(change_pin_flagTest, DirHadBeenPinned)
+{
+	ino_t inode = 5452345; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = TRUE;
+	EXPECT_EQ(1, change_pin_flag(inode, S_IFDIR, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinDirSuccess)
+{
+	ino_t inode = 3142334; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFDIR, TRUE));
+}
+
+TEST_F(change_pin_flagTest, LinkHadBeenPinned)
+{
+	ino_t inode = 5452345; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = TRUE;
+	EXPECT_EQ(1, change_pin_flag(inode, S_IFLNK, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinLinkSuccess)
+{
+	ino_t inode = 3142334; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFLNK, TRUE));
+}
+
+/* End of unittest for change_pin_flag() */
+
+/* Unittest for collect_dir_children */
+class collect_dir_childrenTest : public ::testing::Test {
+protected:
+	long long num_dir_node, num_nondir_node;
+	ino_t *dir_node_list, *nondir_node_list;
+	
+	void SetUp()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			rmdir(MOCK_META_PATH);
+		mkdir(MOCK_META_PATH, 0700);
+	}
+
+	void TearDown()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			rmdir(MOCK_META_PATH);
+	}
+};
+
+TEST_F(collect_dir_childrenTest, MetaNotExist)
+{
+	ino_t inode;
+
+	inode = 5;
+	EXPECT_EQ(-ENOENT, collect_dir_children(inode, &dir_node_list,
+		&num_dir_node, &nondir_node_list, &num_nondir_node));
+}
+
+TEST_F(collect_dir_childrenTest, NoChildren)
+{
+	ino_t inode;
+	char metapath[300];
+	FILE *fptr;
+	struct stat tempstat;
+	DIR_META_TYPE dirmeta;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	fptr = fopen(metapath, "w+");
+	memset(&tempstat, 0, sizeof(struct stat));
+	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
+	fwrite(&tempstat, 1, sizeof(struct stat), fptr);
+	fwrite(&dirmeta, 1, sizeof(DIR_META_TYPE), fptr);
+	fclose(fptr);
+
+	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
+		&num_dir_node, &nondir_node_list, &num_nondir_node));
+
+	/* Verify */
+	EXPECT_EQ(0, num_dir_node);
+	EXPECT_EQ(0, num_nondir_node);
+	EXPECT_EQ(NULL, dir_node_list);
+	EXPECT_EQ(NULL, nondir_node_list);
+
+	unlink(metapath);
+}
+
+TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
+{
+	ino_t inode, child_inode;
+	char metapath[300];
+	FILE *fptr;
+	struct stat tempstat;
+	DIR_META_TYPE dirmeta;
+	DIR_ENTRY_PAGE temppage;
+
+	inode = 5;
+	fetch_meta_path(metapath, inode);
+	fptr = fopen(metapath, "w+");
+	memset(&tempstat, 0, sizeof(struct stat));
+	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
+	dirmeta.total_children = 2;
+	dirmeta.tree_walk_list_head = sizeof(struct stat) +
+				sizeof(DIR_META_TYPE);
+	fwrite(&tempstat, 1, sizeof(struct stat), fptr);
+	fwrite(&dirmeta, 1, sizeof(DIR_META_TYPE), fptr);
+
+	/* First page */
+	temppage.num_entries = 10;
+	child_inode = 1;
+	for (int i = 0; i < 10; i++, child_inode++) {
+		strcpy(temppage.dir_entries[i].d_name, "aaa");
+		temppage.dir_entries[i].d_ino = child_inode;
+		temppage.dir_entries[i].d_type = child_inode % 2 ?
+						D_ISDIR : D_ISREG;
+	}
+	temppage.tree_walk_next = sizeof(struct stat) +
+		sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
+	fwrite(&temppage, 1, sizeof(DIR_ENTRY_PAGE), fptr);
+
+	/* Second page */
+	temppage.num_entries = 10;
+	for (int i = 0; i < 10; i++, child_inode++) {
+		strcpy(temppage.dir_entries[i].d_name, "aaa");
+		temppage.dir_entries[i].d_ino = child_inode;
+		temppage.dir_entries[i].d_type = child_inode % 2 ?
+						D_ISDIR : D_ISREG;
+	}
+	temppage.tree_walk_next = 0;
+	fwrite(&temppage, 1, sizeof(DIR_ENTRY_PAGE), fptr);
+
+	fclose(fptr);
+
+	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
+		&num_dir_node, &nondir_node_list, &num_nondir_node));
+
+	/* Verify */
+	EXPECT_EQ(10, num_dir_node);
+	EXPECT_EQ(10, num_nondir_node);
+
+	child_inode = 1;
+	for (int i = 0; i < num_dir_node; i++, child_inode += 2)
+		EXPECT_EQ(child_inode, dir_node_list[i]);
+
+	child_inode = 2;
+	for (int i = 0; i < num_nondir_node; i++, child_inode += 2)
+		EXPECT_EQ(child_inode, nondir_node_list[i]);
+
+	unlink(metapath);
+}
+
+/* End of unittest for collect_dir_children */

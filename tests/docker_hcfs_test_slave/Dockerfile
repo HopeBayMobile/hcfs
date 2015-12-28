@@ -1,9 +1,15 @@
-FROM docker:5000/baseimage:0.9.17
+FROM phusion/baseimage:0.9.17
 MAINTAINER Jethro Yu <jethro.yu@hopebaytech.com>
 
 # Use baseimage-docker's init system.
 CMD ["/sbin/my_init"]
-ENV PATH "/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ENV PATH="/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ENV USE_CCACHE="1"
+ENV DEBIAN_FRONTEND=noninteractive
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+ENV TZ=Asia/Taipei
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	echo "jenkins:qwert1234" | chpasswd && \
@@ -13,11 +19,7 @@ RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	chown -R jenkins:jenkins /home/jenkins/.ssh && \
 	chmod 600 /home/jenkins/.ssh/*
 
+ADD utils/ /utils/
 
-ADD setup_dev_env.sh requirements.txt /
-RUN /setup_dev_env.sh -v -m docker_slave
-RUN apt-get upgrade -y
-
-RUN apt-get clean
-RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-RUN rm -f /etc/service/sshd/down
+# CI runs build/test in all roles
+RUN /utils/setup_ci_env.sh

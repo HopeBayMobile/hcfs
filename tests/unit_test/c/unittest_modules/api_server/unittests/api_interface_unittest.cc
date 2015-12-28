@@ -1,3 +1,4 @@
+/* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved. */
 #include "api_interface_unittest.h"
 
 #include <stdio.h>
@@ -6,6 +7,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <ftw.h>
 
 #include <unistd.h>
 #include <string.h>
@@ -19,6 +21,11 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
+#define UNUSED(x) ((void)x)
+
+extern int api_server_monitor_time;
+SYSTEM_CONF_STRUCT *system_config;
+
 /* Begin of the test case for the function init_api_interface */
 
 class init_api_interfaceTest : public ::testing::Test {
@@ -27,9 +34,13 @@ class init_api_interfaceTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
+    sem_init(&(hcfs_system->fuse_sem), 0, 0);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
-   }
+  }
 
   virtual void TearDown() {
 
@@ -99,6 +110,9 @@ class destroy_api_interfaceTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
    }
@@ -146,56 +160,99 @@ TEST_F(destroy_api_interfaceTest, TestIntegrity) {
   else
     ret_val = 0;
   EXPECT_EQ(-1, ret_val);
-
- }
-
+}
 
 /* End of the test case for the function destroy_api_interface */
 
 /* Begin of the test case for the function api_module */
 
-class api_moduleTest : public ::testing::Test {
- protected:
-  int count;
-  int fd, status;
-  struct sockaddr_un addr;
+class api_moduleTest : public ::testing::Test
+{
+	protected:
+	int count;
+	int fd, status;
+	struct sockaddr_un addr;
 
-  virtual void SetUp() {
-    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-    hcfs_system->system_going_down = FALSE;
-    sem_init(&(hcfs_system->access_sem), 0, 1);
-    if (access(SOCK_PATH, F_OK) == 0)
-      unlink(SOCK_PATH);
-    fd = 0;
-   }
+	virtual void SetUp()
+	{
+    		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		api_server_monitor_time = 1;
+		hcfs_system =
+		    (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		if (access(SOCK_PATH, F_OK) == 0)
+			unlink(SOCK_PATH);
+		fd = 0;
+		METAPATH = (char *)malloc(sizeof(char) * 100);
+		snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
+		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+		mkdir("/tmp/testHCFS", 0700);
+		if (access(METAPATH, F_OK) != 0)
+			mkdir(METAPATH, 0700);
+		HCFSPAUSESYNC = (char *)malloc(strlen(METAPATH) + 20);
+		ASSERT_EQ(TRUE, HCFSPAUSESYNC != NULL);
+		snprintf(HCFSPAUSESYNC, strlen(METAPATH) + 20,
+			 "%s/hcfspausesync", METAPATH);
+	}
 
-  virtual void TearDown() {
+	virtual void TearDown()
+	{
 
-    if (fd != 0)
-      close(fd);
-    hcfs_system->system_going_down = TRUE;
+		if (fd != 0)
+			close(fd);
+		hcfs_system->system_going_down = TRUE;
 
-    if (api_server != NULL) {
-      for (count = 0; count < api_server->num_threads; count++)
-        pthread_join(api_server->local_thread[count], NULL);
-      pthread_join(api_server->monitor_thread, NULL);
-      sem_destroy(&(api_server->job_lock));
-      free(api_server);
-      api_server = NULL;
-     }
-    if (access(SOCK_PATH, F_OK) == 0)
-      unlink(SOCK_PATH);
-    free(hcfs_system);
-   }
+		if (api_server != NULL) {
+			for (count = 0; count < api_server->num_threads;
+			     count++)
+				pthread_join(api_server->local_thread[count],
+					     NULL);
+			pthread_join(api_server->monitor_thread, NULL);
+			sem_destroy(&(api_server->job_lock));
+			free(api_server);
+			api_server = NULL;
+		}
+		if (access(SOCK_PATH, F_OK) == 0)
+			unlink(SOCK_PATH);
+		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+		free(HCFSPAUSESYNC);
+		free(METAPATH);
+		free(hcfs_system);
+    		free(system_config);
+	}
 
-  int connect_sock() {
-    addr.sun_family = AF_UNIX;
-    strcpy(addr.sun_path, SOCK_PATH);
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    status = connect(fd, (sockaddr *)&addr, sizeof(addr));
-    return status;
-   }
- };
+	int connect_sock()
+	{
+		addr.sun_family = AF_UNIX;
+		strcpy(addr.sun_path, SOCK_PATH);
+		fd = socket(AF_UNIX, SOCK_STREAM, 0);
+		status = connect(fd, (sockaddr *)&addr, sizeof(addr));
+		return status;
+	}
+
+	static int do_delete(const char *fpath, const struct stat *sb, int tflag,
+		      struct FTW *ftwbuf)
+	{
+		UNUSED(sb);
+		UNUSED(ftwbuf);
+		switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir(fpath);
+			break;
+		default:
+			unlink(fpath);
+			break;
+		}
+		return (0);
+	}
+};
 
 /* Test a single API call */ 
 TEST_F(api_moduleTest, SingleTest) {
@@ -229,7 +286,7 @@ TEST_F(api_moduleTest, SingleTest) {
 /* Test API call for checking system stat */
 TEST_F(api_moduleTest, StatTest) {
 
-  int ret_val, errcode;
+  int ret_val;
   unsigned int code, cmd_len, size_msg;
   char ans_string[50], tmp_str[50];
 
@@ -267,7 +324,7 @@ TEST_F(api_moduleTest, StatTest) {
 /* Test API call correctness for a call with large arg size */
 TEST_F(api_moduleTest, LargeEchoTest) {
 
-  int ret_val, errcode, count;
+  int ret_val, count;
   unsigned int code, cmd_len, size_msg;
   char teststr[2048], recvstr[2048];
   int bytes_recv;
@@ -298,7 +355,7 @@ TEST_F(api_moduleTest, LargeEchoTest) {
   ASSERT_EQ(sizeof(unsigned int), ret_val);
   ASSERT_EQ(2001, size_msg);
   bytes_recv = 0;
-  while (bytes_recv < size_msg) {
+  while ((unsigned int)bytes_recv < size_msg) {
     ret_val = recv(fd, &(recvstr[bytes_recv]), 2001, 0);
     bytes_recv += ret_val;
     if (ret_val == 0)
@@ -372,7 +429,7 @@ TEST_F(api_moduleTest, TerminateTest) {
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
  }
 
-/* Test CREATEFS API call */ 
+/* Test CREATEVOL API call */ 
 TEST_F(api_moduleTest, CreateFSTest) {
 
   int ret_val, errcode;
@@ -387,7 +444,7 @@ TEST_F(api_moduleTest, CreateFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = CREATEFS;
+  code = CREATEVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -407,7 +464,7 @@ TEST_F(api_moduleTest, CreateFSTest) {
   ASSERT_EQ(TRUE, CREATEDFS);
   EXPECT_STREQ("123456789", recvFSname);
  }
-/* Test DELETEFS API call */ 
+/* Test DELETEVOL API call */ 
 TEST_F(api_moduleTest, DeleteFSTest) {
 
   int ret_val, errcode;
@@ -422,7 +479,7 @@ TEST_F(api_moduleTest, DeleteFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = DELETEFS;
+  code = DELETEVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -442,7 +499,7 @@ TEST_F(api_moduleTest, DeleteFSTest) {
   ASSERT_EQ(TRUE, DELETEDFS);
   EXPECT_STREQ("123456789", recvFSname);
  }
-/* Test CHECKFS API call */ 
+/* Test CHECKVOL API call */ 
 TEST_F(api_moduleTest, CheckFSTest) {
 
   int ret_val, errcode;
@@ -457,7 +514,7 @@ TEST_F(api_moduleTest, CheckFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = CHECKFS;
+  code = CHECKVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -477,13 +534,11 @@ TEST_F(api_moduleTest, CheckFSTest) {
   ASSERT_EQ(TRUE, CHECKEDFS);
   EXPECT_STREQ("123456789", recvFSname);
  }
-/* Test LISTFS API call */ 
+/* Test LISTVOL API call */ 
 TEST_F(api_moduleTest, ListFSTestNoFS) {
 
-  int ret_val, errcode;
+  int ret_val;
   unsigned int code, cmd_len, size_msg;
-  char tmpstr[10];
-  DIR_ENTRY tmp_entry;
 
   LISTEDFS = FALSE;
   numlistedFS = 0;
@@ -494,7 +549,7 @@ TEST_F(api_moduleTest, ListFSTestNoFS) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = LISTFS;
+  code = LISTVOL;
   cmd_len = 0;
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(unsigned int), 0);
@@ -508,12 +563,11 @@ TEST_F(api_moduleTest, ListFSTestNoFS) {
   ASSERT_EQ(TRUE, LISTEDFS);
  }
 
-/* Test LISTFS API call */ 
+/* Test LISTVOL API call */ 
 TEST_F(api_moduleTest, ListFSTestOneFS) {
 
-  int ret_val, errcode;
+  int ret_val;
   unsigned int code, cmd_len, size_msg;
-  char tmpstr[10];
   DIR_ENTRY tmp_entry;
 
   LISTEDFS = FALSE;
@@ -527,7 +581,7 @@ TEST_F(api_moduleTest, ListFSTestOneFS) {
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
 
-  code = LISTFS;
+  code = LISTVOL;
   cmd_len = 0;
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(unsigned int), 0);
@@ -544,7 +598,7 @@ TEST_F(api_moduleTest, ListFSTestOneFS) {
   ASSERT_EQ(TRUE, LISTEDFS);
  }
 
-/* Test MOUNTFS API call */ 
+/* Test MOUNTVOL API call */ 
 TEST_F(api_moduleTest, MountFSTest) {
 
   int ret_val, errcode;
@@ -561,7 +615,7 @@ TEST_F(api_moduleTest, MountFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = MOUNTFS;
+  code = MOUNTVOL;
   cmd_len = 20 + sizeof(int);
   fsname_len = 10;
   snprintf(tmpstr, 10, "123456789");
@@ -590,13 +644,12 @@ TEST_F(api_moduleTest, MountFSTest) {
   EXPECT_STREQ("123456789", recvmpname);
  }
 
-/* Test UNMOUNTFS API call */ 
+/* Test UNMOUNTVOL API call */ 
 TEST_F(api_moduleTest, UnmountFSTest) {
 
   int ret_val, errcode;
   unsigned int code, cmd_len, size_msg;
   char tmpstr[10];
-  int fsname_len;
 
   UNMOUNTEDFS = FALSE;
   ret_val = init_api_interface();
@@ -606,7 +659,7 @@ TEST_F(api_moduleTest, UnmountFSTest) {
   ret_val = connect_sock();
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
-  code = UNMOUNTFS;
+  code = UNMOUNTVOL;
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
@@ -634,7 +687,6 @@ TEST_F(api_moduleTest, CheckMountTest) {
   int ret_val, errcode;
   unsigned int code, cmd_len, size_msg;
   char tmpstr[10];
-  int fsname_len;
 
   CHECKEDMOUNT = FALSE;
   ret_val = init_api_interface();
@@ -666,7 +718,7 @@ TEST_F(api_moduleTest, CheckMountTest) {
   EXPECT_STREQ("123456789", recvFSname);
  }
 
-/* Test UNMOUNTALL API call */ 
+/* Test UNMOUNTALL API call */
 TEST_F(api_moduleTest, UnmountAllTest) {
 
   int ret_val, errcode;
@@ -698,6 +750,473 @@ TEST_F(api_moduleTest, UnmountAllTest) {
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
  }
 
+TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  long long reserved_size;
+  unsigned int num_inode;
+
+  PIN_INODE_ROLLBACK = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = PIN;
+  reserved_size = 1000;
+  num_inode = 0;
+  cmd_len = sizeof(long long) + sizeof(unsigned int);
+  memcpy(buf, &reserved_size, sizeof(long long));
+  memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
+  CACHE_HARD_LIMIT = 300; /* Space not available */
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(-ENOSPC, errcode);
+ }
+
+TEST_F(api_moduleTest, pin_inodeTest_Success) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  long long reserved_size;
+  unsigned int num_inode;
+  ino_t inode_list[1];
+
+  PIN_INODE_ROLLBACK = FALSE; /* pin_inode() success */
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = PIN;
+  reserved_size = 10;
+  num_inode = 1;
+  inode_list[0] = 5;
+  cmd_len = sizeof(long long) + sizeof(unsigned int) + sizeof(ino_t);
+  memcpy(buf, &reserved_size, sizeof(long long));
+  memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
+  memcpy(buf + sizeof(long long) + sizeof(unsigned int),
+  		&inode_list, sizeof(ino_t));
+  CACHE_HARD_LIMIT = 500; 
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+ }
+
+TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  long long reserved_size;
+  unsigned int num_inode;
+  ino_t inode_list[1];
+
+  PIN_INODE_ROLLBACK = TRUE; /* pin_inode() fail */
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = PIN;
+  reserved_size = 10;
+  num_inode = 1;
+  inode_list[0] = 5;
+  cmd_len = sizeof(long long) + sizeof(unsigned int) + sizeof(ino_t);
+  memcpy(buf, &reserved_size, sizeof(long long));
+  memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
+  memcpy(buf + sizeof(long long) + sizeof(unsigned int),
+  		&inode_list, sizeof(ino_t));
+  CACHE_HARD_LIMIT = 500; 
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(-EIO, errcode);
+ }
+
+TEST_F(api_moduleTest, unpin_inodeTest_Success) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  unsigned int num_inode;
+  ino_t inode_list[1];
+
+  UNPIN_INODE_FAIL = FALSE; /* unpin_inode() success */
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+
+  code = UNPIN;
+  num_inode = 1;
+  inode_list[0] = 5;
+  cmd_len = sizeof(unsigned int) + sizeof(ino_t);
+  memcpy(buf, &num_inode, sizeof(unsigned int));
+  memcpy(buf + sizeof(unsigned int),
+  		&inode_list, sizeof(ino_t));
+  CACHE_HARD_LIMIT = 500; 
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+ }
+
+TEST_F(api_moduleTest, unpin_inodeTest_Fail) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  unsigned int num_inode;
+  ino_t inode_list[1];
+
+  UNPIN_INODE_FAIL = TRUE; /* unpin_inode() success */
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+
+  code = UNPIN;
+  num_inode = 1;
+  inode_list[0] = 5;
+  cmd_len = sizeof(unsigned int) + sizeof(ino_t);
+  memcpy(buf, &num_inode, sizeof(unsigned int));
+  memcpy(buf + sizeof(unsigned int),
+  		&inode_list, sizeof(ino_t));
+  CACHE_HARD_LIMIT = 500; 
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(-EIO, errcode);
+}
+
+/* Test CLOUDSTAT API call */
+TEST_F(api_moduleTest, CloudState)
+{
+	int ret_val, retcode;
+	unsigned int code, cmd_len, size_msg;
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+	code = CLOUDSTAT;
+	cmd_len = 0;
+
+	hcfs_system->backend_is_online = TRUE;
+	printf("Start sending\n");
+	size_msg = send(fd, &code, sizeof(code), 0);
+	ASSERT_EQ(sizeof(code), size_msg);
+	size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+	ASSERT_EQ(sizeof(cmd_len), size_msg);
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(size_msg), 0);
+	ASSERT_EQ(sizeof(size_msg), ret_val);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+	ret_val = recv(fd, &retcode, sizeof(retcode), 0);
+	ASSERT_EQ(sizeof(retcode), ret_val);
+	ASSERT_EQ(TRUE, retcode);
+	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
+}
+
+/* Test SETSYNCSWITCH API call */
+TEST_F(api_moduleTest, SetSyncSwitchOff)
+{
+	int ret_val, retcode;
+	unsigned int code, cmd_len, size_msg;
+	int status;
+
+	hcfs_system->backend_is_online = TRUE;
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+	code = SETSYNCSWITCH;
+
+	/* Disable sync */
+	hcfs_system->sync_manual_switch = TRUE;
+	status = FALSE;
+	printf("Start sending\n");
+	size_msg = send(fd, &code, sizeof(code), 0);
+	ASSERT_EQ(sizeof(code), size_msg);
+	cmd_len = sizeof(status);
+	size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+	ASSERT_EQ(sizeof(cmd_len), size_msg);
+	size_msg = send(fd, &status, sizeof(status), 0);
+	ASSERT_EQ(sizeof(status), size_msg);
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(size_msg), 0);
+	ASSERT_EQ(sizeof(size_msg), ret_val);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+	size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+
+	ASSERT_EQ(0, retcode);
+	ASSERT_EQ(FALSE, hcfs_system->sync_manual_switch);
+}
+
+TEST_F(api_moduleTest, SetSyncSwitchOn)
+{
+	int ret_val, retcode;
+	unsigned int code, cmd_len, size_msg;
+	int status;
+
+	hcfs_system->backend_is_online = TRUE;
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+	code = SETSYNCSWITCH;
+
+	/* Enable sync */
+	hcfs_system->sync_manual_switch = FALSE;
+	mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
+	status = TRUE;
+	printf("Start sending\n");
+	size_msg = send(fd, &code, sizeof(code), 0);
+	ASSERT_EQ(sizeof(code), size_msg);
+	cmd_len = sizeof(status);
+	size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+	ASSERT_EQ(sizeof(cmd_len), size_msg);
+	size_msg = send(fd, &status, sizeof(status), 0);
+	ASSERT_EQ(sizeof(status), size_msg);
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(size_msg), 0);
+	ASSERT_EQ(sizeof(size_msg), ret_val);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+	size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+
+	ASSERT_EQ(0, retcode);
+	ASSERT_EQ(TRUE, hcfs_system->sync_manual_switch);
+}
+TEST_F(api_moduleTest, SetSyncSwitchOnFail)
+{
+	int ret_val, retcode;
+	unsigned int code, cmd_len, size_msg;
+	int status;
+
+	hcfs_system->backend_is_online = TRUE;
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+	code = SETSYNCSWITCH;
+
+	/* Enable sync */
+	hcfs_system->sync_manual_switch = FALSE;
+	mkdir(HCFSPAUSESYNC, 0700);
+	status = TRUE;
+	printf("Start sending\n");
+	size_msg = send(fd, &code, sizeof(code), 0);
+	ASSERT_EQ(sizeof(code), size_msg);
+	cmd_len = sizeof(status);
+	size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+	ASSERT_EQ(sizeof(cmd_len), size_msg);
+	size_msg = send(fd, &status, sizeof(status), 0);
+	ASSERT_EQ(sizeof(status), size_msg);
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(size_msg), 0);
+	ASSERT_EQ(sizeof(size_msg), ret_val);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+	size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+
+	ASSERT_EQ(-21, retcode);
+	ASSERT_EQ(TRUE, hcfs_system->sync_manual_switch);
+}
+
+/* Test GETSYNCSWITCH API call */
+TEST_F(api_moduleTest, GetSyncSwitch)
+{
+	int ret_val, retcode;
+	unsigned int code, cmd_len, size_msg;
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+	code = GETSYNCSWITCH;
+	cmd_len = 0;
+
+	printf("Start sending\n");
+	size_msg = send(fd, &code, sizeof(code), 0);
+	ASSERT_EQ(sizeof(code), size_msg);
+	size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+	ASSERT_EQ(sizeof(cmd_len), size_msg);
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(size_msg), 0);
+	ASSERT_EQ(sizeof(size_msg), ret_val);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+	ret_val = recv(fd, &retcode, sizeof(retcode), 0);
+	ASSERT_EQ(sizeof(retcode), ret_val);
+	ASSERT_EQ(TRUE, retcode);
+	ASSERT_EQ(TRUE, hcfs_system->sync_manual_switch);
+}
+
+/* Test GETSYNCSTAT API call */
+TEST_F(api_moduleTest, GetSyncStat)
+{
+	int ret_val, retcode;
+	unsigned int code, cmd_len, size_msg;
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+	code = GETSYNCSTAT;
+	cmd_len = 0;
+
+	printf("Start sending\n");
+	size_msg = send(fd, &code, sizeof(code), 0);
+	ASSERT_EQ(sizeof(code), size_msg);
+	size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+	ASSERT_EQ(sizeof(cmd_len), size_msg);
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(size_msg), 0);
+	ASSERT_EQ(sizeof(size_msg), ret_val);
+	ASSERT_EQ(sizeof(retcode), size_msg);
+	ret_val = recv(fd, &retcode, sizeof(retcode), 0);
+	ASSERT_EQ(sizeof(retcode), ret_val);
+	ASSERT_EQ(TRUE, retcode);
+	ASSERT_EQ(FALSE, hcfs_system->sync_paused);
+}
+
+TEST_F(api_moduleTest, ReloadConfigSuccess) {
+
+	int ret_val, errcode;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = RELOADCONFIG;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(0, errcode);
+}
+
 /* End of the test case for the function api_module */
 
 /* Begin of the test case for the function api_server_monitor */
@@ -713,6 +1232,9 @@ class api_server_monitorTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
     for (count = 0; count < 20; count++)

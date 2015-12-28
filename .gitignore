@@ -6,20 +6,20 @@
 # C extensions
 *.a
 *.o
+*.d
 *.so
 
 # Packages
-*.egg
-*.egg-info
-dist
-build
-eggs
-parts
-bin
-var
-sdist
-lib
-lib64
+/*.egg
+/*.egg-info
+/dist
+/eggs
+/parts
+/bin
+/var
+/sdist
+/lib
+/lib64
 
 # Installer logs
 pip-log.txt
@@ -39,12 +39,13 @@ pip-log.txt
 *.gcno
 *.gcov
 /tests/unit_test/c/unittest_modules/*/*_unittest
+/clangScanBuildReports
 
 # Auto tests
 /tmp
 
 # Virtualenv
-.venv
+/.venv
 
 # Translations
 *.mo
@@ -60,8 +61,17 @@ pip-log.txt
 backend_upload_log
 cache_maintain_log
 fuse_log
+hcfs_android_log
 
-# Build 
+# Compiled outputs
 /src/CLI_utils/HCFSvol
+/src/CLI_utils/pin_test
 /src/HCFS/hcfs
 /src/HCFS/hcfs.log
+/src/HCFS/obj
+
+# Build Process
+/build/.ndk_build
+/build/.init_ccache
+/build/obj
+/build/libs

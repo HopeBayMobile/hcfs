@@ -19,16 +19,15 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <curl/curl.h>
 
 #include "hcfscurl.h"
 #include "compress.h"
-#include "enc.h"
+#include "objmeta.h"
 #include "fuseop.h"
 #include "dedup_table.h"
 
-#define MAX_UPLOAD_CONCURRENCY 16
-#define MAX_SYNC_CONCURRENCY 16
+#define MAX_UPLOAD_CONCURRENCY 8
+#define MAX_SYNC_CONCURRENCY 4
 
 #define TOUPLOAD_BLOCKS 0
 #define BACKEND_BLOCKS 1
@@ -45,6 +44,7 @@ typedef struct {
 	int which_curl;
 	int progress_fd;
 	char tempfilename[400];
+	int which_index;
 #if (DEDUP_ENABLE)
 	char is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
@@ -58,6 +58,7 @@ typedef struct {
 	mode_t this_mode;
 	int progress_fd;
 	char is_revert;
+	int which_index;
 } SYNC_THREAD_TYPE;
 
 typedef struct {
@@ -71,6 +72,7 @@ typedef struct {
 	pthread_t upload_threads_no[MAX_UPLOAD_CONCURRENCY];
 	char threads_in_use[MAX_UPLOAD_CONCURRENCY];
 	char threads_created[MAX_UPLOAD_CONCURRENCY];
+	char threads_finished[MAX_UPLOAD_CONCURRENCY];
 	int total_active_upload_threads;
 	/*upload threads: used for upload objects to backends*/
 } UPLOAD_THREAD_CONTROL;
@@ -83,6 +85,7 @@ typedef struct {
 	ino_t threads_in_use[MAX_SYNC_CONCURRENCY];
 	int progress_fd[MAX_SYNC_CONCURRENCY];
 	char threads_created[MAX_SYNC_CONCURRENCY];
+	char threads_finished[MAX_SYNC_CONCURRENCY];
 	char threads_error[MAX_SYNC_CONCURRENCY];
 	char is_revert[MAX_SYNC_CONCURRENCY];
 	int total_active_sync_threads;
@@ -119,7 +122,11 @@ void dispatch_delete_block(int which_curl);
 int schedule_sync_meta(char *toupload_metapath, int which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
+#ifdef _ANDROID_ENV_
+void *upload_loop(void *ptr);
+#else
 void upload_loop(void);
+#endif
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta);
 int download_meta_from_backend(ino_t inode, const char *download_metapath,

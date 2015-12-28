@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <stdarg.h>
+#include <inttypes.h>
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -7,6 +8,7 @@
 #include "super_block.h"
 #include "global.h"
 #include "fuseop.h"
+#include "enc.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
@@ -18,13 +20,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-#ifdef ARM_32bit_
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%lld_%lld",
-		this_inode, block_num);
-#else
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%ld_%lld",
-		this_inode, block_num);
-#endif
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%" PRIu64 "_%lld",
+		(uint64_t)this_inode, block_num);
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -55,12 +52,14 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 			this_inode; // Record the inode number to verify.
 		shm_verified_data->record_inode_counter++;
 		sem_post(&shm_verified_data->record_inode_sem);
+
+		sys_super_block->head.num_dirty--;
 		printf("Test: inode %d is updated\n", this_inode);
 	}
 	return 0;
 }
 
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
 {
 	char objectpath[40];
 	FILE *objptr;
@@ -79,17 +78,20 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
+	hcfs_system->systemdata.dirty_cache_size = 0;
 	return 200;
 }
 
-int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
+#if (DEDUP_ENABLE)
+int do_block_delete(ino_t this_inode, long long block_no, unsigned char *obj_id,
+		    CURL_HANDLE *curl_handle)
+#else
+int do_block_delete(ino_t this_inode, long long block_no,
+		    CURL_HANDLE *curl_handle)
+#endif
 {
 	char deleteobjname[30];
-#ifdef ARM_32bit_
-	sprintf(deleteobjname, "data_%lld_%lld", this_inode, block_no);
-#else
-	sprintf(deleteobjname, "data_%ld_%lld", this_inode, block_no);
-#endif
+	sprintf(deleteobjname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
 	usleep(200000); // Let thread busy
@@ -113,7 +115,7 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
 	(inode_ptr->inode_stat).st_mode = S_IFDIR;
-	
+
 	if (shm_test_data->tohandle_counter == shm_test_data->num_inode) {
 		inode_ptr->util_ll_next = 0;
 		sys_super_block->head.first_dirty_inode = 0;
@@ -161,7 +163,7 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
 	long long sys_size, num_ino;
 
@@ -177,3 +179,36 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return 200;
 }
 
+int set_block_dirty_status(char *path, FILE *fptr, char status)
+{
+	setxattr(path, "user.dirty", "F", 1, 0);
+	return 0;
+}
+
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	return 0;
+}
+
+off_t check_file_size(const char *path)
+{
+	struct stat block_stat;
+	int errcode;
+
+	errcode = stat(path, &block_stat);
+	if (errcode == 0)
+		return block_stat.st_size;
+	errcode = errno;
+	write_log(0, "Error when checking file size. Code %d, %s\n",
+			errcode, strerror(errcode));
+	return -errcode;
+}
+int sync_hcfs_system_data(char need_lock)
+{
+	return 0;
+}
+int backup_FS_database(void)
+{
+	return 0;
+}

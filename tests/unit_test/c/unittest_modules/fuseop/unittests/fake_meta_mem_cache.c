@@ -184,6 +184,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		file_meta_ptr->double_indirect = 0;
 		file_meta_ptr->triple_indirect = 0;
 		file_meta_ptr->quadruple_indirect = 0;
+		file_meta_ptr->local_pin = FALSE;
 		switch (this_inode) {
 		case 14:
 		case 15:

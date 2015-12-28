@@ -12,7 +12,7 @@
 struct fuse_chan {
 	int test
 } tmpchan;
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 void temp_init(void *userdata, struct fuse_conn_info *conn)
 {
@@ -108,13 +108,17 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	return 0;
 }
-int update_FS_statistics(char *pathname, long long system_size,
-		long long num_inodes)
+
+int fetch_stat_path(char *pathname, ino_t this_inode)
 {
-	return 0;
+        snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
+        return 0;
 }
-int read_FS_statistics(char *pathname, long long *system_size_ptr,
-		long long *num_inodes_ptr)
+PATH_CACHE * init_pathcache(ino_t root_inode)
+{
+	return (PATH_CACHE *) malloc(sizeof(PATH_CACHE));
+}
+int destroy_pathcache(PATH_CACHE *cacheptr)
 {
 	return 0;
 }

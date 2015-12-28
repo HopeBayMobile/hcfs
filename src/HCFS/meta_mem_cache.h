@@ -153,8 +153,10 @@ int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 				const DIR_ENTRY_PAGE *temppage);
 
 
-int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
-	const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr);
+int meta_cache_update_symlink_data(ino_t this_inode,
+				   const struct stat *inode_stat,
+				   const SYMLINK_META_TYPE *symlink_meta_ptr,
+				   META_CACHE_ENTRY_STRUCT *bptr);
 
 int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr);

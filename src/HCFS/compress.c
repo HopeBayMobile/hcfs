@@ -8,8 +8,9 @@
  * **************************************************************************/
 
 #include "compress.h"
+#include "utils.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
+#if COMPRESS_ENABLE
 
 /************************************************************************
  * *
@@ -60,6 +61,8 @@ decompress_func decompress_f = LZ4_decompress_safe;
  * *************************************************************************/
 compress_bound_func compress_bound_f = LZ4_compressBound;
 
+#endif  /* COMPRESS_ENABLE */
+
 /************************************************************************
  * *
  * * Function name: transform_compress_fd
@@ -73,6 +76,7 @@ compress_bound_func compress_bound_f = LZ4_compressBound;
  * *************************************************************************/
 FILE *transform_compress_fd(FILE *in_fd, unsigned char **data)
 {
+#if COMPRESS_ENABLE
 	unsigned char *buf = calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
 
 	if (buf == NULL) {
@@ -100,7 +104,22 @@ FILE *transform_compress_fd(FILE *in_fd, unsigned char **data)
 	free(buf);
 	*data = new_data;
 	write_log(10, "compress_size: %d\n", ret);
+#if defined(__ANDROID__) || defined(_ANDROID_ENV_)
+	FILE *tmp_file = tmpfile();
+	if (tmp_file == NULL) {
+		write_log(2, "tmpfile() failed to create tmpfile\n");
+		return NULL;
+	}
+	fwrite(new_data, sizeof(unsigned char), ret, tmp_file);
+	rewind(tmp_file);
+	return tmp_file;
+#else
 	return fmemopen(new_data, ret, "rb");
+#endif /* __ANDROID__ */
+
+#else
+	return NULL;
+#endif /* COMPRESS_ENABLE */
 }
 /************************************************************************
  * *
@@ -116,6 +135,7 @@ FILE *transform_compress_fd(FILE *in_fd, unsigned char **data)
 int decompress_to_fd(FILE *decompress_to_fd, unsigned char *input,
 		     int input_length)
 {
+#if COMPRESS_ENABLE
 	write_log(10, "decompress_size: %d\n", input_length);
 	unsigned char *output =
 	    (unsigned char *)calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
@@ -131,4 +151,7 @@ int decompress_to_fd(FILE *decompress_to_fd, unsigned char *input,
 	fwrite(output, sizeof(unsigned char), ret, decompress_to_fd);
 	free(output);
 	return 0;
+#else
+	return 1;
+#endif
 }

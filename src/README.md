@@ -12,9 +12,14 @@ that 'tmp' can be any directory and this won't be the actual mountpoint.
 3. Compile the utility program 'HCFSvol.c' under 'src/CLI_utils' using
 'cc HCFSvol.c -o HCFSvol'.
 
+ps. Before launch the hcfs, please make sure the permission setting of /etc/fuse.conf is 644
+
 #### **Creating and mounting a HCFS FS**
 
 1. Use './HCFSvol create FSname' for creating the FS 'FSname'.
+(For Android, need to specify whether the mount is for internal or
+external storage, using './HCFSvol create FSname internal' or
+'./HCFSvol create FSname external'.
 
 2. Use './HCFSvol mount FSname MntPoint' for mounting the FS 'FSname'
 to the mountpoint 'MntPoint'.

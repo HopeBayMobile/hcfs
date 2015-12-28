@@ -1,23 +1,28 @@
 #include <sys/stat.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <errno.h>
 #include <fuse/fuse_lowlevel.h>
+#include <inttypes.h>
 
 #include "mock_param.h"
 
 #include "meta_mem_cache.h"
 #include "params.h"
 #include "mount_manager.h"
+#include "global.h"
+
 
 /* Global vars*/
 int DELETE_DIR_ENTRY_BTREE_RESULT = 1;
-
-SYSTEM_CONF_STRUCT system_config;
 
 /* mock functions - meta_mem_cache*/
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (dir_meta_ptr)
+		dir_meta_ptr->local_pin = pin_flag_in_meta;
 
 	switch(this_inode) {
 	case INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2:
@@ -45,7 +50,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		dir_meta_ptr->entry_page_gc_list = 0;
 		dir_meta_ptr->tree_walk_list_head = sizeof(DIR_ENTRY_PAGE);
 		dir_meta_ptr->total_children = to_verified_meta.total_children;
-		inode_stat->st_nlink = to_verified_stat.st_nlink;
+		if (inode_stat)
+			inode_stat->st_nlink = to_verified_stat.st_nlink;
 		return 0;
 	}
 }
@@ -57,7 +63,7 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 	if (dir_meta_ptr)
 		to_verified_meta = *dir_meta_ptr;
 	
-	if (dir_meta_ptr)
+	if (inode_stat)
 		to_verified_stat = *inode_stat;
 	
 	return 0;
@@ -120,12 +126,7 @@ int meta_cache_remove(ino_t this_inode)
 	char metapath[METAPATHLEN];
 
 	/* Remove todel file here */
-#ifdef ARM_32bit_
-	sprintf(metapath, "testpatterns/inode_%lld_meta_file.todel",
-			this_inode);
-#else
-	sprintf(metapath, "testpatterns/inode_%d_meta_file.todel", this_inode);
-#endif
+	sprintf(metapath, "testpatterns/inode_%" PRIu64 "_meta_file.todel", (uint64_t)this_inode);
 	if (!access(metapath, F_OK))
 		unlink(metapath);
 
@@ -138,7 +139,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 
-	
+	file_meta_ptr->local_pin = pin_flag_in_meta;	
 	switch(this_inode) {
        	case INO_DIRECT_SUCCESS:
 		file_meta_ptr->direct = sizeof(FILE_META_TYPE);
@@ -252,7 +253,8 @@ off_t check_file_size(const char *path)
 
 int fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	//sprintf(pathname, "testpatterns/inode_%d_meta_file.todel", this_inode);
+	//sprintf(pathname, "testpatterns/inode_%" PRIu64 "_meta_file.todel",
+	//(uint64_t)this_inode);
 	strcpy(pathname, TO_DELETE_METAPATH);
 	if (this_inode == INO_RENAME_FAIL) {
 		strcpy(pathname, "\0");
@@ -269,11 +271,7 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-#ifdef ARM_32bit_
-	sprintf(pathname, "%s_%lld", MOCK_META_PATH, this_inode);
-#else
-	sprintf(pathname, "%s_%d", MOCK_META_PATH, this_inode);
-#endif
+	sprintf(pathname, "%s_%" PRIu64 "", MOCK_META_PATH, (uint64_t)this_inode);
 	//strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
@@ -281,13 +279,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-#ifdef ARM_32bit_
-	sprintf(pathname, "testpatterns/inode_%lld_block_%lld", this_inode,
-			block_num);
-#else
-	sprintf(pathname, "testpatterns/inode_%d_block_%d", this_inode,
-			block_num);
-#endif
+	sprintf(pathname, "testpatterns/inode_%" PRIu64 "_block_%d",
+			(uint64_t)this_inode, block_num);
 	return 0;
 }
 
@@ -315,6 +308,11 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 
 int write_log(int level, char *format, ...)
 {
+	va_list alist;
+
+	va_start(alist, format);
+	//vprintf(format, alist);
+	va_end(alist);
 	return 0;
 }
 MOUNT_T tmpmount;
@@ -323,17 +321,6 @@ void* fuse_req_userdata(fuse_req_t req)
 {
 	tmpmount.f_ino = ROOT_INODE;
 	return &tmpmount;
-}
-
-int read_FS_statistics(char *pathname, long long *system_size_ptr, 
-	long long *num_inodes_ptr)
-{
-	return 0;
-}
-int update_FS_statistics(char *pathname, long long system_size, 
-	long long num_inodes)
-{
-	return 0;
 }
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta, 
@@ -346,3 +333,39 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+        snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
+        return 0;
+}
+
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	if (pathlookup_write_parent_success == TRUE)
+		return 0;
+	else
+		return -EIO;
+}
+
+int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
+{
+	if (delete_pathcache_node_success == TRUE)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
+        const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
+{
+	return 0;
+}
+
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+        SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	if (symlink_meta_ptr)
+		symlink_meta_ptr->local_pin = pin_flag_in_meta;
+	return 0;
+}
+

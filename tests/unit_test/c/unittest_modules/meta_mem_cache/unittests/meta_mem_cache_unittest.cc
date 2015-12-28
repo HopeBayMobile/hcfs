@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <time.h>
+#include <errno.h>
 extern "C" {
 #include "global.h"
 #include "params.h"
@@ -256,7 +257,7 @@ class meta_cache_drop_pagesTest : public BaseClassWithMetaCacheEntry {
 
 TEST_F(meta_cache_drop_pagesTest, CacheNotLocked)
 {
-	EXPECT_EQ(-1, meta_cache_drop_pages(body_ptr));
+	EXPECT_EQ(-EINVAL, meta_cache_drop_pages(body_ptr));
 }
 
 TEST_F(meta_cache_drop_pagesTest, SuccessDropAllPages)
@@ -466,7 +467,7 @@ class meta_cache_unlock_entryTest : public ::testing::Test {
 TEST_F(meta_cache_unlock_entryTest, CacheIsUnlock)
 {
 	/* Test */
-	EXPECT_EQ(-1, meta_cache_unlock_entry(body_ptr));
+	EXPECT_EQ(-EINVAL, meta_cache_unlock_entry(body_ptr));
 }
 
 TEST_F(meta_cache_unlock_entryTest, CacheIsLock)
@@ -606,7 +607,7 @@ protected:
 TEST_F(meta_cache_update_file_dataTest, CacheNotLocked)
 {
 	/* Test for non-locked cache */
-	EXPECT_EQ(-1, meta_cache_update_file_data(0, NULL, NULL, NULL, 0, body_ptr));
+	EXPECT_EQ(-EINVAL, meta_cache_update_file_data(0, NULL, NULL, NULL, 0, body_ptr));
 }
 
 TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
@@ -661,7 +662,7 @@ class meta_cache_lookup_file_dataTest : public BaseClassWithMetaCacheEntry {
 TEST_F(meta_cache_lookup_file_dataTest, CacheNotLocked)
 {
 	/* Test for non-locked cache */
-	EXPECT_EQ(-1, meta_cache_lookup_file_data(0, NULL, NULL, NULL, 0, body_ptr));
+	EXPECT_EQ(-EINVAL, meta_cache_lookup_file_data(0, NULL, NULL, NULL, 0, body_ptr));
 }
 
 TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
@@ -797,7 +798,7 @@ protected:
 TEST_F(meta_cache_update_dir_dataTest, CacheNotLocked)
 {
 	/* Test for non-locked cache */
-	EXPECT_EQ(-1, meta_cache_update_dir_data(0, NULL, NULL, NULL, body_ptr));
+	EXPECT_EQ(-EINVAL, meta_cache_update_dir_data(0, NULL, NULL, NULL, body_ptr));
 }
 
 TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
@@ -902,7 +903,7 @@ protected:
 TEST_F(meta_cache_lookup_dir_dataTest, CacheNotLocked)
 {
 	/* Test for non-locked cache */
-	EXPECT_EQ(-1, meta_cache_lookup_dir_data(0, NULL, NULL, NULL, body_ptr));
+	EXPECT_EQ(-EINVAL, meta_cache_lookup_dir_data(0, NULL, NULL, NULL, body_ptr));
 }
 
 TEST_F(meta_cache_lookup_dir_dataTest, Lookup_Stat_and_Meta_Success)
@@ -1204,7 +1205,7 @@ class flush_single_entryTest : public ::testing::Test {
 
 TEST_F(flush_single_entryTest, CacheNotLock)
 {
-	EXPECT_EQ(-1, flush_single_entry(body_ptr));
+	EXPECT_EQ(-EINVAL, flush_single_entry(body_ptr));
 }
 
 TEST_F(flush_single_entryTest, FlushFileMeta)
@@ -1483,7 +1484,7 @@ TEST_F(meta_cache_seek_dir_entryTest, CacheNotLocked)
 {
 	DIR_ENTRY_PAGE verified_dir_entry_page;
 	int verified_index;
-	ASSERT_EQ(-1, meta_cache_seek_dir_entry(0, &verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	ASSERT_EQ(-EINVAL, meta_cache_seek_dir_entry(0, &verified_dir_entry_page, &verified_index, "test_name", body_ptr));
 }
 
 TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_Cache)

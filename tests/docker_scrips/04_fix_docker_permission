@@ -1,13 +1,14 @@
 #!/bin/bash
 echo ======== ${BASH_SOURCE[0]} ========
+WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
 set -e -x
 OLDUID=${SUDO_UID:-$UID}
 OLDGID=${SUDO_GID:-$GROUPS}
-NEWUID=$(stat -c '%u' /home/jenkins/workspace/HCFS)
-NEWGID=$(stat -c '%g' /home/jenkins/workspace/HCFS)
+NEWUID=$(stat -c '%u' $WORKSPACE)
+NEWGID=$(stat -c '%g' $WORKSPACE)
 if [[ $OLDUID != $NEWUID || $OLDGID != $NEWGID ]]; then
 	echo FIX file permission in docker
-	ls -l /home/jenkins/workspace/HCFS
+	ls -l $WORKSPACE
 	if [ $NEWUID -eq 0 ]; then
 		NEWUID=$OLDUID
 	else
@@ -18,7 +19,7 @@ if [[ $OLDUID != $NEWUID || $OLDGID != $NEWGID ]]; then
 	else
 		sudo groupmod -g $NEWGID jenkins
 	fi
-	sudo chown -R $NEWUID:$NEWGID $HOME
-	ls -l /home/jenkins/workspace/HCFS
+	sudo chown -R $NEWUID:$NEWGID /var/jenkins/workspace/HCFS/
+	ls -l $WORKSPACE
 fi
 

@@ -27,18 +27,28 @@ UNITTEST_DIR = $(realpath ./unittests)
 # the compiler doesn't generate warnings in Google Test headers.
 CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
 
+# Flags passed to C and C++ compilers
+CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
+	    -D_FILE_OFFSET_BITS=64 \
+	    -DDEDUP_ENABLE=0 \
+	    -DENCRYPT_ENABLE=1 \
+	    -DCOMPRESS_ENABLE=0 \
+	    -DARM_32bit_ \
+	    -D_ANDROID_ENV_
+# Flags passed to the C compiler. (We trace coverage of hcfs source only)
+CFLAGS += -ftest-coverage
+CFAKEFLAGS +=
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
-
+CXXFLAGS +=
+# gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CXX = gcc
-
-CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
-
-CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
 TESTS = fuseop_unittest 
+
+.PHONY: $(DO_TESTS)
+DO_TESTS = $(TESTS:%=test-%)
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -51,14 +61,22 @@ all : setup $(TESTS)
 
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
+# Umount of crashed test FS should be done in a cleanup script for
+# crashed UT or by hand. It should not be part of the make process
+# and the cleanup should be done only when necessary. (In fuseop
+# unittest the test FS will be unmounted at the end of the test).
 
-test : setup $(TESTS)
-	./fuseop_unittest
+test : setup $(DO_TESTS)
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
+
+$(DO_TESTS): $(TESTS)
+	./$(@:test-%=%)
 
 .PHONY : setup
 setup :
-	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1
@@ -105,6 +123,4 @@ fuseop_unittest.o : $(UNITTEST_DIR)/fuseop_unittest.cc \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/fuseop_unittest.cc
 
 fuseop_unittest : fuseop.o fake_meta_mem_cache.o fake_misc.o fuseop_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lfuse
-
-
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@ -lstdc++ -lfuse -lpthread -lsqlite3

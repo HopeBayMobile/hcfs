@@ -26,9 +26,10 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <semaphore.h>
 #include <sys/mman.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "utils.h"
@@ -41,8 +42,10 @@
 #include "mount_manager.h"
 #include "lookup_count.h"
 #include "super_block.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
+#ifdef _ANDROID_ENV_
+#include "path_reconstruct.h"
+#include "FS_manager.h"
+#endif
 
 static inline void logerr(int errcode, char *msg)
 {
@@ -105,7 +108,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 	size_t ret_size;
 	int sem_val;
 	char no_need_rewrite;
-	long ret_pos;
+	int64_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
 
@@ -122,10 +125,14 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", childname);
 	if (S_ISREG(child_mode))
 		temp_entry.d_type = D_ISREG;
-	if (S_ISDIR(child_mode))
+	else if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
-	if (S_ISLNK(child_mode))
+	else if (S_ISLNK(child_mode))
 		temp_entry.d_type = D_ISLNK;
+	else if (S_ISFIFO(child_mode))
+		temp_entry.d_type = D_ISFIFO;
+	else if (S_ISSOCK(child_mode))
+		temp_entry.d_type = D_ISSOCK;
 
 	/* Load parent meta from meta cache */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -357,10 +364,14 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 	strcpy(temp_entry.d_name, childname);
 	if (S_ISREG(child_mode))
 		temp_entry.d_type = D_ISREG;
-	if (S_ISDIR(child_mode))
+	else if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
-	if (S_ISLNK(child_mode))
+	else if (S_ISLNK(child_mode))
 		temp_entry.d_type = D_ISLNK;
+	else if (S_ISFIFO(child_mode))
+		temp_entry.d_type = D_ISFIFO;
+	else if (S_ISSOCK(child_mode))
+		temp_entry.d_type = D_ISSOCK;
 
 	/* Initialize B-tree deletion by first loading the root of B-tree */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -503,14 +514,27 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		if (S_ISREG(new_mode)) {
 			write_log(10, "Debug: change to type REG\n");
 			tpage.dir_entries[count].d_type = D_ISREG;
-		}
-		if (S_ISLNK(new_mode)) {
+
+		} else if (S_ISLNK(new_mode)) {
 			write_log(10, "Debug: change to type LNK\n");
 			tpage.dir_entries[count].d_type = D_ISLNK;
-		}
-		if (S_ISDIR(new_mode)) {
+
+		} else if (S_ISDIR(new_mode)) {
 			write_log(10, "Debug: change to type DIR\n");
 			tpage.dir_entries[count].d_type = D_ISDIR;
+
+		} else if (S_ISFIFO(new_mode)) {
+			write_log(10, "Debug: change to type FIFO\n");
+			tpage.dir_entries[count].d_type = D_ISFIFO;
+
+		} else if (S_ISSOCK(new_mode)) {
+			write_log(10, "Debug: change to type SOCK\n");
+			tpage.dir_entries[count].d_type = D_ISSOCK;
+		
+		} else {
+			write_log(0, "Error: Invalid rename type in %s\n",
+					__func__);
+			return -EINVAL;
 		}
 
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
@@ -556,6 +580,7 @@ int delete_inode_meta(ino_t this_inode)
 
 	/*Try a rename first*/
 	ret = rename(thismetapath, todelete_metapath);
+	write_log(10, "%s, %s, %d\n", thismetapath, todelete_metapath, ret);
 	if (ret < 0) {
 		/*If not successful, copy the meta*/
 		todeletefptr = NULL;
@@ -709,7 +734,7 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 	PTR_ENTRY_PAGE tmp_ptr_page;
 	int count, ret, errcode;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
 
@@ -869,7 +894,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 	int count, ret, errcode;
 	BLOCK_ENTRY_PAGE temppage;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
 
@@ -1018,7 +1043,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	FILE_META_TYPE temp_meta;
 	int which_indirect;
 	int ret, errcode;
-	long ret_pos;
+	int64_t ret_pos;
 
 	/* First check if meta cache is locked */
 	/* Create page here */
@@ -1197,15 +1222,25 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
         struct timeval start_time, end_time;
         float elapsed_time;
         char block_status;
-	long long tmp_system_size, tmp_num_inodes;
 	char rootpath[METAPATHLEN];
+	FILE *fptr;
+	FS_STAT_T tmpstat;
+	SYSTEM_DATA_TYPE *statptr;
 
 	if (mptr == NULL) {
-		ret = fetch_meta_path(rootpath, root_inode);
+		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
 			return ret;
-		read_FS_statistics(rootpath, &tmp_system_size,
-					&tmp_num_inodes);
+		fptr = fopen(rootpath, "r+");
+		if (fptr == NULL) {
+			errcode = errno;
+			write_log(0, "Unexpected error %d, %s\n", errcode,
+				strerror(errcode));
+			errcode = -errcode;
+			return errcode;
+		}
+		setbuf(fptr, NULL);
+		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
 	gettimeofday(&start_time, NULL);
@@ -1219,7 +1254,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 		if (mptr == NULL)
-			tmp_num_inodes--;
+			tmpstat.num_inodes--;
 		else
 			change_mount_stat(mptr, 0, -1);
 		break;
@@ -1233,7 +1268,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 		if (mptr == NULL)
-			tmp_num_inodes--;
+			tmpstat.num_inodes--;
 		else
 			change_mount_stat(mptr, 0, -1);
 		break;
@@ -1245,7 +1280,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		/* Open meta */
 		ret = fetch_meta_path(thismetapath, this_inode);
-		if (ret < 0) 
+		if (ret < 0)
 			return ret;
 
 		metafptr = fopen(thismetapath, "r+");
@@ -1285,19 +1320,19 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				page_pos = seek_page2(&file_meta, metafptr,
 					which_page, 0);
 				if (page_pos <= 0) {
-					count += (MAX_BLOCK_ENTRIES_PER_PAGE 
+					count += (MAX_BLOCK_ENTRIES_PER_PAGE
 						- 1);
 					continue;
 				}
 				current_page = which_page;
 				FSEEK(metafptr, page_pos, SEEK_SET);
-				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 
+				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
 					1, metafptr);
 			}
 
 			/* Skip if block does not exist */
 			block_status = tmppage.block_entries[e_index].status;
-			if ((block_status == ST_NONE) || 
+			if ((block_status == ST_NONE) ||
 				(block_status == ST_CLOUD))
 				continue;
 
@@ -1308,28 +1343,48 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				goto errcode_handle;
 			}
 
+			/* Do not need to change per-file statistics here
+			as the file is in the process of being deleted */
 			if (access(thisblockpath, F_OK) == 0) {
 				cache_block_size =
 						check_file_size(thisblockpath);
 				UNLINK(thisblockpath);
 				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_size -=
+				statptr = &(hcfs_system->systemdata);
+				statptr->cache_size -=
 						(long long) cache_block_size;
-				hcfs_system->systemdata.cache_blocks -= 1;
+				if (statptr->cache_size < 0)
+					statptr->cache_size = 0;
+				if ((block_status == ST_LDISK) ||
+				    (block_status == ST_LtoC))
+					statptr->dirty_cache_size -=
+						(long long) cache_block_size;
+				if (statptr->dirty_cache_size < 0)
+					statptr->dirty_cache_size = 0;
+				statptr->cache_blocks -= 1;
+				if (statptr->cache_blocks < 0)
+					statptr->cache_blocks = 0;
 				sem_post(&(hcfs_system->access_sem));
 			}
 		}
-		/* TODO: Change size of data here for each FS (or
-			in the places where this function is called)*/
 		sem_wait(&(hcfs_system->access_sem));
+		if (file_meta.local_pin == TRUE) {
+			hcfs_system->systemdata.pinned_size -=
+						this_inode_stat.st_size;
+			if (hcfs_system->systemdata.pinned_size < 0)
+				hcfs_system->systemdata.pinned_size = 0;
+		}
+
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
+		if (hcfs_system->systemdata.system_size < 0)
+			hcfs_system->systemdata.system_size = 0;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 		if (mptr != NULL) {
 			change_mount_stat(mptr, -this_inode_stat.st_size, -1);
 		} else {
-			tmp_num_inodes--;
-			tmp_system_size -= this_inode_stat.st_size;
+			tmpstat.num_inodes--;
+			tmpstat.system_size -= this_inode_stat.st_size;
 		}
 
 
@@ -1342,12 +1397,14 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		break;
 	}
 
-	if (mptr == NULL)
-		update_FS_statistics(rootpath, tmp_system_size,
-					tmp_num_inodes);
+	if (mptr == NULL) {
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
+		fclose(fptr);
+	}
 
 	/* unlink markdelete tag because it has been deleted */
-	ret = disk_cleardelete(this_inode, root_inode); 
+	ret = disk_cleardelete(this_inode, root_inode);
 
 	gettimeofday(&end_time, NULL);
 	elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001)
@@ -1389,13 +1446,8 @@ int disk_markdelete(ino_t this_inode, ino_t root_inode)
 	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
 
-#ifdef ARM_32bit_
-	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
-					METAPATH, this_inode, root_inode);
-#else
-	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
-					METAPATH, this_inode, root_inode);
-#endif
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
+			(uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
@@ -1421,13 +1473,8 @@ int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-#ifdef ARM_32bit_
-	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
-					METAPATH, this_inode, root_inode);
-#else
-	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
-					METAPATH, this_inode, root_inode);
-#endif
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
+			(uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
@@ -1454,13 +1501,8 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-#ifdef ARM_32bit_
-	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
-					METAPATH, this_inode, root_inode);
-#else
-	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
-					METAPATH, this_inode, root_inode);
-#endif
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
+			(uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1507,20 +1549,15 @@ int startup_finish_delete(void)
 	}
 
 	while (tmpptr != NULL) {
-#ifdef ARM_32bit_
-		ret_val = sscanf(tmpent.d_name, "inode%lld_%lld", &tmp_ino,
-					&root_inode);
-#else
-		ret_val = sscanf(tmpent.d_name, "inode%ld_%ld", &tmp_ino,
-					&root_inode);
-#endif
+		ret_val = sscanf(tmpent.d_name, "inode%" PRIu64 "_%" PRIu64 "",
+				(uint64_t *)&tmp_ino, (uint64_t *)&root_inode);
 		if (ret_val > 0) {
-			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL);
+			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL, NULL);
 			if (ret < 0) {
 				closedir(dirp);
 				return ret;
 			}
-			if (S_ISREG(tmpstat.st_mode))
+			if (S_ISFILE(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISREG,
 						root_inode, NULL);
 			if (S_ISDIR(tmpstat.st_mode))
@@ -1529,9 +1566,6 @@ int startup_finish_delete(void)
 			if (S_ISLNK(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISLNK,
 						root_inode, NULL);
-
-			/* TODO: Directly decrease num of inodes
-			in the xattr of root inode. */
 
 			if (ret < 0) {
 				closedir(dirp);
@@ -1579,4 +1613,314 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 	memcpy(dentry, &(temp_page.dir_entries[temp_index]),
 			sizeof(DIR_ENTRY));
 	return 0;
+}
+
+/**
+ * Change "local_pin" flag in meta cache. "new_pin_status" is either
+ * TRUE or FALSE. local_pin equals TRUE means this inode is pinned at local
+ * device but not neccessarily all blocks are local now.
+ *
+ * @param this_inode Inode of the meta to be changed.
+ * @param this_mode Mode of this inode.
+ * @param new_pin_status New "local_pin" status that is going to updated.
+ *
+ * @return 0 when succeding in change pin-flag, 1 when new pin-flag is the
+ *         same as old one. Otherwise return negative error code.
+ */
+int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
+{
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	FILE_META_TYPE file_meta;
+	DIR_META_TYPE dir_meta;
+	SYMLINK_META_TYPE symlink_meta;
+	int ret, ret_code;
+
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {
+		return -ENOMEM;
+	}
+
+	ret_code = 0;
+	/* Case regfile & fifo file */
+	if (S_ISFILE(this_mode)) {
+		ret = meta_cache_lookup_file_data(this_inode, NULL, &file_meta,
+				NULL, 0, meta_cache_entry);
+		if (ret < 0) {
+			ret_code = ret;
+			goto error_handling;
+		}
+
+		if (file_meta.local_pin == new_pin_status) {
+			ret_code = 1;
+		} else {
+			file_meta.local_pin = new_pin_status;
+			ret = meta_cache_update_file_data(this_inode, NULL,
+				&file_meta, NULL, 0, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+		}
+	/* Case dir */
+	} else if (S_ISDIR(this_mode)){
+		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dir_meta,
+				NULL, meta_cache_entry);
+		if (ret < 0) {
+			ret_code = ret;
+			goto error_handling;
+		}
+
+		if (dir_meta.local_pin == new_pin_status) {
+			ret_code = 1;
+		} else {
+			dir_meta.local_pin = new_pin_status;
+			ret = meta_cache_update_dir_data(this_inode, NULL,
+				&dir_meta, NULL, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+		}
+
+	/* Case symlink */
+	} else if (S_ISLNK(this_mode)) {
+		ret = meta_cache_lookup_symlink_data(this_inode, NULL,
+			&symlink_meta, meta_cache_entry);
+		if (ret < 0) {
+			ret_code = ret;
+			goto error_handling;
+		}
+
+		if (symlink_meta.local_pin == new_pin_status) {
+			ret_code = 1;
+		} else {
+			symlink_meta.local_pin = new_pin_status;
+			ret = meta_cache_update_symlink_data(this_inode, NULL,
+					&symlink_meta, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+		}
+	} else {
+		write_log(0, "Error: Invalid type in %s\n", __func__);
+		ret_code = -EINVAL;
+	}
+
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return ret_code;
+
+error_handling:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return ret_code;
+}
+
+/*
+ * Subroutin used to check size of the array and extend the
+ * array size if it is full.
+ */
+static int _check_extend_size(ino_t **ptr, long long num_elem,
+	long long *max_elem_size)
+{
+	ino_t *tmp_ptr;
+
+	if (num_elem >= *max_elem_size) {
+		*max_elem_size *= 2;
+		tmp_ptr = malloc(sizeof(ino_t) * (*max_elem_size));
+		if (tmp_ptr == NULL)
+			return -ENOMEM;
+		memcpy(tmp_ptr, *ptr, sizeof(ino_t) * num_elem);
+		free(*ptr);
+		*ptr = tmp_ptr;
+	}
+	return 0;
+}
+
+/*
+ * Subroutine used to shrink the array size so that eliminate wasting
+ * on memory.
+ */
+static int _check_shrink_size(ino_t **ptr, long long num_elem,
+	long long max_elem_size)
+{
+	ino_t *tmp_ptr;
+
+	if (num_elem == 0) { /* free memory when # of elem is zero */
+		free(*ptr);
+		*ptr = NULL;
+		return 0;
+	}
+
+	if (num_elem == max_elem_size)/*Do nothing when size is exactly enough*/
+		return 0;
+
+	else if (num_elem > max_elem_size) { /* Error when size exceeds limit */
+		write_log(0, "Error: Memory out of bound in %s", __func__);
+		return -ENOMEM;
+	}
+
+	tmp_ptr = malloc(sizeof(ino_t) * num_elem);
+	if (tmp_ptr == NULL)
+		return -ENOMEM;
+	memcpy(tmp_ptr, *ptr, sizeof(ino_t) * num_elem);
+	free(*ptr);
+	*ptr = tmp_ptr;
+
+	return 0;
+}
+
+/**
+ * collect_dir_children
+ *
+ * Given a dir inode, collect all the children and classify them as
+ * dir nodes and non-dir nodes. This function takes advantage of
+ * tree-walk pointer in meta of a dir.
+ *
+ * @param this_inode The inode number of the dir
+ * @param dir_node_list Address of a pointer used to point to dir-children-array
+ * @param num_dir_node Number of elements in the dir-array
+ * @param nondir_node_list Address of a pointer used to point to
+ *                         non-dir-children-array
+ * @param num_nondir_node Number of elements in the non-dir-array
+ *
+ * @return 0 on success, otherwise negative error code
+ */
+int collect_dir_children(ino_t this_inode,
+	ino_t **dir_node_list, long long *num_dir_node,
+	ino_t **nondir_node_list, long long *num_nondir_node)
+{
+	char metapath[300];
+	FILE *fptr;
+	int ret, errcode;
+	int count;
+	long long ret_size, now_page_pos;
+	long long total_children, half, now_nondir_size, now_dir_size;
+	DIR_META_TYPE dir_meta;
+	DIR_ENTRY_PAGE dir_page;
+	DIR_ENTRY *tmpentry;
+
+	*num_dir_node = 0;
+	*num_nondir_node = 0;
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+
+	ret = fetch_meta_path(metapath, this_inode);
+	if (ret < 0)
+		return ret;
+
+	fptr = fopen(metapath, "r");
+	if (fptr == NULL) {
+		ret = errno;
+		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
+			(uint64_t)this_inode, __func__, ret);
+		return -ret;
+	}
+
+	flock(fileno(fptr), LOCK_EX);
+	if (access(metapath, F_OK) < 0) {
+		write_log(5, "meta %"PRIu64" does not exist in %s\n",
+			(uint64_t)this_inode, __func__);
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return -ENOENT;
+	}
+
+	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
+	total_children = dir_meta.total_children;
+	now_page_pos = dir_meta.tree_walk_list_head;
+	if (total_children == 0 || now_page_pos == 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return 0;
+	}
+
+	half = total_children / 2 + 1; /* Avoid zero malloc */
+	now_dir_size = half;
+	now_nondir_size = half;
+	*dir_node_list = (ino_t *) malloc(sizeof(ino_t) * now_dir_size);
+	*nondir_node_list = (ino_t *) malloc(sizeof(ino_t) * now_nondir_size);
+	if ((*dir_node_list == NULL) || (*nondir_node_list == NULL)) {
+		errcode = -ENOMEM;
+		goto errcode_handle;
+	}
+
+	/* Collect all file in this dir */
+	while (now_page_pos) {
+		FSEEK(fptr, now_page_pos, SEEK_SET);
+		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+		for (count = 0; count < dir_page.num_entries; count++) {
+
+			tmpentry = &(dir_page.dir_entries[count]);
+			if (!strcmp(tmpentry->d_name, ".") || /* Ingore */
+				!strcmp(tmpentry->d_name, ".."))
+				continue;
+
+			if (tmpentry->d_type == D_ISDIR) {
+				ret = _check_extend_size(dir_node_list,
+					*num_dir_node, &now_dir_size);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				(*dir_node_list)[*num_dir_node] =
+								tmpentry->d_ino;
+				(*num_dir_node)++;
+
+			} else {
+				ret = _check_extend_size(nondir_node_list,
+					*num_nondir_node, &now_nondir_size);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				(*nondir_node_list)[*num_nondir_node] =
+								tmpentry->d_ino;
+				(*num_nondir_node)++;
+			}
+		}
+
+		now_page_pos = dir_page.tree_walk_next;
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+
+	/* Shrink dir_node_list size */
+	ret = _check_shrink_size(dir_node_list, *num_dir_node, now_dir_size);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to malloc in %s\n", __func__);
+		free(*dir_node_list);
+		free(*nondir_node_list);
+		*dir_node_list = NULL;
+		*nondir_node_list = NULL;
+		return -ENOMEM;
+	}
+
+	/* Shrink nondir_node_list size */
+	ret = _check_shrink_size(nondir_node_list, *num_nondir_node,
+			now_nondir_size);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to malloc in %s\n", __func__);
+		free(*dir_node_list);
+		free(*nondir_node_list);
+		*dir_node_list = NULL;
+		*nondir_node_list = NULL;
+		return -ENOMEM;
+	}
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	free(*dir_node_list);
+	free(*nondir_node_list);
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
+	return errcode;
 }

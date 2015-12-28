@@ -1,5 +1,5 @@
 /*************************************************************************
-*
+
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: super_block.c
@@ -22,11 +22,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* pin-status in super block */
+#define ST_DEL 0
+#define ST_UNPIN 1
+#define ST_PINNING 2
+#define ST_PIN 3
+
 /* SUPER_BLOCK_ENTRY defines the structure for an entry in super block */
 typedef struct {
 	struct stat inode_stat;
 	ino_t util_ll_next;
 	ino_t util_ll_prev;
+	ino_t pin_ll_next; /* Next file to be pinned */
+	ino_t pin_ll_prev;
+	char pin_status; /* ST_DEL, ST_UNPIN, ST_PINNING, ST_PIN */
 
 	/* status is one of NO_LL, IS_DIRTY, TO_BE_DELETED, TO_BE_RECLAIMED,
 	or RECLAIMED */
@@ -49,7 +58,10 @@ typedef struct {
 	ino_t last_dirty_inode;
 	ino_t first_to_delete_inode;
 	ino_t last_to_delete_inode;
+	ino_t first_pin_inode; /* first element in pin-queue */
+	ino_t last_pin_inode; /* last element in pin-queue */
 
+	long long num_pinning_inodes; /* Num inode to be pinned */
 	long long num_to_be_reclaimed;
 	long long num_to_be_deleted;
 	long long num_dirty;
@@ -85,7 +97,7 @@ int super_block_delete(ino_t this_inode);
 int super_block_reclaim(void);
 int super_block_reclaim_fullscan(void);
 ino_t super_block_new_inode(struct stat *in_stat,
-				unsigned long *ret_generation);
+				unsigned long *ret_generation, char local_pin);
 int super_block_update_stat(ino_t this_inode, struct stat *newstat);
 
 int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry);
@@ -101,5 +113,12 @@ int super_block_share_locking(void);
 int super_block_share_release(void);
 int super_block_exclusive_locking(void);
 int super_block_exclusive_release(void);
+
+int super_block_finish_pinning(ino_t this_inode);
+int super_block_mark_pin(ino_t this_inode, mode_t this_mode);
+int super_block_mark_unpin(ino_t this_inode, mode_t this_mode);
+
+int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
+int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 
 #endif  /* GW20_HCFS_SUPER_BLOCK_H_ */

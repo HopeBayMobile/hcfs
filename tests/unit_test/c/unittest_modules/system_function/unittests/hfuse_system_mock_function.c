@@ -50,9 +50,8 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 		return 0;
 }
 
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
-
 }
 
 void ENGINE_load_builtin_engines(void)
@@ -87,7 +86,21 @@ void *delete_loop(void *arg)
 {
 	return NULL;
 }
+#ifdef _ANDROID_ENV_
+void *upload_loop(void *ptr)
+{
+	return NULL;
+}
 
+void *run_cache_loop(void *ptr)
+{
+	return NULL;
+}
+void *monitor_loop(void *ptr)
+{
+	return NULL;
+}
+#else
 void upload_loop(void)
 {
 	/* kill child process */
@@ -99,7 +112,11 @@ void run_cache_loop(void)
 	/* kill child process */
 	exit(0);
 }
-
+void monitor_loop(void)
+{
+	exit(0);
+}
+#endif
 int hook_fuse(int argc, char **argv)
 {
 	return 0;
@@ -128,4 +145,24 @@ int init_fs_manager(void)
 {
 	return 0;
 }
-
+int init_pathlookup(void)
+{
+	return 0;
+}
+void destroy_pathlookup(void)
+{
+	return;
+}
+int init_dirstat_lookup()
+{
+	return 0;
+}
+void destroy_dirstat_lookup()
+{
+}
+void init_sync_stat_control(void)
+{
+}
+inline void update_sync_state(void)
+{
+}

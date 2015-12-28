@@ -2,12 +2,32 @@ extern "C" {
 #include "fuseop.h"
 #include "file_present.h"
 #include "meta_mem_cache.h"
+#include "global.h"
+#include "path_reconstruct.h"
 #include <errno.h>
 }
 #include "gtest/gtest.h"
 #include "mock_param.h"
-
 fuse_req_t req1;
+
+class file_presentEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const env =
+	::testing::AddGlobalTestEnvironment(new file_presentEnvironment);
+
+
 /*
 	Unittest of meta_forget_inode()
  */
@@ -31,7 +51,7 @@ TEST(fetch_inode_statTest, FetchRootStatFail)
 	struct stat inode_stat;
 	ino_t inode = 0;
 
-	EXPECT_EQ(-ENOENT, fetch_inode_stat(inode, &inode_stat, NULL));
+	EXPECT_EQ(-ENOENT, fetch_inode_stat(inode, &inode_stat, NULL, NULL));
 }
 
 TEST(fetch_inode_statTest, FetchInodeStatSuccess)
@@ -40,7 +60,7 @@ TEST(fetch_inode_statTest, FetchInodeStatSuccess)
 	ino_t inode = INO_REGFILE;
 
 	/* Run */
-	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, NULL));
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, NULL, NULL));
 
 	/* Verify */
 	EXPECT_EQ(inode, inode_stat.st_ino);
@@ -56,7 +76,22 @@ TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 	gen = 0;
 
 	/* Run */
-	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen, NULL));
+
+	/* Verify */
+	EXPECT_EQ(GENERATION_NUM, gen);
+}
+
+TEST(fetch_inode_statTest, FetchFIFOFileGenerationSuccess)
+{
+	struct stat inode_stat;
+	unsigned long gen;
+	ino_t inode = INO_FIFO;
+
+	gen = 0;
+
+	/* Run */
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen, NULL));
 
 	/* Verify */
 	EXPECT_EQ(GENERATION_NUM, gen);
@@ -71,7 +106,7 @@ TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 	gen = 0;
 
 	/* Run */
-	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen, NULL));
 
 	/* Verify */
 	EXPECT_EQ(GENERATION_NUM, gen);
@@ -86,7 +121,7 @@ TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 	gen = 0;
 
 	/* Run */
-	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen, NULL));
 
 	/* Verify */
 	EXPECT_EQ(GENERATION_NUM, gen);
@@ -98,17 +133,23 @@ TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 /*
  	Unittest of mknod_update_meta()
  */
+class mknod_update_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		sem_init(&(pathlookup_data_lock), 0, 1);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+	}
 
-TEST(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
-{
-	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
-	ino_t parent_inode = 1;
+	void TearDown()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+	}
+};
 
-	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", NULL, 0, 1));
-}
-
-TEST(mknod_update_metaTest, FailTo_dir_add_entry)
+TEST_F(mknod_update_metaTest, FailTo_dir_add_entry)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
@@ -120,11 +161,23 @@ TEST(mknod_update_metaTest, FailTo_dir_add_entry)
 		"\0", &tmp_stat, 0, 1));
 }
 
-TEST(mknod_update_metaTest, FunctionWorkSuccess)
+TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
+{
+	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
+	ino_t parent_inode = 1;
+	struct stat tmp_stat;
+
+	tmp_stat.st_mode = S_IFREG;
+	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
+		"\0", &tmp_stat, 0, 1));
+}
+
+TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	struct stat tmp_stat;
+	int ret;
 
 	tmp_stat.st_mode = S_IFREG;
 
@@ -139,16 +192,6 @@ TEST(mknod_update_metaTest, FunctionWorkSuccess)
 /*
 	Unittest of mkdir_update_meta()
  */
-
-TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
-{
-	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
-	ino_t parent_inode = 1;
-
-	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", NULL, 0, 1));
-}
-
 TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
@@ -156,7 +199,20 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 	struct stat tmp_stat;
 
 	tmp_stat.st_mode = S_IFDIR;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
+	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
+		"\0", &tmp_stat, 0, 1));
+}
+
+TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
+{
+	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
+	ino_t parent_inode = 1;
+	struct stat tmp_stat;
+
+	tmp_stat.st_mode = S_IFDIR;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
 }
@@ -168,6 +224,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	struct stat tmp_stat;
 
 	tmp_stat.st_mode = S_IFDIR;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
@@ -181,7 +238,23 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	Unittest of unlink_update_meta()
  */
 
-TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
+class unlink_update_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+		sem_init(&(pathlookup_data_lock), 0, 1);
+	}
+	void TearDown()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+		sem_destroy(&(pathlookup_data_lock));
+	}
+};
+
+TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
@@ -194,7 +267,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 		&mock_entry));
 }
 
-TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
+TEST_F(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
@@ -207,7 +280,20 @@ TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 			&mock_entry));
 }
 
-TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
+TEST_F(unlink_update_metaTest, UnlinkUpdateFIFOfileMetaSuccess)
+{
+	DIR_ENTRY mock_entry;
+	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
+
+	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
+	mock_entry.d_ino = INO_FIFO;
+	mock_entry.d_type = D_ISFIFO;
+
+	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
+			&mock_entry));
+}
+
+TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
@@ -220,7 +306,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 			&mock_entry));
 }
 
-TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
+TEST_F(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 {
 	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
@@ -245,6 +331,7 @@ TEST(rmdir_update_metaTest, ChildrenNonempty)
 {
 	ino_t self_inode = INO_CHILDREN_IS_NONEMPTY;
 	ino_t parent_inode = 1;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
@@ -254,6 +341,7 @@ TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
 {
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
@@ -263,6 +351,7 @@ TEST(rmdir_update_metaTest, FunctionWorkSuccess)
 {
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
+	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
@@ -294,6 +383,7 @@ protected:
 			unlink(mock_meta_path);
 
 		mock_meta_entry->fptr = fopen(mock_meta_path, "wr+");
+		mock_meta_entry->meta_opened = TRUE;
 		fseek(mock_meta_entry->fptr, 0, SEEK_SET);
 		fwrite(&mock_xattr_page, sizeof(XATTR_PAGE),
 			1, mock_meta_entry->fptr);
@@ -333,6 +423,19 @@ TEST_F(fetch_xattr_pageTest, XattrPageNULL)
 	ret = fetch_xattr_page(mock_meta_entry, NULL, NULL);
 
 	EXPECT_EQ(-ENOMEM, ret);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
+{
+	int ret;
+	long long xattr_pos;
+
+	xattr_pos = 0;
+	mock_meta_entry->inode_num = INO_FIFO;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(-EINVAL, ret);
+	EXPECT_EQ(0, xattr_pos);
 }
 
 TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
@@ -447,12 +550,16 @@ protected:
 	{
 		mock_parent_entry = (META_CACHE_ENTRY_STRUCT *)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		memset(mock_parent_entry, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		sem_init(&(pathlookup_data_lock), 0, 1);
 	}
 
 	void TearDown()
 	{
 		if (mock_parent_entry)
 			free(mock_parent_entry);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
 	}
 };
 
@@ -503,12 +610,16 @@ protected:
 	{
 		mock_parent_entry = (META_CACHE_ENTRY_STRUCT *)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		memset(mock_parent_entry, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		sem_init(&(pathlookup_data_lock), 0, 1);
 	}
 
 	void TearDown()
 	{
 		if (mock_parent_entry)
 			free(mock_parent_entry);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
 	}
 };
 
@@ -583,3 +694,271 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 /*
 	End of unittest of link_update_meta()
  */
+
+/* Unittest for pin_inode() */
+class pin_inodeTest : public ::testing::Test {
+protected:
+	long long mock_reserved_size;
+
+	void SetUp()
+	{
+		mock_reserved_size = 0;
+		CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+			malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->systemdata.pinned_size = 0;
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+	}
+};
+
+TEST_F(pin_inodeTest, FailIn_fetch_inode_stat)
+{
+	ino_t inode = 0;
+
+	EXPECT_EQ(-ENOENT, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, FailIn_change_pin_flag)
+{
+	ino_t inode = 1; /* this inode # will fail in change_pin_flag() */
+
+	EXPECT_EQ(-ENOMEM, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinRegfile_ENOSPC)
+{
+	ino_t inode = INO_REGFILE;
+
+	CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
+	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinRegfileSuccess)
+{
+	ino_t inode = INO_REGFILE;
+
+	CACHE_HARD_LIMIT = NUM_BLOCKS * MOCK_BLOCK_SIZE * 2;
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinFIFOSuccess)
+{
+	ino_t inode = INO_FIFO;
+
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinSymlinkSuccess)
+{
+	ino_t inode = INO_LNK;
+
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinDirSuccess)
+{
+	ino_t inode = INO_DIR;
+
+	collect_dir_children_flag = FALSE;
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(pin_inodeTest, PinDirSuccess_ManyChildren)
+{
+	ino_t inode = INO_DIR;
+
+	collect_dir_children_flag = TRUE;
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+}
+
+/* End of unittest for pin_inode() */
+
+/* Unittest for unpin_inode() */
+class unpin_inodeTest : public ::testing::Test {
+protected:
+	long long mock_reserved_size;
+
+	void SetUp()
+	{
+		mock_reserved_size = 0;
+		CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+			malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+	}
+};
+
+TEST_F(unpin_inodeTest, FailIn_fetch_inode_stat)
+{
+	ino_t inode = 0;
+
+	EXPECT_EQ(-ENOENT, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, FailIn_change_pin_flag)
+{
+	ino_t inode = 1; /* this inode # will fail in change_pin_flag() */
+
+	EXPECT_EQ(-ENOMEM, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, UnpinRegfileSuccess)
+{
+	ino_t inode = INO_REGFILE;
+
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, UnpinFIFOSuccess)
+{
+	ino_t inode = INO_FIFO;
+
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, UnpinSymlinkSuccess)
+{
+	ino_t inode = INO_LNK;
+
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, UnpinDirSuccess)
+{
+	ino_t inode = INO_DIR;
+
+	collect_dir_children_flag = FALSE;
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+}
+
+TEST_F(unpin_inodeTest, UnpinDirSuccess_ManyChildren)
+{
+	ino_t inode = INO_DIR;
+
+	collect_dir_children_flag = TRUE;
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+}
+/* End of unittest for unpin_inode() */
+
+/* Unittest for increase_pinned_size() */
+class increase_pinned_sizeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		CACHE_HARD_LIMIT = 0;
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+			malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(increase_pinned_sizeTest, QuotaIsSufficient)
+{
+	long long quota_size;
+	long long file_size;
+
+	quota_size = 100;
+	file_size = 20;
+	hcfs_system->systemdata.pinned_size = 200;
+
+	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(100 - 20, quota_size);
+	EXPECT_EQ(200, hcfs_system->systemdata.pinned_size);
+}
+
+TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemSufficient)
+{
+	long long quota_size;
+	long long file_size;
+
+	quota_size = 10;
+	file_size = 50;
+	CACHE_HARD_LIMIT = 200; /* pinned space = 0.8 * hard_limit */
+	hcfs_system->systemdata.pinned_size = 0;
+
+	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(0, quota_size);
+	EXPECT_EQ((50 - 10), hcfs_system->systemdata.pinned_size);
+}
+
+TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemInsufficient)
+{
+	long long quota_size;
+	long long file_size;
+
+	quota_size = 10;
+	file_size = 50;
+	CACHE_HARD_LIMIT = 20; /* pinned space = 0.8 * hard_limit */
+	hcfs_system->systemdata.pinned_size = 0;
+
+	EXPECT_EQ(-ENOSPC, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(10, quota_size);
+	EXPECT_EQ(0, hcfs_system->systemdata.pinned_size);
+}
+/* End of unittest for increase_pinned_size() */
+
+/* Unittest for decrease_pinned_size() */
+class decrease_pinned_sizeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		CACHE_HARD_LIMIT = 0;
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+			malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(decrease_pinned_sizeTest, QuotaIsSufficient)
+{
+	long long quota_size;
+	long long file_size;
+
+	quota_size = 100;
+	file_size = 20;
+	hcfs_system->systemdata.pinned_size = 200;
+
+	EXPECT_EQ(0, decrease_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(100 - 20, quota_size);
+	EXPECT_EQ(200, hcfs_system->systemdata.pinned_size);
+}
+
+TEST_F(decrease_pinned_sizeTest, QuotaIsInsufficient)
+{
+	long long quota_size;
+	long long file_size;
+
+	quota_size = 10;
+	file_size = 40;
+	hcfs_system->systemdata.pinned_size = 200;
+
+	EXPECT_EQ(0, decrease_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(0, quota_size);
+	EXPECT_EQ(200 - (40 - 10), hcfs_system->systemdata.pinned_size);
+}
+
+/* End of unittest for decrease_pinned_size() */

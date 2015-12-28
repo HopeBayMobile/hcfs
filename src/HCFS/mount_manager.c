@@ -24,8 +24,10 @@
 #include "utils.h"
 #include "lookup_count.h"
 #include "logger.h"
-
-extern struct fuse_lowlevel_ops hfuse_ops;
+#include "macro.h"
+#ifdef _ANDROID_ENV_
+#include "path_reconstruct.h"
+#endif
 
 /************************************************************************
 *
@@ -473,13 +475,23 @@ errcode_handle:
 /* Helper for unmounting */
 int do_unmount_FS(MOUNT_T *mount_info)
 {
+	int ret;
+
+	if (mount_info->stat_fptr != NULL)
+		fclose(mount_info->stat_fptr);
 	pthread_join(mount_info->mt_thread, NULL);
 	fuse_remove_signal_handlers(mount_info->session_ptr);
 	fuse_session_remove_chan(mount_info->chan_ptr);
 	fuse_session_destroy(mount_info->session_ptr);
 	fuse_unmount(mount_info->f_mp, mount_info->chan_ptr);
 	fuse_opt_free_args(&(mount_info->mount_args));
-
+#ifdef _ANDROID_ENV_
+	if (mount_info->vol_path_cache != NULL) {
+		ret = destroy_pathcache(mount_info->vol_path_cache);
+		if (ret < 0)
+			return ret;
+	}
+#endif
 	return 0;
 }
 
@@ -497,6 +509,7 @@ int mount_FS(char *fsname, char *mp)
 	int ret, errcode;
 	MOUNT_T *tmp_info, *new_info;
 	DIR_ENTRY tmp_entry;
+	char temppath[METAPATHLEN];
 
 	sem_wait(&(fs_mgr_head->op_lock));
 	sem_wait(&(mount_mgr.mount_lock));
@@ -535,7 +548,20 @@ int mount_FS(char *fsname, char *mp)
 		goto errcode_handle;
 	}
 
+	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
+#ifdef _ANDROID_ENV_
+	new_info->volume_type = tmp_entry.d_type;
+	if (new_info->volume_type == ANDROID_EXTERNAL) {
+		new_info->vol_path_cache = init_pathcache(new_info->f_ino);
+		if (new_info->vol_path_cache == NULL) {
+			errcode = -ENOMEM;
+			goto errcode_handle;
+		}
+	} else {
+		new_info->vol_path_cache = NULL;
+	}
+#endif
 	ret = fetch_meta_path(new_info->rootpath, new_info->f_ino);
 	if (ret < 0) {
 		errcode = ret;
@@ -565,10 +591,28 @@ int mount_FS(char *fsname, char *mp)
 		goto errcode_handle;
 	}
 
-	sem_init(&((new_info->FS_stat).lock), 0, 1);
-	ret = read_FS_statistics(new_info->rootpath,
-			&((new_info->FS_stat).system_size),
-			&((new_info->FS_stat).num_inodes));
+	sem_init(&(new_info->stat_lock), 0, 1);
+
+	ret = fetch_stat_path(temppath, new_info->f_ino);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	new_info->stat_fptr = fopen(temppath, "r+");
+	if (new_info->stat_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error %d (%s)\n", errcode,
+		          strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	ret = read_FS_statistics(new_info);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 	ret = do_mount_FS(mp, new_info);
 	if (ret < 0) {
 		errcode = ret;
@@ -594,6 +638,8 @@ errcode_handle:
 			free(new_info->f_mp);
 		if (new_info->lookup_table != NULL)
 			free(new_info->lookup_table);
+		if (new_info->stat_fptr != NULL)
+			fclose(new_info->stat_fptr);
 		free(new_info);
 	}
 	sem_post(&(mount_mgr.mount_lock));
@@ -740,7 +786,7 @@ int mount_status(char *fsname)
 *************************************************************************/
 int unmount_all(void)
 {
-	int ret, errcode;
+	/* TODO: errcode_handle */
 	MOUNT_T *ret_info;
 	MOUNT_NODE_T *ret_node;
 	char fsname[MAX_FILENAME_LEN+1];
@@ -759,7 +805,8 @@ int unmount_all(void)
 		pthread_kill(ret_info->mt_thread, SIGHUP);
 		do_unmount_FS(ret_info);
 
-		ret = delete_mount(fsname, &ret_node);
+		/* TODO: check return value */
+		delete_mount(fsname, &ret_node);
 
 		free((ret_node->mt_entry)->f_mp);
 		free(ret_node->mt_entry);
@@ -771,11 +818,6 @@ int unmount_all(void)
 	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
-
-errcode_handle:
-	sem_post(&(mount_mgr.mount_lock));
-	sem_post(&(fs_mgr_head->op_lock));
-	return errcode;
 }
 
 /************************************************************************
@@ -794,17 +836,66 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 {
 	int ret;
 
-	sem_wait(&((mptr->FS_stat).lock));
+	sem_wait(&(mptr->stat_lock));
 	(mptr->FS_stat).system_size += system_size_delta;
 	if ((mptr->FS_stat).system_size < 0)
 		(mptr->FS_stat).system_size = 0;
 	(mptr->FS_stat).num_inodes += num_inodes_delta;
 	if ((mptr->FS_stat).num_inodes < 0)
 		(mptr->FS_stat).num_inodes = 0;
-	ret = update_FS_statistics(mptr->rootpath,
-			(mptr->FS_stat).system_size,
-			(mptr->FS_stat).num_inodes);
-	sem_post(&((mptr->FS_stat).lock));
+	ret = update_FS_statistics(mptr);
+	sem_post(&(mptr->stat_lock));
 
 	return ret;
+}
+
+/************************************************************************
+*
+* Function name: update_FS_statistics
+*        Inputs: MOUNT_T *mptr
+*       Summary: Update per-FS statistics to the stat file of root inode.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int update_FS_statistics(MOUNT_T *mptr)
+{
+	int errcode;
+	int tmpfd;
+	ssize_t ret_ssize;
+
+	tmpfd = fileno(mptr->stat_fptr);
+
+	PWRITE(tmpfd, &(mptr->FS_stat), sizeof(FS_STAT_T), 0);
+
+	/* Remove fsync for the purpose of write performance */
+	//FSYNC(tmpfd);
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: read_FS_statistics
+*        Inputs: MOUNT_T *mptr
+*       Summary: Read per-FS statistics from the stat file of root inode.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int read_FS_statistics(MOUNT_T *mptr)
+{
+	int errcode;
+	int tmpfd;
+	ssize_t ret_ssize;
+
+	tmpfd = fileno(mptr->stat_fptr);
+
+	PREAD(tmpfd, &(mptr->FS_stat), sizeof(FS_STAT_T), 0);
+
+	return 0;
+
+errcode_handle:
+	return errcode;
 }

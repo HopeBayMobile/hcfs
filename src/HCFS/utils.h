@@ -11,15 +11,26 @@
 *
 **************************************************************************/
 
-#ifndef GW20_SRC_UTILS_H_
-#define GW20_SRC_UTILS_H_
+#ifndef SRC_HCFS_UTILS_H_
+#define SRC_HCFS_UTILS_H_
 
 #include <sys/types.h>
+#include <stdio.h>
+#include "params.h"
+
+extern SYSTEM_CONF_STRUCT *system_config;
+
+#include "dir_statistics.h"
+#include "global.h"
 
 /*BEGIN string utility definition*/
 
 /*Will copy the filename of the meta file to pathname*/
 int fetch_meta_path(char *pathname, ino_t this_inode);
+
+int fetch_stat_path(char *pathname, ino_t this_inode);
+
+int fetch_trunc_path(char *pathname, ino_t this_inode);
 
 /*Will copy the filename of the block file to pathname*/
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num);
@@ -30,19 +41,17 @@ int fetch_todelete_path(char *pathname, ino_t this_inode);
 
 /*END string utility definition*/
 
-int read_system_config(char *config_path);
-int validate_system_config(void);
+int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config);
+int validate_system_config(SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 
 int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta);
+		long long cache_size_delta, long long cache_blocks_delta,
+		long long dirty_cache_delta);
 
-int update_FS_statistics(char *pathname, long long system_size,
-		long long num_inodes);
-
-int read_FS_statistics(char *pathname, long long *system_size_ptr,
-		long long *num_inodes_ptr);
+int set_block_dirty_status(char *path, FILE *fptr, char status);
+int get_block_dirty_status(char *path, FILE *fptr, char *status);
 
 void fetch_backend_block_objname(ino_t this_inode, long long block_no,
 	char *block_name);
@@ -52,4 +61,18 @@ void fetch_backend_meta_objname(ino_t this_inode, char *meta_name);
 /* Will copy the filename of ddt meta file to pathname */
 int fetch_ddt_path(char *pathname, unsigned char last_char);
 
-#endif  /* GW20_SRC_UTILS_H_ */
+int fetch_error_download_path(char *path, ino_t inode);
+
+void get_system_size(long long *cache_size, long long *pinned_size);
+
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta, ino_t thisinode);
+/* Function for checking if a file is local, cloud, or hybrid */
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
+
+int reload_system_config(const char *config_path);
+
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
+
+#endif  /* SRC_HCFS_UTILS_H_ */

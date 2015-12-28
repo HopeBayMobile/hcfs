@@ -43,9 +43,12 @@ struct stat to_verified_stat;
 #define INO_DELETE_DIR 12345
 #define INO_DELETE_LNK 13142
 #define TRUNC_SIZE 65536
+char pathlookup_write_parent_success;
+char delete_pathcache_node_success;
 
 /* fetch_inode_stat() & fetch_xattr_page() */
 #define INO_REGFILE 12213
+#define INO_FIFO 34534
 #define INO_DIR 9403
 #define INO_LNK 8234
 #define INO_DIR_XATTR_PAGE_EXIST 14423
@@ -69,6 +72,12 @@ struct stat to_verified_stat;
 
 /* link_update_meta() */
 #define INO_TOO_MANY_LINKS 279348
+
+/* pin_inode() */
+char collect_dir_children_flag;
+
+/* change_pin_falg */
+char pin_flag_in_meta;
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0
@@ -116,7 +125,7 @@ enum { INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_1,
 /*
 	Mock data for super_block_unittest
  */
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 
 /*
 	Tool vars used for lookup_count_unittest	

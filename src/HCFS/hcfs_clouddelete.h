@@ -19,13 +19,12 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <curl/curl.h>
 
 #include "hcfscurl.h"
 #include "dedup_table.h"
 
-#define MAX_DELETE_CONCURRENCY 16
-#define MAX_DSYNC_CONCURRENCY 16
+#define MAX_DELETE_CONCURRENCY 8
+#define MAX_DSYNC_CONCURRENCY 4
 
 typedef struct {
 	ino_t inode;
@@ -36,11 +35,14 @@ typedef struct {
 #endif
 	char is_block;
 	int which_curl;
+	int which_index;
+	int dsync_index;
 } DELETE_THREAD_TYPE;
 
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
+	int which_index;
 } DSYNC_THREAD_TYPE;
 
 /*delete threads: used for deleting objects to backends*/
@@ -55,6 +57,8 @@ typedef struct {
 	pthread_t threads_no[MAX_DELETE_CONCURRENCY];
 	char threads_in_use[MAX_DELETE_CONCURRENCY];
 	char threads_created[MAX_DELETE_CONCURRENCY];
+	char threads_finished[MAX_DELETE_CONCURRENCY];
+	char threads_error[MAX_DELETE_CONCURRENCY];
 	int total_active_delete_threads;
 } DELETE_THREAD_CONTROL;
 
@@ -66,6 +70,8 @@ typedef struct {
 	pthread_t inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
 	char threads_created[MAX_DSYNC_CONCURRENCY];
+	char threads_finished[MAX_DSYNC_CONCURRENCY];
+	char threads_error[MAX_DSYNC_CONCURRENCY];
 	int total_active_dsync_threads;
 } DSYNC_THREAD_CONTROL;
 
@@ -85,6 +91,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr);
 void collect_finished_dsync_threads(void *ptr);
 void collect_finished_delete_threads(void *ptr);
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr);
-void *delete_loop(void *arg);
+#ifdef _ANDROID_ENV_
+void *delete_loop(void *ptr);
+#else
+void delete_loop(void);
+#endif
 
 #endif  /* GW20_HCFS_HCFS_CLOUDDELETE_H_ */

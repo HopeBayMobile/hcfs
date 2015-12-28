@@ -1,88 +1,60 @@
 CC = gcc
-CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64
-CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -Wall -Wextra
+CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
+CFLAGS = -g -pthread -Wall -Wextra
+LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3
 
-hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o atomic_tocloud.o
-	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o atomic_tocloud.o -lfuse -lcurl -pthread -lssl -lcrypto -llz4
+# [Autodependencies with GNU make]
+# http://scottmcpeak.com/autodepend/autodepend.html
 
-mount_manager.o: mount_manager.c mount_manager.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c mount_manager.c
+OBJS_DIR = obj/
+OBJS_F := objmeta.o \
+	mount_manager.o \
+	FS_manager.o \
+	api_interface.o \
+	logger.o \
+	lookup_count.o \
+	file_present.o \
+	hfuse_system.o \
+	utils.o \
+	super_block.o \
+	fuseop.o \
+	metaops.o \
+	filetables.o \
+	hcfscurl.o \
+	hcfs_tocloud.o \
+	hcfs_fromcloud.o \
+	hcfs_cacheops.o \
+	hcfs_clouddelete.o \
+	hcfs_cachebuild.o \
+	b64encode.o \
+	meta_mem_cache.o \
+	dir_entry_btree.o \
+	xattr_ops.o \
+	enc.o \
+	compress.o \
+	dedup_table.o \
+	path_reconstruct.o \
+	pin_scheduling.o \
+	monitor.o \
+	dir_statistics.o \
+	parent_lookup.o \
+	atomic_upload.o
+OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
-FS_manager.o: FS_manager.c FS_manager.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c FS_manager.c
+hcfs: $(OBJS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LFLAGS)
 
-dir_entry_btree.o: dir_entry_btree.c dir_entry_btree.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c dir_entry_btree.c
+# pull in dependency info for *existing* .o files
+-include $(OBJS:.o=.d)
 
-api_interface.o: api_interface.c api_interface.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c api_interface.c
+# compile and generate dependency info
+$(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)$*.o
+	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)$*.d
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(OBJS_DIR)$*.d
 
-logger.o: logger.c logger.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c logger.c
-
-meta_mem_cache.o: meta_mem_cache.c global.h params.h meta_mem_cache.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c meta_mem_cache.c
-
-file_present.o: file_present.c global.h file_present.h super_block.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c file_present.c
-
-fuseop.o: fuseop.c fuseop.h super_block.h params.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c fuseop.c
-
-super_block.o: super_block.c fuseop.h super_block.h params.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c super_block.c
-
-utils.o: utils.c fuseop.h params.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c utils.c
-
-hfuse_system.o: hfuse_system.c fuseop.h super_block.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hfuse_system.c
-
-metaops.o: metaops.c fuseop.h params.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c metaops.c
-
-filetables.o: filetables.c fuseop.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c filetables.c
-
-hcfscurl.o: hcfscurl.c hcfscurl.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfscurl.c
-
-hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_tocloud.c
-
-hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_fromcloud.c
-
-hcfs_cacheops.o: hcfs_cacheops.c hcfs_cacheops.h params.h fuseop.h super_block.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_cacheops.c
-
-hcfs_cachebuild.o: hcfs_cachebuild.c hcfs_cachebuild.h params.h fuseop.h super_block.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_cachebuild.c
-
-hcfs_clouddelete.o: hcfs_clouddelete.c hcfs_clouddelete.h hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_clouddelete.c
-
-lookup_count.o: lookup_count.c lookup_count.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c lookup_count.c
-
-b64encode.o: b64encode.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c b64encode.c
-
-xattr_ops.o: xattr_ops.c xattr_ops.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c xattr_ops.c
-
-enc.o: enc.h enc.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c enc.c
-
-atomic_tocloud.o: atomic_tocloud.h atomic_tocloud.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c atomic_tocloud.c
-
-compress.o: compress.h compress.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c compress.c
-
-
-dedup_table.o: dedup_table.c dedup_table.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c dedup_table.c
+$(OBJS_DIR):
+	mkdir $@
 
 clean:
-	rm -rf *.o hcfs
+	rm -rf hcfs $(OBJS_DIR)*.o $(OBJS_DIR)*.d

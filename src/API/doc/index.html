@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Documentation</title>
+    <meta charset="utf-8">
+
+    <link rel="stylesheet" type="text/css" href="styles/cldoc.css">
+</head>
+
+<body id="cldoc">
+    <div id="cldoc_sidebar">
+        <div id="cldoc_sidebar_items">
+            <div id="cldoc_sidebar_pagenav"></div>
+            <div class="subtitle">Categories</div>
+            <ul>
+                <li><a href="Return%20value.html#Return%20value">Return value<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Return value definition</p>
+                    </div>
+                </li>
+                <li><a href="Return%20code.html#Return%20code">Return code<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Return code definition</p>
+                    </div>
+                </li>
+            </ul>
+            <div class="subtitle">Functions</div>
+            <ul>
+                <li><a href="#HCFS_dir_status">HCFS_dir_status<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Dir status</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_file_status">HCFS_file_status<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>File status</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_get_config">HCFS_get_config<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Get config</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_get_pkg_uid">HCFS_get_pkg_uid<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Query package uid</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_get_sync_status">HCFS_get_sync_status<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Sync status</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_pin_app">HCFS_pin_app<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Pin app</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_pin_path">HCFS_pin_path<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Pin file</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_pin_status">HCFS_pin_status<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Pin status</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_reboot">HCFS_reboot<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Secret function</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_reset_xfer">HCFS_reset_xfer<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Reset xfer</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_set_config">HCFS_set_config<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Set config</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_stat">HCFS_stat<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Statistic</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_toggle_sync">HCFS_toggle_sync<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Toggle sync</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_unpin_app">HCFS_unpin_app<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Unpin app</p>
+                    </div>
+                </li>
+                <li><a href="#HCFS_unpin_path">HCFS_unpin_path<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Unpin file</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div id="cldoc_content">
+        <h2 data-cldoc-dynamic="1" id="categories">Categories</h2>
+        <div class="categories">
+            <div class="item"><a href="Return%20value.html#Return%20value" id="Return value+Return value">Return value</a>
+                <div class="brief">
+                    <p>Return value definition</p>
+                </div>
+                <div class="item"><a href="Return%20code.html#Return%20code" id="Return code+Return code">Return code</a>
+                    <div class="brief">
+                        <p>Return code definition</p>
+                    </div>
+                </div>
+                <h2 data-cldoc-dynamic="1" id="functions">Functions</h2>
+                <div class="functions">
+                    <div class="function">
+                        <div class="declaration" id="HCFS_dir_status">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_dir_status</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">pathname</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To get the status of (pathname).</p>
+                            <p>Return data dict in json_res -</p>
+                            <pre><code class="lang-json">data: {
+    num_local: num,
+    num_cloud: num,
+    num_hybrid: num,
+}</code></pre>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_dir_status::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_dir_status::pathname">
+                                    <td>pathname</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>target pathname.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_file_status">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_file_status</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">pathname</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To get the status of (pathname).</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_file_status::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_file_status::pathname">
+                                    <td>pathname</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>target pathname.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_get_config">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_get_config</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">key</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>Get the Value of specific field. (Supported keys are listed in <a href="#HCFS_set_config">HCFS_set_config</a>.)</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_get_config::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_get_config::key">
+                                    <td>key</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>field in HCFS configuration.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_get_pkg_uid">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_get_pkg_uid</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">pkg_name</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_get_pkg_uid::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_get_pkg_uid::pkg_name">
+                                    <td>pkg_name</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>target package</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_get_sync_status">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_get_sync_status</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To get status of cloud sync.</p>
+                            <p>Return data dict in json_res -</p>
+                            <pre><code class="lang-json">data: {
+    enabled: boolean,
+}</code></pre>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_get_sync_status::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_pin_app">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_pin_app</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">app_path,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">data_path,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">sd0_path,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">sd1_path</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>Pin all binaries and data files created by a app. Input are four possible path where contain files belong to this app.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_pin_app::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_pin_app::app_path">
+                                    <td>app_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/data/data/&lt;package-name&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_pin_app::data_path">
+                                    <td>data_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/data/app/&lt;codePath&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_pin_app::sd0_path">
+                                    <td>sd0_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/storage/sdcard0/Android/&lt;type&gt;/&lt;package-name&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_pin_app::sd1_path">
+                                    <td>sd1_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/storage/sdcard1/Android/&lt;type&gt;/&lt;package-name&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_pin_path">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_pin_path</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">pin_path</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>Pin a file so that it will never be replaced when doing cache replacement. If the given (pin_path) is a directory, HCFS_pin_path() will recursively pin all files and files in subdirectories.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_pin_path::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_pin_path::pin_path">
+                                    <td>pin_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>a valid pathname (cloud be a file or a directory).</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_pin_status">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_pin_status</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">pathname</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To check a given (pathname) is pinned or unpinned.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_pin_status::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_pin_status::pathname">
+                                    <td>pathname</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>target pathname.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_reboot">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_reboot</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To reboot.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_reboot::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_reset_xfer">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_reset_xfer</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To reset the value of upload/download statistic.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_reset_xfer::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_set_config">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_set_config</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">key,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">value</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To set value of a specific field in HCFS configuration.</p>
+                            <blockquote>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Key supported</th>
+                                            <th align="left">Valid value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>current_backend</td>
+                                            <td align="left">none/swift</td>
+                                        </tr>
+                                        <tr>
+                                            <td>swift_account</td>
+                                            <td align="left">account</td>
+                                        </tr>
+                                        <tr>
+                                            <td>swift_user</td>
+                                            <td align="left">user</td>
+                                        </tr>
+                                        <tr>
+                                            <td>swift_pass</td>
+                                            <td align="left">password</td>
+                                        </tr>
+                                        <tr>
+                                            <td>swift_url</td>
+                                            <td align="left">&lt;server url&gt;:&lt;port&gt;</td>
+                                        </tr>
+                                        <tr>
+                                            <td>swift_container</td>
+                                            <td align="left">container name</td>
+                                        </tr>
+                                        <tr>
+                                            <td>swift_protocol</td>
+                                            <td align="left">http/https</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </blockquote>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_set_config::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_set_config::key">
+                                    <td>key</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>field in HCFS configuration.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_set_config::value">
+                                    <td>value</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>value for input key.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_stat">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_stat</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To fetch HCFS sytem statistics.</p>
+                            <p>Return data dict in json_res -</p>
+                            <pre><code class="lang-json">data: {
+    cloud_total: Bytes,
+    cloud_used: Bytes,
+    cache_total: Bytes,
+    cache_used: Bytes,
+    cache_dirty: Bytes,
+    pin_max: Bytes,
+    pin_total: Bytes,
+    xfer_up: Bytes,
+    xfer_down: Bytes,
+    cloud_conn: True|False,
+}</code></pre>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_stat::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_toggle_sync">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_toggle_sync</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">int</span></span>
+                                        </td>
+                                        <td class="argument_name">enabled</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>To toggle if hcfs can/can't sync data in local cache to cloud storage.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_toggle_sync::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_toggle_sync::enabled">
+                                    <td>enabled</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>1 to turn on sync, 0 to turn off sync.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_unpin_app">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_unpin_app</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">app_path,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">data_path,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">sd0_path,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">sd1_path</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>Unpin all binaries and data files created by a app. Input are four possible path where contain files belong to this app.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_unpin_app::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_unpin_app::app_path">
+                                    <td>app_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/data/data/&lt;package-name&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_unpin_app::data_path">
+                                    <td>data_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/data/app/&lt;codePath&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_unpin_app::sd0_path">
+                                    <td>sd0_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/storage/sdcard0/Android/&lt;type&gt;/&lt;package-name&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_unpin_app::sd1_path">
+                                    <td>sd1_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>/storage/sdcard1/Android/&lt;type&gt;/&lt;package-name&gt;</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
+                        <div class="declaration" id="HCFS_unpin_path">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_unpin_path</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res,</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2"></td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
+                                        </td>
+                                        <td class="argument_name">pin_path</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>Unpin a file. If the given (pin_path) is a directory, HCFS_unpin_path() will recursively unpin all files and files in subdirectories.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_unpin_path::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr id="HCFS_unpin_path::pin_path">
+                                    <td>pin_path</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>a valid pathname (cloud be a file or a directory).</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
+<!-- vi:ts=2:et -->

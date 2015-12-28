@@ -5,8 +5,9 @@
 #include "global.h"
 #include "hcfscurl.h"
 #include "FS_manager_unittest.h"
+#include "path_reconstruct.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 int write_log(int level, char *format, ...)
 {
@@ -72,6 +73,12 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	snprintf(pathname, 100, "%s/meta%ld", METAPATH, this_inode);
 	return 0;
 }
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+        snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
+        return 0;
+}
+
 
 ino_t super_block_new_inode(struct stat *in_stat,
 				unsigned long *ret_generation)
@@ -98,11 +105,12 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 		return 404;
 	return 200;
 }
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return 200;
 }
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+		    HTTP_meta *meta)
 {
 	if (failedput == TRUE)
 		return 404;
@@ -110,7 +118,8 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	fread(&headbuf, sizeof(DIR_META_TYPE), 1, fptr);
 	return 200;
 }
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+		    HCFS_encode_object_meta *object_meta)
 {
 	if (failedget == TRUE)
 		return 404;
@@ -144,4 +153,21 @@ int update_FS_statistics(char *pathname, long long system_size,
 	return 0;
 }
 
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
 
+int destroy_pathcache(PATH_CACHE *cacheptr)
+{
+	return 0;
+}
+
+PATH_CACHE * init_pathcache(ino_t root_inode)
+{
+	return NULL;
+}
+int reset_dirstat_lookup(ino_t thisinode)
+{
+	return 0;
+}

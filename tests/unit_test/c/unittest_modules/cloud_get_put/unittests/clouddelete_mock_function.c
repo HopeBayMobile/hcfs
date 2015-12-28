@@ -14,7 +14,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 }
 
 
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return;
 }
@@ -57,7 +57,7 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	objname_counter++;
 	sem_post(&objname_counter_sem);
 
-	return 0;
+	return 200;
 }
 
 int super_block_share_locking(void)
@@ -72,6 +72,7 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (test_data.tohandle_counter == test_data.num_inode) {
 		inode_ptr->status = TO_BE_DELETED;
 		inode_ptr->util_ll_next = 0;
+		sys_super_block->head.first_to_delete_inode = 0;
 	} else {
 		inode_ptr->status = TO_BE_DELETED;
 		inode_ptr->util_ll_next = test_data.to_handle_inode[test_data.tohandle_counter];
@@ -106,4 +107,16 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta)
 {
 	return 0;
+}
+
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	return 0;
+}
+
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+{
+	sleep(secs);
+	return;
 }

@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/7/1 Jiahong created this file
+* 2015/11/27 Jiahong modifying format for inode printout
 *
 **************************************************************************/
 
@@ -20,7 +21,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/file.h>
 #include <fcntl.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "macro.h"
 #include "fuseop.h"
@@ -31,8 +35,6 @@
 #include "metaops.h"
 #include "dir_entry_btree.h"
 #include "utils.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
 
 /************************************************************************
 *
@@ -50,13 +52,13 @@ int init_fs_manager(void)
 	ssize_t ret_ssize;
 	struct timeval tmptime;
 
-	fs_mgr_path = malloc(sizeof(char) * (strlen(METAPATH)+100));
-	if (fs_mgr_path  == NULL) {
+	fs_mgr_path = malloc(sizeof(char) * (strlen(METAPATH) + 100));
+	if (fs_mgr_path == NULL) {
 		errcode = -ENOMEM;
 		write_log(0, "Out of memory in %s.\n", __func__);
 		goto errcode_handle;
 	}
-	snprintf(fs_mgr_path, strlen(METAPATH)+100, "%s/fsmgr", METAPATH);
+	snprintf(fs_mgr_path, strlen(METAPATH) + 100, "%s/fsmgr", METAPATH);
 
 	fs_mgr_head = malloc(sizeof(FS_MANAGER_HEAD_TYPE));
 	if (fs_mgr_head == NULL) {
@@ -72,7 +74,7 @@ int init_fs_manager(void)
 		errcode = errno;
 		if (errcode != ENOENT) {
 			write_log(0, "Unexpected error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+				  __func__, errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
 		}
@@ -80,12 +82,12 @@ int init_fs_manager(void)
 
 		/* Initialize header for FS manager on disk and in memory */
 		errcode = 0;
-		fs_mgr_head->FS_list_fh = open(fs_mgr_path, O_RDWR | O_CREAT,
-						S_IRUSR | S_IWUSR);
+		fs_mgr_head->FS_list_fh =
+		    open(fs_mgr_path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 		if (fs_mgr_head->FS_list_fh < 0) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				  errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
 		}
@@ -108,20 +110,19 @@ int init_fs_manager(void)
 		if (ret < 0) {
 			errcode = errno;
 			write_log(0, "IO error reading random device. (%s)\n",
-				strerror(errcode));
+				  strerror(errcode));
 			errcode = -errcode;
 			close(fd);
 			goto errcode_handle;
 		}
 		close(fd);
 
-		PWRITE(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid,
-					16, 0);
+		PWRITE(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid, 16, 0);
 
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-					sizeof(DIR_META_TYPE), 16);
+		       sizeof(DIR_META_TYPE), 16);
 
-		ret = backup_FS_database();
+		ret = prepare_FS_database_backup();
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -131,17 +132,16 @@ int init_fs_manager(void)
 
 		if (fs_mgr_head->FS_list_fh < 0) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				  errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
 		}
 
-		PREAD(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid,
-					16, 0);
+		PREAD(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid, 16, 0);
 
-		PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-					sizeof(DIR_META_TYPE), 16);
+		PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+		      16);
 		fs_mgr_head->num_FS = tmp_head.total_children;
 	}
 
@@ -170,6 +170,48 @@ void destroy_fs_manager(void)
 	fs_mgr_path = NULL;
 }
 
+/* Helper function for initializing a file for collecting statistics for
+data stored at backend */
+int _init_backend_stat(ino_t root_inode)
+{
+	int ret, errcode;
+	char fname[METAPATHLEN];
+	FILE *fptr;
+	long long system_size, num_inodes;
+	size_t ret_size;
+	char is_fopen;
+
+	is_fopen = FALSE;
+
+	write_log(10, "Debug creating backend stat file\n");
+
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+		 METAPATH, (uint64_t)root_inode);
+	write_log(10, "Creating stat for backend\n");
+	fptr = fopen(fname, "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
+			  errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	is_fopen = TRUE;
+	FSEEK(fptr, 0, SEEK_SET);
+	system_size = 0;
+	num_inodes = 0;
+	FWRITE(&system_size, sizeof(long long), 1, fptr);
+	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+	fclose(fptr);
+	is_fopen = FALSE;
+
+	return 0;
+errcode_handle:
+	if (is_fopen)
+		fclose(fptr);
+	return errcode;
+}
+
 /* Helper function for allocating a new inode as root */
 ino_t _create_root_inode(void)
 {
@@ -178,18 +220,26 @@ ino_t _create_root_inode(void)
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	mode_t self_mode;
-	FILE *metafptr;
+	FILE *metafptr, *statfptr;
 	char metapath[METAPATHLEN];
+	char temppath[METAPATHLEN];
 	int ret, errcode;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 	unsigned long this_gen;
+	FS_STAT_T tmp_stat;
+
+	statfptr = NULL;
 
 	memset(&this_stat, 0, sizeof(struct stat));
 	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
-	self_mode = S_IFDIR | 0777;
+#ifdef _ANDROID_ENV_
+	self_mode = S_IFDIR | 0770;
+#else
+	self_mode = S_IFDIR | 0775;
+#endif
 	this_stat.st_mode = self_mode;
 
 	/*One pointed by the parent, another by self*/
@@ -199,7 +249,7 @@ ino_t _create_root_inode(void)
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	root_inode = super_block_new_inode(&this_stat, &this_gen);
+	root_inode = super_block_new_inode(&this_stat, &this_gen, DEFAULT_PIN);
 
 	if (root_inode <= 1) {
 		write_log(0, "Error creating new root inode\n");
@@ -229,19 +279,58 @@ ino_t _create_root_inode(void)
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
+	this_meta.local_pin = DEFAULT_PIN;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+	this_meta.metaver = CURRENT_META_VER;
+
+	/* Init parent lookup. Root inode does not have a parent */
+	ret = pathlookup_write_parent(root_inode, 0);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+	/* Init the dir stat for this node */
+	ret = reset_dirstat_lookup(root_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
 	ret = init_dir_page(&temppage, root_inode, root_inode,
-				this_meta.root_entry_page);
+			    this_meta.root_entry_page);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
 
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
-	ret = update_FS_statistics(metapath, 0, 1);
+
+	ret = fetch_stat_path(temppath, root_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	statfptr = fopen(temppath, "w");
+	if (statfptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error %d (%s)\n", errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+	tmp_stat.num_inodes = 1;
+
+	FWRITE(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+	FSYNC(fileno(statfptr));
+
+	fclose(statfptr);
+	statfptr = NULL;
+
+	/* Create stat file for backend statistics */
+	ret = _init_backend_stat(root_inode);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -259,6 +348,8 @@ ino_t _create_root_inode(void)
 errcode_handle:
 	if (metafptr != NULL)
 		fclose(metafptr);
+	if (statfptr != NULL)
+		fclose(metafptr);
 	return 0;
 }
 
@@ -266,12 +357,19 @@ errcode_handle:
 *
 * Function name: add_filesystem
 *        Inputs: char *fsname, DIR_ENTRY *ret_entry
+*        Inputs: (Android) char *fsname, char voltype, DIR_ENTRY *ret_entry
 *       Summary: Creates the filesystem "fsname" if it does not exist.
 *                The root inode for the new FS is returned in ret_entry.
+*                For Android system, will also need to specify if the type
+*                of volume is internal or external storage
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
+#ifdef _ANDROID_ENV_
+int add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry)
+#else
 int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+#endif
 {
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
@@ -280,8 +378,8 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	int ret, errcode, ret_index;
 	char no_need_rewrite;
 	off_t ret_pos;
-	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
-	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE + 2)];
+	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	ino_t new_FS_ino;
 	ssize_t ret_ssize;
 
@@ -290,13 +388,12 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
 		write_log(2, "Name of new filesystem (%s) is too long\n",
-			fsname);
+			  fsname);
 		errcode = -errcode;
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	if (fs_mgr_head->num_FS <= 0) {
 		ftruncate(fs_mgr_head->FS_list_fh, sizeof(DIR_META_TYPE));
@@ -310,17 +407,17 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
 		tpage.this_page_pos = sizeof(DIR_META_TYPE) + 16;
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-			sizeof(DIR_META_TYPE), 16);
+		       sizeof(DIR_META_TYPE), 16);
 		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-			tpage.this_page_pos);
+		       tpage.this_page_pos);
 	} else {
 		/* Initialize B-tree insertion by first loading the root of
 		*  the B-tree. */
 		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-			tmp_head.root_entry_page);
+		      tmp_head.root_entry_page);
 	}
 	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
-		&ret_index, &tpage2);
+				     &ret_index, &tpage2);
 
 	if (ret >= 0) {
 		errcode = -EEXIST;
@@ -346,15 +443,17 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	}
 
 	temp_entry.d_ino = new_FS_ino;
-	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", fsname);
-
+#ifdef _ANDROID_ENV_
+	temp_entry.d_type = voltype;
+#endif
+	snprintf(temp_entry.d_name, MAX_FILENAME_LEN + 1, "%s", fsname);
 
 	/* Recursive routine for B-tree insertion*/
 	/* Temp space for traversing the tree is allocated before calling */
 	ret = insert_dir_entry_btree(&temp_entry, &tpage,
-			fs_mgr_head->FS_list_fh, &overflow_entry,
-			&overflow_new_page, &tmp_head, temp_dir_entries,
-							temp_child_page_pos);
+				     fs_mgr_head->FS_list_fh, &overflow_entry,
+				     &overflow_new_page, &tmp_head,
+				     temp_dir_entries, temp_child_page_pos);
 
 	if (ret < 0) {
 		errcode = ret;
@@ -368,7 +467,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	if (ret == 1) {
 		/* Reload old root */
 		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-				tmp_head.root_entry_page);
+		      tmp_head.root_entry_page);
 
 		/* tpage contains the old root node now */
 
@@ -376,8 +475,8 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		if (tmp_head.entry_page_gc_list != 0) {
 			/*Reclaim node from gc list first*/
 			PREAD(fs_mgr_head->FS_list_fh, &new_root,
-				sizeof(DIR_ENTRY_PAGE),
-				tmp_head.entry_page_gc_list);
+			      sizeof(DIR_ENTRY_PAGE),
+			      tmp_head.entry_page_gc_list);
 
 			new_root.this_page_pos = tmp_head.entry_page_gc_list;
 			tmp_head.entry_page_gc_list = new_root.gc_list_next;
@@ -391,7 +490,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 				errcode = errno;
 				write_log(0, "IO error in adding dir entry\n");
 				write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
+					  strerror(errcode));
 				errcode = -errcode;
 				goto errcode_handle;
 			}
@@ -408,8 +507,8 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 			tpage.tree_walk_prev = new_root.this_page_pos;
 		} else {
 			PREAD(fs_mgr_head->FS_list_fh, &tpage2,
-				sizeof(DIR_ENTRY_PAGE),
-				tmp_head.tree_walk_list_head);
+			      sizeof(DIR_ENTRY_PAGE),
+			      tmp_head.tree_walk_list_head);
 
 			tpage2.tree_walk_prev = new_root.this_page_pos;
 			if (tpage2.this_page_pos == overflow_new_page) {
@@ -417,20 +516,19 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 				no_need_rewrite = TRUE;
 			}
 			PWRITE(fs_mgr_head->FS_list_fh, &tpage2,
-				sizeof(DIR_ENTRY_PAGE),
-				tmp_head.tree_walk_list_head);
+			       sizeof(DIR_ENTRY_PAGE),
+			       tmp_head.tree_walk_list_head);
 		}
-
 
 		tmp_head.tree_walk_list_head = new_root.this_page_pos;
 
 		/* Initialize the new root node */
 		new_root.parent_page_pos = 0;
 		memset(new_root.child_page_pos, 0,
-				sizeof(long long)*(MAX_DIR_ENTRIES_PER_PAGE+1));
+		       sizeof(long long) * (MAX_DIR_ENTRIES_PER_PAGE + 1));
 		new_root.num_entries = 1;
 		memcpy(&(new_root.dir_entries[0]), &overflow_entry,
-							sizeof(DIR_ENTRY));
+		       sizeof(DIR_ENTRY));
 		/* The two children of the new root is the old root and
 		*  the new node created by the overflow. */
 		new_root.child_page_pos[0] = tmp_head.root_entry_page;
@@ -440,24 +538,24 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		*  content of the new root the the meta file. */
 		tmp_head.root_entry_page = new_root.this_page_pos;
 		PWRITE(fs_mgr_head->FS_list_fh, &new_root,
-			sizeof(DIR_ENTRY_PAGE), new_root.this_page_pos);
+		       sizeof(DIR_ENTRY_PAGE), new_root.this_page_pos);
 
 		/* Change the parent of the old root to point to the new root.
 		*  Write to the meta file afterward. */
 		tpage.parent_page_pos = new_root.this_page_pos;
-		PWRITE(fs_mgr_head->FS_list_fh, &tpage,
-			sizeof(DIR_ENTRY_PAGE), tpage.this_page_pos);
+		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+		       tpage.this_page_pos);
 
 		/* If no_need_rewrite is true, we have already write modified
 		*  content for the new node from the overflow. Otherwise we need
 		*  to write it to the meta file here. */
 		if (no_need_rewrite == FALSE) {
 			PREAD(fs_mgr_head->FS_list_fh, &tpage2,
-				sizeof(DIR_ENTRY_PAGE), overflow_new_page);
+			      sizeof(DIR_ENTRY_PAGE), overflow_new_page);
 
 			tpage2.parent_page_pos = new_root.this_page_pos;
 			PWRITE(fs_mgr_head->FS_list_fh, &tpage2,
-				sizeof(DIR_ENTRY_PAGE), overflow_new_page);
+			       sizeof(DIR_ENTRY_PAGE), overflow_new_page);
 		}
 	}
 
@@ -468,13 +566,13 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
-	write_log(10,
-		"Total filesystem is now %lld\n", tmp_head.total_children);
+	write_log(10, "Total filesystem is now %lld\n",
+		  tmp_head.total_children);
 
 	memcpy(ret_entry, &temp_entry, sizeof(DIR_ENTRY));
 
 	/* TODO: return handling for backup database */
-	backup_FS_database();
+	prepare_FS_database_backup();
 	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
@@ -507,8 +605,8 @@ int delete_filesystem(char *fsname)
 	size_t ret_size;
 	char thismetapath[400];
 	FILE *metafptr;
-	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
-	long long temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
+	long long temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -517,7 +615,7 @@ int delete_filesystem(char *fsname)
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
 		write_log(2, "Name of filesystem to delete (%s) is too long\n",
-			fsname);
+			  fsname);
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -528,25 +626,24 @@ int delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	/* Initialize B-tree deletion by first loading the root of
 	*  the B-tree. */
 	PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-		tmp_head.root_entry_page);
+	      tmp_head.root_entry_page);
 
 	/* Check if the FS name exists. If not, return error */
 
 	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
-		&ret_index, &tpage2);
+				     &ret_index, &tpage2);
 
 	if (ret < 0) {
 		if (ret == -ENOENT)
 			write_log(2, "Filesystem does not exist\n");
 		else
 			write_log(0, "Error in deleting FS. Code %d, %s\n",
-				-ret, strerror(-ret));
+				  -ret, strerror(-ret));
 		errcode = ret;
 		goto errcode_handle;
 	}
@@ -569,7 +666,7 @@ int delete_filesystem(char *fsname)
 
 	/* Check if the filesystem is empty. If not, returns error */
 	memcpy(&temp_entry, &(tpage2.dir_entries[ret_index]),
-		sizeof(DIR_ENTRY));
+	       sizeof(DIR_ENTRY));
 	FS_root = temp_entry.d_ino;
 
 	ret = fetch_meta_path(thismetapath, FS_root);
@@ -577,8 +674,8 @@ int delete_filesystem(char *fsname)
 	metafptr = fopen(thismetapath, "r");
 	if (metafptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO Error in %s. Code %d, %s\n",
-			__func__, errcode, strerror(errcode));
+		write_log(0, "IO Error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -603,16 +700,15 @@ int delete_filesystem(char *fsname)
 
 	/* Delete FS from database */
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
-			fs_mgr_head->FS_list_fh, &tmp_head, temp_dir_entries,
-							temp_child_page_pos);
+				     fs_mgr_head->FS_list_fh, &tmp_head,
+				     temp_dir_entries, temp_child_page_pos);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
 
 	tmp_head.total_children--;
-	write_log(10, "TOTAL CHILDREN is now %lld\n",
-					tmp_head.total_children);
+	write_log(10, "TOTAL CHILDREN is now %lld\n", tmp_head.total_children);
 	/* Write head back */
 
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
@@ -659,7 +755,7 @@ int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
 		write_log(2, "Name of filesystem to delete (%s) is too long\n",
-			fsname);
+			  fsname);
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -670,26 +766,24 @@ int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	/* Initialize B-tree searching by first loading the root of
 	*  the B-tree. */
 	PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-		tmp_head.root_entry_page);
+	      tmp_head.root_entry_page);
 
 	/* Check if the FS name exists. If not, return error */
 
 	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
-		&ret_index, &tpage2);
+				     &ret_index, &tpage2);
 
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
 
-	memcpy(ret_entry, &(tpage2.dir_entries[ret_index]),
-		sizeof(DIR_ENTRY));
+	memcpy(ret_entry, &(tpage2.dir_entries[ret_index]), sizeof(DIR_ENTRY));
 
 	return 0;
 errcode_handle:
@@ -713,13 +807,13 @@ errcode_handle:
 *
 *************************************************************************/
 int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
-		unsigned long *ret_num)
+		    unsigned long *ret_num)
 {
 	DIR_ENTRY_PAGE tpage;
 	DIR_META_TYPE tmp_head;
 	int errcode;
 	ssize_t ret_ssize;
-	unsigned long num_walked;
+	int64_t num_walked;
 	long long next_node_pos;
 	int count;
 
@@ -738,9 +832,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 		return 0;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 16);
-
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	/* Initialize B-tree walk by first loading the first node
 		of the tree walk. */
@@ -750,7 +842,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 
 	while (next_node_pos != 0) {
 		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-				next_node_pos);
+		      next_node_pos);
 		if ((num_walked + tpage.num_entries) > buf_num) {
 			/* Only compute the number of FS */
 			num_walked += tpage.num_entries;
@@ -759,14 +851,14 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 		}
 		for (count = 0; count < tpage.num_entries; count++) {
 			memcpy(&(ret_entry[num_walked]),
-				&(tpage.dir_entries[count]), sizeof(DIR_ENTRY));
+			       &(tpage.dir_entries[count]), sizeof(DIR_ENTRY));
 			num_walked++;
 		}
 		next_node_pos = tpage.tree_walk_next;
 	}
 
 	if ((fs_mgr_head->num_FS != num_walked) ||
-		(tmp_head.total_children != num_walked)) {
+	    (tmp_head.total_children != num_walked)) {
 		/* Number of FS is wrong. */
 		write_log(0, "Error in FS num. Recomputing\n");
 		fs_mgr_head->num_FS = num_walked;
@@ -774,7 +866,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 			tmp_head.total_children = num_walked;
 			write_log(0, "Rewriting FS num in database\n");
 			PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 16);
+			       sizeof(DIR_META_TYPE), 16);
 		}
 	}
 
@@ -790,36 +882,47 @@ errcode_handle:
 
 /************************************************************************
 *
-* Function name: backup_FS_database
+* Function name: prepare_FS_database_backup
 *        Inputs: None
-*       Summary: Upload FS backup to backend.
+*       Summary: Write DB to a tmp file for backup to backend.
 *          Note: Assume that the op_lock is locked when calling
 *
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int backup_FS_database(void)
+int prepare_FS_database_backup(void)
 {
+	char tmppath[METAPATHLEN];
 	FILE *fptr;
 	int ret, errcode;
-	CURL_HANDLE upload_handle;
 	char buf[4096];
 	size_t ret_size;
 	ssize_t ret_ssize;
 	off_t curpos;
 
-	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+	if (CURRENT_BACKEND == NONE)
+		return 0;
+
+	snprintf(tmppath, METAPATHLEN, "%s/fsmgr_upload", METAPATH);
 
 	/* Assume that the access lock is locked already */
+
 	fptr = NULL;
-	fptr = fopen("/tmp/FSmgr_upload", "w");
+	if (access(tmppath, F_OK) == 0)
+		fptr = fopen(tmppath, "r+");
+	else
+		fptr = fopen(tmppath, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-			errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
+	flock(fileno(fptr), LOCK_EX);
+	setbuf(fptr, NULL);
+	FTRUNCATE(fileno(fptr), 0);
+
 	curpos = 0;
 	ret_ssize = 0;
 	while (!feof(fptr)) {
@@ -827,29 +930,106 @@ int backup_FS_database(void)
 		if (ret_ssize <= 0)
 			break;
 		curpos += ret_ssize;
-		FWRITE(buf, 1, ret_ssize, fptr);
+		FWRITE(buf, 1, (size_t)ret_ssize, fptr);
 	}
 
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:
+	if (fptr != NULL)
+		fclose(fptr);
+
+	unlink(tmppath);
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: backup_FS_database
+*        Inputs: None
+*       Summary: Upload FS backup to backend if the temp backup file exists.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int backup_FS_database(void)
+{
+	char tmppath[METAPATHLEN];
+	FILE *fptr, *tmpdbfptr;
+	int ret, errcode;
+	CURL_HANDLE upload_handle;
+	char buf[4096];
+	size_t ret_size;
+	ssize_t ret_ssize;
+	off_t ret_pos;
+
+	if (CURRENT_BACKEND == NONE)
+		return 0;
+	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+
+	snprintf(tmppath, METAPATHLEN, "%s/fsmgr_upload", METAPATH);
+
+	/* Check if temp db exists and needs to be uploaded */
+	if (access(tmppath, F_OK) != 0)
+		return 0;
+
+	tmpdbfptr = NULL;
+	tmpdbfptr = fopen(tmppath, "r");
+	if (tmpdbfptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	flock(fileno(tmpdbfptr), LOCK_EX);
+	/* Check if file size is zero. If so, do nothing */
+	FSEEK(tmpdbfptr, 0, SEEK_END);
+	FTELL(tmpdbfptr);
+	if (ret_pos == 0) {
+		/* Empty file, do nothing */
+		flock(fileno(tmpdbfptr), LOCK_UN);
+		fclose(tmpdbfptr);
+		return 0;
+	}
+	FSEEK(tmpdbfptr, 0, SEEK_SET);
+
+	fptr = NULL;
+	fptr = fopen("/tmp/FSmgr_upload", "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	ret_ssize = 0;
+	while (!feof(fptr)) {
+		FREAD(buf, 1, 4096, tmpdbfptr);
+		if (ret_size == 0)
+			break;
+		FWRITE(buf, 1, ret_size, fptr);
+	}
+	flock(fileno(tmpdbfptr), LOCK_UN);
+	fclose(tmpdbfptr);
 	fclose(fptr);
 
 	fptr = NULL;
-	snprintf(upload_handle.id, 256, "FSmgr_upload");
-	ret = hcfs_init_backend(&upload_handle);
-	if ((ret < 200) || (ret > 299)) {
-		errcode = -EIO;
-		write_log(0, "Error in backing up FS database\n");
-		goto errcode_handle;
-	}
+	snprintf(upload_handle.id, sizeof(upload_handle.id), "FSmgr_upload");
+	upload_handle.curl_backend = NONE;
+	upload_handle.curl = NULL;
 
 	fptr = fopen("/tmp/FSmgr_upload", "r");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-			errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle);
+	ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle, NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in backing up FS database\n");
@@ -859,12 +1039,13 @@ int backup_FS_database(void)
 	fclose(fptr);
 
 	unlink("/tmp/FSmgr_upload");
-	hcfs_destroy_backend(upload_handle.curl);
+	hcfs_destroy_backend(&upload_handle);
+	unlink(tmppath);
 	return 0;
 
 errcode_handle:
 	if (upload_handle.curl != NULL)
-		hcfs_destroy_backend(upload_handle.curl);
+		hcfs_destroy_backend(&upload_handle);
 
 	if (fptr != NULL)
 		fclose(fptr);
@@ -895,24 +1076,27 @@ int restore_FS_database(void)
 	fptr = NULL;
 	memset(&download_handle, 0, sizeof(CURL_HANDLE));
 
-	snprintf(download_handle.id, 256, "FSmgr_download");
-
-	ret = hcfs_init_backend(&download_handle);
-	if ((ret < 200) || (ret > 299)) {
-		errcode = -EIO;
-		write_log(0, "Error in restoring FS database\n");
-		goto errcode_handle;
-	}
-
+	snprintf(download_handle.id, sizeof(download_handle.id), "FSmgr_download");
+	download_handle.curl_backend = NONE;
+	download_handle.curl = NULL;
+	/* Do not actually init backend until needed */
+	/*
+		ret = hcfs_init_backend(&download_handle);
+		if ((ret < 200) || (ret > 299)) {
+			errcode = -EIO;
+			write_log(0, "Error in restoring FS database\n");
+			goto errcode_handle;
+		}
+	*/
 	fptr = fopen(fs_mgr_path, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-			errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	ret = hcfs_get_object(fptr, "FSmgr_backup", &download_handle);
+	ret = hcfs_get_object(fptr, "FSmgr_backup", &download_handle, NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in restoring FS database\n");
@@ -921,12 +1105,12 @@ int restore_FS_database(void)
 
 	fclose(fptr);
 
-	hcfs_destroy_backend(download_handle.curl);
+	hcfs_destroy_backend(&download_handle);
 	return 0;
 
 errcode_handle:
 	if (download_handle.curl != NULL)
-		hcfs_destroy_backend(download_handle.curl);
+		hcfs_destroy_backend(&download_handle);
 
 	if (fptr != NULL)
 		fclose(fptr);

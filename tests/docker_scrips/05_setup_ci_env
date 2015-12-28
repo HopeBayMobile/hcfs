@@ -1,0 +1,6 @@
+#!/bin/bash
+echo ======== ${BASH_SOURCE[0]} ========
+WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
+set -e -x
+
+sudo $WORKSPACE/utils/setup_ci_env.sh

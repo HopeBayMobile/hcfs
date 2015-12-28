@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # built-in
-import os, sys
+import os
+import sys
 import logging
 import ConfigParser
 from optparse import OptionParser
@@ -53,6 +54,7 @@ def main():
                       default=False, 
                       help="For develope use")
     (options, args) = parser.parse_args()
+    test_stat = 1
 
     if options.debug_flag:
         # -d
@@ -65,19 +67,19 @@ def main():
     if options.caseid_prefix:
         # -c
         runner = TestEngine.Runner(['all'])
-        runner.run(options.caseid_prefix)     
+        test_stat = runner.run(options.caseid_prefix)     
     elif options.run_csv_path:
         # -s
         runner = TestEngine.Runner(options.run_csv_path.split(','))   
-        runner.run_all()
+        test_stat = runner.run_all()
     elif options.csv_list:
         # -l
         with open(options.csv_list, 'rb') as fh:
             for line in fh:
                 csv_path = os.path.join('TestSuites', line.rstrip('\r\n'))
                 runner = TestEngine.Runner([csv_path])   
-                runner.run_all()
-        
+                test_stat = runner.run_all()
+
     elif options.csv_file_path:
         # -g
         arg = options.csv_file_path
@@ -87,14 +89,15 @@ def main():
     elif options.test_flag:
         # -t
         testCaseSuites, caseList, csvFileList = engine.ParseFromCSV()
-        #Tester.GenerateTestCase(testCaseSuites, caseList, csvFileList)
+        # Tester.GenerateTestCase(testCaseSuites, caseList, csvFileList)
     elif options.run_all_flag:
         # -a
         runner = TestEngine.Runner(['all'])
-        runner.run_all()
+        test_stat = runner.run_all()
     else:
         parser.print_help()
-    
-                   
+
+    return test_stat
 if __name__ == "__main__":
-    main()
+    ret = main()
+    exit(ret)

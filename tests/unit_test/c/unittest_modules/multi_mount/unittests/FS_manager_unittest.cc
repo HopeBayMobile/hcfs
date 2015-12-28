@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <ftw.h>
 
 #include <unistd.h>
 #include <string.h>
@@ -19,7 +20,41 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
+
+class FS_managerEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const metaops_env =
+	::testing::AddGlobalTestEnvironment(new FS_managerEnvironment);
+
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 /* Begin of the test case for the function init_fs_manager */
 
@@ -27,6 +62,7 @@ class init_fs_managerTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     METAPATH = (char *)malloc(sizeof(char)*100);
@@ -36,6 +72,8 @@ class init_fs_managerTest : public ::testing::Test {
     if (access(METAPATH, F_OK) != 0)
       mkdir(METAPATH, 0700);
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
    }
 
   virtual void TearDown() {
@@ -46,9 +84,7 @@ class init_fs_managerTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -122,6 +158,7 @@ class destroy_fs_managerTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     METAPATH = (char *)malloc(sizeof(char)*100);
@@ -131,12 +168,12 @@ class destroy_fs_managerTest : public ::testing::Test {
     if (access(METAPATH, F_OK) != 0)
       mkdir(METAPATH, 0700);
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
    }
 
   virtual void TearDown() {
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -171,6 +208,9 @@ class add_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpsyncpath[100];
+  char tmpbackuppath[100];
+
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -184,8 +224,13 @@ class add_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     entry_in_database = FALSE;
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    mkdir(tmpsyncpath, 0700);
    }
 
   virtual void TearDown() {
@@ -196,9 +241,7 @@ class add_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -219,7 +262,11 @@ TEST_F(add_filesystemTest, AddOneFS) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -260,7 +307,11 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -272,7 +323,11 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   fakeino = 3;
   snprintf(tmppath, 100, "%s/meta%ld", METAPATH, fakeino);
-  ret = add_filesystem("testFS1", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS1", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS1", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -286,7 +341,11 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   treesplit = TRUE;
   fakeino = 4;
   snprintf(tmppath, 100, "%s/meta%ld", METAPATH, fakeino);
-  ret = add_filesystem("testFS2", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS2", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS2", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -343,7 +402,11 @@ TEST_F(add_filesystemTest, NameTooLong) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem(verylongname, ANDROID_INTERNAL, &tmp_entry);
+#else
   ret = add_filesystem(verylongname, &tmp_entry);
+#endif
   EXPECT_EQ(-ENAMETOOLONG, ret);
  }
 
@@ -355,6 +418,8 @@ class delete_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpsyncpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -368,6 +433,11 @@ class delete_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    mkdir(tmpsyncpath, 0700);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     sem_init(&(mount_mgr.mount_lock), 0, 1);
 
@@ -381,9 +451,7 @@ class delete_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -426,7 +494,11 @@ TEST_F(delete_filesystemTest, NoRootMeta) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -451,7 +523,11 @@ TEST_F(delete_filesystemTest, RootNotEmpty) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -489,7 +565,11 @@ TEST_F(delete_filesystemTest, DeleteOneFS) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -512,6 +592,8 @@ class check_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpsyncpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -525,7 +607,12 @@ class check_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
+    snprintf(tmpsyncpath, 100, "%s/FS_sync", METAPATH);
+    mkdir(tmpsyncpath, 0700);
 
    }
 
@@ -537,9 +624,7 @@ class check_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -586,7 +671,11 @@ TEST_F(check_filesystemTest, FSFound) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -613,7 +702,11 @@ TEST_F(check_filesystemTest, FSNotFound) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -633,6 +726,7 @@ class list_filesystemTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -646,6 +740,9 @@ class list_filesystemTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
 
    }
@@ -658,9 +755,7 @@ class list_filesystemTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -861,6 +956,7 @@ class backup_FS_databaseTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -874,10 +970,13 @@ class backup_FS_databaseTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     failedcurlinit = FALSE;
     failedput = FALSE;
-
+    CURRENT_BACKEND = SWIFT;
    }
 
   virtual void TearDown() {
@@ -888,9 +987,7 @@ class backup_FS_databaseTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -898,10 +995,16 @@ class backup_FS_databaseTest : public ::testing::Test {
 
 TEST_F(backup_FS_databaseTest, CannotCreate) {
   int ret;
+  FILE *tmpfptr;
 
   mknod("/tmp/FSmgr_upload", S_IFREG | 0400, 0);
 
   ret = init_fs_manager();
+  EXPECT_EQ(0, ret);
+  tmpfptr = fopen(tmpbackuppath, "w");
+  fprintf(tmpfptr, "test data\n");
+  fclose(tmpfptr);
+  ret = backup_FS_database();
   EXPECT_EQ(-EACCES, ret);
   unlink("/tmp/FSmgr_upload");
  }
@@ -919,6 +1022,8 @@ TEST_F(backup_FS_databaseTest, UploadDone) {
   tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
 
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  ret = prepare_FS_database_backup();
+  EXPECT_EQ(0, ret);
 
   ret = backup_FS_database();
   EXPECT_EQ(0, ret);
@@ -935,6 +1040,8 @@ TEST_F(backup_FS_databaseTest, UploadDone) {
 
  }
 
+/* Init backend is done in get object op now */
+/*
 TEST_F(backup_FS_databaseTest, FailedInit) {
   int ret, errcode;
   DIR_META_TYPE tmphead;
@@ -950,6 +1057,9 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
   failedcurlinit = TRUE;
 
+  ret = prepare_FS_database_backup();
+  EXPECT_EQ(0, ret);
+
   ret = backup_FS_database();
   EXPECT_EQ(-EIO, ret);
 
@@ -963,7 +1073,7 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
     unlink("/tmp/FSmgr_upload");
 
  }
-
+*/
 TEST_F(backup_FS_databaseTest, FailedPut) {
   int ret, errcode;
   DIR_META_TYPE tmphead;
@@ -978,6 +1088,8 @@ TEST_F(backup_FS_databaseTest, FailedPut) {
 
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
   failedput = TRUE;
+  ret = prepare_FS_database_backup();
+  EXPECT_EQ(0, ret);
 
   ret = backup_FS_database();
   EXPECT_EQ(-EIO, ret);
@@ -1001,6 +1113,7 @@ class restore_FS_databaseTest : public ::testing::Test {
  protected:
   int count;
   char tmpmgrpath[100];
+  char tmpbackuppath[100];
   FILE *fptr;
   DIR_META_TYPE tmp_head;
   virtual void SetUp() {
@@ -1014,6 +1127,9 @@ class restore_FS_databaseTest : public ::testing::Test {
     snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
+    snprintf(tmpbackuppath, sizeof(tmpbackuppath), "%s/fsmgr_upload",
+             METAPATH);
+
     treesplit = FALSE;
     failedcurlinit = FALSE;
     failedget = FALSE;
@@ -1022,9 +1138,7 @@ class restore_FS_databaseTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    unlink(tmpmgrpath);
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -1050,7 +1164,8 @@ TEST_F(restore_FS_databaseTest, CannotCreate) {
   if (fs_mgr_path != NULL)
     free(fs_mgr_path);
  }
-
+/* Init backend is done in get object op now */
+/*
 TEST_F(restore_FS_databaseTest, CurlInitFailed) {
   int ret;
 
@@ -1070,6 +1185,7 @@ TEST_F(restore_FS_databaseTest, CurlInitFailed) {
   if (fs_mgr_path != NULL)
     free(fs_mgr_path);
  }
+*/
 
 TEST_F(restore_FS_databaseTest, CurlGetFailed) {
   int ret;

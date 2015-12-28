@@ -71,6 +71,7 @@ protected:
 			int index = i % NUM_LOOKUP_ENTRIES;
 			/* inode i has lookup_count = i */
 			ptr = (LOOKUP_NODE_TYPE *)malloc(sizeof(LOOKUP_NODE_TYPE));
+			memset(ptr, 0, sizeof(LOOKUP_NODE_TYPE));
 			ptr->this_inode = i;
 			ptr->lookup_count = i;
 			ptr->to_delete = FALSE;
@@ -108,6 +109,7 @@ TEST_F(lookup_increaseTest, InsertOneNode_InEmptyTable)
 	int index;
 
 	expected_node = (LOOKUP_NODE_TYPE *) malloc(sizeof(LOOKUP_NODE_TYPE));
+	memset(expected_node, 0, sizeof(LOOKUP_NODE_TYPE));
 	expected_node->this_inode = 123;
 	expected_node->lookup_count = 567777;
 	expected_node->d_type = D_ISDIR;

@@ -12,6 +12,24 @@ extern "C" {
 #include "hfuse_system.c"
 }
 
+class hfuse_systemEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const env =
+	::testing::AddGlobalTestEnvironment(new hfuse_systemEnvironment);
+
+
 /*
 	Unittest for init_hcfs_system_data()
  */
@@ -185,21 +203,24 @@ class mainTest : public ::testing::Test {
 		char **tmp_argv;
 };
 
+/* Backend init is now remove from system init */
+/*
 TEST_F(mainTest, InitBackendFail)
 {
 	hcfs_list_container_success = TRUE;
-	hcfs_init_backend_success = FALSE;
-	/* Test */	
+	hcfs_init_backend_success = FALSE;*/
+	/* Test */	/*
 	EXPECT_EXIT(main(1, tmp_argv), ::testing::ExitedWithCode(255), "");
 }
 
 TEST_F(mainTest, ListContainerFail)
 {
 	hcfs_list_container_success = FALSE;
-	hcfs_init_backend_success = TRUE;
-	/* Test */
+	hcfs_init_backend_success = TRUE; */
+	/* Test */ /*
 	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(255), "");
 }
+*/
 
 TEST_F(mainTest, MainFunctionSuccess)
 {
@@ -212,6 +233,10 @@ TEST_F(mainTest, MainFunctionSuccess)
 	EXPECT_EQ(0, main(1, tmp_argv));
 	sleep(1); // Waiting for child process finishing their work
 	/* Check */
+#ifdef _ANDROID_ENV_
+	EXPECT_EQ(0, access("hcfs_android_log", F_OK));
+	EXPECT_EQ(0, unlink("hcfs_android_log"));
+#else
 	EXPECT_EQ(0, access("backend_upload_log", F_OK));
 	EXPECT_EQ(0, access("cache_maintain_log", F_OK));
 	EXPECT_EQ(0, access("fuse_log", F_OK));
@@ -219,6 +244,7 @@ TEST_F(mainTest, MainFunctionSuccess)
 	EXPECT_EQ(0, unlink("backend_upload_log"));
 	EXPECT_EQ(0, unlink("cache_maintain_log"));
 	EXPECT_EQ(0, unlink("fuse_log"));
+#endif
 	unlink("/tmp/root_meta_path");
 	unlink(HCFSSYSTEM);
 	dup2(saved_stdout, fileno(stdout));

@@ -33,7 +33,7 @@ extern "C" {
 
 #include "fake_misc.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 extern struct fuse_lowlevel_ops hfuse_ops;
 MOUNT_T unittest_mount;
 
@@ -60,7 +60,7 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
 
   memset(tmpmount, 0, sizeof(MOUNT_T));
   tmpmount->f_ino = 1;
-  sem_init(&((tmpmount->FS_stat).lock), 0, 1);
+  sem_init(&(tmpmount->stat_lock), 0, 1);
   fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
   tmp_channel = fuse_mount(mount, &tmp_args);
   tmp_session = fuse_lowlevel_new(&tmp_args,
@@ -92,24 +92,31 @@ class fuseopEnvironment : public ::testing::Environment {
       symlink(tmppath, "/tmp/testHCFS");
      }
 
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     sem_init(&(hcfs_system->access_sem), 0, 1);
     sys_super_block = (SUPER_BLOCK_CONTROL *)
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
     memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
-    system_config.max_block_size = 2097152;
-    system_config.cache_hard_limit = 3200000;
-    system_config.cache_soft_limit = 3200000;
+    system_config->max_block_size = 2097152;
+    system_config->cache_hard_limit = 3200000;
+    system_config->cache_soft_limit = 3200000;
+    system_config->current_backend = 1;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
     fail_open_files = FALSE;
 
     system_fh_table.entry_table_flags = (char *) malloc(sizeof(char) * 100);
     memset(system_fh_table.entry_table_flags, 0, sizeof(char) * 100);
     system_fh_table.entry_table = (FH_ENTRY *) malloc(sizeof(FH_ENTRY) * 100);
     memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) * 100);
+    sem_init(&(pathlookup_data_lock), 0, 1);
 
     _mount_test_fuse(&unittest_mount);
   }
@@ -137,6 +144,7 @@ class fuseopEnvironment : public ::testing::Environment {
     free(system_fh_table.entry_table);
     free(sys_super_block);
     free(hcfs_system);
+    free(system_config);
 
     unlink("/tmp/testHCFS");
     rmdir(tmppath);
@@ -771,10 +779,12 @@ TEST_F(hfuse_utimensTest, UtimeTest) {
   stat("/tmp/test_fuse/testfile1", &tempstat);
   EXPECT_EQ(tempstat.st_atime, 123456);
   EXPECT_EQ(tempstat.st_mtime, 456789);
+#ifndef _ANDROID_ENV_
   EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
   EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
   EXPECT_EQ(tempstat.st_atim.tv_nsec, 0);
   EXPECT_EQ(tempstat.st_mtim.tv_nsec, 0);
+#endif
 }
 TEST_F(hfuse_utimensTest, UtimensatTest) {
   int ret_val;
@@ -793,10 +803,12 @@ TEST_F(hfuse_utimensTest, UtimensatTest) {
   stat("/tmp/test_fuse/testfile1", &tempstat);
   EXPECT_EQ(tempstat.st_atime, 123456);
   EXPECT_EQ(tempstat.st_mtime, 456789);
+#ifndef _ANDROID_ENV_
   EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
   EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
   EXPECT_EQ(tempstat.st_atim.tv_nsec, 2222);
   EXPECT_EQ(tempstat.st_mtim.tv_nsec, 12345678);
+#endif
 }
 TEST_F(hfuse_utimensTest, FutimensTest) {
   int ret_val;
@@ -820,10 +832,12 @@ TEST_F(hfuse_utimensTest, FutimensTest) {
   stat("/tmp/test_fuse/testfile1", &tempstat);
   EXPECT_EQ(tempstat.st_atime, 123456);
   EXPECT_EQ(tempstat.st_mtime, 456789);
+#ifndef _ANDROID_ENV_
   EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
   EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
   EXPECT_EQ(tempstat.st_atim.tv_nsec, 2222);
   EXPECT_EQ(tempstat.st_mtim.tv_nsec, 12345678);
+#endif
 }
 
 /* End of the test case for the function hfuse_utimens */
@@ -839,12 +853,16 @@ class hfuse_truncateTest : public ::testing::Test {
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 10000;
   }
 
   virtual void TearDown() {
     char temppath[1024];
 
     fetch_block_path(temppath, 14, 0);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
+    fetch_trunc_path(temppath, 14);
     if (access(temppath, F_OK) == 0)
       unlink(temppath);
   }
@@ -1444,6 +1462,7 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudWaitCache) {
   fptr = NULL;
 
   fptr = fopen(temppath,"r");
+  ASSERT_NE(fptr != NULL, 0);
   fread(tempbuf, tmp_len, 1, fptr);
   fclose(fptr);
   fptr = NULL;
@@ -1841,6 +1860,7 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
 
 /* End of the test case for the function hfuse_ll_readdir */
 
+#ifndef _ANDROID_ENV_
 /* 
 	Unittest of hfuse_ll_setxattr()
  */
@@ -2132,6 +2152,7 @@ TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
 	End of unittest of hfuse_ll_removexattr()
  */
 
+#endif
 /*
 	Unittest of hfuse_ll_symlink()
  */

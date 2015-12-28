@@ -30,6 +30,8 @@ S3_URL = (S3 url)
 S3_BUCKET = (S3 bucket name)
 S3_PROTOCOL = (protocol for S3 connection (https for now))
 LOG_LEVEL = (To which log level the log messages should be dumped) (Ranged from 0 to 10 now, with 0 being the most critical level)
+LOG_PATH = (A directory that create hcfs log files. This setting is optional and hcfs will create log file at current path if this term is not set.
+           This will be ignored if the path is invalid, and create log file at current path if it is ignored.)
 
 Example:
 
@@ -52,7 +54,7 @@ S3_URL = s3.hicloud.net.tw
 S3_BUCKET = testgateway
 S3_PROTOCOL = https
 LOG_LEVEL = 10
-
+LOG_PATH = /home/kewei/
 Required packages
 -----------------
 

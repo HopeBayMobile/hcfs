@@ -19,7 +19,24 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
+
+class mount_managerEnvironment : public ::testing::Environment {
+	public:
+		void SetUp()
+		{
+			system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		}
+		void TearDown()
+		{
+			free(system_config);
+		}
+};
+
+::testing::Environment* const metaops_env =
+	::testing::AddGlobalTestEnvironment(new mount_managerEnvironment);
 
 MOUNT_NODE_T* prepare_node(char *fname) {
   MOUNT_NODE_T *tmpptr;
@@ -483,6 +500,8 @@ TEST_F(FS_is_mountedTest, MultipleFSNotFound) {
 
 class mount_FSTest : public ::testing::Test {
  protected:
+  FILE *statfptr;
+  FS_STAT_T tmp_stat;
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     mount_mgr.root = NULL;
@@ -491,11 +510,32 @@ class mount_FSTest : public ::testing::Test {
     fs_mgr_head = (FS_MANAGER_HEAD_TYPE *) malloc(sizeof(FS_MANAGER_HEAD_TYPE));
     sem_init(&(fs_mgr_head->op_lock), 0, 1);
     FS_CORE_FAILED = 0;
+    METAPATH = (char *)malloc(sizeof(char)*100);
+    snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    if (access(METAPATH, F_OK) != 0)
+      mkdir(METAPATH, 0700);
+
+    statfptr = fopen("/tmp/testHCFS/metapath/stat100", "w");
+    memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+    tmp_stat.num_inodes = 1;
+
+    fwrite(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+    fsync(fileno(statfptr));
+
+    fclose(statfptr);
+
    }
 
   virtual void TearDown() {
     if (mount_mgr.root != NULL)
       free_tree(mount_mgr.root);
+    unlink("/tmp/testHCFS/metapath/stat100");
+    rmdir(METAPATH);
+    rmdir("/tmp/testHCFS");
+    free(METAPATH);
+
     free(hcfs_system);
     free(fs_mgr_head);
    }
@@ -544,6 +584,7 @@ TEST_F(mount_FSTest, MountedFS) {
   ASSERT_STREQ("/tmp/testmount", mount_mgr.root->mt_entry->f_mp);
 
   free(mount_mgr.root->mt_entry->f_mp);
+  free(mount_mgr.root->mt_entry->vol_path_cache);
   pthread_join(mount_mgr.root->mt_entry->mt_thread, NULL);
  }
 
@@ -753,6 +794,8 @@ TEST_F(mount_statusTest, MultipleFSNotFound) {
 
 class unmount_allTest : public ::testing::Test {
  protected:
+  FILE *statfptr;
+  FS_STAT_T tmp_stat;
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     mount_mgr.root = NULL;
@@ -761,11 +804,30 @@ class unmount_allTest : public ::testing::Test {
     fs_mgr_head = (FS_MANAGER_HEAD_TYPE *) malloc(sizeof(FS_MANAGER_HEAD_TYPE));
     sem_init(&(fs_mgr_head->op_lock), 0, 1);
     FS_CORE_FAILED = 0;
+    METAPATH = (char *)malloc(sizeof(char)*100);
+    snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    if (access(METAPATH, F_OK) != 0)
+      mkdir(METAPATH, 0700);
+
+    statfptr = fopen("/tmp/testHCFS/metapath/stat100", "w");
+    memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+    tmp_stat.num_inodes = 1;
+
+    fwrite(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+    fsync(fileno(statfptr));
+
+    fclose(statfptr);
    }
 
   virtual void TearDown() {
     if (mount_mgr.root != NULL)
       free_tree(mount_mgr.root);
+    unlink("/tmp/testHCFS/metapath/stat100");
+    rmdir(METAPATH);
+    rmdir("/tmp/testHCFS");
+    free(METAPATH);
     free(hcfs_system);
     free(fs_mgr_head);
    }
@@ -817,10 +879,22 @@ class change_mount_statTest : public ::testing::Test {
   MOUNT_T tmp_mount;
   virtual void SetUp() {
     memset(&tmp_mount, 0, sizeof(MOUNT_T));
-    sem_init(&(tmp_mount.FS_stat.lock), 0, 1);
+    sem_init(&(tmp_mount.stat_lock), 0, 1);
+    METAPATH = (char *)malloc(sizeof(char)*100);
+    snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    if (access(METAPATH, F_OK) != 0)
+      mkdir(METAPATH, 0700);
+    tmp_mount.stat_fptr = fopen("/tmp/testHCFS/metapath/tmpstat", "a+");
    }
 
   virtual void TearDown() {
+    fclose(tmp_mount.stat_fptr);
+    unlink("/tmp/testHCFS/metapath/tmpstat");
+    rmdir(METAPATH);
+    rmdir("/tmp/testHCFS");
+    free(METAPATH);
    }
  };
 

@@ -15,6 +15,7 @@
 #include "xattr_ops.h"
 #include "global.h"
 #include "mount_manager.h"
+#include "dir_statistics.h"
 
 #include "fake_misc.h"
 
@@ -359,7 +360,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	return 0;
 }
-int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
+int fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
+		long long block_no)
 {
 	char tempbuf[1024];
 	int tmp_len;
@@ -591,7 +593,7 @@ int invalidate_pathname_cache_entry(const char *path)
 	return 0;
 }
 
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return;
 }
@@ -781,3 +783,95 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	else
 		return 0;
 }
+
+int set_block_dirty_status(char *path, FILE *fptr, char status)
+{
+	if (path != NULL) {
+		if (status == TRUE)
+			setxattr(path, "user.dirty", "T", 1, 0);
+		else
+			setxattr(path, "user.dirty", "F", 1, 0);
+	} else {
+		if (status == TRUE)
+			fsetxattr(fileno(fptr), "user.dirty", "T", 1, 0);
+		else
+			fsetxattr(fileno(fptr), "user.dirty", "F", 1, 0);
+	}
+	return 0;
+}
+
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	return 0;
+}
+
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
+{
+	*result = malloc(10);
+	snprintf(*result, 10, "/test");
+	return 0;
+}
+
+int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
+{
+	return 0;
+}
+
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+int super_block_mark_dirty(ino_t this_inode)
+{
+	return 0;
+}
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta)
+{
+	return 0;
+}
+int init_pin_scheduler()
+{
+	return 0;
+}
+int destroy_pin_scheduler()
+{
+	return 0;
+}
+int init_download_control()
+{
+	return 0;
+}
+int destroy_download_control()
+{
+	return 0;
+}
+
+int reset_dirstat_lookup(ino_t thisinode)
+{
+	return 0;
+}
+int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
+			  ino_t parent_inode2)
+{
+	return 0;
+}
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
+{
+	return 0;
+}
+

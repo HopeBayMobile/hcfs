@@ -24,8 +24,8 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 #include "params.h"
 #include "fuseop.h"
@@ -33,8 +33,6 @@
 #include "logger.h"
 #include "global.h"
 #include "utils.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
 
 /************************************************************************
 *
@@ -245,15 +243,18 @@ int build_cache_usage(void)
 	ino_t this_inode;
 	struct stat tempstat;
 	CACHE_USAGE_NODE *tempnode;
-	char tempval[10];
 	size_t tmp_size;
+	char is_dirty;
 
 	write_log(5, "Building cache usage hash table\n");
 	ret = cache_usage_hash_init();
 	if (ret < 0)
 		return ret;
 
+	write_log(10, "Initialized cache usage hash table\n");
+
 	for (count = 0; count < NUMSUBDIR; count++) {
+		write_log(10, "Now processing subfolder %d\n", count);
 		sprintf(blockpath, "%s/sub_%d", BLOCKPATH, count);
 
 		if (access(blockpath, F_OK) < 0)
@@ -278,19 +279,19 @@ int build_cache_usage(void)
 			closedir(dirptr);
 			continue;
 		}
+		write_log(10, "count is now %d\n", count);
 
 		while (direntptr != NULL) {
+			write_log(10, "count is now %d\n", count);
+			write_log(10, "Scanning file name %s\n",
+			          temp_dirent.d_name);
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
-#ifdef ARM_32bit_
-			ret = sscanf(temp_dirent.d_name, "block%lld_%lld",
-							&this_inode, &blockno);
-#else
-			ret = sscanf(temp_dirent.d_name, "block%ld_%lld",
-							&this_inode, &blockno);
-#endif
+			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%lld",
+			             (uint64_t *)&this_inode, &blockno);
 			if (ret != 2) {
+				write_log(10, "Scan file does not match\n");
 				ret = readdir_r(dirptr, &temp_dirent,
 					&direntptr);
 				if (ret > 0) {
@@ -299,12 +300,17 @@ int build_cache_usage(void)
 				}
 				continue;
 			}
+			write_log(10, "Count is now %d, %lu, %lu\n", count,
+			          (unsigned long)&count, (unsigned long)&blockno);
+			write_log(10, "Block file for %" PRIu64 " %lld\n",
+			          (uint64_t)this_inode, blockno);
 			ret = fetch_block_path(thisblockpath, this_inode,
 						blockno);
 			if (ret < 0) {
 				errcode = ret;
 				break;
 			}
+			write_log(10, "Debug %s, %d\n", thisblockpath, count);
 			ret = stat(thisblockpath, &tempstat);
 
 			if (ret != 0) {
@@ -317,8 +323,11 @@ int build_cache_usage(void)
 				continue;
 			}
 
+			write_log(10, "Fetching cache usage node\n");
+			write_log(10, "count is now %d\n", count);
 			tempnode = return_cache_usage_node(this_inode);
 			if (tempnode == NULL) {
+				write_log(10, "Not found. Alloc a new one\n");
 				tmp_size = sizeof(CACHE_USAGE_NODE);
 				tempnode = malloc(tmp_size);
 				memset(tempnode, 0, tmp_size);
@@ -331,29 +340,28 @@ int build_cache_usage(void)
 
 			tempnode->this_inode = this_inode;
 
-			ret = getxattr(thisblockpath, "user.dirty",
-							(void *)tempval, 1);
+			ret = get_block_dirty_status(thisblockpath, NULL,
+					&is_dirty);
 			if (ret < 0) {
 				errcode = errno;
 				break;
 			}
 			/*If this is dirty cache entry*/
-			if (!strncmp(tempval, "T", 1)) {
+			if (is_dirty == TRUE)
 				tempnode->dirty_cache_size += tempstat.st_size;
-			} else {
-				/*If clean cache entry*/
-				if (!strncmp(tempval, "F", 1))
-					tempnode->clean_cache_size +=
+			else
+				tempnode->clean_cache_size +=
 							tempstat.st_size;
-				/*Otherwise, don't know the status of
-						the block, so do nothing*/
-			}
+
+			write_log(10, "Inserting the node\n");
+			write_log(10, "count is now %d\n", count);
 			insert_cache_usage_node(this_inode, tempnode);
 			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
 			if (ret > 0) {
 				errcode = ret;
 				break;
 			}
+			write_log(10, "count is now %d\n", count);
 		}
 
 		if (errcode > 0) {

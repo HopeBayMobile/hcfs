@@ -27,18 +27,29 @@ UNITTEST_DIR = $(realpath ./unittests)
 # the compiler doesn't generate warnings in Google Test headers.
 CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
 
+# Flags passed to C and C++ compilers
+CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
+	    -D_FILE_OFFSET_BITS=64 \
+	    -DDEDUP_ENABLE=0 \
+	    -DENCRYPT_ENABLE=1 \
+	    -DCOMPRESS_ENABLE=0 \
+	    -DARM_32bit_ \
+	    -D_ANDROID_ENV_
+# Flags passed to the C compiler. (We trace coverage of hcfs source only)
+CFLAGS += -ftest-coverage
+CFAKEFLAGS +=
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
-
+CXXFLAGS +=
+# gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CXX = gcc
-
-CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
-
-CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
+#TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
+TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest pin_scheduling_unittest
+
+.PHONY: $(DO_TESTS)
+DO_TESTS = $(TESTS:%=test-%)
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -52,17 +63,17 @@ all : setup $(TESTS)
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test : setup $(TESTS)
-	./metaops_unittest
-	./file_present_unittest
-	./super_block_unittest
-	./lookup_count_unittest
-	./xattr_ops_unittest
+test : setup $(DO_TESTS)
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
+
+$(DO_TESTS): $(TESTS)
+	./$(@:test-%=%)
 
 .PHONY : setup
 setup :
-	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1
@@ -152,16 +163,29 @@ lookup_count_unittest : lookup_count_mock_function.o lookup_count.o lookup_count
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
 
-# xattr_ops.c
-xattr_ops.o : $(USER_DIR)/xattr_ops.c $(USER_DIR)/logger.h $(USER_DIR)/meta_mem_cache.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/xattr_ops.c
+# pin_scheduling.c
+pin_scheduling.o : $(USER_DIR)/pin_scheduling.c $(USER_DIR)/pin_scheduling.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/pin_scheduling.c
 
-xattr_ops_mock_function.o : $(UNITTEST_DIR)/xattr_ops_mock_function.c $(UNITTEST_DIR)/mock_param.h
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_mock_function.c
+pin_scheduling_mock_function.o : $(UNITTEST_DIR)/pin_scheduling_mock_function.c $(UNITTEST_DIR)/mock_param.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pin_scheduling_mock_function.c
 
-xattr_ops_unittest.o : $(UNITTEST_DIR)/xattr_ops_unittest.cc $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_unittest.cc
+pin_scheduling_unittest.o : $(UNITTEST_DIR)/pin_scheduling_unittest.cc $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pin_scheduling_unittest.cc
 
-xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
+pin_scheduling_unittest : pin_scheduling_mock_function.o pin_scheduling.o pin_scheduling_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
+
+# xattr_ops.c
+#xattr_ops.o : $(USER_DIR)/xattr_ops.c $(USER_DIR)/logger.h $(USER_DIR)/meta_mem_cache.h $(GTEST_HEADERS)
+#	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/xattr_ops.c
+
+#xattr_ops_mock_function.o : $(UNITTEST_DIR)/xattr_ops_mock_function.c $(UNITTEST_DIR)/mock_param.h
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_mock_function.c
+
+#xattr_ops_unittest.o : $(UNITTEST_DIR)/xattr_ops_unittest.cc $(GTEST_HEADERS)
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_unittest.cc
+
+#xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++

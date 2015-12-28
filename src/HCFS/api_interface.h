@@ -21,11 +21,16 @@
 #include <semaphore.h>
 #include <time.h>
 
-#define MAX_API_THREADS 32
-#define INIT_API_THREADS 10
+#ifdef _ANDROID_ENV_
+#include <pthread.h>
+#endif
+
+#define MAX_API_THREADS 10
+#define INIT_API_THREADS 4
 #define PROCESS_WINDOW 30
 #define INCREASE_RATIO 0.8
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
+#define API_SERVER_MONITOR_TIME 5
 
 /* Message format for an API request:
 	(From the first byte)

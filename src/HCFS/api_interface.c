@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/6/10 Jiahong created this file, and moved prototype here.
+* 2015/11/27 Jiahong modified format for inode printout
 *
 **************************************************************************/
 
@@ -25,6 +26,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/file.h>
+#include <inttypes.h>
 
 #include "macro.h"
 #include "global.h"
@@ -32,10 +35,16 @@
 #include "FS_manager.h"
 #include "mount_manager.h"
 #include "fuseop.h"
+#include "super_block.h"
+#include "dir_statistics.h"
+#include "file_present.h"
+#include "utils.h"
+#include "monitor.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
+int api_server_monitor_time = API_SERVER_MONITOR_TIME;
 
 /************************************************************************
 *
@@ -73,7 +82,7 @@ int init_api_interface(void)
 			sizeof(pthread_t) * MAX_API_THREADS);
 
 	api_server->sock.addr.sun_family = AF_UNIX;
-	strcpy(api_server->sock.addr.sun_path, SOCK_PATH);
+	snprintf(api_server->sock.addr.sun_path, sizeof(SOCK_PATH), SOCK_PATH);
 	api_server->sock.fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (api_server->sock.fd < 0) {
@@ -174,13 +183,20 @@ errcode_handle:
 int create_FS_handle(int arg_len, char *largebuf)
 {
 	DIR_ENTRY tmp_entry;
-	char *buf;
+	char *buf, tmptype;
 	int ret;
 
 	buf = malloc(arg_len + 10);
+#ifdef _ANDROID_ENV_
+	memcpy(buf, largebuf, arg_len - 1);
+	buf[arg_len - 1] = 0;
+	tmptype = largebuf[arg_len - 1];
+	ret = add_filesystem(buf, tmptype, &tmp_entry);
+#else
 	memcpy(buf, largebuf, arg_len);
 	buf[arg_len] = 0;
 	ret = add_filesystem(buf, &tmp_entry);
+#endif
 
 	free(buf);
 	return ret;
@@ -249,6 +265,161 @@ int delete_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
+long long get_vol_size(int arg_len, char *largebuf)
+{
+	DIR_ENTRY temp_entry;
+	MOUNT_T *tmp_info;
+	char *buf;
+	int ret, errcode;
+	long long llretval;
+	char temppath[METAPATHLEN];
+	FILE *statfptr;
+	FS_STAT_T tmpvolstat;
+	ssize_t ret_ssize;
+
+	statfptr = NULL;
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+
+	if ((arg_len == 0) || (buf[0] == '\0')) {
+		/* Return the total size of all volumes */
+		sem_wait(&(hcfs_system->access_sem));
+		llretval = hcfs_system->systemdata.cache_size;
+		sem_post(&(hcfs_system->access_sem));
+		free(buf);
+		return llretval;
+	}
+
+	sem_wait(&(fs_mgr_head->op_lock));
+	sem_wait(&(mount_mgr.mount_lock));
+
+	/* First check if FS already mounted */
+	statfptr = NULL;
+
+	ret = search_mount(buf, &tmp_info);
+	if ((ret < 0) && (ret != -ENOENT)) {
+		llretval = (long long) ret;
+		goto error_handling;
+	} else if (ret == 0) {
+		/* Fetch stat from mounted volume */
+		sem_wait(&(tmp_info->stat_lock));
+		llretval = (tmp_info->FS_stat).system_size;
+		sem_post(&(tmp_info->stat_lock));
+
+		free(buf);
+		sem_post(&(mount_mgr.mount_lock));
+		sem_post(&(fs_mgr_head->op_lock));
+		return llretval;
+	}
+
+	/* Check whether the filesystem exists */
+	ret = check_filesystem_core(buf, &temp_entry);
+	if (ret < 0) {
+		llretval = (long long) ret;
+		goto error_handling;
+	}
+
+	/* Fetch from stat file if not mounted */
+	ret = fetch_stat_path(temppath, temp_entry.d_ino);
+	if (ret < 0) {
+		llretval = (long long) ret;
+		goto error_handling;
+	}
+
+	statfptr = fopen(temppath, "r+");
+	if (statfptr == NULL) {
+		ret = (long long) errno;
+		write_log(0, "IO error %d (%s)\n", ret, strerror(ret));
+		llretval = (long long) -ret;
+		goto error_handling;
+	}
+	PREAD(fileno(statfptr), &tmpvolstat, sizeof(FS_STAT_T), 0);
+	llretval = tmpvolstat.system_size;
+
+	fclose(statfptr);
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+	free(buf);
+	return llretval;
+
+errcode_handle:
+	if (statfptr != NULL)
+		fclose(statfptr);
+	llretval = (long long) errcode;
+error_handling:
+	free(buf);
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+	return llretval;
+}
+
+long long get_cloud_size(int arg_len, char *largebuf)
+{
+	DIR_ENTRY temp_entry;
+	char *buf;
+	int ret, errcode;
+	long long llretval;
+	char temppath[METAPATHLEN];
+	FILE *statfptr;
+	ssize_t ret_ssize;
+
+	statfptr = NULL;
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+
+	if ((arg_len == 0) || (buf[0] == '\0')) {
+		/* Return the total size of all volumes */
+		sem_wait(&(hcfs_system->access_sem));
+		llretval = hcfs_system->systemdata.backend_size;
+		sem_post(&(hcfs_system->access_sem));
+		free(buf);
+		return llretval;
+	}
+
+	sem_wait(&(fs_mgr_head->op_lock));
+
+	/* Check whether the filesystem exists */
+	ret = check_filesystem_core(buf, &temp_entry);
+	if (ret < 0) {
+		llretval = (long long) ret;
+		goto error_handling;
+	}
+
+	/* Fetch from stat file if not mounted */
+
+	snprintf(temppath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64,
+		 METAPATH, (uint64_t)temp_entry.d_ino);
+	write_log(10, "Checking for FS stat in backend\n");
+	statfptr = fopen(temppath, "r");
+	if (statfptr == NULL) {
+		ret = (long long) errno;
+		write_log(0, "IO error %d (%s)\n", ret, strerror(ret));
+		llretval = (long long) -ret;
+		goto error_handling;
+	}
+	flock(fileno(statfptr), LOCK_EX);
+	PREAD(fileno(statfptr), &llretval, sizeof(long long), 0);
+	flock(fileno(statfptr), LOCK_UN);
+	fclose(statfptr);
+
+	sem_post(&(fs_mgr_head->op_lock));
+	free(buf);
+	return llretval;
+
+errcode_handle:
+	if (statfptr != NULL) {
+		flock(fileno(statfptr), LOCK_UN);
+		fclose(statfptr);
+	}
+	llretval = (long long) errcode;
+error_handling:
+	free(buf);
+	sem_post(&(fs_mgr_head->op_lock));
+	return llretval;
+}
+
 int check_FS_handle(int arg_len, char *largebuf)
 {
 	DIR_ENTRY temp_entry;
@@ -259,7 +430,7 @@ int check_FS_handle(int arg_len, char *largebuf)
 	memcpy(buf, largebuf, arg_len);
 	buf[arg_len] = 0;
 	ret = check_filesystem(buf, &temp_entry);
-	write_log(10, "Debug check FS %s returns %d\n", buf, ret);
+	write_log(10, "Debug check volume %s returns %d\n", buf, ret);
 
 	free(buf);
 	return ret;
@@ -272,14 +443,14 @@ int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
 
 	ret = list_filesystem(0, NULL, &num_entries);
 
-	write_log(10, "Debug list FS num FS %ld\n", num_entries);
+	write_log(10, "Debug list volume num volumes %ld\n", num_entries);
 	if (ret < 0)
 		return ret;
 	if (num_entries > 0) {
 		*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
 		ret = list_filesystem(num_entries, *entryarray, &temp);
 	}
-	write_log(10, "Debug list FS %d, %ld\n", ret, temp);
+	write_log(10, "Debug list volume %d, %ld\n", ret, temp);
 	*ret_entries = num_entries;
 	return ret;
 }
@@ -291,6 +462,291 @@ int unmount_all_handle(void)
 	ret = unmount_all();
 
 	return ret;
+}
+
+int pin_inode_handle(ino_t *pinned_list, int num_inode,
+		long long total_reserved_size)
+{
+	int retcode, count, count2;
+	long long total_reserved_size_bak, zero_size;
+	long long unused_reserved_size;
+
+	retcode = 0;
+
+	total_reserved_size_bak = total_reserved_size;
+
+	for (count = 0; count < num_inode; count++) {
+		write_log(10, "Debug: Prepare to pin inode %"PRIu64
+			", remaining reserved pinned size %lld\n",
+			(uint64_t)pinned_list[count], total_reserved_size);
+		retcode = pin_inode(pinned_list[count], &total_reserved_size);
+		if (retcode < 0) {
+			unused_reserved_size = total_reserved_size;
+
+			/* First return the unused reserved size */
+			if (unused_reserved_size > 0) {
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->systemdata.pinned_size -=
+					unused_reserved_size;
+				if (hcfs_system->systemdata.pinned_size < 0)
+					hcfs_system->systemdata.pinned_size = 0;
+				sem_post(&(hcfs_system->access_sem));
+			}
+
+			/* Roll back */
+			zero_size = 0;
+			for (count2 = 0; count2 < num_inode; count2++) {
+				write_log(5, "Fail to pin, Roll back inode %"
+					PRIu64"\n",
+					(uint64_t)pinned_list[count2]);
+				unpin_inode(pinned_list[count2],
+							&zero_size);
+			}
+
+			write_log(10, "Debug: After roll back, %s%lld\n",
+				  "now system pinned size is ",
+				  hcfs_system->systemdata.pinned_size);
+
+			return retcode;
+		}
+	}
+
+	/* Remaining size, return these space */
+	if (total_reserved_size > 0) {
+		write_log(10, "Debug: Remaining reserved pinned size %lld\n",
+				total_reserved_size);
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -=
+			total_reserved_size;
+
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+
+		sem_post(&(hcfs_system->access_sem));
+	}
+
+	write_log(10, "Debug: After pinning, now system pinned size is %lld\n",
+			hcfs_system->systemdata.pinned_size);
+	return retcode;
+}
+
+int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
+{
+	int retcode;
+	long long zero_reserved_size;
+	unsigned int count;
+
+	retcode = 0;
+	zero_reserved_size = 0; /* There is no reserved size when unpin */
+
+	for (count = 0; count < num_inode; count++) {
+		write_log(10, "Debug: Prepare to unpin inode %"PRIu64"\n",
+			(uint64_t)unpinned_list[count]);
+		retcode = unpin_inode(unpinned_list[count],
+						&zero_reserved_size);
+		if (retcode < 0) {
+			write_log(5, "Fail to unpin. Begin to roll back\n");
+			break;
+		}
+	}
+
+	write_log(10, "Debug:After unpinning, now system pinned size is %lld\n",
+		hcfs_system->systemdata.pinned_size);
+
+	return retcode;
+}
+
+int check_location_handle(int arg_len, char *largebuf)
+{
+	ino_t target_inode;
+	int errcode;
+	char metapath[METAPATHLEN];
+	struct stat thisstat;
+	META_CACHE_ENTRY_STRUCT *thisptr;
+	char inode_loc;
+	FILE_STATS_TYPE tmpstats;
+	ssize_t ret_ssize;
+
+	if (arg_len != sizeof(ino_t))
+		return -EINVAL;
+
+	memcpy(&target_inode, largebuf, sizeof(ino_t));
+	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
+		  (uint64_t)target_inode);
+	errcode = fetch_meta_path(metapath, target_inode);
+	if (errcode < 0)
+		return errcode;
+
+	if (access(metapath, F_OK) != 0)
+		return -ENOENT;
+
+	thisptr = meta_cache_lock_entry(target_inode);
+	if (thisptr == NULL)
+		return -ENOMEM;
+
+	errcode = meta_cache_lookup_file_data(target_inode, &thisstat,
+						NULL, NULL, 0, thisptr);
+	if (errcode < 0)
+		goto errcode_handle;
+
+	if (S_ISREG(thisstat.st_mode)) {
+		errcode = meta_cache_open_file(thisptr);
+		PREAD(fileno(thisptr->fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		      sizeof(struct stat) + sizeof(FILE_META_TYPE));
+		if ((tmpstats.num_blocks == 0) ||
+		    (tmpstats.num_blocks == tmpstats.num_cached_blocks))
+			inode_loc = 0;  /* If the location is "local" */
+		else if (tmpstats.num_cached_blocks == 0)
+			inode_loc = 1;  /* If the location is "cloud" */
+		else
+			inode_loc = 2;  /* If the location is "hybrid" */
+	} else {
+		inode_loc = 0;  /* Non-file obj defaults to "local" */
+	}
+
+	meta_cache_close_file(thisptr);
+	meta_cache_unlock_entry(thisptr);
+
+	return inode_loc;
+
+errcode_handle:
+	meta_cache_unlock_entry(thisptr);
+	return errcode;
+}
+
+int checkpin_handle(int arg_len, char *largebuf)
+{
+	ino_t target_inode;
+	int retcode;
+	char metapath[METAPATHLEN];
+	struct stat thisstat;
+	META_CACHE_ENTRY_STRUCT *thisptr;
+	FILE_META_TYPE filemeta;
+	DIR_META_TYPE dirmeta;
+	SYMLINK_META_TYPE linkmeta;
+	char is_local_pin;
+
+	memcpy(&target_inode, largebuf, sizeof(ino_t));
+	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
+		  (uint64_t)target_inode);
+	retcode = fetch_meta_path(metapath, target_inode);
+	if (retcode < 0)
+		return retcode;
+
+	if (access(metapath, F_OK) != 0)
+		return -ENOENT;
+
+	thisptr = meta_cache_lock_entry(target_inode);
+	if (thisptr == NULL)
+		return -ENOMEM;
+
+	retcode = meta_cache_lookup_file_data(target_inode, &thisstat,
+						NULL, NULL, 0, thisptr);
+	if (retcode < 0)
+		goto error_handling;
+
+	if (S_ISFILE(thisstat.st_mode)) {
+		retcode = meta_cache_lookup_file_data(target_inode, NULL,
+						&filemeta, NULL, 0, thisptr);
+		if (retcode < 0)
+			goto error_handling;
+		is_local_pin = filemeta.local_pin;
+	}
+
+	if (S_ISDIR(thisstat.st_mode)) {
+		retcode = meta_cache_lookup_dir_data(target_inode, NULL,
+						&dirmeta, NULL, thisptr);
+		if (retcode < 0)
+			goto error_handling;
+		is_local_pin = dirmeta.local_pin;
+	}
+
+	if (S_ISLNK(thisstat.st_mode)) {
+		retcode = meta_cache_lookup_symlink_data(target_inode, NULL,
+						&linkmeta, thisptr);
+		if (retcode < 0)
+			goto error_handling;
+		is_local_pin = linkmeta.local_pin;
+	}
+
+	meta_cache_close_file(thisptr);
+	meta_cache_unlock_entry(thisptr);
+
+	if (is_local_pin == TRUE)
+		return 1;
+	else
+		return 0;
+
+error_handling:
+	meta_cache_unlock_entry(thisptr);
+	return retcode;
+}
+
+int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
+{
+	ino_t target_inode;
+	int retcode;
+	struct stat structstat;
+	char metapath[METAPATHLEN];
+
+	if (arg_len != sizeof(ino_t))
+		return -EINVAL;
+
+	memcpy(&target_inode, largebuf, sizeof(ino_t));
+	write_log(10, "Debug API: target inode %" PRIu64 "\n",
+		  (uint64_t)target_inode);
+	retcode = fetch_meta_path(metapath, target_inode);
+	if (retcode < 0) {
+		tmpstats->num_local = retcode;
+		tmpstats->num_cloud = retcode;
+		tmpstats->num_hybrid = retcode;
+		return retcode;
+	}
+
+	if (access(metapath, F_OK) != 0) {
+		retcode = -ENOENT;
+		tmpstats->num_local = retcode;
+		tmpstats->num_cloud = retcode;
+		tmpstats->num_hybrid = retcode;
+		return retcode;
+	}
+
+	retcode = fetch_inode_stat(target_inode, &structstat, NULL, NULL);
+	if (retcode == 0) {
+		if (S_ISDIR(structstat.st_mode))
+			retcode = read_dirstat_lookup(target_inode, tmpstats);
+		else
+			memset(tmpstats, 0, sizeof(DIR_STATS_TYPE));
+	}
+	if (retcode < 0) {
+		tmpstats->num_local = retcode;
+		tmpstats->num_cloud = retcode;
+		tmpstats->num_hybrid = retcode;
+	}
+	write_log(10, "Dir stat lookup %lld, %lld, %lld\n",
+		tmpstats->num_local, tmpstats->num_cloud, tmpstats->num_hybrid);
+	return retcode;
+}
+
+int set_sync_switch_handle(int sync_switch)
+{
+	int retcode = 0;
+	int pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+
+	hcfs_system->sync_manual_switch = (sync_switch == TRUE) ? ON : OFF;
+	update_sync_state();
+
+	if (sync_switch == TRUE && pause_file)
+		retcode = unlink(HCFSPAUSESYNC);
+	if (sync_switch != TRUE && !pause_file)
+		retcode = mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
+	if (retcode == -1) {
+		retcode = -errno;
+		write_log(0, "%s @ %s: %s\n",
+			  "Failed to manipulate pause syncing file", __func__,
+			  strerror(errno));
+	}
+	return retcode;
 }
 
 /************************************************************************
@@ -321,9 +777,16 @@ void api_module(void *index)
 	int msg_index;
 	unsigned long num_entries;
 	unsigned int api_code, arg_len, ret_len;
+	long long llretval, llretval2;
 
 	DIR_ENTRY *entryarray;
 	char *tmpptr;
+	DIR_STATS_TYPE tmpstat;
+
+	long long reserved_pinned_size;
+	unsigned int num_inode;
+	ino_t *pinned_list, *unpinned_list;
+	unsigned int sync_switch;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -355,7 +818,7 @@ void api_module(void *index)
 			if (msg_len >= 4)
 				break;
 		}
-		if (msg_len < sizeof(unsigned int)) {
+		if (msg_len < (ssize_t)sizeof(unsigned int)) {
 			/* Error reading API code. Return EINVAL. */
 			write_log(5, "Invalid API code received\n");
 			retcode = EINVAL;
@@ -375,7 +838,7 @@ void api_module(void *index)
 			if (msg_len >= 4)
 				break;
 		}
-		if (msg_len < sizeof(unsigned int)) {
+		if (msg_len < (ssize_t)sizeof(unsigned int)) {
 			/* Error reading API code. Return EINVAL. */
 			write_log(5, "Invalid arg length received\n");
 			retcode = EINVAL;
@@ -432,10 +895,107 @@ void api_module(void *index)
 		}
 
 		switch (api_code) {
+		case PIN:
+			memcpy(&reserved_pinned_size, largebuf,
+				sizeof(long long));
+
+			/* Check required size */
+			sem_wait(&(hcfs_system->access_sem));
+			if (hcfs_system->systemdata.pinned_size +
+				reserved_pinned_size >= MAX_PINNED_LIMIT) {
+				sem_post(&(hcfs_system->access_sem));
+				write_log(5, "No pinned space available\n");
+				retcode = -ENOSPC;
+				break;
+			}
+			/* else */
+			hcfs_system->systemdata.pinned_size +=
+			    reserved_pinned_size;
+			sem_post(&(hcfs_system->access_sem));
+			write_log(
+			    10,
+			    "Debug: Preallocate pinned size %lld. %s %lld\n",
+			    reserved_pinned_size, "Now system pinned size",
+			    hcfs_system->systemdata.pinned_size);
+
+			/* Prepare inode array */
+			memcpy(&num_inode, largebuf + sizeof(long long),
+					sizeof(unsigned int));
+
+			pinned_list = malloc(sizeof(ino_t) * num_inode);
+			if (pinned_list == NULL) {
+				retcode = -ENOMEM;
+				break;
+			}
+			memcpy(pinned_list, largebuf + sizeof(long long) +
+				sizeof(unsigned int),
+				sizeof(ino_t) * num_inode);
+
+			/* Begin to pin all of them */
+			retcode = pin_inode_handle(pinned_list, num_inode,
+							reserved_pinned_size);
+			free(pinned_list);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case UNPIN:
+			memcpy(&num_inode, largebuf, sizeof(unsigned int));
+			unpinned_list = malloc(sizeof(ino_t) * num_inode);
+			if (unpinned_list == NULL) {
+				retcode = -ENOMEM;
+				break;
+			}
+
+			memcpy(unpinned_list, largebuf + sizeof(unsigned int),
+				sizeof(ino_t) * num_inode);
+
+			/* Begin to unpin all of them */
+			retcode = unpin_inode_handle(unpinned_list, num_inode);
+			free(unpinned_list);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKDIRSTAT:
+			retcode = check_dir_stat_handle(arg_len, largebuf,
+							&tmpstat);
+			if (retcode == 0) {
+				ret_len = 3 * sizeof(long long);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &(tmpstat.num_local),
+				     sizeof(long long), 0);
+				send(fd1, &(tmpstat.num_cloud),
+				     sizeof(long long), 0);
+				send(fd1, &(tmpstat.num_hybrid),
+				     sizeof(long long), 0);
+			}
+			break;
+		case CHECKLOC:
+			retcode = check_location_handle(arg_len, largebuf);
+			if (retcode >= 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKPIN:
+			retcode = checkpin_handle(arg_len, largebuf);
+			if (retcode >= 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
 		case TERMINATE:
 			/* Terminate the system */
 			unmount_all();
 			hcfs_system->system_going_down = TRUE;
+			sem_post(&(hcfs_system->fuse_sem));
 			retcode = 0;
 			ret_len = sizeof(int);
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
@@ -446,7 +1006,7 @@ void api_module(void *index)
 			buf[0] = 0;
 			retcode = 0;
 			sem_wait(&(hcfs_system->access_sem));
-			sprintf(buf, "%lld %lld %lld",
+			snprintf(buf, sizeof(buf), "%lld %lld %lld",
 				hcfs_system->systemdata.system_size,
 				hcfs_system->systemdata.cache_size,
 				hcfs_system->systemdata.cache_blocks);
@@ -455,6 +1015,89 @@ void api_module(void *index)
 			ret_len = strlen(buf)+1;
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, buf, strlen(buf)+1, 0);
+			break;
+		case GETPINSIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.pinned_size;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETCACHESIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.cache_size;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETDIRTYCACHESIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.dirty_cache_size;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETXFERSTAT:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long) * 2;
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.xfer_size_download;
+			llretval2 = hcfs_system->systemdata.xfer_size_upload;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, sizeof(long long), 0);
+			send(fd1, &llretval2, sizeof(long long), 0);
+			break;
+		case RESETXFERSTAT:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(int);
+			sem_wait(&(hcfs_system->access_sem));
+			hcfs_system->systemdata.xfer_size_download = 0;
+			hcfs_system->systemdata.xfer_size_upload = 0;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &retcode, sizeof(int), 0);
+			break;
+		case GETMAXPINSIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			llretval = MAX_PINNED_LIMIT;
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETMAXCACHESIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			llretval = CACHE_HARD_LIMIT;
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETVOLSIZE:
+			llretval = get_vol_size(arg_len, largebuf);
+			retcode = 0;
+			ret_len = sizeof(long long);
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETCLOUDSIZE:
+			llretval = get_cloud_size(arg_len, largebuf);
+			retcode = 0;
+			ret_len = sizeof(long long);
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
 			break;
 		case TESTAPI:
 			/* Simulate a long API call of 5 seconds */
@@ -483,7 +1126,7 @@ void api_module(void *index)
 			}
 
 			break;
-		case CREATEFS:
+		case CREATEVOL:
 			retcode = create_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -491,7 +1134,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case DELETEFS:
+		case DELETEVOL:
 			retcode = delete_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -499,7 +1142,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case CHECKFS:
+		case CHECKVOL:
 			retcode = check_FS_handle(arg_len, largebuf);
 			write_log(10, "retcode is %d\n", retcode);
 			if (retcode == 0) {
@@ -508,7 +1151,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case LISTFS:
+		case LISTVOL:
 			/*Echos the arguments back to the caller*/
 			retcode = list_FS_handle(&entryarray, &num_entries);
 			tmpptr = (char *) entryarray;
@@ -528,7 +1171,7 @@ void api_module(void *index)
 			if (num_entries > 0)
 				free(entryarray);
 			break;
-		case MOUNTFS:
+		case MOUNTVOL:
 			retcode = mount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -536,7 +1179,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case UNMOUNTFS:
+		case UNMOUNTVOL:
 			retcode = unmount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -558,6 +1201,44 @@ void api_module(void *index)
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(unsigned int), 0);
 				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CLOUDSTAT:
+			retcode = (int)hcfs_system->backend_is_online;
+			ret_len = sizeof(retcode);
+			send(fd1, &ret_len, sizeof(ret_len), 0);
+			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = 0;
+			break;
+		case SETSYNCSWITCH:
+			memcpy(&sync_switch, largebuf, sizeof(unsigned int));
+			retcode = set_sync_switch_handle(sync_switch);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case GETSYNCSWITCH:
+			retcode = (int)hcfs_system->sync_manual_switch;
+			ret_len = sizeof(retcode);
+			send(fd1, &ret_len, sizeof(ret_len), 0);
+			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = 0;
+			break;
+		case GETSYNCSTAT:
+			retcode = (int)!hcfs_system->sync_paused;
+			ret_len = sizeof(retcode);
+			send(fd1, &ret_len, sizeof(ret_len), 0);
+			send(fd1, &retcode, sizeof(retcode), 0);
+			retcode = 0;
+			break;
+		case RELOADCONFIG:
+			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(ret_len), 0);
+				send(fd1, &retcode, sizeof(retcode), 0);
 			}
 			break;
 		default:
@@ -634,7 +1315,7 @@ void api_server_monitor(void)
 	waittime.tv_nsec = 0;
 
 	while (hcfs_system->system_going_down == FALSE) {
-		sleep(5);
+		sleep(api_server_monitor_time);
 		/* Using timed wait to handle system shutdown event */
 		ret = sem_timedwait(&(api_server->job_lock), &waittime);
 		if (ret < 0)
@@ -697,6 +1378,5 @@ void api_server_monitor(void)
 		}
 
 		sem_post(&(api_server->job_lock));
-
 	}
 }

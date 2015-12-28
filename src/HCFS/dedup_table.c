@@ -24,6 +24,7 @@
 #include "global.h"
 #include "macro.h"
 #include "logger.h"
+#include "utils.h"
 
 int initialize_ddt_meta(char *meta_path)
 {

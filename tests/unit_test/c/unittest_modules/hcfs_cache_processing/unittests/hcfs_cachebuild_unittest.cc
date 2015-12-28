@@ -4,6 +4,8 @@
 #include <sys/xattr.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 extern "C" {
 #include "mock_params.h"
 #include "hcfs_cachebuild.h"
@@ -20,6 +22,9 @@ protected:
 		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 	}
 
 	void TearDown()
@@ -209,6 +214,9 @@ protected:
 	{
 		BaseClassForCacheUsageArray::SetUp();
 
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		init_mock_system_config();
 		if (!access(BLOCKPATH, F_OK))
 			delete_mock_dir(BLOCKPATH);
@@ -221,6 +229,7 @@ protected:
 			free(answer_node_list[i]);
 		delete_mock_dir(BLOCKPATH);
 		rmdir(BLOCKPATH);
+		free(system_config);
 
 		BaseClassForCacheUsageArray::TearDown();
 	}
@@ -248,11 +257,23 @@ protected:
 				fd = creat(path, 0700);
 				rand_size = rand() % 100;
 				ftruncate(fd, rand_size);
+#ifdef _ANDROID_ENV_
+				struct stat tmpstat;
+				stat(path, &tmpstat);
+#endif
 				if (block_id % 2) {
+#ifdef _ANDROID_ENV_
+					chmod(path, tmpstat.st_mode | S_ISVTX);
+#else
 					setxattr(path, "user.dirty", "T", 1, XATTR_CREATE);
+#endif
 					answer_node->dirty_cache_size += rand_size;
 				} else {
+#ifdef _ANDROID_ENV_
+					chmod(path, tmpstat.st_mode & ~S_ISVTX);
+#else
 					setxattr(path, "user.dirty", "F", 1, XATTR_CREATE);
+#endif
 					answer_node->clean_cache_size += rand_size;
 				}
 				if (block_id == num_block_per_node - 1) {

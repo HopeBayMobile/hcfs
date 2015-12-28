@@ -15,7 +15,7 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
-SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 // Tests non-existing file
 TEST(check_file_sizeTest, Nonexist) {
@@ -37,6 +37,7 @@ TEST(check_file_sizeTest, Test_8_bytes) {
 class fetch_meta_pathTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     METAPATH = (char *)malloc(METAPATHLEN);
     mkdir("/tmp/testmeta",0700);
     strcpy(METAPATH, "/tmp/testmeta/metapath");
@@ -45,6 +46,7 @@ class fetch_meta_pathTest : public ::testing::Test {
   virtual void TearDown() {
     rmdir("/tmp/testmeta");
     free(METAPATH);
+    free(system_config);
    }
 
  };
@@ -149,6 +151,7 @@ TEST_F(fetch_meta_pathTest, SubDirMod) {
 class fetch_todelete_pathTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     METAPATH = (char *)malloc(METAPATHLEN);
     mkdir("/tmp/testmeta",0700);
     strcpy(METAPATH, "/tmp/testmeta/metapath");
@@ -157,6 +160,7 @@ class fetch_todelete_pathTest : public ::testing::Test {
   virtual void TearDown() {
     rmdir("/tmp/testmeta");
     free(METAPATH);
+    free(system_config);
    }
 
  };
@@ -283,6 +287,7 @@ TEST_F(fetch_todelete_pathTest, SubDirMod) {
 class fetch_block_pathTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     BLOCKPATH = (char *)malloc(METAPATHLEN);
     mkdir("/tmp/testmeta",0700);
     strcpy(BLOCKPATH, "/tmp/testmeta/blockpath");
@@ -291,6 +296,7 @@ class fetch_block_pathTest : public ::testing::Test {
   virtual void TearDown() {
     rmdir("/tmp/testmeta");
     free(BLOCKPATH);
+    free(system_config);
    }
 
  };
@@ -476,17 +482,19 @@ class read_system_configTest : public ::testing::Test {
       mkdir("/tmp/testHCFS", 0700);
     mkdir("/tmp/testHCFS/metastorage", 0700);
     mkdir("/tmp/testHCFS/blockstorage", 0700);
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
    }
 
   virtual void TearDown() {
     rmdir("/tmp/testHCFS/metastorage");
     rmdir("/tmp/testHCFS/blockstorage");
     rmdir("/tmp/testHCFS");
+    free(system_config);
    }
  };
 
 TEST_F(read_system_configTest, PathNotExist) {
-  EXPECT_EQ(-1,read_system_config("EmptyFile"));
+  EXPECT_EQ(-1,read_system_config("EmptyFile", system_config));
  }
 TEST_F(read_system_configTest, GoodConfig) {
   char pathname[100];
@@ -495,7 +503,7 @@ TEST_F(read_system_configTest, GoodConfig) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
   EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
@@ -524,7 +532,7 @@ TEST_F(read_system_configTest, GoodS3Config) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
   EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
@@ -553,7 +561,7 @@ TEST_F(read_system_configTest, UnsupportedBackendConfig) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(-1,read_system_config(pathname));
+  ASSERT_EQ(-1,read_system_config(pathname, system_config));
  }
 TEST_F(read_system_configTest, UnsupportedProtocol) {
   char pathname[100];
@@ -562,7 +570,7 @@ TEST_F(read_system_configTest, UnsupportedProtocol) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(-1,read_system_config(pathname));
+  ASSERT_EQ(-1,read_system_config(pathname, system_config));
  }
 TEST_F(read_system_configTest, UnsupportedProtocolS3) {
   char pathname[100];
@@ -571,7 +579,7 @@ TEST_F(read_system_configTest, UnsupportedProtocolS3) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(-1,read_system_config(pathname));
+  ASSERT_EQ(-1,read_system_config(pathname, system_config));
  }
 TEST_F(read_system_configTest, OptionsTooLong) {
   char pathname[100];
@@ -580,7 +588,7 @@ TEST_F(read_system_configTest, OptionsTooLong) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(-1,read_system_config(pathname));
+  ASSERT_EQ(-1,read_system_config(pathname, system_config));
  }
 TEST_F(read_system_configTest, WrongNumbersConfig) {
   char pathname[100];
@@ -589,25 +597,25 @@ TEST_F(read_system_configTest, WrongNumbersConfig) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  EXPECT_EQ(-1,read_system_config(pathname));
+  EXPECT_EQ(-1,read_system_config(pathname, system_config));
 
   strcpy(pathname,"testpatterns/test_wrong_hard_limit_hcfs.conf");
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  EXPECT_EQ(-1,read_system_config(pathname));
+  EXPECT_EQ(-1,read_system_config(pathname, system_config));
 
   strcpy(pathname,"testpatterns/test_wrong_delta_hcfs.conf");
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  EXPECT_EQ(-1,read_system_config(pathname));
+  EXPECT_EQ(-1,read_system_config(pathname, system_config));
 
   strcpy(pathname,"testpatterns/test_wrong_block_size_hcfs.conf");
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  EXPECT_EQ(-1,read_system_config(pathname));
+  EXPECT_EQ(-1,read_system_config(pathname, system_config));
 
  }
 
@@ -631,6 +639,8 @@ class validate_system_configTest : public ::testing::Test {
      }
     mkdir("/tmp/testHCFS/metastorage", 0700);
     mkdir("/tmp/testHCFS/blockstorage", 0700);
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
    }
 
   virtual void TearDown() {
@@ -642,11 +652,12 @@ class validate_system_configTest : public ::testing::Test {
       free(workpath);
     if (tmppath != NULL)
       free(tmppath);
+    free(system_config);
    }
  };
 
 TEST_F(validate_system_configTest, PathNotExist) {
-  EXPECT_EQ(-1,read_system_config("EmptyFile"));
+  EXPECT_EQ(-1,read_system_config("EmptyFile", system_config));
  }
 TEST_F(validate_system_configTest, GoodConfig) {
   char pathname[100];
@@ -655,9 +666,9 @@ TEST_F(validate_system_configTest, GoodConfig) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
-  ASSERT_EQ(0,validate_system_config());
+  ASSERT_EQ(0,validate_system_config(system_config));
 
   EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
   EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
@@ -674,9 +685,9 @@ TEST_F(validate_system_configTest, GoodS3Config) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
-  ASSERT_EQ(0,validate_system_config());
+  ASSERT_EQ(0,validate_system_config(system_config));
 
   EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
   EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
@@ -693,9 +704,9 @@ TEST_F(validate_system_configTest, NoBackendConfig) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
-  ASSERT_EQ(-1,validate_system_config());
+  ASSERT_EQ(-1,validate_system_config(system_config));
  }
 TEST_F(validate_system_configTest, NoMetaPath) {
   char pathname[100];
@@ -704,11 +715,11 @@ TEST_F(validate_system_configTest, NoMetaPath) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   rmdir(METAPATH);
 
-  ASSERT_EQ(-1,validate_system_config());
+  ASSERT_EQ(-1,validate_system_config(system_config));
  }
 TEST_F(validate_system_configTest, NoBlockPath) {
   char pathname[100];
@@ -717,11 +728,11 @@ TEST_F(validate_system_configTest, NoBlockPath) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   rmdir(BLOCKPATH);
 
-  ASSERT_EQ(-1,validate_system_config());
+  ASSERT_EQ(-1,validate_system_config(system_config));
  }
 TEST_F(validate_system_configTest, InvalidValue) {
   char pathname[100];
@@ -731,26 +742,26 @@ TEST_F(validate_system_configTest, InvalidValue) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   tmpval = MAX_BLOCK_SIZE;
   MAX_BLOCK_SIZE = 0;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   MAX_BLOCK_SIZE = tmpval;
 
   tmpval = CACHE_DELTA;
   CACHE_DELTA = MAX_BLOCK_SIZE - 1;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   CACHE_DELTA = tmpval;
 
   tmpval = CACHE_SOFT_LIMIT;
   CACHE_SOFT_LIMIT = MAX_BLOCK_SIZE - 1;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   CACHE_SOFT_LIMIT = tmpval;
 
   tmpval = CACHE_HARD_LIMIT;
   CACHE_HARD_LIMIT = CACHE_SOFT_LIMIT - 1;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   CACHE_HARD_LIMIT = tmpval;
 
  }
@@ -762,36 +773,36 @@ TEST_F(validate_system_configTest, MissingSWIFTConfig) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   tmpptr = SWIFT_ACCOUNT;
   SWIFT_ACCOUNT = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   SWIFT_ACCOUNT = tmpptr;
 
   tmpptr = SWIFT_USER;
   SWIFT_USER = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   SWIFT_USER = tmpptr;
 
   tmpptr = SWIFT_PASS;
   SWIFT_PASS = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   SWIFT_PASS = tmpptr;
 
   tmpptr = SWIFT_URL;
   SWIFT_URL = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   SWIFT_URL = tmpptr;
 
   tmpptr = SWIFT_CONTAINER;
   SWIFT_CONTAINER = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   SWIFT_CONTAINER = tmpptr;
 
   tmpptr = SWIFT_PROTOCOL;
   SWIFT_PROTOCOL = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   SWIFT_PROTOCOL = tmpptr;
 
  }
@@ -804,33 +815,135 @@ TEST_F(validate_system_configTest, MissingS3Config) {
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(0,read_system_config(pathname));
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
 
   tmpptr = S3_ACCESS;
   S3_ACCESS = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   S3_ACCESS = tmpptr;
 
   tmpptr = S3_SECRET;
   S3_SECRET = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   S3_SECRET = tmpptr;
 
   tmpptr = S3_URL;
   S3_URL = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   S3_URL = tmpptr;
 
   tmpptr = S3_BUCKET;
   S3_BUCKET = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   S3_BUCKET = tmpptr;
 
   tmpptr = S3_PROTOCOL;
   S3_PROTOCOL = NULL;
-  EXPECT_EQ(-1,validate_system_config());
+  EXPECT_EQ(-1,validate_system_config(system_config));
   S3_PROTOCOL = tmpptr;
 
  }
 /* End of the test case for the function validate_system_config*/
 
+/* Unittest for reload_system_config */
+class reload_system_configTest : public ::testing::Test {
+protected:
+	char *workpath, *tmppath;
+	void SetUp()
+	{
+		workpath = NULL;
+		tmppath = NULL;
+		if (access("/tmp/testHCFS", F_OK) != 0) {
+			workpath = get_current_dir_name();
+			tmppath = (char *)malloc(strlen(workpath)+20);
+			snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir",
+				workpath);
+			if (access(tmppath, F_OK) != 0)
+				mkdir(tmppath, 0700);
+			symlink(tmppath, "/tmp/testHCFS");
+		}
+		mkdir("/tmp/testHCFS/metastorage", 0700);
+		mkdir("/tmp/testHCFS/blockstorage", 0700);
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+	}
+
+	void TearDown()
+	{
+		rmdir("/tmp/testHCFS/metastorage");
+		rmdir("/tmp/testHCFS/blockstorage");
+		unlink("/tmp/testHCFS");
+		rmdir(tmppath);
+		if (workpath != NULL)
+			free(workpath);
+		if (tmppath != NULL)
+			free(tmppath);
+		free(system_config);
+	}
+};
+
+TEST_F(reload_system_configTest, NewConfigInvalid)
+{
+	char pathname[200];
+	int ret;
+
+	strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+	read_system_config(pathname, system_config);
+	strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+	ret = reload_system_config(pathname);
+
+	EXPECT_EQ(-EINVAL, ret);
+	EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+	EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
+	EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+	EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+	EXPECT_EQ(CACHE_DELTA, 10485760);
+	EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+	EXPECT_EQ(CURRENT_BACKEND, SWIFT);
+}
+
+TEST_F(reload_system_configTest, NewConfig_TheSame)
+{
+	char pathname[200];
+	int ret;
+
+	strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+	read_system_config(pathname, system_config);
+	strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+
+	ret = reload_system_config(pathname);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+	EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
+	EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+	EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+	EXPECT_EQ(CACHE_DELTA, 10485760);
+	EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+	EXPECT_EQ(CURRENT_BACKEND, SWIFT);
+}
+
+TEST_F(reload_system_configTest, Set_Backend_Success)
+{
+	char pathname[200];
+	int ret;
+
+	strcpy(pathname,"testpatterns/test_hcfs_backend_none.conf");
+	read_system_config(pathname, system_config);
+	strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+
+	ret = reload_system_config(pathname);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+	EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
+	EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+	EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+	EXPECT_EQ(CACHE_DELTA, 10485760);
+	EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+	EXPECT_EQ(CURRENT_BACKEND, SWIFT);
+}
+
+/* End of unittest for reload_system_config */

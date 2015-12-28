@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include "gtest/gtest.h"
 extern "C" {
 #include "hcfs_cacheops.h"
@@ -47,6 +49,9 @@ protected:
 		sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0); 
 		sem_init(&(hcfs_system->check_cache_sem), 1, 0); 
 		sem_init(&(hcfs_system->check_next_sem), 1, 0);
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
 	}
 	
@@ -58,31 +63,20 @@ protected:
 		for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
 			ino_t inode = inode_cache_usage_hash[i]->this_inode;
 
-#ifdef ARM_32bit_
 			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_filemeta%lld",
-				inode);
-#else
-			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_filemeta%ld",
-				inode);
-#endif
+				"/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+				(uint64_t)inode);
 			unlink(meta_name);
 			for (int blockno = 0; blockno < 10 ; blockno++) {	
-#ifdef ARM_32bit_
 				sprintf(block_name,
-					"/tmp/testHCFS/run_cache_loop_block%lld_%d", 
-					inode, blockno);
-#else
-				sprintf(block_name,
-					"/tmp/testHCFS/run_cache_loop_block%ld_%d", 
-					inode, blockno);
-#endif
+					"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d", 
+					(uint64_t)inode, blockno);
 				unlink(block_name);
 			}
 		}
 		
 		free(hcfs_system);
+		free(system_config);
 	}
 	
 	void init_mock_cache_usage()
@@ -135,13 +129,8 @@ private:
 		for (int i = 0; i < file_entry.num_entries ; i++)
 			file_entry.block_entries[i].status = ST_BOTH;
 
-#ifdef ARM_32bit_
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
-				inode);
-#else
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
-				inode);
-#endif
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+				(uint64_t)inode);
 		fptr = fopen(meta_name, "w+");
 		fseek(fptr, 0, SEEK_SET);
 		fwrite(&file_stat, sizeof(struct stat), 1, fptr);
@@ -150,15 +139,9 @@ private:
 		fclose(fptr);
 
 		for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
-#ifdef ARM_32bit_
 			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_block%lld_%d",
-				inode, blockno);
-#else
-			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_block%ld_%d",
-				inode, blockno);
-#endif
+				"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d",
+				(uint64_t)inode, blockno);
 			mknod(meta_name, 0700, 0);
 			truncate(meta_name, MAX_BLOCK_SIZE);
 		}
@@ -167,7 +150,11 @@ private:
 
 void *cache_loop_function(void *ptr)
 {
+#ifdef _ANDROID_ENV_
+	run_cache_loop(NULL);
+#else
 	run_cache_loop();
+#endif
 	printf("Test: run_cache_loop() thread leave\n");
 	return NULL;
 }
@@ -184,6 +171,9 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 	CACHE_SOFT_LIMIT = 1;
 	hcfs_system->systemdata.cache_size = CURRENT_CACHE_SIZE; 
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
 	hcfs_system->systemdata.cache_blocks = CURRENT_BLOCK_NUM;
 	printf("Test: Generate mock data (cache usage & block file).\n");
 	init_mock_cache_usage();
@@ -212,13 +202,8 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 		ino_t inode;
 		
 		inode = inode_cache_usage_hash[i]->this_inode;
-#ifdef ARM_32bit_
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
-				inode);
-#else
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
-				inode);
-#endif
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+				(uint64_t)inode);
 		fptr = fopen(meta_name, "r");
 		
 		fseek(fptr, 0, SEEK_SET);
@@ -231,15 +216,9 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 			char block_name[200];
 			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);
-#ifdef ARM_32bit_
 			sprintf(block_name,
-				"/tmp/testHCFS/run_cache_loop_block%lld_%d",
-				inode, entry);
-#else
-			sprintf(block_name,
-				"/tmp/testHCFS/run_cache_loop_block%ld_%d",
-				inode, entry);
-#endif
+				"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d",
+				(uint64_t)inode, entry);
 			ASSERT_TRUE(access(block_name, F_OK) < 0);
 
 			expected_block_num--;

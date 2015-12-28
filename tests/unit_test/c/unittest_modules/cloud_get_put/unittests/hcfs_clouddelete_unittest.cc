@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include "gtest/gtest.h"
 #include "mock_params.h"
 extern "C" {
@@ -15,6 +17,9 @@ class deleteEnvironment : public ::testing::Environment {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
 
     workpath = NULL;
     tmppath = NULL;
@@ -79,6 +84,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		}
 		dsync_ctl.threads_in_use[t_index] = inode;
 		dsync_ctl.threads_created[t_index] = TRUE;
+		dsync_ctl.threads_finished[t_index] = TRUE;
 		dsync_ctl.total_active_dsync_threads++;
 		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL, 
 			dsync_test_thread_fn, (void *)&i));
@@ -135,6 +141,7 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 		}
 		delete_ctl.threads_in_use[t_index] = TRUE;
 		delete_ctl.threads_created[t_index] = TRUE;
+		delete_ctl.threads_finished[t_index] = TRUE;
 		delete_ctl.delete_threads[t_index].is_block = TRUE;
 		delete_ctl.total_active_delete_threads++;
 		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[t_index]), NULL,
@@ -165,6 +172,9 @@ class dsync_single_inodeTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
 	}
 	virtual void TearDown()
@@ -173,6 +183,7 @@ protected:
 		sem_destroy(&(sync_ctl.sync_op_sem));
 		destroy_objname_buffer(expected_num_objname);
 		free(mock_thread_info);
+		free(system_config);
 	}
 	void init_objname_buffer(unsigned num_objname)
 	{
@@ -233,6 +244,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
+	mock_thread_info->which_index = 0;
 	meta_stat.st_size = 1000000; // Let total_blocks = 1000000/100 = 10000
 	MAX_BLOCK_SIZE = 100;
 	
@@ -260,19 +272,11 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	qsort(objname_list, expected_num_objname, sizeof(char *), dsync_single_inodeTest::objname_cmp);
 	for (int block = 0 ; block < expected_num_objname - 1 ; block++) {
 		char expected_objname[size_objname];
-#ifdef ARM_32bit_
-		sprintf(expected_objname, "data_%lld_%d", mock_thread_info->inode, block);
-#else
-		sprintf(expected_objname, "data_%d_%d", mock_thread_info->inode, block);
-#endif
+		sprintf(expected_objname, "data_%" PRIu64 "_%d", (uint64_t)mock_thread_info->inode, block);
 		ASSERT_STREQ(expected_objname, objname_list[block]); // Check all obj was recorded.
 	}
 	char expected_objname[size_objname];
-#ifdef ARM_32bit_
-	sprintf(expected_objname, "meta_%lld", mock_thread_info->inode);
-#else
-	sprintf(expected_objname, "meta_%d", mock_thread_info->inode);
-#endif
+	sprintf(expected_objname, "meta_%" PRIu64 "", (uint64_t)mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
 	
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
@@ -291,6 +295,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Mock a dir meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFDIR;	
+	mock_thread_info->which_index = 0;
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fclose(meta);
@@ -330,6 +335,11 @@ TEST(delete_loopTest, DeleteSuccess)
 	void *res;
 	int size_objname;
 
+	system_config = (SYSTEM_CONF_STRUCT *)
+		malloc(sizeof(SYSTEM_CONF_STRUCT));
+	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+	hcfs_system->backend_is_online = TRUE;
+	
 	size_objname = 50;
 	objname_counter = 0;
 	objname_list = (char **)malloc(sizeof(char *) * 100);
@@ -351,7 +361,7 @@ TEST(delete_loopTest, DeleteSuccess)
 
 	/* Create a thread to run delete_loop() */
 	ASSERT_EQ(0, pthread_create(&thread, NULL, delete_loop, NULL));
-	sleep(10);
+	sleep(20);
 
 	/* Check answer */
 	EXPECT_EQ(test_data.num_inode, to_verified_data.record_inode_counter);
@@ -368,6 +378,7 @@ TEST(delete_loopTest, DeleteSuccess)
 	free(test_data.to_handle_inode);
 	free(to_verified_data.record_handle_inode);
 	free(sys_super_block);
+	free(system_config);
 }
 /*
 	End of unittest of delete_loop()

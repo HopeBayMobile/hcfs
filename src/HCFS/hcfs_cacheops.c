@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/11~12 Jiahong added header for this file, and revising coding style.
 * 2015/6/3 Jiahong added error handling
+* 2015/10/22 Kewei added mechanism skipping pinned inodes.
 *
 **************************************************************************/
 
@@ -26,8 +27,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 #include "hcfs_cachebuild.h"
 #include "params.h"
@@ -42,14 +43,21 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /* TODO: Consider whether need to update block status when throwing
 out blocks and sync to cloud, and how this may interact with meta
 sync in upload process */
 
-/* Helper function for removing local cached block for blocks that
-has been synced to backend already */
+/*
+ * Helper function for removing local cached block for blocks that
+ * has been synced to backend already.
+ *
+ * @param this_inode The inode to be removed
+ * @param builttime Builttime of last cache usage.
+ * @param seconds_slept Total sleeping time accumulating up to now. 
+ *
+ * @return 0 on succeeding in removing the inode, 1 on skipping the inode,
+ *         otherwise negative error code.
+ */
 int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 							long *seconds_slept)
 {
@@ -70,6 +78,9 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	BLOCK_ENTRY *blk_entry_ptr;
 	int ret, errcode;
 	size_t ret_size;
+
+	write_log(10, "Begin remove sync block inode %" PRIu64 "\n",
+	          (uint64_t)this_inode);
 
 	ret = super_block_read(this_inode, &tempentry);
 
@@ -113,8 +124,17 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		current_block = 0;
 
 		FREAD(&temphead_stat, sizeof(struct stat), 1, metafptr);
-
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
+
+		/* Skip if inode is pinned */
+		if (temphead.local_pin == TRUE) {
+			write_log(10, "Debug: inode %"PRIu64" is pinned. "
+				"Skip to page it out.\n", (uint64_t)this_inode);
+			flock(fileno(metafptr), LOCK_UN);
+			fclose(metafptr);
+			return 1;
+		}
+
 		total_blocks = (temphead_stat.st_size +
 					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
 
@@ -190,6 +210,14 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					goto errcode_handle;
 				}
 				sync_hcfs_system_data(FALSE);
+				ret = update_file_stats(metafptr, 0, -1,
+							-(tempstat.st_size),
+							this_inode);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+
 				sem_post(&(hcfs_system->access_sem));
 				ret = super_block_mark_dirty(this_inode);
 				if (ret < 0) {
@@ -200,8 +228,12 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 /*Adding a delta threshold to avoid thrashing at hard limit boundary*/
 			if (hcfs_system->systemdata.cache_size <
 					(CACHE_HARD_LIMIT - CACHE_DELTA))
-				notify_sleep_on_cache();
+				notify_sleep_on_cache(0);
 
+			/* If cache size < soft limit, take a break and wait
+			for exceeding soft limit. Stop paging out these blocks
+			if cache size is still < soft limit after 5 mins.
+			Otherwise lock meta and remove next block. */
 			if (hcfs_system->systemdata.cache_size <
 						CACHE_SOFT_LIMIT) {
 				flock(fileno(metafptr), LOCK_UN);
@@ -239,6 +271,17 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 
 				flock(fileno(metafptr), LOCK_EX);
 
+				/* Check pin status before paging blocks out */
+				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+				FREAD(&temphead, sizeof(FILE_META_TYPE),
+					1, metafptr);
+				if (temphead.local_pin == TRUE) {
+					write_log(10, "Debug: inode %"PRIu64" "
+						"is pinned when paging it out. "
+						"Stop\n", (uint64_t)this_inode);
+					break;
+				}
+
 				/*If meta file does not exist, do nothing*/
 				if (access(thismetapath, F_OK) < 0)
 					break;
@@ -265,6 +308,26 @@ errcode_handle:
 	return errcode;
 }
 
+
+static int _check_cache_replace_result(long long *num_removed_inode)
+{
+	/* If number of removed inodes = 0, and cache size is full, and
+	 * backend is offline, then wake them up and tell them cannot
+	 * do this action.
+	 */
+	if (*num_removed_inode == 0) { /* No inodes be removed */
+		if ((hcfs_system->systemdata.cache_size >=
+			CACHE_HARD_LIMIT - CACHE_DELTA) &&
+			(hcfs_system->sync_paused))
+			/* Wake them up and tell them cannot do this action */
+			notify_sleep_on_cache(-EIO);
+		sleep(1);
+	}
+
+	*num_removed_inode = 0;
+	return 0;
+}
+
 /*TODO: For scanning caches, only need to check one block subfolder a time,
 and scan for mtime greater than the last update time for uploads, and scan
 for atime for cache replacement*/
@@ -284,7 +347,11 @@ out. Will need to consider whether to force checking of replacement? */
 *  Return value: None
 *
 *************************************************************************/
+#ifdef _ANDROID_ENV_
+void *run_cache_loop(void *ptr)
+#else
 void run_cache_loop(void)
+#endif
 {
 	ino_t this_inode;
 	struct timeval builttime, currenttime;
@@ -294,9 +361,13 @@ void run_cache_loop(void)
 	time_t node_time;
 	CACHE_USAGE_NODE *this_cache_node;
 	int ret;
+	long long num_removed_inode;
 
 	ret = -1;
 	while (ret < 0) {
+		if (hcfs_system->system_going_down == TRUE)
+			break;
+		num_removed_inode = 0;
 		ret = build_cache_usage();
 		if (ret < 0) {
 			write_log(0, "Error in cache mgmt.\n");
@@ -311,11 +382,19 @@ void run_cache_loop(void)
 	do_something = FALSE;
 
 	while (hcfs_system->system_going_down == FALSE) {
+		write_log(10, "Start one round of cache replacement\n");
+		write_log(10, "Cache size is %lld\n",
+		          hcfs_system->systemdata.cache_size);
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
+			if (hcfs_system->system_going_down == TRUE)
+				break;
+			write_log(10, "Need to throw out something\n");
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
+				write_log(10, "Recomputing cache usage\n");
+				_check_cache_replace_result(&num_removed_inode);
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -332,6 +411,8 @@ void run_cache_loop(void)
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
+					write_log(10, "Recomputing cache usage part 2\n");
+					_check_cache_replace_result(&num_removed_inode);
 					ret = build_cache_usage();
 					if (ret < 0) {
 						write_log(0,
@@ -355,6 +436,7 @@ void run_cache_loop(void)
 			/* skip empty bucket */
 			if (inode_cache_usage_hash[e_index] == NULL) {
 				e_index++;
+				write_log(10, "Skipping, part 1\n");
 				continue;
 			}
 
@@ -362,6 +444,7 @@ void run_cache_loop(void)
 			if (inode_cache_usage_hash[e_index]->clean_cache_size
 									<= 0) {
 				e_index++;
+				write_log(10, "Skipping, part 2\n");
 				continue;
 			}
 
@@ -377,6 +460,7 @@ void run_cache_loop(void)
 							->last_mod_time;
 				if ((currenttime.tv_sec - node_time) < 300) {
 					e_index++;
+					write_log(10, "Skipping, part 3\n");
 					continue;
 				}
 			}
@@ -384,6 +468,8 @@ void run_cache_loop(void)
 
 			this_inode =
 				inode_cache_usage_hash[e_index]->this_inode;
+			write_log(10, "Preparing to remove blocks in %" PRIu64 "\n",
+			          (uint64_t)this_inode);
 
 			this_cache_node =
 				return_cache_usage_node(
@@ -397,6 +483,8 @@ void run_cache_loop(void)
 								&seconds_slept);
 			if (ret < 0)
 				sleep(10);
+			else if (ret == 0)
+				num_removed_inode++;
 		}
 		if (hcfs_system->system_going_down == TRUE)
 			break;
@@ -405,6 +493,9 @@ void run_cache_loop(void)
 			gettimeofday(&currenttime, NULL);
 			/*Rebuild cache usage every five minutes if cache usage
 			not near full*/
+			write_log(10, "Checking cache size %lld, %lld\n",
+			          hcfs_system->systemdata.cache_size,
+			          CACHE_SOFT_LIMIT);
 			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
 							(seconds_slept > 300)) {
 				ret = build_cache_usage();
@@ -413,6 +504,7 @@ void run_cache_loop(void)
 					sleep(10);
 					continue;
 				}
+				num_removed_inode = 0;
 				gettimeofday(&builttime, NULL);
 				seconds_slept = 0;
 				e_index = 0;
@@ -425,6 +517,10 @@ void run_cache_loop(void)
 			seconds_slept++;
 		}
 	}
+	notify_sleep_on_cache(-ESHUTDOWN);
+#ifdef _ANDROID_ENV_
+	return NULL;
+#endif
 }
 
 /************************************************************************
@@ -437,34 +533,50 @@ void run_cache_loop(void)
 *  Return value: None
 *
 *************************************************************************/
-void sleep_on_cache_full(void)
+int sleep_on_cache_full(void)
 {
-	sem_post(&(hcfs_system->num_cache_sleep_sem));
-	sem_wait(&(hcfs_system->check_cache_sem));
-	sem_wait(&(hcfs_system->num_cache_sleep_sem));
+	int cache_replace_status;
+
+	/* Check cache replacement status */
+	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
+	if (cache_replace_status < 0)
+		return cache_replace_status;
+
+	sem_post(&(hcfs_system->num_cache_sleep_sem)); /* Count++ */
+	sem_wait(&(hcfs_system->check_cache_sem)); /* Sleep a while */
+	sem_wait(&(hcfs_system->num_cache_sleep_sem)); /* Count-- */
+	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
+	sem_post(&(hcfs_system->check_cache_replace_status_sem)); /*Get status*/
 	sem_post(&(hcfs_system->check_next_sem));
+
+	return cache_replace_status;
 }
 
 /************************************************************************
 *
 * Function name: sleep_on_cache_full
 *        Inputs: None
-*       Summary: Routine for waking threads/processes sleeping using
-*                sleep_on_cache_full when cache not full.
+*       Summary: Routine for waking threads/processes sleeping from using
+*                sleep_on_cache_full.
 *  Return value: None
 *
 *************************************************************************/
-void notify_sleep_on_cache(void)
+void notify_sleep_on_cache(int cache_replace_status)
 {
 	int num_cache_sleep_sem_value;
+
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.cache_replace_status = cache_replace_status;
+	sem_post(&(hcfs_system->access_sem));
 
 	while (TRUE) {
 		sem_getvalue(&(hcfs_system->num_cache_sleep_sem),
 					&num_cache_sleep_sem_value);
 
-		/*If still have threads/processes waiting on cache not full*/
+		/*If still have threads/processes waiting on cache full*/
 		if (num_cache_sleep_sem_value > 0) {
-			sem_post(&(hcfs_system->check_cache_sem));
+			sem_post(&(hcfs_system->check_cache_sem)); /* Wake up */
+			sem_wait(&(hcfs_system->check_cache_replace_status_sem));
 			sem_wait(&(hcfs_system->check_next_sem));
 		} else {
 			break;

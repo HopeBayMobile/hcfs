@@ -24,11 +24,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <fuse/fuse_opt.h>
 
+#include "global.h"
 #include "params.h"
 #include "dedup_table.h"
+
+extern struct fuse_lowlevel_ops hfuse_ops;
 
 /*BEGIN META definition*/
 
@@ -71,6 +75,8 @@
 #define D_ISDIR 0
 #define D_ISREG 1
 #define D_ISLNK 2
+#define D_ISFIFO 3
+#define D_ISSOCK 4
 
 /* Define constants for timestamp changes */
 #define ATIME 4
@@ -97,9 +103,11 @@ typedef struct {
 	long long entry_page_gc_list;
 	long long tree_walk_list_head;
 	unsigned long generation;
+	unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	char local_pin;
 } DIR_META_TYPE;
 
 /* Defining the structure for a page of directory entries */
@@ -147,11 +155,20 @@ typedef struct {
 	long long triple_indirect;
 	long long quadruple_indirect;
 	unsigned long generation;
+        unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
 	long long size_last_upload;
+	char local_pin;
 } FILE_META_TYPE;
+
+/* The structure for keeping statistics for a file */
+typedef struct {
+	long long num_blocks;
+	long long num_cached_blocks;
+	long long cached_size;
+} FILE_STATS_TYPE;
 
 /* Defining the structure of symbolic link meta */
 typedef struct {
@@ -159,9 +176,11 @@ typedef struct {
 	unsigned link_len;
 	unsigned long generation;
 	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
+        unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+	char local_pin;
 } SYMLINK_META_TYPE;
 
 /*END META definition*/
@@ -171,16 +190,30 @@ typedef struct {
 	long long system_size;
 	long long cache_size;
 	long long cache_blocks;
+	long long pinned_size;
+	long long backend_size;
+	long long backend_inodes;
+	long long dirty_cache_size;
+	long long xfer_size_download;
+	long long xfer_size_upload;
+	int cache_replace_status;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
-	char system_going_down;
+	sem_t fuse_sem;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;
 	sem_t check_next_sem;
+	sem_t check_cache_replace_status_sem;
+	/* system state controllers */
+	BOOL system_going_down;
+	BOOL backend_is_online;
+	BOOL sync_manual_switch;
+	BOOL sync_paused;
+	struct timespec backend_status_last_time;
 } SYSTEM_DATA_HEAD;
 
 SYSTEM_DATA_HEAD *hcfs_system;

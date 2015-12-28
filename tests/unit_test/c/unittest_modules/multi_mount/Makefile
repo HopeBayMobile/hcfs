@@ -27,18 +27,28 @@ UNITTEST_DIR = $(realpath ./unittests)
 # the compiler doesn't generate warnings in Google Test headers.
 CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
 
+# Flags passed to C and C++ compilers
+CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
+	    -D_FILE_OFFSET_BITS=64 \
+	    -DDEDUP_ENABLE=0 \
+	    -DENCRYPT_ENABLE=1 \
+	    -DCOMPRESS_ENABLE=0 \
+	    -DARM_32bit_ \
+	    -D_ANDROID_ENV_
+# Flags passed to the C compiler. (We trace coverage of hcfs source only)
+CFLAGS += -ftest-coverage
+CFAKEFLAGS +=
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
-
+CXXFLAGS +=
+# gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CXX = gcc
-
-CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
-
-CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
 TESTS = FS_manager_unittest mount_manager_unittest
+
+.PHONY: $(DO_TESTS)
+DO_TESTS = $(TESTS:%=test-%)
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -52,14 +62,17 @@ all : setup $(TESTS)
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test : setup $(TESTS)
-	./FS_manager_unittest
-	./mount_manager_unittest
+test : setup $(DO_TESTS)
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
+
+$(DO_TESTS): $(TESTS)
+	./$(@:test-%=%)
 
 .PHONY : setup
 setup :
-	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1
@@ -121,4 +134,3 @@ mount_manager_unittest.o : $(UNITTEST_DIR)/mount_manager_unittest.cc \
 
 mount_manager_unittest : mount_manager.o mount_manager_fakeftn.o mount_manager_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-
