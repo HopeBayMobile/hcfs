@@ -2148,8 +2148,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 					last_block_entry->obj_id);
 #else
 			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-					filestat->st_ino, last_block);
-
+					filestat->st_ino, last_block,
+					last_block_entry->seqnum);
 #endif
 			if (ret < 0) {
 				if (blockfptr != NULL) {
@@ -2881,6 +2881,7 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		}
 		temp_prefetch->this_inode = this_inode;
 		temp_prefetch->block_no = block_index + 1;
+		temp_prefetch->seqnum = tpage->block_entries[eindex+1].seqnum;
 		temp_prefetch->page_start_fpos = this_page_fpos;
 		temp_prefetch->entry_index = eindex + 1;
 		write_log(10, "Prefetching block %lld for inode %" PRIu64 "\n",
@@ -2994,7 +2995,8 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				tpage->block_entries[eindex].obj_id);
 #else
 		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				this_inode, bindex);
+				this_inode, bindex,
+				tpage->block_entries[eindex].seqnum);
 #endif
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
@@ -3608,7 +3610,8 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				tpage->block_entries[bindex].obj_id);
 #else
 		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				this_inode, bindex);
+				this_inode, bindex,
+				tpage->block_entries[eindex].seqnum);
 #endif
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {

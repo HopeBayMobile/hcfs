@@ -33,6 +33,7 @@
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
+	long long seqnum;
 	off_t page_start_fpos;
 	int entry_index;
 } PREFETCH_STRUCT_TYPE;
@@ -61,7 +62,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		unsigned char *obj_id);
 #else
-		ino_t this_inode, long long block_no);
+		ino_t this_inode, long long block_no, long long seq);
 #endif
 
 void download_block_manager();

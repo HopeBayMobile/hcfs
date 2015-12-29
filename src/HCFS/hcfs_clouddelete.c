@@ -374,7 +374,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		}
 
 		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				this_inode, 0);
+				this_inode, 0, 0);
 		if (ret < 0) {
 			if (ret == -EIO) {
 				write_log(0, "Error: Fail to download "

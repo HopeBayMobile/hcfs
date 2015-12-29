@@ -51,7 +51,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		     unsigned char *obj_id)
 #else
-		     ino_t this_inode, long long block_no)
+		     ino_t this_inode, long long block_no, long long seq)
 #endif
 {
 	char objname[1000];
@@ -72,8 +72,8 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 		obj_id_to_string(obj_id, obj_id_str);
 		sprintf(objname, "data_%s", obj_id_str);
 #else
-		sprintf(objname, "data_%" PRIu64 "_%lld_0",
-			(uint64_t)this_inode, block_no); //seqnum
+		sprintf(objname, "data_%" PRIu64 "_%lld_%lld",
+			(uint64_t)this_inode, block_no, seq); /* TODO: seq */
 #endif
 	}
 
@@ -250,7 +250,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			temppage.block_entries[entry_index].obj_id);
 #else
 		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-			ptr->this_inode, ptr->block_no);
+			ptr->this_inode, ptr->block_no, ptr->seqnum);
 #endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");

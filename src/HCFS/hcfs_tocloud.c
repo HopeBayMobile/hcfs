@@ -1225,9 +1225,7 @@ store in some other file */
 			}
 			tmp_entry = &(toupload_temppage.block_entries[e_index]);
 			toupload_block_status = tmp_entry->status;
-			/*toupload_block_seq = MAX(tmp_entry->seqnum[0],
-							tmp_entry->seqnum[1]);*/
-			toupload_block_seq = 0;
+			toupload_block_seq = tmp_entry->seqnum; /* TODO:seq */
 			/*TODO: error handling here if cannot read correctly*/
 
 			/* Lock local meta. Read local meta and update status.
@@ -1251,9 +1249,7 @@ store in some other file */
 			tmp_entry = &(local_temppage.
 					block_entries[e_index]);
 			local_block_status = tmp_entry->status;
-			/*local_block_seq = MAX(tmp_entry->seqnum[0],
-						tmp_entry->seqnum[1]);*/
-			local_block_seq = 0;
+			local_block_seq = tmp_entry->seqnum; /* TODO: seq */
 
 			/*** Case 1: Local is dirty. Update status & upload ***/
 			if (toupload_block_status == ST_LDISK) {
@@ -1645,8 +1641,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	snprintf(objname, sizeof(objname), "data_%s", obj_id_str);
 
 #else
-	snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%lld",
-		 (uint64_t)this_inode, block_no);
+	snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%lld_%lld",
+		 (uint64_t)this_inode, block_no, seq);
 	/* Force to upload */
 	ret = 1;
 #endif

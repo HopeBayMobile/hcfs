@@ -537,10 +537,11 @@ int init_progress_info(int fd, long long backend_blocks,
 				block_page.block_entries[e_index].obj_id,
 				sizeof(char) * OBJID_LENGTH);
 #else
-		block_uploading_status.backend_seq = 0;
-		//	MAX(block_page.block_entries[e_index].seqnum[0],
-		//	block_page.block_entries[e_index].seqnum[1]);
-		write_log(10, "Debug: init progress file block%lld_%lld", block, block_uploading_status.backend_seq);
+		block_uploading_status.backend_seq =  /* TODO: seq */
+			block_page.block_entries[e_index].seqnum;
+
+		write_log(10, "Debug: init progress file block%lld_%lld",
+				block, block_uploading_status.backend_seq);
 #endif
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
 		offset = create_status_page(fd, block);
