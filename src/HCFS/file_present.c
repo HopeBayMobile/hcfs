@@ -213,6 +213,13 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
 	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
 		&parent_meta, NULL, body_ptr);
 	if (ret_val < 0)
@@ -236,7 +243,8 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
-        this_meta.source_arch = ARCH_CODE;
+        this_meta.finished_seq = 0;
+	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.local_pin = pin_status;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
@@ -339,6 +347,10 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
 	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
 		&parent_meta, NULL, body_ptr);
 	if (ret_val < 0)
@@ -372,6 +384,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.local_pin = pin_status;
+	this_meta.finished_seq = 0;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
 		selfname, pin_status == TRUE? "PIN" : "UNPIN");
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
@@ -460,6 +473,10 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	parent_ptr = meta_cache_lock_entry(parent_inode);
 	if (parent_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = update_meta_seq(parent_ptr);
+	if (ret_val < 0)
+		goto error_handling;
 
 	self_ptr = meta_cache_lock_entry(this_inode);
 	if (self_ptr == NULL)
@@ -596,6 +613,7 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
+	/* Get meta and check whether it is empty */
 	body_ptr = meta_cache_lock_entry(this_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
@@ -629,13 +647,19 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
 		return ret_val;
 	}
 	ret_val = meta_cache_unlock_entry(body_ptr);
-
 	if (ret_val < 0)
 		return ret_val;
 
@@ -727,6 +751,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
 	symlink_meta.local_pin = pin_status;
+	symlink_meta.finished_seq = 0;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
 		name, pin_status == TRUE? "PIN" : "UNPIN");

@@ -875,3 +875,13 @@ int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 }
 
+int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
+{
+	return 0;
+}
+
+int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
+		off_t page_fpos, long long eindex, long long bindex)
+{
+	return 0;
+}
