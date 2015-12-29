@@ -50,6 +50,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "dedup_table.h"
 #include "metaops.h"
 #include "utils.h"
+#include "hcfs_fromcloud.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -366,23 +367,31 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		sprintf(backend_metapath, 
 			"%s/upload_bullpen/backend_meta_%ld.del",
 			METAPATH, this_inode);
-		ret = download_meta_from_backend(this_inode, backend_metapath,
-				&backend_metafptr);
-		if (ret < 0) {
-			write_log(0, "Error: Fail to download backend meta_%ld."
-				" Delete next time...\n", this_inode);
+		backend_metafptr = fopen(backend_metapath, "w+");
+		if (backend_metafptr == NULL) {
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 			return;
-		} else {
-		/* backend_metafptr may be NULL when never uploading */
-			if (backend_metafptr == NULL) {
+		}
+
+		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
+				this_inode, 0);
+		if (ret < 0) {
+			if (ret == -EIO) {
+				write_log(0, "Error: Fail to download "
+					"backend meta_%ld. Delete next time.\n",
+					this_inode);
+
+			} else if (ret == -ENOENT) {
 				write_log(10, "Debug: Nothing on cloud to be "
 					"deleted for inode_%ld\n", this_inode);
 				is_meta_on_cloud = FALSE;
 				unlink(thismetapath);
 				super_block_delete(this_inode);
 				super_block_reclaim();
-				return;
 			}
+
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
 		}
 	}
 	/* Open local meta for dir and symlink */
@@ -395,6 +404,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
+	/*
 	ret_ssize = fgetxattr(fileno(metafptr),
 		"user.upload_seq", &upload_seq, sizeof(long long));
 	if (ret_ssize < 0) {
@@ -404,7 +414,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			write_log(0, "Error: Get xattr error in %s."
 				" Code %d\n", __func__, errcode);
 	}
-
+	*/
 	if (S_ISDIR(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
@@ -612,7 +622,6 @@ errcode_handle:
 			break;
 		}
 	}
-	sem_post(&(delete_ctl.delete_op_sem));
 
 	pthread_create(&(delete_ctl.threads_no[curl_id]), NULL,
 		(void *)&con_object_dsync,
@@ -620,6 +629,7 @@ errcode_handle:
 
 	delete_ctl.threads_created[curl_id] = TRUE;
 	delete_ctl.threads_finished[curl_id] = FALSE;
+	sem_post(&(delete_ctl.delete_op_sem));
 
 	pthread_join(delete_ctl.threads_no[curl_id], NULL);
 
@@ -658,8 +668,8 @@ errcode_handle:
 	}
 
 	/* Update FS stat in the backend if updated previously */
-	if (upload_seq > 0)
-		update_backend_stat(root_inode, -system_size_change, -1);
+	//TODO if (upload_seq > 0)
+	update_backend_stat(root_inode, -system_size_change, -1);
 
 	unlink(thismetapath);
 	super_block_delete(this_inode);

@@ -1,15 +1,17 @@
+#include "atomic_tocloud.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <dirent.h>
 
 #include "hcfs_tocloud.h"
-#include "atomic_tocloud.h"
 #include "macro.h"
 #include "global.h"
 #include "metaops.h"
+#include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
-extern SYSTEM_CONF_STRUCT system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 /*
  * Tag inode as uploading or not_uploading in fuse process memory.
@@ -425,8 +427,8 @@ int open_progress_info(ino_t inode)
 	if (access(pathname, F_OK) == -1)
 		mkdir(pathname, 0700);
 
-	sprintf(filename, "%s/upload_progress_inode_%ld",
-		pathname, inode);
+	sprintf(filename, "%s/upload_progress_inode_%"PRIu64,
+		pathname, (uint64_t)inode);
 	
 	if (access(filename, F_OK) == 0) {
 		write_log(0, "Error: Open \"%s\" but it exist. Unlink it\n",
@@ -441,8 +443,8 @@ int open_progress_info(ino_t inode)
 			" in %s. Code %d\n", __func__, errcode);
 		return ret_fd;
 	} else {
-		write_log(10, "Debug: Open progress-info file for inode %lld,"
-			" fd = %d\n", inode, ret_fd);
+		write_log(10, "Debug: Open progress-info file for inode %"PRIu64
+			", fd = %d\n", (uint64_t)inode, ret_fd);
 	}
 
 	return ret_fd;
@@ -574,14 +576,14 @@ int close_progress_info(int fd, ino_t inode)
 	char filename[200];
 	int ret, errcode;
 
-	sprintf(filename, "%s/upload_bullpen/upload_progress_inode_%ld",
-		METAPATH, inode);
+	sprintf(filename, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
+		METAPATH, (uint64_t)inode);
 
 	close(fd);
 	UNLINK(filename);
 
-	write_log(10, "Debug: Close progress-info file for inode %lld\n",
-		inode);
+	write_log(10, "Debug: Close progress-info file for inode %"PRIu64"\n",
+		(uint64_t)inode);
 
 	return 0;
 
@@ -599,11 +601,8 @@ int fetch_toupload_meta_path(char *pathname, ino_t inode)
 	if (access(path, F_OK) == -1)
 		MKDIR(path, 0700);
 
-#ifdef ARM_32bit_
-	sprintf(pathname, "%s/hcfs_local_meta_%lld.tmp", path, inode);
-#else
-	sprintf(pathname, "%s/hcfs_local_meta_%ld.tmp", path, inode);
-#endif
+	sprintf(pathname, "%s/hcfs_local_meta_%"PRIu64".tmp",
+			path, (uint64_t)inode);
 
 	return 0;
 
@@ -615,13 +614,8 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 	long long block_no, long long seq)
 {
 
-#ifdef ARM_32bit_
-	sprintf(pathname, "/dev/shm/hcfs_sync_block_%lld_%lld_%lld.tmp",
-		inode, block_no, seq);
-#else
-	sprintf(pathname, "/dev/shm/hcfs_sync_block_%ld_%lld_%lld.tmp",
-		inode, block_no, seq);
-#endif
+	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%lld_%lld.tmp",
+		(uint64_t)inode, block_no, seq);
 
 	return 0;
 }
@@ -637,11 +631,8 @@ int fetch_backend_meta_path(char *pathname, ino_t inode)
 	if (access(path, F_OK) == -1)
 		MKDIR(path, 0700);
 
-#ifdef ARM_32bit_
-	sprintf(pathname, "%s/hcfs_backend_meta_%lld.tmp", path, inode);
-#else
-	sprintf(pathname, "%s/hcfs_backend_meta_%ld.tmp", path, inode);
-#endif
+	sprintf(pathname, "%s/hcfs_backend_meta_%"PRIu64".tmp",
+			path, (uint64_t)inode);
 	return 0;
 
 errcode_handle:
@@ -651,16 +642,10 @@ errcode_handle:
 int fetch_progress_file_path(char *pathname, ino_t inode)
 {
 
-#ifdef ARM_32bit_
-	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%lld",
-		METAPATH, inode);
-#else
-	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%ld",
-		METAPATH, inode);
-#endif
+	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
+		METAPATH, (uint64_t)inode);
+
 	return 0;
-
-
 }
 
 /**
@@ -838,7 +823,8 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
 
-	write_log(10, "Debug: Now begin to revert uploading inode_%ld\n", inode);
+	write_log(10, "Debug: Now begin to revert uploading inode_%"PRIu64"\n",
+			(uint64_t)inode);
 	/* Check backend meta exist */
 	if (access(backend_meta_path, F_OK) == 0) {
 		backend_meta_exist = TRUE;
@@ -881,8 +867,8 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
 
-			write_log(10, "Debug: begin revert uploading inode %ld\n",
-				inode);
+			write_log(10, "Debug: begin revert uploading inode %"
+				PRIu64"\n", (uint64_t)inode);
 			sync_single_inode((void *)data_ptr);
 
 		} else { 
@@ -911,7 +897,8 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	return;
 
 errcode_handle:
-	write_log(0, "Error: Fail to revert uploading inode %ld\n", inode);
+	write_log(0, "Error: Fail to revert uploading inode %"PRIu64"\n",
+			(uint64_t)inode);
 	return;
 }
 
@@ -959,7 +946,8 @@ int uploading_revert()
 	while (direntptr) {
 		if (strncmp("upload_progress", temp_dirent.d_name, 15) == 0) {
 			ret = sscanf(temp_dirent.d_name,
-				"upload_progress_inode_%ld", &inode);
+				"upload_progress_inode_%"PRIu64,
+				(uint64_t *)&inode);
 			sprintf(progress_filepath, "%s/%s", upload_pathname,
 				temp_dirent.d_name);
 			fd = open(progress_filepath, O_RDWR);

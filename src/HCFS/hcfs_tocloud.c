@@ -61,6 +61,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "atomic_tocloud.h"
 #include "hfuse_system.h"
 #include "FS_manager.h"
+#include "hcfs_fromcloud.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -771,6 +772,7 @@ static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
 	return;
 }
 
+/*
 static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 {
 	ssize_t ret_ssize;
@@ -796,11 +798,11 @@ static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 			return -errcode;
 		}
 	}
-	*upload_seq -= 1; /* Return old seq so that backend stat works */
+	*upload_seq -= 1;
 
 	return 0;
 }
-
+*/
 
 
 #if (DEDUP_ENABLE)
@@ -970,9 +972,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	off_t toupload_size;
 	BLOCK_ENTRY *tmp_entry;
 	long long temp_trunc_size;
-#ifndef _ANDROID_ENV_
+//#ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
-#endif
+//#endif
 	size_t ret_size;
 	char sync_error;
 	int count1;
@@ -1054,22 +1056,34 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		first_upload = FALSE;
 		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, this_inode);
-		ret = download_meta_from_backend(this_inode, backend_metapath,
-				&backend_metafptr);
-		if (ret < 0) {
+		backend_metafptr = fopen(backend_metapath, "w+");
+		if (backend_metafptr == NULL) {
 			super_block_update_transit(ptr->inode, FALSE, TRUE);
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			unlink(toupload_metapath);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
 			return;
-		} else {
-		/* backend_metafptr may be NULL when first uploading */
-			if (backend_metafptr == NULL) {
+		}
+		setbuf(backend_metafptr, NULL); /* Do not need to lock */
+		
+		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
+				this_inode, 0);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
 				write_log(10, "Debug: upload first time\n");
 				first_upload = TRUE;
+			} else {
+				super_block_update_transit(ptr->inode,
+						FALSE, TRUE);
+				fclose(local_metafptr);
+				fclose(toupload_metafptr);
+				unlink(toupload_metapath);
+				sync_ctl.threads_finished[ptr->which_index] =
+					TRUE;
+				return;
 			}
 		}
-
 		/* Init backend info and close */
 		if (first_upload == FALSE) {
 			PREAD(fileno(backend_metafptr), &tempfilestat,
@@ -1098,6 +1112,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			fclose(toupload_metafptr);
 			unlink(toupload_metapath);
 			fclose(local_metafptr);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
 			return;
 		}
 	}
@@ -1763,7 +1778,6 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	FILE *new_fptr = transform_fd(fptr, key, &data,
 			ENCRYPT_ENABLE, COMPRESS_ENABLE);
 
-	fclose(fptr);
 	if (new_fptr == NULL) {
 		if (data != NULL)
 			free(data);
@@ -1771,6 +1785,8 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	}
 
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL);
+
+	fclose(fptr);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
@@ -2193,7 +2209,6 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				      ", mode %d\n",
 				  (uint64_t)sync_threads[count].inode,
 				  sync_threads[count].this_mode);
-#endif
 
 			if (sync_ctl.is_revert[count] == TRUE)
 				pthread_create(

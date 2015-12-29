@@ -64,14 +64,18 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	if (hcfs_system->sync_paused)
 		return -EIO;
 
+	if (action_from == FETCH_FILE_META) {
+		sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
+	} else {
 #if (DEDUP_ENABLE)
-	/* Get objname by obj_id */
-	obj_id_to_string(obj_id, obj_id_str);
-	sprintf(objname, "data_%s", obj_id_str);
+		/* Get objname by obj_id */
+		obj_id_to_string(obj_id, obj_id_str);
+		sprintf(objname, "data_%s", obj_id_str);
 #else
-	sprintf(objname, "data_%" PRIu64 "_%lld_0", (uint64_t)this_inode,
-			block_no); //seqnum
+		sprintf(objname, "data_%" PRIu64 "_%lld_0",
+			(uint64_t)this_inode, block_no); //seqnum
 #endif
+	}
 
 	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
 		sem_wait(&pin_download_curl_sem);
@@ -149,11 +153,13 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	/* Already retried in get object if necessary */
 	if ((status >= 200) && (status <= 299))
 		ret = 0;
+	else if (status == 404)
+		ret = -ENOENT;
 	else
 		ret = -EIO;
 
 	fflush(fptr);
-	return status;
+	return ret;
 
 errcode_handle:
 	return errcode;
@@ -323,6 +329,7 @@ errcode_handle:
  *
  * @return 0 if succeed to download or object not found. Otherwise -EIO on error
  */
+/*
 int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	FILE **backend_fptr)
 {
@@ -391,6 +398,7 @@ int download_meta_from_backend(ino_t inode, const char *download_metapath,
 
 	return errcode;
 }
+*/
 
 int init_download_control()
 {

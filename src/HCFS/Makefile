@@ -1,5 +1,5 @@
 CC = gcc
-CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
+CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
 CFLAGS = -g -pthread -Wall -Wextra
 LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3
 
@@ -38,7 +38,7 @@ OBJS_F := objmeta.o \
 	monitor.o \
 	dir_statistics.o \
 	parent_lookup.o \
-	atomic_upload.o
+	atomic_tocloud.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)

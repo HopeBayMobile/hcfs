@@ -197,7 +197,7 @@ int init_hfuse(void)
 }
 
 /* Helper function to initialize curl handles for downloading objects */
-int _init_download_curl(int count, const char *suffix)
+int _init_download_curl(int count)
 {
 	int ret_val;
 

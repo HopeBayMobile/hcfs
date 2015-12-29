@@ -28,7 +28,7 @@
 #define MAX_PIN_DL_CONCURRENCY ((MAX_DOWNLOAD_CURL_HANDLE) / 2)
 #define READ_BLOCK 0
 #define PIN_BLOCK 1
-
+#define FETCH_FILE_META 2
 
 typedef struct {
 	ino_t this_inode;

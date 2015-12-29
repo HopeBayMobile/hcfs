@@ -129,8 +129,6 @@ void upload_loop(void);
 #endif
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta);
-int download_meta_from_backend(ino_t inode, const char *download_metapath,
-	FILE **backend_fptr);
 
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	char delete_which_one);
