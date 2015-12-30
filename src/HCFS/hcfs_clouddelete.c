@@ -642,12 +642,12 @@ errcode_handle:
 
 	/*Wait for any upload to complete and change super inode
 		from to_delete to deleted*/
-
+/*
 	while (TRUE) {
 		in_sync = FALSE;
-		sem_wait(&(sync_ctl.sync_op_sem));
+		sem_wait(&(sync_ctl.sync_op_sem));*/
 		/*Check if this inode is being synced now*/
-		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
+/*		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 			if (sync_ctl.threads_in_use[count] ==
 					this_inode) {
 				in_sync = TRUE;
@@ -659,7 +659,7 @@ errcode_handle:
 			sleep(10);
 		else
 			break;
-	}
+	} */
 
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {

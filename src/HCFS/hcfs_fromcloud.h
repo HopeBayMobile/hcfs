@@ -41,6 +41,7 @@ typedef struct {
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
+	long long seqnum;
 	off_t page_pos;
 	char dl_error;
 	char active;

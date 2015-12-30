@@ -931,11 +931,13 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			inode, block_count, block_seq,
 			0, 0, progress_fd, TRUE);
 #endif
-		sem_post(&(upload_ctl.upload_op_sem));
 		dispatch_delete_block(which_curl);
+		sem_post(&(upload_ctl.upload_op_sem));
 	}
 
 	_busy_wait_all_specified_upload_threads(inode);
+
+	write_log(10, "Debug: Finish deleting unuseful blocks on cloud\n");
 	return 0;
 }
 
@@ -1052,8 +1054,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	/* Download backend meta and fetch seq number if it is regfile 
 	and is not reverting mode */
+	first_upload = FALSE; 
+	/* TODO: How to know if the inode is upload first time? */
 	if (S_ISREG(ptr->this_mode) && (is_revert == FALSE)) {
-		first_upload = FALSE;
 		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, this_inode);
 		backend_metafptr = fopen(backend_metapath, "w+");
@@ -1068,7 +1071,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		setbuf(backend_metafptr, NULL); /* Do not need to lock */
 		
 		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				this_inode, 0);
+				this_inode, 0, 0);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(10, "Debug: upload first time\n");
@@ -1102,7 +1105,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			UNLINK(backend_metapath);
 		} else {
 			ret = init_progress_info(progress_fd, 0, 0,
-				backend_metafptr);
+				NULL);
 			backend_size = 0;
 			total_backend_blocks = 0; 
 		}
@@ -1118,7 +1121,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	/* If it is reverting mode, read progress meta and get info */
-	if (is_revert == TRUE) {
+	if (S_ISREG(ptr->this_mode) && (is_revert == TRUE)) {
 		PROGRESS_META progress_meta;
 
 		memset(&progress_meta, 0, sizeof(PROGRESS_META));
@@ -1133,6 +1136,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			fclose(local_metafptr);		
 			super_block_update_transit(ptr->inode, FALSE, TRUE);
 			return;
+		} else {
+			if (progress_meta.backend_size == 0)
+				first_upload = TRUE;
+			else
+				first_upload = FALSE;
 		}
 	}
 
@@ -1539,7 +1547,6 @@ store in some other file */
 		sem_post(&(upload_ctl.upload_queue_sem));
 		return;
 	}
-	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 
 	if (sync_error == TRUE) /* TODO: Something has to be done? */
 		return;
@@ -1551,12 +1558,14 @@ store in some other file */
 	}
 
 	/* Upload successfully. Update FS stat in backend */
-	if (upload_seq == 0)
+	if (first_upload == TRUE)
 		update_backend_stat(root_inode, size_diff, 1);
 	else if (size_diff != 0)
 		update_backend_stat(root_inode, size_diff, 0);
 
 	super_block_update_transit(ptr->inode, FALSE, sync_error);
+
+	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 	return;
 
 errcode_handle:

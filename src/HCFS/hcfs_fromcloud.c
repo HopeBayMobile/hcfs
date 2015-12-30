@@ -648,7 +648,7 @@ void fetch_backend_block(void *ptr)
 
 	/* Fetch block from cloud */
 	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, block_info->this_inode,
-						block_info->block_no);
+				block_info->block_no, block_info->seqnum);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;
@@ -788,6 +788,7 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 		which_th = _select_thread();
 		download_thread_ctl.block_info[which_th].this_inode = inode;
 		download_thread_ctl.block_info[which_th].block_no = blkno;
+		download_thread_ctl.block_info[which_th].seqnum = temp_entry->seqnum;
 		download_thread_ctl.block_info[which_th].page_pos = page_pos;
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;

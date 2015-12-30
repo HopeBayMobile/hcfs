@@ -1193,6 +1193,27 @@ errcode_handle:
 	return errcode;
 }
 
+void fetch_backend_block_objname(char *objname,
+#ifdef DEDUP_ENABLE
+	unsigned char *obj_id)
+#else
+	ino_t inode, long long block_no, long long seqnum)
+#endif
+{
+
+#ifdef DEDUP_ENABLE
+	sprintf(objname, "block_%s", obj_id);
+#else
+	sprintf(objname, "block_%"PRIu64"_%lld_%lld",
+		(uint64_t)inode, block_no, seqnum);
+#endif
+}
+
+void fetch_backend_meta_name(char *objname, ino_t inode)
+{
+	sprintf(objname, "meta_%"PRIu64, (uint64_t)inode);
+}
+
 /**
  * fetch_error_download_path
  *
@@ -1299,29 +1320,6 @@ int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 errcode_handle:
 	return errcode;
-}
-
-void fetch_backend_block_objname(ino_t this_inode, long long block_no,
-	char *block_name)
-{
-
-#ifdef ARM_32bit_
-	sprintf(block_name, "data_%lld_%lld_0", this_inode, block_no);
-#else
-	sprintf(block_name, "data_%ld_%lld_0", this_inode, block_no);
-#endif
-	return;
-}
-
-void fetch_backend_meta_objname(ino_t this_inode, char *meta_name)
-{
-
-#ifdef ARM_32bit_
-	sprintf(meta_name, "meta_%lld", this_inode);
-#else
-	sprintf(meta_name, "meta_%ld", this_inode);
-#endif
-	return;
 }
 
 /**

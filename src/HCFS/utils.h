@@ -53,10 +53,14 @@ int change_system_meta(long long system_size_delta,
 int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
 
-void fetch_backend_block_objname(ino_t this_inode, long long block_no,
-	char *block_name);
+void fetch_backend_block_objname(char *objname,
+#ifdef DEDUP_ENABLE
+	unsigned char *obj_id);
+#else
+	ino_t inode, long long block_no, long long seqnum);
+#endif
 
-void fetch_backend_meta_objname(ino_t this_inode, char *meta_name);
+void fetch_backend_meta_objname(char *objname, ino_t inode);
 
 /* Will copy the filename of ddt meta file to pathname */
 int fetch_ddt_path(char *pathname, unsigned char last_char);
