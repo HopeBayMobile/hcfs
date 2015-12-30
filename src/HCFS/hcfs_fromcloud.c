@@ -47,14 +47,8 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr, char action_from,
-#if (DEDUP_ENABLE)
-		     unsigned char *obj_id)
-#else
-		     ino_t this_inode, long long block_no, long long seq)
-#endif
+int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
-	char objname[1000];
 	char obj_id_str[OBJID_STRING_LENGTH];
 	int status;
 	int which_curl_handle;
@@ -63,20 +57,19 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 
 	if (hcfs_system->sync_paused)
 		return -EIO;
-
+/*
 	if (action_from == FETCH_FILE_META) {
 		sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
 	} else {
 #if (DEDUP_ENABLE)
-		/* Get objname by obj_id */
 		obj_id_to_string(obj_id, obj_id_str);
 		sprintf(objname, "data_%s", obj_id_str);
 #else
 		sprintf(objname, "data_%" PRIu64 "_%lld_%lld",
-			(uint64_t)this_inode, block_no, seq); /* TODO: seq */
+			(uint64_t)this_inode, block_no, seq);
 #endif
 	}
-
+*/
 	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
 		sem_wait(&pin_download_curl_sem);
 	sem_wait(&download_curl_sem);
@@ -246,12 +239,13 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		mlock = FALSE;
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-			temppage.block_entries[entry_index].obj_id);
+		fetch_backend_block_objname(objname,
+				temppage.block_entries[entry_index].obj_id);
 #else
-		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-			ptr->this_inode, ptr->block_no, ptr->seqnum);
+		fetch_backend_block_objname(objname, ptr->this_inode,
+				ptr->block_no, ptr->seqnum);
 #endif
+		ret = fetch_from_cloud(blockfptr, READ_BLOCK, objname);
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;
@@ -596,6 +590,7 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 void fetch_backend_block(void *ptr)
 {
 	char block_path[400];
+	char objname[600];
 	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
 	int ret;
@@ -647,8 +642,9 @@ void fetch_backend_block(void *ptr)
 	}
 
 	/* Fetch block from cloud */
-	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, block_info->this_inode,
-				block_info->block_no, block_info->seqnum);
+	fetch_backend_block_objname(objname, block_info->this_inode,
+			block_info->block_no, block_info->seqnum);
+	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;

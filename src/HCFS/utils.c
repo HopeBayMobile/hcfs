@@ -1194,24 +1194,30 @@ errcode_handle:
 }
 
 void fetch_backend_block_objname(char *objname,
-#ifdef DEDUP_ENABLE
+#if DEDUP_ENABLE
 	unsigned char *obj_id)
 #else
 	ino_t inode, long long block_no, long long seqnum)
 #endif
 {
+#if DEDUP_ENABLE
+	char obj_id_str[OBJID_STRING_LENGTH];
 
-#ifdef DEDUP_ENABLE
-	sprintf(objname, "block_%s", obj_id);
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
 #else
-	sprintf(objname, "block_%"PRIu64"_%lld_%lld",
+	sprintf(objname, "data_%"PRIu64"_%lld_%lld",
 		(uint64_t)inode, block_no, seqnum);
 #endif
+
+	return;
 }
 
-void fetch_backend_meta_name(char *objname, ino_t inode)
+void fetch_backend_meta_objname(char *objname, ino_t inode)
 {
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)inode);
+
+	return;
 }
 
 /**

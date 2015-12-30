@@ -59,12 +59,7 @@ typedef struct {
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int fetch_from_cloud(FILE *fptr, char action_from,
-#if (DEDUP_ENABLE)
-		unsigned char *obj_id);
-#else
-		ino_t this_inode, long long block_no, long long seq);
-#endif
+int fetch_from_cloud(FILE *fptr, char action_from, char *objname);
 
 void download_block_manager();
 int init_download_control();

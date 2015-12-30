@@ -955,6 +955,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
 	char toupload_metapath[400];
 	char backend_metapath[500];
+	char objname[500];
 	char local_metapath[METAPATHLEN];
 	ino_t this_inode;
 	FILE *toupload_metafptr, *local_metafptr, *backend_metafptr;
@@ -1069,9 +1070,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			return;
 		}
 		setbuf(backend_metafptr, NULL); /* Do not need to lock */
-		
+
+		fetch_backend_meta_objname(objname, this_inode);
 		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				this_inode, 0, 0);
+				objname);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(10, "Debug: upload first time\n");
@@ -2433,8 +2435,9 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	size_t ret_size;
 
 	write_log(10, "Debug: entering update backend stat\n");
-	write_log(10, "Debug: root %ld change %lld bytes and %lld inodes on "
-		"backend\n", root_inode, system_size_delta, num_inodes_delta);
+	write_log(10, "Debug: root %"PRIu64" change %lld bytes and %lld "
+		"inodes on backend\n", (uint64_t)root_inode, system_size_delta,
+		num_inodes_delta);
 
 	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));

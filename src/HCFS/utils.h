@@ -54,7 +54,7 @@ int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
 
 void fetch_backend_block_objname(char *objname,
-#ifdef DEDUP_ENABLE
+#if DEDUP_ENABLE
 	unsigned char *obj_id);
 #else
 	ino_t inode, long long block_no, long long seqnum);

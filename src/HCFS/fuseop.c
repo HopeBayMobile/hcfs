@@ -1508,7 +1508,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				parent1_ptr, parent2_ptr);
 		fuse_reply_err(req, ENOMEM);
 		return;
-	}	
+	}
 
 	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0) {
@@ -2144,13 +2144,15 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 
 #if (DEDUP_ENABLE)
-			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+			fetch_backend_block_objname(objname,
 					last_block_entry->obj_id);
 #else
-			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-					filestat->st_ino, last_block,
-					last_block_entry->seqnum);
+			fetch_backend_block_objname(objname, filestat->st_ino,
+					last_block, last_block_entry->seqnum);
 #endif
+			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+					objname);
+
 			if (ret < 0) {
 				if (blockfptr != NULL) {
 					fclose(blockfptr);
@@ -2991,13 +2993,14 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+		fetch_backend_block_objname(objname,
 				tpage->block_entries[eindex].obj_id);
 #else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				this_inode, bindex,
+		fetch_backend_block_objname(objname, this_inode, bindex,
 				tpage->block_entries[eindex].seqnum);
 #endif
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				objname);
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
 				fclose(fh_ptr->blockfptr);
@@ -3606,13 +3609,14 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				tpage->block_entries[bindex].obj_id);
+		fetch_backend_block_objname(objname,
+				tpage->block_entries[eindex].obj_id);
 #else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				this_inode, bindex,
+		fetch_backend_block_objname(objname, this_inode, bindex,
 				tpage->block_entries[eindex].seqnum);
 #endif
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK, objname);
+
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
 				fclose(fh_ptr->blockfptr);
@@ -3835,7 +3839,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		}
 
 		long long now_seq;
-		/*now_seq = MAX(temppage.block_entries[entry_index].seqnum[0], 
+		/*now_seq = MAX(temppage.block_entries[entry_index].seqnum[0],
 			temppage.block_entries[entry_index].seqnum[1]);*/
 		now_seq = 0;
 
@@ -6143,7 +6147,7 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 *        Inputs: coid *data
 *
 *       Summary: This thread function aims to be a contact window between
-*                fuse process and other processes. 
+*                fuse process and other processes.
 *
 *       Response: Send integer 0 when succeeding in tagging inode. Otherwise
 *                 Send -1 on error.
@@ -6180,7 +6184,7 @@ void *fuse_communication_contact_window(void *data)
 			}
 		}
 
-		recv(ac_fd, &uploading_data, 
+		recv(ac_fd, &uploading_data,
 			sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 
 		ret = set_uploading_data(&uploading_data);
@@ -6192,11 +6196,11 @@ void *fuse_communication_contact_window(void *data)
 			communicate_result = 0;
 			if (uploading_data.is_uploading)
 				write_log(10, "Debug: Succeed in tagging inode "
-					"%lld as UPLOADING\n", 
+					"%lld as UPLOADING\n",
 					uploading_data.inode);
 			else
 				write_log(10, "Debug: Succeed in tagging inode "
-					"%lld as NOT_UPLOADING\n", 
+					"%lld as NOT_UPLOADING\n",
 					uploading_data.inode);
 		}
 
@@ -6221,7 +6225,7 @@ int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
 	strcpy(sock_addr.sun_path, FUSE_SOCK_PATH);
 	*socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
-	ret = bind(*socket_fd, (struct sockaddr *)&sock_addr, 
+	ret = bind(*socket_fd, (struct sockaddr *)&sock_addr,
 		sizeof(struct sockaddr_un));
 	if (ret < 0) {
 		errcode = errno;
@@ -6243,7 +6247,7 @@ int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
 	}
 
 	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {
-		ret = pthread_create(&communicate_tid[i], NULL, 
+		ret = pthread_create(&communicate_tid[i], NULL,
 			fuse_communication_contact_window, socket_fd);
 		if (ret < 0) {
 			errcode = ret;
@@ -6257,7 +6261,7 @@ int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
 	return 0;
 
 errcode_handle:
-	return errcode;		
+	return errcode;
 }
 
 int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd)
@@ -6275,7 +6279,7 @@ int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd)
 	return 0;
 
 errcode_handle:
-	return errcode;		
+	return errcode;
 }
 
 int hook_fuse(int argc, char **argv)

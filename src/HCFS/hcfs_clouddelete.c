@@ -318,6 +318,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
 	char thismetapath[400];
 	char backend_metapath[400];
+	char objname[500];
 	char truncpath[METAPATHLEN];
 	ino_t this_inode;
 	FILE *metafptr, *backend_metafptr, *truncfptr;
@@ -373,8 +374,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			return;
 		}
 
+		fetch_backend_meta_objname(objname, this_inode);
 		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				this_inode, 0, 0);
+				objname);
 		if (ret < 0) {
 			if (ret == -EIO) {
 				write_log(0, "Error: Fail to download "
@@ -510,9 +512,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 			block_status =
 				temppage.block_entries[current_index].status;
-			block_seq = 0;/*MAX(
-				temppage.block_entries[current_index].seqnum[0],
-				temppage.block_entries[current_index].seqnum[1]);*/
+			block_seq =
+				temppage.block_entries[current_index].seqnum;
 
 			/* Delete backend object if uploaded */
 			if ((block_status != ST_NONE) && 
@@ -733,8 +734,7 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 /* Handle objname - consider platforms, dedup flag  */
 #if (DEDUP_ENABLE)
 	/* Object named by block hashkey */
-	obj_id_to_string(obj_id, obj_id_str);
-	sprintf(objname, "data_%s", obj_id_str);
+	fetch_backend_block_objname(objname, obj_id);
 
 	/* Get dedup table meta */
 	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
@@ -747,8 +747,7 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 	/* Update ddt */
 	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
 #else
-	sprintf(objname, "data_%" PRIu64 "_%lld_%lld", (uint64_t)this_inode,
-			block_no, seq);
+	fetch_backend_block_objname(objname, this_inode, block_no, seq);
 	/* Force to delete */
 	ddt_ret = 0;
 #endif
