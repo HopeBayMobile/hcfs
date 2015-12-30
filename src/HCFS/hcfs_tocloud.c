@@ -337,7 +337,8 @@ static inline int _upload_terminate_thread(int index)
 	//	this_inode, blockno, tmp_page.status_entry[blockno].to_upload_seq, sizeof(PROGRESS_META));
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
 #endif
-	fetch_toupload_block_path(toupload_blockpath, this_inode, blockno, 0);
+	fetch_toupload_block_path(toupload_blockpath, this_inode,
+			blockno, toupload_block_seq);
 	if (access(toupload_blockpath, F_OK) == 0)
 		UNLINK(toupload_blockpath);
 
@@ -2039,7 +2040,7 @@ int dispatch_upload_block(int which_curl)
 	}
 
 	ret = fetch_toupload_block_path(toupload_blockpath,
-		upload_ptr->inode, upload_ptr->blockno, 0);
+		upload_ptr->inode, upload_ptr->blockno, upload_ptr->seq);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

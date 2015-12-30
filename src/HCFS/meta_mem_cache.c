@@ -1613,7 +1613,7 @@ int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	long long bindex, long long seq)
 {
-	char toupload_bpath[500], local_bpath[500];
+	char toupload_bpath[500], local_bpath[500], objname[500];
 	char inode_uploading;
 	int progress_fd;
 	int ret;
@@ -1629,7 +1629,8 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	} else {
 		fetch_block_path(local_bpath, inode, bindex);
 		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
-		write_log(10, "Debug: begin to copy block in %s", __func__);
+		fetch_backend_block_objname(objname, inode, bindex, seq);
+		write_log(10, "Debug: begin to copy block, obj is %s", objname);
 		ret = check_and_copy_file(local_bpath, toupload_bpath);
 		if (ret < 0) {
 			if (ret != -EEXIST) {
