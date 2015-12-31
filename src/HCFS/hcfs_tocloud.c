@@ -124,7 +124,8 @@ static inline void _sync_terminate_thread(int index)
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
 			/* Reverting do not need communicate with fuse */
-			tag_ret = tag_status_on_fuse(inode, FALSE, 0);
+			tag_ret = tag_status_on_fuse(inode, FALSE, 0,
+					sync_ctl.is_revert[index]);
 			if (tag_ret < 0) {
 				write_log(0, "Fail to tag inode %lld "
 						"as NOT_UPLOADING in %s\n",
@@ -938,7 +939,8 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	_busy_wait_all_specified_upload_threads(inode);
 
-	write_log(10, "Debug: Finish deleting unuseful blocks on cloud\n");
+	write_log(10, "Debug: Finish deleting unuseful blocks for inode %"
+			PRIu64" on cloud\n", inode);
 	return 0;
 }
 
@@ -954,7 +956,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
  */
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
-	char toupload_metapath[400];
+	char toupload_metapath[400], toupload_bpath[400];
 	char backend_metapath[500];
 	char objname[500];
 	char local_metapath[METAPATHLEN];
@@ -1370,6 +1372,13 @@ store in some other file */
 				set_progress_info(progress_fd, block_count,
 					&toupload_exist, NULL, NULL, NULL,
 					&finish_uploading);
+
+				fetch_toupload_block_path(toupload_bpath,
+					this_inode, block_count,
+					toupload_block_seq);
+				if (access(toupload_bpath, F_OK) == 0)
+					unlink(toupload_bpath);
+
 /*#else
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
@@ -1395,6 +1404,13 @@ store in some other file */
 					&toupload_exist, NULL, NULL, NULL,
 					&finish_uploading);
 
+				fetch_toupload_block_path(toupload_bpath,
+					this_inode, block_count,
+					toupload_block_seq);
+				if (access(toupload_bpath, F_OK) == 0)
+					unlink(toupload_bpath);
+
+
 			} else { /* ST_BOTH, ST_CtoL */
 				write_log(10, "Debug: block_%lld is %d\n",
 						block_count, toupload_block_status);
@@ -1413,6 +1429,11 @@ store in some other file */
 					&toupload_block_seq, NULL,
 					&finish_uploading);
 #endif
+				fetch_toupload_block_path(toupload_bpath,
+					this_inode, block_count,
+					toupload_block_seq);
+				if (access(toupload_bpath, F_OK) == 0)
+					unlink(toupload_bpath);
 			}
 		}
 		/* ---End of syncing blocks loop--- */
@@ -2046,7 +2067,7 @@ int dispatch_upload_block(int which_curl)
 		goto errcode_handle;
 	}
 
-	ret = check_and_copy_file(thisblockpath, toupload_blockpath);
+	ret = check_and_copy_file(thisblockpath, toupload_blockpath, TRUE);
 	if (ret < 0) {
 		if (ret != -EEXIST) {
 			errcode = ret;
@@ -2151,7 +2172,6 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	int count, ret, errcode;
 	int progress_fd;
 	char progress_file_path[300];
-	char toupload_metapath[300], local_metapath[300];
 
 	ret = -1;
 
@@ -2176,7 +2196,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			}
 
 			/* Copy meta if it does not revert uploading */
-			if (sync_ctl.is_revert[count] == FALSE) {
+			/*if (sync_ctl.is_revert[count] == FALSE) {
 				fetch_toupload_meta_path(toupload_metapath,
 					this_inode);
 				fetch_meta_path(local_metapath, this_inode);
@@ -2191,10 +2211,11 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					toupload_metapath);
 				if (ret < 0)
 					break;
-			}
+			}*/
 
 			/* Notify fuse process that it is going to upload */
-			ret = tag_status_on_fuse(this_inode, TRUE, progress_fd);
+			ret = tag_status_on_fuse(this_inode, TRUE,
+					progress_fd, sync_ctl.is_revert[count]);
 			if (ret < 0) {
 				write_log(0, "Error on tagging inode %lld as "
 					"UPLOADING.\n", this_inode);

@@ -390,7 +390,7 @@ void run_cache_loop(void)
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
-			write_log(10, "Need to throw out something\n");
+		//	write_log(10, "Need to throw out something\n");
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
 				write_log(10, "Recomputing cache usage\n");
@@ -436,7 +436,7 @@ void run_cache_loop(void)
 			/* skip empty bucket */
 			if (inode_cache_usage_hash[e_index] == NULL) {
 				e_index++;
-				write_log(10, "Skipping, part 1\n");
+			//	write_log(10, "Skipping, part 1\n");
 				continue;
 			}
 
@@ -444,7 +444,7 @@ void run_cache_loop(void)
 			if (inode_cache_usage_hash[e_index]->clean_cache_size
 									<= 0) {
 				e_index++;
-				write_log(10, "Skipping, part 2\n");
+			//	write_log(10, "Skipping, part 2\n");
 				continue;
 			}
 
@@ -460,7 +460,7 @@ void run_cache_loop(void)
 							->last_mod_time;
 				if ((currenttime.tv_sec - node_time) < 300) {
 					e_index++;
-					write_log(10, "Skipping, part 3\n");
+			//		write_log(10, "Skipping, part 3\n");
 					continue;
 				}
 			}

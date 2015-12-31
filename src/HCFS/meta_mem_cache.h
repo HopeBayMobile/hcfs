@@ -74,6 +74,7 @@ check whether this inode is now uploading or not */
 typedef struct {
 	char is_uploading; /* TRUE or FALSE */
 	int progress_list_fd;
+	long long toupload_blocks;
 } UPLOADING_INFO;
 
 typedef struct {
@@ -168,5 +169,8 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int expire_meta_mem_cache_entry(void);
+
+int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char is_now_uploading, int new_fd, long long toupload_blocks);
 
 #endif  /* GW20_HCFS_META_MEM_CACHE_H_ */

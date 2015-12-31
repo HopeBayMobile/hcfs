@@ -15,6 +15,7 @@
 typedef struct {
 	ino_t inode;
 	char is_uploading;
+	char is_revert;
 	int progress_list_fd;
 } UPLOADING_COMMUNICATION_DATA;
 
@@ -40,6 +41,8 @@ typedef struct {
 	char finish_init_backend_data;
 	long long backend_size;
 	long long total_backend_blocks;
+	long long toupload_size;
+	long long total_toupload_blocks;
 	long long direct;
 	long long single_indirect;
 	long long double_indirect;
@@ -47,7 +50,7 @@ typedef struct {
 	long long quadruple_indirect;
 } PROGRESS_META;
 
-int tag_status_on_fuse(ino_t this_inode, char status, int fd);
+int tag_status_on_fuse(ino_t this_inode, char status, int fd, BOOL is_revert);
 
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
@@ -74,7 +77,7 @@ int open_progress_info(ino_t inode);
 
 int close_progress_info(int fd, ino_t inode);
 
-int check_and_copy_file(const char *srcpath, const char *tarpath);
+int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src);
 
 int fetch_toupload_meta_path(char *pathname, ino_t inode);
 

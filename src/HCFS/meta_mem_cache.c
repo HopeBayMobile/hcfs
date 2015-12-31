@@ -1574,7 +1574,7 @@ errcode_handle:
  * @return 0 for succeeding in setting info, otherwise -1 on error.
  */
 int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-	char is_now_uploading, int new_fd)
+	char is_now_uploading, int new_fd, long long toupload_blocks)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -1586,6 +1586,7 @@ int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 
 	body_ptr->uploading_info.is_uploading = is_now_uploading;
 	body_ptr->uploading_info.progress_list_fd = new_fd;
+	body_ptr->uploading_info.toupload_blocks = toupload_blocks;
 
 	return 0;
 }
@@ -1618,20 +1619,30 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	int progress_fd;
 	int ret;
 
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
 	inode_uploading = body_ptr->uploading_info.is_uploading;
 	progress_fd = body_ptr->uploading_info.progress_list_fd;
 
 	if (inode_uploading == FALSE) {
 		return 0;
-	} else if ((inode_uploading == TRUE) && 
-		(did_block_finish_uploading(progress_fd, bindex) == TRUE)) {
-		return 0;
-	} else {
+	} else { 
+
+		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
+			write_log(10, "Debug: Ask if block %lld was uploaded in %s. %lld\n",
+				bindex, __func__, body_ptr->uploading_info.toupload_blocks);
+			return 0;
+		}
+
+		if (did_block_finish_uploading(progress_fd, bindex) == TRUE) {
+			return 0;
+		}
+
 		fetch_block_path(local_bpath, inode, bindex);
 		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
 		fetch_backend_block_objname(objname, inode, bindex, seq);
 		write_log(10, "Debug: begin to copy block, obj is %s", objname);
-		ret = check_and_copy_file(local_bpath, toupload_bpath);
+		ret = check_and_copy_file(local_bpath, toupload_bpath, TRUE);
 		if (ret < 0) {
 			if (ret != -EEXIST) {
 				write_log(0, "Error: Copy block error in %s",

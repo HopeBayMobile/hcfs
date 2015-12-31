@@ -6114,21 +6114,81 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 {
 	int ret;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	char toupload_metapath[300], local_metapath[300];
+	PROGRESS_META progress_meta;
+	struct stat tmpstat;
+	int errcode;
+	ssize_t ret_ssize;
 
 	meta_cache_entry = meta_cache_lock_entry(data->inode);
 	if (!meta_cache_entry) {
 		write_log(0, "Fail to lock meta cache entry in %s\n", __func__);
 		return -1;
 	}
+	ret = meta_cache_open_file(meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
 
+	/* Copy meta if need to upload and is not reverting mode */
+	if ((data->is_uploading == TRUE) && (data->is_revert == FALSE)) {
+		fetch_toupload_meta_path(toupload_metapath,
+				data->inode);
+		fetch_meta_path(local_metapath, data->inode);
+		if (access(toupload_metapath, F_OK) == 0) {
+			write_log(0, "Error: cannot copy since "
+					"%s exists", toupload_metapath);
+			unlink(toupload_metapath);
+			meta_cache_unlock_entry(meta_cache_entry);
+			return -1;
+		}
+		ret = check_and_copy_file(local_metapath,
+				toupload_metapath, FALSE);
+		if (ret < 0) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			return -1;	
+		}
+
+		ret = meta_cache_lookup_file_data(data->inode, &tmpstat,
+				NULL, NULL, 0, meta_cache_entry);
+		if (ret < 0) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			return ret;
+		}
+
+		/* Do NOT need to lock */
+		flock(data->progress_list_fd, LOCK_EX);
+		PREAD(data->progress_list_fd, &progress_meta,
+				sizeof(PROGRESS_META), 0);
+		progress_meta.toupload_size = tmpstat.st_size;
+		progress_meta.total_toupload_blocks = (tmpstat.st_size == 0) ? 
+			0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
+		write_log(10, "Debug: toupload_size %lld, total_toupload_blocks %lld\n",
+			progress_meta.toupload_size, progress_meta.total_toupload_blocks);
+
+		PWRITE(data->progress_list_fd, &progress_meta,
+				sizeof(PROGRESS_META), 0);
+		flock(data->progress_list_fd, LOCK_UN);
+	}
+
+	/* Set uploading information */
 	ret = meta_cache_set_uploading_info(meta_cache_entry,
-		data->is_uploading, data->progress_list_fd);
+		data->is_uploading, data->progress_list_fd, progress_meta.total_toupload_blocks);
 	if (ret < 0) {
 		write_log(0, "Fail to set uploading info in %s\n", __func__);
+		meta_cache_close_file(meta_cache_entry);
 		meta_cache_unlock_entry(meta_cache_entry);
 		return -1;
 	}
 
+	ret = meta_cache_close_file(meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
 	ret = meta_cache_unlock_entry(meta_cache_entry);
 	if (ret < 0) {
 		write_log(0, "Fail to unlock entry in %s\n", __func__);
@@ -6136,6 +6196,11 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 	}
 
 	return 0;
+
+errcode_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return errcode;
 }
 
 
