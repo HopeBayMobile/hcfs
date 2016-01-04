@@ -898,7 +898,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	if (delete_which_one == TOUPLOAD_BLOCKS)
 	write_log(10, "Debug: Delete those blocks uploaded just now for "
-		"inode_%ld because local meta disapper\n", inode);
+		"inode_%"PRIu64" because local meta disapper\n", (uint64_t)inode);
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 		ret = get_progress_info(progress_fd, block_count,
@@ -1003,6 +1003,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
@@ -1016,25 +1017,14 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		return;
 	}
 
-	/* Copy local meta, -EEXIST means it has been copied */
-	/*if (is_revert == FALSE) {
-		ret = check_and_copy_file(local_metapath, toupload_metapath, directly_copy);
-		if (ret < 0) {
-			if (ret != -EEXIST) {
-				super_block_update_transit(ptr->inode,
-					FALSE, TRUE);
-				return;
-			}
-		}
-	}*/
-
-	/* Open temp meta to be uploaded */
+	/* Open temp meta to be uploaded. TODO: Maybe copy meta here? */
 	toupload_metafptr = fopen(toupload_metapath, "r");
 	if (toupload_metafptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
 			__func__, errcode, strerror(errcode));
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
@@ -1060,6 +1050,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	and is not reverting mode */
 	first_upload = FALSE; 
 	/* TODO: How to know if the inode is upload first time? */
+	/* TODO: Move this init backend seq procedure to another function */
+	/* TODO: Consider how to handle disconnection and continuing uploading */
 	if (S_ISREG(ptr->this_mode) && (is_revert == FALSE)) {
 		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, this_inode);
@@ -1518,7 +1510,6 @@ store in some other file */
 		fclose(local_metafptr);
 		fclose(toupload_metafptr);
 
-		//write_log(10, "Debug: Now inode %ld has upload_seq = %lld\n", ptr->inode, upload_seq);
 		ret = schedule_sync_meta(toupload_metapath, which_curl);
 
 		if (ret < 0) {

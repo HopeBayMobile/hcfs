@@ -1624,16 +1624,20 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	inode_uploading = body_ptr->uploading_info.is_uploading;
 	progress_fd = body_ptr->uploading_info.progress_list_fd;
 
+	/* Return directly when inode is not uploading */
 	if (inode_uploading == FALSE) {
 		return 0;
-	} else { 
 
+	} else {
+		/* Do nothing when block index + 1 more than # of blocks
+		 * of to-upload data */
 		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
 			write_log(10, "Debug: Ask if block %lld was uploaded in %s. %lld\n",
 				bindex, __func__, body_ptr->uploading_info.toupload_blocks);
 			return 0;
 		}
 
+		/* Check if this block finished uploading */
 		if (did_block_finish_uploading(progress_fd, bindex) == TRUE) {
 			return 0;
 		}
@@ -1645,11 +1649,13 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		ret = check_and_copy_file(local_bpath, toupload_bpath, TRUE);
 		if (ret < 0) {
 			if (ret != -EEXIST) {
-				write_log(0, "Error: Copy block error in %s",
-				__func__);
+				write_log(0, "Error: Copy block error in %s. "
+					"Code %d\n", __func__, -ret);
 				return ret;
+			} else { /* -EEXIST means target had been copied */
+				return 0;
 			}
 		}
-		return ret;
+		return 0;
 	}
 }

@@ -50,7 +50,8 @@ typedef struct {
 	long long quadruple_indirect;
 } PROGRESS_META;
 
-int tag_status_on_fuse(ino_t this_inode, char status, int fd, BOOL is_revert);
+int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
+	int fd, BOOL is_revert);
 
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
