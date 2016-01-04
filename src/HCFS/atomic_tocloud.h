@@ -74,7 +74,7 @@ int set_progress_info(int fd, long long block_index,
 int init_progress_info(int fd, long long backend_blocks, long long backend_size,
 	FILE *backend_metafptr);
 
-int open_progress_info(ino_t inode);
+int create_progress_file(ino_t inode);
 
 int close_progress_info(int fd, ino_t inode);
 

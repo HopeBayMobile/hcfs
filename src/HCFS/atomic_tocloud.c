@@ -10,6 +10,7 @@
 #include "global.h"
 #include "metaops.h"
 #include "utils.h"
+#include "hcfs_fromcloud.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -60,7 +61,8 @@ int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
 		ret = -1;
 	} else {
 		write_log(10, "Debug: Inode %"PRIu64
-			" succeeded in communicating to fuse proc\n", this_inode);
+			" succeeded in communicating to fuse proc\n",
+			(uint64_t)this_inode);
 		ret = 0;
 	}
 
@@ -257,6 +259,20 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * get_progress_info()
+ *
+ * Get uploading information for a specified block.
+ *
+ * @param fd File descriptor of a uploading progress file
+ * @param block_index The block index that needs to be queried
+ * @param block_uploading_status A pointer points to memory space 
+ *        that will be stored with uploading info of the block.
+ *
+ * @return 0 on success, -ENOENT when the uploading info of the
+ *         block not found. Otherwise return other negative error
+ *         code
+ */ 
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
@@ -275,19 +291,20 @@ int get_progress_info(int fd, long long block_index,
 		PREAD(fd, &block_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
-	if (offset == 0) {
+	if (offset <= 0) {
 		/* It may occur when backend has truncated data
 		 * and this block has not been uploaded. */
 		memset(block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		block_uploading_status->finish_uploading = FALSE;
+		return -ENOENT;
 	} else {
 		memcpy(block_uploading_status,
 			&(block_page.status_entry[entry_index]),
 			sizeof(BLOCK_UPLOADING_STATUS));
 	}
 
-	return ret_ssize;
+	return 0;
 
 errcode_handle:
 	write_log(0, "Error: Fail to get progress-info of block_%lld\n",
@@ -409,7 +426,7 @@ errcode_handle:
 }
 #endif
 
-int open_progress_info(ino_t inode)
+int create_progress_file(ino_t inode)
 {
 	int ret_fd;
 	int errcode, ret;
@@ -572,7 +589,7 @@ errcode_handle:
 	return errcode;
 }
 
-int close_progress_info(int fd, ino_t inode)
+int del_progress_file(int fd, ino_t inode)
 {
 	char filename[200];
 	int ret, errcode;
@@ -815,17 +832,135 @@ char did_block_finish_uploading(int fd, long long blockno)
 
 	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	if (blockno + 1 > progress_meta.total_toupload_blocks) {
-		write_log(10, "Debug: Do not care about block %lld since #"
-			" of to-upload blocks is %lld\n", blockno, progress_meta.total_toupload_blocks);
+		write_log(10, "Debug: Do not care about block %lld because #"
+			" of to-upload blocks is %lld\n", blockno,
+			progress_meta.total_toupload_blocks);
 		return TRUE;
 	}
 
 	ret = get_progress_info(fd, blockno, &block_uploading_status);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to get progress info\n");
-		return FALSE;
+		if (ret != -ENOENT) {
+			write_log(0, "Error: Fail to get progress info."
+					" Code %d\n", -ret);
+			return FALSE;
+		} else {
+			return FALSE;
+		}
 	}
 	return block_uploading_status.finish_uploading;
+
+errcode_handle:
+	return errcode;
+}
+
+/**
+ * init_backend_file_info()
+ *
+ * Initialize block information(seq/obj id) backend regfile meta. If it is NOT
+ * reverting mode, then first download backend meta and init progress file using
+ * this backend meta. In case of meta does not exist on cloud, it is regarded as
+ * uploading first time. If it is reverting mode now, then just read the
+ * progress meta and fetch backend size.
+ *
+ * @param ptr A pointer points to information of a now syncing inode.
+ * @param first_upload Store whether it is uploaded first time.
+ * @param backend_size File size on cloud of this inode.
+ * @param total_backend_blocks Total # of blocks of this backend file.
+ *
+ * @return 0 on success, -ECANCELED when cancelling to sync,
+ *         or other negative error code.
+ */
+int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
+		long long *backend_size, long long *total_backend_blocks)
+{
+	FILE *backend_metafptr;
+	char backend_metapath[400];
+	char objname[400];
+	struct stat tempfilestat;
+	int errcode, ret;
+	ssize_t ret_ssize;
+
+	if (ptr->is_revert == FALSE) {
+		/* Try to download backend meta */
+		backend_metafptr = NULL;
+		fetch_backend_meta_path(backend_metapath, ptr->inode);
+		backend_metafptr = fopen(backend_metapath, "w+");
+		if (backend_metafptr == NULL) {
+			errcode = errno;
+			return -errcode;
+		}
+		setbuf(backend_metafptr, NULL); /* Do not need to lock */
+
+		fetch_backend_meta_objname(objname, ptr->inode);
+		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
+				objname);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(10, "Debug: upload first time\n");
+				*first_upload = TRUE;
+				fclose(backend_metafptr);
+				UNLINK(backend_metapath);
+			} else { /* fetch error */
+				fclose(backend_metafptr);
+				UNLINK(backend_metapath);
+				return ret;
+			}
+		} else { /* Success */
+			*first_upload = FALSE;
+		}
+
+		/* Init backend info and unlink it */
+		if (*first_upload == FALSE) {
+			PREAD(fileno(backend_metafptr), &tempfilestat,
+					sizeof(struct stat), 0);
+			*backend_size = tempfilestat.st_size;
+			*total_backend_blocks = (*backend_size == 0) ? 
+				0 : (*backend_size - 1) / MAX_BLOCK_SIZE + 1;
+			ret = init_progress_info(ptr->progress_fd,
+				*total_backend_blocks, *backend_size,
+				backend_metafptr);
+
+			fclose(backend_metafptr);
+			UNLINK(backend_metapath);
+		} else {
+			ret = init_progress_info(ptr->progress_fd, 0, 0,
+					NULL);
+			*backend_size = 0;
+			*total_backend_blocks = 0; 
+		}
+
+		write_log(10, "Debug: backend meta size = %lld\n", *backend_size);
+		if (ret < 0) /* init progress fail */
+			return ret;
+
+
+	/* Reverting/continuing to upload. Just read progress meta and check. */
+	} else {
+		PROGRESS_META progress_meta;
+
+		PREAD(ptr->progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+		/* Cancel to coninue */
+		if (progress_meta.finish_init_backend_data == FALSE) {
+			write_log(2, "Interrupt before uploading, do nothing and"
+				" cancel uploading\n");
+			return -ECANCELED;
+
+		} else {
+			*backend_size = progress_meta.backend_size;
+			*total_backend_blocks =
+				progress_meta.total_backend_blocks;
+
+			/* TODO: Modify later */
+			if (progress_meta.backend_size == 0)
+				*first_upload = TRUE;
+			else
+				*first_upload = FALSE;
+		}	
+	}
+
+	return 0;
 
 errcode_handle:
 	return errcode;

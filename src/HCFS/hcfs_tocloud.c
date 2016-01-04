@@ -131,7 +131,7 @@ static inline void _sync_terminate_thread(int index)
 						"as NOT_UPLOADING in %s\n",
 						inode, __func__);
 			}
-			close_progress_info(sync_ctl.progress_fd[index], inode);
+			del_progress_file(sync_ctl.progress_fd[index], inode);
 
 			fetch_toupload_meta_path(toupload_metapath, inode);
 			if (access(toupload_metapath, F_OK) == 0) {
@@ -255,10 +255,6 @@ static inline int _upload_terminate_thread(int index)
 	}
 	sem_post(&(sync_ctl.sync_op_sem));
 
-#if (DEDUP_ENABLE)
-	memcpy(blk_obj_id, upload_ctl.upload_threads[index].obj_id,
-	       OBJID_LENGTH);
-#endif
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -860,7 +856,8 @@ static inline int _choose_deleted_block(char delete_which_one,
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
 
-	write_log(10, "Debug: toupload_seq = %lld, backend_seq = %lld\n", to_upload_seq, backend_seq);
+	write_log(10, "Debug: toupload_seq = %lld, backend_seq = %lld\n",
+			to_upload_seq, backend_seq);
 	if (delete_which_one == TOUPLOAD_BLOCKS) {
 		if (finish_uploading == FALSE)
 			return -1;
@@ -902,11 +899,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 		ret = get_progress_info(progress_fd, block_count,
-			&block_info); // TODO: read just one time for a page?
-		if (ret == 0) { /* Both block entry and whole page are empty */
-			block_count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
-			continue;
-		} else if (ret < 0) { /* TODO: error handling */
+			&block_info); /* TODO: read just one time for a page? */
+		if (ret < 0) {
+			if (ret == -ENOENT) /* truncated block does not exist */
+				block_count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
+			else /*TODO: more error handling*/
+				write_log(0, "Error: Fail to get uploading info"
+					" for block_%"PRIu64"_%lld\n",
+					(uint64_t)inode, block_count);
 			continue;
 		}
 
@@ -940,7 +940,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	_busy_wait_all_specified_upload_threads(inode);
 
 	write_log(10, "Debug: Finish deleting unuseful blocks for inode %"
-			PRIu64" on cloud\n", inode);
+			PRIu64" on cloud\n", (uint64_t)inode);
 	return 0;
 }
 
@@ -1046,103 +1046,26 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 	setbuf(local_metafptr, NULL);
 
-	/* Download backend meta and fetch seq number if it is regfile 
-	and is not reverting mode */
 	first_upload = FALSE; 
 	/* TODO: How to know if the inode is upload first time? */
-	/* TODO: Move this init backend seq procedure to another function */
 	/* TODO: Consider how to handle disconnection and continuing uploading */
-	if (S_ISREG(ptr->this_mode) && (is_revert == FALSE)) {
-		backend_metafptr = NULL;
-		fetch_backend_meta_path(backend_metapath, this_inode);
-		backend_metafptr = fopen(backend_metapath, "w+");
-		if (backend_metafptr == NULL) {
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
-			fclose(local_metafptr);
-			fclose(toupload_metafptr);
-			unlink(toupload_metapath);
-			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			return;
-		}
-		setbuf(backend_metafptr, NULL); /* Do not need to lock */
-
-		fetch_backend_meta_objname(objname, this_inode);
-		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				objname);
-		if (ret < 0) {
-			if (ret == -ENOENT) {
-				write_log(10, "Debug: upload first time\n");
-				first_upload = TRUE;
-			} else {
-				super_block_update_transit(ptr->inode,
-						FALSE, TRUE);
-				fclose(local_metafptr);
-				fclose(toupload_metafptr);
-				unlink(toupload_metapath);
-				sync_ctl.threads_finished[ptr->which_index] =
-					TRUE;
-				return;
-			}
-		}
-		/* Init backend info and close */
-		if (first_upload == FALSE) {
-			PREAD(fileno(backend_metafptr), &tempfilestat,
-				sizeof(struct stat), 0);
-			backend_size = tempfilestat.st_size;
-			write_log(10, "Debug: backend meta size = %lld\n",
-					backend_size);
-			total_backend_blocks = (backend_size == 0) ? 
-				0 : (backend_size - 1) / MAX_BLOCK_SIZE + 1;
-			ret = init_progress_info(progress_fd,
-				total_backend_blocks, backend_size,
-				backend_metafptr);
-
-			fclose(backend_metafptr);
-			backend_metafptr = NULL;
-			UNLINK(backend_metapath);
-		} else {
-			ret = init_progress_info(progress_fd, 0, 0,
-				NULL);
-			backend_size = 0;
-			total_backend_blocks = 0; 
-		}
-
-		if (ret < 0) { /* init progress fail */
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
-			fclose(toupload_metafptr);
-			unlink(toupload_metapath);
-			fclose(local_metafptr);
-			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			return;
-		}
-	}
-
-	/* If it is reverting mode, read progress meta and get info */
-	if (S_ISREG(ptr->this_mode) && (is_revert == TRUE)) {
-		PROGRESS_META progress_meta;
-
-		memset(&progress_meta, 0, sizeof(PROGRESS_META));
-		PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-		backend_size = progress_meta.backend_size;
-		total_backend_blocks = progress_meta.total_backend_blocks;
-		if (progress_meta.finish_init_backend_data == FALSE) {
-			write_log(2, "Crash before uploading, do nothing and"
-				" cancel uploading\n");
-			fclose(toupload_metafptr);
-			unlink(toupload_metapath);
-			fclose(local_metafptr);		
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
-			return;
-		} else {
-			if (progress_meta.backend_size == 0)
-				first_upload = TRUE;
-			else
-				first_upload = FALSE;
-		}
-	}
 
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
+		/* First download backend meta and init backend block info in
+		 * upload progress file. If it is revert mode now, then
+		 * just read progress meta. */
+		ret = init_backend_file_info(ptr, &first_upload, &backend_size,
+				&total_backend_blocks);
+		if (ret < 0) {
+			fclose(toupload_metafptr);
+			UNLINK(toupload_metapath);
+			fclose(local_metafptr);		
+			super_block_update_transit(ptr->inode, FALSE, TRUE);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			return;	
+		}
+		
 		FSEEK(toupload_metafptr, 0, SEEK_SET);
 		FREAD(&tempfilestat, sizeof(struct stat), 1,
 			toupload_metafptr);
@@ -1336,17 +1259,7 @@ store in some other file */
 			   block data, too. ***/
 			if (toupload_block_status == ST_TODELETE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
-				/*tmp_entry->status = ST_LtoC;*/
-				/* Update local meta */
-				/*FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
-					page_pos, SEEK_SET, TRUE);
-				FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
-					sizeof(BLOCK_ENTRY_PAGE),
-					1, local_metafptr, TRUE);
-				flock(fileno(local_metafptr), LOCK_UN);
-				set_progress_info(progress_fd, block_count,
-					TRUE, 0, 0);*/
-//#if (DEDUP_ENABLE)
+	
 				if (local_block_status == ST_TODELETE) {
 					memset(tmp_entry, 0,
 							sizeof(BLOCK_ENTRY));
@@ -1371,18 +1284,6 @@ store in some other file */
 				if (access(toupload_bpath, F_OK) == 0)
 					unlink(toupload_bpath);
 
-/*#else
-				flock(fileno(local_metafptr), LOCK_UN);
-				sem_wait(&(upload_ctl.upload_queue_sem));
-				sem_wait(&(upload_ctl.upload_op_sem));
-				which_curl = _select_upload_thread(TRUE, TRUE,
-						ptr->inode, block_count,
-						0, page_pos,
-						e_index, progress_fd,
-						FALSE);
-				sem_post(&(upload_ctl.upload_op_sem));
-				dispatch_delete_block(which_curl);
-#endif*/
 				continue;	
 			}
 
@@ -1441,6 +1342,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			unlink(toupload_metapath);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
 			return;
 		}
 	}
@@ -1837,7 +1739,12 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 			thread_ptr->blockno, &temp_block_uploading_status);
 		if (ret < 0)
 			goto errcode_handle;
-		memcpy(thread_ptr->obj_id, /* The obj id should be read from cloud */
+
+		/* The obj id should be read from progress file. This is used
+		 * to compare between old and new object id, and then decide
+		 * whether needs to upload the object. thread_ptr->obj_id
+		 * will be replaced with new object id after uploading */
+		memcpy(thread_ptr->obj_id, 
 			temp_block_uploading_status.backend_objid,
 			OBJID_LENGTH);
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
@@ -2179,7 +2086,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				sync_ctl.is_revert[count] = TRUE;
 				sync_threads[count].is_revert = TRUE;
 			} else {
-				progress_fd = open_progress_info(this_inode);
+				progress_fd = create_progress_file(this_inode);
 				if (progress_fd < 0)
 					break;
 				sync_ctl.is_revert[count] = FALSE;
@@ -2210,7 +2117,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			if (ret < 0) {
 				write_log(0, "Error on tagging inode %lld as "
 					"UPLOADING.\n", this_inode);
-				close_progress_info(progress_fd, this_inode);
+				del_progress_file(progress_fd, this_inode);
 				ret = -1;
 				break;
 			}

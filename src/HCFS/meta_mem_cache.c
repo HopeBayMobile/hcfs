@@ -1632,8 +1632,10 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		/* Do nothing when block index + 1 more than # of blocks
 		 * of to-upload data */
 		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
-			write_log(10, "Debug: Ask if block %lld was uploaded in %s. %lld\n",
-				bindex, __func__, body_ptr->uploading_info.toupload_blocks);
+			write_log(10, "Debug: Ask if block_%"PRIu64
+				"_%lld was uploaded in %s, but # of to-upload "
+				"blocks is %lld\n", (uint64_t)inode, bindex,
+				__func__, body_ptr->uploading_info.toupload_blocks);
 			return 0;
 		}
 
@@ -1653,6 +1655,9 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 					"Code %d\n", __func__, -ret);
 				return ret;
 			} else { /* -EEXIST means target had been copied */
+				write_log(10, "Debug: block_%"PRIu64"_%lld had"
+					" been copied in %s\n", (uint64_t)inode,
+					bindex, __func__);
 				return 0;
 			}
 		}
