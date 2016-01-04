@@ -4715,17 +4715,14 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
-		if (temp_context->uid != 0) {   /* Not privileged */
-			meta_cache_close_file(body_ptr);
-			meta_cache_unlock_entry(body_ptr);
-			fuse_reply_err(req, EPERM);
-			return;
-		}
+		/* Do not need to check if the caller can chown. Kernel will
+		do it. */
 
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
 	}
 
+	/* TODO: Check if need to remove permission checking for group and time */
 	if (to_set & FUSE_SET_ATTR_GID) {
 		if (temp_context->uid != 0) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
