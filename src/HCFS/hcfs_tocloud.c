@@ -324,14 +324,6 @@ static inline int _upload_terminate_thread(int index)
 	finish_uploading = TRUE;
 	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
 		&toupload_block_seq, NULL, &finish_uploading);
-	//write_log(10, "Debug: finish uploading, block%ld_%lld_%lld", this_inode, blockno, toupload_block_seq);
-	//BLOCK_UPLOADING_STATUS tmp_status;
-	//BLOCK_UPLOADING_PAGE tmp_page;
-	//get_progress_info(progress_fd, blockno, &tmp_status);
-	//pread(progress_fd, &tmp_page, sizeof(BLOCK_UPLOADING_PAGE), sizeof(PROGRESS_META));
-	
-	//write_log(10, "Debug: finish uploading, block%ld_%lld_%lld, sizeof progressmeta = %d", 
-	//	this_inode, blockno, tmp_page.status_entry[blockno].to_upload_seq, sizeof(PROGRESS_META));
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
 #endif
 	fetch_toupload_block_path(toupload_blockpath, this_inode,
@@ -1180,7 +1172,8 @@ store in some other file */
 			local_block_seq = tmp_entry->seqnum; /* TODO: seq */
 
 			/*** Case 1: Local is dirty. Update status & upload ***/
-			if (toupload_block_status == ST_LDISK) {
+			if (toupload_block_status == ST_LDISK ||
+					toupload_block_status == ST_LtoC) {
 				/* Important: Update status if this block is
 				not deleted or is NOT newer than to-upload
 				version. */
@@ -1225,37 +1218,7 @@ store in some other file */
 				continue;
 			}
 
-			/*** Case 2: Fail to upload last time, re-upload it.***/
-			if (toupload_block_status == ST_LtoC) {
-				flock(fileno(local_metafptr), LOCK_UN);
-				sem_wait(&(upload_ctl.upload_queue_sem));
-				sem_wait(&(upload_ctl.upload_op_sem));
-#if (DEDUP_ENABLE)
-				which_curl = _select_upload_thread(TRUE, FALSE,
-						TRUE,
-						tmp_entry->obj_id,
-						ptr->inode, block_count,
-						toupload_block_seq, page_pos,
-						e_index, progress_fd,
-						FALSE);
-#else
-				which_curl = _select_upload_thread(TRUE, FALSE,
-						ptr->inode, block_count,
-						toupload_block_seq, page_pos,
-						e_index, progress_fd,
-						FALSE);
-#endif
-
-				sem_post(&(upload_ctl.upload_op_sem));
-				ret = dispatch_upload_block(which_curl);
-				if (ret < 0) {
-					sync_error = TRUE;
-					break;
-				}
-				continue;
-			}
-
-			/*** Case 3: Local block is deleted. Delete backend
+			/*** Case 2: Local block is deleted. Delete backend
 			   block data, too. ***/
 			if (toupload_block_status == ST_TODELETE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
@@ -1304,7 +1267,7 @@ store in some other file */
 					unlink(toupload_bpath);
 
 
-			} else { /* ST_BOTH, ST_CtoL */
+			} else { /* ST_BOTH, ST_CtoL, ST_CLOUD */
 				write_log(10, "Debug: block_%lld is %d\n",
 						block_count, toupload_block_status);
 				flock(fileno(local_metafptr), LOCK_UN);
