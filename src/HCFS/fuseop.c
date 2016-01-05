@@ -6176,7 +6176,8 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 
 	/* Set uploading information */
 	ret = meta_cache_set_uploading_info(meta_cache_entry,
-		data->is_uploading, data->progress_list_fd, progress_meta.total_toupload_blocks);
+		data->is_uploading, data->progress_list_fd,
+		progress_meta.total_toupload_blocks);
 	if (ret < 0) {
 		write_log(0, "Fail to set uploading info in %s\n", __func__);
 		meta_cache_close_file(meta_cache_entry);

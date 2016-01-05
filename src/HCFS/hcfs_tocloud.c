@@ -115,7 +115,7 @@ static inline void _sync_terminate_thread(int index)
 	int ret;
 	int tag_ret;
 	ino_t inode;
-	char toupload_metapath[300];
+	char toupload_metapath[300], local_metapath[400];
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
@@ -123,14 +123,20 @@ static inline void _sync_terminate_thread(int index)
 		ret = pthread_join(sync_ctl.inode_sync_thread[index], NULL);
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
-			/* Reverting do not need communicate with fuse */
-			tag_ret = tag_status_on_fuse(inode, FALSE, 0,
+
+			/* Tell memory cache that finish uploading if
+			 * meta exist */
+			fetch_meta_path(local_metapath, inode);
+			if (!access(local_metapath, F_OK)) {
+				tag_ret = tag_status_on_fuse(inode, FALSE, 0,
 					sync_ctl.is_revert[index]);
-			if (tag_ret < 0) {
-				write_log(0, "Fail to tag inode %lld "
+				if (tag_ret < 0) {
+					write_log(0, "Fail to tag inode %lld "
 						"as NOT_UPLOADING in %s\n",
 						inode, __func__);
+				}
 			}
+
 			del_progress_file(sync_ctl.progress_fd[index], inode);
 
 			fetch_toupload_meta_path(toupload_metapath, inode);
@@ -141,6 +147,8 @@ static inline void _sync_terminate_thread(int index)
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.threads_finished[index] = FALSE;
+			sync_ctl.threads_error[index] = FALSE;
+			sync_ctl.is_revert[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
@@ -263,19 +271,29 @@ static inline int _upload_terminate_thread(int index)
 	progress_fd = upload_ctl.upload_threads[index].progress_fd;
 	toupload_block_seq = upload_ctl.upload_threads[index].seq;
 
-	/* Terminate directly when thread is used to delete old data on cloud */
-	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {
-		char backend_exist;
+	/* Terminate it directly when thread is used to delete
+	 * old data on cloud */
+	if (upload_ctl.upload_threads[index].is_backend_delete != FALSE) {
+		char backend_exist, toupload_exist;
 
 		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
 		upload_ctl.threads_in_use[index] = FALSE;
 		upload_ctl.threads_created[index] = FALSE;
 		upload_ctl.total_active_upload_threads--;
-
 		sem_post(&(upload_ctl.upload_queue_sem));
-		backend_exist = FALSE;
-		set_progress_info(progress_fd, blockno, NULL, &backend_exist,
-			NULL, NULL, NULL);
+
+		/* TODO: Maybe we don't care about deleting backend
+		 * blocks when re-connecting */
+		if (upload_ctl.upload_threads[index].is_backend_delete ==
+				BACKEND_BLOCKS) {
+			backend_exist = FALSE;
+			set_progress_info(progress_fd, blockno, NULL,
+					&backend_exist, NULL, NULL, NULL);
+		} else {
+			toupload_exist = FALSE;
+			set_progress_info(progress_fd, blockno, &toupload_exist,
+					NULL, NULL, NULL, NULL);
+		}
 
 		return 0;
 	}
@@ -919,11 +937,11 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		which_curl = _select_upload_thread(TRUE, FALSE,
 			TRUE, block_objid,
 			inode, block_count, block_seq,
-			0, 0, progress_fd, TRUE);
+			0, 0, progress_fd, delete_which_one);
 #else
 		which_curl = _select_upload_thread(TRUE, FALSE,
 			inode, block_count, block_seq,
-			0, 0, progress_fd, TRUE);
+			0, 0, progress_fd, delete_which_one);
 #endif
 		dispatch_delete_block(which_curl);
 		sem_post(&(upload_ctl.upload_op_sem));
@@ -1110,8 +1128,6 @@ store in some other file */
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 
-			//flock(fileno(metafptr), LOCK_EX);
-
 			if (is_revert == TRUE) {
 				if (did_block_finish_uploading(progress_fd, 
 					block_count) == TRUE)
@@ -1213,14 +1229,12 @@ store in some other file */
 					sync_error = TRUE;
 					break;
 				}
-				/*TODO: Maybe should also first copy block
-					out first*/
 				continue;
-			}
 
-			/*** Case 2: Local block is deleted. Delete backend
-			   block data, too. ***/
-			if (toupload_block_status == ST_TODELETE) {
+			/*** Case 2: Local block is deleted or none.
+			 * Do nothing ***/
+			} else if (toupload_block_status == ST_TODELETE ||
+					toupload_block_status == ST_NONE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
 	
 				if (local_block_status == ST_TODELETE) {
@@ -1248,24 +1262,6 @@ store in some other file */
 					unlink(toupload_bpath);
 
 				continue;	
-			}
-
-			if (toupload_block_status == ST_NONE) {
-				write_log(10, "Debug: block_%lld is ST_NONE\n",
-					block_count);
-				flock(fileno(local_metafptr), LOCK_UN);
-				finish_uploading = TRUE;
-				toupload_exist = FALSE;
-				set_progress_info(progress_fd, block_count,
-					&toupload_exist, NULL, NULL, NULL,
-					&finish_uploading);
-
-				fetch_toupload_block_path(toupload_bpath,
-					this_inode, block_count,
-					toupload_block_seq);
-				if (access(toupload_bpath, F_OK) == 0)
-					unlink(toupload_bpath);
-
 
 			} else { /* ST_BOTH, ST_CtoL, ST_CLOUD */
 				write_log(10, "Debug: block_%lld is %d\n",
@@ -1319,10 +1315,13 @@ store in some other file */
 
 	/* Abort sync to cloud if error occured or system is going down */
 	if ((sync_error == TRUE) || (hcfs_system->system_going_down == TRUE)) {
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		/* TODO: When system going down, re-upload it later */
+		delete_backend_blocks(progress_fd, total_blocks,
+			ptr->inode, TOUPLOAD_BLOCKS);
 		fclose(local_metafptr);
 		fclose(toupload_metafptr);
 		unlink(toupload_metapath);
+		super_block_update_transit(ptr->inode, FALSE, TRUE);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
@@ -1401,11 +1400,9 @@ store in some other file */
 			_get_inode_sync_error(ptr->inode, &sync_error);	
 		}
 		if (sync_error == TRUE) {
-			write_log(10, "Sync inode %" PRIu64
+			write_log(0, "Sync inode %" PRIu64
 				      " to backend incomplete.\n",
 				  (uint64_t)ptr->inode);
-			/* TODO: Revert info re last upload if upload
-				fails */
 		}
 	} else {
 
@@ -1428,11 +1425,15 @@ store in some other file */
 		return;
 	}
 
-	if (sync_error == TRUE) /* TODO: Something has to be done? */
+	if (sync_error == TRUE) { /* Delete to-upload blocks */
+		delete_backend_blocks(progress_fd, total_blocks,
+				ptr->inode, TOUPLOAD_BLOCKS);
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
+	}
 
-	if (S_ISREG(ptr->this_mode)) {
 	/* Delete old block data on backend and wait for those threads */
+	if (S_ISREG(ptr->this_mode)) {
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, BACKEND_BLOCKS);
 	}
@@ -1457,6 +1458,8 @@ errcode_handle:
 	fclose(local_metafptr);
 	flock(fileno(toupload_metafptr), LOCK_UN);
 	fclose(toupload_metafptr);
+	delete_backend_blocks(progress_fd, total_blocks,
+			ptr->inode, TOUPLOAD_BLOCKS);
 	super_block_update_transit(ptr->inode, FALSE, TRUE);
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 }

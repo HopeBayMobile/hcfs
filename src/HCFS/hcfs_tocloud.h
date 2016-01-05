@@ -29,8 +29,8 @@
 #define MAX_UPLOAD_CONCURRENCY 8
 #define MAX_SYNC_CONCURRENCY 4
 
-#define TOUPLOAD_BLOCKS 0
-#define BACKEND_BLOCKS 1
+#define TOUPLOAD_BLOCKS 1
+#define BACKEND_BLOCKS 2
 
 typedef struct {
 	off_t page_filepos;
@@ -40,7 +40,7 @@ typedef struct {
 	long long seq;
 	char is_block;
 	char is_delete;
-	char is_backend_delete;
+	char is_backend_delete; /* FALSE, TOUPLOAD_BLOCKS, BACKEND_BLOCKS */
 	int which_curl;
 	int progress_fd;
 	char tempfilename[400];
