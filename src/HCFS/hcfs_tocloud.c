@@ -276,12 +276,6 @@ static inline int _upload_terminate_thread(int index)
 	if (upload_ctl.upload_threads[index].is_backend_delete != FALSE) {
 		char backend_exist, toupload_exist;
 
-		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
-		upload_ctl.threads_in_use[index] = FALSE;
-		upload_ctl.threads_created[index] = FALSE;
-		upload_ctl.total_active_upload_threads--;
-		sem_post(&(upload_ctl.upload_queue_sem));
-
 		/* TODO: Maybe we don't care about deleting backend
 		 * blocks when re-connecting */
 		if (upload_ctl.upload_threads[index].is_backend_delete ==
@@ -294,6 +288,13 @@ static inline int _upload_terminate_thread(int index)
 			set_progress_info(progress_fd, blockno, &toupload_exist,
 					NULL, NULL, NULL, NULL);
 		}
+
+		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
+		upload_ctl.threads_in_use[index] = FALSE;
+		upload_ctl.threads_created[index] = FALSE;
+		upload_ctl.threads_finished[index] = FALSE;
+		upload_ctl.total_active_upload_threads--;
+		sem_post(&(upload_ctl.upload_queue_sem));
 
 		return 0;
 	}
@@ -319,7 +320,8 @@ static inline int _upload_terminate_thread(int index)
 
 	flock(fileno(toupload_metafptr), LOCK_EX);
 	is_toupload_meta_lock = TRUE;
-	
+
+	/* Record object id on to-upload meta */	
 	FSEEK(toupload_metafptr, page_filepos, SEEK_SET);
 	FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, toupload_metafptr);
 	memcpy(temppage.block_entries[e_index].obj_id, blk_obj_id,
@@ -363,78 +365,75 @@ static inline int _upload_terminate_thread(int index)
 				return -errcode;
 			}
 		}
-		if (metafptr != NULL) {
-			setbuf(metafptr, NULL);
-			flock(fileno(metafptr), LOCK_EX);
-			/*Perhaps the file is deleted already*/
-			if (!access(thismetapath, F_OK)) {
-				FSEEK(metafptr, page_filepos, SEEK_SET);
-				FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-				      metafptr);
-				tmp_entry = &(temppage.block_entries[e_index]);
-				tmp_size = sizeof(BLOCK_ENTRY_PAGE);
-				if ((tmp_entry->status == ST_LtoC) &&
-				    (is_delete == FALSE)) {
-					tmp_entry->status = ST_BOTH;
-					tmp_entry->uploaded = TRUE;
-#if (DEDUP_ENABLE)
-					/* Store hash in block meta too */
-					memcpy(tmp_entry->obj_id, blk_obj_id,
-					       OBJID_LENGTH);
-#endif
-					ret = fetch_block_path(
-					    blockpath, this_inode, blockno);
-					if (ret < 0) {
-						errcode = ret;
-						goto errcode_handle;
-					}
-					ret = set_block_dirty_status(
-					    blockpath, NULL, FALSE);
-					if (ret < 0) {
-						errcode = ret;
-						goto errcode_handle;
-					}
-					cache_block_size =
-					    check_file_size(blockpath);
-					sem_wait(&(hcfs_system->access_sem));
-					statptr = &(hcfs_system->systemdata);
-					statptr->dirty_cache_size -=
-					    cache_block_size;
-					if (statptr->dirty_cache_size < 0)
-						statptr->dirty_cache_size = 0;
-					sem_post(&(hcfs_system->access_sem));
+		setbuf(metafptr, NULL);
+		flock(fileno(metafptr), LOCK_EX);
 
-					FSEEK(metafptr, page_filepos, SEEK_SET);
-					FWRITE(&temppage, tmp_size, 1,
-								metafptr);
-				} else {
-					if ((tmp_entry->status ==
-					     ST_TODELETE) &&
-					    (is_delete == TRUE)) {
-						tmp_entry->status = ST_NONE;
-						tmp_entry->uploaded = FALSE;
-						FSEEK(metafptr, page_filepos,
-						      SEEK_SET);
-						FWRITE(&temppage, tmp_size, 1,
-						       metafptr);
-					}
-				}
-				/*Check if status is ST_NONE. If so,
-				the block is removed due to truncating.
-				(And perhaps block deletion thread finished
-				earlier than upload, and deleted nothing.)
-				Need to schedule block for deletion due to
-				truncating*/
-				if ((tmp_entry->status == ST_NONE) &&
-				    (is_delete == FALSE)) {
-					write_log(5,
-						  "Debug upload block gone\n");
-					need_delete_object = TRUE;
-				}
-			}
-			flock(fileno(metafptr), LOCK_UN);
-			fclose(metafptr);
+		/*Perhaps the file had been deleted already*/
+		if (access(thismetapath, F_OK) < 0) {
+			upload_ctl.threads_in_use[index] = FALSE;
+			upload_ctl.threads_created[index] = FALSE;
+			upload_ctl.threads_finished[index] = FALSE;
+			upload_ctl.total_active_upload_threads--;
+			sem_post(&(upload_ctl.upload_queue_sem));
+			return;
 		}
+
+		/* Begin to change status of local meta */
+		FSEEK(metafptr, page_filepos, SEEK_SET);
+		FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
+		tmp_entry = &(temppage.block_entries[e_index]);
+		tmp_size = sizeof(BLOCK_ENTRY_PAGE);
+		if ((tmp_entry->status == ST_LtoC) && (is_delete == FALSE)) {
+			tmp_entry->status = ST_BOTH;
+			tmp_entry->uploaded = TRUE;
+#if (DEDUP_ENABLE)
+			/* Store hash in block meta too */
+			memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
+#endif
+			ret = fetch_block_path(blockpath, this_inode, blockno);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			ret = set_block_dirty_status(blockpath, NULL, FALSE);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			cache_block_size = check_file_size(blockpath);
+			sem_wait(&(hcfs_system->access_sem));
+			statptr = &(hcfs_system->systemdata);
+			statptr->dirty_cache_size -= cache_block_size;
+			if (statptr->dirty_cache_size < 0)
+				statptr->dirty_cache_size = 0;
+			sem_post(&(hcfs_system->access_sem));
+
+			FSEEK(metafptr, page_filepos, SEEK_SET);
+			FWRITE(&temppage, tmp_size, 1,
+					metafptr);
+		} else {
+			if ((tmp_entry->status == ST_TODELETE) &&
+					(is_delete == TRUE)) {
+				tmp_entry->status = ST_NONE;
+				tmp_entry->uploaded = FALSE;
+				FSEEK(metafptr, page_filepos, SEEK_SET);
+				FWRITE(&temppage, tmp_size, 1, metafptr);
+			}
+		}
+		/*Check if status is ST_NONE. If so,
+		  the block is removed due to truncating.
+		  (And perhaps block deletion thread finished
+		  earlier than upload, and deleted nothing.)
+		  Need to schedule block for deletion due to
+		  truncating. TODO: Now we do not care about this
+		  case because it will be deleted next time. */
+		if ((tmp_entry->status == ST_NONE) && (is_delete == FALSE)) {
+			write_log(5, "Debug upload block gone\n");
+			need_delete_object = TRUE;
+		}
+
+		flock(fileno(metafptr), LOCK_UN);
+		fclose(metafptr);
 	}
 
 	/* If file is deleted or block already deleted, create deleted-thread
@@ -1193,7 +1192,7 @@ store in some other file */
 				/* Important: Update status if this block is
 				not deleted or is NOT newer than to-upload
 				version. */
-				if ((local_block_status != ST_TODELETE) &&
+				if ((local_block_status == ST_LDISK) &&
 					(local_block_seq == toupload_block_seq)) {
 
 					tmp_entry->status = ST_LtoC;
@@ -1932,7 +1931,7 @@ int dispatch_upload_block(int which_curl)
 	}
 
 	ret = check_and_copy_file(thisblockpath, toupload_blockpath, TRUE);
-	if (ret < 0) {
+	if (ret < 0) { /* -EEXIST means target had been copied when writing */
 		if (ret != -EEXIST) {
 			errcode = ret;
 			goto errcode_handle;

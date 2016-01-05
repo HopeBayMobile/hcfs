@@ -692,7 +692,7 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 	if (access(srcpath, F_OK) != 0) {
 		errcode = errno;
 		if (errcode == ENOENT)
-			write_log(0, "Error: Source file does not exist. In %s\n",
+			write_log(2, "Warn: Source file does not exist. In %s\n",
 				__func__);
 		else
 			write_log(0, "IO error in %s. Code %d, %s\n", __func__,

@@ -1650,11 +1650,14 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		write_log(10, "Debug: begin to copy block, obj is %s", objname);
 		ret = check_and_copy_file(local_bpath, toupload_bpath, TRUE);
 		if (ret < 0) {
-			if (ret != -EEXIST) {
+			if (ret != -EEXIST && ret != -ENOENT) {
 				write_log(0, "Error: Copy block error in %s. "
 					"Code %d\n", __func__, -ret);
 				return ret;
-			} else { /* -EEXIST means target had been copied */
+
+			/* -EEXIST means target had been copied, and -ENOENT
+			 * means src file is deleted. */
+			} else {
 				write_log(10, "Debug: block_%"PRIu64"_%lld had"
 					" been copied in %s\n", (uint64_t)inode,
 					bindex, __func__);
