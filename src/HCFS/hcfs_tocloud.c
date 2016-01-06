@@ -1696,7 +1696,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	unsigned char *key = NULL;
 	unsigned char *data = NULL;
 
-#ifdef ENCRYPT_ENABLE
+#if ENCRYPT_ENABLE
 	key = get_key();
 #endif
 	FILE *new_fptr = transform_fd(fptr, key, &data,

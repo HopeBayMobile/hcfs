@@ -54,7 +54,9 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
-#ifndef _ANDROID_ENV_
+#ifdef _ANDROID_ENV_
+#include <sys/xattr.h>
+#else
 #include <attr/xattr.h>
 #endif
 #include <inttypes.h>
@@ -4800,17 +4802,14 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
-		if (temp_context->uid != 0) {   /* Not privileged */
-			meta_cache_close_file(body_ptr);
-			meta_cache_unlock_entry(body_ptr);
-			fuse_reply_err(req, EPERM);
-			return;
-		}
+		/* Do not need to check if the caller can chown. Kernel will
+		do it. */
 
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
 	}
 
+	/* TODO: Check if need to remove permission checking for group and time */
 	if (to_set & FUSE_SET_ATTR_GID) {
 		if (temp_context->uid != 0) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
@@ -5306,7 +5305,6 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 *                value with new value.
 *
 *************************************************************************/
-#ifndef _ANDROID_ENV_
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	const char *value, size_t size, int flag)
 {
@@ -5399,7 +5397,6 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
-# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5410,7 +5407,6 @@ error_handle:
 *                If name is not found, reply error.
 *
 *************************************************************************/
-#ifndef _ANDROID_ENV_
 static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	size_t size)
 {
@@ -5528,7 +5524,6 @@ error_handle:
 		free(value);
 	fuse_reply_err(req, -retcode);
 }
-# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5540,7 +5535,6 @@ error_handle:
 *                filled with all names separated by null character.
 *
 *************************************************************************/
-#ifndef _ANDROID_ENV_
 static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 {
 	XATTR_PAGE *xattr_page;
@@ -5633,7 +5627,6 @@ error_handle:
 		free(key_buf);
 	fuse_reply_err(req, -retcode);
 }
-# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -5644,7 +5637,6 @@ error_handle:
 *                error if attribute is not found.
 *
 *************************************************************************/
-#ifndef _ANDROID_ENV_
 static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	const char *name)
 {
@@ -5730,7 +5722,6 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
-# endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -6055,12 +6046,10 @@ struct fuse_lowlevel_ops hfuse_ops = {
 	.forget = hfuse_ll_forget,
 	.symlink = hfuse_ll_symlink,
 	.readlink = hfuse_ll_readlink,
-#ifndef _ANDROID_ENV_
 	.setxattr = hfuse_ll_setxattr,
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
-#endif
 	.link = hfuse_ll_link,
 	.create = hfuse_ll_create,
 };
