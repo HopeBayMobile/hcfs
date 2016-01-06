@@ -476,6 +476,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
 	/* Return uid 0 if error occurred */
+	data = NULL;
 	*uid = 0;
 
 	snprintf(sql, sizeof(sql),
