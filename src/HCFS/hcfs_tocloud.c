@@ -370,12 +370,10 @@ static inline int _upload_terminate_thread(int index)
 
 		/*Perhaps the file had been deleted already*/
 		if (access(thismetapath, F_OK) < 0) {
-			upload_ctl.threads_in_use[index] = FALSE;
-			upload_ctl.threads_created[index] = FALSE;
-			upload_ctl.threads_finished[index] = FALSE;
-			upload_ctl.total_active_upload_threads--;
-			sem_post(&(upload_ctl.upload_queue_sem));
-			return;
+			errcode = errno;
+			flock(fileno(metafptr), LOCK_UN);
+			fclose(metafptr);
+			return -errcode;
 		}
 
 		/* Begin to change status of local meta */
@@ -438,41 +436,7 @@ static inline int _upload_terminate_thread(int index)
 
 	/* If file is deleted or block already deleted, create deleted-thread
 	   to delete cloud block data. */
-/*	if ((access(thismetapath, F_OK) == -1) || (need_delete_object)) {
-		sem_wait(&(delete_ctl.delete_queue_sem));
-		sem_wait(&(delete_ctl.delete_op_sem));
-		which_curl = -1;
-		for (count2 = 0; count2 < MAX_DELETE_CONCURRENCY; count2++) {
-			if (delete_ctl.threads_in_use[count2] == FALSE) {
-				delete_ctl.threads_in_use[count2] = TRUE;
-				delete_ctl.threads_created[count2] = FALSE;
-				delete_ctl.threads_finished[count2] = FALSE;
 
-				tmp_del = &(delete_ctl.delete_threads[count2]);
-				tmp_del->is_block = TRUE;
-				tmp_del->inode = this_inode;
-				tmp_del->blockno = blockno;
-				tmp_del->which_curl = count2;
-				tmp_del->which_index = count2;
-#if (DEDUP_ENABLE)
-				memcpy(tmp_del->obj_id, blk_obj_id,
-				       OBJID_LENGTH);
-#endif
-
-				delete_ctl.total_active_delete_threads++;
-				which_curl = count2;
-				break;
-			}
-		}
-		sem_post(&(delete_ctl.delete_op_sem));
-		pthread_create(
-		    &(delete_ctl.threads_no[which_curl]), NULL,
-		    (void *)&con_object_dsync,
-		    (void *)&(delete_ctl.delete_threads[which_curl]));
-
-		delete_ctl.threads_created[which_curl] = TRUE;
-	}
-*/
 	/* Finally reclaim the uploaded-thread. */
 	upload_ctl.threads_in_use[index] = FALSE;
 	upload_ctl.threads_created[index] = FALSE;
@@ -855,7 +819,8 @@ static inline int _choose_deleted_block(char delete_which_one,
 
 #else
 static inline int _choose_deleted_block(char delete_which_one, 
-	const BLOCK_UPLOADING_STATUS *block_info, long long *block_seq)
+		const BLOCK_UPLOADING_STATUS *block_info,
+		long long *block_seq, ino_t inode)
 {
 	char finish_uploading;
 	long long to_upload_seq;
@@ -865,13 +830,19 @@ static inline int _choose_deleted_block(char delete_which_one,
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
 
-	write_log(10, "Debug: toupload_seq = %lld, backend_seq = %lld\n",
+	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
+			"backend_seq = %lld\n", (uint64_t)inode,
 			to_upload_seq, backend_seq);
+
 	if (delete_which_one == TOUPLOAD_BLOCKS) {
+		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
 			return -1;
+		/* Do not need to delete if block does not exist */
 		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == FALSE)
 			return -1;
+		/* Do not need to delete if seq is the same as backend,
+		 * because it is not uploaded */
 		if (to_upload_seq == backend_seq)
 			return -1;
 
@@ -879,6 +850,8 @@ static inline int _choose_deleted_block(char delete_which_one,
 		return 0;
 	}
 
+	/* Do not need to check finish_uploading because backend blocks
+	 * exist on cloud. */
 	if (delete_which_one == BACKEND_BLOCKS) {
 		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
 			return -1;		
@@ -903,8 +876,9 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	int which_curl;
 
 	if (delete_which_one == TOUPLOAD_BLOCKS)
-	write_log(10, "Debug: Delete those blocks uploaded just now for "
-		"inode_%"PRIu64" because local meta disapper\n", (uint64_t)inode);
+	write_log(4, "Debug: Delete those blocks uploaded just now for "
+		"inode_%"PRIu64" because local meta is deleted\n",
+		(uint64_t)inode);
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 		ret = get_progress_info(progress_fd, block_count,
@@ -921,11 +895,11 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 #if (DEDUP_ENABLE)
 		ret = _choose_deleted_block(delete_which_one,
-			&block_info, block_objid);
+			&block_info, block_objid, inode);
 #else
 		block_seq = 0;
 		ret = _choose_deleted_block(delete_which_one,
-			&block_info, &block_seq);
+			&block_info, &block_seq, inode);
 #endif
 		if (ret < 0)
 			continue;
@@ -987,9 +961,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	off_t toupload_size;
 	BLOCK_ENTRY *tmp_entry;
 	long long temp_trunc_size;
-//#ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
-//#endif
 	size_t ret_size;
 	char sync_error;
 	int count1;

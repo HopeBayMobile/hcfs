@@ -8,6 +8,7 @@
 *
 * Revision History
 * 2015/2/16 Jiahong added header for this file, and revising coding style.
+* 2016/1/6 Kewei Add flag of continuing uploading.
 *
 **************************************************************************/
 #ifndef GW20_HCFS_HCFS_TOCLOUD_H_
@@ -82,12 +83,29 @@ typedef struct {
 	sem_t sync_queue_sem; /*similar to upload_queue_sem*/
 	pthread_t sync_handler_thread;
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
-	ino_t threads_in_use[MAX_SYNC_CONCURRENCY];
-	int progress_fd[MAX_SYNC_CONCURRENCY];
-	char threads_created[MAX_SYNC_CONCURRENCY];
-	char threads_finished[MAX_SYNC_CONCURRENCY];
-	char threads_error[MAX_SYNC_CONCURRENCY];
-	char is_revert[MAX_SYNC_CONCURRENCY];
+
+	ino_t threads_in_use[MAX_SYNC_CONCURRENCY]; /* Now syncing inode */
+
+	int progress_fd[MAX_SYNC_CONCURRENCY]; /* File descriptor of uploading
+						  progress file */
+
+	char threads_created[MAX_SYNC_CONCURRENCY]; /* This thread is created */
+
+	char threads_finished[MAX_SYNC_CONCURRENCY]; /* This thread finished
+							uploading, and it can be
+							reclaimed */
+
+	char threads_error[MAX_SYNC_CONCURRENCY]; /* When error occur, cancel
+						     uploading this time */
+
+	BOOL is_revert[MAX_SYNC_CONCURRENCY]; /* Check whether syncing this time
+						 keeps going syncing last
+						 time of given uploaded inode */
+
+	BOOL continue_nexttime[MAX_SYNC_CONCURRENCY]; /* When disconnection or
+							system going down,
+							continue uploading
+							next time */
 	int total_active_sync_threads;
 	/*sync threads: used for syncing meta/block in a single inode*/
 } SYNC_THREAD_CONTROL;
