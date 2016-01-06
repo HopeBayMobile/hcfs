@@ -820,6 +820,8 @@ errcode_handle:
 	flock(fileno(tar_ptr), LOCK_UN);
 	fclose(src_ptr);
 	fclose(tar_ptr);
+	if (access(srcpath, F_OK) == 0)
+		unlink(srcpath);
 	return errcode;
 }
 
