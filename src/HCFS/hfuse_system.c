@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
 #ifndef _ANDROID_ENV_
 #include <sys/shm.h>
 #include <sys/ipc.h>
@@ -253,6 +254,14 @@ void init_backend_related_module()
 
 }
 
+/* Signal handler for recording ignored signals */
+void sigpipe_handler(int num)
+{
+        write_log(2, "Warning: Received signal %s and ignored.\n",
+	          strsignal(num));
+}
+
+
 /************************************************************************
 *
 * Function name: main
@@ -268,6 +277,12 @@ int main(int argc, char **argv)
 	int ret_val;
 	struct rlimit nofile_limit;
 	int count;
+        struct sigaction newact;
+
+	/* For SIGPIPE, only record a warning log for now */
+        memset(&newact, 0, sizeof(struct sigaction));
+        newact.sa_handler = sigpipe_handler;
+        sigaction(SIGPIPE, &newact, NULL);
 
 	logptr = NULL;
 
