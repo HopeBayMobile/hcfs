@@ -403,10 +403,11 @@ static inline int _upload_terminate_thread(int index)
 	if (access(toupload_blockpath, F_OK) == 0)
 		UNLINK(toupload_blockpath);
 
-	need_delete_object = FALSE;
+/*	need_delete_object = FALSE;
+ */
 	/* Perhaps the file is deleted already. If not, modify the block
 	  status in file meta. */
-	if (access(thismetapath, F_OK) == 0) {
+/*	if (access(thismetapath, F_OK) == 0) {
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;
@@ -418,17 +419,17 @@ static inline int _upload_terminate_thread(int index)
 		}
 		setbuf(metafptr, NULL);
 		flock(fileno(metafptr), LOCK_EX);
-
+*/
 		/*Perhaps the file had been deleted already*/
-		if (access(thismetapath, F_OK) < 0) {
+/*		if (access(thismetapath, F_OK) < 0) {
 			errcode = errno;
 			flock(fileno(metafptr), LOCK_UN);
 			fclose(metafptr);
 			return -errcode;
 		}
-
+*/
 		/* Begin to change status of local meta */
-		FSEEK(metafptr, page_filepos, SEEK_SET);
+/*		FSEEK(metafptr, page_filepos, SEEK_SET);
 		FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 		tmp_entry = &(temppage.block_entries[e_index]);
 		tmp_size = sizeof(BLOCK_ENTRY_PAGE);
@@ -436,8 +437,9 @@ static inline int _upload_terminate_thread(int index)
 			tmp_entry->status = ST_BOTH;
 			tmp_entry->uploaded = TRUE;
 #if (DEDUP_ENABLE)
+*/
 			/* Store hash in block meta too */
-			memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
+/*			memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
 #endif
 			ret = fetch_block_path(blockpath, this_inode, blockno);
 			if (ret < 0) {
@@ -469,6 +471,7 @@ static inline int _upload_terminate_thread(int index)
 				FWRITE(&temppage, tmp_size, 1, metafptr);
 			}
 		}
+*/
 		/*Check if status is ST_NONE. If so,
 		  the block is removed due to truncating.
 		  (And perhaps block deletion thread finished
@@ -476,7 +479,7 @@ static inline int _upload_terminate_thread(int index)
 		  Need to schedule block for deletion due to
 		  truncating. TODO: Now we do not care about this
 		  case because it will be deleted next time. */
-		if ((tmp_entry->status == ST_NONE) && (is_delete == FALSE)) {
+/*		if ((tmp_entry->status == ST_NONE) && (is_delete == FALSE)) {
 			write_log(5, "Debug upload block gone\n");
 			need_delete_object = TRUE;
 		}
@@ -484,7 +487,7 @@ static inline int _upload_terminate_thread(int index)
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 	}
-
+*/
 	/* If file is deleted or block already deleted, create deleted-thread
 	   to delete cloud block data. */
 
@@ -977,6 +980,112 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	return 0;
 }
 
+int _change_status_to_CLOUD(ino_t inode, int progress_fd,
+		FILE *local_metafptr, char *local_metapath)
+{
+	PROGRESS_META progress_meta;
+	BLOCK_UPLOADING_STATUS block_info;
+	FILE_META_TYPE tempfilemeta;
+	BLOCK_ENTRY_PAGE tmp_page;
+	long long block_count, total_blocks, which_page, current_page;
+	long long page_pos;
+	long long local_seq;
+	char local_status;
+	int e_index;
+	int ret, errcode;
+	ssize_t ret_ssize;
+	char blockpath[300];
+	SYSTEM_DATA_TYPE *statptr;
+	off_t cache_block_size;
+
+	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	total_blocks = progress_meta.total_toupload_blocks;
+
+	current_page = -1;
+	for (block_count = 0; block_count < total_blocks; block_count++) {
+		ret = get_progress_info(progress_fd, block_count, &block_info);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				block_count += (BLK_INCREMENTS - 1);
+				continue;
+			} else {
+				break;
+			}
+		}
+
+		if (TOUPLOAD_BLOCK_EXIST(block_info.block_exist) == TRUE) {
+			/* It did not upload anything. (CLOUD/CtoL/BOTH) */
+			if (block_info.to_upload_seq == block_info.backend_seq)
+				continue;
+		} else {
+			/* TO_DELETE/ NONE */
+			continue;
+		}
+
+		/* Change status if local status is ST_LtoC */
+		flock(fileno(local_metafptr), LOCK_EX);
+		if (access(local_metapath, F_OK) < 0) {
+			flock(fileno(local_metafptr), LOCK_UN);
+			break;
+		}
+
+		e_index = block_count % BLK_INCREMENTS;
+		which_page = block_count / BLK_INCREMENTS;
+		if (which_page != current_page) {
+			PREAD(fileno(local_metafptr), &tempfilemeta,
+				sizeof(FILE_META_TYPE), sizeof(struct stat));
+			page_pos = seek_page2(&tempfilemeta,
+				local_metafptr, which_page, 0);
+			if (page_pos <= 0) {
+				flock(fileno(local_metafptr), LOCK_UN);
+				continue;
+			}
+			current_page = which_page;
+		}
+
+		PREAD(fileno(local_metafptr), &tmp_page,
+				sizeof(BLOCK_ENTRY_PAGE), page_pos);
+		local_status = tmp_page.block_entries[e_index].status;
+		local_seq = tmp_page.block_entries[e_index].seqnum;
+		/* Change status if status is ST_LtoC */
+		if (local_status == ST_LtoC &&
+				local_seq == block_info.to_upload_seq) {
+			tmp_page.block_entries[e_index].status = ST_BOTH;
+			tmp_page.block_entries[e_index].uploaded = TRUE;
+			
+			ret = fetch_block_path(blockpath, inode, block_count);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			ret = set_block_dirty_status(blockpath, NULL, FALSE);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			/* Remember dirty_cache_size */
+			cache_block_size = check_file_size(blockpath);
+			sem_wait(&(hcfs_system->access_sem));
+			statptr = &(hcfs_system->systemdata);
+			statptr->dirty_cache_size -= cache_block_size;
+			if (statptr->dirty_cache_size < 0)
+				statptr->dirty_cache_size = 0;
+			sem_post(&(hcfs_system->access_sem));
+
+			PWRITE(fileno(local_metafptr), &tmp_page,
+					sizeof(BLOCK_ENTRY_PAGE), page_pos);
+		}
+
+		flock(fileno(local_metafptr), LOCK_UN);
+	}
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(local_metafptr), LOCK_UN);
+	return errcode;
+}
+
 /**
  * Main function to upload all block and meta
  *
@@ -1424,7 +1533,6 @@ store in some other file */
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
-		fclose(local_metafptr);
 		fclose(toupload_metafptr);
 
 		ret = schedule_sync_meta(toupload_metapath, which_curl);
@@ -1456,7 +1564,6 @@ store in some other file */
 	} else {
 
 		flock(fileno(local_metafptr), LOCK_UN);
-		fclose(local_metafptr);
 		fclose(toupload_metafptr);
 
 		/* Delete those uploaded blocks if local meta is removed */
@@ -1488,8 +1595,14 @@ store in some other file */
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
+		_change_status_to_CLOUD(ptr->inode, progress_fd,
+				local_metafptr, local_metapath);
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, BACKEND_BLOCKS);
+		fclose(local_metafptr);
+
+	} else {
+		fclose(local_metafptr);
 	}
 
 	/* Upload successfully. Update FS stat in backend */

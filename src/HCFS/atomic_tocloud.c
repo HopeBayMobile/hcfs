@@ -292,8 +292,7 @@ int get_progress_info(int fd, long long block_index,
 	flock(fd, LOCK_UN);
 
 	if (offset <= 0) {
-		/* It may occur when backend has truncated data
-		 * and this block has not been uploaded. */
+		/* It may occur when query a truncated block. */
 		memset(block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		block_uploading_status->finish_uploading = FALSE;
