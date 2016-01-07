@@ -165,7 +165,7 @@ static inline void _sync_terminate_thread(int index)
 				struct stat tmpstat;
 				long long num_blocks, i;
 				char block_path[300];
-				FILE *fptr = fopen(toupload_metapath, F_OK);
+				FILE *fptr = fopen(toupload_metapath, "r");
 				if (fptr != NULL) {
 					pread(fileno(fptr), &tmpstat,
 						sizeof(struct stat), 0);
@@ -332,10 +332,13 @@ static inline int _upload_terminate_thread(int index)
 			backend_exist = FALSE;
 			set_progress_info(progress_fd, blockno, NULL,
 					&backend_exist, NULL, NULL, NULL);
+		/* When deleting to-upload blocks, it is important to recover
+		 * the block status to ST_LDISK */
 		} else {
 			toupload_exist = FALSE;
 			set_progress_info(progress_fd, blockno, &toupload_exist,
 					NULL, NULL, NULL, NULL);
+			// TODO: _revert_block_status_LDISK(this_inode, blockno, e_index, page_filepos);
 		}
 
 		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
@@ -399,7 +402,6 @@ static inline int _upload_terminate_thread(int index)
 			blockno, toupload_block_seq);
 	if (access(toupload_blockpath, F_OK) == 0)
 		UNLINK(toupload_blockpath);
-
 
 	need_delete_object = FALSE;
 	/* Perhaps the file is deleted already. If not, modify the block
@@ -926,8 +928,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	if (delete_which_one == TOUPLOAD_BLOCKS)
 	write_log(4, "Debug: Delete those blocks uploaded just now for "
-		"inode_%"PRIu64" because local meta is deleted\n",
-		(uint64_t)inode);
+		"inode_%"PRIu64"\n", (uint64_t)inode);
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 		ret = get_progress_info(progress_fd, block_count,
@@ -1229,6 +1230,18 @@ store in some other file */
 					 * return when to-upload meta does
 					 * not match local meta */
 					if (is_revert == TRUE) {
+						write_log(4, "When continue"
+							"uploading inode %"
+							PRIu64", cancel to"
+							" continue uploading"
+							" because block %lld"
+							" has local_seq %lld"
+							" and toupload seq"
+							" %lld\n", (uint64_t)
+							this_inode,
+							block_count,
+							local_block_seq,
+							toupload_block_seq);
 						sync_error = TRUE;
 						sync_ctl.threads_error[ptr->which_index]
 							= TRUE;

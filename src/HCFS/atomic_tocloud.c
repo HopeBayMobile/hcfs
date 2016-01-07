@@ -902,10 +902,13 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 				write_log(10, "Debug: upload first time\n");
 				*first_upload = TRUE;
 				fclose(backend_metafptr);
-				UNLINK(backend_metapath);
+				unlink(backend_metapath);
 			} else { /* fetch error */
+				write_log(0, "Fail to donwload %s in %s\n",
+					objname, __func__);
 				fclose(backend_metafptr);
-				UNLINK(backend_metapath);
+				/* Be careful with using macro UNLINK */
+				unlink(backend_metapath);
 				return ret;
 			}
 		} else { /* Success */
@@ -932,7 +935,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 			*total_backend_blocks = 0; 
 		}
 
-		write_log(10, "Debug: backend meta size = %lld\n", *backend_size);
+		write_log(10, "Debug: backend size = %lld\n", *backend_size);
 		if (ret < 0) /* init progress fail */
 			return ret;
 
@@ -1018,7 +1021,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		if (errcode != ENOENT) {
 			write_log(0, "Error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
-			return;
+			goto errcode_handle;
 		} else {
 			backend_meta_exist = FALSE;
 		}
@@ -1032,7 +1035,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		if (errcode != ENOENT) {
 			write_log(0, "Error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
-			return;
+			goto errcode_handle;
 		} else {
 			toupload_meta_exist = FALSE;
 		}
@@ -1040,11 +1043,11 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 
 	/*** Begin to revert ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	if (ret_ssize == 0) {
+	if (progress_meta.finish_init_backend_data = FALSE) {
 		finish_init = FALSE;
 	} else {
 		total_blocks = progress_meta.total_backend_blocks;
-		finish_init = progress_meta.finish_init_backend_data;
+		finish_init = TRUE;
 	}
 
 	if (toupload_meta_exist == TRUE) {
@@ -1052,7 +1055,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
 
-			write_log(10, "Debug: begin revert uploading inode %"
+			write_log(10, "Debug: begin continue uploading inode %"
 				PRIu64"\n", (uint64_t)inode);
 			sync_single_inode((void *)data_ptr);
 
@@ -1079,11 +1082,15 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
+	super_block_update_transit(data_ptr->inode, FALSE, TRUE);
+	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
 
 errcode_handle:
-	write_log(0, "Error: Fail to revert uploading inode %"PRIu64"\n",
+	write_log(0, "Error: Fail to revert/continue uploading inode %"PRIu64"\n",
 			(uint64_t)inode);
+	super_block_update_transit(data_ptr->inode, FALSE, TRUE);
+	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
 }
 
