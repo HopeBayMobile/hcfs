@@ -61,6 +61,7 @@
 #endif
 #include <inttypes.h>
 #include <sqlite3.h>
+#include <sys/capabilities.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -4624,6 +4625,38 @@ void hfuse_ll_destroy(void *userdata)
 		  (uint64_t)tmpptr->f_ino);
 }
 
+/* Helper for checking chown capability */
+int _check_chown_capability(pid_t thispid)
+{
+	char proc_status_path[100];
+        char tmpstr[100], outstr[20];
+        char *saveptr, *outptr;
+        FILE *fptr;
+
+	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
+	         thispid);
+        fptr = fopen(fname, "r");
+
+        do {
+                fgets(tmpstr, 80, fptr);
+                outptr = strtok_r(tmpstr, "\t", &saveptr);
+                if (strcmp(outptr, "CapEff:") == 0) {
+                        outptr = strtok_r(NULL, "\t", &saveptr);
+			strncpy(outstr, outptr, 16);
+			outstr[16] = 0;
+                        break;
+                } else {
+                        continue;
+                }
+        } while (!feof(fptr));
+        fclose(fptr);
+	/* TODO: Convert string to 64bit bitmask */
+
+	/* TODO: Check the chown bit in the bitmask */
+
+	/* TODO: Return whether the chown is set */
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_setattr
@@ -4718,15 +4751,22 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
-		/* Do not need to check if the caller can chown. Kernel will
-		do it. */
+		/* TODO: Add checks to capabilities here */
+		/* Replace the following line with capability check */
+		if (temp_context->uid != 0) {   /* Not privileged */
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}
 
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
 	}
 
-	/* TODO: Check if need to remove permission checking for group and time */
 	if (to_set & FUSE_SET_ATTR_GID) {
+		/* TODO: Check capabilities here */
+		/* If root still need to check capabilities */
 		if (temp_context->uid != 0) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
 			if (ret_val < 0) {
