@@ -70,4 +70,6 @@ int reload_system_config(const char *config_path);
 
 void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
 
+int ignore_sigpipe(void);
+
 #endif  /* SRC_HCFS_UTILS_H_ */

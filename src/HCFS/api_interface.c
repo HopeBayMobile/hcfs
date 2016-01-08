@@ -937,8 +937,9 @@ void api_module(void *index)
 			free(pinned_list);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case UNPIN:
@@ -957,8 +958,9 @@ void api_module(void *index)
 			free(unpinned_list);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKDIRSTAT:
@@ -966,29 +968,32 @@ void api_module(void *index)
 							&tmpstat);
 			if (retcode == 0) {
 				ret_len = 3 * sizeof(long long);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_local),
-				     sizeof(long long), 0);
+				     sizeof(long long), MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_cloud),
-				     sizeof(long long), 0);
+				     sizeof(long long), MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_hybrid),
-				     sizeof(long long), 0);
+				     sizeof(long long), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKLOC:
 			retcode = check_location_handle(arg_len, largebuf);
 			if (retcode >= 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKPIN:
 			retcode = checkpin_handle(arg_len, largebuf);
 			if (retcode >= 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case TERMINATE:
@@ -998,8 +1003,8 @@ void api_module(void *index)
 			sem_post(&(hcfs_system->fuse_sem));
 			retcode = 0;
 			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &retcode, sizeof(int), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			break;
 		case VOLSTAT:
 			/* Returns the system statistics */
@@ -1013,8 +1018,8 @@ void api_module(void *index)
 			sem_post(&(hcfs_system->access_sem));
 			write_log(10, "debug stat hcfs %s\n", buf);
 			ret_len = strlen(buf)+1;
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, buf, strlen(buf)+1, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, buf, strlen(buf)+1, MSG_NOSIGNAL);
 			break;
 		case GETPINSIZE:
 			buf[0] = 0;
@@ -1023,8 +1028,8 @@ void api_module(void *index)
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.pinned_size;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETCACHESIZE:
 			buf[0] = 0;
@@ -1033,8 +1038,8 @@ void api_module(void *index)
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.cache_size;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETDIRTYCACHESIZE:
 			buf[0] = 0;
@@ -1043,8 +1048,8 @@ void api_module(void *index)
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.dirty_cache_size;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETXFERSTAT:
 			buf[0] = 0;
@@ -1054,9 +1059,9 @@ void api_module(void *index)
 			llretval = hcfs_system->systemdata.xfer_size_download;
 			llretval2 = hcfs_system->systemdata.xfer_size_upload;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, sizeof(long long), 0);
-			send(fd1, &llretval2, sizeof(long long), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, sizeof(long long), MSG_NOSIGNAL);
+			send(fd1, &llretval2, sizeof(long long), MSG_NOSIGNAL);
 			break;
 		case RESETXFERSTAT:
 			buf[0] = 0;
@@ -1066,38 +1071,38 @@ void api_module(void *index)
 			hcfs_system->systemdata.xfer_size_download = 0;
 			hcfs_system->systemdata.xfer_size_upload = 0;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &retcode, sizeof(int), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			break;
 		case GETMAXPINSIZE:
 			buf[0] = 0;
 			retcode = 0;
 			ret_len = sizeof(long long);
 			llretval = MAX_PINNED_LIMIT;
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETMAXCACHESIZE:
 			buf[0] = 0;
 			retcode = 0;
 			ret_len = sizeof(long long);
 			llretval = CACHE_HARD_LIMIT;
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETVOLSIZE:
 			llretval = get_vol_size(arg_len, largebuf);
 			retcode = 0;
 			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETCLOUDSIZE:
 			llretval = get_cloud_size(arg_len, largebuf);
 			retcode = 0;
 			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &llretval, ret_len, 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case TESTAPI:
 			/* Simulate a long API call of 5 seconds */
@@ -1106,14 +1111,14 @@ void api_module(void *index)
 			cur_index = *((int *)index);
 			write_log(10, "Index is %d\n", cur_index);
 			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &retcode, sizeof(int), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			break;
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/
 			retcode = 0;
 			ret_len = arg_len;
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
 			total_sent = 0;
 			while (total_sent < ret_len) {
 				if ((ret_len - total_sent) > 1024)
@@ -1121,7 +1126,7 @@ void api_module(void *index)
 				else
 					to_send = ret_len - total_sent;
 				size_msg = send(fd1, &largebuf[total_sent],
-					to_send, 0);
+					to_send, MSG_NOSIGNAL);
 				total_sent += size_msg;
 			}
 
@@ -1130,16 +1135,18 @@ void api_module(void *index)
 			retcode = create_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case DELETEVOL:
 			retcode = delete_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKVOL:
@@ -1147,8 +1154,9 @@ void api_module(void *index)
 			write_log(10, "retcode is %d\n", retcode);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case LISTVOL:
@@ -1157,7 +1165,7 @@ void api_module(void *index)
 			tmpptr = (char *) entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;
 			write_log(10, "Debug listFS return size %d\n", ret_len);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
 			total_sent = 0;
 			while (total_sent < ret_len) {
 				if ((ret_len - total_sent) > 1024)
@@ -1165,7 +1173,7 @@ void api_module(void *index)
 				else
 					to_send = ret_len - total_sent;
 				size_msg = send(fd1, &tmpptr[total_sent],
-					to_send, 0);
+					to_send, MSG_NOSIGNAL);
 				total_sent += size_msg;
 			}
 			if (num_entries > 0)
@@ -1175,39 +1183,43 @@ void api_module(void *index)
 			retcode = mount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case UNMOUNTVOL:
 			retcode = unmount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKMOUNT:
 			retcode = mount_status_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case UNMOUNTALL:
 			retcode = unmount_all_handle();
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case CLOUDSTAT:
 			retcode = (int)hcfs_system->backend_is_online;
 			ret_len = sizeof(retcode);
-			send(fd1, &ret_len, sizeof(ret_len), 0);
-			send(fd1, &retcode, sizeof(retcode), 0);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
 			retcode = 0;
 			break;
 		case SETSYNCSWITCH:
@@ -1215,30 +1227,33 @@ void api_module(void *index)
 			retcode = set_sync_switch_handle(sync_switch);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int), 0);
-				send(fd1, &retcode, sizeof(int), 0);
+				send(fd1, &ret_len, sizeof(unsigned int),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 			}
 			break;
 		case GETSYNCSWITCH:
 			retcode = (int)hcfs_system->sync_manual_switch;
 			ret_len = sizeof(retcode);
-			send(fd1, &ret_len, sizeof(ret_len), 0);
-			send(fd1, &retcode, sizeof(retcode), 0);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
 			retcode = 0;
 			break;
 		case GETSYNCSTAT:
 			retcode = (int)!hcfs_system->sync_paused;
 			ret_len = sizeof(retcode);
-			send(fd1, &ret_len, sizeof(ret_len), 0);
-			send(fd1, &retcode, sizeof(retcode), 0);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
 			retcode = 0;
 			break;
 		case RELOADCONFIG:
 			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(ret_len), 0);
-				send(fd1, &retcode, sizeof(retcode), 0);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
 			}
 			break;
 		default:
@@ -1248,8 +1263,8 @@ void api_module(void *index)
 return_message:
 		if (retcode != 0) {
 			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &retcode, sizeof(int), 0);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
 		}
 		if ((largebuf != NULL) && (buf_reused == FALSE))
 			free(largebuf);

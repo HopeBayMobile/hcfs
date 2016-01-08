@@ -476,6 +476,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
 	/* Return uid 0 if error occurred */
+	data = NULL;
 	*uid = 0;
 
 	snprintf(sql, sizeof(sql),
@@ -5218,6 +5219,9 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	int retcode;
 	struct stat stat_data;
 	ino_t this_inode;
+        MOUNT_T *tmpptr;
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -5255,6 +5259,16 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+
+#ifdef _ANDROID_ENV_
+        if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &stat_data);
+        }
+#endif
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
 		write_log(0, "Error: setxattr Permission denied ");
@@ -5321,6 +5335,9 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
 	size_t actual_size;
 	char *value;
+        MOUNT_T *tmpptr;
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	value = NULL;
@@ -5354,6 +5371,17 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+
+#ifdef _ANDROID_ENV_
+        if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &stat_data);
+        }
+#endif
+
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
 		write_log(0, "Error: getxattr permission denied ");
 		write_log(0, "(READ needed)\n");
@@ -5549,6 +5577,9 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	char name_space;
 	char key[MAX_KEY_SIZE];
 	struct stat stat_data;
+        MOUNT_T *tmpptr;
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -5580,6 +5611,16 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+
+#ifdef _ANDROID_ENV_
+        if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &stat_data);
+        }
+#endif
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
 		write_log(
