@@ -37,6 +37,7 @@ int main(int argc, char **argv)
 	long long downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
 	int first_size, rest_size;
+	char vol_mode;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -157,6 +158,8 @@ int main(int argc, char **argv)
 			buf[strlen(argv[2]) + 1] = ANDROID_EXTERNAL;
 		} else if (strcasecmp(argv[3], "internal") == 0) {
 			buf[strlen(argv[2]) + 1] = ANDROID_INTERNAL;
+		} else if (strcasecmp(argv[3], "3external") == 0) {
+			buf[strlen(argv[2]) + 1] = ANDROID_3EXTERNAL;
 		} else {
 			printf("Unsupported storage type\n");
 			exit(-ENOTSUP);
@@ -264,14 +267,34 @@ int main(int argc, char **argv)
 		break;
 
 	case MOUNTVOL:
-		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);
+		if (argc == 5) {
+			if (!strcmp("default", argv[4]))
+				vol_mode = MP_DEFAULT;
+			else if (!strcmp("read", argv[4]))
+				vol_mode = MP_READ;
+			else if (!strcmp("write", argv[4]))
+				vol_mode = MP_WRITE;
+			else {
+				printf("Command error: %s is not supported\n",
+						argv[4]);
+				break;
+			}
+		} else {
+			vol_mode = VOL_DEFAULT;
+		}
+		buf[0] = vol_mode;
+		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 +
+			sizeof(int) + sizeof(char);
 		fsname_len = strlen(argv[2]) + 1;
-		memcpy(buf, &fsname_len, sizeof(int));
-		first_size = sizeof(int);
+		memcpy(buf + 1, &fsname_len, sizeof(int)); /* first byte is vol mode */
+		first_size = sizeof(int) + 1;
 		rest_size = sizeof(buf) - first_size;
+
+		/* [vol mode][fsname len][fsname][mp] */
 		snprintf(&(buf[first_size]), rest_size, "%s", argv[2]);
-		snprintf(&(buf[sizeof(int) + fsname_len]), 4092 - fsname_len,
+		snprintf(&(buf[first_size + fsname_len]), 4092 - fsname_len,
 			 "%s", argv[3]);
+ 
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);

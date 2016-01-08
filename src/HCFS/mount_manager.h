@@ -27,6 +27,11 @@
 #include "path_reconstruct.h"
 #endif
 
+#ifdef _ANDROID_ENV_
+#define MP_DEFAULT 1
+#define MP_READ 2
+#define MP_WRITE 3
+#endif
 /*
 Binary search tree
 
@@ -87,7 +92,7 @@ in the two modules */
 int init_mount_mgr(void);
 int destroy_mount_mgr(void); /* Will call unmount_all */
 
-int mount_FS(char *fsname, char *mp);
+int mount_FS(char *fsname, char *mp, char mp_mode);
 int unmount_FS(char *fsname);  /* Need to unmount FUSE and set is_unmount */
 int unmount_all(void);
 

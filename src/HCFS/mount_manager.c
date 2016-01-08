@@ -504,7 +504,7 @@ int do_unmount_FS(MOUNT_T *mount_info)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int mount_FS(char *fsname, char *mp)
+int mount_FS(char *fsname, char *mp, char mp_mode)
 {
 	int ret, errcode;
 	MOUNT_T *tmp_info, *new_info;

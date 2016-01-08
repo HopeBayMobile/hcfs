@@ -204,19 +204,28 @@ int create_FS_handle(int arg_len, char *largebuf)
 int mount_FS_handle(int arg_len, char *largebuf)
 {
 	char *buf, *mpbuf;
+	char mp_mode;
 	int ret;
 	int fsname_len, mp_len;
 
-	memcpy(&fsname_len, largebuf, sizeof(int));
+	mp_mode = largebuf[0];
+	if (mp_mode != MP_DEFAULT && mp_mode != MP_READ &&
+			mp_mode != MP_WRITE) {
+		write_log(2, "Invalid mount point type\n");
+		return -EINVAL;
+	}
+
+	memcpy(&fsname_len, largebuf + 1, sizeof(int));
 
 	buf = malloc(fsname_len + 10);
-	mp_len = arg_len - sizeof(int) - fsname_len;
+	mp_len = arg_len - sizeof(int) - fsname_len - sizeof(char);
 	mpbuf = malloc(mp_len + 10);
-	memcpy(buf, &(largebuf[sizeof(int)]), fsname_len);
-	memcpy(mpbuf, &(largebuf[sizeof(int) + fsname_len]), mp_len);
+	memcpy(buf, &(largebuf[1 + sizeof(int)]), fsname_len);
+	memcpy(mpbuf, &(largebuf[1 + sizeof(int) + fsname_len]), mp_len);
+	write_log(10, "Debug: fsname is %s, mp is %s, mp_mode is %d\n", buf, mpbuf, mp_mode);
 	buf[fsname_len] = 0;
 	mpbuf[mp_len] = 0;
-	ret = mount_FS(buf, mpbuf);
+	ret = mount_FS(buf, mpbuf, mp_mode);
 
 	free(buf);
 	free(mpbuf);
