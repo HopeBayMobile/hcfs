@@ -6004,7 +6004,7 @@ void *mount_multi_thread(void *ptr)
 			(uint64_t)tmpptr->f_ino, tmpptr->is_unmount);
 
 	if (tmpptr->is_unmount == FALSE)
-		unmount_event(tmpptr->f_name);
+		unmount_event(tmpptr->f_name, tmpptr->f_mp);
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
 	return 0;
@@ -6022,7 +6022,7 @@ void *mount_single_thread(void *ptr)
 			(uint64_t)tmpptr->f_ino, tmpptr->is_unmount);
 
 	if (tmpptr->is_unmount == FALSE)
-		unmount_event(tmpptr->f_name);
+		unmount_event(tmpptr->f_name, tmpptr->f_mp);
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
 	return 0;

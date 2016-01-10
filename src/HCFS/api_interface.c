@@ -232,15 +232,27 @@ int mount_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
+/* TODO: unmount a single mp and unmount all mps */
 int unmount_FS_handle(int arg_len, char *largebuf)
 {
-	char *buf;
+	char *buf, *mp;
 	int ret;
+	int fsname_len;
 
+	memcpy(&fsname_len, largebuf, sizeof(int));
 	buf = malloc(arg_len + 10);
-	memcpy(buf, largebuf, arg_len);
-	buf[arg_len] = 0;
-	ret = unmount_FS(buf);
+	memcpy(buf, largebuf + sizeof(int), fsname_len);
+	buf[fsname_len] = 0;
+
+	mp = malloc(arg_len + 10);
+	memcpy(mp, largebuf + sizeof(int) + fsname_len + 1,
+			arg_len - sizeof(int) - fsname_len - 1);
+	mp[arg_len - sizeof(int) - fsname_len - 1] = 0;
+	if (mp[0] == 0)
+		mp = NULL;
+	write_log(10, "Debug: fsname is %s, mp is %s\n", buf, mp);
+
+	ret = unmount_FS(buf, mp);
 
 	free(buf);
 	return ret;
@@ -306,7 +318,7 @@ long long get_vol_size(int arg_len, char *largebuf)
 	/* First check if FS already mounted */
 	statfptr = NULL;
 
-	ret = search_mount(buf, &tmp_info);
+	ret = search_mount(buf, NULL, &tmp_info);
 	if ((ret < 0) && (ret != -ENOENT)) {
 		llretval = (long long) ret;
 		goto error_handling;

@@ -178,9 +178,35 @@ int main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 #endif
+	case UNMOUNTVOL:
+		memset(buf, 0, sizeof(buf));
+		fsname_len = strlen(argv[2]);
+		cmd_len = sizeof(int) + strlen(argv[2]) + 1;
+		if (argc >= 4)
+			cmd_len += (strlen(argv[3]) + 1);
+		else
+			cmd_len += 1;
+
+		memcpy(buf, &fsname_len, sizeof(int));
+		strcpy(buf + sizeof(int), argv[2]);
+		if (argc >= 4)
+			strcpy(buf + sizeof(int) + fsname_len + 1, argv[3]);
+		else
+			buf[sizeof(int) + fsname_len + 1] = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
 	case DELETEVOL:
 	case CHECKVOL:
-	case UNMOUNTVOL:
 	case CHECKMOUNT:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
@@ -280,7 +306,7 @@ int main(int argc, char **argv)
 				break;
 			}
 		} else {
-			vol_mode = VOL_DEFAULT;
+			vol_mode = MP_DEFAULT;
 		}
 		buf[0] = vol_mode;
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 +
@@ -333,6 +359,8 @@ int main(int argc, char **argv)
 		for (count = 0; count < total_entries; count++) {
 			if (tmp[count].d_type == ANDROID_EXTERNAL)
 				printf("%s\tExternal\n", tmp[count].d_name);
+			else if (tmp[count].d_type == ANDROID_3EXTERNAL)
+				printf("%s\tMultiExternal\n", tmp[count].d_name);
 			else
 				printf("%s\tInternal\n", tmp[count].d_name);
 		}
