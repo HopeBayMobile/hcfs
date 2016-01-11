@@ -61,7 +61,7 @@
 #endif
 #include <inttypes.h>
 #include <sqlite3.h>
-#include <sys/capabilities.h>
+#include <sys/capability.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -4625,6 +4625,32 @@ void hfuse_ll_destroy(void *userdata)
 		  (uint64_t)tmpptr->f_ino);
 }
 
+/* Helper for converting string to 64-bit mask */
+uint64_t str_to_mask(char *input)
+{
+        int count;
+        uint64_t tempout;
+
+        tempout = 0;
+
+        /* First compute the length of the mask */
+        for (count = 0; count < 16; count++) {
+                if ((input[count] <= 'f') && (input[count] >= 'a')) {
+                        tempout = tempout << 4;
+                        tempout += (10 + (input[count] - 'a'));
+                        continue;
+                }
+                if ((input[count] <= '9') && (input[count] >= '0')) {
+                        tempout = tempout << 4;
+                        tempout += (input[count] - '0');
+                        continue;
+                }
+                break;
+        }
+
+        return tempout;
+}
+
 /* Helper for checking chown capability */
 int _check_chown_capability(pid_t thispid)
 {
@@ -4632,29 +4658,38 @@ int _check_chown_capability(pid_t thispid)
         char tmpstr[100], outstr[20];
         char *saveptr, *outptr;
         FILE *fptr;
+	uint64_t cap_mask, op_mask, result_mask;
 
 	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
 	         thispid);
-        fptr = fopen(fname, "r");
+        fptr = fopen(proc_status_path, "r");
 
         do {
                 fgets(tmpstr, 80, fptr);
                 outptr = strtok_r(tmpstr, "\t", &saveptr);
                 if (strcmp(outptr, "CapEff:") == 0) {
                         outptr = strtok_r(NULL, "\t", &saveptr);
-			strncpy(outstr, outptr, 16);
-			outstr[16] = 0;
+			snprintf(outstr, sizeof(outstr), "%s", outptr);
                         break;
                 } else {
                         continue;
                 }
         } while (!feof(fptr));
         fclose(fptr);
-	/* TODO: Convert string to 64bit bitmask */
+	/* Convert string to 64bit bitmask */
+	cap_mask = str_to_mask(outstr);
+	write_log(10, "Cap mask is %" PRIu64 "\n", cap_mask);
 
-	/* TODO: Check the chown bit in the bitmask */
+	/* Check the chown bit in the bitmask */
 
-	/* TODO: Return whether the chown is set */
+	op_mask = 1;
+	op_mask = op_mask << CAP_CHOWN;
+	result_mask = cap_mask & op_mask;
+
+	/* Return whether the chown is set */
+	if (result_mask != 0)
+		return TRUE;
+	return FALSE;
 }
 
 /************************************************************************
@@ -4751,9 +4786,9 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
-		/* TODO: Add checks to capabilities here */
-		/* Replace the following line with capability check */
-		if (temp_context->uid != 0) {   /* Not privileged */
+		/* Checks if process has CHOWN capabilities here */
+		if (_check_chown_capability(temp_context->pid) != TRUE) {
+			/* Not privileged */
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EPERM);
@@ -4765,9 +4800,9 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_GID) {
-		/* TODO: Check capabilities here */
-		/* If root still need to check capabilities */
-		if (temp_context->uid != 0) {
+		/* Checks if process has CHOWN capabilities here */
+		/* Or if is owner or in group */
+		if (_check_chown_capability(temp_context->pid) != TRUE) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
 			if (ret_val < 0) {
 				meta_cache_close_file(body_ptr);
