@@ -516,6 +516,27 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	return 0;
 }
 
+static inline void _android6_permission(struct stat *thisstat,
+		char mp_mode, mode_t *newpermission)
+{
+	if (mp_mode == MP_DEFAULT) {
+		if (!S_ISDIR(thisstat->st_mode))
+			*newpermission = 0660;
+		else
+			*newpermission = 0771;
+	} else if (mp_mode == MP_READ) {
+		if (!S_ISDIR(thisstat->st_mode))
+			*newpermission = 0640;
+		else
+			*newpermission = 0750;
+	} else {
+		if (!S_ISDIR(thisstat->st_mode))
+			*newpermission = 0660;
+		else
+			*newpermission = 0770;
+	}
+}
+
 int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 {
 	int ret, errcode;
@@ -524,6 +545,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	char *tmptok, *tmptoksave, *tmptok_prev;
 	int count;
 	uid_t tmpuid;
+	char volume_type, mp_mode;
 
 	tmppath = NULL;
 	tmptok_prev = NULL;
@@ -541,8 +563,39 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	}
 	write_log(10, "Debug path lookup %s\n", tmppath);
 
+	volume_type = tmpptr->volume_type;
+	mp_mode = tmpptr->mp_mode;
+
+	/* For android 6.0 */
+	BOOL keep_check = TRUE;
+	if (volume_type == ANDROID_MULTIEXTERNAL) {
+		tmptok = strtok_r(tmppath, "/", &tmptoksave);
+		/* Root in android 6.0 */
+		if (tmptok == NULL) {
+			if (tmpptr->volume_type ==
+					ANDROID_MULTIEXTERNAL) {
+				newpermission = 0711;
+			}
+			keep_check = FALSE;
+		} else {
+			/* TODO: check multiuser folder */
+		}
+
+		if (keep_check == FALSE) {
+			/* TODO: Change gid and */
+			tmpmask = 0777;
+			tmpmask = ~tmpmask;
+			tmpmask = tmpmask & thisstat->st_mode;
+			thisstat->st_mode = tmpmask | newpermission;
+			free(tmppath);
+			return 0;
+		}
+	}
+
+	/* For android 6.0, begin to check /x/<file/folder>, for 5.0,
+	 * check /<file/folder> */
 	for (count = 0; count < 4; count++) {
-		if (count == 0)
+		if (count == 0 && volume_type != ANDROID_MULTIEXTERNAL)
 			tmptok = strtok_r(tmppath, "/", &tmptoksave);
 		else
 			tmptok = strtok_r(NULL, "/", &tmptoksave);
@@ -551,13 +604,20 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		if (tmptok == NULL) {
 			switch (count) {
 			case 0:
-				/* Is root */
 				thisstat->st_uid = 0;
-				thisstat->st_gid = 1028;
-				newpermission = 0770;
+				/* For android 6.0, it is /ooxx */
+				if (volume_type == ANDROID_MULTIEXTERNAL) {
+					_android6_permission(thisstat, mp_mode,
+							&newpermission);
+
+				/* It is root for android 5.0 */
+				} else {
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				}
 				break;
 			case 1:
-				/* Is /Android */
+				/* Is /Android for 5.0, /x/Android for 6.0 */
 				if (!S_ISDIR(thisstat->st_mode)) {
 					/* If not a directory */
 					thisstat->st_uid = 0;
@@ -614,12 +674,28 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		}
 		tmptok_prev = tmptok;
 		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
-			/* Not under /Android */
 			thisstat->st_uid = 0;
-			thisstat->st_gid = 1028;
-			newpermission = 0770;
+			/* For android 6.0, it is not under /x/Android,
+			 * so follow 6.0's rules */
+			if (volume_type == ANDROID_MULTIEXTERNAL) {
+				_android6_permission(thisstat, mp_mode,
+						&newpermission);
+
+			/* Not under /Android for android 5.0 */
+			} else {
+				thisstat->st_gid = 1028;
+				newpermission = 0770;
+			}
 			break;
 		}
+	}
+
+	/* Modify gid for android 6.0 */
+	if (volume_type == ANDROID_MULTIEXTERNAL) {
+		if (tmpptr->mp_mode == MP_DEFAULT) /* default */
+			thisstat->st_gid = SDCARD_RW;
+		else /* read/write */
+			thisstat->st_gid = EVERYBODY;
 	}
 
 	tmpmask = 0777;

@@ -68,4 +68,9 @@
 
 #define DEFAULT_PIN TRUE
 
+#ifdef _ANDROID_ENV_
+#define SDCARD_RW 1015
+#define EVERYBODY 1000
+#endif
+
 #endif  /* GW20_SRC_GLOBAL_H_ */

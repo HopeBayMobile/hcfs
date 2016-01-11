@@ -541,7 +541,11 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 	/* First check if FS already mounted */
 	new_info = NULL;
 
+#ifdef _ANDROID_ENV_
 	ret = search_mount(fsname, mp, &tmp_info);
+#else
+	ret = search_mount(fsname, NULL, &tmp_info); /*Only one mp is allowed*/
+#endif
 	if (ret != -ENOENT) {
 		if (ret == 0) {
 			write_log(2, "Mount error: FS already mounted\n");
@@ -571,9 +575,10 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 	}
 	memset(new_info, 0, sizeof(MOUNT_T));
 
+#ifdef _ANDROID_ENV_
+	/* Check whether this volume was mounted at other mount points */
 	ret = search_mount(fsname, NULL, &tmp_info);
 	if (ret == 0) {
-
 		/* Now only ANDROID_MULTIEXTERNAL is allowed to mount at many
 		 * mount points */
 		if (tmp_info->volume_type != ANDROID_MULTIEXTERNAL) {
@@ -592,9 +597,7 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 		new_info->FS_stat = tmp_info->FS_stat;
 		new_info->stat_fptr = tmp_info->stat_fptr;
 		new_info->stat_lock = tmp_info->stat_lock;
-#ifdef _ANDROID_ENV_
 		new_info->vol_path_cache = tmp_info->vol_path_cache;
-#endif
 
 		/* Self data */
 		new_info->mp_mode = mp_mode;
@@ -624,12 +627,14 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 		sem_post(&(fs_mgr_head->op_lock));
 		return 0;
 	}
+#endif
 
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
 #ifdef _ANDROID_ENV_
 	new_info->volume_type = tmp_entry.d_type;
-	if (new_info->volume_type == ANDROID_EXTERNAL) {
+	if (new_info->volume_type == ANDROID_EXTERNAL ||
+			new_info->volume_type == ANDROID_MULTIEXTERNAL) {
 		new_info->vol_path_cache = init_pathcache(new_info->f_ino);
 		if (new_info->vol_path_cache == NULL) {
 			errcode = -ENOMEM;
