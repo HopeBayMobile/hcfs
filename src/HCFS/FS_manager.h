@@ -26,7 +26,7 @@ or external */
 #ifdef _ANDROID_ENV_
 #define ANDROID_INTERNAL 1
 #define ANDROID_EXTERNAL 2
-#define ANDROID_3EXTERNAL 3
+#define ANDROID_MULTIEXTERNAL 3
 #endif
 
 typedef struct {

@@ -232,7 +232,6 @@ int mount_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
-/* TODO: unmount a single mp and unmount all mps */
 int unmount_FS_handle(int arg_len, char *largebuf)
 {
 	char *buf, *mp;
@@ -248,12 +247,17 @@ int unmount_FS_handle(int arg_len, char *largebuf)
 	memcpy(mp, largebuf + sizeof(int) + fsname_len + 1,
 			arg_len - sizeof(int) - fsname_len - 1);
 	mp[arg_len - sizeof(int) - fsname_len - 1] = 0;
-	if (mp[0] == 0)
-		mp = NULL;
+	if (!strlen(mp)) {
+		write_log(2, "Mountpoint is needed when unmount\n");
+		free(buf);
+		free(mp);
+		return -EINVAL;
+	}
 	write_log(10, "Debug: fsname is %s, mp is %s\n", buf, mp);
 
 	ret = unmount_FS(buf, mp);
 
+	free(mp);
 	free(buf);
 	return ret;
 }
@@ -324,9 +328,9 @@ long long get_vol_size(int arg_len, char *largebuf)
 		goto error_handling;
 	} else if (ret == 0) {
 		/* Fetch stat from mounted volume */
-		sem_wait(&(tmp_info->stat_lock));
-		llretval = (tmp_info->FS_stat).system_size;
-		sem_post(&(tmp_info->stat_lock));
+		sem_wait((tmp_info->stat_lock));
+		llretval = (tmp_info->FS_stat)->system_size;
+		sem_post((tmp_info->stat_lock));
 
 		free(buf);
 		sem_post(&(mount_mgr.mount_lock));

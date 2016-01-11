@@ -54,7 +54,7 @@ typedef struct {
 #ifdef _ANDROID_ENV_
 	char mp_mode;
 	char volume_type;
-	PATH_CACHE *vol_path_cache;
+	PATH_CACHE *vol_path_cache; /* Shared */
 #endif
 	char rootpath[METAPATHLEN];
 	char *f_mp;
@@ -64,9 +64,9 @@ typedef struct {
 	struct fuse_chan *chan_ptr;
 	char is_unmount;
 	LOOKUP_HEAD_TYPE *lookup_table; /* All vol share the same one */
-	FS_STAT_T FS_stat; /* shared */
+	FS_STAT_T *FS_stat; /* shared */
 	FILE *stat_fptr;  /* For keeping track of FS stat. shared */
-	sem_t stat_lock; /* shared */
+	sem_t *stat_lock; /* shared */
 	struct fuse_args mount_args;
 } MOUNT_T;
 

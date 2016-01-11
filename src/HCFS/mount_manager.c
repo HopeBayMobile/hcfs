@@ -51,7 +51,7 @@ int search_mount(char *fsname, char *mp, MOUNT_T **mt_info)
 	}
 
 	if (fsname == NULL) { /* mp can be NULL when just search fsname */
-		errcode = -ENOENT;
+		errcode = -EINVAL;
 		goto errcode_handle;
 	}
 
@@ -503,26 +503,17 @@ errcode_handle:
 		fuse_unmount(mp, tmp_channel);
 	return -EACCES;
 }
+
 /* Helper for unmounting */
 int do_unmount_FS(MOUNT_T *mount_info)
 {
-	int ret;
-
-	if (mount_info->stat_fptr != NULL)
-		fclose(mount_info->stat_fptr);
 	pthread_join(mount_info->mt_thread, NULL);
 	fuse_remove_signal_handlers(mount_info->session_ptr);
 	fuse_session_remove_chan(mount_info->chan_ptr);
 	fuse_session_destroy(mount_info->session_ptr);
 	fuse_unmount(mount_info->f_mp, mount_info->chan_ptr);
 	fuse_opt_free_args(&(mount_info->mount_args));
-#ifdef _ANDROID_ENV_
-	if (mount_info->vol_path_cache != NULL) {
-		ret = destroy_pathcache(mount_info->vol_path_cache);
-		if (ret < 0)
-			return ret;
-	}
-#endif
+
 	return 0;
 }
 
@@ -583,28 +574,30 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 	ret = search_mount(fsname, NULL, &tmp_info);
 	if (ret == 0) {
 
-		/* Now only ANDROID_3EXTERNAL is allowed to mount at many
+		/* Now only ANDROID_MULTIEXTERNAL is allowed to mount at many
 		 * mount points */
-		if (tmp_info->volume_type != ANDROID_3EXTERNAL) {
+		if (tmp_info->volume_type != ANDROID_MULTIEXTERNAL) {
 			write_log(2, "Mount error: FS already mounted\n");
 			errcode = -EPERM;
 			goto errcode_handle;
 		}
 
-		/* Copy static part */
+		/* Copy static data */
 		new_info->f_ino = tmp_info->f_ino;
 		new_info->volume_type = tmp_info->volume_type;
 		strcpy(new_info->f_name, tmp_info->f_name);
 
-		/* Shared part */
+		/* Shared data */
 		new_info->lookup_table = tmp_info->lookup_table;
-		//TODO: new_info->FS_stat = tmp_info->FS_stat;
+		new_info->FS_stat = tmp_info->FS_stat;
 		new_info->stat_fptr = tmp_info->stat_fptr;
+		new_info->stat_lock = tmp_info->stat_lock;
+#ifdef _ANDROID_ENV_
+		new_info->vol_path_cache = tmp_info->vol_path_cache;
+#endif
 
-		/* Self part */
-		sem_init(&(new_info->stat_lock), 0, 1);
+		/* Self data */
 		new_info->mp_mode = mp_mode;
-		new_info->vol_path_cache = NULL;
 		new_info->f_mp = NULL;
 		new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 		if (new_info->f_mp == NULL) {
@@ -614,26 +607,6 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 		}
 		strcpy((new_info->f_mp), mp);
 
-		ret = fetch_stat_path(temppath, new_info->f_ino);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
-		}
-		new_info->stat_fptr = fopen(temppath, "r+");
-		if (new_info->stat_fptr == NULL) {
-			errcode = errno;
-			write_log(0, "IO error %d (%s)\n", errcode,
-					strerror(errcode));
-			errcode = -errcode;
-			goto errcode_handle;
-		}
-
-		/* Prepare something and begin to mount */
-		ret = read_FS_statistics(new_info);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
-		}
 		ret = do_mount_FS(mp, new_info);
 		if (ret < 0) {
 			errcode = ret;
@@ -695,8 +668,26 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 
-	sem_init(&(new_info->stat_lock), 0, 1);
+	/* Init fs_stat */
+	new_info->FS_stat = malloc(sizeof(FS_STAT_T));
+	if (new_info->FS_stat == NULL) {
+		errcode = -ENOMEM;
+		write_log(0, "Out of memory in %s\n", __func__);
+		goto errcode_handle;
+	}
+	memset(new_info->FS_stat, 0, sizeof(FS_STAT_T));
+	
+	/* init sem of stat lock */
+	new_info->stat_lock = NULL;
+	new_info->stat_lock = malloc(sizeof(sem_t));
+	if (new_info->stat_lock == NULL) {
+		errcode = -ENOMEM;
+		write_log(0, "Out of memory in %s\n", __func__);
+		goto errcode_handle;
+	}
+	sem_init(new_info->stat_lock, 0, 1);
 
+	/* Open stat_fptr */
 	ret = fetch_stat_path(temppath, new_info->f_ino);
 	if (ret < 0) {
 		errcode = ret;
@@ -712,6 +703,7 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 
+	/* read stat */
 	ret = read_FS_statistics(new_info);
 	if (ret < 0) {
 		errcode = ret;
@@ -751,6 +743,44 @@ errcode_handle:
 	return errcode;
 }
 
+static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
+{
+	int ret;
+	MOUNT_T *tmp_info;
+
+	/* Search any mountpoint of given volume name */
+	ret = search_mount(mount_info->f_name, NULL, &tmp_info);
+	if (ret < 0) {
+		/* Destroy shared data when all mountpoints are unmounted */
+		if (ret == -ENOENT) {
+			write_log(4, "Destroy shared data of volume %s\n",
+					mount_info->f_name);
+			lookup_destroy(mount_info->lookup_table, mount_info);
+			if (mount_info->stat_fptr != NULL)
+				fclose(mount_info->stat_fptr);
+			if (mount_info->FS_stat != NULL)
+				free(mount_info->FS_stat);
+			if (mount_info->stat_lock != NULL)
+				sem_destroy(mount_info->stat_lock);
+#ifdef _ANDROID_ENV_
+			if (mount_info->vol_path_cache != NULL) {
+				ret = destroy_pathcache(mount_info->vol_path_cache);
+				if (ret < 0)
+					return ret;
+			}
+#endif
+		} else {
+			write_log(0, "Error: Search mount fail in %s.Code %d\n",
+					__func__, -ret);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+
+
 /************************************************************************
 *
 * Function name: unmount_FS
@@ -781,7 +811,6 @@ int unmount_FS(char *fsname, char *mp)
 		goto errcode_handle;
 	}
 
-
 	ret_info->is_unmount = TRUE;
 	fuse_set_signal_handlers(ret_info->session_ptr);
 	pthread_kill(ret_info->mt_thread, SIGHUP);
@@ -790,6 +819,7 @@ int unmount_FS(char *fsname, char *mp)
 
 	/* TODO: Error handling for failed unmount such as block mp */
 	ret = delete_mount(fsname, ret_info->f_mp, &ret_node);
+	_check_destroy_vol_shared_data(ret_info);
 
 	free((ret_node->mt_entry)->f_mp);
 	free(ret_node->mt_entry);
@@ -841,6 +871,7 @@ int unmount_event(char *fsname, char *mp)
 	do_unmount_FS(ret_info);
 
 	ret = delete_mount(fsname, mp, &ret_node);
+	_check_destroy_vol_shared_data(ret_info);
 
 	free((ret_node->mt_entry)->f_mp);
 	free(ret_node->mt_entry);
@@ -910,13 +941,14 @@ int unmount_all(void)
 		do_unmount_FS(ret_info);
 
 		/* TODO: check return value */
-		delete_mount(fsname, NULL, &ret_node);
+		write_log(5, "Unmounted filesystem %s at mountpoint %s\n",
+				fsname, ret_info->f_mp);
+		delete_mount(fsname, ret_info->f_mp, &ret_node);
+		_check_destroy_vol_shared_data(ret_info);
 
 		free((ret_node->mt_entry)->f_mp);
 		free(ret_node->mt_entry);
 		free(ret_node);
-		write_log(5, "Unmounted filesystem %s at mountpoint %s\n",
-				fsname, ret_info->f_mp);
 	}
 
 	sem_post(&(mount_mgr.mount_lock));
@@ -941,15 +973,15 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 {
 	int ret;
 
-	sem_wait(&(mptr->stat_lock));
-	(mptr->FS_stat).system_size += system_size_delta;
-	if ((mptr->FS_stat).system_size < 0)
-		(mptr->FS_stat).system_size = 0;
-	(mptr->FS_stat).num_inodes += num_inodes_delta;
-	if ((mptr->FS_stat).num_inodes < 0)
-		(mptr->FS_stat).num_inodes = 0;
+	sem_wait((mptr->stat_lock));
+	(mptr->FS_stat)->system_size += system_size_delta;
+	if ((mptr->FS_stat)->system_size < 0)
+		(mptr->FS_stat)->system_size = 0;
+	(mptr->FS_stat)->num_inodes += num_inodes_delta;
+	if ((mptr->FS_stat)->num_inodes < 0)
+		(mptr->FS_stat)->num_inodes = 0;
 	ret = update_FS_statistics(mptr);
-	sem_post(&(mptr->stat_lock));
+	sem_post((mptr->stat_lock));
 
 	return ret;
 }
@@ -970,7 +1002,7 @@ int update_FS_statistics(MOUNT_T *mptr)
 
 	tmpfd = fileno(mptr->stat_fptr);
 
-	PWRITE(tmpfd, &(mptr->FS_stat), sizeof(FS_STAT_T), 0);
+	PWRITE(tmpfd, (mptr->FS_stat), sizeof(FS_STAT_T), 0);
 
 	/* Remove fsync for the purpose of write performance */
 	//FSYNC(tmpfd);
@@ -997,7 +1029,7 @@ int read_FS_statistics(MOUNT_T *mptr)
 
 	tmpfd = fileno(mptr->stat_fptr);
 
-	PREAD(tmpfd, &(mptr->FS_stat), sizeof(FS_STAT_T), 0);
+	PREAD(tmpfd, (mptr->FS_stat), sizeof(FS_STAT_T), 0);
 
 	return 0;
 

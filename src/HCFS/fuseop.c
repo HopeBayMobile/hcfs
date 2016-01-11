@@ -4183,12 +4183,12 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 	/*Prototype is linux statvfs call*/
-	sem_wait(&(tmpptr->stat_lock));
+	sem_wait((tmpptr->stat_lock));
 
-	system_size = (tmpptr->FS_stat).system_size;
-	num_inodes = (tmpptr->FS_stat).num_inodes;
+	system_size = (tmpptr->FS_stat)->system_size;
+	num_inodes = (tmpptr->FS_stat)->num_inodes;
 
-	sem_post(&(tmpptr->stat_lock));
+	sem_post((tmpptr->stat_lock));
 
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
@@ -6006,7 +6006,6 @@ void *mount_multi_thread(void *ptr)
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name, tmpptr->f_mp);
 
-	lookup_destroy(tmpptr->lookup_table, tmpptr);
 	return 0;
 }
 void *mount_single_thread(void *ptr)
@@ -6024,7 +6023,6 @@ void *mount_single_thread(void *ptr)
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name, tmpptr->f_mp);
 
-	lookup_destroy(tmpptr->lookup_table, tmpptr);
 	return 0;
 }
 

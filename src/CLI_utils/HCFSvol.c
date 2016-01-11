@@ -158,8 +158,8 @@ int main(int argc, char **argv)
 			buf[strlen(argv[2]) + 1] = ANDROID_EXTERNAL;
 		} else if (strcasecmp(argv[3], "internal") == 0) {
 			buf[strlen(argv[2]) + 1] = ANDROID_INTERNAL;
-		} else if (strcasecmp(argv[3], "3external") == 0) {
-			buf[strlen(argv[2]) + 1] = ANDROID_3EXTERNAL;
+		} else if (strcasecmp(argv[3], "multiexternal") == 0) {
+			buf[strlen(argv[2]) + 1] = ANDROID_MULTIEXTERNAL;
 		} else {
 			printf("Unsupported storage type\n");
 			exit(-ENOTSUP);
@@ -316,7 +316,7 @@ int main(int argc, char **argv)
 		first_size = sizeof(int) + 1;
 		rest_size = sizeof(buf) - first_size;
 
-		/* [vol mode][fsname len][fsname][mp] */
+		/* [mp mode][fsname len][fsname][mp] */
 		snprintf(&(buf[first_size]), rest_size, "%s", argv[2]);
 		snprintf(&(buf[first_size + fsname_len]), 4092 - fsname_len,
 			 "%s", argv[3]);
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
 		for (count = 0; count < total_entries; count++) {
 			if (tmp[count].d_type == ANDROID_EXTERNAL)
 				printf("%s\tExternal\n", tmp[count].d_name);
-			else if (tmp[count].d_type == ANDROID_3EXTERNAL)
+			else if (tmp[count].d_type == ANDROID_MULTIEXTERNAL)
 				printf("%s\tMultiExternal\n", tmp[count].d_name);
 			else
 				printf("%s\tInternal\n", tmp[count].d_name);
