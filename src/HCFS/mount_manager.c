@@ -80,7 +80,8 @@ static int _compare_node(const char *fsname, const char *mp,
 				   exist or delete all volume. */
 			ret = 0;
 		else
-			ret = strcmp(mp, now_node->mt_entry->f_mp);
+			if (now_node->mt_entry->f_mp)
+				ret = strcmp(mp, now_node->mt_entry->f_mp);
 	}
 
 	return ret;
@@ -538,6 +539,9 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 
 	/* TODO: check if mp is a valid mountpoint */
 
+	if (fsname == NULL || mp == NULL)
+		return -EINVAL;
+
 	/* First check if FS already mounted */
 	new_info = NULL;
 
@@ -959,7 +963,8 @@ int unmount_all(void)
 		_check_destroy_vol_shared_data(ret_info);
 #endif
 
-		free((ret_node->mt_entry)->f_mp);
+		if ((ret_node->mt_entry)->f_mp != NULL)
+			free((ret_node->mt_entry)->f_mp);
 		free(ret_node->mt_entry);
 		free(ret_node);
 	}
