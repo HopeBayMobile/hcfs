@@ -166,3 +166,7 @@ void init_sync_stat_control(void)
 inline void update_sync_state(void)
 {
 }
+int ignore_sigpipe(void)
+{
+	return 0;
+}

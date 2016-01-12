@@ -133,3 +133,7 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 }
 
 void update_backend_status(int status, struct timespec *status_time) {}
+int ignore_sigpipe(void)
+{
+	return 0;
+}
