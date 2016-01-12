@@ -72,4 +72,6 @@ void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
 
 int ignore_sigpipe(void);
 
+BOOL is_natural_number(char *str);
+
 #endif  /* SRC_HCFS_UTILS_H_ */

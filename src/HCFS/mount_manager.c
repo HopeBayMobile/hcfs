@@ -631,6 +631,7 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
+	new_info->mp_mode = mp_mode;
 #ifdef _ANDROID_ENV_
 	new_info->volume_type = tmp_entry.d_type;
 	if (new_info->volume_type == ANDROID_EXTERNAL ||
@@ -754,6 +755,9 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 	MOUNT_T *tmp_info;
 
 	/* Search any mountpoint of given volume name */
+	if (mount_info->volume_type != ANDROID_MULTIEXTERNAL)
+		return 0;
+
 	ret = search_mount(mount_info->f_name, NULL, &tmp_info);
 	if (ret < 0) {
 		/* Destroy shared data when all mountpoints are unmounted */
@@ -783,8 +787,6 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 
 	return 0;
 }
-
-
 
 /************************************************************************
 *
@@ -824,7 +826,9 @@ int unmount_FS(char *fsname, char *mp)
 
 	/* TODO: Error handling for failed unmount such as block mp */
 	ret = delete_mount(fsname, ret_info->f_mp, &ret_node);
+#ifdef _ANDROID_ENV_
 	_check_destroy_vol_shared_data(ret_info);
+#endif
 
 	free((ret_node->mt_entry)->f_mp);
 	free(ret_node->mt_entry);
@@ -876,7 +880,9 @@ int unmount_event(char *fsname, char *mp)
 	do_unmount_FS(ret_info);
 
 	ret = delete_mount(fsname, mp, &ret_node);
+#ifdef _ANDROID_ENV_
 	_check_destroy_vol_shared_data(ret_info);
+#endif
 
 	free((ret_node->mt_entry)->f_mp);
 	free(ret_node->mt_entry);
@@ -949,7 +955,9 @@ int unmount_all(void)
 		write_log(5, "Unmounted filesystem %s at mountpoint %s\n",
 				fsname, ret_info->f_mp);
 		delete_mount(fsname, ret_info->f_mp, &ret_node);
+#ifdef _ANDROID_ENV_
 		_check_destroy_vol_shared_data(ret_info);
+#endif
 
 		free((ret_node->mt_entry)->f_mp);
 		free(ret_node->mt_entry);

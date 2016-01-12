@@ -546,6 +546,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	int count;
 	uid_t tmpuid;
 	char volume_type, mp_mode;
+	BOOL keep_check;
 
 	tmppath = NULL;
 	tmptok_prev = NULL;
@@ -565,24 +566,35 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 
 	volume_type = tmpptr->volume_type;
 	mp_mode = tmpptr->mp_mode;
+	write_log(10, "Debug: volume type %d, mp_mode %d\n",
+			(int)volume_type, (int)mp_mode);
 
-	/* For android 6.0 */
-	BOOL keep_check = TRUE;
+	/* For android 6.0, first check folders/files under root. */
+	keep_check = TRUE;
 	if (volume_type == ANDROID_MULTIEXTERNAL) {
 		tmptok = strtok_r(tmppath, "/", &tmptoksave);
 		/* Root in android 6.0 */
 		if (tmptok == NULL) {
-			if (tmpptr->volume_type ==
-					ANDROID_MULTIEXTERNAL) {
-				newpermission = 0711;
-			}
+			newpermission = 0711;
 			keep_check = FALSE;
 		} else {
-			/* TODO: check multiuser folder */
+			/* Not multi-user folder */
+			if (is_natural_number(tmptok) == FALSE) {
+				_android6_permission(thisstat, mp_mode,
+						&newpermission);
+				keep_check = FALSE;
+
+			} else {
+				keep_check = TRUE;
+			}
 		}
 
 		if (keep_check == FALSE) {
-			/* TODO: Change gid and */
+			thisstat->st_uid = 0;
+			if (tmpptr->mp_mode == MP_DEFAULT) /* default */
+				thisstat->st_gid = GID_SDCARD_RW;
+			else /* read/write */
+				thisstat->st_gid = GID_EVERYBODY;
 			tmpmask = 0777;
 			tmpmask = ~tmpmask;
 			tmpmask = tmpmask & thisstat->st_mode;
@@ -604,17 +616,10 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		if (tmptok == NULL) {
 			switch (count) {
 			case 0:
-				thisstat->st_uid = 0;
-				/* For android 6.0, it is /ooxx */
-				if (volume_type == ANDROID_MULTIEXTERNAL) {
-					_android6_permission(thisstat, mp_mode,
-							&newpermission);
-
 				/* It is root for android 5.0 */
-				} else {
-					thisstat->st_gid = 1028;
-					newpermission = 0770;
-				}
+				thisstat->st_uid = 0;
+				thisstat->st_gid = 1028;
+				newpermission = 0770;
 				break;
 			case 1:
 				/* Is /Android for 5.0, /x/Android for 6.0 */
@@ -674,28 +679,22 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		}
 		tmptok_prev = tmptok;
 		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
-			thisstat->st_uid = 0;
-			/* For android 6.0, it is not under /x/Android,
-			 * so follow 6.0's rules */
-			if (volume_type == ANDROID_MULTIEXTERNAL) {
-				_android6_permission(thisstat, mp_mode,
-						&newpermission);
-
 			/* Not under /Android for android 5.0 */
-			} else {
-				thisstat->st_gid = 1028;
-				newpermission = 0770;
-			}
+			thisstat->st_uid = 0;
+			thisstat->st_gid = 1028;
+			newpermission = 0770;
 			break;
 		}
 	}
 
-	/* Modify gid for android 6.0 */
+	/* Modify permission and gid for android 6.0 */
 	if (volume_type == ANDROID_MULTIEXTERNAL) {
+		_android6_permission(thisstat, mp_mode,
+				&newpermission);
 		if (tmpptr->mp_mode == MP_DEFAULT) /* default */
-			thisstat->st_gid = SDCARD_RW;
+			thisstat->st_gid = GID_SDCARD_RW;
 		else /* read/write */
-			thisstat->st_gid = EVERYBODY;
+			thisstat->st_gid = GID_EVERYBODY;
 	}
 
 	tmpmask = 0777;
@@ -708,6 +707,7 @@ errcode_handle:
 	return errcode;
 }
 #endif
+
 /************************************************************************
 *
 * Function name: hfuse_ll_getattr
@@ -743,7 +743,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 		}
 
 #ifdef _ANDROID_ENV_
-		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 			if (tmpptr->vol_path_cache == NULL) {
 				fuse_reply_err(req, EIO);
 				return;
@@ -825,7 +825,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -966,7 +966,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1088,7 +1088,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1123,7 +1123,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL)
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
 #endif
@@ -1167,7 +1167,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1216,7 +1216,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL)
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
 #endif
@@ -1271,7 +1271,7 @@ a directory (for NFS) */
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1315,7 +1315,7 @@ a directory (for NFS) */
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1452,7 +1452,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1482,7 +1482,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1754,7 +1754,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 #ifdef _ANDROID_ENV_
 		/* Clear path cache entry if needed */
-		if (tmpptr->volume_type == ANDROID_EXTERNAL)
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						old_target_inode);
 #endif
@@ -1884,7 +1884,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		sem_post(&(pathlookup_data_lock));
 
 #ifdef _ANDROID_ENV_
-		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 							self_inode);
 			if (ret_val < 0) {
@@ -2778,7 +2778,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -4428,7 +4428,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -4957,7 +4957,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -5057,7 +5057,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -5337,7 +5337,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
                         return;
@@ -5449,7 +5449,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
                         return;
@@ -5689,7 +5689,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
                         return;
@@ -5769,7 +5769,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -5936,7 +5936,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -6005,7 +6005,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;

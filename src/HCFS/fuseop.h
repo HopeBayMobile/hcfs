@@ -83,6 +83,11 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define MTIME 2
 #define CTIME 1
 
+#ifdef _ANDROID_ENV_
+#define  IS_ANDROID_EXTERNAL(type) (((type) == (ANDROID_EXTERNAL)) || \
+		((type) == (ANDROID_MULTIEXTERNAL)))
+#endif
+
 /* Structures for directories */
 /* Defining directory entry in meta files*/
 typedef struct {
