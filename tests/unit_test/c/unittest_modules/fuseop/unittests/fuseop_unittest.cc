@@ -59,8 +59,10 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   struct fuse_args tmp_args = FUSE_ARGS_INIT(3, argv);
 
   memset(tmpmount, 0, sizeof(MOUNT_T));
+  tmpmount->stat_lock = (sem_t *)malloc(sizeof(sem_t));
+  tmpmount->FS_stat = (FS_STAT_T *) malloc(sizeof(FS_STAT_T));
   tmpmount->f_ino = 1;
-  sem_init(&(tmpmount->stat_lock), 0, 1);
+  sem_init((tmpmount->stat_lock), 0, 1);
   fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
   tmp_channel = fuse_mount(mount, &tmp_args);
   tmp_session = fuse_lowlevel_new(&tmp_args,
@@ -152,6 +154,8 @@ class fuseopEnvironment : public ::testing::Environment {
       free(workpath);
     if (tmppath != NULL)
       free(tmppath);
+
+    free(unittest_mount.FS_stat);
   }
 };
 
@@ -1476,12 +1480,12 @@ class hfuse_ll_statfsTest : public ::testing::Test {
  protected:
 
   virtual void SetUp() {
-    unittest_mount.FS_stat.system_size = 12800000;
+    unittest_mount.FS_stat->system_size = 12800000;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     sys_super_block->head.num_active_inodes = 10000;
-    unittest_mount.FS_stat.num_inodes = 10000;
+    unittest_mount.FS_stat->num_inodes = 10000;
     before_update_file_data = TRUE;
     root_updated = FALSE;
   }
@@ -1528,8 +1532,8 @@ TEST_F(hfuse_ll_statfsTest, EmptySysStat) {
   hcfs_system->systemdata.cache_size = 0;
   hcfs_system->systemdata.cache_blocks = 0;
   sys_super_block->head.num_active_inodes = 0;
-  unittest_mount.FS_stat.system_size = 0;
-  unittest_mount.FS_stat.num_inodes = 0;
+  unittest_mount.FS_stat->system_size = 0;
+  unittest_mount.FS_stat->num_inodes = 0;
 
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
 
@@ -1552,7 +1556,7 @@ TEST_F(hfuse_ll_statfsTest, BorderStat) {
   hcfs_system->systemdata.system_size = 4096;
   hcfs_system->systemdata.cache_size = 0;
   hcfs_system->systemdata.cache_blocks = 0;
-  unittest_mount.FS_stat.system_size = 4096;
+  unittest_mount.FS_stat->system_size = 4096;
 
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
 
@@ -1575,8 +1579,8 @@ TEST_F(hfuse_ll_statfsTest, LargeSysStat) {
 
   hcfs_system->systemdata.system_size = 50*powl(1024,3) + 1;
   sys_super_block->head.num_active_inodes = 2000000;
-  unittest_mount.FS_stat.system_size = 50*powl(1024,3) + 1;
-  unittest_mount.FS_stat.num_inodes = 2000000;
+  unittest_mount.FS_stat->system_size = 50*powl(1024,3) + 1;
+  unittest_mount.FS_stat->num_inodes = 2000000;
 
   sys_blocks = ((50*powl(1024,3) + 1 - 1) / 4096) + 1;
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
