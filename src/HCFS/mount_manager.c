@@ -758,10 +758,10 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 	int ret;
 	MOUNT_T *tmp_info;
 
-	/* Search any mountpoint of given volume name */
 	if (mount_info->volume_type != ANDROID_MULTIEXTERNAL)
 		return 0;
 
+	/* Search any mountpoint of given volume name */
 	ret = search_mount(mount_info->f_name, NULL, &tmp_info);
 	if (ret < 0) {
 		/* Destroy shared data when all mountpoints are unmounted */
@@ -773,15 +773,20 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 				fclose(mount_info->stat_fptr);
 			if (mount_info->FS_stat != NULL)
 				free(mount_info->FS_stat);
-			if (mount_info->stat_lock != NULL)
+			if (mount_info->stat_lock != NULL) {
 				sem_destroy(mount_info->stat_lock);
-#ifdef _ANDROID_ENV_
-			if (mount_info->vol_path_cache != NULL) {
-				ret = destroy_pathcache(mount_info->vol_path_cache);
-				if (ret < 0)
-					return ret;
+				free(mount_info->stat_lock);
 			}
-#endif
+			if (mount_info->vol_path_cache != NULL) {
+				ret = destroy_pathcache(
+						mount_info->vol_path_cache);
+				if (ret < 0) {
+					write_log(0, "Error: Fail to destroy"
+						"path cache in %s. Code %d\n",
+						__func__, -ret);
+					return ret;
+				}
+			}
 		} else {
 			write_log(0, "Error: Search mount fail in %s.Code %d\n",
 					__func__, -ret);
