@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: api_interface.c
 * Abstract: The c source file for Defining API for controlling / monitoring

@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: fuseop.c
 * Abstract: The c source code file for the main FUSE operations for HCFS.
@@ -578,14 +578,15 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 			newpermission = 0711;
 			keep_check = FALSE;
 		} else {
-			/* Not multi-user folder */
-			if (is_natural_number(tmptok) == FALSE) {
+			if (is_natural_number(tmptok) == TRUE) {
+				keep_check = TRUE;
+
+			} else {
+				/* Not multi-user folder */
 				_android6_permission(thisstat, mp_mode,
 						&newpermission);
 				keep_check = FALSE;
 
-			} else {
-				keep_check = TRUE;
 			}
 		}
 
