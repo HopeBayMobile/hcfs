@@ -24,7 +24,7 @@ extern SYSTEM_CONF_STRUCT *system_config;
  * @return 0 if succeeding in tagging status, otherwise -1 on error.
  */
 int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
-		int fd, BOOL is_revert)
+		int fd, BOOL is_revert, BOOL finish_sync)
 {
 	int sockfd;
 	int ret, resp, errcode;
@@ -36,6 +36,7 @@ int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
 	data.is_uploading = is_uploading;
 	data.is_revert = is_revert;
 	data.progress_list_fd = fd;
+	data.finish_sync = finish_sync;
 
 	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
 	addr.sun_family = AF_UNIX;
@@ -51,14 +52,14 @@ int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
 		return -errcode;
 	}
 
-
+	resp = 0;
 	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 	recv(sockfd, &resp, sizeof(int), 0);
 
 	if (resp < 0) {
-		write_log(0, "Communication error: Response code %d in %s",
+		write_log(2, "Communication fail: Response code %d in %s",
 			resp, __func__);
-		ret = -1;
+		ret = resp;
 	} else {
 		write_log(10, "Debug: Inode %"PRIu64
 			" succeeded in communicating to fuse proc\n",
@@ -1042,7 +1043,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 
 	/*** Begin to revert ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	if (progress_meta.finish_init_backend_data = FALSE) {
+	if (progress_meta.finish_init_backend_data == FALSE) {
 		finish_init = FALSE;
 	} else {
 		total_blocks = progress_meta.total_backend_blocks;
@@ -1053,10 +1054,10 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		if ((backend_meta_exist == FALSE) && (finish_init == TRUE)) {
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
-
 			write_log(10, "Debug: begin continue uploading inode %"
 				PRIu64"\n", (uint64_t)inode);
 			sync_single_inode((void *)data_ptr);
+			return;
 
 		} else {
 		/* NOT begin to upload, so cancel uploading.

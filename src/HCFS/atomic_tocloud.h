@@ -15,7 +15,8 @@
 typedef struct {
 	ino_t inode;
 	char is_uploading;
-	char is_revert;
+	BOOL is_revert;
+	BOOL finish_sync;
 	int progress_list_fd;
 } UPLOADING_COMMUNICATION_DATA;
 
@@ -51,7 +52,7 @@ typedef struct {
 } PROGRESS_META;
 
 int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
-	int fd, BOOL is_revert);
+	int fd, BOOL is_revert, BOOL finish_sync);
 
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);

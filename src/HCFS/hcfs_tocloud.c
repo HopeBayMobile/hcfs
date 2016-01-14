@@ -136,6 +136,7 @@ static inline void _sync_terminate_thread(int index)
 	int tag_ret;
 	ino_t inode;
 	char toupload_metapath[300], local_metapath[400];
+	char finish_sync;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
@@ -143,6 +144,8 @@ static inline void _sync_terminate_thread(int index)
 		ret = pthread_join(sync_ctl.inode_sync_thread[index], NULL);
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
+			finish_sync = sync_ctl.threads_error[index] == TRUE ?
+					FALSE : TRUE;
 			fetch_toupload_meta_path(toupload_metapath, inode);
 
 			/* Tell memory cache that finish uploading if
@@ -150,7 +153,7 @@ static inline void _sync_terminate_thread(int index)
 			fetch_meta_path(local_metapath, inode);
 			if (!access(local_metapath, F_OK)) {
 				tag_ret = tag_status_on_fuse(inode, FALSE, 0,
-					sync_ctl.is_revert[index]);
+					sync_ctl.is_revert[index], finish_sync);
 				if (tag_ret < 0) {
 					write_log(0, "Fail to tag inode %lld "
 						"as NOT_UPLOADING in %s\n",
@@ -1334,6 +1337,11 @@ store in some other file */
 					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
 						sizeof(BLOCK_ENTRY_PAGE),
 						1, local_metafptr, TRUE);
+
+				} else if ((local_block_status == ST_LtoC) &&
+					(local_block_seq == toupload_block_seq)) {
+					/* Tmp do nothing */
+
 				} else {
 					/* In continue mode, directly
 					 * return when to-upload meta does
@@ -2214,7 +2222,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	int progress_fd;
 	char progress_file_path[300];
 
-	ret = -1;
+	ret = 0;
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
@@ -2224,26 +2232,30 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				this_inode);
 			if (access(progress_file_path, F_OK) == 0) {
 				progress_fd = open(progress_file_path, O_RDWR);
-				if (progress_fd < 0)
-					break;	
+				if (progress_fd < 0) {
+					ret = -errno;
+					break;
+				}
 				sync_ctl.is_revert[count] = TRUE;
 				sync_threads[count].is_revert = TRUE;
 			} else {
 				progress_fd = create_progress_file(this_inode);
-				if (progress_fd < 0)
+				if (progress_fd < 0) {
+					ret = -1;
 					break;
+				}
 				sync_ctl.is_revert[count] = FALSE;
 				sync_threads[count].is_revert = FALSE;
 			}
 
 			/* Notify fuse process that it is going to upload */
 			ret = tag_status_on_fuse(this_inode, TRUE,
-					progress_fd, sync_ctl.is_revert[count]);
+					progress_fd, sync_ctl.is_revert[count],
+					FALSE);
 			if (ret < 0) {
-				write_log(0, "Error on tagging inode %lld as "
+				write_log(2, "Fail to tagging inode %lld as "
 					"UPLOADING.\n", this_inode);
 				del_progress_file(progress_fd, this_inode);
-				ret = -1;
 				break;
 			}
 			/* Prepare data */
@@ -2275,7 +2287,6 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
-			ret = count;
 			break;
 		}
 	}

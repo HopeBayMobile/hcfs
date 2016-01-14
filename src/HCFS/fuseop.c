@@ -6108,11 +6108,13 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 	struct stat tmpstat;
 	int errcode;
 	ssize_t ret_ssize;
+	long long toupload_blocks;
 
+	meta_cache_entry = NULL;
 	meta_cache_entry = meta_cache_lock_entry(data->inode);
 	if (!meta_cache_entry) {
 		write_log(0, "Fail to lock meta cache entry in %s\n", __func__);
-		return -1;
+		return -ENOMEM;
 	}
 	ret = meta_cache_open_file(meta_cache_entry);
 	if (ret < 0) {
@@ -6126,18 +6128,16 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 				data->inode);
 		fetch_meta_path(local_metapath, data->inode);
 		if (access(toupload_metapath, F_OK) == 0) {
-			write_log(0, "Error: cannot copy since "
+			write_log(2, "Cannot copy since "
 					"%s exists", toupload_metapath);
 			unlink(toupload_metapath);
-			meta_cache_unlock_entry(meta_cache_entry);
-			return -1;
 		}
 		ret = check_and_copy_file(local_metapath,
 				toupload_metapath, FALSE);
 		if (ret < 0) {
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
-			return -1;	
+			return ret;	
 		}
 
 		ret = meta_cache_lookup_file_data(data->inode, &tmpstat,
@@ -6148,13 +6148,14 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 			return ret;
 		}
 
-		/* Do NOT need to lock */
 		flock(data->progress_list_fd, LOCK_EX);
 		PREAD(data->progress_list_fd, &progress_meta,
 				sizeof(PROGRESS_META), 0);
+
 		progress_meta.toupload_size = tmpstat.st_size;
-		progress_meta.total_toupload_blocks = (tmpstat.st_size == 0) ? 
+		toupload_blocks = (tmpstat.st_size == 0) ? 
 			0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
+		progress_meta.total_toupload_blocks = toupload_blocks;
 		write_log(10, "Debug: toupload_size %lld, total_toupload_blocks %lld\n",
 			progress_meta.toupload_size, progress_meta.total_toupload_blocks);
 
@@ -6163,15 +6164,33 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 		flock(data->progress_list_fd, LOCK_UN);
 	}
 
+	/* Just read progress meta when continuing uploading */
+	if ((data->is_uploading == TRUE) && (data->is_revert == TRUE)) {
+		flock(data->progress_list_fd, LOCK_EX);
+		PREAD(data->progress_list_fd, &progress_meta,
+				sizeof(PROGRESS_META), 0);
+		flock(data->progress_list_fd, LOCK_UN);
+		if (progress_meta.finish_init_backend_data == FALSE) {
+			errcode = -ECANCELED;
+			goto errcode_handle;
+		}
+		toupload_blocks = progress_meta.total_toupload_blocks;
+	}
+
 	/* Set uploading information */
-	ret = meta_cache_set_uploading_info(meta_cache_entry,
-		data->is_uploading, data->progress_list_fd,
-		progress_meta.total_toupload_blocks);
+	if (data->is_uploading == TRUE) {
+		ret = meta_cache_set_uploading_info(meta_cache_entry,
+			TRUE, data->progress_list_fd,
+			toupload_blocks);
+	} else {
+		ret = meta_cache_set_uploading_info(meta_cache_entry,
+			FALSE, 0, 0);
+	}
 	if (ret < 0) {
 		write_log(0, "Fail to set uploading info in %s\n", __func__);
 		meta_cache_close_file(meta_cache_entry);
 		meta_cache_unlock_entry(meta_cache_entry);
-		return -1;
+		return ret;
 	}
 
 	ret = meta_cache_close_file(meta_cache_entry);
@@ -6182,7 +6201,7 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 	ret = meta_cache_unlock_entry(meta_cache_entry);
 	if (ret < 0) {
 		write_log(0, "Fail to unlock entry in %s\n", __func__);
-		return -1;
+		return ret;
 	}
 
 	return 0;
@@ -6242,8 +6261,8 @@ void *fuse_communication_contact_window(void *data)
 
 		ret = set_uploading_data(&uploading_data);
 		if (ret < 0) {
-			communicate_result = -1;
-			write_log(0, "Fail to tag inode %lld in %s",
+			communicate_result = ret;
+			write_log(2, "Fail to tag inode %lld in %s",
 				uploading_data.inode, __func__);
 		} else {
 			communicate_result = 0;
@@ -6323,7 +6342,7 @@ int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd)
 	int i;
 
 	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {
-		pthread_join(communicate_tid, NULL);
+		pthread_join(*communicate_tid, NULL);
 	}
 
 	close(socket_fd);
