@@ -163,8 +163,9 @@ int _revert_block_status_LDISK(ino_t this_inode, long long blockno,
 		tmppage.block_entries[e_index].status == ST_LDISK;
 		write_log(8, "Debug: block_%"PRIu64"_%lld is reverted"
 				" to ST_LDISK", (uint64_t)this_inode, blockno);
+		PWRITE(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE),
+				page_filepos);
 	}
-	PWRITE(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE), page_filepos);
 
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
@@ -978,40 +979,50 @@ static inline int _choose_deleted_block(char delete_which_one,
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	char delete_which_one)
 {
-	BLOCK_UPLOADING_STATUS block_info;
+	BLOCK_UPLOADING_PAGE tmppage;
+	BLOCK_UPLOADING_STATUS *block_info;
 	long long block_count;
 	long long block_seq;
-	long long which_page;
+	long long which_page, current_page;
+	long long offset;
 	unsigned char block_objid[OBJID_LENGTH];
-	int ret;
+	int ret, errcode;
 	int which_curl;
-	int which_index;
-	char sync_error;
+	int e_index;
+	BOOL sync_error;
 
 	if (delete_which_one == TOUPLOAD_BLOCKS)
 	write_log(4, "Debug: Delete those blocks uploaded just now for "
 		"inode_%"PRIu64"\n", (uint64_t)inode);
 
+	current_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
-		ret = get_progress_info(progress_fd, block_count,
-			&block_info); /* TODO: read just one time for a page? */
-		if (ret < 0) {
-			if (ret == -ENOENT) /* truncated block does not exist */
-				block_count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
-			else /*TODO: more error handling*/
-				write_log(0, "Error: Fail to get uploading info"
-					" for block_%"PRIu64"_%lld\n",
-					(uint64_t)inode, block_count);
-			continue;
+
+		which_page = block_count / BLK_INCREMENTS;
+		if (current_page != which_page) {
+			flock(progress_fd, LOCK_EX);
+			offset = query_status_page(progress_fd, block_count);
+			if (offset <= 0) {
+				block_count += (BLK_INCREMENTS - 1);
+				flock(progress_fd, LOCK_UN);
+				continue;
+			}
+			PREAD(progress_fd, &tmppage,
+					sizeof(BLOCK_UPLOADING_PAGE), offset);
+			flock(progress_fd, LOCK_UN);
+			current_page = which_page;
 		}
+
+		e_index = block_count % BLK_INCREMENTS;
+		block_info = &(tmppage.status_entry[e_index]);
 
 #if (DEDUP_ENABLE)
 		ret = _choose_deleted_block(delete_which_one,
-			&block_info, block_objid, inode);
+			block_info, block_objid, inode);
 #else
 		block_seq = 0;
 		ret = _choose_deleted_block(delete_which_one,
-			&block_info, &block_seq, inode);
+			block_info, &block_seq, inode);
 #endif
 		if (ret < 0)
 			continue;
@@ -1986,6 +1997,7 @@ errcode_handle:
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
 	int which_curl, ret, count1, which_index;
+	char local_metapath[200];
 
 	which_curl = thread_ptr->which_curl;
 	which_index = thread_ptr->which_index;
