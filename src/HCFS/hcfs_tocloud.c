@@ -67,7 +67,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
-static inline int _get_inode_sync_error(ino_t inode, char *sync_error)
+static inline int _get_inode_sync_error(ino_t inode, BOOL *sync_error)
 {
 	int count1;
 
@@ -127,6 +127,55 @@ static inline int _set_inode_continue_nexttime(ino_t inode)
 	}
 }
 
+/**
+ * _revert_block_status_LDISK
+ *
+ * When cancelling uploading this time, revert the status from ST_LtoC to
+ * ST_LDISK if needed.
+ *
+ * @return 0 on success, otherwise negative errcode.
+ */
+int _revert_block_status_LDISK(ino_t this_inode, long long blockno,
+		int e_index, long long page_filepos)
+{
+	BLOCK_ENTRY_PAGE tmppage;
+	char local_metapath[300];
+	FILE *fptr;
+	int errcode, ret;
+	ssize_t ret_ssize;
+
+	fetch_meta_path(local_metapath, this_inode);
+
+	fptr = fopen(local_metapath, "r+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "Error: Fail to open meta in %s. Code %d\n",
+				__func__, -errcode);
+		return -errcode;
+	}
+	flock(fileno(fptr), LOCK_EX);
+	setbuf(fptr, NULL);
+	if (access(local_metapath, F_OK) < 0)
+		return 0;
+
+	PREAD(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE), page_filepos);
+	if (tmppage.block_entries[e_index].status == ST_LtoC) {
+		tmppage.block_entries[e_index].status == ST_LDISK;
+		write_log(8, "Debug: block_%"PRIu64"_%lld is reverted"
+				" to ST_LDISK", (uint64_t)this_inode, blockno);
+	}
+	PWRITE(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE), page_filepos);
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:	
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
+
 /* Don't need to collect return code for the per-inode sync thread, as
 the error handling for syncing this inode will be handled in
 sync_single_inode. */
@@ -137,6 +186,10 @@ static inline void _sync_terminate_thread(int index)
 	ino_t inode;
 	char toupload_metapath[300], local_metapath[400];
 	char finish_sync;
+	struct stat tmpstat;
+	long long num_blocks, i;
+	char block_path[300];
+	FILE *fptr;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
@@ -162,12 +215,10 @@ static inline void _sync_terminate_thread(int index)
 			}
 
 			/* When threads error occur (no matter whether it is
-			 * caused by disconnection), delete all to-upload
+			 * caused by disconnection or not), delete all to-upload
 			 * blocks. */
-			if (sync_ctl.threads_error[index] == TRUE) {
-				struct stat tmpstat;
-				long long num_blocks, i;
-				char block_path[300];
+			if (sync_ctl.threads_error[index] == TRUE &&
+				S_ISREG(sync_ctl.upload_threads[index].this_mode)) {
 				FILE *fptr = fopen(toupload_metapath, "r");
 				if (fptr != NULL) {
 					pread(fileno(fptr), &tmpstat,
@@ -337,11 +388,13 @@ static inline int _upload_terminate_thread(int index)
 					&backend_exist, NULL, NULL, NULL);
 		/* When deleting to-upload blocks, it is important to recover
 		 * the block status to ST_LDISK */
-		} else {
+		} else if (upload_ctl.upload_threads[index].is_backend_delete ==
+				TOUPLOAD_BLOCKS) {
 			toupload_exist = FALSE;
 			set_progress_info(progress_fd, blockno, &toupload_exist,
 					NULL, NULL, NULL, NULL);
-			// TODO: _revert_block_status_LDISK(this_inode, blockno, e_index, page_filepos);
+			ret = _revert_block_status_LDISK(this_inode, blockno,
+					e_index, page_filepos);
 		}
 
 		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
@@ -928,9 +981,12 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	BLOCK_UPLOADING_STATUS block_info;
 	long long block_count;
 	long long block_seq;
+	long long which_page;
 	unsigned char block_objid[OBJID_LENGTH];
 	int ret;
 	int which_curl;
+	int which_index;
+	char sync_error;
 
 	if (delete_which_one == TOUPLOAD_BLOCKS)
 	write_log(4, "Debug: Delete those blocks uploaded just now for "
@@ -977,13 +1033,20 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	}
 
 	_busy_wait_all_specified_upload_threads(inode);
+	_get_inode_sync_error(inode, &sync_error);
 
-	write_log(10, "Debug: Finish deleting unuseful blocks for inode %"
-			PRIu64" on cloud\n", (uint64_t)inode);
-	return 0;
+	if (sync_error == TRUE) {
+		write_log(4, "Fail to delete unuseful data on cloud for inode %"
+				PRIu64, (uint64_t)inode);
+		return -ECANCELED;
+	} else {
+		write_log(10, "Debug: Finish deleting unuseful blocks "
+			"for inode %"PRIu64" on cloud\n", (uint64_t)inode);
+		return 0;
+	}
 }
 
-int _change_status_to_CLOUD(ino_t inode, int progress_fd,
+int _change_status_to_BOTH(ino_t inode, int progress_fd,
 		FILE *local_metafptr, char *local_metapath)
 {
 	PROGRESS_META progress_meta;
@@ -1460,6 +1523,7 @@ store in some other file */
 
 		/* If meta is deleted when uploading, delete backend blocks */
 		if (is_local_meta_deleted == TRUE) {
+			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
 			delete_backend_blocks(progress_fd, total_blocks,
 				ptr->inode, TOUPLOAD_BLOCKS);
 			fclose(local_metafptr);
@@ -1476,7 +1540,7 @@ store in some other file */
 	if ((sync_error == TRUE) || (hcfs_system->system_going_down == TRUE)) {
 		/* When system going down, re-upload it later */
 		if (hcfs_system->system_going_down == TRUE) {
-			_set_inode_continue_nexttime(ptr->inode);
+			sync_ctl.continue_nexttime[ptr->which_index] = TRUE;
 		
 		/* If it is just sync error, then delete backend */
 		} else {
@@ -1593,17 +1657,23 @@ store in some other file */
 				(uint64_t)ptr->inode);
 		/* Delete to-upload blocks when it fails by anything but
 		 * disconnection */
-		if (sync_ctl.continue_nexttime[ptr->which_index] == FALSE) {
-			delete_backend_blocks(progress_fd, total_blocks,
-				ptr->inode, TOUPLOAD_BLOCKS);
+		if (S_ISREG(ptr->this_mode)) {
+			if (sync_ctl.continue_nexttime[ptr->which_index] ==
+					FALSE) {
+				delete_backend_blocks(progress_fd, total_blocks,
+					ptr->inode, TOUPLOAD_BLOCKS);
+			}
+		} else { /* Just re-upload for dir/slnk/fifo/socket */
+			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
 		}
+
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
-		_change_status_to_CLOUD(ptr->inode, progress_fd,
+		_change_status_to_BOTH(ptr->inode, progress_fd,
 				local_metafptr, local_metapath);
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, BACKEND_BLOCKS);
@@ -1786,21 +1856,6 @@ int do_block_sync(ino_t this_inode, long long block_no,
 
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
-
-	/* Since the object mapped by this block is changed, need to remove old
-	 * object
-	 * Sync was successful
-	 */
-	/*if (ret == 0 && uploaded) {
-		printf("Start to delete obj %02x...%02x\n", old_obj_id[0], old_obj_id[31]);
-		// Delete old object in cloud
-		do_block_delete(this_inode, block_no, old_obj_id,
-					curl_handle);
-
-		printf("Delete result - %d\n", ret);
-		printf("Delete obj - %02x...%02x\n", old_obj_id[0], old_obj_id[31]);
-	}*/
-
 #else
 	}
 #endif
@@ -1955,8 +2010,17 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 errcode_handle:
 	write_log(10, "Recording error in %s\n", __func__);
-	_set_inode_sync_error(thread_ptr->inode);	
+	_set_inode_sync_error(thread_ptr->inode);
+	
+	/* If upload caused by disconnection, then upload next time */
+	fetch_meta_path(local_metapath, thread_ptr->inode);
+	if (access(local_metapath, F_OK) == 0) {
+		if (hcfs_system->sync_paused == TRUE)
+			_set_inode_continue_nexttime(thread_ptr->inode);
+	}
+	
 	upload_ctl.threads_finished[which_index] = TRUE;
+	return;
 }
 
 int schedule_sync_meta(char *toupload_metapath, int which_curl)

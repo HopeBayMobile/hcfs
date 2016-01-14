@@ -6148,6 +6148,7 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 			return ret;
 		}
 
+		/* Update some info */
 		flock(data->progress_list_fd, LOCK_EX);
 		PREAD(data->progress_list_fd, &progress_meta,
 				sizeof(PROGRESS_META), 0);
@@ -6193,6 +6194,7 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 		return ret;
 	}
 
+	/* Unlock meta cache */
 	ret = meta_cache_close_file(meta_cache_entry);
 	if (ret < 0) {
 		meta_cache_unlock_entry(meta_cache_entry);

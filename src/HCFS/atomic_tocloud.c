@@ -971,7 +971,6 @@ errcode_handle:
 	return errcode;
 }
 
-
 /**
  * Revert uploading for given inode
  *

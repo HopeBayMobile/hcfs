@@ -57,9 +57,6 @@ int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
-int get_progress_info_nonlock(int fd, long long block_index,
-	BLOCK_UPLOADING_STATUS *block_uploading_status);
-
 #if (DEDUP_ENABLE)
 int set_progress_info(int fd, long long block_index,
 	const char *toupload_exist, const char *backend_exist,
@@ -91,6 +88,8 @@ int fetch_backend_meta_path(char *pathname, ino_t inode);
 char did_block_finish_uploading(int fd, long long blockno);
 
 int uploading_revert();
+
+long long query_status_page(int fd, long long block_index);
 
 void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr);
 #endif
