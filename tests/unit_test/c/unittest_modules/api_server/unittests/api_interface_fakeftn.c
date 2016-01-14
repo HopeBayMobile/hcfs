@@ -9,8 +9,6 @@
 #include "meta_mem_cache.h"
 #include "dir_statistics.h"
 
-SYSTEM_CONF_STRUCT system_config;
-
 int write_log(int level, char *format, ...)
 {
 	va_list alist;
@@ -59,14 +57,14 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	return 0;
 }
 
-int mount_FS(char *fsname, char *mp)
+int mount_FS(char *fsname, char *mp, char mp_mode)
 {
 	MOUNTEDFS = TRUE;
 	strcpy(recvFSname, fsname);
 	strcpy(recvmpname, mp);
 	return 0;
 }
-int unmount_FS(char *fsname)
+int unmount_FS(char *fsname, char *mp)
 {
 	UNMOUNTEDFS = TRUE;
 	strcpy(recvFSname, fsname);
@@ -79,7 +77,7 @@ int mount_status(char *fsname)
 	return 0;
 }
 
-int search_mount(char *fsname, MOUNT_T **mt_info)
+int search_mount(char *fsname, char *mp, MOUNT_T **mt_info)
 {
 	return -ENOENT;
 }

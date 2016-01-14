@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: api_interface.c
 * Abstract: The c source file for Defining API for controlling / monitoring
@@ -204,19 +204,28 @@ int create_FS_handle(int arg_len, char *largebuf)
 int mount_FS_handle(int arg_len, char *largebuf)
 {
 	char *buf, *mpbuf;
+	char mp_mode;
 	int ret;
 	int fsname_len, mp_len;
 
-	memcpy(&fsname_len, largebuf, sizeof(int));
+	mp_mode = largebuf[0];
+	if (mp_mode != MP_DEFAULT && mp_mode != MP_READ &&
+			mp_mode != MP_WRITE) {
+		write_log(2, "Invalid mount point type\n");
+		return -EINVAL;
+	}
+
+	memcpy(&fsname_len, largebuf + 1, sizeof(int));
 
 	buf = malloc(fsname_len + 10);
-	mp_len = arg_len - sizeof(int) - fsname_len;
+	mp_len = arg_len - sizeof(int) - fsname_len - sizeof(char);
 	mpbuf = malloc(mp_len + 10);
-	memcpy(buf, &(largebuf[sizeof(int)]), fsname_len);
-	memcpy(mpbuf, &(largebuf[sizeof(int) + fsname_len]), mp_len);
+	memcpy(buf, &(largebuf[1 + sizeof(int)]), fsname_len);
+	memcpy(mpbuf, &(largebuf[1 + sizeof(int) + fsname_len]), mp_len);
+	write_log(10, "Debug: fsname is %s, mp is %s, mp_mode is %d\n", buf, mpbuf, mp_mode);
 	buf[fsname_len] = 0;
 	mpbuf[mp_len] = 0;
-	ret = mount_FS(buf, mpbuf);
+	ret = mount_FS(buf, mpbuf, mp_mode);
 
 	free(buf);
 	free(mpbuf);
@@ -225,14 +234,30 @@ int mount_FS_handle(int arg_len, char *largebuf)
 
 int unmount_FS_handle(int arg_len, char *largebuf)
 {
-	char *buf;
+	char *buf, *mp;
 	int ret;
+	int fsname_len;
 
+	memcpy(&fsname_len, largebuf, sizeof(int));
 	buf = malloc(arg_len + 10);
-	memcpy(buf, largebuf, arg_len);
-	buf[arg_len] = 0;
-	ret = unmount_FS(buf);
+	memcpy(buf, largebuf + sizeof(int), fsname_len);
+	buf[fsname_len] = 0;
 
+	mp = malloc(arg_len + 10);
+	memcpy(mp, largebuf + sizeof(int) + fsname_len + 1,
+			arg_len - sizeof(int) - fsname_len - 1);
+	mp[arg_len - sizeof(int) - fsname_len - 1] = 0;
+	if (!strlen(mp)) {
+		write_log(2, "Mountpoint is needed when unmount\n");
+		free(buf);
+		free(mp);
+		return -EINVAL;
+	}
+	write_log(10, "Debug: fsname is %s, mp is %s\n", buf, mp);
+
+	ret = unmount_FS(buf, mp);
+
+	free(mp);
 	free(buf);
 	return ret;
 }
@@ -297,15 +322,15 @@ long long get_vol_size(int arg_len, char *largebuf)
 	/* First check if FS already mounted */
 	statfptr = NULL;
 
-	ret = search_mount(buf, &tmp_info);
+	ret = search_mount(buf, NULL, &tmp_info);
 	if ((ret < 0) && (ret != -ENOENT)) {
 		llretval = (long long) ret;
 		goto error_handling;
 	} else if (ret == 0) {
 		/* Fetch stat from mounted volume */
-		sem_wait(&(tmp_info->stat_lock));
-		llretval = (tmp_info->FS_stat).system_size;
-		sem_post(&(tmp_info->stat_lock));
+		sem_wait((tmp_info->stat_lock));
+		llretval = (tmp_info->FS_stat)->system_size;
+		sem_post((tmp_info->stat_lock));
 
 		free(buf);
 		sem_post(&(mount_mgr.mount_lock));
