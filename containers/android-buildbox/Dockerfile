@@ -21,7 +21,8 @@ RUN apt-get install -y openjdk-7-jdk \
 RUN apt-get install -y git make python-networkx zlib1g-dev:i386 \
 	vim bc libglib2.0-data libsasl2-modules:amd64 gcc g++ \
 	syslog-ng-core
-RUN apt-get upgrade -y
+RUN apt-get install -y bash-completion
+RUN apt-get update && apt-get upgrade -y
 
 ENV USE_CCACHE 1
 ENV PATH=/root/bin:$PATH
