@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: global.h
 * Abstract: The header file for global settings for HCFS
@@ -67,5 +67,10 @@
 #define RELOADCONFIG 30
 
 #define DEFAULT_PIN TRUE
+
+#ifdef _ANDROID_ENV_
+#define GID_SDCARD_RW 1015
+#define GID_EVERYBODY 9997
+#endif
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

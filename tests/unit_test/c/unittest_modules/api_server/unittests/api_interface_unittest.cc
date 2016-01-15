@@ -18,6 +18,7 @@ extern "C" {
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
+#include "mount_manager.h"
 }
 #include "gtest/gtest.h"
 
@@ -606,6 +607,7 @@ TEST_F(api_moduleTest, MountFSTest) {
   char tmpstr[10];
   char mpstr[10];
   int fsname_len;
+  char mp_mode;
 
   MOUNTEDFS = FALSE;
   ret_val = init_api_interface();
@@ -616,15 +618,18 @@ TEST_F(api_moduleTest, MountFSTest) {
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
   code = MOUNTVOL;
-  cmd_len = 20 + sizeof(int);
+  cmd_len = 20 + sizeof(int) + sizeof(char);
   fsname_len = 10;
   snprintf(tmpstr, 10, "123456789");
   snprintf(mpstr, 10, "123456789");
+  mp_mode = MP_DEFAULT;
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(unsigned int), 0);
   ASSERT_EQ(sizeof(unsigned int), size_msg);
   size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
   ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &mp_mode, sizeof(char), 0);
+  ASSERT_EQ(sizeof(char), size_msg);
   size_msg=send(fd, &fsname_len, sizeof(int), 0);
   ASSERT_EQ(sizeof(unsigned int), size_msg);
 
@@ -648,7 +653,7 @@ TEST_F(api_moduleTest, MountFSTest) {
 TEST_F(api_moduleTest, UnmountFSTest) {
 
   int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  unsigned int code, cmd_len, size_msg, fsname_len;
   char tmpstr[10];
 
   UNMOUNTEDFS = FALSE;
@@ -660,14 +665,19 @@ TEST_F(api_moduleTest, UnmountFSTest) {
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
   code = UNMOUNTVOL;
-  cmd_len = 10;
+  cmd_len = 20 + sizeof(int);
   snprintf(tmpstr, 10, "123456789");
+  fsname_len = 10;
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(unsigned int), 0);
   ASSERT_EQ(sizeof(unsigned int), size_msg);
   size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
   ASSERT_EQ(sizeof(unsigned int), size_msg);
 
+  size_msg=send(fd, &fsname_len, sizeof(int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");

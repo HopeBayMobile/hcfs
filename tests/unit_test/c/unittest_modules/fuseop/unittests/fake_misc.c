@@ -738,7 +738,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	return 0;
 }
 
-int unmount_event(char *fsname)
+int unmount_event(char *fsname, char *mp)
 {
 	return 0;
 }
@@ -875,3 +875,7 @@ int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 }
 
+BOOL is_natural_number(char *str)
+{
+	return TRUE;
+}

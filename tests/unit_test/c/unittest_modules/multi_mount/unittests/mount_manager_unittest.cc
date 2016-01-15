@@ -46,6 +46,8 @@ MOUNT_NODE_T* prepare_node(char *fname) {
   tmpptr->mt_entry = (MOUNT_T *) malloc(sizeof(MOUNT_T));
   memset(tmpptr->mt_entry, 0, sizeof(MOUNT_T));
   strcpy((tmpptr->mt_entry)->f_name, fname);
+  (tmpptr->mt_entry)->f_mp = NULL;
+  tmpptr->mt_entry->volume_type = ANDROID_MULTIEXTERNAL;
   return tmpptr;
  }
 
@@ -117,7 +119,7 @@ TEST_F(search_mountTest, EmptyDatabase) {
   MOUNT_T *tmpinfo;
 
   mount_mgr.root = NULL;
-  ret = search_mount("anyFS", &tmpinfo);
+  ret = search_mount("anyFS", NULL, &tmpinfo);
   EXPECT_EQ(-ENOENT, ret);
 
  }
@@ -131,7 +133,7 @@ TEST_F(search_mountTest, MultipleFSFound) {
 
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = search_mount(fsname, &tmpinfo);
+    ret = search_mount(fsname, NULL, &tmpinfo);
     EXPECT_EQ(0, ret);
    }
 
@@ -145,7 +147,7 @@ TEST_F(search_mountTest, MultipleFSNotFound) {
 
   for (count = 100; count < 200; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = search_mount(fsname, &tmpinfo);
+    ret = search_mount(fsname, NULL, &tmpinfo);
     EXPECT_EQ(-ENOENT, ret);
    }
 
@@ -180,6 +182,7 @@ TEST_F(insert_mountTest, MultipleFS) {
     tmpinfo1 = (MOUNT_T *) malloc(sizeof(MOUNT_T));
     snprintf(fsname, 10, "%4d", count);
     strcpy(tmpinfo1->f_name, fsname);
+    tmpinfo1->f_mp = "mp";
     ret = insert_mount(fsname, tmpinfo1);
     if (ret != 0)
       printf("%s\n", strerror(-ret));
@@ -189,7 +192,7 @@ TEST_F(insert_mountTest, MultipleFS) {
   ASSERT_EQ(100, mount_mgr.num_mt_FS);
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = search_mount(fsname, &tmpinfo2);
+    ret = search_mount(fsname, "mp", &tmpinfo2);
     ASSERT_EQ(0, ret);
     EXPECT_EQ(tmpptr[count], tmpinfo2);
    }
@@ -205,6 +208,7 @@ TEST_F(insert_mountTest, MultipleFSReverse) {
     tmpinfo1 = (MOUNT_T *) malloc(sizeof(MOUNT_T));
     snprintf(fsname, 10, "%4d", count);
     strcpy(tmpinfo1->f_name, fsname);
+    tmpinfo1->f_mp = "mp";
     ret = insert_mount(fsname, tmpinfo1);
     if (ret != 0)
       printf("%s\n", strerror(-ret));
@@ -214,7 +218,7 @@ TEST_F(insert_mountTest, MultipleFSReverse) {
   ASSERT_EQ(100, mount_mgr.num_mt_FS);
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = search_mount(fsname, &tmpinfo2);
+    ret = search_mount(fsname, "mp", &tmpinfo2);
     ASSERT_EQ(0, ret);
     EXPECT_EQ(tmpptr[count], tmpinfo2);
    }
@@ -251,12 +255,12 @@ TEST_F(delete_mountTest, MultipleFS) {
 
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = delete_mount(fsname, &tmpnode);
+    ret = delete_mount(fsname, NULL, &tmpnode);
     ASSERT_EQ(0, ret);
     EXPECT_STREQ(fsname, (tmpnode->mt_entry)->f_name);
     free(tmpnode->mt_entry);
     free(tmpnode);
-    ret = search_mount(fsname, &tmpinfo1);
+    ret = search_mount(fsname, NULL, &tmpinfo1);
     EXPECT_EQ(-ENOENT, ret);
    }
   ASSERT_EQ(0, mount_mgr.num_mt_FS);
@@ -274,12 +278,12 @@ TEST_F(delete_mountTest, MultipleFSReverse) {
 
   for (count = 99; count >= 0; count--) {
     snprintf(fsname, 10, "%4d", count);
-    ret = delete_mount(fsname, &tmpnode);
+    ret = delete_mount(fsname, NULL, &tmpnode);
     ASSERT_EQ(0, ret);
     EXPECT_STREQ(fsname, (tmpnode->mt_entry)->f_name);
     free(tmpnode->mt_entry);
     free(tmpnode);
-    ret = search_mount(fsname, &tmpinfo1);
+    ret = search_mount(fsname, NULL, &tmpinfo1);
     EXPECT_EQ(-ENOENT, ret);
    }
   ASSERT_EQ(0, mount_mgr.num_mt_FS);
@@ -297,12 +301,12 @@ TEST_F(delete_mountTest, MultipleFSReverse1) {
 
   for (count = 49; count >= 0; count--) {
     snprintf(fsname, 10, "%4d", count);
-    ret = delete_mount(fsname, &tmpnode);
+    ret = delete_mount(fsname, NULL, &tmpnode);
     ASSERT_EQ(0, ret);
     EXPECT_STREQ(fsname, (tmpnode->mt_entry)->f_name);
     free(tmpnode->mt_entry);
     free(tmpnode);
-    ret = search_mount(fsname, &tmpinfo1);
+    ret = search_mount(fsname, NULL, &tmpinfo1);
     EXPECT_EQ(-ENOENT, ret);
    }
   ASSERT_EQ(50, mount_mgr.num_mt_FS);
@@ -320,12 +324,12 @@ TEST_F(delete_mountTest, MultipleFSReverse2) {
 
   for (count = 24; count >= 0; count--) {
     snprintf(fsname, 10, "%4d", count);
-    ret = delete_mount(fsname, &tmpnode);
+    ret = delete_mount(fsname, NULL, &tmpnode);
     ASSERT_EQ(0, ret);
     EXPECT_STREQ(fsname, (tmpnode->mt_entry)->f_name);
     free(tmpnode->mt_entry);
     free(tmpnode);
-    ret = search_mount(fsname, &tmpinfo1);
+    ret = search_mount(fsname, NULL, &tmpinfo1);
     EXPECT_EQ(-ENOENT, ret);
    }
   ASSERT_EQ(75, mount_mgr.num_mt_FS);
@@ -343,12 +347,12 @@ TEST_F(delete_mountTest, MultipleFS1) {
 
   for (count = 49; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = delete_mount(fsname, &tmpnode);
+    ret = delete_mount(fsname, NULL, &tmpnode);
     ASSERT_EQ(0, ret);
     EXPECT_STREQ(fsname, (tmpnode->mt_entry)->f_name);
     free(tmpnode->mt_entry);
     free(tmpnode);
-    ret = search_mount(fsname, &tmpinfo1);
+    ret = search_mount(fsname, NULL, &tmpinfo1);
     EXPECT_EQ(-ENOENT, ret);
    }
   ASSERT_EQ(49, mount_mgr.num_mt_FS);
@@ -366,12 +370,12 @@ TEST_F(delete_mountTest, MultipleFS2) {
 
   for (count = 74; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = delete_mount(fsname, &tmpnode);
+    ret = delete_mount(fsname, NULL, &tmpnode);
     ASSERT_EQ(0, ret);
     EXPECT_STREQ(fsname, (tmpnode->mt_entry)->f_name);
     free(tmpnode->mt_entry);
     free(tmpnode);
-    ret = search_mount(fsname, &tmpinfo1);
+    ret = search_mount(fsname, NULL, &tmpinfo1);
     EXPECT_EQ(-ENOENT, ret);
    }
   ASSERT_EQ(74, mount_mgr.num_mt_FS);
@@ -548,7 +552,7 @@ TEST_F(mount_FSTest, AlreadyMounted) {
   build_tree(100);
 
   snprintf(fsname, 10, "%4d", 99);
-  ret = mount_FS(fsname, "/tmp/testmount");
+  ret = mount_FS(fsname, "/tmp/testmount", MP_DEFAULT);
   EXPECT_EQ(-EPERM, ret);
  }
 
@@ -558,7 +562,7 @@ TEST_F(mount_FSTest, FSNotExist) {
 
   FS_CORE_FAILED = -ENOENT;
   snprintf(fsname, 10, "%4d", 10);
-  ret = mount_FS(fsname, "/tmp/testmount");
+  ret = mount_FS(fsname, "/tmp/testmount", MP_DEFAULT);
   EXPECT_EQ(-ENOENT, ret);
  }
 
@@ -568,7 +572,7 @@ TEST_F(mount_FSTest, FSCoreError) {
 
   FS_CORE_FAILED = -EACCES;
   snprintf(fsname, 10, "%4d", 10);
-  ret = mount_FS(fsname, "/tmp/testmount");
+  ret = mount_FS(fsname, "/tmp/testmount", MP_DEFAULT);
   EXPECT_EQ(-EACCES, ret);
  }
 
@@ -577,10 +581,11 @@ TEST_F(mount_FSTest, MountedFS) {
   char fsname[10];
 
   snprintf(fsname, 10, "%4d", 10);
-  ret = mount_FS(fsname, "/tmp/testmount");
+  ret = mount_FS(fsname, "/tmp/testmount", MP_DEFAULT);
   ASSERT_EQ(0, ret);
   EXPECT_EQ(1, mount_mgr.num_mt_FS);
   EXPECT_EQ(100, mount_mgr.root->mt_entry->f_ino);
+  EXPECT_EQ(MP_DEFAULT, mount_mgr.root->mt_entry->mp_mode);
   ASSERT_STREQ("/tmp/testmount", mount_mgr.root->mt_entry->f_mp);
 
   free(mount_mgr.root->mt_entry->f_mp);
@@ -617,7 +622,7 @@ TEST_F(unmount_FSTest, NotMounted) {
   char fsname[10];
 
   snprintf(fsname, 10, "%4d", 99);
-  ret = unmount_FS(fsname);
+  ret = unmount_FS(fsname, "mp");
   EXPECT_EQ(-ENOENT, ret);
  }
 TEST_F(unmount_FSTest, UnmountMountedFS) {
@@ -652,7 +657,7 @@ TEST_F(unmount_FSTest, UnmountMountedFS) {
   pthread_create(&(mount_mgr.root->mt_entry->mt_thread),
          NULL, mount_multi_thread, (void *)mount_mgr.root->mt_entry);
 
-  ret = unmount_FS(fsname);
+  ret = unmount_FS(fsname, mount_mgr.root->mt_entry->f_mp);
   EXPECT_EQ(0, ret);
 
   pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
@@ -715,7 +720,7 @@ TEST_F(unmount_eventTest, UnmountMountedFS) {
   EXPECT_EQ(1, mount_mgr.num_mt_FS);
 
   pthread_kill(mount_mgr.root->mt_entry->mt_thread, SIGHUP);
-  ret_val = unmount_event(fsname);
+  ret_val = unmount_event(fsname, mount_mgr.root->mt_entry->f_mp);
   EXPECT_EQ(0, ret_val);
   EXPECT_EQ(0, mount_mgr.num_mt_FS);
 
@@ -858,7 +863,7 @@ TEST_F(unmount_allTest, UnmountAll) {
 
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
-    ret = mount_FS(fsname, "/tmp/testmount");
+    ret = mount_FS(fsname, "/tmp/testmount", MP_DEFAULT);
    }
   EXPECT_EQ(100, mount_mgr.num_mt_FS);
   ret = unmount_all();
@@ -879,7 +884,9 @@ class change_mount_statTest : public ::testing::Test {
   MOUNT_T tmp_mount;
   virtual void SetUp() {
     memset(&tmp_mount, 0, sizeof(MOUNT_T));
-    sem_init(&(tmp_mount.stat_lock), 0, 1);
+    tmp_mount.FS_stat = (FS_STAT_T *)malloc(sizeof(FS_STAT_T));
+    tmp_mount.stat_lock = (sem_t *)malloc(sizeof(sem_t));
+    sem_init((tmp_mount.stat_lock), 0, 1);
     METAPATH = (char *)malloc(sizeof(char)*100);
     snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
     if (access("/tmp/testHCFS", F_OK) != 0)
@@ -894,6 +901,7 @@ class change_mount_statTest : public ::testing::Test {
     unlink("/tmp/testHCFS/metapath/tmpstat");
     rmdir(METAPATH);
     rmdir("/tmp/testHCFS");
+    free(tmp_mount.FS_stat);
     free(METAPATH);
    }
  };
@@ -901,19 +909,19 @@ class change_mount_statTest : public ::testing::Test {
 TEST_F(change_mount_statTest, TestChange) {
   int ret;
 
-  tmp_mount.FS_stat.system_size = 100000;
-  tmp_mount.FS_stat.num_inodes = 123;
+  tmp_mount.FS_stat->system_size = 100000;
+  tmp_mount.FS_stat->num_inodes = 123;
 
   ret = change_mount_stat(&tmp_mount, 123456, 789);
 
   ASSERT_EQ(0, ret);
-  EXPECT_EQ(100000 + 123456, tmp_mount.FS_stat.system_size);
-  EXPECT_EQ(123 + 789, tmp_mount.FS_stat.num_inodes);
+  EXPECT_EQ(100000 + 123456, tmp_mount.FS_stat->system_size);
+  EXPECT_EQ(123 + 789, tmp_mount.FS_stat->num_inodes);
 
   ret = change_mount_stat(&tmp_mount, -1234560, -7890);
   ASSERT_EQ(0, ret);
-  EXPECT_EQ(0, tmp_mount.FS_stat.system_size);
-  EXPECT_EQ(0, tmp_mount.FS_stat.num_inodes);
+  EXPECT_EQ(0, tmp_mount.FS_stat->system_size);
+  EXPECT_EQ(0, tmp_mount.FS_stat->num_inodes);
  }
 
 /* End of the test case for the function change_mount_stat */

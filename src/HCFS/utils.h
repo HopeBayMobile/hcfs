@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: utils.h
 * Abstract: The header file for the utility functions for HCFS
@@ -71,5 +71,7 @@ int reload_system_config(const char *config_path);
 void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
 
 int ignore_sigpipe(void);
+
+BOOL is_natural_number(char *str);
 
 #endif  /* SRC_HCFS_UTILS_H_ */
