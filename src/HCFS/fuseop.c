@@ -6171,10 +6171,6 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 		PREAD(data->progress_list_fd, &progress_meta,
 				sizeof(PROGRESS_META), 0);
 		flock(data->progress_list_fd, LOCK_UN);
-		if (progress_meta.finish_init_backend_data == FALSE) {
-			errcode = -ECANCELED;
-			goto errcode_handle;
-		}
 		toupload_blocks = progress_meta.total_toupload_blocks;
 	}
 

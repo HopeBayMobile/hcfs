@@ -979,8 +979,9 @@ errcode_handle:
  * 2. copy from local meta to to-upload meta
  *    - Communicate to fuse process and tag inode as uploading
  * 3. download backend meta
- * 4. init all backend block (seq or obj-id)
+ * 4. init all backend block seq or obj-id
  * 5. unlink downloaded meta
+ * -------------------------- Continue uploading after finish 5.
  * 6. upload blocks
  * 7. upload to-upload meta
  * 8. unlink to-upload meta
@@ -1000,6 +1001,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	long long total_blocks;
 	ssize_t ret_ssize;
 	char finish_init;
+	int ret;
 	PROGRESS_META progress_meta;
 
 	finish_init = FALSE;
@@ -1040,13 +1042,25 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
-	/*** Begin to revert ***/
+	/* If it is not regfile (strange), then just remove all and upload
+	 * it again. */
+	if (!S_ISREG(this_mode)) {
+		if (toupload_meta_exist == TRUE)
+			UNLINK(toupload_meta_path);
+		if (backend_meta_exist == TRUE)
+			UNLINK(backend_meta_path);
+		super_block_update_transit(data_ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+		return;
+	}
+
+	/*** Begin to check break point ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	if (progress_meta.finish_init_backend_data == FALSE) {
-		finish_init = FALSE;
-	} else {
+	if (progress_meta.finish_init_backend_data == TRUE) {
 		total_blocks = progress_meta.total_backend_blocks;
 		finish_init = TRUE;
+	} else {
+		finish_init = FALSE;
 	}
 
 	if (toupload_meta_exist == TRUE) {
@@ -1067,18 +1081,19 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 			unlink(toupload_meta_path);
 		}
 	} else {
-		if (finish_init == FALSE) {
-		/* Crash before copying local meta, so just
-		cancel uploading. case[1, 2] */
-			if (backend_meta_exist)
-				unlink(backend_meta_path);
-		} else {
+		if (finish_init == TRUE) {
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
 		case10 */
 			delete_backend_blocks(progress_fd, total_blocks,
 				inode, BACKEND_BLOCKS);
+		} else {
+		/* Crash before copying local meta, so just
+		cancel uploading. case[1, 2] */
+			if (backend_meta_exist)
+				unlink(backend_meta_path);
 		}
+
 	}
 
 	super_block_update_transit(data_ptr->inode, FALSE, TRUE);
@@ -1091,135 +1106,4 @@ errcode_handle:
 	super_block_update_transit(data_ptr->inode, FALSE, TRUE);
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
-}
-
-int uploading_revert()
-{
-	DIR *dirptr;
-	int fd;
-	struct dirent temp_dirent;
-	struct dirent *direntptr;
-	char upload_pathname[100];
-	char progress_filepath[300];
-	int errcode, ret, count, inode_count;
-	int total_reverted_inode;
-	char all_finish;
-	ino_t inode;
-	ino_t reverted_inode[5 * MAX_SYNC_CONCURRENCY];
-	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
-
-
-	sprintf(upload_pathname, "%s/upload_bullpen", METAPATH);
-	if (access(upload_pathname, F_OK) < 0) {
-		write_log(2, "Upload bullpen does not exist\n");
-		return 0;
-	}
-
-	dirptr = opendir(upload_pathname);
-	if (dirptr == NULL) {
-		errcode = errno;
-		write_log(0, "Fail to open %s. Code %d, %s\n",
-			upload_pathname, errcode, strerror(errcode));
-		return -errcode;
-	}
-
-	ret = readdir_r(dirptr, &temp_dirent, &direntptr);
-	if (ret > 0) {
-		errcode = ret;
-		write_log(0, "Fail to read %s. Code %d, %s\n",
-			upload_pathname, errcode, strerror(errcode));
-		closedir(dirptr);
-		return -errcode;
-	}
-
-	errcode = 0;
-	total_reverted_inode = 0;
-	while (direntptr) {
-		if (strncmp("upload_progress", temp_dirent.d_name, 15) == 0) {
-			ret = sscanf(temp_dirent.d_name,
-				"upload_progress_inode_%"PRIu64,
-				(uint64_t *)&inode);
-			sprintf(progress_filepath, "%s/%s", upload_pathname,
-				temp_dirent.d_name);
-			fd = open(progress_filepath, O_RDWR);
-			if ((ret != 1) || (fd <= 0)) {
-				ret = readdir_r(dirptr, &temp_dirent,
-						&direntptr);
-				if (ret > 0) {
-					errcode = errno;
-					break;
-				}
-				continue;
-			}
-
-			/* Error on total_reverted_inode >= MAX_SYNC_CONCURRENCY -1.
-			Because number of threads to sync inode is less than
-			MAX_SYNC_CONCURRENCY, then number of all undone threads
-			shoud be less than it. */
-			if (total_reverted_inode >= MAX_SYNC_CONCURRENCY - 1) {
-				write_log(0, "Error: Why does number of reverted"
-					" inode exceed MAX_SYNC_CONCURRENCY?\n");
-			}
-			sem_wait(&(sync_ctl.sync_queue_sem));
-			sem_wait(&(sync_ctl.sync_op_sem));
-			for (count = 0; count < MAX_SYNC_CONCURRENCY;
-								count++) {
-				if (sync_ctl.threads_in_use[count] == 0)
-					break;
-			}
-			sync_ctl.threads_in_use[count] = inode;
-			sync_ctl.threads_created[count] = FALSE;
-			sync_ctl.threads_error[count] = FALSE;
-			sync_ctl.progress_fd[count] = fd;
-			sync_ctl.is_revert[count] = TRUE;
-			sync_threads[count].inode = inode;
-			sync_threads[count].this_mode = S_IFREG; // temp
-			sync_threads[count].progress_fd = fd;
-			sync_threads[count].is_revert = TRUE;
-			pthread_create(&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&revert_inode_uploading,
-					(void *)&(sync_threads[count]));
-			sync_ctl.threads_created[count] = TRUE;
-			sync_ctl.total_active_sync_threads++;
-
-			sem_post(&(sync_ctl.sync_op_sem));
-			reverted_inode[total_reverted_inode++] = inode;
-		}
-
-		ret = readdir_r(dirptr, &temp_dirent,
-				&direntptr);
-		if (ret > 0) {
-			errcode = errno;
-			break;
-		}
-
-	}
-
-	closedir(dirptr);
-	if (errcode > 0) {
-		write_log(0, "Fail to traverse dir %s. Code %d, %s\n",
-			upload_pathname, errcode , strerror(errcode));
-		return -errcode;
-	}
-
-	/* Wait for all reveting threads */
-	all_finish = TRUE;
-	for (inode_count = 0; inode_count < total_reverted_inode ; inode_count++) {
-		inode = reverted_inode[inode_count];
-		sem_wait(&(sync_ctl.sync_op_sem));
-		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
-			if (sync_ctl.threads_in_use[count] == inode) {
-				all_finish = FALSE;
-				break;
-			}
-		}
-		sem_post(&(sync_ctl.sync_op_sem));
-		if (all_finish == FALSE) {
-			usleep(100000);
-			inode_count--;
-			all_finish = TRUE;
-		}
-	}
-
-	return 0;
 }

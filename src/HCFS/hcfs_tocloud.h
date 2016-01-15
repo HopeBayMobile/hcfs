@@ -41,7 +41,7 @@ typedef struct {
 	long long seq;
 	char is_block;
 	char is_delete;
-	char is_backend_delete; /* FALSE, TOUPLOAD_BLOCKS, BACKEND_BLOCKS */
+	char backend_delete_type; /* FALSE, TOUPLOAD_BLOCKS, BACKEND_BLOCKS */
 	int which_curl;
 	int progress_fd;
 	char tempfilename[400];
