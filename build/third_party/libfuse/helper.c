@@ -248,7 +248,7 @@ static struct fuse_chan *fuse_mount_common(const char *mountpoint,
 
 	fd = fuse_mount_compat25(mountpoint, args, fd1);
 	if (fd == -1)
-		return -1;
+		return NULL;
 
 	if (ch1 != NULL)
 		return ch1;

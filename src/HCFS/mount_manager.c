@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: FS_manager.c
 * Abstract: The C source file for mount manager
@@ -8,6 +8,7 @@
 * Revision History
 * 2015/7/7 Jiahong created this file
 * 2015/7/15 Jiahong adding content
+* 2016/1/15 Jiahong changed mount to premount first then mount
 *
 **************************************************************************/
 #define FUSE_USE_VERSION 29
@@ -429,10 +430,12 @@ int FS_is_mounted(char *fsname)
 /* Helper for mounting */
 int do_mount_FS(char *mp, MOUNT_T *new_info)
 {
-	struct fuse_chan *tmp_channel;
+	struct fuse_chan *tmp_channel, *tmp_ch1;
 	struct fuse_session *tmp_session;
 	char *mount;
-	int mt, fg;
+	int mt, fg, need_unmount;
+
+	need_unmount = FALSE;
 
 	struct fuse_args tmp_args = FUSE_ARGS_INIT(global_argc, global_argv);
 
@@ -442,7 +445,9 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 
 	/* f_ino, f_name, f_mp are filled before calling this function */
 	/* global_fuse_args is stored in fuseop.h */
-	tmp_channel = fuse_mount(mp, &(new_info->mount_args));
+
+	/* Now changed to premount first */
+	tmp_channel = fuse_premount(mp, &(new_info->mount_args));
 	if (tmp_channel == NULL) {
 		write_log(10, "Unable to create channel in mounting\n");
 		goto errcode_handle;
@@ -464,12 +469,25 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 	else
 		pthread_create(&(new_info->mt_thread), NULL,
 			mount_single_thread, (void *)new_info);
-	/* TODO: checking for failed mount */
+	need_unmount = TRUE;
+        tmp_ch1 = fuse_mount(mp, &(new_info->mount_args), tmp_channel);
+        if (tmp_ch1 == NULL) {
+                write_log(10, "Unable to mount\n");
+                goto errcode_handle;
+        }
+
 	return 0;
 errcode_handle:
 	write_log(2, "Error in mounting %s\n", new_info->f_name);
 	if (tmp_channel != NULL)
 		fuse_unmount(mp, tmp_channel);
+	if (need_unmount) {
+		fuse_set_signal_handlers(new_info->session_ptr);
+		pthread_kill(new_info->mt_thread, SIGHUP);
+
+		do_unmount_FS(new_info);
+	}
+
 	return -EACCES;
 }
 /* Helper for unmounting */
