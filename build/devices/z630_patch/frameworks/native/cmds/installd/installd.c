@@ -757,7 +757,7 @@ int main(const int argc, const char *argv[]) {
     }
 
     //Vince
-    //drop_privileges();
+    drop_privileges();
 
     lsocket = android_get_control_socket(SOCKET_PATH);
     if (lsocket < 0) {
