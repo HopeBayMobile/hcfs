@@ -308,6 +308,15 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 		}
 		tmpptr = tmpptr->next;
 	}
+        ret = sem_wait(&(pathlookup_data_lock));
+        if (ret < 0) {
+                errcode = errno;
+                write_log(0, "Unexpected error: %d (%s)\n", errcode,
+                          strerror(errcode));
+                errcode = -errcode;
+                return errcode;
+        }
+
 	/* Did not find the node. Proceed to lookup and then add to cache */
 
         parentlist = NULL;
@@ -327,6 +336,7 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	parentinode = parentlist[0];
 	free(parentlist);
 	parentlist = NULL;
+	sem_post(&(pathlookup_data_lock));
 
 	write_log(10, "Debug parent lookup %" PRIu64 " %" PRIu64 "\n",
 	          (uint64_t) thisinode, (uint64_t) parentinode);
@@ -356,6 +366,7 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	memcpy(retnode, tmpptr, sizeof(PATH_LOOKUP));
 	return 0;
 errcode_handle:
+	sem_post(&(pathlookup_data_lock));
 	if (parentlist != NULL)
 		free(parentlist);
 	return errcode;
