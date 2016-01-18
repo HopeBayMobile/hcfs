@@ -288,7 +288,8 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	int ret, errcode;
 	int hashindex;
 	PATH_LOOKUP *tmpptr;
-	ino_t parentinode;
+	ino_t parentinode, *parentlist;
+	int numparents;
 	DIR_ENTRY tmpentry;
 
 	hashindex = thisinode % NUM_LOOKUP_ENTRY;
@@ -308,11 +309,23 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	}
 	/* Did not find the node. Proceed to lookup and then add to cache */
 
-	ret = pathlookup_read_parent(thisinode, &parentinode);
-	if (ret < 0) {
-		errcode = ret;
+        parentlist = NULL;
+        ret = fetch_all_parents(thisinode, &numparents, &parentlist);
+        if (ret < 0) {
+                errcode = ret;
+                goto errcode_handle;
+        }
+
+	/* If there is no parent, return error */
+	if (numparents <= 0) {
+		errcode = -ENOENT;
+		write_log(2, "Cannot find parent in lookup\n");
 		goto errcode_handle;
 	}
+
+	parentinode = parentlist[0];
+	free(parentlist);
+	parentlist = NULL;
 
 	write_log(10, "Debug parent lookup %" PRIu64 " %" PRIu64 "\n",
 	          (uint64_t) thisinode, (uint64_t) parentinode);
@@ -342,6 +355,8 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	memcpy(retnode, tmpptr, sizeof(PATH_LOOKUP));
 	return 0;
 errcode_handle:
+	if (parentlist != NULL)
+		free(parentlist);
 	return errcode;
 }
 
