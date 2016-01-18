@@ -916,7 +916,13 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 		}
 
 		/* Init backend info and unlink it */
-		if (*first_upload == FALSE) {
+		if (*first_upload == TRUE) {
+			ret = init_progress_info(ptr->progress_fd, 0, 0,
+					NULL);
+			*backend_size = 0;
+			*total_backend_blocks = 0; 
+
+		} else {
 			PREAD(fileno(backend_metafptr), &tempfilestat,
 					sizeof(struct stat), 0);
 			*backend_size = tempfilestat.st_size;
@@ -927,12 +933,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 				backend_metafptr);
 
 			fclose(backend_metafptr);
-			UNLINK(backend_metapath);
-		} else {
-			ret = init_progress_info(ptr->progress_fd, 0, 0,
-					NULL);
-			*backend_size = 0;
-			*total_backend_blocks = 0; 
+			unlink(backend_metapath);
 		}
 
 		write_log(10, "Debug: backend size = %lld\n", *backend_size);
@@ -947,12 +948,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 		PREAD(ptr->progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 
 		/* Cancel to coninue */
-		if (progress_meta.finish_init_backend_data == FALSE) {
-			write_log(2, "Interrupt before uploading, do nothing and"
-				" cancel uploading\n");
-			return -ECANCELED;
-
-		} else {
+		if (progress_meta.finish_init_backend_data == TRUE) {
 			*backend_size = progress_meta.backend_size;
 			*total_backend_blocks =
 				progress_meta.total_backend_blocks;
@@ -962,12 +958,19 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 				*first_upload = TRUE;
 			else
 				*first_upload = FALSE;
+
+		} else {
+			write_log(2, "Interrupt before uploading, do nothing and"
+				" cancel uploading\n");
+			return -ECANCELED;
 		}	
 	}
 
 	return 0;
 
 errcode_handle:
+	fclose(backend_metafptr);
+	unlink(backend_metapath);
 	return errcode;
 }
 
