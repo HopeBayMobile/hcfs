@@ -362,7 +362,7 @@ static inline int _upload_terminate_thread(int index)
 	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
 
-	if (upload_ctl.threads_in_use[index] == 0)
+	if (upload_ctl.threads_in_use[index] == FALSE)
 		return 0;
 
 	if (upload_ctl.upload_threads[index].is_block != TRUE)
@@ -388,29 +388,6 @@ static inline int _upload_terminate_thread(int index)
 		/* Thread is busy. Wait some more */
 		return ret;
 	}
-
-	/* Find the sync-inode correspond to the block-inode */
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] ==
-		    upload_ctl.upload_threads[index].inode)
-			break;
-	}
-	/* Check whether the sync-inode-thread raise error or not. */
-	if (count1 < MAX_SYNC_CONCURRENCY) {
-		if (sync_ctl.threads_error[count1] == TRUE) {
-			sem_post(&(sync_ctl.sync_op_sem));
-
-			upload_ctl.threads_in_use[index] = FALSE;
-			upload_ctl.threads_created[index] = FALSE;
-			upload_ctl.threads_finished[index] = FALSE;
-			upload_ctl.total_active_upload_threads--;
-
-			sem_post(&(upload_ctl.upload_queue_sem));
-			return 0; /* Error already marked */
-		}
-	}
-	sem_post(&(sync_ctl.sync_op_sem));
 
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
@@ -453,9 +430,28 @@ static inline int _upload_terminate_thread(int index)
 		return 0;
 	}
 
-	ret = fetch_meta_path(thismetapath, this_inode);
-	if (ret < 0)
-		return ret;
+	/* Find the sync-inode correspond to the block-inode */
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] ==
+		    upload_ctl.upload_threads[index].inode)
+			break;
+	}
+	/* Check whether the sync-inode-thread raise error or not. */
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		if (sync_ctl.threads_error[count1] == TRUE) {
+			sem_post(&(sync_ctl.sync_op_sem));
+
+			upload_ctl.threads_in_use[index] = FALSE;
+			upload_ctl.threads_created[index] = FALSE;
+			upload_ctl.threads_finished[index] = FALSE;
+			upload_ctl.total_active_upload_threads--;
+
+			sem_post(&(upload_ctl.upload_queue_sem));
+			return 0; /* Error already marked */
+		}
+	}
+	sem_post(&(sync_ctl.sync_op_sem));
 
 #if (DEDUP_ENABLE)
 	/* copy new object id to toupload meta */
@@ -951,11 +947,19 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	int e_index;
 	BOOL sync_error;
 	ssize_t ret_ssize;
+	char local_metapath[300];
+	FILE *local_metafptr;
+	ssize_t ret_size;
+	long long page_pos;
+	FILE_META_TYPE filemeta;
 
 	if (delete_which_one == TOUPLOAD_BLOCKS)
 	write_log(4, "Debug: Delete those blocks uploaded just now for "
 		"inode_%"PRIu64"\n", (uint64_t)inode);
 
+	fetch_meta_path(local_metapath, inode);
+
+	page_pos = 0;
 	current_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 
@@ -971,6 +975,27 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			PREAD(progress_fd, &tmppage,
 					sizeof(BLOCK_UPLOADING_PAGE), offset);
 			flock(progress_fd, LOCK_UN);
+
+			/* When delete to-upload blocks, we need page position
+			 * to recover status to ST_LDISK */
+			if (delete_which_one == TOUPLOAD_BLOCKS) {
+				local_metafptr = fopen(local_metapath, "r");
+				if (local_metafptr != NULL) {
+					flock(fileno(local_metafptr), LOCK_EX);
+					ret_size = pread(fileno(local_metafptr),
+						&filemeta, sizeof(FILE_META_TYPE),
+						sizeof(struct stat));
+					if (ret_size == sizeof(FILE_META_TYPE))
+						page_pos = seek_page2(&filemeta,
+							local_metafptr,
+							which_page, 0);
+					flock(fileno(local_metafptr), LOCK_UN);
+					fclose(local_metafptr);
+				} else {
+					page_pos = 0;
+				}
+			}
+
 			current_page = which_page;
 		}
 
@@ -994,14 +1019,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		which_curl = _select_upload_thread(TRUE, FALSE,
 			TRUE, block_objid,
 			inode, block_count, block_seq,
-			0, 0, progress_fd, delete_which_one);
+			page_pos, e_index, progress_fd, delete_which_one);
 #else
 		which_curl = _select_upload_thread(TRUE, FALSE,
 			inode, block_count, block_seq,
-			0, 0, progress_fd, delete_which_one);
+			page_pos, e_index, progress_fd, delete_which_one);
 #endif
-		dispatch_delete_block(which_curl);
 		sem_post(&(upload_ctl.upload_op_sem));
+		dispatch_delete_block(which_curl);
 	}
 
 	/* Wait for all deleting threads. TODO: error handling when
@@ -1585,14 +1610,7 @@ store in some other file */
 		flock(fileno(local_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);
 
-		ret = schedule_sync_meta(toupload_metapath, which_curl);
-
-		if (ret < 0) {
-			write_log(0, "Error: schedule_sync_meta fails."
-					" Code %d\n", -ret);
-			sync_error = TRUE;
-			sync_ctl.threads_error[ptr->which_index] = TRUE;
-		}
+		schedule_sync_meta(toupload_metapath, which_curl);
 
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
 
@@ -1609,14 +1627,11 @@ store in some other file */
 			write_log(10, "Checking for other error\n");
 			sync_error = sync_ctl.threads_error[ptr->which_index];
 		}
-	} else {
 
+	} else { /* meta is removed */
 		flock(fileno(local_metafptr), LOCK_UN);
+		fclose(local_metafptr);
 		fclose(toupload_metafptr);
-
-		/* Delete those uploaded blocks if local meta is removed */
-		delete_backend_blocks(progress_fd, total_blocks,
-			ptr->inode, TOUPLOAD_BLOCKS);
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1625,10 +1640,17 @@ store in some other file */
 		upload_ctl.total_active_upload_threads--;
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
+
+		/* Delete those uploaded blocks if local meta is removed */
+		delete_backend_blocks(progress_fd, total_blocks,
+			ptr->inode, TOUPLOAD_BLOCKS);
+
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
 	if (sync_error == TRUE) {
+		fclose(local_metafptr);
 		write_log(0, "Sync inode %"PRIu64" to backend incomplete.\n",
 				(uint64_t)ptr->inode);
 		/* Delete to-upload blocks when it fails by anything but
