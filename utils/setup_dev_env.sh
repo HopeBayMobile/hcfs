@@ -1,13 +1,24 @@
 #!/bin/bash
-set -x
-WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+#########################################################################
+#
+# Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+#
+# Abstract:
+#
+# Revision History
+#   2016/1/17 Jethro hide debug infomation
+#
+##########################################################################
+
+echo -e "\n======== ${BASH_SOURCE[0]} ========"
+repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd $here
+source $repo/utils/common_header.bash
+cd $repo
 
-
-configfile="$WORKSPACE/utils/env_config.sh"
+configfile="$repo/utils/env_config.sh"
 if [[ -f /.dockerinit && "$USER" = jenkins ]]; then
-	sudo chown -R jenkins:jenkins $WORKSPACE/utils
+	sudo chown -R jenkins:jenkins $repo/utils
 fi
 touch "$configfile"
 
@@ -37,7 +48,7 @@ while getopts ":vm:" opt; do
 	esac
 done
 
-source $WORKSPACE/utils/common_header.bash
+source $repo/utils/common_header.bash
 
 setup_status_file="${here}/.setup_$setup_dev_env_mode"
 if md5sum --quiet -c "$setup_status_file"; then
@@ -54,21 +65,21 @@ fi
 
 case "$setup_dev_env_mode" in
 unit_test )
-	source ./require_compile_deps.bash
+	source $here/require_compile_deps.bash
 	packages="$packages gcovr"
 	install_pkg
 	;;
 functional_test )
-	source ./require_compile_deps.bash
-	./nopasswd_sudoer.bash
+	source $here/require_compile_deps.bash
+	$here/nopasswd_sudoer.bash
 	packages="$packages python-pip python-dev python-swiftclient"
 	# generate large file
 	packages="$packages openssl units pv"
 
 	install_pkg
 
-	if [ -f $WORKSPACE/tests/functional_test/requirements.txt ]; then
-		sudo -H pip install -q -r $WORKSPACE/tests/functional_test/requirements.txt
+	if [ -f $repo/tests/functional_test/requirements.txt ]; then
+		sudo -H pip install -q -r $repo/tests/functional_test/requirements.txt
 	else
 		sudo -H pip install -q -r /utils/requirements.txt
 	fi
@@ -98,7 +109,7 @@ docker_host )
 	install_pkg
 	;;
 * )
-	source ./require_compile_deps.bash
+	source $here/require_compile_deps.bash
 	install_pkg
 	;;
 esac

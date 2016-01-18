@@ -16,10 +16,4 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-$repo/utils/setup_dev_env.sh -v -m docker_host
-sudo git clean -dXf $repo
-
-rsync -avz --delete $repo/utils/ $here/utils/
-cp -f $repo/tests/functional_test/requirements.txt $here/utils/
-docker build -t docker:5000/docker_hcfs_test_slave .
-docker push docker:5000/docker_hcfs_test_slave
+sudo -H -u jenkins run-parts --exit-on-error --verbose $here/scrips

@@ -1,8 +1,24 @@
 #!/bin/bash
-WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
-configfile="$WORKSPACE/utils/env_config.sh"
+#########################################################################
+#
+# Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+#
+# Abstract:
+#
+# Revision History
+#   2016/1/18 Jethro unified usage of workspace path
+#
+##########################################################################
 
-source $WORKSPACE/utils/common_header.bash
+echo -e "\n======== ${BASH_SOURCE[0]} ========"
+repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
+here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $repo/utils/common_header.bash
+cd $repo
+
+configfile="$repo/utils/env_config.sh"
+
+source $repo/utils/common_header.bash
 
 # Use ccache to speedup compile
 if ! ccache -V | grep 3.2; then
