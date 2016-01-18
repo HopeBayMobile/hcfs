@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: file_present.c
 * Abstract: The c source code file for meta processing involving regular
@@ -12,6 +12,7 @@
 * 2015/6/2 Jiahong added error handling
 * 2015/6/16 Kewei added function fetch_xattr_page().
 * 2015/7/9 Kewei added function symlink_update_meta().
+* 2016/1/18 Jiahong moved lookup_add_parent to reduce impact of crashes
 *
 **************************************************************************/
 
@@ -219,6 +220,16 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		goto error_handling;
 	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
 
+	/* Add path lookup table */
+	ret_val = sem_wait(&(pathlookup_data_lock));
+	if (ret_val < 0)
+		return ret_val;
+	ret_val = lookup_add_parent(self_inode, parent_inode);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
 	if (ret_val < 0)
@@ -278,15 +289,6 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		return ret_val;
 
-	/* Add path lookup table */
-	ret_val = sem_wait(&(pathlookup_data_lock));
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = lookup_add_parent(self_inode, parent_inode);
-	if (ret_val < 0) {
-		sem_post(&(pathlookup_data_lock));
-		return ret_val;
-	}
 	/* Storage location for new file is local */
 	DIR_STATS_TYPE tmpstat;
 	tmpstat.num_local = 1;
@@ -344,6 +346,18 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		goto error_handling;
 	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+
+	/* Add parent to lookup db */
+	ret_val = sem_wait(&(pathlookup_data_lock));
+	if (ret_val < 0)
+		return ret_val;
+	ret_val = lookup_add_parent(self_inode, parent_inode);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+
+	sem_post(&(pathlookup_data_lock));
 
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
@@ -405,17 +419,6 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	ret_val = meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0)
 		return ret_val;
-
-	ret_val = sem_wait(&(pathlookup_data_lock));
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = lookup_add_parent(self_inode, parent_inode);
-	if (ret_val < 0) {
-		sem_post(&(pathlookup_data_lock));
-		return ret_val;
-	}
-
-	sem_post(&(pathlookup_data_lock));
 
 	/* Init the dir stat for this node */
 	ret_val = reset_dirstat_lookup(self_inode);
@@ -708,6 +711,17 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
+	/* Add parent to lookup first */
+	ret_code = sem_wait(&(pathlookup_data_lock));
+	if (ret_code < 0)
+		return ret_code;
+	ret_code = lookup_add_parent(self_inode, parent_inode);
+	if (ret_code < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_code;
+	}
+	sem_post(&(pathlookup_data_lock));
+
 	ret_code = dir_add_entry(parent_inode, self_inode, name,
 		this_stat->st_mode, parent_meta_cache_entry);
 	if (ret_code < 0) {
@@ -757,16 +771,6 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
-
-	ret_code = sem_wait(&(pathlookup_data_lock));
-	if (ret_code < 0)
-		return ret_code;
-	ret_code = lookup_add_parent(self_inode, parent_inode);
-	if (ret_code < 0) {
-		sem_post(&(pathlookup_data_lock));
-		return ret_code;
-	}
-	sem_post(&(pathlookup_data_lock));
 
 	return 0;
 }
@@ -967,16 +971,6 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	if (ret_val < 0)
 		goto error_handle;
 
-	/* Add entry to this dir */
-	ret_val = dir_add_entry(parent_inode, link_inode, newname,
-		link_stat->st_mode, parent_meta_cache_entry);
-	if (ret_val < 0) {
-		link_stat->st_nlink--; /* Recover nlink */
-		meta_cache_update_file_data(link_inode, link_stat,
-			NULL, NULL, 0, link_entry);
-		goto error_handle;
-	}
-
 	/* Add path lookup table */
 	ret_val = sem_wait(&(pathlookup_data_lock));
 	if (ret_val < 0)
@@ -984,6 +978,16 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	ret_val = lookup_add_parent(link_inode, parent_inode);
 	if (ret_val < 0) {
 		sem_post(&(pathlookup_data_lock));
+		goto error_handle;
+	}
+
+	/* Add entry to this dir */
+	ret_val = dir_add_entry(parent_inode, link_inode, newname,
+		link_stat->st_mode, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		link_stat->st_nlink--; /* Recover nlink */
+		meta_cache_update_file_data(link_inode, link_stat,
+			NULL, NULL, 0, link_entry);
 		goto error_handle;
 	}
 

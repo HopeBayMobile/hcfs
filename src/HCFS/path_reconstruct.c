@@ -1,12 +1,13 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: path_reconstruct.c
 * Abstract: The c source file for reconstructing path from parent lookups
 *
 * Revision History
 * 2015/10/26 Jiahong created this file
+* 2016/1/18 Jiahong modified the file to change lookup routines and log
 *
 **************************************************************************/
 
