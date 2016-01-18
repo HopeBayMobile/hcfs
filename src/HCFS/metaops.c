@@ -1319,14 +1319,14 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		memset(&this_inode_stat, 0, sizeof(struct stat));
 		memset(&file_meta, 0, sizeof(FILE_META_TYPE));
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
-		if (ret_size < sizeof(struct stat)) {
+		if (ret_size < 1) {
 			write_log(2, "Skipping block deletion (meta gone)\n");
 			fclose(metafptr);
 			break;
 		}
 
 		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
-		if (ret_size < sizeof(FILE_META_TYPE)) {
+		if (ret_size < 1) {
 			write_log(2, "Skipping block deletion (meta gone)\n");
 			fclose(metafptr);
 			break;
