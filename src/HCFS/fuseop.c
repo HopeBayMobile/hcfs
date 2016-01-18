@@ -6148,21 +6148,24 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 			return ret;
 		}
 
-		/* Update some info */
-		flock(data->progress_list_fd, LOCK_EX);
-		PREAD(data->progress_list_fd, &progress_meta,
-				sizeof(PROGRESS_META), 0);
-
-		progress_meta.toupload_size = tmpstat.st_size;
-		toupload_blocks = (tmpstat.st_size == 0) ? 
-			0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
-		progress_meta.total_toupload_blocks = toupload_blocks;
-		write_log(10, "Debug: toupload_size %lld, total_toupload_blocks %lld\n",
-			progress_meta.toupload_size, progress_meta.total_toupload_blocks);
-
-		PWRITE(data->progress_list_fd, &progress_meta,
-				sizeof(PROGRESS_META), 0);
-		flock(data->progress_list_fd, LOCK_UN);
+		/* Update info of to-upload blocks and size */
+		if (S_ISREG(tmpstat.st_mode)) {
+			flock(data->progress_list_fd, LOCK_EX);
+			PREAD(data->progress_list_fd, &progress_meta,
+					sizeof(PROGRESS_META), 0);
+			progress_meta.toupload_size = tmpstat.st_size;
+			toupload_blocks = (tmpstat.st_size == 0) ? 
+				0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
+			progress_meta.total_toupload_blocks = toupload_blocks;
+			PWRITE(data->progress_list_fd, &progress_meta,
+					sizeof(PROGRESS_META), 0);
+			flock(data->progress_list_fd, LOCK_UN);
+			
+			write_log(10, "Debug: toupload_size %lld,"
+				" total_toupload_blocks %lld\n",
+				progress_meta.toupload_size,
+				progress_meta.total_toupload_blocks);
+		}
 	}
 
 	/* Just read progress meta when continuing uploading */
@@ -6180,6 +6183,11 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 			TRUE, data->progress_list_fd,
 			toupload_blocks);
 	} else {
+		ret = update_upload_seq(meta_cache_entry);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 		ret = meta_cache_set_uploading_info(meta_cache_entry,
 			FALSE, 0, 0);
 	}

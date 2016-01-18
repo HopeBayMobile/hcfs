@@ -103,6 +103,14 @@ typedef struct {
 	involved operations*/
 	struct timeval last_access_time;
 	UPLOADING_INFO uploading_info; /* Only in memory */
+	BOOL can_be_synced_cloud_later; /* This is always false unless calling
+					   meta_cache_sync_later() before 
+					   meta_cache_update_xxx(). This flag
+					   is used to avoid inode to be pushed
+					   into dirty list in meta_cache_update
+					   and flush_single_entry(). It will be
+					   set to false in flush_single_entry().
+					   */
 } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {
@@ -172,5 +180,7 @@ int expire_meta_mem_cache_entry(void);
 
 int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	char is_now_uploading, int new_fd, long long toupload_blocks);
+
+int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr);
 
 #endif  /* GW20_HCFS_META_MEM_CACHE_H_ */

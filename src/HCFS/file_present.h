@@ -63,4 +63,6 @@ int decrease_pinned_size(long long *reserved_release_size,
 int pin_inode(ino_t this_inode, long long *reserved_pinned_size);
 int unpin_inode(ino_t this_inode, long long *reserved_release_size);
 
+int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr);
+
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */

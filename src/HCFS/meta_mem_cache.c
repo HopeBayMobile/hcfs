@@ -391,11 +391,16 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 		get pushed to cloud */
 	/* TODO: May need to simply this so that only dirty status in super
 		inode is updated */
-	ret = super_block_update_stat(body_ptr->inode_num,
+	if (body_ptr->can_be_synced_cloud_later == TRUE) { /* Skip sync */
+		body_ptr->can_be_synced_cloud_later = FALSE;
+
+	} else {
+		ret = super_block_update_stat(body_ptr->inode_num,
 				&(body_ptr->this_stat));
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	}
 
 	body_ptr->something_dirty = FALSE;
@@ -1666,4 +1671,12 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		}
 		return 0;
 	}
+}
+
+int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	body_ptr->can_be_synced_cloud_later = TRUE;
+	return 0;
 }

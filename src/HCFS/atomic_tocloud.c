@@ -873,8 +873,8 @@ errcode_handle:
  * @return 0 on success, -ECANCELED when cancelling to sync,
  *         or other negative error code.
  */
-int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
-		long long *backend_size, long long *total_backend_blocks)
+int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
+		long long *total_backend_blocks)
 {
 	FILE *backend_metafptr;
 	char backend_metapath[400];
@@ -882,6 +882,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 	struct stat tempfilestat;
 	int errcode, ret;
 	ssize_t ret_ssize;
+	BOOL first_upload;
 
 	if (ptr->is_revert == FALSE) {
 		/* Try to download backend meta */
@@ -900,7 +901,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(10, "Debug: upload first time\n");
-				*first_upload = TRUE;
+				first_upload = TRUE;
 				fclose(backend_metafptr);
 				unlink(backend_metapath);
 			} else { /* fetch error */
@@ -912,11 +913,11 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 				return ret;
 			}
 		} else { /* Success */
-			*first_upload = FALSE;
+			first_upload = FALSE;
 		}
 
 		/* Init backend info and unlink it */
-		if (*first_upload == TRUE) {
+		if (first_upload == TRUE) {
 			ret = init_progress_info(ptr->progress_fd, 0, 0,
 					NULL);
 			*backend_size = 0;
@@ -940,7 +941,6 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 		if (ret < 0) /* init progress fail */
 			return ret;
 
-
 	/* Reverting/continuing to upload. Just read progress meta and check. */
 	} else {
 		PROGRESS_META progress_meta;
@@ -952,12 +952,6 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, BOOL *first_upload,
 			*backend_size = progress_meta.backend_size;
 			*total_backend_blocks =
 				progress_meta.total_backend_blocks;
-
-			/* TODO: Modify later */
-			if (progress_meta.backend_size == 0)
-				*first_upload = TRUE;
-			else
-				*first_upload = FALSE;
 
 		} else {
 			write_log(2, "Interrupt before uploading, do nothing and"
@@ -1052,7 +1046,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 			UNLINK(toupload_meta_path);
 		if (backend_meta_exist == TRUE)
 			UNLINK(backend_meta_path);
-		super_block_update_transit(data_ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 		return;
 	}
@@ -1099,14 +1093,14 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 
 	}
 
-	super_block_update_transit(data_ptr->inode, FALSE, TRUE);
+	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
 
 errcode_handle:
 	write_log(0, "Error: Fail to revert/continue uploading inode %"PRIu64"\n",
 			(uint64_t)inode);
-	super_block_update_transit(data_ptr->inode, FALSE, TRUE);
+	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
 }

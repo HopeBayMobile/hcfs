@@ -1315,3 +1315,73 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 	return 0;
 }
 
+int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	int ret;
+	struct stat tmpstat;
+	ino_t inode;
+	long long upload_seq;
+
+	inode = body_ptr->inode_num;
+	ret = meta_cache_lookup_file_data(inode, &tmpstat,
+			NULL, NULL, 0, body_ptr);
+	if (ret < 0)
+		return ret;
+
+	ret = meta_cache_sync_later(body_ptr);
+	if (ret < 0)
+		return ret;
+	/* update upload_seq */
+	if (S_ISFILE(tmpstat.st_mode)) {
+		FILE_META_TYPE filemeta;
+
+		ret = meta_cache_lookup_file_data(inode, NULL, &filemeta,
+				NULL, 0, body_ptr);
+		if (ret < 0)
+			return ret;
+		filemeta.upload_seq++;
+		upload_seq = filemeta.upload_seq;
+		ret = meta_cache_update_file_data(inode, NULL, &filemeta,
+				NULL, 0, body_ptr);
+		if (ret < 0)
+			return ret;
+
+	} else if (S_ISDIR(tmpstat.st_mode)) {
+		DIR_META_TYPE dirmeta;		
+
+		ret = meta_cache_lookup_dir_data(inode, NULL, &dirmeta,
+				NULL, body_ptr);
+		if (ret < 0)
+			return ret;
+		dirmeta.upload_seq++;
+		upload_seq = dirmeta.upload_seq;
+		ret = meta_cache_update_dir_data(inode, NULL, &dirmeta,
+				NULL, body_ptr);
+		if (ret < 0)
+			return ret;
+
+	} else if (S_ISLNK(tmpstat.st_mode)) {
+		SYMLINK_META_TYPE symmeta;
+
+		ret = meta_cache_lookup_symlink_data(inode, NULL,
+				&symmeta, body_ptr);
+		if (ret < 0)
+			return ret;
+		symmeta.upload_seq++;
+		upload_seq = symmeta.upload_seq;
+		ret = meta_cache_update_symlink_data(inode, NULL,
+				&symmeta, body_ptr);
+		if (ret < 0)
+			return ret;
+
+	} else {
+		write_log(0, "Error: st_mode %d is incorrect.\n",
+				tmpstat.st_mode);
+		return -EPERM;
+	}
+
+	write_log(10, "Debug sync: Now inode %"PRIu64" has upload_seq %lld\n",
+			(uint64_t)inode, upload_seq);
+
+	return 0;
+}

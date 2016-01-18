@@ -154,7 +154,7 @@ int _revert_block_status_LDISK(ino_t this_inode, long long blockno,
 				__func__, errcode);
 			return -errcode;
 		} else {
-			write_log(4, "Meta is deleted in %s. Code %d\n",
+			write_log(8, "Meta is deleted in %s. Code %d\n",
 				__func__, errcode);
 			return 0;
 		}
@@ -250,7 +250,7 @@ static inline void _sync_terminate_thread(int index)
 			/* Tell memory cache that finish uploading if
 			 * meta exist */
 			fetch_meta_path(local_metapath, inode);
-			if (!access(local_metapath, F_OK)) {
+			if (access(local_metapath, F_OK) == 0) {
 				tag_ret = tag_status_on_fuse(inode, FALSE, 0,
 					sync_ctl.is_revert[index], finish_sync);
 				if (tag_ret < 0) {
@@ -258,7 +258,16 @@ static inline void _sync_terminate_thread(int index)
 						"as NOT_UPLOADING in %s\n",
 						inode, __func__);
 				}
+			} else {
+				sync_ctl.threads_error[index] = TRUE;
+				sync_ctl.continue_nexttime[index] = FALSE;
 			}
+
+			/* Dequeue from dirty list */
+			if (finish_sync == TRUE)
+				super_block_update_transit(inode, FALSE, FALSE);
+			else
+				super_block_update_transit(inode, FALSE, TRUE);
 
 			/* When threads error occur (no matter whether it is
 			 * caused by disconnection or not), delete all to-upload
@@ -272,8 +281,12 @@ static inline void _sync_terminate_thread(int index)
 						-ret);
 			}
 
-			/* Delete to-upload meta and progress file */
-			if (sync_ctl.continue_nexttime[index] == FALSE) {
+			/* If need to continue nexttime, then just close
+			 * progress file. Otherwise delete it. */
+			if (sync_ctl.continue_nexttime[index] == TRUE) {
+				close(sync_ctl.progress_fd[index]);
+
+			} else {
 				del_progress_file(sync_ctl.progress_fd[index],
 						inode);
 				if (access(toupload_metapath, F_OK) == 0)
@@ -1161,7 +1174,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	long long size_diff;
 	long long toupload_block_seq, local_block_seq;
 	int progress_fd;
-	char first_upload, is_local_meta_deleted;
+	BOOL first_upload, is_local_meta_deleted;
 	BLOCK_UPLOADING_STATUS temp_uploading_status;
 	char toupload_exist, finish_uploading;
 	char is_revert;
@@ -1173,7 +1186,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
@@ -1183,7 +1196,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		  ptr->this_mode);
 
 	if (ret < 0) {
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
@@ -1194,7 +1207,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
 			__func__, errcode, strerror(errcode));
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
@@ -1206,7 +1219,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		if (errcode != ENOENT) {
 			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
 				  errcode, strerror(errcode));
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
 		}
 		/* If meta file is gone, the inode is deleted and we don't need
 		to sync this object anymore. */
@@ -1217,20 +1230,17 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	setbuf(local_metafptr, NULL);
 
 	first_upload = FALSE;
-	/* TODO: How to know if the inode is upload first time? */
-	/* TODO: Consider how to handle disconnection and continuing uploading */
-
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
 		/* First download backend meta and init backend block info in
 		 * upload progress file. If it is revert mode now, then
 		 * just read progress meta. */
-		ret = init_backend_file_info(ptr, &first_upload, &backend_size,
+		ret = init_backend_file_info(ptr, &backend_size,
 				&total_backend_blocks);
 		if (ret < 0) {
 			fclose(toupload_metafptr);
 			fclose(local_metafptr);
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
 			return;
 		}
@@ -1519,7 +1529,7 @@ store in some other file */
 
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
@@ -1541,25 +1551,26 @@ store in some other file */
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (!access(local_metapath, F_OK)) {
 		FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
-		/* TODO: increment_upload_seq(local_metafptr, &upload_seq); */
 
 		if (S_ISFILE(ptr->this_mode)) {
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			      local_metafptr);
 			root_inode = tempfilemeta.root_inode;
-			//upload_seq = tempfilemeta.upload_seq;
 			tempfilemeta.size_last_upload = tempfilestat.st_size;
-			//tempfilemeta.upload_seq++; /* TODO: perhaps upload_seq is not useful */
 			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
 			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			       local_metafptr);
 			size_diff = toupload_size - backend_size;
+			first_upload = tempfilemeta.upload_seq <= 0 ?
+				TRUE : FALSE;
 		}
 		if (S_ISDIR(ptr->this_mode)) {
 			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
 				1, local_metafptr);
 			root_inode = tempdirmeta.root_inode;
 			size_diff = 0;
+			first_upload = tempdirmeta.upload_seq <= 0 ?
+				TRUE : FALSE;
 		}
 		if (S_ISLNK(ptr->this_mode)) {
 			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
@@ -1567,6 +1578,8 @@ store in some other file */
 
 			root_inode = tempsymmeta.root_inode;
 			size_diff = 0;
+			first_upload = tempsymmeta.upload_seq <= 0 ?
+				TRUE : FALSE;
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
@@ -1582,8 +1595,6 @@ store in some other file */
 		}
 
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
-		/*TODO: Need to check if metafile still exists.
-			If not, schedule the deletion of meta*/
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1651,10 +1662,10 @@ store in some other file */
 	/* Upload successfully. Update FS stat in backend */
 	if (first_upload == TRUE)
 		update_backend_stat(root_inode, size_diff, 1);
-	else if (size_diff != 0)
-		update_backend_stat(root_inode, size_diff, 0);
+	else
+		if (size_diff != 0)
+			update_backend_stat(root_inode, size_diff, 0);
 
-	super_block_update_transit(ptr->inode, FALSE, FALSE);
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 	return;
 
@@ -1665,7 +1676,7 @@ errcode_handle:
 	fclose(toupload_metafptr);
 	delete_backend_blocks(progress_fd, total_blocks,
 			ptr->inode, TOUPLOAD_BLOCKS);
-	super_block_update_transit(ptr->inode, FALSE, TRUE);
+	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 }
 

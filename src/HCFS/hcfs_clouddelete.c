@@ -348,7 +348,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long upload_seq;
 	long long block_seq;
 	ino_t root_inode;
-	char is_meta_on_cloud;
+	BOOL meta_on_cloud;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -360,42 +360,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	system_size_change = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
-
-	/* Download backend meta and read it if it is regfile */
-	backend_metafptr = NULL;
-	if (S_ISREG(ptr->this_mode)) {
-		is_meta_on_cloud = TRUE;
-		sprintf(backend_metapath, 
-			"%s/upload_bullpen/backend_meta_%ld.del",
-			METAPATH, this_inode);
-		backend_metafptr = fopen(backend_metapath, "w+");
-		if (backend_metafptr == NULL) {
-			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-			return;
-		}
-
-		fetch_backend_meta_objname(objname, this_inode);
-		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				objname);
-		if (ret < 0) {
-			if (ret == -EIO) {
-				write_log(0, "Error: Fail to download "
-					"backend meta_%ld. Delete next time.\n",
-					this_inode);
-
-			} else if (ret == -ENOENT) {
-				write_log(10, "Debug: Nothing on cloud to be "
-					"deleted for inode_%ld\n", this_inode);
-				is_meta_on_cloud = FALSE;
-				unlink(thismetapath);
-				super_block_delete(this_inode);
-				super_block_reclaim();
-			}
-
-			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-			return;
-		}
-	}
 	/* Open local meta for dir and symlink */
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
@@ -404,19 +368,68 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				errcode, strerror(errcode));
 		goto errcode_handle;
 	}
-
 	setbuf(metafptr, NULL);
-	/*
-	ret_ssize = fgetxattr(fileno(metafptr),
-		"user.upload_seq", &upload_seq, sizeof(long long));
-	if (ret_ssize < 0) {
-		errcode = errno;
-		upload_seq = 0;
-		if (errcode != ENOATTR)
-			write_log(0, "Error: Get xattr error in %s."
-				" Code %d\n", __func__, errcode);
+
+	/* Download backend meta and read it if it is regfile */
+	backend_metafptr = NULL;
+	if (S_ISREG(ptr->this_mode)) {
+		flock(fileno(metafptr), LOCK_EX);
+		mlock = TRUE;
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
+		meta_on_cloud = tempfilemeta.upload_seq > 0 ? TRUE : FALSE;
+
+		sprintf(backend_metapath, 
+			"%s/upload_bullpen/backend_meta_%"PRIu64".del",
+			METAPATH, (uint64_t)this_inode);
+		backend_metafptr = fopen(backend_metapath, "w+");
+		if (backend_metafptr == NULL) {
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
+		}
+		setbuf(backend_metafptr, NULL);
+
+		if (meta_on_cloud == TRUE) {
+			fetch_backend_meta_objname(objname, this_inode);
+			ret = fetch_from_cloud(backend_metafptr,
+					FETCH_FILE_META, objname);
+			if (ret < 0) {
+				if (ret == -EIO) {
+					write_log(0, "Error: Fail to download "
+						"backend meta_%"PRIu64". "
+						"Delete next time.\n",
+						(uint64_t)this_inode);
+
+				} else if (ret == -ENOENT) {
+					write_log(10, "Debug: Nothing on"
+						" cloud to be deleted for"
+						" inode_%"PRIu64"\n",
+						(uint64_t)this_inode);
+					unlink(thismetapath);
+					super_block_delete(this_inode);
+					super_block_reclaim();
+				}
+
+				dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+				fclose(backend_metafptr);
+				unlink(backend_metapath);
+				return;
+			}
+		} else {
+			write_log(10, "Debug:meta_%"PRIu64" is not on cloud\n",
+					(uint64_t)this_inode);
+			unlink(thismetapath);
+			super_block_delete(this_inode);
+			super_block_reclaim();
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			fclose(backend_metafptr);
+			unlink(backend_metapath);
+			return;
+		}
 	}
-	*/
+	
 	if (S_ISDIR(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
@@ -426,6 +439,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		root_inode = tempdirmeta.root_inode;
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
+		meta_on_cloud = tempdirmeta.upload_seq > 0 ? TRUE : FALSE;
 	}
 
 	if (S_ISLNK(ptr->this_mode)) {
@@ -437,9 +451,22 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		root_inode = tempsymmeta.root_inode;
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
+		meta_on_cloud = tempsymmeta.upload_seq > 0 ? TRUE : FALSE;
 	}
 
-	if (S_ISFILE(ptr->this_mode)) {
+	if (S_ISSOCK(ptr->this_mode) || S_ISFIFO(ptr->this_mode)) {
+		flock(fileno(metafptr), LOCK_EX);
+		mlock = TRUE;
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+
+		root_inode = tempfilemeta.root_inode;
+		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
+		meta_on_cloud = tempfilemeta.upload_seq > 0 ? TRUE : FALSE;
+	}
+
+	if (S_ISREG(ptr->this_mode)) {
 		flock(fileno(backend_metafptr), LOCK_EX);
 		backend_mlock = TRUE;
 		FSEEK(backend_metafptr, 0, SEEK_SET);
@@ -452,33 +479,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		tmp_size = tempfilestat.st_size;
 
 		/* Check if need to sync past the current size */
-/*
-#ifdef _ANDROID_ENV_
-		ret = fetch_trunc_path(truncpath, this_inode);
 
-		truncfptr = fopen(truncpath, "r+");
-		if (truncfptr != NULL) {
-			setbuf(truncfptr, NULL);
-			flock(fileno(truncfptr), LOCK_EX);
-			FREAD(&temp_trunc_size, sizeof(long long), 1,
-				truncfptr);
-
-			if (tmp_size < temp_trunc_size) {
-				tmp_size = temp_trunc_size;
-				UNLINK(truncpath);
-			}
-			fclose(truncfptr);
-		}
-#else
-		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
-
-		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
-			tmp_size = temp_trunc_size;
-			fremovexattr(fileno(metafptr), "user.trunc_size");
-		}
-#endif
-*/
 		if (tmp_size == 0)
 			total_blocks = 0;
 		else
@@ -581,6 +582,18 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	}
 
+	/* Return if meta is not on cloud */
+	if (meta_on_cloud == FALSE) {
+		write_log(10, "Debug:meta_%"PRIu64" is not on cloud.\n",
+				(uint64_t)this_inode);
+		unlink(thismetapath);
+		super_block_delete(this_inode);
+		super_block_reclaim();
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		return;
+	}
+
+
 errcode_handle:
 	/* TODO: If cannot handle object deletion from metaptr, need to scrub */
 	if (metafptr != NULL) {
@@ -643,24 +656,6 @@ errcode_handle:
 
 	/*Wait for any upload to complete and change super inode
 		from to_delete to deleted*/
-/*
-	while (TRUE) {
-		in_sync = FALSE;
-		sem_wait(&(sync_ctl.sync_op_sem));*/
-		/*Check if this inode is being synced now*/
-/*		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
-			if (sync_ctl.threads_in_use[count] ==
-					this_inode) {
-				in_sync = TRUE;
-				break;
-			}
-		}
-		sem_post(&(sync_ctl.sync_op_sem));
-		if (in_sync == TRUE)
-			sleep(10);
-		else
-			break;
-	} */
 
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
@@ -669,8 +664,8 @@ errcode_handle:
 	}
 
 	/* Update FS stat in the backend if updated previously */
-	//TODO if (upload_seq > 0)
-	update_backend_stat(root_inode, -system_size_change, -1);
+	if (meta_on_cloud == TRUE)
+		update_backend_stat(root_inode, -system_size_change, -1);
 
 	unlink(thismetapath);
 	super_block_delete(this_inode);
@@ -702,8 +697,11 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
+	else if (ret_val == 404)
+		ret = -ENOENT;
 	else
 		ret = -EIO;
+
 	return ret;
 }
 
@@ -759,8 +757,10 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
-		if (((ret_val >= 200) && (ret_val <= 299)) || (ret_val == 404))
+		if ((ret_val >= 200) && (ret_val <= 299))
 			ret = 0;
+		else if (ret_val == 404)
+			ret = -ENOENT;
 		else
 			ret = -EIO;
 	} else if (ddt_ret == 1) {
@@ -812,7 +812,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 		ret = do_meta_delete(delete_thread_ptr->inode,
 			&(delete_curl_handles[which_curl]));
 
-	if (ret < 0)
+	if (ret < 0 && ret != -ENOENT) /* do not care 404 not found */
 		delete_ctl.threads_error[which_index] = TRUE;
 	else
 		delete_ctl.threads_error[which_index] = FALSE;
