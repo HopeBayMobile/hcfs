@@ -1316,8 +1316,21 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
+		memset(&this_inode_stat, 0, sizeof(struct stat));
+		memset(&file_meta, 0, sizeof(FILE_META_TYPE));
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
+		if (ret_size < sizeof(struct stat)) {
+			write_log(2, "Skipping block deletion (meta gone)\n");
+			fclose(metafptr);
+			break;
+		}
+
 		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
+		if (ret_size < sizeof(FILE_META_TYPE)) {
+			write_log(2, "Skipping block deletion (meta gone)\n");
+			fclose(metafptr);
+			break;
+		}
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
@@ -1343,6 +1356,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				}
 				current_page = which_page;
 				FSEEK(metafptr, page_pos, SEEK_SET);
+				memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
 					1, metafptr);
 			}
