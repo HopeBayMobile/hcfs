@@ -1226,7 +1226,9 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	SYSTEM_DATA_TYPE *statptr;
+	char meta_deleted;
 
+	meta_deleted = FALSE;
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
@@ -1283,6 +1285,18 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
+		if (access(thismetapath, F_OK) != 0) {
+			errcode = errno;
+			if (errcode != ENOENT) {
+				write_log(0, "IO error, code %d\n", errcode);
+				return -errcode;
+			}
+			meta_deleted = TRUE;
+			ret = fetch_todelete_path(thismetapath, this_inode);
+			if (ret < 0)
+				return ret;
+		}
+
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;
@@ -1290,11 +1304,14 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				__func__, errcode, strerror(errcode));
 			return errcode;
 		}
+
 		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0) {
-			fclose(metafptr);
-			return ret;
+		if (meta_deleted == FALSE) {
+			ret = delete_inode_meta(this_inode);
+			if (ret < 0) {
+				fclose(metafptr);
+				return ret;
+			}
 		}
 
 		flock(fileno(metafptr), LOCK_EX);
