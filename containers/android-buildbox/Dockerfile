@@ -11,24 +11,24 @@ CMD ["/sbin/my_init"]
 RUN sed -i 's/archive.ubuntu/tw.archive.ubuntu/g' /etc/apt/sources.list
 RUN echo 'Acquire::http::Proxy "http://cache:8000";' > /etc/apt/apt.conf.d/30autoproxy
 
-RUN dpkg --add-architecture i386
-RUN apt-get update
-RUN apt-get install -y openjdk-7-jdk \
-	git-core gnupg flex bison gperf build-essential \
-	zip curl gcc-multilib g++-multilib libc6-dev-i386 \
-	lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache \
-	libgl1-mesa-dev libxml2-utils xsltproc unzip
-RUN apt-get install -y git make python-networkx zlib1g-dev:i386 \
-	vim bc libglib2.0-data libsasl2-modules:amd64 gcc g++ \
-	syslog-ng-core
-RUN apt-get install -y bash-completion
-RUN apt-get update && apt-get upgrade -y
-
-ENV USE_CCACHE 1
-ENV PATH=/root/bin:$PATH
+# Add android repo
 ADD https://storage.googleapis.com/git-repo-downloads/repo /root/bin/repo
 RUN chmod a+x ~/bin/repo
-RUN rm -f /etc/service/sshd/down
+ENV USE_CCACHE=1 PATH=/root/bin:$PATH
+
+RUN apt-get update \
+	    && apt-get install -y aptitude \
+	    && aptitude update \
+	    && DEBIAN_FRONTEND=noninteractive aptitude full-upgrade -y \
+	    && DEBIAN_FRONTEND=noninteractive aptitude install -y openjdk-7-jdk \
+	    git-core gnupg flex bison gperf build-essential \
+	    zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 \
+	    lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache \
+	    libgl1-mesa-dev libxml2-utils xsltproc unzip \
+	    make python-networkx \
+	    syslog-ng-core autotools-dev pkg-config libtool vim bc bash-completion \
+	    && apt-get clean
+
 
 # Clean up APT when done.
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN rm -rf /tmp/* /var/tmp/* /etc/service/sshd/down
