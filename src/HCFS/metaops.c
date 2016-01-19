@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: metaops.c
 * Abstract: The c source code file for meta processing involving regular
@@ -16,6 +16,7 @@
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
 * 2015/5/28 Jiahong adding error handling
 * 2015/6/2 Jiahong moving lookup_dir to this file
+* 2016/1/18 Jiahong revised actual_delete_inode routine
 **************************************************************************/
 #include "metaops.h"
 
