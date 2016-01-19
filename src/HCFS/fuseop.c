@@ -1912,7 +1912,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			long long page_index, long long old_last_block,
-			ino_t inode_index, FILE *metafptr,
+			ino_t inode_index, META_CACHE_ENTRY_STRUCT *body_ptr,
 			FILE_META_TYPE *filemeta)
 {
 	int block_count;
@@ -1925,11 +1925,13 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	off_t total_deleted_dirty_cache;
 	int ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
+	FILE *metafptr;
 
 	total_deleted_cache = 0;
 	total_deleted_dirty_cache = 0;
 	total_deleted_blocks = 0;
 	total_deleted_fileblocks = 0;
+	metafptr = body_ptr->fptr;
 
 	write_log(10, "Debug truncate_delete_block, start %d, old_last %lld,",
 		start_index, old_last_block);
@@ -1948,6 +1950,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		case ST_TODELETE:
 			break;
 		case ST_LDISK:
+			meta_cache_check_uploading(body_ptr, inode_index,
+					block_count, tmpentry->seqnum);
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
@@ -1979,6 +1983,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			total_deleted_fileblocks++;
 			break;
 		case ST_BOTH:
+			meta_cache_check_uploading(body_ptr, inode_index,
+					block_count, tmpentry->seqnum);
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
@@ -1995,6 +2001,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			total_deleted_fileblocks++;
 			break;
 		case ST_LtoC:
+			meta_cache_check_uploading(body_ptr, inode_index,
+					block_count, tmpentry->seqnum);
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
@@ -2264,6 +2272,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 		tmpstatus = (temppage->block_entries[last_index]).status;
 
+		meta_cache_check_uploading(*body_ptr, this_inode, last_block,
+				(temppage->block_entries[last_index]).seqnum);
+
 		/* TODO: Error handling here if block status is not ST_NONE
 			but cannot find block on local disk */
 		blockfptr = fopen(thisblockpath, "r+");
@@ -2500,7 +2511,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, old_last_block,
-				filestat->st_ino, (*body_ptr)->fptr, &tempfilemeta);
+				filestat->st_ino, (*body_ptr), &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -2557,7 +2568,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			ret = truncate_delete_block(&temppage, 0,
 				current_page, old_last_block,
-				filestat->st_ino, (*body_ptr)->fptr, &tempfilemeta);
+				filestat->st_ino, (*body_ptr), &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -6137,7 +6148,7 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 		if (ret < 0) {
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
-			return ret;	
+			return ret;
 		}
 
 		ret = meta_cache_lookup_file_data(data->inode, &tmpstat,
@@ -6154,13 +6165,13 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 			PREAD(data->progress_list_fd, &progress_meta,
 					sizeof(PROGRESS_META), 0);
 			progress_meta.toupload_size = tmpstat.st_size;
-			toupload_blocks = (tmpstat.st_size == 0) ? 
+			toupload_blocks = (tmpstat.st_size == 0) ?
 				0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
 			progress_meta.total_toupload_blocks = toupload_blocks;
 			PWRITE(data->progress_list_fd, &progress_meta,
 					sizeof(PROGRESS_META), 0);
 			flock(data->progress_list_fd, LOCK_UN);
-			
+
 			write_log(10, "Debug: toupload_size %lld,"
 				" total_toupload_blocks %lld\n",
 				progress_meta.toupload_size,
@@ -6287,6 +6298,8 @@ void *fuse_communication_contact_window(void *data)
 	}
 
 	write_log(10, "Debug: Terminate fuse communication contact\n");
+
+	return;
 }
 
 int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
@@ -6309,7 +6322,7 @@ int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
 		errcode = errno;
 		write_log(0, "Bind socket error in %s. Code %d.\n",
 			__func__, errcode);
-		return;
+		return ret;
 	}
 
 	socket_flag = fcntl(*socket_fd, F_GETFL, 0);
@@ -6321,7 +6334,7 @@ int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
 		errcode = errno;
 		write_log(0, "Listen socket error in %s. Code %d.\n",
 			__func__, errcode);
-		return;
+		return ret;
 	}
 
 	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {

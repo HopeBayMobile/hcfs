@@ -931,8 +931,8 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	current_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
-
 		which_page = block_count / BLK_INCREMENTS;
+
 		if (current_page != which_page) {
 			flock(progress_fd, LOCK_EX);
 			offset = query_status_page(progress_fd, block_count);
@@ -1026,11 +1026,13 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 		FILE *local_metafptr, char *local_metapath)
 {
 	PROGRESS_META progress_meta;
-	BLOCK_UPLOADING_STATUS block_info;
+	BLOCK_UPLOADING_STATUS *block_info;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE tmp_page;
-	long long block_count, total_blocks, which_page, current_page;
-	long long page_pos;
+	BLOCK_UPLOADING_PAGE upload_page;
+	long long block_count, total_blocks, which_page;
+	long long current_page, current_status_page;
+	long long page_pos, offset;
 	long long local_seq;
 	char local_status;
 	int e_index;
@@ -1044,20 +1046,26 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 	total_blocks = progress_meta.total_toupload_blocks;
 
 	current_page = -1;
+	current_status_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
-		ret = get_progress_info(progress_fd, block_count, &block_info);
-		if (ret < 0) {
-			if (ret == -ENOENT) {
+		e_index = block_count % BLK_INCREMENTS;
+		which_page = block_count / BLK_INCREMENTS;
+
+		if (which_page != current_status_page) {
+			offset = query_status_page(progress_fd, block_count);
+			if (offset <= 0) {
 				block_count += (BLK_INCREMENTS - 1);
 				continue;
-			} else {
-				break;
 			}
+			PREAD(progress_fd, &upload_page,
+					sizeof(BLOCK_UPLOADING_PAGE), offset);
+			current_status_page = which_page;
 		}
 
-		if (TOUPLOAD_BLOCK_EXIST(block_info.block_exist) == TRUE) {
+		block_info = &(upload_page.status_entry[e_index]);
+		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == TRUE) {
 			/* It did not upload anything. (CLOUD/CtoL/BOTH) */
-			if (block_info.to_upload_seq == block_info.backend_seq)
+			if (block_info->to_upload_seq == block_info->backend_seq)
 				continue;
 		} else {
 			/* TO_DELETE/ NONE */
@@ -1071,8 +1079,6 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 			break;
 		}
 
-		e_index = block_count % BLK_INCREMENTS;
-		which_page = block_count / BLK_INCREMENTS;
 		if (which_page != current_page) {
 			PREAD(fileno(local_metafptr), &tempfilemeta,
 				sizeof(FILE_META_TYPE), sizeof(struct stat));
@@ -1091,7 +1097,7 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 		local_seq = tmp_page.block_entries[e_index].seqnum;
 		/* Change status if status is ST_LtoC */
 		if (local_status == ST_LtoC &&
-				local_seq == block_info.to_upload_seq) {
+				local_seq == block_info->to_upload_seq) {
 			tmp_page.block_entries[e_index].status = ST_BOTH;
 			tmp_page.block_entries[e_index].uploaded = TRUE;
 
@@ -1119,6 +1125,9 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
+		write_log(10, "Debug sync: block_%"PRIu64"_%lld"
+				" is changed to ST_BOTH\n",
+				(uint64_t)inode, block_count);
 	}
 
 	return 0;
