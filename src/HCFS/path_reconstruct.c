@@ -329,7 +329,7 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	/* If there is no parent, return error */
 	if (numparents <= 0) {
 		errcode = -ENOENT;
-		write_log(2, "Cannot find parent in lookup\n");
+		write_log(4, "Cannot find parent in lookup\n");
 		goto errcode_handle;
 	}
 
@@ -459,7 +459,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: construct_path
-*        Inputs: PATH_CACHE *cacheptr, ino_t thisinode, char **result
+*        Inputs: MOUNT_T *tmpptr, ino_t thisinode, char **result
 *       Summary: Construct the path from root to thisinode, and return
 *                the path via the pointer in *result.
 *          Note: The caller is responsible for freeing the memory storing
@@ -467,10 +467,14 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+                   ino_t rootinode)
 {
 	int ret, errcode;
 	char *tmpbuf;
+	char pathname[200];
+	FILE *fptr;
+	int64_t ret_pos;
 
 	ret = sem_wait(&(cacheptr->pathcache_lock));
 	if (ret < 0) {
@@ -493,9 +497,39 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
 		snprintf(*result, 10, "/");
 	} else {
 		ret = construct_path_iterate(cacheptr, thisinode, result, 10);
-		if (ret < 0) {
+		if ((ret < 0) && (ret != -ENOENT)) {
 			errcode = ret;
 			goto errcode_handle;
+		}
+		if (ret == -ENOENT) {
+			snprintf(pathname, 200,
+			         "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
+			         METAPATH, (uint64_t)thisinode,
+			         (uint64_t)rootinode);
+			if (access(pathname, F_OK) != 0) {
+				errcode = -ENOENT;
+				goto errcode_handle;
+			}
+			fptr = fopen(pathname, "r");
+			FSEEK(fptr, 0, SEEK_END);
+			FTELL(fptr);
+			if (ret_pos == 0) {
+				errcode = -ENOENT;
+				fclose(fptr);
+				goto errcode_handle;
+			}
+			free(*result);
+			*result = NULL;
+			*result = (char *) malloc(((size_t) ret_pos) + 10);
+			if (*result == NULL) {
+				errcode = -ENOMEM;
+				write_log(0, "Out of memory\n");
+				goto errcode_handle;
+			}
+			FSEEK(fptr, 0, SEEK_SET);
+			fscanf(fptr, "%s ", *result);
+			write_log(4, "Read path %s\n", *result);
+			fclose(fptr);
 		}
 	}
 

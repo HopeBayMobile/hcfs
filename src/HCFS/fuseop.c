@@ -556,7 +556,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	write_log(10, "Debug rewrite stat inode %" PRIu64,
 	          (uint64_t) thisstat->st_ino);
 	ret = construct_path(tmpptr->vol_path_cache, thisstat->st_ino,
-				&tmppath);
+				&tmppath, tmpptr->f_ino);
 	if (ret < 0) {
 		if (tmppath != NULL)
 			free(tmppath);
