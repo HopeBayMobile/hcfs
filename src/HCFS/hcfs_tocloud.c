@@ -144,6 +144,9 @@ int _revert_block_status_LDISK(ino_t this_inode, long long blockno,
 	int errcode, ret;
 	ssize_t ret_ssize;
 
+	if (page_filepos <= 0 || e_index < 0)
+		return 0;
+
 	fetch_meta_path(local_metapath, this_inode);
 
 	fptr = fopen(local_metapath, "r+");
@@ -406,16 +409,16 @@ static inline int _upload_terminate_thread(int index)
 		 * blocks when re-connecting */
 		if (upload_ctl.upload_threads[index].backend_delete_type ==
 				BACKEND_BLOCKS) {
-			backend_exist = FALSE;
+			/*backend_exist = FALSE;
 			set_progress_info(progress_fd, blockno, NULL,
-					&backend_exist, NULL, NULL, NULL);
+					&backend_exist, NULL, NULL, NULL);*/
 		/* When deleting to-upload blocks, it is important to recover
 		 * the block status to ST_LDISK */
 		} else if (upload_ctl.upload_threads[index].backend_delete_type
 				== TOUPLOAD_BLOCKS) {
-			toupload_exist = FALSE;
+			/*toupload_exist = FALSE;
 			set_progress_info(progress_fd, blockno, &toupload_exist,
-					NULL, NULL, NULL, NULL);
+					NULL, NULL, NULL, NULL);*/
 			ret = _revert_block_status_LDISK(this_inode, blockno,
 					e_index, page_filepos);
 		}
@@ -810,39 +813,6 @@ static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
 	return;
 }
 
-/*
-static int increment_upload_seq(FILE *fptr, long long *upload_seq)
-{
-	ssize_t ret_ssize;
-	int errcode;
-
-	ret_ssize = fgetxattr(fileno(fptr),
-			"user.upload_seq", upload_seq, sizeof(long long));
-	if (ret_ssize >= 0) {
-		*upload_seq += 1;
-		fsetxattr(fileno(fptr), "user.upload_seq",
-			upload_seq, sizeof(long long), 0);
-	} else {
-		errcode = errno;
-		*upload_seq = 1;
-		if (errcode == ENOATTR) {
-			fsetxattr(fileno(fptr),
-				"user.upload_seq", upload_seq,
-				sizeof(long long), 0);
-		} else {
-			write_log(0, "Error: Get xattr error in %s."
-					" Code %d\n", __func__, errcode);
-			*upload_seq = 0;
-			return -errcode;
-		}
-	}
-	*upload_seq -= 1;
-
-	return 0;
-}
-*/
-
-
 #if (DEDUP_ENABLE)
 static inline int _choose_deleted_block(char delete_which_one,
 	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
@@ -959,7 +929,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	fetch_meta_path(local_metapath, inode);
 
-	page_pos = 0;
 	current_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 
@@ -979,6 +948,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			/* When delete to-upload blocks, we need page position
 			 * to recover status to ST_LDISK */
 			if (delete_which_one == TOUPLOAD_BLOCKS) {
+				page_pos = 0;
 				local_metafptr = fopen(local_metapath, "r");
 				if (local_metafptr != NULL) {
 					flock(fileno(local_metafptr), LOCK_EX);
@@ -989,6 +959,8 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 						page_pos = seek_page2(&filemeta,
 							local_metafptr,
 							which_page, 0);
+					else
+						page_pos = 0;
 					flock(fileno(local_metafptr), LOCK_UN);
 					fclose(local_metafptr);
 				} else {
@@ -2001,8 +1973,10 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 #endif
 	}
 
+	/* Do not care about object not found on cloud. */
 	if (ret < 0)
-		goto errcode_handle;
+		if (ret != -ENOENT)
+			goto errcode_handle;
 
 	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
