@@ -10,11 +10,9 @@
 #
 ##########################################################################
 verbose=1
+set -ex
 echo -e "\n======== ${BASH_SOURCE[0]} should execute with root ========"
-repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
-here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source $repo/utils/common_header.bash
-cd $repo
+source /build/utils/common_header.bash
 
 # use cache server to speed up docker building
 echo 'Acquire::http::Proxy "http://cache:8000";' | tee /etc/apt/apt.conf.d/30autoproxy
@@ -61,9 +59,9 @@ if [ ! -f /CCM.exe ]; then
 fi
 
 apt-get upgrade -y
-sudo -u jenkins $repo/utils/setup_dev_env.sh -v -m docker_host
-sudo -u jenkins $repo/utils/setup_dev_env.sh -v -m functional_test
-sudo -u jenkins $repo/utils/setup_dev_env.sh -v -m unit_test
-sudo -u jenkins $repo/utils/install_ccache.bash
+sudo -u jenkins /build/utils/setup_dev_env.sh -v -m docker_host
+sudo -u jenkins /build/utils/setup_dev_env.sh -v -m functional_test
+sudo -u jenkins /build/utils/setup_dev_env.sh -v -m unit_test
+sudo -u jenkins /build/utils/install_ccache.bash
 apt-get clean
 popd

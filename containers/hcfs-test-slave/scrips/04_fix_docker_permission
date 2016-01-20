@@ -33,7 +33,7 @@ if [[ $OLDUID != $NEWUID || $OLDGID != $NEWGID ]]; then
 	else
 		sudo groupmod -g $NEWGID jenkins
 	fi
-	sudo chown -R $NEWUID:$NEWGID /var/jenkins/repo/HCFS/
+	sudo chown -R $NEWUID:$NEWGID $repo
 	ls -l $repo
 fi
 

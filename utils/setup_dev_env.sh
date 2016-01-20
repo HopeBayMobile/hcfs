@@ -11,7 +11,7 @@
 ##########################################################################
 
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
-repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
+repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d utils ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
@@ -81,7 +81,7 @@ functional_test )
 	if [ -f $repo/tests/functional_test/requirements.txt ]; then
 		sudo -H pip install -q -r $repo/tests/functional_test/requirements.txt
 	else
-		sudo -H pip install -q -r /utils/requirements.txt
+		sudo -H pip install -q -r $here/requirements.txt
 	fi
 	echo "########## Configure user_allow_other in /etc/fuse.conf"
 	if sudo grep "#user_allow_other" /etc/fuse.conf; then
