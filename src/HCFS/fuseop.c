@@ -24,6 +24,7 @@
 * 2015/7/7 Kewei began to add ops about symbolic link
 * 2015/11/5 Jiahong adding changes for per-file statistics
 * 2015/11/24 Jethro adding
+* 2016/1/19 Jiahong modified path reconstruct routine
 *
 **************************************************************************/
 
