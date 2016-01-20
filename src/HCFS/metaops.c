@@ -1924,3 +1924,168 @@ errcode_handle:
 	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
 	return errcode;
 }
+
+/**
+ * inherit_xattr()
+ *
+ * Inherit xattrs from parent.
+ *
+ * @param parent_inode Parent inode number
+ * @param this_inode Self inode number
+ * @param selbody_ptr Self meta cache entry, which had been locked.
+ *
+ * @return 0 on success, otherwise negative errcode.
+ */ 
+int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+		META_CACHE_ENTRY_STRUCT *selbody_ptr)
+{
+	META_CACHE_ENTRY_STRUCT *pbody_ptr;
+	XATTR_PAGE p_xattr_page, sel_xattr_page;
+	long long p_xattr_pos, sel_xattr_pos;
+	size_t total_keysize, total_keysize2;
+	const char *key_ptr;
+	char now_key[400], namespace, key[300];
+	char *key_buf, *value_buf;
+	size_t value_buf_size;
+	size_t value_size;
+	int ret;
+
+	key_buf = NULL;
+	value_buf = NULL;
+
+	pbody_ptr = meta_cache_lock_entry(parent_inode);
+	if (!pbody_ptr) {
+		return -ENOMEM;		
+	}
+	ret = meta_cache_open_file(pbody_ptr);
+	if (ret < 0) {
+		meta_cache_unlock_entry(pbody_ptr);
+		return ret;
+	}
+
+	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+
+	/* Fetch needed size of key buffer */
+	ret = list_xattr(pbody_ptr, &p_xattr_page, NULL, 0, &total_keysize);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+	if (total_keysize == 0) {
+		write_log(10, "Debug: parent inode %"PRIu64" has no xattrs.\n",
+				(uint64_t)parent_inode);
+		meta_cache_close_file(pbody_ptr);
+		meta_cache_unlock_entry(pbody_ptr);
+		return 0;	
+	}
+
+	key_buf = malloc(sizeof(char) * (total_keysize + 100));
+	if (!key_buf) {
+		ret = -ENOMEM;
+		goto errcode_handle;
+	}
+	memset(key_buf, 0, total_keysize + 100);
+
+	/* Fetch all namespace.key */
+	ret = list_xattr(pbody_ptr, &p_xattr_page, key_buf, total_keysize,
+			&total_keysize2);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+	key_buf[total_keysize] = 0;
+
+	/* Tmp value buffer size */
+	value_buf_size = MAX_VALUE_BLOCK_SIZE + 100;
+	value_buf = malloc(value_buf_size);
+	if (!value_buf) {
+		ret = -ENOMEM;
+		goto errcode_handle;
+	}
+
+	/* Self xattr page */
+	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page, &sel_xattr_pos);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+
+	/* Begin to insert.
+	 * Step 1: Copy key to now_key and parse it
+	 * Step 2: Get value of now_key from parent
+	 * Step 3: Insert key-value pair to this inode */
+	key_ptr = key_buf;
+	while(*key_ptr) {
+		strncpy(now_key, key_ptr, 300);
+		key_ptr += (strlen(now_key) + 1);
+
+		ret = parse_xattr_namespace(now_key, &namespace, key);
+		if (ret < 0) {
+			write_log(0, "Error: Invalid xattr %s. Code %d",
+					now_key, -ret);
+			continue;
+		}
+
+		/* Get this xattr value */
+		ret = -1;
+		while (ret < 0) {
+			ret = get_xattr(pbody_ptr, &p_xattr_page, namespace,
+					key, value_buf, value_buf_size,
+					&value_size);
+			if (ret < 0 && ret != -ERANGE) {
+				goto errcode_handle;
+			
+			} else if (ret < 0 && ret == -ERANGE) {
+				free(value_buf);
+				value_buf = malloc(value_size + 100);
+				if (!value_buf) {
+					ret = -ENOMEM;
+					goto errcode_handle;
+				}
+				value_buf_size = value_size + 100;
+				continue;
+			
+			} else {
+				value_buf[value_size] = 0;
+			}
+		}
+
+		write_log(10, "Debug: Insert xattr key %s and value %s\n",
+				now_key, value_buf);
+		ret = insert_xattr(selbody_ptr, &sel_xattr_page,
+				sel_xattr_pos, namespace, key,
+				value_buf, value_size, 0);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to insert xattr. Code %d",
+					-ret);
+			continue;
+		}
+	}
+
+	if (key_buf)
+		free(key_buf);
+	if (value_buf)
+		free(value_buf);
+
+	ret = meta_cache_close_file(pbody_ptr);
+	if (ret < 0) {
+		meta_cache_unlock_entry(pbody_ptr);
+		return ret;
+	}
+	ret = meta_cache_unlock_entry(pbody_ptr);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+
+errcode_handle:
+	if (key_buf)
+		free(key_buf);
+	if (value_buf)
+		free(value_buf);
+	meta_cache_close_file(pbody_ptr);
+	meta_cache_unlock_entry(pbody_ptr);
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -ret);
+
+	return ret;
+}

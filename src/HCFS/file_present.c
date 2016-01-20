@@ -268,6 +268,20 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
 		SEEK_SET);
 	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
+	
+#ifdef _ANDROID_ENV_
+	/* Inherit xattr from parent */
+	if (S_ISREG(this_stat->st_mode)) {
+		write_log(10, "Debug:inode %"PRIu64" begin to inherit xattrs\n",
+				(uint64_t)self_inode);
+		ret_val = inherit_xattr(parent_inode, self_inode, body_ptr);
+		if (ret_val < 0)
+			write_log(0, "Error: inode %"PRIu64" fails to inherit"
+				" xattrs from parent inode %"PRIu64".\n",
+				(uint64_t)self_inode, (uint64_t)parent_inode);
+	}
+#endif
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -396,6 +410,18 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			selfname, this_stat->st_mode);
 		goto error_handling;
 	}
+
+#ifdef _ANDROID_ENV_
+	write_log(10, "Debug: inode %"PRIu64" begin to inherit xattrs\n",
+			(uint64_t)self_inode);
+	/* Inherit xattr from parent */
+	ret_val = inherit_xattr(parent_inode, self_inode, body_ptr);
+	if (ret_val < 0)
+		write_log(0, "Error: inode %"PRIu64" fails to inherit"
+				" xattrs from parent inode %"PRIu64".\n",
+				(uint64_t)self_inode, (uint64_t)parent_inode);
+#endif
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -749,6 +775,26 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
+#ifdef _ANDROID_ENV_
+	meta_cache_unlock_entry(parent_meta_cache_entry);
+
+	write_log(10, "Debug: inode %"PRIu64" begin to inherit xattrs\n",
+			(uint64_t)self_inode);
+	/* Inherit xattr from parent */
+	ret_code = inherit_xattr(parent_inode, self_inode,
+			self_meta_cache_entry);
+	if (ret_code < 0)
+		write_log(0, "Error: inode %"PRIu64" fails to inherit"
+				" xattrs from parent inode %"PRIu64".\n",
+				(uint64_t)self_inode, (uint64_t)parent_inode);
+	
+	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
+	if (!parent_meta_cache_entry) {
+		meta_cache_close_file(self_meta_cache_entry);
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		return -ENOMEM;
+	}
+#endif
 	ret_code = meta_cache_close_file(self_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_unlock_entry(self_meta_cache_entry);
@@ -839,13 +885,8 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return -EINVAL;
 	}
 
-
 	/* It is used to prevent user from forgetting to open meta file */
 	ret_code = meta_cache_open_file(meta_cache_entry);
-	if (ret_code < 0)
-		return ret_code;
-
-	ret_code = flush_single_entry(meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
 
