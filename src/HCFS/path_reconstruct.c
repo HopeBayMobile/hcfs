@@ -329,7 +329,7 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	/* If there is no parent, return error */
 	if (numparents <= 0) {
 		errcode = -ENOENT;
-		write_log(4, "Cannot find parent in lookup\n");
+		write_log(10, "Cannot find parent in lookup\n");
 		goto errcode_handle;
 	}
 
@@ -528,7 +528,7 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 			}
 			FSEEK(fptr, 0, SEEK_SET);
 			fscanf(fptr, "%s ", *result);
-			write_log(4, "Read path %s\n", *result);
+			write_log(10, "Read path %s\n", *result);
 			fclose(fptr);
 		}
 	}

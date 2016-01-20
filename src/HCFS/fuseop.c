@@ -476,6 +476,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char sql[500];
 	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
+	write_log(4, "Looking up pkg %s\n", pkgname);
 	/* Return uid 0 if error occurred */
 	data = NULL;
 	*uid = 0;
@@ -485,13 +486,13 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 		 pkgname);
 
 	if (access(db_path, F_OK) != 0) {
-		write_log(10, "Query pkg uid err (open db) - db file not existed\n");
+		write_log(4, "Query pkg uid err (open db) - db file not existed\n");
 		return -1;
 	}
 
 	ret_code = sqlite3_open(db_path, &db);
 	if (ret_code != SQLITE_OK) {
-		write_log(10, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
+		write_log(4, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
 		return -1;
 	}
 
@@ -499,7 +500,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb,
 	                        (void *)&data, &sql_err);
 	if( ret_code != SQLITE_OK ){
-		write_log(10, "Query pkg uid err (sql statement) - %s\n", sql_err);
+		write_log(4, "Query pkg uid err (sql statement) - %s\n", sql_err);
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
 		return -1;
@@ -508,11 +509,12 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	sqlite3_close(db);
 
 	if (data == NULL) {
-		write_log(10, "Query pkg uid err (sql statement) - pkg not found\n");
+		write_log(4, "Query pkg uid err (sql statement) - pkg not found\n");
 		return -1;
 	}
 
 	*uid = (uid_t)atoi(data);
+	write_log(4, "Fetch pkg uid %d, %d\n", *uid, data);
 	free(data);
 	return 0;
 }
@@ -728,7 +730,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 
 	UNUSED(fi);
 
-	write_log(10, "Debug getattr inode %ld\n", ino);
+	write_log(4, "Debug getattr inode %ld\n", ino);
 	gettimeofday(&tmp_time1, NULL);
 	hit_inode = real_ino(req, ino);
 
@@ -815,6 +817,9 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	parent_inode = real_ino(req, parent);
+
+        write_log(4, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
+                        (uint64_t)parent_inode);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -957,6 +962,9 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+        write_log(4, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
+                        (uint64_t)parent_inode);
+
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
 
@@ -1073,6 +1081,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
+        write_log(4, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
+                        (uint64_t)parent_inode);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1151,7 +1161,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
-	write_log(10, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
+	write_log(4, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
 			(uint64_t)parent_inode);
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1253,7 +1263,7 @@ a directory (for NFS) */
 
 	parent_inode = real_ino(req, parent);
 
-	write_log(10, "Debug lookup parent %" PRIu64 ", name %s\n",
+	write_log(4, "Debug lookup parent %" PRIu64 ", name %s\n",
 			(uint64_t)parent_inode, selfname);
 
 	/* Reject if name too long */
@@ -1431,6 +1441,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
+
+        write_log(4, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
+                        (uint64_t)parent_inode1);
+        write_log(4, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
+                        (uint64_t)parent_inode2);
+
 
 	/* Reject if name too long */
 	if (strlen(selfname1) > MAX_FILENAME_LEN) {
@@ -2761,7 +2777,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	int file_flags;
 	MOUNT_T *tmpptr;
 
-	write_log(10, "Debug open inode %ld\n", ino);
+	write_log(4, "Debug open inode %ld\n", ino);
 
 	thisinode = real_ino(req, ino);
 
@@ -6181,9 +6197,15 @@ void *mount_single_thread(void *ptr)
 int hook_fuse(int argc, char **argv)
 {
 	int dl_count;
+	int count;
 
-	global_argc = argc;
-	global_argv = argv;
+	global_argc = argc + 1;
+	global_argv = (char **) malloc(sizeof(char *) * global_argc);
+	global_argv[argc] = (char *) malloc(10);
+	snprintf(global_argv[argc], 10, "-d");
+	for (count = 0; count < argc; count++)
+		global_argv[count] = argv[count];
+	//global_argv = argv;
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
