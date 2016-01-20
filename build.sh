@@ -53,7 +53,7 @@ function parse_options()
 	shift $OPTIND || true
 	ORIG_ARGV=("$@")
 
-	if [[ "$NDK_BUILD" = "" ]]; then
+	if [[ "$1" = "android-lib" && "$NDK_BUILD" = "" ]]; then
 		if /usr/bin/which ndk-build; then
 			export NDK_BUILD=`/usr/bin/which ndk-build`
 		else
