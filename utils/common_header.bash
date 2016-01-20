@@ -1,6 +1,7 @@
 set +x
 export TERM=xterm-256color
 script_error_report() {
+	set +x
 	local script="$1"
 	local parent_lineno="$2"
 	local message="$3"

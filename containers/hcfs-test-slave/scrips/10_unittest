@@ -32,7 +32,7 @@ sudo chown -R $USER:$USER $HOME/.ccache || :
 
 # oclint-report.xml
 #       OCLint with Bear
-bear make -j4 -C $srcdir
+/usr/local/bin/bear make -j4 -C $srcdir
 /ci-tools/oclint-0.8.1/bin/oclint-json-compilation-database . -- -report-type pmd -o $repo/oclint-report.xml || :
 sed -i "s@file name=\"@&src/HCFS/@g" $repo/oclint-report.xml
 
