@@ -9,7 +9,7 @@
 #   2016/1/18 Jethro unified usage of workspace path
 #
 ##########################################################################
-
+if [ "$UID" -ne 0 ]; then exec sudo -E ${BASH_SOURCE[0]}; fi
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -20,7 +20,8 @@ OLDUID=${SUDO_UID:-$UID}
 OLDGID=${SUDO_GID:-$GROUPS}
 NEWUID=$(stat -c '%u' $repo)
 NEWGID=$(stat -c '%g' $repo)
-if [[ $OLDUID != $NEWUID || $OLDGID != $NEWGID ]]; then
+# Only fix file permission if thry are different then expect
+if [[ ( $NEWUID != 0 ) && ( $OLDUID != $NEWUID || $OLDGID != $NEWGID ) ]]; then
 	echo FIX file permission in docker
 	ls -l $repo
 	if [ $NEWUID -eq 0 ]; then

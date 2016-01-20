@@ -33,23 +33,17 @@ sudo chown -R $USER:$USER $HOME/.ccache || :
 # oclint-report.xml
 #       OCLint with Bear
 bear make -j4 -C $srcdir
-/oclint-0.8.1/bin/oclint-json-compilation-database . -- -report-type pmd -o $repo/oclint-report.xml || :
+/ci-tools/oclint-0.8.1/bin/oclint-json-compilation-database . -- -report-type pmd -o $repo/oclint-report.xml || :
 sed -i "s@file name=\"@&src/HCFS/@g" $repo/oclint-report.xml
 
 # cpd-result.xml
 #        PMD's Copy/Paste Detector (CPD)
-/pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir --format xml --language cpp > $repo/cpd-result.xml || return_code=$?
+/ci-tools/pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir --format xml --language cpp > $repo/cpd-result.xml || return_code=$?
 if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
 	echo pmd returns unknown error code $return_code
 	false
 fi
 sed -i "s@$repo/@@g" $repo/cpd-result.xml
-
-# Run unit test
-cd $testdir/unit_test
-./run_unittests
-
-ccache -s $HOME/.ccache
 
 # cloc-result.xml
 #        Publish SLOCCount analysis results
@@ -58,7 +52,7 @@ sed -i "s@$repo/@@g" $repo/cloc-result.xml
 
 # ccm-result.xml
 #        Publish CCM analysis results (Cyclomatic Complexity)
-mono /CCM.exe $srcdir /xml > $repo/ccm-result.xml
+mono /ci-tools/CCM.exe $srcdir /xml > $repo/ccm-result.xml
 sed -i "s@<file>/@<file>src/HCFS/@g" $repo/ccm-result.xml
 
 # hb_clint.xml
@@ -77,6 +71,10 @@ rm -rf ${repo}/clangScanBuildReports
 cd $srcdir
 make clean
 scan-build-3.5 -o ${repo}/clangScanBuildReports make -j4
+
+# Run unit test
+cd $testdir/unit_test
+./run_unittests
 
 # coverage.xml
 #         Unit test coverage report

@@ -16,4 +16,9 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-sudo -H -u jenkins run-parts --exit-on-error --verbose $here/scrips
+
+if id -u jenkins >/dev/null 2>&1; then
+	sudo -E -u jenkins run-parts --exit-on-error --verbose $here/scrips
+else
+	run-parts --exit-on-error --verbose $here/scrips
+fi

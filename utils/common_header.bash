@@ -1,6 +1,5 @@
+set +x
 export TERM=xterm-256color
-
-
 script_error_report() {
 	local script="$1"
 	local parent_lineno="$2"
@@ -39,7 +38,11 @@ function install_pkg (){
 # Main source
 
 # Enable debug log only if verbose on
-if [ "$verbose" = "1" ]; then set -x; else set +x; fi
+if ${CI_VERBOSE:-false}; then
+	set -x;
+else
+	set +x;
+fi
 # Enable error trace
 trap 'script_error_report "${BASH_SOURCE[0]}" ${LINENO}' ERR
 set -e

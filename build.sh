@@ -22,6 +22,7 @@ function usage()
 	echo "Available Targets:"
 	echo "  android-lib   Build Android Libraries."
 	echo "  ci-test       Run continuous integration tests."
+	echo "  unittest      Run unit tests."
 	echo
 	echo "Options:"
 	echo "  -d DIR   Path to Android-ndk directory"
@@ -72,8 +73,12 @@ if [ -f "$NDK_BUILD" ]; then
 fi
 
 case "$1" in
+unittest)
+	$repo/tests/unit_test/run_unittests
+	;;
 ci-test)
-	. tests/docker_test.sh
+	export CI_VERBOSE=true
+	$repo/containers/hcfs-test-slave/ci-test.sh
 	;;
 android-lib)
 	cd $repo"/build/"
