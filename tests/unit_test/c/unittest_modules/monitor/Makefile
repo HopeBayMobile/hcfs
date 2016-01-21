@@ -76,7 +76,7 @@ setup :
 
 RUN_TESTS = $(TESTS:%=test-%)
 $(RUN_TESTS) :
-	./$(@:test-%=%) --gtest_color=yes
+	./$(@:test-%=%) --gtest_output=xml:test_detail_$(@:test-%=%).xml
 
 test : all $(RUN_TESTS)
 ifndef NOGCOVR

@@ -31,6 +31,6 @@ fi
 make="TERM=xterm-color $make GTEST_COLOR=yes NOGCOVR=1"
 
 eval $make clean
-eval $make test
+eval $make $UNITTEST_MAKE_FLAG test
 
 gcovr -r $repo/src .

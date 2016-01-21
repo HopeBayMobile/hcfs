@@ -78,6 +78,7 @@ unittest)
 	;;
 ci-test)
 	export CI_VERBOSE=true
+	export UNITTEST_MAKE_FLAG=-k
 	$repo/containers/hcfs-test-slave/ci-test.sh
 	;;
 android-lib)

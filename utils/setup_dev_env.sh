@@ -9,11 +9,10 @@
 #   2016/1/17 Jethro hide debug infomation
 #
 ##########################################################################
-
-echo -e "\n======== ${BASH_SOURCE[0]} ========"
+set +x
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d utils ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source $repo/utils/common_header.bash
+CI_VERBOSE=false source $repo/utils/common_header.bash
 cd $repo
 
 configfile="$repo/utils/env_config.sh"
@@ -47,8 +46,6 @@ while getopts ":vm:" opt; do
 		;;
 	esac
 done
-
-source $repo/utils/common_header.bash
 
 setup_status_file="${here}/.setup_$setup_dev_env_mode"
 if md5sum --quiet -c "$setup_status_file"; then
@@ -118,3 +115,4 @@ awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tm
 sudo mv -f /tmp/awk_tmp "$configfile"
 md5sum "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
 sudo chmod --reference="${BASH_SOURCE[0]}" "$configfile" "$setup_status_file"
+if ${CI_VERBOSE:-false}; then set -x; else set +x; fi
