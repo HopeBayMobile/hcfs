@@ -89,6 +89,15 @@ function clang_scan_build()
 	scan-build-3.5 -o ${repo}/clangScanBuildReports make -j4
 }
 
+# Run unit test
+function unittest()
+{
+	sudo rm -rf /tmp/tmp_meta_dir/
+	cd $testdir/unit_test
+	./run_unittests
+	sed -i "s@$repo/@@g" $repo/tests/unit_test/c/unittest_modules/*/test_detail_*.xml
+}
+
 set +x
 echo ==========================
 echo Running oclint_report, clang_scan_build, cpd_result, cloc_result, ccm_result, hb_clint concurrently
@@ -100,10 +109,8 @@ cloc_result      > /dev/null 2>&1 &
 ccm_result       > /dev/null 2>&1 &
 hb_clint         > /dev/null 2>&1 &
 checkpatch
+unittest
 wait
-# Run unit test
-cd $testdir/unit_test
-./run_unittests
 
 # coverage.xml
 #         Unit test coverage report
