@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: file_present.c
 * Abstract: The c source code file for meta processing involving regular
@@ -12,6 +12,7 @@
 * 2015/6/2 Jiahong added error handling
 * 2015/6/16 Kewei added function fetch_xattr_page().
 * 2015/7/9 Kewei added function symlink_update_meta().
+* 2016/1/21 Kewei added feature that inherit xattrs from parent.
 *
 **************************************************************************/
 
