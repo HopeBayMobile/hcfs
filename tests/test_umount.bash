@@ -1,13 +1,24 @@
 #!/bin/bash
-set -e
+#########################################################################
+#
+# Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+#
+# Abstract:
+#
+# Revision History
+#   2016/1/18 Jethro unified usage of workspace path
+#
+##########################################################################
+
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
-WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $repo/utils/common_header.bash
+cd $repo
 
 echo "########## Setup Test Env"
-. $WORKSPACE/utils/trace_error.bash
-$WORKSPACE/utils/setup_dev_env.sh -m functional_test
-. $WORKSPACE/utils/env_config.sh
+$repo/utils/setup_dev_env.sh -m functional_test
+. $repo/utils/env_config.sh
 
 if [[ $(id -Gn) != *fuse* ]]; then
 	echo "########## Reload script with fuse group permission"
@@ -17,12 +28,12 @@ id
 groups
 
 echo "########## Compile binary files"
-$WORKSPACE/tests/functional_test/TestCases/HCFS/compile_hcfs_bin.bash
-. $WORKSPACE/tests/functional_test/TestCases/HCFS/path_config.sh
+$repo/tests/functional_test/TestCases/HCFS/compile_hcfs_bin.bash
+. $repo/tests/functional_test/TestCases/HCFS/path_config.sh
 
 echo "########## Test unmount"
 $HCFSvol unmount autotest
-! mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
+! mount | grep "hcfs on $repo/tmp/mount type fuse.hcfs"
 
 echo "########## Test delete volume"
 $HCFSvol delete autotest

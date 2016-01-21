@@ -1,15 +1,27 @@
 #!/bin/bash
+#########################################################################
+#
+# Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+#
+# Abstract:
+#
+# Revision History
+#   2016/1/18 Jethro unified usage of workspace path
+#
+##########################################################################
+
+echo -e "\n======== ${BASH_SOURCE[0]} ========"
+repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
+here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source $repo/utils/common_header.bash
+cd $repo
+
 exec 1> >(while read line; do echo -e "        $line"; done;)
 exec 2> >(while read line; do echo -e "        $line" >&2; done;)
-set -e
-echo -e "\n======== ${BASH_SOURCE[0]} ========"
-WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../../.. && pwd )"
-here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "########## Setup Test Env"
-. $WORKSPACE/utils/trace_error.bash
-$WORKSPACE/utils/setup_dev_env.sh -m functional_test
-. $WORKSPACE/utils/env_config.sh
+$repo/utils/setup_dev_env.sh -m functional_test
+. $repo/utils/env_config.sh
 
 if [[ $(id -Gn) != *fuse* ]]; then
 	echo "########## Reload script with fuse group permission"
@@ -20,11 +32,11 @@ id
 # Main cource code
 function cleanup {
 	echo "########## Cleanup"
-	sudo umount $WORKSPACE/tmp/mount* |& grep -v "not mounted" || :
+	sudo umount $repo/tmp/mount* |& grep -v "not mounted" || :
 	sudo pgrep -a "hcfs " || :
 	sudo killall -9 'hcfs' || :
-	mkdir -p $WORKSPACE/tmp/mount
-	sudo find $WORKSPACE/tmp/mount* -mindepth 1 -delete
+	mkdir -p $repo/tmp/mount
+	sudo find $repo/tmp/mount* -mindepth 1 -delete
 }
 
 echo "########## Compile binary files"
