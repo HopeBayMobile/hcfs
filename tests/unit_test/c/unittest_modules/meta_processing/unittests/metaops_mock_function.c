@@ -368,4 +368,10 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 		symlink_meta_ptr->local_pin = pin_flag_in_meta;
 	return 0;
 }
-
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+                   ino_t rootinode)
+{
+	*result = (char *) malloc(50);
+	snprintf(*result, 50, "/tmp/markdeletetmp");
+	return 0;
+}

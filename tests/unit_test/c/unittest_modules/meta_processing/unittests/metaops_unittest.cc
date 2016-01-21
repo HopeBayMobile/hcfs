@@ -1342,23 +1342,23 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 
 TEST(disk_markdeleteTest, MakeDir_markdelete_Fail)
 {
-	ino_t root_inode;
+	MOUNT_T tmpmount;
 
 	METAPATH = "\0";
-	root_inode = 556677;
+	tmpmount.f_ino = 556677;
 
-	EXPECT_EQ(-EACCES, disk_markdelete(6, root_inode));
+	EXPECT_EQ(-EACCES, disk_markdelete(6, &tmpmount));
 }
 
 TEST(disk_markdeleteTest, MarkSuccess)
 {
-	ino_t root_inode;
+	MOUNT_T tmpmount;
 
 	METAPATH = "/tmp";
-	root_inode = 556677;
+	tmpmount.f_ino = 556677;
 	
 	/* Run */
-	EXPECT_EQ(0, disk_markdelete(6, 556677));
+	EXPECT_EQ(0, disk_markdelete(6, &tmpmount));
 	
 	/* Verify */
 	EXPECT_EQ(0, access("/tmp/markdelete", F_OK));

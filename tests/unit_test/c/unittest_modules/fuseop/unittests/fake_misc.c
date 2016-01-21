@@ -806,7 +806,8 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+		ino_t rootinode)
 {
 	*result = malloc(10);
 	snprintf(*result, 10, "/test");
