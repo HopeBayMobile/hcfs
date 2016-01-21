@@ -276,3 +276,9 @@ int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 	return 0;
 }
 
+int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+		META_CACHE_ENTRY_STRUCT *selbody_ptr)
+{
+	return 0;
+}
+

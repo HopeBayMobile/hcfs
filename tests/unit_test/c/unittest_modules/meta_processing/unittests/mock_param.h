@@ -73,6 +73,14 @@ char delete_pathcache_node_success;
 /* link_update_meta() */
 #define INO_TOO_MANY_LINKS 279348
 
+/* inherit_xattr() */
+#define INO_NO_XATTR_PAGE 758925
+#define INO_XATTR_PAGE_EXIST 490013
+size_t TOTAL_KEY_SIZE;
+size_t XATTR_VALUE_SIZE; 
+char xattr_key[3][100];
+int xattr_count;
+
 /* pin_inode() */
 char collect_dir_children_flag;
 

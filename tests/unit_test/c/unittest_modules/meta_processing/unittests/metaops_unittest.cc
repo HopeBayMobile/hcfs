@@ -20,6 +20,7 @@ extern "C" {
 #include "params.h"
 #include "metaops.h"
 #include "FS_manager.h"
+#include "xattr_ops.h"
 }
 #include "gtest/gtest.h"
 
@@ -1344,10 +1345,10 @@ TEST(disk_markdeleteTest, MakeDir_markdelete_Fail)
 {
 	ino_t root_inode;
 
-	METAPATH = "\0";
+	METAPATH = "/rqjwsfdswer";
 	root_inode = 556677;
 
-	EXPECT_EQ(-EACCES, disk_markdelete(6, root_inode));
+	EXPECT_EQ(-ENOENT, disk_markdelete(6, root_inode));
 }
 
 TEST(disk_markdeleteTest, MarkSuccess)
@@ -1394,7 +1395,7 @@ TEST_F(disk_cleardeleteTest, Dir_markdelete_NotExist)
 {
 	ino_t root_inode;
 
-	METAPATH = "\0"; // Let access fail
+	METAPATH = "/adkas"; // Let access fail
 
 	EXPECT_EQ(-ENOENT, disk_cleardelete(6, ROOT_INODE));
 }
@@ -1435,7 +1436,7 @@ TEST(disk_checkdeleteTest, Dir_markdelete_CannotAccess)
 {
 	ino_t root_inode;
 
-	METAPATH = "\0";
+	METAPATH = "/adadsadfg";
 	root_inode = 556677;
 
 	EXPECT_EQ(-ENOENT, disk_checkdelete(6, root_inode));
@@ -1522,7 +1523,7 @@ protected:
 
 TEST_F(startup_finish_deleteTest, Dir_markdelete_NotCreateYet)
 {
-	METAPATH = "\0";
+	METAPATH = "/affdsfs";
 	num_inode = 0;
 
 	EXPECT_EQ(-ENOENT, startup_finish_delete());
@@ -1782,3 +1783,79 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 }
 
 /* End of unittest for collect_dir_children */
+
+/*
+ * Unittest of inherit_xattr()
+ */
+class inherit_xattrTest : public ::testing::Test {
+protected:
+	
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(inherit_xattrTest, XattrpageNotExist)
+{
+	ino_t parent_inode, this_inode;
+
+	parent_inode = INO_NO_XATTR_PAGE;
+	this_inode = 1234;
+
+	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
+}
+
+TEST_F(inherit_xattrTest, TotalKeySize_Is_Zero)
+{
+	ino_t parent_inode, this_inode;
+
+	parent_inode = INO_XATTR_PAGE_EXIST;
+	this_inode = 1234;
+
+	TOTAL_KEY_SIZE = 0;
+	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
+}
+
+TEST_F(inherit_xattrTest, InsertSuccess_ValueIsLarge)
+{
+	ino_t parent_inode, this_inode;
+
+	parent_inode = INO_XATTR_PAGE_EXIST;
+	this_inode = 1234;
+
+	TOTAL_KEY_SIZE = 100;
+	XATTR_VALUE_SIZE = MAX_VALUE_BLOCK_SIZE * 3;
+	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
+
+	/* Verify those keys recorded in mock insert_xattr() */
+	EXPECT_EQ(3, xattr_count);
+	EXPECT_STREQ("key1", xattr_key[0]);
+	EXPECT_STREQ("key2", xattr_key[1]);
+	EXPECT_STREQ("key3", xattr_key[2]);
+}
+
+TEST_F(inherit_xattrTest, InsertSuccess_ValueIsSmall)
+{
+	ino_t parent_inode, this_inode;
+
+	parent_inode = INO_XATTR_PAGE_EXIST;
+	this_inode = 1234;
+
+	TOTAL_KEY_SIZE = 100;
+	XATTR_VALUE_SIZE = MAX_VALUE_BLOCK_SIZE / 2;
+	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
+
+	/* Verify those keys recorded in mock insert_xattr() */
+	EXPECT_EQ(3, xattr_count);
+	EXPECT_STREQ("key1", xattr_key[0]);
+	EXPECT_STREQ("key2", xattr_key[1]);
+	EXPECT_STREQ("key3", xattr_key[2]);
+}
+
+/*
+ * End of unittest of inherit_xattr()
+ */

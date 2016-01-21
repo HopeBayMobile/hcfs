@@ -1925,6 +1925,11 @@ errcode_handle:
 	return errcode;
 }
 
+static BOOL _namespace_filter(char namespace) /* Always return true now */
+{
+	return TRUE;
+}
+
 /**
  * inherit_xattr()
  *
@@ -1941,6 +1946,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 {
 	META_CACHE_ENTRY_STRUCT *pbody_ptr;
 	XATTR_PAGE p_xattr_page, sel_xattr_page;
+	DIR_META_TYPE dirmeta;
 	long long p_xattr_pos, sel_xattr_pos;
 	size_t total_keysize, total_keysize2;
 	const char *key_ptr;
@@ -1953,6 +1959,12 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	key_buf = NULL;
 	value_buf = NULL;
 
+	/* self fptr should be opened */
+	ret = meta_cache_open_file(selbody_ptr);
+	if (ret < 0)
+		return ret;
+
+	/* Lock parent */
 	pbody_ptr = meta_cache_lock_entry(parent_inode);
 	if (!pbody_ptr) {
 		return -ENOMEM;		
@@ -1961,6 +1973,21 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	if (ret < 0) {
 		meta_cache_unlock_entry(pbody_ptr);
 		return ret;
+	}
+
+	ret = meta_cache_lookup_dir_data(parent_inode, NULL, &dirmeta,
+			NULL, pbody_ptr);
+	if (ret < 0)
+		goto errcode_handle;
+
+	/* Check xattr_page */
+	if (dirmeta.next_xattr_page <= 0) {
+		write_log(10, "Debug: parent inode %"PRIu64
+				" has no xattr page.\n",
+				(uint64_t)parent_inode);
+		meta_cache_close_file(pbody_ptr);
+		meta_cache_unlock_entry(pbody_ptr);
+		return 0;
 	}
 
 	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos);
@@ -1973,12 +2000,12 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	if (ret < 0) {
 		goto errcode_handle;
 	}
-	if (total_keysize == 0) {
+	if (total_keysize <= 0) {
 		write_log(10, "Debug: parent inode %"PRIu64" has no xattrs.\n",
 				(uint64_t)parent_inode);
 		meta_cache_close_file(pbody_ptr);
 		meta_cache_unlock_entry(pbody_ptr);
-		return 0;	
+		return 0;
 	}
 
 	key_buf = malloc(sizeof(char) * (total_keysize + 100));
@@ -2026,16 +2053,21 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 			continue;
 		}
 
+		/* Choose namespace to inherit */
+		if (_namespace_filter(namespace) == FALSE)
+			continue;
+
 		/* Get this xattr value */
 		ret = -1;
 		while (ret < 0) {
 			ret = get_xattr(pbody_ptr, &p_xattr_page, namespace,
 					key, value_buf, value_buf_size,
 					&value_size);
-			if (ret < 0 && ret != -ERANGE) {
+			if (ret < 0 && ret != -ERANGE) { /* Error */
 				goto errcode_handle;
-			
-			} else if (ret < 0 && ret == -ERANGE) {
+
+			} else if ((ret < 0 && ret == -ERANGE) || /* Larger */
+				(ret == 0 && value_size == value_buf_size)) {
 				free(value_buf);
 				value_buf = malloc(value_size + 100);
 				if (!value_buf) {
@@ -2045,7 +2077,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 				value_buf_size = value_size + 100;
 				continue;
 			
-			} else {
+			} else { /* ok */
 				value_buf[value_size] = 0;
 			}
 		}
@@ -2062,6 +2094,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		}
 	}
 
+	/* Free and unlock */
 	if (key_buf)
 		free(key_buf);
 	if (value_buf)

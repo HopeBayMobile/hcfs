@@ -870,8 +870,10 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	hash_index = hash(key); /* Hash the key */
 	namespace_page = &(xattr_page->namespace_page[name_space]);
 
-	if (namespace_page->key_hash_table[hash_index] == 0)
+	if (namespace_page->key_hash_table[hash_index] == 0) {
+		write_log(2, "Key %s not found in get_xattr()\n", key);
 		return -ENODATA;
+	}
 
 	first_key_list_pos = namespace_page->key_hash_table[hash_index];
 	ret_code = find_key_entry(meta_cache_entry, first_key_list_pos,
@@ -1065,8 +1067,10 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			&prev_key_list_pos);
 	if (ret_code < 0) /* Error */
 		return ret_code;
-	if (ret_code > 0) /* Hit nothing */
+	if (ret_code > 0) { /* Hit nothing */
+		write_log(10, "Debug removexattr:Key %s does not exist\n", key);
 		return -ENODATA;
+	}
 
 	/* Record value block position, and reclaim them later. */
 	first_value_pos =
