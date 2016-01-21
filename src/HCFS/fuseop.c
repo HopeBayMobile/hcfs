@@ -5806,7 +5806,6 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
-	write_log(5, "Remove key success\n");
 	fuse_reply_err(req, 0);
 	return;
 
