@@ -4,9 +4,6 @@
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
-
-  File modified @ Hope Bay Technologies, Inc. (2016)
-  Jiahong (1/15/16) modified fuse_mount to include a premount routine
 */
 
 /** @file */
@@ -169,36 +166,17 @@ struct fuse_session;
 struct fuse_chan;
 struct fuse_pollhandle;
 
-/* Jiahong (1/15/16) modified fuse_mount to include a premount routine */
-
 /**
- * Preallocate channel to a FUSE mountpoint
+ * Create a FUSE mountpoint
  *
- * Returns a control file descriptor suitable for passing to
- * fuse_new(), but do not actually call system call mount()
- *
- * @param mountpoint the mount point path
- * @param args argument vector
- * @return the communication channel on success, NULL on failure
- */
-struct fuse_chan *fuse_premount(const char *mountpoint, struct fuse_args *args);
-
-/**
- * Actually create a FUSE mountpoint
- *
- * If a valid file descriptor is provided, it is used in the call to
- * the system call mount().
  * Returns a control file descriptor suitable for passing to
  * fuse_new()
  *
  * @param mountpoint the mount point path
  * @param args argument vector
- * @param ch the channel with allocated fd from premount. NULL if none
- * @return the file descriptor for the mount on success, negative int if failed
+ * @return the communication channel on success, NULL on failure
  */
-struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args,
-			struct fuse_chan *ch);
-
+struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args);
 
 /**
  * Umount a FUSE mountpoint
