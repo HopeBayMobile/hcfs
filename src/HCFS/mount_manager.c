@@ -796,7 +796,7 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 	if (ret < 0) {
 		/* Destroy shared data when all mountpoints are unmounted */
 		if (ret == -ENOENT) {
-			write_log(4, "Destroy shared data of volume %s\n",
+			write_log(8, "Destroy shared data of volume %s\n",
 					mount_info->f_name);
 			lookup_destroy(mount_info->lookup_table, mount_info);
 			if (mount_info->stat_fptr != NULL)

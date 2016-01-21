@@ -477,7 +477,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char sql[500];
 	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
-	write_log(4, "Looking up pkg %s\n", pkgname);
+	write_log(8, "Looking up pkg %s\n", pkgname);
 	/* Return uid 0 if error occurred */
 	data = NULL;
 	*uid = 0;
@@ -515,7 +515,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	}
 
 	*uid = (uid_t)atoi(data);
-	write_log(4, "Fetch pkg uid %d, %d\n", *uid, data);
+	write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
 	free(data);
 	return 0;
 }
@@ -731,7 +731,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 
 	UNUSED(fi);
 
-	write_log(4, "Debug getattr inode %ld\n", ino);
+	write_log(8, "Debug getattr inode %ld\n", ino);
 	gettimeofday(&tmp_time1, NULL);
 	hit_inode = real_ino(req, ino);
 
@@ -819,7 +819,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-        write_log(4, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
+        write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -963,7 +963,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-        write_log(4, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
+        write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
@@ -1082,7 +1082,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
-        write_log(4, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
+        write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
 	/* Reject if name too long */
@@ -1162,7 +1162,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
-	write_log(4, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
+	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
 			(uint64_t)parent_inode);
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1264,7 +1264,7 @@ a directory (for NFS) */
 
 	parent_inode = real_ino(req, parent);
 
-	write_log(4, "Debug lookup parent %" PRIu64 ", name %s\n",
+	write_log(8, "Debug lookup parent %" PRIu64 ", name %s\n",
 			(uint64_t)parent_inode, selfname);
 
 	/* Reject if name too long */
@@ -1443,9 +1443,9 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
 
-        write_log(4, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
+        write_log(8, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
                         (uint64_t)parent_inode1);
-        write_log(4, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
+        write_log(8, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
                         (uint64_t)parent_inode2);
 
 
@@ -2778,7 +2778,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	int file_flags;
 	MOUNT_T *tmpptr;
 
-	write_log(4, "Debug open inode %ld\n", ino);
+	write_log(8, "Debug open inode %ld\n", ino);
 
 	thisinode = real_ino(req, ino);
 
