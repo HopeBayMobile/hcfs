@@ -14,19 +14,11 @@ echo -e "\n======== ${BASH_SOURCE[0]} ========"
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
-set -e -x
-cd $here
+cd $repo
 
-sudo apt-get install pv wget
 
-IMG=docker:5000/android-buildbox
-TAG=`date +%Y%m%d`
-echo $IMG
-docker build -t $IMG .
-docker tag -f $IMG $IMG:$TAG
-if [ ! -e /usr/local/bin/docker-squash ]; then
-	cd /tmp
-	wget https://github.com/jwilder/docker-squash/releases/download/v0.2.0/docker-squash-linux-amd64-v0.2.0.tar.gz
-	sudo tar -C /usr/local/bin -xzvf docker-squash-linux-amd64-v0.2.0.tar.gz
+if id -u jenkins >/dev/null 2>&1; then
+	sudo -E -u jenkins run-parts --exit-on-error --verbose $here/scrips
+else
+	run-parts --exit-on-error --verbose $here/scrips
 fi
-docker push $IMG:$TAG
