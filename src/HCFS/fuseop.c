@@ -467,7 +467,7 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
  *
  * @return - 0 for success, otherwise -1.
  */
-int lookup_pkg(char *pkgname, uid_t *uid)
+int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 {
 
 	sqlite3 *db;
@@ -481,6 +481,14 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	/* Return uid 0 if error occurred */
 	data = NULL;
 	*uid = 0;
+
+	sem_wait(&(tmpptr->pkg_cache_lock));
+	if (strcmp(pkgname, (tmpptr->pkg_cache_entry).pkgname) == 0) {
+		*uid = (tmpptr->pkg_cache_entry).pkguid;
+		sem_post(&(tmpptr->pkg_cache_lock));
+		return 0;
+	}
+	sem_post(&(tmpptr->pkg_cache_lock));
 
 	snprintf(sql, sizeof(sql),
 		 "SELECT uid from uid WHERE package_name='%s'",
@@ -516,6 +524,12 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 
 	*uid = (uid_t)atoi(data);
 	write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
+	sem_wait(&(tmpptr->pkg_cache_lock));
+	snprintf((tmpptr->pkg_cache_entry).pkgname, sizeof((tmpptr->pkg_cache_entry).pkgname),
+		 "%s", pkgname);
+	(tmpptr->pkg_cache_entry).pkguid= *uid;
+	sem_post(&(tmpptr->pkg_cache_lock));
+
 	free(data);
 	return 0;
 }
@@ -661,7 +675,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 				} else {
 					/* If this is a package folder */
 					/* Need to lookup package uid */
-					lookup_pkg(tmptok_prev, &tmpuid);
+					lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
 					thisstat->st_uid = tmpuid;
 					thisstat->st_gid = 1028;
 					newpermission = 0770;
@@ -676,7 +690,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 			break;
 		}
 		if (count == 3) {
-			lookup_pkg(tmptok_prev, &tmpuid);
+			lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
 			thisstat->st_uid = tmpuid;
 			thisstat->st_gid = 1028;
 			newpermission = 0770;
