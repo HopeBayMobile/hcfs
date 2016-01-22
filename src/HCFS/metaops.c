@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: metaops.c
 * Abstract: The c source code file for meta processing involving regular
@@ -16,6 +16,8 @@
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
 * 2015/5/28 Jiahong adding error handling
 * 2015/6/2 Jiahong moving lookup_dir to this file
+* 2016/1/18 Jiahong revised actual_delete_inode routine
+* 2016/1/19 Jiahong revised disk_markdelete
 **************************************************************************/
 #include "metaops.h"
 
@@ -1226,7 +1228,9 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	SYSTEM_DATA_TYPE *statptr;
+	char meta_deleted;
 
+	meta_deleted = FALSE;
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
@@ -1283,6 +1287,18 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
+		if (access(thismetapath, F_OK) != 0) {
+			errcode = errno;
+			if (errcode != ENOENT) {
+				write_log(0, "IO error, code %d\n", errcode);
+				return -errcode;
+			}
+			meta_deleted = TRUE;
+			ret = fetch_todelete_path(thismetapath, this_inode);
+			if (ret < 0)
+				return ret;
+		}
+
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;
@@ -1290,17 +1306,33 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				__func__, errcode, strerror(errcode));
 			return errcode;
 		}
+
 		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0) {
-			fclose(metafptr);
-			return ret;
+		if (meta_deleted == FALSE) {
+			ret = delete_inode_meta(this_inode);
+			if (ret < 0) {
+				fclose(metafptr);
+				return ret;
+			}
 		}
 
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
+		memset(&this_inode_stat, 0, sizeof(struct stat));
+		memset(&file_meta, 0, sizeof(FILE_META_TYPE));
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
+		if (ret_size < 1) {
+			write_log(2, "Skipping block deletion (meta gone)\n");
+			fclose(metafptr);
+			break;
+		}
+
 		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
+		if (ret_size < 1) {
+			write_log(2, "Skipping block deletion (meta gone)\n");
+			fclose(metafptr);
+			break;
+		}
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
@@ -1326,6 +1358,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				}
 				current_page = which_page;
 				FSEEK(metafptr, page_pos, SEEK_SET);
+				memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
 					1, metafptr);
 			}
@@ -1428,7 +1461,7 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	ret = disk_markdelete(this_inode, tmpptr->f_ino);
+	ret = disk_markdelete(this_inode, tmpptr);
 	if (ret < 0)
 		return ret;
 	ret = lookup_markdelete(tmpptr->lookup_table, this_inode);
@@ -1436,21 +1469,65 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 }
 
 /* Mark inode as to delete on disk */
-int disk_markdelete(ino_t this_inode, ino_t root_inode)
+int disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
 {
 	char pathname[200];
 	int ret, errcode;
+	char *tmppath;
+	FILE *fptr;
+
+	tmppath = NULL;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
 	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
 
-	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
-			(uint64_t)this_inode, (uint64_t)root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
+	         METAPATH, (uint64_t)this_inode, (uint64_t)mptr->f_ino);
 
+	/* In Android env, if need to delete the inode, first remember
+	the path of the inode if needed */
+#ifdef _ANDROID_ENV_
+	if (access(pathname, F_OK) != 0) {
+		if (IS_ANDROID_EXTERNAL(mptr->volume_type)) {
+			if (mptr->vol_path_cache == NULL) {
+				MKNOD(pathname, S_IFREG | 0700, 0);
+			} else {
+				ret = construct_path(mptr->vol_path_cache,
+				                     this_inode, &tmppath,
+				                     mptr->f_ino);
+				if (ret < 0) {
+					if (tmppath != NULL)
+						free(tmppath);
+					errcode = ret;
+					goto errcode_handle;
+				}
+				fptr = fopen(pathname, "w");
+				if (fptr == NULL) {
+					errcode = -errno;
+					write_log(0, "IO Error\n");
+					goto errcode_handle;
+				}
+				ret = fprintf(fptr, "%s ", tmppath);
+				if (ret < 0) {
+					errcode = -EIO;
+					fclose(fptr);
+					write_log(0, "IO Error\n");
+					goto errcode_handle;
+				}
+
+				fclose(fptr);
+				free(tmppath);
+			}
+		} else {
+			MKNOD(pathname, S_IFREG | 0700, 0);
+		}
+	}
+#else
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
+#endif
 
 	return 0;
 

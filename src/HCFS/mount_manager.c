@@ -8,6 +8,7 @@
 * Revision History
 * 2015/7/7 Jiahong created this file
 * 2015/7/15 Jiahong adding content
+* 2016/1/15 Jiahong changed mount to premount first then mount
 *
 **************************************************************************/
 #define FUSE_USE_VERSION 29
@@ -458,13 +459,19 @@ int FS_is_mounted(char *fsname)
 	return ret;
 }
 
+int do_unmount_FS(MOUNT_T *mount_info);
 /* Helper for mounting */
 int do_mount_FS(char *mp, MOUNT_T *new_info)
 {
-	struct fuse_chan *tmp_channel;
+	struct fuse_chan *tmp_channel, *tmp_ch1;
 	struct fuse_session *tmp_session;
 	char *mount;
 	int mt, fg;
+
+#ifdef _ANDROID_PREMOUNT_
+	int need_unmount;
+	need_unmount = FALSE;
+#endif
 
 	struct fuse_args tmp_args = FUSE_ARGS_INIT(global_argc, global_argv);
 
@@ -474,7 +481,13 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 
 	/* f_ino, f_name, f_mp are filled before calling this function */
 	/* global_fuse_args is stored in fuseop.h */
+
+#ifdef _ANDROID_PREMOUNT_
+	/* Now changed to premount first if in Android */
+	tmp_channel = fuse_premount(mp, &(new_info->mount_args));
+#else
 	tmp_channel = fuse_mount(mp, &(new_info->mount_args));
+#endif
 	if (tmp_channel == NULL) {
 		write_log(10, "Unable to create channel in mounting\n");
 		goto errcode_handle;
@@ -496,12 +509,29 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 	else
 		pthread_create(&(new_info->mt_thread), NULL,
 			mount_single_thread, (void *)new_info);
-	/* TODO: checking for failed mount */
+#ifdef _ANDROID_PREMOUNT_
+	need_unmount = TRUE;
+        tmp_ch1 = fuse_mount(mp, &(new_info->mount_args), tmp_channel);
+        if (tmp_ch1 == NULL) {
+                write_log(10, "Unable to mount\n");
+                goto errcode_handle;
+        }
+#endif
+
 	return 0;
 errcode_handle:
 	write_log(2, "Error in mounting %s\n", new_info->f_name);
 	if (tmp_channel != NULL)
 		fuse_unmount(mp, tmp_channel);
+#ifdef _ANDROID_PREMOUNT_
+	if (need_unmount) {
+		fuse_set_signal_handlers(new_info->session_ptr);
+		pthread_kill(new_info->mt_thread, SIGHUP);
+
+		do_unmount_FS(new_info);
+	}
+#endif
+
 	return -EACCES;
 }
 
@@ -766,7 +796,7 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 	if (ret < 0) {
 		/* Destroy shared data when all mountpoints are unmounted */
 		if (ret == -ENOENT) {
-			write_log(4, "Destroy shared data of volume %s\n",
+			write_log(8, "Destroy shared data of volume %s\n",
 					mount_info->f_name);
 			lookup_destroy(mount_info->lookup_table, mount_info);
 			if (mount_info->stat_fptr != NULL)

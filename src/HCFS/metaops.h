@@ -54,7 +54,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			MOUNT_T *mptr);
 int mark_inode_delete(fuse_req_t req, ino_t this_inode);
 
-int disk_markdelete(ino_t this_inode, ino_t root_inode);
+int disk_markdelete(ino_t this_inode, MOUNT_T *mptr);
 int disk_cleardelete(ino_t this_inode, ino_t root_inode);
 int disk_checkdelete(ino_t this_inode, ino_t root_inode);
 int startup_finish_delete(void);
