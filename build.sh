@@ -85,4 +85,7 @@ android-lib)
 	make
 	exit
 	;;
+*)
+	usage
+	exit;;
 esac
