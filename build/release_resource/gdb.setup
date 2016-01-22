@@ -1,0 +1,5 @@
+set solib-search-path armeabi
+source ../../../HCFS_android/android-ndk-r10e-win64/prebuilt/common/gdb/common.setup
+directory ../../../HCFS_android/android-ndk-r10e-win64/platforms/android-21/arch-arm/usr/include include/jansson src/API/ src/CLI_utils/ src/HCFS/ include/sqlite3 ../../../HCFS_android/android-ndk-r10e-win64/sources/cxx-stl/system
+file armeabi/hcfs
+target remote :5678

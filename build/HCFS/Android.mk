@@ -1,6 +1,6 @@
 LOCAL_PATH := $(dir $(call this-makefile))
-BUILD_PATH := $(abspath $(dir $(call this-makefile))/..)
-LIBS_PATH := prebuilt/$(TARGET_ARCH_ABI)
+BUILD_PATH := $(abspath $(LOCAL_PATH)/..)
+LIBS_PATH := $(BUILD_PATH)/prebuilt/$(TARGET_ARCH_ABI)
 
 LOCAL_ALLOW_UNDEFINED_SYMBOLS := true
 

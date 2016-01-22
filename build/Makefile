@@ -4,7 +4,6 @@ all :
 
 export NDK_PROJECT_PATH := $(abspath .)
 export NDK_OUT := $(abspath ./obj)
-export NDK_LIBS_OUT := $(abspath ./libs)
 
 targets := acer-z630 acer-s58a
 target_out := $(addsuffix -hcfs, $(targets)) $(addsuffix -hcfs-gdb, $(targets))
