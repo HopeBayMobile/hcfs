@@ -6198,6 +6198,8 @@ void *mount_single_thread(void *ptr)
 int hook_fuse(int argc, char **argv)
 {
 	int dl_count;
+
+#ifdef _FORCE_FUSE_DEBUG_  /* If want to dump debug log from fuse lib */
 	int count;
 
 	global_argc = argc + 1;
@@ -6206,7 +6208,10 @@ int hook_fuse(int argc, char **argv)
 	snprintf(global_argv[argc], 10, "-d");
 	for (count = 0; count < argc; count++)
 		global_argv[count] = argv[count];
-	//global_argv = argv;
+#else
+	global_argc = argc;
+	global_argv = argv;
+#endif
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
