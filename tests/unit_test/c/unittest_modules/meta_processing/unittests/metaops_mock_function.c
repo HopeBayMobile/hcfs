@@ -383,6 +383,8 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 int parse_xattr_namespace(const char *name, char *name_space, char *key)
 {
 	strcpy(key, name);
+	*name_space = global_mock_namespace;
+
 	return 0;
 }
 

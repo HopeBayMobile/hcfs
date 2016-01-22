@@ -1925,9 +1925,9 @@ errcode_handle:
 	return errcode;
 }
 
-static BOOL _namespace_filter(char namespace) /* Always return true now */
+static BOOL _namespace_filter(char namespace) /* Only SECURITY now */
 {
-	return TRUE;
+	return (namespace == SECURITY ? TRUE : FALSE);
 }
 
 /**
@@ -2053,7 +2053,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 			continue;
 		}
 
-		/* Choose namespace to inherit */
+		/* Choose namespace to inherit. Only SECURITY now. */
 		if (_namespace_filter(namespace) == FALSE)
 			continue;
 

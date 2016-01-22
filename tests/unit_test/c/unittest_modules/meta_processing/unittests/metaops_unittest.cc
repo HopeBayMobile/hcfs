@@ -1829,6 +1829,8 @@ TEST_F(inherit_xattrTest, InsertSuccess_ValueIsLarge)
 
 	TOTAL_KEY_SIZE = 100;
 	XATTR_VALUE_SIZE = MAX_VALUE_BLOCK_SIZE * 3;
+	xattr_count = 0;
+	global_mock_namespace = SECURITY; /* namespace passed */
 	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
 
 	/* Verify those keys recorded in mock insert_xattr() */
@@ -1847,6 +1849,8 @@ TEST_F(inherit_xattrTest, InsertSuccess_ValueIsSmall)
 
 	TOTAL_KEY_SIZE = 100;
 	XATTR_VALUE_SIZE = MAX_VALUE_BLOCK_SIZE / 2;
+	xattr_count = 0;
+	global_mock_namespace = SECURITY; /* namespace passed */
 	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
 
 	/* Verify those keys recorded in mock insert_xattr() */
@@ -1856,6 +1860,39 @@ TEST_F(inherit_xattrTest, InsertSuccess_ValueIsSmall)
 	EXPECT_STREQ("key3", xattr_key[2]);
 }
 
+TEST_F(inherit_xattrTest, NameSpace_USER_NOT_Pass)
+{
+	ino_t parent_inode, this_inode;
+
+	parent_inode = INO_XATTR_PAGE_EXIST;
+	this_inode = 1234;
+
+	TOTAL_KEY_SIZE = 100;
+	XATTR_VALUE_SIZE = MAX_VALUE_BLOCK_SIZE / 2;
+	xattr_count = 0;
+	global_mock_namespace = USER; /* namespace NOT passed */
+	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
+
+	/* Verify those keys recorded in mock insert_xattr() */
+	EXPECT_EQ(0, xattr_count);
+}
+
+TEST_F(inherit_xattrTest, NameSpace_SYSTEM_NOT_Pass)
+{
+	ino_t parent_inode, this_inode;
+
+	parent_inode = INO_XATTR_PAGE_EXIST;
+	this_inode = 1234;
+
+	TOTAL_KEY_SIZE = 100;
+	XATTR_VALUE_SIZE = MAX_VALUE_BLOCK_SIZE / 2;
+	xattr_count = 0;
+	global_mock_namespace = SYSTEM; /* namespace NOT passed */
+	EXPECT_EQ(0, inherit_xattr(parent_inode, this_inode, NULL));
+
+	/* Verify those keys recorded in mock insert_xattr() */
+	EXPECT_EQ(0, xattr_count);
+}
 /*
  * End of unittest of inherit_xattr()
  */

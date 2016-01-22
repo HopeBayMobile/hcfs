@@ -79,6 +79,7 @@ char delete_pathcache_node_success;
 size_t TOTAL_KEY_SIZE;
 size_t XATTR_VALUE_SIZE; 
 char xattr_key[3][100];
+char global_mock_namespace;
 int xattr_count;
 
 /* pin_inode() */
