@@ -303,12 +303,12 @@ void pinning_loop()
 		}
 		pinning_scheduler.pinning_info[t_idx].this_inode = now_inode;
 		pinning_scheduler.pinning_info[t_idx].t_idx = t_idx;
-		pthread_create(&pinning_scheduler.pinning_file_tid[t_idx], NULL,
-				(void *)&pinning_worker,
-				(void *)&pinning_scheduler.pinning_info[t_idx]);
 		pinning_scheduler.thread_active[t_idx] = TRUE;
 		pinning_scheduler.thread_finish[t_idx] = FALSE;
 		pinning_scheduler.total_active_pinning++;
+		pthread_create(&pinning_scheduler.pinning_file_tid[t_idx], NULL,
+				(void *)&pinning_worker,
+				(void *)&pinning_scheduler.pinning_info[t_idx]);
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 
 		/* Find next inode to be pinned */
