@@ -77,3 +77,4 @@ hcfs_android_log
 /build/.init_ccache
 /build/obj
 /build/libs
+/build/out

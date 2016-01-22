@@ -1,10 +1,11 @@
 LOCAL_PATH := $(dir $(call this-makefile))
+BUILD_PATH := $(abspath $(dir $(call this-makefile))/..)
 LIBS_PATH := prebuilt/$(TARGET_ARCH_ABI)
 
 LOCAL_ALLOW_UNDEFINED_SYMBOLS := true
 
 include $(CLEAR_VARS)
-LOCAL_CFLAGS	:= -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D__MULTI_THREAD -O0
+LOCAL_CFLAGS	:= -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D__MULTI_THREAD -O0 $(HCFS_CFLAGS)
 LOCAL_MODULE    := libfuse
 LOCAL_SRC_FILES := libfuse/cuse_lowlevel.c \
                    libfuse/fuse.c \
@@ -21,7 +22,7 @@ LOCAL_SRC_FILES := libfuse/cuse_lowlevel.c \
                    libfuse/mount_util.c \
                    libfuse/ulockmgr.c
 
-LOCAL_C_INCLUDES := include
+LOCAL_C_INCLUDES := $(BUILD_PATH)/include
 LOCAL_LDFLAGS += -O0 -fuse-ld=mcld
 include $(BUILD_SHARED_LIBRARY)
 
@@ -55,8 +56,8 @@ export INCLUDE_SQLITE := 1
 
 include $(CLEAR_VARS)
 LOCAL_CFLAGS    := -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -DDEDUP_ENABLE=0 -DSTAT_VFS_H="<fuse/sys/statvfs.h>"
-LOCAL_CFLAGS    += -pie -fPIE -O0 -Wall -Wextra
-LOCAL_LDFLAGS   += -pie -fPIE -O0
+LOCAL_CFLAGS    += -pie -fPIE -O0 $(HCFS_CFLAGS) -Wall -Wextra
+LOCAL_LDFLAGS   += -pie -fPIE -O0 $(HCFS_CFLAGS)
 LOCAL_MODULE    := hcfs
 LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)../../src/HCFS/*.c)
 LOCAL_C_INCLUDES := $(BUILD_PATH)/include/sqlite3 $(BUILD_PATH)/include
