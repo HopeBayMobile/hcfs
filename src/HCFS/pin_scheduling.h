@@ -17,6 +17,7 @@
 
 typedef struct {
 	ino_t this_inode;
+	int t_idx;
 } PINNING_INFO;
 
 typedef struct {
@@ -24,11 +25,12 @@ typedef struct {
 	pthread_t pinning_collector; /* Collector for joining threads */
 	pthread_t pinning_file_tid[MAX_PINNING_FILE_CONCURRENCY];
 	PINNING_INFO pinning_info[MAX_PINNING_FILE_CONCURRENCY];
-	char thread_active[MAX_PINNING_FILE_CONCURRENCY]; /* T or F */
+	BOOL thread_active[MAX_PINNING_FILE_CONCURRENCY]; /* T or F */
+	BOOL thread_finish[MAX_PINNING_FILE_CONCURRENCY];
 	sem_t pinning_sem; /* Max active threads simultaneously */
 	sem_t ctl_op_sem; /* Control semaphore */
 	int total_active_pinning;
-	char deep_sleep;
+	BOOL deep_sleep;
 } PINNING_SCHEDULER;
 
 PINNING_SCHEDULER pinning_scheduler;

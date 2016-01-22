@@ -95,6 +95,9 @@ protected:
 
 void mock_thread_fctnl(void *ptr)
 {
+	PINNING_INFO *info = (PINNING_INFO *)ptr;
+
+	pinning_scheduler.thread_finish[info->t_idx] = TRUE;
 	return;
 }
 
@@ -116,8 +119,10 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 				break;
 			}
 		}
+		pinning_scheduler.pinning_info[idx].t_idx = idx;
 		pthread_create(&pinning_scheduler.pinning_file_tid[idx], NULL,
-				(void *)&mock_thread_fctnl, NULL);
+				(void *)&mock_thread_fctnl,
+				(void *)&(pinning_scheduler.pinning_info[idx]));
 		pinning_scheduler.thread_active[idx] = TRUE;
 		pinning_scheduler.total_active_pinning++;
 		sem_post(&pinning_scheduler.ctl_op_sem);
@@ -169,6 +174,7 @@ TEST_F(pinning_workerTest, FetchBlocks_ENOSPC)
 	PINNING_INFO pinning_info;
 
 	pinning_info.this_inode = INO_PINNING_ENOSPC;
+	pinning_info.t_idx = 0;
 	pinning_worker(&pinning_info);
 
 	EXPECT_EQ(TRUE, pinning_scheduler.deep_sleep);
@@ -180,6 +186,7 @@ TEST_F(pinning_workerTest, PinningSuccess)
 	PINNING_INFO pinning_info;
 
 	pinning_info.this_inode = 2394732; /* Arbitrary inode*/
+	pinning_info.t_idx = 0;
 	pinning_worker(&pinning_info);
 
 	EXPECT_EQ(FALSE, pinning_scheduler.deep_sleep);
