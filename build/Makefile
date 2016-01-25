@@ -3,7 +3,6 @@ all :
 -include ndk-build.mk
 
 export NDK_PROJECT_PATH := $(abspath .)
-export NDK_OUT := $(abspath ./obj)
 
 targets := acer-z630 acer-s58a
 target_out := $(addsuffix -hcfs, $(targets)) $(addsuffix -hcfs-gdb, $(targets))
@@ -15,13 +14,12 @@ all : $(target_out)
 clean :
 	rm -rf libs obj out/*
 
-
 define runprepareout
 	@mkdir -p $@/system/bin
 	@mkdir -p $@/system/lib
 	@mv -f $@/armeabi/*.so $@/system/lib
 	@mv -f $@/armeabi/* $@/system/bin
-	@cp -r release_resource/* $@/
+	@cp release_resource/* $@/
 	@rm -r $@/armeabi
 endef
 
@@ -39,6 +37,7 @@ out/%-hcfs:
 	ndk-build $(NDK_ARG)
 	$(runprepareout)
 	@rm -rf out/hcfs/gdb.*
+	touch $@
 
 out/%-hcfs-gdb:
 	ndk-build $(NDK_ARG)
@@ -47,6 +46,7 @@ out/%-hcfs-gdb:
 	@mv $@/armeabi-tmp $@/armeabi
 	@rsync -a ../src/{API,CLI_utils,HCFS} $@/src/
 	@cp -r include $@/
+	touch $@
 
 out:
 	mkdir out
