@@ -511,6 +511,7 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 			mount_single_thread, (void *)new_info);
 #ifdef _ANDROID_PREMOUNT_
 	need_unmount = TRUE;
+	memcpy(&(new_info->mount_args), &tmp_args, sizeof(struct fuse_args));
         tmp_ch1 = fuse_mount(mp, &(new_info->mount_args), tmp_channel);
         if (tmp_ch1 == NULL) {
                 write_log(10, "Unable to mount\n");
