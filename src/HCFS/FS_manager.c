@@ -843,7 +843,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	while (next_node_pos != 0) {
 		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
 		      next_node_pos);
-		if ((num_walked + tpage.num_entries) > buf_num) {
+		if ((num_walked + tpage.num_entries) > (int64_t)buf_num) {
 			/* Only compute the number of FS */
 			num_walked += tpage.num_entries;
 			next_node_pos = tpage.tree_walk_next;
@@ -857,8 +857,8 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 		next_node_pos = tpage.tree_walk_next;
 	}
 
-	if ((fs_mgr_head->num_FS != num_walked) ||
-	    (tmp_head.total_children != num_walked)) {
+	if (((int64_t)fs_mgr_head->num_FS != num_walked) ||
+		(tmp_head.total_children != num_walked)) {
 		/* Number of FS is wrong. */
 		write_log(0, "Error in FS num. Recomputing\n");
 		fs_mgr_head->num_FS = num_walked;
@@ -962,7 +962,6 @@ int backup_FS_database(void)
 	CURL_HANDLE upload_handle;
 	char buf[4096];
 	size_t ret_size;
-	ssize_t ret_ssize;
 	off_t ret_pos;
 
 	if (CURRENT_BACKEND == NONE)
@@ -1005,7 +1004,6 @@ int backup_FS_database(void)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	ret_ssize = 0;
 	while (!feof(fptr)) {
 		FREAD(buf, 1, 4096, tmpdbfptr);
 		if (ret_size == 0)
@@ -1076,7 +1074,8 @@ int restore_FS_database(void)
 	fptr = NULL;
 	memset(&download_handle, 0, sizeof(CURL_HANDLE));
 
-	snprintf(download_handle.id, sizeof(download_handle.id), "FSmgr_download");
+	snprintf(download_handle.id, sizeof(download_handle.id),
+		 "FSmgr_download");
 	download_handle.curl_backend = NONE;
 	download_handle.curl = NULL;
 	/* Do not actually init backend until needed */

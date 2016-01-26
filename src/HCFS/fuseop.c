@@ -452,6 +452,8 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 	size_t uid_len;
 	char **uid = (char**)data;
 
+	UNUSED(argc);
+	UNUSED(azColName);
 	if (!argv[0])
 		return -1;
 
@@ -2630,6 +2632,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		write back to meta cache */
 #ifdef _ANDROID_ENV_
 		ret = fetch_trunc_path(truncpath, this_inode);
+		if (ret != 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 
 		if (access(truncpath, F_OK) != 0) {
 			errcode = errno;
@@ -4078,7 +4084,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	*  the write */
 	/* Block indexing starts at zero */
 	start_block = (offset / MAX_BLOCK_SIZE);
-	end_block = ((offset+ ((off_t)size)-1) / MAX_BLOCK_SIZE);
+	end_block = ((offset + ((off_t)size) - 1) / MAX_BLOCK_SIZE);
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
 
@@ -4123,7 +4129,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if ((thisfilemeta.local_pin == TRUE) &&
 	    ((offset + (off_t)size) > temp_stat.st_size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		sizediff = (long long) ((offset + (off_t)size) - temp_stat.st_size);
+		sizediff =
+		    (long long)((offset + (off_t)size) - temp_stat.st_size);
 		write_log(10, "Write details: %lld, %lld\n", sizediff,
 		          (off_t) size);
 		if ((hcfs_system->systemdata.pinned_size + sizediff)
@@ -4314,12 +4321,14 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	else
 		buf->f_files = 2000000;
 
+	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
+	 * if runs into negative value */
 	if (num_inodes < 0) {
 		/* when FS_stat.num_inodes >= 9223372036854775808,
 		 * num_inodes will become negative here and system free
 		 * inode will gets reset */
 		buf->f_ffree = buf->f_files;
-	} else if (buf->f_files < num_inodes) {
+	} else if (buf->f_files < (uint64_t)num_inodes) {
 		/* over used inodes */
 		buf->f_ffree = 0;
 	} else {
