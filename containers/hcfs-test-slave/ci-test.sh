@@ -17,7 +17,7 @@ source $repo/utils/common_header.bash
 cd $repo
 
 
-if id -u jenkins >/dev/null 2>&1; then
+if [ -f /.dockerinit ] && id -u jenkins >/dev/null 2>&1; then
 	echo "jenkins ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/50_jenkins_sh
 	sudo -E -u jenkins run-parts --exit-on-error --verbose $here/scrips
 else

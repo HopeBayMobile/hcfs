@@ -16,6 +16,10 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
+if [ ! -f /.dockerinit ]; then
+	exit
+fi
+
 OLDUID=${SUDO_UID:-$UID}
 OLDGID=${SUDO_GID:-$GROUPS}
 NEWUID=$(stat -c '%u' $repo)
