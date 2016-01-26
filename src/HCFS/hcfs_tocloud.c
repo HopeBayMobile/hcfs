@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_tocloud.c
 * Abstract: The c source code file for syncing meta or data to
@@ -1040,13 +1040,13 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
-		unsigned char *key = NULL;
 		unsigned char *data = NULL;
 		HCFS_encode_object_meta *object_meta = NULL;
 		HTTP_meta *http_meta = NULL;
 		unsigned char *object_key = NULL;
 
 #if ENCRYPT_ENABLE
+		unsigned char *key = NULL;
 		key = get_key();
 		object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
 		object_key = calloc(KEY_SIZE, sizeof(unsigned char));

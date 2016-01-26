@@ -42,6 +42,7 @@
 #include "hcfs_clouddelete.h"
 #include "hcfs_cacheops.h"
 #include "monitor.h"
+#include "FS_manager.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
@@ -232,7 +233,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 	 return -1;
 
 	for (count = strlen(pathname)-1; count >= 0; count--) {
-		if ((pathname[count] == '/') && (count < (strlen(pathname)-1)))
+		if ((pathname[count] == '/') && ((size_t)count < (strlen(pathname)-1)))
 			break;
 	}
 
@@ -267,7 +268,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
+int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
@@ -647,8 +648,8 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config)
 	char pathname[400];
 #ifndef _ANDROID_ENV_
 	char tempval[10];
-#endif
 	int ret_val;
+#endif
 	int errcode;
 
 	/* Validating system path settings */
@@ -1033,7 +1034,9 @@ errcode_handle:
 int get_block_dirty_status(char *path, FILE *fptr, char *status)
 {
 	int ret, errcode;
+#ifndef _ANDROID_ENV_
 	char tmpstr[5];
+#endif
 
 #ifdef _ANDROID_ENV_
 
@@ -1376,7 +1379,7 @@ int _check_config(const SYSTEM_CONF_STRUCT *new_config)
  */
 int reload_system_config(const char *config_path)
 {
-	int ret, count;
+	int ret;
 	char enable_related_module;
 	SYSTEM_CONF_STRUCT *temp_config, *new_config;
 
@@ -1476,7 +1479,8 @@ int ignore_sigpipe(void)
  */ 
 BOOL is_natural_number(char *str)
 {
-	int num, i;
+	int num;
+	size_t i;
 	BOOL ret;
 
 	if (strlen(str) == 0)
