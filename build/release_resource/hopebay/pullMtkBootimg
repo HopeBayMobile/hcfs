@@ -1,0 +1,15 @@
+#!/bin/bash
+
+adb remount
+
+echo -e "adb shell dd if=/dev/block/platform/mtk-msdc.0/by-name/boot of=/cache/boot.img.orig"
+adb shell dd if=/dev/block/platform/mtk-msdc.0/by-name/boot of=/cache/boot.img.orig
+
+echo -e "\nadb pull /cache/boot.img.orig ."
+adb pull /cache/boot.img.orig .
+adb shell rm /cache/boot.img.orig
+
+if [ -e ./boot.img.orig ];then
+	echo -e "\nExtracting boot.img"
+	unzip-bootimg ./boot.img.orig
+fi

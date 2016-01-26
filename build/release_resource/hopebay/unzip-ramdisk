@@ -1,0 +1,40 @@
+#!/bin/sh
+# randisk.img is initramfs format, which is an gzip file of a cpio file
+
+if [ "$1" = "-h" -o $# -ne 1 ]; then     
+        echo
+        echo "  Usage: `basename $0` ramdiskImageName"        
+		echo "  Example:"
+		echo "           `basename $0` ramdisk.img"
+        echo
+        exit 1
+fi
+
+ramdiskImageName=`basename $1`
+
+currentDir=`pwd`
+sourceDir=`dirname $1` 
+cd ${sourceDir}
+sourceDir=`pwd`
+
+ramdiskImageName=${sourceDir}/${ramdiskImageName}
+#echo ${ramdiskImageName}
+
+cd ${currentDir}
+
+if [ ! -d root ]; then
+	mkdir root
+fi
+
+cd root
+gunzip -dc ${ramdiskImageName} | cpio -i
+
+### to extract xxx.cpio, use:
+# cpio -i -d -H newc -F fileName.cpio --no-absolute-filenames
+
+### to create ramdisk.img, use:
+# mkdir initramfs/
+# cd initramfs/
+# find . | cpio -H newc -o > ../initramfs.cpio
+# cd ..
+# cat initramfs.cpio | gzip > initramfs.igz

@@ -7,5 +7,6 @@ adb wait-for-device
 adb root
 adb wait-for-device
 adb remount
-adb push system /system
+adb push hopebay /system/bin
+adb shell busybox --install /system/xbin
 pause

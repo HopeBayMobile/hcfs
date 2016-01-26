@@ -1,0 +1,5 @@
+adb push /lib/terminfo /system/etc/terminfo
+
+adb shell
+	export TERMINFO=/system/etc/terminfo
+	export TERM=xterm

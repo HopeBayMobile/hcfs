@@ -4,8 +4,5 @@
 	pause
 	exit)
 adb wait-for-device
-adb root
-adb wait-for-device
-adb remount
-adb push system /system
+adb reboot
 pause
