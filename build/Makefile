@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 all :
 -include ccache.mk
 -include ndk-build.mk
@@ -37,7 +38,6 @@ out/%-hcfs:
 	ndk-build $(NDK_ARG)
 	$(runprepareout)
 	@rm -rf out/hcfs/gdb.*
-	touch $@
 
 out/%-hcfs-gdb:
 	ndk-build $(NDK_ARG)
@@ -46,7 +46,6 @@ out/%-hcfs-gdb:
 	@mv $@/armeabi-tmp $@/armeabi
 	@rsync -a ../src/{API,CLI_utils,HCFS} $@/src/
 	@cp -r include $@/
-	touch $@
 
 out:
 	mkdir out
