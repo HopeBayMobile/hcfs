@@ -19,7 +19,7 @@ define runprepareout
 	@mkdir -p $@/system/lib
 	@mv -f $@/armeabi/*.so $@/system/lib
 	@mv -f $@/armeabi/* $@/system/bin
-	@cp release_resource/* $@/
+	@cp -r release_resource/* $@/
 	@rm -r $@/armeabi
 endef
 
