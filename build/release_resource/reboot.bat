@@ -4,5 +4,7 @@
 	pause
 	exit)
 adb wait-for-device
+call install_busybox.bat
+adb shell killall -9 hcfs
 adb reboot
 pause
