@@ -1345,7 +1345,7 @@ TEST(disk_markdeleteTest, MakeDir_markdelete_Fail)
 {
 	MOUNT_T tmpmount;
 
-	METAPATH = "/rqjwsfdswer";
+	METAPATH = "\0";
 	tmpmount.f_ino = 556677;
 
 	EXPECT_EQ(-EACCES, disk_markdelete(6, &tmpmount));
