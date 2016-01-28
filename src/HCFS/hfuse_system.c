@@ -276,8 +276,10 @@ int main(int argc, char **argv)
 
 	logptr = NULL;
 
+#ifndef OPENSSL_IS_BORINGSSL
 	ENGINE_load_builtin_engines();
 	ENGINE_register_all_complete();
+#endif
 
 	/*TODO: Error handling after reading system config*/
 	/*TODO: Allow reading system config path from program arg */

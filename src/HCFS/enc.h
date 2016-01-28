@@ -14,6 +14,9 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+#ifdef OPENSSL_IS_BORINGSSL
+#include <openssl/mem.h>
+#endif
 #include "params.h"
 #include "b64encode.h"
 #include "logger.h"
