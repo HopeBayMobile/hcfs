@@ -58,7 +58,6 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 		tmpstr[count] = 0;
 
 	output_index = 0;
-	input_index = 0;
 
 	for (input_index = 0; input_index < ((origin_str_len + 2) / 3) * 3;
 	     input_index += 3) {

@@ -363,6 +363,9 @@ void run_cache_loop(void)
 	int ret;
 	long long num_removed_inode;
 
+#ifdef _ANDROID_ENV_
+	UNUSED(ptr);
+#endif
 	ret = -1;
 	while (ret < 0) {
 		if (hcfs_system->system_going_down == TRUE)

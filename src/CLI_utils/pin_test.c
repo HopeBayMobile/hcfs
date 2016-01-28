@@ -8,6 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "global.h"
 #define MAX_FILENAME_LEN 255
@@ -22,15 +23,12 @@ typedef struct {
 	char d_type;
 } DIR_ENTRY;
 
-void main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-	int fd,size_msg, status, count, retcode, code, fsname_len;
-	unsigned int cmd_len, reply_len, total_recv, to_recv;
-	int total_entries;
+	int fd, status, retcode, code;
+	unsigned int cmd_len, reply_len;
 	struct sockaddr_un addr;
 	char buf[4096];
-	DIR_ENTRY *tmp;
-	char *ptr;
 	struct stat tempstat;
 	ino_t this_inode;
 	long long reserved_size = 123;
@@ -63,13 +61,13 @@ void main(int argc, char **argv)
 		inode_list[num_inodes] = this_inode;
 		num_inodes++;
 
-		printf("%s - inode %lld - num_inode %d\n", argv[i], this_inode, num_inodes);
+		printf("%s - inode %"PRIu64" - num_inode %d\n", argv[i], (uint64_t)this_inode, num_inodes);
 	}
 
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, "/dev/shm/hcfs_reporter");
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	status = connect(fd, &addr, sizeof(addr));
+	status = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
 	printf("status is %d, err %s\n", status, strerror(errno));
 	switch (code) {
 	case PIN:
@@ -81,12 +79,12 @@ void main(int argc, char **argv)
 			sizeof(unsigned int));
 		memcpy(buf + sizeof(long long) + sizeof(unsigned int), /* inode array */
 			inode_list, sizeof(ino_t) * num_inodes);
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = send(fd, buf, cmd_len, 0);
+		send(fd, &code, sizeof(unsigned int), 0);
+		send(fd, &cmd_len, sizeof(unsigned int), 0);
+		send(fd, buf, cmd_len, 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		recv(fd, &reply_len, sizeof(unsigned int), 0);
+		recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
@@ -99,12 +97,12 @@ void main(int argc, char **argv)
 		memcpy(buf + sizeof(unsigned int), /* inode array */
 			inode_list, sizeof(ino_t) * num_inodes);
 
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = send(fd, buf, cmd_len, 0);
+		send(fd, &code, sizeof(unsigned int), 0);
+		send(fd, &cmd_len, sizeof(unsigned int), 0);
+		send(fd, buf, cmd_len, 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		recv(fd, &reply_len, sizeof(unsigned int), 0);
+		recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
@@ -115,5 +113,5 @@ void main(int argc, char **argv)
 		break;
 	}
 	close(fd);
-	return;
+	return 0;
 }
