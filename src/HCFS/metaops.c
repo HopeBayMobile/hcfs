@@ -2001,3 +2001,201 @@ errcode_handle:
 	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
 	return errcode;
 }
+
+static BOOL _namespace_filter(char namespace) /* Only SECURITY now */
+{
+	return (namespace == SECURITY ? TRUE : FALSE);
+}
+
+/**
+ * inherit_xattr()
+ *
+ * Inherit xattrs from parent.
+ *
+ * @param parent_inode Parent inode number
+ * @param this_inode Self inode number
+ * @param selbody_ptr Self meta cache entry, which had been locked.
+ *
+ * @return 0 on success, otherwise negative errcode.
+ */ 
+int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+		META_CACHE_ENTRY_STRUCT *selbody_ptr)
+{
+	META_CACHE_ENTRY_STRUCT *pbody_ptr;
+	XATTR_PAGE p_xattr_page, sel_xattr_page;
+	DIR_META_TYPE dirmeta;
+	long long p_xattr_pos, sel_xattr_pos;
+	size_t total_keysize, total_keysize2;
+	const char *key_ptr;
+	char now_key[400], namespace, key[300];
+	char *key_buf, *value_buf;
+	size_t value_buf_size;
+	size_t value_size;
+	int ret;
+
+	key_buf = NULL;
+	value_buf = NULL;
+
+	/* self fptr should be opened */
+	ret = meta_cache_open_file(selbody_ptr);
+	if (ret < 0)
+		return ret;
+
+	/* Lock parent */
+	pbody_ptr = meta_cache_lock_entry(parent_inode);
+	if (!pbody_ptr) {
+		return -ENOMEM;		
+	}
+	ret = meta_cache_open_file(pbody_ptr);
+	if (ret < 0) {
+		meta_cache_unlock_entry(pbody_ptr);
+		return ret;
+	}
+
+	ret = meta_cache_lookup_dir_data(parent_inode, NULL, &dirmeta,
+			NULL, pbody_ptr);
+	if (ret < 0)
+		goto errcode_handle;
+
+	/* Check xattr_page */
+	if (dirmeta.next_xattr_page <= 0) {
+		write_log(10, "Debug: parent inode %"PRIu64
+				" has no xattr page.\n",
+				(uint64_t)parent_inode);
+		meta_cache_close_file(pbody_ptr);
+		meta_cache_unlock_entry(pbody_ptr);
+		return 0;
+	}
+
+	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+
+	/* Fetch needed size of key buffer */
+	ret = list_xattr(pbody_ptr, &p_xattr_page, NULL, 0, &total_keysize);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+	if (total_keysize <= 0) {
+		write_log(10, "Debug: parent inode %"PRIu64" has no xattrs.\n",
+				(uint64_t)parent_inode);
+		meta_cache_close_file(pbody_ptr);
+		meta_cache_unlock_entry(pbody_ptr);
+		return 0;
+	}
+
+	key_buf = malloc(sizeof(char) * (total_keysize + 100));
+	if (!key_buf) {
+		ret = -ENOMEM;
+		goto errcode_handle;
+	}
+	memset(key_buf, 0, total_keysize + 100);
+
+	/* Fetch all namespace.key */
+	ret = list_xattr(pbody_ptr, &p_xattr_page, key_buf, total_keysize,
+			&total_keysize2);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+	key_buf[total_keysize] = 0;
+
+	/* Tmp value buffer size */
+	value_buf_size = MAX_VALUE_BLOCK_SIZE + 100;
+	value_buf = malloc(value_buf_size);
+	if (!value_buf) {
+		ret = -ENOMEM;
+		goto errcode_handle;
+	}
+
+	/* Self xattr page */
+	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page, &sel_xattr_pos);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+
+	/* Begin to insert.
+	 * Step 1: Copy key to now_key and parse it
+	 * Step 2: Get value of now_key from parent
+	 * Step 3: Insert key-value pair to this inode */
+	key_ptr = key_buf;
+	while(*key_ptr) {
+		strncpy(now_key, key_ptr, 300);
+		key_ptr += (strlen(now_key) + 1);
+
+		ret = parse_xattr_namespace(now_key, &namespace, key);
+		if (ret < 0) {
+			write_log(0, "Error: Invalid xattr %s. Code %d",
+					now_key, -ret);
+			continue;
+		}
+
+		/* Choose namespace to inherit. Only SECURITY now. */
+		if (_namespace_filter(namespace) == FALSE)
+			continue;
+
+		/* Get this xattr value */
+		ret = -1;
+		while (ret < 0) {
+			ret = get_xattr(pbody_ptr, &p_xattr_page, namespace,
+					key, value_buf, value_buf_size,
+					&value_size);
+			if (ret < 0 && ret != -ERANGE) { /* Error */
+				goto errcode_handle;
+
+			} else if ((ret < 0 && ret == -ERANGE) || /* Larger */
+				(ret == 0 && value_size == value_buf_size)) {
+				free(value_buf);
+				value_buf = malloc(value_size + 100);
+				if (!value_buf) {
+					ret = -ENOMEM;
+					goto errcode_handle;
+				}
+				value_buf_size = value_size + 100;
+				continue;
+			
+			} else { /* ok */
+				value_buf[value_size] = 0;
+			}
+		}
+
+		write_log(10, "Debug: Insert xattr key %s and value %s\n",
+				now_key, value_buf);
+		ret = insert_xattr(selbody_ptr, &sel_xattr_page,
+				sel_xattr_pos, namespace, key,
+				value_buf, value_size, 0);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to insert xattr. Code %d",
+					-ret);
+			continue;
+		}
+	}
+
+	/* Free and unlock */
+	if (key_buf)
+		free(key_buf);
+	if (value_buf)
+		free(value_buf);
+
+	ret = meta_cache_close_file(pbody_ptr);
+	if (ret < 0) {
+		meta_cache_unlock_entry(pbody_ptr);
+		return ret;
+	}
+	ret = meta_cache_unlock_entry(pbody_ptr);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+
+errcode_handle:
+	if (key_buf)
+		free(key_buf);
+	if (value_buf)
+		free(value_buf);
+	meta_cache_close_file(pbody_ptr);
+	meta_cache_unlock_entry(pbody_ptr);
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -ret);
+
+	return ret;
+}

@@ -10,6 +10,7 @@
 #include "meta_mem_cache.h"
 #include "params.h"
 #include "mount_manager.h"
+#include "xattr_ops.h"
 #include "global.h"
 
 
@@ -41,6 +42,16 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		if (inode_stat != NULL) {
 			inode_stat->st_nlink = 1;
 			inode_stat->st_size = 0;
+		}
+		return 0;
+	case INO_NO_XATTR_PAGE:
+		if (dir_meta_ptr) {
+			dir_meta_ptr->next_xattr_page = 0;
+		}
+		return 0;
+	case INO_XATTR_PAGE_EXIST:
+		if (dir_meta_ptr) {
+			dir_meta_ptr->next_xattr_page = 123;
 		}
 		return 0;
 	default:
@@ -367,6 +378,62 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	if (symlink_meta_ptr)
 		symlink_meta_ptr->local_pin = pin_flag_in_meta;
 	return 0;
+}
+
+int parse_xattr_namespace(const char *name, char *name_space, char *key)
+{
+	strcpy(key, name);
+	*name_space = global_mock_namespace;
+
+	return 0;
+}
+
+int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+	XATTR_PAGE *xattr_page, const long long xattr_filepos,
+	const char name_space, const char *key,
+	const char *value, const size_t size, const int flag)
+{
+	printf("key is %s, value size is %ld\n", key, size);
+	if (xattr_count == 3)
+		xattr_count = 0;
+	strcpy(xattr_key[xattr_count++], key); /* To be verified */
+	return 0;
+}
+
+int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+	const char name_space, const char *key, char *value, const size_t size,
+	size_t *actual_size)
+{
+	*actual_size = XATTR_VALUE_SIZE;
+
+	if (size < XATTR_VALUE_SIZE) {
+		return -ERANGE;
+	}
+
+	return 0;
+}
+
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+	XATTR_PAGE *xattr_page, char *key_buf, const size_t size,
+	size_t *actual_size)
+{
+	if (size == 0) {
+		*actual_size = TOTAL_KEY_SIZE;
+	} else {
+		if (size < TOTAL_KEY_SIZE)
+			return -ERANGE;
+		strcpy(key_buf, "key1");
+		strcpy(key_buf + 5, "key2");
+		strcpy(key_buf + 10, "key3");
+		*actual_size = TOTAL_KEY_SIZE;
+	}
+	return 0;
+}
+
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+		XATTR_PAGE *xattr_page, long long *xattr_pos)
+{
+        return 0;
 }
 int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
                    ino_t rootinode)

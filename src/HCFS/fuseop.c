@@ -5822,8 +5822,9 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	/* Remove xattr */
 	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos,
 		name_space, key);
-	if (retcode < 0) { /* ENOENT or others */
-		write_log(0, "Error: removexattr remove xattr fail\n");
+	if (retcode < 0 && retcode != -ENODATA) { /* ENOENT or others */
+		write_log(0, "Error: removexattr remove xattr fail. Code %d\n",
+				-retcode);
 		goto error_handle;
 	}
 
@@ -5831,7 +5832,6 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
-	write_log(5, "Remove key success\n");
 	fuse_reply_err(req, 0);
 	return;
 
