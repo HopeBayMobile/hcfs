@@ -82,7 +82,10 @@ android-lib)
 		exit 1
 	fi
 	cd $repo"/build/"
-	make
+	_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
+	PARALLEL_JOBS=-j`expr $_nr_cpu + $_nr_cpu`
+	set -x
+	make $PARALLEL_JOBS
 	exit
 	;;
 *)
