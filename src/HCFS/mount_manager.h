@@ -49,6 +49,11 @@ typedef struct {
 } FS_STAT_T;
 
 typedef struct {
+	char pkgname[MAX_FILENAME_LEN+1];
+	uid_t pkguid;
+} PKG_CACHE_ENTRY;
+
+typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
 #ifdef _ANDROID_ENV_
@@ -67,6 +72,8 @@ typedef struct {
 	FS_STAT_T *FS_stat; /* shared */
 	FILE *stat_fptr;  /* For keeping track of FS stat. shared */
 	sem_t *stat_lock; /* shared */
+	sem_t pkg_cache_lock; /* Lock for package to uid lookup cache */
+	PKG_CACHE_ENTRY pkg_cache_entry;
 	struct fuse_args mount_args;
 } MOUNT_T;
 
