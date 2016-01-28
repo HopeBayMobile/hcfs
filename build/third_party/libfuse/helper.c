@@ -4,6 +4,9 @@
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
+
+  File modified @ Hope Bay Technologies, Inc. (2016)
+  1/15/16: Jiahong modified the routines to add premount
 */
 
 #include "fuse/config.h"
@@ -191,7 +194,8 @@ int fuse_daemonize(int foreground)
 	return 0;
 }
 
-static struct fuse_chan *fuse_mount_common(const char *mountpoint,
+/* 1/15/16: Jiahong modified fuse_mount_common to add premount routines */
+static struct fuse_chan *fuse_premount_common(const char *mountpoint,
 					   struct fuse_args *args)
 {
 	struct fuse_chan *ch;
@@ -207,7 +211,8 @@ static struct fuse_chan *fuse_mount_common(const char *mountpoint,
 			close(fd);
 	} while (fd >= 0 && fd <= 2);
 
-	fd = fuse_mount_compat25(mountpoint, args);
+	/* 1/15/16 (Jiahong): Only premount here */
+	fd = fuse_premount_compat25(mountpoint, args);
 	if (fd == -1)
 		return NULL;
 
@@ -218,9 +223,52 @@ static struct fuse_chan *fuse_mount_common(const char *mountpoint,
 	return ch;
 }
 
-struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args)
+/* 1/15/16 (Jiahong): Changed the routine to pass in the fd obtained
+in the premount routines */
+static struct fuse_chan *fuse_mount_common(const char *mountpoint,
+			struct fuse_args *args, struct fuse_chan *ch1)
 {
-	return fuse_mount_common(mountpoint, args);
+	struct fuse_chan *ch;
+	int fd, fd1;
+
+	/*
+	 * Make sure file descriptors 0, 1 and 2 are open, otherwise chaos
+	 * would ensue.
+	 */
+	do {
+		fd = open("/dev/null", O_RDWR);
+		if (fd > 2)
+			close(fd);
+	} while (fd >= 0 && fd <= 2);
+
+	if (ch1 == NULL)
+		fd1 = -1;
+	else
+		fd1 = fuse_chan_fd(ch1);
+
+	fd = fuse_mount_compat25(mountpoint, args, fd1);
+	if (fd == -1)
+		return NULL;
+
+	if (ch1 != NULL)
+		return ch1;
+
+	ch = fuse_kern_chan_new(fd);
+	if (!ch)
+		fuse_kern_unmount(mountpoint, fd);
+
+	return ch;
+}
+
+/* 1/15/16: Jiahong added premount routines */
+struct fuse_chan *fuse_premount(const char *mountpoint, struct fuse_args *args)
+{
+	return fuse_premount_common(mountpoint, args);
+}
+struct fuse_chan *fuse_mount(const char *mountpoint, struct fuse_args *args,
+		struct fuse_chan *ch)
+{
+	return fuse_mount_common(mountpoint, args, ch);
 }
 
 static void fuse_unmount_common(const char *mountpoint, struct fuse_chan *ch)
@@ -254,7 +302,8 @@ struct fuse *fuse_setup_common(int argc, char *argv[],
 	if (res == -1)
 		return NULL;
 
-	ch = fuse_mount_common(*mountpoint, &args);
+	/* 1/15/16: (Jiahong) Pass NULL to allocate new channel */
+	ch = fuse_mount_common(*mountpoint, &args, NULL);
 	if (!ch) {
 		fuse_opt_free_args(&args);
 		goto err_free;
@@ -444,12 +493,19 @@ void fuse_teardown_compat22(struct fuse *fuse, int fd, char *mountpoint)
 	fuse_teardown_common(fuse, mountpoint);
 }
 
-int fuse_mount_compat25(const char *mountpoint, struct fuse_args *args)
+/* 1/15/16: Jiahong added premount */
+int fuse_premount_compat25(const char *mountpoint, struct fuse_args *args)
 {
-	return fuse_kern_mount(mountpoint, args);
+	return fuse_kern_premount(mountpoint, args);
+}
+
+int fuse_mount_compat25(const char *mountpoint, struct fuse_args *args, int fd)
+{
+	return fuse_kern_mount(mountpoint, args, fd);
 }
 
 FUSE_SYMVER(".symver fuse_setup_compat25,fuse_setup@FUSE_2.5");
 FUSE_SYMVER(".symver fuse_teardown_compat22,fuse_teardown@FUSE_2.2");
 FUSE_SYMVER(".symver fuse_main_real_compat25,fuse_main_real@FUSE_2.5");
+FUSE_SYMVER(".symver fuse_premount_compat25,fuse_premount@FUSE_2.5");
 FUSE_SYMVER(".symver fuse_mount_compat25,fuse_mount@FUSE_2.5");

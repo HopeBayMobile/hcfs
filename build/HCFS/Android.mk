@@ -1,6 +1,6 @@
 LOCAL_PATH := $(dir $(call this-makefile))
-
 LIBS_PATH := prebuilt/$(TARGET_ARCH_ABI)
+
 LOCAL_ALLOW_UNDEFINED_SYMBOLS := true
 
 include $(CLEAR_VARS)

@@ -433,5 +433,12 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		XATTR_PAGE *xattr_page, long long *xattr_pos)
 {
+        return 0;
+}
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+                   ino_t rootinode)
+{
+	*result = (char *) malloc(50);
+	snprintf(*result, 50, "/tmp/markdeletetmp");
 	return 0;
 }

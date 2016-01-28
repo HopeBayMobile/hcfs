@@ -4,6 +4,10 @@
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
+
+  File modified @ Hope Bay Technologies, Inc. (2016)
+
+  Jiahong 1/15/16: Modified routines to add premount.
 */
 
 #include "fuse/config.h"
@@ -387,8 +391,53 @@ int fuse_mount_compat22(const char *mountpoint, const char *opts)
 	return fuse_mount_fusermount(mountpoint, opts, 0);
 }
 
+/* Jiahong 1/15/2016: Now adds premount routine */
+static int fuse_premount_sys(const char *mnt, struct mount_opts *mo,
+			     const char *mnt_opts)
+{
+	char tmp[128];
+	const char *devname = "/dev/fuse";
+	char *source = NULL;
+	char *type = NULL;
+	struct stat stbuf;
+	int fd;
+	int res;
+
+	if (!mnt) {
+		fprintf(stderr, "fuse: missing mountpoint parameter\n");
+		return -1;
+	}
+
+	res = stat(mnt, &stbuf);
+	if (res == -1) {
+		fprintf(stderr ,"fuse: failed to access mountpoint %s: %s\n",
+		        mnt, strerror(errno));
+		return -1;
+	}
+
+	if (!mo->nonempty) {
+		res = fuse_mnt_check_empty("fuse", mnt, stbuf.st_mode,
+		                           stbuf.st_size);
+		if (res == -1)
+			return -1;
+	}
+
+	fd = open(devname, O_RDWR);
+	if (fd == -1) {
+		if (errno == ENODEV || errno == ENOENT)
+			fprintf(stderr, "fuse: device not found, try 'modprobe fuse' first\n");
+		else
+			fprintf(stderr, "fuse: failed to open %s: %s\n",
+			        devname, strerror(errno));
+		return -1;
+	}
+
+	return fd;
+}
+
+/* Jiahong 1/15/2016: Mount now can take a fd as input */
 static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
-			  const char *mnt_opts)
+			  const char *mnt_opts, int fd1)
 {
 	char tmp[128];
 	const char *devname = "/dev/fuse";
@@ -417,7 +466,12 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
 			return -1;
 	}
 
-	fd = open(devname, O_RDWR);
+	/* If a valid fd is passed in, use that. Else open a new one */
+	if (fd1 < 0)
+		fd = open(devname, O_RDWR);
+	else
+		fd = fd1;
+
 	if (fd == -1) {
 		if (errno == ENODEV || errno == ENOENT)
 			fprintf(stderr, "fuse: device not found, try 'modprobe fuse' first\n");
@@ -527,7 +581,9 @@ static int get_mnt_flag_opts(char **mnt_optsp, int flags)
 	return 0;
 }
 
-int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
+/* 1/15/16: Jiahong adding premount */
+
+int fuse_kern_premount(const char *mountpoint, struct fuse_args *args)
 {
 	struct mount_opts mo;
 	int res = -1;
@@ -556,7 +612,50 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args)
 	if (mo.mtab_opts &&  fuse_opt_add_opt(&mnt_opts, mo.mtab_opts) == -1)
 		goto out;
 
-	res = fuse_mount_sys(mountpoint, &mo, mnt_opts);
+	res = fuse_premount_sys(mountpoint, &mo, mnt_opts);
+	/* In premount, if failed, simply return */
+out:
+	free(mnt_opts);
+	free(mo.fsname);
+	free(mo.subtype);
+	free(mo.fusermount_opts);
+	free(mo.subtype_opt);
+	free(mo.kernel_opts);
+	free(mo.mtab_opts);
+	return res;
+}
+
+/* 1/15/16: fuse_kern_mount now takes fd as input */
+int fuse_kern_mount(const char *mountpoint, struct fuse_args *args, int fd)
+{
+	struct mount_opts mo;
+	int res = -1;
+	char *mnt_opts = NULL;
+
+	memset(&mo, 0, sizeof(mo));
+	mo.flags = MS_NOSUID | MS_NODEV;
+
+	if (args &&
+	    fuse_opt_parse(args, &mo, fuse_mount_opts, fuse_mount_opt_proc) == -1)
+		return -1;
+
+	if (mo.allow_other && mo.allow_root) {
+		fprintf(stderr, "fuse: 'allow_other' and 'allow_root' options are mutually exclusive\n");
+		goto out;
+	}
+	res = 0;
+	if (mo.ishelp)
+		goto out;
+
+	res = -1;
+	if (get_mnt_flag_opts(&mnt_opts, mo.flags) == -1)
+		goto out;
+	if (mo.kernel_opts && fuse_opt_add_opt(&mnt_opts, mo.kernel_opts) == -1)
+		goto out;
+	if (mo.mtab_opts &&  fuse_opt_add_opt(&mnt_opts, mo.mtab_opts) == -1)
+		goto out;
+
+	res = fuse_mount_sys(mountpoint, &mo, mnt_opts, fd);
 	if (res == -2) {
 		if (mo.fusermount_opts &&
 		    fuse_opt_add_opt(&mnt_opts, mo.fusermount_opts) == -1)

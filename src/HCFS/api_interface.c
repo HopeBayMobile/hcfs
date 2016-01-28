@@ -493,12 +493,10 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 		long long total_reserved_size)
 {
 	int retcode, count, count2;
-	long long total_reserved_size_bak, zero_size;
+	long long zero_size;
 	long long unused_reserved_size;
 
 	retcode = 0;
-
-	total_reserved_size_bak = total_reserved_size;
 
 	for (count = 0; count < num_inode; count++) {
 		write_log(10, "Debug: Prepare to pin inode %"PRIu64
@@ -651,6 +649,7 @@ int checkpin_handle(int arg_len, char *largebuf)
 	SYMLINK_META_TYPE linkmeta;
 	char is_local_pin;
 
+	UNUSED(arg_len);
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
 		  (uint64_t)target_inode);
