@@ -5,49 +5,64 @@ all :
 
 export NDK_PROJECT_PATH := $(abspath .)
 
-targets := acer-z630 acer-s58a
-target_out := $(addsuffix -hcfs, $(targets)) $(addsuffix -hcfs-gdb, $(targets))
-target_out := $(addprefix out/, $(target_out))
+TARGETS          := acer-z630 acer-s58a
+TARGETS-HCFS     := $(addsuffix -hcfs, $(TARGETS))
+TARGETS-HCFS-GDB := $(addsuffix -hcfs-gdb, $(TARGETS))
 
-all : $(target_out)
+all : out $(TARGETS)
 	@cd out; find -mindepth 2 -type f -exec md5sum {} \; > md5sum.md5
 
 clean :
-	rm -rf libs obj out/*
+	rm -rf libs obj out
+
+define TARGET_RULE
+$(1):          $(1)-hcfs $(1)-hcfs-gdb
+$(1)-hcfs:     out/$(1)-hcfs
+$(1)-hcfs-gdb: out/$(1)-hcfs-gdb
+endef
+
+$(foreach t,$(TARGETS),$(eval $(call TARGET_RULE,$(t))))
 
 define runprepareout
-	@mkdir -p $@/system/bin
-	@mkdir -p $@/system/lib
+	@mkdir -p $@/system/{bin,lib}
 	@mv -f $@/armeabi/*.so $@/system/lib
 	@mv -f $@/armeabi/* $@/system/bin
 	@cp -r release_resource/* $@/
-	@rm -r $@/armeabi
 endef
 
-$(target_out): NDK_ARG += DEVICE=$*
-$(target_out): NDK_ARG += NDK_OUT=$(abspath ./obj/$*)
-$(target_out): NDK_ARG += NDK_LIBS_OUT=$(abspath ./$@)
-$(target_out): NDK_ARG += NDK_APPLICATION_MK=Application.mk
-$(target_out): NDK_ARG += TARGET_PLATFORM=android-21
-out/acer-s58a-hcfs out/acer-s58a-hcfs-gdb: NDK_ARG += OPENSSL_IS_BORINGSSL=1
-out/%-hcfs-gdb: NDK_ARG += NDK_DEBUG=1
-out/%-hcfs-gdb:	NDK_ARG += HCFS_CFLAGS="-ggdb -O0"
-out/%-hcfs-gdb: NDK_ARG += HCFS_LDFLAGS="-ggdb -O0"
+# Common Flags
+$(TARGETS): NDK_ARG += DEVICE=$*
+$(TARGETS): NDK_ARG += NDK_APPLICATION_MK=Application.mk
+$(TARGETS): NDK_ARG += TARGET_PLATFORM=android-21
+$(TARGETS): NDK_ARG += NDK_LIBS_OUT=$@
+$(TARGETS): NDK_ARG += NDK_OUT=$(@:out/%=obj/%)
+
+# hcfs Flags
+
+# hcfs-gdb Flags
+$(TARGETS-HCFS-GDB): NDK_ARG += NDK_DEBUG=1
+$(TARGETS-HCFS-GDB): NDK_ARG += HCFS_CFLAGS="-ggdb -O0"
+$(TARGETS-HCFS-GDB): NDK_ARG += HCFS_LDFLAGS="-ggdb -O0"
+
+# Device Flags
+acer-s58a-%: NDK_ARG += OPENSSL_IS_BORINGSSL=1
+
+_nr_cpu := $(shell cat /proc/cpuinfo | grep processor | wc -l)
+PARALLEL_JOBS := -j$(shell expr $(_nr_cpu) + $(_nr_cpu))
 
 out/%-hcfs:
-	ndk-build $(NDK_ARG)
+	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
 	$(runprepareout)
-	@rm -rf out/hcfs/gdb.*
+	@rm -rf $@/gdb.* $@/armeabi
 
 out/%-hcfs-gdb:
-	ndk-build $(NDK_ARG)
-	@cp -r $@/armeabi $@/armeabi-tmp
+	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
 	$(runprepareout)
-	@mv $@/armeabi-tmp $@/armeabi
+	@cp $@/system/*/* $@/armeabi
 	@rsync -a ../src/{API,CLI_utils,HCFS} $@/src/
 	@cp -r include $@/
 
 out:
 	mkdir out
 
-.PHONY: $(target_out) clean
+.PHONY: clean
