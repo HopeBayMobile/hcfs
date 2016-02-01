@@ -216,6 +216,7 @@ static inline int _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 		num_blocks = ((tmpstat.st_size == 0) ? 0
 				: (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1);
 		for (bcount = 0; bcount < num_blocks; bcount++) {
+			/* TODO: consider truncating situation */
 			fetch_toupload_block_path(block_path, inode, bcount, 0);
 			if (access(block_path, F_OK) == 0)
 				unlink(block_path);
@@ -1403,7 +1404,6 @@ store in some other file */
 							block_count,
 							local_block_seq,
 							toupload_block_seq);
-						sync_error = TRUE;
 						sync_ctl.threads_error[ptr->which_index]
 							= TRUE;
 						break;
@@ -1431,7 +1431,6 @@ store in some other file */
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
 				if (ret < 0) {
-					sync_error = TRUE;
 					sync_ctl.threads_error[ptr->which_index]
 							= TRUE;
 					break;
@@ -1512,27 +1511,25 @@ store in some other file */
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
 			return;
 		}
+
+		/* If sync error, then return and delete to-upload blocks
+		 * if needed */
+		sync_error = sync_ctl.threads_error[ptr->which_index];
+		if (sync_error == TRUE) {
+			if (sync_ctl.continue_nexttime[ptr->which_index] == FALSE)
+				delete_backend_blocks(progress_fd, total_blocks,
+						ptr->inode, TOUPLOAD_BLOCKS);
+			fclose(local_metafptr);
+			fclose(toupload_metafptr);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			return;
+		}
 	}
 
-	if (sync_error == FALSE)
-		sync_error = sync_ctl.threads_error[ptr->which_index];
-
-	/* Abort sync to cloud if error occured or system is going down */
-	if ((sync_error == TRUE) || (hcfs_system->system_going_down == TRUE)) {
+	/* Abort sync to cloud if system is going down */
+	if (hcfs_system->system_going_down == TRUE) {
 		/* When system going down, re-upload it later */
-		if (hcfs_system->system_going_down == TRUE) {
-			sync_ctl.continue_nexttime[ptr->which_index] = TRUE;
-
-		/* If it is just sync error, then delete backend */
-		} else {
-			/* Do not unlink to-upload meta if needs continue
-			 * next time */
-			if (sync_ctl.continue_nexttime[ptr->which_index] ==
-					FALSE)
-				delete_backend_blocks(progress_fd, total_blocks,
-					ptr->inode, TOUPLOAD_BLOCKS);
-		}
-
+		sync_ctl.continue_nexttime[ptr->which_index] = TRUE;
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
