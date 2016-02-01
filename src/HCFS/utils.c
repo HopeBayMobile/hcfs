@@ -267,7 +267,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
+int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
