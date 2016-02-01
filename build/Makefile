@@ -27,7 +27,7 @@ define runprepareout
 	@mkdir -p $@/system/{bin,lib}
 	@mv -f $@/armeabi/*.so $@/system/lib
 	@mv -f $@/armeabi/* $@/system/bin
-	@cp -r release_resource/* $@/
+	@cp -r internal_testing_resource/* $@/
 endef
 
 # Common Flags
