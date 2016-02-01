@@ -344,8 +344,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long system_size_change;
 	long long upload_seq;
 	ino_t root_inode;
-#ifdef _ANDROID_ENV_
-#else
+#ifndef _ANDROID_ENV_
 	long long ret_ssize;
 #endif
 

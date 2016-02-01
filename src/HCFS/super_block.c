@@ -153,8 +153,7 @@ int super_block_init(void)
 {
 	int errcode;
 	ssize_t ret;
-#ifdef _ANDROID_ENV_
-#else
+#ifndef _ANDROID_ENV_
 	int shm_key;
 #endif
 
