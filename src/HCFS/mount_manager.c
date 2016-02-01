@@ -463,12 +463,13 @@ int do_unmount_FS(MOUNT_T *mount_info);
 /* Helper for mounting */
 int do_mount_FS(char *mp, MOUNT_T *new_info)
 {
-	struct fuse_chan *tmp_channel, *tmp_ch1;
+	struct fuse_chan *tmp_channel;
 	struct fuse_session *tmp_session;
 	char *mount;
 	int mt, fg;
 
 #ifdef _ANDROID_PREMOUNT_
+	struct fuse_chan *tmp_ch1;
 	int need_unmount;
 	need_unmount = FALSE;
 #endif

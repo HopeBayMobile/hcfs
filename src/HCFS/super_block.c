@@ -40,6 +40,7 @@
 #include "params.h"
 #include "logger.h"
 #include "utils.h"
+#include "macro.h"
 
 #define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
@@ -150,9 +151,11 @@ int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 *************************************************************************/
 int super_block_init(void)
 {
-	int shm_key;
 	int errcode;
 	ssize_t ret;
+#ifndef _ANDROID_ENV_
+	int shm_key;
+#endif
 
 #ifdef _ANDROID_ENV_
 	sys_super_block = malloc(sizeof(SUPER_BLOCK_CONTROL));
@@ -366,7 +369,6 @@ int super_block_update_stat(ino_t this_inode, struct stat *newstat)
 	int ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 
 	/* Read the old content of super block entry first */
@@ -569,7 +571,6 @@ int super_block_delete(ino_t this_inode)
 	ino_t temp;
 	size_t retsize;
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 
@@ -649,13 +650,9 @@ int super_block_reclaim(void)
 	long long count;
 	ino_t last_reclaimed;
 	ino_t *unclaimed_list;
-	long long num_unclaimed;
+	size_t num_unclaimed;
 	size_t ret_items;
 	long total_bytes;
-
-	last_reclaimed = 0;
-
-	ret_val = 0;
 
 	if (sys_super_block->head.num_to_be_reclaimed < RECLAIM_TRIGGER)
 		return 0;
@@ -1161,6 +1158,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 	ino_t temp_inode;
 	int ret;
 
+	UNUSED(thisinode);
 	old_which_ll = this_entry->status;
 
 	if (old_which_ll == NO_LL)
@@ -1437,6 +1435,8 @@ int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 	case ST_PINNING: /* regfile in pinning queue */
 		/* Enqueue and set as ST_UNPIN */
 		ret = pin_ll_dequeue(this_inode, &this_entry);
+		if(ret < 0)
+			break;
 		this_entry.pin_status = ST_UNPIN;
 		ret = write_super_block_entry(this_inode, &this_entry);
 		if (!S_ISREG(this_mode)) {
