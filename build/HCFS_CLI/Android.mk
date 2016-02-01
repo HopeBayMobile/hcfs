@@ -1,6 +1,8 @@
 # Copyright (C) 2012 Seth Huang<seth.hg@gmail.com>
 #
 LOCAL_PATH := $(dir $(call this-makefile))
+BUILD_PATH := $(abspath $(LOCAL_PATH)/..)
+LIBS_PATH := $(BUILD_PATH)/prebuilt/$(DEVICE)
 
 #include $(CLEAR_VARS)
 
@@ -17,10 +19,10 @@ LOCAL_PATH := $(dir $(call this-makefile))
 include $(CLEAR_VARS)
 
 LOCAL_CFLAGS	:= -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_
+LOCAL_CFLAGS	+= -pie -fPIE $(HCFS_CFLAGS)
+LOCAL_LDFLAGS	+= -pie -fPIE
 #LOCAL_C_INCLUDES := jni/include
 LOCAL_MODULE    := HCFSvol
-LOCAL_SRC_FILES := src/HCFSvol.c
+LOCAL_SRC_FILES := ../../src/CLI_utils/HCFSvol.c
 #LOCAL_STATIC_LIBRARIES := libfuse
-LOCAL_CFLAGS += -pie -fPIE
-LOCAL_LDFLAGS += -pie -fPIE
 include $(BUILD_EXECUTABLE)
