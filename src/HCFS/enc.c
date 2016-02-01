@@ -398,15 +398,16 @@ FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
 }
 
 /************************************************************************
- * *
- * * Function name: decode_to_fd
- * *        Inputs: FILE* to_fd, open with 'w' mode, unsigned char* key,unsigned
- * *  char* input,int input_length, enc_flag, compress_flag,
- * *       Summary: Decode to to_fd
- * *
- * *  Return value: 0 if success or 1 if failed
- * *
- * *************************************************************************/
+ *
+ * Function name: decode_to_fd
+ *        Inputs: FILE* to_fd, open with 'w' mode,
+ *                unsigned char* key, unsigned char* input,
+ *                int input_length, int enc_flag, int compress_flag
+ *       Summary: Decode to to_fd
+ *
+ *  Return value: 0 if success or 1 if failed
+ *
+ *************************************************************************/
 int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 		 int input_length, int enc_flag, int compress_flag)
 {

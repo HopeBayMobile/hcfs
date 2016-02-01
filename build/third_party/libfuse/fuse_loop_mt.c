@@ -4,6 +4,9 @@
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB.
+
+  File modified @ Hope Bay Technologies, Inc. (2016)
+  1/15/16: Modified by Jiahong to catch perm error at startup (TO ENHANCE)
 */
 
 #include "fuse/fuse_lowlevel.h"
@@ -101,6 +104,14 @@ static void *fuse_do_work(void *data)
 		if (res == -EINTR)
 			continue;
 		if (res <= 0) {
+			/* 1/15/2016: Jiahong
+			   Do not break off FUSE loop if error occurs.
+			   This was intended for catching perm error from
+			   kernel due to mount call not readied.
+			   TODO: Distinguish error occurred before completion
+			   of mount call and the ones during FUSE op */
+			sleep(1);
+			continue;
 			if (res < 0) {
 				fuse_session_exit(mt->se);
 				mt->error = -1;

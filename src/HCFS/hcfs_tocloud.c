@@ -1404,6 +1404,7 @@ store in some other file */
 							block_count,
 							local_block_seq,
 							toupload_block_seq);
+						flock(fileno(local_metafptr), LOCK_UN);
 						sync_ctl.threads_error[ptr->which_index]
 							= TRUE;
 						break;

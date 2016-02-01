@@ -9,6 +9,8 @@
 
 #include "compress.h"
 #include "utils.h"
+#include "logger.h"
+#include "macro.h"
 
 #if COMPRESS_ENABLE
 
@@ -118,6 +120,8 @@ FILE *transform_compress_fd(FILE *in_fd, unsigned char **data)
 #endif /* __ANDROID__ */
 
 #else
+	UNUSED(in_fd);
+	UNUSED(data);
 	return NULL;
 #endif /* COMPRESS_ENABLE */
 }
@@ -152,6 +156,9 @@ int decompress_to_fd(FILE *decompress_to_fd, unsigned char *input,
 	free(output);
 	return 0;
 #else
+	UNUSED(decompress_to_fd);
+	UNUSED(input);
+	UNUSED(input_length);
 	return 1;
 #endif
 }

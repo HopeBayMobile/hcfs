@@ -745,7 +745,7 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 
 	int selected_sibling;
 	int num_el_selected_child, num_el_selected_sibling;
-	int finish_rotate, finish_merge;
+	int finish_rotate/*, finish_merge*/;
 	int change_root;
 	DDT_BTREE_NODE child_node, sibling_node;
 	int errcode;
@@ -753,7 +753,7 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 
 	/* Initialize */
 	finish_rotate = FALSE;
-	finish_merge = FALSE;
+	/* finish_merge = FALSE; */
 	change_root = FALSE;
 	memset(&child_node, 0, sizeof(DDT_BTREE_NODE));
 	memset(&sibling_node, 0, sizeof(DDT_BTREE_NODE));
@@ -1002,7 +1002,7 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 		}
 
 		/* Merge done */
-		finish_merge = TRUE;
+		/* finish_merge = TRUE; */
 	}
 
 	return 0;
@@ -1087,7 +1087,6 @@ int get_obj_id(char *path, unsigned char hash[], unsigned char start_bytes[],
 	/* Compute hash */
 	SHA256_Init(&ctx);
 	buf = malloc(buf_size);
-	bytes_read = 0;
 
 	fptr = fopen(path, "rb");
 	fd = fileno(fptr);
@@ -1130,4 +1129,5 @@ int obj_id_to_string(unsigned char obj_id[OBJID_LENGTH],
 		sprintf(output_str + (i * 2), "%02x", obj_id[i]);
 
 	output_str[OBJID_STRING_LENGTH - 1] = 0;
+	return 0;
 }

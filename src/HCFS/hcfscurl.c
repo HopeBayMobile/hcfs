@@ -1058,6 +1058,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1284,7 +1285,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_URL, S3_BUCKET_URL);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	HTTP_PERFORM_RETRY(curl);
@@ -1392,6 +1393,10 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	int ret_val, num_retries;
 
+        ret_val = ignore_sigpipe();
+        if (ret_val < 0)
+                return ret_val;
+
 	/* If init is successful, curl_backend is set to the current
 	backend setting. Otherwise, it is set to NONE. */
 	switch (CURRENT_BACKEND) {
@@ -1481,6 +1486,10 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 {
 	int ret_val;
 
+        ret_val = ignore_sigpipe();
+        if (ret_val < 0)
+                return ret_val;
+
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
 		if (_http_is_success(ret_val) == FALSE) {
@@ -1530,6 +1539,10 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 int hcfs_list_container(CURL_HANDLE *curl_handle)
 {
 	int ret_val, num_retries;
+
+        ret_val = ignore_sigpipe();
+        if (ret_val < 0)
+                return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1597,6 +1610,10 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 {
 	int ret_val, num_retries;
 	int ret, errcode;
+
+	ret_val = ignore_sigpipe();
+	if (ret_val < 0)
+		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1671,6 +1688,10 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	int ret_val, num_retries;
 	int ret, errcode;
 	int64_t ret_pos;
+
+        ret_val = ignore_sigpipe();
+        if (ret_val < 0)
+                return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1759,6 +1780,10 @@ errcode_handle:
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	int ret_val, num_retries;
+
+        ret_val = ignore_sigpipe();
+        if (ret_val < 0)
+                return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1904,7 +1929,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_READDATA, (void *)&put_control);
 	curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
 	curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
@@ -2022,7 +2047,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
@@ -2141,7 +2166,8 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);

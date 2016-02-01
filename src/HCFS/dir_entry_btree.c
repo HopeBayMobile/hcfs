@@ -644,7 +644,7 @@ If the sibling contains child > MAX_DIR_ENTRIES_PER_PAGE / 2, pool the elements
 from the two nodes, plus the parent item in between, and split the pooled
 elements into two, using the median as the new parent item. */
 
-	int selected_sibling, left_node, right_node, to_return;
+	int selected_sibling, left_node, /*right_node,*/ to_return;
 	DIR_ENTRY_PAGE left_page, right_page, temp_page;
 	int temp_total, median_entry;
 	char merging;
@@ -670,7 +670,7 @@ elements into two, using the median as the new parent item. */
 
 		selected_sibling = selected_child - 1;
 		left_node = selected_sibling;
-		right_node = selected_child;
+		/* right_node = selected_child; */
 		PREAD(fh, &left_page, sizeof(DIR_ENTRY_PAGE),
 				tnode->child_page_pos[selected_sibling]);
 		if (left_page.num_entries < MAX_DIR_ENTRIES_PER_PAGE / 2)
@@ -686,7 +686,7 @@ elements into two, using the median as the new parent item. */
 
 		selected_sibling = selected_child + 1;
 		left_node = selected_child;
-		right_node = selected_sibling;
+		/* right_node = selected_sibling; */
 		PREAD(fh, &right_page, sizeof(DIR_ENTRY_PAGE),
 				tnode->child_page_pos[selected_sibling]);
 		if (right_page.num_entries < MAX_DIR_ENTRIES_PER_PAGE / 2)

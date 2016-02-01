@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: utils.c
 * Abstract: The c source code file for the utility functions for HCFS
@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 #ifndef _ANDROID_ENV_
 #include <attr/xattr.h>
 #endif
@@ -1454,4 +1455,72 @@ void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
 	}
 
 	return;
+}
+
+/* Signal handler for recording ignored signals */
+void sigpipe_handler(int num)
+{
+        write_log(2, "Warning: Received signal %s and ignored.\n",
+                  strsignal(num));
+}
+
+/* Helper routine for ignoring SIGPIPE signal */
+int ignore_sigpipe(void)
+{
+	int ret_val;
+        struct sigaction newact;
+
+        /* For SIGPIPE, only record a warning log for now */
+        memset(&newact, 0, sizeof(struct sigaction));
+        newact.sa_handler = sigpipe_handler;
+        ret_val = sigaction(SIGPIPE, &newact, NULL);
+	if (ret_val < 0) {
+		ret_val = -errno;
+                write_log(0, "Unable to set signal handler\n");
+	}
+
+	return ret_val;
+}
+
+/**
+ * is_natural_number()
+ *
+ * Check if input string is a natural number (including of zero)
+ *
+ * @param str Input string
+ *
+ * @return TRUE when it is a natural number, else return FALSE
+ */ 
+BOOL is_natural_number(char *str)
+{
+	int num, i;
+	BOOL ret;
+
+	if (strlen(str) == 0)
+		return FALSE;
+
+	/* 0~9 when string len just 1 */
+	num = str[0] - '0';
+	if (strlen(str) == 1) {
+		if (0 <= num && num <= 9)
+			return TRUE;
+		else
+			return FALSE;
+
+	/* Check first digit is not 0, and following is 0~9 */
+	} else {
+		if (!(1 <= num && num <= 9))
+			return FALSE;
+
+		ret = TRUE;
+		for (i = 1; i < strlen(str); i++) {
+			num = str[i] - '0';
+			if (!(0 <= num && num <= 9)) {
+				ret = FALSE;
+				break;
+			}
+		}
+
+		return ret;
+	}
 }

@@ -1,12 +1,13 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: path_reconstruct.c
 * Abstract: The c source file for reconstructing path from parent lookups
 *
 * Revision History
 * 2015/10/26 Jiahong created this file
+* 2016/1/18 Jiahong modified the file to change lookup routines and log
 *
 **************************************************************************/
 
@@ -288,7 +289,8 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	int ret, errcode;
 	int hashindex;
 	PATH_LOOKUP *tmpptr;
-	ino_t parentinode;
+	ino_t parentinode, *parentlist;
+	int numparents;
 	DIR_ENTRY tmpentry;
 
 	hashindex = thisinode % NUM_LOOKUP_ENTRY;
@@ -306,13 +308,35 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 		}
 		tmpptr = tmpptr->next;
 	}
+        ret = sem_wait(&(pathlookup_data_lock));
+        if (ret < 0) {
+                errcode = errno;
+                write_log(0, "Unexpected error: %d (%s)\n", errcode,
+                          strerror(errcode));
+                errcode = -errcode;
+                return errcode;
+        }
+
 	/* Did not find the node. Proceed to lookup and then add to cache */
 
-	ret = pathlookup_read_parent(thisinode, &parentinode);
-	if (ret < 0) {
-		errcode = ret;
+        parentlist = NULL;
+        ret = fetch_all_parents(thisinode, &numparents, &parentlist);
+        if (ret < 0) {
+                errcode = ret;
+                goto errcode_handle;
+        }
+
+	/* If there is no parent, return error */
+	if (numparents <= 0) {
+		errcode = -ENOENT;
+		write_log(10, "Cannot find parent in lookup\n");
 		goto errcode_handle;
 	}
+
+	parentinode = parentlist[0];
+	free(parentlist);
+	parentlist = NULL;
+	sem_post(&(pathlookup_data_lock));
 
 	write_log(10, "Debug parent lookup %" PRIu64 " %" PRIu64 "\n",
 	          (uint64_t) thisinode, (uint64_t) parentinode);
@@ -342,6 +366,9 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 	memcpy(retnode, tmpptr, sizeof(PATH_LOOKUP));
 	return 0;
 errcode_handle:
+	sem_post(&(pathlookup_data_lock));
+	if (parentlist != NULL)
+		free(parentlist);
 	return errcode;
 }
 
@@ -432,7 +459,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: construct_path
-*        Inputs: PATH_CACHE *cacheptr, ino_t thisinode, char **result
+*        Inputs: MOUNT_T *tmpptr, ino_t thisinode, char **result
 *       Summary: Construct the path from root to thisinode, and return
 *                the path via the pointer in *result.
 *          Note: The caller is responsible for freeing the memory storing
@@ -440,10 +467,14 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+                   ino_t rootinode)
 {
 	int ret, errcode;
 	char *tmpbuf;
+	char pathname[200];
+	FILE *fptr;
+	int64_t ret_pos;
 
 	ret = sem_wait(&(cacheptr->pathcache_lock));
 	if (ret < 0) {
@@ -466,9 +497,39 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
 		snprintf(*result, 10, "/");
 	} else {
 		ret = construct_path_iterate(cacheptr, thisinode, result, 10);
-		if (ret < 0) {
+		if ((ret < 0) && (ret != -ENOENT)) {
 			errcode = ret;
 			goto errcode_handle;
+		}
+		if (ret == -ENOENT) {
+			snprintf(pathname, 200,
+			         "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
+			         METAPATH, (uint64_t)thisinode,
+			         (uint64_t)rootinode);
+			if (access(pathname, F_OK) != 0) {
+				errcode = -ENOENT;
+				goto errcode_handle;
+			}
+			fptr = fopen(pathname, "r");
+			FSEEK(fptr, 0, SEEK_END);
+			FTELL(fptr);
+			if (ret_pos == 0) {
+				errcode = -ENOENT;
+				fclose(fptr);
+				goto errcode_handle;
+			}
+			free(*result);
+			*result = NULL;
+			*result = (char *) malloc(((size_t) ret_pos) + 10);
+			if (*result == NULL) {
+				errcode = -ENOMEM;
+				write_log(0, "Out of memory\n");
+				goto errcode_handle;
+			}
+			FSEEK(fptr, 0, SEEK_SET);
+			fscanf(fptr, "%s ", *result);
+			write_log(10, "Read path %s\n", *result);
+			fclose(fptr);
 		}
 	}
 

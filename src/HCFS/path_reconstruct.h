@@ -62,7 +62,8 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode);
 int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 		int bufsize);
 
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result);
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+                   ino_t rootinode);
 
 int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete);
 

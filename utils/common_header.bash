@@ -1,7 +1,17 @@
-# Enable debug only if verbose on
-if [ "$verbose" = "1" ]; then set -x; else set +x; fi
-source $WORKSPACE/utils/trace_error.bash
-set -e
+set +x
+export TERM=xterm-256color
+script_error_report() {
+	set +x
+	local script="$1"
+	local parent_lineno="$2"
+	local message="$3"
+	local code="${4:-1}"
+	echo "Error near ${script} line ${parent_lineno}; exiting with status ${code}"
+	if [[ -n "$message" ]] ; then
+		echo -e "Message: ${message}"
+	fi
+	exit "${code}"
+}
 
 function install_pkg (){
 	[[ "$-" =~ "x" ]] && flag_x="-x" || flag_x="+x"
@@ -25,3 +35,11 @@ function install_pkg (){
 	fi
 	eval set $flag_x
 }
+
+# Main source
+# Enable error trace
+trap 'script_error_report "${BASH_SOURCE[0]}" ${LINENO}' ERR
+set -e
+
+# Enable debug log only if verbose on
+if ${CI_VERBOSE:-false}; then set -x; else set +x; fi

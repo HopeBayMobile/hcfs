@@ -19,7 +19,9 @@ RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	chown -R jenkins:jenkins /home/jenkins/.ssh && \
 	chmod 600 /home/jenkins/.ssh/*
 
-ADD utils/ /utils/
-
 # CI runs build/test in all roles
-RUN /utils/setup_ci_env.sh
+#
+ADD . /build
+RUN ls -l /build
+RUN /build/scrips/05_setup_ci_env
+RUN rm -rf /tmp/* /var/tmp/* /etc/service/sshd/down

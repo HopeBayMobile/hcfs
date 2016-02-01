@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: HCFSvol.c
 * Abstract: The c source file for CLI utilities
@@ -37,6 +37,7 @@ int main(int argc, char **argv)
 	long long downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
 	int first_size, rest_size;
+	char vol_mode;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -157,6 +158,8 @@ int main(int argc, char **argv)
 			buf[strlen(argv[2]) + 1] = ANDROID_EXTERNAL;
 		} else if (strcasecmp(argv[3], "internal") == 0) {
 			buf[strlen(argv[2]) + 1] = ANDROID_INTERNAL;
+		} else if (strcasecmp(argv[3], "multiexternal") == 0) {
+			buf[strlen(argv[2]) + 1] = ANDROID_MULTIEXTERNAL;
 		} else {
 			printf("Unsupported storage type\n");
 			exit(-ENOTSUP);
@@ -175,9 +178,35 @@ int main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 #endif
+	case UNMOUNTVOL:
+		memset(buf, 0, sizeof(buf));
+		fsname_len = strlen(argv[2]);
+		cmd_len = sizeof(int) + strlen(argv[2]) + 1;
+		if (argc >= 4)
+			cmd_len += (strlen(argv[3]) + 1);
+		else
+			cmd_len += 1;
+
+		memcpy(buf, &fsname_len, sizeof(int));
+		strcpy(buf + sizeof(int), argv[2]);
+		if (argc >= 4)
+			strcpy(buf + sizeof(int) + fsname_len + 1, argv[3]);
+		else
+			buf[sizeof(int) + fsname_len + 1] = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
 	case DELETEVOL:
 	case CHECKVOL:
-	case UNMOUNTVOL:
 	case CHECKMOUNT:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
@@ -264,14 +293,34 @@ int main(int argc, char **argv)
 		break;
 
 	case MOUNTVOL:
-		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);
+		if (argc == 5) {
+			if (!strcmp("default", argv[4]))
+				vol_mode = MP_DEFAULT;
+			else if (!strcmp("read", argv[4]))
+				vol_mode = MP_READ;
+			else if (!strcmp("write", argv[4]))
+				vol_mode = MP_WRITE;
+			else {
+				printf("Command error: %s is not supported\n",
+						argv[4]);
+				break;
+			}
+		} else {
+			vol_mode = MP_DEFAULT;
+		}
+		buf[0] = vol_mode;
+		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 +
+			sizeof(int) + sizeof(char);
 		fsname_len = strlen(argv[2]) + 1;
-		memcpy(buf, &fsname_len, sizeof(int));
-		first_size = sizeof(int);
+		memcpy(buf + 1, &fsname_len, sizeof(int)); /* first byte is vol mode */
+		first_size = sizeof(int) + 1;
 		rest_size = sizeof(buf) - first_size;
+
+		/* [mp mode][fsname len][fsname][mp] */
 		snprintf(&(buf[first_size]), rest_size, "%s", argv[2]);
-		snprintf(&(buf[sizeof(int) + fsname_len]), 4092 - fsname_len,
+		snprintf(&(buf[first_size + fsname_len]), 4092 - fsname_len,
 			 "%s", argv[3]);
+ 
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
@@ -310,6 +359,8 @@ int main(int argc, char **argv)
 		for (count = 0; count < total_entries; count++) {
 			if (tmp[count].d_type == ANDROID_EXTERNAL)
 				printf("%s\tExternal\n", tmp[count].d_name);
+			else if (tmp[count].d_type == ANDROID_MULTIEXTERNAL)
+				printf("%s\tMultiExternal\n", tmp[count].d_name);
 			else
 				printf("%s\tInternal\n", tmp[count].d_name);
 		}
