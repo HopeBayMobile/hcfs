@@ -11,6 +11,8 @@
 * 2015/1/27 Jiahong revised the coding format for coding style check.
 * 2015/2/11 Jiahong revised coding style and add hfuse_system.h inclusion.
 * 2015/5/27 Jiahong working on improving error handling
+* 2016/2/1  Jiahong If DEBUG_ON is not defined at compile time, limit log
+*           level to 4
 *
 **************************************************************************/
 
@@ -357,6 +359,14 @@ int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
 					"Log level cannot be less than zero.");
 				return -1;
 			}
+			/* Jiahong 2/1/16: If DEBUG_ON is not defined at
+			compile time, limit log level to 4 */
+#ifndef DEBUG_ON
+			if (temp_val > 4) {
+				write_log(0, "Setting log level to 4\n");
+				temp_val = 4;
+			} 
+#endif
 			config->log_level = temp_val;
 			continue;
 		}
