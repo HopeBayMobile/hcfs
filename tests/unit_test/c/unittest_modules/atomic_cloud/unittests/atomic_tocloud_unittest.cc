@@ -10,7 +10,7 @@ extern "C" {
 #define RESPONSE_FAIL 0
 #define RESPONSE_SUCCESS 1
 
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 
 class tag_status_on_fuseTest : public ::testing::Test {
 protected:
@@ -72,7 +72,7 @@ TEST_F(tag_status_on_fuseTest, FailToConnect_SocketPathNotExist)
 	ino_t inode = 1;
 
 	ret = 0;
-	ret = tag_status_on_fuse(inode, status, fd);
+	ret = tag_status_on_fuse(inode, status, fd, FALSE, FALSE);
 
 	EXPECT_EQ(-ENOENT, ret);
 }
@@ -89,7 +89,7 @@ TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseFail)
 
 	usleep(100000); /* Wait for connector */
 	ret = 0;
-	ret = tag_status_on_fuse(inode, status, fd);
+	ret = tag_status_on_fuse(inode, status, fd, FALSE, FALSE);
 
 	EXPECT_EQ(-1, ret);
 
@@ -108,7 +108,7 @@ TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseSuccess)
 
 	usleep(100000); /* Wait for connector */
 	ret = 0;
-	ret = tag_status_on_fuse(inode, status, fd);
+	ret = tag_status_on_fuse(inode, status, fd, FALSE, FALSE);
 
 	EXPECT_EQ(0, ret);
 
@@ -611,15 +611,16 @@ TEST_F(get_progress_infoTest, GetEmptyProgressFileSuccess)
 	close(fd);
 }
 
-class open_progress_infoTest : public ::testing::Test {
+class create_progress_fileTest : public ::testing::Test {
 protected:
 	char upload_bullpen_path[200];
 	char path[200];
+	char *metapath;
 
 	void SetUp()
 	{
-		METAPATH = "/tmp";
-		sprintf(upload_bullpen_path, "%s/upload_bullpen", METAPATH);
+		metapath = "/tmp";
+		sprintf(upload_bullpen_path, "%s/upload_bullpen", metapath);
 
 		if (!access(upload_bullpen_path, F_OK))
 			rmdir(upload_bullpen_path);
@@ -635,13 +636,13 @@ protected:
 	}
 };
 
-TEST_F(open_progress_infoTest, upload_pullpen_NotExist_OpenSuccess)
+TEST_F(create_progress_fileTest, upload_pullpen_NotExist_OpenSuccess)
 {
 	int fd;
 	int inode;
 
 	inode = 3;
-	fd = open_progress_info(inode);
+	fd = create_progress_file(inode);
 
 	/* Verify */
 	sprintf(path, "%s/upload_progress_inode_%d",
@@ -655,7 +656,7 @@ TEST_F(open_progress_infoTest, upload_pullpen_NotExist_OpenSuccess)
 	rmdir(upload_bullpen_path);
 }
 
-TEST_F(open_progress_infoTest, progressfile_Exist_ReOpenSuccess)
+TEST_F(create_progress_fileTest, progressfile_Exist_ReOpenSuccess)
 {
 	int fd;
 	int inode;
@@ -668,7 +669,7 @@ TEST_F(open_progress_infoTest, progressfile_Exist_ReOpenSuccess)
 	mknod(path, 0700, 0);
 	stat(path, &old_stat);
 
-	fd = open_progress_info(inode);
+	fd = create_progress_file(inode);
 
 	/* Verify */
 	stat(upload_bullpen_path, &new_stat);
@@ -682,15 +683,16 @@ TEST_F(open_progress_infoTest, progressfile_Exist_ReOpenSuccess)
 	rmdir(upload_bullpen_path);
 }
 
-class close_progress_infoTest : public ::testing::Test {
+class del_progress_fileTest : public ::testing::Test {
 protected:
 	char upload_bullpen_path[200];
 	char path[200];
+	char *metapath;
 
 	void SetUp()
 	{
-		METAPATH = "/tmp";
-		sprintf(upload_bullpen_path, "%s/upload_bullpen", METAPATH);
+		metapath = "/tmp";
+		sprintf(upload_bullpen_path, "%s/upload_bullpen", metapath);
 
 		if (!access(upload_bullpen_path, F_OK))
 			rmdir(upload_bullpen_path);
@@ -706,7 +708,7 @@ protected:
 	}
 };
 
-TEST_F(close_progress_infoTest, CloseSuccess)
+TEST_F(del_progress_fileTest, CloseSuccess)
 {
 	int fd;
 	int inode;
@@ -719,7 +721,7 @@ TEST_F(close_progress_infoTest, CloseSuccess)
 	fd = open(path, O_CREAT | O_RDWR);
 
 	/* Run */
-	ret = close_progress_info(fd, inode);
+	ret = del_progress_file(fd, inode);
 
 	/* Verify */
 	EXPECT_EQ(0, ret);
@@ -815,11 +817,12 @@ protected:
 	char progress_path[200];
 	char toupload_metapath[200];
 	char backend_metapath[200];
+	char *metapath;
 
 	virtual void SetUp()
 	{
-		METAPATH = "/tmp";
-		sprintf(bullpen_path, "%s/upload_bullpen", METAPATH);
+		metapath = "/tmp";
+		sprintf(bullpen_path, "%s/upload_bullpen", metapath);
 		if (!access(bullpen_path, F_OK))
 			rmdir(bullpen_path);
 		init_sync_control();
@@ -827,6 +830,7 @@ protected:
 		sem_init(&test_sync_struct.record_sem, 0, 1);
 		memset(&test_delete_struct, 0, sizeof(TEST_REVERT_STRUCT));
 		sem_init(&test_delete_struct.record_sem, 0, 1);
+		mkdir(bullpen_path, 0700);
 	}
 
 	virtual void TearDown()
@@ -839,6 +843,7 @@ protected:
 			rmdir(bullpen_path);
 		sem_destroy(&(sync_ctl.sync_op_sem));
 		sem_destroy(&(sync_ctl.sync_queue_sem));
+		rmdir(bullpen_path);
 	}
 
 	void init_sync_control(void)
@@ -869,7 +874,7 @@ void *terminate_sync_threads(void *data)
 						sync_ctl.inode_sync_thread[count],
 						NULL);
 				if (ret == 0) {
-					close_progress_info(
+					del_progress_file(
 						sync_ctl.progress_fd[count],
 						sync_ctl.threads_in_use[count]);
 					sem_wait(&sync_ctl.sync_op_sem);
@@ -884,55 +889,29 @@ void *terminate_sync_threads(void *data)
 	}
 }
 
-TEST_F(uploading_revertTest, BullpenNotExist)
-{
-	int ret;
-
-	ret = uploading_revert();
-	EXPECT_EQ(0, ret);
-}
-
-TEST_F(uploading_revertTest, BullpenCannotBeOpened)
-{
-	int ret;
-
-	mkdir(bullpen_path, 0000);
-
-	ret = uploading_revert();
-	EXPECT_EQ(-EACCES, ret);
-
-	rmdir(bullpen_path);
-}
-
 TEST_F(uploading_revertTest, Crash_AfterOpenProgressFile)
 {
 	int ret;
 	int fd;
 	int inode;
 	pthread_t terminate_tid;
+	SYNC_THREAD_TYPE sync_type;
 
 	/* Prepare mock data */
-	mkdir(bullpen_path, 0700);
 	inode = 3;
 	sprintf(progress_path, "%s/upload_progress_inode_%d",
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
-	close(fd);
+	sync_type.this_mode = S_IFREG;
+	sync_type.inode = inode;
+	sync_type.progress_fd = fd;
+	sync_type.which_index = 0;
 
-	keep_on = TRUE;
-	pthread_create(&terminate_tid, NULL,
-			terminate_sync_threads, NULL);
 	/* Run */
-	ret = uploading_revert();
-	EXPECT_EQ(0, ret);
-	keep_on = FALSE;
-	pthread_join(terminate_tid, NULL);	
+	revert_inode_uploading(&sync_type);
 
 	/* Verify */
 	EXPECT_EQ(-1, access(progress_path, F_OK));
-
-	/* Recycle */
-	rmdir(bullpen_path);
 }
 
 TEST_F(uploading_revertTest, Crash_AfterCopyLocalMeta)
@@ -941,33 +920,30 @@ TEST_F(uploading_revertTest, Crash_AfterCopyLocalMeta)
 	int fd;
 	int inode;
 	pthread_t terminate_tid;
+	SYNC_THREAD_TYPE sync_type;
+	PROGRESS_META tmp_meta;
 
 	/* Prepare mock data */
-	mkdir(bullpen_path, 0700);
 	inode = 3;
 	sprintf(progress_path, "%s/upload_progress_inode_%d",
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
-	close(fd);
-	
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+
 	fetch_toupload_meta_path(toupload_metapath, inode);
 	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+	sync_type.this_mode = S_IFREG;
+	sync_type.inode = inode;
+	sync_type.progress_fd = fd;
+	sync_type.which_index = 0;
 
-	keep_on = TRUE;
-	pthread_create(&terminate_tid, NULL,
-			terminate_sync_threads, NULL);
 	/* Run */
-	ret = uploading_revert();
-	EXPECT_EQ(0, ret);
-	keep_on = FALSE;
-	pthread_join(terminate_tid, NULL);	
+	revert_inode_uploading(&sync_type);
 
 	/* Verify */
 	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
 	EXPECT_EQ(-1, access(progress_path, F_OK));
-
-	/* Recycle */
-	rmdir(bullpen_path);
 }
 
 TEST_F(uploading_revertTest, Crash_AfterDownloadBackendMeta)
