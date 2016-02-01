@@ -1,3 +1,14 @@
+/*************************************************************************
+*
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: mock_function.c
+* Abstract: 
+*
+* Revision History
+* 2016/1/14 Jethro add copyright.
+*
+**************************************************************************/
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include <openssl/hmac.h>
