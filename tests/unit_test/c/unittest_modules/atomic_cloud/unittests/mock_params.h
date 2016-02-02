@@ -8,3 +8,6 @@ typedef struct {
 
 TEST_REVERT_STRUCT test_sync_struct;
 TEST_REVERT_STRUCT test_delete_struct;
+
+char is_first_upload;
+char fetch_from_cloud_fail;

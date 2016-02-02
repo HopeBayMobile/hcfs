@@ -183,4 +183,7 @@ int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 
 int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr);
 
+int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
+	long long bindex, long long seq);
+
 #endif  /* GW20_HCFS_META_MEM_CACHE_H_ */

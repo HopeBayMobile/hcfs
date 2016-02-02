@@ -74,7 +74,7 @@ int init_progress_info(int fd, long long backend_blocks, long long backend_size,
 
 int create_progress_file(ino_t inode);
 
-int del_progress_info(int fd, ino_t inode);
+int del_progress_file(int fd, ino_t inode);
 
 int check_and_copy_file(const char *srcpath, const char *tarpath,
 		BOOL lock_src);
@@ -88,13 +88,13 @@ int fetch_backend_meta_path(char *pathname, ino_t inode);
 
 char did_block_finish_uploading(int fd, long long blockno);
 
-int uploading_revert();
-
 long long query_status_page(int fd, long long block_index);
 
 void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr);
 
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		long long *total_backend_blocks);
+
+int fuse_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data);
 
 #endif

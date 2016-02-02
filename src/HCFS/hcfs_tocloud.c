@@ -1002,14 +1002,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		dispatch_delete_block(which_curl);
 	}
 
-	/* Wait for all deleting threads. TODO: error handling when
-	 * fail to delete cloud data */
+	/* Wait for all deleting threads. */
 	_busy_wait_all_specified_upload_threads(inode);
 	write_log(10, "Debug: Finish deleting unuseful blocks "
 			"for inode %"PRIu64" on cloud\n", (uint64_t)inode);
 	return 0;
 
 errcode_handle:
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
 	return errcode;
 }
 
@@ -1076,6 +1076,8 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 		/* Change status if local status is ST_LtoC */
 		flock(fileno(local_metafptr), LOCK_EX);
 		if (access(local_metapath, F_OK) < 0) {
+			write_log(8, "meta %"PRIu64" is removed "
+				"when changing to BOTH\n", (uint64_t)inode);
 			flock(fileno(local_metafptr), LOCK_UN);
 			break;
 		}
@@ -1208,7 +1210,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		return;
 	}
 
-	/* Open temp meta to be uploaded. TODO: Maybe copy meta here? */
+	/* Open temp meta to be uploaded. */
 	toupload_metafptr = fopen(toupload_metapath, "r");
 	if (toupload_metafptr == NULL) {
 		errcode = errno;

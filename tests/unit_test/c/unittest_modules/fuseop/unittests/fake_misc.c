@@ -360,11 +360,15 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	return 0;
 }
-int fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
-		long long block_no)
+int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
 	char tempbuf[1024];
 	int tmp_len;
+	ino_t this_inode;
+	long long block_no, seqnum;
+
+	sscanf(objname, "data_%"PRIu64"_%lld_%lld",
+			(uint64_t *)&this_inode, &block_no, &seqnum);
 
 	switch (this_inode) {
 	case 14:
@@ -429,12 +433,12 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 		inode_stat->st_ino = 4;
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
-		break;	
+		break;
 	case 6:
 		inode_stat->st_ino = 6;
 		inode_stat->st_mode = S_IFDIR | 0700;
 		inode_stat->st_atime = 100000;
-		break;	
+		break;
 	case 10:
 		inode_stat->st_ino = 10;
 		inode_stat->st_mode = S_IFREG | 0700;
@@ -677,9 +681,9 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 		return -EOPNOTSUPP;
 }
 
-int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
-	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
-	const char name_space, const char *key, 
+int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+	XATTR_PAGE *xattr_page, const long long xattr_filepos,
+	const char name_space, const char *key,
 	const char *value, const size_t size, const int flag)
 {
 	if (meta_cache_entry->inode_num == 20)
@@ -689,11 +693,11 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 }
 
 int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
-	const char name_space, const char *key, char *value, const size_t size, 
+	const char name_space, const char *key, char *value, const size_t size,
 	size_t *actual_size)
 {
 	if (meta_cache_entry->inode_num == 20)
-		return -EEXIST;	
+		return -EEXIST;
 
 	if (size == 0) {
 		*actual_size = CORRECT_VALUE_SIZE;
@@ -705,12 +709,12 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	return 0;
 }
 
-int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
-	XATTR_PAGE *xattr_page, char *key_buf, 
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+	XATTR_PAGE *xattr_page, char *key_buf,
 	const size_t size, size_t *actual_size)
 {
 	if (meta_cache_entry->inode_num == 20)
-		return -EEXIST;	
+		return -EEXIST;
 
 	if (size == 0) {
 		*actual_size = CORRECT_VALUE_SIZE;
@@ -723,7 +727,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 }
 
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	XATTR_PAGE *xattr_page, const long long xattr_filepos,
 	const char name_space, const char *key)
 {
 	if (meta_cache_entry->inode_num == 20)
@@ -732,7 +736,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	return 0;
 }
 
-int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, long long *xattr_pos)
 {
 	return 0;
@@ -753,8 +757,8 @@ void destroy_fs_manager(void)
 	return 0;
 }
 
-int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
-	const struct stat *this_stat, const char *link, 
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
+	const struct stat *this_stat, const char *link,
 	const unsigned long generation, const char *name)
 {
 	if (!strcmp("update_meta_fail", link))
@@ -770,7 +774,7 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 }
 
 int link_update_meta(ino_t link_inode, const char *newname,
-	struct stat *link_stat, unsigned long *generation, 
+	struct stat *link_stat, unsigned long *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {
 	memset(link_stat, 0, sizeof(struct stat));
@@ -890,4 +894,41 @@ int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
 BOOL is_natural_number(char *str)
 {
 	return TRUE;
+}
+
+void fetch_backend_block_objname(char *objname,
+#if DEDUP_ENABLE
+		unsigned char *obj_id)
+#else
+	ino_t inode, long long block_no, long long seqnum)
+#endif
+{
+#if DEDUP_ENABLE
+	char obj_id_str[OBJID_STRING_LENGTH];
+
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
+#else
+	sprintf(objname, "data_%"PRIu64"_%lld_%lld",
+			(uint64_t)inode, block_no, seqnum);
+#endif
+
+	return;
+}
+
+int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr,
+		ino_t inode, long long bindex, long long seq)
+{
+	return 0;
+}
+
+int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+		char is_now_uploading, int new_fd, long long toupload_blocks)
+{
+	return 0;
+}
+
+int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
 }

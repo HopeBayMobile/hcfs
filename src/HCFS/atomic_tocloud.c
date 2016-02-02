@@ -795,7 +795,8 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 	}
 
 	/* Copy xattr "trunc_size" if it exists */
-	/*ret_ssize = fgetxattr(fileno(src_ptr), "user.trunc_size",
+#ifndef _ANDROID_ENV_
+	ret_ssize = fgetxattr(fileno(src_ptr), "user.trunc_size",
 		&temp_trunc_size, sizeof(long long));
 	if (ret_ssize >= 0) {
 		fsetxattr(fileno(tar_ptr), "user.trunc_size",
@@ -803,7 +804,8 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 
 		fremovexattr(fileno(src_ptr), "user.trunc_size");
 		write_log(10, "Debug: trunc_size = %lld",temp_trunc_size);
-	}*/
+	}
+#endif
 
 	/* Unlock soruce file */
 	if (lock_src == TRUE)
@@ -884,6 +886,9 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 	ssize_t ret_ssize;
 	BOOL first_upload;
 
+	if (!S_ISREG(ptr->this_mode))
+		return 0;
+
 	if (ptr->is_revert == FALSE) {
 		/* Try to download backend meta */
 		backend_metafptr = NULL;
@@ -947,7 +952,6 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 
 		PREAD(ptr->progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 
-		/* Cancel to coninue */
 		if (progress_meta.finish_init_backend_data == TRUE) {
 			*backend_size = progress_meta.backend_size;
 			*total_backend_blocks =
@@ -1000,11 +1004,13 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	char finish_init;
 	int ret;
 	PROGRESS_META progress_meta;
+	int which_index;
 
 	finish_init = FALSE;
 	this_mode = data_ptr->this_mode;
 	inode = data_ptr->inode;
 	progress_fd = data_ptr->progress_fd;
+	which_index = data_ptr->which_index;
 
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
@@ -1081,9 +1087,11 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		if (finish_init == TRUE) {
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
-		case10 */
+		case10. Do not need to update backend size again. */
 			delete_backend_blocks(progress_fd, total_blocks,
 				inode, BACKEND_BLOCKS);
+			sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+			return;
 		} else {
 		/* Crash before copying local meta, so just
 		cancel uploading. case[1, 2] */
@@ -1104,3 +1112,133 @@ errcode_handle:
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
 }
+
+/**
+ * Set uploading data in meta cache.
+ *
+ * This static function aims to set uploading data in meta cache.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int fuse_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
+{
+	int ret;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	char toupload_metapath[300], local_metapath[300];
+	PROGRESS_META progress_meta;
+	struct stat tmpstat;
+	int errcode;
+	ssize_t ret_ssize;
+	long long toupload_blocks;
+
+	meta_cache_entry = NULL;
+	meta_cache_entry = meta_cache_lock_entry(data->inode);
+	if (!meta_cache_entry) {
+		write_log(0, "Fail to lock meta cache entry in %s\n", __func__);
+		return -ENOMEM;
+	}
+	ret = meta_cache_open_file(meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+
+	/* Copy meta if need to upload and is not reverting mode */
+	if ((data->is_uploading == TRUE) && (data->is_revert == FALSE)) {
+		fetch_toupload_meta_path(toupload_metapath,
+				data->inode);
+		fetch_meta_path(local_metapath, data->inode);
+		if (access(toupload_metapath, F_OK) == 0) {
+			write_log(2, "Cannot copy since "
+					"%s exists", toupload_metapath);
+			unlink(toupload_metapath);
+		}
+		ret = check_and_copy_file(local_metapath,
+				toupload_metapath, FALSE);
+		if (ret < 0) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			return ret;
+		}
+
+		ret = meta_cache_lookup_file_data(data->inode, &tmpstat,
+				NULL, NULL, 0, meta_cache_entry);
+		if (ret < 0) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			return ret;
+		}
+
+		/* Update info of to-upload blocks and size */
+		if (S_ISREG(tmpstat.st_mode)) {
+			flock(data->progress_list_fd, LOCK_EX);
+			PREAD(data->progress_list_fd, &progress_meta,
+					sizeof(PROGRESS_META), 0);
+			progress_meta.toupload_size = tmpstat.st_size;
+			toupload_blocks = (tmpstat.st_size == 0) ?
+				0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
+			progress_meta.total_toupload_blocks = toupload_blocks;
+			PWRITE(data->progress_list_fd, &progress_meta,
+					sizeof(PROGRESS_META), 0);
+			flock(data->progress_list_fd, LOCK_UN);
+
+			write_log(10, "Debug: toupload_size %lld,"
+				" total_toupload_blocks %lld\n",
+				progress_meta.toupload_size,
+				progress_meta.total_toupload_blocks);
+		}
+	}
+
+	/* Just read progress meta when continuing uploading */
+	if ((data->is_uploading == TRUE) && (data->is_revert == TRUE)) {
+		flock(data->progress_list_fd, LOCK_EX);
+		PREAD(data->progress_list_fd, &progress_meta,
+				sizeof(PROGRESS_META), 0);
+		flock(data->progress_list_fd, LOCK_UN);
+		toupload_blocks = progress_meta.total_toupload_blocks;
+	}
+
+	/* Set uploading information */
+	if (data->is_uploading == TRUE) {
+		ret = meta_cache_set_uploading_info(meta_cache_entry,
+			TRUE, data->progress_list_fd,
+			toupload_blocks);
+	} else {
+		if (data->finish_sync == TRUE) {
+			ret = update_upload_seq(meta_cache_entry);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+		}
+		ret = meta_cache_set_uploading_info(meta_cache_entry,
+			FALSE, 0, 0);
+	}
+	if (ret < 0) {
+		write_log(0, "Fail to set uploading info in %s\n", __func__);
+		meta_cache_close_file(meta_cache_entry);
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+
+	/* Unlock meta cache */
+	ret = meta_cache_close_file(meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+	ret = meta_cache_unlock_entry(meta_cache_entry);
+	if (ret < 0) {
+		write_log(0, "Fail to unlock entry in %s\n", __func__);
+		return ret;
+	}
+
+	return 0;
+
+errcode_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return errcode;
+}
+
+
