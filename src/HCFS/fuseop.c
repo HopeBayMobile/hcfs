@@ -4309,10 +4309,10 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (system_size > (500 * powl(1024, 3)))
+	if (system_size > (512 * powl(1024, 3)))
 		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
 	else
-		buf->f_blocks = (250*powl(1024, 2));
+		buf->f_blocks = (256*powl(1024, 2));
 
 	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
