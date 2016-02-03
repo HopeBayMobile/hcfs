@@ -212,3 +212,9 @@ int backup_FS_database(void)
 {
 	return 0;
 }
+
+void fetch_backend_block_objname(char *objname, ino_t inode,
+		long long block_no, long long seqnum)
+{
+	return;
+}

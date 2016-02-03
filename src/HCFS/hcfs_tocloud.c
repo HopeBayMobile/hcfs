@@ -255,7 +255,7 @@ static inline void _sync_terminate_thread(int index)
 			 * meta exist */
 			fetch_meta_path(local_metapath, inode);
 			if (access(local_metapath, F_OK) == 0) {
-				tag_ret = tag_status_on_fuse(inode, FALSE, 0,
+				tag_ret = comm2fuseproc(inode, FALSE, 0,
 					sync_ctl.is_revert[index], finish_sync);
 				if (tag_ret < 0) {
 					write_log(0, "Fail to tag inode %lld "
@@ -2142,7 +2142,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			}
 
 			/* Notify fuse process that it is going to upload */
-			ret = tag_status_on_fuse(this_inode, TRUE,
+			ret = comm2fuseproc(this_inode, TRUE,
 					progress_fd, sync_ctl.is_revert[count],
 					FALSE);
 			if (ret < 0) {

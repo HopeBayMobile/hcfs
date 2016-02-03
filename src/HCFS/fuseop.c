@@ -6381,7 +6381,7 @@ void *fuse_communication_contact_window(void *data)
 		recv(ac_fd, &uploading_data,
 			sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 
-		ret = fuse_set_uploading_info(&uploading_data);
+		ret = fuseproc_set_uploading_info(&uploading_data);
 		if (ret < 0) {
 			communicate_result = ret;
 			write_log(2, "Fail to tag inode %lld in %s",

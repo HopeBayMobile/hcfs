@@ -95,12 +95,14 @@ protected:
 	static void *fetch_from_cloud_for_thread(void *block_no)
 	{
 		char tmp_filename[50];
+		char objname[100];
 		FILE *fptr;
 		int ret;
 
+		sprintf(objname, "data_1_%ld", *(int *)block_no);
 		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int *)block_no);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, READ_BLOCK, 1, *(int *)block_no);
+		ret = fetch_from_cloud(fptr, READ_BLOCK, objname);
 		fclose(fptr);
 		unlink(tmp_filename);
 		return NULL;
@@ -126,7 +128,7 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_paused = TRUE;
 
-	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, 0, 0));
+	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, NULL));
 }
 
 TEST_F(fetch_from_cloudTest, FetchSuccess)
@@ -533,13 +535,15 @@ protected:
 	char metapath[300];
 	void SetUp()
 	{
+		mkdir("/tmp/testHCFS", 0700);
+		mknod("/tmp/testHCFS/tmp_meta", 0700, 0);
 		OPEN_BLOCK_PATH_FAIL = FALSE;
 		OPEN_META_PATH_FAIL = FALSE;
     		FETCH_BACKEND_BLOCK_TESTING = TRUE;
 
 		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 		download_thread_ctl.block_info[0].this_inode = 1;
-		download_thread_ctl.block_info[0].block_no = 0;
+		download_thread_ctl.block_info[0].block_no = 123;
 		download_thread_ctl.block_info[0].dl_error = FALSE;
 
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
@@ -550,6 +554,8 @@ protected:
 
 	void TearDown()
 	{
+		unlink("/tmp/testHCFS/tmp_meta");
+		rmdir("/tmp/testHCFS");
 		if (access(metapath, F_OK) == 0)
 			unlink(metapath);
 	}
@@ -574,8 +580,8 @@ TEST_F(fetch_backend_blockTest, BlockStatusIsLDISK)
 {
 	pthread_t tid;
 
-	NOW_STATUS = ST_CLOUD;
-	OPEN_META_PATH_FAIL = TRUE;
+	NOW_STATUS = ST_LDISK;
+	OPEN_META_PATH_FAIL = FALSE;
 
 	/* Test */
 	pthread_create(&tid, NULL, fetch_backend_block,
@@ -583,7 +589,7 @@ TEST_F(fetch_backend_blockTest, BlockStatusIsLDISK)
 	pthread_join(tid, NULL);
 
 	/* Verify */
-	EXPECT_EQ(TRUE, download_thread_ctl.block_info[0].dl_error);
+	EXPECT_EQ(FALSE, download_thread_ctl.block_info[0].dl_error);
 }
 
 TEST_F(fetch_backend_blockTest, FetchSuccess)
@@ -591,8 +597,7 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 	pthread_t tid;
 
 	NOW_STATUS = ST_CLOUD;
-	fetch_meta_path(metapath, 0);
-	mknod(metapath, 0700, 0);
+	OPEN_META_PATH_FAIL = FALSE;
 
 	/* Test */
 	pthread_create(&tid, NULL, fetch_backend_block,

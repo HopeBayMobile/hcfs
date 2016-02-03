@@ -962,3 +962,229 @@ TEST_F(decrease_pinned_sizeTest, QuotaIsInsufficient)
 }
 
 /* End of unittest for decrease_pinned_size() */
+
+/*
+ * Unittest of fuseproc_set_uploading_info() 
+ */
+class fuseproc_set_uploading_infoTest : public ::testing::Test {
+protected:
+	char progress_path[200];
+
+	void SetUp()
+	{
+		MAX_BLOCK_SIZE = 1048576;
+	}
+
+	void TearDown()
+	{
+		if (!access(progress_path, F_OK))
+			unlink(progress_path);
+	}
+};
+
+TEST_F(fuseproc_set_uploading_infoTest, Uploading_NotRevertMode_Regfile)
+{
+	UPLOADING_COMMUNICATION_DATA data;
+	PROGRESS_META progress_meta;
+	int fd;
+	int inode;
+	int ret;
+
+	inode = INO_REGFILE;
+	sprintf(progress_path, "/tmp/mock_progress_%d", inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&progress_meta, 0, sizeof(PROGRESS_META));
+	pwrite(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+	data.inode = inode;
+	data.is_uploading = TRUE;
+	data.is_revert = FALSE;
+	data.finish_sync = FALSE;
+	data.progress_list_fd = fd;
+
+	ret = fuseproc_set_uploading_info(&data);
+
+	EXPECT_EQ(0, ret);
+	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	EXPECT_EQ(NUM_BLOCKS * MOCK_BLOCK_SIZE, progress_meta.toupload_size);
+	EXPECT_EQ(TRUE, CHECK_UPLOADING_FLAG);
+	EXPECT_EQ(NUM_BLOCKS * MOCK_BLOCK_SIZE / MAX_BLOCK_SIZE + 1,
+			CHECK_TOUPLOAD_BLOCKS);
+	
+	close(fd);
+	unlink(progress_path);
+}
+
+TEST_F(fuseproc_set_uploading_infoTest, Uploading_NotRevertMode_NotRegfile)
+{
+	UPLOADING_COMMUNICATION_DATA data;
+	PROGRESS_META progress_meta, verified_meta;
+	int fd;
+	int inode;
+	int ret;
+
+	inode = INO_DIR;
+	sprintf(progress_path, "/tmp/mock_progress_%d", inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&progress_meta, 0, sizeof(PROGRESS_META));
+	pwrite(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+	data.inode = inode;
+	data.is_uploading = TRUE;
+	data.is_revert = FALSE;
+	data.finish_sync = FALSE;
+	data.progress_list_fd = fd;
+
+	ret = fuseproc_set_uploading_info(&data);
+
+	EXPECT_EQ(0, ret);
+	pread(fd, &verified_meta, sizeof(PROGRESS_META), 0);
+	EXPECT_EQ(0, memcmp(&verified_meta, &progress_meta,
+			sizeof(PROGRESS_META)));
+	EXPECT_EQ(TRUE, CHECK_UPLOADING_FLAG);
+	EXPECT_EQ(0, CHECK_TOUPLOAD_BLOCKS);
+
+	close(fd);
+	unlink(progress_path);
+}
+
+TEST_F(fuseproc_set_uploading_infoTest, Uploading_RevertMode)
+{
+	UPLOADING_COMMUNICATION_DATA data;
+	PROGRESS_META progress_meta;
+	int fd;
+	int inode;
+	int ret;
+
+	inode = INO_REGFILE;
+	sprintf(progress_path, "/tmp/mock_progress_%d", inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&progress_meta, 0, sizeof(PROGRESS_META));
+	progress_meta.total_toupload_blocks = 123456;
+	pwrite(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+	data.inode = inode;
+	data.is_uploading = TRUE;
+	data.is_revert = TRUE;
+	data.finish_sync = FALSE;
+	data.progress_list_fd = fd;
+
+	ret = fuseproc_set_uploading_info(&data);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(TRUE, CHECK_UPLOADING_FLAG);
+	EXPECT_EQ(123456, CHECK_TOUPLOAD_BLOCKS);
+
+	close(fd);
+	unlink(progress_path);
+}
+
+TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
+{
+	UPLOADING_COMMUNICATION_DATA data;
+	PROGRESS_META progress_meta;
+	int fd;
+	int inode;
+	int ret;
+
+	inode = INO_REGFILE;
+	
+	data.inode = inode;
+	data.is_uploading = FALSE;
+	data.is_revert = FALSE;
+	data.finish_sync = FALSE;
+	data.progress_list_fd = 0;
+
+	ret = fuseproc_set_uploading_info(&data);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(FALSE, CHECK_UPLOADING_FLAG);
+	EXPECT_EQ(0, CHECK_TOUPLOAD_BLOCKS);
+
+	close(fd);
+	unlink(progress_path);
+}
+/*
+ * End of unittest of fuseproc_set_uploading_info() 
+ */
+
+/*
+ * Unittest for update_upload_seq()
+ */
+class update_upload_seqTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(update_upload_seqTest, UpdateRegfile)
+{
+	int inode;
+	int ret;
+	META_CACHE_ENTRY_STRUCT meta_entry;
+
+	inode = INO_REGFILE;
+	meta_entry.inode_num = inode;
+	CHECK_UPLOAD_SEQ = 0;
+
+	ret = update_upload_seq(&meta_entry);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(MOCK_UPLOAD_SEQ + 1, CHECK_UPLOAD_SEQ);
+}
+
+TEST_F(update_upload_seqTest, UpdateDir)
+{
+	int inode;
+	int ret;
+	META_CACHE_ENTRY_STRUCT meta_entry;
+
+	inode = INO_DIR;
+	meta_entry.inode_num = inode;
+	CHECK_UPLOAD_SEQ = 0;
+
+	ret = update_upload_seq(&meta_entry);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(MOCK_UPLOAD_SEQ + 1, CHECK_UPLOAD_SEQ);
+}
+
+TEST_F(update_upload_seqTest, UpdateLink)
+{
+	int inode;
+	int ret;
+	META_CACHE_ENTRY_STRUCT meta_entry;
+
+	inode = INO_LNK;
+	meta_entry.inode_num = inode;
+	CHECK_UPLOAD_SEQ = 0;
+
+	ret = update_upload_seq(&meta_entry);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(MOCK_UPLOAD_SEQ + 1, CHECK_UPLOAD_SEQ);
+}
+
+TEST_F(update_upload_seqTest, UpdateFIFO)
+{
+	int inode;
+	int ret;
+	META_CACHE_ENTRY_STRUCT meta_entry;
+
+	inode = INO_FIFO;
+	meta_entry.inode_num = inode;
+	CHECK_UPLOAD_SEQ = 0;
+
+	ret = update_upload_seq(&meta_entry);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(MOCK_UPLOAD_SEQ + 1, CHECK_UPLOAD_SEQ);
+}
+/*
+ * End of unittest for update_upload_seq()
+ */ 

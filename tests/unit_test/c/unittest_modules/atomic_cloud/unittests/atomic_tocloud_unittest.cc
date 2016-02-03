@@ -13,9 +13,9 @@ extern "C" {
 SYSTEM_CONF_STRUCT *system_config;
 
 /*
- * Unittest for tag_status_on_fuse()
+ * Unittest for comm2fuseproc()
  */ 
-class tag_status_on_fuseTest : public ::testing::Test {
+class comm2fuseprocTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
 	{
@@ -67,7 +67,7 @@ void *mock_sock_connector(void *data)
 	return NULL;
 }
 
-TEST_F(tag_status_on_fuseTest, FailToConnect_SocketPathNotExist)
+TEST_F(comm2fuseprocTest, FailToConnect_SocketPathNotExist)
 {
 	int ret;
 	int fd = 1;
@@ -75,12 +75,12 @@ TEST_F(tag_status_on_fuseTest, FailToConnect_SocketPathNotExist)
 	ino_t inode = 1;
 
 	ret = 0;
-	ret = tag_status_on_fuse(inode, status, fd, FALSE, FALSE);
+	ret = comm2fuseproc(inode, status, fd, FALSE, FALSE);
 
 	EXPECT_EQ(-ENOENT, ret);
 }
 
-TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseFail)
+TEST_F(comm2fuseprocTest, SucceedToConn_ResponseFail)
 {
 	int ret;
 	pthread_t tid;
@@ -92,14 +92,14 @@ TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseFail)
 
 	usleep(100000); /* Wait for connector */
 	ret = 0;
-	ret = tag_status_on_fuse(inode, status, fd, FALSE, FALSE);
+	ret = comm2fuseproc(inode, status, fd, FALSE, FALSE);
 
 	EXPECT_EQ(-1, ret);
 
 	pthread_join(tid, NULL);
 }
 
-TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseSuccess)
+TEST_F(comm2fuseprocTest, SucceedToConn_ResponseSuccess)
 {
 	int ret;
 	pthread_t tid;
@@ -111,14 +111,14 @@ TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseSuccess)
 
 	usleep(100000); /* Wait for connector */
 	ret = 0;
-	ret = tag_status_on_fuse(inode, status, fd, FALSE, FALSE);
+	ret = comm2fuseproc(inode, status, fd, FALSE, FALSE);
 
 	EXPECT_EQ(0, ret);
 
 	pthread_join(tid, NULL);
 }
 /*
- * End of unittest for tag_status_on_fuse()
+ * End of unittest for comm2fuseproc()
  */ 
 
 /*

@@ -16,6 +16,7 @@
 #include "global.h"
 #include "mount_manager.h"
 #include "dir_statistics.h"
+#include "atomic_tocloud.h"
 
 #include "fake_misc.h"
 
@@ -929,6 +930,11 @@ int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 }
 
 int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
+int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 {
 	return 0;
 }

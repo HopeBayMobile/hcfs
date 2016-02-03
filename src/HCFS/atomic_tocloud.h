@@ -51,7 +51,7 @@ typedef struct {
 	long long quadruple_indirect;
 } PROGRESS_META;
 
-int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
+int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 	int fd, BOOL is_revert, BOOL finish_sync);
 
 int get_progress_info(int fd, long long block_index,
@@ -94,7 +94,5 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr);
 
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		long long *total_backend_blocks);
-
-int fuse_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data);
 
 #endif

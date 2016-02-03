@@ -1619,6 +1619,23 @@ int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	return 0;
 }
 
+/**
+ * meta_cache_check_uploading
+ *
+ * This function is used to check if this file is now uploading.
+ * Case 1: The file is uploading and this block finish upload,
+ *         so just do nothing.
+ * Case 2: The file is uploading and this block does NOT be uploaded,
+ *         so try to copy this block to to-upload block.
+ * Case 3: The file is not uploading, so do nothing and return;
+ *
+ * @param body_ptr This meta cache entry.
+ * @param inode This inode to check if it is now uploading.
+ * @param bindex Block index of this inode.
+ * @param seq Sequence number of this block
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
 int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	long long bindex, long long seq)
 {
@@ -1637,6 +1654,7 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		return 0;
 
 	} else {
+
 		/* Do nothing when block index + 1 more than # of blocks
 		 * of to-upload data */
 		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
@@ -1647,10 +1665,15 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 			return 0;
 		}
 
-		/* Check if this block finished uploading */
-		if (did_block_finish_uploading(progress_fd, bindex) == TRUE) {
-			return 0;
+		if (progress_fd <= 0) {
+			write_log(0, "Error: fd error of inode %"PRIu64" in %s\n",
+					(uint64_t)inode, __func__);
+			return -EIO;
 		}
+
+		/* Check if this block finished uploading */
+		if (did_block_finish_uploading(progress_fd, bindex) == TRUE)
+			return 0;
 
 		fetch_block_path(local_bpath, inode, bindex);
 		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
@@ -1658,24 +1681,35 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 		write_log(10, "Debug: begin to copy block, obj is %s", objname);
 		ret = check_and_copy_file(local_bpath, toupload_bpath, TRUE);
 		if (ret < 0) {
-			if (ret != -EEXIST && ret != -ENOENT) {
-				write_log(0, "Error: Copy block error in %s. "
-					"Code %d\n", __func__, -ret);
-				return ret;
-
 			/* -EEXIST means target had been copied, and -ENOENT
 			 * means src file is deleted. */
-			} else {
+			if (ret == -EEXIST || ret == -ENOENT) {
 				write_log(10, "Debug: block_%"PRIu64"_%lld had"
 					" been copied in %s\n", (uint64_t)inode,
 					bindex, __func__);
 				return 0;
+
+			} else {
+				write_log(0, "Error: Copy block error in %s. "
+					"Code %d\n", __func__, -ret);
+				return ret;
 			}
 		}
 		return 0;
 	}
 }
 
+/**
+ * meta_cache_sync_later
+ *
+ * Set can_be_synced_cloud_later flag on so that this inode will not
+ * be marked as dirty after update meta cache data next time. The flag
+ * will be set as FALSE in flush_single_entry().
+ *
+ * @param body_ptr Meta cache entry of this inode.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
 int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));

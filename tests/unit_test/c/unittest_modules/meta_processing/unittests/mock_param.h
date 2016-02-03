@@ -141,4 +141,11 @@ SYSTEM_CONF_STRUCT *system_config;
  */
 char *check_actual_delete_table;
 
+/* meta_cache_set_uploading_info */
+char CHECK_UPLOADING_FLAG;
+long long CHECK_TOUPLOAD_BLOCKS;
+
+#define MOCK_UPLOAD_SEQ 1234
+long long CHECK_UPLOAD_SEQ;
+
 #endif

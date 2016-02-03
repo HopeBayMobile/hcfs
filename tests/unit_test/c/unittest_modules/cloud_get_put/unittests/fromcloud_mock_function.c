@@ -30,7 +30,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_en
 	int inode, block_no;
 
 	if (FETCH_BACKEND_BLOCK_TESTING == TRUE)
-		return 0;
+		return HTTP_OK;
 
 	sscanf(objname, "data_%d_%d", &inode, &block_no);
 	if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
@@ -161,4 +161,11 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page)
 {
 	return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+}
+
+void fetch_backend_block_objname(char *objname, ino_t inode,
+		long long block_no, long long seqnum)
+{
+	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
+	return;
 }
