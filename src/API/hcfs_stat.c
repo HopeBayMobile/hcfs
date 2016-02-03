@@ -40,6 +40,41 @@ int _get_usage_val(unsigned int api_code, long long *res_val)
 	return 0;
 }
 
+int get_volume_usage(long long *vol_usage)
+{
+
+	int fd, ret_code, size_msg;
+	unsigned int code, cmd_len, reply_len;
+	long long ll_ret_code;
+	char buf[1];
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = GETVOLSIZE;
+	cmd_len = 1;
+	buf[0] = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ll_ret_code, sizeof(long long), 0);
+
+	if (ll_ret_code < 0) {
+		*vol_usage = 0;
+		ret_code = (int)ll_ret_code;
+		close(fd);
+		return ret_code;
+	}
+
+	*vol_usage = ll_ret_code;
+	close(fd);
+	return 0;
+}
+
 int get_cloud_usage(long long *cloud_usage)
 {
 
@@ -166,7 +201,7 @@ int get_cloud_stat(int *cloud_stat)
 	return 0;
 }
 
-int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
+int get_hcfs_stat(long long *vol_usage, long long *cloud_usage, long long *cache_total,
 		  long long *cache_used, long long *cache_dirty,
 		  long long *pin_max, long long *pin_total,
 		  long long *xfer_up, long long *xfer_down,
@@ -174,6 +209,10 @@ int get_hcfs_stat(long long *cloud_usage, long long *cache_total,
 {
 
 	int ret_code;
+
+	ret_code = get_volume_usage(vol_usage);
+	if (ret_code < 0)
+		return ret_code;
 
 	ret_code = get_cloud_usage(cloud_usage);
 	if (ret_code < 0)
