@@ -8,6 +8,7 @@ include $(CLEAR_VARS)
 LOCAL_CFLAGS	:= -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D__MULTI_THREAD -O0 $(HCFS_CFLAGS)
 LOCAL_MODULE    := libfuse
 LOCAL_SRC_FILES := libfuse/cuse_lowlevel.c \
+                   libfuse/buffer.c \
                    libfuse/fuse.c \
                    libfuse/fuse_kern_chan.c \
                    libfuse/fuse_loop.c \
