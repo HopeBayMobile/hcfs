@@ -50,12 +50,12 @@ acer-s58a-%: NDK_ARG += OPENSSL_IS_BORINGSSL=1
 _nr_cpu := $(shell cat /proc/cpuinfo | grep processor | wc -l)
 PARALLEL_JOBS := -j$(shell expr $(_nr_cpu) + $(_nr_cpu))
 
-out/%-hcfs:
+out/%-hcfs: force
 	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
 	$(runprepareout)
 	@rm -rf $@/gdb.* $@/armeabi
 
-out/%-hcfs-gdb:
+out/%-hcfs-gdb: force
 	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
 	$(runprepareout)
 	@cp $@/system/*/* $@/armeabi
@@ -65,4 +65,4 @@ out/%-hcfs-gdb:
 out:
 	mkdir out
 
-.PHONY: clean
+.PHONY: clean force

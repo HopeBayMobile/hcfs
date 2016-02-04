@@ -7,23 +7,8 @@ LOCAL_ALLOW_UNDEFINED_SYMBOLS := true
 include $(CLEAR_VARS)
 LOCAL_CFLAGS	:= -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D__MULTI_THREAD -O0 $(HCFS_CFLAGS)
 LOCAL_MODULE    := libfuse
-LOCAL_SRC_FILES := libfuse/cuse_lowlevel.c \
-                   libfuse/buffer.c \
-                   libfuse/fuse.c \
-                   libfuse/fuse_kern_chan.c \
-                   libfuse/fuse_loop.c \
-                   libfuse/fuse_loop_mt.c \
-                   libfuse/fuse_lowlevel.c \
-                   libfuse/fuse_mt.c \
-                   libfuse/fuse_opt.c \
-                   libfuse/fuse_session.c \
-                   libfuse/fuse_signals.c \
-                   libfuse/helper.c \
-                   libfuse/mount.c \
-                   libfuse/mount_util.c \
-                   libfuse/ulockmgr.c
-
-LOCAL_C_INCLUDES := $(BUILD_PATH)/include
+LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)../third_party/libfuse/*.c)
+LOCAL_C_INCLUDES := $(BUILD_PATH)/include $(BUILD_PATH)/include/fuse
 LOCAL_LDFLAGS += -O0 -fuse-ld=mcld
 include $(BUILD_SHARED_LIBRARY)
 
