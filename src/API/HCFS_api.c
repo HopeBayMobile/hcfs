@@ -621,6 +621,7 @@ void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
 	}
 
 	code = QUERYPKGUID;
+	cmd_len = 0;
 
 	CONCAT_ARGS(pkg_name);
 
