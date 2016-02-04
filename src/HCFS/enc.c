@@ -122,7 +122,7 @@ int aes_gcm_encrypt_core(unsigned char *output, unsigned char *input,
 		retcode = 1;
 		goto final;
 	}
-	if (!EVP_EncryptFinal(&ctx, output + output_preserve_size + tmp_length,
+	if (!EVP_EncryptFinal_ex(&ctx, output + output_preserve_size + tmp_length,
 			      &output_length)) {
 		retcode = 2;
 		goto final;
@@ -181,7 +181,7 @@ int aes_gcm_decrypt_core(unsigned char *output, unsigned char *input,
 		retcode = 1;
 		goto decrypt_final;
 	}
-	if (!EVP_DecryptFinal(&ctx, tag, &output_length)) {
+	if (!EVP_DecryptFinal_ex(&ctx, tag, &output_length)) {
 		retcode = 2;
 		goto decrypt_final;
 	}
@@ -398,15 +398,16 @@ FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
 }
 
 /************************************************************************
- * *
- * * Function name: decode_to_fd
- * *        Inputs: FILE* to_fd, open with 'w' mode, unsigned char* key,unsigned
- * *  char* input,int input_length, enc_flag, compress_flag,
- * *       Summary: Decode to to_fd
- * *
- * *  Return value: 0 if success or 1 if failed
- * *
- * *************************************************************************/
+ *
+ * Function name: decode_to_fd
+ *        Inputs: FILE* to_fd, open with 'w' mode,
+ *                unsigned char* key, unsigned char* input,
+ *                int input_length, int enc_flag, int compress_flag
+ *       Summary: Decode to to_fd
+ *
+ *  Return value: 0 if success or 1 if failed
+ *
+ *************************************************************************/
 int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 		 int input_length, int enc_flag, int compress_flag)
 {

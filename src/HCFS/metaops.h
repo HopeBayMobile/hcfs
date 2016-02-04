@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: metaops.h
 * Abstract: The c header file for meta processing involving regular
@@ -54,7 +54,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			MOUNT_T *mptr);
 int mark_inode_delete(fuse_req_t req, ino_t this_inode);
 
-int disk_markdelete(ino_t this_inode, ino_t root_inode);
+int disk_markdelete(ino_t this_inode, MOUNT_T *mptr);
 int disk_cleardelete(ino_t this_inode, ino_t root_inode);
 int disk_checkdelete(ino_t this_inode, ino_t root_inode);
 int startup_finish_delete(void);
@@ -65,5 +65,8 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status);
 int collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 	long long *num_dir_node, ino_t **nondir_node_list,
 	long long *num_nondir_node);
+
+int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+		META_CACHE_ENTRY_STRUCT *selbody_ptr);
 
 #endif /* GW20_HCFS_METAOPS_H_ */

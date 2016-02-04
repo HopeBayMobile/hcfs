@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: metaops.c
 * Abstract: The c source code file for meta processing involving regular
@@ -16,6 +16,8 @@
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
 * 2015/5/28 Jiahong adding error handling
 * 2015/6/2 Jiahong moving lookup_dir to this file
+* 2016/1/18 Jiahong revised actual_delete_inode routine
+* 2016/1/19 Jiahong revised disk_markdelete
 **************************************************************************/
 #include "metaops.h"
 
@@ -457,6 +459,8 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	int ret_val;
 	struct stat tmpstat;
 
+	/* TODO: remove unused parameter ‘parent_inode1’ */
+	UNUSED(parent_inode1);
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
 								"..", body_ptr);
 
@@ -813,6 +817,7 @@ long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 	int ret;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
+	UNUSED(hint_page);
 	/* First check if meta cache is locked */
 	/* Do not actually create page here */
 
@@ -1142,6 +1147,7 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	int which_indirect;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
+	UNUSED(hint_page);
 	/* First check if meta cache is locked */
 	/* Do not actually create page here */
 	/*TODO: put error handling for the read/write ops here*/
@@ -1226,7 +1232,9 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	SYSTEM_DATA_TYPE *statptr;
+	char meta_deleted;
 
+	meta_deleted = FALSE;
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
@@ -1283,6 +1291,18 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
+		if (access(thismetapath, F_OK) != 0) {
+			errcode = errno;
+			if (errcode != ENOENT) {
+				write_log(0, "IO error, code %d\n", errcode);
+				return -errcode;
+			}
+			meta_deleted = TRUE;
+			ret = fetch_todelete_path(thismetapath, this_inode);
+			if (ret < 0)
+				return ret;
+		}
+
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;
@@ -1290,17 +1310,33 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				__func__, errcode, strerror(errcode));
 			return errcode;
 		}
+
 		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0) {
-			fclose(metafptr);
-			return ret;
+		if (meta_deleted == FALSE) {
+			ret = delete_inode_meta(this_inode);
+			if (ret < 0) {
+				fclose(metafptr);
+				return ret;
+			}
 		}
 
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
+		memset(&this_inode_stat, 0, sizeof(struct stat));
+		memset(&file_meta, 0, sizeof(FILE_META_TYPE));
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
+		if (ret_size < 1) {
+			write_log(2, "Skipping block deletion (meta gone)\n");
+			fclose(metafptr);
+			break;
+		}
+
 		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
+		if (ret_size < 1) {
+			write_log(2, "Skipping block deletion (meta gone)\n");
+			fclose(metafptr);
+			break;
+		}
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
@@ -1326,6 +1362,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				}
 				current_page = which_page;
 				FSEEK(metafptr, page_pos, SEEK_SET);
+				memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
 					1, metafptr);
 			}
@@ -1428,7 +1465,7 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	ret = disk_markdelete(this_inode, tmpptr->f_ino);
+	ret = disk_markdelete(this_inode, tmpptr);
 	if (ret < 0)
 		return ret;
 	ret = lookup_markdelete(tmpptr->lookup_table, this_inode);
@@ -1436,21 +1473,65 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 }
 
 /* Mark inode as to delete on disk */
-int disk_markdelete(ino_t this_inode, ino_t root_inode)
+int disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
 {
 	char pathname[200];
 	int ret, errcode;
+	char *tmppath;
+	FILE *fptr;
+
+	tmppath = NULL;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
 	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
 
-	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
-			(uint64_t)this_inode, (uint64_t)root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
+	         METAPATH, (uint64_t)this_inode, (uint64_t)mptr->f_ino);
 
+	/* In Android env, if need to delete the inode, first remember
+	the path of the inode if needed */
+#ifdef _ANDROID_ENV_
+	if (access(pathname, F_OK) != 0) {
+		if (IS_ANDROID_EXTERNAL(mptr->volume_type)) {
+			if (mptr->vol_path_cache == NULL) {
+				MKNOD(pathname, S_IFREG | 0700, 0);
+			} else {
+				ret = construct_path(mptr->vol_path_cache,
+				                     this_inode, &tmppath,
+				                     mptr->f_ino);
+				if (ret < 0) {
+					if (tmppath != NULL)
+						free(tmppath);
+					errcode = ret;
+					goto errcode_handle;
+				}
+				fptr = fopen(pathname, "w");
+				if (fptr == NULL) {
+					errcode = -errno;
+					write_log(0, "IO Error\n");
+					goto errcode_handle;
+				}
+				ret = fprintf(fptr, "%s ", tmppath);
+				if (ret < 0) {
+					errcode = -EIO;
+					fclose(fptr);
+					write_log(0, "IO Error\n");
+					goto errcode_handle;
+				}
+
+				fclose(fptr);
+				free(tmppath);
+			}
+		} else {
+			MKNOD(pathname, S_IFREG | 0700, 0);
+		}
+	}
+#else
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
+#endif
 
 	return 0;
 
@@ -1923,4 +2004,202 @@ errcode_handle:
 	*nondir_node_list = NULL;
 	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
 	return errcode;
+}
+
+static BOOL _namespace_filter(char namespace) /* Only SECURITY now */
+{
+	return (namespace == SECURITY ? TRUE : FALSE);
+}
+
+/**
+ * inherit_xattr()
+ *
+ * Inherit xattrs from parent.
+ *
+ * @param parent_inode Parent inode number
+ * @param this_inode Self inode number
+ * @param selbody_ptr Self meta cache entry, which had been locked.
+ *
+ * @return 0 on success, otherwise negative errcode.
+ */ 
+int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+		META_CACHE_ENTRY_STRUCT *selbody_ptr)
+{
+	META_CACHE_ENTRY_STRUCT *pbody_ptr;
+	XATTR_PAGE p_xattr_page, sel_xattr_page;
+	DIR_META_TYPE dirmeta;
+	long long p_xattr_pos, sel_xattr_pos;
+	size_t total_keysize, total_keysize2;
+	const char *key_ptr;
+	char now_key[400], namespace, key[300];
+	char *key_buf, *value_buf;
+	size_t value_buf_size;
+	size_t value_size;
+	int ret;
+
+	key_buf = NULL;
+	value_buf = NULL;
+
+	/* self fptr should be opened */
+	ret = meta_cache_open_file(selbody_ptr);
+	if (ret < 0)
+		return ret;
+
+	/* Lock parent */
+	pbody_ptr = meta_cache_lock_entry(parent_inode);
+	if (!pbody_ptr) {
+		return -ENOMEM;		
+	}
+	ret = meta_cache_open_file(pbody_ptr);
+	if (ret < 0) {
+		meta_cache_unlock_entry(pbody_ptr);
+		return ret;
+	}
+
+	ret = meta_cache_lookup_dir_data(parent_inode, NULL, &dirmeta,
+			NULL, pbody_ptr);
+	if (ret < 0)
+		goto errcode_handle;
+
+	/* Check xattr_page */
+	if (dirmeta.next_xattr_page <= 0) {
+		write_log(10, "Debug: parent inode %"PRIu64
+				" has no xattr page.\n",
+				(uint64_t)parent_inode);
+		meta_cache_close_file(pbody_ptr);
+		meta_cache_unlock_entry(pbody_ptr);
+		return 0;
+	}
+
+	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+
+	/* Fetch needed size of key buffer */
+	ret = list_xattr(pbody_ptr, &p_xattr_page, NULL, 0, &total_keysize);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+	if (total_keysize <= 0) {
+		write_log(10, "Debug: parent inode %"PRIu64" has no xattrs.\n",
+				(uint64_t)parent_inode);
+		meta_cache_close_file(pbody_ptr);
+		meta_cache_unlock_entry(pbody_ptr);
+		return 0;
+	}
+
+	key_buf = malloc(sizeof(char) * (total_keysize + 100));
+	if (!key_buf) {
+		ret = -ENOMEM;
+		goto errcode_handle;
+	}
+	memset(key_buf, 0, total_keysize + 100);
+
+	/* Fetch all namespace.key */
+	ret = list_xattr(pbody_ptr, &p_xattr_page, key_buf, total_keysize,
+			&total_keysize2);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+	key_buf[total_keysize] = 0;
+
+	/* Tmp value buffer size */
+	value_buf_size = MAX_VALUE_BLOCK_SIZE + 100;
+	value_buf = malloc(value_buf_size);
+	if (!value_buf) {
+		ret = -ENOMEM;
+		goto errcode_handle;
+	}
+
+	/* Self xattr page */
+	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page, &sel_xattr_pos);
+	if (ret < 0) {
+		goto errcode_handle;
+	}
+
+	/* Begin to insert.
+	 * Step 1: Copy key to now_key and parse it
+	 * Step 2: Get value of now_key from parent
+	 * Step 3: Insert key-value pair to this inode */
+	key_ptr = key_buf;
+	while(*key_ptr) {
+		strncpy(now_key, key_ptr, 300);
+		key_ptr += (strlen(now_key) + 1);
+
+		ret = parse_xattr_namespace(now_key, &namespace, key);
+		if (ret < 0) {
+			write_log(0, "Error: Invalid xattr %s. Code %d",
+					now_key, -ret);
+			continue;
+		}
+
+		/* Choose namespace to inherit. Only SECURITY now. */
+		if (_namespace_filter(namespace) == FALSE)
+			continue;
+
+		/* Get this xattr value */
+		ret = -1;
+		while (ret < 0) {
+			ret = get_xattr(pbody_ptr, &p_xattr_page, namespace,
+					key, value_buf, value_buf_size,
+					&value_size);
+			if (ret < 0 && ret != -ERANGE) { /* Error */
+				goto errcode_handle;
+
+			} else if ((ret < 0 && ret == -ERANGE) || /* Larger */
+				(ret == 0 && value_size == value_buf_size)) {
+				free(value_buf);
+				value_buf = malloc(value_size + 100);
+				if (!value_buf) {
+					ret = -ENOMEM;
+					goto errcode_handle;
+				}
+				value_buf_size = value_size + 100;
+				continue;
+			
+			} else { /* ok */
+				value_buf[value_size] = 0;
+			}
+		}
+
+		write_log(10, "Debug: Insert xattr key %s and value %s\n",
+				now_key, value_buf);
+		ret = insert_xattr(selbody_ptr, &sel_xattr_page,
+				sel_xattr_pos, namespace, key,
+				value_buf, value_size, 0);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to insert xattr. Code %d",
+					-ret);
+			continue;
+		}
+	}
+
+	/* Free and unlock */
+	if (key_buf)
+		free(key_buf);
+	if (value_buf)
+		free(value_buf);
+
+	ret = meta_cache_close_file(pbody_ptr);
+	if (ret < 0) {
+		meta_cache_unlock_entry(pbody_ptr);
+		return ret;
+	}
+	ret = meta_cache_unlock_entry(pbody_ptr);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+
+errcode_handle:
+	if (key_buf)
+		free(key_buf);
+	if (value_buf)
+		free(value_buf);
+	meta_cache_close_file(pbody_ptr);
+	meta_cache_unlock_entry(pbody_ptr);
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -ret);
+
+	return ret;
 }

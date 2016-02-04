@@ -1,0 +1,6 @@
+set solib-search-path C:/users/jwgre_000/AppData/local/android/sdk/terafonn/HCFS_TEST/obj/local/armeabi
+source C:/users/jwgre_000/AppData/local/android/sdk/android-ndk-r10e/prebuilt/common/gdb/common.setup
+directory C:/users/jwgre_000/AppData/local/android/sdk/android-ndk-r10e/platforms/android-3/arch-arm/usr/include C:/users/jwgre_000/AppData/local/android/sdk/terafonn/HCFS_TEST/jni jni/fuse C:/users/jwgre_000/AppData/local/android/sdk/android-ndk-r10e/sources/cxx-stl/system
+file C:/users/jwgre_000/AppData/local/android/sdk/terafonn/HCFS_TEST/obj/local/armeabi/hcfs
+target remote :5678
+ 

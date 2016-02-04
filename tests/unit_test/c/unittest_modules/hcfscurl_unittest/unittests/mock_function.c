@@ -1,3 +1,14 @@
+/*************************************************************************
+*
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: mock_function.c
+* Abstract: 
+*
+* Revision History
+* 2016/1/14 Jethro add copyright.
+*
+**************************************************************************/
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include <openssl/hmac.h>
@@ -133,3 +144,7 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 }
 
 void update_backend_status(int status, struct timespec *status_time) {}
+int ignore_sigpipe(void)
+{
+	return 0;
+}

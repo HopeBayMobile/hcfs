@@ -1,3 +1,14 @@
+/*************************************************************************
+*
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hfuse_system_mock_function.c
+* Abstract: 
+*
+* Revision History
+* 2016/1/14 Jethro add copyright.
+*
+**************************************************************************/
 #include "sys/stat.h"
 #include "curl/curl.h"
 #include "fuseop.h"
@@ -165,4 +176,8 @@ void init_sync_stat_control(void)
 }
 inline void update_sync_state(void)
 {
+}
+int ignore_sigpipe(void)
+{
+	return 0;
 }

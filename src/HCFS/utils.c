@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: utils.c
 * Abstract: The c source code file for the utility functions for HCFS
@@ -11,6 +11,8 @@
 * 2015/1/27 Jiahong revised the coding format for coding style check.
 * 2015/2/11 Jiahong revised coding style and add hfuse_system.h inclusion.
 * 2015/5/27 Jiahong working on improving error handling
+* 2016/2/1  Jiahong If DEBUG_ON is not defined at compile time, limit log
+*           level to 4
 *
 **************************************************************************/
 
@@ -24,6 +26,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 #ifndef _ANDROID_ENV_
 #include <attr/xattr.h>
 #endif
@@ -39,6 +42,7 @@
 #include "hcfs_clouddelete.h"
 #include "hcfs_cacheops.h"
 #include "monitor.h"
+#include "FS_manager.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
@@ -229,7 +233,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 	 return -1;
 
 	for (count = strlen(pathname)-1; count >= 0; count--) {
-		if ((pathname[count] == '/') && (count < (strlen(pathname)-1)))
+		if ((pathname[count] == '/') && ((size_t)count < (strlen(pathname)-1)))
 			break;
 	}
 
@@ -264,7 +268,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
+int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
@@ -356,6 +360,14 @@ int read_system_config(char *config_path, SYSTEM_CONF_STRUCT *config)
 					"Log level cannot be less than zero.");
 				return -1;
 			}
+			/* Jiahong 2/1/16: If DEBUG_ON is not defined at
+			compile time, limit log level to 4 */
+#ifndef DEBUG_ON
+			if (temp_val > 4) {
+				write_log(0, "Setting log level to 4\n");
+				temp_val = 4;
+			} 
+#endif
 			config->log_level = temp_val;
 			continue;
 		}
@@ -636,8 +648,8 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config)
 	char pathname[400];
 #ifndef _ANDROID_ENV_
 	char tempval[10];
-#endif
 	int ret_val;
+#endif
 	int errcode;
 
 	/* Validating system path settings */
@@ -1022,7 +1034,9 @@ errcode_handle:
 int get_block_dirty_status(char *path, FILE *fptr, char *status)
 {
 	int ret, errcode;
+#ifndef _ANDROID_ENV_
 	char tmpstr[5];
+#endif
 
 #ifdef _ANDROID_ENV_
 
@@ -1365,7 +1379,7 @@ int _check_config(const SYSTEM_CONF_STRUCT *new_config)
  */
 int reload_system_config(const char *config_path)
 {
-	int ret, count;
+	int ret;
 	char enable_related_module;
 	SYSTEM_CONF_STRUCT *temp_config, *new_config;
 
@@ -1427,4 +1441,73 @@ void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
 	}
 
 	return;
+}
+
+/* Signal handler for recording ignored signals */
+void sigpipe_handler(int num)
+{
+        write_log(2, "Warning: Received signal %s and ignored.\n",
+                  strsignal(num));
+}
+
+/* Helper routine for ignoring SIGPIPE signal */
+int ignore_sigpipe(void)
+{
+	int ret_val;
+        struct sigaction newact;
+
+        /* For SIGPIPE, only record a warning log for now */
+        memset(&newact, 0, sizeof(struct sigaction));
+        newact.sa_handler = sigpipe_handler;
+        ret_val = sigaction(SIGPIPE, &newact, NULL);
+	if (ret_val < 0) {
+		ret_val = -errno;
+                write_log(0, "Unable to set signal handler\n");
+	}
+
+	return ret_val;
+}
+
+/**
+ * is_natural_number()
+ *
+ * Check if input string is a natural number (including of zero)
+ *
+ * @param str Input string
+ *
+ * @return TRUE when it is a natural number, else return FALSE
+ */ 
+BOOL is_natural_number(char *str)
+{
+	int num;
+	size_t i;
+	BOOL ret;
+
+	if (strlen(str) == 0)
+		return FALSE;
+
+	/* 0~9 when string len just 1 */
+	num = str[0] - '0';
+	if (strlen(str) == 1) {
+		if (0 <= num && num <= 9)
+			return TRUE;
+		else
+			return FALSE;
+
+	/* Check first digit is not 0, and following is 0~9 */
+	} else {
+		if (!(1 <= num && num <= 9))
+			return FALSE;
+
+		ret = TRUE;
+		for (i = 1; i < strlen(str); i++) {
+			num = str[i] - '0';
+			if (!(0 <= num && num <= 9)) {
+				ret = FALSE;
+				break;
+			}
+		}
+
+		return ret;
+	}
 }

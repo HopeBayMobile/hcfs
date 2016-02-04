@@ -98,6 +98,7 @@ void collect_finished_dsync_threads(void *ptr)
 	int count;
 	struct timespec time_to_sleep;
 
+	UNUSED(ptr);
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
@@ -163,6 +164,7 @@ void collect_finished_delete_threads(void *ptr)
 	int count;
 	struct timespec time_to_sleep;
 
+	UNUSED(ptr);
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
@@ -214,7 +216,7 @@ void init_dsync_control(void)
 /* Helper for initializing curl handles for deleting backend objects */
 static inline int _init_delete_handle(int index)
 {
-	int ret_val;
+	/* int ret_val; */
 
 	snprintf(delete_curl_handles[index].id, 255,
 				"delete_thread_%d", index);
@@ -247,13 +249,13 @@ static inline int _init_delete_handle(int index)
 *************************************************************************/
 void init_delete_control(void)
 {
-	int count, ret_val;
+	int count;
 
 	memset(&delete_ctl, 0, sizeof(DELETE_THREAD_CONTROL));
 	memset(&delete_curl_handles, 0,
 			sizeof(CURL_HANDLE) * MAX_DELETE_CONCURRENCY);
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++)
-		ret_val = _init_delete_handle(count);
+		_init_delete_handle(count);
 
 	sem_init(&(delete_ctl.delete_op_sem), 0, 1);
 	sem_init(&(delete_ctl.delete_queue_sem), 0, MAX_DELETE_CONCURRENCY);
@@ -328,7 +330,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long page_pos, which_page, current_page;
 	long long count, block_count;
 	long long total_blocks;
-	long long ret_ssize;
 	long long temp_trunc_size;
 	unsigned char block_status;
 	char delete_done;
@@ -343,6 +344,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long system_size_change;
 	long long upload_seq;
 	ino_t root_inode;
+#ifndef _ANDROID_ENV_
+	long long ret_ssize;
+#endif
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -669,12 +673,14 @@ int do_block_delete(ino_t this_inode, long long block_no,
 #endif
 {
 	char objname[400];
-	char obj_id_str[OBJID_STRING_LENGTH];
 	int ret_val, ret, ddt_ret;
-	FILE *ddt_fptr;
-	int ddt_fd;
+#if (DEDUP_ENABLE)
 	DDT_BTREE_NODE tree_root;
 	DDT_BTREE_META ddt_meta;
+	char obj_id_str[OBJID_STRING_LENGTH];
+	FILE *ddt_fptr;
+	int ddt_fd;
+#endif
 
 /* Handle objname - consider platforms, dedup flag  */
 #if (DEDUP_ENABLE)
@@ -812,10 +818,12 @@ void delete_loop(void)
 	ino_t inode_to_dsync, inode_to_check;
 	SUPER_BLOCK_ENTRY tempentry;
 	int count;
-	short sleep_count;
 	char in_dsync;
 	int ret_val;
 
+#ifdef _ANDROID_ENV_
+	UNUSED(ptr);
+#endif
 	init_delete_control();
 	init_dsync_control();
 
@@ -899,4 +907,7 @@ void delete_loop(void)
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		}
 	}
+#ifdef _ANDROID_ENV_
+	return NULL;
+#endif
 }

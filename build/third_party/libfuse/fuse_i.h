@@ -4,6 +4,9 @@
 
   This program can be distributed under the terms of the GNU LGPLv2.
   See the file COPYING.LIB
+
+  File modified @ Hope Bay Technologies, Inc. (2016)
+  Jiahong (1/15/2016) modified fuse_kern_mount to add a premount routine
 */
 
 #include "fuse/fuse.h"
@@ -110,7 +113,9 @@ void fuse_kern_unmount_compat22(const char *mountpoint);
 int fuse_chan_clearfd(struct fuse_chan *ch);
 
 void fuse_kern_unmount(const char *mountpoint, int fd);
-int fuse_kern_mount(const char *mountpoint, struct fuse_args *args);
+/* Jiahong (1/15/2016) modified fuse_kern_mount to add a premount routine */
+int fuse_kern_premount(const char *mountpoint, struct fuse_args *args);
+int fuse_kern_mount(const char *mountpoint, struct fuse_args *args, int fd);
 
 int fuse_send_reply_iov_nofree(fuse_req_t req, int error, struct iovec *iov,
 			       int count);

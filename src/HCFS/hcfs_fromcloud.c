@@ -37,6 +37,7 @@
 #include "utils.h"
 #include "dedup_table.h"
 #include "metaops.h"
+#include "super_block.h"
 
 /************************************************************************
 *
@@ -55,7 +56,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 #endif
 {
 	char objname[1000];
+#if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
+#endif
 	int status;
 	int which_curl_handle;
 	int ret, errcode;
@@ -128,7 +131,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	OPENSSL_free(key);
 #endif
 
-	decode_to_fd(fptr, object_key, (char *)get_fptr_data, len,
+	decode_to_fd(fptr, object_key, (unsigned char *)get_fptr_data, len,
 		     object_meta->enc_alg, object_meta->comp_alg);
 
 	free_object_meta(object_meta);
@@ -256,7 +259,6 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			(temppage).block_entries[entry_index].status = ST_BOTH;
 			ret = set_block_dirty_status(NULL, blockfptr, FALSE);
 			if (ret < 0) {
-				errcode = ret;
 				goto errcode_handle;
 			}
 			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);

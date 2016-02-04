@@ -738,7 +738,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	return 0;
 }
 
-int unmount_event(char *fsname)
+int unmount_event(char *fsname, char *mp)
 {
 	return 0;
 }
@@ -806,7 +806,8 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+		ino_t rootinode)
 {
 	*result = malloc(10);
 	snprintf(*result, 10, "/test");
@@ -875,3 +876,7 @@ int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 }
 
+BOOL is_natural_number(char *str)
+{
+	return TRUE;
+}

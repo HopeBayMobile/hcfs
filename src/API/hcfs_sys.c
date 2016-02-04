@@ -79,14 +79,19 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	snprintf(tmp_path, sizeof(tmp_path),"%s.%s",
 		CONF_PATH, "tmp");
 
+	/* Default etc is readonly, set to writable */
+	system("mount -o remount,rw /system");
+
 	conf = fopen(CONF_PATH, "r");
 	if (conf == NULL) {
+		system("mount -o remount,ro /system");
 		return -errno;
 	}
 
 	tmp_conf = fopen(tmp_path, "w");
 	if (tmp_conf == NULL) {
 		fclose(conf);
+		system("mount -o remount,ro /system");
 		return -errno;
 	}
 
@@ -103,6 +108,8 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	fclose(tmp_conf);
 
 	ret_code = rename(tmp_path, CONF_PATH);
+	system("mount -o remount,ro /system");
+
 	if (ret_code < 0)
 		return -errno;
 	else

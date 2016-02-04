@@ -1,7 +1,7 @@
 *.py[cod]
 *.swp
 *~
-
+*.orig
 
 # C extensions
 *.a
@@ -35,9 +35,11 @@ pip-log.txt
 /hb_clint.xml
 /nosetests.xml
 /oclint-report.xml
-*.gcda
-*.gcno
-*.gcov
+/tests/unit_test/c/unittest_modules/*/obj
+/tests/unit_test/c/unittest_modules/*/*.gcda
+/tests/unit_test/c/unittest_modules/*/*.gcno
+/tests/unit_test/c/unittest_modules/*/*.gcov
+/tests/unit_test/c/unittest_modules/*/test_detail_*.xml
 /tests/unit_test/c/unittest_modules/*/*_unittest
 /clangScanBuildReports
 
@@ -75,3 +77,6 @@ hcfs_android_log
 /build/.init_ccache
 /build/obj
 /build/libs
+/build/out
+!/build/prebuilt/*/*.so
+!/build/prebuilt/*/*.a

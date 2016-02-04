@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_tocloud.c
 * Abstract: The c source code file for syncing meta or data to
@@ -1040,13 +1040,13 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
-		unsigned char *key = NULL;
 		unsigned char *data = NULL;
 		HCFS_encode_object_meta *object_meta = NULL;
 		HTTP_meta *http_meta = NULL;
 		unsigned char *object_key = NULL;
 
 #if ENCRYPT_ENABLE
+		unsigned char *key = NULL;
 		key = get_key();
 		object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
 		object_key = calloc(KEY_SIZE, sizeof(unsigned char));
@@ -1134,11 +1134,15 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 			  strerror(errcode));
 		return -errcode;
 	}
-	unsigned char *key = get_key();
+	unsigned char *key = NULL;
 	unsigned char *data = NULL;
-	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
 
-	fclose(fptr);
+#if ENCRYPT_ENABLE
+	key = get_key();
+#endif
+	FILE *new_fptr = transform_fd(fptr, key, &data,
+			ENCRYPT_ENABLE, COMPRESS_ENABLE);
+
 	if (new_fptr == NULL) {
 		if (data != NULL)
 			free(data);
@@ -1146,12 +1150,16 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	}
 
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL);
+
+	fclose(fptr);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
 	else
 		ret = -EIO;
-	fclose(new_fptr);
+
+	if (fptr != new_fptr)
+		fclose(new_fptr);
 	if (data != NULL)
 		free(data);
 	return ret;

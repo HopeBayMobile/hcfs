@@ -72,7 +72,7 @@ ifndef NOGCOVR
 endif
 
 $(DO_TESTS): $(TESTS)
-	./$(@:test-%=%)
+	./$(@:test-%=%) --gtest_output=xml:test_detail_$(@:test-%=%).xml
 
 .PHONY : setup
 setup :
