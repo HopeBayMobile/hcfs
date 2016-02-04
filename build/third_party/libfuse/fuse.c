@@ -4567,10 +4567,30 @@ static int node_table_init(struct node_table *t)
 	return 0;
 }
 
+/* Jiahong (2/4/16) Borrowed the following code from mt_loop */
+/* ADDED by seth
+ * SIGUSR1 handler.
+ * */
+void thread_exit_handler1(int sig)
+{
+    pthread_exit(0);
+}
+
 static void *fuse_prune_nodes(void *fuse)
 {
 	struct fuse *f = fuse;
 	int sleep_time;
+	/* Jiahong (2/4/16) Borrowed the following code from mt_loop */
+	/* added by seth */
+	struct sigaction actions;
+	int rc;
+
+	memset(&actions, 0, sizeof(actions));
+	sigemptyset(&actions.sa_mask);
+	actions.sa_flags = 0;
+	actions.sa_handler = thread_exit_handler1;
+	rc = sigaction(SIGUSR1,&actions,NULL);
+	/**/
 
 	while(1) {
 		sleep_time = fuse_clean_cache(f);
@@ -4591,7 +4611,9 @@ void fuse_stop_cleanup_thread(struct fuse *f)
 {
 	if (lru_enabled(f)) {
 		pthread_mutex_lock(&f->lock);
-		pthread_cancel(f->prune_thread);
+		/* Jiahong (2/4/16) borrowed the following code from mt_loop */
+		pthread_kill(f->prune_thread, SIGUSR1);
+		//pthread_cancel(f->prune_thread);
 		pthread_mutex_unlock(&f->lock);
 		pthread_join(f->prune_thread, NULL);
 	}
