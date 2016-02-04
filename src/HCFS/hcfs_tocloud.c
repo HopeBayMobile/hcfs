@@ -2171,7 +2171,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			if (sync_ctl.is_revert[count] == TRUE)
 				pthread_create(
 					&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&revert_inode_uploading,
+					NULL, (void *)&continue_inode_upload,
 					(void *)&(sync_threads[count]));
 			else
 				pthread_create(

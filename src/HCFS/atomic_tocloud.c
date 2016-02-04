@@ -657,13 +657,13 @@ errcode_handle:
 	return errcode;
 }
 
-int fetch_progress_file_path(char *pathname, ino_t inode)
+void fetch_progress_file_path(char *pathname, ino_t inode)
 {
 
 	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
 		METAPATH, (uint64_t)inode);
 
-	return 0;
+	return;
 }
 
 /**
@@ -990,7 +990,7 @@ errcode_handle:
  * 10. close progress info file
  *
  */
-void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
+void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 {
 	char toupload_meta_exist, backend_meta_exist;
 	char toupload_meta_path[200];

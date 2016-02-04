@@ -90,9 +90,11 @@ char did_block_finish_uploading(int fd, long long blockno);
 
 long long query_status_page(int fd, long long block_index);
 
-void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr);
+void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr);
 
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		long long *total_backend_blocks);
+
+void fetch_progress_file_path(char *pathname, ino_t inode);
 
 #endif

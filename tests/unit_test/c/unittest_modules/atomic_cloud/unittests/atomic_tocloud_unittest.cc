@@ -862,9 +862,9 @@ TEST_F(check_and_copy_fileTest, CopySuccess)
  */ 
 
 /* 
- * Unittest for revert_inode_uploading()
+ * Unittest for continue_inode_upload()
  */
-class revert_inode_uploadingTest : public ::testing::Test {
+class continue_inode_uploadTest : public ::testing::Test {
 protected:
 	char bullpen_path[200];
 	char progress_path[200];
@@ -919,7 +919,7 @@ protected:
 };
 
 
-TEST_F(revert_inode_uploadingTest, Revert_NonRegfile)
+TEST_F(continue_inode_uploadTest, Revert_NonRegfile)
 {
 	int ret;
 	int fd;
@@ -948,7 +948,7 @@ TEST_F(revert_inode_uploadingTest, Revert_NonRegfile)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 
 	/* Verify */
 	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
@@ -962,7 +962,7 @@ TEST_F(revert_inode_uploadingTest, Revert_NonRegfile)
 }
 
 
-TEST_F(revert_inode_uploadingTest, Crash_AfterOpenProgressFile)
+TEST_F(continue_inode_uploadTest, Crash_AfterOpenProgressFile)
 {
 	int ret;
 	int fd;
@@ -983,7 +983,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterOpenProgressFile)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -993,7 +993,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterOpenProgressFile)
 	unlink(progress_path);
 }
 
-TEST_F(revert_inode_uploadingTest, Crash_AfterCopyLocalMeta)
+TEST_F(continue_inode_uploadTest, Crash_AfterCopyLocalMeta)
 {
 	int ret;
 	int fd;
@@ -1020,7 +1020,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterCopyLocalMeta)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1032,7 +1032,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterCopyLocalMeta)
 	unlink(progress_path);
 }
 
-TEST_F(revert_inode_uploadingTest, Crash_AfterDownloadBackendMeta_BeforeFinishInit)
+TEST_F(continue_inode_uploadTest, Crash_AfterDownloadBackendMeta_BeforeFinishInit)
 {
 	int ret;
 	int fd;
@@ -1060,7 +1060,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterDownloadBackendMeta_BeforeFinishIn
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1074,7 +1074,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterDownloadBackendMeta_BeforeFinishIn
 	unlink(progress_path);
 }
 
-TEST_F(revert_inode_uploadingTest, Crash_AfterFinishInit_ProgressFile)
+TEST_F(continue_inode_uploadTest, Crash_AfterFinishInit_ProgressFile)
 {
 	int ret;
 	int fd;
@@ -1103,7 +1103,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterFinishInit_ProgressFile)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 
 	/* Verify */
 	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
@@ -1116,7 +1116,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterFinishInit_ProgressFile)
 	unlink(progress_path);	
 }
 
-TEST_F(revert_inode_uploadingTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
+TEST_F(continue_inode_uploadTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 {
 	int ret;
 	int fd;
@@ -1143,7 +1143,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1160,7 +1160,7 @@ TEST_F(revert_inode_uploadingTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 	unlink(progress_path);	
 }
 
-TEST_F(revert_inode_uploadingTest, Crash_When_DeleteOldData_KeepDeleting)
+TEST_F(continue_inode_uploadTest, Crash_When_DeleteOldData_KeepDeleting)
 {
 	int ret;
 	int fd;
@@ -1188,7 +1188,7 @@ TEST_F(revert_inode_uploadingTest, Crash_When_DeleteOldData_KeepDeleting)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	revert_inode_uploading(&sync_type);
+	continue_inode_upload(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1206,7 +1206,7 @@ TEST_F(revert_inode_uploadingTest, Crash_When_DeleteOldData_KeepDeleting)
 	unlink(progress_path);
 }
 /* 
- * Unittest for revert_inode_uploading()
+ * Unittest for continue_inode_upload()
  */
 
 /*

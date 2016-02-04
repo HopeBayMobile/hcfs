@@ -9,6 +9,7 @@
 #include "global.h"
 #include "fuseop.h"
 #include "enc.h"
+#include "atomic_tocloud.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
@@ -46,7 +47,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 int super_block_update_transit(ino_t this_inode, char is_start_transit,
 	char transit_incomplete)
 {
-	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
+	if (this_inode > 1 && transit_incomplete == FALSE) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
 		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
 			this_inode; // Record the inode number to verify.
@@ -86,7 +87,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 int do_block_delete(ino_t this_inode, long long block_no, unsigned char *obj_id,
 		    CURL_HANDLE *curl_handle)
 #else
-int do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 		    CURL_HANDLE *curl_handle)
 #endif
 {
@@ -217,4 +218,86 @@ void fetch_backend_block_objname(char *objname, ino_t inode,
 		long long block_no, long long seqnum)
 {
 	return;
+}
+
+int fetch_toupload_block_path(char *pathname, ino_t inode,
+		long long block_no, long long seq)
+{
+	return 0;
+}
+
+int fetch_toupload_meta_path(char *pathname, ino_t inode)
+{
+	return 0;
+}
+
+int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
+		int fd, BOOL is_revert, BOOL finish_sync)
+{
+	return 0;
+}
+
+int del_progress_file(int fd, ino_t inode)
+{
+	close(fd);
+	unlink("/tmp/mock_progress_file");
+	return 0;
+}
+
+int set_progress_info(int fd, long long block_index,
+	const char *toupload_exist, const char *backend_exist,
+	const long long *toupload_seq, const long long *backend_seq,
+	const char *finish)
+{
+	BLOCK_UPLOADING_STATUS block_entry;
+
+	if (toupload_seq)
+		block_entry.to_upload_seq = *toupload_seq;
+	if (backend_seq)
+		block_entry.backend_seq = *backend_seq;
+	if (finish)
+		block_entry.finish_uploading = *finish;
+
+	/* Linear mock */	
+	pwrite(fd, &block_entry, sizeof(BLOCK_UPLOADING_STATUS),
+			block_index * sizeof(BLOCK_UPLOADING_STATUS));
+
+	return 0;
+}
+
+long long query_status_page(int fd, long long block_index)
+{
+	return 0;
+}
+
+int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
+		long long *total_backend_blocks)
+{
+	return 0;
+}
+
+void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
+{
+	return;
+}
+
+int check_and_copy_file(const char *srcpath, const char *tarpath,
+		BOOL lock_src)
+{
+	return 0;
+}
+
+void fetch_progress_file_path(char *pathname, ino_t inode)
+{
+	return;
+}
+
+char did_block_finish_uploading(int fd, long long blockno)
+{
+	return TRUE;
+}
+
+int create_progress_file(ino_t inode)
+{
+	return 0;
 }
