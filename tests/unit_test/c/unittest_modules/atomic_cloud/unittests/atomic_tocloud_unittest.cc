@@ -3,6 +3,7 @@ extern "C" {
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
+#include "utils.h"
 }
 #include "gtest/gtest.h"
 #include "mock_params.h"
@@ -870,6 +871,7 @@ protected:
 	char progress_path[200];
 	char toupload_metapath[200];
 	char backend_metapath[200];
+	char localmetapath[200];
 
 	virtual void SetUp()
 	{
@@ -885,6 +887,9 @@ protected:
 		memset(&test_delete_struct, 0, sizeof(TEST_REVERT_STRUCT));
 		sem_init(&test_delete_struct.record_sem, 0, 1);
 		mkdir(bullpen_path, 0700);
+
+		fetch_meta_path(localmetapath, 0);
+		mknod(localmetapath, 0700, 0);
 	}
 
 	virtual void TearDown()
@@ -901,6 +906,8 @@ protected:
 		sem_destroy(&(sync_ctl.sync_queue_sem));
 		rmdir(bullpen_path);
 		free(system_config);
+
+		unlink(localmetapath);
 	}
 
 	void init_sync_control(void)

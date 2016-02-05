@@ -288,7 +288,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
 		SEEK_SET);
 	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
-	
+
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
 	if (S_ISREG(this_stat->st_mode)) {
@@ -827,7 +827,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		write_log(0, "Error: inode %"PRIu64" fails to inherit"
 				" xattrs from parent inode %"PRIu64".\n",
 				(uint64_t)self_inode, (uint64_t)parent_inode);
-	
+
 	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
 	if (!parent_meta_cache_entry) {
 		meta_cache_close_file(self_meta_cache_entry);
@@ -1371,7 +1371,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
  * @param body_ptr Meta cache entry, it should be locked.
  *
  * @return 0 on success, otherwise negative error code.
- */ 
+ */
 int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret;
@@ -1406,7 +1406,7 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 			return ret;
 
 	} else if (S_ISDIR(tmpstat.st_mode)) {
-		DIR_META_TYPE dirmeta;		
+		DIR_META_TYPE dirmeta;
 
 		memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
 		ret = meta_cache_lookup_dir_data(inode, NULL, &dirmeta,
@@ -1486,6 +1486,8 @@ int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 		return ret;
 	}
 
+
+
 	/* Copy meta if need to upload and is not reverting mode */
 	if (data->is_uploading == TRUE) {
 
@@ -1499,9 +1501,18 @@ int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 
 		/* clone meta and record # of toupload_blocks */
 		} else {
+
+			fetch_meta_path(local_metapath, data->inode);
+			ret = access(local_metapath, F_OK);
+			if (ret < 0) {
+				write_log(2, "meta %"PRIu64" not exist. Code %d in %s\n",
+						(uint64_t)data->inode, ret, __func__);
+				errcode = ret;
+				goto errcode_handle;
+			}
+
 			fetch_toupload_meta_path(toupload_metapath,
 					data->inode);
-			fetch_meta_path(local_metapath, data->inode);
 			if (access(toupload_metapath, F_OK) == 0) {
 				write_log(2, "Cannot copy since "
 						"%s exists", toupload_metapath);

@@ -86,3 +86,8 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	return 0;
 }
+
+int fetch_meta_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/mock_local_meta");
+}

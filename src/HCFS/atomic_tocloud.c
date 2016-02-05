@@ -992,14 +992,15 @@ errcode_handle:
  */
 void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 {
-	char toupload_meta_exist, backend_meta_exist;
+	char toupload_meta_exist, backend_meta_exist, local_meta_exist;
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
+	char local_meta_path[200];
 	int errcode;
 	mode_t this_mode;
 	ino_t inode;
 	int progress_fd;
-	long long total_blocks;
+	long long total_backend_blocks, total_toupload_blocks;
 	ssize_t ret_ssize;
 	char finish_init;
 	int ret;
@@ -1014,6 +1015,7 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
+	fetch_meta_path(local_meta_path, inode);
 
 	write_log(10, "Debug: Now begin to revert uploading inode_%"PRIu64"\n",
 			(uint64_t)inode);
@@ -1045,6 +1047,20 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
+	/* Check local meta */
+	if (access(local_meta_path, F_OK) == 0) {
+		local_meta_exist = TRUE;
+	} else {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			goto errcode_handle;
+		} else {
+			local_meta_exist = FALSE;
+		}
+	}
+
 	/* If it is not regfile (strange), then just remove all and upload
 	 * it again. */
 	if (!S_ISREG(this_mode)) {
@@ -1057,23 +1073,35 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 		return;
 	}
 
-	/*** Begin to check break point ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	if (progress_meta.finish_init_backend_data == TRUE) {
-		total_blocks = progress_meta.total_backend_blocks;
+		total_backend_blocks = progress_meta.total_backend_blocks;
+		total_toupload_blocks = progress_meta.total_toupload_blocks;
 		finish_init = TRUE;
 	} else {
+		total_backend_blocks = 0;
+		total_toupload_blocks = 0;
 		finish_init = FALSE;
 	}
 
+	/*** Begin to check break point ***/
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (finish_init == TRUE)) {
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
-			write_log(10, "Debug: begin continue uploading inode %"
-				PRIu64"\n", (uint64_t)inode);
-			sync_single_inode((void *)data_ptr);
-			return;
+			if (local_meta_exist) {
+				write_log(10, "Debug: begin continue uploading"
+					" inode %"PRIu64"\n", (uint64_t)inode);
+				sync_single_inode((void *)data_ptr);
+				return;
+			} else {
+				delete_backend_blocks(progress_fd,
+					total_toupload_blocks, inode,
+					TOUPLOAD_BLOCKS);
+				sync_ctl.threads_finished[data_ptr->which_index]
+				       = TRUE;
+				return;	
+			}
 
 		} else {
 		/* NOT begin to upload, so cancel uploading.
@@ -1088,7 +1116,7 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
 		case10. Do not need to update backend size again. */
-			delete_backend_blocks(progress_fd, total_blocks,
+			delete_backend_blocks(progress_fd, total_backend_blocks,
 				inode, BACKEND_BLOCKS);
 			sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 			return;

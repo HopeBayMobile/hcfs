@@ -13,7 +13,7 @@
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	strcpy(pathname, "/tmp/testHCFS/mock_file_meta");
+	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 
@@ -228,6 +228,9 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 
 int fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
+	sprintf(pathname, "mock_meta_folder/mock_toupload_meta_%"PRIu64,
+			(uint64_t)inode);
+
 	return 0;
 }
 
@@ -267,7 +270,8 @@ int set_progress_info(int fd, long long block_index,
 
 long long query_status_page(int fd, long long block_index)
 {
-	return 0;
+	return (block_index / MAX_BLOCK_ENTRIES_PER_PAGE) *
+		sizeof(BLOCK_UPLOADING_PAGE);
 }
 
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,

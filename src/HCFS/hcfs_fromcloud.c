@@ -127,7 +127,8 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
 
-	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
+	/*Release sem if action from pinning file*/
+	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
 		sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);

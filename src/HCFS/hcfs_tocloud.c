@@ -868,10 +868,10 @@ static inline int _choose_deleted_block(char delete_which_one,
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
 
-	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
+/*	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
 			"backend_seq = %lld\n", (uint64_t)inode,
 			to_upload_seq, backend_seq);
-
+*/
 	if (delete_which_one == TOUPLOAD_BLOCKS) {
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
