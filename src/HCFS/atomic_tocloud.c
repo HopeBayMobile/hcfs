@@ -462,7 +462,7 @@ int create_progress_file(ino_t inode)
 	}
 
 	memset(&progress_meta, 0, sizeof(PROGRESS_META));
-	progress_meta.finish_init_backend_data = FALSE;
+	progress_meta.now_action = PREPARING;
 	PWRITE(ret_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 
 	return ret_fd;
@@ -508,7 +508,7 @@ int init_progress_info(int fd, long long backend_blocks,
 
 	if (backend_metafptr == NULL) { /* backend meta does not exist */
 		PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-		progress_meta.finish_init_backend_data = TRUE;
+		progress_meta.now_action = NOW_UPLOADING;
 		PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 		flock(fd, LOCK_UN);
 
@@ -575,7 +575,7 @@ int init_progress_info(int fd, long long backend_blocks,
 
 	/* Finally write meta */
 	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	progress_meta.finish_init_backend_data = TRUE;
+	progress_meta.now_action = NOW_UPLOADING;
 	progress_meta.backend_size = backend_size;
 	progress_meta.total_backend_blocks = backend_blocks;
 	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
@@ -632,7 +632,7 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 	long long block_no, long long seq)
 {
 
-	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%lld.tmp",
+	sprintf(pathname, "/tmp/hcfs_sync_block_%"PRIu64"_%lld.tmp",
 		(uint64_t)inode, block_no);
 
 	return 0;
@@ -948,15 +948,15 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		PREAD(ptr->progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 
 		/* Cancel to coninue */
-		if (progress_meta.finish_init_backend_data == TRUE) {
-			*backend_size = progress_meta.backend_size;
-			*total_backend_blocks =
-				progress_meta.total_backend_blocks;
-
-		} else {
+		if (progress_meta.now_action == PREPARING) {
 			write_log(2, "Interrupt before uploading, do nothing and"
 				" cancel uploading\n");
 			return -ECANCELED;
+
+		} else {
+			*backend_size = progress_meta.backend_size;
+			*total_backend_blocks =
+				progress_meta.total_backend_blocks;
 		}	
 	}
 
@@ -1053,7 +1053,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 
 	/*** Begin to check break point ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	if (progress_meta.finish_init_backend_data == TRUE) {
+	if (progress_meta.now_action != PREPARING) {
 		total_blocks = progress_meta.total_backend_blocks;
 		finish_init = TRUE;
 	} else {
@@ -1083,7 +1083,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		remove backend old block. case[8, 9], case9, case[9. 10],
 		case10 */
 			delete_backend_blocks(progress_fd, total_blocks,
-				inode, BACKEND_BLOCKS);
+				inode, DEL_BACKEND_BLOCKS);
 		} else {
 		/* Crash before copying local meta, so just
 		cancel uploading. case[1, 2] */
@@ -1104,3 +1104,146 @@ errcode_handle:
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
 }
+
+void revert_inode_sync(SYNC_THREAD_TYPE *data_ptr)
+{
+	char toupload_meta_exist, backend_meta_exist;
+	char toupload_meta_path[200];
+	char backend_meta_path[200];
+	int errcode;
+	mode_t this_mode;
+	ino_t inode;
+	int progress_fd;
+	long long total_blocks;
+	ssize_t ret_ssize;
+	int ret;
+	char now_action;
+	PROGRESS_META progress_meta;
+
+	this_mode = data_ptr->this_mode;
+	inode = data_ptr->inode;
+	progress_fd = data_ptr->progress_fd;
+
+	fetch_backend_meta_path(backend_meta_path, inode);
+	fetch_toupload_meta_path(toupload_meta_path, inode);
+
+	write_log(10, "Debug sync: Now begin to revert uploading inode_%"
+			PRIu64"\n", (uint64_t)inode);
+
+	/* Check backend meta exist */
+	if (access(backend_meta_path, F_OK) == 0) {
+		backend_meta_exist = TRUE;
+	} else {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			goto errcode_handle;
+		} else {
+			backend_meta_exist = FALSE;
+		}
+	}
+
+	/* Check to-upload meta exist */
+	if (access(toupload_meta_path, F_OK) == 0) {
+		toupload_meta_exist = TRUE;
+	} else {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			goto errcode_handle;
+		} else {
+			toupload_meta_exist = FALSE;
+		}
+	}
+
+	/* If it is not regfile (strange), then just remove all and upload
+	 * it again. */
+	if (!S_ISREG(this_mode)) {
+		if (toupload_meta_exist == TRUE)
+			UNLINK(toupload_meta_path);
+		if (backend_meta_exist == TRUE)
+			UNLINK(backend_meta_path);
+		sync_ctl.threads_error[data_ptr->which_index] = TRUE;
+		sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+		return;
+	}
+
+	/*** Begin to check break point ***/
+	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	now_action = progress_meta.now_action;
+	if (now_action == PREPARING) {
+		write_log(4, "sync: Cancel to continue uploading inode %"
+				PRIu64"\n", (uint64_t)inode);
+		/* Do nothing and re-upload next time */
+
+	} else if (now_action == NOW_UPLOADING) {
+		if (toupload_meta_exist == TRUE) {
+			write_log(4, "sync: Continue uploading inode %"
+					PRIu64"\n", (uint64_t)inode);
+			sync_single_inode((void *)data_ptr);
+			return;
+		} else {
+			/* Maybe toupload_meta is uploaded
+			 * and now_action flag is not set to
+			 * DEL_BACKEND_BLOCKS because of 
+			 * unexpected crash. mm...perhaps do
+			 * nothing and re-upload next time. */
+			write_log(2, "sync warn: inode %"PRIu64" toupload meta"
+				"disappear. Perhaps crash?\n", (uint64_t)inode);
+		}
+	
+	} else if (now_action == DEL_TOUPLOAD_BLOCKS) {
+		write_log(4, "sync: Continue to del toupload blocks of inode %"
+				PRIu64"\n", (uint64_t)inode);
+		delete_backend_blocks(progress_fd,
+			progress_meta.total_toupload_blocks,
+			inode, DEL_TOUPLOAD_BLOCKS);
+
+	} else if (now_action == DEL_BACKEND_BLOCKS) {
+		write_log(4, "sync: Continue to del cloud old blocks of inode %"
+				PRIu64"\n", (uint64_t)inode);
+		delete_backend_blocks(progress_fd,
+			progress_meta.total_backend_blocks,
+			inode, DEL_BACKEND_BLOCKS);
+	}
+
+	if (toupload_meta_exist == TRUE)
+		UNLINK(toupload_meta_path);
+	if (backend_meta_exist == TRUE)
+		UNLINK(backend_meta_path);
+	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
+	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+	return;
+
+errcode_handle:
+	write_log(0, "Error: Fail to revert/continue uploading inode %"PRIu64"\n",
+			(uint64_t)inode);
+	if (toupload_meta_exist == TRUE)
+		unlink(toupload_meta_path);
+	if (backend_meta_exist == TRUE)
+		unlink(backend_meta_path);
+	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
+	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+	return;
+}
+
+int change_action(int fd, char now_action)
+{
+	int ret, errcode;
+	ssize_t ret_ssize;
+	PROGRESS_META progress_meta;
+
+	flock(fd, LOCK_EX);
+	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	progress_meta.now_action = now_action;
+	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	flock(fd, LOCK_UN);
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+

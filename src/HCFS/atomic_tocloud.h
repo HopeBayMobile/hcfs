@@ -11,6 +11,11 @@
 #define CLOUD_BLOCK_EXIST(flag) (((flag) & 2) == 2 ? TRUE : FALSE)
 #define SET_CLOUD_BLOCK_EXIST(flag) ((flag) |= 2)
 
+#define PREPARING 0
+#define NOW_UPLOADING 1
+#define DEL_TOUPLOAD_BLOCKS 2
+#define DEL_BACKEND_BLOCKS 3
+
 /* Data that should be known by fuse process when uploading a file */
 typedef struct {
 	ino_t inode;
@@ -39,7 +44,7 @@ typedef struct {
 
 
 typedef struct {
-	char finish_init_backend_data;
+	char now_action;
 	long long backend_size;
 	long long total_backend_blocks;
 	long long toupload_size;
@@ -97,4 +102,7 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr);
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		long long *total_backend_blocks);
 
+void revert_inode_sync(SYNC_THREAD_TYPE *data_ptr);
+
+int change_action(int fd, char now_action);
 #endif

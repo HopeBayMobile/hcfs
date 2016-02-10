@@ -203,10 +203,15 @@ static inline int _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 	struct stat tmpstat;
 	int ret, errcode;
 	ssize_t ret_ssize;
+	FILE_META_TYPE tmpmeta;
+	long long current_page, which_page, page_pos;
 
 	fptr = fopen(toupload_metapath, "r");
 	if (fptr != NULL) {
+		flock(fileno(fptr), LOCK_EX);
 		PREAD(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
+		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
+				sizeof(struct stat));
 
 		if (!S_ISREG(tmpstat.st_mode)) { /* Return when not regfile */
 			fclose(fptr);
@@ -215,13 +220,26 @@ static inline int _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 
 		num_blocks = ((tmpstat.st_size == 0) ? 0
 				: (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1);
+
+		current_page = -1;
 		for (bcount = 0; bcount < num_blocks; bcount++) {
+			which_page = bcount / MAX_BLOCK_ENTRIES_PER_PAGE;
+			if (current_page != which_page) {
+				page_pos = seek_page2(&tmpmeta, fptr,
+						which_page, 0);
+				current_page = which_page;
+				if (page_pos <= 0) {
+					bcount += (BLK_INCREMENTS - 1);
+					continue;
+				}
+			}
 			/* TODO: consider truncating situation */
 			fetch_toupload_block_path(block_path, inode, bcount, 0);
 			if (access(block_path, F_OK) == 0)
 				unlink(block_path);
 		}
 		fclose(fptr);
+		flock(fileno(fptr), LOCK_UN);
 	}
 
 	return 0;
@@ -409,14 +427,14 @@ static inline int _upload_terminate_thread(int index)
 		/* TODO: Maybe we don't care about deleting backend
 		 * blocks when re-connecting */
 		if (upload_ctl.upload_threads[index].backend_delete_type ==
-				BACKEND_BLOCKS) {
+				DEL_BACKEND_BLOCKS) {
 			/*backend_exist = FALSE;
 			set_progress_info(progress_fd, blockno, NULL,
 					&backend_exist, NULL, NULL, NULL);*/
 		/* When deleting to-upload blocks, it is important to recover
 		 * the block status to ST_LDISK */
 		} else if (upload_ctl.upload_threads[index].backend_delete_type
-				== TOUPLOAD_BLOCKS) {
+				== DEL_TOUPLOAD_BLOCKS) {
 			/*toupload_exist = FALSE;
 			set_progress_info(progress_fd, blockno, &toupload_exist,
 					NULL, NULL, NULL, NULL);*/
@@ -697,7 +715,7 @@ errcode_handle:
 			errcode = errno;\
 			write_log(0, "IO error in %s. Code %d, %s\n",\
 				__func__, errcode, strerror(errcode));\
-			sync_error = TRUE;\
+			sync_ctl.threads_error[ptr->which_index];\
 			if (UNLOCK_ON_ERROR == TRUE) {\
 				flock(fileno(A), LOCK_UN);\
 			}\
@@ -714,7 +732,7 @@ errcode_handle:
 			if (errcode != 0)\
 				write_log(0, "Code %d, %s\n", errcode,\
 					strerror(errcode));\
-			sync_error = TRUE;\
+			sync_ctl.threads_error[ptr->which_index];\
 			if (UNLOCK_ON_ERROR == TRUE) {\
 				flock(fileno(D), LOCK_UN);\
 			}\
@@ -730,7 +748,7 @@ errcode_handle:
 			write_log(0, "IO error in %s.\n", __func__);\
 			write_log(0, "Code %d, %s\n", errcode,\
 				strerror(errcode));\
-			sync_error = TRUE;\
+			sync_ctl.threads_error[ptr->which_index];\
 			if (UNLOCK_ON_ERROR == TRUE) {\
 				flock(fileno(D), LOCK_UN);\
 			}\
@@ -823,7 +841,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 	finish_uploading = block_info->finish_uploading;
 
 	/* Delete those blocks just uploaded */
-	if (delete_which_one == TOUPLOAD_BLOCKS) {
+	if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
 			return -1;
@@ -840,7 +858,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 	}
 
 	/* Delete old blocks on cloud */
-	if (delete_which_one == BACKEND_BLOCKS) {
+	if (delete_which_one == DEL_BACKEND_BLOCKS) {
 		/* Do not delete if it does not exist */
 		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
 			return -1;
@@ -872,7 +890,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 			"backend_seq = %lld\n", (uint64_t)inode,
 			to_upload_seq, backend_seq);
 
-	if (delete_which_one == TOUPLOAD_BLOCKS) {
+	if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
 			return -1;
@@ -890,7 +908,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 
 	/* Do not need to check finish_uploading because backend blocks
 	 * exist on cloud. */
-	if (delete_which_one == BACKEND_BLOCKS) {
+	if (delete_which_one == DEL_BACKEND_BLOCKS) {
 		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
 			return -1;
 		if (to_upload_seq == backend_seq)
@@ -924,7 +942,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	long long page_pos;
 	FILE_META_TYPE filemeta;
 
-	if (delete_which_one == TOUPLOAD_BLOCKS)
+	ret = change_action(progress_fd, delete_which_one);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to delete old blocks for inode %"
+				PRIu64"\n", (uint64_t)inode);
+		return ret;
+	}
+
+	if (delete_which_one == DEL_TOUPLOAD_BLOCKS)
 	write_log(4, "Debug: Delete those blocks uploaded just now for "
 		"inode_%"PRIu64"\n", (uint64_t)inode);
 
@@ -947,8 +972,9 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			flock(progress_fd, LOCK_UN);
 
 			/* When delete to-upload blocks, we need page position
-			 * to recover status to ST_LDISK */
-			if (delete_which_one == TOUPLOAD_BLOCKS) {
+			 * to recover status to ST_LDISK. TODO: Maybe do not
+			 * need this action. */
+			if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 				page_pos = 0;
 				local_metafptr = fopen(local_metapath, "r");
 				if (local_metafptr != NULL) {
@@ -1087,6 +1113,7 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 				local_metafptr, which_page, 0);
 			if (page_pos <= 0) {
 				flock(fileno(local_metafptr), LOCK_UN);
+				block_count += (BLK_INCREMENTS - 1);
 				continue;
 			}
 			current_page = which_page;
@@ -1333,11 +1360,11 @@ store in some other file */
 				   page position because toupload_meta cannot
 				   be modified by other processes. */
 				FSEEK_ADHOC_SYNC_LOOP(toupload_metafptr,
-					page_pos, SEEK_SET, FALSE);
+					page_pos, SEEK_SET, TRUE);
 
 				FREAD_ADHOC_SYNC_LOOP(&toupload_temppage,
 					sizeof(BLOCK_ENTRY_PAGE),
-					1, toupload_metafptr, FALSE);
+					1, toupload_metafptr, TRUE);
 				flock(fileno(toupload_metafptr), LOCK_UN);
 			}
 			tmp_entry = &(toupload_temppage.block_entries[e_index]);
@@ -1505,7 +1532,7 @@ store in some other file */
 		if (is_local_meta_deleted == TRUE) {
 			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
 			delete_backend_blocks(progress_fd, total_blocks,
-				ptr->inode, TOUPLOAD_BLOCKS);
+				ptr->inode, DEL_TOUPLOAD_BLOCKS);
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -1518,7 +1545,7 @@ store in some other file */
 		if (sync_error == TRUE) {
 			if (sync_ctl.continue_nexttime[ptr->which_index] == FALSE)
 				delete_backend_blocks(progress_fd, total_blocks,
-						ptr->inode, TOUPLOAD_BLOCKS);
+						ptr->inode, DEL_TOUPLOAD_BLOCKS);
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -1621,7 +1648,7 @@ store in some other file */
 
 		/* Delete those uploaded blocks if local meta is removed */
 		delete_backend_blocks(progress_fd, total_blocks,
-			ptr->inode, TOUPLOAD_BLOCKS);
+			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
@@ -1637,7 +1664,7 @@ store in some other file */
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
 				delete_backend_blocks(progress_fd, total_blocks,
-					ptr->inode, TOUPLOAD_BLOCKS);
+					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 			}
 		} else { /* Just re-upload for dir/slnk/fifo/socket */
 			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
@@ -1652,7 +1679,7 @@ store in some other file */
 		_change_status_to_BOTH(ptr->inode, progress_fd,
 				local_metafptr, local_metapath);
 		delete_backend_blocks(progress_fd, total_backend_blocks,
-				ptr->inode, BACKEND_BLOCKS);
+				ptr->inode, DEL_BACKEND_BLOCKS);
 		fclose(local_metafptr);
 
 	} else {
@@ -1675,7 +1702,7 @@ errcode_handle:
 	flock(fileno(toupload_metafptr), LOCK_UN);
 	fclose(toupload_metafptr);
 	delete_backend_blocks(progress_fd, total_blocks,
-			ptr->inode, TOUPLOAD_BLOCKS);
+			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 }
@@ -2168,7 +2195,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			if (sync_ctl.is_revert[count] == TRUE)
 				pthread_create(
 					&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&revert_inode_uploading,
+					NULL, (void *)&revert_inode_sync,
 					(void *)&(sync_threads[count]));
 			else
 				pthread_create(
