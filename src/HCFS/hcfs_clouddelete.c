@@ -304,6 +304,41 @@ static inline int _use_delete_thread(int index, int dsync_index,
 	return 0;
 }
 
+static inline void _check_del_progress_file(ino_t inode)
+{
+	BOOL now_sync;
+	char toupload_metapath[300], backend_metapath[300];
+	char progress_path[300];
+	int idx, ret[3] = {0};
+
+	now_sync = FALSE;
+	sem_wait(&sync_ctl.sync_op_sem);
+	for (idx = 0; idx < MAX_SYNC_CONCURRENCY ; idx++) {
+		if (sync_ctl.threads_in_use[idx] == inode) {
+			now_sync = TRUE;
+			break;
+		}
+	}
+	sem_post(&sync_ctl.sync_op_sem);
+
+	if (now_sync == FALSE) {
+		/* TODO: Maybe delete blocks on cloud if progress file exist */
+		fetch_toupload_meta_path(toupload_metapath, inode);
+		fetch_backend_meta_path(backend_metapath, inode);
+		fetch_progress_file_path(progress_path, inode);
+		if (!access(toupload_metapath, F_OK))
+			ret[0] = unlink(toupload_metapath);
+		if (!access(backend_metapath, F_OK))
+			ret[1] = unlink(backend_metapath);
+		if (!access(progress_path, F_OK))
+			ret[2] = unlink(progress_path);
+
+		if ((ret[0] | ret[1] | ret[2]))
+			write_log(0, "Error: Fail to unlink in %s\n",
+					__func__);
+	}
+}
+
 static inline int _read_meta(char *todel_metapath, mode_t this_mode,
 		ino_t *root_inode, BOOL *meta_on_cloud)
 {
@@ -417,8 +452,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	ret = _read_meta(thismetapath, ptr->this_mode,
 			&root_inode, &meta_on_cloud);
 	if (ret < 0) {
-		write_log(0, "Meta %s cannot be read. Code %d\n",
+		write_log(0, "Error: Meta %s cannot be read. Code %d\n",
 				thismetapath, -ret);
+		_check_del_progress_file(this_inode);
 		unlink(thismetapath);
 		super_block_delete(this_inode);
 		super_block_reclaim();
@@ -430,6 +466,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	if (meta_on_cloud == FALSE) {
 		write_log(10, "Debug:meta_%"PRIu64" is not on cloud.\n",
 				(uint64_t)this_inode);
+		_check_del_progress_file(this_inode);
 		unlink(thismetapath);
 		super_block_delete(this_inode);
 		super_block_reclaim();
@@ -440,9 +477,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	/* Download backend meta and read it if it is regfile */
 	backend_metafptr = NULL;
 	if (S_ISREG(ptr->this_mode)) {
-		sprintf(backend_metapath,
-			"%s/upload_bullpen/backend_meta_%"PRIu64".del",
-			METAPATH, (uint64_t)this_inode);
+		sprintf(backend_metapath, "/tmp/backend_meta_%"PRIu64".del",
+				(uint64_t)this_inode);
 		backend_metafptr = fopen(backend_metapath, "w+");
 		if (backend_metafptr == NULL) {
 			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
@@ -451,43 +487,33 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		}
 		setbuf(backend_metafptr, NULL);
 
-		if (meta_on_cloud == TRUE) {
-			fetch_backend_meta_objname(objname, this_inode);
-			ret = fetch_from_cloud(backend_metafptr,
-					FETCH_FILE_META, objname);
-			if (ret < 0) {
-				if (ret == -EIO) {
-					write_log(0, "Error: Fail to download "
+		fetch_backend_meta_objname(objname, this_inode);
+		ret = fetch_from_cloud(backend_metafptr,
+				FETCH_FILE_META, objname);
+		if (ret < 0) {
+			if (ret == -EIO) {
+				write_log(0, "Error: Fail to download "
 						"backend meta_%"PRIu64". "
 						"Delete next time.\n",
 						(uint64_t)this_inode);
 
-				} else if (ret == -ENOENT) {
-					write_log(10, "Debug: Nothing on"
+			} else if (ret == -ENOENT) {
+				write_log(10, "Debug: Nothing on"
 						" cloud to be deleted for"
 						" inode_%"PRIu64"\n",
 						(uint64_t)this_inode);
-					unlink(thismetapath);
-					super_block_delete(this_inode);
-					super_block_reclaim();
-				}
-
-				dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-				fclose(backend_metafptr);
-				unlink(backend_metapath);
-				return;
+				_check_del_progress_file(this_inode);
+				unlink(thismetapath);
+				super_block_delete(this_inode);
+				super_block_reclaim();
 			}
-		} else {
-			write_log(10, "Debug:meta_%"PRIu64" is not on cloud\n",
-					(uint64_t)this_inode);
-			unlink(thismetapath);
-			super_block_delete(this_inode);
-			super_block_reclaim();
-			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+
 			fclose(backend_metafptr);
 			unlink(backend_metapath);
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 			return;
 		}
+
 	}
 
 	/* Delete blocks */
@@ -674,6 +700,7 @@ errcode_handle:
 	if (meta_on_cloud == TRUE)
 		update_backend_stat(root_inode, -system_size_change, -1);
 
+	_check_del_progress_file(this_inode);
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();

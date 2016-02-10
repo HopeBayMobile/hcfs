@@ -2490,9 +2490,17 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 					goto errcode_handle;
 				}
 
-				/* Update block seq number */
+				/* Update block seq number and reload meta */
 				ret = update_block_seq(*body_ptr, filepos,
 						last_index, last_block);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+
+				ret = meta_cache_lookup_file_data(this_inode,
+						NULL, NULL, &temppage, filepos,
+						*body_ptr);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
