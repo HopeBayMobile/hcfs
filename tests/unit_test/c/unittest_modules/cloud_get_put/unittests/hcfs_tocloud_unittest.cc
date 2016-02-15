@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
 #include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
@@ -14,6 +15,7 @@ extern "C" {
 #include "global.h"
 #include "fuseop.h"
 #include "super_block.h"
+#include "atomic_tocloud.h"
 }
 
 
@@ -158,6 +160,9 @@ TEST_F(init_sync_stat_controlTest, InitCleanup) {
 
 class InitUploadControlTool {
 public:
+	int fd;
+	char progress_path[100];
+
 	static InitUploadControlTool *Tool()
 	{
 		if (tool == NULL)
@@ -216,6 +221,9 @@ public:
 		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
 		fclose(mock_file_meta);
 
+		strcpy(progress_path, "/tmp/mock_progress_file");
+		fd = open(progress_path, O_CREAT | O_RDWR);
+
 		for (int i = 0 ; i < num_block_entry ; i++) {
 			ino_t inode = 1;
 			FILE *ptr;
@@ -237,6 +245,9 @@ public:
 			upload_ctl.upload_threads[index].page_entry_index = i;
 			upload_ctl.upload_threads[index].blockno = i;
 			upload_ctl.upload_threads[index].is_block = TRUE;
+			upload_ctl.upload_threads[index].seq = i;
+			upload_ctl.upload_threads[index].progress_fd = fd;
+			upload_ctl.upload_threads[index].backend_delete_type = FALSE;
 			upload_ctl.threads_in_use[index] = TRUE;
 			upload_ctl.threads_created[index] = TRUE;
 			upload_ctl.threads_finished[index] = TRUE;
@@ -278,6 +289,9 @@ protected:
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
 		rmdir(tmppath);
+		close(InitUploadControlTool::Tool()->fd);
+		unlink(InitUploadControlTool::Tool()->progress_path);
+
 		unlink(MOCK_META_PATH);
 	}
 };
@@ -300,8 +314,6 @@ TEST_F(init_upload_controlTest, DoNothing_JustRun)
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
-
-
 
 TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 {
@@ -329,11 +341,19 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		char xattr_val[5] = "N";
 		char path[50];
+		BLOCK_UPLOADING_STATUS block_entry;
 
-		ASSERT_EQ(ST_BOTH, mock_block_page.block_entries[i].status); // Check status
+		ASSERT_EQ(ST_LtoC, mock_block_page.block_entries[i].status); // Check status
 		sprintf(path, "/tmp/testHCFS/data_1_%d", i);
 		getxattr(path, "user.dirty", xattr_val, 1);
-		ASSERT_STREQ("F", xattr_val);
+		ASSERT_STREQ("T", xattr_val);
+
+		pread(InitUploadControlTool::Tool()->fd, &block_entry,
+			sizeof(BLOCK_UPLOADING_STATUS),
+			i * sizeof(BLOCK_UPLOADING_STATUS));
+		ASSERT_EQ(TRUE, block_entry.finish_uploading);
+		ASSERT_EQ(i, block_entry.to_upload_seq);
+
 		unlink(path);
 	}
 
@@ -343,44 +363,6 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	EXPECT_EQ(PTHREAD_CANCELED, res);
 	unlink(MOCK_META_PATH);
 }
-
-TEST_F(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
-{
-	void *res;
-	int num_block_entry = 80;
-	BLOCK_ENTRY_PAGE mock_block_page;
-	FILE *mock_file_meta;
-	/* Run tested function */
-	init_upload_control();
-
-	/* Generate mock threads */
-	InitUploadControlTool::Tool()->generate_mock_meta_and_thread(num_block_entry,
-		ST_TODELETE, TRUE);
-	sleep(2);
-
-	/* Verify */
-	ASSERT_EQ(0, upload_ctl.total_active_upload_threads);
-	for (int i = 0 ; i < MAX_UPLOAD_CONCURRENCY ; i++) {
-		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
-		ASSERT_EQ(FALSE, upload_ctl.threads_created[i])<< "thread " << i << " is in use";
-	}
-	mock_file_meta = fopen(MOCK_META_PATH, "r+");
-	fread(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
-	for (int i = 0 ; i < num_block_entry ; i++) {
-		char path[50];
-		ASSERT_EQ(ST_NONE, mock_block_page.block_entries[i].status);
-		sprintf(path, "/tmp/testHCFS/mockblock_1_%d", i);
-		unlink(path);
-	}
-
-	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
-	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
-	unlink(MOCK_META_PATH);
-}
-
-
 
 TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 {
@@ -424,8 +406,6 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
 		ASSERT_EQ(FALSE, upload_ctl.threads_created[i]) << "thread " << i << " is in use";
 	}
-	for (int i = 0 ; i < num_block_entry ; i++)
-		ASSERT_EQ(TRUE, upload_ctl_todelete_blockno[i]) << "error in blockno " << i;
 
 	/* Reclaim resource */
 	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
@@ -441,6 +421,46 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 	Unittest of init_sync_control()
  */
 
+class init_sync_controlTest : public ::testing::Test {
+protected:
+	int num_inode;
+	ino_t empty_ino_array[MAX_SYNC_CONCURRENCY];
+	char empty_created_array[MAX_SYNC_CONCURRENCY];
+	char metapath[100];
+
+	void SetUp()
+	{
+		mkdir("/tmp/testHCFS", 0700);
+		num_inode = 100;
+		memset(empty_ino_array, 0, sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
+		memset(empty_created_array, 0, sizeof(char) * MAX_SYNC_CONCURRENCY);
+		empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
+
+		shm_verified_data = malloc(sizeof(LoopToVerifiedData));
+		sem_init(&shm_verified_data->record_inode_sem, 0, 1);
+		shm_verified_data->record_handle_inode =
+			malloc(sizeof(ino_t) * 1000);
+		shm_verified_data->record_inode_counter = 0;
+		
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+			malloc(sizeof(SUPER_BLOCK_CONTROL));
+		sys_super_block->head.num_dirty = num_inode;
+	}
+
+	void TearDown()
+	{
+		free(shm_verified_data->record_handle_inode);
+		sem_destroy(&shm_verified_data->record_inode_sem);
+		free(shm_verified_data);
+
+		free(sys_super_block);
+
+		if (!access(metapath, F_OK))
+			unlink(metapath);
+		rmdir("/tmp/testHCFS");
+	}
+};
+
 void *sync_thread_function(void *ptr)
 {
 	SYNC_THREAD_TYPE *ptr1;
@@ -450,10 +470,9 @@ void *sync_thread_function(void *ptr)
 	sync_ctl.threads_finished[ptr1->which_index] = TRUE;
 	return NULL;
 }
-TEST(init_sync_controlTest, DoNothing_ControlSuccess)
+
+TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 {
-	ino_t empty_ino_array[MAX_SYNC_CONCURRENCY] = {0};
-	char empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
 	void *res;
 
 	/* Run tested function */
@@ -471,19 +490,16 @@ TEST(init_sync_controlTest, DoNothing_ControlSuccess)
 	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
 
-TEST(init_sync_controlTest, Multithread_ControlSuccess)
+TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
 {
 	void *res;
-	int num_threads = 100;
-	ino_t empty_ino_array[MAX_SYNC_CONCURRENCY] = {0};
-	char empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 
 	/* Run tested function */
 	init_sync_control();
 
 	/* Generate threads */
-	for (int i = 0 ; i < num_threads ; i++) {
+	for (int i = 0 ; i < num_inode ; i++) {
 		int idle_thread = -1;
 		sem_wait(&sync_ctl.sync_queue_sem);
 		sem_wait(&sync_ctl.sync_op_sem);
@@ -494,9 +510,13 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 				break;
 			}
 		}
-		sync_ctl.threads_in_use[idle_thread] = i+1;
+		sync_ctl.threads_in_use[idle_thread] = i + 1;
 		sync_ctl.threads_created[idle_thread] = TRUE;
 		sync_ctl.threads_finished[idle_thread] = FALSE;
+		sync_ctl.is_revert[idle_thread] = FALSE;
+		sync_ctl.continue_nexttime[idle_thread] = FALSE;
+		sync_ctl.threads_error[idle_thread] = FALSE;
+
 		sync_threads[idle_thread].which_index = idle_thread;
 		pthread_create(&sync_ctl.inode_sync_thread[idle_thread], NULL,
 			sync_thread_function,
@@ -516,6 +536,142 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
+
+TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
+{
+	int fd;
+	void *res;
+	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
+
+	/* Run tested function */
+	init_sync_control();
+
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+
+	sem_wait(&sync_ctl.sync_queue_sem);
+	sem_wait(&sync_ctl.sync_op_sem);
+	sync_ctl.threads_in_use[0] = 2;
+	sync_ctl.threads_created[0] = TRUE;
+	sync_ctl.threads_finished[0] = FALSE;
+	sync_ctl.is_revert[0] = FALSE;
+	sync_ctl.continue_nexttime[0] = FALSE;
+	sync_ctl.threads_error[0] = TRUE; /* Set upload error */
+	sync_ctl.progress_fd[0] = fd;
+
+	sync_threads[0].which_index = 0;
+	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+			sync_thread_function,
+			(void *)&(sync_threads[0]));
+	sync_ctl.total_active_sync_threads++;
+	sem_post(&sync_ctl.sync_op_sem);
+	sleep(1);
+
+	/* Reclaim resource */
+	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+
+	/* Verify */
+	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
+	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use, sizeof(empty_ino_array)));
+	EXPECT_EQ(0, shm_verified_data->record_inode_counter);
+	EXPECT_EQ(-1, access("/tmp/mock_progress_file", F_OK));
+	EXPECT_EQ(ENOENT, errno);
+}
+
+TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
+{
+	int fd;
+	void *res;
+	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
+
+	/* Run tested function */
+	init_sync_control();
+
+	/* The same as fetch_meta_path */
+	sprintf(metapath, "/tmp/testHCFS/mock_file_meta");
+	mknod(metapath, 0700, 0);
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+
+	sem_wait(&sync_ctl.sync_queue_sem);
+	sem_wait(&sync_ctl.sync_op_sem);
+	sync_ctl.threads_in_use[0] = 2;
+	sync_ctl.threads_created[0] = TRUE;
+	sync_ctl.threads_finished[0] = FALSE;
+	sync_ctl.is_revert[0] = FALSE;
+	sync_ctl.continue_nexttime[0] = TRUE; /* Set continue_nexttime */
+	sync_ctl.threads_error[0] = TRUE; /* Set upload error */
+	sync_ctl.progress_fd[0] = fd;
+
+	sync_threads[0].which_index = 0;
+	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+			sync_thread_function,
+			(void *)&(sync_threads[0]));
+	sync_ctl.total_active_sync_threads++;
+	sem_post(&sync_ctl.sync_op_sem);
+	sleep(1);
+
+	/* Reclaim resource */
+	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+
+	/* Verify */
+	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
+	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use, sizeof(empty_ino_array)));
+	EXPECT_EQ(0, shm_verified_data->record_inode_counter);
+	EXPECT_EQ(0, access("/tmp/mock_progress_file", F_OK));
+	EXPECT_EQ(0, access(metapath, F_OK));
+
+	unlink("/tmp/mock_progress_file");
+	unlink(metapath);
+}
+
+TEST_F(init_sync_controlTest, SyncSuccess)
+{
+	int fd;
+	void *res;
+	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
+
+	/* Run tested function */
+	init_sync_control();
+
+	/* The same as fetch_meta_path */
+	sprintf(metapath, "/tmp/testHCFS/mock_file_meta");
+	mknod(metapath, 0700, 0);
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+
+	sem_wait(&sync_ctl.sync_queue_sem);
+	sem_wait(&sync_ctl.sync_op_sem);
+	sync_ctl.threads_in_use[0] = 2;
+	sync_ctl.threads_created[0] = TRUE;
+	sync_ctl.threads_finished[0] = FALSE;
+	sync_ctl.is_revert[0] = FALSE;
+	sync_ctl.continue_nexttime[0] = FALSE; /* No error */
+	sync_ctl.threads_error[0] = FALSE; /* No error */
+	sync_ctl.progress_fd[0] = fd;
+
+	sync_threads[0].which_index = 0;
+	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+			sync_thread_function,
+			(void *)&(sync_threads[0]));
+	sync_ctl.total_active_sync_threads++;
+	sem_post(&sync_ctl.sync_op_sem);
+	sleep(1);
+
+	/* Reclaim resource */
+	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+
+	/* Verify */
+	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
+	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use, sizeof(empty_ino_array)));
+	EXPECT_EQ(1, shm_verified_data->record_inode_counter);
+	EXPECT_EQ(-1, access("/tmp/mock_progress_file", F_OK)); /* progress file will be deleted */
+	EXPECT_EQ(ENOENT, errno);
+	EXPECT_EQ(0, access(metapath, F_OK));
+
+	unlink("/tmp/mock_progress_file");
+	unlink(metapath);
+}
 /*
 	End of unittest of init_sync_control()
  */
@@ -526,8 +682,20 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 
 class sync_single_inodeTest : public ::testing::Test {
 protected:
+	char toupload_meta[100];
+	char progress_file[100];
+	int fd;
+
 	void SetUp()
 	{
+		mkdir("mock_meta_folder", 0700);
+		/* Mock toupload meta for each inode */	
+		fetch_toupload_meta_path(toupload_meta, 1);
+		mknod(toupload_meta, 0700, 0);
+
+		strcpy(progress_file, "mock_meta_folder/progress_file");
+		fd = open(progress_file, O_CREAT | O_RDWR);
+
 		no_backend_stat = TRUE;
 		init_sync_stat_control();
 		max_objname_num = 4000;
@@ -536,8 +704,8 @@ protected:
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char) * 20);
-
 	}
+
 	void TearDown()
 	{
 		void *res;
@@ -558,29 +726,53 @@ protected:
 
 		pthread_cancel(sync_ctl.sync_handler_thread);
 		pthread_join(sync_ctl.sync_handler_thread, &res);
+
+		close(fd);
+		unlink(progress_file);
+		unlink(toupload_meta);
+		rmdir("mock_meta_folder");
 	}
+
 	void write_mock_meta_file(char *metapath, int total_page, unsigned char block_status)
 	{
 		struct stat mock_stat;
 		FILE_META_TYPE mock_file_meta;
 		BLOCK_ENTRY_PAGE mock_block_page;
+		BLOCK_UPLOADING_PAGE block_uploading_page;
 		FILE *mock_metaptr;
+
+		memset(&block_uploading_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 
 		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
-		mock_stat.st_size = 1000000; // Let total_blocks = 1000000/1000 = 1000
+		mock_stat.st_size = 1000000; /* Let total_blocks = 1000000/1000 = 1000 */
 		mock_stat.st_mode = S_IFREG;
 		mock_file_meta.root_inode = 10;
-		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
+		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); /* Write stat */
 
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
 
-		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 			mock_block_page.block_entries[i].status = block_status;
+			mock_block_page.block_entries[i].seqnum = 1;
+
+			if (block_status == ST_LDISK) {
+				block_uploading_page.status_entry[i].to_upload_seq = 1;
+				block_uploading_page.status_entry[i].backend_seq = 0;
+				SET_TOUPLOAD_BLOCK_EXIST(block_uploading_page.status_entry[i].block_exist);
+			} else {
+				block_uploading_page.status_entry[i].to_upload_seq = 1;
+				block_uploading_page.status_entry[i].backend_seq = 0;
+			}
+
+		}
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int page_num = 0 ; page_num < total_page ; page_num++) {
 			fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
-					1, mock_metaptr); // Linearly write block page
+				1, mock_metaptr); /* Linearly write block page */
+			pwrite(fd, &mock_block_page,
+				sizeof(BLOCK_UPLOADING_PAGE),
+				total_page * sizeof(BLOCK_UPLOADING_PAGE));
 		}
 		fclose(mock_metaptr);
 
@@ -634,6 +826,8 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
+	mock_thread_type.is_revert = FALSE;
+	mock_thread_type.progress_fd = fd;
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = TRUE;
@@ -651,12 +845,16 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	/* Verify */
 	printf("Begin to verify sync blocks\n");
 	EXPECT_EQ(num_total_blocks, objname_counter);
-	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
-	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
+	qsort(objname_list, objname_counter, sizeof(char *),
+			sync_single_inodeTest::objname_cmp);
+
+       	/* Check uploaded-object is recorded */
+	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {
 		char expected_objname[50];
 		sprintf(expected_objname, "data_%lld_%d",
 				mock_thread_type.inode, blockno);
-		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
+		ASSERT_STREQ(expected_objname, objname_list[blockno]) <<
+				"blockno = " << blockno;
 		sprintf(expected_objname, "/tmp/testHCFS/data_%" PRIu64 "_%d",
 				(uint64_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
@@ -666,9 +864,10 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	fseek(metaptr, sizeof(struct stat), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
 	while (!feof(metaptr)) {
-		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); // Linearly read block meta
+		/* Linearly read block meta */
+		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); 
 		for (int i = 0 ; i < block_page.num_entries ; i++) {
-			ASSERT_EQ(ST_BOTH, block_page.block_entries[i].status); // Check status
+			ASSERT_EQ(ST_BOTH, block_page.block_entries[i].status);
 		}
 	}
 	fclose(metaptr);
@@ -707,7 +906,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *),
 	      sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0; blockno < num_total_blocks - 1;
-	     blockno++) { // Check deleted-object is recorded
+			blockno++) { // Check deleted-object is recorded
 		char expected_objname[50];
 		sprintf(expected_objname, "data_%" PRIu64 "_%d",
 			(uint64_t)mock_thread_type.inode, blockno);
@@ -748,9 +947,12 @@ class upload_loopTest : public ::testing::Test {
 protected:
 	FILE *mock_file_meta;
 	int max_objname_num;
+	char toupload_meta[100];
 
 	void SetUp()
 	{
+		mkdir("mock_meta_folder", 0700);
+
 		no_backend_stat = TRUE;
 		init_sync_stat_control();
 		if (!access(MOCK_META_PATH, F_OK))
@@ -760,8 +962,13 @@ protected:
 		objname_counter = 0;
 		max_objname_num = 40;
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
-		for (int i = 0 ; i < max_objname_num ; i++)
+		for (int i = 0 ; i < max_objname_num ; i++) {
 			objname_list[i] = (char *)malloc(sizeof(char) * 20);
+
+			/* Mock toupload meta for each inode */	
+			fetch_toupload_meta_path(toupload_meta, (i + 1) * 5);
+			mknod(toupload_meta, 0700, 0);
+		}
 
 		sem_init(&objname_counter_sem, 0, 1);
 
@@ -769,6 +976,23 @@ protected:
 		hcfs_system->sync_paused = FALSE;
 		CACHE_SOFT_LIMIT = 100000;
 		hcfs_system->systemdata.cache_size = 0;
+
+		/* Generate mock data and allocate space to check answer */
+		shm_test_data = (LoopTestData *)malloc(sizeof(LoopTestData));
+		shm_test_data->num_inode = max_objname_num; /* Test 40 nodes */
+		shm_test_data->to_handle_inode = (int *)
+				malloc(sizeof(int) * shm_test_data->num_inode);
+		shm_test_data->tohandle_counter = 0;
+		for (int i = 0; i < max_objname_num; i++)
+			/* mock inode, which is used as expected answer */
+			shm_test_data->to_handle_inode[i] = (i + 1) * 5;
+
+		/* Allocate space to store actual value */
+		shm_verified_data = (LoopToVerifiedData *)malloc(sizeof(LoopToVerifiedData));
+		shm_verified_data->record_handle_inode = (int *)
+				malloc(sizeof(int) * shm_test_data->num_inode);
+		shm_verified_data->record_inode_counter = 0;
+		sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 	}
 
 	void TearDown()
@@ -785,8 +1009,17 @@ protected:
 			free(objname_list[i]);
 		free(objname_list);
 
+		if (!access(toupload_meta, F_OK))
+			unlink(toupload_meta);
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
+
+		rmdir("mock_meta_folder");
+
+		free(shm_test_data->to_handle_inode);
+		free(shm_test_data);
+		free(shm_verified_data->record_handle_inode);
+		free(shm_verified_data);
 	}
 };
 
@@ -811,47 +1044,8 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	empty_meta.root_inode = 10;
 	fseek(mock_file_meta, 0, SEEK_SET);
 	fwrite(&empty_stat, sizeof(struct stat), 1, mock_file_meta);
-	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
-	/*
-	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
-		mock_block_page.block_entries[i].status = ST_LDISK;
-	mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
-	for (int page_num = 0 ; page_num < total_page ; page_num++) {
-		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
-				1, mock_metaptr); // Linearly write block page
-	}
-*/
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);	
 	fclose(mock_file_meta);
-
-	/* Generate mock data and allocate space to check answer */
-	shm_key = shmget(1122, sizeof(LoopTestData), IPC_CREAT | 0666);
-	ASSERT_NE(-1, shm_key);
-	shm_test_data = (LoopTestData *)shmat(shm_key, NULL, 0);
-	ASSERT_NE((void *)-1, shm_test_data);
-	shm_test_data->num_inode = max_objname_num; // Test 40 nodes
-
-	shm_key2 = shmget(2222, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
-	ASSERT_NE(-1, shm_key2);
-	shm_test_data->to_handle_inode = (int *)shmat(shm_key2, NULL, 0);
-	ASSERT_NE((void *)-1, shm_test_data->to_handle_inode);
-	shm_test_data->tohandle_counter = 0;
-
-	for (int i = 0 ; i < shm_test_data->num_inode ; i++)
-		// mock inode, which is used as expected answer
-		shm_test_data->to_handle_inode[i] = (i + 1) * 5;
-
-	/* Allocate a share space to store actual value */
-	shm_key = shmget(5566, sizeof(LoopToVerifiedData), IPC_CREAT | 0666);
-	ASSERT_NE(-1, shm_key);
-	shm_verified_data = (LoopToVerifiedData *) shmat(shm_key, NULL, 0);
-	ASSERT_NE((void *)-1, shm_verified_data);
-
-	shm_key2 = shmget(8899, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
-	ASSERT_NE(-1, shm_key2);
-	shm_verified_data->record_handle_inode = (int *)shmat(shm_key2, NULL, 0);
-	ASSERT_NE((void *)-1, shm_verified_data->record_handle_inode);
-	shm_verified_data->record_inode_counter = 0;
-	sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
 	hcfs_system->systemdata.dirty_cache_size = 100;
@@ -873,7 +1067,11 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	qsort(shm_verified_data->record_handle_inode, shm_verified_data->record_inode_counter,
 		sizeof(int), inode_cmp);
 	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
-		EXPECT_EQ(shm_test_data->to_handle_inode[i], shm_verified_data->record_handle_inode[i]);
+		ASSERT_EQ(shm_test_data->to_handle_inode[i],
+				shm_verified_data->record_handle_inode[i]);
+		fetch_toupload_meta_path(toupload_meta,
+				shm_verified_data->record_handle_inode[i]);
+		ASSERT_EQ(-1, access(toupload_meta, F_OK));
 	}
 }
 

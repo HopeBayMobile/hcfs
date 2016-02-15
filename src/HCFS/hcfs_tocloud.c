@@ -273,7 +273,7 @@ static inline void _sync_terminate_thread(int index)
 			 * meta exist */
 			fetch_meta_path(local_metapath, inode);
 			if (access(local_metapath, F_OK) == 0) {
-				tag_ret = tag_status_on_fuse(inode, FALSE, 0,
+				tag_ret = comm2fuseproc(inode, FALSE, 0,
 					sync_ctl.is_revert[index], finish_sync);
 				if (tag_ret < 0) {
 					write_log(0, "Fail to tag inode %lld "
@@ -886,10 +886,10 @@ static inline int _choose_deleted_block(char delete_which_one,
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
 
-	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
+/*	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
 			"backend_seq = %lld\n", (uint64_t)inode,
 			to_upload_seq, backend_seq);
-
+*/
 	if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
@@ -1028,14 +1028,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		dispatch_delete_block(which_curl);
 	}
 
-	/* Wait for all deleting threads. TODO: error handling when
-	 * fail to delete cloud data */
+	/* Wait for all deleting threads. */
 	_busy_wait_all_specified_upload_threads(inode);
 	write_log(10, "Debug: Finish deleting unuseful blocks "
 			"for inode %"PRIu64" on cloud\n", (uint64_t)inode);
 	return 0;
 
 errcode_handle:
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
 	return errcode;
 }
 
@@ -1102,6 +1102,8 @@ int _change_status_to_BOTH(ino_t inode, int progress_fd,
 		/* Change status if local status is ST_LtoC */
 		flock(fileno(local_metafptr), LOCK_EX);
 		if (access(local_metapath, F_OK) < 0) {
+			write_log(8, "meta %"PRIu64" is removed "
+				"when changing to BOTH\n", (uint64_t)inode);
 			flock(fileno(local_metafptr), LOCK_UN);
 			break;
 		}
@@ -1235,7 +1237,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		return;
 	}
 
-	/* Open temp meta to be uploaded. TODO: Maybe copy meta here? */
+	/* Open temp meta to be uploaded. */
 	toupload_metafptr = fopen(toupload_metapath, "r");
 	if (toupload_metafptr == NULL) {
 		errcode = errno;
@@ -1431,6 +1433,7 @@ store in some other file */
 							block_count,
 							local_block_seq,
 							toupload_block_seq);
+						flock(fileno(local_metafptr), LOCK_UN);
 						sync_ctl.threads_error[ptr->which_index]
 							= TRUE;
 						break;
@@ -2166,7 +2169,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			}
 
 			/* Notify fuse process that it is going to upload */
-			ret = tag_status_on_fuse(this_inode, TRUE,
+			ret = comm2fuseproc(this_inode, TRUE,
 					progress_fd, sync_ctl.is_revert[count],
 					FALSE);
 			if (ret < 0) {

@@ -123,3 +123,7 @@ int destroy_pathcache(PATH_CACHE *cacheptr)
 	return 0;
 }
 
+int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
+{
+	return 0;
+}

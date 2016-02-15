@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: fuseop.h
 * Abstract: The header file for FUSE definition
@@ -86,6 +86,11 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 /* Define socket path for process communicating */
 #define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
 #define MAX_FUSE_COMMUNICATION_THREAD 4
+
+#ifdef _ANDROID_ENV_
+#define  IS_ANDROID_EXTERNAL(type) (((type) == (ANDROID_EXTERNAL)) || \
+		((type) == (ANDROID_MULTIEXTERNAL)))
+#endif
 
 /* Structures for directories */
 /* Defining directory entry in meta files*/

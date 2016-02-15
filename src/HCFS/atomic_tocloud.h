@@ -56,7 +56,7 @@ typedef struct {
 	long long quadruple_indirect;
 } PROGRESS_META;
 
-int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
+int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 	int fd, BOOL is_revert, BOOL finish_sync);
 
 int get_progress_info(int fd, long long block_index,
@@ -79,7 +79,7 @@ int init_progress_info(int fd, long long backend_blocks, long long backend_size,
 
 int create_progress_file(ino_t inode);
 
-int del_progress_info(int fd, ino_t inode);
+int del_progress_file(int fd, ino_t inode);
 
 int check_and_copy_file(const char *srcpath, const char *tarpath,
 		BOOL lock_src);
@@ -93,11 +93,9 @@ int fetch_backend_meta_path(char *pathname, ino_t inode);
 
 char did_block_finish_uploading(int fd, long long blockno);
 
-int uploading_revert();
-
 long long query_status_page(int fd, long long block_index);
 
-void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr);
+void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr);
 
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		long long *total_backend_blocks);
@@ -105,4 +103,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 void revert_inode_sync(SYNC_THREAD_TYPE *data_ptr);
 
 int change_action(int fd, char now_action);
+
+void fetch_progress_file_path(char *pathname, ino_t inode);
+
 #endif

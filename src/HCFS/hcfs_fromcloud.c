@@ -57,20 +57,9 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	if (hcfs_system->sync_paused)
 		return -EIO;
-/*
-	if (action_from == FETCH_FILE_META) {
-		sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
-	} else {
-#if (DEDUP_ENABLE)
-		obj_id_to_string(obj_id, obj_id_str);
-		sprintf(objname, "data_%s", obj_id_str);
-#else
-		sprintf(objname, "data_%" PRIu64 "_%lld_%lld",
-			(uint64_t)this_inode, block_no, seq);
-#endif
-	}
-*/
-	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
+
+	/* Get sem if action is from pinning file or from download meta. */
+	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
 		sem_wait(&pin_download_curl_sem);
 	sem_wait(&download_curl_sem);
 
@@ -138,7 +127,8 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
 
-	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
+	/*Release sem if action from pinning file*/
+	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
 		sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
@@ -307,92 +297,6 @@ errcode_handle:
 		fclose(metafptr);
 	free(ptr);
 }
-
-/**
- * Download meta from backend
- *
- * @inode Inode number of downloaded meta
- * @download_metapath Path that place the downloaded meta object
- * @backend_fptr Address of file pointer used to open downloaded meta
- *
- * This function is now used in sync_single_inode() of hcfs_tocloud.c, which
- * chooses a usable thread in download_curl_handles[] and then download the
- * meta of given inode number. If succeed to download the meta, "backend_fptr"
- * will be a file pointer of "download_metapath" with w+ flag. Otherwise
- * "backend_fptr" will be NULL.
- *
- * @return 0 if succeed to download or object not found. Otherwise -EIO on error
- */
-/*
-int download_meta_from_backend(ino_t inode, const char *download_metapath,
-	FILE **backend_fptr)
-{
-	char backend_meta_name[500];
-	int ret, errcode;
-	int curl_idx;
-
-	fetch_backend_meta_objname(inode, backend_meta_name);
-
-	*backend_fptr = fopen(download_metapath, "w+");
-	if (*backend_fptr == NULL) {
-		write_log(0, "Error: Fail to open file in %s\n", __func__);
-		return -1;
-	}
-	setbuf(*backend_fptr, NULL);
-
-	sem_wait(&download_curl_sem);
-	sem_wait(&download_curl_control_sem);
-	for (curl_idx = 0; curl_idx < MAX_DOWNLOAD_CURL_HANDLE; curl_idx++)
-		if (curl_handle_mask[curl_idx] == FALSE)
-			break;
-	curl_handle_mask[curl_idx] = TRUE;
-	sem_post(&download_curl_control_sem);
-
-	write_log(10, "Debug: Begin to download meta. Inode %ld\n", inode);
-#if (ENCRYPT_ENABLE)
-	char  *get_fptr_data = NULL;
-	size_t len = 0;
-	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
-
-	ret = hcfs_get_object(get_fptr, backend_meta_name,
-		&(download_curl_handles[curl_idx]));
-#else
-	ret = hcfs_get_object(*backend_fptr, backend_meta_name,
-		&(download_curl_handles[curl_idx]));
-#endif
-#if (ENCRYPT_ENABLE)
-	fclose(get_fptr);
-	unsigned char *key = get_key();
-	decrypt_to_fd(*backend_fptr, key, get_fptr_data, len);
-	free(get_fptr_data);
-	free(key);
-#endif
-	sem_wait(&download_curl_control_sem);
-	curl_handle_mask[curl_idx] = FALSE;
-	sem_post(&download_curl_control_sem);
-
-	sem_post(&download_curl_sem);
-
-	if ((ret >= 200) && (ret <= 299)) {
-		errcode = 0;
-		write_log(10, "Debug: Download meta %ld from backend\n", inode);
-	} else if (ret != 404) {
-		errcode = -EIO;
-		fclose(*backend_fptr);
-		unlink(download_metapath);
-		*backend_fptr = NULL;
-	} else {
-		errcode = 0;
-		fclose(*backend_fptr);
-		unlink(download_metapath);
-		*backend_fptr = NULL;
-		write_log(10, "Debug: meta %ld does not exist on cloud\n",
-			inode);
-	}
-
-	return errcode;
-}
-*/
 
 int init_download_control()
 {

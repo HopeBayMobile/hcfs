@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: fuseop.c
 * Abstract: The c source code file for the main FUSE operations for HCFS.
@@ -24,6 +24,7 @@
 * 2015/7/7 Kewei began to add ops about symbolic link
 * 2015/11/5 Jiahong adding changes for per-file statistics
 * 2015/11/24 Jethro adding
+* 2016/1/19 Jiahong modified path reconstruct routine
 *
 **************************************************************************/
 
@@ -61,6 +62,7 @@
 #endif
 #include <inttypes.h>
 #include <sqlite3.h>
+#include <sys/capability.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -451,6 +453,8 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 	size_t uid_len;
 	char **uid = (char**)data;
 
+	UNUSED(argc);
+	UNUSED(azColName);
 	if (!argv[0])
 		return -1;
 
@@ -466,7 +470,7 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
  *
  * @return - 0 for success, otherwise -1.
  */
-int lookup_pkg(char *pkgname, uid_t *uid)
+int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 {
 
 	sqlite3 *db;
@@ -476,21 +480,31 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	char sql[500];
 	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
+	write_log(8, "Looking up pkg %s\n", pkgname);
 	/* Return uid 0 if error occurred */
+	data = NULL;
 	*uid = 0;
+
+	sem_wait(&(tmpptr->pkg_cache_lock));
+	if (strcmp(pkgname, (tmpptr->pkg_cache_entry).pkgname) == 0) {
+		*uid = (tmpptr->pkg_cache_entry).pkguid;
+		sem_post(&(tmpptr->pkg_cache_lock));
+		return 0;
+	}
+	sem_post(&(tmpptr->pkg_cache_lock));
 
 	snprintf(sql, sizeof(sql),
 		 "SELECT uid from uid WHERE package_name='%s'",
 		 pkgname);
 
 	if (access(db_path, F_OK) != 0) {
-		write_log(10, "Query pkg uid err (open db) - db file not existed\n");
+		write_log(4, "Query pkg uid err (open db) - db file not existed\n");
 		return -1;
 	}
 
 	ret_code = sqlite3_open(db_path, &db);
 	if (ret_code != SQLITE_OK) {
-		write_log(10, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
+		write_log(4, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
 		return -1;
 	}
 
@@ -498,7 +512,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb,
 	                        (void *)&data, &sql_err);
 	if( ret_code != SQLITE_OK ){
-		write_log(10, "Query pkg uid err (sql statement) - %s\n", sql_err);
+		write_log(4, "Query pkg uid err (sql statement) - %s\n", sql_err);
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
 		return -1;
@@ -507,13 +521,41 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	sqlite3_close(db);
 
 	if (data == NULL) {
-		write_log(10, "Query pkg uid err (sql statement) - pkg not found\n");
+		write_log(4, "Query pkg uid err (sql statement) - pkg not found\n");
 		return -1;
 	}
 
 	*uid = (uid_t)atoi(data);
+	write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
+	sem_wait(&(tmpptr->pkg_cache_lock));
+	snprintf((tmpptr->pkg_cache_entry).pkgname, sizeof((tmpptr->pkg_cache_entry).pkgname),
+		 "%s", pkgname);
+	(tmpptr->pkg_cache_entry).pkguid= *uid;
+	sem_post(&(tmpptr->pkg_cache_lock));
+
 	free(data);
 	return 0;
+}
+
+static inline void _android6_permission(struct stat *thisstat,
+		char mp_mode, mode_t *newpermission)
+{
+	if (mp_mode == MP_DEFAULT) {
+		if (!S_ISDIR(thisstat->st_mode))
+			*newpermission = 0660;
+		else
+			*newpermission = 0771;
+	} else if (mp_mode == MP_READ) {
+		if (!S_ISDIR(thisstat->st_mode))
+			*newpermission = 0640;
+		else
+			*newpermission = 0750;
+	} else {
+		if (!S_ISDIR(thisstat->st_mode))
+			*newpermission = 0660;
+		else
+			*newpermission = 0770;
+	}
 }
 
 int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
@@ -524,6 +566,8 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	char *tmptok, *tmptoksave, *tmptok_prev;
 	int count;
 	uid_t tmpuid;
+	char volume_type, mp_mode;
+	BOOL keep_check;
 
 	tmppath = NULL;
 	tmptok_prev = NULL;
@@ -532,7 +576,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	write_log(10, "Debug rewrite stat inode %" PRIu64,
 	          (uint64_t) thisstat->st_ino);
 	ret = construct_path(tmpptr->vol_path_cache, thisstat->st_ino,
-				&tmppath);
+				&tmppath, tmpptr->f_ino);
 	if (ret < 0) {
 		if (tmppath != NULL)
 			free(tmppath);
@@ -541,8 +585,51 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	}
 	write_log(10, "Debug path lookup %s\n", tmppath);
 
+	volume_type = tmpptr->volume_type;
+	mp_mode = tmpptr->mp_mode;
+	write_log(10, "Debug: volume type %d, mp_mode %d\n",
+			(int)volume_type, (int)mp_mode);
+
+	/* For android 6.0, first check folders/files under root. */
+	keep_check = TRUE;
+	if (volume_type == ANDROID_MULTIEXTERNAL) {
+		tmptok = strtok_r(tmppath, "/", &tmptoksave);
+		/* Root in android 6.0 */
+		if (tmptok == NULL) {
+			newpermission = 0711;
+			keep_check = FALSE;
+		} else {
+			if (is_natural_number(tmptok) == TRUE) {
+				keep_check = TRUE;
+
+			} else {
+				/* Not multi-user folder */
+				_android6_permission(thisstat, mp_mode,
+						&newpermission);
+				keep_check = FALSE;
+
+			}
+		}
+
+		if (keep_check == FALSE) {
+			thisstat->st_uid = 0;
+			if (tmpptr->mp_mode == MP_DEFAULT) /* default */
+				thisstat->st_gid = GID_SDCARD_RW;
+			else /* read/write */
+				thisstat->st_gid = GID_EVERYBODY;
+			tmpmask = 0777;
+			tmpmask = ~tmpmask;
+			tmpmask = tmpmask & thisstat->st_mode;
+			thisstat->st_mode = tmpmask | newpermission;
+			free(tmppath);
+			return 0;
+		}
+	}
+
+	/* For android 6.0, begin to check /x/<file/folder>, for 5.0,
+	 * check /<file/folder> */
 	for (count = 0; count < 4; count++) {
-		if (count == 0)
+		if (count == 0 && volume_type != ANDROID_MULTIEXTERNAL)
 			tmptok = strtok_r(tmppath, "/", &tmptoksave);
 		else
 			tmptok = strtok_r(NULL, "/", &tmptoksave);
@@ -551,13 +638,13 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		if (tmptok == NULL) {
 			switch (count) {
 			case 0:
-				/* Is root */
+				/* It is root for android 5.0 */
 				thisstat->st_uid = 0;
 				thisstat->st_gid = 1028;
 				newpermission = 0770;
 				break;
 			case 1:
-				/* Is /Android */
+				/* Is /Android for 5.0, /x/Android for 6.0 */
 				if (!S_ISDIR(thisstat->st_mode)) {
 					/* If not a directory */
 					thisstat->st_uid = 0;
@@ -591,7 +678,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 				} else {
 					/* If this is a package folder */
 					/* Need to lookup package uid */
-					lookup_pkg(tmptok_prev, &tmpuid);
+					lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
 					thisstat->st_uid = tmpuid;
 					thisstat->st_gid = 1028;
 					newpermission = 0770;
@@ -606,7 +693,7 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 			break;
 		}
 		if (count == 3) {
-			lookup_pkg(tmptok_prev, &tmpuid);
+			lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
 			thisstat->st_uid = tmpuid;
 			thisstat->st_gid = 1028;
 			newpermission = 0770;
@@ -614,12 +701,22 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		}
 		tmptok_prev = tmptok;
 		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
-			/* Not under /Android */
+			/* Not under /Android for android 5.0 */
 			thisstat->st_uid = 0;
 			thisstat->st_gid = 1028;
 			newpermission = 0770;
 			break;
 		}
+	}
+
+	/* Modify permission and gid for android 6.0 */
+	if (volume_type == ANDROID_MULTIEXTERNAL) {
+		_android6_permission(thisstat, mp_mode,
+				&newpermission);
+		if (tmpptr->mp_mode == MP_DEFAULT) /* default */
+			thisstat->st_gid = GID_SDCARD_RW;
+		else /* read/write */
+			thisstat->st_gid = GID_EVERYBODY;
 	}
 
 	tmpmask = 0777;
@@ -632,6 +729,7 @@ errcode_handle:
 	return errcode;
 }
 #endif
+
 /************************************************************************
 *
 * Function name: hfuse_ll_getattr
@@ -650,7 +748,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 
 	UNUSED(fi);
 
-	write_log(10, "Debug getattr inode %ld\n", ino);
+	write_log(8, "Debug getattr inode %ld\n", ino);
 	gettimeofday(&tmp_time1, NULL);
 	hit_inode = real_ino(req, ino);
 
@@ -667,7 +765,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 		}
 
 #ifdef _ANDROID_ENV_
-		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 			if (tmpptr->vol_path_cache == NULL) {
 				fuse_reply_err(req, EIO);
 				return;
@@ -738,6 +836,9 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+        write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
+                        (uint64_t)parent_inode);
+
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
@@ -749,7 +850,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -879,6 +980,9 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+        write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
+                        (uint64_t)parent_inode);
+
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
 
@@ -890,7 +994,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -995,6 +1099,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
+        write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
+                        (uint64_t)parent_inode);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1012,7 +1118,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1047,7 +1153,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL)
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
 #endif
@@ -1073,7 +1179,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
-	write_log(10, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
+	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
 			(uint64_t)parent_inode);
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1091,7 +1197,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1140,7 +1246,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL)
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
 #endif
@@ -1175,7 +1281,7 @@ a directory (for NFS) */
 
 	parent_inode = real_ino(req, parent);
 
-	write_log(10, "Debug lookup parent %" PRIu64 ", name %s\n",
+	write_log(8, "Debug lookup parent %" PRIu64 ", name %s\n",
 			(uint64_t)parent_inode, selfname);
 
 	/* Reject if name too long */
@@ -1195,7 +1301,7 @@ a directory (for NFS) */
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1239,7 +1345,7 @@ a directory (for NFS) */
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1354,6 +1460,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
 
+        write_log(8, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
+                        (uint64_t)parent_inode1);
+        write_log(8, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
+                        (uint64_t)parent_inode2);
+
+
 	/* Reject if name too long */
 	if (strlen(selfname1) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -1376,7 +1488,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1406,7 +1518,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -1716,7 +1828,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 #ifdef _ANDROID_ENV_
 		/* Clear path cache entry if needed */
-		if (tmpptr->volume_type == ANDROID_EXTERNAL)
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						old_target_inode);
 #endif
@@ -1846,7 +1958,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		sem_post(&(pathlookup_data_lock));
 
 #ifdef _ANDROID_ENV_
-		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 							self_inode);
 			if (ret_val < 0) {
@@ -2609,6 +2721,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		write back to meta cache */
 #ifdef _ANDROID_ENV_
 		ret = fetch_trunc_path(truncpath, this_inode);
+		if (ret != 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 
 		if (access(truncpath, F_OK) != 0) {
 			errcode = errno;
@@ -2757,7 +2873,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	int file_flags;
 	MOUNT_T *tmpptr;
 
-	write_log(10, "Debug open inode %ld\n", ino);
+	write_log(8, "Debug open inode %ld\n", ino);
 
 	thisinode = real_ino(req, ino);
 
@@ -2776,7 +2892,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -4079,7 +4195,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	*  the write */
 	/* Block indexing starts at zero */
 	start_block = (offset / MAX_BLOCK_SIZE);
-	end_block = ((offset+ ((off_t)size)-1) / MAX_BLOCK_SIZE);
+	end_block = ((offset + ((off_t)size) - 1) / MAX_BLOCK_SIZE);
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
 
@@ -4125,7 +4241,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if ((thisfilemeta.local_pin == TRUE) &&
 	    ((offset + (off_t)size) > temp_stat.st_size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		sizediff = (long long) ((offset + (off_t)size) - temp_stat.st_size);
+		sizediff =
+		    (long long)((offset + (off_t)size) - temp_stat.st_size);
 		write_log(10, "Write details: %lld, %lld\n", sizediff,
 		          (off_t) size);
 		if ((hcfs_system->systemdata.pinned_size + sizediff)
@@ -4286,12 +4403,12 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 	/*Prototype is linux statvfs call*/
-	sem_wait(&(tmpptr->stat_lock));
+	sem_wait((tmpptr->stat_lock));
 
-	system_size = (tmpptr->FS_stat).system_size;
-	num_inodes = (tmpptr->FS_stat).num_inodes;
+	system_size = (tmpptr->FS_stat)->system_size;
+	num_inodes = (tmpptr->FS_stat)->num_inodes;
 
-	sem_post(&(tmpptr->stat_lock));
+	sem_post((tmpptr->stat_lock));
 
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
@@ -4322,12 +4439,14 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	else
 		buf->f_files = 2000000;
 
+	/* TODO: BUG here: buf->f_ffree is unsugned and may become larger
+	 * if runs into negative value */
 	if (num_inodes < 0) {
 		/* when FS_stat.num_inodes >= 9223372036854775808,
 		 * num_inodes will become negative here and system free
 		 * inode will gets reset */
 		buf->f_ffree = buf->f_files;
-	} else if (buf->f_files < num_inodes) {
+	} else if (buf->f_files < (uint64_t)num_inodes) {
 		/* over used inodes */
 		buf->f_ffree = 0;
 	} else {
@@ -4455,7 +4574,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -4727,6 +4846,73 @@ void hfuse_ll_destroy(void *userdata)
 		  (uint64_t)tmpptr->f_ino);
 }
 
+/* Helper for converting string to 64-bit mask */
+uint64_t str_to_mask(char *input)
+{
+        int count;
+        uint64_t tempout;
+
+        tempout = 0;
+
+        /* First compute the length of the mask */
+        for (count = 0; count < 16; count++) {
+                if ((input[count] <= 'f') && (input[count] >= 'a')) {
+                        tempout = tempout << 4;
+                        tempout += (10 + (input[count] - 'a'));
+                        continue;
+                }
+                if ((input[count] <= '9') && (input[count] >= '0')) {
+                        tempout = tempout << 4;
+                        tempout += (input[count] - '0');
+                        continue;
+                }
+                break;
+        }
+
+        return tempout;
+}
+
+/* Helper for checking chown capability */
+int _check_chown_capability(pid_t thispid)
+{
+	char proc_status_path[100];
+        char tmpstr[100], outstr[20];
+        char *saveptr, *outptr;
+        FILE *fptr;
+	uint64_t cap_mask, op_mask, result_mask;
+
+	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
+	         thispid);
+        fptr = fopen(proc_status_path, "r");
+
+        do {
+                fgets(tmpstr, 80, fptr);
+                outptr = strtok_r(tmpstr, "\t", &saveptr);
+                if (strcmp(outptr, "CapEff:") == 0) {
+                        outptr = strtok_r(NULL, "\t", &saveptr);
+			snprintf(outstr, sizeof(outstr), "%s", outptr);
+                        break;
+                } else {
+                        continue;
+                }
+        } while (!feof(fptr));
+        fclose(fptr);
+	/* Convert string to 64bit bitmask */
+	cap_mask = str_to_mask(outstr);
+	write_log(10, "Cap mask is %" PRIu64 "\n", cap_mask);
+
+	/* Check the chown bit in the bitmask */
+
+	op_mask = 1;
+	op_mask = op_mask << CAP_CHOWN;
+	result_mask = cap_mask & op_mask;
+
+	/* Return whether the chown is set */
+	if (result_mask != 0)
+		return TRUE;
+	return FALSE;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_setattr
@@ -4821,16 +5007,23 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
-		/* Do not need to check if the caller can chown. Kernel will
-		do it. */
+		/* Checks if process has CHOWN capabilities here */
+		if (_check_chown_capability(temp_context->pid) != TRUE) {
+			/* Not privileged */
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}
 
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
 	}
 
-	/* TODO: Check if need to remove permission checking for group and time */
 	if (to_set & FUSE_SET_ATTR_GID) {
-		if (temp_context->uid != 0) {
+		/* Checks if process has CHOWN capabilities here */
+		/* Or if is owner or in group */
+		if (_check_chown_capability(temp_context->pid) != TRUE) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
 			if (ret_val < 0) {
 				meta_cache_close_file(body_ptr);
@@ -4992,7 +5185,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -5092,7 +5285,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -5336,6 +5529,9 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	int retcode;
 	struct stat stat_data;
 	ino_t this_inode;
+        MOUNT_T *tmpptr;
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -5373,6 +5569,16 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+
+#ifdef _ANDROID_ENV_
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &stat_data);
+        }
+#endif
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
 		write_log(0, "Error: setxattr Permission denied ");
@@ -5439,6 +5645,9 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
 	size_t actual_size;
 	char *value;
+        MOUNT_T *tmpptr;
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	value = NULL;
@@ -5472,6 +5681,17 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+
+#ifdef _ANDROID_ENV_
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &stat_data);
+        }
+#endif
+
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
 		write_log(0, "Error: getxattr permission denied ");
 		write_log(0, "(READ needed)\n");
@@ -5667,6 +5887,9 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	char name_space;
 	char key[MAX_KEY_SIZE];
 	struct stat stat_data;
+        MOUNT_T *tmpptr;
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -5699,6 +5922,16 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	if (retcode < 0)
 		goto error_handle;
 
+#ifdef _ANDROID_ENV_
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &stat_data);
+        }
+#endif
+
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
 		write_log(
 		    0, "Error: removexattr Permission denied (WRITE needed)\n");
@@ -5721,8 +5954,9 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	/* Remove xattr */
 	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos,
 		name_space, key);
-	if (retcode < 0) { /* ENOENT or others */
-		write_log(0, "Error: removexattr remove xattr fail\n");
+	if (retcode < 0 && retcode != -ENODATA) { /* ENOENT or others */
+		write_log(0, "Error: removexattr remove xattr fail. Code %d\n",
+				-retcode);
 		goto error_handle;
 	}
 
@@ -5730,7 +5964,6 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
-	write_log(5, "Remove key success\n");
 	fuse_reply_err(req, 0);
 	return;
 
@@ -5770,7 +6003,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -5943,7 +6176,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -6012,7 +6245,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
 #ifdef _ANDROID_ENV_
-	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
@@ -6087,9 +6320,8 @@ void *mount_multi_thread(void *ptr)
 			(uint64_t)tmpptr->f_ino, tmpptr->is_unmount);
 
 	if (tmpptr->is_unmount == FALSE)
-		unmount_event(tmpptr->f_name);
+		unmount_event(tmpptr->f_name, tmpptr->f_mp);
 
-	lookup_destroy(tmpptr->lookup_table, tmpptr);
 	return 0;
 }
 void *mount_single_thread(void *ptr)
@@ -6105,136 +6337,9 @@ void *mount_single_thread(void *ptr)
 			(uint64_t)tmpptr->f_ino, tmpptr->is_unmount);
 
 	if (tmpptr->is_unmount == FALSE)
-		unmount_event(tmpptr->f_name);
-
-	lookup_destroy(tmpptr->lookup_table, tmpptr);
-	return 0;
-}
-
-/**
- * Set uploading data in meta cache.
- *
- * This static function aims to set uploading data in meta cache.
- *
- * @return 0 on success, -1 on error.
- */
-int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
-{
-	int ret;
-	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
-	char toupload_metapath[300], local_metapath[300];
-	PROGRESS_META progress_meta;
-	struct stat tmpstat;
-	int errcode;
-	ssize_t ret_ssize;
-	long long toupload_blocks;
-
-	meta_cache_entry = NULL;
-	meta_cache_entry = meta_cache_lock_entry(data->inode);
-	if (!meta_cache_entry) {
-		write_log(0, "Fail to lock meta cache entry in %s\n", __func__);
-		return -ENOMEM;
-	}
-	ret = meta_cache_open_file(meta_cache_entry);
-	if (ret < 0) {
-		meta_cache_unlock_entry(meta_cache_entry);
-		return ret;
-	}
-
-	/* Copy meta if need to upload and is not reverting mode */
-	if ((data->is_uploading == TRUE) && (data->is_revert == FALSE)) {
-		fetch_toupload_meta_path(toupload_metapath,
-				data->inode);
-		fetch_meta_path(local_metapath, data->inode);
-		if (access(toupload_metapath, F_OK) == 0) {
-			write_log(2, "Cannot copy since "
-					"%s exists", toupload_metapath);
-			unlink(toupload_metapath);
-		}
-		ret = check_and_copy_file(local_metapath,
-				toupload_metapath, FALSE);
-		if (ret < 0) {
-			meta_cache_close_file(meta_cache_entry);
-			meta_cache_unlock_entry(meta_cache_entry);
-			return ret;
-		}
-
-		ret = meta_cache_lookup_file_data(data->inode, &tmpstat,
-				NULL, NULL, 0, meta_cache_entry);
-		if (ret < 0) {
-			meta_cache_close_file(meta_cache_entry);
-			meta_cache_unlock_entry(meta_cache_entry);
-			return ret;
-		}
-
-		/* Update info of to-upload blocks and size */
-		if (S_ISREG(tmpstat.st_mode)) {
-			flock(data->progress_list_fd, LOCK_EX);
-			PREAD(data->progress_list_fd, &progress_meta,
-					sizeof(PROGRESS_META), 0);
-			progress_meta.toupload_size = tmpstat.st_size;
-			toupload_blocks = (tmpstat.st_size == 0) ?
-				0 : (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1;
-			progress_meta.total_toupload_blocks = toupload_blocks;
-			PWRITE(data->progress_list_fd, &progress_meta,
-					sizeof(PROGRESS_META), 0);
-			flock(data->progress_list_fd, LOCK_UN);
-
-			write_log(10, "Debug: toupload_size %lld,"
-				" total_toupload_blocks %lld\n",
-				progress_meta.toupload_size,
-				progress_meta.total_toupload_blocks);
-		}
-	}
-
-	/* Just read progress meta when continuing uploading */
-	if ((data->is_uploading == TRUE) && (data->is_revert == TRUE)) {
-		flock(data->progress_list_fd, LOCK_EX);
-		PREAD(data->progress_list_fd, &progress_meta,
-				sizeof(PROGRESS_META), 0);
-		flock(data->progress_list_fd, LOCK_UN);
-		toupload_blocks = progress_meta.total_toupload_blocks;
-	}
-
-	/* Set uploading information */
-	if (data->is_uploading == TRUE) {
-		ret = meta_cache_set_uploading_info(meta_cache_entry,
-			TRUE, data->progress_list_fd,
-			toupload_blocks);
-	} else {
-		ret = update_upload_seq(meta_cache_entry);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
-		}
-		ret = meta_cache_set_uploading_info(meta_cache_entry,
-			FALSE, 0, 0);
-	}
-	if (ret < 0) {
-		write_log(0, "Fail to set uploading info in %s\n", __func__);
-		meta_cache_close_file(meta_cache_entry);
-		meta_cache_unlock_entry(meta_cache_entry);
-		return ret;
-	}
-
-	/* Unlock meta cache */
-	ret = meta_cache_close_file(meta_cache_entry);
-	if (ret < 0) {
-		meta_cache_unlock_entry(meta_cache_entry);
-		return ret;
-	}
-	ret = meta_cache_unlock_entry(meta_cache_entry);
-	if (ret < 0) {
-		write_log(0, "Fail to unlock entry in %s\n", __func__);
-		return ret;
-	}
+		unmount_event(tmpptr->f_name, tmpptr->f_mp);
 
 	return 0;
-
-errcode_handle:
-	meta_cache_close_file(meta_cache_entry);
-	meta_cache_unlock_entry(meta_cache_entry);
-	return errcode;
 }
 
 
@@ -6284,7 +6389,7 @@ void *fuse_communication_contact_window(void *data)
 		recv(ac_fd, &uploading_data,
 			sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 
-		ret = set_uploading_data(&uploading_data);
+		ret = fuseproc_set_uploading_info(&uploading_data);
 		if (ret < 0) {
 			communicate_result = ret;
 			write_log(2, "Fail to tag inode %lld in %s",
@@ -6387,8 +6492,19 @@ int hook_fuse(int argc, char **argv)
 	pthread_t communicate_tid[MAX_FUSE_COMMUNICATION_THREAD];
 	int socket_fd;
 
+#ifdef _FORCE_FUSE_DEBUG_  /* If want to dump debug log from fuse lib */
+	int count;
+
+	global_argc = argc + 1;
+	global_argv = (char **) malloc(sizeof(char *) * global_argc);
+	global_argv[argc] = (char *) malloc(10);
+	snprintf(global_argv[argc], 10, "-d");
+	for (count = 0; count < argc; count++)
+		global_argv[count] = argv[count];
+#else
 	global_argc = argc;
 	global_argv = argv;
+#endif
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);

@@ -14,9 +14,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	test_sync_struct.record_uploading_inode[test_sync_struct.total_inode++] = ptr->inode;
 	sem_post(&test_sync_struct.record_sem);
 
-	fetch_toupload_meta_path(toupload_metapath, ptr->inode);
-	unlink(toupload_metapath);
-
 	return;
 }
 
@@ -25,7 +22,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 {
 	sem_wait(&test_delete_struct.record_sem);
 	if (delete_which_one == BACKEND_BLOCKS)
-	test_delete_struct.record_uploading_inode[test_delete_struct.total_inode++] = inode;
+		test_delete_struct.record_uploading_inode[test_delete_struct.total_inode++] = inode;
 	sem_post(&test_delete_struct.record_sem);
 	return 0;
 }
@@ -64,4 +61,33 @@ int check_page_level(long long page_index)
 		POINTERS_PER_PAGE); 
 
 	return 4;
+}
+
+void fetch_backend_meta_objname(char *objname, ino_t inode)
+{
+	sprintf(objname, "/tmp/mock_backend_meta_%"PRIu64, (uint64_t)inode);
+	return;
+}
+
+int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+{
+	FILE_META_TYPE filemeta;
+	struct stat tmpstat;
+
+	if (fetch_from_cloud_fail == TRUE)
+		return -EIO;
+	if (is_first_upload == TRUE)
+		return -ENOENT;
+
+	tmpstat.st_size = 10485760;
+	pwrite(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
+	pwrite(fileno(fptr), &filemeta, sizeof(FILE_META_TYPE),
+			sizeof(struct stat));
+
+	return 0;
+}
+
+int fetch_meta_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/mock_local_meta");
 }

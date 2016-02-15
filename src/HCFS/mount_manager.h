@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: FS_manager.h
 * Abstract: The header file for mount manager
@@ -27,6 +27,11 @@
 #include "path_reconstruct.h"
 #endif
 
+#ifdef _ANDROID_ENV_
+#define MP_DEFAULT 1
+#define MP_READ 2
+#define MP_WRITE 3
+#endif
 /*
 Binary search tree
 
@@ -44,11 +49,17 @@ typedef struct {
 } FS_STAT_T;
 
 typedef struct {
+	char pkgname[MAX_FILENAME_LEN+1];
+	uid_t pkguid;
+} PKG_CACHE_ENTRY;
+
+typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
 #ifdef _ANDROID_ENV_
+	char mp_mode;
 	char volume_type;
-	PATH_CACHE *vol_path_cache;
+	PATH_CACHE *vol_path_cache; /* Shared */
 #endif
 	char rootpath[METAPATHLEN];
 	char *f_mp;
@@ -57,10 +68,12 @@ typedef struct {
 	struct fuse_session *session_ptr;
 	struct fuse_chan *chan_ptr;
 	char is_unmount;
-	LOOKUP_HEAD_TYPE *lookup_table;
-	FS_STAT_T FS_stat;
-	FILE *stat_fptr;  /* For keeping track of FS stat */
-	sem_t stat_lock;
+	LOOKUP_HEAD_TYPE *lookup_table; /* All vol share the same one */
+	FS_STAT_T *FS_stat; /* shared */
+	FILE *stat_fptr;  /* For keeping track of FS stat. shared */
+	sem_t *stat_lock; /* shared */
+	sem_t pkg_cache_lock; /* Lock for package to uid lookup cache */
+	PKG_CACHE_ENTRY pkg_cache_entry;
 	struct fuse_args mount_args;
 } MOUNT_T;
 
@@ -87,29 +100,30 @@ in the two modules */
 int init_mount_mgr(void);
 int destroy_mount_mgr(void); /* Will call unmount_all */
 
-int mount_FS(char *fsname, char *mp);
-int unmount_FS(char *fsname);  /* Need to unmount FUSE and set is_unmount */
+int mount_FS(char *fsname, char *mp, char mp_mode);
+int unmount_FS(char *fsname, char *mp); /* Need to unmount FUSE and set is_unmount */
 int unmount_all(void);
 
 /* If is_unmount is set, FUSE destroy routine should not call
 unmount_event */
-int unmount_event(char *fsname);
+int unmount_event(char *fsname, char *mp);
 int mount_status(char *fsname);
 
 /* Below are helper functions. Will not process lock / unlock in these
 functions */
 int FS_is_mounted(char *fsname);
 
-int search_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T **mt_info);
-int search_mount(char *fsname, MOUNT_T **mt_info);
+int search_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
+		MOUNT_T **mt_info);
+int search_mount(char *fsname, char *mp, MOUNT_T **mt_info);
 int insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info);
 int insert_mount(char *fsname, MOUNT_T *mt_info);
 
 /* For delete from tree, the tree node will not be freed immediately. This
 should be handled in the unmount routines */
-int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
+int delete_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 					MOUNT_NODE_T **ret_node);
-int delete_mount(char *fsname, MOUNT_NODE_T **ret_node);
+int delete_mount(char *fsname, char *mp, MOUNT_NODE_T **ret_node);
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 				long long num_inodes_delta);

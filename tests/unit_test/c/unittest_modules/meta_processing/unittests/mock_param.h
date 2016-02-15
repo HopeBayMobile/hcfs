@@ -73,6 +73,15 @@ char delete_pathcache_node_success;
 /* link_update_meta() */
 #define INO_TOO_MANY_LINKS 279348
 
+/* inherit_xattr() */
+#define INO_NO_XATTR_PAGE 758925
+#define INO_XATTR_PAGE_EXIST 490013
+size_t TOTAL_KEY_SIZE;
+size_t XATTR_VALUE_SIZE; 
+char xattr_key[3][100];
+char global_mock_namespace;
+int xattr_count;
+
 /* pin_inode() */
 char collect_dir_children_flag;
 
@@ -131,5 +140,12 @@ SYSTEM_CONF_STRUCT *system_config;
 	Tool vars used for lookup_count_unittest	
  */
 char *check_actual_delete_table;
+
+/* meta_cache_set_uploading_info */
+char CHECK_UPLOADING_FLAG;
+long long CHECK_TOUPLOAD_BLOCKS;
+
+#define MOCK_UPLOAD_SEQ 1234
+long long CHECK_UPLOAD_SEQ;
 
 #endif

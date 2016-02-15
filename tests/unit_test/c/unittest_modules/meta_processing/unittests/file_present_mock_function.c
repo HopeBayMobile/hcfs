@@ -26,6 +26,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		if (this_inode == INO_DIR_XATTR_PAGE_EXIST)
 			dir_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
 		dir_meta_ptr->local_pin = 1;
+		dir_meta_ptr->upload_seq = MOCK_UPLOAD_SEQ;
 	}
 
 	return 0;
@@ -40,6 +41,10 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 		return 0;
 	else if (this_inode == INO_META_CACHE_UPDATE_DIR_FAIL)
 		return -1;
+
+	if (dir_meta_ptr)
+		CHECK_UPLOAD_SEQ = dir_meta_ptr->upload_seq;
+
 	return 0;
 }
 
@@ -109,6 +114,8 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			file_meta_ptr->next_xattr_page = 0;
 		if (this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
 			file_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
+
+		file_meta_ptr->upload_seq = MOCK_UPLOAD_SEQ;
 	}
 
 	if (this_inode == INO_TOO_MANY_LINKS)
@@ -125,6 +132,10 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 		return 0;
 	else if (this_inode == INO_META_CACHE_UPDATE_FILE_FAIL)
 		return -1;
+
+	if (file_meta_ptr)
+		CHECK_UPLOAD_SEQ = file_meta_ptr->upload_seq;
+
 	return 0;
 }
 
@@ -188,11 +199,17 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 	char buf[5000];
 
 	memset(buf, 0, 5000);
-	memcpy(buf, symlink_meta_ptr->link_path, symlink_meta_ptr->link_len);
 
-	if (!strcmp("update_symlink_data_fail", buf))
-		return -1;
+	if (symlink_meta_ptr) {
+		if (symlink_meta_ptr->link_path)
+			memcpy(buf, symlink_meta_ptr->link_path,
+					symlink_meta_ptr->link_len);
 
+		if (!strcmp("update_symlink_data_fail", buf))
+			return -1;
+
+		CHECK_UPLOAD_SEQ = symlink_meta_ptr->upload_seq;
+	}
 	return 0;
 }
 
@@ -206,6 +223,7 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 			symlink_meta_ptr->next_xattr_page = 0;
 		if (this_inode == INO_LNK_XATTR_PAGE_EXIST)
 			symlink_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
+		symlink_meta_ptr->upload_seq = MOCK_UPLOAD_SEQ;
 	}
 	return 0;
 }
@@ -271,6 +289,7 @@ int lookup_add_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
+
 int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
@@ -278,5 +297,34 @@ int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 
 int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 {
+	return 0;
+}
+
+int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+		META_CACHE_ENTRY_STRUCT *selbody_ptr)
+{
+	return 0;
+}
+
+int fetch_toupload_meta_path(char *pathname, ino_t inode)
+{
+	return 0;
+}
+
+int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
+{
+	return 0;
+}
+
+int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
+int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+		char is_now_uploading, int new_fd, long long toupload_blocks)
+{
+	CHECK_UPLOADING_FLAG = is_now_uploading;
+	CHECK_TOUPLOAD_BLOCKS = toupload_blocks;
 	return 0;
 }

@@ -23,7 +23,7 @@ extern SYSTEM_CONF_STRUCT *system_config;
  *
  * @return 0 if succeeding in tagging status, otherwise -1 on error.
  */
-int tag_status_on_fuse(ino_t this_inode, BOOL is_uploading,
+int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 		int fd, BOOL is_revert, BOOL finish_sync)
 {
 	int sockfd;
@@ -657,13 +657,13 @@ errcode_handle:
 	return errcode;
 }
 
-int fetch_progress_file_path(char *pathname, ino_t inode)
+void fetch_progress_file_path(char *pathname, ino_t inode)
 {
 
 	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
 		METAPATH, (uint64_t)inode);
 
-	return 0;
+	return;
 }
 
 /**
@@ -795,7 +795,8 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 	}
 
 	/* Copy xattr "trunc_size" if it exists */
-	/*ret_ssize = fgetxattr(fileno(src_ptr), "user.trunc_size",
+#ifndef _ANDROID_ENV_
+	ret_ssize = fgetxattr(fileno(src_ptr), "user.trunc_size",
 		&temp_trunc_size, sizeof(long long));
 	if (ret_ssize >= 0) {
 		fsetxattr(fileno(tar_ptr), "user.trunc_size",
@@ -803,7 +804,8 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 
 		fremovexattr(fileno(src_ptr), "user.trunc_size");
 		write_log(10, "Debug: trunc_size = %lld",temp_trunc_size);
-	}*/
+	}
+#endif
 
 	/* Unlock soruce file */
 	if (lock_src == TRUE)
@@ -883,6 +885,9 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 	int errcode, ret;
 	ssize_t ret_ssize;
 	BOOL first_upload;
+
+	if (!S_ISREG(ptr->this_mode))
+		return 0;
 
 	if (ptr->is_revert == FALSE) {
 		/* Try to download backend meta */
@@ -986,28 +991,32 @@ errcode_handle:
  * 10. close progress info file
  *
  */
-void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
+void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 {
-	char toupload_meta_exist, backend_meta_exist;
+	char toupload_meta_exist, backend_meta_exist, local_meta_exist;
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
+	char local_meta_path[200];
 	int errcode;
 	mode_t this_mode;
 	ino_t inode;
 	int progress_fd;
-	long long total_blocks;
+	long long total_backend_blocks, total_toupload_blocks;
 	ssize_t ret_ssize;
 	char finish_init;
 	int ret;
 	PROGRESS_META progress_meta;
+	int which_index;
 
 	finish_init = FALSE;
 	this_mode = data_ptr->this_mode;
 	inode = data_ptr->inode;
 	progress_fd = data_ptr->progress_fd;
+	which_index = data_ptr->which_index;
 
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
+	fetch_meta_path(local_meta_path, inode);
 
 	write_log(10, "Debug: Now begin to revert uploading inode_%"PRIu64"\n",
 			(uint64_t)inode);
@@ -1039,6 +1048,20 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
+	/* Check local meta */
+	if (access(local_meta_path, F_OK) == 0) {
+		local_meta_exist = TRUE;
+	} else {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			goto errcode_handle;
+		} else {
+			local_meta_exist = FALSE;
+		}
+	}
+
 	/* If it is not regfile (strange), then just remove all and upload
 	 * it again. */
 	if (!S_ISREG(this_mode)) {
@@ -1051,23 +1074,35 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		return;
 	}
 
-	/*** Begin to check break point ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	if (progress_meta.now_action != PREPARING) {
-		total_blocks = progress_meta.total_backend_blocks;
+		total_backend_blocks = progress_meta.total_backend_blocks;
+		total_toupload_blocks = progress_meta.total_toupload_blocks;
 		finish_init = TRUE;
 	} else {
+		total_backend_blocks = 0;
+		total_toupload_blocks = 0;
 		finish_init = FALSE;
 	}
 
+	/*** Begin to check break point ***/
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (finish_init == TRUE)) {
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
-			write_log(10, "Debug: begin continue uploading inode %"
-				PRIu64"\n", (uint64_t)inode);
-			sync_single_inode((void *)data_ptr);
-			return;
+			if (local_meta_exist) {
+				write_log(10, "Debug: begin continue uploading"
+					" inode %"PRIu64"\n", (uint64_t)inode);
+				sync_single_inode((void *)data_ptr);
+				return;
+			} else {
+				delete_backend_blocks(progress_fd,
+					total_toupload_blocks, inode,
+					TOUPLOAD_BLOCKS);
+				sync_ctl.threads_finished[data_ptr->which_index]
+				       = TRUE;
+				return;	
+			}
 
 		} else {
 		/* NOT begin to upload, so cancel uploading.
@@ -1081,9 +1116,11 @@ void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		if (finish_init == TRUE) {
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
-		case10 */
-			delete_backend_blocks(progress_fd, total_blocks,
+		case10. Do not need to update backend size again. */
+			delete_backend_blocks(progress_fd, total_backend_blocks,
 				inode, DEL_BACKEND_BLOCKS);
+			sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+			return;
 		} else {
 		/* Crash before copying local meta, so just
 		cancel uploading. case[1, 2] */
@@ -1246,4 +1283,3 @@ int change_action(int fd, char now_action)
 errcode_handle:
 	return errcode;
 }
-

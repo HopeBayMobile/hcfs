@@ -46,7 +46,7 @@ CXX = gcc
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
 #TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
-TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest pin_scheduling_unittest
+TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest pin_scheduling_unittest xattr_ops_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
@@ -69,7 +69,7 @@ ifndef NOGCOVR
 endif
 
 $(DO_TESTS): $(TESTS)
-	./$(@:test-%=%)
+	./$(@:test-%=%) --gtest_output=xml:test_detail_$(@:test-%=%).xml
 
 .PHONY : setup
 setup :
@@ -178,14 +178,14 @@ pin_scheduling_unittest : pin_scheduling_mock_function.o pin_scheduling.o pin_sc
 
 
 # xattr_ops.c
-#xattr_ops.o : $(USER_DIR)/xattr_ops.c $(USER_DIR)/logger.h $(USER_DIR)/meta_mem_cache.h $(GTEST_HEADERS)
-#	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/xattr_ops.c
+xattr_ops.o : $(USER_DIR)/xattr_ops.c $(USER_DIR)/logger.h $(USER_DIR)/meta_mem_cache.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/xattr_ops.c
 
-#xattr_ops_mock_function.o : $(UNITTEST_DIR)/xattr_ops_mock_function.c $(UNITTEST_DIR)/mock_param.h
-#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_mock_function.c
+xattr_ops_mock_function.o : $(UNITTEST_DIR)/xattr_ops_mock_function.c $(UNITTEST_DIR)/mock_param.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_mock_function.c
 
-#xattr_ops_unittest.o : $(UNITTEST_DIR)/xattr_ops_unittest.cc $(GTEST_HEADERS)
-#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_unittest.cc
+xattr_ops_unittest.o : $(UNITTEST_DIR)/xattr_ops_unittest.cc $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_unittest.cc
 
-#xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
-#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++

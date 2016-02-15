@@ -947,3 +947,44 @@ TEST_F(reload_system_configTest, Set_Backend_Success)
 }
 
 /* End of unittest for reload_system_config */
+
+class is_natural_numberTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(is_natural_numberTest, ZeroTest)
+{
+	EXPECT_EQ(TRUE, is_natural_number("0"));
+}
+
+TEST_F(is_natural_numberTest, NegativeNumber)
+{
+	EXPECT_EQ(FALSE, is_natural_number("-12345"));
+}
+
+TEST_F(is_natural_numberTest, NotNumber)
+{
+	EXPECT_EQ(FALSE, is_natural_number("lalala12345"));
+}
+
+TEST_F(is_natural_numberTest, InvalidNumber)
+{
+	EXPECT_EQ(FALSE, is_natural_number("00012345"));
+}
+
+TEST_F(is_natural_numberTest, PositiveNumber1)
+{
+	EXPECT_EQ(TRUE, is_natural_number("12345"));
+}
+
+TEST_F(is_natural_numberTest, PositiveNumber2)
+{
+	EXPECT_EQ(TRUE, is_natural_number("5"));
+}

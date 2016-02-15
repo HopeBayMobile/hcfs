@@ -269,6 +269,11 @@ int main(int argc, char **argv)
 	struct rlimit nofile_limit;
 	int count;
 
+	ret_val = ignore_sigpipe();
+
+        if (ret_val < 0)
+                exit(-ret_val);
+
 	logptr = NULL;
 
 	ENGINE_load_builtin_engines();
