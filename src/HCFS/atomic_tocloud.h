@@ -100,7 +100,7 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr);
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		long long *total_backend_blocks);
 
-void revert_inode_sync(SYNC_THREAD_TYPE *data_ptr);
+void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr);
 
 int change_action(int fd, char now_action);
 

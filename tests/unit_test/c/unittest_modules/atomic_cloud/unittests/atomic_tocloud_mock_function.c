@@ -1,4 +1,4 @@
-#include "hcfs_tocloud.h"
+#include "atomic_tocloud.h"
 #include "mock_params.h"
 
 int write_log(int level, char *format, ...)
@@ -21,7 +21,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		char delete_which_one)
 {
 	sem_wait(&test_delete_struct.record_sem);
-	if (delete_which_one == BACKEND_BLOCKS)
+	if (delete_which_one == DEL_BACKEND_BLOCKS)
 		test_delete_struct.record_uploading_inode[test_delete_struct.total_inode++] = inode;
 	sem_post(&test_delete_struct.record_sem);
 	return 0;

@@ -174,7 +174,7 @@ TEST_F(init_progress_infoTest, Init_backend_fptr_Is_NULL)
 	/* verify */
 	ASSERT_EQ(0, ret);
 	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	EXPECT_EQ(TRUE, progress_meta.finish_init_backend_data);
+	EXPECT_EQ(NOW_UPLOADING, progress_meta.now_action);
 	EXPECT_EQ(0, progress_meta.backend_size);
 	EXPECT_EQ(0, progress_meta.total_backend_blocks);
 	size = lseek(fd, 0, SEEK_END);
@@ -226,7 +226,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 	/* verify */
 	ASSERT_EQ(0, ret);
 	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	EXPECT_EQ(TRUE, progress_meta.finish_init_backend_data);
+	EXPECT_EQ(NOW_UPLOADING, progress_meta.now_action);
 	EXPECT_EQ(0, progress_meta.backend_size);
 	EXPECT_EQ(num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
 		progress_meta.total_backend_blocks);
@@ -285,7 +285,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 	/* verify */
 	ASSERT_EQ(0, ret);
 	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	EXPECT_EQ(TRUE, progress_meta.finish_init_backend_data);
+	EXPECT_EQ(NOW_UPLOADING, progress_meta.now_action);
 	EXPECT_EQ(123, progress_meta.backend_size);
 	EXPECT_EQ(num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
 		progress_meta.total_backend_blocks);
@@ -355,7 +355,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 	/* verify */
 	ASSERT_EQ(0, ret);
 	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	EXPECT_EQ(TRUE, progress_meta.finish_init_backend_data);
+	EXPECT_EQ(NOW_UPLOADING, progress_meta.now_action);
 	EXPECT_EQ(123, progress_meta.backend_size);
 	EXPECT_EQ(num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
 		progress_meta.total_backend_blocks);
@@ -940,7 +940,7 @@ TEST_F(continue_inode_uploadTest, Revert_NonRegfile)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
-	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	tmp_meta.now_action = NOW_UPLOADING; // Finish init
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 
 	fetch_toupload_meta_path(toupload_metapath, inode);
@@ -1095,7 +1095,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterFinishInit_ProgressFile)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
-	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	tmp_meta.now_action = NOW_UPLOADING; // Finish init
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 
 	fetch_toupload_meta_path(toupload_metapath, inode);
@@ -1137,7 +1137,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
-	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	tmp_meta.now_action = NOW_UPLOADING; // Finish init
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 	
 	fetch_toupload_meta_path(toupload_metapath, inode);
@@ -1182,7 +1182,7 @@ TEST_F(continue_inode_uploadTest, Crash_When_DeleteOldData_KeepDeleting)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
-	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	tmp_meta.now_action = DEL_BACKEND_BLOCKS; // Finish init
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 	
 	fetch_toupload_meta_path(toupload_metapath, inode);
@@ -1373,7 +1373,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_FinishInit)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
-	tmp_meta.finish_init_backend_data = TRUE;
+	tmp_meta.now_action = NOW_UPLOADING;
 	tmp_meta.backend_size = MAX_BLOCK_SIZE * 10;
 	tmp_meta.total_backend_blocks = 10;
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
@@ -1413,7 +1413,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_NotFinishInit)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
-	tmp_meta.finish_init_backend_data = FALSE;
+	tmp_meta.now_action = PREPARING;
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 
 	sync_type.this_mode = S_IFREG;

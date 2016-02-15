@@ -770,9 +770,9 @@ protected:
 		for (int page_num = 0 ; page_num < total_page ; page_num++) {
 			fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
 				1, mock_metaptr); /* Linearly write block page */
-			pwrite(fd, &mock_block_page,
+			pwrite(fd, &block_uploading_page,
 				sizeof(BLOCK_UPLOADING_PAGE),
-				total_page * sizeof(BLOCK_UPLOADING_PAGE));
+				page_num * sizeof(BLOCK_UPLOADING_PAGE));
 		}
 		fclose(mock_metaptr);
 

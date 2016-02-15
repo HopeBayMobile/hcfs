@@ -514,10 +514,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			return;
 		}
 
-	}
-
-	/* Delete blocks */
-	if (S_ISREG(ptr->this_mode)) {
+		/* Delete blocks */
 		flock(fileno(backend_metafptr), LOCK_EX);
 		backend_mlock = TRUE;
 		FSEEK(backend_metafptr, 0, SEEK_SET);

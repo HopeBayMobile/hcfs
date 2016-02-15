@@ -482,8 +482,8 @@ errcode_handle:
  * This function initializes object-id and seq number of given backend data.
  * Other info is set as none, that is all zeros. Backend info of given
  * data block will not be set if status is ST_NONE or ST_TODELETE. After init
- * all backend data blocks, The field "finish_init" in progress meta will be
- * set as TRUE.
+ * all backend data blocks, The field now_action in progress meta will be
+ * set as NOW_UPLOADING.
  *
  * @return 0 if succeed. Otherwise negative error code.
  *
@@ -889,7 +889,26 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 	if (!S_ISREG(ptr->this_mode))
 		return 0;
 
-	if (ptr->is_revert == FALSE) {
+	if (ptr->is_revert == TRUE) {
+		/* Reverting/continuing to upload. Just read progress
+		 * meta and check. */
+		PROGRESS_META progress_meta;
+
+		PREAD(ptr->progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+		/* Cancel to coninue */
+		if (progress_meta.now_action == PREPARING) {
+			write_log(2, "Interrupt before uploading, do nothing and"
+				" cancel uploading\n");
+			return -ECANCELED;
+
+		} else {
+			*backend_size = progress_meta.backend_size;
+			*total_backend_blocks =
+				progress_meta.total_backend_blocks;
+		}
+
+	} else {	
 		/* Try to download backend meta */
 		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, ptr->inode);
@@ -945,24 +964,6 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 		write_log(10, "Debug: backend size = %lld\n", *backend_size);
 		if (ret < 0) /* init progress fail */
 			return ret;
-
-	/* Reverting/continuing to upload. Just read progress meta and check. */
-	} else {
-		PROGRESS_META progress_meta;
-
-		PREAD(ptr->progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-
-		/* Cancel to coninue */
-		if (progress_meta.now_action == PREPARING) {
-			write_log(2, "Interrupt before uploading, do nothing and"
-				" cancel uploading\n");
-			return -ECANCELED;
-
-		} else {
-			*backend_size = progress_meta.backend_size;
-			*total_backend_blocks =
-				progress_meta.total_backend_blocks;
-		}	
 	}
 
 	return 0;
@@ -1098,7 +1099,7 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 			} else {
 				delete_backend_blocks(progress_fd,
 					total_toupload_blocks, inode,
-					TOUPLOAD_BLOCKS);
+					DEL_TOUPLOAD_BLOCKS);
 				sync_ctl.threads_finished[data_ptr->which_index]
 				       = TRUE;
 				return;	
@@ -1142,7 +1143,17 @@ errcode_handle:
 	return;
 }
 
-void revert_inode_sync(SYNC_THREAD_TYPE *data_ptr)
+/**
+ * continue_inode_sync()
+ *
+ * Let inode continues to upload. When now_action is PREPARING,
+ * cancel to upload this time. If now_action is NOW_UPLOADING,
+ * keep inode uploading by calling sync_single_inode() subroutine.
+ * If now_action is DEL_BACKEND_BLOCKS, then delete backend old blocks.
+ * If now_action is DEL_TOUPLOAD_BLOCKS, then delete those new blocks
+ * on cloud.
+ */ 
+void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 {
 	char toupload_meta_exist, backend_meta_exist;
 	char toupload_meta_path[200];
@@ -1266,6 +1277,16 @@ errcode_handle:
 	return;
 }
 
+/**
+ * change_action()
+ *
+ * Change now_action field in progress_meta.
+ *
+ * @param fd File descriptor of this progress file
+ * @param now_action New action to be changed.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
 int change_action(int fd, char now_action)
 {
 	int ret, errcode;

@@ -280,11 +280,6 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 	return 0;
 }
 
-void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
-{
-	return;
-}
-
 int check_and_copy_file(const char *srcpath, const char *tarpath,
 		BOOL lock_src)
 {
@@ -302,6 +297,16 @@ char did_block_finish_uploading(int fd, long long blockno)
 }
 
 int create_progress_file(ino_t inode)
+{
+	return 0;
+}
+
+void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
+{
+	return;
+}
+
+int change_action(int fd, char now_action)
 {
 	return 0;
 }
