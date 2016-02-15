@@ -38,7 +38,8 @@ OBJS_F := objmeta.o \
 	monitor.o \
 	dir_statistics.o \
 	parent_lookup.o \
-	atomic_tocloud.o
+	atomic_tocloud.o \
+	tocloud_tools.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)

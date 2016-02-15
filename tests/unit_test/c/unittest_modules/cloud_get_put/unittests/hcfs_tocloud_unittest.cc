@@ -739,7 +739,9 @@ protected:
 		FILE_META_TYPE mock_file_meta;
 		BLOCK_ENTRY_PAGE mock_block_page;
 		BLOCK_UPLOADING_PAGE block_uploading_page;
-		FILE *mock_metaptr;
+		FILE *mock_metaptr, *mock_touploadptr;
+		char buf[5000];
+		size_t size;
 
 		memset(&block_uploading_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 
@@ -774,9 +776,19 @@ protected:
 				sizeof(BLOCK_UPLOADING_PAGE),
 				page_num * sizeof(BLOCK_UPLOADING_PAGE));
 		}
-		fclose(mock_metaptr);
 
+		/* copy toupload meta */
+		mock_touploadptr = fopen(toupload_meta, "w+");
+		fseek(mock_metaptr, 0, SEEK_SET);
+		fseek(mock_touploadptr, 0, SEEK_SET);
+		while (size = fread(buf, 1, 4096, mock_metaptr)) {
+			fwrite(buf, 1, size, mock_touploadptr);
+		}
+
+		fclose(mock_touploadptr);
+		fclose(mock_metaptr);
 	}
+
 	static int objname_cmp(const void *s1, const void *s2)
 	{
 		char *name1 = *(char **)s1;
@@ -918,7 +930,6 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	}
 	unlink(metapath);
 }
-
 /*
 	End of unittest of sync_single_inode()
  */
@@ -926,7 +937,6 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 /*
 	Unittest of upload_loop()
  */
-
 int inode_cmp(const void *a, const void *b)
 {
 	return *(int *)a - *(int *)b;

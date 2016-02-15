@@ -145,7 +145,14 @@ void upload_loop(void);
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta);
 
-int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
-	char delete_which_one);
+int select_upload_thread(char is_block, char is_delete,
+#if (DEDUP_ENABLE)
+		char is_upload,
+		unsigned char old_obj_id[],
+#endif
+		ino_t this_inode, long long block_count,
+		long long seq, off_t page_pos,
+		long long e_index, int progress_fd,
+		char backend_delete_type);
 
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

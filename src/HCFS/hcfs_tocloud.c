@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_tocloud.c
 * Abstract: The c source code file for syncing meta or data to
@@ -62,6 +62,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "hfuse_system.h"
 #include "FS_manager.h"
 #include "hcfs_fromcloud.h"
+#include "tocloud_tools.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -756,7 +757,7 @@ errcode_handle:
 		}\
 	}
 
-static inline int _select_upload_thread(char is_block, char is_delete,
+int select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
 				char is_upload,
 				unsigned char old_obj_id[],
@@ -804,369 +805,6 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 	}
 	return which_curl;
 }
-
-static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
-{
-	char upload_done;
-	struct timespec time_to_sleep;
-	int count;
-
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
-	upload_done = FALSE;
-	while (upload_done == FALSE) {
-		nanosleep(&time_to_sleep, NULL);
-		upload_done = TRUE;
-		sem_wait(&(upload_ctl.upload_op_sem));
-		for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
-			if ((upload_ctl.threads_in_use[count] == TRUE) &&
-				(upload_ctl.upload_threads[count].inode ==
-				inode)) { /* Wait for this inode */
-				upload_done = FALSE;
-				break;
-			}
-		}
-		sem_post(&(upload_ctl.upload_op_sem));
-	}
-
-	return;
-}
-
-#if (DEDUP_ENABLE)
-static inline int _choose_deleted_block(char delete_which_one,
-	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
-{
-	char finish_uploading;
-
-	finish_uploading = block_info->finish_uploading;
-
-	/* Delete those blocks just uploaded */
-	if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
-		/* Do not delete if not finish */
-		if (finish_uploading == FALSE)
-			return -1;
-		/* Do not delete if it does not exist */
-		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == FALSE)
-			return -1;
-		/* Do not delete if it is the same as backend block */
-		if (!memcmp(block_info->to_upload_objid,
-				block_info->backend_objid, OBJID_LENGTH))
-			return -1;
-
-		memcpy(block_objid, block_info->to_upload_objid, OBJID_LENGTH);
-		return 0;
-	}
-
-	/* Delete old blocks on cloud */
-	if (delete_which_one == DEL_BACKEND_BLOCKS) {
-		/* Do not delete if it does not exist */
-		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
-			return -1;
-		/* Do not delete if it is the same as to-upload block */
-		if (!memcmp(block_info->to_upload_objid,
-				block_info->backend_objid, OBJID_LENGTH))
-			return -1;
-
-		memcpy(block_objid, block_info->backend_objid, OBJID_LENGTH);
-		return 0;
-	}
-	return -1; /* unknown type */
-}
-
-#else
-static inline int _choose_deleted_block(char delete_which_one,
-		const BLOCK_UPLOADING_STATUS *block_info,
-		long long *block_seq, ino_t inode)
-{
-	char finish_uploading;
-	long long to_upload_seq;
-	long long backend_seq;
-
-	finish_uploading = block_info->finish_uploading;
-	to_upload_seq = block_info->to_upload_seq;
-	backend_seq = block_info->backend_seq;
-
-/*	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
-			"backend_seq = %lld\n", (uint64_t)inode,
-			to_upload_seq, backend_seq);
-*/
-	if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
-		/* Do not delete if not finish */
-		if (finish_uploading == FALSE)
-			return -1;
-		/* Do not need to delete if block does not exist */
-		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == FALSE)
-			return -1;
-		/* Do not need to delete if seq is the same as backend,
-		 * because it is not uploaded */
-		if (to_upload_seq == backend_seq)
-			return -1;
-
-		*block_seq = to_upload_seq;
-		return 0;
-	}
-
-	/* Do not need to check finish_uploading because backend blocks
-	 * exist on cloud. */
-	if (delete_which_one == DEL_BACKEND_BLOCKS) {
-		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
-			return -1;
-		if (to_upload_seq == backend_seq)
-			return -1;
-
-		*block_seq = backend_seq;
-		return 0;
-	}
-	return -1; /* unknown type */
-}
-#endif
-
-int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
-	char delete_which_one)
-{
-	BLOCK_UPLOADING_PAGE tmppage;
-	BLOCK_UPLOADING_STATUS *block_info;
-	long long block_count;
-	long long block_seq;
-	long long which_page, current_page;
-	long long offset;
-	unsigned char block_objid[OBJID_LENGTH];
-	int ret, errcode;
-	int which_curl;
-	int e_index;
-	BOOL sync_error;
-	ssize_t ret_ssize;
-	char local_metapath[300];
-	FILE *local_metafptr;
-	ssize_t ret_size;
-	long long page_pos;
-	FILE_META_TYPE filemeta;
-
-	ret = change_action(progress_fd, delete_which_one);
-	if (ret < 0) {
-		write_log(0, "Error: Fail to delete old blocks for inode %"
-				PRIu64"\n", (uint64_t)inode);
-		return ret;
-	}
-
-	if (delete_which_one == DEL_TOUPLOAD_BLOCKS)
-	write_log(4, "Debug: Delete those blocks uploaded just now for "
-		"inode_%"PRIu64"\n", (uint64_t)inode);
-
-	fetch_meta_path(local_metapath, inode);
-
-	current_page = -1;
-	for (block_count = 0; block_count < total_blocks; block_count++) {
-		which_page = block_count / BLK_INCREMENTS;
-
-		if (current_page != which_page) {
-			flock(progress_fd, LOCK_EX);
-			offset = query_status_page(progress_fd, block_count);
-			if (offset <= 0) {
-				block_count += (BLK_INCREMENTS - 1);
-				flock(progress_fd, LOCK_UN);
-				continue;
-			}
-			PREAD(progress_fd, &tmppage,
-					sizeof(BLOCK_UPLOADING_PAGE), offset);
-			flock(progress_fd, LOCK_UN);
-
-			/* When delete to-upload blocks, we need page position
-			 * to recover status to ST_LDISK. TODO: Maybe do not
-			 * need this action. */
-			if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
-				page_pos = 0;
-				local_metafptr = fopen(local_metapath, "r");
-				if (local_metafptr != NULL) {
-					flock(fileno(local_metafptr), LOCK_EX);
-					ret_size = pread(fileno(local_metafptr),
-						&filemeta, sizeof(FILE_META_TYPE),
-						sizeof(struct stat));
-					if (ret_size == sizeof(FILE_META_TYPE))
-						page_pos = seek_page2(&filemeta,
-							local_metafptr,
-							which_page, 0);
-					else
-						page_pos = 0;
-					flock(fileno(local_metafptr), LOCK_UN);
-					fclose(local_metafptr);
-				} else {
-					page_pos = 0;
-				}
-			}
-
-			current_page = which_page;
-		}
-
-		e_index = block_count % BLK_INCREMENTS;
-		block_info = &(tmppage.status_entry[e_index]);
-
-#if (DEDUP_ENABLE)
-		ret = _choose_deleted_block(delete_which_one,
-			block_info, block_objid, inode);
-#else
-		block_seq = 0;
-		ret = _choose_deleted_block(delete_which_one,
-			block_info, &block_seq, inode);
-#endif
-		if (ret < 0)
-			continue;
-
-		sem_wait(&(upload_ctl.upload_queue_sem));
-		sem_wait(&(upload_ctl.upload_op_sem));
-#if (DEDUP_ENABLE)
-		which_curl = _select_upload_thread(TRUE, FALSE,
-			TRUE, block_objid,
-			inode, block_count, block_seq,
-			page_pos, e_index, progress_fd, delete_which_one);
-#else
-		which_curl = _select_upload_thread(TRUE, FALSE,
-			inode, block_count, block_seq,
-			page_pos, e_index, progress_fd, delete_which_one);
-#endif
-		sem_post(&(upload_ctl.upload_op_sem));
-		dispatch_delete_block(which_curl);
-	}
-
-	/* Wait for all deleting threads. */
-	_busy_wait_all_specified_upload_threads(inode);
-	write_log(10, "Debug: Finish deleting unuseful blocks "
-			"for inode %"PRIu64" on cloud\n", (uint64_t)inode);
-	return 0;
-
-errcode_handle:
-	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
-	return errcode;
-}
-
-/**
- * _change_status_to_BOTH()
- *
- * After finishing syncing, change status of those blocks from ST_LtoC
- * to ST_BOTH. If block status is ST_LDISK or ST_TODELETE or ST_NONE,
- * then it means the block is changed after syncing, so do NOT change
- * the status of the block.
- *
- * @return 0 on success
- */ 
-int _change_status_to_BOTH(ino_t inode, int progress_fd,
-		FILE *local_metafptr, char *local_metapath)
-{
-	PROGRESS_META progress_meta;
-	BLOCK_UPLOADING_STATUS *block_info;
-	FILE_META_TYPE tempfilemeta;
-	BLOCK_ENTRY_PAGE tmp_page;
-	BLOCK_UPLOADING_PAGE upload_page;
-	long long block_count, total_blocks, which_page;
-	long long current_page, current_status_page;
-	long long page_pos, offset;
-	long long local_seq;
-	char local_status;
-	int e_index;
-	int ret, errcode;
-	ssize_t ret_ssize;
-	char blockpath[300];
-	SYSTEM_DATA_TYPE *statptr;
-	off_t cache_block_size;
-
-	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	total_blocks = progress_meta.total_toupload_blocks;
-
-	current_page = -1;
-	current_status_page = -1;
-	for (block_count = 0; block_count < total_blocks; block_count++) {
-		e_index = block_count % BLK_INCREMENTS;
-		which_page = block_count / BLK_INCREMENTS;
-
-		if (which_page != current_status_page) {
-			offset = query_status_page(progress_fd, block_count);
-			if (offset <= 0) {
-				block_count += (BLK_INCREMENTS - 1);
-				continue;
-			}
-			PREAD(progress_fd, &upload_page,
-					sizeof(BLOCK_UPLOADING_PAGE), offset);
-			current_status_page = which_page;
-		}
-
-		block_info = &(upload_page.status_entry[e_index]);
-		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == TRUE) {
-			/* It did not upload anything. (CLOUD/CtoL/BOTH) */
-			if (block_info->to_upload_seq == block_info->backend_seq)
-				continue;
-		} else {
-			/* TO_DELETE/ NONE */
-			continue;
-		}
-
-		/* Change status if local status is ST_LtoC */
-		flock(fileno(local_metafptr), LOCK_EX);
-		if (access(local_metapath, F_OK) < 0) {
-			write_log(8, "meta %"PRIu64" is removed "
-				"when changing to BOTH\n", (uint64_t)inode);
-			flock(fileno(local_metafptr), LOCK_UN);
-			break;
-		}
-
-		if (which_page != current_page) {
-			PREAD(fileno(local_metafptr), &tempfilemeta,
-				sizeof(FILE_META_TYPE), sizeof(struct stat));
-			page_pos = seek_page2(&tempfilemeta,
-				local_metafptr, which_page, 0);
-			if (page_pos <= 0) {
-				flock(fileno(local_metafptr), LOCK_UN);
-				block_count += (BLK_INCREMENTS - 1);
-				continue;
-			}
-			current_page = which_page;
-		}
-
-		PREAD(fileno(local_metafptr), &tmp_page,
-				sizeof(BLOCK_ENTRY_PAGE), page_pos);
-		local_status = tmp_page.block_entries[e_index].status;
-		local_seq = tmp_page.block_entries[e_index].seqnum;
-		/* Change status if status is ST_LtoC */
-		if (local_status == ST_LtoC &&
-				local_seq == block_info->to_upload_seq) {
-			tmp_page.block_entries[e_index].status = ST_BOTH;
-			tmp_page.block_entries[e_index].uploaded = TRUE;
-
-			ret = fetch_block_path(blockpath, inode, block_count);
-			if (ret < 0) {
-				errcode = ret;
-				goto errcode_handle;
-			}
-			ret = set_block_dirty_status(blockpath, NULL, FALSE);
-			if (ret < 0) {
-				errcode = ret;
-				goto errcode_handle;
-			}
-			/* Remember dirty_cache_size */
-			cache_block_size = check_file_size(blockpath);
-			sem_wait(&(hcfs_system->access_sem));
-			statptr = &(hcfs_system->systemdata);
-			statptr->dirty_cache_size -= cache_block_size;
-			if (statptr->dirty_cache_size < 0)
-				statptr->dirty_cache_size = 0;
-			sem_post(&(hcfs_system->access_sem));
-
-			PWRITE(fileno(local_metafptr), &tmp_page,
-					sizeof(BLOCK_ENTRY_PAGE), page_pos);
-		}
-
-		flock(fileno(local_metafptr), LOCK_UN);
-		write_log(10, "Debug sync: block_%"PRIu64"_%lld"
-				" is changed to ST_BOTH\n",
-				(uint64_t)inode, block_count);
-	}
-
-	return 0;
-
-errcode_handle:
-	flock(fileno(local_metafptr), LOCK_UN);
-	return errcode;
-}
-
 /**
  * Main function to upload all block and meta
  *
@@ -1443,7 +1081,7 @@ store in some other file */
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 #if (DEDUP_ENABLE)
-				which_curl = _select_upload_thread(TRUE, FALSE,
+				which_curl = select_upload_thread(TRUE, FALSE,
 						TRUE,
 						tmp_entry->obj_id,
 						ptr->inode, block_count,
@@ -1451,7 +1089,7 @@ store in some other file */
 						e_index, progress_fd,
 						FALSE);
 #else
-				which_curl = _select_upload_thread(TRUE, FALSE,
+				which_curl = select_upload_thread(TRUE, FALSE,
 						ptr->inode, block_count,
 						toupload_block_seq, page_pos,
 						e_index, progress_fd,
@@ -1529,7 +1167,7 @@ store in some other file */
 
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
-		_busy_wait_all_specified_upload_threads(ptr->inode);
+		busy_wait_all_specified_upload_threads(ptr->inode);
 
 		/* If meta is deleted when uploading, delete backend blocks */
 		if (is_local_meta_deleted == TRUE) {
@@ -1571,10 +1209,10 @@ store in some other file */
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
 #if (DEDUP_ENABLE)
-	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL,
+	which_curl = select_upload_thread(FALSE, FALSE, FALSE, NULL,
 		ptr->inode, 0, 0, 0, 0, progress_fd, FALSE);
 #else
-	which_curl = _select_upload_thread(FALSE, FALSE,
+	which_curl = select_upload_thread(FALSE, FALSE,
 		ptr->inode, 0, 0, 0, 0, progress_fd, FALSE);
 #endif
 
@@ -1679,7 +1317,7 @@ store in some other file */
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
-		_change_status_to_BOTH(ptr->inode, progress_fd,
+		change_status_to_BOTH(ptr->inode, progress_fd,
 				local_metafptr, local_metapath);
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, DEL_BACKEND_BLOCKS);
@@ -1779,8 +1417,9 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	snprintf(objname, sizeof(objname), "data_%s", obj_id_str);
 
 #else
-	snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%lld_%lld",
-		 (uint64_t)this_inode, block_no, seq);
+	fetch_backend_block_objname(objname, this_inode, block_no, seq);
+	//snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%lld_%lld",
+	//	 (uint64_t)this_inode, block_no, seq);
 	/* Force to upload */
 	ret = 1;
 #endif

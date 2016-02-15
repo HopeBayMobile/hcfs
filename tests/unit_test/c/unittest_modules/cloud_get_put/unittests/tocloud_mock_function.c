@@ -217,12 +217,15 @@ int backup_FS_database(void)
 void fetch_backend_block_objname(char *objname, ino_t inode,
 		long long block_no, long long seqnum)
 {
+	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
 	return;
 }
 
 int fetch_toupload_block_path(char *pathname, ino_t inode,
 		long long block_no, long long seq)
 {
+	sprintf(pathname, "mock_meta_folder/mock_toupload_block_%"PRIu64"_%lld",
+			(uint64_t)inode, block_no);
 	return 0;
 }
 
@@ -283,6 +286,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 int check_and_copy_file(const char *srcpath, const char *tarpath,
 		BOOL lock_src)
 {
+	mknod(tarpath, 0700, 0);
 	return 0;
 }
 
@@ -310,3 +314,41 @@ int change_action(int fd, char now_action)
 {
 	return 0;
 }
+
+int change_status_to_BOTH(ino_t inode, int progress_fd,
+		FILE *local_metafptr, char *local_metapath)
+{
+	FILE_META_TYPE filemeta;
+	BLOCK_ENTRY_PAGE block_page;
+	int i;
+	long long pos;
+
+	printf("Begin to change status to BOTH\n");
+	fseek(local_metafptr, sizeof(struct stat), SEEK_SET);
+	fread(&filemeta, sizeof(FILE_META_TYPE), 1, local_metafptr);
+	while (!feof(local_metafptr)) {
+		/* Linearly read block meta */
+		pos = ftell(local_metafptr);
+		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, local_metafptr);
+		for (i = 0 ; i < block_page.num_entries ; i++) {
+			if (block_page.block_entries[i].status == ST_LtoC)
+				block_page.block_entries[i].status = ST_BOTH;
+		}
+		fseek(local_metafptr, pos, SEEK_SET);
+		fwrite(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, local_metafptr);
+	}
+
+	return 0;
+}
+
+int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
+		char delete_which_one)
+{
+	return 0;
+}
+
+void busy_wait_all_specified_upload_threads(ino_t inode)
+{
+	return;
+}
+
