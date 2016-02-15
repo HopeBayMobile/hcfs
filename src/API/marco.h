@@ -4,7 +4,7 @@
 #define CONCAT_ARGS(A)\
 	{\
 		if (A != NULL) {\
-			str_len = strlen(A);\
+			str_len = strlen(A) + 1;\
 			memcpy(&(buf[cmd_len]), &str_len, sizeof(ssize_t));\
 			cmd_len += sizeof(ssize_t);\
 			memcpy(&(buf[cmd_len]), A, str_len);\

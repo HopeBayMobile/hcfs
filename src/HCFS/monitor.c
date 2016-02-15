@@ -94,6 +94,8 @@ void monitor_loop(void)
 	prctl(PR_SET_NAME, "monitor_loop");
 #endif /* _ANDROID_ENV_ */
 
+	last_time->tv_sec = 0;
+	last_time->tv_nsec = 0;
 	monitor_curl_handle.curl_backend = NONE;
 	monitor_curl_handle.curl = NULL;
 
