@@ -457,7 +457,7 @@ void HCFS_pin_status(char **json_res, char *pathname)
 	}
 
 	code = CHECKPIN;
-	cmd_len = strlen(pathname);
+	cmd_len = strlen(pathname) + 1;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -490,7 +490,7 @@ void HCFS_dir_status(char **json_res, char *pathname)
 	}
 
 	code = CHECKDIRSTAT;
-	cmd_len = strlen(pathname);
+	cmd_len = strlen(pathname) + 1;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -532,7 +532,7 @@ void HCFS_file_status(char **json_res, char *pathname)
 	}
 
 	code = CHECKLOC;
-	cmd_len = strlen(pathname);
+	cmd_len = strlen(pathname) + 1;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
