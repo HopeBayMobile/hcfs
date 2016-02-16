@@ -901,7 +901,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 
 	if (size > 0) {
 		if (size < *actual_size) {
-			write_log(4, "Error: Size of key buffer is too small\n");
+			write_log(8, "Error: Size of key buffer is too small\n");
 			return -ERANGE;
 		}
 
@@ -1018,7 +1018,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 				ret = fill_buffer_with_key(&key_page, key_buf,
 					size, actual_size, namespace_prefix);
 				if (ret < 0) {
-					write_log(4, "Error: Size of buffer is "
+					write_log(8, "Error: Size of buffer is "
 						"too small in list_xattr()\n");
 					return -ERANGE;
 				}
