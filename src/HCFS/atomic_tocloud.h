@@ -90,6 +90,7 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 	long long block_no, long long seq);
 
 int fetch_backend_meta_path(char *pathname, ino_t inode);
+void fetch_del_backend_meta_path(char *pathname, ino_t inode);
 
 char did_block_finish_uploading(int fd, long long blockno);
 

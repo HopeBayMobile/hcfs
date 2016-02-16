@@ -477,8 +477,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	/* Download backend meta and read it if it is regfile */
 	backend_metafptr = NULL;
 	if (S_ISREG(ptr->this_mode)) {
-		sprintf(backend_metapath, "/tmp/backend_meta_%"PRIu64".del",
-				(uint64_t)this_inode);
+		fetch_del_backend_meta_path(backend_metapath, this_inode);
 		backend_metafptr = fopen(backend_metapath, "w+");
 		if (backend_metafptr == NULL) {
 			dsync_ctl.threads_finished[which_dsync_index] = TRUE;

@@ -688,6 +688,12 @@ protected:
 
 	void SetUp()
 	{
+		/* First remove garbage if exists */
+		unlink(MOCK_META_PATH);
+		unlink(progress_file);
+		unlink(toupload_meta);
+		rmdir("mock_meta_folder");
+
 		mkdir("mock_meta_folder", 0700);
 		/* Mock toupload meta for each inode */	
 		fetch_toupload_meta_path(toupload_meta, 1);
@@ -751,22 +757,17 @@ protected:
 		mock_stat.st_mode = S_IFREG;
 		mock_file_meta.root_inode = 10;
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); /* Write stat */
-
-		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
+		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); /* Write file meta */
 
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 			mock_block_page.block_entries[i].status = block_status;
 			mock_block_page.block_entries[i].seqnum = 1;
 
+			block_uploading_page.status_entry[i].to_upload_seq = 1;
+			block_uploading_page.status_entry[i].backend_seq = 0;
 			if (block_status == ST_LDISK) {
-				block_uploading_page.status_entry[i].to_upload_seq = 1;
-				block_uploading_page.status_entry[i].backend_seq = 0;
 				SET_TOUPLOAD_BLOCK_EXIST(block_uploading_page.status_entry[i].block_exist);
-			} else {
-				block_uploading_page.status_entry[i].to_upload_seq = 1;
-				block_uploading_page.status_entry[i].backend_seq = 0;
 			}
-
 		}
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int page_num = 0 ; page_num < total_page ; page_num++) {
@@ -834,7 +835,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	/* Mock data */
 	write_mock_meta_file(metapath, total_page, ST_LDISK);
 
-	system_config->max_block_size = 100;
+	system_config->max_block_size = 1000;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
@@ -871,6 +872,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 				(uint64_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
+
 	printf("Begin to check block status\n");
 	metaptr = fopen(metapath, "r+");
 	fseek(metaptr, sizeof(struct stat), SEEK_SET);
@@ -894,6 +896,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	int total_page = 3;
 	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	BLOCK_ENTRY_PAGE block_page;
+	FILE_META_TYPE filemeta;
 	FILE *metaptr;
 
 	hcfs_system->system_going_down = FALSE;
@@ -913,21 +916,19 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	sync_single_inode(&mock_thread_type);
 	sleep(1);
 
-	/* Verify */
-	EXPECT_EQ(num_total_blocks, objname_counter);
-	qsort(objname_list, objname_counter, sizeof(char *),
-	      sync_single_inodeTest::objname_cmp);
-	for (int blockno = 0; blockno < num_total_blocks - 1;
-			blockno++) { // Check deleted-object is recorded
-		char expected_objname[50];
-		sprintf(expected_objname, "data_%" PRIu64 "_%d",
-			(uint64_t)mock_thread_type.inode, blockno);
-		ASSERT_STREQ(expected_objname, objname_list[blockno])
-		    << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/testHCFS/data_%" PRIu64 "_%d",
-			(uint64_t)mock_thread_type.inode, blockno);
-		unlink(expected_objname);
+	/* Check status */
+	printf("Begin to check block status\n");
+	metaptr = fopen(metapath, "r+");
+	fseek(metaptr, sizeof(struct stat), SEEK_SET);
+	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
+	while (!feof(metaptr)) {
+		/* Linearly read block meta */
+		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); 
+		for (int i = 0 ; i < block_page.num_entries ; i++) {
+			ASSERT_EQ(ST_NONE, block_page.block_entries[i].status);
+		}
 	}
+	fclose(metaptr);
 	unlink(metapath);
 }
 /*

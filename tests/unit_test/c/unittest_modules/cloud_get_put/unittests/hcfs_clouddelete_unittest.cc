@@ -8,6 +8,7 @@ extern "C" {
 #include "global.h"
 #include "fuseop.h"
 #include "super_block.h"
+#include "atomic_tocloud.h"
 }
 
 class deleteEnvironment : public ::testing::Environment {
@@ -170,12 +171,19 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 */
 class dsync_single_inodeTest : public ::testing::Test {
 protected:
+	DSYNC_THREAD_TYPE *mock_thread_info;
+	unsigned expected_num_objname;
+	unsigned size_objname;
+	char backend_meta[100];
+
 	virtual void SetUp()
 	{
 		system_config = (SYSTEM_CONF_STRUCT *)
 			malloc(sizeof(SYSTEM_CONF_STRUCT));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
+		if (!access(backend_meta, F_OK))
+			unlink(backend_meta);
 	}
 	virtual void TearDown()
 	{
@@ -184,6 +192,8 @@ protected:
 		destroy_objname_buffer(expected_num_objname);
 		free(mock_thread_info);
 		free(system_config);
+		if (!access(backend_meta, F_OK))
+			unlink(backend_meta);
 	}
 	void init_objname_buffer(unsigned num_objname)
 	{
@@ -226,9 +236,6 @@ protected:
 		}
 
 	}
-	DSYNC_THREAD_TYPE *mock_thread_info;
-	unsigned expected_num_objname;
-	unsigned size_objname;
 };
 
 TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
@@ -238,17 +245,25 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	BLOCK_ENTRY_PAGE tmp_blockentry_page;
 	FILE_META_TYPE tmp_file_meta;
 	int total_page = 3;
-	expected_num_objname = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	void *res;
-	
+	FILE *backend_meta_fptr;
+	size_t size;
+	char buf[5000];
+	expected_num_objname = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
+
 	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
 	mock_thread_info->which_index = 0;
 	meta_stat.st_size = 1000000; // Let total_blocks = 1000000/100 = 10000
+	meta_stat.st_mode = S_IFREG; 
 	MAX_BLOCK_SIZE = 100;
-	
+	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
+	tmp_file_meta.upload_seq = 1;
+
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
+	setbuf(meta, NULL);
+	fseek(meta, 0, SEEK_SET);
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
 	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
@@ -261,6 +276,8 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	}
 	fclose(meta);
 
+	fetch_del_backend_meta_path(backend_meta, mock_thread_info->inode);
+
 	/* Begin to test */
 	init_delete_control();
 	init_objname_buffer(expected_num_objname);
@@ -269,10 +286,12 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 
 	/* Check answer */
 	EXPECT_EQ(expected_num_objname, objname_counter); // Check # of object name.
-	qsort(objname_list, expected_num_objname, sizeof(char *), dsync_single_inodeTest::objname_cmp);
+	qsort(objname_list, expected_num_objname, sizeof(char *),
+			dsync_single_inodeTest::objname_cmp);
 	for (int block = 0 ; block < expected_num_objname - 1 ; block++) {
 		char expected_objname[size_objname];
-		sprintf(expected_objname, "data_%" PRIu64 "_%d", (uint64_t)mock_thread_info->inode, block);
+		sprintf(expected_objname, "data_%" PRIu64 "_%d",
+				(uint64_t)mock_thread_info->inode, block);
 		ASSERT_STREQ(expected_objname, objname_list[block]); // Check all obj was recorded.
 	}
 	char expected_objname[size_objname];
@@ -291,15 +310,19 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	struct stat meta_stat;
 	void *res;
 	expected_num_objname = 1;
+	DIR_META_TYPE dirmeta;
 
 	/* Mock a dir meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFDIR;	
 	mock_thread_info->which_index = 0;
+	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
+	dirmeta.upload_seq = 1;
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
+	fwrite(&dirmeta, sizeof(DIR_META_TYPE), 1, meta);
 	fclose(meta);
-	
+
 	/* Begin to test */
 	init_delete_control();
 	init_objname_buffer(expected_num_objname);

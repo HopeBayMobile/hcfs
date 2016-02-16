@@ -657,6 +657,13 @@ errcode_handle:
 	return errcode;
 }
 
+void fetch_del_backend_meta_path(char *pathname, ino_t inode)
+{
+	sprintf(pathname, "/tmp/backend_meta_%"PRIu64".del",
+			(uint64_t)inode);
+	return;
+}
+
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
 

@@ -402,4 +402,65 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * revert_block_status_LDISK
+ *
+ * When cancelling uploading this time, revert the status from ST_LtoC to
+ * ST_LDISK if needed.
+ *
+ * @return 0 on success, otherwise negative errcode.
+ */
+int revert_block_status_LDISK(ino_t this_inode, long long blockno,
+		int e_index, long long page_filepos)
+{
+	BLOCK_ENTRY_PAGE tmppage;
+	char local_metapath[300];
+	FILE *fptr;
+	int errcode, ret;
+	ssize_t ret_ssize;
+
+	/* Do nothing when error on page position and entry index */
+	if (page_filepos <= 0 || e_index < 0)
+		return 0;
+
+	fetch_meta_path(local_metapath, this_inode);
+
+	fptr = fopen(local_metapath, "r+");
+	if (fptr == NULL) {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error: Fail to open meta in %s. Code %d\n",
+				__func__, errcode);
+			return -errcode;
+		} else {
+			write_log(8, "Meta is deleted in %s. Code %d\n",
+				__func__, errcode);
+			return 0;
+		}
+	}
+	flock(fileno(fptr), LOCK_EX);
+	setbuf(fptr, NULL);
+	if (access(local_metapath, F_OK) < 0) {
+		fclose(fptr);
+		return 0;
+	}
+
+	PREAD(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE), page_filepos);
+	if (tmppage.block_entries[e_index].status == ST_LtoC) {
+		tmppage.block_entries[e_index].status = ST_LDISK;
+		write_log(8, "Debug: block_%"PRIu64"_%lld is reverted"
+				" to ST_LDISK", (uint64_t)this_inode, blockno);
+		PWRITE(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE),
+				page_filepos);
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
 

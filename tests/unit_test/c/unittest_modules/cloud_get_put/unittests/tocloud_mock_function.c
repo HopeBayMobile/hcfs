@@ -352,3 +352,8 @@ void busy_wait_all_specified_upload_threads(ino_t inode)
 	return;
 }
 
+int revert_block_status_LDISK(ino_t this_inode, long long blockno,
+		int e_index, long long page_filepos)
+{
+	return 0;
+}
