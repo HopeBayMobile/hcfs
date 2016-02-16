@@ -234,11 +234,11 @@ int _init_download_curl(int count)
  * after setting up backend info.
  *
  * @return None
- */ 
-void init_backend_related_module()
+ */
+void init_backend_related_module(void)
 {
 	int count;
-	
+
 	if (CURRENT_BACKEND != NONE) {
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
@@ -250,7 +250,6 @@ void init_backend_related_module()
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
 	}
-
 }
 
 /************************************************************************
@@ -267,7 +266,9 @@ int main(int argc, char **argv)
 	CURL_HANDLE curl_handle;
 	int ret_val;
 	struct rlimit nofile_limit;
+#ifndef _ANDROID_ENV_
 	int count;
+#endif
 
 	ret_val = ignore_sigpipe();
 
@@ -276,8 +277,10 @@ int main(int argc, char **argv)
 
 	logptr = NULL;
 
+#ifndef OPENSSL_IS_BORINGSSL
 	ENGINE_load_builtin_engines();
 	ENGINE_register_all_complete();
+#endif
 
 	/*TODO: Error handling after reading system config*/
 	/*TODO: Allow reading system config path from program arg */

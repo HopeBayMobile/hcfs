@@ -528,6 +528,7 @@ processing the new one */
 	int ret, errcode;
 	size_t ret_size;
 
+	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
@@ -605,6 +606,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	int ret, errcode;
 	size_t ret_size;
 
+	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
@@ -725,6 +727,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	int ret, errcode;
 	size_t ret_size;
 
+	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
@@ -815,6 +818,7 @@ the new one */
 
 	int ret;
 
+	UNUSED(this_inode);
 	write_log(10, "Debug meta cache update dir data\n");
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(bptr->access_sem));
@@ -901,17 +905,16 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	int ret, errcode;
 	size_t ret_size;
 	long nextfilepos;
-	int can_use_index;
 	DIR_ENTRY tmp_entry;
 	int tmp_index;
 	int cache_idx;
 
+	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	/* First check if any of the two cached page entries
 	  contains the target entry */
 	strcpy(tmp_entry.d_name, childname);
-	can_use_index = -1;
 
 	for (cache_idx = 0; cache_idx <= 1; cache_idx++) {
 		if (body_ptr->dir_entry_cache[cache_idx] == NULL)
@@ -924,7 +927,6 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			*result_index = ret;
 			memcpy(result_page, tmp_page_ptr,
 				sizeof(DIR_ENTRY_PAGE));
-			can_use_index = cache_idx;
 			gettimeofday(&(body_ptr->last_access_time), NULL);
 			return 0;
 		}
@@ -1194,13 +1196,11 @@ int expire_meta_mem_cache_entry(void)
 	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
 	double float_current_time, float_access_time;
 	int ret;
-	char isdone;
 
 	gettimeofday(&current_time, NULL);
 	srandom((unsigned int)(current_time.tv_usec));
 	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);
 	cindex = start_index;
-	isdone = FALSE;
 	/* Go through meta_mem_cache[] */
 	do {
 		sem_wait(&(meta_mem_cache[cindex].header_sem));
@@ -1351,7 +1351,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		(current_ptr->body).meta_opened = FALSE;
 		memcpy(&((current_ptr->body).this_stat),
 				&(tempentry.inode_stat), sizeof(struct stat));
-		need_new = FALSE;
+		/* need_new = FALSE; */
 		break;
 	}
 	/*Lock body*/
@@ -1461,6 +1461,8 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 		body_ptr->dir_entry_cache_dirty[1] = FALSE;
 	}
 
+	UNUSED(ret_val);
+	/* TODO: variable ‘ret_val’ set but not used */
 	return 0;
 }
 
@@ -1481,6 +1483,7 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 {
 	int ret;
 
+	UNUSED(this_inode);
 	write_log(10, "Debug meta cache update symbolic link data\n");
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(bptr->access_sem));
@@ -1535,6 +1538,7 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	int ret, errcode;
 	size_t ret_size;
 
+	UNUSED(this_inode);
 	write_log(10, "Debug meta cache lookup symbolic link data\n");
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));

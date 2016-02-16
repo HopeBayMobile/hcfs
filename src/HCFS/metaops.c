@@ -459,6 +459,8 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	int ret_val;
 	struct stat tmpstat;
 
+	/* TODO: remove unused parameter ‘parent_inode1’ */
+	UNUSED(parent_inode1);
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
 								"..", body_ptr);
 
@@ -815,6 +817,7 @@ long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 	int ret;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
+	UNUSED(hint_page);
 	/* First check if meta cache is locked */
 	/* Do not actually create page here */
 
@@ -1144,6 +1147,7 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	int which_indirect;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
+	UNUSED(hint_page);
 	/* First check if meta cache is locked */
 	/* Do not actually create page here */
 	/*TODO: put error handling for the read/write ops here*/

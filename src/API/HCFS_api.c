@@ -82,6 +82,8 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_get_config(char **json_res, char *key)
@@ -129,6 +131,8 @@ void HCFS_get_config(char **json_res, char *key)
 
 		_json_response(json_res, TRUE, 0, data);
 	}
+
+	close(fd);
 }
 
 void HCFS_stat(char **json_res)
@@ -137,7 +141,7 @@ void HCFS_stat(char **json_res)
 	int fd, status, size_msg, ret_code;
 	int cloud_stat;
 	unsigned int code, reply_len, cmd_len, buf_idx;
-	long long cloud_usage;
+	long long vol_usage, cloud_usage;
 	long long cache_total, cache_used, cache_dirty;
 	long long pin_max, pin_total;
 	long long xfer_up, xfer_down;
@@ -164,6 +168,7 @@ void HCFS_stat(char **json_res)
 		size_msg = recv(fd, buf, reply_len, 0);
 		buf_idx = 0;
 
+		READ_LL_ARGS(vol_usage);
 		READ_LL_ARGS(cloud_usage);
 		READ_LL_ARGS(cache_total);
 		READ_LL_ARGS(cache_used);
@@ -177,6 +182,7 @@ void HCFS_stat(char **json_res)
 		buf_idx += sizeof(int);
 
 		data = json_object();
+		json_object_set_new(data, "vol_used", json_integer(vol_usage));
 		json_object_set_new(data, "cloud_used", json_integer(cloud_usage));
 		json_object_set_new(data, "cache_total", json_integer(cache_total));
 		json_object_set_new(data, "cache_used", json_integer(cache_used));
@@ -189,6 +195,8 @@ void HCFS_stat(char **json_res)
 
 		_json_response(json_res, TRUE, 0, data);
 	}
+
+	close(fd);
 }
 
 void HCFS_reload_config(char **json_res)
@@ -217,6 +225,8 @@ void HCFS_reload_config(char **json_res)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_toggle_sync(char **json_res, int enabled)
@@ -246,6 +256,8 @@ void HCFS_toggle_sync(char **json_res, int enabled)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_get_sync_status(char **json_res)
@@ -279,6 +291,8 @@ void HCFS_get_sync_status(char **json_res)
 
 		_json_response(json_res, TRUE, 0, data);
 	}
+
+	close(fd);
 }
 
 void HCFS_pin_path(char **json_res, char *pin_path)
@@ -312,6 +326,8 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
@@ -350,6 +366,7 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
 
+	close(fd);
 }
 
 void HCFS_unpin_path(char **json_res, char *pin_path)
@@ -383,6 +400,8 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 
@@ -422,6 +441,7 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
 
+	close(fd);
 }
 
 void HCFS_pin_status(char **json_res, char *pathname)
@@ -437,7 +457,7 @@ void HCFS_pin_status(char **json_res, char *pathname)
 	}
 
 	code = CHECKPIN;
-	cmd_len = strlen(pathname);
+	cmd_len = strlen(pathname) + 1;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -450,6 +470,8 @@ void HCFS_pin_status(char **json_res, char *pathname)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_dir_status(char **json_res, char *pathname)
@@ -468,7 +490,7 @@ void HCFS_dir_status(char **json_res, char *pathname)
 	}
 
 	code = CHECKDIRSTAT;
-	cmd_len = strlen(pathname);
+	cmd_len = strlen(pathname) + 1;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -493,6 +515,8 @@ void HCFS_dir_status(char **json_res, char *pathname)
 
 		_json_response(json_res, TRUE, 0, data);
 	}
+
+	close(fd);
 }
 
 void HCFS_file_status(char **json_res, char *pathname)
@@ -508,7 +532,7 @@ void HCFS_file_status(char **json_res, char *pathname)
 	}
 
 	code = CHECKLOC;
-	cmd_len = strlen(pathname);
+	cmd_len = strlen(pathname) + 1;
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -521,6 +545,8 @@ void HCFS_file_status(char **json_res, char *pathname)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_reset_xfer(char **json_res)
@@ -548,6 +574,8 @@ void HCFS_reset_xfer(char **json_res)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_reboot(char **json_res)
@@ -572,6 +600,8 @@ void HCFS_reboot(char **json_res)
 	size_msg = recv(fd, &ret_code, sizeof(int), 0);
 
 	_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
 
 void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
@@ -591,6 +621,7 @@ void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
 	}
 
 	code = QUERYPKGUID;
+	cmd_len = 0;
 
 	CONCAT_ARGS(pkg_name);
 
@@ -611,4 +642,5 @@ void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
 		_json_response(json_res, TRUE, 0, data);
 	}
 
+	close(fd);
 }

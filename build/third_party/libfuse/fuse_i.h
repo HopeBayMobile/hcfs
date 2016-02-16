@@ -19,6 +19,12 @@ struct fuse_ll;
 struct fuse_session {
 	struct fuse_session_ops op;
 
+	int (*receive_buf)(struct fuse_session *se, struct fuse_buf *buf,
+			   struct fuse_chan **chp);
+
+	void (*process_buf)(void *data, const struct fuse_buf *buf,
+			    struct fuse_chan *ch);
+
 	void *data;
 
 	volatile int exited;
@@ -34,6 +40,7 @@ struct fuse_req {
 	struct fuse_ctx ctx;
 	struct fuse_chan *ch;
 	int interrupted;
+	unsigned int ioctl_64bit : 1;
 	union {
 		struct {
 			uint64_t unique;
@@ -47,12 +54,27 @@ struct fuse_req {
 	struct fuse_req *prev;
 };
 
+struct fuse_notify_req {
+	uint64_t unique;
+	void (*reply)(struct fuse_notify_req *, fuse_req_t, fuse_ino_t,
+		      const void *, const struct fuse_buf *);
+	struct fuse_notify_req *next;
+	struct fuse_notify_req *prev;
+};
+
 struct fuse_ll {
 	int debug;
 	int allow_root;
 	int atomic_o_trunc;
-	int no_remote_lock;
+	int no_remote_posix_lock;
+	int no_remote_flock;
 	int big_writes;
+	int splice_write;
+	int splice_move;
+	int splice_read;
+	int no_splice_write;
+	int no_splice_move;
+	int no_splice_read;
 	struct fuse_lowlevel_ops op;
 	int got_init;
 	struct cuse_data *cuse_data;
@@ -63,6 +85,10 @@ struct fuse_ll {
 	struct fuse_req interrupts;
 	pthread_mutex_t lock;
 	int got_destroy;
+	pthread_key_t pipe_key;
+	int broken_splice_nonblock;
+	uint64_t notify_ctr;
+	struct fuse_notify_req notify_list;
 };
 
 struct fuse_cmd {
@@ -84,6 +110,8 @@ struct fuse_session *fuse_lowlevel_new_common(struct fuse_args *args,
 					size_t op_size, void *userdata);
 
 void fuse_kern_unmount_compat22(const char *mountpoint);
+int fuse_chan_clearfd(struct fuse_chan *ch);
+
 void fuse_kern_unmount(const char *mountpoint, int fd);
 /* Jiahong (1/15/2016) modified fuse_kern_mount to add a premount routine */
 int fuse_kern_premount(const char *mountpoint, struct fuse_args *args);
@@ -104,3 +132,5 @@ struct fuse *fuse_setup_common(int argc, char *argv[],
 			       int compat);
 
 void cuse_lowlevel_init(fuse_req_t req, fuse_ino_t nodeide, const void *inarg);
+
+int fuse_start_thread(pthread_t *thread_id, void *(*func)(void *), void *arg);

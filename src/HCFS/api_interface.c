@@ -8,6 +8,7 @@
 * Revision History
 * 2015/6/10 Jiahong created this file, and moved prototype here.
 * 2015/11/27 Jiahong modified format for inode printout
+* 2016/2/3 Jiahong fixed bug re get_vol_size
 *
 **************************************************************************/
 
@@ -310,7 +311,7 @@ long long get_vol_size(int arg_len, char *largebuf)
 	if ((arg_len == 0) || (buf[0] == '\0')) {
 		/* Return the total size of all volumes */
 		sem_wait(&(hcfs_system->access_sem));
-		llretval = hcfs_system->systemdata.cache_size;
+		llretval = hcfs_system->systemdata.system_size;
 		sem_post(&(hcfs_system->access_sem));
 		free(buf);
 		return llretval;

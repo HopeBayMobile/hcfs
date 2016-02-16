@@ -86,4 +86,5 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
 int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader, const char *, const char *,
 				  const char *, const char *);
+int _http_is_success(int code);
 #endif /* GW20_HCFS_HCFSCURL_H_ */

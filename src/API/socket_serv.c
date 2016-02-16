@@ -43,7 +43,7 @@ int process_request(int thread_idx)
 	int fd, ret_code, to_recv, buf_idx;
 	int cloud_stat;
 	unsigned int api_code, arg_len, ret_len;
-	long long cloud_usage;
+	long long vol_usage, cloud_usage;
 	long long cache_total, cache_used, cache_dirty;
 	long long pin_max, pin_total;
 	long long xfer_up, xfer_down;
@@ -180,7 +180,7 @@ int process_request(int thread_idx)
 	case GETSTAT:
 		printf("Get statistics\n");
 		ret_len = 0;
-		ret_code = get_hcfs_stat(&cloud_usage, &cache_total,
+		ret_code = get_hcfs_stat(&vol_usage, &cloud_usage, &cache_total,
 					 &cache_used, &cache_dirty,
 					 &pin_max, &pin_total,
 					 &xfer_up, &xfer_down,
@@ -190,6 +190,7 @@ int process_request(int thread_idx)
 			size_msg = send(fd, &ret_code, sizeof(int), 0);
 		}
 
+		CONCAT_LL_ARGS(vol_usage);
 		CONCAT_LL_ARGS(cloud_usage);
 		CONCAT_LL_ARGS(cache_total);
 		CONCAT_LL_ARGS(cache_used);
@@ -347,8 +348,10 @@ int init_server()
 		}
 
 		thread_pool[thread_idx].fd = new_sock_fd;
-		pthread_create(&(thread_pool[thread_idx].thread), NULL,
+		/*pthread_create(&(thread_pool[thread_idx].thread), NULL,
 			       (void *)process_request, (void *)thread_idx);
+		*/
+		process_request(thread_idx);
 
 	}
 

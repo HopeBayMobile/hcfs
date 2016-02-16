@@ -28,13 +28,12 @@ if type -a colormake >/dev/null 2>&1; then
 else
 	make="make"
 fi
-
-UNITTEST_MAKE_FLAG="$UNITTEST_MAKE_FLAG GTEST_COLOR=yes NOGCOVR=1"
 export TERM=xterm-color
+export GTEST_COLOR=yes
+export NOGCOVR=1
 
 make clean
 $make
-
 make $UNITTEST_MAKE_FLAG test
 
 gcovr -r $repo/src .

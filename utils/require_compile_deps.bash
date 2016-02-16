@@ -1,4 +1,15 @@
 #!/bin/bash
+#########################################################################
+#
+# Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+#
+# Abstract:
+#
+# Revision History
+#   2016/1/14 Jethro add copyright.
+#
+##########################################################################
+
 # dev dependencies
 packages+=" build-essential"
 packages+=" libattr1-dev"

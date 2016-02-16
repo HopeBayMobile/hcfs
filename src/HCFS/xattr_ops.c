@@ -210,7 +210,7 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 		}
 
 		/* can insert key to last position */
-		if (mid_index >= num_xattr)
+		if ((unsigned)mid_index >= num_xattr)
 			break;
 
 		cmp_result = strcmp(key, key_list[mid_index].key);
@@ -592,7 +592,7 @@ errcode_handle:
 /*** A debugged function used to print key-value in a key page. ***/
 static void print_keys_to_log(KEY_LIST_PAGE *key_page)
 {
-	int i;
+	unsigned int i;
 	for (i = 0 ; i < key_page->num_xattr ; i++) {
 		write_log(10,
 			"Debug: key[%d] = %s, len = %d, data_pos = %lld\n", i,
@@ -626,7 +626,7 @@ static void print_keys_to_log(KEY_LIST_PAGE *key_page)
  * @return 0 if success to set xattr, otherwise negative error code.
  */
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
-	const long long xattr_filepos, const char name_space, const char *key,
+	const long long xattr_filepos, const char name_space_c, const char *key,
 	const char *value, const size_t size, const int flag)
 {
 	unsigned hash_entry;
@@ -642,7 +642,11 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	int errcode;
 	int ret;
 	int ret_size;
+	int name_space = name_space_c;
 
+#ifdef _ANDROID_ENV_
+	UNUSED(flag);
+#endif
 	/* Used to record value block pos when replacing */
 	long long replace_value_block_pos;
 
@@ -853,7 +857,7 @@ errcode_handle:
  *         and error code on error.
  */
 int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
-	const char name_space, const char *key, char *value_buf,
+	const char name_space_c, const char *key, char *value_buf,
 	const size_t size, size_t *actual_size)
 {
 	NAMESPACE_PAGE *namespace_page;
@@ -864,6 +868,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	unsigned hash_index;
 	int key_index;
 	int ret_code;
+	int name_space = name_space_c;
 
 	*actual_size = 0;
 
@@ -1041,7 +1046,7 @@ errcode_handle:
  */
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		XATTR_PAGE *xattr_page,
-	const long long xattr_filepos, const char name_space, const char *key)
+	const long long xattr_filepos, const char name_space_c, const char *key)
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE target_key_list_page;
@@ -1056,6 +1061,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int ret_code;
 	int num_remaining;
 	int errcode, ret, ret_size;
+	int name_space = name_space_c;
 
 	hash_index = hash(key); /* Hash the key */
 	namespace_page = &(xattr_page->namespace_page[name_space]);
