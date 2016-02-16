@@ -7,6 +7,7 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 #include "mock_params.h"
+#include <inttypes.h>
 
 #define RESPONSE_FAIL 0
 #define RESPONSE_SUCCESS 1
