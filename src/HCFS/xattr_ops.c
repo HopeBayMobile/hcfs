@@ -657,7 +657,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	if (namespace_page->key_hash_table[hash_entry] == 0) {
 		/* Allocate if no page */
 		if (flag == XATTR_REPLACE) {
-			write_log(2, "Error: Replace value but key did not exist\n");
+			write_log(5, "Error: Replace value but key did not exist\n");
 			return -ENODATA;
 		}
 
@@ -702,7 +702,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		if (ret_code > 0) { /* Hit nothing, CREATE key and value */
 
 			if (flag == XATTR_REPLACE) {
-				write_log(2, "Error: Replace value but key did not exist\n");
+				write_log(5, "Error: Replace value but key did not exist\n");
 				return -ENODATA;
 			}
 
@@ -781,7 +781,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		} else if (ret_code == 0) {
 			/* Hit the key entry, REPLACE value */
 			if (flag == XATTR_CREATE) {
-				write_log(2, "Error: Create a new key but it existed\n");
+				write_log(5, "Error: Create a new key but it existed\n");
 				return -EEXIST;
 			}
 
@@ -876,7 +876,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	namespace_page = &(xattr_page->namespace_page[name_space]);
 
 	if (namespace_page->key_hash_table[hash_index] == 0) {
-		write_log(2, "Key %s not found in get_xattr()\n", key);
+		write_log(8, "Key %s not found in get_xattr()\n", key);
 		return -ENODATA;
 	}
 
@@ -889,7 +889,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 		return ret_code;
 
 	if (ret_code > 0) { /* Hit nothing */
-		write_log(2, "Key %s not found in get_xattr()\n", key);
+		write_log(8, "Key %s not found in get_xattr()\n", key);
 		return -ENODATA;
 	}
 
@@ -901,7 +901,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 
 	if (size > 0) {
 		if (size < *actual_size) {
-			write_log(0, "Error: Size of key buffer is too small\n");
+			write_log(4, "Error: Size of key buffer is too small\n");
 			return -ERANGE;
 		}
 
@@ -1018,7 +1018,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 				ret = fill_buffer_with_key(&key_page, key_buf,
 					size, actual_size, namespace_prefix);
 				if (ret < 0) {
-					write_log(0, "Error: Size of buffer is "
+					write_log(4, "Error: Size of buffer is "
 						"too small in list_xattr()\n");
 					return -ERANGE;
 				}
