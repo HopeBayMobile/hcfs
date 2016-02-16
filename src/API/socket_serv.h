@@ -8,6 +8,7 @@
 
 typedef struct {
 	char in_used;
+	pthread_attr_t attr;
 	pthread_t thread;
 	int fd;
 } SOCK_THREAD;
