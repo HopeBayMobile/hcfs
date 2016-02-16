@@ -348,16 +348,13 @@ int init_server()
 		}
 
 		thread_pool[thread_idx].fd = new_sock_fd;
-		/*pthread_create(&(thread_pool[thread_idx].thread), NULL,
+		/* Set thread detached */
+		pthread_attr_init(&(thread_pool[thread_idx].attr));
+		pthread_attr_setdetachstate(&(thread_pool[thread_idx].attr),
+					    PTHREAD_CREATE_DETACHED);
+		pthread_create(&(thread_pool[thread_idx].thread),
+			       &(thread_pool[thread_idx].attr),
 			       (void *)process_request, (void *)thread_idx);
-		*/
-		process_request(thread_idx);
-
-	}
-
-	for (count = 0; count > MAX_THREAD; count++) {
-		if (thread_pool[count].in_used)
-			pthread_join(thread_pool[count].thread, NULL);
 	}
 
 	close(sock_fd);
