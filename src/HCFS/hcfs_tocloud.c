@@ -752,6 +752,186 @@ int select_upload_thread(char is_block, char is_delete,
 	}
 	return which_curl;
 }
+
+
+int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
+		char *local_metapath, long long block_count,
+		long long *current_page, long long *page_pos,
+		BLOCK_ENTRY_PAGE *toupload_temppage,
+		FILE_META_TYPE *toupload_meta, SYNC_THREAD_TYPE *ptr)
+{
+	long long which_page;
+	long long toupload_block_seq, local_block_seq;
+	unsigned char local_block_status, toupload_block_status;
+	BLOCK_ENTRY *tmp_entry;
+	BLOCK_ENTRY_PAGE local_temppage;
+	int e_index;
+	char toupload_bpath[400];
+	size_t ret_size;
+	int ret, errcode;
+	int which_curl;
+	BOOL llock, ulock;
+	char finish_uploading, toupload_exist;
+
+	llock = FALSE;
+	ulock = FALSE;
+
+	e_index = block_count % BLK_INCREMENTS;
+	which_page = block_count / BLK_INCREMENTS;
+
+	if (*current_page != which_page) {
+		flock(fileno(toupload_metafptr), LOCK_EX);
+		ulock = TRUE;
+		*page_pos = seek_page2(toupload_meta, toupload_metafptr,
+				which_page, 0);
+		if (*page_pos <= 0) {
+			flock(fileno(toupload_metafptr), LOCK_UN);
+			return -ENOENT;
+		}
+		*current_page = which_page;
+		/* Do not need to read again in the same
+		   page position because toupload_meta cannot
+		   be modified by other processes. */
+		FSEEK(toupload_metafptr, *page_pos, SEEK_SET);
+		FREAD(toupload_temppage, sizeof(BLOCK_ENTRY_PAGE),
+				1, toupload_metafptr);
+		flock(fileno(toupload_metafptr), LOCK_UN);
+		ulock = FALSE;
+	}
+	tmp_entry = &(toupload_temppage->block_entries[e_index]);
+	toupload_block_status = tmp_entry->status;
+	toupload_block_seq = tmp_entry->seqnum;
+
+	/* Lock local meta. Read local meta and update status.
+	   This should be read again even in the same page pos
+	   because someone may modify it. */
+	flock(fileno(local_metafptr), LOCK_EX);
+	llock = TRUE;
+	if (access(local_metapath, F_OK) < 0) {
+		flock(fileno(local_metafptr), LOCK_UN);
+		return -EACCES;
+	}
+
+	FSEEK(local_metafptr, *page_pos, SEEK_SET);
+	FREAD(&local_temppage, sizeof(BLOCK_ENTRY_PAGE), 1, local_metafptr);
+	tmp_entry = &(local_temppage.block_entries[e_index]);
+	local_block_status = tmp_entry->status;
+	local_block_seq = tmp_entry->seqnum;
+
+	/*** Case 1: Local is dirty. Update status & upload ***/
+	if (toupload_block_status == ST_LDISK ||
+			toupload_block_status == ST_LtoC) {
+		/* Important: Update status if this block is
+		   not deleted or is NOT newer than to-upload
+		   version. */
+		if ((local_block_status == ST_LDISK) &&
+				(local_block_seq == toupload_block_seq)) {
+
+			tmp_entry->status = ST_LtoC;
+			FSEEK(local_metafptr, *page_pos, SEEK_SET);
+			FWRITE(&local_temppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, local_metafptr);
+
+		} else if ((local_block_status == ST_LtoC) &&
+				(local_block_seq == toupload_block_seq)) {
+			/* Tmp do nothing */
+
+		} else {
+			/* In continue mode, directly
+			 * return when to-upload meta does
+			 * not match local meta */
+			if (ptr->is_revert == TRUE) {
+				write_log(4, "When continue uploading inode %"
+					PRIu64", cancel to continue uploading"
+					" because block %lld has local_seq %lld"
+					" and toupload seq %lld\n", (uint64_t)
+					ptr->inode, block_count,
+					local_block_seq, toupload_block_seq);
+				flock(fileno(local_metafptr), LOCK_UN);
+				return -ECANCELED;
+			}
+		}
+	
+		flock(fileno(local_metafptr), LOCK_UN);
+		sem_wait(&(upload_ctl.upload_queue_sem));
+		sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
+		which_curl = select_upload_thread(TRUE, FALSE, TRUE,
+				tmp_entry->obj_id, ptr->inode, block_count,
+				toupload_block_seq, *page_pos, e_index,
+				ptr->progress_fd, FALSE);
+#else
+		which_curl = select_upload_thread(TRUE, FALSE, ptr->inode,
+				block_count, toupload_block_seq, *page_pos,
+				e_index, ptr->progress_fd, FALSE);
+#endif
+
+		sem_post(&(upload_ctl.upload_op_sem));
+		ret = dispatch_upload_block(which_curl);
+		if (ret < 0) {
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
+			return ret;
+		}
+
+	/*** Case 2: Local block is deleted or none. Do nothing ***/
+	} else if (toupload_block_status == ST_TODELETE ||
+			toupload_block_status == ST_NONE) {
+		write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
+
+		if (local_block_status == ST_TODELETE) {
+			memset(tmp_entry, 0, sizeof(BLOCK_ENTRY));
+			tmp_entry->status = ST_NONE;
+			FSEEK(local_metafptr, *page_pos, SEEK_SET);
+			FWRITE(&local_temppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, local_metafptr);
+		}
+
+		flock(fileno(local_metafptr), LOCK_UN);
+
+		finish_uploading = TRUE;
+		toupload_exist = FALSE;
+		set_progress_info(ptr->progress_fd, block_count,
+			&toupload_exist, NULL, NULL, NULL, &finish_uploading);
+
+		fetch_toupload_block_path(toupload_bpath, ptr->inode,
+				block_count, toupload_block_seq);
+		if (access(toupload_bpath, F_OK) == 0)
+			unlink(toupload_bpath);
+
+	/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
+	} else {
+		write_log(10, "Debug: block_%lld is %d\n", block_count,
+				toupload_block_status);
+		flock(fileno(local_metafptr), LOCK_UN);
+
+		finish_uploading = TRUE;
+		toupload_exist = TRUE;
+#if (DEDUP_ENABLE)
+		set_progress_info(ptr->progress_fd, block_count,
+			&toupload_exist, NULL, tmp_entry->obj_id, NULL,
+			&finish_uploading);
+#else
+		set_progress_info(ptr->progress_fd, block_count,
+			&toupload_exist, NULL, &toupload_block_seq, NULL,
+			&finish_uploading);
+#endif
+		fetch_toupload_block_path(toupload_bpath, ptr->inode,
+			block_count, toupload_block_seq);
+		if (access(toupload_bpath, F_OK) == 0)
+			unlink(toupload_bpath);
+	}
+
+	return 0;
+
+errcode_handle:
+	write_log(0, "IO error in %s\n", __func__);
+	if (llock)
+		flock(fileno(local_metafptr), LOCK_UN);
+	if (ulock)
+		flock(fileno(toupload_metafptr), LOCK_UN);
+	return errcode;
+}
+
 /**
  * Main function to upload all block and meta
  *
@@ -913,6 +1093,7 @@ store in some other file */
 				/ MAX_BLOCK_SIZE) + 1;
 
 		/* Begin to upload blocks */
+		page_pos = 0;
 		current_page = -1;
 		is_local_meta_deleted = FALSE;
 		for (block_count = 0; block_count < total_blocks;
@@ -931,186 +1112,32 @@ store in some other file */
 					continue;
 			}
 
-			e_index = block_count % BLK_INCREMENTS;
-			which_page = block_count / BLK_INCREMENTS;
-
-			if (current_page != which_page) {
-				flock(fileno(toupload_metafptr), LOCK_EX);
-				page_pos = seek_page2(&tempfilemeta,
-					toupload_metafptr, which_page, 0);
-				if (page_pos <= 0) {
+			ret = _check_block_sync(toupload_metafptr,
+					local_metafptr, local_metapath,
+					block_count, &current_page, &page_pos,
+					&toupload_temppage, &tempfilemeta,
+					ptr);
+			if (ret < 0) {
+				if (ret == -ENOENT) {
 					block_count += (BLK_INCREMENTS - 1);
-					flock(fileno(toupload_metafptr),
-								LOCK_UN);
 					continue;
-				}
-				current_page = which_page;
-				/* Do not need to read again in the same
-				   page position because toupload_meta cannot
-				   be modified by other processes. */
-				FSEEK_ADHOC_SYNC_LOOP(toupload_metafptr,
-					page_pos, SEEK_SET, TRUE);
 
-				FREAD_ADHOC_SYNC_LOOP(&toupload_temppage,
-					sizeof(BLOCK_ENTRY_PAGE),
-					1, toupload_metafptr, TRUE);
-				flock(fileno(toupload_metafptr), LOCK_UN);
-			}
-			tmp_entry = &(toupload_temppage.block_entries[e_index]);
-			toupload_block_status = tmp_entry->status;
-			toupload_block_seq = tmp_entry->seqnum;
-
-			/* Lock local meta. Read local meta and update status.
-			   This should be read again even in the same page pos
-			   because someone may modify it. */
-			if (is_local_meta_deleted == FALSE) {
-				flock(fileno(local_metafptr), LOCK_EX);
-				if (access(local_metapath, F_OK) < 0) {
+				} else if (ret == -EACCES) {
 					is_local_meta_deleted = TRUE;
-					flock(fileno(local_metafptr), LOCK_UN);
 					break;
-				}
-			}
 
-			FSEEK_ADHOC_SYNC_LOOP(local_metafptr, page_pos,
-					SEEK_SET, TRUE);
-			FREAD_ADHOC_SYNC_LOOP(&local_temppage,
-					sizeof(BLOCK_ENTRY_PAGE), 1,
-					local_metafptr, TRUE);
-
-			tmp_entry = &(local_temppage.block_entries[e_index]);
-			local_block_status = tmp_entry->status;
-			local_block_seq = tmp_entry->seqnum;
-
-			/*** Case 1: Local is dirty. Update status & upload ***/
-			if (toupload_block_status == ST_LDISK ||
-					toupload_block_status == ST_LtoC) {
-				/* Important: Update status if this block is
-				not deleted or is NOT newer than to-upload
-				version. */
-				if ((local_block_status == ST_LDISK) &&
-					(local_block_seq == toupload_block_seq)) {
-
-					tmp_entry->status = ST_LtoC;
-					/* Update local meta */
-					FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
-						page_pos, SEEK_SET, TRUE);
-					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
-						sizeof(BLOCK_ENTRY_PAGE),
-						1, local_metafptr, TRUE);
-
-				} else if ((local_block_status == ST_LtoC) &&
-					(local_block_seq == toupload_block_seq)) {
-					/* Tmp do nothing */
+				} else if (ret == -ECANCELED) {
+					sync_ctl.threads_error[ptr->which_index]
+					       = TRUE;
+					break;
 
 				} else {
-					/* In continue mode, directly
-					 * return when to-upload meta does
-					 * not match local meta */
-					if (is_revert == TRUE) {
-						write_log(4, "When continue"
-							"uploading inode %"
-							PRIu64", cancel to"
-							" continue uploading"
-							" because block %lld"
-							" has local_seq %lld"
-							" and toupload seq"
-							" %lld\n", (uint64_t)
-							this_inode,
-							block_count,
-							local_block_seq,
-							toupload_block_seq);
-						flock(fileno(local_metafptr), LOCK_UN);
-						sync_ctl.threads_error[ptr->which_index]
-							= TRUE;
-						break;
-					}
-				}
-				flock(fileno(local_metafptr), LOCK_UN);
-				sem_wait(&(upload_ctl.upload_queue_sem));
-				sem_wait(&(upload_ctl.upload_op_sem));
-#if (DEDUP_ENABLE)
-				which_curl = select_upload_thread(TRUE, FALSE,
-						TRUE,
-						tmp_entry->obj_id,
-						ptr->inode, block_count,
-						toupload_block_seq, page_pos,
-						e_index, progress_fd,
-						FALSE);
-#else
-				which_curl = select_upload_thread(TRUE, FALSE,
-						ptr->inode, block_count,
-						toupload_block_seq, page_pos,
-						e_index, progress_fd,
-						FALSE);
-#endif
-
-				sem_post(&(upload_ctl.upload_op_sem));
-				ret = dispatch_upload_block(which_curl);
-				if (ret < 0) {
 					sync_ctl.threads_error[ptr->which_index]
-							= TRUE;
+					       = TRUE;
 					break;
 				}
-				continue;
-
-			/*** Case 2: Local block is deleted or none.
-			 * Do nothing ***/
-			} else if (toupload_block_status == ST_TODELETE ||
-					toupload_block_status == ST_NONE) {
-				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
-
-				if (local_block_status == ST_TODELETE) {
-					memset(tmp_entry, 0,
-							sizeof(BLOCK_ENTRY));
-					tmp_entry->status = ST_NONE;
-					FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
-						page_pos, SEEK_SET, TRUE);
-					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
-						sizeof(BLOCK_ENTRY_PAGE),
-						1, local_metafptr, TRUE);
-				}
-				flock(fileno(local_metafptr), LOCK_UN);
-
-				finish_uploading = TRUE;
-				toupload_exist = FALSE;
-				set_progress_info(progress_fd, block_count,
-					&toupload_exist, NULL, NULL, NULL,
-					&finish_uploading);
-
-				fetch_toupload_block_path(toupload_bpath,
-					this_inode, block_count,
-					toupload_block_seq);
-				if (access(toupload_bpath, F_OK) == 0)
-					unlink(toupload_bpath);
-
-				continue;
-
-			/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
-			} else {
-				write_log(10, "Debug: block_%lld is %d\n",
-						block_count, toupload_block_status);
-				flock(fileno(local_metafptr), LOCK_UN);
-
-				finish_uploading = TRUE;
-				toupload_exist = TRUE;
-#if (DEDUP_ENABLE)
-				set_progress_info(progress_fd,
-					block_count, &toupload_exist, NULL,
-					tmp_entry->obj_id, NULL,
-					&finish_uploading);
-#else
-				set_progress_info(progress_fd,
-					block_count, &toupload_exist, NULL,
-					&toupload_block_seq, NULL,
-					&finish_uploading);
-#endif
-				fetch_toupload_block_path(toupload_bpath,
-					this_inode, block_count,
-					toupload_block_seq);
-				if (access(toupload_bpath, F_OK) == 0)
-					unlink(toupload_bpath);
 			}
+
 		}
 		/* ---End of syncing blocks loop--- */
 
@@ -1688,7 +1715,6 @@ int dispatch_upload_block(int which_curl)
 		NULL, (void *)&con_object_sync,	(void *)upload_ptr);
 
 	upload_ctl.threads_created[which_curl] = TRUE;
-
 	return 0;
 
 errcode_handle:
