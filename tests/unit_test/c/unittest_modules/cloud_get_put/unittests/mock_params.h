@@ -50,3 +50,16 @@ LoopTestData test_data;
 LoopToVerifiedData to_verified_data;
 LoopTestData *shm_test_data;  // Used in upload_loop_unittest as expected value
 LoopToVerifiedData *shm_verified_data; // Used in upload_loop_unittest as actual value
+
+/* For atomic tocloud */
+typedef struct {
+	sem_t record_sem;
+	ino_t record_uploading_inode[500];
+	int total_inode;
+} TEST_REVERT_STRUCT;
+
+TEST_REVERT_STRUCT test_sync_struct;
+TEST_REVERT_STRUCT test_delete_struct;
+
+char is_first_upload;
+char fetch_from_cloud_fail;

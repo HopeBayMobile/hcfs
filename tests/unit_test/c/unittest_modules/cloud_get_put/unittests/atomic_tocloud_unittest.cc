@@ -11,7 +11,7 @@ extern "C" {
 #define RESPONSE_FAIL 0
 #define RESPONSE_SUCCESS 1
 
-SYSTEM_CONF_STRUCT *system_config;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 /*
  * Unittest for comm2fuseproc()
@@ -454,6 +454,8 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 		ret = set_progress_info(fd, i, &toupload_exist,
 			&backend_exist, toupload_objid, backend_objid, &finish);
 #else
+		ret = set_progress_info(fd, i, &toupload_exist,
+			&backend_exist, &toupload_seq, &backend_seq, &finish);
 #endif
 		ASSERT_EQ(0, ret);
 	}
@@ -550,6 +552,8 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 		ret = set_progress_info(fd, block_index[i], &toupload_exist,
 			&backend_exist, toupload_objid, backend_objid, &finish);
 #else
+		ret = set_progress_info(fd, block_index[i], &toupload_exist,
+			&backend_exist, &toupload_seq, &backend_seq, &finish);
 #endif
 		ASSERT_EQ(0, ret);
 	}
