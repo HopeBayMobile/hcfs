@@ -50,7 +50,6 @@
 *************************************************************************/
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
-	char objname[1000];
 #if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
 #endif
