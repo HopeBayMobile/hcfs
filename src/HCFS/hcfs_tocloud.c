@@ -1047,7 +1047,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 
 #if ENCRYPT_ENABLE
 		unsigned char *key = NULL;
-		key = get_key();
+		key = get_key("this is hopebay testing");
 		object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
 		object_key = calloc(KEY_SIZE, sizeof(unsigned char));
 		get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
@@ -1138,7 +1138,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	unsigned char *data = NULL;
 
 #if ENCRYPT_ENABLE
-	key = get_key();
+	key = get_key("this is hopebay testing");
 #endif
 	FILE *new_fptr = transform_fd(fptr, key, &data,
 			ENCRYPT_ENABLE, COMPRESS_ENABLE);

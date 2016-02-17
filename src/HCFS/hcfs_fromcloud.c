@@ -125,7 +125,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	fclose(get_fptr);
 	unsigned char *object_key = NULL;
 #if ENCRYPT_ENABLE
-	unsigned char *key = get_key();
+	unsigned char *key = get_key("this is hopebay testing");
 	object_key = calloc(KEY_SIZE, sizeof(unsigned char));
 	decrypt_session_key(object_key, object_meta->enc_session_key, key);
 	OPENSSL_free(key);

@@ -62,7 +62,7 @@ int aes_gcm_decrypt_fix_iv(unsigned char *, unsigned char *, unsigned int,
 
 int expect_b64_encode_length(unsigned int);
 
-unsigned char *get_key(void);
+unsigned char *get_key(char *);
 
 FILE *transform_encrypt_fd(FILE *, unsigned char *, unsigned char **);
 

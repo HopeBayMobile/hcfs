@@ -236,13 +236,13 @@ int aes_gcm_decrypt_fix_iv(unsigned char *output, unsigned char *input,
 }
 
 /*
- * This function only for deceloping upload to cloud.
+ * This function only for developing "upload to cloud".
  * In the future, it should be reimplemented considering
  * key management specs
  */
-unsigned char *get_key()
+unsigned char *get_key(char *keywords)
 {
-	const char *user_pass = "this is hopebay testing";
+	const char *user_pass = keywords;
 	unsigned char md_value[EVP_MAX_MD_SIZE];
 	unsigned int md_len;
 	unsigned char *ret =
