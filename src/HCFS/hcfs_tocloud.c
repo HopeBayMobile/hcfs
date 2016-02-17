@@ -819,9 +819,10 @@ int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	local_block_seq = tmp_entry->seqnum;
 
 	/*** Case 1: Local is dirty. Update status & upload ***/
-	if (toupload_block_status == ST_LDISK ||
-			toupload_block_status == ST_LtoC) {
-		/* Important: Update status if this block is
+	switch(toupload_block_status) {
+	case ST_LDISK:
+	case ST_LtoC:
+		/* Update status if this block is
 		   not deleted or is NOT newer than to-upload
 		   version. */
 		if ((local_block_status == ST_LDISK) &&
@@ -869,13 +870,16 @@ int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		sem_post(&(upload_ctl.upload_op_sem));
 		ret = dispatch_upload_block(which_curl);
 		if (ret < 0) {
+			if (ret == -ENOENT)
+				ret = -ECANCELED;
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
 			return ret;
 		}
-
+		
+		break;
 	/*** Case 2: Local block is deleted or none. Do nothing ***/
-	} else if (toupload_block_status == ST_TODELETE ||
-			toupload_block_status == ST_NONE) {
+	case ST_TODELETE:
+	case ST_NONE:
 		write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
 
 		if (local_block_status == ST_TODELETE) {
@@ -898,8 +902,9 @@ int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		if (access(toupload_bpath, F_OK) == 0)
 			unlink(toupload_bpath);
 
+		break;
 	/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
-	} else {
+	default:
 		write_log(10, "Debug: block_%lld is %d\n", block_count,
 				toupload_block_status);
 		flock(fileno(local_metafptr), LOCK_UN);
@@ -1695,12 +1700,15 @@ int dispatch_upload_block(int which_curl)
 	ret = check_and_copy_file(thisblockpath, toupload_blockpath, TRUE);
 	if (ret < 0) {
 		/* -EEXIST means target had been copied when writing */
-		/* If ret == -ENOENT, it means file is deleted.
-		 * Just set sync error and cancel uploading */
+		/* If ret == -ENOENT, it means file is deleted. */
 		if (ret == -ENOENT) {
 			fetch_meta_path(local_metapath, upload_ptr->inode);
 			if (access(local_metapath, F_OK) < 0) {
 				errcode = 0;
+				goto errcode_handle;
+			}
+			if (access(toupload_blockpath, F_OK) < 0) {
+				errcode = errno;
 				goto errcode_handle;
 			}
 		}

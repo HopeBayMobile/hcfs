@@ -695,18 +695,6 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 	long long temp_trunc_size;
 	long ret_pos;
 
-	/* source file should exist */
-	if (access(srcpath, F_OK) != 0) {
-		errcode = errno;
-		if (errcode == ENOENT)
-			write_log(2, "Warn: Source file does not exist. In %s\n",
-				__func__);
-		else
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
-		return -errcode;
-	}
-
 	/* if target file exists, do not copy it.
 	   (it may be copied by another process) */
 	ret = access(tarpath, F_OK);
@@ -719,6 +707,18 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 				errcode, strerror(errcode));
 			return -errcode;
 		}
+	}
+
+	/* source file should exist */
+	if (access(srcpath, F_OK) != 0) {
+		errcode = errno;
+		if (errcode == ENOENT)
+			write_log(2, "Warn: Source file does not exist. In %s\n",
+				__func__);
+		else
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+		return -errcode;
 	}
 
 	src_ptr = fopen(srcpath, "r");
