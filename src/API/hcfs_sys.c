@@ -43,8 +43,8 @@ int _validate_config_key(char *key)
  *     The size of *output* should be larger than
  *     input_len + IV_SIZE + TAG_SIZE.
  */
-int _encrypt_config(unsigned char *output, unsigned char *input,
-		    long input_len)
+int encrypt_config(unsigned char *output, unsigned char *input,
+		   long input_len)
 {
 
 	int ret;
@@ -72,7 +72,7 @@ int _encrypt_config(unsigned char *output, unsigned char *input,
 	return 0;
 }
 
-FILE *_get_decrypt_configfp()
+FILE *get_decrypt_configfp()
 {
 
 	long file_size, enc_size, data_size;
@@ -82,7 +82,7 @@ FILE *_get_decrypt_configfp()
         unsigned char *data_buf = NULL;
 	unsigned char *enc_key;
 
-	if (access(CONF_PATH, F_OK | R_OK) == -1)
+	if (access(CONF_PATH, F_OK|R_OK) == -1)
 		goto error;
 
 	datafp = fopen(CONF_PATH, "r");
@@ -99,7 +99,6 @@ FILE *_get_decrypt_configfp()
 	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
 	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
 	data_buf = (char*)malloc(sizeof(char)*(data_size));
-
 	if (!iv_buf || !enc_buf || !data_buf)
 		goto error;
 
@@ -129,6 +128,12 @@ FILE *_get_decrypt_configfp()
 error:
 	if (datafp)
 		fclose(datafp);
+	if (data_buf)
+		free(data_buf);
+	if (enc_buf)
+		free(enc_buf);
+	if (iv_buf)
+		free(iv_buf);
 
 	return NULL;
 }
@@ -178,7 +183,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	/* Default etc is readonly, set to writable */
 	system("mount -o remount,rw /system");
 
-	conf = _get_decrypt_configfp();
+	conf = get_decrypt_configfp();
 	if (conf == NULL) {
 		goto error;
 	}
@@ -202,7 +207,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	if (enc_data == NULL)
 		goto error;
 
-	ret_code = _encrypt_config(enc_data, data_buf, data_size);
+	ret_code = encrypt_config(enc_data, data_buf, data_size);
 	if (ret_code != 0) {
 		ret_code = EIO;
 		goto end;
@@ -274,7 +279,7 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 	for (idx = 0; idx < strlen(key); idx++)
 		upper_key[idx] = toupper(upper_key[idx]);
 
-	conf = _get_decrypt_configfp();
+	conf = get_decrypt_configfp();
 	if (conf == NULL) {
 		return -errno;
 	}

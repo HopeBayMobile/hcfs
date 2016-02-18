@@ -14,6 +14,9 @@ socket_serv_OBJS = $(addprefix $(OBJS_DIR), \
 test_OBJS = $(addprefix $(OBJS_DIR), \
 	    test.o HCFS_api.o)
 
+hcfsconf_OBJS = $(addprefix $(OBJS_DIR), \
+	    hcfsconf.o enc.o)
+
 OBJS := $(socket_serv_OBJS) $(test_OBJS)
 
 socket_serv: $(socket_serv_OBJS)
@@ -21,6 +24,9 @@ socket_serv: $(socket_serv_OBJS)
 
 test: $(test_OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(test_OBJS) -o $@ $(LFLAGS)
+
+hcfsconf: $(hcfsconf_OBJS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsconf_OBJS) -o $@ $(LFLAGS)
 
 publish: doc
 	sudo cp -r doc /mnt/nas/CloudDataSolution/Gateway_2.0/
