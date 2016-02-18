@@ -101,5 +101,6 @@ typedef struct {
 #define RECLAIMED 4
 
 #define DEFAULT_CONFIG_PATH "/etc/hcfs.conf"
+#define CONFIG_PASSPHRASE "lets encrypt configuration"
 
 #endif  /* GW20_SRC_PARAMS_H_ */

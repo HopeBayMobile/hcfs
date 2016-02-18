@@ -1,7 +1,9 @@
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <sqlite3.h>
 
@@ -9,6 +11,7 @@
 
 #include "global.h"
 #include "utils.h"
+#include "enc.h"
 
 
 int _validate_config_key(char *key)
@@ -35,6 +38,101 @@ int _validate_config_key(char *key)
 	return -1;
 }
 
+/*
+ * NOTE:
+ *     The size of *output* should be larger than
+ *     input_len + IV_SIZE + TAG_SIZE.
+ */
+int _encrypt_config(unsigned char *output, unsigned char *input,
+		    long input_len)
+{
+
+	int ret;
+	unsigned char iv[IV_SIZE] = {0};
+	unsigned char *enc_key, *enc_data;
+	long data_size, enc_size;
+
+	/* Key and iv */
+	enc_key = get_key(PASSPHRASE);
+	generate_random_bytes(iv, IV_SIZE);
+
+	enc_data = (char*)malloc(
+			sizeof(unsigned char) * (input_len + TAG_SIZE));
+
+	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
+	if (ret != 0) {
+		free(enc_data);
+		return -1;
+	}
+
+	memcpy(output, iv, IV_SIZE);
+	memcpy(output + IV_SIZE, enc_data, input_len + TAG_SIZE);
+
+	free(enc_data);
+	return 0;
+}
+
+FILE *_get_decrypt_configfp()
+{
+
+	long file_size, enc_size, data_size;
+	FILE *datafp = NULL;
+	unsigned char *iv_buf = NULL;
+        unsigned char *enc_buf = NULL;
+        unsigned char *data_buf = NULL;
+	unsigned char *enc_key;
+
+	if (access(CONF_PATH, F_OK | R_OK) == -1)
+		goto error;
+
+	datafp = fopen(CONF_PATH, "r");
+	if (datafp == NULL)
+		goto error;
+
+	fseek(datafp, 0, SEEK_END);
+	file_size = ftell(datafp);
+	rewind(datafp);
+
+	enc_size = file_size - IV_SIZE;
+	data_size = enc_size - TAG_SIZE;
+
+	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
+	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
+	data_buf = (char*)malloc(sizeof(char)*(data_size));
+
+	if (!iv_buf || !enc_buf || !data_buf)
+		goto error;
+
+	enc_key = get_key(PASSPHRASE);
+	fread(iv_buf, sizeof(unsigned char), IV_SIZE, datafp);
+	fread(enc_buf, sizeof(unsigned char), enc_size, datafp);
+
+	if (aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
+				 enc_key, iv_buf) != 0)
+		goto error;
+
+	FILE *tmp_file = tmpfile();
+	if (tmp_file == NULL)
+		goto error;
+	fwrite(data_buf, sizeof(unsigned char), data_size,
+		tmp_file);
+
+	free(data_buf);
+	free(enc_buf);
+	free(iv_buf);
+
+	fclose(datafp);
+	rewind(tmp_file);
+
+	return tmp_file;
+
+error:
+	if (datafp)
+		fclose(datafp);
+
+	return NULL;
+}
+
 int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 {
 
@@ -45,7 +143,10 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	char buf[300];
 	char key[100], upper_key[100], value[400];
 	char *tmp_ptr, *line, *token;
-	FILE *conf, *tmp_conf;
+	FILE *conf = NULL;
+	FILE *tmp_conf = NULL;
+	unsigned char data_buf[1024];
+	int data_size = 0;
 
 
 	msg_len = 0;
@@ -64,56 +165,74 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	value[str_len] = 0;
 	msg_len += str_len;
 
-	if (msg_len != arg_len)
-		return -EINVAL;
-
-	ret_code = _validate_config_key(key);
-	if (ret_code < 0) {
-		return -1;
+	if (msg_len != arg_len ||
+	    _validate_config_key(key) < 0) {
+		ret_code = -EINVAL;
+		goto end;
 	}
 
 	memcpy(upper_key, key, sizeof(upper_key));
 	for (idx = 0; idx < strlen(key); idx++)
 		upper_key[idx] = toupper(upper_key[idx]);
 
-	snprintf(tmp_path, sizeof(tmp_path),"%s.%s",
-		CONF_PATH, "tmp");
-
 	/* Default etc is readonly, set to writable */
 	system("mount -o remount,rw /system");
 
-	conf = fopen(CONF_PATH, "r");
+	conf = _get_decrypt_configfp();
 	if (conf == NULL) {
-		system("mount -o remount,ro /system");
-		return -errno;
+		goto error;
 	}
 
-	tmp_conf = fopen(tmp_path, "w");
-	if (tmp_conf == NULL) {
-		fclose(conf);
-		system("mount -o remount,ro /system");
-		return -errno;
-	}
-
+	data_size = str_len = 0;
 	while (fgets(buf, sizeof(buf), conf) != NULL) {
 		tmp_ptr = line = strdup(buf);
 		token = strsep(&line, " = ");
 		if (strcmp(upper_key, token) == 0)
 			snprintf(buf, sizeof(buf), "%s = %s\n", token, value);
-		fputs(buf, tmp_conf);
+
+		str_len = strlen(buf);
+		memcpy(&(data_buf[data_size]), buf, str_len + 1);
+		data_size += str_len;
+
 		free(tmp_ptr);
 	}
 
-	fclose(conf);
-	fclose(tmp_conf);
+	unsigned char *enc_data =
+		(unsigned char*)malloc(sizeof(char) * (data_size + IV_SIZE + TAG_SIZE));
+	if (enc_data == NULL)
+		goto error;
+
+	ret_code = _encrypt_config(enc_data, data_buf, data_size);
+	if (ret_code != 0) {
+		ret_code = EIO;
+		goto end;
+	}
+
+	snprintf(tmp_path, sizeof(tmp_path),"%s.%s",
+		 CONF_PATH, "tmp");
+	tmp_conf = fopen(tmp_path, "w");
+	if (tmp_conf == NULL)
+		goto error;
+
+	fwrite(enc_data, sizeof(unsigned char),
+	       data_size + IV_SIZE + TAG_SIZE, tmp_conf);
 
 	ret_code = rename(tmp_path, CONF_PATH);
-	system("mount -o remount,ro /system");
-
 	if (ret_code < 0)
-		return -errno;
+		goto error;
 	else
-		return 0;
+		goto end;
+
+error:
+	ret_code = -errno;
+
+end:
+	if (conf)
+		fclose(conf);
+	if (tmp_conf)
+		fclose(tmp_conf);
+	system("mount -o remount,ro /system");
+	return ret_code;
 }
 
 int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
@@ -155,9 +274,9 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 	for (idx = 0; idx < strlen(key); idx++)
 		upper_key[idx] = toupper(upper_key[idx]);
 
-	conf = fopen(CONF_PATH, "r");
+	conf = _get_decrypt_configfp();
 	if (conf == NULL) {
-	        return -errno;
+		return -errno;
 	}
 
 	ret_code = -1;
