@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <inttypes.h>
 
 #include "hcfs_tocloud.h"
 #include "macro.h"
