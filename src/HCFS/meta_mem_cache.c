@@ -21,6 +21,7 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "params.h"
