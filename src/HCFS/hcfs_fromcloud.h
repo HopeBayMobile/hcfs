@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_fromcloud.h
 * Abstract: The c header file for retrieving meta or data from backend.

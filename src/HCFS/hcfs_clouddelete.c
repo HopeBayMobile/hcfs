@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_clouddelete.c
 * Abstract: The c source code file for deleting meta or data from
@@ -12,6 +12,7 @@
 *           unmount.
 * 2015/6/5 Jiahong added error handling.
 * 2015/8/5 Jiahong added routines for updating FS statistics
+* 2016/2/18 Kewei finished changing flow of deleting file on cloud.
 *
 **************************************************************************/
 
