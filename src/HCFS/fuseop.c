@@ -5534,7 +5534,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	xattr_page = NULL;
 
 	if (size <= 0) {
-		write_log(0, "Cannot set key without value.\n");
+		write_log(5, "Cannot set key without value.\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
@@ -5578,8 +5578,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #endif
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: setxattr Permission denied ");
-		write_log(0, "(WRITE needed)\n");
+		write_log(5, "Error: setxattr Permission denied ");
+		write_log(5, "(WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5690,8 +5690,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #endif
 
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
-		write_log(0, "Error: getxattr permission denied ");
-		write_log(0, "(READ needed)\n");
+		write_log(5, "Error: getxattr permission denied ");
+		write_log(5, "(READ needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5931,7 +5931,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
 		write_log(
-		    0, "Error: removexattr Permission denied (WRITE needed)\n");
+		    5, "Error: removexattr Permission denied (WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -5952,7 +5952,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos,
 		name_space, key);
 	if (retcode < 0 && retcode != -ENODATA) { /* ENOENT or others */
-		write_log(0, "Error: removexattr remove xattr fail. Code %d\n",
+		write_log(5, "Error: removexattr remove xattr fail. Code %d\n",
 				-retcode);
 		goto error_handle;
 	}
