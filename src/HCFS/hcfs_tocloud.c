@@ -644,60 +644,6 @@ errcode_handle:
 }
 
 /**
- *
- * Following are some inline macros and functions used in sync_single_inode()
- *
- */
-
-#define FSEEK_ADHOC_SYNC_LOOP(A, B, C, UNLOCK_ON_ERROR)\
-	{\
-		ret = fseek(A, B, C);\
-		if (ret < 0) {\
-			errcode = errno;\
-			write_log(0, "IO error in %s. Code %d, %s\n",\
-				__func__, errcode, strerror(errcode));\
-			sync_ctl.threads_error[ptr->which_index];\
-			if (UNLOCK_ON_ERROR == TRUE) {\
-				flock(fileno(A), LOCK_UN);\
-			}\
-			break;\
-		}\
-	}
-
-#define FREAD_ADHOC_SYNC_LOOP(A, B, C, D, UNLOCK_ON_ERROR)\
-	{\
-		ret = fread(A, B, C, D);\
-		if (ret < 1) {\
-			errcode = ferror(D);\
-			write_log(0, "IO error in %s.\n", __func__);\
-			if (errcode != 0)\
-				write_log(0, "Code %d, %s\n", errcode,\
-					strerror(errcode));\
-			sync_ctl.threads_error[ptr->which_index];\
-			if (UNLOCK_ON_ERROR == TRUE) {\
-				flock(fileno(D), LOCK_UN);\
-			}\
-			break;\
-		}\
-	}
-
-#define FWRITE_ADHOC_SYNC_LOOP(A, B, C, D, UNLOCK_ON_ERROR)\
-	{\
-		ret = fwrite(A, B, C, D);\
-		if (ret < 1) {\
-			errcode = ferror(D);\
-			write_log(0, "IO error in %s.\n", __func__);\
-			write_log(0, "Code %d, %s\n", errcode,\
-				strerror(errcode));\
-			sync_ctl.threads_error[ptr->which_index];\
-			if (UNLOCK_ON_ERROR == TRUE) {\
-				flock(fileno(D), LOCK_UN);\
-			}\
-			break;\
-		}\
-	}
-
-/**
  * select_upload_thread()
  *
  * Select an appropriate thread to upload/delete a block or meta.
@@ -753,8 +699,26 @@ int select_upload_thread(char is_block, char is_delete,
 	return which_curl;
 }
 
-
-int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
+/**
+ * Check block status from to-upload meta, and compare the status with
+ * corresponding status in local meta. Finally decide if this block should
+ * be uploaded and record in progress file
+ *
+ * @param toupload_metafptr File pointer of toupload meta.
+ * @param local_metafptr File pointer of local meta.
+ * @param local_metapath Local meta path.
+ * @param block_count Block number to be checked and uploaded this time.
+ * @param current_page Current page, which is corresponding to "toupload_temppage"
+ * @param page_pos Page poisition of current page
+ * @param toupload_temppage Cached block entry page of toupload meta
+ * @param toupload_meta To-upload meta, which cannot be changed.
+ * @param ptr Data of synced inode.
+ *
+ * @return 0 on success, -ENOENT when page of this block does not exist,
+ *         -EACCES when local meta is gone, -ECANCELED when cancelling
+ *         syncing this time.
+ */
+static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		char *local_metapath, long long block_count,
 		long long *current_page, long long *page_pos,
 		BLOCK_ENTRY_PAGE *toupload_temppage,
