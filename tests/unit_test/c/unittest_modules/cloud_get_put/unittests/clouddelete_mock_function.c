@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <curl/curl.h>
 #include <semaphore.h>
+#include <inttypes.h>
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include "super_block.h"

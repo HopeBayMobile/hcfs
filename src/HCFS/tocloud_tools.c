@@ -167,7 +167,14 @@ errcode_handle:
 	return errcode;
 }
 
-
+/**
+ * Wait for all specified threads with inode number "inode" and 
+ * return if all these threads are terminated.
+ *
+ * @param inode Inode number to be waited.
+ *
+ * @return None.
+ */
 void busy_wait_all_specified_upload_threads(ino_t inode)
 {
 	char upload_done;
@@ -195,6 +202,21 @@ void busy_wait_all_specified_upload_threads(ino_t inode)
 	return;
 }
 
+/**
+ * Given "block_info" and deletion type "delete_which_one", Choose a
+ * block objid or seq number to be deleted on cloud.
+ *
+ * @param delete_which_one It is either DEL_TOUPLOAD_BLOCKS or
+ *                         DEL_BACKEND_BLOCKS. Choose seq numebr of
+ *                         to-upload blocks if DEL_TOUPLOAD_BLOCKS.
+ *                         Choose another one if DEL_BACKEND_BLOCKS.
+ * @param block_info This entry recorded to-upload data and backend data
+ *                   for a specified block.
+ * @param block_seq Seq number to be returned. 
+ * @param block_objid Object id to be returned
+ *
+ * @return 0 on success, -1 when do not need to delete blocks on cloud.
+ */ 
 #if (DEDUP_ENABLE)
 static inline int _choose_deleted_block(char delete_which_one,
 	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
@@ -249,10 +271,6 @@ static inline int _choose_deleted_block(char delete_which_one,
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
 
-/*	write_log(10, "Debug: inode %"PRIu64", toupload_seq = %lld, "
-			"backend_seq = %lld\n", (uint64_t)inode,
-			to_upload_seq, backend_seq);
-*/
 	if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
@@ -284,6 +302,17 @@ static inline int _choose_deleted_block(char delete_which_one,
 }
 #endif
 
+/**
+ * Delete blocks on cloud based on progress file.
+ *
+ * @param progress_fd File descriptor of this progress file
+ * @param total_blocks Total blocks to be checked and deleted
+ * @param inode Inode number
+ * @param delete_which_one Deletion type. Either DEL_TOUPLOAD_BLOCKS or
+ *                         DEL_BACKEND_BLOCKS.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	char delete_which_one)
 {
@@ -336,7 +365,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 			/* When delete to-upload blocks, we need page position
 			 * to recover status to ST_LDISK. TODO: Maybe do not
-			 * need this action. */
+			 * need this action? */
 			if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 				page_pos = 0;
 				local_metafptr = fopen(local_metapath, "r");

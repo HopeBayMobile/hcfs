@@ -1126,16 +1126,13 @@ store in some other file */
 				if (ret == -ENOENT) {
 					block_count += (BLK_INCREMENTS - 1);
 					continue;
-
 				} else if (ret == -EACCES) {
 					is_local_meta_deleted = TRUE;
 					break;
-
 				} else if (ret == -ECANCELED) {
 					sync_ctl.threads_error[ptr->which_index]
 					       = TRUE;
 					break;
-
 				} else {
 					sync_ctl.threads_error[ptr->which_index]
 					       = TRUE;
@@ -1702,11 +1699,13 @@ int dispatch_upload_block(int which_curl)
 		/* -EEXIST means target had been copied when writing */
 		/* If ret == -ENOENT, it means file is deleted. */
 		if (ret == -ENOENT) {
+			/* Return if meta is deleted */
 			fetch_meta_path(local_metapath, upload_ptr->inode);
 			if (access(local_metapath, F_OK) < 0) {
 				errcode = 0;
 				goto errcode_handle;
 			}
+			/* block is deleted but not be copied, return error */
 			if (access(toupload_blockpath, F_OK) < 0) {
 				errcode = errno;
 				goto errcode_handle;
