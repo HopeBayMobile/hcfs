@@ -753,9 +753,11 @@ protected:
 
 		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
-		mock_stat.st_size = 1000000; /* Let total_blocks = 1000000/1000 = 1000 */
+		mock_stat.st_size = total_page * MAX_BLOCK_ENTRIES_PER_PAGE *
+			MAX_BLOCK_SIZE; /* Let total_blocks = 1000000/1000 = 1000 */
 		mock_stat.st_mode = S_IFREG;
 		mock_file_meta.root_inode = 10;
+		fseek(mock_metaptr, 0, SEEK_SET);
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); /* Write stat */
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); /* Write file meta */
 
@@ -833,9 +835,9 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	FILE *metaptr;
 
 	/* Mock data */
+	system_config->max_block_size = 1000;
 	write_mock_meta_file(metapath, total_page, ST_LDISK);
 
-	system_config->max_block_size = 1000;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
@@ -851,7 +853,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	init_upload_control();
 	init_sync_stat_control();
 	sync_single_inode(&mock_thread_type);
-	sleep(2);
+	sleep(4);
 	hcfs_system->system_going_down = TRUE;
 	sleep(1);
 

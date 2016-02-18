@@ -322,20 +322,33 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 	BLOCK_ENTRY_PAGE block_page;
 	int i;
 	long long pos;
+	long long page_count;
+	size_t ret_size;
 
 	printf("Begin to change status to BOTH\n");
+	page_count = 0;
 	fseek(local_metafptr, sizeof(struct stat), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, local_metafptr);
 	while (!feof(local_metafptr)) {
 		/* Linearly read block meta */
-		pos = ftell(local_metafptr);
-		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, local_metafptr);
+		fseek(local_metafptr, sizeof(struct stat) +
+			sizeof(FILE_META_TYPE) + page_count *
+			sizeof(BLOCK_ENTRY_PAGE), SEEK_SET);
+		ret_size = fread(&block_page, 1, sizeof(BLOCK_ENTRY_PAGE),
+				local_metafptr);
+		if (ret_size != sizeof(BLOCK_ENTRY_PAGE))
+			break;
+
 		for (i = 0 ; i < block_page.num_entries ; i++) {
 			if (block_page.block_entries[i].status == ST_LtoC)
 				block_page.block_entries[i].status = ST_BOTH;
 		}
-		fseek(local_metafptr, pos, SEEK_SET);
-		fwrite(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, local_metafptr);
+		fseek(local_metafptr, sizeof(struct stat) +
+			sizeof(FILE_META_TYPE) + page_count *
+			sizeof(BLOCK_ENTRY_PAGE), SEEK_SET);
+		fwrite(&block_page, 1, sizeof(BLOCK_ENTRY_PAGE), local_metafptr);
+
+		page_count++;
 	}
 
 	return 0;
