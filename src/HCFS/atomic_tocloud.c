@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: atomic_tocloud.c
+* Abstract: The c source code file for helping to sync file atomically.
+*
+* Revision History
+* 2016/2/18 Kewei finish atomic upload and add revision history.
+*
+**************************************************************************/
+
 #define _GNU_SOURCE
 #include "atomic_tocloud.h"
 
@@ -17,7 +29,8 @@
 extern SYSTEM_CONF_STRUCT *system_config;
 
 /*
- * Tag inode as uploading or not_uploading in fuse process memory.
+ * Communicate with fuse and tag inode as uploading or not_uploading
+ * in fuse process memory.
  *
  * Main function of communicating with fuse process. This aims to
  * tag or untag the inode is_uploading flag.
@@ -314,6 +327,23 @@ errcode_handle:
 
 }
 
+/**
+ * set_progress_info()
+ *
+ * Set block info in progress file.
+ *
+ * @param fd File descriptor of progress file
+ * @param block_index Block number.
+ * @param toupload_exist Set if toupload block exist or not.
+ * @param backend_exist Set if backend block exist or not.
+ * @param toupload_objid To-upload object id to be set (in dedup).
+ * @param backend_objid Backedn object id to be set (in dedup).
+ * @param toupload_seq To-upload seq number to be set.
+ * @param backend_seq Backend seq number to be set.
+ * @param finish Set if finish uploading.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
 #if (DEDUP_ENABLE)
 int set_progress_info(int fd, long long block_index,
 	const char *toupload_exist, const char *backend_exist,
@@ -427,6 +457,16 @@ errcode_handle:
 }
 #endif
 
+/**
+ * create_progress_file()
+ *
+ * Create progress file and return file descriptor. If progress file
+ * exist, remove it and create a new one.
+ *
+ * @param inode Inode number of progress file.
+ *
+ * @return file descriptor of progress file, otherwise negative error code.
+ */ 
 int create_progress_file(ino_t inode)
 {
 	int ret_fd;
@@ -442,8 +482,7 @@ int create_progress_file(ino_t inode)
 	if (access(pathname, F_OK) == -1)
 		mkdir(pathname, 0700);
 
-	sprintf(filename, "%s/upload_progress_inode_%"PRIu64,
-		pathname, (uint64_t)inode);
+	fetch_progress_file_path(filename, inode);
 
 	if (access(filename, F_OK) == 0) {
 		write_log(0, "Error: Open \"%s\" but it exist. Unlink it\n",
@@ -590,13 +629,22 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * del_progress_file()
+ *
+ * Close progress file and delete it.
+ *
+ * @param fd File descriptor of progress file.
+ * @param inode Inode number.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
 int del_progress_file(int fd, ino_t inode)
 {
 	char filename[200];
 	int ret, errcode;
 
-	sprintf(filename, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
-		METAPATH, (uint64_t)inode);
+	fetch_progress_file_path(filename, inode);
 
 	close(fd);
 	UNLINK(filename);
@@ -667,7 +715,6 @@ void fetch_del_backend_meta_path(char *pathname, ino_t inode)
 
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
-
 	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
 		METAPATH, (uint64_t)inode);
 

@@ -13,6 +13,7 @@
 *           unmount.
 * 2015/6/4, 6/5 Jiahong added error handling.
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
+* 2015/2/18, Kewei finish atomic upload.
 *
 **************************************************************************/
 
@@ -844,7 +845,9 @@ static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	/*** Case 2: Local block is deleted or none. Do nothing ***/
 	case ST_TODELETE:
 	case ST_NONE:
-		write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
+		write_log(10, "Debug: block_%lld is %s\n", block_count,
+				toupload_block_status == ST_NONE ?
+				"ST_NONE" : "ST_TODELETE");
 
 		if (local_block_status == ST_TODELETE) {
 			memset(tmp_entry, 0, sizeof(BLOCK_ENTRY));

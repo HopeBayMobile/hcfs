@@ -3,7 +3,7 @@
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: tocloud_tools.c
-* Abstract: The c source code file for helping to sync file.
+* Abstract: The c source code file for helping to sync a single file.
 *
 * Revision History
 * 2016/2/15 Kewei create this file

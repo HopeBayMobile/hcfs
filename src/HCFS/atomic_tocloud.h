@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: atomic_tocloud.c
+* Abstract: The c header file corresponding to atomic_tocloud.c.
+*
+* Revision History
+* 2016/2/18 Kewei finish atomic upload and add revision history.
+*
+**************************************************************************/
+
 #ifndef GW20_HCFS_ATOMIC_TOCLOUD_H_
 #define GW20_HCFS_ATOMIC_TOCLOUD_H_
 
