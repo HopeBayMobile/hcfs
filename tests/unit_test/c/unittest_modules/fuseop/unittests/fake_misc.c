@@ -5,7 +5,7 @@
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
-
+#include <inttypes.h>
 #include <stdarg.h>
 #include <fuse/fuse_lowlevel.h>
 
