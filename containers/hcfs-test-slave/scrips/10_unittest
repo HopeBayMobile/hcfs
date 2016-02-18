@@ -110,7 +110,7 @@ ccm_result       > /dev/null 2>&1 &
 hb_clint         > /dev/null 2>&1 &
 checkpatch
 wait
-unittest || :
+unittest
 
 # coverage.xml
 #         Unit test coverage report
