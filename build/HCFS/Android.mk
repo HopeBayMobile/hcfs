@@ -22,10 +22,13 @@ LOCAL_MODULE    := libssl
 LOCAL_SRC_FILES := $(LIBS_PATH)/libssl.so
 include $(PREBUILT_SHARED_LIBRARY)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE    := libcrypto
-LOCAL_SRC_FILES := $(LIBS_PATH)/libcrypto.so
-include $(PREBUILT_SHARED_LIBRARY)
+ifeq "$(INCLUDE_CRYPTO)" ""
+  include $(CLEAR_VARS)
+  LOCAL_MODULE    := libcrypto
+  LOCAL_SRC_FILES := $(LIBS_PATH)/libcrypto.so
+  include $(PREBUILT_SHARED_LIBRARY)
+endif
+export INCLUDE_CRYPTO := 1
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := liblz4
