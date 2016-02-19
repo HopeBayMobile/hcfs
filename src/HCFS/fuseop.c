@@ -1081,7 +1081,9 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	get_meta_size(parent_inode, &new_metasize);
 	get_meta_size(self_inode, &metasize);
-		
+
+	change_system_meta(0, metasize + (new_metasize - old_metasize),
+			0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0,
 			metasize + (new_metasize - old_metasize), 1);
 	if (ret_val < 0) {
@@ -1235,6 +1237,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	get_meta_size(parent_inode, &new_metasize);
 	get_meta_size(self_inode, &metasize);
 
+	change_system_meta(0, metasize + (new_metasize - old_metasize),
+			0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0,
 			metasize + (new_metasize - old_metasize), 1);
 	if (ret_val < 0) {
@@ -2269,7 +2273,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		}
 	}
 	if (total_deleted_blocks > 0) {
-		change_system_meta(0, -total_deleted_cache,
+		change_system_meta(0, 0, -total_deleted_cache,
 				   -total_deleted_blocks,
 				   -total_deleted_dirty_cache);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
@@ -2440,7 +2444,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 					return ret;
 				}
 
-				change_system_meta(0, tempstat.st_size, 1,
+				change_system_meta(0, 0, tempstat.st_size, 1,
 						   tempstat.st_size);
 				cache_delta += tempstat.st_size;
 				cache_block_delta += 1;
@@ -2474,10 +2478,10 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		if (tmpstatus == ST_BOTH)
-			change_system_meta(0, new_block_size - old_block_size,
+			change_system_meta(0, 0, new_block_size - old_block_size,
 					0, new_block_size);
 		else
-			change_system_meta(0, new_block_size - old_block_size,
+			change_system_meta(0, 0, new_block_size - old_block_size,
 					0, new_block_size - old_block_size);
 		cache_delta += new_block_size - old_block_size;
 
@@ -2551,10 +2555,10 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		if (tmpstatus == ST_BOTH)
-			change_system_meta(0, new_block_size - old_block_size,
+			change_system_meta(0, 0, new_block_size - old_block_size,
 					0, new_block_size);
 		else
-			change_system_meta(0, new_block_size - old_block_size,
+			change_system_meta(0, 0, new_block_size - old_block_size,
 					0, new_block_size - old_block_size);
 
 		cache_delta += new_block_size - old_block_size;
@@ -2923,7 +2927,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0);
+	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0, 0);
 
 	ret = change_mount_stat(tmpptr,
 			(long long) (offset - filestat->st_size), 0, 0);
@@ -3305,7 +3309,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				goto error_handling;
 
 			/* Update system meta to reflect correct cache size */
-			change_system_meta(0, tempstat2.st_size, 1, 0);
+			change_system_meta(0, 0, tempstat2.st_size, 1, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -3894,7 +3898,7 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				return ret;
 			}
 			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, tempstat2.st_size, 1,
+			change_system_meta(0, 0, tempstat2.st_size, 1,
 					tempstat2.st_size);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
@@ -4093,7 +4097,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			}
 
 			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, 0, 1, 0);
+			change_system_meta(0, 0, 0, 1, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
@@ -4182,7 +4186,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	new_cache_size = check_file_size(thisblockpath);
 
 	if (old_cache_size != new_cache_size) {
-		change_system_meta(0, new_cache_size - old_cache_size, 0,
+		change_system_meta(0, 0, new_cache_size - old_cache_size, 0,
 				   new_cache_size - old_cache_size);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
@@ -4398,7 +4402,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
-						- temp_stat.st_size), 0, 0, 0);
+				- temp_stat.st_size),
+				(new_metasize - old_metasize), 0, 0, 0);
 		ret = change_mount_stat(tmpptr,
 			(long long) ((offset + total_bytes_written)
 			- temp_stat.st_size), (new_metasize - old_metasize), 0);
@@ -4413,6 +4418,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
 	} else {
+		change_system_meta(0, (new_metasize - old_metasize),
+				0, 0, 0);
 		ret = change_mount_stat(tmpptr, 0,
 				(new_metasize - old_metasize), 0);
 		if (ret < 0) {
@@ -4484,7 +4491,11 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/*Prototype is linux statvfs call*/
 	sem_wait((tmpptr->stat_lock));
 
-	system_size = (tmpptr->FS_stat)->system_size;
+	system_size = (tmpptr->FS_stat)->system_size +
+		(tmpptr->FS_stat)->meta_size;
+	write_log(10, "Debug: system_size is %lld\n", system_size);
+	//system_size = hcfs_system->systemdata.system_size +
+	//		hcfs_system->systemdata.system_meta_size;
 	num_inodes = (tmpptr->FS_stat)->num_inodes;
 
 	sem_post((tmpptr->stat_lock));
@@ -5500,6 +5511,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	get_meta_size(self_inode, &metasize);
+	change_system_meta(0, metasize + (new_metasize - old_metasize),
+			0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0,
 			metasize + (new_metasize - old_metasize), 1);
 	if (ret_val < 0) {

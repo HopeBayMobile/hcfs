@@ -1438,6 +1438,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		break;
 	}
 
+	change_system_meta(0, -metasize, 0, 0, 0);
+
 	if (mptr == NULL) {
 		FSEEK(fptr, 0, SEEK_SET);
 		FWRITE(&tmpstat, sizeof(FS_STAT_T), 1, fptr);

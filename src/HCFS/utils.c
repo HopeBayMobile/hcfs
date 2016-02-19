@@ -900,7 +900,7 @@ off_t check_file_size(const char *path)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int change_system_meta(long long system_size_delta,
+int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	long long cache_size_delta, long long cache_blocks_delta,
 	long long dirty_cache_delta)
 {
@@ -908,6 +908,11 @@ int change_system_meta(long long system_size_delta,
 	hcfs_system->systemdata.system_size += system_size_delta;
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
+
+	hcfs_system->systemdata.system_meta_size += meta_size_delta;
+	if (hcfs_system->systemdata.system_meta_size < 0)
+		hcfs_system->systemdata.system_meta_size = 0;
+
 	hcfs_system->systemdata.cache_size += cache_size_delta;
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;

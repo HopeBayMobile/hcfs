@@ -46,7 +46,7 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 
-int change_system_meta(long long system_size_delta,
+int change_system_meta(long long system_size_delta, long long meta_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta,
 		long long dirty_cache_delta);
 
