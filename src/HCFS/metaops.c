@@ -2085,9 +2085,15 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		return 0;
 	}
 
-	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos);
+	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos, FALSE);
 	if (ret < 0) {
-		goto errcode_handle;
+		if (ret == -ENOENT) {
+			meta_cache_close_file(pbody_ptr);
+			meta_cache_unlock_entry(pbody_ptr);
+			return 0;
+		} else {
+			goto errcode_handle;
+		}
 	}
 
 	/* Fetch needed size of key buffer */
@@ -2127,7 +2133,8 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	}
 
 	/* Self xattr page */
-	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page, &sel_xattr_pos);
+	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page,
+			&sel_xattr_pos, TRUE);
 	if (ret < 0) {
 		goto errcode_handle;
 	}

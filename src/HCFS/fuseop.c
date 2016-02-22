@@ -5757,7 +5757,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	}
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
-		&xattr_filepos);
+		&xattr_filepos, TRUE);
 	if (retcode < 0)
 		goto error_handle;
 	write_log(10, "Debug setxattr: fetch xattr_page, xattr_page = %lld\n",
@@ -5877,9 +5877,18 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	}
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
-		&xattr_filepos);
-	if (retcode < 0)
-		goto error_handle;
+		&xattr_filepos, FALSE);
+	if (retcode < 0) {
+		if (retcode == -ENOENT) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			free(xattr_page);
+			fuse_reply_buf(req, NULL, 0);
+			return;
+		} else {
+			goto error_handle;
+		}
+	}
 
 	/* Get xattr if size is sufficient. If size is zero, return actual
 	   needed size. If size is non-zero but too small, return error code
@@ -5983,9 +5992,18 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		goto error_handle;
 	}
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
-		&xattr_filepos);
-	if (retcode < 0)
-		goto error_handle;
+		&xattr_filepos, FALSE);
+	if (retcode < 0) {
+		if (retcode == -ENOENT) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			free(xattr_page);
+			fuse_reply_buf(req, NULL, 0);
+			return;
+		} else {
+			goto error_handle;
+		}
+	}
 
 	/* Allocate sufficient size */
 	if (size != 0) {
@@ -6125,9 +6143,18 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 	}
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
-		&xattr_filepos);
-	if (retcode < 0)
-		goto error_handle;
+		&xattr_filepos, FALSE);
+	if (retcode < 0) {
+		if (retcode == -ENOENT) {
+			meta_cache_close_file(meta_cache_entry);
+			meta_cache_unlock_entry(meta_cache_entry);
+			free(xattr_page);
+			fuse_reply_err(req, 0);
+			return;
+		} else {
+			goto error_handle;
+		}
+	}
 
 	/* Remove xattr */
 	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos,

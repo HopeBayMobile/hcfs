@@ -51,7 +51,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ino_t root_ino, long long *delta_meta_size, char ispin);
 
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *xattr_pos);
+	XATTR_PAGE *xattr_page, long long *xattr_pos, BOOL create_page);
 
 int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation,

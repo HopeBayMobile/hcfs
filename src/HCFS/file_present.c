@@ -856,7 +856,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 *
 *************************************************************************/
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *xattr_pos)
+	XATTR_PAGE *xattr_page, long long *xattr_pos, BOOL create_page)
 {
 	int ret_code;
 	ino_t this_inode;
@@ -912,6 +912,10 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	} else { /* fifo, socket is not enabled in non-android env */
 		return -EINVAL;
 	}
+
+	/*return ENOENT if do not need to create xattr page*/
+	if (*xattr_pos == 0 && create_page == FALSE)
+		return -ENOENT;
 
 	/* It is used to prevent user from forgetting to open meta file */
 	ret_code = meta_cache_open_file(meta_cache_entry);
