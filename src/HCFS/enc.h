@@ -11,6 +11,7 @@
 #define GW20_HCFS_ENC_H_
 
 #include <string.h>
+#include <unistd.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
@@ -74,5 +75,7 @@ int decode_to_fd(FILE *, unsigned char *, unsigned char *, int, int, int);
 
 int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 			unsigned char *key);
+
+FILE *get_decrypt_configfp(unsigned char *);
 
 #endif /* GW20_HCFS_ENC_H_ */

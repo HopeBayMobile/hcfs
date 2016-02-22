@@ -240,9 +240,9 @@ int aes_gcm_decrypt_fix_iv(unsigned char *output, unsigned char *input,
  * In the future, it should be reimplemented considering
  * key management specs
  */
-unsigned char *get_key(char *keywords)
+unsigned char *get_key(char *passphrase)
 {
-	const char *user_pass = keywords;
+	const char *user_pass = passphrase;
 	unsigned char md_value[EVP_MAX_MD_SIZE];
 	unsigned int md_len;
 	unsigned char *ret =
@@ -545,4 +545,79 @@ void free_object_meta(HCFS_encode_object_meta *object_meta)
 		}
 		free(object_meta);
 	}
+}
+
+/************************************************************************
+*
+* Function name: get_decrypt_configfp
+*        Inputs: unsigned char *config_path
+*       Summary: Helper function to read encrypted "config_path",
+*                and write the decrypted contents to a temp file.
+*  Return value: File pointer to decrypted config, or NULL if error
+*                occured.
+*
+*************************************************************************/
+FILE *get_decrypt_configfp(unsigned char *config_path)
+{
+
+	long file_size, enc_size, data_size;
+	FILE *datafp = NULL;
+	unsigned char *iv_buf = NULL;
+	unsigned char *enc_buf = NULL;
+	unsigned char *data_buf = NULL;
+	unsigned char *enc_key = NULL;
+
+	if (access(config_path, F_OK | R_OK) == -1)
+		goto error;
+
+	datafp = fopen(config_path, "r");
+	if (datafp == NULL)
+		goto error;
+
+	fseek(datafp, 0, SEEK_END);
+	file_size = ftell(datafp);
+	rewind(datafp);
+
+	enc_size = file_size - IV_SIZE;
+	data_size = enc_size - TAG_SIZE;
+
+	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
+	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
+	data_buf = (char*)malloc(sizeof(char)*(data_size));
+
+	if (!iv_buf || !enc_buf || !data_buf)
+		goto error;
+
+	enc_key = get_key(CONFIG_PASSPHRASE);
+	fread(iv_buf, sizeof(unsigned char), IV_SIZE, datafp);
+	fread(enc_buf, sizeof(unsigned char), enc_size, datafp);
+
+	if (aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
+				 enc_key, iv_buf) != 0)
+		goto error;
+
+	FILE *tmp_file = tmpfile();
+	if (tmp_file == NULL)
+		goto error;
+	fwrite(data_buf, sizeof(unsigned char), data_size,
+		tmp_file);
+
+	rewind(tmp_file);
+	goto end;
+
+error:
+	tmp_file = NULL;
+end:
+	if (datafp)
+		fclose(datafp);
+	if (enc_key)
+		free(enc_key);
+	if (data_buf)
+		free(data_buf);
+	if (enc_buf)
+		free(enc_buf);
+	if (iv_buf)
+		free(iv_buf);
+
+	return tmp_file;
 }

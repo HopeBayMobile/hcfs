@@ -72,6 +72,11 @@
                         <p>Secret function</p>
                     </div>
                 </li>
+                <li><a href="#HCFS_reload_config">HCFS_reload_config<span class="counter"></span></a>
+                    <div class="brief">
+                        <p>Reload config</p>
+                    </div>
+                </li>
                 <li><a href="#HCFS_reset_xfer">HCFS_reset_xfer<span class="counter"></span></a>
                     <div class="brief">
                         <p>Reset xfer</p>
@@ -567,6 +572,39 @@
                         </table>
                     </div>
                     <div class="function">
+                        <div class="declaration" id="HCFS_reload_config">
+                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
+                            </div>
+                            <table class="declaration">
+                                <tbody>
+                                    <tr>
+                                        <td class="identifier">HCFS_reload_config</td>
+                                        <td class="open_paren">(</td>
+                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
+                                        </td>
+                                        <td class="argument_name">json_res</td>
+                                        <td class="close_paren">)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="doc">
+                            <p>Reload HCFS configuration file. Backend can be changed from NONE to NONE/SWIFT/S3.</p>
+                        </div>
+                        <table class="arguments">
+                            <tbody>
+                                <tr id="HCFS_reload_config::json_res">
+                                    <td>json_res</td>
+                                    <td>
+                                        <div class="doc">
+                                            <p>result string in json format.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="function">
                         <div class="declaration" id="HCFS_reset_xfer">
                             <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
                             </div>
@@ -731,6 +769,7 @@
     xfer_up: Bytes,
     xfer_down: Bytes,
     cloud_conn: True|False,
+    sync_conn: True|False,
 }</code></pre>
                         </div>
                         <table class="arguments">

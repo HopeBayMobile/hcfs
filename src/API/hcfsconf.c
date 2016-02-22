@@ -140,10 +140,10 @@ error:
 	ret_code = -errno;
 
 end:
-        if (config)
-                fclose(config);
-        if (dec_config)
-                fclose(dec_config);
+	if (config)
+		fclose(config);
+	if (dec_config)
+		fclose(dec_config);
 	if (data_buf)
 		free(data_buf);
 	if (enc_buf)

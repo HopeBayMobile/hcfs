@@ -262,76 +262,6 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 
 /************************************************************************
 *
-* Function name: _get_decrypt_configfp
-*       Summary: Helper function to read encrypted "config_path",
-*                and write the decrypted contents to a temp file.
-*  Return value: File pointer to decrypted config, or NULL if error
-*                occured.
-*
-*************************************************************************/
-FILE *_get_decrypt_configfp()
-{
-
-        long file_size, enc_size, data_size;
-        FILE *datafp = NULL;
-        unsigned char *iv_buf = NULL;
-	unsigned char *enc_buf = NULL;
-	unsigned char *data_buf = NULL;
-        unsigned char *enc_key;
-
-        if (access(DEFAULT_CONFIG_PATH, F_OK | R_OK) == -1)
-                goto error;
-
-        datafp = fopen(DEFAULT_CONFIG_PATH, "r");
-        if (datafp == NULL)
-                goto error;
-
-        fseek(datafp, 0, SEEK_END);
-        file_size = ftell(datafp);
-        rewind(datafp);
-
-        enc_size = file_size - IV_SIZE;
-        data_size = enc_size - TAG_SIZE;
-
-        iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
-        enc_buf = (char*)malloc(sizeof(char)*(enc_size));
-        data_buf = (char*)malloc(sizeof(char)*(data_size));
-
-        if (!iv_buf || !enc_buf || !data_buf)
-                goto error;
-
-        enc_key = get_key(CONFIG_PASSPHRASE);
-        fread(iv_buf, sizeof(unsigned char), IV_SIZE, datafp);
-        fread(enc_buf, sizeof(unsigned char), enc_size, datafp);
-
-        if (aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
-                                 enc_key, iv_buf) != 0)
-                goto error;
-
-        FILE *tmp_file = tmpfile();
-        if (tmp_file == NULL)
-                goto error;
-        fwrite(data_buf, sizeof(unsigned char), data_size,
-                tmp_file);
-
-        free(data_buf);
-        free(enc_buf);
-        free(iv_buf);
-
-        fclose(datafp);
-        rewind(tmp_file);
-
-        return tmp_file;
-
-error:
-        if (datafp)
-                fclose(datafp);
-
-        return NULL;
-}
-
-/************************************************************************
-*
 * Function name: read_system_config
 *        Inputs: char *config_path
 *       Summary: Read system configuration from file "config_path", and
@@ -350,7 +280,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 
 	memset(config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
-	fptr = _get_decrypt_configfp();
+	fptr = get_decrypt_configfp(config_path);
 
 	if (fptr == NULL) {
 		errcode = errno;

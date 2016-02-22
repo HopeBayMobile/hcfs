@@ -4,11 +4,6 @@
 #define PASSPHRASE "lets encrypt configuration"
 
 
-int encrypt_config(unsigned char *output, unsigned char *input,
-		   long input_len);
-
-FILE *get_decrypt_configfp();
-
 int set_hcfs_config(char *arg_buf, unsigned int arg_len);
 
 int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value);

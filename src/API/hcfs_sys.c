@@ -43,7 +43,7 @@ int _validate_config_key(char *key)
  *     The size of *output* should be larger than
  *     input_len + IV_SIZE + TAG_SIZE.
  */
-int encrypt_config(unsigned char *output, unsigned char *input,
+int _encrypt_config(unsigned char *output, unsigned char *input,
 		   long input_len)
 {
 
@@ -60,6 +60,7 @@ int encrypt_config(unsigned char *output, unsigned char *input,
 			sizeof(unsigned char) * (input_len + TAG_SIZE));
 
 	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
+	free(enc_key);
 	if (ret != 0) {
 		free(enc_data);
 		return -1;
@@ -72,7 +73,7 @@ int encrypt_config(unsigned char *output, unsigned char *input,
 	return 0;
 }
 
-FILE *get_decrypt_configfp()
+FILE *_get_decrypt_configfp()
 {
 
 	long file_size, enc_size, data_size;
@@ -80,7 +81,7 @@ FILE *get_decrypt_configfp()
 	unsigned char *iv_buf = NULL;
         unsigned char *enc_buf = NULL;
         unsigned char *data_buf = NULL;
-	unsigned char *enc_key;
+	unsigned char *enc_key = NULL;
 
 	if (access(CONF_PATH, F_OK|R_OK) == -1)
 		goto error;
@@ -116,18 +117,16 @@ FILE *get_decrypt_configfp()
 	fwrite(data_buf, sizeof(unsigned char), data_size,
 		tmp_file);
 
-	free(data_buf);
-	free(enc_buf);
-	free(iv_buf);
-
-	fclose(datafp);
 	rewind(tmp_file);
-
-	return tmp_file;
+	goto end;
 
 error:
+	tmp_file = NULL;
+end:
 	if (datafp)
 		fclose(datafp);
+	if (enc_key)
+		free(enc_key);
 	if (data_buf)
 		free(data_buf);
 	if (enc_buf)
@@ -135,7 +134,7 @@ error:
 	if (iv_buf)
 		free(iv_buf);
 
-	return NULL;
+	return tmp_file;
 }
 
 int set_hcfs_config(char *arg_buf, unsigned int arg_len)
@@ -183,7 +182,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	/* Default etc is readonly, set to writable */
 	system("mount -o remount,rw /system");
 
-	conf = get_decrypt_configfp();
+	conf = _get_decrypt_configfp();
 	if (conf == NULL) {
 		goto error;
 	}
@@ -207,7 +206,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	if (enc_data == NULL)
 		goto error;
 
-	ret_code = encrypt_config(enc_data, data_buf, data_size);
+	ret_code = _encrypt_config(enc_data, data_buf, data_size);
 	if (ret_code != 0) {
 		ret_code = EIO;
 		goto end;
@@ -279,7 +278,7 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 	for (idx = 0; idx < strlen(key); idx++)
 		upper_key[idx] = toupper(upper_key[idx]);
 
-	conf = get_decrypt_configfp();
+	conf = _get_decrypt_configfp();
 	if (conf == NULL) {
 		return -errno;
 	}

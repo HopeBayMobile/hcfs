@@ -53,6 +53,7 @@ void HCFS_reload_config(char **json_res);
  *     xfer_up: Bytes,
  *     xfer_down: Bytes,
  *     cloud_conn: True|False,
+ *     sync_conn: True|False,
  * }
  * ```
  */
