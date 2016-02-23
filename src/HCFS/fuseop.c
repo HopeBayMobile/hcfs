@@ -26,7 +26,7 @@
 * 2015/11/24 Jethro adding
 * 2016/1/19 Jiahong modified path reconstruct routine
 * 2016/2/4 Jiahong adding fallocate
-* 2/16/2/23 Jiahong moved fallocate to another file
+* 2016/2/23 Jiahong moved fallocate to another file
 *
 **************************************************************************/
 
