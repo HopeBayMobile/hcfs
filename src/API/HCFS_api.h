@@ -17,6 +17,13 @@
  * | swift_url     | <server url>:<port>|
  * | swift_container| container name|
  * | swift_protocol| http/https|
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_set_config(char **json_res, char *key, char *value);
 
@@ -25,6 +32,13 @@ void HCFS_set_config(char **json_res, char *key, char *value);
  * @key field in HCFS configuration.
  *
  * Get the Value of specific field. (Supported keys are listed in <HCFS_set_config>.)
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_get_config(char **json_res, char *key);
 
@@ -32,6 +46,13 @@ void HCFS_get_config(char **json_res, char *key);
  * @json_res result string in json format.
  *
  * Reload HCFS configuration file. Backend can be changed from NONE to NONE/SWIFT/S3.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_reload_config(char **json_res);
 
@@ -53,9 +74,15 @@ void HCFS_reload_config(char **json_res);
  *     xfer_up: Bytes,
  *     xfer_down: Bytes,
  *     cloud_conn: True|False,
- *     sync_conn: True|False,
  * }
  * ```
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_stat(char **json_res);
 
@@ -86,6 +113,13 @@ void HCFS_stat(char **json_res);
  * @enabled 1 to turn on sync, 0 to turn off sync.
  *
  * To toggle if hcfs can/can't sync data in local cache to cloud storage.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_toggle_sync(char **json_res, int enabled);
 
@@ -100,6 +134,13 @@ void HCFS_toggle_sync(char **json_res, int enabled);
  *     enabled: boolean,
  * }
  * ```
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_get_sync_status(char **json_res);
 
@@ -127,6 +168,15 @@ void HCFS_get_sync_status(char **json_res);
  * Pin a file so that it will never be replaced when doing cache replacement.
  * If the given (pin_path) is a directory, HCFS_pin_path() will recursively
  * pin all files and files in subdirectories.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if successful.|
+ * | | 1 if this path was already pinned.|
+ * | False | ENOSPC when pinned space is not available.|
+ * | | Other linux errors.|
  */
 void HCFS_pin_path(char **json_res, char *pin_path);
 
@@ -139,6 +189,15 @@ void HCFS_pin_path(char **json_res, char *pin_path);
  *
  * Pin all binaries and data files created by a app.
  * Input are four possible path where contain files belong to this app.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if successful.|
+ * | | 1 if this app was already pinned.|
+ * | False | ENOSPC when pinned space is not available.|
+ * | | Other linux errors.|
  */
 void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 		  char *sd0_path, char *sd1_path);
@@ -150,6 +209,14 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
  * Unpin a file. If the given (pin_path) is a directory,
  * HCFS_unpin_path() will recursively unpin all files and
  * files in subdirectories.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if successful.|
+ * | | 1 if this path was already unpinned.|
+ * | False | Linux errors.|
  */
 void HCFS_unpin_path(char **json_res, char *pin_path);
 
@@ -162,6 +229,14 @@ void HCFS_unpin_path(char **json_res, char *pin_path);
  *
  * Unpin all binaries and data files created by a app.
  * Input are four possible path where contain files belong to this app.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if successful.|
+ * | | 1 if this app was already unpinned.|
+ * | False | Linux errors.|
  */
 void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 		    char *sd0_path, char *sd1_path);
@@ -171,6 +246,14 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
  * @pathname target pathname.
  *
  * To check a given (pathname) is pinned or unpinned.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if object is not pinned.|
+ * | | 1 if object is pinned.|
+ * | False | Linux errors.|
  */
 void HCFS_pin_status(char **json_res, char *pathname);
 
@@ -188,6 +271,14 @@ void HCFS_pin_status(char **json_res, char *pathname);
  *     num_hybrid: num,
  * }
  * ```
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | ENOENT if the inode does not existed.|
+ * | | Other linux errors.|
  */
 void HCFS_dir_status(char **json_res, char *pathname);
 
@@ -196,6 +287,15 @@ void HCFS_dir_status(char **json_res, char *pathname);
  * @pathname target pathname.
  *
  * To get the status of (pathname).
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if the file status is "local"|
+ * | | 1 if the file status is "cloud"|
+ * | | 2 if the file status is "hybrid"|
+ * | False | Linux errors.|
  */
 void HCFS_file_status(char **json_res, char *pathname);
 
@@ -203,11 +303,20 @@ void HCFS_file_status(char **json_res, char *pathname);
  * @json_res result string in json format.
  *
  * To reset the value of upload/download statistic.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
  */
 void HCFS_reset_xfer(char **json_res);
 
 /*Secret function
  * @json_res result string in json format.
+ *
+ * (NOTE - This API would not be used anymore.)
  *
  * To reboot.
  */
@@ -216,6 +325,8 @@ void HCFS_reboot(char **json_res);
 /*Query package uid
  * @json_res result string in json format.
  * @pkg_name target package
+ *
+ * (NOTE - This API would not be used anymore.)
  *
  * To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.
  */
