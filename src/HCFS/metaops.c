@@ -1425,7 +1425,11 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 					-metasize, -1);
 		} else {
 			tmpstat.num_inodes--;
-			tmpstat.system_size -= this_inode_stat.st_size;
+			tmpstat.system_size -=
+				(this_inode_stat.st_size + metasize);
+			tmpstat.meta_size -= metasize;
+			tmpstat.num_inodes -= 1;
+
 		}
 
 

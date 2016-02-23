@@ -4516,11 +4516,10 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/*Prototype is linux statvfs call*/
 	sem_wait((tmpptr->stat_lock));
 
-	//system_size = (tmpptr->FS_stat)->system_size +
-	//	(tmpptr->FS_stat)->meta_size;
-	system_size = hcfs_system->systemdata.system_size +
-			hcfs_system->systemdata.system_meta_size;
+	system_size = hcfs_system->systemdata.system_size;
 	write_log(10, "Debug: system_size is %lld\n", system_size);
+	write_log(10, "Debug: volume size is %lld\n",
+			(tmpptr->FS_stat)->system_size);
 	num_inodes = (tmpptr->FS_stat)->num_inodes;
 
 	sem_post((tmpptr->stat_lock));

@@ -905,7 +905,8 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	long long dirty_cache_delta)
 {
 	sem_wait(&(hcfs_system->access_sem));
-	hcfs_system->systemdata.system_size += system_size_delta;
+	hcfs_system->systemdata.system_size +=
+		(system_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
 
@@ -913,15 +914,19 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
 
-	hcfs_system->systemdata.cache_size += cache_size_delta;
+	hcfs_system->systemdata.cache_size +=
+		(cache_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;
+
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	if (hcfs_system->systemdata.cache_blocks < 0)
 		hcfs_system->systemdata.cache_blocks = 0;
+
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
+
 	sync_hcfs_system_data(FALSE);
 	sem_post(&(hcfs_system->access_sem));
 

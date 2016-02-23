@@ -1036,7 +1036,7 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 	int ret;
 
 	sem_wait((mptr->stat_lock));
-	(mptr->FS_stat)->system_size += system_size_delta;
+	(mptr->FS_stat)->system_size += (system_size_delta + meta_size_delta);
 	if ((mptr->FS_stat)->system_size < 0)
 		(mptr->FS_stat)->system_size = 0;
 
