@@ -83,10 +83,10 @@ FILE *_get_decrypt_configfp()
         unsigned char *data_buf = NULL;
 	unsigned char *enc_key = NULL;
 
-	if (access(CONF_PATH, F_OK|R_OK) == -1)
+	if (access(CONFIG_PATH, F_OK|R_OK) == -1)
 		goto error;
 
-	datafp = fopen(CONF_PATH, "r");
+	datafp = fopen(CONFIG_PATH, "r");
 	if (datafp == NULL)
 		goto error;
 
@@ -179,9 +179,6 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	for (idx = 0; idx < strlen(key); idx++)
 		upper_key[idx] = toupper(upper_key[idx]);
 
-	/* Default etc is readonly, set to writable */
-	system("mount -o remount,rw /system");
-
 	conf = _get_decrypt_configfp();
 	if (conf == NULL) {
 		goto error;
@@ -213,7 +210,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	}
 
 	snprintf(tmp_path, sizeof(tmp_path),"%s.%s",
-		 CONF_PATH, "tmp");
+		 CONFIG_PATH, "tmp");
 	tmp_conf = fopen(tmp_path, "w");
 	if (tmp_conf == NULL)
 		goto error;
@@ -221,7 +218,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	fwrite(enc_data, sizeof(unsigned char),
 	       data_size + IV_SIZE + TAG_SIZE, tmp_conf);
 
-	ret_code = rename(tmp_path, CONF_PATH);
+	ret_code = rename(tmp_path, CONFIG_PATH);
 	if (ret_code < 0)
 		goto error;
 	else
@@ -235,7 +232,6 @@ end:
 		fclose(conf);
 	if (tmp_conf)
 		fclose(tmp_conf);
-	system("mount -o remount,ro /system");
 	return ret_code;
 }
 

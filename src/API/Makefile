@@ -35,7 +35,7 @@ doc: HCFS_api.c HCFS_api.h
 	cldoc generate -c -- --basedir . --type html --static --merge docs  --output doc HCFS_api.h
 
 clean:
-	rm -rf $(OBJS_DIR) $(OBJS_DIR) socket_serv test
+	rm -rf $(OBJS_DIR) $(OBJS_DIR) socket_serv test hcfsconf
 
 # pull in dependency info for *existing* .o files
 -include $(OBJS:.o=.d)

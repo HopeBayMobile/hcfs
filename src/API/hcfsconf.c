@@ -10,7 +10,19 @@
 
 void usage()
 {
-	printf("***Usage - hcfsconf <enc|dec> <config_path>***\n");
+#ifdef DEBUG_MODE
+	printf("***Usage - hcfsconf <gen|enc|dec> <config_path>***\n");
+#else
+	printf("***Usage - hcfsconf <gen> <config_path>***\n");
+#endif
+}
+
+int _check_file_existed(char *pathname)
+{
+	if (access(pathname, F_OK) == -1)
+		return -1;
+	else
+		return 0;
 }
 
 int _enc_config(unsigned char *output, unsigned char *input,
@@ -20,14 +32,13 @@ int _enc_config(unsigned char *output, unsigned char *input,
 	int ret;
 	unsigned char iv[IV_SIZE] = {0};
 	unsigned char *enc_key, *enc_data;
-	long data_size, enc_size;
 
 	/* Key and iv */
 	enc_key = get_key(PASSPHRASE);
 	generate_random_bytes(iv, IV_SIZE);
 
 	enc_data =
-		(char*)malloc(sizeof(unsigned char) * (input_len + TAG_SIZE));
+		(unsigned char*)malloc(sizeof(unsigned char) * (input_len + TAG_SIZE));
 
 	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
 	if (ret != 0) {
@@ -44,8 +55,8 @@ int _enc_config(unsigned char *output, unsigned char *input,
 
 int enc_config(char *config_path)
 {
-	char buf[300];
-	char data_buf[1024];
+	unsigned char buf[300];
+	unsigned char data_buf[1024];
 	long data_size = 0;
 	int str_len;
 	FILE *config = NULL;
@@ -66,8 +77,8 @@ int enc_config(char *config_path)
 	if (_enc_config(enc_data, data_buf, data_size) != 0)
 		return -errno;
 
-	unsigned char *tmp_path =
-		(unsigned char*)malloc(strlen(config_path) + 5);
+	char *tmp_path =
+		(char*)malloc(strlen(config_path) + 5);
 	snprintf(tmp_path, strlen(config_path) + 5, "%s.enc", config_path);
 
 	enc_config = fopen(tmp_path, "w");
@@ -107,9 +118,9 @@ int dec_config(char *config_path)
         enc_size = file_size - IV_SIZE;
         data_size = enc_size - TAG_SIZE;
 
-        iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
-        enc_buf = (char*)malloc(sizeof(char)*(enc_size));
-        data_buf = (char*)malloc(sizeof(char)*(data_size));
+        iv_buf = (unsigned char*)malloc(sizeof(char)*IV_SIZE);
+        enc_buf = (unsigned char*)malloc(sizeof(char)*(enc_size));
+        data_buf = (unsigned char*)malloc(sizeof(char)*(data_size));
 
         if (!iv_buf || !enc_buf || !data_buf)
                 goto error;
@@ -124,8 +135,8 @@ int dec_config(char *config_path)
 		goto end;
 	}
 
-	unsigned char *tmp_path =
-		(unsigned char*)malloc(strlen(config_path) + 5);
+	char *tmp_path =
+		(char*)malloc(strlen(config_path) + 5);
 	snprintf(tmp_path, strlen(config_path) + 5, "%s.dec", config_path);
 
         dec_config = fopen(tmp_path, "w");
@@ -154,10 +165,67 @@ end:
         return ret_code;
 }
 
+int gen_config(char *config_path)
+{
+	unsigned char contents[1000] =
+		"METAPATH = /data/hcfs/metastorage\n"
+		"BLOCKPATH = /data/hcfs/blockstorage\n"
+		"CACHE_SOFT_LIMIT = 20474836480\n"
+		"CACHE_HARD_LIMIT = 20548578304\n"
+		"CACHE_DELTA = 1048576\n"
+		"MAX_BLOCK_SIZE = 1048576\n"
+		"CURRENT_BACKEND = NONE\n"
+		"SWIFT_ACCOUNT = \n"
+		"SWIFT_USER = \n"
+		"SWIFT_PASS = \n"
+		"SWIFT_URL = \n"
+		"SWIFT_CONTAINER = \n"
+		"SWIFT_PROTOCOL = http\n"
+		"S3_ACCESS = XXXXX\n"
+		"S3_SECRET = YYYYY\n"
+		"S3_URL = s3.hicloud.net.tw\n"
+		"S3_BUCKET = testgateway\n"
+		"S3_PROTOCOL = https\n"
+		"LOG_LEVEL = 4\n"
+		"LOG_PATH = /data";
+
+	if (_check_file_existed(config_path) == 0)
+		return -EEXIST;
+
+	long input_len = strlen(contents);
+	long output_len = input_len + IV_SIZE + TAG_SIZE;
+	unsigned char output[output_len];
+	if (_enc_config(output, contents, input_len) != 0)
+		return -EIO;
+
+	FILE *config = fopen(config_path, "w");
+	if (config == NULL)
+		return -errno;
+
+	fwrite(output, sizeof(unsigned char), output_len, config);
+	fclose(config);
+
+	return 0;
+}
+
+typedef struct {
+	const char *name;
+	int (*cmd_fn)(char *config_path);
+} CMD_INFO;
+
+CMD_INFO cmds[] = {
+	{"gen", gen_config},
+#ifdef DEBUG_MODE
+	{"enc", enc_config},
+	{"dec", dec_config},
+#endif
+};
+
 int main(int argc, char **argv)
 {
 
 	int ret_code = 0;
+	unsigned int i;
 
 	if (argc != 3) {
 		printf("Error - Invalid args\n");
@@ -165,31 +233,21 @@ int main(int argc, char **argv)
 		return -EINVAL;
 	}
 
-	if (access(argv[2], F_OK|R_OK) == -1) {
-		printf("Error - Config path not found.\n");
-		usage();
-		return -ENOENT;
+	for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
+		if (strcmp(cmds[i].name, argv[1]) == 0) {
+			ret_code = cmds[i].cmd_fn(argv[2]);
+			goto done;
+		}
 	}
+	printf("Action %s not supported\n", argv[1]);
+	usage();
+	return -EINVAL;
 
-
-	if (strcmp(argv[1], "enc") == 0) {
-		ret_code = enc_config(argv[2]);
-		if (ret_code != 0) {
-			printf("Error - Failed to encrypt config.\n");
-			return ret_code;
-		}
-
-	} else if (strcmp(argv[1], "dec") == 0) {
-		ret_code = dec_config(argv[2]);
-		if (ret_code != 0) {
-			printf("Error - Failed to decrypt config.\n");
-			return ret_code;
-		}
-
-	} else {
-		printf("Error - Action not supported.\n");
+done:
+	if (ret_code != 0) {
+		printf("Failed to %s config with path %s\n", argv[1], argv[2]);
 		usage();
-		return -EINVAL;
+		return ret_code;
 	}
 
 	return 0;
