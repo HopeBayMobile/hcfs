@@ -20,6 +20,6 @@
 
 int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
 		off_t offset, off_t length,
-		META_CACHE_ENTRY_STRUCT *body_ptr, fuse_req_t req);
+		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req);
 
 #endif  /* GW20_HCFS_DO_FALLOCATE_H_ */

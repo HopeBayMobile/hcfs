@@ -28,7 +28,7 @@
 	If mode = 3, need to zero regions.
 */
 static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
-		off_t offset, META_CACHE_ENTRY_STRUCT *body_ptr,
+		off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr,
 		fuse_req_t req)
 {
 	FILE_META_TYPE tempfilemeta;
@@ -48,7 +48,7 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	}
 
 	ret = meta_cache_lookup_file_data(this_inode, NULL, &tempfilemeta,
-			NULL, 0, body_ptr);
+			NULL, 0, *body_ptr);
 
 	if (ret < 0)
 		return ret;
@@ -80,7 +80,7 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	}
 
 	ret = meta_cache_update_file_data(this_inode, filestat,
-			&tempfilemeta, NULL, 0, body_ptr);
+			&tempfilemeta, NULL, 0, *body_ptr);
 	if (ret < 0) {
 		write_log(0, "IO error in fallocate. Data may ");
 		write_log(0, "not be consistent\n");
@@ -127,7 +127,7 @@ errcode_handle:
 }
 int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
 		off_t offset, off_t length,
-		META_CACHE_ENTRY_STRUCT *body_ptr, fuse_req_t req)
+		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
 {
 	int ret_val;
 

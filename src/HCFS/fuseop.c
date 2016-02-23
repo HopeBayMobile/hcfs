@@ -26,6 +26,7 @@
 * 2015/11/24 Jethro adding
 * 2016/1/19 Jiahong modified path reconstruct routine
 * 2016/2/4 Jiahong adding fallocate
+* 2/16/2/23 Jiahong moved fallocate to another file
 *
 **************************************************************************/
 
@@ -6165,6 +6166,7 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int mode,
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
+	off_t old_file_size;
 
 	UNUSED(fi);
 
@@ -6211,6 +6213,7 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int mode,
 		return;
 	}
 
+	old_file_size = newstat.st_size;
 	ret_val = do_fallocate(this_inode, &newstat, mode, offset, length,
 	                       &body_ptr, req);
 	if (ret_val < 0) {
@@ -6220,12 +6223,20 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int mode,
 		return;
 	}
 
+	clock_gettime(CLOCK_REALTIME, &timenow);
 
-	newstat.st_mtime = (time_t)(timenow.tv_sec);
+	if ((mode == 3) || (old_file_size != newstat.st_size)) {
+		newstat.st_ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-	memcpy(&(newstat.st_mtim), &timenow,
-		sizeof(struct timespec));
+		memcpy(&(newstat.st_ctim), &timenow,
+			sizeof(struct timespec));
 #endif
+		newstat.st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
+		memcpy(&(newstat.st_mtim), &timenow,
+			sizeof(struct timespec));
+#endif
+	}
 
 	ret_val = meta_cache_update_file_data(this_inode, &newstat,
 			NULL, NULL, 0, body_ptr);
