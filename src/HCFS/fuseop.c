@@ -1081,7 +1081,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	if (delta_meta_size != 0)
+		change_system_meta(0, delta_meta_size, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1232,7 +1233,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	if (delta_meta_size != 0)
+		change_system_meta(0, delta_meta_size, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -5530,7 +5532,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, -ret_val);
 	}
 
-	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	if (delta_meta_size != 0)
+		change_system_meta(0, delta_meta_size, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -5685,11 +5688,14 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
+	long long old_metasize, new_metasize, delta_meta_size;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
+	old_metasize = 0;
+	new_metasize = 0;
 
 	if (size <= 0) {
 		write_log(5, "Cannot set key without value.\n");
@@ -5756,6 +5762,9 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
+
+	get_meta_size(this_inode, &old_metasize);
+
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos, TRUE);
 	if (retcode < 0)
@@ -5769,11 +5778,23 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
+	get_meta_size(this_inode, &new_metasize);
+
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
-	write_log(5, "setxattr operation success\n");
+
+	if (new_metasize > 0 && old_metasize > 0)
+		delta_meta_size = new_metasize - old_metasize;
+	else
+		delta_meta_size = 0;
+
+	if (delta_meta_size != 0) {
+		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
+	}
+
 	fuse_reply_err(req, 0);
 	return;
 
@@ -5883,7 +5904,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);
-			fuse_reply_buf(req, NULL, 0);
+			fuse_reply_err(req, ENODATA);
 			return;
 		} else {
 			goto error_handle;
@@ -5998,7 +6019,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);
-			fuse_reply_buf(req, NULL, 0);
+			fuse_reply_err(req, ENODATA);
 			return;
 		} else {
 			goto error_handle;
@@ -6149,7 +6170,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);
-			fuse_reply_err(req, 0);
+			fuse_reply_err(req, ENODATA);
 			return;
 		} else {
 			goto error_handle;
@@ -6281,8 +6302,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	get_meta_size(parent_inode, &new_metasize);
 	delta_meta_size = new_metasize - old_metasize;
 	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
-		change_system_meta(0, (new_metasize - old_metasize), 0, 0, 0);
-		change_mount_stat(tmpptr, 0, (new_metasize - old_metasize), 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
 	/* Unlock parent */
@@ -6483,7 +6504,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
-	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	if (delta_meta_size != 0)
+		change_system_meta(0, delta_meta_size, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);

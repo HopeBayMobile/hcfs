@@ -913,7 +913,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return -EINVAL;
 	}
 
-	/*return ENOENT if do not need to create xattr page*/
+	/* return ENOENT if do not need to create xattr page */
 	if (*xattr_pos == 0 && create_page == FALSE)
 		return -ENOENT;
 
