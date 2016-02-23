@@ -37,6 +37,7 @@ OBJS_F := objmeta.o \
 	pin_scheduling.o \
 	monitor.o \
 	dir_statistics.o \
+	do_fallocate.o \
 	parent_lookup.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 

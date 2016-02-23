@@ -93,6 +93,7 @@
 #include "pin_scheduling.h"
 #include "dir_statistics.h"
 #include "parent_lookup.h"
+#include "do_fallocate.h"
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
@@ -6146,21 +6147,15 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_create(req, &tmp_param, fi);
 }
 
-static int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
-		off_t offset, off_t length,
-		META_CACHE_ENTRY_STRUCT *body_ptr, fuse_req_t req)
-{
-	/* TODO:
+
+/* TODO:
 	if mode = 0, default op.
 	if mode = 1, keep filesize.
 	if mode = 3, punch hole and keep size.
 	otherwise return ENOTSUPP
 	If mode 0 or 1, don't need to zero regions already containing data
 	If mode = 3, need to zero regions.
-	*/
-	return 0;
-}
-
+*/
 static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int mode,
 			off_t offset, off_t length, struct fuse_file_info *fi)
 {
