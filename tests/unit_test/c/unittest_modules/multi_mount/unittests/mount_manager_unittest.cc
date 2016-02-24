@@ -910,17 +910,20 @@ TEST_F(change_mount_statTest, TestChange) {
   int ret;
 
   tmp_mount.FS_stat->system_size = 100000;
+  tmp_mount.FS_stat->meta_size = 100;
   tmp_mount.FS_stat->num_inodes = 123;
 
-  ret = change_mount_stat(&tmp_mount, 123456, 789);
+  ret = change_mount_stat(&tmp_mount, 123456, 5566, 789);
 
   ASSERT_EQ(0, ret);
-  EXPECT_EQ(100000 + 123456, tmp_mount.FS_stat->system_size);
+  EXPECT_EQ(100000 + 123456 + 5566, tmp_mount.FS_stat->system_size);
+  EXPECT_EQ(100 + 5566, tmp_mount.FS_stat->meta_size);
   EXPECT_EQ(123 + 789, tmp_mount.FS_stat->num_inodes);
 
-  ret = change_mount_stat(&tmp_mount, -1234560, -7890);
+  ret = change_mount_stat(&tmp_mount, -1234560, -123, -7890);
   ASSERT_EQ(0, ret);
   EXPECT_EQ(0, tmp_mount.FS_stat->system_size);
+  EXPECT_EQ(100 + 5566 - 123, tmp_mount.FS_stat->meta_size);
   EXPECT_EQ(0, tmp_mount.FS_stat->num_inodes);
  }
 
