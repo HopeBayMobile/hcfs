@@ -10,6 +10,8 @@ extern "C" {
 #endif
 }
 
+#define PASSPHRASE "this is hopebay testing"
+
 extern SYSTEM_CONF_STRUCT *system_config;
 
 class enc : public testing::Test
@@ -112,7 +114,7 @@ TEST(base64, encode_then_decode)
 
 TEST_F(enc, encrypt_with_fix_iv)
 {
-	unsigned char *key = get_key();
+	unsigned char *key = get_key(PASSPHRASE);
 	unsigned char iv[IV_SIZE] = {0};
 	unsigned char *output1 = (unsigned char *)calloc(input_size + TAG_SIZE,
 							 sizeof(unsigned char));
@@ -132,7 +134,7 @@ TEST_F(enc, encrypt_with_fix_iv)
 
 TEST_F(enc, encrypt_then_decrypt)
 {
-	unsigned char *key = get_key();
+	unsigned char *key = get_key(PASSPHRASE);
 	unsigned char *output = (unsigned char *)calloc(input_size + TAG_SIZE,
 							sizeof(unsigned char));
 	unsigned char *decode =
@@ -153,7 +155,7 @@ TEST_F(enc, encrypt_then_decrypt)
 TEST_F(enc, transform_encrypt_fd)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *key = get_key();
+	unsigned char *key = get_key(PASSPHRASE);
 	unsigned char *data;
 	FILE *new_encrypt_fd = transform_encrypt_fd(in_file, key, &data);
 	EXPECT_TRUE(new_encrypt_fd != NULL);
@@ -209,7 +211,7 @@ TEST_F(enc, transform_fd_no_flag)
 TEST_F(enc, transform_fd_enc_flag)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *key = get_key();
+	unsigned char *key = get_key(PASSPHRASE);
 	unsigned char *data;
 	FILE *new_encrypt_fd = transform_fd(in_file, key, &data, 1, 0);
 	EXPECT_TRUE(new_encrypt_fd != NULL);
@@ -264,7 +266,7 @@ TEST_F(enc, transform_fd_compress_flag)
 TEST_F(enc, transform_fd_both_flag)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *key = get_key();
+	unsigned char *key = get_key(PASSPHRASE);
 	unsigned char *data;
 	FILE *new_encrypt_fd = transform_fd(in_file, key, &data, 1, 1);
 	EXPECT_TRUE(new_encrypt_fd != NULL);
@@ -296,7 +298,7 @@ TEST_F(enc, get_decode_meta){
   HCFS_encode_object_meta object_meta;
   unsigned char *session_key = (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
   //unsigned char *iv = (unsigned char *)calloc(IV_SIZE, sizeof(unsigned char));
-  unsigned char *key = get_key();
+  unsigned char *key = get_key(PASSPHRASE);
 
   int ret = get_decode_meta(&object_meta, session_key, key, 1, 1);
   EXPECT_EQ(ret, 0);
@@ -313,4 +315,53 @@ TEST_F(enc, get_decode_meta){
   OPENSSL_free(key);
   OPENSSL_free(session_key);
   OPENSSL_free(back_session_key);
+}
+
+TEST(get_decrypt_configfpTEST, config_path_not_found)
+{
+	unsigned char path[100] = "/path/not/existed";
+	FILE* ret_fp = get_decrypt_configfp(path);
+
+	int ret = (ret_fp) ? 0 : -1;
+
+	EXPECT_EQ(ret, -1);
+}
+
+TEST(get_decrypt_configfpTEST, config_content_error)
+{
+	unsigned char path[100] = "testpatterns/not_encrypted.conf";
+	FILE* ret_fp = get_decrypt_configfp(path);
+
+	int ret = (ret_fp) ? 0 : -1;
+
+	EXPECT_EQ(ret, -1);
+}
+
+TEST(get_decrypt_configfpTEST, getOK)
+{
+	char buf[200], buf2[200];
+	char unenc_path[100] = "testpatterns/not_encrypted.conf";
+	unsigned char enc_path[100] = "testpatterns/encrypted.conf";
+	FILE *unenc_fp = NULL;
+	FILE *enc_fp = NULL;
+
+	enc_fp = get_decrypt_configfp(enc_path);
+	int ret = (enc_fp) ? 0 : -1;
+	EXPECT_EQ(ret, 0);
+
+	unenc_fp = fopen(unenc_path, "r");
+
+	ret = 0;
+	while (fgets(buf, sizeof(buf), unenc_fp) != NULL) {
+		if (fgets(buf2, sizeof(buf2), enc_fp) == NULL ||
+			strcmp(buf, buf2) != 0) {
+			ret = -1;
+			break;
+		}
+	}
+
+	if (fgets(buf2, sizeof(buf2), enc_fp) != NULL)
+		ret = -1;
+
+	EXPECT_EQ(ret, 0);
 }
