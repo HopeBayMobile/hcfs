@@ -6421,7 +6421,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	if (ispin == (char) 255)
 		ispin = local_pin;
 #endif
-
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
