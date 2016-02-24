@@ -10,23 +10,25 @@
 
 void usage()
 {
+
 #ifdef DEBUG_MODE
-	printf("***Usage - hcfsconf <gen|enc|dec> <config_path>***\n");
+	printf("***Usage - hcfsconf <enc|dec> <source_path> <config_path>***\n");
 #else
-	printf("***Usage - hcfsconf <gen> <config_path>***\n");
+	printf("***Usage - hcfsconf <enc> <source_path> <config_path>***\n");
 #endif
 }
 
 int _check_file_existed(char *pathname)
 {
+
 	if (access(pathname, F_OK) == -1)
 		return -1;
 	else
 		return 0;
 }
 
-int _enc_config(unsigned char *output, unsigned char *input,
-		long input_len)
+int __enc_path(unsigned char *output, unsigned char *input,
+	       long input_len)
 {
 
 	int ret;
@@ -53,8 +55,9 @@ int _enc_config(unsigned char *output, unsigned char *input,
 	return 0;
 }
 
-int enc_config(char *config_path)
+int _enc_config(char *source_path, char *out_path)
 {
+
 	unsigned char buf[300];
 	unsigned char data_buf[1024];
 	long data_size = 0;
@@ -62,7 +65,7 @@ int enc_config(char *config_path)
 	FILE *config = NULL;
 	FILE *enc_config = NULL;
 
-	config = fopen(config_path, "r");
+	config = fopen(source_path, "r");
 	if (config == NULL)
 		return -errno;
 
@@ -74,28 +77,33 @@ int enc_config(char *config_path)
 	fclose(config);
 
 	unsigned char enc_data[data_size + IV_SIZE + TAG_SIZE];
-	if (_enc_config(enc_data, data_buf, data_size) != 0)
+	if (__enc_path(enc_data, data_buf, data_size) != 0)
 		return -errno;
 
-	char *tmp_path =
-		(char*)malloc(strlen(config_path) + 5);
-	snprintf(tmp_path, strlen(config_path) + 5, "%s.enc", config_path);
-
-	enc_config = fopen(tmp_path, "w");
-	if (enc_config == NULL) {
-		free(tmp_path);
+	enc_config = fopen(out_path, "w");
+	if (enc_config == NULL)
 		return -errno;
-	}
 
 	fwrite(enc_data, sizeof(unsigned char),
 	       data_size + IV_SIZE + TAG_SIZE, enc_config);
 	fclose(enc_config);
-	free(tmp_path);
 
 	return 0;
 }
 
-int dec_config(char *config_path)
+int enc_config(char *source_path, char *out_path)
+{
+
+	if (_check_file_existed(source_path) == -1)
+		return -ENOENT;
+
+	if (_check_file_existed(out_path) == 0)
+		return -EEXIST;
+
+	return _enc_config(source_path, out_path);
+}
+
+int _dec_config(char *source_path, char *out_path)
 {
 
 	int ret_code = 0;
@@ -107,7 +115,8 @@ int dec_config(char *config_path)
         unsigned char *data_buf = NULL;
         unsigned char *enc_key;
 
-        config = fopen(config_path, "r");
+
+        config = fopen(source_path, "r");
         if (config == NULL)
                 goto error;
 
@@ -135,11 +144,7 @@ int dec_config(char *config_path)
 		goto end;
 	}
 
-	char *tmp_path =
-		(char*)malloc(strlen(config_path) + 5);
-	snprintf(tmp_path, strlen(config_path) + 5, "%s.dec", config_path);
-
-        dec_config = fopen(tmp_path, "w");
+        dec_config = fopen(out_path, "w");
         if (dec_config == NULL)
                 goto error;
         fwrite(data_buf, sizeof(unsigned char), data_size,
@@ -165,58 +170,26 @@ end:
         return ret_code;
 }
 
-int gen_config(char *config_path)
+int dec_config(char *source_path, char *out_path)
 {
-	unsigned char contents[1000] =
-		"METAPATH = /data/hcfs/metastorage\n"
-		"BLOCKPATH = /data/hcfs/blockstorage\n"
-		"CACHE_SOFT_LIMIT = 20474836480\n"
-		"CACHE_HARD_LIMIT = 20548578304\n"
-		"CACHE_DELTA = 1048576\n"
-		"MAX_BLOCK_SIZE = 1048576\n"
-		"CURRENT_BACKEND = NONE\n"
-		"SWIFT_ACCOUNT = \n"
-		"SWIFT_USER = \n"
-		"SWIFT_PASS = \n"
-		"SWIFT_URL = \n"
-		"SWIFT_CONTAINER = \n"
-		"SWIFT_PROTOCOL = http\n"
-		"S3_ACCESS = XXXXX\n"
-		"S3_SECRET = YYYYY\n"
-		"S3_URL = s3.hicloud.net.tw\n"
-		"S3_BUCKET = testgateway\n"
-		"S3_PROTOCOL = https\n"
-		"LOG_LEVEL = 4\n"
-		"LOG_PATH = /data";
 
-	if (_check_file_existed(config_path) == 0)
+	if (_check_file_existed(source_path) == -1)
+		return -ENOENT;
+
+	if (_check_file_existed(out_path) == 0)
 		return -EEXIST;
 
-	long input_len = strlen(contents);
-	long output_len = input_len + IV_SIZE + TAG_SIZE;
-	unsigned char output[output_len];
-	if (_enc_config(output, contents, input_len) != 0)
-		return -EIO;
-
-	FILE *config = fopen(config_path, "w");
-	if (config == NULL)
-		return -errno;
-
-	fwrite(output, sizeof(unsigned char), output_len, config);
-	fclose(config);
-
-	return 0;
+	return _dec_config(source_path, out_path);
 }
 
 typedef struct {
 	const char *name;
-	int (*cmd_fn)(char *config_path);
+	int (*cmd_fn)(char *source_path, char *out_path);
 } CMD_INFO;
 
 CMD_INFO cmds[] = {
-	{"gen", gen_config},
-#ifdef DEBUG_MODE
 	{"enc", enc_config},
+#ifdef DEBUG_MODE
 	{"dec", dec_config},
 #endif
 };
@@ -227,7 +200,7 @@ int main(int argc, char **argv)
 	int ret_code = 0;
 	unsigned int i;
 
-	if (argc != 3) {
+	if (argc != 4) {
 		printf("Error - Invalid args\n");
 		usage();
 		return -EINVAL;
@@ -235,7 +208,7 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
 		if (strcmp(cmds[i].name, argv[1]) == 0) {
-			ret_code = cmds[i].cmd_fn(argv[2]);
+			ret_code = cmds[i].cmd_fn(argv[2], argv[3]);
 			goto done;
 		}
 	}
