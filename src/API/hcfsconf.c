@@ -27,8 +27,8 @@ int _check_file_existed(char *pathname)
 		return 0;
 }
 
-int __enc_path(unsigned char *output, unsigned char *input,
-	       long input_len)
+int __enc_config(unsigned char *output, unsigned char *input,
+		 long input_len)
 {
 
 	int ret;
@@ -67,7 +67,7 @@ int _enc_config(char *source_path, char *out_path)
 
 	config = fopen(source_path, "r");
 	if (config == NULL)
-		return -errno;
+		return errno;
 
 	while (fgets(buf, sizeof(buf), config) != NULL) {
 	        str_len = strlen(buf);
@@ -77,12 +77,12 @@ int _enc_config(char *source_path, char *out_path)
 	fclose(config);
 
 	unsigned char enc_data[data_size + IV_SIZE + TAG_SIZE];
-	if (__enc_path(enc_data, data_buf, data_size) != 0)
-		return -errno;
+	if (__enc_config(enc_data, data_buf, data_size) != 0)
+		return errno;
 
 	enc_config = fopen(out_path, "w");
 	if (enc_config == NULL)
-		return -errno;
+		return errno;
 
 	fwrite(enc_data, sizeof(unsigned char),
 	       data_size + IV_SIZE + TAG_SIZE, enc_config);
@@ -95,10 +95,10 @@ int enc_config(char *source_path, char *out_path)
 {
 
 	if (_check_file_existed(source_path) == -1)
-		return -ENOENT;
+		return ENOENT;
 
 	if (_check_file_existed(out_path) == 0)
-		return -EEXIST;
+		return EEXIST;
 
 	return _enc_config(source_path, out_path);
 }
@@ -140,7 +140,7 @@ int _dec_config(char *source_path, char *out_path)
 
         if (aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
                                  enc_key, iv_buf) != 0) {
-                ret_code = -EIO;
+		ret_code = EIO;
 		goto end;
 	}
 
@@ -153,7 +153,7 @@ int _dec_config(char *source_path, char *out_path)
 	goto end;
 
 error:
-	ret_code = -errno;
+	ret_code = errno;
 
 end:
 	if (config)
@@ -174,10 +174,10 @@ int dec_config(char *source_path, char *out_path)
 {
 
 	if (_check_file_existed(source_path) == -1)
-		return -ENOENT;
+		return ENOENT;
 
 	if (_check_file_existed(out_path) == 0)
-		return -EEXIST;
+		return EEXIST;
 
 	return _dec_config(source_path, out_path);
 }
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
 	if (argc != 4) {
 		printf("Error - Invalid args\n");
 		usage();
-		return -EINVAL;
+		return EINVAL;
 	}
 
 	for (i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
@@ -214,7 +214,7 @@ int main(int argc, char **argv)
 	}
 	printf("Action %s not supported\n", argv[1]);
 	usage();
-	return -EINVAL;
+	return EINVAL;
 
 done:
 	if (ret_code != 0) {
