@@ -79,25 +79,6 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 		sem_post(&(hcfs_system->access_sem));
 	}
 
-	ret = meta_cache_update_file_data(this_inode, filestat,
-			&tempfilemeta, NULL, 0, *body_ptr);
-	if (ret < 0) {
-		write_log(0, "IO error in fallocate. Data may ");
-		write_log(0, "not be consistent\n");
-		errcode = ret;
-		goto errcode_handle;
-	}
-
-	if ((tempfilemeta.local_pin == TRUE) &&
-	    (offset < filestat->st_size)) {
-		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size +=
-			(long long)(offset - filestat->st_size);
-		if (hcfs_system->systemdata.pinned_size < 0)
-			hcfs_system->systemdata.pinned_size = 0;
-		sem_post(&(hcfs_system->access_sem));
-	}
-
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0);
 
@@ -110,21 +91,8 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	filestat->st_mtime = time(NULL);
 
 	return 0;
-errcode_handle:
-	/* If an error occurs, need to revert the changes to pinned size */
-	if ((tempfilemeta.local_pin == TRUE) &&
-	    (offset > filestat->st_size)) {
-		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size -=
-			(long long)(offset - filestat->st_size);
-		if (hcfs_system->systemdata.pinned_size < 0)
-			hcfs_system->systemdata.pinned_size = 0;
-		sem_post(&(hcfs_system->access_sem));
-	}
-
-	return errcode;
-
 }
+
 int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
 		off_t offset, off_t length,
 		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)

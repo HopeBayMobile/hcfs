@@ -45,7 +45,7 @@ CXX = gcc
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = fuseop_unittest 
+TESTS = fuseop_unittest do_fallocate_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
@@ -124,3 +124,20 @@ fuseop_unittest.o : $(UNITTEST_DIR)/fuseop_unittest.cc \
 
 fuseop_unittest : fuseop.o fake_meta_mem_cache.o fake_misc.o fuseop_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@ -lstdc++ -lfuse -lpthread -lsqlite3
+
+# do_fallocate
+
+do_fallocate.o : $(USER_DIR)/do_fallocate.c $(USER_DIR)/do_fallocate.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/do_fallocate.c
+
+do_fallocate_unittest.o : $(UNITTEST_DIR)/do_fallocate_unittest.cc \
+			$(USER_DIR)/do_fallocate.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/do_fallocate_unittest.cc
+
+fake_misc_do_fallocate.o : $(UNITTEST_DIR)/fake_misc_do_fallocate.c
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/fake_misc_do_fallocate.c
+
+do_fallocate_unittest : do_fallocate.o fake_meta_mem_cache.o fake_misc_do_fallocate.o do_fallocate_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@ -lstdc++ -lpthread
+
+
