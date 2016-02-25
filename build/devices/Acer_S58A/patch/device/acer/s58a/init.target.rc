@@ -69,6 +69,10 @@ on fs
     restorecon_recursive /data/data
     restorecon_recursive /data/app
 
+    # Aaron
+    restorecon_recursive /data/data
+    restorecon_recursive /data/app
+
     wait /dev/block/bootdevice/by-name/cache
     mount ext4 /dev/block/bootdevice/by-name/cache /cache nosuid nodev barrier=1
 
