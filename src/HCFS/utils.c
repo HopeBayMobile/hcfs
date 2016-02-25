@@ -43,6 +43,7 @@
 #include "hcfs_cacheops.h"
 #include "monitor.h"
 #include "FS_manager.h"
+#include "enc.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
@@ -279,7 +280,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 
 	memset(config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
-	fptr = fopen(config_path, "r");
+	fptr = get_decrypt_configfp(config_path);
 
 	if (fptr == NULL) {
 		errcode = errno;

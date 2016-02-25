@@ -17,10 +17,10 @@
 #define TRUE 1
 #define FALSE 0
 
-#define CONF_PATH "/etc/hcfs.conf"
+#define CONFIG_PATH "/data/hcfs.conf"
 #define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
-#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfs_api_sock"
+#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock"
 
 /* List of API codes */
 #define TERMINATE 0
