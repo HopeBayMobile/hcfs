@@ -32,7 +32,7 @@ LOCAL_C_INCLUDES = $(BUILD_PATH)/include/jansson
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE     := socket_serv
+LOCAL_MODULE     := hcfsapid
 LOCAL_CFLAGS     := -pie -fPIE $(HCFS_CFLAGS)
 LOCAL_LDFLAGS    := -pie -fPIE
 LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c utils.c hcfs_stat.c hcfs_sys.c enc.c)
