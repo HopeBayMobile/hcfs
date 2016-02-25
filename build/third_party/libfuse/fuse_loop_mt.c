@@ -7,6 +7,7 @@
 
   File modified @ Hope Bay Technologies, Inc. (2016)
   1/15/16: Modified by Jiahong to catch perm error at startup (TO ENHANCE)
+  2/22/16: Modified by Jiahong to use a long sleep for fuse loop
 */
 
 #include "fuse/fuse_lowlevel.h"
@@ -272,8 +273,10 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	pthread_mutex_unlock(&mt.lock);
 	if (!err) {
 		/* sem_wait() is interruptible */
+		/* 2/22/16 it seems that on Android sem_wait may
+		not be interruptible */
 		while (!fuse_session_exited(se))
-			sem_wait(&mt.finish);
+			sleep(3600);  /* Sleep for a long time */
 
 		pthread_mutex_lock(&mt.lock);
 #if 0

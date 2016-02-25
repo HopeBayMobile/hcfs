@@ -66,7 +66,7 @@
 #define GETSYNCSTAT 29
 #define RELOADCONFIG 30
 
-#define DEFAULT_PIN TRUE
+#define DEFAULT_PIN FALSE
 
 #ifdef _ANDROID_ENV_
 #define GID_SDCARD_RW 1015

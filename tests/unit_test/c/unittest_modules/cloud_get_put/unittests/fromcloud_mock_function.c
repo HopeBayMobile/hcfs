@@ -63,7 +63,7 @@ int decode_to_fd(FILE *fptr, unsigned char *key, unsigned char *input, int input
 	return 0;
 }
 
-unsigned char *get_key(){
+unsigned char *get_key(char *keywords){
   return NULL;
 }
 

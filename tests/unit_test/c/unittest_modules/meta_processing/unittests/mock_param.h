@@ -148,4 +148,23 @@ long long CHECK_TOUPLOAD_BLOCKS;
 #define MOCK_UPLOAD_SEQ 1234
 long long CHECK_UPLOAD_SEQ;
 
+/* Used in pinning_worker() */
+char FINISH_PINNING;
+
+enum {
+	INO_PINNING_ENOSPC,
+	INO_PINNING_EIO,
+	INO_PINNING_ENOENT,
+	INO_PINNING_ESHUTDOWN
+};
+
+/* Used in pinning_loop() */
+#define TOTAL_MOCK_INODES 50
+ino_t mock_inodes[TOTAL_MOCK_INODES];
+int mock_inodes_counter;
+
+ino_t verified_inodes[TOTAL_MOCK_INODES];
+int verified_inodes_counter;
+sem_t verified_inodes_sem;
+
 #endif

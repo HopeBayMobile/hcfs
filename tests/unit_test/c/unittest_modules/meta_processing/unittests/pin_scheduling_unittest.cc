@@ -3,6 +3,7 @@ extern "C" {
 #include "fuseop.h"
 #include "global.h"
 #include "super_block.h"
+#include "mock_param.h"
 }
 
 #include <pthread.h>
@@ -21,23 +22,176 @@ protected:
 		sys_super_block = (SUPER_BLOCK_CONTROL *)
 			malloc(sizeof(SUPER_BLOCK_CONTROL));
 		memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
-		init_pin_scheduler();
+			
+		verified_inodes_counter = 0;
+		mock_inodes_counter = 0;
+		memset(mock_inodes, 0, sizeof(ino_t) * TOTAL_MOCK_INODES);
+		memset(verified_inodes, 0, sizeof(ino_t) * TOTAL_MOCK_INODES);
+		sem_init(&verified_inodes_sem, 0, 1);
+		
+	}
+
+	void TearDown()
+	{
+		hcfs_system->system_going_down = TRUE;
+		destroy_pin_scheduler();
+		free(hcfs_system);
+		free(sys_super_block);
+	}
+};
+
+int compare (const void * a, const void * b)
+{
+	  return ( *(ino_t*)a - *(ino_t*)b );
+}
+
+TEST_F(pinning_loopTest, WorkNormally)
+{
+	/* Generate mock data */
+	hcfs_system->sync_paused = FALSE;
+	for (int i = 0; i < TOTAL_MOCK_INODES; i++) {
+		mock_inodes[i] = (i + 1) * 15;
+	}
+	sys_super_block->head.num_pinning_inodes = TOTAL_MOCK_INODES;
+	sys_super_block->head.first_pin_inode = mock_inodes[0];
+	mock_inodes_counter = 1;
+	
+	/* Run */
+	init_pin_scheduler();
+	sleep(5);
+
+	/* Verify */
+	EXPECT_EQ(TOTAL_MOCK_INODES, verified_inodes_counter);
+	qsort(verified_inodes, TOTAL_MOCK_INODES, sizeof(ino_t), compare);
+	EXPECT_EQ(0, memcmp(mock_inodes, verified_inodes,
+			sizeof(ino_t) * TOTAL_MOCK_INODES));
+}
+
+/*
+ * Unittest for pinning_collect
+ */
+class pinning_collectTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+			malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+
+		memset(&pinning_scheduler, 0, sizeof(PINNING_SCHEDULER));
+		sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
+		sem_init(&(pinning_scheduler.pinning_sem), 0,
+				MAX_PINNING_FILE_CONCURRENCY);
+
+		verified_inodes_counter = 0;
+		sem_init(&verified_inodes_sem, 0, 1);
 	}
 
 	void TearDown()
 	{
 		free(hcfs_system);
-		free(sys_super_block);
-		destroy_pin_scheduler();
 	}
 };
 
-TEST_F(pinning_loopTest, WorkNormally)
+void mock_thread_fctnl(void *ptr)
 {
-	hcfs_system->backend_is_online = TRUE;
-	hcfs_system->sync_paused = FALSE;
-	sys_super_block->head.num_pinning_inodes = 1;
-	sys_super_block->head.first_pin_inode = 3;
+	PINNING_INFO *info = (PINNING_INFO *)ptr;
+
+	pinning_scheduler.thread_finish[info->t_idx] = TRUE;
+	return;
+}
+
+TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
+{
+	int idx, val;
+	char zero[MAX_PINNING_FILE_CONCURRENCY];
+
+	/* Create pinning collector */
+	pthread_create(&pinning_scheduler.pinning_collector, NULL,
+			(void *)pinning_collect, NULL);
+
+	/* Create 100 threads */
+	for (int i = 0; i < 100 ; i++) {
+		sem_wait(&pinning_scheduler.pinning_sem);
+		sem_wait(&pinning_scheduler.ctl_op_sem);
+		for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++) {
+			if (pinning_scheduler.thread_active[idx] == FALSE) {
+				break;
+			}
+		}
+		pinning_scheduler.pinning_info[idx].t_idx = idx;
+		pthread_create(&pinning_scheduler.pinning_file_tid[idx], NULL,
+				(void *)&mock_thread_fctnl,
+				(void *)&(pinning_scheduler.pinning_info[idx]));
+		pinning_scheduler.thread_active[idx] = TRUE;
+		pinning_scheduler.total_active_pinning++;
+		sem_post(&pinning_scheduler.ctl_op_sem);
+	}
 
 	hcfs_system->system_going_down = TRUE;
+        pthread_join(pinning_scheduler.pinning_collector, NULL);
+
+	/* Verify */
+	std::cout << "Begin to Verify" << std::endl;
+	EXPECT_EQ(0, pinning_scheduler.total_active_pinning);
+	memset(zero, 0, sizeof(char) * MAX_PINNING_FILE_CONCURRENCY);
+	EXPECT_EQ(0, memcmp(zero, pinning_scheduler.thread_active,
+			sizeof(char) * MAX_PINNING_FILE_CONCURRENCY));
+	sem_getvalue(&pinning_scheduler.pinning_sem, &val);
+	EXPECT_EQ(MAX_PINNING_FILE_CONCURRENCY, val);
+	sem_getvalue(&pinning_scheduler.ctl_op_sem, &val);
+	EXPECT_EQ(1, val);
 }
+/*
+ * End of unittest for pinning_collect
+ */
+
+/*
+ * Unittest for pinning_worker()
+ */
+class pinning_workerTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+			malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+
+		memset(&pinning_scheduler, 0, sizeof(PINNING_SCHEDULER));
+		sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
+
+		FINISH_PINNING = FALSE;
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(pinning_workerTest, FetchBlocks_ENOSPC)
+{
+	PINNING_INFO pinning_info;
+
+	pinning_info.this_inode = INO_PINNING_ENOSPC;
+	pinning_info.t_idx = 0;
+	pinning_worker(&pinning_info);
+
+	EXPECT_EQ(TRUE, pinning_scheduler.deep_sleep);
+	EXPECT_EQ(FALSE, FINISH_PINNING); /* In super_block_finish_pinning */
+}
+
+TEST_F(pinning_workerTest, PinningSuccess)
+{
+	PINNING_INFO pinning_info;
+
+	pinning_info.this_inode = 2394732; /* Arbitrary inode*/
+	pinning_info.t_idx = 0;
+	pinning_worker(&pinning_info);
+
+	EXPECT_EQ(FALSE, pinning_scheduler.deep_sleep);
+	EXPECT_EQ(TRUE, FINISH_PINNING); /* In super_block_finish_pinning */
+}
+/*
+ * End of unittest for pinning_worker()
+ */

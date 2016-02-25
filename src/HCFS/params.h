@@ -100,6 +100,7 @@ typedef struct {
 #define TO_BE_RECLAIMED 3
 #define RECLAIMED 4
 
-#define DEFAULT_CONFIG_PATH "/etc/hcfs.conf"
+#define DEFAULT_CONFIG_PATH "/data/hcfs.conf"
+#define CONFIG_PASSPHRASE "lets encrypt configuration"
 
 #endif  /* GW20_SRC_PARAMS_H_ */

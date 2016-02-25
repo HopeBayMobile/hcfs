@@ -1343,9 +1343,13 @@ int super_block_finish_pinning(ino_t this_inode)
 		ret = write_super_block_entry(this_inode, &this_entry);
 		break;
 	case ST_UNPIN: /* It may be unpinned by others when pinnning */
-	case ST_PIN: /* What happened? */
-		write_log(5, "inode %"PRIu64 "is ST_PIN in %s",
+		write_log(5, "inode %"PRIu64 " is ST_UNPIN in %s",
 				(uint64_t)this_inode, __func__);
+		break;
+	case ST_PIN: /* What happened? */
+		write_log(5, "inode %"PRIu64 " is ST_PIN in %s",
+				(uint64_t)this_inode, __func__);
+		break;
 	case ST_DEL: /* It may be deleted by others */
 		break;
 	}
