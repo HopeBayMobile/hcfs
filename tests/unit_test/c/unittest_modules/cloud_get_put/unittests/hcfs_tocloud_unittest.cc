@@ -16,6 +16,7 @@ extern "C" {
 #include "super_block.h"
 }
 
+extern SYSTEM_CONF_STRUCT *system_config;
 
 class uploadEnvironment : public ::testing::Environment {
  public:
