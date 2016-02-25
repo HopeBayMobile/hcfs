@@ -8,7 +8,7 @@ LFLAGS = -lsqlite3 -ljansson -lcrypto
 
 OBJS_DIR = obj/
 
-socket_serv_OBJS = $(addprefix $(OBJS_DIR), \
+hcfsapid_OBJS = $(addprefix $(OBJS_DIR), \
 		   socket_serv.o pin_ops.o hcfs_stat.o hcfs_sys.o utils.o enc.o)
 
 test_OBJS = $(addprefix $(OBJS_DIR), \
@@ -17,10 +17,10 @@ test_OBJS = $(addprefix $(OBJS_DIR), \
 hcfsconf_OBJS = $(addprefix $(OBJS_DIR), \
 	    hcfsconf.o enc.o)
 
-OBJS := $(socket_serv_OBJS) $(test_OBJS)
+OBJS := $(hcfsapid_OBJS) $(test_OBJS)
 
-socket_serv: $(socket_serv_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(socket_serv_OBJS) -o $@ $(LFLAGS)
+hcfsapid: $(hcfsapid_OBJS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsapid_OBJS) -o $@ $(LFLAGS)
 
 test: $(test_OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(test_OBJS) -o $@ $(LFLAGS)
@@ -35,7 +35,7 @@ doc: HCFS_api.c HCFS_api.h
 	cldoc generate -c -- --basedir . --type html --static --merge docs  --output doc HCFS_api.h
 
 clean:
-	rm -rf $(OBJS_DIR) $(OBJS_DIR) socket_serv test hcfsconf
+	rm -rf $(OBJS_DIR) $(OBJS_DIR) hcfsapid test hcfsconf
 
 # pull in dependency info for *existing* .o files
 -include $(OBJS:.o=.d)
