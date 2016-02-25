@@ -905,6 +905,7 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	long long dirty_cache_delta)
 {
 	sem_wait(&(hcfs_system->access_sem));
+	/* System size includes meta size */
 	hcfs_system->systemdata.system_size +=
 		(system_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.system_size < 0)
@@ -914,6 +915,7 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
 
+	/* Cached size includes meta size */
 	hcfs_system->systemdata.cache_size +=
 		(cache_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.cache_size < 0)
