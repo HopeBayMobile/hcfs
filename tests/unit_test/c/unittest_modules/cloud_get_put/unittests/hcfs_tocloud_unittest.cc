@@ -55,6 +55,8 @@ class uploadEnvironment : public ::testing::Environment {
     }
     system_config = (SYSTEM_CONF_STRUCT *)
 	    malloc(sizeof(SYSTEM_CONF_STRUCT));
+    if (!system_config)
+	printf("Fail to allocate memory\n");
     memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
     METAPATH = (char *) malloc(METAPATHLEN);
