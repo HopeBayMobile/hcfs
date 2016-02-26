@@ -138,9 +138,9 @@
  * is the same as the one reported by sizeof() at compile time.
  */
 
-typedef char
+/*typedef char
   __curl_rule_01__
-    [CurlchkszEQ(long, CURL_SIZEOF_LONG)];
+    [CurlchkszEQ(long, CURL_SIZEOF_LONG)];*/
 
 /*
  * Verify that the size previously defined and expected for
