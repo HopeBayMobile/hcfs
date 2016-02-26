@@ -29,6 +29,9 @@ RUN apt-get update \
 	    syslog-ng-core autotools-dev pkg-config libtool vim bc bash-completion \
 	    && apt-get clean
 
+RUN echo "if [ -f /data/bashrc ]; then source /data/bashrc; fi" >> /root/.bashrc
 
 # Clean up APT when done.
 RUN rm -rf /tmp/* /var/tmp/* /etc/service/sshd/down
+
+VOLUME /data
