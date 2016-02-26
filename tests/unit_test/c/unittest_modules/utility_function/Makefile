@@ -42,6 +42,10 @@ CFAKEFLAGS +=
 CXXFLAGS +=
 # gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CXX = gcc
+GCC_VERSION_GE_50 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
+ifeq "$(GCC_VERSION_GE_49)" "1"
+	CPPFLAGS += -fdiagnostics-color
+endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.

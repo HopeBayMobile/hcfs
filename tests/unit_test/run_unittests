@@ -23,17 +23,12 @@ $repo/utils/setup_dev_env.sh -vm unit_test
 # Unit test
 cd $here
 
-if type -a colormake >/dev/null 2>&1; then
-	make="colormake"
-else
-	make="make"
-fi
 export TERM=xterm-color
 export GTEST_COLOR=yes
 export NOGCOVR=1
 
 make clean
-$make
+make
 make $UNITTEST_MAKE_FLAG test
 
 gcovr -r $repo/src .
