@@ -19,6 +19,8 @@
 
 #include "fake_misc.h"
 
+SYSTEM_CONF_STRUCT *system_config;
+
 int init_api_interface(void)
 {
 	return 0;
@@ -880,21 +882,12 @@ BOOL is_natural_number(char *str)
 {
 	return TRUE;
 }
-int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
-		off_t offset, off_t length,
-		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
+
+MOUNT_T tmpmount;
+
+void* fuse_req_userdata(fuse_req_t req)
 {
-	off_t newlen;
-	off_t oldsize;
-
-	if (mode != 0)
-		return -ENOTSUP;
-	newlen = offset + length;
-	if (newlen <= newstat->st_size)
-		return 0;
-	oldsize = newstat->st_size;
-
-	newstat->st_size = newlen;
-	hcfs_system->systemdata.system_size += (newlen - oldsize);
-	return 0;
+        tmpmount.f_ino = 2;
+        return &tmpmount;
 }
+
