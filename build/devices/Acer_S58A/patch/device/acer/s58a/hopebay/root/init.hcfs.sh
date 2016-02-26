@@ -1,8 +1,6 @@
 #!/system/bin/sh
 
 MOUNTPT=/data
-HCFSSRC=/etc/hcfs.conf
-HCFSCONF=/data/hcfs.conf
 
 init_hcfs() {
     mkdir /data/data
@@ -14,7 +12,6 @@ init_hcfs() {
 
     while [ ! -e ${HCFSCONF} ]; do sleep 0.1; done
 
-    #start hcfs
     /system/bin/hcfs -oallow_other,big_writes &
 
     while [ ! -e /dev/shm/hcfs_reporter ]; do sleep 0.1; done
@@ -31,8 +28,6 @@ init_hcfs() {
     
     chown system:system /data/app
     chmod 771 /data/app
-    
-    #start hcfs_api
 }
 
 ################################################
@@ -41,6 +36,6 @@ init_hcfs() {
 #
 ################################################
 
-[ -n "`grep ${MOUNTPT} /proc/mounts | grep ext4`" ] && init_hcfs
+[ -n "`grep ${MOUNTPT} /proc/mounts`" ] && init_hcfs
 
 touch /tmp/hcfs_ready
