@@ -35,7 +35,7 @@ function parse_options()
 		opt="$1";
 		shift; #expose next argument
 		case $opt in
-		android-lib|ci-test|unittest)
+		lib|ci-test|unittest)
 			TARGET="$opt";;
 		"-d")
 			export SET_NDK_BUILD="$1";
@@ -62,7 +62,7 @@ ci-test)
 	export UNITTEST_MAKE_FLAG=-k
 	$repo/containers/hcfs-test-slave/ci-test.sh
 	;;
-android-lib)
+lib)
 	# load NDK_BUILD
 	if [ -f build/.ndk_build ]; then
 		source $repo/build/.ndk_build;

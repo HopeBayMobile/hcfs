@@ -34,8 +34,8 @@ endef
 $(TARGETS): NDK_ARG += DEVICE=$*
 $(TARGETS): NDK_ARG += NDK_APPLICATION_MK=Application.mk
 $(TARGETS): NDK_ARG += TARGET_PLATFORM=android-21
-$(TARGETS): NDK_ARG += NDK_LIBS_OUT=$@
-$(TARGETS): NDK_ARG += NDK_OUT=$(@:out/%=obj/%)
+$(TARGETS): NDK_ARG += NDK_LIBS_OUT=$(NDK_PROJECT_PATH)/$@
+$(TARGETS): NDK_ARG += NDK_OUT=$(NDK_PROJECT_PATH)/$(@:out/%=obj/%)
 
 # hcfs Flags
 
