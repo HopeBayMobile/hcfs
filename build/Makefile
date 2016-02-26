@@ -42,7 +42,7 @@ $(hcfs_gdb): NDK_ARG += HCFS_CFLAGS="-ggdb -O0"
 $(hcfs_gdb): NDK_ARG += HCFS_LDFLAGS="-ggdb -O0"
 
 # Device Flags
-arch_arm64_lib_path := $(dir $(shell /usr/bin/which ndk-build))platforms/android-21/arch-arm64/usr/lib
+arch_arm64_lib_path := $(dir $(shell PATH=$(PATH) /usr/bin/which ndk-build))platforms/android-21/arch-arm64/usr/lib
 $(acer-s58a): NDK_ARG += OPENSSL_IS_BORINGSSL=1
 $(acer-s58a): $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
