@@ -38,7 +38,7 @@ $(TARGETS): NDK_ARG += NDK_OUT=$(NDK_PROJECT_PATH)/$(@:out/%=obj/%)
 
 # hcfs-gdb Flags
 $(hcfs_gdb): NDK_ARG += NDK_DEBUG=1
-$(hcfs_gdb): NDK_ARG += HCFS_CFLAGS="-ggdb -O0"
+$(hcfs_gdb): NDK_ARG += HCFS_CFLAGS="-ggdb -O0 -DDEBUG_ON"
 $(hcfs_gdb): NDK_ARG += HCFS_LDFLAGS="-ggdb -O0"
 
 # Device Flags
