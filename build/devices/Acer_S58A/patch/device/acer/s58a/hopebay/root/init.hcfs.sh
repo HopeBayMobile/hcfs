@@ -41,6 +41,6 @@ init_hcfs() {
 #
 ################################################
 
-[ -n "`grep ${MOUNTPT} /proc/mounts`" ] && init_hcfs
+[ -n "`grep ${MOUNTPT} /proc/mounts | grep ext4`" ] && init_hcfs
 
 touch /tmp/hcfs_ready
