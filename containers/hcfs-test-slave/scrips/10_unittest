@@ -16,7 +16,7 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-sudo git clean -dXf
+sudo git clean -dxf
 pwd
 whoami
 ls -la

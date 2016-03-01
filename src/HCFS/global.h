@@ -30,8 +30,9 @@
 #define X64 1
 #define ARM_32BIT 2
 #define ANDROID_32BIT 3
+#define ANDROID_64BIT 4
 
-#define ARCH_CODE ANDROID_32BIT
+#define ARCH_CODE ANDROID_64BIT
 
 /* List of API codes */
 #define TERMINATE 0

@@ -76,7 +76,8 @@ hcfs_android_log
 /build/.ndk_build
 /build/.init_ccache
 /build/obj
-/build/libs
 /build/out
-!/build/prebuilt/*/*.so
-!/build/prebuilt/*/*.a
+/build/*/obj
+/build/*/out
+!/build/prebuilt/**/*.so
+!/build/prebuilt/**/*.a

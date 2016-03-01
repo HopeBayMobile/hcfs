@@ -39,7 +39,6 @@ function install_pkg (){
 # Main source
 # Enable error trace
 trap 'script_error_report "${BASH_SOURCE[0]}" ${LINENO}' ERR
-set -e
-
+set -e -o errtrace
 # Enable debug log only if verbose on
 if ${CI_VERBOSE:-false}; then set -x; else set +x; fi
