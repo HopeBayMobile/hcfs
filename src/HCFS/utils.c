@@ -904,6 +904,8 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	long long cache_size_delta, long long cache_blocks_delta,
 	long long dirty_cache_delta)
 {
+	int ret;
+
 	sem_wait(&(hcfs_system->access_sem));
 	/* System size includes meta size */
 	hcfs_system->systemdata.system_size +=
@@ -929,10 +931,14 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
 
-	sync_hcfs_system_data(FALSE);
+	ret = 0;
+	ret = sync_hcfs_system_data(FALSE);
+	if (ret < 0)
+		write_log(0, "Error: Fail to sync hcfs system data. Code %d\n",
+				-ret);
 	sem_post(&(hcfs_system->access_sem));
 
-	return 0;
+	return ret;
 }
 
 int set_block_dirty_status(char *path, FILE *fptr, char status)

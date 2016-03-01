@@ -1026,9 +1026,21 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 	SUPER_BLOCK_ENTRY tempentry;
 	int ret, errcode;
 	ssize_t retsize;
+	long long now_meta_size, delta_meta_size;
 
-	if (this_entry->status == which_ll)
+	if (this_entry->status == which_ll) {
+		/* Update dirty meta if needs (from DIRTY to DIRTY) */
+		if (which_ll == IS_DIRTY) {
+			get_meta_size(thisinode, &now_meta_size);
+			if (now_meta_size == 0)
+				return 0;
+			delta_meta_size = now_meta_size -
+					this_entry->dirty_meta_size;
+			this_entry->dirty_meta_size = now_meta_size;
+			change_system_meta(0, 0, 0, 0, delta_meta_size);
+		}
 		return 0;
+	}
 	if (this_entry->status != NO_LL) {
 		ret = ll_dequeue(thisinode, this_entry);
 		if (ret < 0)
@@ -1088,6 +1100,12 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				write_log(0, "IO error in superblock.");
 				return -EIO;
 			}
+		}
+		/* Update dirty meta size (from X to DIRTY) */
+		get_meta_size(thisinode, &now_meta_size);
+		if (now_meta_size) {
+			this_entry->dirty_meta_size = now_meta_size;
+			change_system_meta(0, 0, 0, 0, now_meta_size);
 		}
 		break;
 	case TO_BE_DELETED:
@@ -1220,7 +1238,10 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 
 	switch (old_which_ll) {
 	case IS_DIRTY:
+		/* Update dirty meta size */
 		sys_super_block->head.num_dirty--;
+		change_system_meta(0, 0, 0, 0, -(this_entry->dirty_meta_size));
+		this_entry->dirty_meta_size = 0;
 		break;
 	case TO_BE_DELETED:
 		sys_super_block->head.num_to_be_deleted--;
