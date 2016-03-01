@@ -322,7 +322,7 @@
 /data/extra(/.*)?           u:object_r:extra_data_file:s0
 
 #############################
-# Hopebay Cloud Filesystem
+# hcfsd
 /system/bin/hcfs            u:object_r:hcfsd_exec:s0
 /system/bin/HCFSvol         u:object_r:hcfsd_exec:s0
 /etc/hcfs.conf              u:object_r:hcfs_data_file:s0
@@ -334,3 +334,8 @@
 /mnt/runtime/write/emulated(/.*)?    u:object_r:fuse:s0
 /mnt/runtime/read/emulated(/.*)?     u:object_r:fuse:s0
 /storage/emulated(/.*)?              u:object_r:fuse:s0
+
+#############################
+# hcfsapid
+/system/bin/hcfsapid     u:object_r:hcfsapid_exec:s0
+/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock u:object_r:hcfs_socket:s0

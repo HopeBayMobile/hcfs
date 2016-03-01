@@ -10,8 +10,8 @@ type terafonn_data_file, file_type, data_file_type;
 init_daemon_domain(hcfsd)
 
 # Allow hcfsd to have permissions on /data/hcfs_android_log and /data/testfile
-allow hcfsd system_data_file:dir { write read remove_name add_name };
-allow hcfsd system_data_file:file { write setattr create unlink open append };
+allow hcfsd system_data_file:dir { write read create remove_name add_name };
+allow hcfsd system_data_file:file { write setattr create unlink open append lock };
 
 # Allow hcfsd to have permissions on /data/data
 allow hcfsd system_data_file:dir { open mounton };
