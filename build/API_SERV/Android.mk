@@ -2,6 +2,7 @@ LOCAL_PATH := $(dir $(call this-makefile))
 BUILD_PATH := $(abspath $(LOCAL_PATH)/..)
 LIBS_PATH := $(BUILD_PATH)/prebuilt/$(DEVICE)
 
+
 ifeq "$(INCLUDE_CRYPTO)" ""
   include $(CLEAR_VARS)
   LOCAL_MODULE    := libcrypto
@@ -61,3 +62,5 @@ LOCAL_SRC_FILES  := $(addprefix ../../src/API/, test.c HCFS_api.c utils.c)
 LOCAL_SHARED_LIBRARIES = libjansson
 LOCAL_C_INCLUDES = $(BUILD_PATH)/include/jansson
 include $(BUILD_EXECUTABLE)
+
+include $(BUILD_PATH)/third_party/Android.mk

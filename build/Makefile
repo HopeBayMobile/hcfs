@@ -1,20 +1,23 @@
 SHELL := /bin/bash
 all :
+build_dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 -include ccache.mk
 -include ndk-build.mk
 -include Application.mk
-$(info $(shell git submodule update --init --recursive))
 
 export NDK_PROJECT_PATH := $(abspath .)
 
 TARGETS          += acer-s58a
 #TARGETS          += acer-z630
 
-all : out $(TARGETS)
-	@cd out; find -mindepth 2 -type f -exec md5sum {} \; > md5sum.md5
+all : submodule out $(TARGETS)
+	cd out; find -mindepth 2 -type f -exec md5sum {} \; > md5sum.md5
+
+submodule :
+	@git submodule update --init --recursive
 
 clean :
-	rm -rf libs obj out
+	rm -rf obj out */obj */out
 
 define TARGET_RULE
 $(1): out/$(1)-hcfs
@@ -47,35 +50,34 @@ $(acer-s58a): NDK_ARG += OPENSSL_IS_BORINGSSL=1
 $(acer-s58a): $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
 $(arch_arm64_lib_path)/.copy_s58a_system_libs:
-	rsync -a prebuilt/acer-s58a/system/*.so $(arch_arm64_lib_path)/
+	rsync -a $(build_dir)/prebuilt/acer-s58a/system/*.so $(arch_arm64_lib_path)/
 	touch $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
 _nr_cpu := $(shell cat /proc/cpuinfo | grep processor | wc -l)
 PARALLEL_JOBS := -j$(shell expr $(_nr_cpu) + $(_nr_cpu))
 
-define runprepareout
+define prepare_out
 	@mkdir -p $@/system/{bin,lib64}
-	mv -f $@/$(APP_ABI)/*.so $@/system/lib64
-	cd $@/system/lib64; rm -f $(shell \ls $(NDK_PROJECT_PATH)/prebuilt/acer-s58a/system/)
+	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -0r mv -t $@/system/lib64
+	@cd $@/system/lib64/; for i in $$(\ls $(build_dir)/prebuilt/acer-s58a/system/); \
+		do if [ -f $$i ]; then rm -f $$i; fi done
 	@mv -f $@/$(APP_ABI)/* $@/system/bin
-	@cp -r internal_testing_resource/* $@/
+	@cp -r $(build_dir)/internal_testing_resource/* $@/
 endef
 
 out/%-hcfs: force
 	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
-	$(runprepareout)
+	$(prepare_out)
 	@rm -rf $@/gdb.* $@/$(APP_ABI)
 
 out/%-hcfs-gdb: force
 	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
-	$(runprepareout)
+	$(prepare_out)
 	@cp $@/system/*/* $@/$(APP_ABI)
-	@rsync -a ../src/{API,CLI_utils,HCFS} $@/src/
-	@cp -r include $@/
-
-# (cd out/acer-s58a-hcfs/system/lib64/; rm -f `\ls ~/hcfs/build/prebuilt/acer-s58a/system/`)
+	@rsync -a $(build_dir)/../src/{API,CLI_utils,HCFS} $@/src/
+	@cp -r $(build_dir)/include $@/
 
 out:
-	mkdir out
+	@mkdir out
 
-.PHONY: clean force copy_s58a_system_libs
+.PHONY: clean force copy_s58a_system_libs submodule
