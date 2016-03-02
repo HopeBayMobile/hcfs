@@ -44,8 +44,6 @@ DOCKER_IMAGE=docker:5000/s58a-buildbox:0225-cts-userdebug-prebuilt
 BRANCH_OUT_DIR=${BRANCH_OUT_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/android-dev/2.0.3.ci.test}
 JOB_NAME=${JOB_NAME:-HCFS-s58a-image}
 
-# 
-
 #let printf handle the printing
 function _hashes() { printf %0$((${1}))d\\n | tr 0 \# ; }
 
@@ -114,7 +112,7 @@ function build_system() {
 function publish_image() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	mkdir -p ${BRANCH_OUT_DIR}/${JOB_NAME}
-	scp root@172.17.0.2:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${BRANCH_OUT_DIR}/${JOB_NAME}
+	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${BRANCH_OUT_DIR}/${JOB_NAME}
 }
 function publish_resource() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
