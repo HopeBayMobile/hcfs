@@ -35,7 +35,7 @@ echo ========================================
 echo "Environment variables (with defaults):"
 $TRACE
 # Input
-APK_NAME=terafonn_1.0.0022
+APK_NAME=terafonn_1.0.0023
 LIB_DIR=${LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/device/s58a_ci/2.0.3.0261/HCFS-android-binary}
 APK_DIR=/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APK_NAME
 DOCKER_IMAGE=docker:5000/s58a-buildbox:0225-cts-userdebug-prebuilt
