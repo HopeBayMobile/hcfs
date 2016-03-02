@@ -229,9 +229,9 @@ PRODUCT_COPY_FILES += \
     $(MY_LOCAL_PATH)/hopebay/bin/hcfsapid:system/bin/hcfsapid \
     $(MY_LOCAL_PATH)/hopebay/bin/hcfsconf:system/bin/hcfsconf \
     $(MY_LOCAL_PATH)/hopebay/etc/hcfs.conf:system/etc/hcfs.conf \
-    $(MY_LOCAL_PATH)/hopebay/lib/libfuse.so:system/lib/libfuse.so \
-    $(MY_LOCAL_PATH)/hopebay/lib/liblz4.so:system/lib/liblz4.so \
-    $(MY_LOCAL_PATH)/hopebay/lib/libHCFS_api.so:system/lib/libHCFS_api.so \
-    $(MY_LOCAL_PATH)/hopebay/lib/libterafonnapi.so:system/lib/libterafonnapi.so \
-    $(MY_LOCAL_PATH)/hopebay/lib/libHCFS_api.so:system/lib/libHCFS_api.so \
+    $(MY_LOCAL_PATH)/hopebay/lib64/libfuse.so:system/lib64/libfuse.so \
+    $(MY_LOCAL_PATH)/hopebay/lib64/liblz4.so:system/lib64/liblz4.so \
+    $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
+    $(MY_LOCAL_PATH)/hopebay/lib64/libterafonnapi.so:system/lib64/libterafonnapi.so \
+    $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
     $(MY_LOCAL_PATH)/hopebay/root/init.hcfs.sh:root/init.hcfs.sh 

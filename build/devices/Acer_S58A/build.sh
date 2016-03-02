@@ -35,8 +35,8 @@ echo ========================================
 echo "Environment variables (with defaults):"
 $TRACE
 # Input
-APK_NAME=terafonn_1.0.0017
-LIB_DIR=${LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/ci/arm64-lib/2.0.3.0257/HCFS-android-binary}
+APK_NAME=terafonn_1.0.0022
+LIB_DIR=${LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/device/s58a_ci/2.0.3.0261/HCFS-android-binary}
 APK_DIR=/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APK_NAME
 DOCKER_IMAGE=docker:5000/s58a-buildbox:0225-cts-userdebug-prebuilt
 
@@ -104,11 +104,7 @@ function copy_apk_to_source_tree() {
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		$APK_DIR/${APK_NAME}.apk root@$DOCKER_IP:/data/device/acer/common/apps/HopebayHCFSmgmt/
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
-		$APK_DIR/libterafonnapi.so root@$DOCKER_IP:/data/device/acer/s58a/hopebay/lib64/
-}
-function publish_apk() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	\cp -r $APK_DIR ${BRANCH_OUT_DIR}/
+		$APK_DIR/arm64-v8a/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/lib64/
 }
 function build_system() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -118,14 +114,15 @@ function build_system() {
 function publish_image() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	mkdir -p ${BRANCH_OUT_DIR}/${JOB_NAME}
-	pushd $ZFS_PATH/root/acer_s58a/out/target/product/s58a/
-	zip ${BRANCH_OUT_DIR}/${JOB_NAME}/images.zip *.img android-info.txt
-	\cp -v boot.img system.img userdata.img ${BRANCH_OUT_DIR}/${JOB_NAME}
-	popd
+	scp -v root@172.17.0.2:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${BRANCH_OUT_DIR}/${JOB_NAME}
 }
 function publish_resource() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	\cp -fv $here/resource/* ${BRANCH_OUT_DIR}/${JOB_NAME}
+}
+function publish_apk() {
+	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	\cp -r $APK_DIR ${BRANCH_OUT_DIR}/
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -139,7 +136,8 @@ function unmount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	umount /mnt/nas
 }
-trap stop_builder EXIT
+trap stop_builder EXIT # Cleanup docker container
+
 start_builder
 mount_nas
 setup_ssh_key
@@ -148,7 +146,6 @@ copy_hcfs_to_source_tree
 copy_apk_to_source_tree
 build_system
 
-#publish_image
-#publish_resource
-#publish_apk
-# unmount_nas keep nas mountpoint on ci server
+publish_image
+publish_resource
+publish_apk
