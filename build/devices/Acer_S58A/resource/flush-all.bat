@@ -20,7 +20,7 @@ adb kill-server
 adb wait-for-device
 adb root
 adb wait-for-device
-adb shell "set -- `ps | grep hcfs`; kill -9 $2"
+:: adb shell "set -- `ps | grep hcfs`; kill -9 $2"
 adb reboot bootloader
 fastboot oem unlock-go
 fastboot flash boot boot.img
