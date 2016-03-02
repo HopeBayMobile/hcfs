@@ -5,7 +5,7 @@ build_dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 -include ndk-build.mk
 -include Application.mk
 
-export NDK_PROJECT_PATH := $(abspath .)
+NDK_PROJECT_PATH := $(abspath .)
 
 TARGETS          += acer-s58a
 #TARGETS          += acer-z630
@@ -33,6 +33,7 @@ $(foreach t,$(TARGETS),$(eval $(call TARGET_RULE,$(t))))
 $(TARGETS): NDK_ARG += DEVICE=$*
 $(TARGETS): NDK_ARG += NDK_APPLICATION_MK=Application.mk
 $(TARGETS): NDK_ARG += TARGET_PLATFORM=android-21
+$(TARGETS): NDK_ARG += NDK_PROJECT_PATH=$(NDK_PROJECT_PATH)
 $(TARGETS): NDK_ARG += NDK_LIBS_OUT=$(NDK_PROJECT_PATH)/$@
 $(TARGETS): NDK_ARG += NDK_OUT=$(NDK_PROJECT_PATH)/$(@:out/%=obj/%)
 

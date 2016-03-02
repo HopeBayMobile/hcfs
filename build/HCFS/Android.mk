@@ -30,6 +30,15 @@ ifeq "$(INCLUDE_CRYPTO)" ""
 endif
 export INCLUDE_CRYPTO := 1
 
+include $(CLEAR_VARS)
+LOCAL_MODULE := liblz4
+LOCAL_C_INCLUDES := lz4/lz4.c lz4/lz4frame.c lz4/lz4hc.c lz4/xxhash.c programs/lz4io.c
+LOCAL_SRC_FILES := $(LOCAL_PATH)/lz4
+LOCAL_MODULE_TAGS := optional
+LOCAL_CFLAGS += -pie -fPIE
+LOCAL_LDFLAGS += -pie -fPIE
+include $(BUILD_STATIC_LIBRARY)
+
 ifeq "$(INCLUDE_SQLITE)" ""
   include $(CLEAR_VARS)
   LOCAL_MODULE    := libsqlite
