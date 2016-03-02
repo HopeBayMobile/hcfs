@@ -283,7 +283,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
-	if (S_ISREG(this_stat->st_mode)) {
+	if (S_ISFILE(this_stat->st_mode)) {
 		write_log(10, "Debug:inode %"PRIu64" begin to inherit xattrs\n",
 				(uint64_t)self_inode);
 		ret_val = inherit_xattr(parent_inode, self_inode, body_ptr);
