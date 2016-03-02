@@ -114,7 +114,7 @@ function build_system() {
 function publish_image() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	mkdir -p ${BRANCH_OUT_DIR}/${JOB_NAME}
-	scp -v root@172.17.0.2:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${BRANCH_OUT_DIR}/${JOB_NAME}
+	scp root@172.17.0.2:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${BRANCH_OUT_DIR}/${JOB_NAME}
 }
 function publish_resource() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
