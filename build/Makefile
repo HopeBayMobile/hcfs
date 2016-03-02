@@ -1,9 +1,9 @@
 SHELL := /bin/bash
 all :
 build_dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
--include ccache.mk
--include ndk-build.mk
--include Application.mk
+include $(build_dir)/ccache.mk
+include $(build_dir)/ndk-build.mk
+include $(build_dir)/Application.mk
 
 NDK_PROJECT_PATH := $(abspath .)
 
@@ -46,7 +46,7 @@ $(hcfs_gdb): NDK_ARG += HCFS_CFLAGS="-ggdb -O0 -DDEBUG_ON"
 $(hcfs_gdb): NDK_ARG += HCFS_LDFLAGS="-ggdb -O0"
 
 # Device Flags
-arch_arm64_lib_path := $(dir $(shell PATH=$(PATH) /usr/bin/which ndk-build))platforms/android-21/arch-arm64/usr/lib
+arch_arm64_lib_path := $(dir $(NDK_BUILD))/platforms/android-21/arch-arm64/usr/lib
 $(acer-s58a): NDK_ARG += OPENSSL_IS_BORINGSSL=1
 $(acer-s58a): $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
