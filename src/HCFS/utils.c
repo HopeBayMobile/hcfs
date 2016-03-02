@@ -931,6 +931,11 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
 
+	/* Pinned size includes meta size because meta is never paged out. */
+	hcfs_system->systemdata.pinned_size += meta_size_delta;
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+
 	ret = 0;
 	ret = sync_hcfs_system_data(FALSE);
 	if (ret < 0)
@@ -939,6 +944,22 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	sem_post(&(hcfs_system->access_sem));
 
 	return ret;
+}
+
+int change_pin_size(long long delta_pin_size)
+{
+	sem_wait(&(hcfs_system->access_sem));
+	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
+			MAX_PINNED_LIMIT) {
+		sem_post(&(hcfs_system->access_sem));
+		return -ENOSPC;
+	}
+
+	hcfs_system->systemdata.pinned_size += delta_pin_size;
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+	sem_post(&(hcfs_system->access_sem));
+	return 0;
 }
 
 int set_block_dirty_status(char *path, FILE *fptr, char status)

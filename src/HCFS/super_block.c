@@ -1026,7 +1026,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 	SUPER_BLOCK_ENTRY tempentry;
 	int ret, errcode;
 	ssize_t retsize;
-	long long now_meta_size, delta_meta_size;
+	long long now_meta_size, dirty_delta_meta_size;
 
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */
@@ -1034,10 +1034,10 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			get_meta_size(thisinode, &now_meta_size);
 			if (now_meta_size == 0)
 				return 0;
-			delta_meta_size = now_meta_size -
+			dirty_delta_meta_size = now_meta_size -
 					this_entry->dirty_meta_size;
 			this_entry->dirty_meta_size = now_meta_size;
-			change_system_meta(0, 0, 0, 0, delta_meta_size);
+			change_system_meta(0, 0, 0, 0, dirty_delta_meta_size);
 		}
 		return 0;
 	}

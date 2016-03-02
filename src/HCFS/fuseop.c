@@ -963,6 +963,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	/* Reject if no more pinned size */
+	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+
 	parent_inode = real_ino(req, parent);
 
         write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
@@ -1125,6 +1131,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	/* Reject if no more pinned size */
+	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		fuse_reply_err(req, ENOSPC);
 		return;
 	}
 
@@ -5407,6 +5419,12 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 #endif
 
+	/* Reject if no more pinned size */
+	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+
 	parent_inode = real_ino(req, parent);
 
 	/* Reject if name too long */
@@ -5699,6 +5717,12 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (size <= 0) {
 		write_log(5, "Cannot set key without value.\n");
 		fuse_reply_err(req, EINVAL);
+		return;
+	}
+
+	/* Reject if no more pinned size */
+	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		fuse_reply_err(req, ENOSPC);
 		return;
 	}
 
@@ -6235,6 +6259,12 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 #endif
 
+	/* Reject if no more pinned size */
+	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+
 	parent_inode = real_ino(req, newparent);
 	link_inode = real_ino(req, ino);
 
@@ -6395,6 +6425,12 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	/* Reject if no more pinned size */
+	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		fuse_reply_err(req, ENOSPC);
 		return;
 	}
 
