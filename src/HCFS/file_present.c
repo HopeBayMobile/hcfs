@@ -868,7 +868,11 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return ret_code;
 
 	/* Get metadata by case */
+#ifdef _ANDROID_ENV_
+	if (S_ISFILE(stat_data.st_mode)) {
+#else
 	if (S_ISREG(stat_data.st_mode)) {
+#endif
 		ret_code = meta_cache_lookup_file_data(this_inode, NULL,
 			&filemeta, NULL, 0, meta_cache_entry);
 		if (ret_code < 0)
@@ -886,7 +890,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = symlinkmeta.next_xattr_page;
-	} else { /* fifo, socket... */
+	} else { /* fifo, socket is not enabled in non-android env */
 		return -EINVAL;
 	}
 
