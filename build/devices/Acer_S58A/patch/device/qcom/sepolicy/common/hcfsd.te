@@ -7,7 +7,9 @@ type terafonn_data_file, file_type, data_file_type;
 #type qti_init_shell, domain;
 
 # Domain traistion from init to hcfsd
-init_daemon_domain(hcfsd)
+#init_daemon_domain(hcfsd)
+domain_auto_trans(qti_init_shell, hcfsd_exec, hcfsd)
+tmpfs_domain(hcfsd)
 
 # Allow hcfsd to have permissions on /data/hcfs_android_log and /data/testfile
 allow hcfsd system_data_file:dir { write read create remove_name add_name };
@@ -44,6 +46,9 @@ allow hcfsd self:capability { sys_admin sys_resource dac_override };
 #allow hcfsd system_data_file:dir { write read remove_name create open add_name mounton };
 #allow hcfsd system_data_file:file { write setattr lock create unlink open append rename };
 allow hcfsd apk_data_file:dir { read open mounton };
+allow hcfsd qti_init_shell:fd use;
+allow hcfsd shell_data_file:dir { write remove_name search add_name };
+allow hcfsd shell_data_file:file { write getattr read create unlink open };
 
 # comm="hcfs" name="/" dev="fuse" scontext=u:r:hcfsd:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
 allow hcfsd labeledfs:filesystem mount;
@@ -105,7 +110,7 @@ allow hcfsd mediaserver:file { read open };
 
 #============= qti_init_shell ==============
 # Allow qti_init_shell to have permissions on /dev/shm/hcfs_reporter 
-allow qti_init_shell hcfs_socket:sock_file write;
+allow qti_init_shell hcfs_socket:sock_file { write getattr };
 allow qti_init_shell hcfsd:unix_stream_socket connectto;
 
 # Allow qti_init_shell to have permissions on /system/bin/HCFSvol 
@@ -155,6 +160,7 @@ r_dir_file(gatekeeperd, firmware_file)
 #============= vold ==============
 # comm="vold" name="/" dev="fuse" scontext=u:r:vold:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir 
 allow vold unlabeled:dir write;
+#allow vold default_prop:property_service set;
 
 #============= untrusted_app ==============
 # comm="android.vending" path="/storage/emulated" dev="fuse" scontext=u:r:untrusted_app:s0:c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir
@@ -171,6 +177,7 @@ allow platform_app unlabeled:file { read write unlink open setattr };
 #============= init ==============
 #allow init socket_device:sock_file create;
 #allow init system_file:file execute_no_trans;
+allow init boot_block_device:blk_file setattr;
 
 #============= shell ==============
 #comm="sh" path="/dev/ttyHSL0" dev="tmpfs" ino=11974 scontext=u:r:shell:s0 tcontext=u:object_r:device:s0 tclass=chr_file

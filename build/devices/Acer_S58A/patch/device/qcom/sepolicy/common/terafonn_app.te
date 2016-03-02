@@ -1,0 +1,7 @@
+type terafonn_app, domain;
+app_domain(terafonn_app)
+
+# Allow connection and send from terafonn_app domain via socket to other domain
+allow terafonn_app hcfs_socket:sock_file write;
+allow terafonn_app hcfs_socket:unix_stream_socket connectto;
+#allow terafonn_app terafonn_data_file:unix_dgram_socket sendto;

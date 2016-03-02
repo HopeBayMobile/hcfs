@@ -325,7 +325,9 @@
 # hcfsd
 /system/bin/hcfs            u:object_r:hcfsd_exec:s0
 /system/bin/HCFSvol         u:object_r:hcfsd_exec:s0
+/system/bin/hcfsconf        u:object_r:hcfsd_exec:s0
 /etc/hcfs.conf              u:object_r:hcfs_data_file:s0
+/data/hcfs.conf             u:object_r:hcfs_data_file:s0
 /data/hcfs_android_log      u:object_r:hcfs_data_file:s0
 /data/testfile              u:object_r:hcfs_data_file:s0
 /data/hcfs(/.*)?            u:object_r:hcfs_data_file:s0

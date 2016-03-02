@@ -7,7 +7,7 @@ init_daemon_domain(hcfsapid)
 # Allow permission to create hcfsapid_socket file in com.hopebaytech.hcfsmgmt folder
 allow hcfsapid terafonn_data_file:dir rw_dir_perms;
 allow hcfsapid terafonn_data_file:sock_file create_file_perms;
-file_type_auto_trans(hcfsapid, terafonn_data_file, hcfs_socket)
+#file_type_auto_trans(hcfsapid, terafonn_data_file, hcfs_socket)
 file_type_auto_trans(hcfsapid, app_data_file, hcfs_socket)
 
 # Allow connection from hcfsapid domain via socket to terafonn_app domain
@@ -33,3 +33,5 @@ allow hcfsapid terafonn_data_file:file rw_file_perms;
 allow hcfsapid device:dir rw_dir_perms;
 allow hcfsapid hcfs_socket:sock_file rw_file_perms;
 
+# For socket file (should change to terafonn_data_file?)
+allow hcfsapid app_data_file:dir { search add_name };
