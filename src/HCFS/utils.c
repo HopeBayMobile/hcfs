@@ -962,6 +962,48 @@ int change_pin_size(long long delta_pin_size)
 	return 0;
 }
 
+int update_sb_size()
+{
+	long long old_size, new_size;
+	struct stat sbstat;
+	int ret, ret_code;
+
+	sem_wait(&(hcfs_system->access_sem));
+	old_size = hcfs_system->systemdata.super_block_size;
+	ret = stat(SUPERBLOCK, &sbstat);
+	if (ret < 0) {
+		sem_post(&(hcfs_system->access_sem));
+		ret_code = errno;
+		write_log(0, "Error on get stat of super block." 
+				" Code %d\n", ret_code);
+		return -ret_code;
+	}
+
+	new_size = sbstat.st_size;
+	if (new_size == old_size) {
+		sem_post(&(hcfs_system->access_sem));
+		return 0;
+	}
+
+	hcfs_system->systemdata.system_size += (new_size - old_size);
+	if (hcfs_system->systemdata.system_meta_size < 0)
+		hcfs_system->systemdata.system_meta_size = 0;
+
+	hcfs_system->systemdata.cache_size += (new_size - old_size);
+	if (hcfs_system->systemdata.cache_size < 0)
+		hcfs_system->systemdata.cache_size = 0;
+
+	hcfs_system->systemdata.pinned_size += (new_size - old_size);
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+
+	hcfs_system->systemdata.super_block_size = new_size;
+	sem_post(&(hcfs_system->access_sem));
+	write_log(10, "Debug: now sb size is %lld\n", new_size);
+
+	return 0;
+}
+
 int set_block_dirty_status(char *path, FILE *fptr, char status)
 {
 	int ret, errcode;

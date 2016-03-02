@@ -219,6 +219,14 @@ int super_block_init(void)
 				"Code %d, %s\n", errcode, strerror(errcode));
 			return -errcode;
 		}
+
+		ret = update_sb_size();
+		if (ret < 0) {
+			write_log(0, "Fail to update superblock size in %s\n",
+					__func__);
+			close(sys_super_block->iofptr);
+			return ret;
+		}
 	}
 	sys_super_block->unclaimed_list_fptr = fopen(UNCLAIMEDFILE, "a+");
 	if (sys_super_block->unclaimed_list_fptr == NULL) {
@@ -926,7 +934,8 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	struct stat tempstat;
 	ino_t new_first_reclaimed;
 	unsigned long this_generation;
-	int errcode;
+	int errcode, ret;
+	BOOL update_size;
 
 	super_block_exclusive_locking();
 
@@ -960,6 +969,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 							new_first_reclaimed;
 		}
 		this_generation = tempentry.generation + 1;
+		update_size = FALSE;
 	} else {
 		/* If need to append a new super inode and add total
 		*  inode count*/
@@ -967,6 +977,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		this_inode = sys_super_block->head.num_total_inodes + 1;
 		/* Inode starts from 2 */
 		this_generation = 1;
+		update_size = TRUE;
 	}
 	sys_super_block->head.num_active_inodes++;
 
@@ -1003,6 +1014,12 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	if (retsize < SB_HEAD_SIZE) {
 		super_block_exclusive_release();
 		return 0;
+	}
+
+	if (update_size == TRUE) {
+		ret = update_sb_size();
+		if (ret < 0)
+			return 0;
 	}
 
 	super_block_exclusive_release();
