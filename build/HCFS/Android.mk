@@ -42,15 +42,28 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := hcfs
 LOCAL_CFLAGS    += -pie -fPIE -O0 $(HCFS_CFLAGS) -Wall -Wextra
 LOCAL_CFLAGS    += -D_FILE_OFFSET_BITS=64
-LOCAL_CFLAGS    += -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -DDEDUP_ENABLE=0 -DSTAT_VFS_H="<fuse/sys/statvfs.h>" -D_ANDROID_PREMOUNT_
+LOCAL_CFLAGS    += -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DDEDUP_ENABLE=0 -DSTAT_VFS_H="<fuse/sys/statvfs.h>" -D_ANDROID_PREMOUNT_
 LOCAL_LDFLAGS   += -pie -fPIE -O0 $(HCFS_LDFLAGS)
 LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)../../src/HCFS/*.c)
 LOCAL_C_INCLUDES := $(BUILD_PATH)/include/sqlite3 $(BUILD_PATH)/include
-ifdef OPENSSL_IS_BORINGSSL
-LOCAL_C_INCLUDES += $(BUILD_PATH)/include/boringssl
+LOCAL_SHARED_LIBRARIES := libcurl libssl libcrypto libsqlite libfuse
+
+## Compression feature
+COMPRESS_ENABLE := 0
+ifeq "$(COMPRESS_ENABLE)" "0"
+  LOCAL_CFLAGS += -DCOMPRESS_ENABLE=0
 else
-LOCAL_C_INCLUDES += $(BUILD_PATH)/include/openssl
+  LOCAL_CFLAGS += -DCOMPRESS_ENABLE=1
+  LOCAL_C_INCLUDES += $(BUILD_PATH)/third_party/lz4
+  LOCAL_SHARED_LIBRARIES += liblz4
 endif
-LOCAL_SHARED_LIBRARIES := libcurl libssl libcrypto liblz4 libsqlite libfuse
+
+## Openssl
+ifdef OPENSSL_IS_BORINGSSL
+  LOCAL_C_INCLUDES += $(BUILD_PATH)/include/boringssl
+else
+  LOCAL_C_INCLUDES += $(BUILD_PATH)/include/openssl
+endif
 include $(BUILD_EXECUTABLE)
 
+include $(BUILD_PATH)/third_party/Android.mk
