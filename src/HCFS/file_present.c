@@ -909,7 +909,11 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			meta_cache_entry->fptr);
 
 		/* Update xattr filepos in meta cache */
+#ifdef _ANDROID_ENV_
+		if (S_ISFILE(stat_data.st_mode)) {
+#else
 		if (S_ISREG(stat_data.st_mode)) {
+#endif
 			filemeta.next_xattr_page = *xattr_pos;
 			ret_code = meta_cache_update_file_data(this_inode, NULL,
 				&filemeta, NULL, 0, meta_cache_entry);
