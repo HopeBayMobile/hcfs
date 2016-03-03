@@ -896,7 +896,6 @@ BOOL is_natural_number(char *str)
 {
 	return TRUE;
 }
-<<<<<<< HEAD
 
 void fetch_backend_block_objname(char *objname,
 #if DEDUP_ENABLE

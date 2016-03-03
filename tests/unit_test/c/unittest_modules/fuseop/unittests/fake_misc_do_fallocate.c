@@ -362,33 +362,6 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	return 0;
 }
-int fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
-		long long block_no)
-{
-	char tempbuf[1024];
-	int tmp_len;
-
-	switch (this_inode) {
-	case 14:
-		ftruncate(fileno(fptr), 102400);
-		break;
-	case 15:
-	case 16:
-		if (test_fetch_from_backend == TRUE) {
-			fseek(fptr, 0, SEEK_SET);
-			snprintf(tempbuf, 100, "This is a test data");
-			tmp_len = strlen(tempbuf);
-			fwrite(tempbuf, tmp_len, 1, fptr);
-			fflush(fptr);
-		} else {
-			ftruncate(fileno(fptr), 204800);
-		}
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
 
 void sleep_on_cache_full(void)
 {
