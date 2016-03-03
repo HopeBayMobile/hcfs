@@ -14,7 +14,10 @@ all : submodule out $(TARGETS)
 	cd out; find -mindepth 2 -type f -exec md5sum {} \; > md5sum.md5
 
 submodule :
-	@git submodule update --init --recursive
+	@if [ ! -n "$$(grep "^gitlab.hopebaytech.com " ~/.ssh/known_hosts)" ]; \
+		then ssh-keyscan gitlab.hopebaytech.com >> ~/.ssh/known_hosts 2>/dev/null; \
+	fi
+	git submodule update --init $(build_dir)/third_party/jansson
 
 clean :
 	rm -rf obj out */obj */out
