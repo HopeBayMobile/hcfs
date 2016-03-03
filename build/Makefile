@@ -17,7 +17,7 @@ submodule :
 	@if [ ! -n "$$(grep "^gitlab.hopebaytech.com " ~/.ssh/known_hosts)" ]; \
 		then ssh-keyscan gitlab.hopebaytech.com >> ~/.ssh/known_hosts 2>/dev/null; \
 	fi
-	git submodule update --init $(build_dir)/third_party/jansson
+	@git submodule update --init $(build_dir)/third_party/jansson
 
 clean :
 	@rm -rf obj out
@@ -50,7 +50,7 @@ $(hcfs_gdb): NDK_ARG += HCFS_CFLAGS="-ggdb -O0 -DDEBUG_ON"
 $(hcfs_gdb): NDK_ARG += HCFS_LDFLAGS="-ggdb -O0"
 
 # Device Flags
-arch_arm64_lib_path := $(dir $(NDK_BUILD))/platforms/android-21/arch-arm64/usr/lib
+arch_arm64_lib_path := $(NDK_DIR)/platforms/android-21/arch-arm64/usr/lib
 $(acer-s58a): NDK_ARG += OPENSSL_IS_BORINGSSL=1
 $(acer-s58a): $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
