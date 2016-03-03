@@ -28,7 +28,7 @@ UNITTEST_DIR = $(realpath ./unittests)
 CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
 
 # Flags passed to C and C++ compilers
-CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -fpermissive\
+CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -fpermissive \
 	    -D_FILE_OFFSET_BITS=64 \
 	    -DDEDUP_ENABLE=0 \
 	    -DENCRYPT_ENABLE=1 \
@@ -42,6 +42,10 @@ CFAKEFLAGS +=
 CXXFLAGS +=
 # gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CXX = gcc
+GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
+ifeq "$(GCC_VERSION_GE_49)" "1"
+	CPPFLAGS += -fdiagnostics-color
+endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.

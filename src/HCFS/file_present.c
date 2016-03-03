@@ -291,7 +291,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
-	if (S_ISREG(this_stat->st_mode)) {
+	if (S_ISFILE(this_stat->st_mode)) {
 		write_log(10, "Debug:inode %"PRIu64" begin to inherit xattrs\n",
 				(uint64_t)self_inode);
 		ret_val = inherit_xattr(parent_inode, self_inode, body_ptr);
@@ -893,7 +893,11 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return ret_code;
 
 	/* Get metadata by case */
+#ifdef _ANDROID_ENV_
+	if (S_ISFILE(stat_data.st_mode)) {
+#else
 	if (S_ISREG(stat_data.st_mode)) {
+#endif
 		ret_code = meta_cache_lookup_file_data(this_inode, NULL,
 			&filemeta, NULL, 0, meta_cache_entry);
 		if (ret_code < 0)
@@ -911,7 +915,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = symlinkmeta.next_xattr_page;
-	} else { /* fifo, socket... */
+	} else { /* fifo, socket is not enabled in non-android env */
 		return -EINVAL;
 	}
 
@@ -930,7 +934,11 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			meta_cache_entry->fptr);
 
 		/* Update xattr filepos in meta cache */
+#ifdef _ANDROID_ENV_
+		if (S_ISFILE(stat_data.st_mode)) {
+#else
 		if (S_ISREG(stat_data.st_mode)) {
+#endif
 			filemeta.next_xattr_page = *xattr_pos;
 			ret_code = meta_cache_update_file_data(this_inode, NULL,
 				&filemeta, NULL, 0, meta_cache_entry);

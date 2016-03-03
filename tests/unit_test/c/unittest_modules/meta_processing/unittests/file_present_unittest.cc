@@ -434,8 +434,13 @@ TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
 	mock_meta_entry->inode_num = INO_FIFO;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
 
+#ifdef _ANDROID_ENV_
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
+#else
 	EXPECT_EQ(-EINVAL, ret);
 	EXPECT_EQ(0, xattr_pos);
+#endif
 }
 
 TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)

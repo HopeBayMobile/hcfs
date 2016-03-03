@@ -352,7 +352,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			temp_val = strtoll(argval, &num_check_ptr, 10);
 			if ((errno != 0) || (*num_check_ptr != '\0')) {
 				fclose(fptr);
-				write_log(0, "Number conversion error\n");
+				write_log(0, "Number conversion error: %s\n", argname);
 				return -1;
 			}
 			if (temp_val < 0) {
@@ -414,7 +414,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			temp_val = strtoll(argval, &num_check_ptr, 10);
 			if ((errno != 0) || (*num_check_ptr != '\0')) {
 				fclose(fptr);
-				write_log(0, "Number conversion error\n");
+				write_log(0, "Number conversion error: %s\n", argname);
 				return -1;
 			}
 			config->cache_soft_limit = temp_val;
@@ -425,7 +425,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			temp_val = strtoll(argval, &num_check_ptr, 10);
 			if ((errno != 0) || (*num_check_ptr != '\0')) {
 				fclose(fptr);
-				write_log(0, "Number conversion error\n");
+				write_log(0, "Number conversion error: %s\n", argname);
 				return -1;
 			}
 			config->cache_hard_limit = temp_val;
@@ -436,7 +436,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			temp_val = strtoll(argval, &num_check_ptr, 10);
 			if ((errno != 0) || (*num_check_ptr != '\0')) {
 				fclose(fptr);
-				write_log(0, "Number conversion error\n");
+				write_log(0, "Number conversion error: %s\n", argname);
 				return -1;
 			}
 			config->cache_update_delta = temp_val;
@@ -447,7 +447,7 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			temp_val = strtoll(argval, &num_check_ptr, 10);
 			if ((errno != 0) || (*num_check_ptr != '\0')) {
 				fclose(fptr);
-				write_log(0, "Number conversion error\n");
+				write_log(0, "Number conversion error: %s\n", argname);
 				return -1;
 			}
 			config->max_block_size = temp_val;

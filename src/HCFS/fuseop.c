@@ -25,6 +25,8 @@
 * 2015/11/5 Jiahong adding changes for per-file statistics
 * 2015/11/24 Jethro adding
 * 2016/1/19 Jiahong modified path reconstruct routine
+* 2016/2/4 Jiahong adding fallocate
+* 2016/2/23 Jiahong moved fallocate to another file
 *
 **************************************************************************/
 
@@ -93,6 +95,7 @@
 #include "pin_scheduling.h"
 #include "dir_statistics.h"
 #include "parent_lookup.h"
+#include "do_fallocate.h"
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
@@ -6269,6 +6272,107 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_create(req, &tmp_param, fi);
 }
 
+
+/* TODO:
+	if mode = 0, default op.
+	if mode = 1, keep filesize.
+	if mode = 3, punch hole and keep size.
+	otherwise return ENOTSUPP
+	If mode 0 or 1, don't need to zero regions already containing data
+	If mode = 3, need to zero regions.
+*/
+static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int mode,
+			off_t offset, off_t length, struct fuse_file_info *fi)
+{
+	int ret_val;
+	ino_t this_inode;
+	struct timespec timenow;
+	struct stat newstat;
+	META_CACHE_ENTRY_STRUCT *body_ptr;
+	struct fuse_ctx *temp_context;
+	off_t old_file_size;
+
+	UNUSED(fi);
+
+	write_log(10, "Debug fallocate, mode %d, off %lld, len %lld\n",
+	          mode, offset, length);
+
+	if ((offset < 0) || (length <= 0)) {
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
+
+	this_inode = real_ino(req, ino);
+
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+
+	body_ptr = meta_cache_lock_entry(this_inode);
+	if (body_ptr == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+
+	ret_val = meta_cache_lookup_file_data(this_inode, &newstat,
+			NULL, NULL, 0, body_ptr);
+
+	if (ret_val < 0) {  /* Cannot fetch any meta*/
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		meta_cache_remove(this_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &newstat, 2);
+
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	old_file_size = newstat.st_size;
+	ret_val = do_fallocate(this_inode, &newstat, mode, offset, length,
+	                       &body_ptr, req);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	clock_gettime(CLOCK_REALTIME, &timenow);
+
+	if ((mode == 3) || (old_file_size != newstat.st_size)) {
+		newstat.st_ctime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
+		memcpy(&(newstat.st_ctim), &timenow,
+			sizeof(struct timespec));
+#endif
+		newstat.st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
+		memcpy(&(newstat.st_mtim), &timenow,
+			sizeof(struct timespec));
+#endif
+	}
+
+	ret_val = meta_cache_update_file_data(this_inode, &newstat,
+			NULL, NULL, 0, body_ptr);
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	fuse_reply_err(req, 0);
+}
+
 /* Specify the functions used for the FUSE operations */
 struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
@@ -6301,6 +6405,7 @@ struct fuse_lowlevel_ops hfuse_ops = {
 	.removexattr = hfuse_ll_removexattr,
 	.link = hfuse_ll_link,
 	.create = hfuse_ll_create,
+	.fallocate = hfuse_ll_fallocate,
 };
 
 /* Initiate FUSE */

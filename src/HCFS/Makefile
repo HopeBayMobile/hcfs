@@ -2,6 +2,10 @@ CC = gcc
 CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_ -DDEBUG_ON
 CFLAGS = -g -pthread -Wall -Wextra
 LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3
+GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
+ifeq "$(GCC_VERSION_GE_49)" "1"
+	CPPFLAGS += -fdiagnostics-color
+endif
 
 # [Autodependencies with GNU make]
 # http://scottmcpeak.com/autodepend/autodepend.html
@@ -40,6 +44,7 @@ OBJS_F := objmeta.o \
 	parent_lookup.o \
 	atomic_tocloud.o \
 	tocloud_tools.o
+	do_fallocate.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)

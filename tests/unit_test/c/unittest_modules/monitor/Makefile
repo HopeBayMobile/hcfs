@@ -35,12 +35,16 @@ vpath	%.c	$(USER_DIR)
 # gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CC	=	gcc
 CXX	=	g++
+GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
+ifeq "$(GCC_VERSION_GE_49)" "1"
+	CPPFLAGS += -fdiagnostics-color
+endif
 
 # Flags for gcc (We trace coverage of hcfs source only)
 CFLAGS += -ftest-coverage
 # Flags for g++
 CXXFLAGS += -fpermissive -Wno-missing-field-initializers
-# Flags for both gcc and g++
+# Flags passed to C and C++ compilers
 CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
 	    -D_FILE_OFFSET_BITS=64 \
 	    -DDEDUP_ENABLE=0 \

@@ -896,6 +896,7 @@ BOOL is_natural_number(char *str)
 {
 	return TRUE;
 }
+<<<<<<< HEAD
 
 void fetch_backend_block_objname(char *objname,
 #if DEDUP_ENABLE
@@ -936,5 +937,24 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 {
+	return 0;
+}
+
+int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
+		off_t offset, off_t length,
+		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
+{
+	off_t newlen;
+	off_t oldsize;
+
+	if (mode != 0)
+		return -ENOTSUP;
+	newlen = offset + length;
+	if (newlen <= newstat->st_size)
+		return 0;
+	oldsize = newstat->st_size;
+
+	newstat->st_size = newlen;
+	hcfs_system->systemdata.system_size += (newlen - oldsize);
 	return 0;
 }

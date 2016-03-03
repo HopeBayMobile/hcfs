@@ -2538,3 +2538,98 @@ TEST_F(hfuse_ll_createTest, CreateSuccess)
 /*
 	End of unittest of hfuse_ll_create()
  */
+
+/* Begin of the test case for the function hfuse_ll_fallocate */
+class hfuse_ll_fallocateTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+    root_updated = FALSE;
+    fake_block_status = ST_NONE;
+    after_update_block_page = FALSE;
+    hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 10000;
+  }
+
+  virtual void TearDown() {
+    char temppath[1024];
+
+    fetch_block_path(temppath, 14, 0);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
+    fetch_trunc_path(temppath, 14);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
+  }
+};
+TEST_F(hfuse_ll_fallocateTest, ExtendSize) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  FILE *fptr;
+
+  fptr = fopen("/tmp/test_fuse/testfile2", "r+");
+  ASSERT_NE(0, (fptr != NULL));
+  ret_val = fallocate(fileno(fptr), 0, 0, 102400);
+  tmp_err = errno;
+  fclose(fptr);
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile2", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 102400);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 + (102400 - 1024));
+}
+TEST_F(hfuse_ll_fallocateTest, ExtendSize2) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  FILE *fptr;
+
+  fptr = fopen("/tmp/test_fuse/testfile2", "r+");
+  ASSERT_NE(0, (fptr != NULL));
+  ret_val = fallocate(fileno(fptr), 0, 1024, 102400);
+  tmp_err = errno;
+  fclose(fptr);
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile2", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 102400 + 1024);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 + 102400);
+}
+TEST_F(hfuse_ll_fallocateTest, ModeNotSupported) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  FILE *fptr;
+
+  fptr = fopen("/tmp/test_fuse/testfile2", "r+");
+  ASSERT_NE(0, (fptr != NULL));
+  ret_val = fallocate(fileno(fptr), 4, 1024, 102400);
+  tmp_err = errno;
+  fclose(fptr);
+
+  ASSERT_EQ(-1, ret_val);
+  ASSERT_EQ(ENOTSUP, tmp_err);
+}
+TEST_F(hfuse_ll_fallocateTest, NoExtend) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  FILE *fptr;
+
+  fptr = fopen("/tmp/test_fuse/testfile2", "r+");
+  ASSERT_NE(0, (fptr != NULL));
+  ret_val = fallocate(fileno(fptr), 0, 0, 10);
+  tmp_err = errno;
+  fclose(fptr);
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile2", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 1024);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
+}
+
+/* End of the test case for the function hfuse_ll_fallocate */
+
