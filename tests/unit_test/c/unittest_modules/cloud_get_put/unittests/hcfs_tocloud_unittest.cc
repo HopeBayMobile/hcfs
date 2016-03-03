@@ -24,7 +24,7 @@ class uploadEnvironment : public ::testing::Environment {
 
   virtual void SetUp() {
     int shm_key;
-
+/*
     shm_key = shmget(5678, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
     if (shm_key < 0) {
 	    int errcode;
@@ -32,9 +32,9 @@ class uploadEnvironment : public ::testing::Environment {
 	    printf("Error %d %s\n", errcode, strerror(errcode));
 	    return;
     }
-    hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
+  */
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 
-    //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
