@@ -20,8 +20,8 @@ submodule :
 	git submodule update --init $(build_dir)/third_party/jansson
 
 clean :
-	rm -rf obj out */obj */out
-	make clean -C $(build_dir)/third_party/lz4
+	@rm -rf obj out
+	@make clean -s -C $(build_dir)/third_party/lz4
 
 define TARGET_RULE
 $(1): out/$(1)-hcfs
