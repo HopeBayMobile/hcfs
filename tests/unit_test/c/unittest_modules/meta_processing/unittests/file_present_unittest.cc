@@ -438,7 +438,7 @@ TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
 
 	xattr_pos = 0;
 	mock_meta_entry->inode_num = INO_FIFO;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
 
 #ifdef _ANDROID_ENV_
 	EXPECT_EQ(0, ret);
@@ -459,6 +459,17 @@ TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchRegFileXattr_WithFlagFalse_ReturnNOENT)
+{
+	int ret;
+	long long xattr_pos;
+
+	mock_meta_entry->inode_num = INO_REGFILE;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
+
+	EXPECT_EQ(-ENOENT, ret);
 }
 
 TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
