@@ -43,7 +43,7 @@ OBJS_F := objmeta.o \
 	dir_statistics.o \
 	parent_lookup.o \
 	atomic_tocloud.o \
-	tocloud_tools.o
+	tocloud_tools.o \
 	do_fallocate.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
