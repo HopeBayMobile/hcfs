@@ -971,6 +971,10 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		this_generation = tempentry.generation + 1;
 		update_size = FALSE;
 	} else {
+		if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+			super_block_exclusive_release();
+			return 0;
+		}
 		/* If need to append a new super inode and add total
 		*  inode count*/
 		sys_super_block->head.num_total_inodes++;
@@ -1016,6 +1020,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		return 0;
 	}
 
+	/* Update superblock size if a new inode is born. */
 	if (update_size == TRUE) {
 		ret = update_sb_size();
 		if (ret < 0)

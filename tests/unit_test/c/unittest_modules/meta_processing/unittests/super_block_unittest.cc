@@ -904,6 +904,7 @@ protected:
 		expected_stat.st_dev = 5;
 		expected_stat.st_nlink = 6;
 		expected_stat.st_size = 5566;
+		CACHE_HARD_LIMIT = 10000;
 	}
 };
 
@@ -936,6 +937,20 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	EXPECT_EQ(1, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
 		sizeof(struct stat)));
+}
+
+TEST_F(super_block_new_inodeTest, NoReclaimedNodes_ExceedPinSizeLimit)
+{
+	unsigned long generation;
+	ino_t ret_node;
+
+	/* Mock stat */
+	generation = 0;
+	hcfs_system->systemdata.pinned_size = MAX_PINNED_LIMIT + 1;
+
+	/* Run */
+	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
+	EXPECT_EQ(0, ret_node); /*Return 0 because exceeding pinned size limit*/
 }
 
 TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes)
@@ -1001,6 +1016,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	ino_t ret_node;
 	
 	/* Mock one reclaimed inode */
+	hcfs_system->systemdata.pinned_size = MAX_PINNED_LIMIT + 1;
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.generation = 1;
 	sb_entry.util_ll_next = 0;

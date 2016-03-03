@@ -22,3 +22,8 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	return 0;
 }
+
+int update_sb_size()
+{
+	return 0;
+}
