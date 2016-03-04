@@ -184,6 +184,11 @@ typedef struct {
 	char local_pin;
 } SYMLINK_META_TYPE;
 
+typedef struct {
+	long long size_last_upload;
+	long long upload_seq;
+} CLOUD_RELATED_DATA;
+
 /*END META definition*/
 
 /* Defining the system meta resources */
