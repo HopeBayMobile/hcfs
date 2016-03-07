@@ -50,6 +50,12 @@ int change_system_meta(long long system_size_delta, long long meta_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta,
 		long long dirty_cache_delta);
 
+int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
+		long long fs_meta_size_delta, long long fs_num_inodes_delta);
+
+int update_backend_usage(long long total_backend_size_delta,
+		long long meta_size_delta, long long num_inodes_delta);
+
 int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
 

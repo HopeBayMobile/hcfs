@@ -107,7 +107,6 @@ typedef struct {
 	unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
-	long long upload_seq;
 	char local_pin;
 } DIR_META_TYPE;
 
@@ -159,8 +158,6 @@ typedef struct {
         unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
-	long long upload_seq;
-	long long size_last_upload;
 	char local_pin;
 } FILE_META_TYPE;
 
@@ -180,12 +177,12 @@ typedef struct {
         unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
-	long long upload_seq;
 	char local_pin;
 } SYMLINK_META_TYPE;
 
 typedef struct {
-	long long size_last_upload;
+	long long size_last_upload; /* Record data + meta */
+	long long meta_last_upload; /* Record meta only */
 	long long upload_seq;
 } CLOUD_RELATED_DATA;
 
@@ -200,6 +197,7 @@ typedef struct {
 	long long cache_blocks;
 	long long pinned_size; /* data(pin) + meta + sb */
 	long long backend_size; /* data(sync) + meta(sync) */
+	long long backend_meta_size;
 	long long backend_inodes;
 	long long dirty_cache_size; /* data + meta */
 	long long xfer_size_download;

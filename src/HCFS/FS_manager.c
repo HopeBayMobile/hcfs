@@ -180,6 +180,7 @@ int _init_backend_stat(ino_t root_inode)
 	long long system_size, num_inodes;
 	size_t ret_size;
 	char is_fopen;
+	FS_CLOUD_STAT_T cloud_fs_stat;
 
 	is_fopen = FALSE;
 
@@ -197,11 +198,9 @@ int _init_backend_stat(ino_t root_inode)
 		goto errcode_handle;
 	}
 	is_fopen = TRUE;
+	memset(&cloud_fs_stat, 0, sizeof(FS_CLOUD_STAT_T));
 	FSEEK(fptr, 0, SEEK_SET);
-	system_size = 0;
-	num_inodes = 0;
-	FWRITE(&system_size, sizeof(long long), 1, fptr);
-	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+	FWRITE(&cloud_fs_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);	
 	fclose(fptr);
 	is_fopen = FALSE;
 
@@ -232,6 +231,7 @@ ino_t _create_root_inode()
 	int64_t ret_pos;
 	unsigned long this_gen;
 	FS_STAT_T tmp_stat;
+	CLOUD_RELATED_DATA cloud_related_data;
 	char ispin;
 
 	statfptr = NULL;
@@ -281,8 +281,10 @@ ino_t _create_root_inode()
 		goto errcode_handle;
 	}
 
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
 	FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 
 	FTELL(metafptr);
 	this_meta.generation = this_gen;
@@ -315,6 +317,7 @@ ino_t _create_root_inode()
 		goto errcode_handle;
 	}
 
+	FSEEK(metafptr, this_meta.root_entry_page, SEEK_SET);
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
 
 	ret = fetch_stat_path(temppath, root_inode);

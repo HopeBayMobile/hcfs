@@ -43,6 +43,7 @@
 #include "hcfs_cacheops.h"
 #include "monitor.h"
 #include "FS_manager.h"
+#include "mount_manager.h"
 #include "enc.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
@@ -1002,6 +1003,78 @@ int update_sb_size()
 	write_log(10, "Debug: now sb size is %lld\n", new_size);
 
 	return 0;
+}
+
+/**
+ * update_backend_usage()
+ *
+ * Change backend space usage.
+ *
+ * @param total_backend_size_delta Backend space usage to be updated.
+ * @param meta_size_delte Backend meta size to be updated.
+ * @param num_inodes_delta Number of inodes to be updated.
+ *
+ * @return 0 on success.
+ */ 
+int update_backend_usage(long long total_backend_size_delta,
+		long long meta_size_delta, long long num_inodes_delta)
+{
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.backend_size += total_backend_size_delta;
+	if (hcfs_system->systemdata.backend_size < 0)
+		hcfs_system->systemdata.backend_size = 0;
+
+	hcfs_system->systemdata.backend_meta_size += meta_size_delta;
+	if (hcfs_system->systemdata.backend_meta_size < 0)
+		hcfs_system->systemdata.backend_meta_size = 0;
+
+	hcfs_system->systemdata.backend_inodes += num_inodes_delta;
+	if (hcfs_system->systemdata.backend_inodes < 0)
+		hcfs_system->systemdata.backend_inodes = 0;
+	sync_hcfs_system_data(FALSE);
+	sem_post(&(hcfs_system->access_sem));
+
+	write_log(10, "Debug cloud usage: total size %lld, meta size %lld",
+			hcfs_system->systemdata.backend_size,
+			hcfs_system->systemdata.backend_meta_size);
+	return 0;
+}
+
+int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
+		long long fs_meta_size_delta, long long fs_num_inodes_delta)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fs_cloud_stat.backend_system_size += fs_total_size_delta;
+	if (fs_cloud_stat.backend_system_size < 0)
+		fs_cloud_stat.backend_system_size = 0;
+
+	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
+	if (fs_cloud_stat.backend_meta_size < 0)
+		fs_cloud_stat.backend_meta_size = 0;
+
+	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
+	if (fs_cloud_stat.backend_num_inodes < 0)
+		fs_cloud_stat.backend_num_inodes = 0;
+
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	flock(fileno(fptr), LOCK_UN);
+
+	write_log(10, "Debug FS cloud usage: total size %lld, meta size %lld",
+			fs_cloud_stat.backend_system_size,
+			fs_cloud_stat.backend_meta_size);
+	return 0;
+
+errcode_handle:
+	write_log(0, "Fail to update fs backend statistics\n");
+	flock(fileno(fptr), LOCK_UN);
+	return errcode;
 }
 
 int set_block_dirty_status(char *path, FILE *fptr, char status)

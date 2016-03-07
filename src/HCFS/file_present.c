@@ -408,7 +408,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
 	/* Initialize new directory object and save the meta to meta cache */
-	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE)
+			+ sizeof(CLOUD_RELATED_DATA);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
@@ -441,7 +442,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
-							&temppage, body_ptr);
+							NULL, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
 			selfname, this_stat->st_mode);
@@ -449,9 +450,18 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE), SEEK_SET);
-	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, body_ptr->fptr);
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+			SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+			body_ptr->fptr);
 
+	ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
+			&temppage, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
 #ifdef _ANDROID_ENV_
 	write_log(10, "Debug: inode %"PRIu64" begin to inherit xattrs\n",
 			(uint64_t)self_inode);
