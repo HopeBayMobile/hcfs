@@ -6,10 +6,10 @@
 # Abstract:
 #
 # Required Env Variable:
-#     BRANCH_OUT_DIR  Absolute path for current branch on nas, start with
+#     PUBLISH_DIR  Absolute path for current branch on nas, start with
 #                     /mnt/CloudDataSolution/TeraFonn_CI_build.
 #
-#     LIB_DIR         Absolute path for from previous jenkins job in pipeline.
+#     UPSTREAM_LIB_DIR         Absolute path for from previous jenkins job in pipeline.
 #
 #     JOB_NAME        image build job name given by jenkins.
 # Revision History
@@ -28,20 +28,25 @@ TRACE="set -x"; UNTRACE="set +x"
 
 echo ========================================
 echo Jenkins pass-through variables:
-echo BRANCH_OUT_DIR: ${BRANCH_OUT_DIR}
-echo LIB_DIR: ${LIB_DIR}
+echo UPSTREAM_LIB_DIR: ${UPSTREAM_LIB_DIR}
+echo PUBLISH_DIR: ${PUBLISH_DIR}
 echo JOB_NAME: ${JOB_NAME}
 echo ========================================
 echo "Environment variables (with defaults):"
 $TRACE
-# Input
+
+### Upstream hcfs lib
+# UPSTREAM_LIB_DIR=${UPSTREAM_LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/device/s58a_ci/2.0.3.0261/HCFS-android-binary}
+[[ "$UPSTREAM_LIB_DIR" != "" ]] ### Assign these for local build
+
+### Upstream APK
 APK_NAME=terafonn_1.0.0024
-LIB_DIR=${LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/device/s58a_ci/2.0.3.0261/HCFS-android-binary}
 APK_DIR=/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APK_NAME
 DOCKER_IMAGE=docker:5000/s58a-buildbox:0225-cts-userdebug-prebuilt
 
-# Output
-BRANCH_OUT_DIR=${BRANCH_OUT_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/android-dev/2.0.3.ci.test}
+### Publish dir
+# PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/android-dev/2.0.3.ci.test}
+[[ "$PUBLISH_DIR" != "" ]] ### Assign these for local build
 JOB_NAME=${JOB_NAME:-HCFS-s58a-image}
 
 #let printf handle the printing
@@ -95,7 +100,7 @@ function patch_system() {
 function copy_hcfs_to_source_tree() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
-		$LIB_DIR/acer-s58a-hcfs/system/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/
+		$UPSTREAM_LIB_DIR/acer-s58a-hcfs/system/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/
 }
 function copy_apk_to_source_tree() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -111,16 +116,16 @@ function build_system() {
 }
 function publish_image() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	mkdir -p ${BRANCH_OUT_DIR}/${JOB_NAME}
-	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${BRANCH_OUT_DIR}/${JOB_NAME}
+	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}
+	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${PUBLISH_DIR}/${JOB_NAME}
 }
 function publish_resource() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	\cp -fv $here/resource/* ${BRANCH_OUT_DIR}/${JOB_NAME}
+	\cp -fv $here/resource/* ${PUBLISH_DIR}/${JOB_NAME}
 }
 function publish_apk() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	\cp -r $APK_DIR ${BRANCH_OUT_DIR}/
+	\cp -r $APK_DIR ${PUBLISH_DIR}/
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
