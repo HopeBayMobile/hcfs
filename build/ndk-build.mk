@@ -1,24 +1,31 @@
 ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
 
   TOP := $(dir $(lastword $(MAKEFILE_LIST)))
-  NDK_CONFIG := $(TOP).ndk_build
-  # 1. from make argument
+  NDK_CONFIG := $(TOP).ndk_dir
+
+  # 1. Find correct ndk-build filepath from arguments
+  override NDK_BUILD := $(filter %/ndk-build, $(wildcard \
+	  $(NDK_DIR) \
+	  $(NDK_DIR)/ndk-build \
+	  $(NDK_BUILD) \
+	  $(NDK_BUILD)/ndk-build))
+  override NDK_DIR := $(abspath $(dir $(NDK_BUILD)))
   # 2. from config
-  ifeq "$(wildcard $(NDK_BUILD))" ""
+  ifeq "$(NDK_DIR)" ""
     -include $(NDK_CONFIG)
   endif
   # 3. from PATH
-  ifeq "$(wildcard $(NDK_BUILD))" ""
-    export NDK_BUILD := $(shell /usr/bin/which ndk-build)
+  ifeq "$(NDK_DIR)" ""
+    override NDK_DIR := $(abspath $(dir $(shell /usr/bin/which ndk-build)))
   endif
 
-  ifeq "$(wildcard $(NDK_BUILD))" ""
-    $(error filepath NDK_BUILD is not set)
+  ifeq "$(wildcard $(NDK_DIR))" ""
+    $(error Usage: "make NDK_DIR=<path-of-android-ndk-r10e>" )
   else
-    # Save NDK_BUILD variable
-    $(shell echo "export NDK_BUILD=$(NDK_BUILD)" > $(NDK_CONFIG))
-    # Export NDK_BUILD into path
-    PATH := $(PATH):$(dir $(NDK_BUILD))
+    # Save NDK_DIR variable
+    $(shell echo "override NDK_DIR=$(NDK_DIR)" > $(NDK_CONFIG))
+    # Export NDK_DIR into path
+    PATH := $(PATH):$(NDK_DIR)
   endif
 
 endif

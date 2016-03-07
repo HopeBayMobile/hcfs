@@ -23,10 +23,7 @@ IMG=docker:5000/android-buildbox
 TAG=`date +%Y%m%d`
 echo $IMG
 docker build -t $IMG .
-docker tag -f $IMG $IMG:$TAG
-if [ ! -e /usr/local/bin/docker-squash ]; then
-	cd /tmp
-	wget https://github.com/jwilder/docker-squash/releases/download/v0.2.0/docker-squash-linux-amd64-v0.2.0.tar.gz
-	sudo tar -C /usr/local/bin -xzvf docker-squash-linux-amd64-v0.2.0.tar.gz
-fi
+docker rmi $IMG:$TAG || :
+docker tag $IMG $IMG:$TAG
 docker push $IMG:$TAG
+docker push $IMG
