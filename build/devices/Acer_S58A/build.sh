@@ -37,7 +37,7 @@ $TRACE
 
 ### Upstream hcfs lib
 # UPSTREAM_LIB_DIR=${UPSTREAM_LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/device/s58a_ci/2.0.3.0261/HCFS-android-binary}
-[[ "$UPSTREAM_LIB_DIR" != "" ]] ### Assign these for local build
+eval '[ -n "$UPSTREAM_LIB_DIR" ]' || { echo Assign these for local build; exit 1; }
 
 ### Upstream APK
 APK_NAME=terafonn_1.0.0024
@@ -46,7 +46,7 @@ DOCKER_IMAGE='docker:5000/s58a-buildbox:0225-cts-${IMAGE_TYPE}-prebuilt'
 
 ### Publish dir
 # PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/android-dev/2.0.3.ci.test}
-[[ "$PUBLISH_DIR" != "" ]] ### Assign these for local build
+eval '[ -n "$PUBLISH_DIR" ]' || { echo Assign these for local build; exit 1; }
 JOB_NAME=${JOB_NAME:-HCFS-s58a-image}
 
 #let printf handle the printing
