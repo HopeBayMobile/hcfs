@@ -8,8 +8,8 @@ FROM phusion/baseimage:0.9.18
 CMD ["/sbin/my_init"]
 
 # ...put your own build instructions here...
-RUN sed -i 's/archive.ubuntu/tw.archive.ubuntu/g' /etc/apt/sources.list
-RUN echo 'Acquire::http::Proxy "http://cache:8000";' > /etc/apt/apt.conf.d/30autoproxy
+RUN sed -i 's/archive.ubuntu/free.nchc.org.tw/g' /etc/apt/sources.list
+RUN echo 'Acquire::http::Proxy "http://10.0.1.5:8000";' > /etc/apt/apt.conf.d/30aptproxy
 
 # Add android repo
 ADD https://storage.googleapis.com/git-repo-downloads/repo /root/bin/repo
