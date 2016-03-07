@@ -64,20 +64,20 @@ function _hdr_inc() {
 	$TRACE
 }
 function start_builder() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	mkdir -p /data/ccache
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-`date +%m%d-%H%M%S`
 	eval docker pull $DOCKER_IMAGE
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
 }
 function stop_builder() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	docker rm -f $DOCKERNAME
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
+	docker rm -f $DOCKERNAME || :
 }
 
 alias ssh="ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no'"
 function setup_ssh_key() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	if [ ! -f ~/.ssh/id_rsa.pub ]; then
 		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
 	fi
@@ -94,29 +94,29 @@ function setup_ssh_key() {
 	ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' root@$DOCKER_IP pwd
 }
 function patch_system() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		$repo/build/devices/Acer_S58A/patch/ root@$DOCKER_IP:/data/
 }
 function copy_hcfs_to_source_tree() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		$UPSTREAM_LIB_DIR/acer-s58a-hcfs/system/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/
 }
 function copy_apk_to_source_tree() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		$APK_DIR/${APK_NAME}.apk root@$DOCKER_IP:/data/device/acer/common/apps/HopebayHCFSmgmt/
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		$APK_DIR/arm64-v8a/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/lib64/
 }
 function build_system() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh root@$DOCKER_IP ccache --max-size=30G
 	ssh root@$DOCKER_IP bash -ic "./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 }
