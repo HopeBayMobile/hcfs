@@ -42,7 +42,7 @@ $TRACE
 ### Upstream APK
 APK_NAME=terafonn_1.0.0024
 APK_DIR=/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APK_NAME
-DOCKER_IMAGE=docker:5000/s58a-buildbox:0225-cts-userdebug-prebuilt
+DOCKER_IMAGE='docker:5000/s58a-buildbox:0225-cts-${IMAGE_TYPE}-prebuilt'
 
 ### Publish dir
 # PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/android-dev/2.0.3.ci.test}
@@ -66,8 +66,9 @@ function _hdr_inc() {
 function start_builder() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	mkdir -p /data/ccache
-	DOCKERNAME=s58a-image-build-`date +%m%d-%H%M%S`
-	docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	DOCKERNAME=s58a-build-${IMAGE_TYPE}-`date +%m%d-%H%M%S`
+	eval docker pull $DOCKER_IMAGE
+	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
 }
 function stop_builder() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -112,16 +113,16 @@ function copy_apk_to_source_tree() {
 function build_system() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	ssh root@$DOCKER_IP ccache --max-size=30G
-	ssh root@$DOCKER_IP bash -ic "build"
+	ssh root@$DOCKER_IP bash -ic "./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}
-	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${PUBLISH_DIR}/${JOB_NAME}
+	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
+	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 }
 function publish_resource() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	\cp -fv $here/resource/* ${PUBLISH_DIR}/${JOB_NAME}
+	\cp -fv $here/resource/* ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 }
 function publish_apk() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -141,14 +142,19 @@ function unmount_nas() {
 }
 trap stop_builder EXIT # Cleanup docker container
 
-start_builder
 mount_nas
-setup_ssh_key
-patch_system
-copy_hcfs_to_source_tree
-copy_apk_to_source_tree
-build_system
 
-publish_image
+for IMAGE_TYPE in user userdebug
+do
+	start_builder
+	setup_ssh_key
+	patch_system
+	copy_hcfs_to_source_tree
+	copy_apk_to_source_tree
+	build_system
+	publish_image
+	stop_builder
+done
+
 publish_resource
 publish_apk
