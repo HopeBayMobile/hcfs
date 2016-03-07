@@ -76,4 +76,5 @@ apt-get clean
 popd
 
 # Remove files thail will fail tests
+sudo -u jenkins fusermount -u -z /tmp/test_fuse || :
 sudo rm -rf /tmp/tmpdir /tmp/testHCFS /tmp/this_met /tmp/test_fuse /tmp/FSmgr_upload /tmp/markdelete /tmp/root_meta_path /tmp/test_dir_meta /tmp/testmeta /tmp/test /tmp/testmount /tmp/tmp_meta_dir /tmp/FSmgr_upload /tmp/test1 /tmp/mock_dir_meta /tmp/mock_path /tmp/mock_meta_used_in_dir_add_entry /tmp/mock_meta_path /tmp/dir_meta_path /tmp/directory_creation /tmp/tmp_dir_meta /tmp/test_system_file /tmp/xattr_mock_meta /tmp/dir_remove_entry_meta_file /tmp/mock_symlink_meta /tmp/mock_meta /tmp/here_is_obj /tmp/this_meta /tmp/to_delete_meta /tmp/readdir_meta /tmp/tmpout /tmp/testlog || :
