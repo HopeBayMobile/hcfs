@@ -200,26 +200,18 @@ static inline int dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino)
+			ino_t root_ino, char ispin)
 {
 	int ret_val, ret, errcode;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	char pin_status;
-	DIR_META_TYPE parent_meta;
 
 	/* Add "self_inode" to its parent "parent_inode" */
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
-
-	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
-		&parent_meta, NULL, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
 
 	/* Add path lookup table */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -250,9 +242,9 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
-	this_meta.local_pin = pin_status;
+	this_meta.local_pin = ispin;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+		selfname, ispin == TRUE? "PIN" : "UNPIN");
 
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
@@ -342,25 +334,17 @@ error_handling:
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino)
+			ino_t root_ino, char ispin)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	char pin_status;
-	DIR_META_TYPE parent_meta;
 
 	/* Save the new entry to its parent and update meta */
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
-
-	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
-		&parent_meta, NULL, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
 
 	/* Add parent to lookup db */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -400,9 +384,9 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
-	this_meta.local_pin = pin_status;
+	this_meta.local_pin = ispin;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+		selfname, ispin == TRUE? "PIN" : "UNPIN");
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
@@ -711,14 +695,13 @@ error_handling:
 *************************************************************************/
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link,
-	const unsigned long generation, const char *name, ino_t root_ino)
+	const unsigned long generation, const char *name, ino_t root_ino,
+	char ispin)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
 	ino_t parent_inode, self_inode;
 	int ret_code;
-	char pin_status;
-	DIR_META_TYPE parent_meta;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
@@ -726,12 +709,6 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
 	   because it had been locked before calling this function. Just need to
 	   open meta file. */
-	ret_code = meta_cache_lookup_dir_data(parent_inode, NULL,
-		&parent_meta, NULL, parent_meta_cache_entry);
-	if (ret_code < 0)
-		return ret_code;
-	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
-
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
@@ -767,10 +744,10 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.metaver = CURRENT_META_VER;
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
-	symlink_meta.local_pin = pin_status;
+	symlink_meta.local_pin = ispin;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		name, pin_status == TRUE? "PIN" : "UNPIN");
+		name, ispin == TRUE? "PIN" : "UNPIN");
 
 	/* Update self meta data */
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);

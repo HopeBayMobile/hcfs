@@ -483,6 +483,12 @@ static int _lookup_pkg_status_cb(void *data, int argc, char **argv, char **azCol
 	return 0;
 }
 
+int lookup_pkg_status(char *pkgname, BOOL *ispin, BOOL *issys)
+{
+	*issys = TRUE;
+	return 0;
+}
+
 /*
  * Helper function for querying uid of input (pkgname),
  * result uid will be stored in (uid).
@@ -634,7 +640,23 @@ static inline void _android6_permission(struct stat *thisstat,
 	}
 }
 
-int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
+
+static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
+{
+	BOOL ispin, issys;
+	int ret;
+
+	ret = lookup_pkg_status(tmptok_prev, &ispin, &issys);
+	/* Get pin st if success */
+	if (ret == 0) {
+		if (issys)
+			*pin_status = TRUE;
+		else
+			*pin_status = (char)ispin;
+	}
+}
+
+int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat, char *pin_status)
 {
 	int ret, errcode;
 	char *tmppath;
@@ -755,6 +777,9 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 					/* If this is a package folder */
 					/* Need to lookup package uid */
 					lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
+					if (pin_status)
+						_try_get_pin_st(tmptok_prev,
+								pin_status);
 					thisstat->st_uid = tmpuid;
 					thisstat->st_gid = 1028;
 					newpermission = 0770;
@@ -770,6 +795,9 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		}
 		if (count == 3) {
 			lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
+			if (pin_status)
+				_try_get_pin_st(tmptok_prev,
+						pin_status);
 			thisstat->st_uid = tmpuid;
 			thisstat->st_gid = 1028;
 			newpermission = 0770;
@@ -846,7 +874,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 				fuse_reply_err(req, EIO);
 				return;
 			}
-			_rewrite_stat(tmpptr, &tmp_stat);
+			_rewrite_stat(tmpptr, &tmp_stat, NULL);
 		}
 #endif
 
@@ -893,6 +921,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	unsigned long this_generation;
 	MOUNT_T *tmpptr;
 	char local_pin;
+	char ispin;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -926,13 +955,17 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
+	ispin = (char) 255;
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat);
+		_rewrite_stat(tmpptr, &parent_stat, &ispin);
 	}
+	/* Inherit parent pin status if "ispin" is not modified */
+	if (ispin == (char) 255)
+		ispin = local_pin;
 #endif
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
@@ -973,9 +1006,13 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
+#ifdef _ANDROID_ENV_
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			ispin);
+#else
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
 			local_pin);
-
+#endif
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
@@ -984,8 +1021,13 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_ino = self_inode;
 
+#ifdef _ANDROID_ENV_
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation, tmpptr->f_ino);
+			&this_stat, this_generation, tmpptr->f_ino, ispin);
+#else
+	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
+			&this_stat, this_generation, tmpptr->f_ino, local_pin);
+#endif
 
 	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0) {
@@ -1045,6 +1087,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	unsigned long this_gen;
 	MOUNT_T *tmpptr;
 	char local_pin;
+	char ispin;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -1070,13 +1113,17 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	ispin = (char) 255;
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat);
+		_rewrite_stat(tmpptr, &parent_stat, &ispin);
 	}
+	/* Inherit parent pin status if "ispin" is not modified */
+	if (ispin == (char) 255)
+		ispin = local_pin;
 #endif
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
@@ -1114,7 +1161,11 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
 
+#ifdef _ANDROID_ENV_
+	self_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
+#else
 	self_inode = super_block_new_inode(&this_stat, &this_gen, local_pin);
+#endif
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
 		return;
@@ -1122,9 +1173,15 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_ino = self_inode;
 
+#ifdef _ANDROID_ENV_
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
-			selfname, &this_stat, this_gen, tmpptr->f_ino);
-
+			selfname, &this_stat, this_gen,
+			tmpptr->f_ino, ispin);
+#else
+	ret_code = mkdir_update_meta(self_inode, parent_inode,
+			selfname, &this_stat, this_gen,
+			tmpptr->f_ino, local_pin);
+#endif
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_code);
@@ -1199,7 +1256,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat);
+		_rewrite_stat(tmpptr, &parent_stat, NULL);
 	}
 #endif
 
@@ -1278,7 +1335,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat);
+		_rewrite_stat(tmpptr, &parent_stat, NULL);
 	}
 #endif
 
@@ -1382,7 +1439,7 @@ a directory (for NFS) */
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat);
+		_rewrite_stat(tmpptr, &parent_stat, NULL);
 	}
 #endif
 
@@ -1426,7 +1483,7 @@ a directory (for NFS) */
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &(output_param.attr));
+		_rewrite_stat(tmpptr, &(output_param.attr), NULL);
 	}
 #endif
 
@@ -1569,7 +1626,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat1);
+		_rewrite_stat(tmpptr, &parent_stat1, NULL);
 	}
 #endif
 
@@ -1599,7 +1656,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat2);
+		_rewrite_stat(tmpptr, &parent_stat2, NULL);
 	}
 #endif
 
@@ -2899,7 +2956,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &this_stat);
+		_rewrite_stat(tmpptr, &this_stat, NULL);
 	}
 #endif
 
@@ -4549,7 +4606,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &this_stat);
+		_rewrite_stat(tmpptr, &this_stat, NULL);
 	}
 #endif
 
@@ -5152,7 +5209,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &thisstat);
+		_rewrite_stat(tmpptr, &thisstat, NULL);
 	}
 #endif
 
@@ -5344,7 +5401,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
-		link, this_generation, name, tmpptr->f_ino);
+		link, this_generation, name, tmpptr->f_ino, local_pin);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		errcode = ret_val;
@@ -5407,7 +5464,9 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	struct stat symlink_stat;
 	char link_buffer[MAX_LINK_PATH + 1];
 	int ret_code;
+	MOUNT_T *tmpptr;
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_inode = real_ino(req, ino);
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -5427,6 +5486,16 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
+
+#ifdef _ANDROID_ENV_
+        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+                if (tmpptr->vol_path_cache == NULL) {
+                        fuse_reply_err(req, EIO);
+                        return;
+                }
+                _rewrite_stat(tmpptr, &symlink_stat, NULL);
+        }
+#endif
 
 	/* Update access time */
 	set_timestamp_now(&symlink_stat, ATIME);
@@ -5532,7 +5601,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                         fuse_reply_err(req, EIO);
                         return;
                 }
-                _rewrite_stat(tmpptr, &stat_data);
+                _rewrite_stat(tmpptr, &stat_data, NULL);
         }
 #endif
 
@@ -5644,7 +5713,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                         fuse_reply_err(req, EIO);
                         return;
                 }
-                _rewrite_stat(tmpptr, &stat_data);
+                _rewrite_stat(tmpptr, &stat_data, NULL);
         }
 #endif
 
@@ -5884,7 +5953,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
                         fuse_reply_err(req, EIO);
                         return;
                 }
-                _rewrite_stat(tmpptr, &stat_data);
+                _rewrite_stat(tmpptr, &stat_data, NULL);
         }
 #endif
 
@@ -6097,6 +6166,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	long long fh;
 	MOUNT_T *tmpptr;
 	char local_pin;
+	char ispin;
 
 	parent_inode = real_ino(req, parent);
 
@@ -6126,13 +6196,17 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	ispin = (char) 255;
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat);
+		_rewrite_stat(tmpptr, &parent_stat, &ispin);
 	}
+	/* Inherit parent pin status if "ispin" is not modified */
+	if (ispin == (char) 255)
+		ispin = local_pin;
 #endif
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
@@ -6169,8 +6243,13 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+#ifdef _ANDROID_ENV_
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			ispin);
+#else
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
 			local_pin);
+#endif
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
@@ -6179,8 +6258,13 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_stat.st_ino = self_inode;
+#ifdef _ANDROID_ENV_
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
-			&this_stat, this_generation, tmpptr->f_ino);
+			&this_stat, this_generation, tmpptr->f_ino, ispin);
+#else
+	ret_val = mknod_update_meta(self_inode, parent_inode, name,
+			&this_stat, this_generation, tmpptr->f_ino, local_pin);
+#endif
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -6200,7 +6284,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &(tmp_param.attr));
+		_rewrite_stat(tmpptr, &(tmp_param.attr), NULL);
 	}
 #endif
 
