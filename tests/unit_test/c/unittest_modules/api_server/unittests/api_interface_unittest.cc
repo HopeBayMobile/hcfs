@@ -1227,6 +1227,43 @@ TEST_F(api_moduleTest, ReloadConfigSuccess) {
 	ASSERT_EQ(0, errcode);
 }
 
+TEST_F(api_moduleTest, GetTotalCloudSizeSuccess) {
+
+	int ret_val;
+	long long cloudsize;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = GETCLOUDSIZE;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.backend_size = 12345566;
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(long long), size_msg);
+	ret_val = recv(fd, &cloudsize, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
+	ASSERT_EQ(12345566, cloudsize);
+}
+
 /* End of the test case for the function api_module */
 
 /* Begin of the test case for the function api_server_monitor */

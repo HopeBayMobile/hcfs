@@ -1040,6 +1040,17 @@ int update_backend_usage(long long total_backend_size_delta,
 	return 0;
 }
 
+/**
+ * Update backend usage (statistics) per volume.
+ *
+ * @param fptr File pointer of FS backend statistics file.
+ * @param fs_total_size_delta Amount of total change (data + meta) in
+ *        backend space.
+ * @param fs_meta_size_delta Amount of meta size change in backend spsace.
+ * @param fs_num_inodes_delta Delta of # of inodes in backend space.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
 		long long fs_meta_size_delta, long long fs_num_inodes_delta)
 {

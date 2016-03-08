@@ -13,6 +13,7 @@ extern "C" {
 #include "hfuse_system.h"
 #include "params.h"
 #include "fuseop.h"
+#include "mount_manager.h"
 }
 #include "gtest/gtest.h"
 
@@ -950,6 +951,7 @@ TEST_F(reload_system_configTest, Set_Backend_Success)
 
 /* End of unittest for reload_system_config */
 
+/* Unittest of is_natural_number() */
 class is_natural_numberTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -990,6 +992,72 @@ TEST_F(is_natural_numberTest, PositiveNumber2)
 {
 	EXPECT_EQ(TRUE, is_natural_number("5"));
 }
+/* End of unittest of is_natural_number() */
+
+/* Unittest of update_backend_usage() */
+class update_fs_backend_usageTest : public ::testing::Test {
+protected:
+	FILE *fptr;
+
+	void SetUp()
+	{
+		mkdir("utils_unittest_folder", 0700);
+		fptr = fopen("utils_unittest_folder/mock_FSstat", "w+");
+	}
+
+	void TearDown()
+	{
+		fclose(fptr);
+		unlink("utils_unittest_folder/mock_FSstat");
+		rmdir("utils_unittest_folder");
+	}
+};
+
+TEST_F(update_fs_backend_usageTest, UpdateSuccess)
+{
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	fs_cloud_stat.backend_system_size = 123456;
+	fs_cloud_stat.backend_meta_size = 456;
+	fs_cloud_stat.backend_num_inodes = 5566;
+
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+
+	/* Run */
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789));
+
+	/* Verify */
+	fseek(fptr, 0, SEEK_SET);
+	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	EXPECT_EQ(123456 + 123, fs_cloud_stat.backend_system_size);
+	EXPECT_EQ(456 + 456, fs_cloud_stat.backend_meta_size);
+	EXPECT_EQ(5566 + 789, fs_cloud_stat.backend_num_inodes);
+}
+
+TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
+{
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	fs_cloud_stat.backend_system_size = 123456;
+	fs_cloud_stat.backend_meta_size = 456;
+	fs_cloud_stat.backend_num_inodes = 5566;
+
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+
+	/* Run */
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, -12345678, -456666, -789999));
+
+	/* Verify */
+	fseek(fptr, 0, SEEK_SET);
+	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	EXPECT_EQ(0, fs_cloud_stat.backend_system_size);
+	EXPECT_EQ(0, fs_cloud_stat.backend_meta_size);
+	EXPECT_EQ(0, fs_cloud_stat.backend_num_inodes);
+}
+
+/* End of unittest of update_backend_usage() */
 
 /*
  * Unittest of change_system_meta()
