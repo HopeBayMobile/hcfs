@@ -117,9 +117,12 @@ function build_system() {
 }
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-	\cp -fv $here/resource/* ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
+	rsync -v \
+		$here/resource/* \
+		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
+	rsync -v \
+		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} \
+		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 }
 function publish_apk() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
