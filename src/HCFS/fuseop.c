@@ -483,12 +483,6 @@ static int _lookup_pkg_status_cb(void *data, int argc, char **argv, char **azCol
 	return 0;
 }
 
-int lookup_pkg_status(char *pkgname, BOOL *ispin, BOOL *issys)
-{
-	*issys = TRUE;
-	return 0;
-}
-
 /*
  * Helper function for querying uid of input (pkgname),
  * result uid will be stored in (uid).
@@ -649,10 +643,15 @@ static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 	ret = lookup_pkg_status(tmptok_prev, &ispin, &issys);
 	/* Get pin st if success */
 	if (ret == 0) {
-		if (issys)
+		if (issys == TRUE) {
 			*pin_status = TRUE;
-		else
-			*pin_status = (char)ispin;
+		} else {
+			if (ispin == TRUE || ispin == FALSE)
+				*pin_status = (char)ispin;
+			else
+				write_log(0, "Error: Lookup pin status "
+						"is not bool\n");
+		}
 	}
 }
 
