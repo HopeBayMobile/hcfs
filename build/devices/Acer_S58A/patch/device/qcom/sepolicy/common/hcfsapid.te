@@ -20,16 +20,25 @@ allow hcfsapid hcfs_data_file:dir create_file_perms;
 allow hcfsapid hcfs_data_file:file create_file_perms;
 allow hcfsapid system_data_file:dir remove_name;
 
-# Allow connection from hcfsapid domain via socket to hcfsd domain
-#allow hcfsapid hcfs_socket:sock_file create_file_perms;
-#allow hcfsapid hcfs_socket:unix_stream_socket connectto;
-#allow hcfsapid hcfs_socket:sock_file rw_file_perms;
+# Allow permissions on internal mountpoint
+typeattribute app_data_file hcfs_internal_domain;
+typeattribute system_app_data_file hcfs_internal_domain;
+typeattribute system_data_file hcfs_internal_domain;
+typeattribute radio_data_file hcfs_internal_domain;
+typeattribute bluetooth_data_file hcfs_internal_domain;
+typeattribute shell_data_file hcfs_internal_domain;
+typeattribute location_app_data_file hcfs_internal_domain;
+typeattribute qsee_svc_app_data_file hcfs_internal_domain;
+typeattribute qtitetherservice_app_data_file hcfs_internal_domain;
+# /data/app
+typeattribute apk_data_file hcfs_internal_domain;
+typeattribute apk_tmp_file hcfs_internal_domain;
 
-# For socket file (should change to terafonn_data_file?)
-#allow hcfsapid app_data_file:dir { search add_name };
+allow hcfsapid hcfs_internal_domain:dir { search getattr };
+allow hcfsapid hcfs_internal_domain:file { getattr };
 
 # Allow permisssions on externel mountpoint
-allow hcfsapid fuse:dir { read open search };
+allow hcfsapid fuse:dir { read open search getattr };
 allow hcfsapid fuse:file { getattr };
 # Allow to access /mnt/runtime 
 allow hcfsapid storage_file:dir { search };

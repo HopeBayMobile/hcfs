@@ -11,6 +11,10 @@ allow terafonn_app terafonn_data_file:dir create_dir_perms;
 allow terafonn_app terafonn_data_file:file create_file_perms;
 allow terafonn_app terafonn_data_file:sock_file write;
 
+# Allow permissions to fetch app info
+allow terafonn_app apk_tmp_file:dir { search getattr };
+allow terafonn_app apk_tmp_file:file { read getattr open };
+
 allow terafonn_app unlabeled:file { read write open setattr };
 
 allow terafonn_app servicemanager:service_manager list;
