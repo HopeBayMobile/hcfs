@@ -69,10 +69,6 @@ on fs
     restorecon_recursive /data/data
     restorecon_recursive /data/app
 
-    # Aaron
-    restorecon_recursive /data/data
-    restorecon_recursive /data/app
-
     wait /dev/block/bootdevice/by-name/cache
     mount ext4 /dev/block/bootdevice/by-name/cache /cache nosuid nodev barrier=1
 
@@ -395,11 +391,15 @@ on property:ro.serialno=*
     start snid_emmc_init
 
 # Hopebay service
-on property:hopebay.hcfs.init=1
+on property:vold.hopebay.hcfs.init=1
     #trigger init-hcfs
     start hcfs_data_app
     wait /tmp/hcfs_ready 60
     rm /tmp/hcfs_ready
+
+    # Aaron
+    restorecon_recursive /data/data
+    restorecon_recursive /data/app
 
 service hcfs /system/bin/hcfs -oallow_other,big_writes
     class core

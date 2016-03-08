@@ -1,37 +1,41 @@
 type hcfsapid, domain;
 type hcfsapid_exec, exec_type, file_type;
-
 # Domain traistion from init to hcfsapid
 init_daemon_domain(hcfsapid)
 
 # Allow permission to create hcfsapid_socket file in com.hopebaytech.hcfsmgmt folder
 allow hcfsapid terafonn_data_file:dir rw_dir_perms;
 allow hcfsapid terafonn_data_file:sock_file create_file_perms;
-#file_type_auto_trans(hcfsapid, terafonn_data_file, hcfs_socket)
-file_type_auto_trans(hcfsapid, app_data_file, hcfs_socket)
+allow hcfsapid terafonn_data_file:file rw_file_perms;
 
-# Allow connection from hcfsapid domain via socket to terafonn_app domain
-allow hcfsapid hcfs_socket:sock_file create_file_perms;
-allow hcfsapid hcfs_socket:unix_stream_socket connectto;
-
-# Temp for test
-# Allow permission to create hcfs.conf.tmp file on /system/etc/
-#allow hcfsapid system_file:dir create_file_perms;
-# Type transition from system_file type to terafonn_data_file 
-#file_type_auto_trans(hcfsapid, system_file, terafonn_data_file) 
+# Allow connection from hcfsapid domain via socket to hcfsd domain
+allow hcfsapid hcfs_socket:sock_file rw_file_perms;
+allow hcfsapid hcfsd:unix_stream_socket connectto;
+allow hcfsapid device:dir rw_dir_perms;
+#allow hcfsapid hcfs_socket:sock_file create_file_perms;
 
 # Allow permission to read/write hcfs.conf
+file_type_auto_trans(hcfsapid, system_data_file, hcfs_data_file)
 allow hcfsapid hcfs_data_file:dir create_file_perms;
 allow hcfsapid hcfs_data_file:file create_file_perms;
-
-# Allow permissin to access files in terafonn app folder
-allow hcfsapid terafonn_data_file:file rw_file_perms;
+allow hcfsapid system_data_file:dir remove_name;
 
 # Allow connection from hcfsapid domain via socket to hcfsd domain
 #allow hcfsapid hcfs_socket:sock_file create_file_perms;
 #allow hcfsapid hcfs_socket:unix_stream_socket connectto;
-allow hcfsapid device:dir rw_dir_perms;
-allow hcfsapid hcfs_socket:sock_file rw_file_perms;
+#allow hcfsapid hcfs_socket:sock_file rw_file_perms;
 
 # For socket file (should change to terafonn_data_file?)
-allow hcfsapid app_data_file:dir { search add_name };
+#allow hcfsapid app_data_file:dir { search add_name };
+
+# Allow permisssions on externel mountpoint
+allow hcfsapid fuse:dir { read open search };
+allow hcfsapid fuse:file { getattr };
+# Allow to access /mnt/runtime 
+allow hcfsapid storage_file:dir { search };
+
+allow hcfsapid shell_data_file:dir { write remove_name search add_name };
+allow hcfsapid shell_data_file:file { write getattr read create unlink open };
+
+allow hcfsapid self:capability dac_override;
+

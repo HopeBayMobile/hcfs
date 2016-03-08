@@ -1,7 +1,17 @@
+# TeraFonn management app
 type terafonn_app, domain;
+# Permissions to work likes system app
 app_domain(terafonn_app)
+net_domain(terafonn_app)
+binder_service(terafonn_app)
 
 # Allow connection and send from terafonn_app domain via socket to other domain
-allow terafonn_app hcfs_socket:sock_file write;
-allow terafonn_app hcfs_socket:unix_stream_socket connectto;
-#allow terafonn_app terafonn_data_file:unix_dgram_socket sendto;
+allow terafonn_app hcfsapid:unix_stream_socket connectto;
+allow terafonn_app terafonn_data_file:dir create_dir_perms;
+allow terafonn_app terafonn_data_file:file create_file_perms;
+allow terafonn_app terafonn_data_file:sock_file write;
+
+allow terafonn_app unlabeled:file { read write open setattr };
+
+allow terafonn_app servicemanager:service_manager list;
+allow terafonn_app service_manager_type:service_manager find;

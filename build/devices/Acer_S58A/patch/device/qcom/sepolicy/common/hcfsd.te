@@ -21,6 +21,7 @@ allow hcfsd system_data_file:dir { open mounton };
 # Allow HCFSvol (executed by init.rc) to mount hcfs on /data/data and /data/app
 allow init fuse:filesystem { mount remount };
 allow init system_data_file:dir mounton;
+allow init rootfs:dir relabelfrom;
 
 # Allow permission to create hcfs_socket file in /dev/shm folder
 allow hcfsd device:dir rw_dir_perms;
@@ -39,16 +40,33 @@ allow hcfsd hcfs_data_file:file create_file_perms;
 allow hcfsd tmpfs:dir create_dir_perms;
 allow hcfsd tmpfs:file create_file_perms;
 
+# Allow hcfsd to communicate with hcfsmgmt app
+allow hcfsd terafonn_app:file { read open };
+allow hcfsd terafonn_app:dir search;
+allow hcfsd terafonn_data_file:dir search;
+allow hcfsd terafonn_data_file:file { write getattr setattr read lock open };
+
 # From avc warning
 allow hcfsd fuse_device:chr_file { read write open };
 allow hcfsd hcfsd_tmpfs:file { create open getattr unlink };
-allow hcfsd self:capability { sys_admin sys_resource dac_override };
+allow hcfsd self:capability { sys_admin sys_resource dac_override net_raw };
 #allow hcfsd system_data_file:dir { write read remove_name create open add_name mounton };
 #allow hcfsd system_data_file:file { write setattr lock create unlink open append rename };
 allow hcfsd apk_data_file:dir { read open mounton };
 allow hcfsd qti_init_shell:fd use;
 allow hcfsd shell_data_file:dir { write remove_name search add_name };
 allow hcfsd shell_data_file:file { write getattr read create unlink open };
+
+allow hcfsd cnd:unix_stream_socket connectto;
+allow hcfsd cnd_socket:sock_file write;
+allow hcfsd dpmd:unix_stream_socket connectto;
+allow hcfsd dpmwrapper_socket:sock_file write;
+allow hcfsd fwmarkd_socket:sock_file write;
+allow hcfsd netd:unix_stream_socket connectto;
+allow hcfsd port:tcp_socket name_connect;
+allow hcfsd self:tcp_socket { write read getopt create getattr connect };
+allow hcfsd self:udp_socket create;
+
 
 # comm="hcfs" name="/" dev="fuse" scontext=u:r:hcfsd:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
 allow hcfsd labeledfs:filesystem mount;
@@ -136,6 +154,16 @@ allow qti_init_shell unlabeled:dir { setattr getattr };
 # Allow qti_init_shell to have permission to create /data/data and /data/app folder
 #allow qti_init_shell unlabeled:dir { add_name create }; 
 
+# Allow ati_init_shell to execute /system/xbin/su
+#allow qti_init_shell su_exec:file { read getattr open execute execute_no_trans };
+# Allow ati_init_shell to access /data/qdss/qdss.agent.sh
+allow qti_init_shell system_data_file:file open;
+
+# Allow to chown /
+allow qti_init_shell apk_data_file:dir setattr;
+# Allow to have permissions on /data/hcfs, /data/hcfs.conf 
+allow qti_init_shell hcfs_data_file:file getattr;
+
 #============= sdcardd ==============
 # Allow sdcardd to have permissions on /dev/shm/hcfs_reporter
 allow sdcardd hcfs_socket:sock_file write;
@@ -164,7 +192,7 @@ allow vold unlabeled:dir write;
 
 #============= untrusted_app ==============
 # comm="android.vending" path="/storage/emulated" dev="fuse" scontext=u:r:untrusted_app:s0:c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir
-allow untrusted_app unlabeled:dir { read search getattr };
+allow untrusted_app unlabeled:dir { read write search getattr remove_name add_name };
 # Allow untrusted_app(RenderThread) to have permissions on /data/data/com.android.systemui/code_cache/com.android.opengl.shaders_cache
 allow untrusted_app unlabeled:file { read write open setattr unlink };
 
@@ -204,3 +232,20 @@ qmux_socket(system_app)
 #============= perfd ==============
 allow perfd self:capability kill;
 allow perfd system_server:process signull;
+
+#============= installd ==============
+allow installd terafonn_data_file:dir { write search setattr relabelto getattr add_name };
+allow installd terafonn_data_file:lnk_file create;
+
+#============= system_server ==============
+allow system_server terafonn_data_file:dir getattr;
+
+#============= netd ==============
+allow netd terafonn_app:fd use;
+allow netd terafonn_app:tcp_socket { read write setopt getopt };
+allow netd hcfsd:fd use;
+allow netd hcfsd:tcp_socket { read write setopt getopt };
+
+#============= dpmd ==============
+allow dpmd hcfsd:fd use;
+allow dpmd hcfsd:tcp_socket { read write };
