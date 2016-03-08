@@ -449,7 +449,9 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 #ifdef _ANDROID_ENV_
 /* Internal function for generating the ownership / permission for
 Android external storage */
-static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
+#define PKG_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
+
+static int _lookup_pkg_cb(void *data, int argc, char **argv, char **azColName)
 {
 
 	size_t uid_len;
@@ -463,6 +465,21 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 	uid_len = strlen(argv[0]);
 	*uid = malloc(sizeof(char) * (uid_len + 1));
 	snprintf(*uid, uid_len + 1, "%s", argv[0]);
+	return 0;
+}
+
+static int _lookup_pkg_status_cb(void *data, int argc, char **argv, char **azColName)
+{
+
+	int *res = (int*)data;
+
+	UNUSED(argc);
+	UNUSED(azColName);
+	if (!argv[0] || !argv[1])
+		return -1;
+
+	res[0] = atoi(argv[0]);
+	res[1] = atoi(argv[1]);
 	return 0;
 }
 
@@ -480,7 +497,6 @@ int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 	char *data;
 	char *sql_err = 0;
 	char sql[500];
-	char db_path[500] = "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db";
 
 	write_log(8, "Looking up pkg %s\n", pkgname);
 	/* Return uid 0 if error occurred */
@@ -499,19 +515,19 @@ int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 		 "SELECT uid from uid WHERE package_name='%s'",
 		 pkgname);
 
-	if (access(db_path, F_OK) != 0) {
+	if (access(PKG_DB_PATH, F_OK) != 0) {
 		write_log(4, "Query pkg uid err (open db) - db file not existed\n");
 		return -1;
 	}
 
-	ret_code = sqlite3_open(db_path, &db);
+	ret_code = sqlite3_open(PKG_DB_PATH, &db);
 	if (ret_code != SQLITE_OK) {
 		write_log(4, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
 		return -1;
 	}
 
 	/* Sql statement */
-	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb,
+	ret_code = sqlite3_exec(db, sql, _lookup_pkg_cb,
 	                        (void *)&data, &sql_err);
 	if( ret_code != SQLITE_OK ){
 		write_log(4, "Query pkg uid err (sql statement) - %s\n", sql_err);
@@ -536,6 +552,64 @@ int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 	sem_post(&(tmpptr->pkg_cache_lock));
 
 	free(data);
+	return 0;
+}
+
+/*
+ * Helper function for querying status of input (pkgname),
+ * result ispin will be TRUE if pkg is pinned, otherwise FALSE.
+ * result issys will be TRUE if pkg is system app, otherwise FALSE.
+ *
+ * @return - 0 for success, otherwise -1.
+ */
+int lookup_pkg_status(char *pkgname, BOOL *ispin, BOOL *issys)
+{
+
+	sqlite3 *db;
+	int ret_code;
+	int status_code[2] = {-1, -1};
+	char *sql_err = 0;
+	char sql[500];
+
+	write_log(8, "Looking up pkg status %s\n", pkgname);
+
+	snprintf(sql, sizeof(sql),
+		 "SELECT system_app,pin_status from uid WHERE package_name='%s'",
+		 pkgname);
+
+	if (access(PKG_DB_PATH, F_OK) != 0) {
+		write_log(4, "Query pkg status err (open db) - db file not existed\n");
+		return -1;
+	}
+
+	ret_code = sqlite3_open(PKG_DB_PATH, &db);
+	if (ret_code != SQLITE_OK) {
+		write_log(4, "Query pkg status err (open db) - %s\n", sqlite3_errmsg(db));
+		return -1;
+	}
+
+	/* Sql statement */
+	ret_code = sqlite3_exec(db, sql, _lookup_pkg_status_cb,
+	                        (void *)status_code, &sql_err);
+	if( ret_code != SQLITE_OK ){
+		write_log(4, "Query pkg status err (sql statement) - %s\n", sql_err);
+		sqlite3_free(sql_err);
+		sqlite3_close(db);
+		return -1;
+	}
+
+	sqlite3_close(db);
+
+	if (status_code[0] < 0 || status_code[1] < 0) {
+		write_log(4, "Query pkg status err (sql statement) - pkg not found\n");
+		return -1;
+	}
+
+	write_log(8, "Fetch pkg status issys = %d, ispin = %d\n",
+		  status_code[0], status_code[1]);
+
+	*issys = status_code[0];
+	*ispin = status_code[1];
 	return 0;
 }
 
