@@ -94,7 +94,10 @@ function unittest()
 {
 	cd $testdir/unit_test
 	./run_unittests
-	sed -i "s@$repo/@@g" $repo/tests/unit_test/c/unittest_modules/*/test_detail_*.xml
+}
+function unittest_report()
+{
+	sed -i "s@$repo/@@g" $repo/tests/unit_test/c/unittest_modules/*/test_detail_*.xml;
 }
 
 set +x
@@ -109,6 +112,7 @@ ccm_result       > /dev/null 2>&1 &
 hb_clint         > /dev/null 2>&1 &
 checkpatch
 wait
+trap unittest_report ERR EXIT
 unittest
 
 # coverage.xml
