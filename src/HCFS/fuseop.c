@@ -5468,6 +5468,13 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_inode = real_ino(req, ino);
 
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		fuse_reply_err(req, ENOTSUP);
+		return;
+	}
+#endif
+
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
 		write_log(0, "readlink() lock meta cache entry fail\n");
@@ -5485,16 +5492,6 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
-
-#ifdef _ANDROID_ENV_
-        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-                if (tmpptr->vol_path_cache == NULL) {
-                        fuse_reply_err(req, EIO);
-                        return;
-                }
-                _rewrite_stat(tmpptr, &symlink_stat, NULL);
-        }
-#endif
 
 	/* Update access time */
 	set_timestamp_now(&symlink_stat, ATIME);
