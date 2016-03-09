@@ -944,7 +944,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
-	long long metasize, old_metasize, new_metasize;
 	long long delta_meta_size;
 
 	write_log(10,
@@ -1123,7 +1122,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
-	long long metasize, old_metasize, new_metasize;
 	long long delta_meta_size;
 
 	gettimeofday(&tmp_time1, NULL);
@@ -6408,7 +6406,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
-	long long metasize, old_metasize, new_metasize;
 	long long delta_meta_size;
 
 	parent_inode = real_ino(req, parent);
