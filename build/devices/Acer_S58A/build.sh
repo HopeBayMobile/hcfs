@@ -40,7 +40,7 @@ $TRACE
 eval '[ -n "$UPSTREAM_LIB_DIR" ]' || { echo Assign these for local build; exit 1; }
 
 ### Upstream APK
-APK_NAME=terafonn_1.0.0024
+APK_NAME=terafonn_1.0.0025
 APK_DIR=/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APK_NAME
 DOCKER_IMAGE='docker:5000/s58a-buildbox:0225-cts-${IMAGE_TYPE}-prebuilt'
 
