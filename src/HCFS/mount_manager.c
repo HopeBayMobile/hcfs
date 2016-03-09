@@ -1031,7 +1031,7 @@ int unmount_all(void)
 *
 *************************************************************************/
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-				long long num_inodes_delta)
+		long long meta_size_delta, long long num_inodes_delta)
 {
 	int ret;
 
@@ -1039,6 +1039,11 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 	(mptr->FS_stat)->system_size += system_size_delta;
 	if ((mptr->FS_stat)->system_size < 0)
 		(mptr->FS_stat)->system_size = 0;
+
+	(mptr->FS_stat)->meta_size += meta_size_delta;
+	if ((mptr->FS_stat)->meta_size < 0)
+		(mptr->FS_stat)->meta_size = 0;
+
 	(mptr->FS_stat)->num_inodes += num_inodes_delta;
 	if ((mptr->FS_stat)->num_inodes < 0)
 		(mptr->FS_stat)->num_inodes = 0;

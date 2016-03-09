@@ -944,6 +944,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
+	long long metasize, old_metasize, new_metasize;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -963,6 +964,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+	get_meta_size(parent_inode, &old_metasize);
         write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
@@ -1076,7 +1078,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
-	ret_val = change_mount_stat(tmpptr, 0, 1);
+
+	get_meta_size(parent_inode, &new_metasize);
+	get_meta_size(self_inode, &metasize);
+		
+	ret_val = change_mount_stat(tmpptr, 0,
+			metasize + (new_metasize - old_metasize), 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -1110,6 +1117,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
+	long long metasize, old_metasize, new_metasize;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -1121,6 +1129,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+	get_meta_size(parent_inode, &old_metasize);
         write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
@@ -1222,7 +1231,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
-	ret_val = change_mount_stat(tmpptr, 0, 1);
+
+	get_meta_size(parent_inode, &new_metasize);
+	get_meta_size(self_inode, &metasize);
+
+	ret_val = change_mount_stat(tmpptr, 0,
+			metasize + (new_metasize - old_metasize), 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -2912,7 +2926,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0);
 
 	ret = change_mount_stat(tmpptr,
-			(long long) (offset - filestat->st_size), 0);
+			(long long) (offset - filestat->st_size), 0, 0);
 	if (ret < 0)
 		return ret;
 
@@ -4226,6 +4240,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
 	long long sizediff, amount_preallocated;
+	long long old_metasize, new_metasize;
 
 	write_log(10, "Debug write: size %zu, offset %lld\n", size,
 	          offset);
@@ -4244,6 +4259,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	get_meta_size(thisinode, &old_metasize);
 	/*Sleep if cache already full (don't do this now)*/
 /*	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT)
 		sleep_on_cache_full();
@@ -4349,8 +4365,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			break;
 	}
 
-	/*Update and flush file meta*/
+	get_meta_size(thisinode, &new_metasize);
 
+	/*Update and flush file meta*/
 	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
 			&thisfilemeta, NULL, 0, fh_ptr->meta_cache_ptr);
 	if (ret < 0) {
@@ -4384,7 +4401,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 						- temp_stat.st_size), 0, 0, 0);
 		ret = change_mount_stat(tmpptr,
 			(long long) ((offset + total_bytes_written)
-						- temp_stat.st_size), 0);
+			- temp_stat.st_size), (new_metasize - old_metasize), 0);
 		if (ret < 0) {
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -4395,6 +4412,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
+	} else {
+		ret = change_mount_stat(tmpptr, 0,
+				(new_metasize - old_metasize), 0);
+		if (ret < 0) {
+			fh_ptr->meta_cache_locked = FALSE;
+			meta_cache_close_file(fh_ptr->meta_cache_ptr);
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			fuse_reply_err(req, -ret);
+			return;
+		}
 	}
 
 	if (total_bytes_written > 0)
@@ -5334,6 +5361,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int errcode;
 	MOUNT_T *tmpptr;
 	char local_pin;
+	long long metasize, old_metasize, new_metasize;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5367,6 +5395,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
+
+	get_meta_size(parent_inode, &old_metasize);
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
@@ -5454,6 +5484,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 
+	get_meta_size(parent_inode, &new_metasize);
+
 	/* Reply fuse entry */
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
@@ -5462,12 +5494,14 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISLNK);
-
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
 	}
-	ret_val = change_mount_stat(tmpptr, 0, 1);
+
+	get_meta_size(self_inode, &metasize);
+	ret_val = change_mount_stat(tmpptr, 0,
+			metasize + (new_metasize - old_metasize), 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);

@@ -189,6 +189,7 @@ typedef struct {
 /* Defining the system meta resources */
 typedef struct {
 	long long system_size;
+	long long system_meta_size;
 	long long cache_size;
 	long long cache_blocks;
 	long long pinned_size;

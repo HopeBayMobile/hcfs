@@ -1512,3 +1512,21 @@ BOOL is_natural_number(char *str)
 		return ret;
 	}
 }
+
+int get_meta_size(ino_t inode, long long *metasize)
+{
+	char metapath[300];
+	struct stat metastat;
+	int ret, ret_code;
+
+	fetch_meta_path(metapath, inode);
+	ret = stat(metapath, &metastat);
+	if (ret < 0) {
+		ret_code = errno;
+		write_log(0, "Error on stat. Code %d\n", ret_code);
+		*metasize = 0;
+		return -ret_code;
+	}
+	*metasize = metastat.st_size;
+	return 0;
+}

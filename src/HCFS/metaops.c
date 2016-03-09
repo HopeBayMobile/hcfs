@@ -1233,6 +1233,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FS_STAT_T tmpstat;
 	SYSTEM_DATA_TYPE *statptr;
 	char meta_deleted;
+	long long metasize;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1251,6 +1252,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
+	get_meta_size(this_inode, &metasize);
+
 	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
@@ -1264,7 +1267,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
 		else
-			change_mount_stat(mptr, 0, -1);
+			change_mount_stat(mptr, 0, -metasize, -1);
 		break;
 
 	case D_ISLNK:
@@ -1278,7 +1281,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
 		else
-			change_mount_stat(mptr, 0, -1);
+			change_mount_stat(mptr, 0, -metasize, -1);
 		break;
 
 	case D_ISREG:
@@ -1418,7 +1421,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 		if (mptr != NULL) {
-			change_mount_stat(mptr, -this_inode_stat.st_size, -1);
+			change_mount_stat(mptr, -this_inode_stat.st_size,
+					-metasize, -1);
 		} else {
 			tmpstat.num_inodes--;
 			tmpstat.system_size -= this_inode_stat.st_size;
