@@ -1523,6 +1523,18 @@ BOOL is_natural_number(char *str)
 	}
 }
 
+/**
+ * get_meta_size()
+ *
+ * Get size of meta file. "metasize" is 0 if size of this meta file
+ * cannot be retrieved, and then return negative error code.
+ *
+ * @param inode Inode number of this meta file.
+ * @param metasize Variable to store meta size.
+ *
+ * @return 0 on success, otherwise negative error code.
+ *
+ */ 
 int get_meta_size(ino_t inode, long long *metasize)
 {
 	char metapath[300];
@@ -1533,10 +1545,12 @@ int get_meta_size(ino_t inode, long long *metasize)
 	ret = stat(metapath, &metastat);
 	if (ret < 0) {
 		ret_code = errno;
-		write_log(0, "Error on stat. Code %d\n", ret_code);
+		write_log(0, "Error on get stat of meta %"PRIu64
+				". Code %d\n", (uint64_t)inode, ret_code);
 		*metasize = 0;
 		return -ret_code;
 	}
 	*metasize = metastat.st_size;
+
 	return 0;
 }

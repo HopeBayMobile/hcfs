@@ -5903,7 +5903,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);
-			fuse_reply_err(req, ENODATA);
+			fuse_reply_xattr(req, 0);
 			return;
 		} else {
 			goto error_handle;
@@ -6018,7 +6018,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);
-			fuse_reply_err(req, ENODATA);
+			fuse_reply_xattr(req, 0);
 			return;
 		} else {
 			goto error_handle;
