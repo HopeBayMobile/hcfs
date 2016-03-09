@@ -213,7 +213,11 @@ errcode_handle:
 }
 
 /* Helper function for allocating a new inode as root */
-ino_t _create_root_inode(void)
+#ifdef _ANDROID_ENV_
+ino_t _create_root_inode(char voltype)
+#else
+ino_t _create_root_inode()
+#endif
 {
 	ino_t root_inode;
 	struct stat this_stat;
@@ -228,6 +232,7 @@ ino_t _create_root_inode(void)
 	int64_t ret_pos;
 	unsigned long this_gen;
 	FS_STAT_T tmp_stat;
+	char ispin;
 
 	statfptr = NULL;
 
@@ -237,8 +242,13 @@ ino_t _create_root_inode(void)
 
 #ifdef _ANDROID_ENV_
 	self_mode = S_IFDIR | 0770;
+	if (voltype == ANDROID_INTERNAL) /* Default pin internal storage */
+		ispin = TRUE;
+	else
+		ispin = DEFAULT_PIN;
 #else
 	self_mode = S_IFDIR | 0775;
+	ispin = DEFAULT_PIN;
 #endif
 	this_stat.st_mode = self_mode;
 
@@ -249,7 +259,7 @@ ino_t _create_root_inode(void)
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	root_inode = super_block_new_inode(&this_stat, &this_gen, DEFAULT_PIN);
+	root_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
 
 	if (root_inode <= 1) {
 		write_log(0, "Error creating new root inode\n");
@@ -279,7 +289,7 @@ ino_t _create_root_inode(void)
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
-	this_meta.local_pin = DEFAULT_PIN;
+	this_meta.local_pin = ispin;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 	this_meta.metaver = CURRENT_META_VER;
 
@@ -434,7 +444,11 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	memset(&temp_entry, 0, sizeof(DIR_ENTRY));
 	memset(&overflow_entry, 0, sizeof(DIR_ENTRY));
 
+#ifdef _ANDROID_ENV_
+	new_FS_ino = _create_root_inode(voltype);
+#else
 	new_FS_ino = _create_root_inode();
+#endif
 
 	if (new_FS_ino == 0) {
 		write_log(0, "Error in creating root inode of filesystem\n");
