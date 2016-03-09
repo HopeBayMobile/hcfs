@@ -16,10 +16,20 @@
 PATH=%PATH%;"%SYSTEMROOT%\System32"
 
 @ECHO ON
-adb kill-server
-adb wait-for-device
-adb root
-adb wait-for-device
-:: adb shell "set -- `ps | grep hcfs`; kill -9 $2"
-adb reboot bootloader
-call fastboot-flush-all.bat
+fastboot oem unlock-go
+fastboot flash boot boot.img || goto :error
+fastboot flash system system.img || goto :error
+fastboot flash userdata userdata.img || goto :error
+fastboot erase cache
+fastboot reboot
+@ECHO OFF
+echo Press any key to exit...
+pause >nul
+exit
+
+:error
+@ECHO OFF
+echo Failed with error #%errorlevel%.
+echo Press any key to exit...
+pause >nul
+exit /b %errorlevel%

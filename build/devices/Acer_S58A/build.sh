@@ -113,13 +113,22 @@ function copy_apk_to_source_tree() {
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh root@$DOCKER_IP ccache --max-size=30G
+	ssh root@$DOCKER_IP bash -ic "cd /data/device/acer/common/apps/HopebayHCFSmgmt/ && \
+	java  -Xmx2048m -jar /data/out/host/linux-x86/framework/signapk.jar \
+		-w /data/build/target/product/security/platform.x509.pem \
+		/data/build/target/product/security/platform.pk8 \
+		/data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}.apk /data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}-signed.apk && \
+	mv -vf /data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}-signed.apk /data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}.apk"
 	ssh root@$DOCKER_IP bash -ic "./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-	scp -i ~/.ssh/id_rsa root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-	\cp -fv $here/resource/* ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
+	rsync -v \
+		$here/resource/* \
+		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
+	rsync -v \
+		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} \
+		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 }
 function publish_apk() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
