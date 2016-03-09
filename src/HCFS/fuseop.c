@@ -4491,11 +4491,11 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/*Prototype is linux statvfs call*/
 	sem_wait((tmpptr->stat_lock));
 
-	system_size = (tmpptr->FS_stat)->system_size +
-		(tmpptr->FS_stat)->meta_size;
+	//system_size = (tmpptr->FS_stat)->system_size +
+	//	(tmpptr->FS_stat)->meta_size;
+	system_size = hcfs_system->systemdata.system_size +
+			hcfs_system->systemdata.system_meta_size;
 	write_log(10, "Debug: system_size is %lld\n", system_size);
-	//system_size = hcfs_system->systemdata.system_size +
-	//		hcfs_system->systemdata.system_meta_size;
 	num_inodes = (tmpptr->FS_stat)->num_inodes;
 
 	sem_post((tmpptr->stat_lock));
@@ -6303,6 +6303,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
+	long long metasize, old_metasize, new_metasize;
 
 	parent_inode = real_ino(req, parent);
 
@@ -6320,6 +6321,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
+
+	get_meta_size(parent_inode, &old_metasize);
 
 	/* Check parent type */
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
@@ -6424,6 +6427,18 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
+	get_meta_size(parent_inode, &new_metasize);
+	get_meta_size(self_inode, &metasize);
+	change_system_meta(0, metasize + (new_metasize - old_metasize),
+			0, 0, 0);
+	ret_val = change_mount_stat(tmpptr, 0,
+			metasize + (new_metasize - old_metasize), 1);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	ret_val = lookup_increase(tmpptr->lookup_table, self_inode, 1, D_ISREG);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -6439,6 +6454,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 	fi->fh = fh;
+
 	fuse_reply_create(req, &tmp_param, fi);
 }
 
