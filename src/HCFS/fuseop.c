@@ -945,6 +945,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	long long metasize, old_metasize, new_metasize;
+	long long delta_meta_size;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -964,7 +965,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-	get_meta_size(parent_inode, &old_metasize);
         write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
@@ -1047,10 +1047,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 #ifdef _ANDROID_ENV_
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation, tmpptr->f_ino, ispin);
+			&this_stat, this_generation, tmpptr->f_ino,
+			&delta_meta_size, ispin);
 #else
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation, tmpptr->f_ino, local_pin);
+			&this_stat, this_generation, tmpptr->f_ino,
+			&delta_meta_size, local_pin);
 #endif
 
 	/* TODO: May need to delete from super block and parent if failed. */
@@ -1079,13 +1081,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	get_meta_size(parent_inode, &new_metasize);
-	get_meta_size(self_inode, &metasize);
-
-	change_system_meta(0, metasize + (new_metasize - old_metasize),
-			0, 0, 0);
-	ret_val = change_mount_stat(tmpptr, 0,
-			metasize + (new_metasize - old_metasize), 1);
+	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -1120,6 +1117,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	long long metasize, old_metasize, new_metasize;
+	long long delta_meta_size;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -1131,7 +1129,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-	get_meta_size(parent_inode, &old_metasize);
         write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
@@ -1206,14 +1203,15 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_ino = self_inode;
 
+	delta_meta_size = 0;
 #ifdef _ANDROID_ENV_
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat, this_gen,
-			tmpptr->f_ino, ispin);
+			tmpptr->f_ino, &delta_meta_size, ispin);
 #else
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat, this_gen,
-			tmpptr->f_ino, local_pin);
+			tmpptr->f_ino, &delta_meta_size, local_pin);
 #endif
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -1234,13 +1232,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	get_meta_size(parent_inode, &new_metasize);
-	get_meta_size(self_inode, &metasize);
-
-	change_system_meta(0, metasize + (new_metasize - old_metasize),
-			0, 0, 0);
-	ret_val = change_mount_stat(tmpptr, 0,
-			metasize + (new_metasize - old_metasize), 1);
+	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -1629,6 +1622,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat1, parent_stat2;
 	MOUNT_T *tmpptr;
 	DIR_STATS_TYPE tmpstat;
+	long long old_metasize1, old_metasize2, new_metasize1, new_metasize2;
+	long long delta_meta_size1, delta_meta_size2;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -1724,6 +1719,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	get_meta_size(parent_inode1, &old_metasize1);
+
 	if (parent_inode1 != parent_inode2) {
 		parent2_ptr = meta_cache_lock_entry(parent_inode2);
 		if (parent2_ptr == NULL) { /* Cannot lock (cannot allocate) */
@@ -1732,8 +1729,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, ENOMEM);
 			return;
 		}
+		get_meta_size(parent_inode2, &old_metasize2);
 	} else {
 		parent2_ptr = parent1_ptr;
+		old_metasize2 = old_metasize1;
 	}
 
 	/* Check if oldpath and newpath exists already */
@@ -2106,8 +2105,28 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		}
 #endif
 	}
+
+	get_meta_size(parent_inode1, &new_metasize1);
+	get_meta_size(parent_inode2, &new_metasize2);
+
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
+
+	if (new_metasize1 > 0 && old_metasize1 > 0)
+		delta_meta_size1 = new_metasize1 - old_metasize1;
+	else
+		delta_meta_size1 = 0;
+	if (new_metasize2 > 0 && old_metasize2 > 0)
+		delta_meta_size2 = new_metasize2 - old_metasize2;
+	else
+		delta_meta_size2 = 0;
+
+	if (delta_meta_size1 + delta_meta_size2 != 0) {
+		change_system_meta(0, delta_meta_size1 + delta_meta_size2,
+				0, 0, 0);
+		change_mount_stat(tmpptr, 0,
+				delta_meta_size1 + delta_meta_size2 , 0);
+	}
 
 	fuse_reply_err(req, 0);
 }
@@ -4244,7 +4263,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
 	long long sizediff, amount_preallocated;
-	long long old_metasize, new_metasize;
+	long long old_metasize, new_metasize, delta_meta_size;
 
 	write_log(10, "Debug write: size %zu, offset %lld\n", size,
 	          offset);
@@ -4263,7 +4282,6 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
-	get_meta_size(thisinode, &old_metasize);
 	/*Sleep if cache already full (don't do this now)*/
 /*	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT)
 		sleep_on_cache_full();
@@ -4298,6 +4316,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 	fh_ptr->meta_cache_locked = TRUE;
+
+	get_meta_size(thisinode, &old_metasize);
 
 	/* If the file is pinned, need to change the pinned_size
 	first if necessary */
@@ -4369,7 +4389,11 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			break;
 	}
 
-	get_meta_size(thisinode, &new_metasize);
+	get_meta_size(thisinode, &new_metasize);	
+	if (old_metasize > 0 && new_metasize > 0)
+		delta_meta_size = (new_metasize - old_metasize);
+	else
+		delta_meta_size = 0;
 
 	/*Update and flush file meta*/
 	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
@@ -4402,11 +4426,10 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
-				- temp_stat.st_size),
-				(new_metasize - old_metasize), 0, 0, 0);
+				- temp_stat.st_size), delta_meta_size, 0, 0, 0);
 		ret = change_mount_stat(tmpptr,
 			(long long) ((offset + total_bytes_written)
-			- temp_stat.st_size), (new_metasize - old_metasize), 0);
+			- temp_stat.st_size), delta_meta_size, 0);
 		if (ret < 0) {
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -4418,16 +4441,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
 	} else {
-		change_system_meta(0, (new_metasize - old_metasize),
-				0, 0, 0);
-		ret = change_mount_stat(tmpptr, 0,
-				(new_metasize - old_metasize), 0);
-		if (ret < 0) {
-			fh_ptr->meta_cache_locked = FALSE;
-			meta_cache_close_file(fh_ptr->meta_cache_ptr);
-			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-			fuse_reply_err(req, -ret);
-			return;
+		if (delta_meta_size != 0) {
+			change_system_meta(0, delta_meta_size, 0, 0, 0);
+			ret = change_mount_stat(tmpptr, 0, delta_meta_size, 0);
+			if (ret < 0) {
+				fh_ptr->meta_cache_locked = FALSE;
+				meta_cache_close_file(fh_ptr->meta_cache_ptr);
+				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+				fuse_reply_err(req, -ret);
+				return;
+			}
 		}
 	}
 
@@ -5372,7 +5395,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int errcode;
 	MOUNT_T *tmpptr;
 	char local_pin;
-	long long metasize, old_metasize, new_metasize;
+	long long delta_meta_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5406,8 +5429,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
-
-	get_meta_size(parent_inode, &old_metasize);
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
@@ -5476,7 +5497,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
-		link, this_generation, name, tmpptr->f_ino, local_pin);
+			link, this_generation, name, tmpptr->f_ino,
+			&delta_meta_size, local_pin);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		errcode = ret_val;
@@ -5495,8 +5517,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 
-	get_meta_size(parent_inode, &new_metasize);
-
 	/* Reply fuse entry */
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
@@ -5510,11 +5530,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, -ret_val);
 	}
 
-	get_meta_size(self_inode, &metasize);
-	change_system_meta(0, metasize + (new_metasize - old_metasize),
-			0, 0, 0);
-	ret_val = change_mount_stat(tmpptr, 0,
-			metasize + (new_metasize - old_metasize), 1);
+	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -6160,6 +6177,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	unsigned long this_generation;
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
+	long long old_metasize, new_metasize, delta_meta_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6210,6 +6228,9 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
+
+	get_meta_size(parent_inode, &old_metasize);
+
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
 		&result_index, newname, parent_meta_cache_entry);
 	if (ret_val < 0) {
@@ -6228,6 +6249,13 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	if (ret_val < 0) {
 		errcode = ret_val;
 		goto error_handle;
+	}
+
+	get_meta_size(parent_inode, &new_metasize);
+	delta_meta_size = new_metasize - old_metasize;
+	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
+		change_system_meta(0, (new_metasize - old_metasize), 0, 0, 0);
+		change_mount_stat(tmpptr, 0, (new_metasize - old_metasize), 0);
 	}
 
 	/* Unlock parent */
@@ -6304,6 +6332,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	long long metasize, old_metasize, new_metasize;
+	long long delta_meta_size;
 
 	parent_inode = real_ino(req, parent);
 
@@ -6321,8 +6350,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
-
-	get_meta_size(parent_inode, &old_metasize);
 
 	/* Check parent type */
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
@@ -6399,10 +6426,12 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_ino = self_inode;
 #ifdef _ANDROID_ENV_
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
-			&this_stat, this_generation, tmpptr->f_ino, ispin);
+			&this_stat, this_generation, tmpptr->f_ino,
+			&delta_meta_size, ispin);
 #else
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
-			&this_stat, this_generation, tmpptr->f_ino, local_pin);
+			&this_stat, this_generation, tmpptr->f_ino,
+			&delta_meta_size, local_pin);
 #endif
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -6427,12 +6456,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
-	get_meta_size(parent_inode, &new_metasize);
-	get_meta_size(self_inode, &metasize);
-	change_system_meta(0, metasize + (new_metasize - old_metasize),
-			0, 0, 0);
-	ret_val = change_mount_stat(tmpptr, 0,
-			metasize + (new_metasize - old_metasize), 1);
+	change_system_meta(0, delta_meta_size, 0, 0, 0);
+	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
