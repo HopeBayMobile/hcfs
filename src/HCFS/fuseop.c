@@ -652,10 +652,14 @@ static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 				write_log(0, "Error: Lookup pin status "
 						"is not bool\n");
 		}
+	} else {
+		write_log(4, "Pin status of pkg %s is not found\n",
+				tmptok_prev);
 	}
 }
 
-int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat, char *pin_status)
+int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
+		char *selfname, char *pin_status)
 {
 	int ret, errcode;
 	char *tmppath;
@@ -764,6 +768,11 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat, char *pin_status)
 					thisstat->st_uid = 0;
 					thisstat->st_gid = 1028;
 					newpermission = 0771;
+					/* When parent is /0/Android/data/,
+					 * need to check self pkg name */
+					if (selfname && pin_status)
+						_try_get_pin_st(selfname,
+								pin_status);
 				}
 				break;
 			case 3:
@@ -873,7 +882,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 				fuse_reply_err(req, EIO);
 				return;
 			}
-			_rewrite_stat(tmpptr, &tmp_stat, NULL);
+			_rewrite_stat(tmpptr, &tmp_stat, NULL, NULL);
 		}
 #endif
 
@@ -960,7 +969,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, &ispin);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, &ispin);
 	}
 	/* Inherit parent pin status if "ispin" is not modified */
 	if (ispin == (char) 255)
@@ -1118,7 +1127,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, &ispin);
+		_rewrite_stat(tmpptr, &parent_stat, selfname, &ispin);
 	}
 	/* Inherit parent pin status if "ispin" is not modified */
 	if (ispin == (char) 255)
@@ -1255,7 +1264,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
 	}
 #endif
 
@@ -1334,7 +1343,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
 	}
 #endif
 
@@ -1438,7 +1447,7 @@ a directory (for NFS) */
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
 	}
 #endif
 
@@ -1482,7 +1491,7 @@ a directory (for NFS) */
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &(output_param.attr), NULL);
+		_rewrite_stat(tmpptr, &(output_param.attr), NULL, NULL);
 	}
 #endif
 
@@ -1625,7 +1634,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat1, NULL);
+		_rewrite_stat(tmpptr, &parent_stat1, NULL, NULL);
 	}
 #endif
 
@@ -1655,7 +1664,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat2, NULL);
+		_rewrite_stat(tmpptr, &parent_stat2, NULL, NULL);
 	}
 #endif
 
@@ -2955,7 +2964,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &this_stat, NULL);
+		_rewrite_stat(tmpptr, &this_stat, NULL, NULL);
 	}
 #endif
 
@@ -4605,7 +4614,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &this_stat, NULL);
+		_rewrite_stat(tmpptr, &this_stat, NULL, NULL);
 	}
 #endif
 
@@ -5208,7 +5217,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &thisstat, NULL);
+		_rewrite_stat(tmpptr, &thisstat, NULL, NULL);
 	}
 #endif
 
@@ -5597,7 +5606,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                         fuse_reply_err(req, EIO);
                         return;
                 }
-                _rewrite_stat(tmpptr, &stat_data, NULL);
+                _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
         }
 #endif
 
@@ -5709,7 +5718,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                         fuse_reply_err(req, EIO);
                         return;
                 }
-                _rewrite_stat(tmpptr, &stat_data, NULL);
+                _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
         }
 #endif
 
@@ -5949,7 +5958,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
                         fuse_reply_err(req, EIO);
                         return;
                 }
-                _rewrite_stat(tmpptr, &stat_data, NULL);
+                _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
         }
 #endif
 
@@ -6198,7 +6207,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, &ispin);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, &ispin);
 	}
 	/* Inherit parent pin status if "ispin" is not modified */
 	if (ispin == (char) 255)
@@ -6280,7 +6289,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &(tmp_param.attr), NULL);
+		_rewrite_stat(tmpptr, &(tmp_param.attr), NULL, NULL);
 	}
 #endif
 
