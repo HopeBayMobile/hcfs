@@ -40,8 +40,8 @@ $TRACE
 eval '[ -n "$UPSTREAM_LIB_DIR" ]' || { echo Assign these for local build; exit 1; }
 
 ### Upstream APK
-APK_NAME=terafonn_1.0.0025
-APK_DIR=/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APK_NAME
+APP_NAME=${APP_NAME:-terafonn_1.0.0026}
+APP_DIR=${APP_DIR:-/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APP_NAME}
 DOCKER_IMAGE='docker:5000/s58a-buildbox:0225-cts-${IMAGE_TYPE}-prebuilt'
 
 ### Publish dir
@@ -106,9 +106,9 @@ function copy_hcfs_to_source_tree() {
 function copy_apk_to_source_tree() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
-		$APK_DIR/${APK_NAME}.apk root@$DOCKER_IP:/data/device/acer/common/apps/HopebayHCFSmgmt/
+		$APP_DIR/${APP_NAME}.apk root@$DOCKER_IP:/data/device/acer/common/apps/HopebayHCFSmgmt/
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
-		$APK_DIR/arm64-v8a/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/lib64/
+		$APP_DIR/arm64-v8a/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/lib64/
 }
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
@@ -117,8 +117,8 @@ function build_system() {
 	java  -Xmx2048m -jar /data/out/host/linux-x86/framework/signapk.jar \
 		-w /data/build/target/product/security/platform.x509.pem \
 		/data/build/target/product/security/platform.pk8 \
-		/data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}.apk /data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}-signed.apk && \
-	mv -vf /data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}-signed.apk /data/device/acer/common/apps/HopebayHCFSmgmt/${APK_NAME}.apk"
+		/data/device/acer/common/apps/HopebayHCFSmgmt/${APP_NAME}.apk /data/device/acer/common/apps/HopebayHCFSmgmt/${APP_NAME}-signed.apk && \
+	mv -vf /data/device/acer/common/apps/HopebayHCFSmgmt/${APP_NAME}-signed.apk /data/device/acer/common/apps/HopebayHCFSmgmt/${APP_NAME}.apk"
 	ssh root@$DOCKER_IP bash -ic "./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
@@ -129,10 +129,7 @@ function publish_image() {
 	rsync -v \
 		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} \
 		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-}
-function publish_apk() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	\cp -r $APK_DIR ${PUBLISH_DIR}/
+	touch ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}/use_${APP_NAME}
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -161,5 +158,3 @@ do
 	publish_image
 	stop_builder
 done
-
-publish_apk
