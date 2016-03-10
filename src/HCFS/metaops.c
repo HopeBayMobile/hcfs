@@ -2006,9 +2006,16 @@ errcode_handle:
 	return errcode;
 }
 
-static BOOL _namespace_filter(char namespace) /* Only SECURITY now */
+static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
 {
-	return (namespace == SECURITY ? TRUE : FALSE);
+	if (namespace == SECURITY) {
+		if (!strcmp("restorecon_last", key))
+			return TRUE; /* Skip this key */
+		else
+			return FALSE; /* Do not skip. Inherit it */
+	} else {
+		return TRUE;
+	}
 }
 
 /**
@@ -2135,7 +2142,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		}
 
 		/* Choose namespace to inherit. Only SECURITY now. */
-		if (_namespace_filter(namespace) == FALSE)
+		if (_skip_inherit_key(namespace, key) == TRUE)
 			continue;
 
 		/* Get this xattr value */
