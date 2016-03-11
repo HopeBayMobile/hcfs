@@ -944,8 +944,12 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
-		objname);
+	if (!strncmp("download_usermeta", curl_handle->id, 100))
+		sprintf(container_string, "%s/%s_gateway_config/%s",
+			swift_url_string, SWIFT_USER, objname);
+	else
+		sprintf(container_string, "%s/%s/%s", swift_url_string,
+			SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 

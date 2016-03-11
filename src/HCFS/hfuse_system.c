@@ -249,6 +249,11 @@ void init_backend_related_module(void)
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
+		/* Init usermeta curl handle */
+		snprintf(download_usermeta_curl_handle.id,
+			sizeof(((CURL_HANDLE *)0)->id) - 1, "download_usermeta");
+		download_usermeta_curl_handle.curl_backend = NONE;
+		download_usermeta_curl_handle.curl = NULL;
 	}
 }
 
