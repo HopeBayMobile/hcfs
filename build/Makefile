@@ -58,9 +58,6 @@ $(arch_arm64_lib_path)/.copy_s58a_system_libs:
 	rsync -a $(build_dir)/prebuilt/acer-s58a/system/*.so $(arch_arm64_lib_path)/
 	touch $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
-_nr_cpu := $(shell cat /proc/cpuinfo | grep processor | wc -l)
-PARALLEL_JOBS := -j$(shell expr $(_nr_cpu) + $(_nr_cpu))
-
 define prepare_out
 	@mkdir -p $@/system/{bin,lib64}
 	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -0r mv -t $@/system/lib64
@@ -71,12 +68,12 @@ define prepare_out
 endef
 
 out/%-hcfs: force
-	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
+	ndk-build $(NDK_ARG)
 	$(prepare_out)
 	@rm -rf $@/gdb.* $@/$(APP_ABI)
 
 out/%-hcfs-gdb: force
-	ndk-build $(NDK_ARG) $(PARALLEL_JOBS)
+	ndk-build $(NDK_ARG)
 	$(prepare_out)
 	@cp $@/system/*/* $@/$(APP_ABI)
 	@rsync -a $(build_dir)/../src/{API,CLI_utils,HCFS} $@/src/
