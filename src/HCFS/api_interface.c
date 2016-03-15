@@ -794,6 +794,7 @@ void api_module(void *index)
 	struct timeval start_time, end_time;
 	float elapsed_time;
 	int retcode, sel_index, count, cur_index;
+	uint32_t uint32_ret;
 	size_t to_recv, to_send, total_sent;
 
 	char buf[512];
@@ -1241,14 +1242,14 @@ void api_module(void *index)
 			}
 			break;
 		case CLOUDSTAT:
-			retcode = (int)hcfs_system->backend_is_online;
-			ret_len = sizeof(retcode);
+			uint32_ret = (uint32_t)hcfs_system->backend_is_online;
+			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
-			retcode = 0;
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case SETSYNCSWITCH:
-			memcpy(&sync_switch, largebuf, sizeof(unsigned int));
+			memcpy(&sync_switch, largebuf, sizeof(uint32_t));
 			retcode = set_sync_switch_handle(sync_switch);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -1258,18 +1259,18 @@ void api_module(void *index)
 			}
 			break;
 		case GETSYNCSWITCH:
-			retcode = (int)hcfs_system->sync_manual_switch;
-			ret_len = sizeof(retcode);
+			uint32_ret = (uint32_t)hcfs_system->sync_manual_switch;
+			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
-			retcode = 0;
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case GETSYNCSTAT:
-			retcode = (int)!hcfs_system->sync_paused;
-			ret_len = sizeof(retcode);
+			uint32_ret = (uint32_t)!hcfs_system->sync_paused;
+			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
-			retcode = 0;
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case RELOADCONFIG:
 			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
