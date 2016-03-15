@@ -38,6 +38,7 @@
 #include "dedup_table.h"
 #include "metaops.h"
 #include "super_block.h"
+#include "jansson.h"
 
 /************************************************************************
 *
@@ -863,4 +864,54 @@ int fetch_pinned_blocks(ino_t inode)
 errcode_handle:
 	fclose(fptr);
 	return errcode;
+}
+
+static void fetch_quota_from_cloud(void *ptr)
+{
+	int status;
+	char objname[100];
+	char download_path[256];
+	FILE *fptr;
+
+	strncpy(objname, "usermeta.json", 100);
+	sprintf(download_path, "%s/new_usermeta", METAPATH);
+
+	while (hcfs_system->system_going_down == FALSE) {
+		if (hcfs_system->sync_paused) {
+			sleep(3);
+			continue;
+		}
+
+		if (access(download_path, F_OK) == 0)
+			unlink(download_path);
+		fptr = fopen(download_path, "w+");
+		if (!fptr) {
+			write_log(0, "Error: Fail to open file %s in %s\n",
+					download_path, __func__);
+			return;
+		}
+		setbuf(fptr, NULL);
+
+		status = hcfs_get_object(fptr, objname,
+				&(download_usermeta_curl_handle),
+				NULL);
+		if (200 <= status && status <= 299) {
+			break;
+		} else if (status == 404) {
+			write_log(0, "Error: Usermeta is not found on cloud.\n");
+			return;
+		}
+	}
+
+	return;
+}
+
+int fetch_quota()
+{
+	pthread_attr_init(&(download_usermeta_ctl.thread_attr));
+	pthread_attr_setdetachstate(&(download_usermeta_ctl.thread_attr), 
+			PTHREAD_CREATE_DETACHED);
+	pthread_create(&(download_usermeta_ctl.download_usermeta_tid),
+			&(download_usermeta_ctl.thread_attr),
+			(void *)fetch_quota_from_cloud, NULL);
 }

@@ -29,7 +29,6 @@
 #define READ_BLOCK 0
 #define PIN_BLOCK 1
 
-
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
@@ -54,6 +53,12 @@ typedef struct {
 	int active_th;
 } DOWNLOAD_THREAD_CTL;
 
+typedef struct {
+	pthread_attr_t thread_attr;
+	pthread_t download_usermeta_tid;
+} DOWNLOAD_USERMETA_CTL;
+
+DOWNLOAD_USERMETA_CTL download_usermeta_ctl;
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
