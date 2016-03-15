@@ -1,4 +1,4 @@
-type hcfsapid, domain;
+type hcfsapid, domain, mlstrustedobject;
 type hcfsapid_exec, exec_type, file_type;
 # Domain traistion from init to hcfsapid
 init_daemon_domain(hcfsapid)
@@ -34,12 +34,13 @@ typeattribute qtitetherservice_app_data_file hcfs_internal_domain;
 typeattribute apk_data_file hcfs_internal_domain;
 typeattribute apk_tmp_file hcfs_internal_domain;
 
-allow hcfsapid hcfs_internal_domain:dir { search getattr };
+allow hcfsapid hcfs_internal_domain:dir { search getattr read open };
 allow hcfsapid hcfs_internal_domain:file { getattr };
 
 # Allow permisssions on externel mountpoint
 allow hcfsapid fuse:dir { read open search getattr };
 allow hcfsapid fuse:file { getattr };
+
 # Allow to access /mnt/runtime 
 allow hcfsapid storage_file:dir { search };
 
@@ -48,3 +49,4 @@ allow hcfsapid shell_data_file:file { write getattr read create unlink open };
 
 allow hcfsapid self:capability dac_override;
 
+allow hcfsapid dalvikcache_data_file:dir { open read };

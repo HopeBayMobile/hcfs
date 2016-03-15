@@ -1,5 +1,5 @@
 # TeraFonn management app
-type terafonn_app, domain;
+type terafonn_app, domain, mlstrustedobject;
 # Permissions to work likes system app
 app_domain(terafonn_app)
 net_domain(terafonn_app)
@@ -19,3 +19,8 @@ allow terafonn_app unlabeled:file { read write open setattr };
 
 allow terafonn_app servicemanager:service_manager list;
 allow terafonn_app service_manager_type:service_manager find;
+
+# Allow permissions to communicate with "SharedPreferenc"
+allow untrusted_app terafonn_data_file:dir { search getattr write };
+allow untrusted_app terafonn_data_file:file { read write };
+allow untrusted_app terafonn_data_file:sock_file { write };
