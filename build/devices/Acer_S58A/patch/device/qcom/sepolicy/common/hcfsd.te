@@ -117,14 +117,16 @@ allow hcfsd mediaserver:dir search;
 allow hcfsd mediaserver:file { read open };
 
 # Allow hcfsd to communicate with "u:r:shared_relro:s0" type objects
-allow hcfsd shared_relro:dir search;
+allow hcfsd shared_relro:dir { search };
+allow hcfsd shared_relro:file { read open };
 
 # Allow hcfsd to communicate with zygote
 allow hcfsd zygote:dir search;
 allow hcfsd zygote:file { open read };
 
 # dex2oat
-allow hcfsd dex2oat:dir search;
+allow hcfsd dex2oat:dir { search read };
+allow hcfsd dex2oat:file { read open };
 
 #============= qti_init_shell ==============
 # Allow qti_init_shell to have permissions on /dev/shm/hcfs_reporter 

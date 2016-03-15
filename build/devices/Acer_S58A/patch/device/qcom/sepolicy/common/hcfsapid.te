@@ -1,4 +1,4 @@
-type hcfsapid, domain, mlstrustedobject;
+type hcfsapid, domain, mlstrustedsubject;
 type hcfsapid_exec, exec_type, file_type;
 # Domain traistion from init to hcfsapid
 init_daemon_domain(hcfsapid)
@@ -19,6 +19,8 @@ file_type_auto_trans(hcfsapid, system_data_file, hcfs_data_file)
 allow hcfsapid hcfs_data_file:dir create_file_perms;
 allow hcfsapid hcfs_data_file:file create_file_perms;
 allow hcfsapid system_data_file:dir remove_name;
+
+allow hcfsapid app_data_file:dir open;
 
 # Allow permissions on internal mountpoint
 typeattribute app_data_file hcfs_internal_domain;

@@ -1,5 +1,5 @@
 # TeraFonn management app
-type terafonn_app, domain, mlstrustedobject;
+type terafonn_app, domain, mlstrustedsubject;
 # Permissions to work likes system app
 app_domain(terafonn_app)
 net_domain(terafonn_app)
