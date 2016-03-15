@@ -32,7 +32,7 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 		fuse_req_t req)
 {
 	FILE_META_TYPE tempfilemeta;
-	int ret, errcode;
+	int ret;
 	long long sizediff;
 	MOUNT_T *tmpptr;
 

@@ -319,7 +319,7 @@ TEST_F(enc, get_decode_meta){
 
 TEST(get_decrypt_configfpTEST, config_path_not_found)
 {
-	unsigned char path[100] = "/path/not/existed";
+	const char path[100] = "/path/not/existed";
 	FILE* ret_fp = get_decrypt_configfp(path);
 
 	int ret = (ret_fp) ? 0 : -1;
@@ -329,7 +329,7 @@ TEST(get_decrypt_configfpTEST, config_path_not_found)
 
 TEST(get_decrypt_configfpTEST, config_content_error)
 {
-	unsigned char path[100] = "testpatterns/not_encrypted.conf";
+	const char path[100] = "testpatterns/not_encrypted.conf";
 	FILE* ret_fp = get_decrypt_configfp(path);
 
 	int ret = (ret_fp) ? 0 : -1;
@@ -341,7 +341,7 @@ TEST(get_decrypt_configfpTEST, getOK)
 {
 	char buf[200], buf2[200];
 	char unenc_path[100] = "testpatterns/not_encrypted.conf";
-	unsigned char enc_path[100] = "testpatterns/encrypted.conf";
+	const char enc_path[100] = "testpatterns/encrypted.conf";
 	FILE *unenc_fp = NULL;
 	FILE *enc_fp = NULL;
 
