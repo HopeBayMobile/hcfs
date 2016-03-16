@@ -122,7 +122,7 @@ static unsigned hash(const char *input)
  * @return none.
  */
 static inline void copy_key_entry(KEY_ENTRY *key_entry, const char *key,
-	long long value_pos, size_t size)
+	int64_t value_pos, size_t size)
 {
 	strcpy(key_entry->key, key);
 	key_entry->key_size = strlen(key);
@@ -140,9 +140,9 @@ static inline void copy_key_entry(KEY_ENTRY *key_entry, const char *key,
  * @return 0 if success, and usable position is stored in "usable_pos".
  */
 int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *usable_pos)
+	XATTR_PAGE *xattr_page, int64_t *usable_pos)
 {
-	long long ret_pos;
+	int64_t ret_pos;
 	KEY_LIST_PAGE key_list_page;
 	int errcode;
 	int ret;
@@ -264,11 +264,11 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
  * @return 0 if entry is found, 1 if entry not found. Return -1 on error.
  */
 int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	long long first_key_list_pos, KEY_LIST_PAGE *target_key_list_page,
-	int *key_index, long long *target_key_list_pos, const char *key,
-	KEY_LIST_PAGE *prev_page, long long *prev_pos)
+	int64_t first_key_list_pos, KEY_LIST_PAGE *target_key_list_page,
+	int *key_index, int64_t *target_key_list_pos, const char *key,
+	KEY_LIST_PAGE *prev_page, int64_t *prev_pos)
 {
-	long long key_list_pos, prev_key_list_pos;
+	int64_t key_list_pos, prev_key_list_pos;
 	KEY_LIST_PAGE now_key_page, prev_key_page;
 	int ret;
 	int index;
@@ -373,8 +373,8 @@ errcode_handle:
  * @return 0 if success, otherwise negative error code.
  */
 int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *replace_value_block_pos,
-	long long *usable_value_pos)
+	XATTR_PAGE *xattr_page, int64_t *replace_value_block_pos,
+	int64_t *usable_value_pos)
 {
 	VALUE_BLOCK value_block;
 	VALUE_BLOCK empty_block;
@@ -440,12 +440,12 @@ errcode_handle:
  * @return 0 for success, otherwise negative error code.
  */
 int write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
-	long long *replace_value_block_pos, long long first_value_pos,
+	int64_t *replace_value_block_pos, int64_t first_value_pos,
 	const char *value, size_t size)
 {
 	size_t index;
 	VALUE_BLOCK tmp_value_block;
-	long long now_pos, next_pos;
+	int64_t now_pos, next_pos;
 	int ret_code;
 	int errcode;
 	int ret, ret_size;
@@ -503,7 +503,7 @@ int read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	VALUE_BLOCK tmp_value_block;
 	size_t value_size;
 	size_t index;
-	long long now_pos;
+	int64_t now_pos;
 	int errcode;
 	int ret, ret_size;
 
@@ -547,11 +547,11 @@ errcode_handle:
  * @return 0 for success, otherwise negative error code.
  */
 int reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *replace_value_block_pos)
+	XATTR_PAGE *xattr_page, int64_t *replace_value_block_pos)
 {
 
-	long long head_pos;
-	long long tail_pos;
+	int64_t head_pos;
+	int64_t tail_pos;
 	VALUE_BLOCK tmp_value_block;
 	int errcode, ret, ret_size;
 
@@ -626,7 +626,7 @@ static void print_keys_to_log(KEY_LIST_PAGE *key_page)
  * @return 0 if success to set xattr, otherwise negative error code.
  */
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
-	const long long xattr_filepos, const char name_space_c, const char *key,
+	const int64_t xattr_filepos, const char name_space_c, const char *key,
 	const char *value, const size_t size, const int flag)
 {
 	unsigned hash_entry;
@@ -636,9 +636,9 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	KEY_ENTRY buf_key_list[MAX_KEY_ENTRY_PER_LIST];
 	int ret_code;
 	int key_index;
-	long long first_key_list_pos;
-	long long target_key_list_pos;
-	long long value_pos; /* Record position of first value block */
+	int64_t first_key_list_pos;
+	int64_t target_key_list_pos;
+	int64_t value_pos; /* Record position of first value block */
 	int errcode;
 	int ret;
 	int ret_size;
@@ -648,7 +648,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	UNUSED(flag);
 #endif
 	/* Used to record value block pos when replacing */
-	long long replace_value_block_pos;
+	int64_t replace_value_block_pos;
 
 	/* Step1: Find the key entry and appropriate insertion position */
 	hash_entry = hash(key); /* Hash the key */
@@ -707,7 +707,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 			}
 
 			if (key_index < 0) { /* All key_list are full, allocate new one */
-				long long usable_pos;
+				int64_t usable_pos;
 
 				ret_code = get_usable_key_list_filepos(meta_cache_entry,
 						xattr_page, &usable_pos);
@@ -863,8 +863,8 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	NAMESPACE_PAGE *namespace_page;
 	KEY_ENTRY *key_entry;
 	KEY_LIST_PAGE target_key_list_page;
-	long long target_key_list_pos;
-	long long first_key_list_pos;
+	int64_t target_key_list_pos;
+	int64_t first_key_list_pos;
 	unsigned hash_index;
 	int key_index;
 	int ret_code;
@@ -1007,7 +1007,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 
 		for (hash_count = 0; hash_count < MAX_KEY_HASH_ENTRY;
 				hash_count++) {
-			long long pos, first_pos;
+			int64_t pos, first_pos;
 
 			first_pos = namespace_page->key_hash_table[hash_count];
 			pos = first_pos;
@@ -1046,16 +1046,16 @@ errcode_handle:
  */
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		XATTR_PAGE *xattr_page,
-	const long long xattr_filepos, const char name_space_c, const char *key)
+	const int64_t xattr_filepos, const char name_space_c, const char *key)
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE target_key_list_page;
 	KEY_LIST_PAGE prev_key_list_page;
 	KEY_ENTRY tmp_key_buf[MAX_KEY_SIZE];
-	long long target_key_list_pos;
-	long long first_key_list_pos;
-	long long prev_key_list_pos;
-	long long first_value_pos;
+	int64_t target_key_list_pos;
+	int64_t first_key_list_pos;
+	int64_t prev_key_list_pos;
+	int64_t first_value_pos;
 	int key_index;
 	int hash_index;
 	int ret_code;
@@ -1099,7 +1099,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		print_keys_to_log(&target_key_list_page);
 
 	} else { /* Reclaim the key_list_page */
-		long long reclaim_key_list_pos;
+		int64_t reclaim_key_list_pos;
 		KEY_LIST_PAGE tmp_list_page;
 
 		/* Case 1: target_page == first_page */

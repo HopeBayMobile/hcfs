@@ -46,7 +46,7 @@
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
-int api_server_monitor_time = API_SERVER_MONITOR_TIME;
+int32_t api_server_monitor_time = API_SERVER_MONITOR_TIME;
 
 /************************************************************************
 *
@@ -57,11 +57,11 @@ int api_server_monitor_time = API_SERVER_MONITOR_TIME;
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_api_interface(void)
+int32_t init_api_interface(void)
 {
-	int ret, errcode, count;
-	int *val;
-	int sock_flag;
+	int32_t ret, errcode, count;
+	int32_t *val;
+	int32_t sock_flag;
 
 	write_log(10, "Starting API interface");
 	if (access(SOCK_PATH, F_OK) == 0)
@@ -78,7 +78,7 @@ int init_api_interface(void)
 	sem_init(&(api_server->job_lock), 0, 1);
 	api_server->num_threads = INIT_API_THREADS;
 	api_server->last_update = 0;
-	memset(api_server->job_count, 0, sizeof(int) * PROCESS_WINDOW);
+	memset(api_server->job_count, 0, sizeof(int32_t) * PROCESS_WINDOW);
 	memset(api_server->job_totaltime, 0, sizeof(float) * PROCESS_WINDOW);
 	memset(api_server->local_thread, 0,
 			sizeof(pthread_t) * MAX_API_THREADS);
@@ -123,7 +123,7 @@ int init_api_interface(void)
 
 	for (count = 0; count < INIT_API_THREADS; count++) {
 		write_log(10, "Starting up API thread %d\n", count);
-		val = malloc(sizeof(int));
+		val = malloc(sizeof(int32_t));
 		*val = count;
 		ret = pthread_create(&(api_server->local_thread[count]), NULL,
 			(void *)api_module, (void *)val);
@@ -162,9 +162,9 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int destroy_api_interface(void)
+int32_t destroy_api_interface(void)
 {
-	int ret, errcode, count;
+	int32_t ret, errcode, count;
 
 	/* Adding lock wait before terminating to prevent last sec
 	thread changes */
@@ -182,11 +182,11 @@ errcode_handle:
 	return errcode;
 }
 
-int create_FS_handle(int arg_len, char *largebuf)
+int32_t create_FS_handle(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY tmp_entry;
 	char *buf, tmptype;
-	int ret;
+	int32_t ret;
 
 	buf = malloc(arg_len + 10);
 #ifdef _ANDROID_ENV_
@@ -203,12 +203,12 @@ int create_FS_handle(int arg_len, char *largebuf)
 	free(buf);
 	return ret;
 }
-int mount_FS_handle(int arg_len, char *largebuf)
+int32_t mount_FS_handle(int32_t arg_len, char *largebuf)
 {
 	char *buf, *mpbuf;
 	char mp_mode;
-	int ret;
-	int fsname_len, mp_len;
+	int32_t ret;
+	int32_t fsname_len, mp_len;
 
 	mp_mode = largebuf[0];
 	if (mp_mode != MP_DEFAULT && mp_mode != MP_READ &&
@@ -217,13 +217,13 @@ int mount_FS_handle(int arg_len, char *largebuf)
 		return -EINVAL;
 	}
 
-	memcpy(&fsname_len, largebuf + 1, sizeof(int));
+	memcpy(&fsname_len, largebuf + 1, sizeof(int32_t));
 
 	buf = malloc(fsname_len + 10);
-	mp_len = arg_len - sizeof(int) - fsname_len - sizeof(char);
+	mp_len = arg_len - sizeof(int32_t) - fsname_len - sizeof(char);
 	mpbuf = malloc(mp_len + 10);
-	memcpy(buf, &(largebuf[1 + sizeof(int)]), fsname_len);
-	memcpy(mpbuf, &(largebuf[1 + sizeof(int) + fsname_len]), mp_len);
+	memcpy(buf, &(largebuf[1 + sizeof(int32_t)]), fsname_len);
+	memcpy(mpbuf, &(largebuf[1 + sizeof(int32_t) + fsname_len]), mp_len);
 	write_log(10, "Debug: fsname is %s, mp is %s, mp_mode is %d\n", buf, mpbuf, mp_mode);
 	buf[fsname_len] = 0;
 	mpbuf[mp_len] = 0;
@@ -234,21 +234,21 @@ int mount_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
-int unmount_FS_handle(int arg_len, char *largebuf)
+int32_t unmount_FS_handle(int32_t arg_len, char *largebuf)
 {
 	char *buf, *mp;
-	int ret;
-	int fsname_len;
+	int32_t ret;
+	int32_t fsname_len;
 
-	memcpy(&fsname_len, largebuf, sizeof(int));
+	memcpy(&fsname_len, largebuf, sizeof(int32_t));
 	buf = malloc(arg_len + 10);
-	memcpy(buf, largebuf + sizeof(int), fsname_len);
+	memcpy(buf, largebuf + sizeof(int32_t), fsname_len);
 	buf[fsname_len] = 0;
 
 	mp = malloc(arg_len + 10);
-	memcpy(mp, largebuf + sizeof(int) + fsname_len + 1,
-			arg_len - sizeof(int) - fsname_len - 1);
-	mp[arg_len - sizeof(int) - fsname_len - 1] = 0;
+	memcpy(mp, largebuf + sizeof(int32_t) + fsname_len + 1,
+			arg_len - sizeof(int32_t) - fsname_len - 1);
+	mp[arg_len - sizeof(int32_t) - fsname_len - 1] = 0;
 	if (!strlen(mp)) {
 		write_log(2, "Mountpoint is needed when unmount\n");
 		free(buf);
@@ -264,10 +264,10 @@ int unmount_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
-int mount_status_handle(int arg_len, char *largebuf)
+int32_t mount_status_handle(int32_t arg_len, char *largebuf)
 {
 	char *buf;
-	int ret;
+	int32_t ret;
 
 	buf = malloc(arg_len + 10);
 	memcpy(buf, largebuf, arg_len);
@@ -278,10 +278,10 @@ int mount_status_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
-int delete_FS_handle(int arg_len, char *largebuf)
+int32_t delete_FS_handle(int32_t arg_len, char *largebuf)
 {
 	char *buf;
-	int ret;
+	int32_t ret;
 
 	buf = malloc(arg_len + 10);
 	memcpy(buf, largebuf, arg_len);
@@ -292,13 +292,13 @@ int delete_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
-long long get_vol_size(int arg_len, char *largebuf)
+int64_t get_vol_size(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY temp_entry;
 	MOUNT_T *tmp_info;
 	char *buf;
-	int ret, errcode;
-	long long llretval;
+	int32_t ret, errcode;
+	int64_t llretval;
 	char temppath[METAPATHLEN];
 	FILE *statfptr;
 	FS_STAT_T tmpvolstat;
@@ -326,7 +326,7 @@ long long get_vol_size(int arg_len, char *largebuf)
 
 	ret = search_mount(buf, NULL, &tmp_info);
 	if ((ret < 0) && (ret != -ENOENT)) {
-		llretval = (long long) ret;
+		llretval = (int64_t) ret;
 		goto error_handling;
 	} else if (ret == 0) {
 		/* Fetch stat from mounted volume */
@@ -343,22 +343,22 @@ long long get_vol_size(int arg_len, char *largebuf)
 	/* Check whether the filesystem exists */
 	ret = check_filesystem_core(buf, &temp_entry);
 	if (ret < 0) {
-		llretval = (long long) ret;
+		llretval = (int64_t) ret;
 		goto error_handling;
 	}
 
 	/* Fetch from stat file if not mounted */
 	ret = fetch_stat_path(temppath, temp_entry.d_ino);
 	if (ret < 0) {
-		llretval = (long long) ret;
+		llretval = (int64_t) ret;
 		goto error_handling;
 	}
 
 	statfptr = fopen(temppath, "r+");
 	if (statfptr == NULL) {
-		ret = (long long) errno;
+		ret = (int64_t) errno;
 		write_log(0, "IO error %d (%s)\n", ret, strerror(ret));
-		llretval = (long long) -ret;
+		llretval = (int64_t) -ret;
 		goto error_handling;
 	}
 	PREAD(fileno(statfptr), &tmpvolstat, sizeof(FS_STAT_T), 0);
@@ -373,7 +373,7 @@ long long get_vol_size(int arg_len, char *largebuf)
 errcode_handle:
 	if (statfptr != NULL)
 		fclose(statfptr);
-	llretval = (long long) errcode;
+	llretval = (int64_t) errcode;
 error_handling:
 	free(buf);
 	sem_post(&(mount_mgr.mount_lock));
@@ -381,12 +381,12 @@ error_handling:
 	return llretval;
 }
 
-long long get_cloud_size(int arg_len, char *largebuf)
+int64_t get_cloud_size(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY temp_entry;
 	char *buf;
-	int ret, errcode;
-	long long llretval;
+	int32_t ret, errcode;
+	int64_t llretval;
 	char temppath[METAPATHLEN];
 	FILE *statfptr;
 	ssize_t ret_ssize;
@@ -411,7 +411,7 @@ long long get_cloud_size(int arg_len, char *largebuf)
 	/* Check whether the filesystem exists */
 	ret = check_filesystem_core(buf, &temp_entry);
 	if (ret < 0) {
-		llretval = (long long) ret;
+		llretval = (int64_t) ret;
 		goto error_handling;
 	}
 
@@ -422,9 +422,9 @@ long long get_cloud_size(int arg_len, char *largebuf)
 	write_log(10, "Checking for FS stat in backend\n");
 	statfptr = fopen(temppath, "r");
 	if (statfptr == NULL) {
-		ret = (long long) errno;
+		ret = (int64_t) errno;
 		write_log(0, "IO error %d (%s)\n", ret, strerror(ret));
-		llretval = (long long) -ret;
+		llretval = (int64_t) -ret;
 		goto error_handling;
 	}
 	flock(fileno(statfptr), LOCK_EX);
@@ -442,18 +442,18 @@ errcode_handle:
 		flock(fileno(statfptr), LOCK_UN);
 		fclose(statfptr);
 	}
-	llretval = (long long) errcode;
+	llretval = (int64_t) errcode;
 error_handling:
 	free(buf);
 	sem_post(&(fs_mgr_head->op_lock));
 	return llretval;
 }
 
-int check_FS_handle(int arg_len, char *largebuf)
+int32_t check_FS_handle(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY temp_entry;
 	char *buf;
-	int ret;
+	int32_t ret;
 
 	buf = malloc(arg_len + 10);
 	memcpy(buf, largebuf, arg_len);
@@ -465,10 +465,10 @@ int check_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
-int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
+int32_t list_FS_handle(DIR_ENTRY **entryarray, uint64_t *ret_entries)
 {
-	unsigned long num_entries, temp;
-	int ret;
+	uint64_t num_entries, temp;
+	int32_t ret;
 
 	ret = list_filesystem(0, NULL, &num_entries);
 
@@ -484,27 +484,27 @@ int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
 	return ret;
 }
 
-int unmount_all_handle(void)
+int32_t unmount_all_handle(void)
 {
-	int ret;
+	int32_t ret;
 
 	ret = unmount_all();
 
 	return ret;
 }
 
-int pin_inode_handle(ino_t *pinned_list, int num_inode,
-		long long total_reserved_size)
+int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
+		int64_t total_reserved_size)
 {
-	int retcode, count, count2;
-	long long zero_size;
-	long long unused_reserved_size;
+	int32_t retcode, count, count2;
+	int64_t zero_size;
+	int64_t unused_reserved_size;
 
 	retcode = 0;
 
 	for (count = 0; count < num_inode; count++) {
 		write_log(10, "Debug: Prepare to pin inode %"PRIu64
-			", remaining reserved pinned size %lld\n",
+			", remaining reserved pinned size %" PRId64 "\n",
 			(uint64_t)pinned_list[count], total_reserved_size);
 		retcode = pin_inode(pinned_list[count], &total_reserved_size);
 		if (retcode < 0) {
@@ -530,7 +530,7 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 							&zero_size);
 			}
 
-			write_log(10, "Debug: After roll back, %s%lld\n",
+			write_log(10, "Debug: After roll back, %s%" PRId64 "\n",
 				  "now system pinned size is ",
 				  hcfs_system->systemdata.pinned_size);
 
@@ -540,7 +540,7 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 
 	/* Remaining size, return these space */
 	if (total_reserved_size > 0) {
-		write_log(10, "Debug: Remaining reserved pinned size %lld\n",
+		write_log(10, "Debug: Remaining reserved pinned size %" PRId64 "\n",
 				total_reserved_size);
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size -=
@@ -552,16 +552,16 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 		sem_post(&(hcfs_system->access_sem));
 	}
 
-	write_log(10, "Debug: After pinning, now system pinned size is %lld\n",
+	write_log(10, "Debug: After pinning, now system pinned size is %" PRId64 "\n",
 			hcfs_system->systemdata.pinned_size);
 	return retcode;
 }
 
-int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
+int32_t unpin_inode_handle(ino_t *unpinned_list, uint32_t num_inode)
 {
-	int retcode;
-	long long zero_reserved_size;
-	unsigned int count;
+	int32_t retcode;
+	int64_t zero_reserved_size;
+	uint32_t count;
 
 	retcode = 0;
 	zero_reserved_size = 0; /* There is no reserved size when unpin */
@@ -577,16 +577,16 @@ int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
 		}
 	}
 
-	write_log(10, "Debug:After unpinning, now system pinned size is %lld\n",
+	write_log(10, "Debug:After unpinning, now system pinned size is %" PRId64 "\n",
 		hcfs_system->systemdata.pinned_size);
 
 	return retcode;
 }
 
-int check_location_handle(int arg_len, char *largebuf)
+int32_t check_location_handle(int32_t arg_len, char *largebuf)
 {
 	ino_t target_inode;
-	int errcode;
+	int32_t errcode;
 	char metapath[METAPATHLEN];
 	struct stat thisstat;
 	META_CACHE_ENTRY_STRUCT *thisptr;
@@ -641,10 +641,10 @@ errcode_handle:
 	return errcode;
 }
 
-int checkpin_handle(int arg_len, char *largebuf)
+int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 {
 	ino_t target_inode;
-	int retcode;
+	int32_t retcode;
 	char metapath[METAPATHLEN];
 	struct stat thisstat;
 	META_CACHE_ENTRY_STRUCT *thisptr;
@@ -710,10 +710,10 @@ error_handling:
 	return retcode;
 }
 
-int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
+int32_t check_dir_stat_handle(int32_t arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 {
 	ino_t target_inode;
-	int retcode;
+	int32_t retcode;
 	struct stat structstat;
 	char metapath[METAPATHLEN];
 
@@ -751,15 +751,15 @@ int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 		tmpstats->num_cloud = retcode;
 		tmpstats->num_hybrid = retcode;
 	}
-	write_log(10, "Dir stat lookup %lld, %lld, %lld\n",
+	write_log(10, "Dir stat lookup %" PRId64 ", %" PRId64 ", %" PRId64 "\n",
 		tmpstats->num_local, tmpstats->num_cloud, tmpstats->num_hybrid);
 	return retcode;
 }
 
-int set_sync_switch_handle(int sync_switch)
+int32_t set_sync_switch_handle(int32_t sync_switch)
 {
-	int retcode = 0;
-	int pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+	int32_t retcode = 0;
+	int32_t pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
 
 	hcfs_system->sync_manual_switch = (sync_switch == TRUE) ? ON : OFF;
 	update_sync_state();
@@ -791,37 +791,37 @@ int set_sync_switch_handle(int sync_switch)
 not following protocol won't crash the system */
 void api_module(void *index)
 {
-	int fd1;
+	int32_t fd1;
 	ssize_t size_msg, msg_len;
 	struct timespec timer;
 	struct timeval start_time, end_time;
 	float elapsed_time;
-	int retcode, sel_index, count, cur_index;
+	int32_t retcode, sel_index, count, cur_index;
 	uint32_t uint32_ret;
 	size_t to_recv, to_send, total_sent;
 
 	char buf[512];
 	char *largebuf;
 	char buf_reused;
-	int msg_index;
-	unsigned long num_entries;
-	unsigned int api_code, arg_len, ret_len;
-	long long llretval, llretval2;
+	int32_t msg_index;
+	uint64_t num_entries;
+	uint32_t api_code, arg_len, ret_len;
+	int64_t llretval, llretval2;
 
 	DIR_ENTRY *entryarray;
 	char *tmpptr;
 	DIR_STATS_TYPE tmpstat;
 
-	long long reserved_pinned_size;
-	unsigned int num_inode;
+	int64_t reserved_pinned_size;
+	uint32_t num_inode;
 	ino_t *pinned_list, *unpinned_list;
-	unsigned int sync_switch;
+	uint32_t sync_switch;
 	int loglevel;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
 
-	write_log(10, "Startup index %d\n", *((int *)index));
+	write_log(10, "Startup index %d\n", *((int32_t *)index));
 
 	while (hcfs_system->system_going_down == FALSE) {
 		fd1 = accept(api_server->sock.fd, NULL, NULL);
@@ -848,15 +848,15 @@ void api_module(void *index)
 			if (msg_len >= 4)
 				break;
 		}
-		if (msg_len < (ssize_t)sizeof(unsigned int)) {
+		if (msg_len < (ssize_t)sizeof(uint32_t)) {
 			/* Error reading API code. Return EINVAL. */
 			write_log(5, "Invalid API code received\n");
 			retcode = EINVAL;
 			goto return_message;
 		}
-		memcpy(&api_code, &buf[msg_index], sizeof(unsigned int));
-		msg_index += sizeof(unsigned int);
-		msg_len -= sizeof(unsigned int);
+		memcpy(&api_code, &buf[msg_index], sizeof(uint32_t));
+		msg_index += sizeof(uint32_t);
+		msg_len -= sizeof(uint32_t);
 		write_log(10, "API code is %d\n", api_code);
 
 		/* Read total length of arguments */
@@ -868,15 +868,15 @@ void api_module(void *index)
 			if (msg_len >= 4)
 				break;
 		}
-		if (msg_len < (ssize_t)sizeof(unsigned int)) {
+		if (msg_len < (ssize_t)sizeof(uint32_t)) {
 			/* Error reading API code. Return EINVAL. */
 			write_log(5, "Invalid arg length received\n");
 			retcode = EINVAL;
 			goto return_message;
 		}
-		memcpy(&arg_len, &buf[msg_index], sizeof(unsigned int));
-		msg_index += sizeof(unsigned int);
-		msg_len -= sizeof(unsigned int);
+		memcpy(&arg_len, &buf[msg_index], sizeof(uint32_t));
+		msg_index += sizeof(uint32_t);
+		msg_len -= sizeof(uint32_t);
 
 		write_log(10, "API arg len is %d\n", arg_len);
 
@@ -927,7 +927,7 @@ void api_module(void *index)
 		switch (api_code) {
 		case PIN:
 			memcpy(&reserved_pinned_size, largebuf,
-				sizeof(long long));
+				sizeof(int64_t));
 
 			/* Check required size */
 			sem_wait(&(hcfs_system->access_sem));
@@ -944,21 +944,21 @@ void api_module(void *index)
 			sem_post(&(hcfs_system->access_sem));
 			write_log(
 			    10,
-			    "Debug: Preallocate pinned size %lld. %s %lld\n",
+			    "Debug: Preallocate pinned size %" PRId64 ". %s %" PRId64 "\n",
 			    reserved_pinned_size, "Now system pinned size",
 			    hcfs_system->systemdata.pinned_size);
 
 			/* Prepare inode array */
-			memcpy(&num_inode, largebuf + sizeof(long long),
-					sizeof(unsigned int));
+			memcpy(&num_inode, largebuf + sizeof(int64_t),
+					sizeof(uint32_t));
 
 			pinned_list = malloc(sizeof(ino_t) * num_inode);
 			if (pinned_list == NULL) {
 				retcode = -ENOMEM;
 				break;
 			}
-			memcpy(pinned_list, largebuf + sizeof(long long) +
-				sizeof(unsigned int),
+			memcpy(pinned_list, largebuf + sizeof(int64_t) +
+				sizeof(uint32_t),
 				sizeof(ino_t) * num_inode);
 
 			/* Begin to pin all of them */
@@ -966,64 +966,64 @@ void api_module(void *index)
 							reserved_pinned_size);
 			free(pinned_list);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case UNPIN:
-			memcpy(&num_inode, largebuf, sizeof(unsigned int));
+			memcpy(&num_inode, largebuf, sizeof(uint32_t));
 			unpinned_list = malloc(sizeof(ino_t) * num_inode);
 			if (unpinned_list == NULL) {
 				retcode = -ENOMEM;
 				break;
 			}
 
-			memcpy(unpinned_list, largebuf + sizeof(unsigned int),
+			memcpy(unpinned_list, largebuf + sizeof(uint32_t),
 				sizeof(ino_t) * num_inode);
 
 			/* Begin to unpin all of them */
 			retcode = unpin_inode_handle(unpinned_list, num_inode);
 			free(unpinned_list);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKDIRSTAT:
 			retcode = check_dir_stat_handle(arg_len, largebuf,
 							&tmpstat);
 			if (retcode == 0) {
-				ret_len = 3 * sizeof(long long);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = 3 * sizeof(int64_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_local),
-				     sizeof(long long), MSG_NOSIGNAL);
+				     sizeof(int64_t), MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_cloud),
-				     sizeof(long long), MSG_NOSIGNAL);
+				     sizeof(int64_t), MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_hybrid),
-				     sizeof(long long), MSG_NOSIGNAL);
+				     sizeof(int64_t), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKLOC:
 			retcode = check_location_handle(arg_len, largebuf);
 			if (retcode >= 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKPIN:
 			retcode = checkpin_handle(arg_len, largebuf);
 			if (retcode >= 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case TERMINATE:
@@ -1032,106 +1032,106 @@ void api_module(void *index)
 			hcfs_system->system_going_down = TRUE;
 			sem_post(&(hcfs_system->fuse_sem));
 			retcode = 0;
-			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case VOLSTAT:
 			/* Returns the system statistics */
 			buf[0] = 0;
 			retcode = 0;
 			sem_wait(&(hcfs_system->access_sem));
-			snprintf(buf, sizeof(buf), "%lld %lld %lld",
+			snprintf(buf, sizeof(buf), "%" PRId64 " %" PRId64 " %" PRId64,
 				hcfs_system->systemdata.system_size,
 				hcfs_system->systemdata.cache_size,
 				hcfs_system->systemdata.cache_blocks);
 			sem_post(&(hcfs_system->access_sem));
 			write_log(10, "debug stat hcfs %s\n", buf);
 			ret_len = strlen(buf)+1;
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, buf, strlen(buf)+1, MSG_NOSIGNAL);
 			break;
 		case GETPINSIZE:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(long long);
+			ret_len = sizeof(int64_t);
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.pinned_size;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETCACHESIZE:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(long long);
+			ret_len = sizeof(int64_t);
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.cache_size;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETDIRTYCACHESIZE:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(long long);
+			ret_len = sizeof(int64_t);
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.dirty_cache_size;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETXFERSTAT:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(long long) * 2;
+			ret_len = sizeof(int64_t) * 2;
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.xfer_size_download;
 			llretval2 = hcfs_system->systemdata.xfer_size_upload;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
-			send(fd1, &llretval, sizeof(long long), MSG_NOSIGNAL);
-			send(fd1, &llretval2, sizeof(long long), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &llretval, sizeof(int64_t), MSG_NOSIGNAL);
+			send(fd1, &llretval2, sizeof(int64_t), MSG_NOSIGNAL);
 			break;
 		case RESETXFERSTAT:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(int);
+			ret_len = sizeof(int32_t);
 			sem_wait(&(hcfs_system->access_sem));
 			hcfs_system->systemdata.xfer_size_download = 0;
 			hcfs_system->systemdata.xfer_size_upload = 0;
 			sem_post(&(hcfs_system->access_sem));
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case GETMAXPINSIZE:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(long long);
+			ret_len = sizeof(int64_t);
 			llretval = MAX_PINNED_LIMIT;
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETMAXCACHESIZE:
 			buf[0] = 0;
 			retcode = 0;
-			ret_len = sizeof(long long);
+			ret_len = sizeof(int64_t);
 			llretval = CACHE_HARD_LIMIT;
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETVOLSIZE:
 			llretval = get_vol_size(arg_len, largebuf);
 			retcode = 0;
-			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			ret_len = sizeof(int64_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETCLOUDSIZE:
 			llretval = get_cloud_size(arg_len, largebuf);
 			retcode = 0;
-			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			ret_len = sizeof(int64_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case GETQUOTA:
@@ -1160,17 +1160,17 @@ void api_module(void *index)
 			/* Simulate a long API call of 5 seconds */
 			sleep(5);
 			retcode = 0;
-			cur_index = *((int *)index);
+			cur_index = *((int32_t *)index);
 			write_log(10, "Index is %d\n", cur_index);
-			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/
 			retcode = 0;
 			ret_len = arg_len;
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			total_sent = 0;
 			while (total_sent < ret_len) {
 				if ((ret_len - total_sent) > 1024)
@@ -1186,29 +1186,29 @@ void api_module(void *index)
 		case CREATEVOL:
 			retcode = create_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case DELETEVOL:
 			retcode = delete_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKVOL:
 			retcode = check_FS_handle(arg_len, largebuf);
 			write_log(10, "retcode is %d\n", retcode);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case LISTVOL:
@@ -1217,7 +1217,7 @@ void api_module(void *index)
 			tmpptr = (char *) entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;
 			write_log(10, "Debug listFS return size %d\n", ret_len);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			total_sent = 0;
 			while (total_sent < ret_len) {
 				if ((ret_len - total_sent) > 1024)
@@ -1234,54 +1234,54 @@ void api_module(void *index)
 		case MOUNTVOL:
 			retcode = mount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case UNMOUNTVOL:
 			retcode = unmount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case CHECKMOUNT:
 			retcode = mount_status_handle(arg_len, largebuf);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case UNMOUNTALL:
 			retcode = unmount_all_handle();
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case CLOUDSTAT:
-			uint32_ret = (uint32_t)hcfs_system->backend_is_online;
-			ret_len = sizeof(uint32_ret);
+			retcode = (int32_t)hcfs_system->backend_is_online;
+			ret_len = sizeof(retcode);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
-			uint32_ret = 0;
+			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
+			retcode = 0;
 			break;
 		case SETSYNCSWITCH:
 			memcpy(&sync_switch, largebuf, sizeof(uint32_t));
 			retcode = set_sync_switch_handle(sync_switch);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
-				send(fd1, &ret_len, sizeof(unsigned int),
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			}
 			break;
 		case GETSYNCSWITCH:
@@ -1301,7 +1301,7 @@ void api_module(void *index)
 		case RELOADCONFIG:
 			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
+				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(ret_len),
 				     MSG_NOSIGNAL);
 				send(fd1, &retcode, sizeof(retcode),
@@ -1342,9 +1342,9 @@ void api_module(void *index)
 		}
 return_message:
 		if (retcode != 0) {
-			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(int), MSG_NOSIGNAL);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 		}
 		if ((largebuf != NULL) && (buf_reused == FALSE))
 			free(largebuf);
@@ -1399,11 +1399,11 @@ return_message:
 *************************************************************************/
 void api_server_monitor(void)
 {
-	int count, totalrefs, index, ret;
+	int32_t count, totalrefs, index, ret;
 	float totaltime, ratio;
-	int *val;
+	int32_t *val;
 	struct timeval cur_time;
-	int sel_index, cur_index;
+	int32_t sel_index, cur_index;
 	struct timespec waittime;
 
 	waittime.tv_sec = 1;
@@ -1465,7 +1465,7 @@ void api_server_monitor(void)
 
 		if (totalrefs > (INCREASE_RATIO * ratio)) {
 			/* Add one more thread */
-			val = malloc(sizeof(int));
+			val = malloc(sizeof(int32_t));
 			index = api_server->num_threads;
 			*val = index;
 			api_server->num_threads++;

@@ -58,7 +58,7 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 
 int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (this_inode == 1)
 		root_updated = TRUE;
@@ -81,7 +81,7 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (inode_stat != NULL) {
 		switch (this_inode) {

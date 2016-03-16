@@ -45,15 +45,15 @@ Pointers to the FUSE session and channel used for this mount
 */
 
 typedef struct {
-	long long system_size;
-	long long meta_size;
-	long long num_inodes;
+	int64_t system_size;
+	int64_t meta_size;
+	int64_t num_inodes;
 } FS_STAT_T;
 
 typedef struct {
-	long long backend_system_size;
-	long long backend_meta_size;
-	long long backend_num_inodes;
+	int64_t backend_system_size;
+	int64_t backend_meta_size;
+	int64_t backend_num_inodes;
 } FS_CLOUD_STAT_T;
 
 typedef struct {
@@ -126,8 +126,8 @@ int delete_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 					MOUNT_NODE_T **ret_node);
 int delete_mount(char *fsname, char *mp, MOUNT_NODE_T **ret_node);
 
-int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta);
+int change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta);
 int update_FS_statistics(MOUNT_T *mptr);
 
 int read_FS_statistics(MOUNT_T *mptr);

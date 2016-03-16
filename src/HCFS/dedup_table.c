@@ -26,13 +26,13 @@
 #include "logger.h"
 #include "utils.h"
 
-int initialize_ddt_meta(char *meta_path)
+int32_t initialize_ddt_meta(char *meta_path)
 {
 
 	FILE *fptr;
-	int fd;
+	int32_t fd;
 	DDT_BTREE_META ddt_meta;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	fptr = fopen(meta_path, "wb");
@@ -68,7 +68,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: get_btree_meta
-*        Inputs: unsigned char key[], DDT_BTREE_NODE *root,
+*        Inputs: uint8_t key[], DDT_BTREE_NODE *root,
 *                DDT_BTREE_META this_meta
 *       Summary: Get point to the metadata of a tree. Also return the root node
 *                (root) and the metadata(this_meta) of this tree. The meta file
@@ -76,15 +76,15 @@ errcode_handle:
 *  Return value: File pointer to btree file
 *
 *************************************************************************/
-FILE *get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
+FILE *get_ddt_btree_meta(uint8_t key[], DDT_BTREE_NODE *root,
 			 DDT_BTREE_META *this_meta)
 {
 
 	char meta_path[1000];
 	FILE *fptr;
-	int fd;
-	int ret;
-	int errcode;
+	int32_t fd;
+	int32_t ret;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	/* Get metafile name by the first char of hash key */
@@ -127,8 +127,8 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: search_ddt_btree
-*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode,
-*                int fd, DDT_BTREE_NODE *result_node, int *result_idx
+*        Inputs: uint8_t key[], DDT_BTREE_NODE *tnode,
+*                int32_t fd, DDT_BTREE_NODE *result_node, int32_t *result_idx
 *       Summary: Search a element by a given hash key. The search operation
 *                starts with tnode and go deeper until the element is found
 *                or there are no nodes to search. Return the tree node
@@ -139,15 +139,15 @@ errcode_handle:
 *                -1 if error occured.
 *
 *************************************************************************/
-int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
-		     DDT_BTREE_NODE *result_node, int *result_idx)
+int32_t search_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
+		     DDT_BTREE_NODE *result_node, int32_t *result_idx)
 {
 
-	int search_idx;
-	int compare_result;
+	int32_t search_idx;
+	int32_t compare_result;
 	DDT_BTREE_NODE temp_node;
 	DDT_BTREE_EL temp_el;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	if (tnode->num_el == 0) {
@@ -190,18 +190,18 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: traverse_ddt_btree
-*        Inputs: DDT_BTREE_NODE *tnode, int fd
+*        Inputs: DDT_BTREE_NODE *tnode, int32_t fd
 *       Summary: Travese btree. Starts from tnode and list all keys
 *                in ascending order.
 *  Return value: 0
 *
 *************************************************************************/
-int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
+int32_t traverse_ddt_btree(DDT_BTREE_NODE *tnode, int32_t fd)
 {
 
-	int search_idx, tmp_idx;
+	int32_t search_idx, tmp_idx;
 	DDT_BTREE_NODE temp_node;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	if (tnode->is_leaf) {
@@ -211,7 +211,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
 			     ++tmp_idx)
 				printf("%02x", tnode->ddt_btree_el[search_idx]
 						   .obj_id[tmp_idx]);
-			printf(" with refcount (%lld) in node - %lld\n",
+			printf(" with refcount (%" PRId64 ") in node - %" PRId64 "\n",
 			       tnode->ddt_btree_el[search_idx].refcount,
 			       tnode->this_node_pos);
 		}
@@ -231,7 +231,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
 			     ++tmp_idx)
 				printf("%02x", tnode->ddt_btree_el[search_idx]
 						   .obj_id[tmp_idx]);
-			printf(" with refcount (%lld) in node - %lld\n",
+			printf(" with refcount (%" PRId64 ") in node - %" PRId64 "\n",
 			       tnode->ddt_btree_el[search_idx].refcount,
 			       tnode->this_node_pos);
 		}
@@ -244,18 +244,18 @@ errcode_handle:
 }
 
 /* static functions for insert_ddt_btree */
-static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
-				      DDT_BTREE_NODE *tnode, int fd,
+static int32_t _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
+				      DDT_BTREE_NODE *tnode, int32_t fd,
 				      DDT_BTREE_META *this_meta);
 
-static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
-				  DDT_BTREE_NODE *cnode, int fd,
+static int32_t _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int32_t s_idx,
+				  DDT_BTREE_NODE *cnode, int32_t fd,
 				  DDT_BTREE_META *this_meta);
 
 /************************************************************************
 *
 * Function name: insert_ddt_btree
-*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
+*        Inputs: uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
 *                DDT_BTREE_META *this_meta
 *       Summary: Insert a element with given hash key. Insert operation
 *                begins with tnode and goes deeper until a leaf node is
@@ -264,15 +264,15 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 *  Return value: 0 if the element is found, or -1 if not.
 *
 *************************************************************************/
-int insert_ddt_btree(unsigned char key[], const off_t obj_size,
-		     DDT_BTREE_NODE *tnode, int fd,
+int32_t insert_ddt_btree(uint8_t key[], const off_t obj_size,
+		     DDT_BTREE_NODE *tnode, int32_t fd,
 		     DDT_BTREE_META *this_meta)
 {
 
 	DDT_BTREE_EL new_el;
 	DDT_BTREE_NODE new_root;
 	DDT_BTREE_NODE temp_node;
-	int errcode;
+	int32_t errcode;
 	off_t ret_pos;
 	ssize_t ret_ssize;
 
@@ -364,7 +364,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: _insert_non_full_ddt_btree
-*        Inputs: DDT_BTREE_EL *new_element, DDT_BTREE_NODE *tnode, int fd,
+*        Inputs: DDT_BTREE_EL *new_element, DDT_BTREE_NODE *tnode, int32_t fd,
 *                DDT_BTREE_META *this_meta
 *       Summary: Insert a element to non-full tree. Find the leaf node and
 *                insert the element to it. Will split the child node if
@@ -372,15 +372,15 @@ errcode_handle:
 *  Return value: 0 if the element is found, or -1 if not.
 *
 *************************************************************************/
-static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
-				      DDT_BTREE_NODE *tnode, int fd,
+static int32_t _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
+				      DDT_BTREE_NODE *tnode, int32_t fd,
 				      DDT_BTREE_META *this_meta)
 {
 
-	int search_idx;
-	int compare_result;
+	int32_t search_idx;
+	int32_t compare_result;
 	DDT_BTREE_NODE temp_node;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	/* To find which index we should insert or go deeper */
@@ -446,22 +446,22 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: _split_child_ddt_btree
-*        Inputs: DDT_BTREE_NODE *pnode, int s_idx, DDT_BTREE_NODE *cnode,
-*                int fd, DDT_BTREE_META *this_meta
+*        Inputs: DDT_BTREE_NODE *pnode, int32_t s_idx, DDT_BTREE_NODE *cnode,
+*                int32_t fd, DDT_BTREE_META *this_meta
 *       Summary: To spilt a full child node (cnode) into two nodes.
 *                (s_idx) is used to find the child node (cnode) in parent
 *                node (pnode).
 *  Return value: 0 if split was successful, or -1 if not.
 *
 *************************************************************************/
-static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
-				  DDT_BTREE_NODE *cnode, int fd,
+static int32_t _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int32_t s_idx,
+				  DDT_BTREE_NODE *cnode, int32_t fd,
 				  DDT_BTREE_META *this_meta)
 {
 
-	int el_left_child, el_right_child, median;
+	int32_t el_left_child, el_right_child, median;
 	DDT_BTREE_NODE new_node;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 	off_t ret_pos;
 
@@ -494,7 +494,7 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 		// Need to copy the pointer to child node for non-leaf node
 		memcpy(&(new_node.child_node_pos[0]),
 		       &(cnode->child_node_pos[median + 1]),
-		       (el_right_child + 1) * sizeof(long long));
+		       (el_right_child + 1) * sizeof(int64_t));
 	}
 
 	/* Update cnode stat */
@@ -517,7 +517,7 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 	if (pnode->num_el > 0) {
 		memmove(&(pnode->child_node_pos[s_idx + 2]),
 			&(pnode->child_node_pos[s_idx + 1]),
-			(pnode->num_el - s_idx) * sizeof(long long));
+			(pnode->num_el - s_idx) * sizeof(int64_t));
 	}
 
 	/* Update pnode status
@@ -536,19 +536,19 @@ errcode_handle:
 }
 
 /* static functions for delete_ddt_btee */
-static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd,
+static int32_t _extract_largest_child(DDT_BTREE_NODE *tnode, int32_t fd,
 				  DDT_BTREE_NODE *result_node,
 				  DDT_BTREE_EL *result_el,
 				  DDT_BTREE_META *this_meta);
 
-static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
+static int32_t _rebalance_btree(DDT_BTREE_NODE *tnode, int32_t selected_child, int32_t fd,
 			    DDT_BTREE_META *this_meta);
 
 /************************************************************************
 *
 * Function name: delete_ddt_btree
-*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
-*                DDT_BTREE_META *this_meta, int force_delete
+*        Inputs: uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
+*                DDT_BTREE_META *this_meta, int32_t force_delete
 *       Summary: To find a element with a given key. If force_delete is
 *                TRUE or the value of refcount decreased is equal to zero,
 *                the element will be removed from tree. Otherwise, this
@@ -559,16 +559,16 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 *                -1 if encountered error.
 *
 *************************************************************************/
-int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
-		     DDT_BTREE_META *this_meta, int force_delete)
+int32_t delete_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
+		     DDT_BTREE_META *this_meta, int32_t force_delete)
 {
 
-	int search_idx;
-	int compare_result, match;
+	int32_t search_idx;
+	int32_t compare_result, match;
 	DDT_BTREE_NODE temp_node, largest_child_node;
 	DDT_BTREE_EL largest_child_el;
-	int ret_val;
-	int errcode;
+	int32_t ret_val;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	/* Init status */
@@ -576,7 +576,7 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 
 	if (tnode->num_el <= 0) {
 		/* This node doesn't contained any elements */
-		printf("This node doesn't contain any elements - node (%lld)\n",
+		printf("This node doesn't contain any elements - node (%" PRId64 ")\n",
 		       tnode->this_node_pos);
 		return -1;
 	}
@@ -676,7 +676,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: _extract_largest_child
-*        Inputs: DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_NODE *result_node,
+*        Inputs: DDT_BTREE_NODE *tnode, int32_t fd, DDT_BTREE_NODE *result_node,
 *                DDT_BTREE_EL *result_el, DDT_BTREE_META *this_meta
 *       Summary: To find a largest child of tnode and remove it. Return the
 *                node(result_node) and element(result_el) where the child is
@@ -684,14 +684,14 @@ errcode_handle:
 *  Return value: 0 if operation was successful, or -1 if not.
 *
 *************************************************************************/
-static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd,
+static int32_t _extract_largest_child(DDT_BTREE_NODE *tnode, int32_t fd,
 				  DDT_BTREE_NODE *result_node,
 				  DDT_BTREE_EL *result_el,
 				  DDT_BTREE_META *this_meta)
 {
-	int max_child;
+	int32_t max_child;
 	DDT_BTREE_NODE temp_node;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	max_child = tnode->num_el;
@@ -728,7 +728,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: _rebalance_btree
-*        Inputs: DDT_BTREE_NODE *tnode, int selected_child, int fd,
+*        Inputs: DDT_BTREE_NODE *tnode, int32_t selected_child, int32_t fd,
 *                DDT_BTREE_META *this_meta
 *       Summary: Rebalance the tree if there is a node has less than
 *                MIN_EL_PER_NODE elements. There two steps of rebalance -
@@ -739,16 +739,16 @@ errcode_handle:
 *  Return value: 0 if operation was successful, or -1 if not.
 *
 *************************************************************************/
-static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
+static int32_t _rebalance_btree(DDT_BTREE_NODE *tnode, int32_t selected_child, int32_t fd,
 			    DDT_BTREE_META *this_meta)
 {
 
-	int selected_sibling;
-	int num_el_selected_child, num_el_selected_sibling;
-	int finish_rotate/*, finish_merge*/;
-	int change_root;
+	int32_t selected_sibling;
+	int32_t num_el_selected_child, num_el_selected_sibling;
+	int32_t finish_rotate/*, finish_merge*/;
+	int32_t change_root;
 	DDT_BTREE_NODE child_node, sibling_node;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	/* Initialize */
@@ -813,12 +813,12 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				memmove(&(child_node.child_node_pos[1]),
 					&(child_node.child_node_pos[0]),
 					(num_el_selected_child) *
-					    sizeof(long long));
+					    sizeof(int64_t));
 
 				memcpy(&(child_node.child_node_pos[0]),
 				       &(sibling_node.child_node_pos
 					     [num_el_selected_sibling]),
-				       sizeof(long long));
+				       sizeof(int64_t));
 			}
 
 			/* Update node status */
@@ -871,12 +871,12 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				memcpy(&(child_node.child_node_pos
 					     [num_el_selected_child + 1]),
 				       &(sibling_node.child_node_pos[0]),
-				       sizeof(long long));
+				       sizeof(int64_t));
 
 				memmove(&(sibling_node.child_node_pos[0]),
 					&(sibling_node.child_node_pos[1]),
 					(num_el_selected_sibling) *
-					    sizeof(long long));
+					    sizeof(int64_t));
 			}
 
 			/* Update number of elements */
@@ -939,7 +939,7 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 			    &(sibling_node
 				  .child_node_pos[num_el_selected_sibling + 1]),
 			    &(child_node.child_node_pos[0]),
-			    (num_el_selected_child + 1) * sizeof(long long));
+			    (num_el_selected_child + 1) * sizeof(int64_t));
 		}
 
 		/* Reclaim child node */
@@ -959,12 +959,12 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 			memmove(&(tnode->child_node_pos[selected_sibling + 1]),
 				&(tnode->child_node_pos[selected_sibling + 2]),
 				(tnode->num_el - selected_sibling - 1) *
-				    sizeof(long long));
+				    sizeof(int64_t));
 			/* One element is borrowed from tnode */
 			(tnode->num_el)--;
 		} else {
 			if (tnode->parent_node_pos == 0) {
-				// printf("Reclaim root - %lld\n",
+				// printf("Reclaim root - %" PRIu64 "\n",
 				// sibling_node.this_node_pos);
 				/* Sibling node is new root */
 				sibling_node.parent_node_pos = 0;
@@ -1014,15 +1014,15 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: increase_ddt_el_refcount
-*        Inputs: DDT_BTREE_NODE *tnode, int s_idx, int fd
+*        Inputs: DDT_BTREE_NODE *tnode, int32_t s_idx, int32_t fd
 *       Summary: Increase the refcount of a specific element
 *  Return value: 0 if operation was successful, -1 if not.
 *
 *************************************************************************/
-int increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd)
+int32_t increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int32_t s_idx, int32_t fd)
 {
 
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	if (s_idx < 0 || s_idx >= tnode->num_el) {
@@ -1045,7 +1045,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: decrease_ddt_el_refcount
-*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
+*        Inputs: uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
 *                DDT_BTREE_META *this_meta
 *       Summary: Decrease the refcount of element or deleted the emelemt
 *                if the refcount is equal to zero.
@@ -1054,26 +1054,26 @@ errcode_handle:
 *                -1 if encountered error.
 *
 *************************************************************************/
-int decrease_ddt_el_refcount(unsigned char key[], DDT_BTREE_NODE *tnode,
-			     int fd, DDT_BTREE_META *this_meta)
+int32_t decrease_ddt_el_refcount(uint8_t key[], DDT_BTREE_NODE *tnode,
+			     int32_t fd, DDT_BTREE_META *this_meta)
 {
 
 	return delete_ddt_btree(key, tnode, fd, this_meta, FALSE);
 }
 
-int get_obj_id(char *path, unsigned char hash[], unsigned char start_bytes[],
-	       unsigned char end_bytes[], off_t *obj_size)
+int32_t get_obj_id(char *path, uint8_t hash[], uint8_t start_bytes[],
+	       uint8_t end_bytes[], off_t *obj_size)
 {
 
 	FILE *fptr;
-	const int buf_size = 16384;
+	const int32_t buf_size = 16384;
 	char *buf;
-	int bytes_read;
+	int32_t bytes_read;
 	struct stat obj_stat;
 	off_t size;
 	SHA256_CTX ctx;
-	int fd;
-	int errcode;
+	int32_t fd;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	if (access(path, R_OK) == -1)
@@ -1120,11 +1120,11 @@ errcode_handle:
 	return errcode;
 }
 
-int obj_id_to_string(unsigned char obj_id[OBJID_LENGTH],
+int32_t obj_id_to_string(uint8_t obj_id[OBJID_LENGTH],
 		   char output_str[OBJID_STRING_LENGTH])
 {
 
-	int i;
+	int32_t i;
 	for (i = 0; i < OBJID_LENGTH; i++)
 		sprintf(output_str + (i * 2), "%02x", obj_id[i]);
 

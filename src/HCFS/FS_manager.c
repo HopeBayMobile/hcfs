@@ -45,9 +45,9 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_fs_manager(void)
+int32_t init_fs_manager(void)
 {
-	int errcode, fd, ret;
+	int32_t errcode, fd, ret;
 	DIR_META_TYPE tmp_head;
 	ssize_t ret_ssize;
 	struct timeval tmptime;
@@ -172,9 +172,9 @@ void destroy_fs_manager(void)
 
 /* Helper function for initializing a file for collecting statistics for
 data stored at backend */
-int _init_backend_stat(ino_t root_inode)
+int32_t _init_backend_stat(ino_t root_inode)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char fname[METAPATHLEN];
 	FILE *fptr;
 	size_t ret_size;
@@ -185,7 +185,7 @@ int _init_backend_stat(ino_t root_inode)
 
 	write_log(10, "Debug creating backend stat file\n");
 
-	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64,
 		 METAPATH, (uint64_t)root_inode);
 	write_log(10, "Creating stat for backend\n");
 	fptr = fopen(fname, "w");
@@ -225,10 +225,10 @@ ino_t _create_root_inode()
 	FILE *metafptr, *statfptr;
 	char metapath[METAPATHLEN];
 	char temppath[METAPATHLEN];
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	int64_t ret_pos;
-	unsigned long this_gen;
+	uint64_t this_gen;
 	FS_STAT_T tmp_stat;
 	CLOUD_RELATED_DATA cloud_related_data;
 	char ispin;
@@ -378,23 +378,23 @@ errcode_handle:
 *
 *************************************************************************/
 #ifdef _ANDROID_ENV_
-int add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry)
+int32_t add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry)
 #else
-int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 #endif
 {
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
 	DIR_META_TYPE tmp_head;
-	long long overflow_new_page;
-	int ret, errcode, ret_index;
+	int64_t overflow_new_page;
+	int32_t ret, errcode, ret_index;
 	char no_need_rewrite;
 	off_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE + 2)];
-	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
+	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	ino_t new_FS_ino;
 	ssize_t ret_ssize;
-	long long metasize;
+	int64_t metasize;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -551,7 +551,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		/* Initialize the new root node */
 		new_root.parent_page_pos = 0;
 		memset(new_root.child_page_pos, 0,
-		       sizeof(long long) * (MAX_DIR_ENTRIES_PER_PAGE + 1));
+		       sizeof(int64_t) * (MAX_DIR_ENTRIES_PER_PAGE + 1));
 		new_root.num_entries = 1;
 		memcpy(&(new_root.dir_entries[0]), &overflow_entry,
 		       sizeof(DIR_ENTRY));
@@ -592,7 +592,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
-	write_log(10, "Total filesystem is now %lld\n",
+	write_log(10, "Total filesystem is now %" PRId64 "\n",
 		  tmp_head.total_children);
 
 	memcpy(ret_entry, &temp_entry, sizeof(DIR_ENTRY));
@@ -618,22 +618,22 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int delete_filesystem(char *fsname)
+int32_t delete_filesystem(char *fsname)
 {
 	/* TODO: temp file for atomic operation (see detailed design) */
 
 	DIR_ENTRY_PAGE tpage, tpage2;
 	DIR_ENTRY temp_entry;
 	DIR_META_TYPE tmp_head, roothead;
-	int ret, errcode, ret_index;
+	int32_t ret, errcode, ret_index;
 	ino_t FS_root;
 	ssize_t ret_ssize;
 	size_t ret_size;
 	char thismetapath[400];
 	FILE *metafptr;
 	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
-	long long temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
-	long long metasize;
+	int64_t temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
+	int64_t metasize;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -743,7 +743,7 @@ int delete_filesystem(char *fsname)
 	}
 
 	tmp_head.total_children--;
-	write_log(10, "TOTAL CHILDREN is now %lld\n", tmp_head.total_children);
+	write_log(10, "TOTAL CHILDREN is now %" PRId64 "\n", tmp_head.total_children);
 	/* Write head back */
 
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
@@ -769,9 +769,9 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+int32_t check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 {
-	int ret;
+	int32_t ret;
 	/* This is the wrapper around check_filesytem_core, and
 	also locks FS manager lock */
 	sem_wait(&(fs_mgr_head->op_lock));
@@ -780,11 +780,11 @@ int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	sem_post(&(fs_mgr_head->op_lock));
 	return ret;
 }
-int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
+int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 {
 	DIR_ENTRY_PAGE tpage, tpage2;
 	DIR_META_TYPE tmp_head;
-	int ret, errcode, ret_index;
+	int32_t ret, errcode, ret_index;
 	ssize_t ret_ssize;
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
@@ -828,7 +828,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: list_filesystem
-*        Inputs: int buf_num, DIR_ENTRY *ret_entry, int *ret_num
+*        Inputs: int32_t buf_num, DIR_ENTRY *ret_entry, int32_t *ret_num
 *       Summary: List all filesystems in the buf "ret_entry" provided
 *                by the caller. "buf_num" indicates the number of entries.
 *                "ret_num" returns the total number of filesystems. If
@@ -841,16 +841,16 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
-		    unsigned long *ret_num)
+int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
+		    uint64_t *ret_num)
 {
 	DIR_ENTRY_PAGE tpage;
 	DIR_META_TYPE tmp_head;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 	int64_t num_walked;
-	long long next_node_pos;
-	int count;
+	int64_t next_node_pos;
+	int32_t count;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -925,11 +925,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int prepare_FS_database_backup(void)
+int32_t prepare_FS_database_backup(void)
 {
 	char tmppath[METAPATHLEN];
 	FILE *fptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 	char buf[4096];
 	size_t ret_size;
 	ssize_t ret_ssize;
@@ -989,11 +989,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int backup_FS_database(void)
+int32_t backup_FS_database(void)
 {
 	char tmppath[METAPATHLEN];
 	FILE *fptr, *tmpdbfptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 	CURL_HANDLE upload_handle;
 	char buf[4096];
 	size_t ret_size;
@@ -1098,10 +1098,10 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int restore_FS_database(void)
+int32_t restore_FS_database(void)
 {
 	FILE *fptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 	CURL_HANDLE download_handle;
 
 	/* Assume that FS manager is not started */

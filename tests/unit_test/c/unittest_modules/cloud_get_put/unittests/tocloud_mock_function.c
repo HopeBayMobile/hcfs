@@ -17,7 +17,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
@@ -84,10 +84,10 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 }
 
 #if (DEDUP_ENABLE)
-int do_block_delete(ino_t this_inode, long long block_no, unsigned char *obj_id,
+int do_block_delete(ino_t this_inode, int64_t block_no, unsigned char *obj_id,
 		    CURL_HANDLE *curl_handle)
 #else
-int do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, int64_t block_no,
 		    CURL_HANDLE *curl_handle)
 #endif
 {
@@ -139,10 +139,10 @@ int super_block_exclusive_release(void)
 }
 
 /* A mock function to return linear block indexing */
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
-	long long target_page, long long hint_page)
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	int64_t target_page, int64_t hint_page)
 {
-	long long ret_page_pos;
+	int64_t ret_page_pos;
 
 	/* target_page starts from 0 */
 	if (target_page >= mock_total_page)
@@ -215,14 +215,14 @@ int backup_FS_database(void)
 	return 0;
 }
 
-int update_backend_usage(long long total_backend_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int update_backend_usage(int64_t total_backend_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
 	return 0;
 }
 
-int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
-		long long fs_meta_size_delta, long long fs_num_inodes_delta)
+int update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta)
 {
 	FS_CLOUD_STAT_T	fs_cloud_stat;
 

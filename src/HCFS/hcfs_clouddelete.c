@@ -275,10 +275,10 @@ void init_delete_control(void)
 static inline int _use_delete_thread(int index, int dsync_index,
 				char is_blk_flag,
 #if (DEDUP_ENABLE)
-				ino_t this_inode, long long blockno,
+				ino_t this_inode, int64_t blockno,
 				unsigned char *obj_id)
 #else
-				ino_t this_inode, long long blockno)
+				ino_t this_inode, int64_t blockno)
 #endif
 {
 	if (delete_ctl.threads_in_use[index] != FALSE)
@@ -326,11 +326,11 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	SYMLINK_META_TYPE tempsymmeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int curl_id, which_dsync_index;
-	long long current_index;
-	long long page_pos, which_page, current_page;
-	long long count, block_count;
-	long long total_blocks;
-	long long temp_trunc_size;
+	int64_t current_index;
+	int64_t page_pos, which_page, current_page;
+	int64_t count, block_count;
+	int64_t total_blocks;
+	int64_t temp_trunc_size;
 	unsigned char block_status;
 	char delete_done;
 	char in_sync;
@@ -341,12 +341,12 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char mlock;
-	long long system_size_change, meta_size_change;
-	long long upload_seq;
+	int64_t system_size_change, meta_size_change;
+	int64_t upload_seq;
 	ino_t root_inode;
 	CLOUD_RELATED_DATA cloud_related_data;
 #ifndef _ANDROID_ENV_
-	long long ret_ssize;
+	int64_t ret_ssize;
 #endif
 
 	time_to_sleep.tv_sec = 0;
@@ -425,7 +425,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		if (truncfptr != NULL) {
 			setbuf(truncfptr, NULL);
 			flock(fileno(truncfptr), LOCK_EX);
-			FREAD(&temp_trunc_size, sizeof(long long), 1,
+			FREAD(&temp_trunc_size, sizeof(int64_t), 1,
 				truncfptr);
 
 			if (tmp_size < temp_trunc_size) {
@@ -436,7 +436,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		}
 #else
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
+				&temp_trunc_size, sizeof(int64_t));
 
 		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
 			tmp_size = temp_trunc_size;
@@ -674,13 +674,13 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 /************************************************************************
 *
 * Function name: do_block_delete
-*        Inputs: ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle
+*        Inputs: ino_t this_inode, int64_t block_no, CURL_HANDLE *curl_handle
 *       Summary: Given curl handle "curl_handle", delete the block object
 *                of inode number "this_inode", block no "block_no" from backend.
 *  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-int do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, int64_t block_no,
 #if (DEDUP_ENABLE)
 				unsigned char *obj_id, CURL_HANDLE *curl_handle)
 #else
@@ -714,7 +714,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 	/* Update ddt */
 	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
 #else
-	sprintf(objname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
+	sprintf(objname, "data_%" PRIu64 "_%" PRId64, (uint64_t)this_inode, block_no);
 	/* Force to delete */
 	ddt_ret = 0;
 #endif
@@ -723,7 +723,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		write_log(10,
 			"Debug delete object: objname %s, inode %" PRIu64 ", block %lld\n",
 			objname, (uint64_t)this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%" PRId64, (uint64_t)this_inode, block_no);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
 		if (((ret_val >= 200) && (ret_val <= 299)) || (ret_val == 404))

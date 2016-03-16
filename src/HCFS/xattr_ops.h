@@ -36,7 +36,7 @@ enum {
    VALUE_BLOCK, and it will be reclaimed if xattr is removed. */
 typedef struct {
 	char content[MAX_VALUE_BLOCK_SIZE]; /* Content is NOT null-terminated */
-	long long next_block_pos;
+	int64_t next_block_pos;
 } VALUE_BLOCK;
 
 /* A key entry includes key size, value size, the key string, and a file
@@ -45,7 +45,7 @@ typedef struct {
 	unsigned key_size;
 	unsigned value_size;
 	char key[MAX_KEY_SIZE]; /* Key is null-terminated string  */
-	long long first_value_block_pos;
+	int64_t first_value_block_pos;
 } KEY_ENTRY;
 
 /* KEY_LIST includes an array sorted by key, and number of xattr.
@@ -54,28 +54,28 @@ typedef struct {
 typedef struct {
 	unsigned num_xattr;
 	KEY_ENTRY key_list[MAX_KEY_ENTRY_PER_LIST];
-	long long next_list_pos;
+	int64_t next_list_pos;
 } KEY_LIST_PAGE;
 
 /* NAMESPACE_PAGE includes a hash table which is used to hash the input key.
    Each hash entry points to a KEY_LIST. */
 typedef struct {
 	unsigned num_xattr;
-	long long key_hash_table[MAX_KEY_HASH_ENTRY];
+	int64_t key_hash_table[MAX_KEY_HASH_ENTRY];
 } NAMESPACE_PAGE;
 
 /* XATTR_PAGE is pointed by next_xattr_page in meta file. Namespace is one of
    user, system, security, and trusted. */
 typedef struct {
-	long long reclaimed_key_list_page;
-	long long reclaimed_value_block;
+	int64_t reclaimed_key_list_page;
+	int64_t reclaimed_value_block;
 	NAMESPACE_PAGE namespace_page[4];
 } XATTR_PAGE;
 
 int parse_xattr_namespace(const char *name, char *name_space, char *key);
 
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, const long long xattr_filepos,
+	XATTR_PAGE *xattr_page, const int64_t xattr_filepos,
 	const char name_space, const char *key,
 	const char *value, const size_t size, const int flag);
 
@@ -88,12 +88,12 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	size_t *actual_size);
 
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, const long long xattr_filepos,
+	XATTR_PAGE *xattr_page, const int64_t xattr_filepos,
 	const char name_space, const char *key);
 
 int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	long long first_key_list_pos, KEY_LIST_PAGE *target_key_list_page,
-	int *key_index, long long *target_key_list_pos, const char *key,
-	KEY_LIST_PAGE *prev_page, long long *prev_pos);
+	int64_t first_key_list_pos, KEY_LIST_PAGE *target_key_list_page,
+	int *key_index, int64_t *target_key_list_pos, const char *key,
+	KEY_LIST_PAGE *prev_page, int64_t *prev_pos);
 
 #endif

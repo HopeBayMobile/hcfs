@@ -740,7 +740,7 @@ TEST_F(validate_system_configTest, NoBlockPath) {
  }
 TEST_F(validate_system_configTest, InvalidValue) {
   char pathname[100];
-  long long tmpval;
+  int64_t tmpval;
 
   strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
 
@@ -1124,7 +1124,7 @@ protected:
 
 TEST_F(get_quota_from_backupTest, MetapathNotExist)
 {
-	long long quota;
+	int64_t quota;
 
 	unlink("get_quota_from_backup_dir/usermeta");
 
@@ -1133,7 +1133,7 @@ TEST_F(get_quota_from_backupTest, MetapathNotExist)
 
 TEST_F(get_quota_from_backupTest, BackupNotExist)
 {
-	long long quota;
+	int64_t quota;
 
 	dec_success = FALSE;
 
@@ -1142,7 +1142,7 @@ TEST_F(get_quota_from_backupTest, BackupNotExist)
 
 TEST_F(get_quota_from_backupTest, JsonfileCorrupt)
 {
-	long long quota;
+	int64_t quota;
 
 	json_file_corrupt = TRUE;
 
@@ -1151,7 +1151,7 @@ TEST_F(get_quota_from_backupTest, JsonfileCorrupt)
 
 TEST_F(get_quota_from_backupTest, Success)
 {
-	long long quota;
+	int64_t quota;
 
 	EXPECT_EQ(0, get_quota_from_backup(&quota));
 	EXPECT_EQ(5566, quota);

@@ -97,12 +97,12 @@ TEST_F(compress, transform_compress_fd)
 
 TEST(base64, encode_then_decode)
 {
-	char *input = (char *)calloc(60, sizeof(char));
+	uint8_t *input = (uint8_t *)calloc(60, sizeof(uint8_t));
   generate_random_bytes((unsigned char*)input, 60);
 	int length_encode = expect_b64_encode_length(60);
 	char *code = (char *)calloc(length_encode, sizeof(char));
 	int out_len = 0;
-	b64encode_str((unsigned char *)input, (unsigned char *)code, &out_len, 60);
+	b64encode_str(input, code, &out_len, 60);
 	unsigned char *decode =
 	    (unsigned char *)calloc(out_len + 1, sizeof(unsigned char));
 	b64decode_str(code, decode, &out_len, out_len);

@@ -30,31 +30,31 @@ or external */
 #endif
 
 typedef struct {
-	unsigned long num_FS;
-	int FS_list_fh;
-	unsigned char sys_uuid[16];
+	uint64_t num_FS;
+	int32_t FS_list_fh;
+	uint8_t sys_uuid[16];
 	sem_t op_lock;
 } FS_MANAGER_HEAD_TYPE;
 
 FS_MANAGER_HEAD_TYPE *fs_mgr_head;
 char *fs_mgr_path;
 
-int init_fs_manager(void);
+int32_t init_fs_manager(void);
 void destroy_fs_manager(void);
 #ifdef _ANDROID_ENV_
-int add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry);
+int32_t add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry);
 #else
-int add_filesystem(char *fsname, DIR_ENTRY *ret_entry);
+int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry);
 #endif
-int delete_filesystem(char *fsname);
-int check_filesystem(char *fsname, DIR_ENTRY *ret_entry);
-int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry);
-int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
-		unsigned long *ret_num);
+int32_t delete_filesystem(char *fsname);
+int32_t check_filesystem(char *fsname, DIR_ENTRY *ret_entry);
+int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry);
+int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
+		uint64_t *ret_num);
 
-int backup_FS_database(void);
-int restore_FS_database(void);
-int prepare_FS_database_backup(void);
+int32_t backup_FS_database(void);
+int32_t restore_FS_database(void);
+int32_t prepare_FS_database_backup(void);
 
 #endif  /* GW20_HCFS_FS_MANAGER_H_ */
 

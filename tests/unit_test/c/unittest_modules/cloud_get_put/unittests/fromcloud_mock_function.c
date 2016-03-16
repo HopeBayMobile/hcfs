@@ -17,7 +17,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	if (OPEN_BLOCK_PATH_FAIL == TRUE)
 		strcpy(pathname, "");
@@ -100,14 +100,14 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 	return 0;
 }
 
-int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-		long long num_cached_blocks_delta,
-		long long cached_size_delta)
+int update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+		int64_t num_cached_blocks_delta,
+		int64_t cached_size_delta)
 {
 	return 0;
 }
 
-void get_system_size(long long *cache_size, long long *pinned_size)
+void get_system_size(int64_t *cache_size, int64_t *pinned_size)
 {
 	if (CACHE_FULL == TRUE) {
 		if (cache_size)
@@ -133,7 +133,7 @@ int super_block_mark_dirty(ino_t this_inode)
 
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (block_page) {
 		block_page->block_entries[0].status = NOW_STATUS;
@@ -147,7 +147,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 
 int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -157,14 +157,14 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 	return 0;
 }
 
-int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta)
+int change_system_meta(int64_t system_size_delta,
+		int64_t cache_size_delta, int64_t cache_blocks_delta)
 {
 	return 0;
 }
 
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
-		long long target_page, long long hint_page)
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
+		int64_t target_page, int64_t hint_page)
 {
 	return sizeof(struct stat) + sizeof(FILE_META_TYPE);
 }

@@ -26,7 +26,7 @@ CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 	va_list alist;
 	FILE *fptr;
 	char buf[500];
-	int retcode;
+	int32_t retcode;
 
 	/* "let_retry" is used to test retry connection */
 	if (let_retry == TRUE) {
@@ -65,7 +65,7 @@ void curl_slist_free_all(struct curl_slist * list)
 {
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list args;
 	va_start (args, format);
@@ -110,13 +110,13 @@ void HMAC_CTX_init(HMAC_CTX *ctx)
 {
 }
 
-int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int key_len,
+int32_t HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int32_t key_len,
 	const EVP_MD *md, ENGINE *impl)
 {
 	return 0;
 }
 
-int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len)
+int32_t HMAC_Update(HMAC_CTX *ctx, const uint8_t *data, size_t len)
 {
 	return 0;
 }
@@ -136,14 +136,14 @@ const EVP_MD *EVP_sha1(void)
 {
 }
 
-int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
-	int *outlen, int inputlen)
+int32_t b64encode_str(uint8_t *inputstr, char *outputstr,
+	int32_t *outlen, int32_t inputlen)
 {
 	strcpy(outputstr, "test_b64encode");
 }
 
-void update_backend_status(int status, struct timespec *status_time) {}
-int ignore_sigpipe(void)
+void update_backend_status(int32_t status, struct timespec *status_time) {}
+int32_t ignore_sigpipe(void)
 {
 	return 0;
 }

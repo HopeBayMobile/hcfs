@@ -525,7 +525,7 @@ static inline int hash_inode_to_meta_cache(ino_t this_inode)
 * Function name: meta_cache_update_file_data
 *        Inputs: ino_t this_inode, struct stat *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-*                long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
+*                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Update the cache content for inode "this_inode". Content
 *                entries not updated are passed as "NULL". If write through
 *                cache is enabled (the only option now), will also write
@@ -536,7 +536,7 @@ static inline int hash_inode_to_meta_cache(ino_t this_inode)
 *************************************************************************/
 int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /* Always change dirty status to TRUE here as we always update */
 /* For block entry page lookup or update, only allow one lookup/update at a
@@ -609,7 +609,7 @@ errcode_handle:
 * Function name: meta_cache_lookup_file_data
 *        Inputs: ino_t this_inode, struct stat *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-*                long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
+*                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Read the cache content for inode "this_inode". Content
 *                entries not required are passed as "NULL". Will read from
 *                meta file if there is no cached content for the requested
@@ -620,7 +620,7 @@ errcode_handle:
 *************************************************************************/
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret, errcode;
 	size_t ret_size;

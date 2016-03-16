@@ -67,7 +67,7 @@ int init_hcfs_system_data(void)
 {
 	int errcode, ret;
 	size_t ret_size;
-	long long quota;
+	int64_t quota;
 
 #ifdef _ANDROID_ENV_
 	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));

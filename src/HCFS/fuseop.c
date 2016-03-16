@@ -949,7 +949,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
-	long long delta_meta_size;
+	int64_t delta_meta_size;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -1127,7 +1127,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
-	long long delta_meta_size;
+	int64_t delta_meta_size;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -1662,8 +1662,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat1, parent_stat2;
 	MOUNT_T *tmpptr;
 	DIR_STATS_TYPE tmpstat;
-	long long old_metasize1, old_metasize2, new_metasize1, new_metasize2;
-	long long delta_meta_size1, delta_meta_size2;
+	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
+	int64_t delta_meta_size1, delta_meta_size2;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -2174,7 +2174,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 /* Helper function for waiting on full cache in the truncate function */
 int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT **body_ptr,
+	int64_t page_pos, META_CACHE_ENTRY_STRUCT **body_ptr,
 	int entry_index)
 {
 	int ret_val;
@@ -2217,17 +2217,17 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 *  "old_last_block". "inode_index" is the inode number of the file being
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
-			long long page_index, long long old_last_block,
+			int64_t page_index, int64_t old_last_block,
 			ino_t inode_index, FILE *metafptr, char ispin)
 {
 	int block_count;
 	char thisblockpath[1024];
-	long long tmp_blk_index;
+	int64_t tmp_blk_index;
 	off_t cache_block_size;
 	off_t total_deleted_cache;
-	long long total_deleted_blocks;
-	long long total_deleted_fileblocks;
-	long long unpin_dirty_size;
+	int64_t total_deleted_blocks;
+	int64_t total_deleted_fileblocks;
+	int64_t unpin_dirty_size;
 	off_t total_deleted_dirty_cache;
 	int ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
@@ -2359,8 +2359,8 @@ errcode_handle:
 *  fits (offset % MAX_BLOCK_SIZE) */
 int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	FILE_META_TYPE *tempfilemeta, BLOCK_ENTRY_PAGE *temppage,
-	long long currentfilepos, META_CACHE_ENTRY_STRUCT **body_ptr,
-	int last_index, long long last_block, off_t offset)
+	int64_t currentfilepos, META_CACHE_ENTRY_STRUCT **body_ptr,
+	int last_index, int64_t last_block, off_t offset)
 
 {
 	char thisblockpath[1024];
@@ -2368,10 +2368,10 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	struct stat tempstat;
 	off_t old_block_size, new_block_size;
 	int ret, errcode;
-	long long cache_delta;
-	long long cache_block_delta;
-	long long block_dirty_size, delta_dirty_size;
-	long long unpin_dirty_size;
+	int64_t cache_delta;
+	int64_t cache_block_delta;
+	int64_t block_dirty_size, delta_dirty_size;
+	int64_t unpin_dirty_size;
 	char tmpstatus;
 	BLOCK_ENTRY *last_block_entry;
 
@@ -2677,12 +2677,12 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	FILE_META_TYPE tempfilemeta;
 	int ret, errcode;
-	long long last_block, last_page, old_last_block;
-	long long current_page, old_last_page;
+	int64_t last_block, last_page, old_last_block;
+	int64_t current_page, old_last_page;
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
-	long long temp_trunc_size, sizediff;
+	int64_t temp_trunc_size, sizediff;
 #ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
 #endif
@@ -3008,7 +3008,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((long long)(offset - filestat->st_size),
+	change_system_meta((int64_t)(offset - filestat->st_size),
 			0, 0, 0, 0, 0, TRUE);
 
 	ret = change_mount_stat(tmpptr,
@@ -3048,7 +3048,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
 	ino_t thisinode;
-	long long fh;
+	int64_t fh;
 	int ret_val;
 	struct stat this_stat;
 	int file_flags;
@@ -3140,7 +3140,7 @@ int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 
 /* Helper function for read operation. Will wait on cache full and wait
 *  until cache is not full. */
-int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
+int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 		FH_ENTRY *fh_ptr, off_t this_page_fpos)
 {
 	int ret;
@@ -3179,8 +3179,8 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 /* TODO: For prefetching, need to prevent opening multiple threads
 to prefetch the same block (waste of resource, but not critical though as
 only one thread will actually download the block) */
-int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
-		ino_t this_inode, long long block_index, off_t this_page_fpos)
+int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, int64_t eindex,
+		ino_t this_inode, int64_t block_index, off_t this_page_fpos)
 {
 	int ret;
 	PREFETCH_STRUCT_TYPE *temp_prefetch;
@@ -3218,8 +3218,8 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 
 /* Helper function for read operation. Will fetch a block from backend for
 *  reading. */
-int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
-		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex)
+int read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
+		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, int64_t eindex)
 {
 	char thisblockpath[400];
 	struct stat tempstat2;
@@ -3425,15 +3425,15 @@ error_handling:
 
 /* Function for reading from a single block for read operation. Will fetch
 *  block from backend if needed. */
-size_t _read_block(char *buf, size_t size, long long bindex,
+size_t _read_block(char *buf, size_t size, int64_t bindex,
 		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int *reterr)
 {
-	long long current_page;
+	int64_t current_page;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
 	off_t this_page_fpos;
 	size_t this_bytes_read, ret_size;
-	long long entry_index;
+	int64_t entry_index;
 	char fill_zeros;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 	int ret, errnum, errcode;
@@ -3627,8 +3627,8 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	size_t size_org, off_t offset, struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
-	long long start_block, end_block;
-	long long block_index;
+	int64_t start_block, end_block;
+	int64_t block_index;
 	int total_bytes_read;
 	int this_bytes_read;
 	off_t current_offset;
@@ -3797,7 +3797,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 
 /* Helper function for write operation. Will wait on cache full and wait
 *  until cache is not full. */
-int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
+int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 		FH_ENTRY *fh_ptr, off_t this_page_fpos)
 {
 	int ret;
@@ -3852,14 +3852,14 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 }
 
 /* Helper function for the write operation. Will fetch a block from backend. */
-int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
-		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex,
+int _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
+		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, int64_t eindex,
 		char ispin)
 {
 	char thisblockpath[400];
 	struct stat tempstat2;
 	int ret, errcode;
-	long long unpin_dirty_size;
+	int64_t unpin_dirty_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
@@ -4036,20 +4036,20 @@ error_handling:
 
 /* Function for writing to a single block for write operation. Will fetch
 *  block from backend if needed. */
-size_t _write_block(const char *buf, size_t size, long long bindex,
+size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode,
 		int *reterr, char ispin)
 {
-	long long current_page;
+	int64_t current_page;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
 	off_t this_page_fpos;
 	off_t old_cache_size, new_cache_size;
 	size_t this_bytes_written, ret_size;
-	long long entry_index;
+	int64_t entry_index;
 	int ret, errnum, errcode;
-	long long tmpcachesize, tmpdiff;
-	long long unpin_dirty_size;
+	int64_t tmpcachesize, tmpdiff;
+	int64_t unpin_dirty_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Check system size before writing */
@@ -4316,8 +4316,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		size_t size, off_t offset, struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
-	long long start_block, end_block;
-	long long block_index;
+	int64_t start_block, end_block;
+	int64_t block_index;
 	off_t total_bytes_written;
 	size_t this_bytes_written;
 	off_t current_offset;
@@ -4327,8 +4327,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
-	long long sizediff, amount_preallocated;
-	long long old_metasize, new_metasize, delta_meta_size;
+	int64_t sizediff, amount_preallocated;
+	int64_t old_metasize, new_metasize, delta_meta_size;
 
 	write_log(10, "Debug write: size %zu, offset %lld\n", size,
 	          offset);
@@ -4573,8 +4573,8 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
 	MOUNT_T *tmpptr;
-	long long system_size, num_inodes, free_block;
-	long long quota;
+	int64_t system_size, num_inodes, free_block;
+	int64_t quota;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5486,7 +5486,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int errcode;
 	MOUNT_T *tmpptr;
 	char local_pin;
-	long long delta_meta_size;
+	int64_t delta_meta_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5775,7 +5775,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* TODO: Tmp ignore permission of namespace */
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
-	long long xattr_filepos;
+	int64_t xattr_filepos;
 	char key[MAX_KEY_SIZE];
 	char name_space;
 	int retcode;
@@ -5783,7 +5783,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
-	long long old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize, new_metasize, delta_meta_size;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5922,7 +5922,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
 	struct stat stat_data;
-	long long xattr_filepos;
+	int64_t xattr_filepos;
 	char key[MAX_KEY_SIZE];
 	char name_space;
 	int retcode;
@@ -6081,7 +6081,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	XATTR_PAGE *xattr_page;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	ino_t this_inode;
-	long long xattr_filepos;
+	int64_t xattr_filepos;
 	int retcode;
 	char *key_buf;
 	size_t actual_size;
@@ -6193,7 +6193,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	XATTR_PAGE *xattr_page;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	ino_t this_inode;
-	long long xattr_filepos;
+	int64_t xattr_filepos;
 	int retcode;
 	char name_space;
 	char key[MAX_KEY_SIZE];
@@ -6327,7 +6327,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	unsigned long this_generation;
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
-	long long old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize, new_metasize, delta_meta_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6483,11 +6483,11 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	struct fuse_ctx *temp_context;
 	struct fuse_entry_param tmp_param;
 	unsigned long this_generation;
-	long long fh;
+	int64_t fh;
 	MOUNT_T *tmpptr;
 	char local_pin;
 	char ispin;
-	long long delta_meta_size;
+	int64_t delta_meta_size;
 
 	parent_inode = real_ino(req, parent);
 

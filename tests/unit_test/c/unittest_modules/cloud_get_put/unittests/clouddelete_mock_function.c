@@ -87,12 +87,12 @@ int super_block_share_release(void)
 }
 
 /* A mock function to return linear block indexing */
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
-	long long target_page, long long hint_page) 
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	int64_t target_page, int64_t hint_page) 
 {
 	if (target_page >= 3)
 		return 0;
-	long long ret_page_pos = sizeof(struct stat) + 
+	int64_t ret_page_pos = sizeof(struct stat) + 
 		sizeof(FILE_META_TYPE) + target_page *
 		sizeof(BLOCK_ENTRY_PAGE);
 	return ret_page_pos;
@@ -103,8 +103,8 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int update_backend_stat(ino_t root_inode, long long system_size_delta,
-			long long num_inodes_delta)
+int update_backend_stat(ino_t root_inode, int64_t system_size_delta,
+			int64_t num_inodes_delta)
 {
 	return 0;
 }

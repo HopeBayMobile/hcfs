@@ -33,9 +33,9 @@ int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 
 /* if returns 1, then there is an entry to be added to the parent */
 int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
-	int fh, DIR_ENTRY *overflow_median, long long *overflow_new_page,
+	int fh, DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	long long *temp_child_page_pos)
+	int64_t *temp_child_page_pos)
 {
 	off_t tmp_pos;
 	DIR_ENTRY_PAGE tmppage;
@@ -95,7 +95,7 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 	return 0;
 }
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
-						long long this_page_pos)
+						int64_t this_page_pos)
 {
 	return 0;
 }
@@ -142,13 +142,13 @@ int delete_inode_meta(ino_t this_inode)
 }
 int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 	int fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	long long *temp_child_page_pos)
+	int64_t *temp_child_page_pos)
 {
 	return 0;
 }
 
-int update_FS_statistics(char *pathname, long long system_size,
-		long long num_inodes)
+int update_FS_statistics(char *pathname, int64_t system_size,
+		int64_t num_inodes)
 {
 	return 0;
 }
@@ -172,14 +172,14 @@ int reset_dirstat_lookup(ino_t thisinode)
 	return 0;
 }
 
-int get_meta_size(ino_t inode, long long *metasize)
+int get_meta_size(ino_t inode, int64_t *metasize)
 {
 	return 0;
 }
 
-int change_system_meta(long long system_data_size_delta,
-	long long meta_size_delta, long long cache_data_size_delta,
-	long long cache_blocks_delta, long long dirty_cache_delta)
+int change_system_meta(int64_t system_data_size_delta,
+	int64_t meta_size_delta, int64_t cache_data_size_delta,
+	int64_t cache_blocks_delta, int64_t dirty_cache_delta)
 {
 	return 0;
 }

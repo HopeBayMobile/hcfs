@@ -1023,16 +1023,16 @@ int unmount_all(void)
 /************************************************************************
 *
 * Function name: change_mount_stat
-*        Inputs: MOUNT_T *mptr, long long system_size_delta,
-*                long long num_inodes_delta
+*        Inputs: MOUNT_T *mptr, int64_t system_size_delta,
+*                int64_t num_inodes_delta
 *       Summary: Update the per-FS statistics in the mount table
 *                for the mount pointed by "mptr". Also sync the content
 *                to the xattr of the root meta file.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
 	int ret;
 
