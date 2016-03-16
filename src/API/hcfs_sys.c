@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <sqlite3.h>
+#include <inttypes.h>
 
 #include "hcfs_sys.h"
 
@@ -14,10 +15,10 @@
 #include "enc.h"
 
 
-int _validate_config_key(char *key)
+int32_t _validate_config_key(char *key)
 {
 
-	int idx, num_keys;
+	int32_t idx, num_keys;
 	char *keys[] = {\
 		"current_backend",\
 		"swift_account",\
@@ -43,21 +44,21 @@ int _validate_config_key(char *key)
  *     The size of *output* should be larger than
  *     input_len + IV_SIZE + TAG_SIZE.
  */
-int _encrypt_config(unsigned char *output, unsigned char *input,
-		   long input_len)
+int32_t _encrypt_config(uint8_t *output, uint8_t *input,
+		   int64_t input_len)
 {
 
-	int ret;
-	unsigned char iv[IV_SIZE] = {0};
-	unsigned char *enc_key, *enc_data;
-	long data_size, enc_size;
+	int32_t ret;
+	uint8_t iv[IV_SIZE] = {0};
+	uint8_t *enc_key, *enc_data;
+	int64_t data_size, enc_size;
 
 	/* Key and iv */
 	enc_key = get_key(PASSPHRASE);
 	generate_random_bytes(iv, IV_SIZE);
 
 	enc_data = (char*)malloc(
-			sizeof(unsigned char) * (input_len + TAG_SIZE));
+			sizeof(uint8_t) * (input_len + TAG_SIZE));
 
 	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
 	free(enc_key);
@@ -76,12 +77,12 @@ int _encrypt_config(unsigned char *output, unsigned char *input,
 FILE *_get_decrypt_configfp()
 {
 
-	long file_size, enc_size, data_size;
+	int64_t file_size, enc_size, data_size;
 	FILE *datafp = NULL;
-	unsigned char *iv_buf = NULL;
-        unsigned char *enc_buf = NULL;
-        unsigned char *data_buf = NULL;
-	unsigned char *enc_key = NULL;
+	uint8_t *iv_buf = NULL;
+        uint8_t *enc_buf = NULL;
+        uint8_t *data_buf = NULL;
+	uint8_t *enc_key = NULL;
 
 	if (access(CONFIG_PATH, F_OK|R_OK) == -1)
 		goto error;
@@ -104,8 +105,8 @@ FILE *_get_decrypt_configfp()
 		goto error;
 
 	enc_key = get_key(PASSPHRASE);
-	fread(iv_buf, sizeof(unsigned char), IV_SIZE, datafp);
-	fread(enc_buf, sizeof(unsigned char), enc_size, datafp);
+	fread(iv_buf, sizeof(uint8_t), IV_SIZE, datafp);
+	fread(enc_buf, sizeof(uint8_t), enc_size, datafp);
 
 	if (aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
 				 enc_key, iv_buf) != 0)
@@ -114,7 +115,7 @@ FILE *_get_decrypt_configfp()
 	FILE *tmp_file = tmpfile();
 	if (tmp_file == NULL)
 		goto error;
-	fwrite(data_buf, sizeof(unsigned char), data_size,
+	fwrite(data_buf, sizeof(uint8_t), data_size,
 		tmp_file);
 
 	rewind(tmp_file);
@@ -137,11 +138,11 @@ end:
 	return tmp_file;
 }
 
-int set_hcfs_config(char *arg_buf, unsigned int arg_len)
+int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 {
 
-	int idx, ret_code;
-	unsigned int msg_len;
+	int32_t idx, ret_code;
+	uint32_t msg_len;
 	ssize_t str_len;
 	char tmp_path[100];
 	char buf[300];
@@ -149,8 +150,8 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	char *tmp_ptr, *line, *token;
 	FILE *conf = NULL;
 	FILE *tmp_conf = NULL;
-	unsigned char data_buf[1024];
-	int data_size = 0;
+	uint8_t data_buf[1024];
+	int32_t data_size = 0;
 
 
 	msg_len = 0;
@@ -198,8 +199,8 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 		free(tmp_ptr);
 	}
 
-	unsigned char *enc_data =
-		(unsigned char*)malloc(sizeof(char) * (data_size + IV_SIZE + TAG_SIZE));
+	uint8_t *enc_data =
+		(uint8_t*)malloc(sizeof(char) * (data_size + IV_SIZE + TAG_SIZE));
 	if (enc_data == NULL)
 		goto error;
 
@@ -215,7 +216,7 @@ int set_hcfs_config(char *arg_buf, unsigned int arg_len)
 	if (tmp_conf == NULL)
 		goto error;
 
-	fwrite(enc_data, sizeof(unsigned char),
+	fwrite(enc_data, sizeof(uint8_t),
 	       data_size + IV_SIZE + TAG_SIZE, tmp_conf);
 
 	ret_code = rename(tmp_path, CONFIG_PATH);
@@ -235,11 +236,11 @@ end:
 	return ret_code;
 }
 
-int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
+int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
 {
 
-	int idx, ret_code;
-	unsigned int msg_len;
+	int32_t idx, ret_code;
+	uint32_t msg_len;
 	ssize_t str_len;
 	char tmp_path[100];
 	char buf[300];
@@ -313,11 +314,11 @@ int get_hcfs_config(char *arg_buf, unsigned int arg_len, char **value)
 		return ret_code;
 }
 
-int reload_hcfs_config()
+int32_t reload_hcfs_config()
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -326,24 +327,24 @@ int reload_hcfs_config()
 	code = RELOADCONFIG;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
-int toggle_cloud_sync(char *arg_buf, unsigned int arg_len)
+int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 {
 
-	int fd, ret_code, size_msg, enabled;
-	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	int32_t fd, ret_code, size_msg, enabled;
+	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
-	memcpy(&enabled, arg_buf, sizeof(int));
+	memcpy(&enabled, arg_buf, sizeof(int32_t));
 	if (enabled != 0 && enabled != 1)
 		return -EINVAL;
 
@@ -352,25 +353,25 @@ int toggle_cloud_sync(char *arg_buf, unsigned int arg_len)
 		return fd;
 
 	code = SETSYNCSWITCH;
-	cmd_len = sizeof(int);
+	cmd_len = sizeof(int32_t);
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-	size_msg = send(fd, &enabled, sizeof(int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	size_msg = send(fd, &enabled, sizeof(int32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
-int get_sync_status()
+int32_t get_sync_status()
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -379,22 +380,22 @@ int get_sync_status()
 	code = GETSYNCSWITCH;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
-int reset_xfer_usage()
+int32_t reset_xfer_usage()
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -403,11 +404,11 @@ int reset_xfer_usage()
 	code = RESETXFERSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
@@ -415,7 +416,7 @@ int reset_xfer_usage()
 }
 
 /* Callback function for sql statement */
-static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
+static int32_t _sqlite_exec_cb(void *data, int32_t argc, char **argv, char **azColName)
 {
 
 	size_t uid_len;
@@ -428,11 +429,11 @@ static int _sqlite_exec_cb(void *data, int argc, char **argv, char **azColName)
 	return 0;
 }
 
-int query_pkg_uid(char *arg_buf, unsigned int arg_len, char **uid)
+int32_t query_pkg_uid(char *arg_buf, uint32_t arg_len, char **uid)
 {
 
-	int idx, ret_code;
-	unsigned int msg_len;
+	int32_t idx, ret_code;
+	uint32_t msg_len;
 	ssize_t str_len;
 	char pkg_name[400];
 	char sql[1000];
