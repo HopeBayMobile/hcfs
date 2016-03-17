@@ -27,6 +27,7 @@
 * 2016/1/19 Jiahong modified path reconstruct routine
 * 2016/2/4 Jiahong adding fallocate
 * 2016/2/23 Jiahong moved fallocate to another file
+* 2016/3/17 Jiahong modified permission checking to add capability check
 *
 **************************************************************************/
 
@@ -133,6 +134,8 @@ ntpdate / ntpd or manual changes*/
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
+int _check_capability(pid_t thispid, int flag);
+
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
    "mode" is the bit-wise OR of ATIME, MTIME, CTIME.
@@ -186,7 +189,14 @@ int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
 	if (temp_context == NULL)
 		return -ENOMEM;
 
-	if (temp_context->uid == 0)  /*If this is the root grant any req */
+	/* Do not grant access based on uid now */
+	/*
+		if (temp_context->uid == 0)
+			return 0;
+	*/
+
+	/* Check the capabilities of the process */
+	if (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE) == TRUE)
 		return 0;
 
 	/* First check owner permission */
@@ -288,7 +298,9 @@ int check_permission_access(fuse_req_t req, struct stat *thisstat, int mode)
 		return -ENOMEM;
 
 	/*If this is the root check if exec is set for any for reg files*/
-	if (temp_context->uid == 0) {
+	if ((temp_context->uid == 0) ||
+	    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE)
+	                == TRUE)) {
 		if ((S_ISREG(thisstat->st_mode)) && (mode & X_OK)) {
 			if (!(thisstat->st_mode &
 				(S_IXUSR | S_IXGRP | S_IXOTH)))
@@ -4908,7 +4920,7 @@ uint64_t str_to_mask(char *input)
 }
 
 /* Helper for checking chown capability */
-int _check_chown_capability(pid_t thispid)
+int _check_capability(pid_t thispid, int flag)
 {
 	char proc_status_path[100];
         char tmpstr[100], outstr[20];
@@ -4939,7 +4951,7 @@ int _check_chown_capability(pid_t thispid)
 	/* Check the chown bit in the bitmask */
 
 	op_mask = 1;
-	op_mask = op_mask << CAP_CHOWN;
+	op_mask = op_mask << flag;
 	result_mask = cap_mask & op_mask;
 
 	/* Return whether the chown is set */
@@ -5027,7 +5039,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		write_log(10, "Debug setattr context %d, file %d\n",
 			temp_context->uid, newstat.st_uid);
 
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
 
@@ -5043,7 +5055,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 
 	if (to_set & FUSE_SET_ATTR_UID) {
 		/* Checks if process has CHOWN capabilities here */
-		if (_check_chown_capability(temp_context->pid) != TRUE) {
+		if (_check_capability(temp_context->pid, CAP_CHOWN) != TRUE) {
 			/* Not privileged */
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
@@ -5058,7 +5070,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	if (to_set & FUSE_SET_ATTR_GID) {
 		/* Checks if process has CHOWN capabilities here */
 		/* Or if is owner or in group */
-		if (_check_chown_capability(temp_context->pid) != TRUE) {
+		if (_check_capability(temp_context->pid, CAP_CHOWN) != TRUE) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
 			if (ret_val < 0) {
 				meta_cache_close_file(body_ptr);
@@ -5082,7 +5094,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
 
@@ -5101,7 +5113,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
 
@@ -5121,7 +5133,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	clock_gettime(CLOCK_REALTIME, &timenow);
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			((temp_context->uid != newstat.st_uid) ||
 				(check_permission(req, &newstat, 2) < 0))) {
 			/* Not privileged and
@@ -5141,7 +5153,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			((temp_context->uid != newstat.st_uid) ||
 				(check_permission(req, &newstat, 2) < 0))) {
 			/* Not privileged and
@@ -5560,6 +5572,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	struct stat stat_data;
 	ino_t this_inode;
         MOUNT_T *tmpptr;
+	struct fuse_ctx *temp_context;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5610,7 +5623,15 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         }
 #endif
 
-	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
+        temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+        if (temp_context == NULL) {
+                fuse_reply_err(req, ENOMEM);
+                return;
+        }
+
+	if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
+	    (check_permission(req, &stat_data, 2) < 0)) {
+		/* WRITE perm needed */
 		write_log(5, "Error: setxattr Permission denied ");
 		write_log(5, "(WRITE needed)\n");
 		retcode = -EACCES;
@@ -5918,6 +5939,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	char key[MAX_KEY_SIZE];
 	struct stat stat_data;
         MOUNT_T *tmpptr;
+	struct fuse_ctx *temp_context;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5962,7 +5984,15 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
         }
 #endif
 
-	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
+        temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+        if (temp_context == NULL) {
+                fuse_reply_err(req, ENOMEM);
+                return;
+        }
+
+	if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
+	    (check_permission(req, &stat_data, 2) < 0)) {
+		/* WRITE perm needed */
 		write_log(
 		    5, "Error: removexattr Permission denied (WRITE needed)\n");
 		retcode = -EACCES;
