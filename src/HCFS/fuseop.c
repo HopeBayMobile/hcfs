@@ -4908,7 +4908,7 @@ uint64_t str_to_mask(char *input)
 }
 
 /* Helper for checking chown capability */
-int _check_capability(pid_t thispid, int cap_to_check)
+BOOL _check_capability(pid_t thispid, int cap_to_check)
 {
 	char proc_status_path[100];
         char tmpstr[100], outstr[20];
@@ -4919,6 +4919,10 @@ int _check_capability(pid_t thispid, int cap_to_check)
 	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
 	         thispid);
         fptr = fopen(proc_status_path, "r");
+	if (!fptr) {
+		write_log(4, "Cannot open proc/x/status file\n");
+		return FALSE;
+	}
 
         do {
                 fgets(tmpstr, 80, fptr);
