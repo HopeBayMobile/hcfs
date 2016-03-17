@@ -107,7 +107,7 @@ int write_log(int level, char *format, ...)
 	else
 		add_newline = FALSE;
 	if ((logptr == NULL) || (logptr->fptr == NULL)) {
-		if (1) {
+		if (level <= LOG_LEVEL) {
 			gettimeofday(&tmptime, NULL);
 			localtime_r(&(tmptime.tv_sec), &tmptm);
 			strftime(timestr, 90, "%F %T", &tmptm);
@@ -120,7 +120,7 @@ int write_log(int level, char *format, ...)
 				printf("\n");
 		}
 	} else {
-		if (1) {
+		if (level <= LOG_LEVEL) {
 			gettimeofday(&tmptime, NULL);
 			localtime_r(&(tmptime.tv_sec), &tmptm);
 			strftime(timestr, 90, "%F %T", &tmptm);

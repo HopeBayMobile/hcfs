@@ -4922,7 +4922,7 @@ BOOL _check_capability(pid_t thispid, int cap_to_check)
         fptr = fopen(proc_status_path, "r");
 	if (!fptr) {
 		errcode = errno;
-		write_log(4, "Cannot open %s file. Code %d\n",
+		write_log(4, "Cannot open %s. Code %d\n",
 				proc_status_path, errcode);
 		return FALSE;
 	}
@@ -5563,15 +5563,7 @@ static int _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
 			return check_permission(req, thisstat, 4);
 		break;
 	case SECURITY:
-		if (ops == WRITE_XATTR) {
-			if (_check_capability(thispid,
-					CAP_SYS_ADMIN) == TRUE)
-				return 0;
-			else
-				return -EACCES;
-		}
-		if (ops == READ_XATTR)
-			return 0;
+		return 0;
 		break;
 	case TRUSTED:
 		if (_check_capability(thispid,

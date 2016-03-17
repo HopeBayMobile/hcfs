@@ -144,7 +144,7 @@ TEST_F(write_logTest, NoLogEntry) {
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  //EXPECT_EQ(EOF, ret);
+  EXPECT_EQ(EOF, ret);
  }
 TEST_F(write_logTest, NoLogWriteOK) {
   int ret, failed;
