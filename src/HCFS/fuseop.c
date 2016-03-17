@@ -4915,12 +4915,15 @@ BOOL _check_capability(pid_t thispid, int cap_to_check)
         char *saveptr, *outptr;
         FILE *fptr;
 	uint64_t cap_mask, op_mask, result_mask;
+	int errcode;
 
 	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
 	         thispid);
         fptr = fopen(proc_status_path, "r");
 	if (!fptr) {
-		write_log(4, "Cannot open proc/x/status file\n");
+		errcode = errno;
+		write_log(4, "Cannot open %s file. Code %d\n",
+				proc_status_path, errcode);
 		return FALSE;
 	}
 
