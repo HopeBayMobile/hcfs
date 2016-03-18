@@ -4521,9 +4521,9 @@ errcode_handle:
 void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
-	/* ino_t thisinode; */
 	MOUNT_T *tmpptr;
-	long long system_size, num_inodes;
+	long long system_size, num_inodes, free_block;
+	long long quota;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -4551,17 +4551,20 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (system_size > (512 * powl(1024, 3)))
+	/*if (system_size > (512 * powl(1024, 3)))
 		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
-	else
-		buf->f_blocks = (256*powl(1024, 2));
+	else*/
+	quota = hcfs_system->systemdata.system_quota;
+	buf->f_blocks = quota ? quota / buf->f_bsize + 1 : 0;
 
-	if (system_size == 0)
+	if (system_size == 0) {
 		buf->f_bfree = buf->f_blocks;
-	else
+	} else {
 		/* we have assigned double size of system blocks, so it
 		 * will keep being postive after subtracting */
-		buf->f_bfree = buf->f_blocks - (((system_size - 1) / 4096) + 1);
+		free_block = buf->f_blocks - (((system_size - 1) / 4096) + 1);
+		buf->f_bfree = free_block < 0 ? 0 : free_block;
+	}
 
 	buf->f_bavail = buf->f_bfree;
 

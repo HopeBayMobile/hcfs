@@ -987,11 +987,6 @@ int update_quota()
 		return -EPERM;
 	}
 
-	if (hcfs_system->sync_paused) {
-		write_log(5, "Cannot connect to backend\n");
-		return -ENONET;
-	}
-
 	sem_wait(&(download_usermeta_ctl.access_sem));
 	if (download_usermeta_ctl.active == TRUE) {
 		sem_post(&(download_usermeta_ctl.access_sem));
