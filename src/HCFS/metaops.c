@@ -2044,6 +2044,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	size_t value_size;
 	int ret;
 
+	UNUSED(this_inode);
 	key_buf = NULL;
 	value_buf = NULL;
 

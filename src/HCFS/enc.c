@@ -240,7 +240,7 @@ int aes_gcm_decrypt_fix_iv(unsigned char *output, unsigned char *input,
  * In the future, it should be reimplemented considering
  * key management specs
  */
-unsigned char *get_key(char *passphrase)
+unsigned char *get_key(const char *passphrase)
 {
 	const char *user_pass = passphrase;
 	unsigned char md_value[EVP_MAX_MD_SIZE];
@@ -557,7 +557,7 @@ void free_object_meta(HCFS_encode_object_meta *object_meta)
 *                occured.
 *
 *************************************************************************/
-FILE *get_decrypt_configfp(unsigned char *config_path)
+FILE *get_decrypt_configfp(const char *config_path)
 {
 
 	long file_size, enc_size, data_size;
@@ -581,9 +581,9 @@ FILE *get_decrypt_configfp(unsigned char *config_path)
 	enc_size = file_size - IV_SIZE;
 	data_size = enc_size - TAG_SIZE;
 
-	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
-	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
-	data_buf = (char*)malloc(sizeof(char)*(data_size));
+	iv_buf = (unsigned char*)malloc(sizeof(char)*IV_SIZE);
+	enc_buf = (unsigned char*)malloc(sizeof(char)*(enc_size));
+	data_buf = (unsigned char*)malloc(sizeof(char)*(data_size));
 
 	if (!iv_buf || !enc_buf || !data_buf)
 		goto error;
