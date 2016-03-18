@@ -134,7 +134,7 @@ ntpdate / ntpd or manual changes*/
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
-int _check_capability(pid_t thispid, int flag);
+BOOL _check_capability(pid_t thispid, int cap_to_check);
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
@@ -5575,14 +5575,6 @@ static int _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
 			return check_permission(req, thisstat, 4);
 		break;
 	case SECURITY:
-		/* Only CAP_SYS_ADMIN capability can modify security */
-		if (ops == WRITE_XATTR) {
-			if (_check_capability(thispid,
-		                CAP_SYS_ADMIN) == TRUE))
-				return 0;
-			else
-				return -EACCES;
-		}
 		return 0;
 		break;
 	case TRUSTED:
