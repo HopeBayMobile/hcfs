@@ -1890,6 +1890,11 @@ static void run(const char* source_path, const char* label, uid_t uid,
         hcfsvol(5, "/mnt/runtime/read/emulated", MP_READ);
         hcfsvol(5, "/mnt/runtime/write/emulated", MP_WRITE);
 
+	// Aaron
+	system("restorecon /mnt/runtime/default/emulated");
+	system("restorecon /mnt/runtime/read/emulated");
+	system("restorecon /mnt/runtime/write/emulated");
+
     } else {
         if (multi_user) {
             /* Multi-user storage is fully isolated per user, so "other"

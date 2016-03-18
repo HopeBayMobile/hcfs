@@ -28,6 +28,10 @@
 #define SECURITY 2
 #define TRUSTED 3
 
+enum {
+	READ_XATTR, WRITE_XATTR
+};
+
 /* Struct of VALUE_BLOCK. Value of an extened attr is stored using linked
    VALUE_BLOCK, and it will be reclaimed if xattr is removed. */
 typedef struct {

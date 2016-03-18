@@ -1865,7 +1865,7 @@ static int cryptfs_restart_internal(int restart_main)
         }
 
         //Vince
-        property_set("hopebay.hcfs.init", "1");
+        property_set("vold.hopebay.hcfs.init", "1");
 
         property_set("vold.decrypt", "trigger_load_persist_props");
         /* Create necessary paths on /data */

@@ -58,26 +58,36 @@ $(arch_arm64_lib_path)/.copy_s58a_system_libs:
 	rsync -a $(build_dir)/prebuilt/acer-s58a/system/*.so $(arch_arm64_lib_path)/
 	touch $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
-define prepare_out
-	@mkdir -p $@/system/{bin,lib64}
-	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -0r mv -t $@/system/lib64
-	@cd $@/system/lib64/; for i in $$(\ls $(build_dir)/prebuilt/acer-s58a/system/); \
-		do if [ -f $$i ]; then rm -f $$i; fi done
-	@mv -f $@/$(APP_ABI)/* $@/system/bin
-	@cp -r $(build_dir)/internal_testing_resource/* $@/
-endef
-
 out/%-hcfs: force
 	ndk-build $(NDK_ARG)
-	$(prepare_out)
+	@mkdir -p $@/system/{bin,lib64}
+	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -0r mv -t $@/system/lib64
+	@find $@/$(APP_ABI) -maxdepth 1 ! -name '*.so' -type f -print0 | xargs -0r mv -t $@/system/bin
+	@cd $@/system/lib64/; for i in $$(\ls $(build_dir)/prebuilt/acer-s58a/system/); \
+		do if [ -f $$i ]; then rm -f $$i; fi done
+	@cp -r $(build_dir)/internal_testing_resource/* $@/
 	@rm -rf $@/gdb.* $@/$(APP_ABI)
 
 out/%-hcfs-gdb: force
 	ndk-build $(NDK_ARG)
-	$(prepare_out)
-	@cp $@/system/*/* $@/$(APP_ABI)
+	@mkdir -p $@/system/{bin,lib64}
+	@rsync -ac -f'- /*/' $(build_dir)/$(@:out/%=obj/%)/local/$(APP_ABI)/ $@/$(APP_ABI)/
+	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -0r cp -t $@/system/lib64
+	@find $@/$(APP_ABI) -maxdepth 1 ! -name '*.so' ! -name 'gdb.setup' -type f -print0 | xargs -0r cp -t $@/system/bin
+	@cd $@/system/lib64/; for i in $$(\ls $(build_dir)/prebuilt/acer-s58a/system/); \
+		do if [ -f $$i ]; then rm -f $$i; fi done
+	@cp -r $(build_dir)/internal_testing_resource/* $@/
 	@rsync -a $(build_dir)/../src/{API,CLI_utils,HCFS} $@/src/
-	@cp -r $(build_dir)/include $@/
+	@cp -r $(build_dir)/include $(build_dir)/third_party $@/
+	@sed -e "s#$(build_dir)/$(@:out/%=obj/%)/local/##g" \
+		-e "s#/opt/android-ndk-r10e/#../../../../HCFS_android/android-ndk-r10e-win64/#g" \
+		-e "s#$(build_dir)/##g" \
+		-e "s#API_SERV/#src/API/#g" \
+		-e "s#HCFS_CLI/#src/CLI_utils/#" \
+		-e "s#HCFS/#src/HCFS/#g" \
+		-e "\$$afile $(APP_ABI)/hcfs" \
+		-e "\$$atarget remote :5678" \
+		$@/$(APP_ABI)/gdb.setup > $@/gdb.setup
 
 out:
 	@mkdir out

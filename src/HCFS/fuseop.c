@@ -178,7 +178,7 @@ void set_timestamp_now(struct stat *thisstat, char mode)
    Inputs: fuse_req_t req, struct stat *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
 */
-int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
+int check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
 {
 	struct fuse_ctx *temp_context;
 	gid_t *tmp_list, tmp1_list[10];
@@ -671,7 +671,7 @@ static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 }
 
 int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
-		char *selfname, char *pin_status)
+		const char *selfname, char *pin_status)
 {
 	int ret, errcode;
 	char *tmppath;
@@ -4920,17 +4920,24 @@ uint64_t str_to_mask(char *input)
 }
 
 /* Helper for checking chown capability */
-int _check_capability(pid_t thispid, int flag)
+BOOL _check_capability(pid_t thispid, int cap_to_check)
 {
 	char proc_status_path[100];
         char tmpstr[100], outstr[20];
         char *saveptr, *outptr;
         FILE *fptr;
 	uint64_t cap_mask, op_mask, result_mask;
+	int errcode;
 
 	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
 	         thispid);
         fptr = fopen(proc_status_path, "r");
+	if (!fptr) {
+		errcode = errno;
+		write_log(4, "Cannot open %s. Code %d\n",
+				proc_status_path, errcode);
+		return FALSE;
+	}
 
         do {
                 fgets(tmpstr, 80, fptr);
@@ -4951,7 +4958,7 @@ int _check_capability(pid_t thispid, int flag)
 	/* Check the chown bit in the bitmask */
 
 	op_mask = 1;
-	op_mask = op_mask << flag;
+	op_mask = op_mask << cap_to_check;
 	result_mask = cap_mask & op_mask;
 
 	/* Return whether the chown is set */
@@ -5055,7 +5062,8 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 
 	if (to_set & FUSE_SET_ATTR_UID) {
 		/* Checks if process has CHOWN capabilities here */
-		if (_check_capability(temp_context->pid, CAP_CHOWN) != TRUE) {
+		if (_check_capability(temp_context->pid,
+			CAP_CHOWN) != TRUE) {
 			/* Not privileged */
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
@@ -5070,7 +5078,8 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	if (to_set & FUSE_SET_ATTR_GID) {
 		/* Checks if process has CHOWN capabilities here */
 		/* Or if is owner or in group */
-		if (_check_capability(temp_context->pid, CAP_CHOWN) != TRUE) {
+		if (_check_capability(temp_context->pid,
+			CAP_CHOWN) != TRUE) {
 			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
 			if (ret_val < 0) {
 				meta_cache_close_file(body_ptr);
@@ -5548,6 +5557,48 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	fuse_reply_readlink(req, link_buffer);
 }
 
+/**
+ * Check xattr R/W permission.
+ *
+ * @return 0 on allowing this action. Reject action when return
+ *           negative error code.
+ */
+static int _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
+		const struct stat *thisstat, char ops)
+{
+	switch (name_space) {
+	case SYSTEM:
+	case USER:
+		if (ops == WRITE_XATTR)
+			return check_permission(req, thisstat, 2);
+		if (ops == READ_XATTR)
+			return check_permission(req, thisstat, 4);
+		break;
+	case SECURITY:
+		/* Only CAP_SYS_ADMIN capability can modify security */
+		if (ops == WRITE_XATTR) {
+			if (_check_capability(thispid,
+		                CAP_SYS_ADMIN) == TRUE))
+				return 0;
+			else
+				return -EACCES;
+		}
+		return 0;
+		break;
+	case TRUSTED:
+		if (_check_capability(thispid,
+				CAP_SYS_ADMIN) == TRUE)
+			return 0;
+		else
+			return -EACCES;
+		break;
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_setxattr
@@ -5629,9 +5680,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                 return;
         }
 
-	if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-	    (check_permission(req, &stat_data, 2) < 0)) {
-		/* WRITE perm needed */
+	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
+			WRITE_XATTR) < 0) {
 		write_log(5, "Error: setxattr Permission denied ");
 		write_log(5, "(WRITE needed)\n");
 		retcode = -EACCES;
@@ -5697,6 +5747,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	size_t actual_size;
 	char *value;
         MOUNT_T *tmpptr;
+	struct fuse_ctx *temp_context;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5743,7 +5794,14 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         }
 #endif
 
-	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+
+	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
+			READ_XATTR) < 0) {
 		write_log(5, "Error: getxattr permission denied ");
 		write_log(5, "(READ needed)\n");
 		retcode = -EACCES;
@@ -5990,9 +6048,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
                 return;
         }
 
-	if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-	    (check_permission(req, &stat_data, 2) < 0)) {
-		/* WRITE perm needed */
+	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
+			WRITE_XATTR) < 0) {
 		write_log(
 		    5, "Error: removexattr Permission denied (WRITE needed)\n");
 		retcode = -EACCES;

@@ -901,7 +901,7 @@ static selinux_enforcing_status selinux_status_from_cmdline() {
     };
 
     //Vince
-    status = SELINUX_PERMISSIVE;
+    //status = SELINUX_PERMISSIVE;
     //End
 
     import_kernel_cmdline(false, fn);
