@@ -134,7 +134,14 @@ ntpdate / ntpd or manual changes*/
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
-int _check_capability(pid_t thispid, int flag);
+BOOL _check_capability(pid_t thispid, int cap_to_check);
+
+BOOL _need_fake_unpin(void)
+{
+	if (hcfs_system->backend_is_online == FALSE)
+		return TRUE;
+	return FALSE;
+}
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
