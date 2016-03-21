@@ -881,6 +881,7 @@ static void fetch_quota_from_cloud(void *ptr)
 	char objname[100];
 	char download_path[256];
 	FILE *fptr;
+	char *buf;
 	int ret, errcode;
 	long long quota;
 	json_error_t jerror;
@@ -890,6 +891,7 @@ static void fetch_quota_from_cloud(void *ptr)
 	sprintf(download_path, "%s/new_usermeta", METAPATH);
 
 	/* Download usermeta.json from cloud */
+	fptr = NULL;
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->sync_paused) {
 			nonblock_sleep(5, quota_wakeup);
@@ -919,8 +921,12 @@ static void fetch_quota_from_cloud(void *ptr)
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
 			unlink(download_path);
+			fptr = NULL;
 		}
 	}
+
+	if (hcfs_system->system_going_down == TRUE)
+		goto errcode_handle;
 
 	/* Parse json file */
 	FSEEK(fptr, 0, SEEK_SET);
@@ -941,12 +947,17 @@ static void fetch_quota_from_cloud(void *ptr)
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.system_quota = quota;
 	sem_post(&(hcfs_system->access_sem));
-	write_log(10, "Now system quota is %lld\n", quota);
+	write_log(10, "Now system quota is %lld\n",
+			hcfs_system->systemdata.system_quota);
 
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 	unlink(download_path);
+
+	buf = json_dumps(json_data, 0);
+	enc_backup_usermeta(buf); /* Backup json usermeta */
 	json_decref(json_data);
+	free(buf);
 
 	sem_wait(&(download_usermeta_ctl.access_sem));
 	download_usermeta_ctl.active = FALSE;
@@ -954,8 +965,10 @@ static void fetch_quota_from_cloud(void *ptr)
 	return;
 
 errcode_handle:
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
+	if (fptr) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+	}
 	unlink(download_path);
 
 	sem_wait(&(download_usermeta_ctl.access_sem));

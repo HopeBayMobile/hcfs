@@ -8,7 +8,11 @@
  * **************************************************************************/
 
 #include "enc.h"
+
+#include <sys/file.h>
+
 #include "utils.h"
+#include "macro.h"
 
 /************************************************************************
  * *
@@ -620,4 +624,118 @@ end:
 		free(iv_buf);
 
 	return tmp_file;
+}
+
+int enc_backup_usermeta(char *json_str)
+{
+	unsigned char *enc_key;
+	unsigned char enc_data_tmp[strlen(json_str) + TAG_SIZE];
+	unsigned char enc_data[strlen(json_str) + IV_SIZE + TAG_SIZE];
+	unsigned char iv[IV_SIZE] = {0};
+	int len, ret, errcode;
+	char path[200];
+	FILE *fptr;
+	size_t ret_size;
+
+	write_log(10, "Debug: enc usermeta, json str is %s\n", json_str);
+	len = strlen(json_str);
+	enc_key = get_key("Enc the usermeta");
+	generate_random_bytes(iv, IV_SIZE);
+
+	ret = aes_gcm_encrypt_core(enc_data_tmp, json_str, len, enc_key, iv);
+	if (ret != 0) {
+	        return -1;
+	}
+	memcpy(enc_data, iv, IV_SIZE);
+	memcpy(enc_data + IV_SIZE, enc_data_tmp, len + TAG_SIZE);
+
+	/* Unlink old backup and enforce to create new one */
+	sprintf(path, "%s/usermeta", METAPATH);
+	if (access(path, F_OK) == 0)
+		unlink(path);
+
+	fptr = fopen(path, "w+");
+	if (!fptr) {
+		errcode = errno;
+		return -errcode;
+	}
+	setbuf(fptr, NULL);
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(enc_data, sizeof(unsigned char),
+			len + IV_SIZE + TAG_SIZE, fptr);
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	write_log(10, "Debug: Finish enc usermeta\n");
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
+
+char *dec_backup_usermeta(char *path)
+{
+	long long enc_size, data_size;
+	unsigned char *iv_buf = NULL;
+	unsigned char *enc_buf = NULL;
+	unsigned char *enc_key = NULL;
+	char *data_buf = NULL;
+	FILE *fptr;
+	int ret, errcode;
+	long long ret_pos;
+	size_t ret_size;
+
+	if (access(path, F_OK) < 0)
+		return NULL;
+
+	fptr = fopen(path, "r");
+	if (!fptr)
+		return NULL;
+
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_END);
+	FTELL(fptr);
+	rewind(fptr);
+
+	enc_size = ret_pos - IV_SIZE;
+	data_size = enc_size - TAG_SIZE;
+	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
+	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
+	data_buf = (char*)malloc(sizeof(char)*(data_size));
+	if (!iv_buf || !enc_buf || !data_buf) {
+		write_log(0, "Error: Out of memory\n");
+		errcode = -ENOMEM;
+		goto errcode_handle;
+	}
+
+	enc_key = get_key("Enc the usermeta");
+	FREAD(iv_buf, sizeof(unsigned char), IV_SIZE, fptr);
+	FREAD(enc_buf, sizeof(unsigned char), enc_size, fptr);
+
+	ret = aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
+				 enc_key, iv_buf);
+	if (ret < 0) {
+		write_log(0, "Fail to dec usermeta. Perhaps it is corrupt\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	if (enc_key)
+		free(enc_key);
+	if (enc_buf)
+		free(enc_buf);
+	if (iv_buf)
+		free(iv_buf);
+	if (errcode < 0) {
+		if (data_buf)
+			free(data_buf);
+		return NULL;
+	} else {
+		return data_buf;
+	}
 }

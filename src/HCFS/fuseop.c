@@ -6776,6 +6776,7 @@ int hook_fuse(int argc, char **argv)
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));
 
+
 	destroy_api_interface();
 
 	return 0;

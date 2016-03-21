@@ -65,8 +65,9 @@
 *************************************************************************/
 int init_hcfs_system_data(void)
 {
-	int errcode;
+	int errcode, ret;
 	size_t ret_size;
+	long long quota;
 
 #ifdef _ANDROID_ENV_
 	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
@@ -93,7 +94,6 @@ int init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
-	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
@@ -128,6 +128,18 @@ int init_hcfs_system_data(void)
 	setbuf(hcfs_system->system_val_fptr, NULL);
 	FREAD(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
 	      hcfs_system->system_val_fptr);
+
+	/* Use backup quota temporarily. It will be updated later. */
+	ret = get_quota_from_backup(&quota);
+	if (ret < 0) {
+		write_log(5, "Backup usermeta looks unreliable. "
+				"tmp set quota to %lld\n", CACHE_HARD_LIMIT);
+		hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
+	} else {
+		write_log(5, "Backup usermeta exist. set quota to %lld\n",
+				quota);
+		hcfs_system->systemdata.system_quota = quota;
+	}
 
 	return 0;
 errcode_handle:
