@@ -64,6 +64,8 @@ ci-test)
 	;;
 lib)
 	# load NDK_BUILD
+	packages+=" zip"		# compress with password protection
+	install_pkg
 	if [ -f build/.ndk_build ]; then
 		source $repo/build/.ndk_build;
 	fi
