@@ -24,6 +24,7 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <inttypes.h>
+#include <jansson.h>
 
 #include "params.h"
 #include "enc.h"
@@ -38,7 +39,6 @@
 #include "dedup_table.h"
 #include "metaops.h"
 #include "super_block.h"
-#include <jansson.h>
 
 /************************************************************************
 *
