@@ -1,6 +1,6 @@
 CC = gcc
 CPPFLAGS =
-CFLAGS = -g -pthread -Wall -Wextra -DDEBUG_MODE
+CFLAGS = -g -pthread -Wall -Wextra
 LFLAGS = -lsqlite3 -ljansson -lcrypto
 
 # [Autodependencies with GNU make]

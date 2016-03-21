@@ -100,7 +100,7 @@ typedef struct {
 #define TO_BE_RECLAIMED 3
 #define RECLAIMED 4
 
-static const char DEFAULT_CONFIG_PATH[] = "hcfs.conf";
+static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";
 static const char USERMETA_PASSPHRASE[] = "hey! kewei enc usermeta :)";
 
