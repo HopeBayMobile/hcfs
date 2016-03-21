@@ -54,6 +54,8 @@ typedef struct {
 } DOWNLOAD_THREAD_CTL;
 
 typedef struct {
+	BOOL active;
+	sem_t access_sem;
 	pthread_attr_t thread_attr;
 	pthread_t download_usermeta_tid;
 } DOWNLOAD_USERMETA_CTL;
@@ -74,5 +76,6 @@ int init_download_control();
 int destroy_download_control();
 void fetch_backend_block(void *ptr);
 int fetch_pinned_blocks(ino_t inode);
+int update_quota();
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

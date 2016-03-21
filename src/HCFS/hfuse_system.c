@@ -49,6 +49,7 @@
 #include "mount_manager.h"
 #include "FS_manager.h"
 #include "path_reconstruct.h"
+#include "hcfs_fromcloud.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -92,6 +93,7 @@ int init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
+	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
@@ -254,6 +256,11 @@ void init_backend_related_module(void)
 			sizeof(((CURL_HANDLE *)0)->id) - 1, "download_usermeta");
 		download_usermeta_curl_handle.curl_backend = NONE;
 		download_usermeta_curl_handle.curl = NULL;
+
+		/* Update quota from cloud */
+		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
+		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+		update_quota();
 	}
 }
 
@@ -366,8 +373,9 @@ int main(int argc, char **argv)
 	write_log(2, "\nStart logging\n");
 
 	/* Init backend related services */
-	if (CURRENT_BACKEND != NONE)
+	if (CURRENT_BACKEND != NONE) {
 		init_backend_related_module();
+	}
 
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
@@ -413,6 +421,14 @@ int main(int argc, char **argv)
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		sem_init(&download_curl_control_sem, 0, 1);
+
+		if (CURRENT_BACKEND != NONE) {
+			/* Update quota from cloud */
+			memset(&download_usermeta_ctl, 0,
+					sizeof(DOWNLOAD_USERMETA_CTL));
+			sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+			update_quota();
+		}
 
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
