@@ -1132,6 +1132,13 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
+		case GETQUOTA:
+			llretval = hcfs_system->systemdata.system_quota;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
+			break;
 		case TESTAPI:
 			/* Simulate a long API call of 5 seconds */
 			sleep(5);
@@ -1276,6 +1283,16 @@ void api_module(void *index)
 			break;
 		case RELOADCONFIG:
 			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
+			}
+			break;
+		case TRIGGERUPDATEQUOTA:
+			retcode = update_quota();
 			if (retcode == 0) {
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(ret_len),

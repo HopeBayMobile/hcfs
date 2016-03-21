@@ -100,6 +100,10 @@ int main(int argc, char **argv)
 		code = GETSYNCSTAT;
 	else if (strcasecmp(argv[1], "reloadconfig") == 0)
 		code = RELOADCONFIG;
+	else if (strcasecmp(argv[1], "getquota") == 0)
+		code = GETQUOTA;
+	else if (strcasecmp(argv[1], "updatequota") == 0)
+		code = TRIGGERUPDATEQUOTA;
 	else
 		code = -1;
 	if (code < 0) {
@@ -117,6 +121,7 @@ int main(int argc, char **argv)
 	case UNMOUNTALL:
 	case RESETXFERSTAT:
 	case RELOADCONFIG:
+	case TRIGGERUPDATEQUOTA:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -130,6 +135,7 @@ int main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	/* APIs at here send result in long long */
+	case GETQUOTA:
 	case GETPINSIZE:
 	case GETCACHESIZE:
 	case GETMAXPINSIZE:

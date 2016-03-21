@@ -1721,6 +1721,7 @@ int get_quota_from_backup(long long *quota)
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
 
+	*quota = 0;
 	sprintf(path, "%s/usermeta", METAPATH);
 	if (access(path, F_OK) < 0)
 		return -ENOENT;

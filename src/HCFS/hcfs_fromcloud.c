@@ -915,13 +915,16 @@ static void fetch_quota_from_cloud(void *ptr)
 		if (200 <= status && status <= 299) {
 			break;
 		} else if (status == 404) {
-			write_log(0, "Error: Usermeta is not found on cloud.\n");
+			write_log(0, "Error: Usermeta is not found"
+					" on cloud.\n");
 			goto errcode_handle;
 		} else { /* Retry, Perhaps disconnect */
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
 			unlink(download_path);
 			fptr = NULL;
+			write_log(5, "Return code %d. Retry fetch"
+					" quota later\n", status);
 		}
 	}
 
@@ -979,10 +982,20 @@ errcode_handle:
 
 int update_quota()
 {
+	if (CURRENT_BACKEND == NONE) {
+		write_log(5, "Cannot trigger updating quota without backend\n");
+		return -EPERM;
+	}
+
+	if (hcfs_system->sync_paused) {
+		write_log(5, "Cannot connect to backend\n");
+		return -ENONET;
+	}
+
 	sem_wait(&(download_usermeta_ctl.access_sem));
 	if (download_usermeta_ctl.active == TRUE) {
 		sem_post(&(download_usermeta_ctl.access_sem));
-		write_log(4, "Quota thread is running\n");
+		write_log(5, "Quota thread is running\n");
 		return -EBUSY;
 	} else {
 		download_usermeta_ctl.active = TRUE;

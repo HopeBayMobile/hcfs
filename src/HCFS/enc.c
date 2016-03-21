@@ -639,7 +639,7 @@ int enc_backup_usermeta(char *json_str)
 
 	write_log(10, "Debug: enc usermeta, json str is %s\n", json_str);
 	len = strlen(json_str);
-	enc_key = get_key("Enc the usermeta");
+	enc_key = get_key(USERMETA_PASSPHRASE);
 	generate_random_bytes(iv, IV_SIZE);
 
 	ret = aes_gcm_encrypt_core(enc_data_tmp, json_str, len, enc_key, iv);
@@ -710,7 +710,7 @@ char *dec_backup_usermeta(char *path)
 		goto errcode_handle;
 	}
 
-	enc_key = get_key("Enc the usermeta");
+	enc_key = get_key(USERMETA_PASSPHRASE);
 	FREAD(iv_buf, sizeof(unsigned char), IV_SIZE, fptr);
 	FREAD(enc_buf, sizeof(unsigned char), enc_size, fptr);
 
