@@ -27,13 +27,214 @@ SOCK_THREAD thread_pool[MAX_THREAD];
 int do_pin_by_path(char *largebuf, int arg_len, char *resbuf, int *res_size)
 {
 	int ret_code;
+	int ret_len = 0;
 
 	printf("Pin by path\n");
 	ret_code = pin_by_path(largebuf, arg_len);
-	memcpy(resbuf, 0, sizeof(unsigned int));
-	*res_size += sizeof(unsigned int);
-	memcpy(resbuf, &ret_code, sizeof(int));
-	*res_size += sizeof(int);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_unpin_by_path(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Unpin by path\n");
+	ret_code = unpin_by_path(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_check_dir_status(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+	long long num_local, num_cloud, num_hybrid;
+
+	printf("Check dir stat\n");
+	ret_code = check_dir_status(largebuf, arg_len,
+				    &num_local, &num_cloud,
+				    &num_hybrid);
+
+	printf("%d\n", ret_code);
+	if (ret_code < 0) {
+		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+		CONCAT_REPLY(&ret_code, sizeof(int));
+	} else {
+		CONCAT_REPLY(res_size, sizeof(unsigned int));
+		CONCAT_REPLY(&num_local, sizeof(long long));
+		CONCAT_REPLY(&num_cloud, sizeof(long long));
+		CONCAT_REPLY(&num_hybrid, sizeof(long long));
+	}
+
+	return ret_code;
+}
+
+int do_check_file_loc(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Check file location\n");
+	ret_code = check_file_loc(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_check_pin_status(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Check pin status\n");
+	ret_code = check_pin_status(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_set_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Set config\n");
+	ret_code = set_hcfs_config(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_get_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+	char *value;
+
+	printf("Get config\n");
+	ret_code = get_hcfs_config(largebuf, arg_len, &value);
+
+	if (ret_code == 0) {
+		ret_len = strlen(value);
+		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+		CONCAT_REPLY(value, ret_len);
+		free(value);
+	} else {
+		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+		CONCAT_REPLY(&ret_code, sizeof(int));
+	}
+
+	return ret_code;
+}
+
+int do_get_hcfs_stat(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+	int cloud_stat;
+	long long vol_usage, cloud_usage;
+	long long cache_total, cache_used, cache_dirty;
+	long long pin_max, pin_total;
+	long long xfer_up, xfer_down;
+
+	printf("Get statistics\n");
+	ret_code = get_hcfs_stat(&vol_usage, &cloud_usage, &cache_total,
+				 &cache_used, &cache_dirty,
+				 &pin_max, &pin_total,
+				 &xfer_up, &xfer_down,
+				 &cloud_stat);
+
+	if (ret_code < 0) {
+		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+		CONCAT_REPLY(&ret_code, sizeof(int));
+	} else {
+		/* Total size for reply msgs */
+		ret_len = sizeof(long long) * 9 + sizeof(int);
+
+		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+		CONCAT_REPLY(&vol_usage, sizeof(long long));
+		CONCAT_REPLY(&cloud_usage, sizeof(long long));
+		CONCAT_REPLY(&cache_total, sizeof(long long));
+		CONCAT_REPLY(&cache_used, sizeof(long long));
+		CONCAT_REPLY(&cache_dirty, sizeof(long long));
+		CONCAT_REPLY(&pin_max, sizeof(long long));
+		CONCAT_REPLY(&pin_total, sizeof(long long));
+		CONCAT_REPLY(&xfer_up, sizeof(long long));
+		CONCAT_REPLY(&xfer_down, sizeof(long long));
+		CONCAT_REPLY(&cloud_stat, sizeof(int));
+	}
+
+	return ret_code;
+}
+
+int do_reset_xfer_usage(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Reset xfer\n");
+	ret_code = reset_xfer_usage(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_toggle_cloud_sync(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Toggle sync\n");
+	ret_code = toggle_cloud_sync(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_get_sync_status(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Get sync status\n");
+	ret_code = get_sync_status(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
+}
+
+int do_reload_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
+{
+	int ret_code;
+	int ret_len = 0;
+
+	printf("Reload config\n");
+	ret_code = reload_hcfs_config(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+	CONCAT_REPLY(&ret_code, sizeof(int));
+
+	return ret_code;
 }
 
 int32_t _get_unused_thread()
@@ -54,34 +255,23 @@ int32_t _get_unused_thread()
 int32_t process_request(int32_t thread_idx)
 {
 
-	int32_t fd, ret_code, to_recv, buf_idx;
-	int32_t res_size;
-	int32_t cloud_stat;
-	uint32_t api_code, arg_len, ret_len;
-	int64_t vol_usage, cloud_usage;
-	int64_t cache_total, cache_used, cache_dirty;
-	int64_t pin_max, pin_total;
-	int64_t xfer_up, xfer_down;
-	int64_t num_local, num_cloud, num_hybrid;
+	int fd, ret_code, res_size;
+	unsigned int api_code, arg_len;
 	char buf_reused;
 	char buf[512], resbuf[512];
-	char *largebuf, *value;
-	ssize_t size_msg, msg_len;
-
-	msg_len = 0;
-	ret_len = 0;
+	char *largebuf;
 
 	fd = thread_pool[thread_idx].fd;
 
-	if (readmsg(fd, &api_code, sizeof(unsigned int))) {
+	if (reads(fd, &api_code, sizeof(unsigned int))) {
 		printf("Failed to recv API code");
-		return -1;
+		goto error;
 	}
 	printf("API code is %d\n", api_code);
 
-	if (readmsg(fd, &arg_len, sizeof(unsigned int))) {
+	if (reads(fd, &arg_len, sizeof(unsigned int))) {
 		printf("Failed to recv arg length\n");
-		return -1;
+		goto error;
 	}
 	printf("Argument length is %d\n", arg_len);
 
@@ -91,12 +281,12 @@ int32_t process_request(int32_t thread_idx)
 	} else {
 		largebuf = malloc(arg_len + 20);
 		if (largebuf == NULL)
-			return -1;
+			goto error;
 	}
 
-	if (readmsg(fd, largebuf, arg_len)) {
+	if (reads(fd, largebuf, arg_len)) {
 		printf("Failed to recv args\n");
-		return -1;
+		goto error;
 	}
 
 	struct cmd {
@@ -105,194 +295,43 @@ int32_t process_request(int32_t thread_idx)
 	};
 
 	struct cmd cmds[] = {
-		{PIN, do_pin_by_path},
-		{UNPIN, do_unpin_by_path}
-	}
+		{PIN,		do_pin_by_path},
+		{UNPIN,		do_unpin_by_path},
+		{CHECKDIRSTAT,	do_check_dir_status},
+		{CHECKLOC,	do_check_file_loc},
+		{CHECKPIN,	do_check_pin_status},
+		{SETCONFIG,	do_set_hcfs_config},
+		{GETCONFIG,	do_get_hcfs_config},
+		{GETSTAT,	do_get_hcfs_stat},
+		{RESETXFERSTAT,	do_reset_xfer_usage},
+		{SETSYNCSWITCH,	do_toggle_cloud_sync},
+		{GETSYNCSWITCH,	do_get_sync_status},
+	};
 
-	int n;
-	for (n = 0; n < sizeof(cmds) / sizeof(cmds[0]), n++) {
+	unsigned int n;
+	for (n = 0; n < sizeof(cmds) / sizeof(cmds[0]); n++) {
 		if (api_code == cmds[n].name) {
 			res_size = 0;
 			ret_code = cmds[n].cmd_fn(largebuf, arg_len, resbuf, &res_size);
-			sendmsg(fd, resbuf, res_size);
-			break;
+			sends(fd, resbuf, res_size);
+			goto done;
 		}
 	}
 	printf("API code not found\n");
 
-	//switch (api_code) {
-	//case PIN:
-	//	printf("Pin by path\n");
-	//	ret_code = pin_by_path(largebuf, arg_len);
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
+error:
+	ret_code = -1;
 
-	//case UNPIN:
-	//	printf("Unpin by path\n");
-	//	ret_code = unpin_by_path(largebuf, arg_len);
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case CHECKDIRSTAT:
-	//	printf("Check dir stat\n");
-	//	ret_len = 0;
-	//	ret_code = check_dir_status(largebuf, arg_len,
-	//				    &num_local, &num_cloud,
-	//				    &num_hybrid);
-
-	//	if (ret_code < 0) {
-	//		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//		size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	}
-
-	//	CONCAT_LL_ARGS(num_local);
-	//	CONCAT_LL_ARGS(num_cloud);
-	//	CONCAT_LL_ARGS(num_hybrid);
-
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, res_buf, ret_len, 0);
-	//	break;
-
-	//case CHECKLOC:
-	//	printf("Check file loc\n");
-	//	ret_code = check_file_loc(largebuf, arg_len);
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case CHECKPIN:
-	//	printf("Check pin status\n");
-	//	ret_code = check_pin_status(largebuf, arg_len);
-	//	printf("ret_code is %d\n", ret_code);
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case SETCONFIG:
-	//	printf("Set config\n");
-	//	ret_code = set_hcfs_config(largebuf, arg_len);
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case GETCONFIG:
-	//	printf("Get config\n");
-	//	ret_code = get_hcfs_config(largebuf, arg_len, &value);
-	//	if (ret_code == 0) {
-	//		ret_len = strlen(value);
-	//		memcpy(res_buf, value, ret_len);
-	//		free(value);
-	//		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//		size_msg = send(fd, res_buf, ret_len, 0);
-	//	} else {
-	//		ret_len = 0;
-	//		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//		size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	}
-	//	break;
-
-	//case GETSTAT:
-	//	printf("Get statistics\n");
-	//	ret_len = 0;
-	//	ret_code = get_hcfs_stat(&vol_usage, &cloud_usage, &cache_total,
-	//				 &cache_used, &cache_dirty,
-	//				 &pin_max, &pin_total,
-	//				 &xfer_up, &xfer_down,
-	//				 &cloud_stat);
-	//	if (ret_code < 0) {
-	//		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//		size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	}
-
-	//	CONCAT_LL_ARGS(vol_usage);
-	//	CONCAT_LL_ARGS(cloud_usage);
-	//	CONCAT_LL_ARGS(cache_total);
-	//	CONCAT_LL_ARGS(cache_used);
-	//	CONCAT_LL_ARGS(cache_dirty);
-	//	CONCAT_LL_ARGS(pin_max);
-	//	CONCAT_LL_ARGS(pin_total);
-	//	CONCAT_LL_ARGS(xfer_up);
-	//	CONCAT_LL_ARGS(xfer_down);
-
-	//	memcpy(&(res_buf[ret_len]), &cloud_stat, sizeof(int));
-	//	ret_len += sizeof(int);
-
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, res_buf, ret_len, 0);
-	//	break;
-
-	//case RESETXFERSTAT:
-	//	printf("Reset xfer\n");
-	//	ret_len = 0;
-	//	ret_code = reset_xfer_usage();
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case SETSYNCSWITCH:
-	//	printf("Set sync\n");
-	//	ret_len = 0;
-	//	ret_code = toggle_cloud_sync(largebuf, arg_len);
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case GETSYNCSWITCH:
-	//	printf("Get sync\n");
-	//	ret_len = 0;
-	//	ret_code = get_sync_status();
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case RELOADCONFIG:
-	//	printf("Reload config");
-	//	ret_len = 0;
-	//	ret_code = reload_hcfs_config();
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	break;
-
-	//case SYSREBOOT:
-	//	printf("Reboot\n");
-	//	ret_len = 0;
-	//	ret_code = 0;
-	//	size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//	size_msg = send(fd, &ret_code, sizeof(int), 0);
-
-	//	// Force to call reboot
-	//	system("reboot");
-	//	break;
-
-	//case QUERYPKGUID:
-	//	printf("Query pkg uid\n");
-	//	ret_len = 0;
-
-	//	ret_code = query_pkg_uid(largebuf, arg_len, &value);
-	//	if (ret_code == 0) {
-	//		ret_len = strlen(value);
-	//		memcpy(res_buf, value, ret_len);
-	//		free(value);
-	//		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//		size_msg = send(fd, res_buf, ret_len, 0);
-	//	} else {
-	//		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
-	//		size_msg = send(fd, &ret_code, sizeof(int), 0);
-	//	}
-	//	break;
-
-	//}
-
+done:
 	printf("Get API code - %d from fd - %d\n", api_code, fd);
 
 	close(fd);
-
 	if (largebuf != NULL && !buf_reused)
 		free(largebuf);
 
 	thread_pool[thread_idx].in_used = FALSE;
+
+	return ret_code;
 }
 
 int32_t init_server()

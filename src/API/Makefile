@@ -1,6 +1,6 @@
 CC = gcc
 CPPFLAGS =
-CFLAGS = -g -pthread -Wall -Wextra
+CFLAGS = -g -pthread -Wall -Wextra -DDEBUG_MODE
 LFLAGS = -lsqlite3 -ljansson -lcrypto
 
 # [Autodependencies with GNU make]
@@ -9,7 +9,7 @@ LFLAGS = -lsqlite3 -ljansson -lcrypto
 OBJS_DIR = obj/
 
 hcfsapid_OBJS = $(addprefix $(OBJS_DIR), \
-		   socket_serv.o pin_ops.o hcfs_stat.o hcfs_sys.o utils.o enc.o)
+		   socket_serv.o pin_ops.o hcfs_stat.o hcfs_sys.o utils.o enc.o socket_util.o)
 
 test_OBJS = $(addprefix $(OBJS_DIR), \
 	    test.o HCFS_api.o)

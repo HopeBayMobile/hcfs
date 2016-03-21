@@ -18,6 +18,12 @@
 		ret_len += sizeof(int64_t);\
 	}
 
+#define CONCAT_REPLY(A, B)\
+	{\
+		memcpy(resbuf + *res_size, A, B);\
+		*res_size += B;\
+	}
+
 #define READ_LL_ARGS(A)\
 	{\
 		memcpy(&A, &(buf[buf_idx]), sizeof(int64_t));\
