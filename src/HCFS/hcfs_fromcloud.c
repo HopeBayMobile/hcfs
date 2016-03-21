@@ -38,7 +38,7 @@
 #include "dedup_table.h"
 #include "metaops.h"
 #include "super_block.h"
-#include "jansson.h"
+#include <jansson.h>
 
 /************************************************************************
 *
@@ -872,6 +872,10 @@ static void fetch_quota_from_cloud(void *ptr)
 	char objname[100];
 	char download_path[256];
 	FILE *fptr;
+	size_t ret_size;
+	int ret, errcode;
+	json_error_t jerror;
+	json_t *json_data, *json_quota;
 
 	strncpy(objname, "usermeta.json", 100);
 	sprintf(download_path, "%s/new_usermeta", METAPATH);
@@ -891,6 +895,7 @@ static void fetch_quota_from_cloud(void *ptr)
 			return;
 		}
 		setbuf(fptr, NULL);
+		flock(fileno(fptr), LOCK_EX);
 
 		status = hcfs_get_object(fptr, objname,
 				&(download_usermeta_curl_handle),
@@ -899,14 +904,54 @@ static void fetch_quota_from_cloud(void *ptr)
 			break;
 		} else if (status == 404) {
 			write_log(0, "Error: Usermeta is not found on cloud.\n");
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			unlink(download_path);
 			return;
+		} else { /* Retry, Perhaps disconnect */
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			unlink(download_path);
 		}
 	}
+
+	FSEEK(fptr, 0, SEEK_SET);
+	json_data = NULL;
+	json_data = json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
+	if (!json_data) {
+		write_log(0, "Error: Fail to parse json file\n");
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		unlink(download_path);
+		return;
+	}
+
+	long long quota;
+	json_quota = json_object_get(json_data, "quota");
+	if (!json_is_number(json_quota)) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		unlink(download_path);
+		return;	
+	}
+	quota = json_integer_value(json_quota);
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.system_quota = quota;
+	sem_post(&(hcfs_system->access_sem));
+	write_log(10, "Now system quota is %lld\n", quota);
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	unlink(download_path);
+
+	return;
+
+errcode_handle:
 
 	return;
 }
 
-int fetch_quota()
+int update_quota()
 {
 	pthread_attr_init(&(download_usermeta_ctl.thread_attr));
 	pthread_attr_setdetachstate(&(download_usermeta_ctl.thread_attr), 

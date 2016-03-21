@@ -202,6 +202,7 @@ typedef struct {
 	long long dirty_cache_size; /* data + meta */
 	long long xfer_size_download;
 	long long xfer_size_upload;
+	long long system_quota;
 	int cache_replace_status;
 } SYSTEM_DATA_TYPE;
 
