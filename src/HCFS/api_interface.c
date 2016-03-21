@@ -41,6 +41,7 @@
 #include "file_present.h"
 #include "utils.h"
 #include "monitor.h"
+#include "hcfs_fromcloud.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */

@@ -642,7 +642,8 @@ int enc_backup_usermeta(char *json_str)
 	enc_key = get_key(USERMETA_PASSPHRASE);
 	generate_random_bytes(iv, IV_SIZE);
 
-	ret = aes_gcm_encrypt_core(enc_data_tmp, json_str, len, enc_key, iv);
+	ret = aes_gcm_encrypt_core(enc_data_tmp, (unsigned char *)json_str,
+			len, enc_key, iv);
 	if (ret != 0) {
 	        return -1;
 	}
@@ -701,8 +702,8 @@ char *dec_backup_usermeta(char *path)
 
 	enc_size = ret_pos - IV_SIZE;
 	data_size = enc_size - TAG_SIZE;
-	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
-	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
+	iv_buf = (unsigned char*)malloc(sizeof(char)*IV_SIZE);
+	enc_buf = (unsigned char*)malloc(sizeof(char)*(enc_size));
 	data_buf = (char*)malloc(sizeof(char)*(data_size));
 	if (!iv_buf || !enc_buf || !data_buf) {
 		write_log(0, "Error: Out of memory\n");
@@ -712,10 +713,11 @@ char *dec_backup_usermeta(char *path)
 
 	enc_key = get_key(USERMETA_PASSPHRASE);
 	FREAD(iv_buf, sizeof(unsigned char), IV_SIZE, fptr);
-	FREAD(enc_buf, sizeof(unsigned char), enc_size, fptr);
+	FREAD(enc_buf, sizeof(unsigned char), (unsigned long long)enc_size,
+			fptr);
 
-	ret = aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
-				 enc_key, iv_buf);
+	ret = aes_gcm_decrypt_core((unsigned char *)data_buf, enc_buf,
+			enc_size, enc_key, iv_buf);
 	if (ret < 0) {
 		write_log(0, "Fail to dec usermeta. Perhaps it is corrupt\n");
 		errcode = ret;

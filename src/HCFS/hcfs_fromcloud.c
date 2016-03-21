@@ -887,6 +887,7 @@ static void fetch_quota_from_cloud(void *ptr)
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
 
+	UNUSED(ptr);
 	strncpy(objname, "usermeta.json", 100);
 	sprintf(download_path, "%s/new_usermeta", METAPATH);
 
