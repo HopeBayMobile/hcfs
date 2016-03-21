@@ -1720,11 +1720,14 @@ int get_quota_from_backup(long long *quota)
 	char *json_result;
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
+	int errcode;
 
 	*quota = 0;
 	sprintf(path, "%s/usermeta", METAPATH);
-	if (access(path, F_OK) < 0)
-		return -ENOENT;
+	if (access(path, F_OK) < 0) {
+		errcode = errno;
+		return -errcode;
+	}
 
 	json_result = dec_backup_usermeta(path);
 	if (!json_result)
@@ -1733,18 +1736,24 @@ int get_quota_from_backup(long long *quota)
 	json_data = NULL;
 	json_data = json_loads(json_result, 0, &jerror);
 	if (!json_data) {
+		free(json_result);
 		write_log(0, "Error: Fail to parse json file\n");
 		return -EINVAL;
 	}
 	json_quota = json_object_get(json_data, "quota");
-	if (!json_is_number(json_quota)) {
-		json_decref(json_data);
+	if (!json_quota || !json_is_integer(json_quota)) {
+		free(json_result);
+		json_delete(json_data);
 		write_log(0, "Error: Json file is corrupt\n");
 		return -EINVAL;
 	}
 	*quota = json_integer_value(json_quota);
+	if (*quota < 0) {
+		write_log(0, "Error: Quota is less than zero?\n");
+		*quota = 0;
+	}
 
 	free(json_result);
-	json_decref(json_data);
+	json_delete(json_data);
 	return 0;
 }

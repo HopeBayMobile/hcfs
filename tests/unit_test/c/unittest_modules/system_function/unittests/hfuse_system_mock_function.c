@@ -181,3 +181,14 @@ int ignore_sigpipe(void)
 {
 	return 0;
 }
+
+int update_quota()
+{
+	return 0;
+}
+
+int get_quota_from_backup(long long *quota)
+{
+	*quota = 0;
+	return 0;
+}

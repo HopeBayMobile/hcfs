@@ -606,3 +606,74 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 }
 
 /* End of unittest for fetch_backend_block */
+
+/* Unittest for fetch_quota_from_cloud */
+class fetch_quota_from_cloudTest : public ::testing::Test {
+protected:
+	char download_path[200];
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->metapath = (char *)malloc(100);
+		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+		mkdir(METAPATH, 0700);
+		hcfs_system->system_going_down = FALSE;
+		hcfs_system->sync_paused = OFF;
+
+		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
+		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+
+		sprintf(download_path, "%s/new_usermeta", METAPATH);
+		hcfs_system->systemdata.system_quota = 0;
+
+		/* global var to control UT */
+		usermeta_notfound = FALSE;
+		FETCH_BACKEND_BLOCK_TESTING = FALSE;
+	}
+
+	void TearDown()
+	{
+		if (!access(download_path, F_OK))
+			unlink(download_path);
+		rmdir(METAPATH);
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(fetch_quota_from_cloudTest, UsermetaNotFoundOnCloud)
+{
+	usermeta_notfound = TRUE;
+	download_usermeta_ctl.active = TRUE;
+	fetch_quota_from_cloud(NULL);
+
+	EXPECT_EQ(-1, access(download_path, F_OK));
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+	EXPECT_EQ(0, hcfs_system->systemdata.system_quota);
+}
+
+TEST_F(fetch_quota_from_cloudTest, FetchSuccess)
+{
+	usermeta_notfound = FALSE;
+	download_usermeta_ctl.active = TRUE;
+	fetch_quota_from_cloud(NULL);
+
+	EXPECT_EQ(-1, access(download_path, F_OK));
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+	EXPECT_EQ(5566, hcfs_system->systemdata.system_quota);
+}
+
+TEST_F(fetch_quota_from_cloudTest, SystemGoingDown)
+{
+	hcfs_system->system_going_down = TRUE;
+	download_usermeta_ctl.active = TRUE;
+	fetch_quota_from_cloud(NULL);
+
+	EXPECT_EQ(-1, access(download_path, F_OK));
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+	EXPECT_EQ(0, hcfs_system->systemdata.system_quota);
+}
+/* End of unittest for fetch_quota_from_cloud */

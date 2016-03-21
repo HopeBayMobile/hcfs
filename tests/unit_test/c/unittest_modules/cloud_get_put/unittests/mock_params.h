@@ -50,3 +50,5 @@ LoopTestData test_data;
 LoopToVerifiedData to_verified_data;
 LoopTestData *shm_test_data;  // Used in upload_loop_unittest as expected value
 LoopToVerifiedData *shm_verified_data; // Used in upload_loop_unittest as actual value
+
+char usermeta_notfound;

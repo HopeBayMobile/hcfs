@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <curl/curl.h>
 #include <semaphore.h>
+#include <jansson.h>
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include "enc.h"
@@ -32,12 +33,17 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_en
 	if (FETCH_BACKEND_BLOCK_TESTING == TRUE)
 		return 0;
 
+	if (!strncmp("user", objname, 4)) {
+		if (usermeta_notfound)
+			return 404;
+		else
+			return 200;
+	}
+
 	sscanf(objname, "data_%d_%d", &inode, &block_no);
 	if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
 		ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
 		return HTTP_OK;
-	} else if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
-		return HTTP_FAIL;
 	} else {
 		sem_wait(&objname_counter_sem);
 		strcpy(objname_list[objname_counter], objname);
@@ -161,4 +167,51 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page)
 {
 	return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+}
+
+void json_delete(json_t *json)
+{
+}
+
+json_t *json_loads(const char *input, size_t flags, json_error_t *error)
+{
+	return 1;
+}
+
+json_t *json_object_get(const json_t *object, const char *key)
+{
+	json_t *ret;
+
+	//if (json_file_corrupt)
+	//	return NULL;
+
+	ret = malloc(sizeof(json_t));
+	ret->type = JSON_INTEGER; 
+	return ret; 
+}
+
+json_int_t json_integer_value(const json_t *integer)
+{
+	free((void *)integer);
+	return 5566;
+}
+
+json_t *json_loadf(FILE *input, size_t flags, json_error_t *error)
+{
+	return 1;
+}
+
+char *json_dumps(const json_t *root, size_t flags)
+{
+	return (char *)malloc(1);
+}
+
+void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+{
+	return;
+}
+
+int enc_backup_usermeta(char *json_str)
+{
+	return 0;
 }

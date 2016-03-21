@@ -875,7 +875,7 @@ static BOOL quota_wakeup()
 		return FALSE;
 }
 
-static void fetch_quota_from_cloud(void *ptr)
+void fetch_quota_from_cloud(void *ptr)
 {
 	int status;
 	char objname[100];
@@ -942,12 +942,17 @@ static void fetch_quota_from_cloud(void *ptr)
 	}
 
 	json_quota = json_object_get(json_data, "quota");
-	if (!json_is_number(json_quota)) {
-		json_decref(json_data);
+	if (!json_quota || !json_is_integer(json_quota)) {
+		json_delete(json_data);
 		write_log(0, "Error: Json file is corrupt\n");
 		goto errcode_handle;
 	}
 	quota = json_integer_value(json_quota);
+	if (quota < 0) {
+		json_delete(json_data);
+		write_log(0, "Error: Quota from cloud is less than zero");
+		goto errcode_handle;
+	}
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.system_quota = quota;
 	sem_post(&(hcfs_system->access_sem));
@@ -960,7 +965,7 @@ static void fetch_quota_from_cloud(void *ptr)
 
 	buf = json_dumps(json_data, 0);
 	enc_backup_usermeta(buf); /* Backup json usermeta */
-	json_decref(json_data);
+	json_delete(json_data);
 	free(buf);
 
 	sem_wait(&(download_usermeta_ctl.access_sem));
