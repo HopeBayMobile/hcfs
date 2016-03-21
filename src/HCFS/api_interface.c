@@ -816,6 +816,7 @@ void api_module(void *index)
 	unsigned int num_inode;
 	ino_t *pinned_list, *unpinned_list;
 	unsigned int sync_switch;
+	int loglevel;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -1300,6 +1301,24 @@ void api_module(void *index)
 				     MSG_NOSIGNAL);
 				send(fd1, &retcode, sizeof(retcode),
 				     MSG_NOSIGNAL);
+			}
+			break;
+		case CHANGELOG:
+			memcpy(&loglevel, largebuf, sizeof(int));
+			if (0 <= loglevel && loglevel <= 10) {
+				system_config->log_level = loglevel;
+				retcode = 0; 
+			} else {
+				retcode = -EINVAL;
+			}
+			write_log(10, "Debug: now log level is %d\n",
+					system_config->log_level);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(ret_len),
+						MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+						MSG_NOSIGNAL);
 			}
 			break;
 		default:
