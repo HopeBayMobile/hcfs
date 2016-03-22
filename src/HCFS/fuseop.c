@@ -136,10 +136,30 @@ ntpdate / ntpd or manual changes*/
 
 BOOL _check_capability(pid_t thispid, int cap_to_check);
 
-BOOL _need_fake_unpin(void)
+BOOL _need_generic_unpin(void)
 {
 	if (hcfs_system->backend_is_online == FALSE)
 		return TRUE;
+	return FALSE;
+}
+
+/* Helper function for checking if a folder contains non-local children */
+BOOL _has_non_local(ino_t this_inode)
+{
+	DIR_STATS_TYPE tmp_stat_result;
+	int32_t ret;
+
+	ret = read_dirstat_lookup(this_inode, &tmp_stat_result);
+
+	if (ret < 0)  /* If cannot read, follows default */
+		return FALSE;
+
+	if (tmp_stat_result.num_cloud > 0)
+		return TRUE;
+
+	if (tmp_stat_result.num_hybrid > 0)
+		return TRUE;
+
 	return FALSE;
 }
 
@@ -1438,6 +1458,17 @@ a directory (for NFS) */
 	unsigned long this_gen;
 	struct stat parent_stat;
 	MOUNT_T *tmpptr;
+	BOOL skip_listing;
+	BOOL feed_generic_apk;
+	BOOL feed_generic_oat;
+	BOOL need_path_reconstruct;
+	char *tmppath, *tmptok, *toksave;
+	int32_t ret;
+
+	skip_listing = FALSE;
+	feed_generic_apk = FALSE;
+	feed_generic_oat = FALSE;
+	need_path_reconstruct = FALSE;
 
 	parent_inode = real_ino(req, parent);
 
@@ -1483,6 +1514,57 @@ a directory (for NFS) */
 		return;
 	}
 
+#ifdef _ANDROID_ENV_
+	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
+
+	/* Check if we need to use generic files or skip listing */
+	if (((uint64_t)tmpptr->f_ino == 3) &&
+	    (_need_generic_unpin() == TRUE))
+		if (_has_non_local(parent_inode) == TRUE)
+			need_path_reconstruct = TRUE;
+	if (need_path_reconstruct == TRUE) {
+		tmppath = NULL;
+		ret = construct_path(tmpptr->vol_path_cache, parent_inode,
+				&tmppath, tmpptr->f_ino);
+		if (ret < 0) {
+			if (tmppath != NULL)
+				free(tmppath);
+		} else {
+			/* Need to check what action needs to be taken */
+			/* Skip package name */
+			tmptok = strtok_r(tmppath, "/", &toksave);
+			if (tmptok != NULL)
+				goto lookup_check_end;
+			write_log(4, "Debug checking package %s\n", tmptok);
+			tmptok = strtok_r(tmppath, "/", &toksave);
+			if (tmptok == NULL) {
+				/* Need to feed generic apk and oat */
+				feed_generic_apk = TRUE;
+				feed_generic_oat = TRUE;
+			} else if (!strncmp(tmptok, "lib", strlen("lib"))) {
+				/* Need to skip listing */
+				skip_listing = TRUE;
+			}
+			/* Free path string when done */
+lookup_check_end:
+			free(tmppath);
+		}
+	}
+
+#endif
+
+#ifdef _ANDROID_ENV_
+	/* Skip entries other than "." and ".." if needed */
+	if ((skip_listing == TRUE) &&
+	    ((strcmp(selfname, ".") != 0) &&
+	     (strcmp(selfname, "..") != 0))) {
+		write_log(4, "Debug lookup skip entry %s\n",
+		          selfname);
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+#endif
+
 	memset(&output_param, 0, sizeof(struct fuse_entry_param));
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
@@ -1494,6 +1576,23 @@ a directory (for NFS) */
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+#ifdef _ANDROID_ENV_
+	if ((feed_generic_apk == TRUE) &&
+	    (!strncmp(selfname,
+	              "base.apk", strlen("base.apk")))) {
+		write_log(4, "Replacing base.apk\n");
+		temp_dentry.d_ino = GENERIC_APK_INO;
+	}
+
+	if ((feed_generic_oat == TRUE) &&
+	    (!strncmp(selfname,
+	              "oat", strlen("oat")))) {
+		write_log(4, "Replacing oat\n");
+		temp_dentry.d_ino = GENERIC_OAT_INO;
+	}
+
+#endif
 
 	this_inode = temp_dentry.d_ino;
 	output_param.ino = (fuse_ino_t) this_inode;
@@ -4683,6 +4782,17 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	size_t entry_size, ret_size;
 	int ret, errcode;
 	char this_type;
+	BOOL skip_listing;
+	BOOL feed_generic_apk;
+	BOOL feed_generic_oat;
+	BOOL need_path_reconstruct;
+	MOUNT_T *tmpptr;
+	char *tmppath, *tmptok, *toksave;
+
+	skip_listing = FALSE;
+	feed_generic_apk = FALSE;
+	feed_generic_oat = FALSE;
+	need_path_reconstruct = FALSE;
 
 	UNUSED(file_info);
 	gettimeofday(&tmp_time1, NULL);
@@ -4714,6 +4824,45 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		return;
 	}
 
+#ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
+
+	/* Check if we need to use generic files or skip listing */
+	if (((uint64_t)tmpptr->f_ino == 3) &&
+	    (_need_generic_unpin() == TRUE))
+		if (_has_non_local(this_inode) == TRUE)
+			need_path_reconstruct = TRUE;
+	if (need_path_reconstruct == TRUE) {
+		tmppath = NULL;
+		ret = construct_path(tmpptr->vol_path_cache, this_inode,
+				&tmppath, tmpptr->f_ino);
+		if (ret < 0) {
+			if (tmppath != NULL)
+				free(tmppath);
+		} else {
+			/* Need to check what action needs to be taken */
+			/* Skip package name */
+			tmptok = strtok_r(tmppath, "/", &toksave);
+			if (tmptok != NULL)
+				goto readdir_check_end;
+			write_log(4, "Debug checking package %s\n", tmptok);
+			tmptok = strtok_r(tmppath, "/", &toksave);
+			if (tmptok == NULL) {
+				/* Need to feed generic apk and oat */
+				feed_generic_apk = TRUE;
+				feed_generic_oat = TRUE;
+			} else if (!strncmp(tmptok, "lib", strlen("lib"))) {
+				/* Need to skip listing */
+				skip_listing = TRUE;
+			}
+readdir_check_end:
+			/* Free path string when done */
+			free(tmppath);
+		}
+	}
+
+#endif
 	buf_pos = 0;
 
 	page_start = 0;
@@ -4777,6 +4926,15 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			temp_page.num_entries);
 		for (count = page_start; count < temp_page.num_entries;
 								count++) {
+#ifdef _ANDROID_ENV_
+			/* Skip entries other than "." and ".." if needed */
+			if ((skip_listing == TRUE) &&
+			    ((strcmp(temp_page.dir_entries[count].d_name,
+			             ".") != 0) &&
+			     (strcmp(temp_page.dir_entries[count].d_name,
+			             "..") != 0)))
+				continue;
+#endif
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 			this_type = temp_page.dir_entries[count].d_type;
@@ -4791,6 +4949,22 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			else if (this_type == D_ISSOCK)
 				tempstat.st_mode = S_IFSOCK;
 
+#ifdef _ANDROID_ENV_
+			if ((feed_generic_apk == TRUE) &&
+			    (!strncmp(temp_page.dir_entries[count].d_name,
+			              "base.apk", strlen("base.apk")))) {
+				write_log(4, "Replacing base.apk\n");
+				tempstat.st_ino = GENERIC_APK_INO;
+			}
+
+			if ((feed_generic_oat == TRUE) &&
+			    (!strncmp(temp_page.dir_entries[count].d_name,
+			              "oat", strlen("oat")))) {
+				write_log(4, "Replacing oat\n");
+				tempstat.st_ino = GENERIC_OAT_INO;
+			}
+
+#endif
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
@@ -5585,7 +5759,7 @@ static int _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
 		/* Only CAP_SYS_ADMIN capability can modify security */
 		if (ops == WRITE_XATTR) {
 			if (_check_capability(thispid,
-		                CAP_SYS_ADMIN) == TRUE))
+		                CAP_SYS_ADMIN) == TRUE)
 				return 0;
 			else
 				return -EACCES;
