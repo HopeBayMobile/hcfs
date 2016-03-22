@@ -1301,6 +1301,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
     after_update_block_page = FALSE;
     test_fetch_from_backend = FALSE;
     fake_block_status = ST_NONE;
+    hcfs_system->systemdata.system_quota = 25600000;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
@@ -1485,6 +1486,7 @@ class hfuse_ll_statfsTest : public ::testing::Test {
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.system_quota = 25600000; /* set quota */
     sys_super_block->head.num_active_inodes = 10000;
     unittest_mount.FS_stat->num_inodes = 10000;
     before_update_file_data = TRUE;
@@ -1500,6 +1502,7 @@ TEST_F(hfuse_ll_statfsTest, SmallSysStat) {
   struct statfs tmpstat;
   int ret_val;
   int ret;
+  long long total_blocks;
 
   if (sys_super_block == NULL)
     ret = 1;
@@ -1516,11 +1519,12 @@ TEST_F(hfuse_ll_statfsTest, SmallSysStat) {
 
   ASSERT_EQ(0, ret_val);
 
+  total_blocks = (25600000 - 1) / 4096 + 1;
   EXPECT_EQ(4096, tmpstat.f_bsize);
   EXPECT_EQ(4096, tmpstat.f_frsize);
-  EXPECT_EQ(256*powl(1024,2), tmpstat.f_blocks);
-  EXPECT_EQ(256*powl(1024,2) - (((12800000 - 1) / 4096) + 1), tmpstat.f_bfree);
-  EXPECT_EQ(256*powl(1024,2) - (((12800000 - 1) / 4096) + 1), tmpstat.f_bavail);
+  EXPECT_EQ(total_blocks, tmpstat.f_blocks);
+  EXPECT_EQ(total_blocks - (((12800000 - 1) / 4096) + 1), tmpstat.f_bfree);
+  EXPECT_EQ(total_blocks - (((12800000 - 1) / 4096) + 1), tmpstat.f_bavail);
   EXPECT_EQ(2000000, tmpstat.f_files);
   EXPECT_EQ(2000000 - 10000, tmpstat.f_ffree);
 }

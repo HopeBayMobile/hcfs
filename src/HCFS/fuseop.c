@@ -4555,7 +4555,7 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
 	else*/
 	quota = hcfs_system->systemdata.system_quota;
-	buf->f_blocks = quota ? quota / buf->f_bsize + 1 : 0;
+	buf->f_blocks = quota ? (quota - 1) / buf->f_bsize + 1 : 0;
 
 	if (system_size == 0) {
 		buf->f_bfree = buf->f_blocks;

@@ -682,12 +682,13 @@ char *dec_backup_usermeta(char *path)
 	unsigned char *iv_buf = NULL;
 	unsigned char *enc_buf = NULL;
 	unsigned char *enc_key = NULL;
-	char *data_buf = NULL;
-	FILE *fptr;
+	char *data_buf = NULL; /* Data to be returned */
+	FILE *fptr = NULL;
 	int ret, errcode;
 	long long ret_pos;
 	size_t ret_size;
 
+	errcode = 0;
 	if (access(path, F_OK) < 0)
 		return NULL;
 
@@ -704,7 +705,7 @@ char *dec_backup_usermeta(char *path)
 	data_size = enc_size - TAG_SIZE;
 	iv_buf = (unsigned char*)malloc(sizeof(char)*IV_SIZE);
 	enc_buf = (unsigned char*)malloc(sizeof(char)*(enc_size));
-	data_buf = (char*)malloc(sizeof(char)*(data_size));
+	data_buf = (char*)calloc(sizeof(char)*(data_size), 1);
 	if (!iv_buf || !enc_buf || !data_buf) {
 		write_log(0, "Error: Out of memory\n");
 		errcode = -ENOMEM;
