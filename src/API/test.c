@@ -14,7 +14,7 @@
 #include "hcfs_stat.h"
 #include "global.h"
 
-int main()
+int32_t main()
 {
 
 	char pin_path[100] = "/home/yuxun/mp/test";
@@ -89,6 +89,7 @@ int main()
 	HCFS_get_sync_status(&res13);
 	printf("sync status - %s\n", res13);
 	free(res13);
+	return 0;
 }
 
 
