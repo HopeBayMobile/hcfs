@@ -116,10 +116,15 @@ function build_system() {
 	ssh root@$DOCKER_IP cd /data/external/sepolicy \&\& \
 		tools/post_process_mac_perms -s terafonn -d /data/device/acer/common/apps/HopebayHCFSmgmt -f mac_permissions.xml \&\& \
 		cat mac_permissions.xml
-	ssh root@$DOCKER_IP bash -ic "./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
+	ssh root@$DOCKER_IP bash -ic ":; cd /data/;\
+	echo BUILD_NUMBER := ${BUILD_NUMBER:-} >> build/core/build_id.mk;\
+	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk;\
+	cat build/core/build_id.mk;\
+	./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
+	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
 	rsync -v \
 		$here/resource/* \
 		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
