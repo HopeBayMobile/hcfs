@@ -121,7 +121,7 @@ void HCFS_stat(char **json_res);
  * | True | 0|
  * | False | Linux errors.|
  */
-void HCFS_toggle_sync(char **json_res, int enabled);
+void HCFS_toggle_sync(char **json_res, int32_t enabled);
 
 /*Sync status
  * @json_res result string in json format.

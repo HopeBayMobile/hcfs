@@ -1,11 +1,13 @@
+#include <inttypes.h>
+
 #include "enc.h"
 
 /************************************************************************
  * *
  * * Function name: generate_random_bytes
- * *        Inputs: unsigned char* bytes: points to a buffer which
+ * *        Inputs: uint8_t* bytes: points to a buffer which
  *		    length should equals length
- *		    unsigned int length
+ *		    uint32_t length
  * *       Summary: generate some random bytes
  * *
  * *
@@ -16,13 +18,13 @@
  *                  error code
  * *
  * *************************************************************************/
-int generate_random_bytes(unsigned char *bytes, unsigned int length)
+int32_t generate_random_bytes(uint8_t *bytes, uint32_t length)
 {
 	if (length <= 0)
 		return -1;
 
 	memset(bytes, 0, length);
-	int rand_success = RAND_bytes(bytes, length);
+	int32_t rand_success = RAND_bytes(bytes, length);
 	/* RAND_bytes() returns 1 on success, 0 otherwise. The error code can
 	 * be obtained by ERR_get_error.
 	 * return -1 if not supported by the current RAND method.
@@ -44,14 +46,14 @@ int generate_random_bytes(unsigned char *bytes, unsigned int length)
 /************************************************************************
  * *
  * * Function name: generate_random_aes_key
- * *        Inputs: unsigned char* key: points to a buffer which
+ * *        Inputs: uint8_t* key: points to a buffer which
  *		    length should equals KEY_SIZE
  * *       Summary: generate a random key for encryption
  * *
  * *  Return value: See get_random_bytes
  * *
  * *************************************************************************/
-int generate_random_aes_key(unsigned char *key)
+int32_t generate_random_aes_key(uint8_t *key)
 {
 	return generate_random_bytes(key, KEY_SIZE);
 }
@@ -59,13 +61,13 @@ int generate_random_aes_key(unsigned char *key)
 /************************************************************************
  * *
  * * Function name: aes_gcm_encrypt_core
- * *        Inputs: unsigned char* output: points to a buffer which
+ * *        Inputs: uint8_t* output: points to a buffer which
  *		                           length should equals
  *		                           input_length + TAG_SIZE
- *		    unsigned char* input
- *		    unsigned int input_length
- *		    unsigned char* key: must be KEY_SIZE length
- *		    unsigned char* iv: must be IV_SIZE length
+ *		    uint8_t* input
+ *		    uint32_t input_length
+ *		    uint8_t* key: must be KEY_SIZE length
+ *		    uint8_t* iv: must be IV_SIZE length
  * *       Summary: Use aes gcm mode to encrypt input
  * *
  * *  Return value: 0 if successful.
@@ -74,15 +76,15 @@ int generate_random_aes_key(unsigned char *key)
  *                  3 if extract TAG error
  * *
  * *************************************************************************/
-int aes_gcm_encrypt_core(unsigned char *output, unsigned char *input,
-			 unsigned int input_length, unsigned char *key,
-			 unsigned char *iv)
+int32_t aes_gcm_encrypt_core(uint8_t *output, uint8_t *input,
+			 uint32_t input_length, uint8_t *key,
+			 uint8_t *iv)
 {
-	int tmp_length = 0;
-	int output_length = 0;
-	int retcode = 0;
-	const int output_preserve_size = TAG_SIZE;
-	unsigned char tag[TAG_SIZE] = {0};
+	int32_t tmp_length = 0;
+	int32_t output_length = 0;
+	int32_t retcode = 0;
+	const int32_t output_preserve_size = TAG_SIZE;
+	uint8_t tag[TAG_SIZE] = {0};
 	/* clear output */
 	memset(output, 0, input_length + TAG_SIZE);
 	EVP_CIPHER_CTX ctx;
@@ -113,12 +115,12 @@ final:
 /************************************************************************
  * *
  * * Function name: aes_gcm_decrypt_core
- * *        Inputs: unsigned char* output:  points to a buffer which
+ * *        Inputs: uint8_t* output:  points to a buffer which
  *		    length should equals input_length - TAG_SIZE
- *		    unsigned char* input
- *		    unsigned int input_length
- *		    unsigned char* key: must KEY_SIZE length
- *		    unsigned char* iv: must IV_SIZE length
+ *		    uint8_t* input
+ *		    uint32_t input_length
+ *		    uint8_t* key: must KEY_SIZE length
+ *		    uint8_t* iv: must IV_SIZE length
  * *       Summary: Use aes gcm mode to decrypt input
  * *
  * *  Return value: 0 if successful.
@@ -127,15 +129,15 @@ final:
  *                  2 if Decrypr final error (TAG wrong)
  * *
  * *************************************************************************/
-int aes_gcm_decrypt_core(unsigned char *output, unsigned char *input,
-			 unsigned int input_length, unsigned char *key,
-			 unsigned char *iv)
+int32_t aes_gcm_decrypt_core(uint8_t *output, uint8_t *input,
+			 uint32_t input_length, uint8_t *key,
+			 uint8_t *iv)
 {
-	int tmp_length = 0;
-	int output_length = 0;
-	int retcode = 0;
-	unsigned char tag[TAG_SIZE] = {0};
-	const int preserve_size = TAG_SIZE;
+	int32_t tmp_length = 0;
+	int32_t output_length = 0;
+	int32_t retcode = 0;
+	uint8_t tag[TAG_SIZE] = {0};
+	const int32_t preserve_size = TAG_SIZE;
 
 	/* clear output */
 	memset(output, 0, input_length - TAG_SIZE);
@@ -167,13 +169,13 @@ decrypt_final:
  * In the future, it should be reimplemented considering
  * key management specs
  */
-unsigned char *get_key(char *keywords)
+uint8_t *get_key(char *keywords)
 {
 	const char *user_pass = keywords;
-	unsigned char md_value[EVP_MAX_MD_SIZE];
-	unsigned int md_len;
-	unsigned char *ret =
-	    (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
+	uint8_t md_value[EVP_MAX_MD_SIZE];
+	uint32_t md_len;
+	uint8_t *ret =
+	    (uint8_t *)calloc(KEY_SIZE, sizeof(uint8_t));
 	if (!ret)
 		return NULL;
 	const EVP_MD *m;
@@ -184,7 +186,7 @@ unsigned char *get_key(char *keywords)
 	if (!m)
 		return NULL;
 	EVP_DigestInit(&ctx, m);
-	unsigned char *salt = (unsigned char *)"oluik.354jhmnk,";
+	uint8_t *salt = (uint8_t *)"oluik.354jhmnk,";
 
 	PKCS5_PBKDF2_HMAC(user_pass, strlen(user_pass), salt,
 			  strlen((char *)salt), 3, m, KEY_SIZE, ret);

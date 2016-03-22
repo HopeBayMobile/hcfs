@@ -19,15 +19,15 @@
 #define KEY_SIZE 32
 
 
-int generate_random_aes_key(unsigned char *);
+int32_t generate_random_aes_key(uint8_t *);
 
-int generate_random_bytes(unsigned char *, unsigned int);
+int32_t generate_random_bytes(uint8_t *, uint32_t);
 
-int aes_gcm_encrypt_core(unsigned char *, unsigned char *, unsigned int,
-			 unsigned char *, unsigned char *);
+int32_t aes_gcm_encrypt_core(uint8_t *, uint8_t *, uint32_t,
+			 uint8_t *, uint8_t *);
 
-int aes_gcm_decrypt_core(unsigned char *, unsigned char *, unsigned int,
-			 unsigned char *, unsigned char *);
+int32_t aes_gcm_decrypt_core(uint8_t *, uint8_t *, uint32_t,
+			 uint8_t *, uint8_t *);
 
-unsigned char *get_key(char *);
+uint8_t *get_key(char *);
 
