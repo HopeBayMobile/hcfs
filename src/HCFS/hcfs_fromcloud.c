@@ -875,6 +875,14 @@ static BOOL quota_wakeup()
 		return FALSE;
 }
 
+/**
+ * Fetch quota from usermeta on cloud
+ *
+ * This function aims to download usermeta.json from arkflex backend,
+ * and then parse the json file to get quota. Finally backup the usermeta
+ * locally and encrypt the file.
+ *
+ */
 void fetch_quota_from_cloud(void *ptr)
 {
 	int status;

@@ -208,6 +208,7 @@ char *json_dumps(const json_t *root, size_t flags)
 
 void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
 {
+	sleep(1);
 	return;
 }
 
