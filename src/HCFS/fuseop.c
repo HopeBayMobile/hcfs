@@ -1533,16 +1533,19 @@ a directory (for NFS) */
 			/* Need to check what action needs to be taken */
 			/* Skip package name */
 			tmptok = strtok_r(tmppath, "/", &toksave);
-			if (tmptok != NULL)
+			if (tmptok == NULL)
 				goto lookup_check_end;
-			write_log(4, "Debug checking package %s\n", tmptok);
-			tmptok = strtok_r(tmppath, "/", &toksave);
+			write_log(4, "Lookup checking package %s\n", tmptok);
+			tmptok = strtok_r(NULL, "/", &toksave);
+			write_log(4, "Next level %s\n", tmptok);
 			if (tmptok == NULL) {
 				/* Need to feed generic apk and oat */
+				write_log(4, "Feed generic\n");
 				feed_generic_apk = TRUE;
 				feed_generic_oat = TRUE;
 			} else if (!strncmp(tmptok, "lib", strlen("lib"))) {
 				/* Need to skip listing */
+				write_log(4, "Skip listing\n");
 				skip_listing = TRUE;
 			}
 			/* Free path string when done */
@@ -4844,17 +4847,20 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			/* Need to check what action needs to be taken */
 			/* Skip package name */
 			tmptok = strtok_r(tmppath, "/", &toksave);
-			if (tmptok != NULL)
+			if (tmptok == NULL)
 				goto readdir_check_end;
-			write_log(4, "Debug checking package %s\n", tmptok);
-			tmptok = strtok_r(tmppath, "/", &toksave);
+			write_log(4, "Readdir checking package %s\n", tmptok);
+			tmptok = strtok_r(NULL, "/", &toksave);
+			write_log(4, "Next level %s\n", tmptok);
 			if (tmptok == NULL) {
 				/* Need to feed generic apk and oat */
 				feed_generic_apk = TRUE;
 				feed_generic_oat = TRUE;
+				write_log(4, "Use generic\n");
 			} else if (!strncmp(tmptok, "lib", strlen("lib"))) {
 				/* Need to skip listing */
 				skip_listing = TRUE;
+				write_log(4, "Skip listing\n");
 			}
 readdir_check_end:
 			/* Free path string when done */
