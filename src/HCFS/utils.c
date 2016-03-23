@@ -1714,6 +1714,16 @@ int get_meta_size(ino_t inode, long long *metasize)
 	return 0;
 }
 
+/**
+ * Get quota value from backup usermeta
+ *
+ * First decrypt the usermeta if it exists, and parse the json string to
+ * get the quota value.
+ *
+ * @param quota Variable to store the value quota.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int get_quota_from_backup(long long *quota)
 {
 	char path[200];
