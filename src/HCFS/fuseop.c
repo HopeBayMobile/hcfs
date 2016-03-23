@@ -28,6 +28,9 @@
 * 2016/2/4 Jiahong adding fallocate
 * 2016/2/23 Jiahong moved fallocate to another file
 * 2016/3/17 Jiahong modified permission checking to add capability check
+* 2016/3/22 Jiahong lifted truncate permission check in Android
+*           Let SELinux do the work here.
+>>>>>>> android-dev
 *
 **************************************************************************/
 
@@ -5021,6 +5024,8 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	if ((to_set & FUSE_SET_ATTR_SIZE) &&
 			(newstat.st_size != attr->st_size)) {
 
+#ifndef _ANDROID_ENV_
+		/* Android may not like this permission check */
 		/* Checking permission */
 		ret_val = check_permission(req, &newstat, 2);
 
@@ -5030,6 +5035,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
+#endif
 
 		ret_val = hfuse_ll_truncate(this_inode, &newstat,
 				attr->st_size, &body_ptr, req);

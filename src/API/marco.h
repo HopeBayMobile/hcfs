@@ -14,14 +14,14 @@
 
 #define CONCAT_LL_ARGS(A)\
 	{\
-		memcpy(&(res_buf[ret_len]), &A, sizeof(long long));\
-		ret_len += sizeof(long long);\
+		memcpy(&(res_buf[ret_len]), &A, sizeof(int64_t));\
+		ret_len += sizeof(int64_t);\
 	}
 
 #define READ_LL_ARGS(A)\
 	{\
-		memcpy(&A, &(buf[buf_idx]), sizeof(long long));\
-		buf_idx += sizeof(long long);\
+		memcpy(&A, &(buf[buf_idx]), sizeof(int64_t));\
+		buf_idx += sizeof(int64_t);\
 	}
 
 #endif  /* GW20_API_MARCO_H_ */

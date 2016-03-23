@@ -27,7 +27,7 @@ function install_pkg (){
 		if [ -n "$setup_dev_env_mode" ]; then
 			echo "Require packages for mode $setup_dev_env_mode: $install"
 		fi
-		sudo apt-get update
+		sudo apt-get update || :
 		sudo apt-get install -y $install $force_install
 		packages=""
 		install=""

@@ -1,4 +1,4 @@
-DIRS := $(wildcard c/unittest_modules/*)
+DIRS := $(wildcard c/unittest_modules/*/.)
 BUILDDIRS = $(DIRS:%=build-%)
 CLEANDIRS = $(DIRS:%=clean-%)
 TESTSUCCESS = $(DIRS:%=%/.success)

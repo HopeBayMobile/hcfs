@@ -11,7 +11,7 @@ TARGETS          += acer-s58a
 #TARGETS          += acer-z630
 
 all : submodule out $(TARGETS)
-	cd out; find -mindepth 2 -type f -exec md5sum {} \; > md5sum.md5
+	cd out; find -type f ! -name md5sum.md5 -exec md5sum {} \; > md5sum.md5
 
 submodule :
 	@if [ ! -n "$$(grep "^gitlab.hopebaytech.com " ~/.ssh/known_hosts)" ]; \
@@ -88,6 +88,10 @@ out/%-hcfs-gdb: force
 		-e "\$$afile $(APP_ABI)/hcfs" \
 		-e "\$$atarget remote :5678" \
 		$@/$(APP_ABI)/gdb.setup > $@/gdb.setup
+ifneq "$(PASSWORD)" ""
+	zip -P "$(PASSWORD)" -r $@.zip $@
+	@rm -rf $@
+endif
 
 out:
 	@mkdir out

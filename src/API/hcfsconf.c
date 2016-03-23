@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "hcfs_sys.h"
@@ -18,7 +19,7 @@ void usage()
 #endif
 }
 
-int _check_file_existed(char *pathname)
+int32_t _check_file_existed(char *pathname)
 {
 
 	if (access(pathname, F_OK) == -1)
@@ -27,20 +28,20 @@ int _check_file_existed(char *pathname)
 		return 0;
 }
 
-int __enc_config(unsigned char *output, unsigned char *input,
-		 long input_len)
+int32_t __enc_config(uint8_t *output, uint8_t *input,
+		 int64_t input_len)
 {
 
-	int ret;
-	unsigned char iv[IV_SIZE] = {0};
-	unsigned char *enc_key, *enc_data;
+	int32_t ret;
+	uint8_t iv[IV_SIZE] = {0};
+	uint8_t *enc_key, *enc_data;
 
 	/* Key and iv */
 	enc_key = get_key(PASSPHRASE);
 	generate_random_bytes(iv, IV_SIZE);
 
 	enc_data =
-		(unsigned char*)malloc(sizeof(unsigned char) * (input_len + TAG_SIZE));
+		(uint8_t*)malloc(sizeof(uint8_t) * (input_len + TAG_SIZE));
 
 	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
 	if (ret != 0) {
@@ -55,13 +56,13 @@ int __enc_config(unsigned char *output, unsigned char *input,
 	return 0;
 }
 
-int _enc_config(char *source_path, char *out_path)
+int32_t _enc_config(char *source_path, char *out_path)
 {
 
-	unsigned char buf[300];
-	unsigned char data_buf[1024];
-	long data_size = 0;
-	int str_len;
+	char buf[300];
+	uint8_t data_buf[1024];
+	int64_t data_size = 0;
+	int32_t str_len;
 	FILE *config = NULL;
 	FILE *enc_config = NULL;
 
@@ -76,7 +77,7 @@ int _enc_config(char *source_path, char *out_path)
 	}
 	fclose(config);
 
-	unsigned char enc_data[data_size + IV_SIZE + TAG_SIZE];
+	uint8_t enc_data[data_size + IV_SIZE + TAG_SIZE];
 	if (__enc_config(enc_data, data_buf, data_size) != 0)
 		return errno;
 
@@ -84,14 +85,14 @@ int _enc_config(char *source_path, char *out_path)
 	if (enc_config == NULL)
 		return errno;
 
-	fwrite(enc_data, sizeof(unsigned char),
+	fwrite(enc_data, sizeof(uint8_t),
 	       data_size + IV_SIZE + TAG_SIZE, enc_config);
 	fclose(enc_config);
 
 	return 0;
 }
 
-int enc_config(char *source_path, char *out_path)
+int32_t enc_config(char *source_path, char *out_path)
 {
 
 	if (_check_file_existed(source_path) == -1)
@@ -103,17 +104,17 @@ int enc_config(char *source_path, char *out_path)
 	return _enc_config(source_path, out_path);
 }
 
-int _dec_config(char *source_path, char *out_path)
+int32_t _dec_config(char *source_path, char *out_path)
 {
 
-	int ret_code = 0;
-        long file_size, enc_size, data_size;
+	int32_t ret_code = 0;
+        int64_t file_size, enc_size, data_size;
         FILE *config = NULL;
         FILE *dec_config = NULL;
-        unsigned char *iv_buf = NULL;
-        unsigned char *enc_buf = NULL;
-        unsigned char *data_buf = NULL;
-        unsigned char *enc_key;
+        uint8_t *iv_buf = NULL;
+        uint8_t *enc_buf = NULL;
+        uint8_t *data_buf = NULL;
+        uint8_t *enc_key;
 
 
         config = fopen(source_path, "r");
@@ -127,16 +128,16 @@ int _dec_config(char *source_path, char *out_path)
         enc_size = file_size - IV_SIZE;
         data_size = enc_size - TAG_SIZE;
 
-        iv_buf = (unsigned char*)malloc(sizeof(char)*IV_SIZE);
-        enc_buf = (unsigned char*)malloc(sizeof(char)*(enc_size));
-        data_buf = (unsigned char*)malloc(sizeof(char)*(data_size));
+        iv_buf = (uint8_t*)malloc(sizeof(char)*IV_SIZE);
+        enc_buf = (uint8_t*)malloc(sizeof(char)*(enc_size));
+        data_buf = (uint8_t*)malloc(sizeof(char)*(data_size));
 
         if (!iv_buf || !enc_buf || !data_buf)
                 goto error;
 
         enc_key = get_key(PASSPHRASE);
-        fread(iv_buf, sizeof(unsigned char), IV_SIZE, config);
-        fread(enc_buf, sizeof(unsigned char), enc_size, config);
+        fread(iv_buf, sizeof(uint8_t), IV_SIZE, config);
+        fread(enc_buf, sizeof(uint8_t), enc_size, config);
 
         if (aes_gcm_decrypt_core(data_buf, enc_buf, enc_size,
                                  enc_key, iv_buf) != 0) {
@@ -147,7 +148,7 @@ int _dec_config(char *source_path, char *out_path)
         dec_config = fopen(out_path, "w");
         if (dec_config == NULL)
                 goto error;
-        fwrite(data_buf, sizeof(unsigned char), data_size,
+        fwrite(data_buf, sizeof(uint8_t), data_size,
 		dec_config);
 
 	goto end;
@@ -170,7 +171,7 @@ end:
         return ret_code;
 }
 
-int dec_config(char *source_path, char *out_path)
+int32_t dec_config(char *source_path, char *out_path)
 {
 
 	if (_check_file_existed(source_path) == -1)
@@ -184,7 +185,7 @@ int dec_config(char *source_path, char *out_path)
 
 typedef struct {
 	const char *name;
-	int (*cmd_fn)(char *source_path, char *out_path);
+	int32_t (*cmd_fn)(char *source_path, char *out_path);
 } CMD_INFO;
 
 CMD_INFO cmds[] = {
@@ -194,11 +195,11 @@ CMD_INFO cmds[] = {
 #endif
 };
 
-int main(int argc, char **argv)
+int32_t main(int32_t argc, char **argv)
 {
 
 	int ret_code = 0;
-	unsigned int i;
+	uint32_t i;
 
 	if (argc != 4) {
 		printf("Error - Invalid args\n");
