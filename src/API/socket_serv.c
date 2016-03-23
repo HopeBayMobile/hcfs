@@ -24,39 +24,39 @@
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 
-int do_pin_by_path(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_pin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Pin by path\n");
 	ret_code = pin_by_path(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_unpin_by_path(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_unpin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Unpin by path\n");
 	ret_code = unpin_by_path(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_check_dir_status(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_check_dir_status(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
-	long long num_local, num_cloud, num_hybrid;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t num_local, num_cloud, num_hybrid;
 
 	printf("Check dir stat\n");
 	ret_code = check_dir_status(largebuf, arg_len,
@@ -65,64 +65,64 @@ int do_check_dir_status(char *largebuf, int arg_len, char *resbuf, int *res_size
 
 	printf("%d\n", ret_code);
 	if (ret_code < 0) {
-		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-		CONCAT_REPLY(&ret_code, sizeof(int));
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	} else {
-		CONCAT_REPLY(res_size, sizeof(unsigned int));
-		CONCAT_REPLY(&num_local, sizeof(long long));
-		CONCAT_REPLY(&num_cloud, sizeof(long long));
-		CONCAT_REPLY(&num_hybrid, sizeof(long long));
+		CONCAT_REPLY(res_size, sizeof(uint32_t));
+		CONCAT_REPLY(&num_local, sizeof(int64_t));
+		CONCAT_REPLY(&num_cloud, sizeof(int64_t));
+		CONCAT_REPLY(&num_hybrid, sizeof(int64_t));
 	}
 
 	return ret_code;
 }
 
-int do_check_file_loc(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_check_file_loc(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Check file location\n");
 	ret_code = check_file_loc(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_check_pin_status(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_check_pin_status(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Check pin status\n");
 	ret_code = check_pin_status(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_set_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_set_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Set config\n");
 	ret_code = set_hcfs_config(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_get_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_get_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 	char *value;
 
 	printf("Get config\n");
@@ -130,26 +130,26 @@ int do_get_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
 
 	if (ret_code == 0) {
 		ret_len = strlen(value);
-		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(value, ret_len);
 		free(value);
 	} else {
-		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-		CONCAT_REPLY(&ret_code, sizeof(int));
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	}
 
 	return ret_code;
 }
 
-int do_get_hcfs_stat(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
-	int cloud_stat;
-	long long vol_usage, cloud_usage;
-	long long cache_total, cache_used, cache_dirty;
-	long long pin_max, pin_total;
-	long long xfer_up, xfer_down;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int32_t cloud_stat;
+	int64_t vol_usage, cloud_usage;
+	int64_t cache_total, cache_used, cache_dirty;
+	int64_t pin_max, pin_total;
+	int64_t xfer_up, xfer_down;
 
 	printf("Get statistics\n");
 	ret_code = get_hcfs_stat(&vol_usage, &cloud_usage, &cache_total,
@@ -159,80 +159,80 @@ int do_get_hcfs_stat(char *largebuf, int arg_len, char *resbuf, int *res_size)
 				 &cloud_stat);
 
 	if (ret_code < 0) {
-		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-		CONCAT_REPLY(&ret_code, sizeof(int));
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	} else {
 		/* Total size for reply msgs */
-		ret_len = sizeof(long long) * 9 + sizeof(int);
+		ret_len = sizeof(int64_t) * 9 + sizeof(int32_t);
 
-		CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-		CONCAT_REPLY(&vol_usage, sizeof(long long));
-		CONCAT_REPLY(&cloud_usage, sizeof(long long));
-		CONCAT_REPLY(&cache_total, sizeof(long long));
-		CONCAT_REPLY(&cache_used, sizeof(long long));
-		CONCAT_REPLY(&cache_dirty, sizeof(long long));
-		CONCAT_REPLY(&pin_max, sizeof(long long));
-		CONCAT_REPLY(&pin_total, sizeof(long long));
-		CONCAT_REPLY(&xfer_up, sizeof(long long));
-		CONCAT_REPLY(&xfer_down, sizeof(long long));
-		CONCAT_REPLY(&cloud_stat, sizeof(int));
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+		CONCAT_REPLY(&vol_usage, sizeof(int64_t));
+		CONCAT_REPLY(&cloud_usage, sizeof(int64_t));
+		CONCAT_REPLY(&cache_total, sizeof(int64_t));
+		CONCAT_REPLY(&cache_used, sizeof(int64_t));
+		CONCAT_REPLY(&cache_dirty, sizeof(int64_t));
+		CONCAT_REPLY(&pin_max, sizeof(int64_t));
+		CONCAT_REPLY(&pin_total, sizeof(int64_t));
+		CONCAT_REPLY(&xfer_up, sizeof(int64_t));
+		CONCAT_REPLY(&xfer_down, sizeof(int64_t));
+		CONCAT_REPLY(&cloud_stat, sizeof(int32_t));
 	}
 
 	return ret_code;
 }
 
-int do_reset_xfer_usage(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_reset_xfer_usage(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Reset xfer\n");
 	ret_code = reset_xfer_usage(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_toggle_cloud_sync(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_toggle_cloud_sync(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Toggle sync\n");
 	ret_code = toggle_cloud_sync(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_get_sync_status(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_get_sync_status(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Get sync status\n");
 	ret_code = get_sync_status(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
 
-int do_reload_hcfs_config(char *largebuf, int arg_len, char *resbuf, int *res_size)
+int32_t do_reload_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
-	int ret_code;
-	int ret_len = 0;
+	int32_t ret_code;
+	uint32_t ret_len = 0;
 
 	printf("Reload config\n");
 	ret_code = reload_hcfs_config(largebuf, arg_len);
 
-	CONCAT_REPLY(&ret_len, sizeof(unsigned int));
-	CONCAT_REPLY(&ret_code, sizeof(int));
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	return ret_code;
 }
@@ -255,21 +255,21 @@ int32_t _get_unused_thread()
 int32_t process_request(int32_t thread_idx)
 {
 
-	int fd, ret_code, res_size;
-	unsigned int api_code, arg_len;
+	int32_t fd, ret_code, res_size;
+	uint32_t api_code, arg_len;
 	char buf_reused;
 	char buf[512], resbuf[512];
 	char *largebuf;
 
 	fd = thread_pool[thread_idx].fd;
 
-	if (reads(fd, &api_code, sizeof(unsigned int))) {
+	if (reads(fd, &api_code, sizeof(uint32_t))) {
 		printf("Failed to recv API code");
 		goto error;
 	}
 	printf("API code is %d\n", api_code);
 
-	if (reads(fd, &arg_len, sizeof(unsigned int))) {
+	if (reads(fd, &arg_len, sizeof(uint32_t))) {
 		printf("Failed to recv arg length\n");
 		goto error;
 	}
@@ -290,8 +290,8 @@ int32_t process_request(int32_t thread_idx)
 	}
 
 	struct cmd {
-		unsigned int name;
-		int (*cmd_fn)(char *largebuf, int arg_len, char *resbuf, int *res_size);
+		uint32_t name;
+		int32_t (*cmd_fn)(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size);
 	};
 
 	struct cmd cmds[] = {
@@ -308,7 +308,7 @@ int32_t process_request(int32_t thread_idx)
 		{GETSYNCSWITCH,	do_get_sync_status},
 	};
 
-	unsigned int n;
+	uint32_t n;
 	for (n = 0; n < sizeof(cmds) / sizeof(cmds[0]); n++) {
 		if (api_code == cmds[n].name) {
 			res_size = 0;

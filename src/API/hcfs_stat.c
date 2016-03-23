@@ -112,7 +112,7 @@ int32_t get_cloud_usage(int64_t *cloud_usage)
 }
 
 int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
-		    int64_t *cache_dirty)
+		        int64_t *cache_dirty)
 {
 
 	int32_t ret_code;
@@ -203,10 +203,10 @@ int32_t get_cloud_stat(int32_t *cloud_stat)
 }
 
 int32_t get_hcfs_stat(int64_t *vol_usage, int64_t *cloud_usage, int64_t *cache_total,
-		  int64_t *cache_used, int64_t *cache_dirty,
-		  int64_t *pin_max, int64_t *pin_total,
-		  int64_t *xfer_up, int64_t *xfer_down,
-		  int32_t *cloud_stat)
+		      int64_t *cache_used, int64_t *cache_dirty,
+		      int64_t *pin_max, int64_t *pin_total,
+		      int64_t *xfer_up, int64_t *xfer_down,
+		      int32_t *cloud_stat)
 {
 
 	int32_t ret_code;

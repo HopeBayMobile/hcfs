@@ -3,13 +3,14 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <inttypes.h>
 
 
-int reads(int fd, void *_buf, int count)
+int32_t reads(int32_t fd, void *_buf, int32_t count)
 {
 
 	char *buf = (char *) _buf;
-	int total = 0, r = 0;
+	int32_t total = 0, r = 0;
 
 	if (count < 0) return -1;
 	while (total < count) {
@@ -26,10 +27,10 @@ int reads(int fd, void *_buf, int count)
 	return 0;
 }
 
-int sends(int fd, const void *_buf, int count)
+int32_t sends(int32_t fd, const void *_buf, int32_t count)
 {
 	const char *buf = (const char *) _buf;
-	int total = 0, s = 0;
+	int32_t total = 0, s = 0;
 
 	if (count < 0) return -1;
 	while (total < count) {
