@@ -13,7 +13,7 @@ int reads(int fd, void *_buf, int count)
 
 	if (count < 0) return -1;
 	while (total < count) {
-		r = recv(fd, &buf[total], count - total,
+		r = recv(fd, buf + total, count - total,
 			 MSG_NOSIGNAL);
 		if (r < 0) {
 			if (errno == EINTR) continue;
@@ -33,7 +33,7 @@ int sends(int fd, const void *_buf, int count)
 
 	if (count < 0) return -1;
 	while (total < count) {
-		s = send(fd, &buf[total], count - total,
+		s = send(fd, buf + total, count - total,
 			 MSG_NOSIGNAL);
 		if (s < 0) {
 			if (errno == EINTR) continue;

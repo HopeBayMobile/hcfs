@@ -313,23 +313,4 @@ void HCFS_file_status(char **json_res, char *pathname);
  */
 void HCFS_reset_xfer(char **json_res);
 
-/*Secret function
- * @json_res result string in json format.
- *
- * (NOTE - This API would not be used anymore.)
- *
- * To reboot.
- */
-void HCFS_reboot(char **json_res);
-
-/*Query package uid
- * @json_res result string in json format.
- * @pkg_name target package
- *
- * (NOTE - This API would not be used anymore.)
- *
- * To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.
- */
-void HCFS_get_pkg_uid(char **json_res, char * pkg_name);
-
 #endif  /* GW20_HCFS_API_H_ */

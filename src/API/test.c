@@ -60,7 +60,7 @@ int32_t main()
 
 	char *res8;
 	char key[500] = "swift_account";
-	char value[500] = "test_account";
+	char value[500] = "test_swift_account";
 	HCFS_set_config(&res8, key, value);
 	printf("set config - %s\n", res8);
 	free(res8);
@@ -76,20 +76,14 @@ int32_t main()
 	free(res10);
 
 	char *res11;
-	HCFS_get_pkg_uid(&res11, "com.hopebaytech.hcfsmgmt");
-	printf("query uid - %s\n", res11);
+	HCFS_toggle_sync(&res11, 0);
+	printf("toggle sync - %s\n", res11);
 	free(res11);
 
 	char *res12;
-	HCFS_toggle_sync(&res12, 0);
-	printf("toggle sync - %s\n", res12);
+	HCFS_get_sync_status(&res12);
+	printf("sync status - %s\n", res12);
 	free(res12);
-
-	char *res13;
-	HCFS_get_sync_status(&res13);
-	printf("sync status - %s\n", res13);
-	free(res13);
-	return 0;
 }
 
 
