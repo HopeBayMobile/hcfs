@@ -372,6 +372,9 @@ protected:
 	char *ret_str;
 	void SetUp()
 	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		METAPATH = "/tmp/backup_usermeta_test";
 		sprintf(usermeta_path, "%s/usermeta", METAPATH);
 		if (!access(usermeta_path, F_OK))
@@ -388,6 +391,8 @@ protected:
 			unlink(usermeta_path);
 		if (!access(METAPATH, F_OK))
 			rmdir(METAPATH);
+
+		free(system_config);
 	}
 };
 
