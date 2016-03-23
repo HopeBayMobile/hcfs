@@ -70,10 +70,10 @@ allow hcfsd self:udp_socket create;
 allow hcfsd labeledfs:filesystem { mount unmount };
 
 # Allow hcfs to have permission to access directories and files on /proc/<pid> folder
-allow hcfsd { init installd qti_init_shell shell vold bluetooth radio wcnss_service
-              platform_app untrusted_app isolated_app rild system_server mediaserver }:dir search;
-allow hcfsd { init installd qti_init_shell shell vold bluetooth radio wcnss_service
-              platform_app untrusted_app isolated_app rild system_server mediaserver }:file { read getattr open };
+allow hcfsd { init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app
+              platform_app untrusted_app isolated_app rild system_server mediaserver hcfsapid }:dir search;
+allow hcfsd { init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app
+              platform_app untrusted_app isolated_app rild system_server mediaserver hcfsapid }:file { read getattr open };
 
 # Allow hcfs to have getattr permission on /mnt/runtime folder
 allow hcfsd storage_file:dir getattr;
