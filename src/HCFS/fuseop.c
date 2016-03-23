@@ -5042,8 +5042,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	UNUSED(fi);
-
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
 
 	this_inode = real_ino(req, ino);
@@ -5087,7 +5085,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			if ((!((fh_ptr->flags & O_ACCMODE) == O_WRONLY)) &&
 			    (!((fh_ptr->flags & O_ACCMODE) == O_RDWR)))
 				goto continue_check;
-			write_log(0, "Allowing truncate\n");
 			goto allow_truncate;
 		}
 
@@ -5096,7 +5093,6 @@ continue_check:
 		ret_val = check_permission(req, &newstat, 2);
 
 		if (ret_val < 0) {
-			write_log(0, "Deny truncate\n");
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, -ret_val);
