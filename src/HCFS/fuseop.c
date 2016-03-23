@@ -30,7 +30,6 @@
 * 2016/3/17 Jiahong modified permission checking to add capability check
 * 2016/3/22 Jiahong lifted truncate permission check in Android
 *           Let SELinux do the work here.
->>>>>>> android-dev
 *
 **************************************************************************/
 
