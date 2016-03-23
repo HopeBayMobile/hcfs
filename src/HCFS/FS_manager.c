@@ -177,7 +177,6 @@ int _init_backend_stat(ino_t root_inode)
 	int ret, errcode;
 	char fname[METAPATHLEN];
 	FILE *fptr;
-	long long system_size, num_inodes;
 	size_t ret_size;
 	char is_fopen;
 	FS_CLOUD_STAT_T cloud_fs_stat;
