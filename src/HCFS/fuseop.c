@@ -27,6 +27,7 @@
 * 2016/1/19 Jiahong modified path reconstruct routine
 * 2016/2/4 Jiahong adding fallocate
 * 2016/2/23 Jiahong moved fallocate to another file
+* 2016/3/17 Jiahong modified permission checking to add capability check
 * 2016/3/22 Jiahong lifted truncate permission check in Android
 *           Let SELinux do the work here.
 *
@@ -135,6 +136,8 @@ ntpdate / ntpd or manual changes*/
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
+BOOL _check_capability(pid_t thispid, int cap_to_check);
+
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
    "mode" is the bit-wise OR of ATIME, MTIME, CTIME.
@@ -188,7 +191,14 @@ int check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
 	if (temp_context == NULL)
 		return -ENOMEM;
 
-	if (temp_context->uid == 0)  /*If this is the root grant any req */
+	/* Do not grant access based on uid now */
+	/*
+		if (temp_context->uid == 0)
+			return 0;
+	*/
+
+	/* Check the capabilities of the process */
+	if (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE) == TRUE)
 		return 0;
 
 	/* First check owner permission */
@@ -290,7 +300,9 @@ int check_permission_access(fuse_req_t req, struct stat *thisstat, int mode)
 		return -ENOMEM;
 
 	/*If this is the root check if exec is set for any for reg files*/
-	if (temp_context->uid == 0) {
+	if ((temp_context->uid == 0) ||
+	    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE)
+	                == TRUE)) {
 		if ((S_ISREG(thisstat->st_mode)) && (mode & X_OK)) {
 			if (!(thisstat->st_mode &
 				(S_IXUSR | S_IXGRP | S_IXOTH)))
@@ -5039,7 +5051,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		write_log(10, "Debug setattr context %d, file %d\n",
 			temp_context->uid, newstat.st_uid);
 
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
 
@@ -5096,7 +5108,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
 
@@ -5115,7 +5127,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
 
@@ -5135,7 +5147,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	clock_gettime(CLOCK_REALTIME, &timenow);
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			((temp_context->uid != newstat.st_uid) ||
 				(check_permission(req, &newstat, 2) < 0))) {
 			/* Not privileged and
@@ -5155,7 +5167,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
-		if ((temp_context->uid != 0) &&
+		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			((temp_context->uid != newstat.st_uid) ||
 				(check_permission(req, &newstat, 2) < 0))) {
 			/* Not privileged and
@@ -5610,7 +5622,6 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 
-	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
@@ -5660,6 +5671,11 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         }
 #endif
 
+        temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+        if (temp_context == NULL) {
+                fuse_reply_err(req, ENOMEM);
+                return;
+        }
 
 	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
 			WRITE_XATTR) < 0) {
@@ -5730,7 +5746,6 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 
-	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
@@ -5775,6 +5790,12 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
                 _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
         }
 #endif
+
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
 
 	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
 			READ_XATTR) < 0) {
@@ -5975,7 +5996,6 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 
-	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
@@ -6018,6 +6038,12 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
                 _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
         }
 #endif
+
+        temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+        if (temp_context == NULL) {
+                fuse_reply_err(req, ENOMEM);
+                return;
+        }
 
 	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
 			WRITE_XATTR) < 0) {
