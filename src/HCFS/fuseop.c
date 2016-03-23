@@ -3647,6 +3647,17 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	char noatime;
 	int ret, errcode;
 	ino_t thisinode;
+	struct fuse_ctx *temp_context;
+	MOUNT_T *tmpptr;
+	char *tmppath;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
 
 	thisinode = real_ino(req, ino);
 
@@ -3742,6 +3753,20 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		/*Do not need to read that much*/
 		if (((off_t)size - total_bytes_read) < target_bytes_read)
 			target_bytes_read = (off_t)size - total_bytes_read;
+
+		if (tmpptr->f_ino == 3) {
+			write_log(0, "Debug Read\n");
+			write_log(0, "Read: inode %" PRIu64 ", offset %lld, size %" PRIu64 "\n",
+				(uint64_t) thisinode, offset, (uint64_t) size);
+			write_log(0, "Read: block %lld\n", block_index);
+			tmppath = NULL;
+			construct_path(tmpptr->vol_path_cache, thisinode,
+				&tmppath, tmpptr->f_ino);
+			if (tmppath != NULL) {
+				write_log(0, "Read: path %s\n", tmppath);
+				free(tmppath);
+			}
+		}
 
 		this_bytes_read = _read_block(&buf[total_bytes_read],
 				target_bytes_read, block_index, current_offset,
@@ -5286,6 +5311,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			write_log(0, "Trunc: file mode %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
 				(uint64_t) newstat.st_mode, (uint64_t) newstat.st_uid, (uint64_t) newstat.st_gid);
 			_check_capability_debug(temp_context->pid, CAP_DAC_OVERRIDE);
+			tmppath = NULL;
 			construct_path(tmpptr->vol_path_cache, this_inode,
 				&tmppath, tmpptr->f_ino);
 			if (tmppath != NULL) {
