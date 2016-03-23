@@ -866,6 +866,9 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Condition to wake the thread up.
+ */
 static BOOL quota_wakeup()
 {
 	if ((hcfs_system->system_going_down == TRUE) ||
@@ -994,6 +997,16 @@ errcode_handle:
 	return;
 }
 
+/**
+ * Trigger updating quota from cloud
+ *
+ * This function creates a thread to update quota and backup it. If backend
+ * is NONE, then reject to update quota from cloud. When this thread is active,
+ * reject to create again and return -EBUSY. Do not need to join this thread
+ * because it is detached thread.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int update_quota()
 {
 	if (CURRENT_BACKEND == NONE) {

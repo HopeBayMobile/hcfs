@@ -626,6 +626,16 @@ end:
 	return tmp_file;
 }
 
+/**
+ * Encrypt json string and backup it.
+ *
+ * Given a valid json string, encrypt it and write to a specified file named
+ * "usermeta", which is in the folder METAPATH.
+ * 
+ * @param json_str The json string to be enc.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int enc_backup_usermeta(char *json_str)
 {
 	unsigned char *enc_key;
