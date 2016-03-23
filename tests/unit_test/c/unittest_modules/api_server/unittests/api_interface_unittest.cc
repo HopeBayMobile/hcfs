@@ -1259,8 +1259,8 @@ TEST_F(api_moduleTest, GetQuotaSuccess) {
 	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
 	ASSERT_EQ(sizeof(unsigned int), ret_val);
 	ASSERT_EQ(sizeof(long long), size_msg);
-	ret_val = recv(fd, &quota, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ret_val = recv(fd, &quota, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
 	ASSERT_EQ(55667788, quota);
 }
 

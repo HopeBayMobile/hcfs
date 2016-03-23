@@ -686,6 +686,14 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Decrypt the content of given path and return the string, which
+ * is a json string.
+ *
+ * @param path Path of the file to be decrypt
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 char *dec_backup_usermeta(char *path)
 {
 	long long enc_size, data_size;
