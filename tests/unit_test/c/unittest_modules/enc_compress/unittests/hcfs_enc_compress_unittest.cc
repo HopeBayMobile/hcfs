@@ -372,7 +372,7 @@ protected:
 	char *ret_str;
 	void SetUp()
 	{
-		METAPATH = "backup_usermeta_test";
+		METAPATH = "/tmp/backup_usermeta_test";
 		sprintf(usermeta_path, "%s/usermeta", METAPATH);
 		if (!access(usermeta_path, F_OK))
 			unlink(usermeta_path);
