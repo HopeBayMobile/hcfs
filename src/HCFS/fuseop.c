@@ -5036,6 +5036,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
+	MOUNT_T *tmpptr;
+	char *tmppath;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	UNUSED(fi);
 
@@ -5085,11 +5089,19 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 #else
 		if (ret_val < 0) {
 			write_log(0, "Debug truncate\n");
+			write_log(0, "Trunc: inode %" PRIu64 ", oldsize %" PRIu64 ", newsize %" PRIu64 "\n",
+				(uint64_t) this_inode, (uint64_t) newstat.st_size, (uint64_t) attr->st_size);
 			write_log(0, "Trunc: pid %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
 				(uint64_t) temp_context->pid, (uint64_t) temp_context->uid, (uint64_t) temp_context->gid);
 			write_log(0, "Trunc: file mode %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
 				(uint64_t) newstat.st_mode, (uint64_t) newstat.st_uid, (uint64_t) newstat.st_gid);
 			_check_capability_debug(temp_context->pid, CAP_DAC_OVERRIDE);
+			construct_path(tmpptr->vol_path_cache, this_inode,
+				&tmppath, tmpptr->f_ino);
+			if (tmppath != NULL) {
+				write_log(0, "Trunc: path %s\n", tmppath);
+				free(tmppath);
+			}
 		}
 #endif
 
