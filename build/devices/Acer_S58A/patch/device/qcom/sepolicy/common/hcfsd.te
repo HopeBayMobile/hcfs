@@ -70,9 +70,9 @@ allow hcfsd self:udp_socket create;
 allow hcfsd labeledfs:filesystem { mount unmount };
 
 # Allow hcfs to have search permission in /proc/<pid of installd/qti/vold> folder
-allow hcfsd { init installd qti_init_shell vold }:dir search;
+allow hcfsd { init installd qti_init_shell shell vold }:dir search;
 # Allow hcfs to have read, geattr, open permissions on status file in /proc/<pid of installd/qti/vold> folder
-allow hcfsd { init installd qti_init_shell vold }:file { read getattr open };
+allow hcfsd { init installd qti_init_shell shell vold }:file { read getattr open };
 # Allow hcfs to have getattr permission on /mnt/runtime folder
 allow hcfsd storage_file:dir getattr;
 # Allow hcfs to have read, getattr, open, mounton permissions on /mnt/runtime/read/emulate folder
