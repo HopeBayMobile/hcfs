@@ -138,33 +138,6 @@ ntpdate / ntpd or manual changes*/
 
 BOOL _check_capability(pid_t thispid, int cap_to_check);
 
-BOOL _need_generic_unpin(void)
-{
-	if (hcfs_system->backend_is_online == FALSE)
-		return TRUE;
-	return FALSE;
-}
-
-/* Helper function for checking if a folder contains non-local children */
-BOOL _has_non_local(ino_t this_inode)
-{
-	DIR_STATS_TYPE tmp_stat_result;
-	int32_t ret;
-
-	ret = read_dirstat_lookup(this_inode, &tmp_stat_result);
-
-	if (ret < 0)  /* If cannot read, follows default */
-		return FALSE;
-
-	if (tmp_stat_result.num_cloud > 0)
-		return TRUE;
-
-	if (tmp_stat_result.num_hybrid > 0)
-		return TRUE;
-
-	return FALSE;
-}
-
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
    "mode" is the bit-wise OR of ATIME, MTIME, CTIME.
@@ -1460,17 +1433,6 @@ a directory (for NFS) */
 	unsigned long this_gen;
 	struct stat parent_stat;
 	MOUNT_T *tmpptr;
-	BOOL skip_listing;
-	BOOL feed_generic_apk;
-	BOOL feed_generic_oat;
-	BOOL need_path_reconstruct;
-	char *tmppath, *tmptok, *toksave;
-	int32_t ret;
-
-	skip_listing = FALSE;
-	feed_generic_apk = FALSE;
-	feed_generic_oat = FALSE;
-	need_path_reconstruct = FALSE;
 
 	parent_inode = real_ino(req, parent);
 
@@ -1516,60 +1478,6 @@ a directory (for NFS) */
 		return;
 	}
 
-#ifdef _ANDROID_ENV_
-	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
-
-	/* Check if we need to use generic files or skip listing */
-	if (((uint64_t)tmpptr->f_ino == 3) &&
-	    (_need_generic_unpin() == TRUE))
-		if (_has_non_local(parent_inode) == TRUE)
-			need_path_reconstruct = TRUE;
-	if (need_path_reconstruct == TRUE) {
-		tmppath = NULL;
-		ret = construct_path(tmpptr->vol_path_cache, parent_inode,
-				&tmppath, tmpptr->f_ino);
-		if (ret < 0) {
-			if (tmppath != NULL)
-				free(tmppath);
-		} else {
-			/* Need to check what action needs to be taken */
-			/* Skip package name */
-			tmptok = strtok_r(tmppath, "/", &toksave);
-			if (tmptok == NULL)
-				goto lookup_check_end;
-			write_log(4, "Lookup checking package %s\n", tmptok);
-			tmptok = strtok_r(NULL, "/", &toksave);
-			write_log(4, "Next level %s\n", tmptok);
-			if (tmptok == NULL) {
-				/* Need to feed generic apk and oat */
-				write_log(4, "Feed generic\n");
-				feed_generic_apk = TRUE;
-				feed_generic_oat = TRUE;
-			} else if (!strncmp(tmptok, "lib", strlen("lib"))) {
-				/* Need to skip listing */
-				write_log(4, "Skip listing\n");
-				skip_listing = TRUE;
-			}
-			/* Free path string when done */
-lookup_check_end:
-			free(tmppath);
-		}
-	}
-
-#endif
-
-#ifdef _ANDROID_ENV_
-	/* Skip entries other than "." and ".." if needed */
-	if ((skip_listing == TRUE) &&
-	    ((strcmp(selfname, ".") != 0) &&
-	     (strcmp(selfname, "..") != 0))) {
-		write_log(4, "Debug lookup skip entry %s\n",
-		          selfname);
-//		fuse_reply_err(req, ENOENT);
-//		return;
-	}
-#endif
-
 	memset(&output_param, 0, sizeof(struct fuse_entry_param));
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
@@ -1581,23 +1489,6 @@ lookup_check_end:
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-
-#ifdef _ANDROID_ENV_
-	if ((feed_generic_apk == TRUE) &&
-	    (!strncmp(selfname,
-	              "base.apk", strlen("base.apk")))) {
-		write_log(4, "Replacing base.apk\n");
-//		temp_dentry.d_ino = GENERIC_APK_INO;
-	}
-
-	if ((feed_generic_oat == TRUE) &&
-	    (!strncmp(selfname,
-	              "oat", strlen("oat")))) {
-		write_log(4, "Replacing oat\n");
-//		temp_dentry.d_ino = GENERIC_OAT_INO;
-	}
-
-#endif
 
 	this_inode = temp_dentry.d_ino;
 	output_param.ino = (fuse_ino_t) this_inode;
@@ -3647,17 +3538,6 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	char noatime;
 	int ret, errcode;
 	ino_t thisinode;
-	struct fuse_ctx *temp_context;
-	MOUNT_T *tmpptr;
-	char *tmppath;
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-
-	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
-	if (temp_context == NULL) {
-		fuse_reply_err(req, ENOMEM);
-		return;
-	}
 
 	thisinode = real_ino(req, ino);
 
@@ -3753,20 +3633,6 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		/*Do not need to read that much*/
 		if (((off_t)size - total_bytes_read) < target_bytes_read)
 			target_bytes_read = (off_t)size - total_bytes_read;
-
-		if (tmpptr->f_ino == 3) {
-			write_log(0, "Debug Read\n");
-			write_log(0, "Read: inode %" PRIu64 ", offset %lld, size %" PRIu64 "\n",
-				(uint64_t) thisinode, offset, (uint64_t) size);
-			write_log(0, "Read: block %lld\n", block_index);
-			tmppath = NULL;
-			construct_path(tmpptr->vol_path_cache, thisinode,
-				&tmppath, tmpptr->f_ino);
-			if (tmppath != NULL) {
-				write_log(0, "Read: path %s\n", tmppath);
-				free(tmppath);
-			}
-		}
 
 		this_bytes_read = _read_block(&buf[total_bytes_read],
 				target_bytes_read, block_index, current_offset,
@@ -4812,20 +4678,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	size_t entry_size, ret_size;
 	int ret, errcode;
 	char this_type;
-	BOOL skip_listing;
-	BOOL feed_generic_apk;
-	BOOL feed_generic_oat;
-	BOOL need_path_reconstruct;
-	MOUNT_T *tmpptr;
-	char *tmppath, *tmptok, *toksave;
-
-	skip_listing = FALSE;
-	feed_generic_apk = FALSE;
-	feed_generic_oat = FALSE;
-	need_path_reconstruct = FALSE;
 
 	UNUSED(file_info);
-	UNUSED(skip_listing);
 	gettimeofday(&tmp_time1, NULL);
 
 	this_inode = real_ino(req, ino);
@@ -4855,48 +4709,6 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		return;
 	}
 
-#ifdef _ANDROID_ENV_
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
-
-	/* Check if we need to use generic files or skip listing */
-	if (((uint64_t)tmpptr->f_ino == 3) &&
-	    (_need_generic_unpin() == TRUE))
-		if (_has_non_local(this_inode) == TRUE)
-			need_path_reconstruct = TRUE;
-	if (need_path_reconstruct == TRUE) {
-		tmppath = NULL;
-		ret = construct_path(tmpptr->vol_path_cache, this_inode,
-				&tmppath, tmpptr->f_ino);
-		if (ret < 0) {
-			if (tmppath != NULL)
-				free(tmppath);
-		} else {
-			/* Need to check what action needs to be taken */
-			/* Skip package name */
-			tmptok = strtok_r(tmppath, "/", &toksave);
-			if (tmptok == NULL)
-				goto readdir_check_end;
-			write_log(4, "Readdir checking package %s\n", tmptok);
-			tmptok = strtok_r(NULL, "/", &toksave);
-			write_log(4, "Next level %s\n", tmptok);
-			if (tmptok == NULL) {
-				/* Need to feed generic apk and oat */
-				feed_generic_apk = TRUE;
-				feed_generic_oat = TRUE;
-				write_log(4, "Use generic\n");
-			} else if (!strncmp(tmptok, "lib", strlen("lib"))) {
-				/* Need to skip listing */
-				skip_listing = TRUE;
-				write_log(4, "Skip listing\n");
-			}
-readdir_check_end:
-			/* Free path string when done */
-			free(tmppath);
-		}
-	}
-
-#endif
 	buf_pos = 0;
 
 	page_start = 0;
@@ -4960,17 +4772,6 @@ readdir_check_end:
 			temp_page.num_entries);
 		for (count = page_start; count < temp_page.num_entries;
 								count++) {
-#ifdef _ANDROID_ENV_
-			/* Skip entries other than "." and ".." if needed */
-/*
-			if ((skip_listing == TRUE) &&
-			    ((strcmp(temp_page.dir_entries[count].d_name,
-			             ".") != 0) &&
-			     (strcmp(temp_page.dir_entries[count].d_name,
-			             "..") != 0)))
-				continue;
-*/
-#endif
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 			this_type = temp_page.dir_entries[count].d_type;
@@ -4985,22 +4786,6 @@ readdir_check_end:
 			else if (this_type == D_ISSOCK)
 				tempstat.st_mode = S_IFSOCK;
 
-#ifdef _ANDROID_ENV_
-			if ((feed_generic_apk == TRUE) &&
-			    (!strncmp(temp_page.dir_entries[count].d_name,
-			              "base.apk", strlen("base.apk")))) {
-				write_log(4, "Replacing base.apk\n");
-//				tempstat.st_ino = GENERIC_APK_INO;
-			}
-
-			if ((feed_generic_oat == TRUE) &&
-			    (!strncmp(temp_page.dir_entries[count].d_name,
-			              "oat", strlen("oat")))) {
-				write_log(4, "Replacing oat\n");
-//				tempstat.st_ino = GENERIC_OAT_INO;
-			}
-
-#endif
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
@@ -5242,7 +5027,7 @@ BOOL _check_capability_debug(pid_t thispid, int cap_to_check)
 *
 *************************************************************************/
 void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-	int to_set, struct fuse_file_info *fi)
+	int to_set, struct fuse_file_info *file_info)
 {
 	int ret_val;
 	ino_t this_inode;
@@ -5253,6 +5038,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct fuse_ctx *temp_context;
 	MOUNT_T *tmpptr;
 	char *tmppath;
+	FH_ENTRY *fh_ptr;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -5289,39 +5075,35 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 
 	if ((to_set & FUSE_SET_ATTR_SIZE) &&
 			(newstat.st_size != attr->st_size)) {
+		/* If opened file, check file table first */
+		if (file_info != NULL) {
+			if (system_fh_table.entry_table_flags[file_info->fh]
+			    == FALSE)
+				goto continue_check;
 
-		/* Android may not like this permission check */
+			fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+			if (fh_ptr->thisinode != (ino_t) this_inode)
+				goto continue_check;
+			if ((!((fh_ptr->flags & O_ACCMODE) == O_WRONLY)) &&
+			    (!((fh_ptr->flags & O_ACCMODE) == O_RDWR)))
+				goto continue_check;
+			write_log(0, "Allowing truncate\n");
+			goto allow_truncate;
+		}
+
+continue_check:
 		/* Checking permission */
 		ret_val = check_permission(req, &newstat, 2);
 
-#ifndef _ANDROID_ENV_
 		if (ret_val < 0) {
+			write_log(0, "Deny truncate\n");
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
-#else
-		if (ret_val < 0) {
-			write_log(0, "Debug truncate\n");
-			write_log(0, "Trunc: inode %" PRIu64 ", oldsize %" PRIu64 ", newsize %" PRIu64 "\n",
-				(uint64_t) this_inode, (uint64_t) newstat.st_size, (uint64_t) attr->st_size);
-			write_log(0, "Trunc: pid %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
-				(uint64_t) temp_context->pid, (uint64_t) temp_context->uid, (uint64_t) temp_context->gid);
-			write_log(0, "Trunc: file mode %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
-				(uint64_t) newstat.st_mode, (uint64_t) newstat.st_uid, (uint64_t) newstat.st_gid);
-			_check_capability_debug(temp_context->pid, CAP_DAC_OVERRIDE);
-			tmppath = NULL;
-			construct_path(tmpptr->vol_path_cache, this_inode,
-				&tmppath, tmpptr->f_ino);
-			if (tmppath != NULL) {
-				write_log(0, "Trunc: path %s\n", tmppath);
-				free(tmppath);
-			}
-		}
 
-#endif
-
+allow_truncate:
 		ret_val = hfuse_ll_truncate(this_inode, &newstat,
 				attr->st_size, &body_ptr, req);
 		if (ret_val < 0) {
