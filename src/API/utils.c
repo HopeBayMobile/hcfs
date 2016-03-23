@@ -10,10 +10,10 @@
 #include "global.h"
 
 
-int get_hcfs_socket_conn()
+int32_t get_hcfs_socket_conn()
 {
 
-	int fd, status;
+	int32_t fd, status;
 	struct sockaddr_un addr;
 
 	addr.sun_family = AF_UNIX;
