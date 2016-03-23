@@ -4969,54 +4969,6 @@ BOOL _check_capability(pid_t thispid, int cap_to_check)
 	return FALSE;
 }
 
-/* Helper for checking chown capability */
-BOOL _check_capability_debug(pid_t thispid, int cap_to_check)
-{
-	char proc_status_path[100];
-        char tmpstr[100], outstr[20];
-        char *saveptr, *outptr;
-        FILE *fptr;
-	uint64_t cap_mask, op_mask, result_mask;
-	int errcode;
-
-	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
-	         thispid);
-        fptr = fopen(proc_status_path, "r");
-	if (!fptr) {
-		errcode = errno;
-		write_log(4, "Cannot open %s. Code %d\n",
-				proc_status_path, errcode);
-		return FALSE;
-	}
-
-        do {
-                fgets(tmpstr, 80, fptr);
-                outptr = strtok_r(tmpstr, "\t", &saveptr);
-                if (strcmp(outptr, "CapEff:") == 0) {
-                        outptr = strtok_r(NULL, "\t", &saveptr);
-			snprintf(outstr, sizeof(outstr), "%s", outptr);
-                        break;
-                } else {
-                        continue;
-                }
-        } while (!feof(fptr));
-        fclose(fptr);
-	/* Convert string to 64bit bitmask */
-	cap_mask = str_to_mask(outstr);
-	write_log(0, "Debug Cap mask is %" PRIu64 "\n", cap_mask);
-
-	/* Check the chown bit in the bitmask */
-
-	op_mask = 1;
-	op_mask = op_mask << cap_to_check;
-	result_mask = cap_mask & op_mask;
-
-	/* Return whether the chown is set */
-	if (result_mask != 0)
-		return TRUE;
-	return FALSE;
-}
-
 /************************************************************************
 *
 * Function name: hfuse_ll_setattr

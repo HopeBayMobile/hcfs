@@ -677,9 +677,8 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 
 #ifdef _ANDROID_ENV_
 	new_info->volume_type = tmp_entry.d_type;
-	if ((new_info->volume_type == ANDROID_EXTERNAL ||
-	     new_info->volume_type == ANDROID_MULTIEXTERNAL) ||
-	    (new_info->f_ino == 3)) {
+	if (new_info->volume_type == ANDROID_EXTERNAL ||
+	    new_info->volume_type == ANDROID_MULTIEXTERNAL) {
 		new_info->vol_path_cache = init_pathcache(new_info->f_ino);
 		if (new_info->vol_path_cache == NULL) {
 			errcode = -ENOMEM;

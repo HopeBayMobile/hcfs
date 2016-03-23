@@ -88,9 +88,6 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 		((type) == (ANDROID_MULTIEXTERNAL)))
 #endif
 
-#define GENERIC_APK_INO 2971 /* For testing purpose only */
-#define GENERIC_OAT_INO 2973 /* For testing purpose only */
-
 /* Structures for directories */
 /* Defining directory entry in meta files*/
 typedef struct {
