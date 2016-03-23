@@ -1565,8 +1565,8 @@ lookup_check_end:
 	     (strcmp(selfname, "..") != 0))) {
 		write_log(4, "Debug lookup skip entry %s\n",
 		          selfname);
-		fuse_reply_err(req, ENOENT);
-		return;
+//		fuse_reply_err(req, ENOENT);
+//		return;
 	}
 #endif
 
@@ -1587,14 +1587,14 @@ lookup_check_end:
 	    (!strncmp(selfname,
 	              "base.apk", strlen("base.apk")))) {
 		write_log(4, "Replacing base.apk\n");
-		temp_dentry.d_ino = GENERIC_APK_INO;
+//		temp_dentry.d_ino = GENERIC_APK_INO;
 	}
 
 	if ((feed_generic_oat == TRUE) &&
 	    (!strncmp(selfname,
 	              "oat", strlen("oat")))) {
 		write_log(4, "Replacing oat\n");
-		temp_dentry.d_ino = GENERIC_OAT_INO;
+//		temp_dentry.d_ino = GENERIC_OAT_INO;
 	}
 
 #endif
@@ -4936,12 +4936,14 @@ readdir_check_end:
 								count++) {
 #ifdef _ANDROID_ENV_
 			/* Skip entries other than "." and ".." if needed */
+/*
 			if ((skip_listing == TRUE) &&
 			    ((strcmp(temp_page.dir_entries[count].d_name,
 			             ".") != 0) &&
 			     (strcmp(temp_page.dir_entries[count].d_name,
 			             "..") != 0)))
 				continue;
+*/
 #endif
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
@@ -4962,14 +4964,14 @@ readdir_check_end:
 			    (!strncmp(temp_page.dir_entries[count].d_name,
 			              "base.apk", strlen("base.apk")))) {
 				write_log(4, "Replacing base.apk\n");
-				tempstat.st_ino = GENERIC_APK_INO;
+//				tempstat.st_ino = GENERIC_APK_INO;
 			}
 
 			if ((feed_generic_oat == TRUE) &&
 			    (!strncmp(temp_page.dir_entries[count].d_name,
 			              "oat", strlen("oat")))) {
 				write_log(4, "Replacing oat\n");
-				tempstat.st_ino = GENERIC_OAT_INO;
+//				tempstat.st_ino = GENERIC_OAT_INO;
 			}
 
 #endif
@@ -5156,6 +5158,54 @@ BOOL _check_capability(pid_t thispid, int cap_to_check)
 	return FALSE;
 }
 
+/* Helper for checking chown capability */
+BOOL _check_capability_debug(pid_t thispid, int cap_to_check)
+{
+	char proc_status_path[100];
+        char tmpstr[100], outstr[20];
+        char *saveptr, *outptr;
+        FILE *fptr;
+	uint64_t cap_mask, op_mask, result_mask;
+	int errcode;
+
+	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
+	         thispid);
+        fptr = fopen(proc_status_path, "r");
+	if (!fptr) {
+		errcode = errno;
+		write_log(4, "Cannot open %s. Code %d\n",
+				proc_status_path, errcode);
+		return FALSE;
+	}
+
+        do {
+                fgets(tmpstr, 80, fptr);
+                outptr = strtok_r(tmpstr, "\t", &saveptr);
+                if (strcmp(outptr, "CapEff:") == 0) {
+                        outptr = strtok_r(NULL, "\t", &saveptr);
+			snprintf(outstr, sizeof(outstr), "%s", outptr);
+                        break;
+                } else {
+                        continue;
+                }
+        } while (!feof(fptr));
+        fclose(fptr);
+	/* Convert string to 64bit bitmask */
+	cap_mask = str_to_mask(outstr);
+	write_log(0, "Debug Cap mask is %" PRIu64 "\n", cap_mask);
+
+	/* Check the chown bit in the bitmask */
+
+	op_mask = 1;
+	op_mask = op_mask << cap_to_check;
+	result_mask = cap_mask & op_mask;
+
+	/* Return whether the chown is set */
+	if (result_mask != 0)
+		return TRUE;
+	return FALSE;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_setattr
@@ -5210,16 +5260,25 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	if ((to_set & FUSE_SET_ATTR_SIZE) &&
 			(newstat.st_size != attr->st_size)) {
 
-#ifndef _ANDROID_ENV_
 		/* Android may not like this permission check */
 		/* Checking permission */
 		ret_val = check_permission(req, &newstat, 2);
 
+#ifndef _ANDROID_ENV_
 		if (ret_val < 0) {
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, -ret_val);
 			return;
+		}
+#else
+		if (ret_val < 0) {
+			write_log(0, "Debug truncate\n");
+			write_log(0, "Trunc: pid %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
+				(uint64_t) temp_context->pid, (uint64_t) temp_context->uid, (uint64_t) temp_context->gid);
+			write_log(0, "Trunc: file mode %" PRIu64 ", uid %" PRIu64 ", gid %" PRIu64 "\n",
+				(uint64_t) newstat.st_mode, (uint64_t) newstat.st_uid, (uint64_t) newstat.st_gid);
+			_check_capability_debug(temp_context->pid, CAP_DAC_OVERRIDE);
 		}
 #endif
 
