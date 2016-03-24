@@ -219,6 +219,14 @@ int super_block_init(void)
 				"Code %d, %s\n", errcode, strerror(errcode));
 			return -errcode;
 		}
+
+		ret = update_sb_size();
+		if (ret < 0) {
+			write_log(0, "Fail to update superblock size in %s\n",
+					__func__);
+			close(sys_super_block->iofptr);
+			return ret;
+		}
 	}
 	sys_super_block->unclaimed_list_fptr = fopen(UNCLAIMEDFILE, "a+");
 	if (sys_super_block->unclaimed_list_fptr == NULL) {
@@ -926,7 +934,8 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	struct stat tempstat;
 	ino_t new_first_reclaimed;
 	unsigned long this_generation;
-	int errcode;
+	int errcode, ret;
+	BOOL update_size;
 
 	super_block_exclusive_locking();
 
@@ -960,13 +969,19 @@ ino_t super_block_new_inode(struct stat *in_stat,
 							new_first_reclaimed;
 		}
 		this_generation = tempentry.generation + 1;
+		update_size = FALSE;
 	} else {
+		if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+			super_block_exclusive_release();
+			return 0;
+		}
 		/* If need to append a new super inode and add total
 		*  inode count*/
 		sys_super_block->head.num_total_inodes++;
 		this_inode = sys_super_block->head.num_total_inodes + 1;
 		/* Inode starts from 2 */
 		this_generation = 1;
+		update_size = TRUE;
 	}
 	sys_super_block->head.num_active_inodes++;
 
@@ -1005,6 +1020,13 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		return 0;
 	}
 
+	/* Update superblock size if a new inode is born. */
+	if (update_size == TRUE) {
+		ret = update_sb_size();
+		if (ret < 0)
+			return 0;
+	}
+
 	super_block_exclusive_release();
 
 	return this_inode;
@@ -1026,9 +1048,21 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 	SUPER_BLOCK_ENTRY tempentry;
 	int ret, errcode;
 	ssize_t retsize;
+	long long now_meta_size, dirty_delta_meta_size;
 
-	if (this_entry->status == which_ll)
+	if (this_entry->status == which_ll) {
+		/* Update dirty meta if needs (from DIRTY to DIRTY) */
+		if (which_ll == IS_DIRTY) {
+			get_meta_size(thisinode, &now_meta_size);
+			if (now_meta_size == 0)
+				return 0;
+			dirty_delta_meta_size = now_meta_size -
+					this_entry->dirty_meta_size;
+			this_entry->dirty_meta_size = now_meta_size;
+			change_system_meta(0, 0, 0, 0, dirty_delta_meta_size);
+		}
 		return 0;
+	}
 	if (this_entry->status != NO_LL) {
 		ret = ll_dequeue(thisinode, this_entry);
 		if (ret < 0)
@@ -1088,6 +1122,12 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				write_log(0, "IO error in superblock.");
 				return -EIO;
 			}
+		}
+		/* Update dirty meta size (from X to DIRTY) */
+		get_meta_size(thisinode, &now_meta_size);
+		if (now_meta_size) {
+			this_entry->dirty_meta_size = now_meta_size;
+			change_system_meta(0, 0, 0, 0, now_meta_size);
 		}
 		break;
 	case TO_BE_DELETED:
@@ -1220,7 +1260,10 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 
 	switch (old_which_ll) {
 	case IS_DIRTY:
+		/* Update dirty meta size */
 		sys_super_block->head.num_dirty--;
+		change_system_meta(0, 0, 0, 0, -(this_entry->dirty_meta_size));
+		this_entry->dirty_meta_size = 0;
 		break;
 	case TO_BE_DELETED:
 		sys_super_block->head.num_to_be_deleted--;

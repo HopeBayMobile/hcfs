@@ -335,7 +335,7 @@ void* fuse_req_userdata(fuse_req_t req)
 }
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta, 
-	long long num_inodes_delta)
+	long long meta_size_delta, long long num_inodes_delta)
 {
 	return 0;
 }
@@ -440,5 +440,17 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 {
 	*result = (char *) malloc(50);
 	snprintf(*result, 50, "/tmp/markdeletetmp");
+	return 0;
+}
+
+int change_system_meta(long long system_size_delta, long long meta_size_delta,
+		long long cache_size_delta, long long cache_blocks_delta,
+		long long dirty_cache_delta)
+{
+	return 0;
+}
+
+int get_meta_size(ino_t inode, long long *metasize)
+{
 	return 0;
 }

@@ -154,11 +154,12 @@ TEST_F(mknod_update_metaTest, FailTo_dir_add_entry)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
 	struct stat tmp_stat;
+	long long delta_metasize;
 
 	tmp_stat.st_mode = S_IFREG;
 
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
 
 TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
@@ -166,10 +167,11 @@ TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 	ino_t parent_inode = 1;
 	struct stat tmp_stat;
+	long long delta_metasize;
 
 	tmp_stat.st_mode = S_IFREG;
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
 
 TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
@@ -177,12 +179,13 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	struct stat tmp_stat;
+	long long delta_metasize;
 	int ret;
 
 	tmp_stat.st_mode = S_IFREG;
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
-		"not_used", &tmp_stat, 0, 1, TRUE));
+		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
 
 /*
@@ -197,12 +200,13 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
 	struct stat tmp_stat;
+	long long delta_metasize;
 
 	tmp_stat.st_mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
 
 TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
@@ -210,11 +214,12 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
 	ino_t parent_inode = 1;
 	struct stat tmp_stat;
+	long long delta_metasize;
 
 	tmp_stat.st_mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
 
 TEST(mkdir_update_metaTest, FunctionWorkSuccess)
@@ -222,12 +227,13 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	struct stat tmp_stat;
+	long long delta_metasize;
 
 	tmp_stat.st_mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
 
 /*
@@ -410,7 +416,7 @@ TEST_F(fetch_xattr_pageTest, InodeNumLessThanZero_FetchFail)
 	int ret;
 
 	mock_meta_entry->inode_num = 0;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, NULL);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, NULL, FALSE);
 
 	EXPECT_EQ(-EINVAL, ret);
 }
@@ -420,7 +426,7 @@ TEST_F(fetch_xattr_pageTest, XattrPageNULL)
 	int ret;
 
 	mock_meta_entry->inode_num = 1;
-	ret = fetch_xattr_page(mock_meta_entry, NULL, NULL);
+	ret = fetch_xattr_page(mock_meta_entry, NULL, NULL, FALSE);
 
 	EXPECT_EQ(-ENOMEM, ret);
 }
@@ -432,7 +438,7 @@ TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
 
 	xattr_pos = 0;
 	mock_meta_entry->inode_num = INO_FIFO;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
 
 #ifdef _ANDROID_ENV_
 	EXPECT_EQ(0, ret);
@@ -449,10 +455,21 @@ TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
 	long long xattr_pos;
 
 	mock_meta_entry->inode_num = INO_REGFILE;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchRegFileXattr_WithFlagFalse_ReturnNOENT)
+{
+	int ret;
+	long long xattr_pos;
+
+	mock_meta_entry->inode_num = INO_REGFILE;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
+
+	EXPECT_EQ(-ENOENT, ret);
 }
 
 TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
@@ -468,7 +485,7 @@ TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
 		mock_meta_entry->fptr);
 
 	mock_meta_entry->inode_num = INO_REGFILE_XATTR_PAGE_EXIST;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
@@ -482,7 +499,7 @@ TEST_F(fetch_xattr_pageTest, FetchDirXattrSuccess)
 	long long xattr_pos;
 
 	mock_meta_entry->inode_num = INO_DIR;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
@@ -501,7 +518,7 @@ TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 		mock_meta_entry->fptr);
 
 	mock_meta_entry->inode_num = INO_DIR_XATTR_PAGE_EXIST;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
@@ -515,7 +532,7 @@ TEST_F(fetch_xattr_pageTest, FetchSymlinkXattrSuccess)
 	long long xattr_pos;
 
 	mock_meta_entry->inode_num = INO_LNK;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
@@ -534,7 +551,7 @@ TEST_F(fetch_xattr_pageTest, FetchExistSymlinkXattrSuccess)
 		mock_meta_entry->fptr);
 
 	mock_meta_entry->inode_num = INO_LNK_XATTR_PAGE_EXIST;
-	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
@@ -571,34 +588,40 @@ protected:
 TEST_F(symlink_update_metaTest, AddDirEntryFail)
 {
 	struct stat mock_stat;
+	long long delta_metasize;
 
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"link_not_used", 12, "name_not_used", 1, TRUE));
+		"link_not_used", 12, "name_not_used", 1, &delta_metasize,
+		TRUE));
 }
 
 TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 {
 	struct stat mock_stat;
+	long long delta_metasize;
 
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"update_symlink_data_fail", 12, "name_not_used", 1, TRUE));
+		"update_symlink_data_fail", 12, "name_not_used", 1,
+		&delta_metasize, TRUE));
 }
 
 TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 {
 	struct stat mock_stat;
+	long long delta_metasize;
 
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"link_not_used", 12, "name_not_used", 1, TRUE));
+		"link_not_used", 12, "name_not_used", 1,
+		&delta_metasize, TRUE));
 }
 /*
 	End of unittest of symlink_update_meta()
