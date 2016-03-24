@@ -67,7 +67,7 @@ function start_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	mkdir -p /data/ccache
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-`date +%m%d-%H%M%S`
-	eval docker pull $DOCKER_IMAGE
+	eval docker pull $DOCKER_IMAGE || :
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
 }
 function stop_builder() {
