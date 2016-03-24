@@ -32,6 +32,8 @@ int32_t do_pin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *r
 	printf("Pin by path\n");
 	ret_code = pin_by_path(largebuf, arg_len);
 
+	if (ret_code > 0) ret_code = 0;
+
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
@@ -45,6 +47,8 @@ int32_t do_unpin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t 
 
 	printf("Unpin by path\n");
 	ret_code = unpin_by_path(largebuf, arg_len);
+
+	if (ret_code > 0) ret_code = 0;
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
@@ -68,7 +72,10 @@ int32_t do_check_dir_status(char *largebuf, int32_t arg_len, char *resbuf, int32
 		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	} else {
-		CONCAT_REPLY(res_size, sizeof(uint32_t));
+		/* Total size for reply msgs */
+		ret_len = sizeof(int64_t) * 3;
+
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(&num_local, sizeof(int64_t));
 		CONCAT_REPLY(&num_cloud, sizeof(int64_t));
 		CONCAT_REPLY(&num_hybrid, sizeof(int64_t));
