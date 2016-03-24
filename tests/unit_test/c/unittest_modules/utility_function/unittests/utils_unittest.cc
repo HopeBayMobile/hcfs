@@ -12,10 +12,12 @@ extern "C" {
 #include "global.h"
 #include "hfuse_system.h"
 #include "params.h"
+#include "fuseop.h"
 }
 #include "gtest/gtest.h"
 
 extern SYSTEM_CONF_STRUCT *system_config;
+extern SYSTEM_DATA_HEAD *hcfs_system;
 
 // Tests non-existing file
 TEST(check_file_sizeTest, Nonexist) {
@@ -988,3 +990,39 @@ TEST_F(is_natural_numberTest, PositiveNumber2)
 {
 	EXPECT_EQ(TRUE, is_natural_number("5"));
 }
+
+/*
+ * Unittest of change_system_meta()
+ */ 
+class change_system_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(change_system_metaTest, UpdateSuccess)
+{
+	int ret;
+
+	ret = change_system_meta(1, 2, 3, 4, 5);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1 + 2, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(2, hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(2 + 3, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
+	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
+}
+/*
+ * End of unittest of change_system_meta()
+ */

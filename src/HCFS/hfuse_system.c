@@ -175,13 +175,13 @@ int init_hfuse(void)
 {
 	int ret_val;
 
+	ret_val = init_hcfs_system_data();
+	if (ret_val < 0)
+		return ret_val;
 	ret_val = super_block_init();
 	if (ret_val < 0)
 		return ret_val;
 	ret_val = init_system_fh_table();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = init_hcfs_system_data();
 	if (ret_val < 0)
 		return ret_val;
 

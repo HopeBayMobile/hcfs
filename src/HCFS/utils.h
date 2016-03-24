@@ -46,7 +46,7 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 
-int change_system_meta(long long system_size_delta,
+int change_system_meta(long long system_size_delta, long long meta_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta,
 		long long dirty_cache_delta);
 
@@ -59,6 +59,8 @@ int fetch_ddt_path(char *pathname, unsigned char last_char);
 int fetch_error_download_path(char *path, ino_t inode);
 
 void get_system_size(long long *cache_size, long long *pinned_size);
+
+int update_sb_size();
 
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
@@ -73,5 +75,7 @@ void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
 int ignore_sigpipe(void);
 
 BOOL is_natural_number(char *str);
+
+int get_meta_size(ino_t inode, long long *metasize);
 
 #endif  /* SRC_HCFS_UTILS_H_ */

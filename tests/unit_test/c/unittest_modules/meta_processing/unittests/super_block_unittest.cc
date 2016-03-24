@@ -6,8 +6,11 @@ extern "C" {
 #include "mock_param.h"
 #include "super_block.h"
 #include "global.h"
+#include "fuseop.h"
 }
 #include "gtest/gtest.h"
+
+extern SYSTEM_DATA_HEAD *hcfs_system;
 
 class superblockEnvironment : public ::testing::Environment {
 	public:
@@ -16,9 +19,15 @@ class superblockEnvironment : public ::testing::Environment {
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
+			hcfs_system = (SYSTEM_DATA_HEAD *)
+					malloc(sizeof(SYSTEM_DATA_HEAD));
+			memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+			//sem_init(&(hcfs_system->access_sem), 0, 1);
 		}
 		void TearDown()
 		{
+			free(hcfs_system);
 			free(system_config);
 		}
 };
@@ -229,6 +238,7 @@ protected:
 		SUPERBLOCK = "testpatterns/sb_path";
 		UNCLAIMEDFILE = "testpatterns/unclaimedfile_path";
 		mock_super_block_init();
+		memset(&(hcfs_system->systemdata), 0, sizeof(SYSTEM_DATA_TYPE));
 	}
 
 	void TearDown()
@@ -238,6 +248,7 @@ protected:
 		free(sys_super_block);
 		unlink(SUPERBLOCK);
 		unlink(UNCLAIMEDFILE);
+		memset(&(hcfs_system->systemdata), 0, sizeof(SYSTEM_DATA_TYPE));
 	}
 	
 	void mock_super_block_init()
@@ -893,6 +904,7 @@ protected:
 		expected_stat.st_dev = 5;
 		expected_stat.st_nlink = 6;
 		expected_stat.st_size = 5566;
+		CACHE_HARD_LIMIT = 10000;
 	}
 };
 
@@ -925,6 +937,20 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	EXPECT_EQ(1, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
 		sizeof(struct stat)));
+}
+
+TEST_F(super_block_new_inodeTest, NoReclaimedNodes_ExceedPinSizeLimit)
+{
+	unsigned long generation;
+	ino_t ret_node;
+
+	/* Mock stat */
+	generation = 0;
+	hcfs_system->systemdata.pinned_size = MAX_PINNED_LIMIT + 1;
+
+	/* Run */
+	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
+	EXPECT_EQ(0, ret_node); /*Return 0 because exceeding pinned size limit*/
 }
 
 TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes)
@@ -990,6 +1016,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	ino_t ret_node;
 	
 	/* Mock one reclaimed inode */
+	hcfs_system->systemdata.pinned_size = MAX_PINNED_LIMIT + 1;
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.generation = 1;
 	sb_entry.util_ll_next = 0;
@@ -1155,19 +1182,22 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 	ino_t now_inode = sys_super_block->head.first_dirty_inode;
 	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
 		long long filepos;
-		
+
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 		filepos = sizeof(SUPER_BLOCK_HEAD) + 
 			sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1);
 		pread(sys_super_block->iofptr, &sb_entry, 
 			sizeof(SUPER_BLOCK_ENTRY), filepos);
-		// Check status and inode number
+		/* Check status and inode number */
 		ASSERT_EQ(IS_DIRTY, sb_entry.status) << "status = "
 			<< sb_entry.status << ", need IS_DIRTY";
 		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = " 
 			<< expected_inode << ", now_inode = " << now_inode;
-		
+		ASSERT_EQ(5566, sb_entry.dirty_meta_size);
 		now_inode = sb_entry.util_ll_next; // Go to next dirty inode	
-	}	
+	}
+
+	EXPECT_EQ(5566 * num_inode, hcfs_system->systemdata.dirty_cache_size);
 }
 
 TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
@@ -1227,6 +1257,8 @@ protected:
 
 		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 		sb_entry.status = status;
+		if (status == IS_DIRTY)
+			sb_entry.dirty_meta_size = 5566;
 
 		/* First dirty inode */
 		sb_entry.util_ll_next = 2;
@@ -1392,7 +1424,8 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 		
 	/* Mock dirty_inode list */	
 	generate_mock_list(num_inode, IS_DIRTY);
-		
+	hcfs_system->systemdata.dirty_cache_size = 5566 * num_inode + 123;
+
 	/* Run */
 	remaining_inode = num_inode;
 	now_inode = num_inode / 2; // Start dequeue from medium dirty inode
@@ -1411,7 +1444,7 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 		// Check remaining inodes by traversing all list entry
 		ASSERT_EQ(remaining_inode, traverse_all_list_entry(IS_DIRTY));
 		ASSERT_EQ(remaining_inode, sys_super_block->head.num_dirty);
-		
+
 		now_inode = (now_inode % num_inode) + 1; // Go to next dirty inode
 	}
 
@@ -1419,13 +1452,17 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
 		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
-		
 		ASSERT_EQ(0, sb_entry.util_ll_next) << "inode = " << inode;
 		ASSERT_EQ(0, sb_entry.util_ll_prev);
 		ASSERT_EQ(NO_LL, sb_entry.status);
+		ASSERT_EQ(0, sb_entry.dirty_meta_size);
 	}
+
+
+	EXPECT_EQ(123, hcfs_system->systemdata.dirty_cache_size);
 }
 
 TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)

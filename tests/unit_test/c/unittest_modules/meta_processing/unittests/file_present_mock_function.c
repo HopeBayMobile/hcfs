@@ -282,3 +282,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	return 0;
 }
 
+int get_meta_size(ino_t inode, long long *metasize)
+{
+	return 0;
+}

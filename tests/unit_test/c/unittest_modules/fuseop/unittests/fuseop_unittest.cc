@@ -108,6 +108,7 @@ class fuseopEnvironment : public ::testing::Environment {
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 0;
     hcfs_system->system_going_down = FALSE;
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;

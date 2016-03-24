@@ -231,9 +231,11 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	return 0;
 }
 
-int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta)
+int change_system_meta(long long system_size_delta, long long meta_size_delta,
+		long long cache_size_delta, long long cache_blocks_delta,
+		long long dirty_cache_delta)
 {
+	hcfs_system->systemdata.system_meta_size += meta_size_delta;
 	hcfs_system->systemdata.system_size += system_size_delta;
 	hcfs_system->systemdata.cache_size += cache_size_delta;
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
@@ -531,7 +533,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino, char ispin)
+			ino_t root_ino, long long *delta_metasize, char ispin)
 {
 	if (fail_mknod_update_meta == TRUE)
 		return -1;
@@ -542,7 +544,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino, char ispin)
+			ino_t root_ino, long long *delta_metasize, char ispin)
 {
 	if (fail_mkdir_update_meta == TRUE)
 		return -1;
@@ -755,7 +757,8 @@ void destroy_fs_manager(void)
 
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
 	const struct stat *this_stat, const char *link, 
-	const unsigned long generation, const char *name, char ispin)
+	const unsigned long generation, const char *name,
+	long long *delta_metasize, char ispin)
 {
 	if (!strcmp("update_meta_fail", link))
 		return -1;
@@ -764,7 +767,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 }
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-				long long num_inodes_delta)
+		long long meta_size_delta, long long num_inodes_delta)
 {
 	return 0;
 }
@@ -880,6 +883,7 @@ BOOL is_natural_number(char *str)
 {
 	return TRUE;
 }
+
 int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
 		off_t offset, off_t length,
 		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
@@ -896,5 +900,10 @@ int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
 
 	newstat->st_size = newlen;
 	hcfs_system->systemdata.system_size += (newlen - oldsize);
+	return 0;
+}
+
+int get_meta_size(ino_t inode, long long *metasize)
+{
 	return 0;
 }

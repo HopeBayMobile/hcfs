@@ -900,25 +900,106 @@ off_t check_file_size(const char *path)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int change_system_meta(long long system_size_delta,
+int change_system_meta(long long system_size_delta, long long meta_size_delta,
 	long long cache_size_delta, long long cache_blocks_delta,
 	long long dirty_cache_delta)
 {
+	int ret;
+
 	sem_wait(&(hcfs_system->access_sem));
-	hcfs_system->systemdata.system_size += system_size_delta;
+	/* System size includes meta size */
+	hcfs_system->systemdata.system_size +=
+		(system_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
-	hcfs_system->systemdata.cache_size += cache_size_delta;
+
+	hcfs_system->systemdata.system_meta_size += meta_size_delta;
+	if (hcfs_system->systemdata.system_meta_size < 0)
+		hcfs_system->systemdata.system_meta_size = 0;
+
+	/* Cached size includes meta size */
+	hcfs_system->systemdata.cache_size +=
+		(cache_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;
+
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	if (hcfs_system->systemdata.cache_blocks < 0)
 		hcfs_system->systemdata.cache_blocks = 0;
+
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
-	sync_hcfs_system_data(FALSE);
+
+	/* Pinned size includes meta size because meta is never paged out. */
+	hcfs_system->systemdata.pinned_size += meta_size_delta;
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+
+	ret = 0;
+	ret = sync_hcfs_system_data(FALSE);
+	if (ret < 0)
+		write_log(0, "Error: Fail to sync hcfs system data. Code %d\n",
+				-ret);
 	sem_post(&(hcfs_system->access_sem));
+
+	return ret;
+}
+
+int change_pin_size(long long delta_pin_size)
+{
+	sem_wait(&(hcfs_system->access_sem));
+	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
+			MAX_PINNED_LIMIT) {
+		sem_post(&(hcfs_system->access_sem));
+		return -ENOSPC;
+	}
+
+	hcfs_system->systemdata.pinned_size += delta_pin_size;
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+	sem_post(&(hcfs_system->access_sem));
+	return 0;
+}
+
+int update_sb_size()
+{
+	long long old_size, new_size;
+	struct stat sbstat;
+	int ret, ret_code;
+
+	sem_wait(&(hcfs_system->access_sem));
+	old_size = hcfs_system->systemdata.super_block_size;
+	ret = stat(SUPERBLOCK, &sbstat);
+	if (ret < 0) {
+		sem_post(&(hcfs_system->access_sem));
+		ret_code = errno;
+		write_log(0, "Error on get stat of super block." 
+				" Code %d\n", ret_code);
+		return -ret_code;
+	}
+
+	new_size = sbstat.st_size;
+	if (new_size == old_size) {
+		sem_post(&(hcfs_system->access_sem));
+		return 0;
+	}
+
+	hcfs_system->systemdata.system_size += (new_size - old_size);
+	if (hcfs_system->systemdata.system_meta_size < 0)
+		hcfs_system->systemdata.system_meta_size = 0;
+
+	hcfs_system->systemdata.cache_size += (new_size - old_size);
+	if (hcfs_system->systemdata.cache_size < 0)
+		hcfs_system->systemdata.cache_size = 0;
+
+	hcfs_system->systemdata.pinned_size += (new_size - old_size);
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+
+	hcfs_system->systemdata.super_block_size = new_size;
+	sem_post(&(hcfs_system->access_sem));
+	write_log(10, "Debug: now sb size is %lld\n", new_size);
 
 	return 0;
 }
@@ -1511,4 +1592,36 @@ BOOL is_natural_number(char *str)
 
 		return ret;
 	}
+}
+
+/**
+ * get_meta_size()
+ *
+ * Get size of meta file. "metasize" is 0 if size of this meta file
+ * cannot be retrieved, and then return negative error code.
+ *
+ * @param inode Inode number of this meta file.
+ * @param metasize Variable to store meta size.
+ *
+ * @return 0 on success, otherwise negative error code.
+ *
+ */ 
+int get_meta_size(ino_t inode, long long *metasize)
+{
+	char metapath[300];
+	struct stat metastat;
+	int ret, ret_code;
+
+	fetch_meta_path(metapath, inode);
+	ret = stat(metapath, &metastat);
+	if (ret < 0) {
+		ret_code = errno;
+		write_log(0, "Error on get stat of meta %"PRIu64
+				". Code %d\n", (uint64_t)inode, ret_code);
+		*metasize = 0;
+		return -ret_code;
+	}
+	*metasize = metastat.st_size;
+
+	return 0;
 }

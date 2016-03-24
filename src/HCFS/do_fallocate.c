@@ -80,10 +80,10 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0);
+	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0, 0);
 
 	ret = change_mount_stat(tmpptr,
-			(long long) (offset - filestat->st_size), 0);
+			(long long) (offset - filestat->st_size), 0, 0);
 	if (ret < 0)
 		return ret;
 
