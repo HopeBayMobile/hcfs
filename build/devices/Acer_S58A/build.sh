@@ -42,7 +42,7 @@ eval '[ -n "$UPSTREAM_LIB_DIR" ]' || { echo Assign these for local build; exit 1
 ### Upstream APK
 APP_NAME=${APP_NAME:-terafonn_1.0.0026}
 APP_DIR=${APP_DIR:-/mnt/nas/CloudDataSolution/HCFS_android/apk_release/$APP_NAME}
-DOCKER_IMAGE='docker:5000/s58a-buildbox:0225-cts-${IMAGE_TYPE}-prebuilt'
+DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-${IMAGE_TYPE}-prebuilt'
 
 ### Publish dir
 # PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/android-dev/2.0.3.ci.test}
