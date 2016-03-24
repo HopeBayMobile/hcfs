@@ -99,6 +99,15 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     AcerGameZone
 
-#HCFS management app
+# For Acer FlipCoverUI
+PRODUCT_PACKAGES += \
+    FlipCover
+
+# For DTS
+PRODUCT_PACKAGES += \
+    libstagefright_soft_dtsdec \
+    libomx-dts
+
+# HCFS management app
 PRODUCT_PACKAGES +=\
-    HopebayHCFSmgmt    
+    HopebayHCFSmgmt

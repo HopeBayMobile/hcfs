@@ -50,7 +50,7 @@ on fs
     # Aaron
     restorecon /data
 
-    # Vince 
+    # Vince
     #mkdir /data/hcfs
     #mkdir /data/hcfs/metastorage
     #mkdir /data/hcfs/blockstorage
@@ -91,7 +91,6 @@ on post-fs-data
     mkdir /tombstones/lpass 0771 system system
     mkdir /tombstones/wcnss 0771 system system
     mkdir /tombstones/dsps 0771 system system
-    mkdir /data/misc/dts 0770 media audio
     mkdir /data/extra 0777 media_rw media_rw
     #copy g sensor calibrated data
     mkdir /data/misc/gsensor 0771 system system
@@ -109,6 +108,19 @@ on post-fs-data
     chown system system /data/misc/alssensor/als_lux
     copy /persist/alssensor/als_data /data/misc/alssensor/als_data
     chown system system /data/misc/alssensor/als_data
+    chown system system /sys/class/leds/red/blink
+    chown system system /sys/class/leds/red/pause_lo
+    chown system system /sys/class/leds/red/trigger
+    chown system system /sys/class/leds/green/blink
+    chown system system /sys/class/leds/green/pause_lo
+    chown system system /sys/class/leds/green/trigger
+    chown system system /sys/class/leds/blue/blink
+    chown system system /sys/class/leds/blue/pause_lo
+    chown system system /sys/class/leds/blue/trigger
+    # DTS_EAGLE START
+    mkdir /data/misc/dts 0771 media audio
+    exec /system/bin/sh /system/etc/set_dts_settings.sh
+    # DTS_EAGLE END
 
 on boot
     symlink /dev/block/platform/soc.0 /dev/block/bootdevice
@@ -140,8 +152,18 @@ on boot
     chown radio system /sys/module/subsystem_restart/parameters/reset_modem
 
     #frp partition
-    chmod 0660 /dev/block/mmcblk0p34
-    chown system system /dev/block/mmcblk0p34
+    chmod 0660 /dev/block/mmcblk0p36
+    chown system system /dev/block/mmcblk0p36
+
+    #Assume SMP uses shared cpufreq policy for all CPUs
+    chown system audio /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+
+chown system system /sys/class/i2c-dev/i2c-6/device/6-0038/hdcp_switch
+
+on property:debug.sf.secure_playing=1
+   write /sys/class/i2c-dev/i2c-6/device/6-0038/secured_playing 1
+on property:debug.sf.secure_playing=0
+   write /sys/class/i2c-dev/i2c-6/device/6-0038/secured_playing 0
 
 #start camera server as daemon
 service qcamerasvr /system/bin/mm-qcamera-daemon
@@ -322,20 +344,13 @@ service energy-awareness /system/bin/energy-awareness
     group system
     oneshot
 
-service dts_configurator /system/bin/dts_configurator
-    class late_start
-    user system
-    group system media audio
-    oneshot
-
-service dtseagleservice /system/bin/dts_eagle_service
+# DTS_EAGLE START
+# DTS HPX service
+service dts_hpx_service /system/bin/dts_hpx_service
     class late_start
     user system
     group audio media
-    disabled
-
-on property:init.svc.dts_configurator=stopped
-    start dtseagleservice
+# DTS_EAGLE END
 
 service fidodaemon /system/vendor/bin/fidodaemon
     class late_start
