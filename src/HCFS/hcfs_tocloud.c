@@ -59,6 +59,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "utils.h"
 #include "hfuse_system.h"
 #include "FS_manager.h"
+#include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -575,7 +576,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int count1;
 	long long upload_seq;
 	ino_t root_inode;
-	long long size_last_upload;
 	long long size_diff;
 
 	sync_error = FALSE;
@@ -617,10 +617,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		tmp_size = tempfilestat.st_size;
-		size_last_upload = tempfilemeta.size_last_upload;
-		size_diff = tmp_size - size_last_upload;
 		root_inode = tempfilemeta.root_inode;
-		upload_seq = tempfilemeta.upload_seq;
 
 /* Check if need to sync past the current size */
 /* If can use xattr, use it to store trunc_size. Otherwise
@@ -847,41 +844,87 @@ store in some other file */
 	flock(fileno(metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (!access(thismetapath, F_OK)) {
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		CLOUD_RELATED_DATA cloud_related_data;
+		long long pos;
+		struct stat metastat;
+		long long now_meta_size;
+		long long meta_size_diff;
+
+		ret = fstat(fileno(metafptr), &metastat);
+		if (ret < 0) {
+			write_log(0, "Fail to fetch meta %"PRIu64" stat\n",
+					(uint64_t)this_inode);
+			errcode = ret;
+			goto errcode_handle;
+		}
+		now_meta_size = metastat.st_size;
 
 		if (S_ISFILE(ptr->this_mode)) {
+			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			      metafptr);
+			pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+					sizeof(FILE_STATS_TYPE);
+			FSEEK(metafptr, pos, SEEK_SET);
+			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, metafptr);
 			root_inode = tempfilemeta.root_inode;
-			upload_seq = tempfilemeta.upload_seq;
-			tempfilemeta.size_last_upload = tempfilestat.st_size;
-			tempfilemeta.upload_seq++;
-			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
-			       metafptr);
+			upload_seq = cloud_related_data.upload_seq;
+			size_diff = (tempfilestat.st_size + now_meta_size) -
+					cloud_related_data.size_last_upload;
+			meta_size_diff = now_meta_size -
+					cloud_related_data.meta_last_upload;
+			/* Update cloud related data */
+			cloud_related_data.size_last_upload =
+					tempfilestat.st_size + now_meta_size;
+			cloud_related_data.meta_last_upload = now_meta_size;
+			cloud_related_data.upload_seq++;
+			FSEEK(metafptr, pos, SEEK_SET);
+			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, metafptr);
 		}
 
 		if (S_ISDIR(ptr->this_mode)) {
-			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
-			root_inode = tempdirmeta.root_inode;
-			upload_seq = tempdirmeta.upload_seq;
-			tempdirmeta.upload_seq++;
-			size_diff = 0;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempdirmeta, sizeof(DIR_META_TYPE), 1,
-			       metafptr);
+			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, metafptr);
+			root_inode = tempdirmeta.root_inode;
+			upload_seq = cloud_related_data.upload_seq;
+			size_diff = now_meta_size -
+					cloud_related_data.size_last_upload;
+			meta_size_diff = now_meta_size -
+					cloud_related_data.meta_last_upload;
+			/* Update cloud related data */
+			cloud_related_data.size_last_upload = now_meta_size;
+			cloud_related_data.meta_last_upload = now_meta_size;
+			cloud_related_data.upload_seq++;
+			FSEEK(metafptr, sizeof(struct stat) +
+					sizeof(DIR_META_TYPE), SEEK_SET);
+			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, metafptr);
 		}
 
 		if (S_ISLNK(ptr->this_mode)) {
-			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
-			      metafptr);
-			root_inode = tempsymmeta.root_inode;
-			upload_seq = tempsymmeta.upload_seq;
-			size_diff = 0;
-			tempsymmeta.upload_seq++;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
-			       metafptr);
+			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
+					metafptr);
+			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, metafptr);
+			root_inode = tempsymmeta.root_inode;
+			upload_seq = cloud_related_data.upload_seq;
+			size_diff = now_meta_size -
+					cloud_related_data.size_last_upload;
+			meta_size_diff = now_meta_size -
+					cloud_related_data.meta_last_upload;
+			/* Update cloud related data */
+			cloud_related_data.size_last_upload = now_meta_size;
+			cloud_related_data.meta_last_upload = now_meta_size;
+			cloud_related_data.upload_seq++;
+			FSEEK(metafptr, sizeof(struct stat) +
+					sizeof(SYMLINK_META_TYPE), SEEK_SET);
+			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, metafptr);
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
@@ -928,9 +971,11 @@ store in some other file */
 		} else {
 			/* Upload successfully. Update FS stat in backend */
 			if (upload_seq == 0)
-				update_backend_stat(root_inode, size_diff, 1);
+				update_backend_stat(root_inode, size_diff,
+						meta_size_diff, 1);
 			else if (size_diff != 0)
-				update_backend_stat(root_inode, size_diff, 0);
+				update_backend_stat(root_inode, size_diff,
+						meta_size_diff, 0);
 		}
 		super_block_update_transit(ptr->inode, FALSE, sync_error);
 	} else {
@@ -1659,17 +1704,23 @@ void upload_loop(void)
 *
 *************************************************************************/
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
-			long long num_inodes_delta)
+		long long meta_size_delta, long long num_inodes_delta)
 {
 	int ret, errcode;
 	char fname[METAPATHLEN], tmpname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
-	long long system_size, num_inodes;
 	char is_fopen, is_backedup;
 	size_t ret_size;
+	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	write_log(10, "Debug entering update backend stat\n");
+
+	/* TODO: Perhaps need to backup sum of backend data to backend as well
+	*/
+	/* Change statistics for summary statistics */
+	update_backend_usage(system_size_delta, meta_size_delta,
+			num_inodes_delta);
 
 	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
@@ -1730,17 +1781,16 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 		} else {
 			/* Not found, init a new one */
 			write_log(10, "Debug update stat: nothing stored\n");
+			memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
 			FTRUNCATE(fileno(fptr), 0);
 			FSEEK(fptr, 0, SEEK_SET);
-			system_size = 0;
-			num_inodes = 0;
-			FWRITE(&system_size, sizeof(long long), 1, fptr);
-			FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 		}
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
 	}
+
 	fptr = fopen(fname, "r+");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1750,40 +1800,20 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 		goto errcode_handle;
 	}
 	setbuf(fptr, NULL);
+	/* File lock is in update_fs_backend_usage() */
+	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
+			num_inodes_delta);
+	if (ret < 0)
+		goto errcode_handle;
+
 	flock(fileno(fptr), LOCK_EX);
 	is_fopen = TRUE;
-	FREAD(&system_size, sizeof(long long), 1, fptr);
-	FREAD(&num_inodes, sizeof(long long), 1, fptr);
-	system_size += system_size_delta;
-	if (system_size < 0)
-		system_size = 0;
-	num_inodes += num_inodes_delta;
-	if (num_inodes < 0)
-		num_inodes = 0;
-	FSEEK(fptr, 0, SEEK_SET);
-	FWRITE(&system_size, sizeof(long long), 1, fptr);
-	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
-
-	/* TODO: Perhaps need to backup sum of backend data to backend as well
-	*/
-	/* Change statistics for summary statistics */
-	sem_wait(&(hcfs_system->access_sem));
-	hcfs_system->systemdata.backend_size += system_size_delta;
-	if (hcfs_system->systemdata.backend_size < 0)
-		hcfs_system->systemdata.backend_size = 0;
-	hcfs_system->systemdata.backend_inodes += num_inodes_delta;
-	if (hcfs_system->systemdata.backend_inodes < 0)
-		hcfs_system->systemdata.backend_inodes = 0;
-	sync_hcfs_system_data(FALSE);
-	sem_post(&(hcfs_system->access_sem));
-
 	FSEEK(fptr, 0, SEEK_SET);
 	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		goto errcode_handle;
 	}
-
 	flock(fileno(fptr), LOCK_UN);
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	fclose(fptr);

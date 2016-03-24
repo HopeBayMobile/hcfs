@@ -341,9 +341,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char mlock;
-	long long system_size_change;
+	long long system_size_change, meta_size_change;
 	long long upload_seq;
 	ino_t root_inode;
+	CLOUD_RELATED_DATA cloud_related_data;
 #ifndef _ANDROID_ENV_
 	long long ret_ssize;
 #endif
@@ -372,9 +373,13 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		mlock = TRUE;
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+				metafptr);
 
 		root_inode = tempdirmeta.root_inode;
-		upload_seq = tempdirmeta.upload_seq;
+		upload_seq = cloud_related_data.upload_seq;
+		system_size_change = cloud_related_data.size_last_upload;
+		meta_size_change = cloud_related_data.meta_last_upload;
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 	}
@@ -384,9 +389,13 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		mlock = TRUE;
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+				metafptr);
 
 		root_inode = tempsymmeta.root_inode;
-		upload_seq = tempsymmeta.upload_seq;
+		upload_seq = cloud_related_data.upload_seq;
+		system_size_change = cloud_related_data.size_last_upload;
+		meta_size_change = cloud_related_data.meta_last_upload;
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 	}
@@ -396,10 +405,15 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		mlock = TRUE;
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+				sizeof(FILE_STATS_TYPE), SEEK_SET);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+				metafptr);
 
-		system_size_change = tempfilemeta.size_last_upload;
 		root_inode = tempfilemeta.root_inode;
-		upload_seq = tempfilemeta.upload_seq;
+		upload_seq = cloud_related_data.upload_seq;
+		system_size_change = cloud_related_data.size_last_upload;
+		meta_size_change = cloud_related_data.meta_last_upload;
 
 		tmp_size = tempfilestat.st_size;
 
@@ -619,7 +633,8 @@ errcode_handle:
 
 	/* Update FS stat in the backend if updated previously */
 	if (upload_seq > 0)
-		update_backend_stat(root_inode, -system_size_change, -1);
+		update_backend_stat(root_inode, -system_size_change,
+				-meta_size_change, -1);
 
 	unlink(thismetapath);
 	super_block_delete(this_inode);

@@ -389,6 +389,7 @@ long long get_cloud_size(int arg_len, char *largebuf)
 	char temppath[METAPATHLEN];
 	FILE *statfptr;
 	ssize_t ret_ssize;
+	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	statfptr = NULL;
 	buf = malloc(arg_len + 10);
@@ -426,9 +427,10 @@ long long get_cloud_size(int arg_len, char *largebuf)
 		goto error_handling;
 	}
 	flock(fileno(statfptr), LOCK_EX);
-	PREAD(fileno(statfptr), &llretval, sizeof(long long), 0);
+	PREAD(fileno(statfptr), &fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 0);
 	flock(fileno(statfptr), LOCK_UN);
 	fclose(statfptr);
+	llretval = fs_cloud_stat.backend_system_size;
 
 	sem_post(&(fs_mgr_head->op_lock));
 	free(buf);
