@@ -118,5 +118,5 @@ void *upload_loop(void *ptr);
 void upload_loop(void);
 #endif
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
-			long long num_inodes_delta);
+		long long meta_size_delta, long long num_inodes_delta);
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

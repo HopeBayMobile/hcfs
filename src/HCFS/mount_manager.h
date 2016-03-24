@@ -50,6 +50,12 @@ typedef struct {
 } FS_STAT_T;
 
 typedef struct {
+	long long backend_system_size;
+	long long backend_meta_size;
+	long long backend_num_inodes;
+} FS_CLOUD_STAT_T;
+
+typedef struct {
 	char pkgname[MAX_FILENAME_LEN+1];
 	uid_t pkguid;
 } PKG_CACHE_ENTRY;

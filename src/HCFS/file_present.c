@@ -208,6 +208,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	long long metasize, old_metasize, new_metasize;
+	CLOUD_RELATED_DATA cloud_related_data;
 
 	*delta_meta_size = 0;
 
@@ -282,6 +283,10 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		SEEK_SET);
 	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
 	
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, body_ptr->fptr);
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
 	if (S_ISFILE(this_stat->st_mode)) {
@@ -357,6 +362,9 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	long long metasize, old_metasize, new_metasize;
+	CLOUD_RELATED_DATA cloud_related_data;
+	int ret, errcode;
+	size_t ret_size;
 
 	*delta_meta_size = 0;
 	/* Save the new entry to its parent and update meta */
@@ -400,7 +408,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
 	/* Initialize new directory object and save the meta to meta cache */
-	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE)
+			+ sizeof(CLOUD_RELATED_DATA);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
@@ -424,14 +433,35 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		return -ENOMEM;
 	}
 
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return ret_val;	
+	}
+
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
-							&temppage, body_ptr);
+							NULL, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
 			selfname, this_stat->st_mode);
 		goto error_handling;
 	}
 
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+			SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+			body_ptr->fptr);
+
+	ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
+			&temppage, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
 #ifdef _ANDROID_ENV_
 	write_log(10, "Debug: inode %"PRIu64" begin to inherit xattrs\n",
 			(uint64_t)self_inode);
@@ -468,12 +498,16 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	return 0;
 
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+
+	return errcode;
 error_handling:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
 	return ret_val;
-
 }
 
 /************************************************************************
@@ -732,6 +766,9 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ino_t parent_inode, self_inode;
 	int ret_code;
 	long long metasize, old_metasize, new_metasize;
+	CLOUD_RELATED_DATA cloud_related_data;
+	int ret, errcode;
+	size_t ret_size;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
@@ -792,6 +829,14 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return -ENOMEM;
 	}
 
+	ret_code = meta_cache_open_file(self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		dir_remove_entry(parent_inode, self_inode, name,
+			this_stat->st_mode, parent_meta_cache_entry);
+		return ret_code;
+	}
+
 	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
 		&symlink_meta, self_meta_cache_entry);
 	if (ret_code < 0) {
@@ -801,6 +846,12 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			this_stat->st_mode, parent_meta_cache_entry);
 		return ret_code;
 	}
+
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
+	FSEEK(self_meta_cache_entry->fptr, sizeof(struct stat) +
+			sizeof(SYMLINK_META_TYPE), SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+			1, self_meta_cache_entry->fptr);
 
 #ifdef _ANDROID_ENV_
 	meta_cache_unlock_entry(parent_meta_cache_entry);
@@ -839,6 +890,12 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		*delta_meta_size = metasize;
 
 	return 0;
+
+errcode_handle:
+	meta_cache_close_file(self_meta_cache_entry);
+	meta_cache_unlock_entry(self_meta_cache_entry);
+
+	return errcode;
 }
 
 /************************************************************************

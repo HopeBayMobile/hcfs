@@ -29,6 +29,10 @@ export NOGCOVR=1
 
 make clean
 make
-make $UNITTEST_MAKE_FLAG test
+make $UNITTEST_MAKE_FLAG test || {
+	if [[ "$UNITTEST_MAKE_FLAG" = *-k* ]]; then
+		make $UNITTEST_MAKE_FLAG test
+	fi;
+}
 
 gcovr -r $repo/src .
