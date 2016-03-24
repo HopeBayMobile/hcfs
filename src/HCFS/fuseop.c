@@ -5743,12 +5743,12 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
-		name_space, key, flag);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
+	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
+		name_space, key, flag);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -5878,12 +5878,12 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n",
-		name_space, key, size);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
+	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n",
+		name_space, key, size);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -6144,12 +6144,12 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug removexattr: namespace = %d, key = %s\n",
-		name_space, key);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
+	write_log(10, "Debug removexattr: namespace = %d, key = %s\n",
+		name_space, key);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);

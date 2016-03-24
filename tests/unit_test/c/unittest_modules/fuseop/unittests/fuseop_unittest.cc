@@ -1944,7 +1944,7 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
 
 /* End of the test case for the function hfuse_ll_readdir */
 
-#ifndef _ANDROID_ENV_
+//#ifndef _ANDROID_ENV_
 /* 
 	Unittest of hfuse_ll_setxattr()
  */
@@ -1996,6 +1996,19 @@ TEST_F(hfuse_ll_setxattrTest, PermissionDenied)
 
 	EXPECT_EQ(-1, ret);
 	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_setxattrTest, SecurityAlwaysAllow)
+{
+	int ret;
+	int errcode;
+	
+	ret = setxattr("/tmp/test_fuse/testsetxattr", 
+		"security.aaa", "123", 3, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EPERM, errcode);
 }
 
 TEST_F(hfuse_ll_setxattrTest, InsertXattrReturnFail)
@@ -2065,6 +2078,18 @@ TEST_F(hfuse_ll_getxattrTest, PermissionDenied)
 
 	EXPECT_EQ(-1, ret);
 	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_getxattrTest, SecurityAlwaysAllow)
+{
+	int ret;
+	int errcode;
+	char buf[10];
+	
+	ret = getxattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
+		"security.aaa", buf, 0);
+
+	EXPECT_EQ(CORRECT_VALUE_SIZE, ret);
 }
 
 TEST_F(hfuse_ll_getxattrTest, GetCorrectValueSizeSuccess)
@@ -2210,6 +2235,19 @@ TEST_F(hfuse_ll_removexattrTest, PermissionDenied)
 	EXPECT_EQ(EACCES, errcode);
 }
 
+TEST_F(hfuse_ll_removexattrTest, SecurityAlwaysAllow)
+{
+	int ret;
+	int errcode;
+	
+	ret = removexattr("/tmp/test_fuse/testsetxattr", 
+		"security.aaa");
+
+	errcode = errno;
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EPERM, errcode);
+}
+
 TEST_F(hfuse_ll_removexattrTest, RemoveXattrReturnFail)
 {
 	int ret;
@@ -2236,7 +2274,7 @@ TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
 	End of unittest of hfuse_ll_removexattr()
  */
 
-#endif
+//#endif
 /*
 	Unittest of hfuse_ll_symlink()
  */
