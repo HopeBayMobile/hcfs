@@ -394,6 +394,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	ino_t new_FS_ino;
 	ssize_t ret_ssize;
+	long long metasize;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -457,6 +458,15 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		errcode = -EIO;
 		goto errcode_handle;
 	}
+
+	/* Update meta size */
+	ret = get_meta_size(new_FS_ino, &metasize);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to get meta size\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+	change_system_meta(0, metasize, 0, 0, 0);
 
 	temp_entry.d_ino = new_FS_ino;
 #ifdef _ANDROID_ENV_
@@ -713,6 +723,16 @@ int delete_filesystem(char *fsname)
 		errcode = ret;
 		goto errcode_handle;
 	}
+
+	/* Update meta size */
+	ret = get_meta_size(new_FS_ino, &metasize);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to get meta size\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+	change_system_meta(0, -metasize, 0, 0, 0);
+
 
 	/* Delete FS from database */
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
