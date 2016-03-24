@@ -633,6 +633,7 @@ int delete_filesystem(char *fsname)
 	FILE *metafptr;
 	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
 	long long temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
+	long long metasize;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -716,16 +717,8 @@ int delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
-	/* Delete root inode (follow ll_rmdir) */
-
-	ret = delete_inode_meta(FS_root);
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
-	}
-
 	/* Update meta size */
-	ret = get_meta_size(new_FS_ino, &metasize);
+	ret = get_meta_size(FS_root, &metasize);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to get meta size\n");
 		errcode = ret;
@@ -733,6 +726,12 @@ int delete_filesystem(char *fsname)
 	}
 	change_system_meta(0, -metasize, 0, 0, 0);
 
+	/* Delete root inode (follow ll_rmdir) */
+	ret = delete_inode_meta(FS_root);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	/* Delete FS from database */
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
