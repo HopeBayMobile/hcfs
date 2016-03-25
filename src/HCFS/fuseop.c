@@ -5051,7 +5051,7 @@ BOOL _check_capability(pid_t thispid, int cap_to_check)
 *
 *************************************************************************/
 void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-	int to_set, struct fuse_file_info *fi)
+	int to_set, struct fuse_file_info *file_info)
 {
 	int ret_val;
 	ino_t this_inode;
@@ -5060,8 +5060,11 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
+	MOUNT_T *tmpptr;
+	char *tmppath;
+	FH_ENTRY *fh_ptr;
 
-	UNUSED(fi);
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
 
@@ -5094,9 +5097,22 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 
 	if ((to_set & FUSE_SET_ATTR_SIZE) &&
 			(newstat.st_size != attr->st_size)) {
+		/* If opened file, check file table first */
+		if (file_info != NULL) {
+			if (system_fh_table.entry_table_flags[file_info->fh]
+			    == FALSE)
+				goto continue_check;
 
-#ifndef _ANDROID_ENV_
-		/* Android may not like this permission check */
+			fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+			if (fh_ptr->thisinode != (ino_t) this_inode)
+				goto continue_check;
+			if ((!((fh_ptr->flags & O_ACCMODE) == O_WRONLY)) &&
+			    (!((fh_ptr->flags & O_ACCMODE) == O_RDWR)))
+				goto continue_check;
+			goto allow_truncate;
+		}
+
+continue_check:
 		/* Checking permission */
 		ret_val = check_permission(req, &newstat, 2);
 
@@ -5106,8 +5122,8 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
-#endif
 
+allow_truncate:
 		ret_val = hfuse_ll_truncate(this_inode, &newstat,
 				attr->st_size, &body_ptr, req);
 		if (ret_val < 0) {
