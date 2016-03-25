@@ -69,10 +69,16 @@ allow hcfsd self:udp_socket create;
 # comm="hcfs" name="/" dev="fuse" scontext=u:r:hcfsd:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
 allow hcfsd labeledfs:filesystem { mount unmount };
 
-# Allow hcfs to have search permission in /proc/<pid of installd/qti/vold> folder
-allow hcfsd { init installd qti_init_shell vold }:dir search;
-# Allow hcfs to have read, geattr, open permissions on status file in /proc/<pid of installd/qti/vold> folder
-allow hcfsd { init installd qti_init_shell vold }:file { read getattr open };
+# Allow hcfs to have permission to access directories and files on /proc/<pid> folder
+define(`hcfs_proc_dataset', `{ init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app platform_app untrusted_app isolated_app rild system_server adbd mediaserver hcfsapid terafonn_app qtitetherservice_app location_app shared_relro debuggerd }')
+allow hcfsd { hcfs_proc_dataset }:dir search;
+allow hcfsd { hcfs_proc_dataset }:file { read getattr open };
+# Cases for userdebug or eng build
+userdebug_or_eng(`
+  allow hcfsd { su perfprofd }:dir search;
+  allow hcfsd { su perfprofd }:file { read getattr open };
+')
+
 # Allow hcfs to have getattr permission on /mnt/runtime folder
 allow hcfsd storage_file:dir getattr;
 # Allow hcfs to have read, getattr, open, mounton permissions on /mnt/runtime/read/emulate folder
@@ -85,41 +91,6 @@ allow hcfsd storage_file:dir search;
 allow hcfsd unlabeled:dir search;
 # Allow hcfs to have permission on /data/data and /data/app
 allow hcfsd unlabeled:dir getattr;
-
-# Allow hcfsd to have permission on /proc/<pid of bluetooth> folder and /proc/<pid of bluetooth>/task/<pid of bluetooth>/status file 
-allow hcfsd bluetooth:dir search;
-allow hcfsd bluetooth:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of radio> folder and /proc/<pid of radio>/task/<pid of radio>/status file 
-allow hcfsd radio:dir search;
-allow hcfsd radio:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of wcnss_service> folder and /proc/<pid of wcnss_service>/task/<pid of wcnss_service>/status file 
-allow hcfsd wcnss_service:dir search;
-allow hcfsd wcnss_service:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of platform_app> folder and /proc/<pid of platform_app>/task/<pid of platform_app>/status file 
-allow hcfsd platform_app:dir search;
-allow hcfsd platform_app:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of untrusted_app> folder and /proc/<pid of untrusted_app>/task/<pid of untrusted_app>/status file
-allow hcfsd untrusted_app:dir search;
-allow hcfsd untrusted_app:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of isolated_app> folder and /proc/<pid of isolated_app>/task/<pid of isolated_app>/status file
-allow hcfsd isolated_app:dir search;
-
-# Allow hcfsd to have permission on /proc/<pid of rild> folder and /proc/<pid of rild>/task/<pid of rild>/status file 
-allow hcfsd rild:dir search;
-allow hcfsd rild:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of system_server> folder and /proc/<pid of system_server>/task/<pid of system_server>/status file 
-allow hcfsd system_server:dir search;
-allow hcfsd system_server:file { read open };
-
-# Allow hcfsd to have permission on /proc/<pid of mediaserver> folder and /proc/<pid of mediaserver>/task/<pid of mediaserver>/status file 
-allow hcfsd mediaserver:dir search;
-allow hcfsd mediaserver:file { read open };
 
 # Allow hcfsd to communicate with "u:r:shared_relro:s0" type objects
 allow hcfsd shared_relro:dir { search };
