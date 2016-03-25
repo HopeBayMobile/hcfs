@@ -24,6 +24,7 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <inttypes.h>
+#include <jansson.h>
 
 #include "params.h"
 #include "enc.h"
@@ -863,4 +864,171 @@ int fetch_pinned_blocks(ino_t inode)
 errcode_handle:
 	fclose(fptr);
 	return errcode;
+}
+
+/**
+ * Condition to wake the thread up.
+ */
+static BOOL quota_wakeup()
+{
+	if ((hcfs_system->system_going_down == TRUE) ||
+			(hcfs_system->sync_paused == FALSE))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+/**
+ * Fetch quota from usermeta on cloud
+ *
+ * This function aims to download usermeta.json from arkflex backend,
+ * and then parse the json file to get quota. Finally backup the usermeta
+ * locally and encrypt the file.
+ *
+ */
+void fetch_quota_from_cloud(void *ptr)
+{
+	int status;
+	char objname[100];
+	char download_path[256];
+	FILE *fptr;
+	char *buf;
+	int ret, errcode;
+	long long quota;
+	json_error_t jerror;
+	json_t *json_data, *json_quota;
+
+	UNUSED(ptr);
+	strncpy(objname, "usermeta.json", 100);
+	sprintf(download_path, "%s/new_usermeta", METAPATH);
+
+	/* Download usermeta.json from cloud */
+	fptr = NULL;
+	while (hcfs_system->system_going_down == FALSE) {
+		if (hcfs_system->sync_paused) {
+			nonblock_sleep(5, quota_wakeup);
+			continue;
+		}
+
+		if (access(download_path, F_OK) == 0)
+			unlink(download_path);
+		fptr = fopen(download_path, "w+");
+		if (!fptr) {
+			write_log(0, "Error: Fail to open file %s in %s\n",
+					download_path, __func__);
+			goto errcode_handle;
+		}
+		setbuf(fptr, NULL);
+		flock(fileno(fptr), LOCK_EX);
+
+		status = hcfs_get_object(fptr, objname,
+				&(download_usermeta_curl_handle),
+				NULL);
+		if (200 <= status && status <= 299) {
+			break;
+		} else if (status == 404) {
+			write_log(0, "Error: Usermeta is not found"
+					" on cloud.\n");
+			goto errcode_handle;
+		} else { /* Retry, Perhaps disconnect */
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			unlink(download_path);
+			fptr = NULL;
+			write_log(5, "Return code %d. Retry fetch"
+					" quota later\n", status);
+		}
+	}
+
+	if (hcfs_system->system_going_down == TRUE)
+		goto errcode_handle;
+
+	/* Parse json file */
+	FSEEK(fptr, 0, SEEK_SET);
+	json_data = NULL;
+	json_data = json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
+	if (!json_data) {
+		write_log(0, "Error: Fail to parse json file\n");
+		goto errcode_handle;
+	}
+
+	json_quota = json_object_get(json_data, "quota");
+	if (!json_quota || !json_is_integer(json_quota)) {
+		json_delete(json_data);
+		write_log(0, "Error: Json file is corrupt\n");
+		goto errcode_handle;
+	}
+	quota = json_integer_value(json_quota);
+	if (quota < 0) {
+		json_delete(json_data);
+		write_log(0, "Error: Quota from cloud is less than zero");
+		goto errcode_handle;
+	}
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.system_quota = quota;
+	sem_post(&(hcfs_system->access_sem));
+	write_log(10, "Now system quota is %lld\n",
+			hcfs_system->systemdata.system_quota);
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	unlink(download_path);
+
+	buf = json_dumps(json_data, 0);
+	enc_backup_usermeta(buf); /* Backup json usermeta */
+	json_delete(json_data);
+	free(buf);
+
+	sem_wait(&(download_usermeta_ctl.access_sem));
+	download_usermeta_ctl.active = FALSE;
+	sem_post(&(download_usermeta_ctl.access_sem));
+	return;
+
+errcode_handle:
+	if (fptr) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+	}
+	unlink(download_path);
+
+	sem_wait(&(download_usermeta_ctl.access_sem));
+	download_usermeta_ctl.active = FALSE;
+	sem_post(&(download_usermeta_ctl.access_sem));
+	return;
+}
+
+/**
+ * Trigger updating quota from cloud
+ *
+ * This function creates a thread to update quota and backup it. If backend
+ * is NONE, then reject to update quota from cloud. When this thread is active,
+ * reject to create again and return -EBUSY. Do not need to join this thread
+ * because it is detached thread.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int update_quota()
+{
+	if (CURRENT_BACKEND == NONE) {
+		write_log(5, "Cannot trigger updating quota without backend\n");
+		return -EPERM;
+	}
+
+	sem_wait(&(download_usermeta_ctl.access_sem));
+	if (download_usermeta_ctl.active == TRUE) {
+		sem_post(&(download_usermeta_ctl.access_sem));
+		write_log(5, "Quota thread is running\n");
+		return -EBUSY;
+	} else {
+		download_usermeta_ctl.active = TRUE;
+	}
+
+	pthread_attr_init(&(download_usermeta_ctl.thread_attr));
+	pthread_attr_setdetachstate(&(download_usermeta_ctl.thread_attr),
+			PTHREAD_CREATE_DETACHED);
+	pthread_create(&(download_usermeta_ctl.download_usermeta_tid),
+			&(download_usermeta_ctl.thread_attr),
+			(void *)fetch_quota_from_cloud, NULL);
+	sem_post(&(download_usermeta_ctl.access_sem));
+	return 0;
 }

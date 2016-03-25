@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 	uint32_t uint32_ret;
 	long long downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
-	int first_size, rest_size;
+	int first_size, rest_size, loglevel;
 	char vol_mode;
 
 	if (argc < 2) {
@@ -100,6 +100,12 @@ int main(int argc, char **argv)
 		code = GETSYNCSTAT;
 	else if (strcasecmp(argv[1], "reloadconfig") == 0)
 		code = RELOADCONFIG;
+	else if (strcasecmp(argv[1], "getquota") == 0)
+		code = GETQUOTA;
+	else if (strcasecmp(argv[1], "updatequota") == 0)
+		code = TRIGGERUPDATEQUOTA;
+	else if (strcasecmp(argv[1], "changelog") == 0)
+		code = CHANGELOG;
 	else
 		code = -1;
 	if (code < 0) {
@@ -117,6 +123,7 @@ int main(int argc, char **argv)
 	case UNMOUNTALL:
 	case RESETXFERSTAT:
 	case RELOADCONFIG:
+	case TRIGGERUPDATEQUOTA:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -130,6 +137,7 @@ int main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	/* APIs at here send result in long long */
+	case GETQUOTA:
 	case GETPINSIZE:
 	case GETCACHESIZE:
 	case GETMAXPINSIZE:
@@ -404,6 +412,25 @@ int main(int argc, char **argv)
 
 		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
 		size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+		break;
+	case CHANGELOG:
+		if (argc != 3) {
+			printf("./HCFSvol changelog <log level>\n");
+			exit(-EINVAL);
+		}
+		loglevel = atoi(argv[2]);
+		cmd_len = sizeof(int);
+		size_msg = send(fd, &code, sizeof(code), 0);
+		size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+		size_msg = send(fd, &loglevel, sizeof(int), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
+		size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
 		break;
 	default:
 		break;

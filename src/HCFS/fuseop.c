@@ -2674,21 +2674,28 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		return 0;
 	}
 
-	if ((tempfilemeta.local_pin == TRUE) &&
-	    (filestat->st_size < offset)) {
+	if (filestat->st_size < offset) {
+		sizediff = (long long) offset - filestat->st_size;
+		sem_wait(&(hcfs_system->access_sem));
+		/* Check system size and reject if exceeding quota */
+		if (hcfs_system->systemdata.system_size + sizediff >
+				hcfs_system->systemdata.system_quota) {
+			sem_post(&(hcfs_system->access_sem));
+			return -ENOSPC;
+		}
 		/* If this is a pinned file and we want to extend the file,
 		need to find out if pinned space is still available for this
 		extension */
 		/* If pinned space is available, add the amount of changes
 		to the total usage first */
-		sizediff = (long long) offset - filestat->st_size;
-		sem_wait(&(hcfs_system->access_sem));
-		if ((hcfs_system->systemdata.pinned_size + sizediff)
-			> MAX_PINNED_LIMIT) {
-			sem_post(&(hcfs_system->access_sem));
-			return -ENOSPC;
+		if (tempfilemeta.local_pin == TRUE) {
+			if ((hcfs_system->systemdata.pinned_size + sizediff)
+					> MAX_PINNED_LIMIT) {
+				sem_post(&(hcfs_system->access_sem));
+				return -ENOSPC;
+			}
+			hcfs_system->systemdata.pinned_size += sizediff;
 		}
-		hcfs_system->systemdata.pinned_size += sizediff;
 		sem_post(&(hcfs_system->access_sem));
 	}
 
@@ -3993,6 +4000,13 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	long long tmpcachesize, tmpdiff;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
+	/* Check system size before writing */
+	if (hcfs_system->systemdata.system_size >
+			hcfs_system->systemdata.system_quota) {
+		*reterr = -ENOSPC;
+		return 0;
+	}
+
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
 	current_page = bindex / MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -4507,9 +4521,9 @@ errcode_handle:
 void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
-	/* ino_t thisinode; */
 	MOUNT_T *tmpptr;
-	long long system_size, num_inodes;
+	long long system_size, num_inodes, free_block;
+	long long quota;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -4537,17 +4551,20 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (system_size > (512 * powl(1024, 3)))
+	/*if (system_size > (512 * powl(1024, 3)))
 		buf->f_blocks = (((system_size - 1) / 4096) + 1) * 2;
-	else
-		buf->f_blocks = (256*powl(1024, 2));
+	else*/
+	quota = hcfs_system->systemdata.system_quota;
+	buf->f_blocks = quota ? (quota - 1) / buf->f_bsize + 1 : 0;
 
-	if (system_size == 0)
+	if (system_size == 0) {
 		buf->f_bfree = buf->f_blocks;
-	else
+	} else {
 		/* we have assigned double size of system blocks, so it
 		 * will keep being postive after subtracting */
-		buf->f_bfree = buf->f_blocks - (((system_size - 1) / 4096) + 1);
+		free_block = buf->f_blocks - (((system_size - 1) / 4096) + 1);
+		buf->f_bfree = free_block < 0 ? 0 : free_block;
+	}
 
 	buf->f_bavail = buf->f_bfree;
 
@@ -5742,12 +5759,12 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
-		name_space, key, flag);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
+	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
+		name_space, key, flag);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -5877,12 +5894,12 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n",
-		name_space, key, size);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
+	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n",
+		name_space, key, size);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -6143,12 +6160,12 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug removexattr: namespace = %d, key = %s\n",
-		name_space, key);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
+	write_log(10, "Debug removexattr: namespace = %d, key = %s\n",
+		name_space, key);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -6791,6 +6808,7 @@ int hook_fuse(int argc, char **argv)
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));
+
 
 	destroy_api_interface();
 

@@ -49,7 +49,6 @@ CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 	fptr = va_arg(alist, FILE *);
 	fwrite(buf, 1, strlen(buf), fptr);
 	va_end(alist);
-
 }
 
 #undef curl_easy_getinfo
