@@ -234,4 +234,5 @@ PRODUCT_COPY_FILES += \
     $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
     $(MY_LOCAL_PATH)/hopebay/lib64/libterafonnapi.so:system/lib64/libterafonnapi.so \
     $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
+    $(MY_LOCAL_PATH)/hopebay/lib64/libjansson.so:system/lib64/libjansson.so \
     $(MY_LOCAL_PATH)/hopebay/root/init.hcfs.sh:root/init.hcfs.sh 

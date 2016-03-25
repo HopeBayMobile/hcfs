@@ -1,7 +1,7 @@
 CC = gcc
 CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
 CFLAGS = -g -pthread -Wall -Wextra -Werror
-LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3
+LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
 	CPPFLAGS += -fdiagnostics-color=auto

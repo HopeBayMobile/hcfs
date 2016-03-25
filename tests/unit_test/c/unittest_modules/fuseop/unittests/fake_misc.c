@@ -673,10 +673,19 @@ int write_log(int level, char *format, ...)
 
 int parse_xattr_namespace(const char *name, char *name_space, char *key)
 {
-	if (!strcmp(name, "user.aaa"))
+	printf("Now parsing namespace\n");
+
+	if (!strcmp(name, "user.aaa")) {
+		*name_space = USER;
+		strcpy(key, "aaa");
 		return 0;
-	else
+	} else if (!strcmp(name, "security.aaa")) {
+		*name_space = SECURITY;
+		strcpy(key, "aaa");
+		return 0;
+	} else {
 		return -EOPNOTSUPP;
+	}
 }
 
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 

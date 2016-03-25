@@ -22,6 +22,7 @@ class do_fallocateTest : public ::testing::Test {
     root_updated = FALSE;
     fake_block_status = ST_NONE;
     after_update_block_page = FALSE;
+    hcfs_system->systemdata.system_quota = 102400000;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
@@ -83,6 +84,22 @@ TEST_F(do_fallocateTest, ExceedPinSize) {
   tempstat.st_size = 1024;
   tempstat.st_mode = S_IFREG;
   ret = do_fallocate(14, &tempstat, 0, 0, 1024768, &tmpptr, req1);
+  ASSERT_EQ(-ENOSPC, ret);
+
+  EXPECT_EQ(tempstat.st_size, 1024);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
+}
+
+TEST_F(do_fallocateTest, ExceedSystemQuota) {
+  int ret;
+  fuse_req_t req1;
+  struct stat tempstat;
+  META_CACHE_ENTRY_STRUCT *tmpptr;
+
+  hcfs_system->systemdata.system_quota = 12800000 - 1;
+  tempstat.st_size = 1024;
+  tempstat.st_mode = S_IFREG;
+  ret = do_fallocate(14, &tempstat, 0, 0, 1024700000, &tmpptr, req1);
   ASSERT_EQ(-ENOSPC, ret);
 
   EXPECT_EQ(tempstat.st_size, 1024);

@@ -1227,6 +1227,122 @@ TEST_F(api_moduleTest, ReloadConfigSuccess) {
 	ASSERT_EQ(0, errcode);
 }
 
+TEST_F(api_moduleTest, GetQuotaSuccess) {
+
+	int ret_val;
+	unsigned int code, cmd_len, size_msg;
+	long long quota;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	hcfs_system->systemdata.system_quota = 55667788;
+	code = GETQUOTA;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(long long), size_msg);
+	ret_val = recv(fd, &quota, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
+	ASSERT_EQ(55667788, quota);
+}
+
+TEST_F(api_moduleTest, UpdateQuotaSuccess) {
+
+	int ret_val, errcode;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = TRIGGERUPDATEQUOTA;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.system_quota = 0; /* It will be modified */
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(0, errcode);
+
+	EXPECT_EQ(5566, hcfs_system->systemdata.system_quota);
+}
+
+TEST_F(api_moduleTest, ChangeLogLevelSuccess) {
+
+	int ret_val, errcode;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+	int loglevel;
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = CHANGELOG;
+	system_config->log_level = 10; /* Original level */
+	loglevel = 6; /* New level */
+	cmd_len = sizeof(int);
+	memset(buf, 0, 300);
+	memcpy(buf, &loglevel, sizeof(int));
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(0, errcode);
+
+	EXPECT_EQ(6, system_config->log_level);
+}
+
 TEST_F(api_moduleTest, GetTotalCloudSizeSuccess) {
 
 	int ret_val;

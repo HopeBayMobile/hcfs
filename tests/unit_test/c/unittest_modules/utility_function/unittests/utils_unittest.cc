@@ -16,6 +16,7 @@ extern "C" {
 #include "mount_manager.h"
 }
 #include "gtest/gtest.h"
+#include "mock_params.h"
 
 extern SYSTEM_CONF_STRUCT *system_config;
 extern SYSTEM_DATA_HEAD *hcfs_system;
@@ -1094,3 +1095,66 @@ TEST_F(change_system_metaTest, UpdateSuccess)
 /*
  * End of unittest of change_system_meta()
  */
+
+/* Unittest of get_quota_from_backup() */
+class get_quota_from_backupTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+
+		METAPATH = (char *)malloc(METAPATHLEN);
+		strcpy(METAPATH, "get_quota_from_backup_dir");
+		mkdir(METAPATH, 0700);
+		mknod("get_quota_from_backup_dir/usermeta", 0700, 0);
+		dec_success = TRUE;
+		json_file_corrupt = FALSE;
+	}
+
+	void TearDown()
+	{
+		unlink("get_quota_from_backup_dir/usermeta");
+		rmdir(METAPATH);
+
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(get_quota_from_backupTest, MetapathNotExist)
+{
+	long long quota;
+
+	unlink("get_quota_from_backup_dir/usermeta");
+
+	EXPECT_EQ(-ENOENT, get_quota_from_backup(&quota));
+}
+
+TEST_F(get_quota_from_backupTest, BackupNotExist)
+{
+	long long quota;
+
+	dec_success = FALSE;
+
+	EXPECT_EQ(-ENOENT, get_quota_from_backup(&quota));
+}
+
+TEST_F(get_quota_from_backupTest, JsonfileCorrupt)
+{
+	long long quota;
+
+	json_file_corrupt = TRUE;
+
+	EXPECT_EQ(-EINVAL, get_quota_from_backup(&quota));
+}
+
+TEST_F(get_quota_from_backupTest, Success)
+{
+	long long quota;
+
+	EXPECT_EQ(0, get_quota_from_backup(&quota));
+	EXPECT_EQ(5566, quota);
+}
+
+/* End of unittest of get_quota_from_backup() */
+
