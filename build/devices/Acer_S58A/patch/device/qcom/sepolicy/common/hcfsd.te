@@ -70,7 +70,7 @@ allow hcfsd self:udp_socket create;
 allow hcfsd labeledfs:filesystem { mount unmount };
 
 # Allow hcfs to have permission to access directories and files on /proc/<pid> folder
-define(`hcfs_proc_dataset', `{ su init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app platform_app untrusted_app isolated_app rild system_server adbd mediaserver hcfsapid terafonn_app qtitetherservice_app location_app perfprofd shared_relro debuggerd }')
+define(`hcfs_proc_dataset', `{ init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app platform_app untrusted_app isolated_app rild system_server adbd mediaserver hcfsapid terafonn_app qtitetherservice_app location_app perfprofd shared_relro debuggerd }')
 allow hcfsd { hcfs_proc_dataset }:dir search;
 allow hcfsd { hcfs_proc_dataset }:file { read getattr open };
 
