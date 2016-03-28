@@ -240,7 +240,7 @@ int parse_http_header_retcode(FILE *fptr)
 	char *endptr;
 
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = fscanf(fptr, "%19s %19s %19s\n", httpcode, retcode, retstatus);
+	ret = fscanf(fptr, "%19s %19s %19s", httpcode, retcode, retstatus);
 	if (ret < 3)
 		return -1;
 
@@ -987,8 +987,8 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		return -1;
 	}
 	/* get object meta data */
-	if (object_meta) {
-		char header[1000] = {0};
+	if (_http_is_success(ret_val) && object_meta) {
+		char header[1024] = {0};
 		FSEEK(swift_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, swift_header_fptr);
 		write_log(10, "download object %s header:\n%s", objname,
@@ -2081,8 +2081,8 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	}
 
 	/* get object meta data */
-	if (object_meta) {
-		char header[1000] = {0};
+	if (_http_is_success(ret_val) && object_meta) {
+		char header[1024] = {0};
 		FSEEK(S3_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, S3_header_fptr);
 		write_log(10, "download object %s header:\n%s", objname,

@@ -79,10 +79,6 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
 		sem_wait(&pin_download_curl_sem);
 	sem_wait(&download_curl_sem);
-
-	FSEEK(fptr, 0, SEEK_SET);
-	FTRUNCATE(fileno(fptr), 0);
-
 	sem_wait(&download_curl_control_sem);
 	for (which_curl_handle = 0;
 	     which_curl_handle < MAX_DOWNLOAD_CURL_HANDLE;
@@ -95,6 +91,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	sem_post(&download_curl_control_sem);
 	write_log(10, "Debug: downloading using curl handle %d\n",
 		  which_curl_handle);
+
+	FSEEK(fptr, 0, SEEK_SET);
+	FTRUNCATE(fileno(fptr), 0);
 
 	char *get_fptr_data = NULL;
 	size_t len = 0;
@@ -112,7 +111,15 @@ int fetch_from_cloud(FILE *fptr, char action_from,
                                  &(download_curl_handles[which_curl_handle]),
                                  object_meta);
 
-	/* TODO: Should process failed get here */
+	/* process failed get here */
+	if ((status >= 200) && (status <= 299)) {
+		errcode = 0;
+	} else {
+		errcode = -EIO;
+		free_object_meta(object_meta);
+		fclose(get_fptr);
+		goto errcode_handle;
+	}
 
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	fseek(get_fptr, 0, SEEK_END);
@@ -139,25 +146,18 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	free(get_fptr_data);
 	if (object_key != NULL)
 		OPENSSL_free(object_key);
+	fflush(fptr);
 
+	/* Finally free download sem */
+
+errcode_handle:
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
-
 	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
 		sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 
-	/* Already retried in get object if necessary */
-	if ((status >= 200) && (status <= 299))
-		ret = 0;
-	else
-		ret = -EIO;
-
-	fflush(fptr);
-	return status;
-
-errcode_handle:
 	return errcode;
 }
 
