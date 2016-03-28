@@ -58,12 +58,12 @@ int32_t main()
 	printf("dir stat - %s\n", res7);
 	free(res7);
 
-	char *res8;
-	char key[500] = "swift_account";
-	char value[500] = "test_swift_account";
-	HCFS_set_config(&res8, key, value);
-	printf("set config - %s\n", res8);
-	free(res8);
+	//char *res8;
+	//char key[500] = "swift_account";
+	//char value[500] = "test_swift_account";
+	//HCFS_set_config(&res8, key, value);
+	//printf("set config - %s\n", res8);
+	//free(res8);
 
 	char *res9;
 	HCFS_get_config(&res9, "swift_account");
@@ -76,7 +76,7 @@ int32_t main()
 	free(res10);
 
 	char *res11;
-	HCFS_toggle_sync(&res11, 0);
+	HCFS_toggle_sync(&res11, 1);
 	printf("toggle sync - %s\n", res11);
 	free(res11);
 
