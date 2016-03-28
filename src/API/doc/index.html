@@ -42,11 +42,6 @@
                         <p>Get config</p>
                     </div>
                 </li>
-                <li><a href="#HCFS_get_pkg_uid">HCFS_get_pkg_uid<span class="counter"></span></a>
-                    <div class="brief">
-                        <p>Query package uid</p>
-                    </div>
-                </li>
                 <li><a href="#HCFS_get_sync_status">HCFS_get_sync_status<span class="counter"></span></a>
                     <div class="brief">
                         <p>Sync status</p>
@@ -65,11 +60,6 @@
                 <li><a href="#HCFS_pin_status">HCFS_pin_status<span class="counter"></span></a>
                     <div class="brief">
                         <p>Pin status</p>
-                    </div>
-                </li>
-                <li><a href="#HCFS_reboot">HCFS_reboot<span class="counter"></span></a>
-                    <div class="brief">
-                        <p>Secret function</p>
                     </div>
                 </li>
                 <li><a href="#HCFS_reload_config">HCFS_reload_config<span class="counter"></span></a>
@@ -347,54 +337,6 @@
                         </table>
                     </div>
                     <div class="function">
-                        <div class="declaration" id="HCFS_get_pkg_uid">
-                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
-                            </div>
-                            <table class="declaration">
-                                <tbody>
-                                    <tr>
-                                        <td class="identifier">HCFS_get_pkg_uid</td>
-                                        <td class="open_paren">(</td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
-                                        </td>
-                                        <td class="argument_name">json_res,</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> *</span></span>
-                                        </td>
-                                        <td class="argument_name">pkg_name</td>
-                                        <td class="close_paren">)</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="doc">
-                            <p>(NOTE - This API would not be used anymore.)</p>
-                            <p>To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.</p>
-                        </div>
-                        <table class="arguments">
-                            <tbody>
-                                <tr id="HCFS_get_pkg_uid::json_res">
-                                    <td>json_res</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>result string in json format.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr id="HCFS_get_pkg_uid::pkg_name">
-                                    <td>pkg_name</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>target package</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="function">
                         <div class="declaration" id="HCFS_get_sync_status">
                             <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
                             </div>
@@ -507,11 +449,7 @@
                                     <tbody>
                                         <tr>
                                             <td>True</td>
-                                            <td align="left">0 if successful.</td>
-                                        </tr>
-                                        <tr>
-                                            <td></td>
-                                            <td align="left">1 if this app was already pinned.</td>
+                                            <td align="left">0</td>
                                         </tr>
                                         <tr>
                                             <td>False</td>
@@ -607,11 +545,7 @@
                                     <tbody>
                                         <tr>
                                             <td>True</td>
-                                            <td align="left">0 if successful.</td>
-                                        </tr>
-                                        <tr>
-                                            <td></td>
-                                            <td align="left">1 if this path was already pinned.</td>
+                                            <td align="left">0</td>
                                         </tr>
                                         <tr>
                                             <td>False</td>
@@ -712,40 +646,6 @@
                                     <td>
                                         <div class="doc">
                                             <p>target pathname.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="function">
-                        <div class="declaration" id="HCFS_reboot">
-                            <div class="return_type"><span class="type"><span class="name builtin">void</span></span>
-                            </div>
-                            <table class="declaration">
-                                <tbody>
-                                    <tr>
-                                        <td class="identifier">HCFS_reboot</td>
-                                        <td class="open_paren">(</td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">char</span><span class="qualifier"> **</span></span>
-                                        </td>
-                                        <td class="argument_name">json_res</td>
-                                        <td class="close_paren">)</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="doc">
-                            <p>(NOTE - This API would not be used anymore.)</p>
-                            <p>To reboot.</p>
-                        </div>
-                        <table class="arguments">
-                            <tbody>
-                                <tr id="HCFS_reboot::json_res">
-                                    <td>json_res</td>
-                                    <td>
-                                        <div class="doc">
-                                            <p>result string in json format.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -1003,7 +903,8 @@
                             <p>To fetch HCFS sytem statistics.</p>
                             <p>Return data dict in json_res -</p>
                             <pre><code class="lang-json">data: {
-    cloud_total: Bytes,
+    quota: Bytes,
+    vol_used: Bytes,
     cloud_used: Bytes,
     cache_total: Bytes,
     cache_used: Bytes,
@@ -1064,7 +965,7 @@
                                     </tr>
                                     <tr>
                                         <td colspan="2"></td>
-                                        <td class="argument_type"><span class="type"><span class="name builtin">int</span></span>
+                                        <td class="argument_type"><span class="type"><span class="name ">int32_t</span></span>
                                         </td>
                                         <td class="argument_name">enabled</td>
                                         <td class="close_paren">)</td>
@@ -1172,11 +1073,7 @@
                                     <tbody>
                                         <tr>
                                             <td>True</td>
-                                            <td align="left">0 if successful.</td>
-                                        </tr>
-                                        <tr>
-                                            <td></td>
-                                            <td align="left">1 if this app was already unpinned.</td>
+                                            <td align="left">0</td>
                                         </tr>
                                         <tr>
                                             <td>False</td>
@@ -1268,11 +1165,7 @@
                                     <tbody>
                                         <tr>
                                             <td>True</td>
-                                            <td align="left">0 if successful.</td>
-                                        </tr>
-                                        <tr>
-                                            <td></td>
-                                            <td align="left">1 if this path was already unpinned.</td>
+                                            <td align="left">0</td>
                                         </tr>
                                         <tr>
                                             <td>False</td>
