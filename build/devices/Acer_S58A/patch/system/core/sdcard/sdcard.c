@@ -1787,7 +1787,7 @@ static int fuse_setup(struct fuse* fuse, gid_t gid, mode_t mask) {
     snprintf(opts, sizeof(opts),
             "fd=%i,rootmode=40000,default_permissions,allow_other,user_id=%d,group_id=%d",
             fuse->fd, fuse->global->uid, fuse->global->gid);
-    if (mount("/dev/fuse", fuse->dest_path, "fuse", MS_NOSUID | MS_NODEV | MS_NOEXEC |
+    if (mount("/dev/fuse", fuse->dest_path, "fuse.sdcard", MS_NOSUID | MS_NODEV | MS_NOEXEC |
             MS_NOATIME, opts) != 0) {
         ERROR("failed to mount fuse filesystem: %s\n", strerror(errno));
         return -1;
