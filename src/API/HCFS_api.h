@@ -1,6 +1,8 @@
 #ifndef GW20_HCFS_API_H_
 #define GW20_HCFS_API_H_
 
+#include <inttypes.h>
+
 /*Set config
  * @json_res result string in json format.
  * @key field in HCFS configuration.
@@ -64,7 +66,8 @@ void HCFS_reload_config(char **json_res);
  * Return data dict in json_res -
  * ```json
  * data: {
- *     cloud_total: Bytes,
+ *     quota: Bytes,
+ *     vol_used: Bytes,
  *     cloud_used: Bytes,
  *     cache_total: Bytes,
  *     cache_used: Bytes,
@@ -173,8 +176,7 @@ void HCFS_get_sync_status(char **json_res);
  *
  * >|||
  * | ------------- |:-------------|
- * | True | 0 if successful.|
- * | | 1 if this path was already pinned.|
+ * | True | 0|
  * | False | ENOSPC when pinned space is not available.|
  * | | Other linux errors.|
  */
@@ -194,8 +196,7 @@ void HCFS_pin_path(char **json_res, char *pin_path);
  *
  * >|||
  * | ------------- |:-------------|
- * | True | 0 if successful.|
- * | | 1 if this app was already pinned.|
+ * | True | 0|
  * | False | ENOSPC when pinned space is not available.|
  * | | Other linux errors.|
  */
@@ -214,8 +215,7 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
  *
  * >|||
  * | ------------- |:-------------|
- * | True | 0 if successful.|
- * | | 1 if this path was already unpinned.|
+ * | True | 0|
  * | False | Linux errors.|
  */
 void HCFS_unpin_path(char **json_res, char *pin_path);
@@ -234,8 +234,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path);
  *
  * >|||
  * | ------------- |:-------------|
- * | True | 0 if successful.|
- * | | 1 if this app was already unpinned.|
+ * | True | 0|
  * | False | Linux errors.|
  */
 void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
@@ -312,24 +311,5 @@ void HCFS_file_status(char **json_res, char *pathname);
  * | False | Linux errors.|
  */
 void HCFS_reset_xfer(char **json_res);
-
-/*Secret function
- * @json_res result string in json format.
- *
- * (NOTE - This API would not be used anymore.)
- *
- * To reboot.
- */
-void HCFS_reboot(char **json_res);
-
-/*Query package uid
- * @json_res result string in json format.
- * @pkg_name target package
- *
- * (NOTE - This API would not be used anymore.)
- *
- * To query uid of (pkg_name). "uid" info are stored in sqlite by manager app.
- */
-void HCFS_get_pkg_uid(char **json_res, char * pkg_name);
 
 #endif  /* GW20_HCFS_API_H_ */

@@ -14,6 +14,10 @@
 #include "utils.h"
 
 
+#define DATA_PREFIX "/data/data"
+#define APP_PREFIX "/data/app"
+#define EXTERNAL_PREFIX "/storage/emulated"
+
 int32_t _walk_folder(char *pathname, int64_t *total_size)
 {
 
@@ -44,24 +48,42 @@ int32_t _walk_folder(char *pathname, int64_t *total_size)
 	closedir(dir);
 }
 
+int32_t _validate_hcfs_path(char *pathname)
+{
+	int32_t ret_code = -ENOENT;
+	char *resolved_path = NULL;
+
+	resolved_path = realpath(pathname, NULL);
+
+	if (resolved_path == NULL)
+		return ret_code;
+
+	/* Check if this pathname is located in hcfs mountpoints */
+	if (!strncmp(resolved_path, DATA_PREFIX, sizeof(DATA_PREFIX) - 1)
+	    || !strncmp(resolved_path, APP_PREFIX, sizeof(APP_PREFIX) - 1)
+	    || !strncmp(resolved_path, EXTERNAL_PREFIX, sizeof(EXTERNAL_PREFIX) - 1))
+		ret_code = 0;
+
+	free(resolved_path);
+	return ret_code;
+}
+
 int32_t _get_path_stat(char *pathname, ino_t *inode, int64_t *total_size)
 {
 
 	int32_t ret_code;
 	struct stat stat_buf;
 
+	ret_code = _validate_hcfs_path(pathname);
+	if (ret_code < 0)
+		return ret_code;
+
 	ret_code = stat(pathname, &stat_buf);
 	if (ret_code < 0)
 		return -errno;
 
-	if (S_ISREG(stat_buf.st_mode)) {
+	if (S_ISREG(stat_buf.st_mode) || S_ISDIR(stat_buf.st_mode)) {
 		*inode = stat_buf.st_ino;
-		if (total_size != NULL)
-			*total_size += stat_buf.st_size;
-	} else if (S_ISDIR(stat_buf.st_mode)) {
-		*inode = stat_buf.st_ino;
-		if (total_size != NULL)
-			_walk_folder(pathname, total_size);
 	} else {
 		return -1;
 	}
@@ -132,7 +154,7 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
 		memcpy(path, &(buf[msg_len]), path_len);
 		msg_len += path_len;
 
-		ret_code = _get_path_stat(path, &tmp_inode, &total_size);
+		ret_code = _get_path_stat(path, &tmp_inode, NULL);
 		if (ret_code < 0)
 			return ret_code;
 
