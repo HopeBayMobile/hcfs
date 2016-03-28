@@ -31,7 +31,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_en
 	int inode, block_no;
 
 	if (FETCH_BACKEND_BLOCK_TESTING == TRUE)
-		return 0;
+		return 200;
 
 	if (!strncmp("user", objname, 4)) {
 		if (usermeta_notfound)
