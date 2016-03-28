@@ -685,6 +685,11 @@ protected:
 	{
 		system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->metapath = (char *)malloc(100);
+		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+		mkdir(METAPATH, 0700);
 		CURRENT_BACKEND = NONE;
 
 		memset(&download_usermeta_ctl, 0,
@@ -698,6 +703,8 @@ protected:
 
 	void TearDown()
 	{
+		rmdir(METAPATH);
+		free(METAPATH);
 		free(system_config);
 	}
 };

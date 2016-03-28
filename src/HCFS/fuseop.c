@@ -5077,11 +5077,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
-	MOUNT_T *tmpptr;
-	char *tmppath;
 	FH_ENTRY *fh_ptr;
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
 
