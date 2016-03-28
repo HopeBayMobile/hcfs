@@ -41,6 +41,18 @@ int32_t _get_usage_val(uint32_t api_code, int64_t *res_val)
 	return 0;
 }
 
+int32_t get_quota(int64_t *quota)
+{
+
+	int32_t ret_code;
+
+	ret_code = _get_usage_val(GETQUOTA, quota);
+	if (ret_code < 0)
+		return ret_code;
+
+	return 0;
+}
+
 int32_t get_volume_usage(int64_t *vol_usage)
 {
 
@@ -112,7 +124,7 @@ int32_t get_cloud_usage(int64_t *cloud_usage)
 }
 
 int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
-		    int64_t *cache_dirty)
+		        int64_t *cache_dirty)
 {
 
 	int32_t ret_code;
@@ -202,14 +214,18 @@ int32_t get_cloud_stat(int32_t *cloud_stat)
 	return 0;
 }
 
-int32_t get_hcfs_stat(int64_t *vol_usage, int64_t *cloud_usage, int64_t *cache_total,
-		  int64_t *cache_used, int64_t *cache_dirty,
-		  int64_t *pin_max, int64_t *pin_total,
-		  int64_t *xfer_up, int64_t *xfer_down,
-		  int32_t *cloud_stat)
+int32_t get_hcfs_stat(int64_t *quota, int64_t *vol_usage, int64_t *cloud_usage,
+		      int64_t *cache_total, int64_t *cache_used, int64_t *cache_dirty,
+		      int64_t *pin_max, int64_t *pin_total,
+		      int64_t *xfer_up, int64_t *xfer_down,
+		      int32_t *cloud_stat)
 {
 
 	int32_t ret_code;
+
+	ret_code = get_quota(quota);
+	if (ret_code < 0)
+		return ret_code;
 
 	ret_code = get_volume_usage(vol_usage);
 	if (ret_code < 0)

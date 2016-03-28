@@ -141,7 +141,7 @@ void HCFS_stat(char **json_res)
 	int32_t fd, status, size_msg, ret_code;
 	int32_t cloud_stat;
 	uint32_t code, reply_len, cmd_len, buf_idx;
-	int64_t vol_usage, cloud_usage;
+	int64_t quota, vol_usage, cloud_usage;
 	int64_t cache_total, cache_used, cache_dirty;
 	int64_t pin_max, pin_total;
 	int64_t xfer_up, xfer_down;
@@ -168,6 +168,7 @@ void HCFS_stat(char **json_res)
 		size_msg = recv(fd, buf, reply_len, 0);
 		buf_idx = 0;
 
+		READ_LL_ARGS(quota);
 		READ_LL_ARGS(vol_usage);
 		READ_LL_ARGS(cloud_usage);
 		READ_LL_ARGS(cache_total);
@@ -182,6 +183,7 @@ void HCFS_stat(char **json_res)
 		buf_idx += sizeof(int32_t);
 
 		data = json_object();
+		json_object_set_new(data, "quota", json_integer(quota));
 		json_object_set_new(data, "vol_used", json_integer(vol_usage));
 		json_object_set_new(data, "cloud_used", json_integer(cloud_usage));
 		json_object_set_new(data, "cache_total", json_integer(cache_total));
@@ -578,69 +580,3 @@ void HCFS_reset_xfer(char **json_res)
 	close(fd);
 }
 
-void HCFS_reboot(char **json_res)
-{
-
-	int32_t fd, status, size_msg, ret_code;
-	uint32_t code, reply_len, cmd_len;
-
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = SYSREBOOT;
-	cmd_len = 0;
-
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
-
-	_json_response(json_res, TRUE, ret_code, NULL);
-
-	close(fd);
-}
-
-void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
-{
-
-	int32_t fd, status, size_msg, ret_code;
-	uint32_t code, reply_len, cmd_len;
-	ssize_t str_len;
-	char buf[1000];
-	char value[500];
-	json_t *data;
-
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = QUERYPKGUID;
-	cmd_len = 0;
-
-	CONCAT_ARGS(pkg_name);
-
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
-
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
-		_json_response(json_res, FALSE, -ret_code, NULL);
-	} else {
-		size_msg = recv(fd, value, reply_len, 0);
-		value[reply_len] = 0;
-		data = json_object();
-		json_object_set_new(data, "uid", json_string(value));
-
-		_json_response(json_res, TRUE, 0, data);
-	}
-
-	close(fd);
-}
