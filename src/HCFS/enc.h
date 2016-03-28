@@ -78,4 +78,6 @@ int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 
 FILE *get_decrypt_configfp(const char *);
 
-#endif /* SRC_HCFS_ENC_H_ */
+int enc_backup_usermeta(char *json_str);
+char *dec_backup_usermeta(char *path);
+#endif /* GW20_HCFS_ENC_H_ */

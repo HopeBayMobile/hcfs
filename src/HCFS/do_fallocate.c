@@ -60,22 +60,28 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 		return 0;
 	}
 
-	/* TODO: will need to allocate space in quota as well */
-	if ((tempfilemeta.local_pin == TRUE) &&
-	    (filestat->st_size < offset)) {
+	if (filestat->st_size < offset) {
+		sizediff = (long long) offset - filestat->st_size;
+		sem_wait(&(hcfs_system->access_sem));
+		/* Check system size and reject if exceeding quota */
+		if (hcfs_system->systemdata.system_size + sizediff >
+				hcfs_system->systemdata.system_quota) {
+			sem_post(&(hcfs_system->access_sem));
+			return -ENOSPC;
+		}
 		/* If this is a pinned file and we want to extend the file,
 		need to find out if pinned space is still available for this
 		extension */
 		/* If pinned space is available, add the amount of changes
 		to the total usage first */
-		sizediff = (long long) offset - filestat->st_size;
-		sem_wait(&(hcfs_system->access_sem));
-		if ((hcfs_system->systemdata.pinned_size + sizediff)
-			> MAX_PINNED_LIMIT) {
-			sem_post(&(hcfs_system->access_sem));
-			return -ENOSPC;
+		if (tempfilemeta.local_pin == TRUE) {
+			if ((hcfs_system->systemdata.pinned_size + sizediff)
+					> MAX_PINNED_LIMIT) {
+				sem_post(&(hcfs_system->access_sem));
+				return -ENOSPC;
+			}
+			hcfs_system->systemdata.pinned_size += sizediff;
 		}
-		hcfs_system->systemdata.pinned_size += sizediff;
 		sem_post(&(hcfs_system->access_sem));
 	}
 

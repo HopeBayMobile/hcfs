@@ -122,7 +122,10 @@ PRODUCT_PACKAGES += \
 
 #RIL
 PRODUCT_PACKAGES += \
-    libqcci_acer
+    libqcci_acer \
+    libtoolbox_jni \
+    AcerUtilityService \
+    AcerUtilityService.xml
 
 #NETDUMP DEBUG
 PRODUCT_PACKAGES += \
@@ -206,7 +209,8 @@ PRODUCT_PACKAGES += \
 
 #Demo mode
 PRODUCT_PACKAGES += \
-    set_demo_mode.sh
+    set_demo_mode.sh \
+    set_dts_settings.sh
 
 # Add System service "GamingManager"
 BOARD_SEPOLICY_DIRS += \
@@ -216,11 +220,28 @@ BOARD_SEPOLICY_UNION += \
     service.te \
     file_contexts \
     file.te \
-    untrusted_app.te
+    untrusted_app.te \
+    mediaserver.te \
+    platform_app.te \
+    system_app.te \
+    dtshpxservice.te \
+    init_shell.te \
+    shell.te
 
 # Enable live function of Acer GameZone
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.acer.live.enable = 1
+
+# DTS license key and HPX service
+PRODUCT_COPY_FILES += \
+    $(MY_LOCAL_PATH)/dts_data/dts-eagle.lic:system/etc/dts/dts-eagle.lic \
+    $(MY_LOCAL_PATH)/dts_data/dts-m6m8-lic.key:system/etc/dts/dts-m6m8-lic.key \
+    $(MY_LOCAL_PATH)/dts_data/libdts_hpx_service_c.so:system/lib/libdts_hpx_service_c.so \
+    $(MY_LOCAL_PATH)/dts_data/dts_hpx_service:system/bin/dts_hpx_service \
+    $(MY_LOCAL_PATH)/dts_data/tuning_configs:system/etc/dts/tuning_configs \
+    $(MY_LOCAL_PATH)/dts_data/dts_hpx_settings:system/etc/dts/dts_hpx_settings \
+    $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/res,system/etc/dts) \
+    $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/path,system/etc/dts)
 
 # Hopebay Cloud Filesystem
 PRODUCT_COPY_FILES += \
@@ -234,4 +255,5 @@ PRODUCT_COPY_FILES += \
     $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
     $(MY_LOCAL_PATH)/hopebay/lib64/libterafonnapi.so:system/lib64/libterafonnapi.so \
     $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
-    $(MY_LOCAL_PATH)/hopebay/root/init.hcfs.sh:root/init.hcfs.sh 
+    $(MY_LOCAL_PATH)/hopebay/lib64/libjansson.so:system/lib64/libjansson.so \
+    $(MY_LOCAL_PATH)/hopebay/root/init.hcfs.sh:root/init.hcfs.sh

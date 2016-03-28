@@ -84,4 +84,5 @@ BOOL is_natural_number(char *str);
 
 int get_meta_size(ino_t inode, long long *metasize);
 
+int get_quota_from_backup(long long *quota);
 #endif  /* SRC_HCFS_UTILS_H_ */

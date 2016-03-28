@@ -32,7 +32,8 @@ genfscon sysfs / u:object_r:sysfs:s0
 genfscon inotifyfs / u:object_r:inotify:s0
 genfscon vfat / u:object_r:vfat:s0
 genfscon debugfs / u:object_r:debugfs:s0
-# fuse now supported xattr
+<<<<<<< HEAD
+# TeraFonn - fuse now supported xattr
 genfscon fuse / u:object_r:fuse:s0
 genfscon pstore / u:object_r:pstorefs:s0
 genfscon functionfs / u:object_r:functionfs:s0

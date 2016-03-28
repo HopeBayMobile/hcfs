@@ -164,3 +164,9 @@ int reload_system_config(const char *config_path)
 {
 	return 0;
 }
+
+int update_quota()
+{
+	hcfs_system->systemdata.system_quota = 5566;
+	return 0;
+}

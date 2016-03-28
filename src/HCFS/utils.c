@@ -32,6 +32,7 @@
 #include <attr/xattr.h>
 #endif
 #include <inttypes.h>
+#include <jansson.h>
 
 #include "global.h"
 #include "fuseop.h"
@@ -1710,5 +1711,59 @@ int get_meta_size(ino_t inode, long long *metasize)
 	}
 	*metasize = metastat.st_size;
 
+	return 0;
+}
+
+/**
+ * Get quota value from backup usermeta
+ *
+ * First decrypt the usermeta if it exists, and parse the json string to
+ * get the quota value.
+ *
+ * @param quota Variable to store the value quota.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int get_quota_from_backup(long long *quota)
+{
+	char path[200];
+	char *json_result;
+	json_error_t jerror;
+	json_t *json_data, *json_quota;
+	int errcode;
+
+	*quota = 0;
+	sprintf(path, "%s/usermeta", METAPATH);
+	if (access(path, F_OK) < 0) {
+		errcode = errno;
+		return -errcode;
+	}
+
+	json_result = dec_backup_usermeta(path);
+	if (!json_result)
+		return -ENOENT;
+	
+	json_data = NULL;
+	json_data = json_loads(json_result, 0, &jerror);
+	if (!json_data) {
+		free(json_result);
+		write_log(0, "Error: Fail to parse json file\n");
+		return -EINVAL;
+	}
+	json_quota = json_object_get(json_data, "quota");
+	if (!json_quota || !json_is_integer(json_quota)) {
+		free(json_result);
+		json_delete(json_data);
+		write_log(0, "Error: Json file is corrupt\n");
+		return -EINVAL;
+	}
+	*quota = json_integer_value(json_quota);
+	if (*quota < 0) {
+		write_log(0, "Error: Quota is less than zero?\n");
+		*quota = 0;
+	}
+
+	free(json_result);
+	json_delete(json_data);
 	return 0;
 }

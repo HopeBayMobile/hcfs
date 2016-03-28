@@ -318,10 +318,6 @@
 /storage(/.*)?              u:object_r:storage_file:s0
 
 #############################
-# private album
-/data/extra(/.*)?           u:object_r:extra_data_file:s0
-
-#############################
 # hcfsd
 /system/bin/hcfs            u:object_r:hcfsd_exec:s0
 /system/bin/HCFSvol         u:object_r:hcfsd_exec:s0
@@ -341,6 +337,5 @@
 # hcfsapid
 /system/bin/hcfsapid     u:object_r:hcfsapid_exec:s0
 /data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock u:object_r:hcfs_socket:s0
-/data/data/com.hopebaytech.hcfsmgmt/aaaa u:object_r:hcfs_socket:s0
 /dev/shm/aaaa u:object_r:hcfs_socket:s0
 /data/app/aaaa u:object_r:hcfs_socket:s0
