@@ -27,7 +27,6 @@ TRACE="set -x"; UNTRACE="set +x"
 
 #let printf handle the printing
 function _hashes() { printf %0$((${1}))d\\n | tr 0 \# ; }
-
 function _hdr_inc() {
 	{ $UNTRACE; } 2>/dev/null
 	local _hinc=${1##*-} _hashc=${2##*[!0-9]}
@@ -57,7 +56,8 @@ function setup_ssh_key() {
 	if [ ! -f ~/.ssh/id_rsa.pub ]; then
 		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
 	fi
-	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
+	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
+		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
 	eval $(ssh-agent)
 	ssh-add ~/.ssh/id_rsa
 	until docker top $DOCKERNAME | grep -q /usr/sbin/sshd
@@ -66,8 +66,8 @@ function setup_ssh_key() {
 		sleep 2
 	done
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
-	DOCKER_SSH="ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' root@$DOCKER_IP"
-	ssh -o 'UserKnownHostsFile=/dev/null' -o 'StrictHostKeyChecking=no' root@$DOCKER_IP pwd
+	ssh-keygen -R $DOCKER_IP
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP pwd
 }
 function patch_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
@@ -88,11 +88,17 @@ function copy_apk_to_source_tree() {
 }
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	ssh root@$DOCKER_IP ccache --max-size=30G
-	ssh root@$DOCKER_IP cd /data/external/sepolicy \&\& \
-		tools/post_process_mac_perms -s terafonn -d /data/device/acer/common/apps/HopebayHCFSmgmt -f mac_permissions.xml \&\& \
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
+		ccache --max-size=30G
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
+		cd /data/external/sepolicy \&\& \
+		tools/post_process_mac_perms \
+		-s terafonn \
+		-d /data/device/acer/common/apps/HopebayHCFSmgmt \
+		-f mac_permissions.xml \&\& \
 		cat mac_permissions.xml
-	ssh root@$DOCKER_IP bash -ic ":; cd /data/;\
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
+		bash -ic ":; cd /data/;\
 	echo BUILD_NUMBER := ${BUILD_NUMBER:-} >> build/core/build_id.mk;\
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk;\
 	cat build/core/build_id.mk;\
