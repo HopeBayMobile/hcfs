@@ -46,9 +46,11 @@ function start_builder() {
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-`date +%m%d-%H%M%S`
 	eval docker pull $DOCKER_IMAGE || :
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	trap stop_builder EXIT # Cleanup docker container
 }
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
+	trap "" EXIT # Cleanup docker container
 	docker rm -f $DOCKERNAME || :
 }
 function setup_ssh_key() {
@@ -119,7 +121,18 @@ function unmount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	umount /mnt/nas
 }
-
+function build_image_type() {
+	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
+	IMAGE_TYPE="$1"
+	start_builder
+	setup_ssh_key
+	patch_system
+	copy_hcfs_to_source_tree
+	copy_apk_to_source_tree
+	build_system
+	publish_image
+	stop_builder
+}
 
 # LIB_DIR=${LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.0.5.0391-android-dev/HCFS-android-binary}
 # APP_DIR=${APP_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.0.5.0391-android-dev/HCFS-terafonn-apk}
@@ -138,18 +151,14 @@ echo JOB_NAME: ${JOB_NAME}
 echo ========================================
 echo "Environment variables (with defaults):"
 $TRACE
-trap stop_builder EXIT # Cleanup docker container
 
 mount_nas
 
-for IMAGE_TYPE in user userdebug
-do
-	start_builder
-	setup_ssh_key
-	patch_system
-	copy_hcfs_to_source_tree
-	copy_apk_to_source_tree
-	build_system
-	publish_image
-	stop_builder
-done
+if [ -n "$IMAGE_TYPE" ]; then
+	build_image_type "$IMAGE_TYPE"
+else
+	for IMAGE_TYPE in user userdebug
+	do
+		build_image_type "$IMAGE_TYPE"
+	done
+fi
