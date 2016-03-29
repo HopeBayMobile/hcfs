@@ -44,7 +44,7 @@ allow hcfsapid fuse:dir { read open search getattr };
 allow hcfsapid fuse:file { getattr };
 
 # Allow to access /mnt/runtime 
-allow hcfsapid storage_file:dir { search };
+allow hcfsapid storage_file:dir { search getattr };
 
 allow hcfsapid shell_data_file:dir { write remove_name search add_name };
 allow hcfsapid shell_data_file:file { write getattr read create unlink open };
