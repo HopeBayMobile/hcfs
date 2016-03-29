@@ -64,7 +64,6 @@ if [ ! -f CCM.exe ]; then
 	rm -f ccm_binaries.zip
 fi
 
-apt-get upgrade -y --force-yes
 if [ -e /.dockerinit ]; then
 	RUN_IN_SLAVE="sudo -E -u jenkins"
 fi
