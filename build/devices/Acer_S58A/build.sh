@@ -11,7 +11,6 @@
 #
 #     LIB_DIR         Absolute path for from previous jenkins job in pipeline.
 #
-#     JOB_NAME        image build job name given by jenkins.
 # Revision History
 #   2016/2/8 Jethro Add ci script for s58a image
 #
@@ -101,13 +100,10 @@ function build_system() {
 }
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	mkdir -p ${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-	rsync -v \
-		$here/resource/* \
-		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
-	rsync -v \
-		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} \
-		${PUBLISH_DIR}/${JOB_NAME}-${IMAGE_TYPE}
+	IMG_DIR=${PUBLISH_DIR}/HCFS-s58a-image-${IMAGE_TYPE}
+	mkdir -p $IMG_DIR
+	rsync -v $here/resource/* $IMG_DIR
+	rsync -v root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} $IMG_DIR
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -137,7 +133,6 @@ function build_image_type() {
 # LIB_DIR=${LIB_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.0.5.0391-android-dev/HCFS-android-binary}
 # APP_DIR=${APP_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.0.5.0391-android-dev/HCFS-terafonn-apk}
 # PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/0.0.0.ci.test}
-JOB_NAME=${JOB_NAME:-HCFS-s58a-image}
 eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
 eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
 eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
@@ -147,7 +142,6 @@ echo ========================================
 echo Jenkins pass-through variables:
 echo LIB_DIR: ${LIB_DIR}
 echo PUBLISH_DIR: ${PUBLISH_DIR}
-echo JOB_NAME: ${JOB_NAME}
 echo ========================================
 echo "Environment variables (with defaults):"
 $TRACE
