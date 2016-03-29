@@ -314,6 +314,7 @@ int32_t process_request(int32_t thread_idx)
 		{RESETXFERSTAT,	do_reset_xfer_usage},
 		{SETSYNCSWITCH,	do_toggle_cloud_sync},
 		{GETSYNCSWITCH,	do_get_sync_status},
+		{RELOADCONFIG,	do_reload_hcfs_config},
 	};
 
 	uint32_t n;
