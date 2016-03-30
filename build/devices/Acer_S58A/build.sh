@@ -44,11 +44,15 @@ function start_builder() {
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-`date +%m%d-%H%M%S`
 	eval docker pull $DOCKER_IMAGE || :
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
-	trap stop_builder EXIT # Cleanup docker container
+	trap cleanup INT TERM
+}
+function cleanup() {
+	trap "" INT TERM
+	stop_builder
+	exit
 }
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
-	trap "" EXIT # Cleanup docker container
 	docker rm -f $DOCKERNAME || :
 }
 function setup_ssh_key() {
