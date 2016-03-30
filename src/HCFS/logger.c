@@ -68,7 +68,8 @@ int open_log(char *filename)
 	}
 
 	setbuf(logptr->fptr, NULL);
-	fchmod(fileno(logptr->fptr), 0600);
+	/* Change the log level so that the log can be deleted */
+	fchmod(fileno(logptr->fptr), 0666);
 
 	ret = dup2(fileno(logptr->fptr), fileno(stdout));
 	if (ret < 0) {
