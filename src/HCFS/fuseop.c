@@ -3080,7 +3080,9 @@ int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 {
 	int ret;
 
+	sem_post(&(fh_ptr->block_sem));
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
+	sem_wait(&(fh_ptr->block_sem));
 	if (fh_ptr->meta_cache_ptr == NULL)
 		return -ENOMEM;
 	fh_ptr->meta_cache_locked = TRUE;
