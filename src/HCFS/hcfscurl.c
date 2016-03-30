@@ -315,7 +315,7 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 					object_meta->len_enc_session_key =
 					    strlen(s2);
 					object_meta->enc_session_key = calloc(
-					    object_meta->len_enc_session_key,
+					    object_meta->len_enc_session_key+10,
 					    sizeof(char));
 					memcpy(
 					    object_meta->enc_session_key, s2,
