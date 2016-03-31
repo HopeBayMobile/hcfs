@@ -1441,7 +1441,10 @@ void api_server_monitor(void)
 			totalrefs += api_server->job_count[count];
 			totaltime += api_server->job_totaltime[count];
 		}
-		ratio = api_server->num_threads / totaltime;
+		if (totaltime > 0)
+			ratio = api_server->num_threads / totaltime;
+		else
+			ratio = 0;
 		write_log(10, "Debug API monitor ref %d, time %f\n",
 			totalrefs, totaltime);
 
