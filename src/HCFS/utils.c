@@ -1700,8 +1700,8 @@ int get_meta_size(ino_t inode, long long *metasize)
 	struct stat metastat;
 	int ret, ret_code;
 
-	//fetch_meta_path(metapath, inode);
-	// ret = stat(metapath, &metastat); //testing
+	fetch_meta_path(metapath, inode);
+	ret = stat(metapath, &metastat);
 	ret = 0;
 	if (ret < 0) {
 		ret_code = errno;
@@ -1711,7 +1711,7 @@ int get_meta_size(ino_t inode, long long *metasize)
 		return -ret_code;
 	}
 	*metasize = 0;
-	//*metasize = metastat.st_size;
+	*metasize = metastat.st_size;
 
 	return 0;
 }

@@ -1731,7 +1731,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	get_meta_size(parent_inode1, &old_metasize1);
+	meta_cache_get_meta_size(parent1_ptr, &old_metasize1);
 
 	if (parent_inode1 != parent_inode2) {
 		parent2_ptr = meta_cache_lock_entry(parent_inode2);
@@ -1741,7 +1741,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, ENOMEM);
 			return;
 		}
-		get_meta_size(parent_inode2, &old_metasize2);
+		meta_cache_get_meta_size(parent2_ptr, &old_metasize2);
 	} else {
 		parent2_ptr = parent1_ptr;
 		old_metasize2 = old_metasize1;
@@ -2118,8 +2118,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 #endif
 	}
 
-	get_meta_size(parent_inode1, &new_metasize1);
-	get_meta_size(parent_inode2, &new_metasize2);
+	meta_cache_get_meta_size(parent1_ptr, &new_metasize1);
+	meta_cache_get_meta_size(parent2_ptr, &new_metasize2);
 
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
@@ -4345,7 +4345,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 	fh_ptr->meta_cache_locked = TRUE;
 
-	get_meta_size(thisinode, &old_metasize);
+	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize);
 
 	/* If the file is pinned, need to change the pinned_size
 	first if necessary */
@@ -4417,7 +4417,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			break;
 	}
 
-	get_meta_size(thisinode, &new_metasize);	
+	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &new_metasize);	
 	if (old_metasize > 0 && new_metasize > 0)
 		delta_meta_size = (new_metasize - old_metasize);
 	else
@@ -5815,7 +5815,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	}
 
-	get_meta_size(this_inode, &old_metasize);
+	meta_cache_get_meta_size(meta_cache_entry, &old_metasize);
 
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos, TRUE);
@@ -5830,7 +5830,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	get_meta_size(this_inode, &new_metasize);
+	meta_cache_get_meta_size(meta_cache_entry, &new_metasize);
 
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
@@ -6335,7 +6335,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	get_meta_size(parent_inode, &old_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
 
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
 		&result_index, newname, parent_meta_cache_entry);
@@ -6357,7 +6357,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 	}
 
-	get_meta_size(parent_inode, &new_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
 	delta_meta_size = new_metasize - old_metasize;
 	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
 		change_system_meta(0, delta_meta_size, 0, 0, 0);

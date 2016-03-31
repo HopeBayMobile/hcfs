@@ -71,6 +71,27 @@ errcode_handle:
 	return errcode;
 }
 
+int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
+{
+	int ret;
+	int errcode;
+	long long ret_pos;
+
+	*metasize = 0;
+	if (ptr->meta_opened == FALSE || ptr->fptr == NULL) {
+		ret = meta_cache_open_file(ptr);
+		if (ret < 0)
+			return ret;
+	}
+
+	LSEEK(fileno(ptr->fptr), 0, SEEK_END);
+	*metasize = ret_pos;
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
 /************************************************************************
 *
 * Function name: meta_cache_open_file
