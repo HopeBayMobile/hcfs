@@ -71,6 +71,15 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Get meta size from meta cache
+ *
+ * Get meta size by meta cache. When meta file pointer is null,
+ * the file will be opened. Finally seek the file offset and get
+ * meta file size.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
 {
 	int ret;
