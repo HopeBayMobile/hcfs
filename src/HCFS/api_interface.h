@@ -25,12 +25,12 @@
 #include <pthread.h>
 #endif
 
-#define MAX_API_THREADS 10
-#define INIT_API_THREADS 4
-#define PROCESS_WINDOW 30
+#define MAX_API_THREADS 4
+#define INIT_API_THREADS 2
+#define PROCESS_WINDOW 60
 #define INCREASE_RATIO 0.8
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
-#define API_SERVER_MONITOR_TIME 5
+#define API_SERVER_MONITOR_TIME 30
 
 /* Message format for an API request:
 	(From the first byte)

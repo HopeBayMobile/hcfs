@@ -218,7 +218,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		return -ENOMEM;
 
 	/* Get old meta size before adding new entry */
-	get_meta_size(parent_inode, &old_metasize);
+	meta_cache_get_meta_size(body_ptr, &old_metasize);
 
 	/* Add path lookup table */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -236,7 +236,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		goto error_handling;
 
 	/* Get old meta size after adding new entry */
-	get_meta_size(parent_inode, &new_metasize);
+	meta_cache_get_meta_size(body_ptr, &new_metasize);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -300,7 +300,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 #endif
 
-	get_meta_size(self_inode, &metasize);
+	meta_cache_get_meta_size(body_ptr, &metasize);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -372,7 +372,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
-	get_meta_size(parent_inode, &old_metasize);
+	meta_cache_get_meta_size(body_ptr, &old_metasize);
 
 	/* Add parent to lookup db */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -391,7 +391,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
-	get_meta_size(parent_inode, &new_metasize);
+	meta_cache_get_meta_size(body_ptr, &new_metasize);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -473,7 +473,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 				(uint64_t)self_inode, (uint64_t)parent_inode);
 #endif
 
-	get_meta_size(self_inode, &metasize);
+	meta_cache_get_meta_size(body_ptr, &metasize);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -783,7 +783,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
-	get_meta_size(parent_inode, &old_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
 
 	/* Add parent to lookup first */
 	ret_code = sem_wait(&(pathlookup_data_lock));
@@ -803,7 +803,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
-	get_meta_size(parent_inode, &new_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
 
 	ret_code = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_code < 0)
@@ -873,7 +873,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return -ENOMEM;
 	}
 #endif
-	get_meta_size(self_inode, &metasize);
+	meta_cache_get_meta_size(self_meta_cache_entry, &metasize);
 
 	ret_code = meta_cache_close_file(self_meta_cache_entry);
 	if (ret_code < 0) {

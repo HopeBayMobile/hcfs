@@ -916,3 +916,8 @@ int get_meta_size(ino_t inode, long long *metasize)
 {
 	return 0;
 }
+
+int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
+{
+	return 0;
+}
