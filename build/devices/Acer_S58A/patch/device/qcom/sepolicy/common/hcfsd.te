@@ -199,3 +199,8 @@ allow netd hcfsd:tcp_socket { read write setopt getopt };
 #============= dpmd ==============
 allow dpmd hcfsd:fd use;
 allow dpmd hcfsd:tcp_socket { read write };
+
+#============= adbd ==============
+# Allow to permission on hcfs log file (adb pull, read)
+allow adbd hcfs_data_file:file { getattr read open };
+allow shell hcfs_data_file:file { open read };
