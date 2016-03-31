@@ -38,15 +38,6 @@
 # levelFrom=app or levelFrom=all is only supported for _app UIDs.
 # level may be used to specify a fixed level for any UID.
 #
-isSystemServer=true domain=system_server
-user=system seinfo=platform domain=system_app type=system_app_data_file
-user=bluetooth seinfo=platform domain=bluetooth type=bluetooth_data_file
-user=nfc seinfo=platform domain=nfc type=nfc_data_file
-user=radio seinfo=platform domain=radio type=radio_data_file
-user=shared_relro domain=shared_relro
-user=shell seinfo=platform domain=shell type=shell_data_file
-user=_isolated domain=isolated_app levelFrom=user
-user=_app seinfo=platform domain=platform_app type=app_data_file levelFrom=user
-user=_app domain=untrusted_app type=app_data_file levelFrom=user
+
 # TeraFonn Management APP
 user=_app seinfo=terafonn name=com.hopebaytech.hcfsmgmt domain=terafonn_app type=terafonn_data_file
