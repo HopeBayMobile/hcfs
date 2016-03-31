@@ -25,21 +25,9 @@ allow hcfsapid system_data_file:dir remove_name;
 allow hcfsapid app_data_file:dir open;
 
 # Allow permissions on internal mountpoint
-typeattribute app_data_file hcfs_internal_domain;
-typeattribute system_app_data_file hcfs_internal_domain;
-typeattribute system_data_file hcfs_internal_domain;
-typeattribute radio_data_file hcfs_internal_domain;
-typeattribute bluetooth_data_file hcfs_internal_domain;
-typeattribute shell_data_file hcfs_internal_domain;
-typeattribute location_app_data_file hcfs_internal_domain;
-typeattribute qsee_svc_app_data_file hcfs_internal_domain;
-typeattribute qtitetherservice_app_data_file hcfs_internal_domain;
-# /data/app
-typeattribute apk_data_file hcfs_internal_domain;
-typeattribute apk_tmp_file hcfs_internal_domain;
-
-allow hcfsapid hcfs_internal_domain:dir { search getattr read open };
-allow hcfsapid hcfs_internal_domain:file { getattr };
+define(`hcfs_internal_dataset', `{ app_data_file system_app_data_file system_data_file radio_data_file bluetooth_data_file shell_data_file location_app_data_file qsee_svc_app_data_file qtitetherservice_app_data_file apk_data_file apk_tmp_file }')
+allow hcfsapid hcfs_internal_dataset:dir { search getattr read open };
+allow hcfsapid hcfs_internal_dataset:file { getattr };
 
 # Allow permisssions on externel mountpoint
 allow hcfsapid fuse:dir { read open search getattr };
