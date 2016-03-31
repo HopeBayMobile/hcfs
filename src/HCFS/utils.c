@@ -1700,8 +1700,9 @@ int get_meta_size(ino_t inode, long long *metasize)
 	struct stat metastat;
 	int ret, ret_code;
 
-	fetch_meta_path(metapath, inode);
-	ret = stat(metapath, &metastat);
+	//fetch_meta_path(metapath, inode);
+	// ret = stat(metapath, &metastat); //testing
+	ret = 0;
 	if (ret < 0) {
 		ret_code = errno;
 		write_log(0, "Error on get stat of meta %"PRIu64
@@ -1709,7 +1710,8 @@ int get_meta_size(ino_t inode, long long *metasize)
 		*metasize = 0;
 		return -ret_code;
 	}
-	*metasize = metastat.st_size;
+	*metasize = 0;
+	//*metasize = metastat.st_size;
 
 	return 0;
 }

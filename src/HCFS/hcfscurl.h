@@ -20,7 +20,7 @@
 #include "objmeta.h"
 #include "params.h"
 
-#define MAX_DOWNLOAD_CURL_HANDLE 8
+#define MAX_DOWNLOAD_CURL_HANDLE 4
 
 typedef struct {
 	FILE *fptr;
