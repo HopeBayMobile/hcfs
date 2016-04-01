@@ -1426,7 +1426,9 @@ static inline void _translate_storage_location(FILE_STATS_TYPE *in,
 /* Helper for updating per-file statistics in fuseop.c */
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta, ino_t thisinode)
+			long long cached_size_delta,
+			long long dirty_data_size_delta,
+			ino_t thisinode)
 {
 	int ret, errcode;
 	size_t ret_size;
@@ -1441,6 +1443,9 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 	meta_stats.num_blocks += num_blocks_delta;
 	meta_stats.num_cached_blocks += num_cached_blocks_delta;
 	meta_stats.cached_size += cached_size_delta;
+	meta_stats.dirty_data_size += dirty_data_size_delta;
+	if (meta_stats.dirty_data_size < 0)
+		meta_stats.dirty_data_size = 0;
 	_translate_storage_location(&meta_stats, &newdirstats);
 
 	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),

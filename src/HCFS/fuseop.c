@@ -2337,7 +2337,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 				   -total_deleted_dirty_cache);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
-				inode_index);
+				-total_deleted_dirty_cache, inode_index);
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -2367,6 +2367,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	int ret, errcode;
 	long long cache_delta;
 	long long cache_block_delta;
+	long long block_dirty_size;
 	char tmpstatus;
 	BLOCK_ENTRY *last_block_entry;
 
@@ -2613,12 +2614,12 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		if (tmpstatus == ST_BOTH)
-			change_system_meta(0, 0, new_block_size - old_block_size,
-					0, new_block_size);
-		else
-			change_system_meta(0, 0, new_block_size - old_block_size,
-					0, new_block_size - old_block_size);
+		/* When status is BOTH, this truncated block is a new dirty
+		 * block. Otherwise it is an old dirty block */
+		block_dirty_size = (tmpstatus == ST_BOTH ? new_block_size :
+				new_block_size - old_block_size);
+		change_system_meta(0, 0, new_block_size - old_block_size,
+				0, block_dirty_size);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -2628,7 +2629,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		if (ret < 0)
 			return ret;
 		ret = update_file_stats((*body_ptr)->fptr, 0,
-				cache_block_delta, cache_delta, this_inode);
+				cache_block_delta, cache_delta,
+				block_dirty_size, this_inode);
 		if (ret < 0) {
 			meta_cache_close_file(*body_ptr);
 			return ret;
@@ -3381,7 +3383,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
 						1, tempstat2.st_size,
-						fh_ptr->thisinode);
+						0, fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
 			ret = super_block_mark_dirty(fh_ptr->thisinode);
@@ -3970,6 +3972,7 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
 						1, tempstat2.st_size,
+						tempstat2.st_size,
 						fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
@@ -4169,7 +4172,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				return 0;
 			}
 			ret = update_file_stats(tmpptr->fptr, 1,
-						1, 0, fh_ptr->thisinode);
+						1, 0, 0, fh_ptr->thisinode);
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;

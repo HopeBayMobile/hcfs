@@ -70,7 +70,9 @@ int update_sb_size();
 
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta, ino_t thisinode);
+			long long cached_size_delta,
+			long long dirty_data_size_delta,
+			ino_t thisinode);
 /* Function for checking if a file is local, cloud, or hybrid */
 int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 

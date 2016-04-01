@@ -166,6 +166,7 @@ typedef struct {
 	long long num_blocks;
 	long long num_cached_blocks;
 	long long cached_size;
+	long long dirty_data_size;
 } FILE_STATS_TYPE;
 
 /* Defining the structure of symbolic link meta */
