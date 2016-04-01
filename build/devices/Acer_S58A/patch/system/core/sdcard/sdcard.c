@@ -1916,36 +1916,34 @@ static void run(const char* source_path, const char* label, uid_t uid,
                 exit(1);
             }
         }
+
+        /* Drop privs */
+        if (setgroups(sizeof(kGroups) / sizeof(kGroups[0]), kGroups) < 0) {
+            ERROR("cannot setgroups: %s\n", strerror(errno));
+            exit(1);
+        }
+        if (setgid(gid) < 0) {
+            ERROR("cannot setgid: %s\n", strerror(errno));
+            exit(1);
+        }
+        if (setuid(uid) < 0) {
+            ERROR("cannot setuid: %s\n", strerror(errno));
+            exit(1);
+        }
+
+        if (multi_user) {
+            fs_prepare_dir(global.obb_path, 0775, uid, gid);
+        }
+
+        if (pthread_create(&thread_default, NULL, start_handler, &handler_default)
+                || pthread_create(&thread_read, NULL, start_handler, &handler_read)
+                || pthread_create(&thread_write, NULL, start_handler, &handler_write)) {
+            ERROR("failed to pthread_create\n");
+            exit(1);
+        }
     }
 
-    /* Drop privs */
-    if (setgroups(sizeof(kGroups) / sizeof(kGroups[0]), kGroups) < 0) {
-        ERROR("cannot setgroups: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (setgid(gid) < 0) {
-        ERROR("cannot setgid: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (setuid(uid) < 0) {
-        ERROR("cannot setuid: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    if (multi_user) {
-        fs_prepare_dir(global.obb_path, 0775, uid, gid);
-    }
-
-    if (pthread_create(&thread_default, NULL, start_handler, &handler_default)
-            || pthread_create(&thread_read, NULL, start_handler, &handler_read)
-            || pthread_create(&thread_write, NULL, start_handler, &handler_write)) {
-        ERROR("failed to pthread_create\n");
-        exit(1);
-    }
-
-    if (is_mount == 0) {
-        watch_package_list(&global);
-    }
+    watch_package_list(&global);
 
     ERROR("terminated prematurely\n");
     exit(1);
