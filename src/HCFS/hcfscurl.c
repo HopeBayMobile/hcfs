@@ -315,7 +315,7 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 					object_meta->len_enc_session_key =
 					    strlen(s2);
 					object_meta->enc_session_key = calloc(
-					    object_meta->len_enc_session_key,
+					    object_meta->len_enc_session_key+10,
 					    sizeof(char));
 					memcpy(
 					    object_meta->enc_session_key, s2,
@@ -666,7 +666,7 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
 	res = curl_easy_perform(curl);

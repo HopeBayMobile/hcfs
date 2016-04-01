@@ -424,6 +424,7 @@ int super_block_mark_dirty(ino_t this_inode)
 	int ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 	char need_write;
+	long long now_meta_size, dirty_delta_meta_size;
 
 	need_write = FALSE;
 	ret_val = 0;
@@ -443,6 +444,21 @@ int super_block_mark_dirty(ino_t this_inode)
 				return ret_val;
 			}
 			need_write = TRUE;
+		} else if (tempentry.status == IS_DIRTY) {
+			/* When marking dirty again, just update
+			 * dirty meta size */
+			get_meta_size(this_inode, &now_meta_size);
+			if (now_meta_size > 0) {
+				dirty_delta_meta_size = now_meta_size -
+						tempentry.dirty_meta_size;
+				if (dirty_delta_meta_size != 0) {
+					tempentry.dirty_meta_size =
+							now_meta_size;
+					change_system_meta(0, 0, 0, 0,
+							dirty_delta_meta_size);
+					need_write = TRUE;
+				}
+			}
 		}
 		if (tempentry.in_transit == TRUE) {
 			need_write = TRUE;

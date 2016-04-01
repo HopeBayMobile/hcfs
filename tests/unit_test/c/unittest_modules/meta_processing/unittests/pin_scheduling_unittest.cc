@@ -12,7 +12,13 @@ extern "C" {
 extern SYSTEM_DATA_HEAD *hcfs_system;
 extern SUPER_BLOCK_CONTROL *sys_super_block;
 
-class pinning_loopTest : public ::testing::Test {
+struct timespec UT_sleep {
+	.tv_sec = 0,
+	.tv_nsec = 99999999 /*0.1 sec sleep*/
+};
+
+class pinning_loopTest : public ::testing::Test
+{
 protected:
 	void SetUp()
 	{
@@ -57,8 +63,13 @@ TEST_F(pinning_loopTest, WorkNormally)
 	mock_inodes_counter = 1;
 	
 	/* Run */
+	hcfs_system->system_going_down = FALSE;
 	init_pin_scheduler();
-	sleep(5);
+	for (int i = 0; i < 100; i++) {
+		nanosleep(&UT_sleep, NULL);
+		if (TOTAL_MOCK_INODES == verified_inodes_counter)
+			break;
+	}
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_MOCK_INODES, verified_inodes_counter);
@@ -130,6 +141,7 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 
 	hcfs_system->system_going_down = TRUE;
         pthread_join(pinning_scheduler.pinning_collector, NULL);
+	hcfs_system->system_going_down = FALSE;
 
 	/* Verify */
 	std::cout << "Begin to Verify" << std::endl;
@@ -156,6 +168,9 @@ protected:
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 			malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+			malloc(sizeof(SUPER_BLOCK_CONTROL));
+		memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
 
 		memset(&pinning_scheduler, 0, sizeof(PINNING_SCHEDULER));
 		sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
@@ -166,6 +181,7 @@ protected:
 	void TearDown()
 	{
 		free(hcfs_system);
+		free(sys_super_block);
 	}
 };
 
