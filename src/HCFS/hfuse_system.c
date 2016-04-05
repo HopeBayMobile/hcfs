@@ -49,6 +49,7 @@
 #include "mount_manager.h"
 #include "FS_manager.h"
 #include "path_reconstruct.h"
+#include "hcfs_fromcloud.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -64,8 +65,9 @@
 *************************************************************************/
 int init_hcfs_system_data(void)
 {
-	int errcode;
+	int errcode, ret;
 	size_t ret_size;
+	long long quota;
 
 #ifdef _ANDROID_ENV_
 	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
@@ -127,6 +129,18 @@ int init_hcfs_system_data(void)
 	FREAD(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
 	      hcfs_system->system_val_fptr);
 
+	/* Use backup quota temporarily. It will be updated later. */
+	ret = get_quota_from_backup(&quota);
+	if (ret < 0) {
+		write_log(5, "Backup usermeta looks unreliable. "
+				"tmp set quota to %lld\n", CACHE_HARD_LIMIT);
+		hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
+	} else {
+		write_log(5, "Backup usermeta exist. set quota to %lld\n",
+				quota);
+		hcfs_system->systemdata.system_quota = quota;
+	}
+
 	return 0;
 errcode_handle:
 	fclose(hcfs_system->system_val_fptr);
@@ -175,13 +189,13 @@ int init_hfuse(void)
 {
 	int ret_val;
 
+	ret_val = init_hcfs_system_data();
+	if (ret_val < 0)
+		return ret_val;
 	ret_val = super_block_init();
 	if (ret_val < 0)
 		return ret_val;
 	ret_val = init_system_fh_table();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = init_hcfs_system_data();
 	if (ret_val < 0)
 		return ret_val;
 
@@ -249,6 +263,16 @@ void init_backend_related_module(void)
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
+		/* Init usermeta curl handle */
+		snprintf(download_usermeta_curl_handle.id,
+			sizeof(((CURL_HANDLE *)0)->id) - 1, "download_usermeta");
+		download_usermeta_curl_handle.curl_backend = NONE;
+		download_usermeta_curl_handle.curl = NULL;
+
+		/* Update quota from cloud */
+		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
+		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+		update_quota();
 	}
 }
 
@@ -361,8 +385,9 @@ int main(int argc, char **argv)
 	write_log(2, "\nStart logging\n");
 
 	/* Init backend related services */
-	if (CURRENT_BACKEND != NONE)
+	if (CURRENT_BACKEND != NONE) {
 		init_backend_related_module();
+	}
 
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
@@ -408,6 +433,14 @@ int main(int argc, char **argv)
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		sem_init(&download_curl_control_sem, 0, 1);
+
+		if (CURRENT_BACKEND != NONE) {
+			/* Update quota from cloud */
+			memset(&download_usermeta_ctl, 0,
+					sizeof(DOWNLOAD_USERMETA_CTL));
+			sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+			update_quota();
+		}
 
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);

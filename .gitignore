@@ -74,6 +74,7 @@ hcfs_android_log
 
 # Build Process
 /build/.ndk_build
+/build/.ndk_dir
 /build/.init_ccache
 /build/obj
 /build/out

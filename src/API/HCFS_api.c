@@ -17,7 +17,7 @@
 #include "utils.h"
 
 
-void _json_response(char **json_str, char result, int code, json_t *data)
+void _json_response(char **json_str, char result, int32_t code, json_t *data)
 {
 
 	json_t *res_obj;
@@ -35,10 +35,10 @@ void _json_response(char **json_str, char result, int code, json_t *data)
 	json_decref(res_obj);
 }
 
-int _api_socket_conn()
+int32_t _api_socket_conn()
 {
 
-	int fd, status;
+	int32_t fd, status;
 	struct sockaddr_un addr;
 
 	addr.sun_family = AF_UNIX;
@@ -54,8 +54,8 @@ int _api_socket_conn()
 void HCFS_set_config(char **json_res, char *key, char *value)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[1000];
 
@@ -71,12 +71,12 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 	CONCAT_ARGS(key);
 	CONCAT_ARGS(value)
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -89,8 +89,8 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 void HCFS_get_config(char **json_res, char *key)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[1000];
 	char value[500];
@@ -107,13 +107,13 @@ void HCFS_get_config(char **json_res, char *key)
 
 	CONCAT_ARGS(key);
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 		if (ret_code == 1) {
 			data = json_object();
 			json_object_set_new(data, key, json_string(""));
@@ -138,13 +138,13 @@ void HCFS_get_config(char **json_res, char *key)
 void HCFS_stat(char **json_res)
 {
 
-	int fd, status, size_msg, ret_code;
-	int cloud_stat;
-	unsigned int code, reply_len, cmd_len, buf_idx;
-	long long vol_usage, cloud_usage;
-	long long cache_total, cache_used, cache_dirty;
-	long long pin_max, pin_total;
-	long long xfer_up, xfer_down;
+	int32_t fd, status, size_msg, ret_code;
+	int32_t cloud_stat;
+	uint32_t code, reply_len, cmd_len, buf_idx;
+	int64_t quota, vol_usage, cloud_usage;
+	int64_t cache_total, cache_used, cache_dirty;
+	int64_t pin_max, pin_total;
+	int64_t xfer_up, xfer_down;
 	char buf[512];
 	json_t *data;
 
@@ -157,17 +157,18 @@ void HCFS_stat(char **json_res)
 	code = GETSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
 		size_msg = recv(fd, buf, reply_len, 0);
 		buf_idx = 0;
 
+		READ_LL_ARGS(quota);
 		READ_LL_ARGS(vol_usage);
 		READ_LL_ARGS(cloud_usage);
 		READ_LL_ARGS(cache_total);
@@ -178,10 +179,11 @@ void HCFS_stat(char **json_res)
 		READ_LL_ARGS(xfer_up);
 		READ_LL_ARGS(xfer_down);
 
-		memcpy(&cloud_stat, &(buf[buf_idx]), sizeof(int));
-		buf_idx += sizeof(int);
+		memcpy(&cloud_stat, &(buf[buf_idx]), sizeof(int32_t));
+		buf_idx += sizeof(int32_t);
 
 		data = json_object();
+		json_object_set_new(data, "quota", json_integer(quota));
 		json_object_set_new(data, "vol_used", json_integer(vol_usage));
 		json_object_set_new(data, "cloud_used", json_integer(cloud_usage));
 		json_object_set_new(data, "cache_total", json_integer(cache_total));
@@ -202,8 +204,8 @@ void HCFS_stat(char **json_res)
 void HCFS_reload_config(char **json_res)
 {
 
-	int fd, size_msg, ret_code;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, size_msg, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
 
 	fd = _api_socket_conn();
@@ -215,11 +217,11 @@ void HCFS_reload_config(char **json_res)
 	code = RELOADCONFIG;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -229,11 +231,11 @@ void HCFS_reload_config(char **json_res)
 	close(fd);
 }
 
-void HCFS_toggle_sync(char **json_res, int enabled)
+void HCFS_toggle_sync(char **json_res, int32_t enabled)
 {
 
-	int fd, size_msg, ret_code;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, size_msg, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
 
 	fd = _api_socket_conn();
@@ -243,14 +245,14 @@ void HCFS_toggle_sync(char **json_res, int enabled)
 	}
 
 	code = SETSYNCSWITCH;
-	cmd_len = sizeof(int);
+	cmd_len = sizeof(int32_t);
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, &enabled, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -263,8 +265,8 @@ void HCFS_toggle_sync(char **json_res, int enabled)
 void HCFS_get_sync_status(char **json_res)
 {
 
-	int fd, size_msg, ret_code;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, size_msg, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
 	json_t *data;
 
@@ -277,11 +279,11 @@ void HCFS_get_sync_status(char **json_res)
 	code = GETSYNCSWITCH;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0) {
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -298,8 +300,8 @@ void HCFS_get_sync_status(char **json_res)
 void HCFS_pin_path(char **json_res, char *pin_path)
 {
 
-	int fd, size_msg, ret_code;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, size_msg, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
 	char buf[500];
 
@@ -315,12 +317,12 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 	/* Append paths to socket msg */
 	CONCAT_ARGS(pin_path);
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -334,8 +336,8 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 		  char *sd0_path, char *sd1_path)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[1000];
 
@@ -354,12 +356,12 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 	CONCAT_ARGS(sd0_path)
 	CONCAT_ARGS(sd1_path)
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -372,8 +374,8 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 void HCFS_unpin_path(char **json_res, char *pin_path)
 {
 
-	int fd, size_msg, ret_code;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, size_msg, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
 	char buf[500];
 
@@ -389,12 +391,12 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 	/* Append paths to socket msg */
 	CONCAT_ARGS(pin_path);
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -409,8 +411,8 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 		    char *sd0_path, char *sd1_path)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[1000];
 
@@ -429,12 +431,12 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 	CONCAT_ARGS(sd0_path)
 	CONCAT_ARGS(sd1_path)
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -447,8 +449,8 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 void HCFS_pin_status(char **json_res, char *pathname)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -459,12 +461,12 @@ void HCFS_pin_status(char **json_res, char *pathname)
 	code = CHECKPIN;
 	cmd_len = strlen(pathname) + 1;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, pathname, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -477,10 +479,10 @@ void HCFS_pin_status(char **json_res, char *pathname)
 void HCFS_dir_status(char **json_res, char *pathname)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len, buf_idx;
-	long long num_local, num_cloud, num_hybrid;
-	char buf[3*sizeof(long long)];
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len, buf_idx;
+	int64_t num_local, num_cloud, num_hybrid;
+	char buf[3*sizeof(int64_t)];
 	json_t *data;
 
 	fd = _api_socket_conn();
@@ -492,13 +494,13 @@ void HCFS_dir_status(char **json_res, char *pathname)
 	code = CHECKDIRSTAT;
 	cmd_len = strlen(pathname) + 1;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, pathname, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
 		size_msg = recv(fd, buf, reply_len, 0);
@@ -522,8 +524,8 @@ void HCFS_dir_status(char **json_res, char *pathname)
 void HCFS_file_status(char **json_res, char *pathname)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -534,12 +536,12 @@ void HCFS_file_status(char **json_res, char *pathname)
 	code = CHECKLOC;
 	cmd_len = strlen(pathname) + 1;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, pathname, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -552,8 +554,8 @@ void HCFS_file_status(char **json_res, char *pathname)
 void HCFS_reset_xfer(char **json_res)
 {
 
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -564,11 +566,11 @@ void HCFS_reset_xfer(char **json_res)
 	code = RESETXFERSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
@@ -578,69 +580,3 @@ void HCFS_reset_xfer(char **json_res)
 	close(fd);
 }
 
-void HCFS_reboot(char **json_res)
-{
-
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
-
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = SYSREBOOT;
-	cmd_len = 0;
-
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
-
-	_json_response(json_res, TRUE, ret_code, NULL);
-
-	close(fd);
-}
-
-void HCFS_get_pkg_uid(char **json_res, char *pkg_name)
-{
-
-	int fd, status, size_msg, ret_code;
-	unsigned int code, reply_len, cmd_len;
-	ssize_t str_len;
-	char buf[1000];
-	char value[500];
-	json_t *data;
-
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = QUERYPKGUID;
-	cmd_len = 0;
-
-	CONCAT_ARGS(pkg_name);
-
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
-
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	if (reply_len == 0) {
-		size_msg = recv(fd, &ret_code, sizeof(int), 0);
-		_json_response(json_res, FALSE, -ret_code, NULL);
-	} else {
-		size_msg = recv(fd, value, reply_len, 0);
-		value[reply_len] = 0;
-		data = json_object();
-		json_object_set_new(data, "uid", json_string(value));
-
-		_json_response(json_res, TRUE, 0, data);
-	}
-
-	close(fd);
-}

@@ -16,8 +16,10 @@ extern "C" {
 #include "fuseop.h"
 #include "super_block.h"
 #include "atomic_tocloud.h"
+#include "mount_manager.h"
 }
 
+extern SYSTEM_CONF_STRUCT *system_config;
 
 class uploadEnvironment : public ::testing::Environment {
  public:
@@ -25,7 +27,7 @@ class uploadEnvironment : public ::testing::Environment {
 
   virtual void SetUp() {
     int shm_key;
-
+/*
     shm_key = shmget(5678, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
     if (shm_key < 0) {
 	    int errcode;
@@ -33,9 +35,8 @@ class uploadEnvironment : public ::testing::Environment {
 	    printf("Error %d %s\n", errcode, strerror(errcode));
 	    return;
     }
-    hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
-
-    //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+  */
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
@@ -56,6 +57,8 @@ class uploadEnvironment : public ::testing::Environment {
     }
     system_config = (SYSTEM_CONF_STRUCT *)
 	    malloc(sizeof(SYSTEM_CONF_STRUCT));
+    if (!system_config)
+	printf("Fail to allocate memory\n");
     memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
     METAPATH = (char *) malloc(METAPATHLEN);
@@ -745,23 +748,26 @@ protected:
 		FILE_META_TYPE mock_file_meta;
 		BLOCK_ENTRY_PAGE mock_block_page;
 		BLOCK_UPLOADING_PAGE block_uploading_page;
+		FILE_STATS_TYPE mock_statistics;
+		CLOUD_RELATED_DATA mock_cloud_data;
 		FILE *mock_metaptr, *mock_touploadptr;
 		char buf[5000];
 		size_t size;
 
 		memset(&block_uploading_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
-
 		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
 		mock_stat.st_size = total_page * MAX_BLOCK_ENTRIES_PER_PAGE *
 			MAX_BLOCK_SIZE; /* Let total_blocks = 1000000/1000 = 1000 */
 		mock_stat.st_mode = S_IFREG;
 		mock_file_meta.root_inode = 10;
-		fseek(mock_metaptr, 0, SEEK_SET);
-		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); /* Write stat */
-		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); /* Write file meta */
 
-		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
+		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
+		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
+		fwrite(&mock_statistics, sizeof(FILE_STATS_TYPE), 1, mock_metaptr);
+		fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_metaptr);
+
+		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
 			mock_block_page.block_entries[i].seqnum = 1;
 
@@ -879,6 +885,9 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	metaptr = fopen(metapath, "r+");
 	fseek(metaptr, sizeof(struct stat), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
+	fseek(metaptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA),
+			SEEK_SET);
 	while (!feof(metaptr)) {
 		/* Linearly read block meta */
 		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); 
@@ -1112,7 +1121,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   char tmppath2[200];
   int ret;
   FILE *fptr;
-  long long sys_size, num_ino;
+  FS_CLOUD_STAT_T fs_cloud_stat;
 
   snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
   snprintf(tmppath2, 199, "%s/FSstat14", tmppath);
@@ -1127,7 +1136,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, 101);
+  ret = update_backend_stat(14, 1024768, 5566, 101);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1136,12 +1145,13 @@ TEST_F(update_backend_statTest, EmptyStat) {
   /* Verify content */
 
   fptr = fopen(tmppath2, "r");
-  fread(&sys_size, sizeof(long long), 1, fptr);
-  fread(&num_ino, sizeof(long long), 1, fptr);
+  fseek(fptr, 0, SEEK_SET);
+  fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  EXPECT_EQ(1024768, sys_size);
-  EXPECT_EQ(101, num_ino);
+  EXPECT_EQ(1024768, fs_cloud_stat.backend_system_size);
+  EXPECT_EQ(5566, fs_cloud_stat.backend_meta_size);
+  EXPECT_EQ(101, fs_cloud_stat.backend_num_inodes);
 
   /* Cleanup */
   unlink(tmppath2);
@@ -1156,7 +1166,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   char tmppath3[200];
   int ret;
   FILE *fptr;
-  long long sys_size, num_ino;
+  FS_CLOUD_STAT_T fs_cloud_stat;
 
   snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
   snprintf(tmppath2, 199, "%s/FSstat14", tmppath);
@@ -1172,18 +1182,17 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  sys_size = 7687483;
-  num_ino = 34334;
+  fs_cloud_stat.backend_system_size = 7687483;
+  fs_cloud_stat.backend_meta_size = 5566;
+  fs_cloud_stat.backend_num_inodes = 34334;
   fptr = fopen(tmppath2, "w");
-  fwrite(&sys_size, sizeof(long long), 1, fptr);
-  fwrite(&num_ino, sizeof(long long), 1, fptr);
+  fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
   fptr = fopen(tmppath3, "w");
-  fwrite(&sys_size, sizeof(long long), 1, fptr);
-  fwrite(&num_ino, sizeof(long long), 1, fptr);
+  fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  ret = update_backend_stat(14, 1024768, -101);
+  ret = update_backend_stat(14, 1024768, 123, -101);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1192,66 +1201,16 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   /* Verify content */
 
   fptr = fopen(tmppath2, "r");
-  fread(&sys_size, sizeof(long long), 1, fptr);
-  fread(&num_ino, sizeof(long long), 1, fptr);
+  fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  EXPECT_EQ(1024768 + 7687483, sys_size);
-  EXPECT_EQ(34334 - 101, num_ino);
+  EXPECT_EQ(1024768 + 7687483, fs_cloud_stat.backend_system_size);
+  EXPECT_EQ(5566 + 123, fs_cloud_stat.backend_meta_size);
+  EXPECT_EQ(34334 - 101, fs_cloud_stat.backend_num_inodes);
 
   /* Cleanup */
   unlink(tmppath2);
   unlink(tmppath3);
-  rmdir(tmppath);
- }
-
-TEST_F(update_backend_statTest, UpdateLessThanZero) {
-  char tmppath[200];
-  char tmppath2[200];
-  int ret;
-  FILE *fptr;
-  long long sys_size, num_ino;
-
-  snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
-  snprintf(tmppath2, 199, "%s/FSstat14", tmppath);
-
-  ret = access(tmppath, F_OK);
-  ASSERT_NE(0, ret);
-  init_sync_stat_control();
-
-  ret = access(tmppath, F_OK);
-  EXPECT_EQ(0, ret);
-
-  ret = access(tmppath2, F_OK);
-  ASSERT_NE(0, ret);
-
-  sys_size = 7687;
-  num_ino = 34;
-  fptr = fopen(tmppath2, "w");
-  fwrite(&sys_size, sizeof(long long), 1, fptr);
-  fwrite(&num_ino, sizeof(long long), 1, fptr);
-  fclose(fptr);
-
-  ret = update_backend_stat(14, -1024768, -101);
-
-  EXPECT_EQ(0, ret);
-  ret = access(tmppath2, F_OK);
-  ASSERT_EQ(0, ret);
-
-  /* Verify content */
-
-  fptr = fopen(tmppath2, "r");
-  fread(&sys_size, sizeof(long long), 1, fptr);
-  fread(&num_ino, sizeof(long long), 1, fptr);
-  fclose(fptr);
-
-  EXPECT_EQ(0, sys_size);
-  EXPECT_EQ(0, num_ino);
-
-  /* Cleanup */
-  unlink(tmppath2);
-  snprintf(tmppath2, 199, "%s/tmpFSstat14", tmppath);
-  unlink(tmppath2);
   rmdir(tmppath);
  }
 
@@ -1261,6 +1220,7 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
   int ret;
   FILE *fptr;
   long long sys_size, num_ino;
+  FS_CLOUD_STAT_T fs_cloud_stat;
 
   snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
   snprintf(tmppath2, 199, "%s/FSstat14", tmppath);
@@ -1276,7 +1236,7 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, -101);
+  ret = update_backend_stat(14, 1024768, 111, -101);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1285,12 +1245,12 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
   /* Verify content */
 
   fptr = fopen(tmppath2, "r");
-  fread(&sys_size, sizeof(long long), 1, fptr);
-  fread(&num_ino, sizeof(long long), 1, fptr);
+  fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  EXPECT_EQ(1024768 + 7687483, sys_size);
-  EXPECT_EQ(34334 - 101, num_ino);
+  EXPECT_EQ(1024768 + 7687483, fs_cloud_stat.backend_system_size);
+  EXPECT_EQ(5566 + 111, fs_cloud_stat.backend_meta_size);
+  EXPECT_EQ(34334 - 101, fs_cloud_stat.backend_num_inodes);
 
   /* Cleanup */
   unlink(tmppath2);

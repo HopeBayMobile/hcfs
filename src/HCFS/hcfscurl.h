@@ -20,7 +20,7 @@
 #include "objmeta.h"
 #include "params.h"
 
-#define MAX_DOWNLOAD_CURL_HANDLE 8
+#define MAX_DOWNLOAD_CURL_HANDLE 4
 
 typedef struct {
 	FILE *fptr;
@@ -40,6 +40,7 @@ char swift_auth_string[1024];
 char swift_url_string[1024];
 
 CURL_HANDLE download_curl_handles[MAX_DOWNLOAD_CURL_HANDLE];
+CURL_HANDLE download_usermeta_curl_handle;
 short curl_handle_mask[MAX_DOWNLOAD_CURL_HANDLE];
 sem_t download_curl_control_sem;
 sem_t download_curl_sem;

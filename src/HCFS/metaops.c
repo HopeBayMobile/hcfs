@@ -1233,6 +1233,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FS_STAT_T tmpstat;
 	SYSTEM_DATA_TYPE *statptr;
 	char meta_deleted;
+	long long metasize;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1251,6 +1252,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
+	get_meta_size(this_inode, &metasize);
+
 	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
@@ -1264,7 +1267,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
 		else
-			change_mount_stat(mptr, 0, -1);
+			change_mount_stat(mptr, 0, -metasize, -1);
 		break;
 
 	case D_ISLNK:
@@ -1278,7 +1281,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
 		else
-			change_mount_stat(mptr, 0, -1);
+			change_mount_stat(mptr, 0, -metasize, -1);
 		break;
 
 	case D_ISREG:
@@ -1418,10 +1421,15 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 		if (mptr != NULL) {
-			change_mount_stat(mptr, -this_inode_stat.st_size, -1);
+			change_mount_stat(mptr, -this_inode_stat.st_size,
+					-metasize, -1);
 		} else {
 			tmpstat.num_inodes--;
-			tmpstat.system_size -= this_inode_stat.st_size;
+			tmpstat.system_size -=
+				(this_inode_stat.st_size + metasize);
+			tmpstat.meta_size -= metasize;
+			tmpstat.num_inodes -= 1;
+
 		}
 
 
@@ -1433,6 +1441,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	default:
 		break;
 	}
+
+	change_system_meta(0, -metasize, 0, 0, 0);
 
 	if (mptr == NULL) {
 		FSEEK(fptr, 0, SEEK_SET);
@@ -2097,9 +2107,16 @@ int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 	return 0;
 }
 	
-static BOOL _namespace_filter(char namespace) /* Only SECURITY now */
+static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
 {
-	return (namespace == SECURITY ? TRUE : FALSE);
+	if (namespace == SECURITY) {
+		if (!strcmp("restorecon_last", key))
+			return TRUE; /* Skip this key */
+		else
+			return FALSE; /* Do not skip. Inherit it */
+	} else {
+		return TRUE;
+	}
 }
 
 /**
@@ -2128,6 +2145,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	size_t value_size;
 	int ret;
 
+	UNUSED(this_inode);
 	key_buf = NULL;
 	value_buf = NULL;
 
@@ -2162,9 +2180,15 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		return 0;
 	}
 
-	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos);
+	ret = fetch_xattr_page(pbody_ptr, &p_xattr_page, &p_xattr_pos, FALSE);
 	if (ret < 0) {
-		goto errcode_handle;
+		if (ret == -ENOENT) {
+			meta_cache_close_file(pbody_ptr);
+			meta_cache_unlock_entry(pbody_ptr);
+			return 0;
+		} else {
+			goto errcode_handle;
+		}
 	}
 
 	/* Fetch needed size of key buffer */
@@ -2204,7 +2228,8 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	}
 
 	/* Self xattr page */
-	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page, &sel_xattr_pos);
+	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page,
+			&sel_xattr_pos, TRUE);
 	if (ret < 0) {
 		goto errcode_handle;
 	}
@@ -2226,7 +2251,7 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		}
 
 		/* Choose namespace to inherit. Only SECURITY now. */
-		if (_namespace_filter(namespace) == FALSE)
+		if (_skip_inherit_key(namespace, key) == TRUE)
 			continue;
 
 		/* Get this xattr value */

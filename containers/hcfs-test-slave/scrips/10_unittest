@@ -43,7 +43,7 @@ function oclint_report()
 # PMD's Copy/Paste Detector (CPD)
 function cpd_result()
 {
-	/ci-tools/pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir --format xml --language cpp \
+	LIB_DIR="" /ci-tools/pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir --format xml --language cpp \
 		> $repo/cpd-result.xml || return_code=$?
 	if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
 		echo pmd returns unknown error code $return_code
@@ -92,10 +92,12 @@ function clang_scan_build()
 # Run unit test
 function unittest()
 {
-	sudo rm -rf /tmp/tmp_meta_dir/ /tmp/testHCFS
 	cd $testdir/unit_test
 	./run_unittests
-	sed -i "s@$repo/@@g" $repo/tests/unit_test/c/unittest_modules/*/test_detail_*.xml
+}
+function unittest_report()
+{
+	sed -i "s@$repo/@@g" $repo/tests/unit_test/c/unittest_modules/*/test_detail_*.xml;
 }
 
 set +x
@@ -110,6 +112,7 @@ ccm_result       > /dev/null 2>&1 &
 hb_clint         > /dev/null 2>&1 &
 checkpatch
 wait
+trap unittest_report ERR EXIT
 unittest
 
 # coverage.xml

@@ -129,6 +129,7 @@ typedef struct {
 	META_CACHE_LOOKUP_ENTRY_STRUCT *last_entry;
 } META_CACHE_HEADER_STRUCT;
 
+int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize);
 int init_meta_cache_headers(void);
 int release_meta_cache_headers(void);
 int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr);

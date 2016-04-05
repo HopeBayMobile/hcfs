@@ -319,7 +319,7 @@ TEST_F(enc, get_decode_meta){
 
 TEST(get_decrypt_configfpTEST, config_path_not_found)
 {
-	unsigned char path[100] = "/path/not/existed";
+	const char path[100] = "/path/not/existed";
 	FILE* ret_fp = get_decrypt_configfp(path);
 
 	int ret = (ret_fp) ? 0 : -1;
@@ -329,7 +329,7 @@ TEST(get_decrypt_configfpTEST, config_path_not_found)
 
 TEST(get_decrypt_configfpTEST, config_content_error)
 {
-	unsigned char path[100] = "testpatterns/not_encrypted.conf";
+	const char path[100] = "testpatterns/not_encrypted.conf";
 	FILE* ret_fp = get_decrypt_configfp(path);
 
 	int ret = (ret_fp) ? 0 : -1;
@@ -341,7 +341,7 @@ TEST(get_decrypt_configfpTEST, getOK)
 {
 	char buf[200], buf2[200];
 	char unenc_path[100] = "testpatterns/not_encrypted.conf";
-	unsigned char enc_path[100] = "testpatterns/encrypted.conf";
+	const char enc_path[100] = "testpatterns/encrypted.conf";
 	FILE *unenc_fp = NULL;
 	FILE *enc_fp = NULL;
 
@@ -364,4 +364,62 @@ TEST(get_decrypt_configfpTEST, getOK)
 		ret = -1;
 
 	EXPECT_EQ(ret, 0);
+}
+
+class enc_backup_usermetaTest : public testing::Test {
+protected:
+	char usermeta_path[200];
+	char *ret_str;
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		METAPATH = "/tmp/backup_usermeta_test";
+		sprintf(usermeta_path, "%s/usermeta", METAPATH);
+		if (!access(usermeta_path, F_OK))
+			unlink(usermeta_path);
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+		mkdir(METAPATH, 0700);
+		ret_str = NULL;
+	}
+
+	void TearDown()
+	{
+		if (!access(usermeta_path, F_OK))
+			unlink(usermeta_path);
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+
+		free(system_config);
+	}
+};
+
+TEST_F(enc_backup_usermetaTest, CreateUsermeta)
+{
+	EXPECT_EQ(0, enc_backup_usermeta("alohaaloha"));
+	EXPECT_EQ(0, access(usermeta_path, F_OK));
+
+	ret_str = dec_backup_usermeta(usermeta_path);
+	ASSERT_NE((char *)NULL, ret_str);
+	EXPECT_EQ(0, strcmp("alohaaloha", ret_str)) << ret_str;
+
+	free(ret_str);
+	unlink(usermeta_path);
+}
+
+TEST_F(enc_backup_usermetaTest, ReCreateNewUsermeta)
+{
+	mknod(usermeta_path, 0700, 0);		
+
+	EXPECT_EQ(0, enc_backup_usermeta("alohaaloha"));
+	EXPECT_EQ(0, access(usermeta_path, F_OK));
+
+	ret_str = dec_backup_usermeta(usermeta_path);
+	ASSERT_NE((char *)NULL, ret_str);
+	EXPECT_EQ(0, strcmp("alohaaloha", ret_str)) << ret_str;
+
+	free(ret_str);
+	unlink(usermeta_path);
 }

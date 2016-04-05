@@ -611,3 +611,141 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 }
 
 /* End of unittest for fetch_backend_block */
+
+/* Unittest for fetch_quota_from_cloud */
+class fetch_quota_from_cloudTest : public ::testing::Test {
+protected:
+	char download_path[200];
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->metapath = (char *)malloc(100);
+		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+		mkdir(METAPATH, 0700);
+		hcfs_system->system_going_down = FALSE;
+		hcfs_system->sync_paused = OFF;
+
+		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
+		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+
+		sprintf(download_path, "%s/new_usermeta", METAPATH);
+		hcfs_system->systemdata.system_quota = 0;
+
+		/* global var to control UT */
+		usermeta_notfound = FALSE;
+		FETCH_BACKEND_BLOCK_TESTING = FALSE;
+	}
+
+	void TearDown()
+	{
+		if (!access(download_path, F_OK))
+			unlink(download_path);
+		rmdir(METAPATH);
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(fetch_quota_from_cloudTest, UsermetaNotFoundOnCloud)
+{
+	usermeta_notfound = TRUE;
+	download_usermeta_ctl.active = TRUE;
+	fetch_quota_from_cloud(NULL);
+
+	EXPECT_EQ(-1, access(download_path, F_OK));
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+	EXPECT_EQ(0, hcfs_system->systemdata.system_quota);
+}
+
+TEST_F(fetch_quota_from_cloudTest, FetchSuccess)
+{
+	usermeta_notfound = FALSE;
+	download_usermeta_ctl.active = TRUE;
+	fetch_quota_from_cloud(NULL);
+
+	EXPECT_EQ(-1, access(download_path, F_OK));
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+	EXPECT_EQ(5566, hcfs_system->systemdata.system_quota);
+}
+
+TEST_F(fetch_quota_from_cloudTest, SystemGoingDown)
+{
+	hcfs_system->system_going_down = TRUE;
+	download_usermeta_ctl.active = TRUE;
+	fetch_quota_from_cloud(NULL);
+
+	EXPECT_EQ(-1, access(download_path, F_OK));
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+	EXPECT_EQ(0, hcfs_system->systemdata.system_quota);
+}
+/* End of unittest for fetch_quota_from_cloud */
+
+/* Unittest for update_quota() */
+class update_quotaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->metapath = (char *)malloc(100);
+		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+		mkdir(METAPATH, 0700);
+		CURRENT_BACKEND = NONE;
+
+		memset(&download_usermeta_ctl, 0,
+				sizeof(DOWNLOAD_USERMETA_CTL));
+		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+		download_usermeta_ctl.active = FALSE;
+
+    		hcfs_system->system_going_down = FALSE;
+		hcfs_system->sync_paused = FALSE;
+	}
+
+	void TearDown()
+	{
+		rmdir(METAPATH);
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(update_quotaTest, NoBackend_RejectUpdate)
+{
+	CURRENT_BACKEND = NONE;
+
+	EXPECT_EQ(-EPERM, update_quota());
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+}
+
+TEST_F(update_quotaTest, ThreadIsRunning)
+{
+	download_usermeta_ctl.active = TRUE;
+	CURRENT_BACKEND = SWIFT;
+
+	EXPECT_EQ(-EBUSY, update_quota());
+	EXPECT_EQ(TRUE, download_usermeta_ctl.active);
+}
+
+TEST_F(update_quotaTest, CreateThreadSuccess)
+{
+	/* Let thread sleep in the loop */
+    	hcfs_system->system_going_down = FALSE;
+	hcfs_system->sync_paused = TRUE;
+	download_usermeta_ctl.active = FALSE;
+	CURRENT_BACKEND = SWIFT;
+
+	EXPECT_EQ(0, update_quota());
+	EXPECT_EQ(TRUE, download_usermeta_ctl.active);
+
+	/* Wake the thread up */
+    	hcfs_system->system_going_down = TRUE;
+	sleep(2);
+	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
+}
+
+/* End of unittest for update_quota() */

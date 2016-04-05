@@ -63,3 +63,4 @@ TEST_REVERT_STRUCT test_delete_struct;
 
 char is_first_upload;
 char fetch_from_cloud_fail;
+char usermeta_notfound;

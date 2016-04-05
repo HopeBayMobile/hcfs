@@ -343,12 +343,14 @@ static inline void _check_del_progress_file(ino_t inode)
 }
 
 static inline int _read_meta(char *todel_metapath, mode_t this_mode,
-		ino_t *root_inode, BOOL *meta_on_cloud)
+		ino_t *root_inode, BOOL *meta_on_cloud,
+		long long *backend_size_change, long long *meta_size_change)
 {
 	FILE *metafptr;
 	FILE_META_TYPE tempfilemeta;
 	DIR_META_TYPE tempdirmeta;
 	SYMLINK_META_TYPE tempsymmeta;
+	CLOUD_RELATED_DATA cloud_related_data;
 	int ret, errcode;
 	size_t ret_size;
 
@@ -365,25 +367,30 @@ static inline int _read_meta(char *todel_metapath, mode_t this_mode,
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+				sizeof(FILE_STATS_TYPE), SEEK_SET);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+				metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempfilemeta.root_inode;
-		*meta_on_cloud = tempfilemeta.upload_seq > 0 ? TRUE : FALSE;
 
 	} else if (S_ISDIR(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+				metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempdirmeta.root_inode;
-		*meta_on_cloud = tempdirmeta.upload_seq > 0 ? TRUE : FALSE;
 
 	} else if (S_ISLNK(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+				metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempsymmeta.root_inode;
-		*meta_on_cloud = tempsymmeta.upload_seq > 0 ? TRUE : FALSE;
 
 	} else {
 		write_log(0, "Error: Unknown type %d\n", this_mode);
@@ -391,6 +398,10 @@ static inline int _read_meta(char *todel_metapath, mode_t this_mode,
 	}
 
 	fclose(metafptr);
+	*meta_on_cloud = cloud_related_data.upload_seq > 0 ? TRUE : FALSE;
+	*backend_size_change = cloud_related_data.size_last_upload;
+	*meta_size_change = cloud_related_data.meta_last_upload;
+
 	return 0;
 
 errcode_handle:
@@ -436,7 +447,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char mlock, backend_mlock;
-	long long system_size_change;
+	long long backend_size_change, meta_size_change;
 	long long upload_seq;
 	long long block_seq;
 	ino_t root_inode;
@@ -452,11 +463,12 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_mlock = FALSE;
 	this_inode = ptr->inode;
 	which_dsync_index = ptr->which_index;
-	system_size_change = 0;
+	backend_size_change = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
 	ret = _read_meta(thismetapath, ptr->this_mode,
-			&root_inode, &meta_on_cloud);
+			&root_inode, &meta_on_cloud,
+			&backend_size_change, &meta_size_change);
 	if (ret < 0) {
 		write_log(0, "Error: Meta %s cannot be read. Code %d\n",
 				thismetapath, -ret);
@@ -526,9 +538,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilestat, sizeof(struct stat), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 							backend_metafptr);
-
-		system_size_change = tempfilestat.st_size;
-		root_inode = tempfilemeta.root_inode;
 		tmp_size = tempfilestat.st_size;
 
 		/* Check if need to sync past the current size */
@@ -700,7 +709,8 @@ errcode_handle:
 
 	/* Update FS stat in the backend if updated previously */
 	if (meta_on_cloud == TRUE)
-		update_backend_stat(root_inode, -system_size_change, -1);
+		update_backend_stat(root_inode, -backend_size_change,
+				-meta_size_change, -1);
 
 	_check_del_progress_file(this_inode);
 	unlink(thismetapath);

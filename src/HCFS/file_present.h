@@ -31,11 +31,13 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino);
+			ino_t root_ino, long long *delta_meta_size, char ispin);
+
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino);
+			ino_t root_ino, long long *delta_meta_size, char ispin);
+
 int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 			const DIR_ENTRY *this_entry);
 
@@ -46,10 +48,11 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link,
-	const unsigned long generation, const char *name, ino_t root_ino);
+	const unsigned long generation, const char *name,
+	ino_t root_ino, long long *delta_meta_size, char ispin);
 
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *xattr_pos);
+	XATTR_PAGE *xattr_page, long long *xattr_pos, BOOL create_page);
 
 int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation,

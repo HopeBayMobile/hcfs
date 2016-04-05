@@ -27,8 +27,8 @@
 #include "fuseop.h"
 #include "dedup_table.h"
 
-#define MAX_UPLOAD_CONCURRENCY 8
-#define MAX_SYNC_CONCURRENCY 4
+#define MAX_UPLOAD_CONCURRENCY 4
+#define MAX_SYNC_CONCURRENCY 2
 
 typedef struct {
 	off_t page_filepos;
@@ -143,7 +143,7 @@ void *upload_loop(void *ptr);
 void upload_loop(void);
 #endif
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
-			long long num_inodes_delta);
+		long long meta_size_delta, long long num_inodes_delta);
 
 int select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)

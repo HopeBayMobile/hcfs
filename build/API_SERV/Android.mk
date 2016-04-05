@@ -31,7 +31,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE     := hcfsapid
 LOCAL_CFLAGS     := -pie -fPIE $(HCFS_CFLAGS)
 LOCAL_LDFLAGS    := -pie -fPIE $(HCFS_LDFLAGS)
-LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c utils.c hcfs_stat.c hcfs_sys.c enc.c)
+LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c utils.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c)
 LOCAL_SHARED_LIBRARIES = libsqlite libcrypto
 LOCAL_C_INCLUDES := $(BUILD_PATH)/include/sqlite3
 ifdef OPENSSL_IS_BORINGSSL

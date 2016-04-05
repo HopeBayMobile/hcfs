@@ -678,7 +678,7 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 #ifdef _ANDROID_ENV_
 	new_info->volume_type = tmp_entry.d_type;
 	if (new_info->volume_type == ANDROID_EXTERNAL ||
-			new_info->volume_type == ANDROID_MULTIEXTERNAL) {
+	    new_info->volume_type == ANDROID_MULTIEXTERNAL) {
 		new_info->vol_path_cache = init_pathcache(new_info->f_ino);
 		if (new_info->vol_path_cache == NULL) {
 			errcode = -ENOMEM;
@@ -1031,14 +1031,19 @@ int unmount_all(void)
 *
 *************************************************************************/
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-				long long num_inodes_delta)
+		long long meta_size_delta, long long num_inodes_delta)
 {
 	int ret;
 
 	sem_wait((mptr->stat_lock));
-	(mptr->FS_stat)->system_size += system_size_delta;
+	(mptr->FS_stat)->system_size += (system_size_delta + meta_size_delta);
 	if ((mptr->FS_stat)->system_size < 0)
 		(mptr->FS_stat)->system_size = 0;
+
+	(mptr->FS_stat)->meta_size += meta_size_delta;
+	if ((mptr->FS_stat)->meta_size < 0)
+		(mptr->FS_stat)->meta_size = 0;
+
 	(mptr->FS_stat)->num_inodes += num_inodes_delta;
 	if ((mptr->FS_stat)->num_inodes < 0)
 		(mptr->FS_stat)->num_inodes = 0;

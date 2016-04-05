@@ -34,9 +34,10 @@ int main(int argc, char **argv)
 	char *ptr;
 	ino_t tmpino;
 	long long num_local, num_cloud, num_hybrid, retllcode;
+	uint32_t uint32_ret;
 	long long downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
-	int first_size, rest_size;
+	int first_size, rest_size, loglevel;
 	char vol_mode;
 
 	if (argc < 2) {
@@ -99,6 +100,12 @@ int main(int argc, char **argv)
 		code = GETSYNCSTAT;
 	else if (strcasecmp(argv[1], "reloadconfig") == 0)
 		code = RELOADCONFIG;
+	else if (strcasecmp(argv[1], "getquota") == 0)
+		code = GETQUOTA;
+	else if (strcasecmp(argv[1], "updatequota") == 0)
+		code = TRIGGERUPDATEQUOTA;
+	else if (strcasecmp(argv[1], "changelog") == 0)
+		code = CHANGELOG;
 	else
 		code = -1;
 	if (code < 0) {
@@ -116,6 +123,7 @@ int main(int argc, char **argv)
 	case UNMOUNTALL:
 	case RESETXFERSTAT:
 	case RELOADCONFIG:
+	case TRIGGERUPDATEQUOTA:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -128,14 +136,13 @@ int main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
+	/* APIs at here send result in long long */
+	case GETQUOTA:
 	case GETPINSIZE:
 	case GETCACHESIZE:
 	case GETMAXPINSIZE:
 	case GETMAXCACHESIZE:
 	case GETDIRTYCACHESIZE:
-	case CLOUDSTAT:
-	case GETSYNCSWITCH:
-	case GETSYNCSTAT:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -149,6 +156,25 @@ int main(int argc, char **argv)
 		} else {
 			printf("Returned value is %lld\n", retllcode);
 		}
+		break;
+	/* APIs at here send result in uint32_t */
+	case CLOUDSTAT:
+	case GETSYNCSWITCH:
+	case GETSYNCSTAT:
+		cmd_len = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &uint32_ret, sizeof(uint32_t), 0);
+		if (code == CLOUDSTAT)
+			printf("Backend is %s\n",
+			       uint32_ret ? "ONLINE (1)" : "OFFLINE (0)");
+		else if (code == GETSYNCSWITCH)
+			printf("Sync switch is %s\n",
+			       uint32_ret ? "ON(1)" : "OFF(0)");
+		else if (code == GETSYNCSTAT)
+			printf("Sync process is %s\n",
+			       uint32_ret ? "RUNNING(1)" : "PAUSED(0)");
 		break;
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_
@@ -320,7 +346,7 @@ int main(int argc, char **argv)
 		snprintf(&(buf[first_size]), rest_size, "%s", argv[2]);
 		snprintf(&(buf[first_size + fsname_len]), 4092 - fsname_len,
 			 "%s", argv[3]);
- 
+
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
@@ -386,6 +412,25 @@ int main(int argc, char **argv)
 
 		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
 		size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+		break;
+	case CHANGELOG:
+		if (argc != 3) {
+			printf("./HCFSvol changelog <log level>\n");
+			exit(-EINVAL);
+		}
+		loglevel = atoi(argv[2]);
+		cmd_len = sizeof(int);
+		size_msg = send(fd, &code, sizeof(code), 0);
+		size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
+		size_msg = send(fd, &loglevel, sizeof(int), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
+		size_msg = recv(fd, &retcode, sizeof(retcode), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
 		break;
 	default:
 		break;

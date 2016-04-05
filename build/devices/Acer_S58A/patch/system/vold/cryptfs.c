@@ -391,12 +391,28 @@ static int keymaster_sign_object(struct crypt_mnt_ftr *ftr,
                                  size_t *signature_size)
 {
     int rc = 0;
+    int retries = 0;
+    char property[2];
     keymaster0_device_t *keymaster0_dev = 0;
     keymaster1_device_t *keymaster1_dev = 0;
+
+    keymaster_init_retries:
     if (keymaster_init(&keymaster0_dev, &keymaster1_dev)) {
         SLOGE("Failed to init keymaster");
+        if (retries < 3) {
+            retries++;
+            SLOGE("Sleep and retry: %d", retries);
+            sleep(5);
+            goto keymaster_init_retries;
+        }
         rc = -1;
         goto out;
+    }
+
+    if (retries != 0) {
+        sprintf(&(property[0]), "%d", retries);
+        property[1] = '\0';
+        property_set("vold.retry", property);
     }
 
     unsigned char to_sign[RSA_KEY_SIZE_BYTES];
@@ -1865,7 +1881,7 @@ static int cryptfs_restart_internal(int restart_main)
         }
 
         //Vince
-        property_set("hopebay.hcfs.init", "1");
+        property_set("vold.hopebay.hcfs.init", "1");
 
         property_set("vold.decrypt", "trigger_load_persist_props");
         /* Create necessary paths on /data */
@@ -1913,7 +1929,6 @@ int cryptfs_restart(void)
         }
 
         property_set("vold.decrypt", "trigger_restart_framework");
-
         return 0;
     }
 
@@ -3204,17 +3219,10 @@ int cryptfs_enable_internal(char *howarg, int crypt_type, char *passwd,
     property_set("vold.decrypt", "trigger_shutdown_framework");
     SLOGD("Just asked init to shut down class main\n");
 
-    system("mkdir /data/test_unmount_01");
-
     /* Ask vold to unmount all devices that it manages */
     if (vold_unmountAll()) {
         SLOGE("Failed to unmount all vold managed devices");
     }
-
-    //Vince
-    //system("mkdir /data/test_unmount_02");
-    //system("umount -l /data/data");
-    //system("umount -l /data/app");
 
     /* Now unmount the /data partition. */
     if (wait_and_unmount(DATA_MNT_POINT, false)) {
@@ -3386,8 +3394,6 @@ int cryptfs_enable_internal(char *howarg, int crypt_type, char *passwd,
             property_set("ro.crypto.state", "encrypted");
             release_wake_lock(lockid);
             cryptfs_check_passwd(DEFAULT_PASSWORD);
-
-            //Vince
             cryptfs_restart_internal(1);
             return 0;
           } else {

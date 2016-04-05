@@ -47,6 +47,7 @@ typedef struct {
 	char mod_after_in_transit;
 	ino_t this_index;
 	unsigned long generation;
+	long long dirty_meta_size;
 } SUPER_BLOCK_ENTRY;
 
 /* SUPER_BLOCK_HEAD defines the structure for the head of super block */

@@ -3,9 +3,19 @@
 	echo ===
 	pause
 	exit)
+@prompt $$ 
+adb wait-for-device
+adb root
+adb wait-for-device
+adb disable-verity | findstr /I "reboot"
+if %errorlevel% == 0 (
+	adb reboot
+)
+
 adb wait-for-device
 adb root
 adb wait-for-device
 adb remount
 adb push system /system
+adb reboot
 pause

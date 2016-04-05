@@ -1934,3 +1934,36 @@ TEST_F(meta_cache_check_uploadingTest, FileIsUploading_Success)
 /*
  * End of unittest for meta_cache_check_uploading()
  */
+
+class meta_cache_get_meta_sizeTest : public BaseClassWithMetaCacheEntry {
+protected:
+	const char *mock_file_meta;
+
+	void SetUp()
+	{
+		mock_file_meta = "/tmp/mock_metafile";
+
+		BaseClassWithMetaCacheEntry::SetUp();
+
+		unlink(mock_file_meta);
+		body_ptr->fptr = fopen(mock_file_meta, "w+");
+		body_ptr->meta_opened = TRUE;
+		fwrite(mock_file_meta, 1, strlen(mock_file_meta),
+				body_ptr->fptr);
+		rewind(body_ptr->fptr);
+	}
+	void TearDown()
+	{
+		fclose(body_ptr->fptr);
+		unlink(mock_file_meta);
+		BaseClassWithMetaCacheEntry::TearDown();
+	}
+};
+
+TEST_F(meta_cache_get_meta_sizeTest, MetaOpened_GetSuccess)
+{
+	long long metasize;
+
+	EXPECT_EQ(0, meta_cache_get_meta_size(body_ptr, &metasize));
+	EXPECT_EQ(strlen(mock_file_meta), metasize);
+}

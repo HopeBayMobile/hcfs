@@ -41,6 +41,7 @@
 #include "file_present.h"
 #include "utils.h"
 #include "monitor.h"
+#include "hcfs_fromcloud.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -389,6 +390,7 @@ long long get_cloud_size(int arg_len, char *largebuf)
 	char temppath[METAPATHLEN];
 	FILE *statfptr;
 	ssize_t ret_ssize;
+	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	statfptr = NULL;
 	buf = malloc(arg_len + 10);
@@ -426,9 +428,10 @@ long long get_cloud_size(int arg_len, char *largebuf)
 		goto error_handling;
 	}
 	flock(fileno(statfptr), LOCK_EX);
-	PREAD(fileno(statfptr), &llretval, sizeof(long long), 0);
+	PREAD(fileno(statfptr), &fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 0);
 	flock(fileno(statfptr), LOCK_UN);
 	fclose(statfptr);
+	llretval = fs_cloud_stat.backend_system_size;
 
 	sem_post(&(fs_mgr_head->op_lock));
 	free(buf);
@@ -794,6 +797,7 @@ void api_module(void *index)
 	struct timeval start_time, end_time;
 	float elapsed_time;
 	int retcode, sel_index, count, cur_index;
+	uint32_t uint32_ret;
 	size_t to_recv, to_send, total_sent;
 
 	char buf[512];
@@ -812,6 +816,7 @@ void api_module(void *index)
 	unsigned int num_inode;
 	ino_t *pinned_list, *unpinned_list;
 	unsigned int sync_switch;
+	int loglevel;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -1129,6 +1134,13 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
+		case GETQUOTA:
+			llretval = hcfs_system->systemdata.system_quota;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
+			break;
 		case TESTAPI:
 			/* Simulate a long API call of 5 seconds */
 			sleep(5);
@@ -1241,14 +1253,14 @@ void api_module(void *index)
 			}
 			break;
 		case CLOUDSTAT:
-			retcode = (int)hcfs_system->backend_is_online;
-			ret_len = sizeof(retcode);
+			uint32_ret = (uint32_t)hcfs_system->backend_is_online;
+			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
-			retcode = 0;
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case SETSYNCSWITCH:
-			memcpy(&sync_switch, largebuf, sizeof(unsigned int));
+			memcpy(&sync_switch, largebuf, sizeof(uint32_t));
 			retcode = set_sync_switch_handle(sync_switch);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -1258,18 +1270,18 @@ void api_module(void *index)
 			}
 			break;
 		case GETSYNCSWITCH:
-			retcode = (int)hcfs_system->sync_manual_switch;
-			ret_len = sizeof(retcode);
+			uint32_ret = (uint32_t)hcfs_system->sync_manual_switch;
+			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
-			retcode = 0;
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case GETSYNCSTAT:
-			retcode = (int)!hcfs_system->sync_paused;
-			ret_len = sizeof(retcode);
+			uint32_ret = (uint32_t)!hcfs_system->sync_paused;
+			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
-			retcode = 0;
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case RELOADCONFIG:
 			retcode = reload_system_config(DEFAULT_CONFIG_PATH);
@@ -1279,6 +1291,34 @@ void api_module(void *index)
 				     MSG_NOSIGNAL);
 				send(fd1, &retcode, sizeof(retcode),
 				     MSG_NOSIGNAL);
+			}
+			break;
+		case TRIGGERUPDATEQUOTA:
+			retcode = update_quota();
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
+			}
+			break;
+		case CHANGELOG:
+			memcpy(&loglevel, largebuf, sizeof(int));
+			if (0 <= loglevel && loglevel <= 10) {
+				system_config->log_level = loglevel;
+				retcode = 0; 
+			} else {
+				retcode = -EINVAL;
+			}
+			write_log(10, "Debug: now log level is %d\n",
+					system_config->log_level);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(ret_len),
+						MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+						MSG_NOSIGNAL);
 			}
 			break;
 		default:
@@ -1401,7 +1441,10 @@ void api_server_monitor(void)
 			totalrefs += api_server->job_count[count];
 			totaltime += api_server->job_totaltime[count];
 		}
-		ratio = api_server->num_threads / totaltime;
+		if (totaltime > 0)
+			ratio = api_server->num_threads / totaltime;
+		else
+			ratio = 0;
 		write_log(10, "Debug API monitor ref %d, time %f\n",
 			totalrefs, totaltime);
 

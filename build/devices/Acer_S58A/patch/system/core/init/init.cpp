@@ -793,6 +793,27 @@ static void import_kernel_nv(char *name, bool for_emulator)
 #if defined(ACER_MSM8992)
     } else if (!strcmp(name, "snid")) {
         property_set("ro.serialno", value);
+    } else if (!strcmp(name, "dinfo")) {
+        char prop[8];
+        memset(prop, 0x00, sizeof(prop));
+        sprintf(prop,"%c%c",value[0],value[1]);
+        property_set("ro.dinfo.hw_ver",prop);
+
+        memset(prop, 0x00, sizeof(prop));
+        sprintf(prop,"%c%c",value[2],value[3]);
+        property_set("ro.dinfo.rf_ver",prop);
+
+        memset(prop, 0x00, sizeof(prop));
+        sprintf(prop,"%c%c",value[4],value[5]);
+        property_set("ro.dinfo.ddr",prop);
+
+        memset(prop, 0x00, sizeof(prop));
+        sprintf(prop,"%c%c",value[6],value[7]);
+        property_set("ro.dinfo.emmc",prop);
+
+        memset(prop, 0x00, sizeof(prop));
+        sprintf(prop,"%c%c",value[8],value[9]);
+        property_set("ro.dinfo.fuse",prop);
 #endif
     }
 }
@@ -901,8 +922,7 @@ static selinux_enforcing_status selinux_status_from_cmdline() {
     };
 
     //Vince
-    status = SELINUX_PERMISSIVE;
-    //End
+    //status = SELINUX_PERMISSIVE;
 
     import_kernel_cmdline(false, fn);
 

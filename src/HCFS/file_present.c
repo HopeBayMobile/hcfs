@@ -200,15 +200,17 @@ static inline int dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino)
+			ino_t root_ino, long long *delta_meta_size, char ispin)
 {
 	int ret_val, ret, errcode;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	char pin_status;
-	DIR_META_TYPE parent_meta;
+	long long metasize, old_metasize, new_metasize;
+	CLOUD_RELATED_DATA cloud_related_data;
+
+	*delta_meta_size = 0;
 
 	/* Add "self_inode" to its parent "parent_inode" */
 	body_ptr = meta_cache_lock_entry(parent_inode);
@@ -222,11 +224,8 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 	}
 
-	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
-		&parent_meta, NULL, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+	/* Get old meta size before adding new entry */
+	meta_cache_get_meta_size(body_ptr, &old_metasize);
 
 	/* Add path lookup table */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -243,6 +242,9 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
+	/* Get old meta size after adding new entry */
+	meta_cache_get_meta_size(body_ptr, &new_metasize);
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -258,9 +260,9 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
         this_meta.finished_seq = 0;
 	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
-	this_meta.local_pin = pin_status;
+	this_meta.local_pin = ispin;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+		selfname, ispin == TRUE? "PIN" : "UNPIN");
 
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
@@ -288,7 +290,11 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
 		SEEK_SET);
 	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
-
+	
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, body_ptr->fptr);
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
 	if (S_ISFILE(this_stat->st_mode)) {
@@ -301,6 +307,8 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 				(uint64_t)self_inode, (uint64_t)parent_inode);
 	}
 #endif
+
+	meta_cache_get_meta_size(body_ptr, &metasize);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -323,6 +331,11 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 	}
 	sem_post(&(pathlookup_data_lock));
+
+	if (old_metasize > 0 && new_metasize > 0)
+		*delta_meta_size = (new_metasize - old_metasize) + metasize;
+	else
+		*delta_meta_size = metasize;
 
 	return 0;
 errcode_handle:
@@ -350,15 +363,18 @@ error_handling:
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino)
+			ino_t root_ino, long long *delta_meta_size, char ispin)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	char pin_status;
-	DIR_META_TYPE parent_meta;
+	long long metasize, old_metasize, new_metasize;
+	CLOUD_RELATED_DATA cloud_related_data;
+	int ret, errcode;
+	size_t ret_size;
 
+	*delta_meta_size = 0;
 	/* Save the new entry to its parent and update meta */
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
@@ -368,11 +384,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
-	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
-		&parent_meta, NULL, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+	meta_cache_get_meta_size(body_ptr, &old_metasize);
 
 	/* Add parent to lookup db */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -391,6 +403,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
+	meta_cache_get_meta_size(body_ptr, &new_metasize);
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -406,16 +420,17 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
 	/* Initialize new directory object and save the meta to meta cache */
-	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE)
+			+ sizeof(CLOUD_RELATED_DATA);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
-	this_meta.local_pin = pin_status;
 	this_meta.finished_seq = 0;
+	this_meta.local_pin = ispin;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+		selfname, ispin == TRUE? "PIN" : "UNPIN");
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
@@ -431,14 +446,35 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		return -ENOMEM;
 	}
 
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return ret_val;	
+	}
+
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
-							&temppage, body_ptr);
+							NULL, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
 			selfname, this_stat->st_mode);
 		goto error_handling;
 	}
 
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+			SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+			body_ptr->fptr);
+
+	ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
+			&temppage, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
 #ifdef _ANDROID_ENV_
 	write_log(10, "Debug: inode %"PRIu64" begin to inherit xattrs\n",
 			(uint64_t)self_inode);
@@ -449,6 +485,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 				" xattrs from parent inode %"PRIu64".\n",
 				(uint64_t)self_inode, (uint64_t)parent_inode);
 #endif
+
+	meta_cache_get_meta_size(body_ptr, &metasize);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -466,14 +504,23 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 	}
 
+	if (old_metasize > 0 && new_metasize > 0)
+		*delta_meta_size = (new_metasize - old_metasize) + metasize;
+	else
+		*delta_meta_size = metasize;
+
 	return 0;
 
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+
+	return errcode;
 error_handling:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
 	return ret_val;
-
 }
 
 /************************************************************************
@@ -735,32 +782,32 @@ error_handling:
 *************************************************************************/
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link,
-	const unsigned long generation, const char *name, ino_t root_ino)
+	const unsigned long generation, const char *name,
+	ino_t root_ino, long long *delta_meta_size, char ispin)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
 	ino_t parent_inode, self_inode;
 	int ret_code;
-	char pin_status;
-	DIR_META_TYPE parent_meta;
+	long long metasize, old_metasize, new_metasize;
+	CLOUD_RELATED_DATA cloud_related_data;
+	int ret, errcode;
+	size_t ret_size;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
+	*delta_meta_size = 0;
 
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
 	   because it had been locked before calling this function. Just need to
 	   open meta file. */
-	ret_code = meta_cache_lookup_dir_data(parent_inode, NULL,
-		&parent_meta, NULL, parent_meta_cache_entry);
-	if (ret_code < 0)
-		return ret_code;
-	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
-
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
 		return ret_code;
 	}
+
+	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
 
 	/* Add parent to lookup first */
 	ret_code = sem_wait(&(pathlookup_data_lock));
@@ -780,6 +827,8 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
+	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
+
 	ret_code = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
@@ -791,11 +840,11 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.metaver = CURRENT_META_VER;
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
-	symlink_meta.local_pin = pin_status;
 	symlink_meta.finished_seq = 0;
+	symlink_meta.local_pin = ispin;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		name, pin_status == TRUE? "PIN" : "UNPIN");
+		name, ispin == TRUE? "PIN" : "UNPIN");
 
 	/* Update self meta data */
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
@@ -803,6 +852,14 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		dir_remove_entry(parent_inode, self_inode, name,
 			this_stat->st_mode, parent_meta_cache_entry);
 		return -ENOMEM;
+	}
+
+	ret_code = meta_cache_open_file(self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		dir_remove_entry(parent_inode, self_inode, name,
+			this_stat->st_mode, parent_meta_cache_entry);
+		return ret_code;
 	}
 
 	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
@@ -814,6 +871,12 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			this_stat->st_mode, parent_meta_cache_entry);
 		return ret_code;
 	}
+
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
+	FSEEK(self_meta_cache_entry->fptr, sizeof(struct stat) +
+			sizeof(SYMLINK_META_TYPE), SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+			1, self_meta_cache_entry->fptr);
 
 #ifdef _ANDROID_ENV_
 	meta_cache_unlock_entry(parent_meta_cache_entry);
@@ -835,6 +898,8 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return -ENOMEM;
 	}
 #endif
+	meta_cache_get_meta_size(self_meta_cache_entry, &metasize);
+
 	ret_code = meta_cache_close_file(self_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_unlock_entry(self_meta_cache_entry);
@@ -844,7 +909,18 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	if (ret_code < 0)
 		return ret_code;
 
+	if (old_metasize > 0 && new_metasize > 0)
+		*delta_meta_size = (new_metasize - old_metasize) + metasize;
+	else
+		*delta_meta_size = metasize;
+
 	return 0;
+
+errcode_handle:
+	meta_cache_close_file(self_meta_cache_entry);
+	meta_cache_unlock_entry(self_meta_cache_entry);
+
+	return errcode;
 }
 
 /************************************************************************
@@ -862,7 +938,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 *
 *************************************************************************/
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *xattr_pos)
+	XATTR_PAGE *xattr_page, long long *xattr_pos, BOOL create_page)
 {
 	int ret_code;
 	ino_t this_inode;
@@ -918,6 +994,10 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	} else { /* fifo, socket is not enabled in non-android env */
 		return -EINVAL;
 	}
+
+	/* return ENOENT if do not need to create xattr page */
+	if (*xattr_pos == 0 && create_page == FALSE)
+		return -ENOENT;
 
 	/* It is used to prevent user from forgetting to open meta file */
 	ret_code = meta_cache_open_file(meta_cache_entry);
@@ -1406,8 +1486,8 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 				NULL, 0, body_ptr);
 		if (ret < 0)
 			return ret;
-		filemeta.upload_seq++;
-		upload_seq = filemeta.upload_seq;
+		//filemeta.upload_seq++;
+		//upload_seq = filemeta.upload_seq;
 		ret = meta_cache_update_file_data(inode, NULL, &filemeta,
 				NULL, 0, body_ptr);
 		if (ret < 0)
@@ -1421,8 +1501,8 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 				NULL, body_ptr);
 		if (ret < 0)
 			return ret;
-		dirmeta.upload_seq++;
-		upload_seq = dirmeta.upload_seq;
+		//dirmeta.upload_seq++;
+		//upload_seq = dirmeta.upload_seq;
 		ret = meta_cache_update_dir_data(inode, NULL, &dirmeta,
 				NULL, body_ptr);
 		if (ret < 0)
@@ -1436,8 +1516,8 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 				&symmeta, body_ptr);
 		if (ret < 0)
 			return ret;
-		symmeta.upload_seq++;
-		upload_seq = symmeta.upload_seq;
+		//symmeta.upload_seq++;
+		//upload_seq = symmeta.upload_seq;
 		ret = meta_cache_update_symlink_data(inode, NULL,
 				&symmeta, body_ptr);
 		if (ret < 0)

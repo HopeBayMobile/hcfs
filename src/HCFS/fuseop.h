@@ -111,7 +111,6 @@ typedef struct {
 	unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
-	long long upload_seq;
 	long long finished_seq;
 	char local_pin;
 } DIR_META_TYPE;
@@ -165,9 +164,7 @@ typedef struct {
         unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
-	long long upload_seq;
 	long long finished_seq;
-	long long size_last_upload;
 	char local_pin;
 } FILE_META_TYPE;
 
@@ -187,24 +184,33 @@ typedef struct {
         unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
-	long long upload_seq;
 	long long finished_seq;
 	char local_pin;
 } SYMLINK_META_TYPE;
+
+typedef struct {
+	long long size_last_upload; /* Record data + meta */
+	long long meta_last_upload; /* Record meta only */
+	long long upload_seq;
+} CLOUD_RELATED_DATA;
 
 /*END META definition*/
 
 /* Defining the system meta resources */
 typedef struct {
-	long long system_size;
-	long long cache_size;
+	long long system_size; /* data + meta + sb */
+	long long system_meta_size; /* meta */
+	long long super_block_size; /* sb */
+	long long cache_size; /* data(local) + meta + sb */
 	long long cache_blocks;
-	long long pinned_size;
-	long long backend_size;
+	long long pinned_size; /* data(pin) + meta + sb */
+	long long backend_size; /* data(sync) + meta(sync) */
+	long long backend_meta_size;
 	long long backend_inodes;
-	long long dirty_cache_size;
+	long long dirty_cache_size; /* data + meta */
 	long long xfer_size_download;
 	long long xfer_size_upload;
+	long long system_quota;
 	int cache_replace_status;
 } SYSTEM_DATA_TYPE;
 

@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "hcfs_stat.h"
 
@@ -8,12 +9,12 @@
 #include "utils.h"
 
 
-int _get_usage_val(unsigned int api_code, long long *res_val)
+int32_t _get_usage_val(uint32_t api_code, int64_t *res_val)
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
-	long long ll_ret_code;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
+	int64_t ll_ret_code;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -22,15 +23,15 @@ int _get_usage_val(unsigned int api_code, long long *res_val)
 	code = api_code;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ll_ret_code, sizeof(long long), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ll_ret_code, sizeof(int64_t), 0);
 
 	if (ll_ret_code < 0) {
 		*res_val = 0;
-		ret_code = (int)ll_ret_code;
+		ret_code = (int32_t)ll_ret_code;
 		close(fd);
 		return ret_code;
 	}
@@ -40,12 +41,24 @@ int _get_usage_val(unsigned int api_code, long long *res_val)
 	return 0;
 }
 
-int get_volume_usage(long long *vol_usage)
+int32_t get_quota(int64_t *quota)
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
-	long long ll_ret_code;
+	int32_t ret_code;
+
+	ret_code = _get_usage_val(GETQUOTA, quota);
+	if (ret_code < 0)
+		return ret_code;
+
+	return 0;
+}
+
+int32_t get_volume_usage(int64_t *vol_usage)
+{
+
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
+	int64_t ll_ret_code;
 	char buf[1];
 
 	fd = get_hcfs_socket_conn();
@@ -56,16 +69,16 @@ int get_volume_usage(long long *vol_usage)
 	cmd_len = 1;
 	buf[0] = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ll_ret_code, sizeof(long long), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ll_ret_code, sizeof(int64_t), 0);
 
 	if (ll_ret_code < 0) {
 		*vol_usage = 0;
-		ret_code = (int)ll_ret_code;
+		ret_code = (int32_t)ll_ret_code;
 		close(fd);
 		return ret_code;
 	}
@@ -75,12 +88,12 @@ int get_volume_usage(long long *vol_usage)
 	return 0;
 }
 
-int get_cloud_usage(long long *cloud_usage)
+int32_t get_cloud_usage(int64_t *cloud_usage)
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
-	long long ll_ret_code;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
+	int64_t ll_ret_code;
 	char buf[1];
 
 	fd = get_hcfs_socket_conn();
@@ -91,16 +104,16 @@ int get_cloud_usage(long long *cloud_usage)
 	cmd_len = 1;
 	buf[0] = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ll_ret_code, sizeof(long long), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ll_ret_code, sizeof(int64_t), 0);
 
 	if (ll_ret_code < 0) {
 		*cloud_usage = 0;
-		ret_code = (int)ll_ret_code;
+		ret_code = (int32_t)ll_ret_code;
 		close(fd);
 		return ret_code;
 	}
@@ -110,11 +123,11 @@ int get_cloud_usage(long long *cloud_usage)
 	return 0;
 }
 
-int get_cache_usage(long long *cache_total, long long *cache_used,
-		    long long *cache_dirty)
+int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
+		        int64_t *cache_dirty)
 {
 
-	int ret_code;
+	int32_t ret_code;
 
 	ret_code = _get_usage_val(GETMAXCACHESIZE, cache_total);
 	if (ret_code < 0)
@@ -131,10 +144,10 @@ int get_cache_usage(long long *cache_total, long long *cache_used,
 	return 0;
 }
 
-int get_pin_usage(long long *pin_max, long long *pin_total)
+int32_t get_pin_usage(int64_t *pin_max, int64_t *pin_total)
 {
 
-	int ret_code;
+	int32_t ret_code;
 
 	ret_code = _get_usage_val(GETMAXPINSIZE, pin_max);
 	if (ret_code < 0)
@@ -147,11 +160,11 @@ int get_pin_usage(long long *pin_max, long long *pin_total)
 	return 0;
 }
 
-int get_xfer_usage(long long *xfer_up, long long *xfer_down)
+int32_t get_xfer_usage(int64_t *xfer_up, int64_t *xfer_down)
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -160,15 +173,15 @@ int get_xfer_usage(long long *xfer_up, long long *xfer_down)
 	code = GETXFERSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	if (reply_len > sizeof(int)) {
-		size_msg = recv(fd, xfer_down, sizeof(long long), 0);
-		size_msg = recv(fd, xfer_up, sizeof(long long), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	if (reply_len > sizeof(int32_t)) {
+		size_msg = recv(fd, xfer_down, sizeof(int64_t), 0);
+		size_msg = recv(fd, xfer_up, sizeof(int64_t), 0);
 	} else {
-		size_msg = recv(fd, &ret_code, sizeof(int), 0);
+		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 		close(fd);
 		return ret_code;
 	}
@@ -177,11 +190,11 @@ int get_xfer_usage(long long *xfer_up, long long *xfer_down)
 	return 0;
 }
 
-int get_cloud_stat(int *cloud_stat)
+int32_t get_cloud_stat(int32_t *cloud_stat)
 {
 
-	int fd, ret_code, size_msg;
-	unsigned int code, cmd_len, reply_len;
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -190,25 +203,29 @@ int get_cloud_stat(int *cloud_stat)
 	code = CLOUDSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(unsigned int), 0);
-	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	*cloud_stat = ret_code;
 	close(fd);
 	return 0;
 }
 
-int get_hcfs_stat(long long *vol_usage, long long *cloud_usage, long long *cache_total,
-		  long long *cache_used, long long *cache_dirty,
-		  long long *pin_max, long long *pin_total,
-		  long long *xfer_up, long long *xfer_down,
-		  int *cloud_stat)
+int32_t get_hcfs_stat(int64_t *quota, int64_t *vol_usage, int64_t *cloud_usage,
+		      int64_t *cache_total, int64_t *cache_used, int64_t *cache_dirty,
+		      int64_t *pin_max, int64_t *pin_total,
+		      int64_t *xfer_up, int64_t *xfer_down,
+		      int32_t *cloud_stat)
 {
 
-	int ret_code;
+	int32_t ret_code;
+
+	ret_code = get_quota(quota);
+	if (ret_code < 0)
+		return ret_code;
 
 	ret_code = get_volume_usage(vol_usage);
 	if (ret_code < 0)

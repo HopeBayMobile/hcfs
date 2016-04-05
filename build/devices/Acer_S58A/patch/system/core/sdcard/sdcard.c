@@ -1787,7 +1787,7 @@ static int fuse_setup(struct fuse* fuse, gid_t gid, mode_t mask) {
     snprintf(opts, sizeof(opts),
             "fd=%i,rootmode=40000,default_permissions,allow_other,user_id=%d,group_id=%d",
             fuse->fd, fuse->global->uid, fuse->global->gid);
-    if (mount("/dev/fuse", fuse->dest_path, "fuse", MS_NOSUID | MS_NODEV | MS_NOEXEC |
+    if (mount("/dev/fuse", fuse->dest_path, "fuse.sdcard", MS_NOSUID | MS_NODEV | MS_NOEXEC |
             MS_NOATIME, opts) != 0) {
         ERROR("failed to mount fuse filesystem: %s\n", strerror(errno));
         return -1;
@@ -1890,6 +1890,11 @@ static void run(const char* source_path, const char* label, uid_t uid,
         hcfsvol(5, "/mnt/runtime/read/emulated", MP_READ);
         hcfsvol(5, "/mnt/runtime/write/emulated", MP_WRITE);
 
+	// Aaron
+	system("restorecon /mnt/runtime/default/emulated");
+	system("restorecon /mnt/runtime/read/emulated");
+	system("restorecon /mnt/runtime/write/emulated");
+
     } else {
         if (multi_user) {
             /* Multi-user storage is fully isolated per user, so "other"
@@ -1911,36 +1916,34 @@ static void run(const char* source_path, const char* label, uid_t uid,
                 exit(1);
             }
         }
+
+        /* Drop privs */
+        if (setgroups(sizeof(kGroups) / sizeof(kGroups[0]), kGroups) < 0) {
+            ERROR("cannot setgroups: %s\n", strerror(errno));
+            exit(1);
+        }
+        if (setgid(gid) < 0) {
+            ERROR("cannot setgid: %s\n", strerror(errno));
+            exit(1);
+        }
+        if (setuid(uid) < 0) {
+            ERROR("cannot setuid: %s\n", strerror(errno));
+            exit(1);
+        }
+
+        if (multi_user) {
+            fs_prepare_dir(global.obb_path, 0775, uid, gid);
+        }
+
+        if (pthread_create(&thread_default, NULL, start_handler, &handler_default)
+                || pthread_create(&thread_read, NULL, start_handler, &handler_read)
+                || pthread_create(&thread_write, NULL, start_handler, &handler_write)) {
+            ERROR("failed to pthread_create\n");
+            exit(1);
+        }
     }
 
-    /* Drop privs */
-    if (setgroups(sizeof(kGroups) / sizeof(kGroups[0]), kGroups) < 0) {
-        ERROR("cannot setgroups: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (setgid(gid) < 0) {
-        ERROR("cannot setgid: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (setuid(uid) < 0) {
-        ERROR("cannot setuid: %s\n", strerror(errno));
-        exit(1);
-    }
-
-    if (multi_user) {
-        fs_prepare_dir(global.obb_path, 0775, uid, gid);
-    }
-
-    if (pthread_create(&thread_default, NULL, start_handler, &handler_default)
-            || pthread_create(&thread_read, NULL, start_handler, &handler_read)
-            || pthread_create(&thread_write, NULL, start_handler, &handler_write)) {
-        ERROR("failed to pthread_create\n");
-        exit(1);
-    }
-
-    if (is_mount == 0) {
-        watch_package_list(&global);
-    }
+    watch_package_list(&global);
 
     ERROR("terminated prematurely\n");
     exit(1);

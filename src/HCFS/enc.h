@@ -7,8 +7,8 @@
  * *
  * **************************************************************************/
 
-#ifndef GW20_HCFS_ENC_H_
-#define GW20_HCFS_ENC_H_
+#ifndef SRC_HCFS_ENC_H_
+#define SRC_HCFS_ENC_H_
 
 #include <string.h>
 #include <unistd.h>
@@ -40,7 +40,7 @@ typedef struct encode_object_meta {
 	int len_enc_session_key;
 } HCFS_encode_object_meta;
 
-void free_object_meta(HCFS_encode_object_meta *);
+void free_object_meta(HCFS_encode_object_meta *object_meta);
 
 int get_decode_meta(HCFS_encode_object_meta *, unsigned char *session_key,
 		    unsigned char *key, int enc_flag, int compress_flag);
@@ -63,7 +63,7 @@ int aes_gcm_decrypt_fix_iv(unsigned char *, unsigned char *, unsigned int,
 
 int expect_b64_encode_length(unsigned int);
 
-unsigned char *get_key(char *);
+unsigned char *get_key(const char *);
 
 FILE *transform_encrypt_fd(FILE *, unsigned char *, unsigned char **);
 
@@ -76,6 +76,8 @@ int decode_to_fd(FILE *, unsigned char *, unsigned char *, int, int, int);
 int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 			unsigned char *key);
 
-FILE *get_decrypt_configfp(unsigned char *);
+FILE *get_decrypt_configfp(const char *);
 
+int enc_backup_usermeta(char *json_str);
+char *dec_backup_usermeta(char *path);
 #endif /* GW20_HCFS_ENC_H_ */

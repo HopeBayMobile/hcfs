@@ -14,6 +14,10 @@ int super_block_share_release(void)
 
 int write_log(int level, char *format, ...)
 {
+	va_list alist;
+	va_start(alist, format);
+	vprintf(format, alist);
+	va_end(alist);
 	return 0;
 }
 
@@ -22,6 +26,7 @@ int super_block_finish_pinning(ino_t this_inode)
 	FINISH_PINNING = TRUE;
 	sem_wait(&verified_inodes_sem);
 	verified_inodes[verified_inodes_counter++] = this_inode;
+	sys_super_block->head.num_pinning_inodes--;
 	sem_post(&verified_inodes_sem);
 	return 0;
 }
@@ -53,7 +58,12 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	return 0;
 }
 
+struct timespec UT_sleep;
+
 void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
 {
+	UT_sleep.tv_sec = 0;
+	UT_sleep.tv_nsec = 99999999 ;
+	nanosleep(&UT_sleep, NULL);
 	return;
 }

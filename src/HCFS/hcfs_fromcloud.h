@@ -56,6 +56,14 @@ typedef struct {
 	int active_th;
 } DOWNLOAD_THREAD_CTL;
 
+typedef struct {
+	BOOL active;
+	sem_t access_sem;
+	pthread_attr_t thread_attr;
+	pthread_t download_usermeta_tid;
+} DOWNLOAD_USERMETA_CTL;
+
+DOWNLOAD_USERMETA_CTL download_usermeta_ctl;
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
@@ -66,5 +74,7 @@ int init_download_control();
 int destroy_download_control();
 void fetch_backend_block(void *ptr);
 int fetch_pinned_blocks(ino_t inode);
+void fetch_quota_from_cloud(void *ptr);
+int update_quota();
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

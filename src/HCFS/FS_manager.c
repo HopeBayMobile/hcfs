@@ -177,9 +177,9 @@ int _init_backend_stat(ino_t root_inode)
 	int ret, errcode;
 	char fname[METAPATHLEN];
 	FILE *fptr;
-	long long system_size, num_inodes;
 	size_t ret_size;
 	char is_fopen;
+	FS_CLOUD_STAT_T cloud_fs_stat;
 
 	is_fopen = FALSE;
 
@@ -197,11 +197,9 @@ int _init_backend_stat(ino_t root_inode)
 		goto errcode_handle;
 	}
 	is_fopen = TRUE;
+	memset(&cloud_fs_stat, 0, sizeof(FS_CLOUD_STAT_T));
 	FSEEK(fptr, 0, SEEK_SET);
-	system_size = 0;
-	num_inodes = 0;
-	FWRITE(&system_size, sizeof(long long), 1, fptr);
-	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+	FWRITE(&cloud_fs_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);	
 	fclose(fptr);
 	is_fopen = FALSE;
 
@@ -213,7 +211,11 @@ errcode_handle:
 }
 
 /* Helper function for allocating a new inode as root */
-ino_t _create_root_inode(void)
+#ifdef _ANDROID_ENV_
+ino_t _create_root_inode(char voltype)
+#else
+ino_t _create_root_inode()
+#endif
 {
 	ino_t root_inode;
 	struct stat this_stat;
@@ -228,6 +230,8 @@ ino_t _create_root_inode(void)
 	int64_t ret_pos;
 	unsigned long this_gen;
 	FS_STAT_T tmp_stat;
+	CLOUD_RELATED_DATA cloud_related_data;
+	char ispin;
 
 	statfptr = NULL;
 
@@ -237,8 +241,13 @@ ino_t _create_root_inode(void)
 
 #ifdef _ANDROID_ENV_
 	self_mode = S_IFDIR | 0770;
+	if (voltype == ANDROID_INTERNAL) /* Default pin internal storage */
+		ispin = TRUE;
+	else
+		ispin = DEFAULT_PIN;
 #else
 	self_mode = S_IFDIR | 0775;
+	ispin = DEFAULT_PIN;
 #endif
 	this_stat.st_mode = self_mode;
 
@@ -249,7 +258,7 @@ ino_t _create_root_inode(void)
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	root_inode = super_block_new_inode(&this_stat, &this_gen, DEFAULT_PIN);
+	root_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
 
 	if (root_inode <= 1) {
 		write_log(0, "Error creating new root inode\n");
@@ -271,15 +280,17 @@ ino_t _create_root_inode(void)
 		goto errcode_handle;
 	}
 
+	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
 	FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 
 	FTELL(metafptr);
 	this_meta.generation = this_gen;
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
-	this_meta.local_pin = DEFAULT_PIN;
+	this_meta.local_pin = ispin;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 	this_meta.metaver = CURRENT_META_VER;
 
@@ -305,6 +316,7 @@ ino_t _create_root_inode(void)
 		goto errcode_handle;
 	}
 
+	FSEEK(metafptr, this_meta.root_entry_page, SEEK_SET);
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
 
 	ret = fetch_stat_path(temppath, root_inode);
@@ -382,6 +394,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	ino_t new_FS_ino;
 	ssize_t ret_ssize;
+	long long metasize;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -434,13 +447,26 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	memset(&temp_entry, 0, sizeof(DIR_ENTRY));
 	memset(&overflow_entry, 0, sizeof(DIR_ENTRY));
 
+#ifdef _ANDROID_ENV_
+	new_FS_ino = _create_root_inode(voltype);
+#else
 	new_FS_ino = _create_root_inode();
+#endif
 
 	if (new_FS_ino == 0) {
 		write_log(0, "Error in creating root inode of filesystem\n");
 		errcode = -EIO;
 		goto errcode_handle;
 	}
+
+	/* Update meta size */
+	ret = get_meta_size(new_FS_ino, &metasize);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to get meta size\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+	change_system_meta(0, metasize, 0, 0, 0);
 
 	temp_entry.d_ino = new_FS_ino;
 #ifdef _ANDROID_ENV_
@@ -607,6 +633,7 @@ int delete_filesystem(char *fsname)
 	FILE *metafptr;
 	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
 	long long temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
+	long long metasize;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -690,8 +717,16 @@ int delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
-	/* Delete root inode (follow ll_rmdir) */
+	/* Update meta size */
+	ret = get_meta_size(FS_root, &metasize);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to get meta size\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+	change_system_meta(0, -metasize, 0, 0, 0);
 
+	/* Delete root inode (follow ll_rmdir) */
 	ret = delete_inode_meta(FS_root);
 	if (ret < 0) {
 		errcode = ret;

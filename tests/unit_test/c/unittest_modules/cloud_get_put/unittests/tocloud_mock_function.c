@@ -10,6 +10,7 @@
 #include "fuseop.h"
 #include "enc.h"
 #include "atomic_tocloud.h"
+#include "mount_manager.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
@@ -148,8 +149,9 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	if (target_page >= mock_total_page)
 		return 0;
 
-	ret_page_pos = sizeof(struct stat) + 
-		sizeof(FILE_META_TYPE) + target_page * sizeof(BLOCK_ENTRY_PAGE);
+	ret_page_pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+		sizeof(FILE_STATS_TYPE) + sizeof(FS_CLOUD_STAT_T) +
+		target_page * sizeof(BLOCK_ENTRY_PAGE);
 
 	return ret_page_pos;
 }
@@ -166,16 +168,16 @@ int write_log(int level, char *format, ...)
 
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
-	long long sys_size, num_ino;
+	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	if (no_backend_stat == TRUE)
 		return 404;
 
-	sys_size = 7687483;
-	num_ino = 34334;
+	fs_cloud_stat.backend_system_size = 7687483;
+	fs_cloud_stat.backend_meta_size = 5566;
+	fs_cloud_stat.backend_num_inodes = 34334;
 	fseek(fptr, 0, SEEK_SET);
-	fwrite(&sys_size, sizeof(long long), 1, fptr);
-	fwrite(&num_ino, sizeof(long long), 1, fptr);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	return 200;
 }
@@ -209,6 +211,7 @@ int sync_hcfs_system_data(char need_lock)
 {
 	return 0;
 }
+
 int backup_FS_database(void)
 {
 	return 0;
@@ -370,3 +373,26 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 {
 	return 0;
 }
+
+int update_backend_usage(long long total_backend_size_delta,
+		long long meta_size_delta, long long num_inodes_delta)
+{
+	return 0;
+}
+
+int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
+		long long fs_meta_size_delta, long long fs_num_inodes_delta)
+{
+	FS_CLOUD_STAT_T	fs_cloud_stat;
+
+	fseek(fptr, 0, SEEK_SET);
+	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fs_cloud_stat.backend_system_size += fs_total_size_delta;
+	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
+	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+
+	return 0;
+}
+

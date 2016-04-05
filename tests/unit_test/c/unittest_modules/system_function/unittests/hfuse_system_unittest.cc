@@ -73,6 +73,7 @@ TEST_F(init_hcfs_system_dataTest, ReadSystemDataSuccess)
 	SYSTEM_DATA_TYPE systemdata_answer;
 
 	/* Mock data */
+	memset(&systemdata_answer, 0, sizeof(SYSTEM_DATA_TYPE));
 	systemdata_answer.system_size = 54321;
 	systemdata_answer.cache_size = 98765;
 	systemdata_answer.cache_blocks = 11223344;
@@ -91,7 +92,7 @@ TEST_F(init_hcfs_system_dataTest, ReadSystemDataSuccess)
 	/* Check answer */
 	ASSERT_EQ(0, access(HCFSSYSTEM, F_OK));
 	EXPECT_EQ(0, memcmp(&systemdata_answer, &(hcfs_system->systemdata), 
-						sizeof(SYSTEM_DATA_TYPE)));
+			sizeof(SYSTEM_DATA_TYPE)));
 	ASSERT_EQ(0, unlink(HCFSSYSTEM));
 }
 /*

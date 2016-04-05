@@ -739,7 +739,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 }
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-				long long num_inodes_delta)
+		long long meta_size_delta, long long num_inodes_delta)
 {
 	return 0;
 }

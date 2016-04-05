@@ -3,6 +3,7 @@
 	echo ===
 	pause
 	exit)
+@prompt $$ 
 adb wait-for-device
 call install_busybox.bat
 adb shell killall -9 hcfs

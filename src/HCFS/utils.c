@@ -24,6 +24,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/file.h>
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
@@ -31,6 +32,7 @@
 #include <attr/xattr.h>
 #endif
 #include <inttypes.h>
+#include <jansson.h>
 
 #include "global.h"
 #include "fuseop.h"
@@ -43,6 +45,7 @@
 #include "hcfs_cacheops.h"
 #include "monitor.h"
 #include "FS_manager.h"
+#include "mount_manager.h"
 #include "enc.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
@@ -893,34 +896,200 @@ off_t check_file_size(const char *path)
 /************************************************************************
 *
 * Function name: change_system_meta
-*        Inputs: long long system_size_delta, long long cache_size_delta,
+*        Inputs: long long system_data_size_delta,
+*                long long meta_size_delta
+*                long long cache_data_size_delta,
 *                long long cache_blocks_delta, long long dirty_cache_delta
 *       Summary: Update system meta (total volume size, cache size, num
 *                of cache entries, dirty cache size) and sync to disk.
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int change_system_meta(long long system_size_delta,
-	long long cache_size_delta, long long cache_blocks_delta,
-	long long dirty_cache_delta)
+int change_system_meta(long long system_data_size_delta,
+		long long meta_size_delta, long long cache_data_size_delta,
+		long long cache_blocks_delta, long long dirty_cache_delta)
 {
+	int ret;
+
 	sem_wait(&(hcfs_system->access_sem));
-	hcfs_system->systemdata.system_size += system_size_delta;
+	/* System size includes meta size */
+	hcfs_system->systemdata.system_size +=
+		(system_data_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
-	hcfs_system->systemdata.cache_size += cache_size_delta;
+
+	hcfs_system->systemdata.system_meta_size += meta_size_delta;
+	if (hcfs_system->systemdata.system_meta_size < 0)
+		hcfs_system->systemdata.system_meta_size = 0;
+
+	/* Cached size includes meta size */
+	hcfs_system->systemdata.cache_size +=
+		(cache_data_size_delta + meta_size_delta);
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;
+
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	if (hcfs_system->systemdata.cache_blocks < 0)
 		hcfs_system->systemdata.cache_blocks = 0;
+
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
+
+	/* Pinned size includes meta size because meta is never paged out. */
+	hcfs_system->systemdata.pinned_size += meta_size_delta;
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+
+	ret = 0;
+	ret = sync_hcfs_system_data(FALSE);
+	if (ret < 0)
+		write_log(0, "Error: Fail to sync hcfs system data. Code %d\n",
+				-ret);
+	sem_post(&(hcfs_system->access_sem));
+
+	return ret;
+}
+
+int change_pin_size(long long delta_pin_size)
+{
+	sem_wait(&(hcfs_system->access_sem));
+	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
+			MAX_PINNED_LIMIT) {
+		sem_post(&(hcfs_system->access_sem));
+		return -ENOSPC;
+	}
+
+	hcfs_system->systemdata.pinned_size += delta_pin_size;
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+	sem_post(&(hcfs_system->access_sem));
+	return 0;
+}
+
+int update_sb_size()
+{
+	long long old_size, new_size;
+	struct stat sbstat;
+	int ret, ret_code;
+
+	sem_wait(&(hcfs_system->access_sem));
+	old_size = hcfs_system->systemdata.super_block_size;
+	ret = stat(SUPERBLOCK, &sbstat);
+	if (ret < 0) {
+		sem_post(&(hcfs_system->access_sem));
+		ret_code = errno;
+		write_log(0, "Error on get stat of super block." 
+				" Code %d\n", ret_code);
+		return -ret_code;
+	}
+
+	new_size = sbstat.st_size;
+	if (new_size == old_size) {
+		sem_post(&(hcfs_system->access_sem));
+		return 0;
+	}
+
+	hcfs_system->systemdata.system_size += (new_size - old_size);
+	if (hcfs_system->systemdata.system_meta_size < 0)
+		hcfs_system->systemdata.system_meta_size = 0;
+
+	hcfs_system->systemdata.cache_size += (new_size - old_size);
+	if (hcfs_system->systemdata.cache_size < 0)
+		hcfs_system->systemdata.cache_size = 0;
+
+	hcfs_system->systemdata.pinned_size += (new_size - old_size);
+	if (hcfs_system->systemdata.pinned_size < 0)
+		hcfs_system->systemdata.pinned_size = 0;
+
+	hcfs_system->systemdata.super_block_size = new_size;
+	sem_post(&(hcfs_system->access_sem));
+	write_log(10, "Debug: now sb size is %lld\n", new_size);
+
+	return 0;
+}
+
+/**
+ * update_backend_usage()
+ *
+ * Change backend space usage.
+ *
+ * @param total_backend_size_delta Backend space usage to be updated.
+ * @param meta_size_delte Backend meta size to be updated.
+ * @param num_inodes_delta Number of inodes to be updated.
+ *
+ * @return 0 on success.
+ */ 
+int update_backend_usage(long long total_backend_size_delta,
+		long long meta_size_delta, long long num_inodes_delta)
+{
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.backend_size += total_backend_size_delta;
+	if (hcfs_system->systemdata.backend_size < 0)
+		hcfs_system->systemdata.backend_size = 0;
+
+	hcfs_system->systemdata.backend_meta_size += meta_size_delta;
+	if (hcfs_system->systemdata.backend_meta_size < 0)
+		hcfs_system->systemdata.backend_meta_size = 0;
+
+	hcfs_system->systemdata.backend_inodes += num_inodes_delta;
+	if (hcfs_system->systemdata.backend_inodes < 0)
+		hcfs_system->systemdata.backend_inodes = 0;
 	sync_hcfs_system_data(FALSE);
 	sem_post(&(hcfs_system->access_sem));
 
+	write_log(10, "Debug cloud usage: total size %lld, meta size %lld",
+			hcfs_system->systemdata.backend_size,
+			hcfs_system->systemdata.backend_meta_size);
 	return 0;
+}
+
+/**
+ * Update backend usage (statistics) per volume.
+ *
+ * @param fptr File pointer of FS backend statistics file.
+ * @param fs_total_size_delta Amount of total change (data + meta) in
+ *        backend space.
+ * @param fs_meta_size_delta Amount of meta size change in backend spsace.
+ * @param fs_num_inodes_delta Delta of # of inodes in backend space.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
+		long long fs_meta_size_delta, long long fs_num_inodes_delta)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fs_cloud_stat.backend_system_size += fs_total_size_delta;
+	if (fs_cloud_stat.backend_system_size < 0)
+		fs_cloud_stat.backend_system_size = 0;
+
+	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
+	if (fs_cloud_stat.backend_meta_size < 0)
+		fs_cloud_stat.backend_meta_size = 0;
+
+	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
+	if (fs_cloud_stat.backend_num_inodes < 0)
+		fs_cloud_stat.backend_num_inodes = 0;
+
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	flock(fileno(fptr), LOCK_UN);
+
+	write_log(10, "Debug FS cloud usage: total size %lld, meta size %lld",
+			fs_cloud_stat.backend_system_size,
+			fs_cloud_stat.backend_meta_size);
+	return 0;
+
+errcode_handle:
+	write_log(0, "Fail to update fs backend statistics\n");
+	flock(fileno(fptr), LOCK_UN);
+	return errcode;
 }
 
 int set_block_dirty_status(char *path, FILE *fptr, char status)
@@ -1538,4 +1707,90 @@ BOOL is_natural_number(char *str)
 
 		return ret;
 	}
+}
+
+/**
+ * get_meta_size()
+ *
+ * Get size of meta file. "metasize" is 0 if size of this meta file
+ * cannot be retrieved, and then return negative error code.
+ *
+ * @param inode Inode number of this meta file.
+ * @param metasize Variable to store meta size.
+ *
+ * @return 0 on success, otherwise negative error code.
+ *
+ */ 
+int get_meta_size(ino_t inode, long long *metasize)
+{
+	char metapath[300];
+	struct stat metastat;
+	int ret, ret_code;
+
+	fetch_meta_path(metapath, inode);
+	ret = stat(metapath, &metastat);
+	if (ret < 0) {
+		ret_code = errno;
+		write_log(0, "Error on get stat of meta %"PRIu64
+				". Code %d\n", (uint64_t)inode, ret_code);
+		*metasize = 0;
+		return -ret_code;
+	}
+	*metasize = metastat.st_size;
+
+	return 0;
+}
+
+/**
+ * Get quota value from backup usermeta
+ *
+ * First decrypt the usermeta if it exists, and parse the json string to
+ * get the quota value.
+ *
+ * @param quota Variable to store the value quota.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int get_quota_from_backup(long long *quota)
+{
+	char path[200];
+	char *json_result;
+	json_error_t jerror;
+	json_t *json_data, *json_quota;
+	int errcode;
+
+	*quota = 0;
+	sprintf(path, "%s/usermeta", METAPATH);
+	if (access(path, F_OK) < 0) {
+		errcode = errno;
+		return -errcode;
+	}
+
+	json_result = dec_backup_usermeta(path);
+	if (!json_result)
+		return -ENOENT;
+	
+	json_data = NULL;
+	json_data = json_loads(json_result, 0, &jerror);
+	if (!json_data) {
+		free(json_result);
+		write_log(0, "Error: Fail to parse json file\n");
+		return -EINVAL;
+	}
+	json_quota = json_object_get(json_data, "quota");
+	if (!json_quota || !json_is_integer(json_quota)) {
+		free(json_result);
+		json_delete(json_data);
+		write_log(0, "Error: Json file is corrupt\n");
+		return -EINVAL;
+	}
+	*quota = json_integer_value(json_quota);
+	if (*quota < 0) {
+		write_log(0, "Error: Quota is less than zero?\n");
+		*quota = 0;
+	}
+
+	free(json_result);
+	json_delete(json_data);
+	return 0;
 }

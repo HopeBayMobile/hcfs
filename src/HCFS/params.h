@@ -100,7 +100,8 @@ typedef struct {
 #define TO_BE_RECLAIMED 3
 #define RECLAIMED 4
 
-#define DEFAULT_CONFIG_PATH "/data/hcfs.conf"
-#define CONFIG_PASSPHRASE "lets encrypt configuration"
+static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
+static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";
+static const char USERMETA_PASSPHRASE[] = "hey! kewei enc usermeta :)";
 
 #endif  /* GW20_SRC_PARAMS_H_ */

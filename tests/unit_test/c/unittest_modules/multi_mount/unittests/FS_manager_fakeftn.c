@@ -171,3 +171,15 @@ int reset_dirstat_lookup(ino_t thisinode)
 {
 	return 0;
 }
+
+int get_meta_size(ino_t inode, long long *metasize)
+{
+	return 0;
+}
+
+int change_system_meta(long long system_data_size_delta,
+	long long meta_size_delta, long long cache_data_size_delta,
+	long long cache_blocks_delta, long long dirty_cache_delta)
+{
+	return 0;
+}

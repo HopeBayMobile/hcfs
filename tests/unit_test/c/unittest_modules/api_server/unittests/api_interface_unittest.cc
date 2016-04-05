@@ -1227,6 +1227,159 @@ TEST_F(api_moduleTest, ReloadConfigSuccess) {
 	ASSERT_EQ(0, errcode);
 }
 
+TEST_F(api_moduleTest, GetQuotaSuccess) {
+
+	int ret_val;
+	unsigned int code, cmd_len, size_msg;
+	long long quota;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	hcfs_system->systemdata.system_quota = 55667788;
+	code = GETQUOTA;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(long long), size_msg);
+	ret_val = recv(fd, &quota, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
+	ASSERT_EQ(55667788, quota);
+}
+
+TEST_F(api_moduleTest, UpdateQuotaSuccess) {
+
+	int ret_val, errcode;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = TRIGGERUPDATEQUOTA;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.system_quota = 0; /* It will be modified */
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(0, errcode);
+
+	EXPECT_EQ(5566, hcfs_system->systemdata.system_quota);
+}
+
+TEST_F(api_moduleTest, ChangeLogLevelSuccess) {
+
+	int ret_val, errcode;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+	int loglevel;
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = CHANGELOG;
+	system_config->log_level = 10; /* Original level */
+	loglevel = 6; /* New level */
+	cmd_len = sizeof(int);
+	memset(buf, 0, 300);
+	memcpy(buf, &loglevel, sizeof(int));
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(0, errcode);
+
+	EXPECT_EQ(6, system_config->log_level);
+}
+
+TEST_F(api_moduleTest, GetTotalCloudSizeSuccess) {
+
+	int ret_val;
+	long long cloudsize;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = GETCLOUDSIZE;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.backend_size = 12345566;
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(long long), size_msg);
+	ret_val = recv(fd, &cloudsize, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
+	ASSERT_EQ(12345566, cloudsize);
+}
+
 /* End of the test case for the function api_module */
 
 /* Begin of the test case for the function api_server_monitor */
@@ -1235,7 +1388,7 @@ class api_server_monitorTest : public ::testing::Test {
 
  protected:
   int count;
-  int fd[20];
+  int fd[10];
   int status;
   struct sockaddr_un addr;
 
@@ -1247,13 +1400,13 @@ class api_server_monitorTest : public ::testing::Test {
     hcfs_system->sync_paused = OFF;
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
-    for (count = 0; count < 20; count++)
+    for (count = 0; count < 10; count++)
       fd[count] = 0;
    }
 
   virtual void TearDown() {
 
-    for (count = 0; count < 20; count++) {
+    for (count = 0; count < 10; count++) {
       if (fd[count] != 0)
         close(fd[count]);
      }
@@ -1279,7 +1432,7 @@ class api_server_monitorTest : public ::testing::Test {
   int connect_sock() {
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, SOCK_PATH);
-    for (count = 0; count < 20; count++) {
+    for (count = 0; count < 10; count++) {
       fd[count] = socket(AF_UNIX, SOCK_STREAM, 0);
       status = connect(fd[count], (sockaddr *)&addr, sizeof(addr));
       if (status != 0)
@@ -1306,14 +1459,14 @@ TEST_F(api_server_monitorTest, TestThreadIncrease) {
   code = TESTAPI;
   cmd_len = 0;
   printf("Start sending\n");
-  for (count1 = 0; count1 < 20; count1++) {
+  for (count1 = 0; count1 < 10; count1++) {
     size_msg=send(fd[count1], &code, sizeof(unsigned int), 0);
     ASSERT_EQ(sizeof(unsigned int), size_msg);
     size_msg=send(fd[count1], &cmd_len, sizeof(unsigned int), 0);
     ASSERT_EQ(sizeof(unsigned int), size_msg);
    }
   printf("Start recv\n");
-  for (count1 = 0; count1 < 20; count1++) {
+  for (count1 = 0; count1 < 10; count1++) {
     ret_val = recv(fd[count1], &size_msg, sizeof(unsigned int), 0);
     ASSERT_EQ(sizeof(unsigned int), ret_val);
     ASSERT_EQ(sizeof(unsigned int), size_msg);

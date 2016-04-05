@@ -46,9 +46,15 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 
-int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta,
-		long long dirty_cache_delta);
+int change_system_meta(long long system_data_size_delta,
+	long long meta_size_delta, long long cache_data_size_delta,
+	long long cache_blocks_delta, long long dirty_cache_delta);
+
+int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
+		long long fs_meta_size_delta, long long fs_num_inodes_delta);
+
+int update_backend_usage(long long total_backend_size_delta,
+		long long meta_size_delta, long long num_inodes_delta);
 
 int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
@@ -69,6 +75,8 @@ int fetch_error_download_path(char *path, ino_t inode);
 
 void get_system_size(long long *cache_size, long long *pinned_size);
 
+int update_sb_size();
+
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
 			long long cached_size_delta, ino_t thisinode);
@@ -83,4 +91,7 @@ int ignore_sigpipe(void);
 
 BOOL is_natural_number(char *str);
 
+int get_meta_size(ino_t inode, long long *metasize);
+
+int get_quota_from_backup(long long *quota);
 #endif  /* SRC_HCFS_UTILS_H_ */

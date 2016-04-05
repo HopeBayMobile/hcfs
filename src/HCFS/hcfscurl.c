@@ -240,7 +240,7 @@ int parse_http_header_retcode(FILE *fptr)
 	char *endptr;
 
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = fscanf(fptr, "%19s %19s %19s\n", httpcode, retcode, retstatus);
+	ret = fscanf(fptr, "%19s %19s %19s", httpcode, retcode, retstatus);
 	if (ret < 3)
 		return -1;
 
@@ -315,7 +315,7 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 					object_meta->len_enc_session_key =
 					    strlen(s2);
 					object_meta->enc_session_key = calloc(
-					    object_meta->len_enc_session_key,
+					    object_meta->len_enc_session_key+10,
 					    sizeof(char));
 					memcpy(
 					    object_meta->enc_session_key, s2,
@@ -666,7 +666,7 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
 	res = curl_easy_perform(curl);
@@ -944,8 +944,12 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
-		objname);
+	if (!strncmp("download_usermeta", curl_handle->id, 100))
+		sprintf(container_string, "%s/%s_gateway_config/%s",
+			swift_url_string, SWIFT_USER, objname);
+	else
+		sprintf(container_string, "%s/%s/%s", swift_url_string,
+			SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
@@ -983,8 +987,8 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		return -1;
 	}
 	/* get object meta data */
-	if (object_meta) {
-		char header[1000] = {0};
+	if (_http_is_success(ret_val) && object_meta) {
+		char header[1024] = {0};
 		FSEEK(swift_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, swift_header_fptr);
 		write_log(10, "download object %s header:\n%s", objname,
@@ -2077,8 +2081,8 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	}
 
 	/* get object meta data */
-	if (object_meta) {
-		char header[1000] = {0};
+	if (_http_is_success(ret_val) && object_meta) {
+		char header[1024] = {0};
 		FSEEK(S3_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, S3_header_fptr);
 		write_log(10, "download object %s header:\n%s", objname,

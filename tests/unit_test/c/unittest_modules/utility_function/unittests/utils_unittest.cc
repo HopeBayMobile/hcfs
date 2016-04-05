@@ -12,10 +12,14 @@ extern "C" {
 #include "global.h"
 #include "hfuse_system.h"
 #include "params.h"
+#include "fuseop.h"
+#include "mount_manager.h"
 }
 #include "gtest/gtest.h"
+#include "mock_params.h"
 
 extern SYSTEM_CONF_STRUCT *system_config;
+extern SYSTEM_DATA_HEAD *hcfs_system;
 
 // Tests non-existing file
 TEST(check_file_sizeTest, Nonexist) {
@@ -948,6 +952,7 @@ TEST_F(reload_system_configTest, Set_Backend_Success)
 
 /* End of unittest for reload_system_config */
 
+/* Unittest of is_natural_number() */
 class is_natural_numberTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -988,3 +993,168 @@ TEST_F(is_natural_numberTest, PositiveNumber2)
 {
 	EXPECT_EQ(TRUE, is_natural_number("5"));
 }
+/* End of unittest of is_natural_number() */
+
+/* Unittest of update_backend_usage() */
+class update_fs_backend_usageTest : public ::testing::Test {
+protected:
+	FILE *fptr;
+
+	void SetUp()
+	{
+		mkdir("utils_unittest_folder", 0700);
+		fptr = fopen("utils_unittest_folder/mock_FSstat", "w+");
+	}
+
+	void TearDown()
+	{
+		fclose(fptr);
+		unlink("utils_unittest_folder/mock_FSstat");
+		rmdir("utils_unittest_folder");
+	}
+};
+
+TEST_F(update_fs_backend_usageTest, UpdateSuccess)
+{
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	fs_cloud_stat.backend_system_size = 123456;
+	fs_cloud_stat.backend_meta_size = 456;
+	fs_cloud_stat.backend_num_inodes = 5566;
+
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+
+	/* Run */
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789));
+
+	/* Verify */
+	fseek(fptr, 0, SEEK_SET);
+	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	EXPECT_EQ(123456 + 123, fs_cloud_stat.backend_system_size);
+	EXPECT_EQ(456 + 456, fs_cloud_stat.backend_meta_size);
+	EXPECT_EQ(5566 + 789, fs_cloud_stat.backend_num_inodes);
+}
+
+TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
+{
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	fs_cloud_stat.backend_system_size = 123456;
+	fs_cloud_stat.backend_meta_size = 456;
+	fs_cloud_stat.backend_num_inodes = 5566;
+
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+
+	/* Run */
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, -12345678, -456666, -789999));
+
+	/* Verify */
+	fseek(fptr, 0, SEEK_SET);
+	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	EXPECT_EQ(0, fs_cloud_stat.backend_system_size);
+	EXPECT_EQ(0, fs_cloud_stat.backend_meta_size);
+	EXPECT_EQ(0, fs_cloud_stat.backend_num_inodes);
+}
+
+/* End of unittest of update_backend_usage() */
+
+/*
+ * Unittest of change_system_meta()
+ */ 
+class change_system_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(change_system_metaTest, UpdateSuccess)
+{
+	int ret;
+
+	ret = change_system_meta(1, 2, 3, 4, 5);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1 + 2, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(2, hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(2 + 3, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
+	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
+}
+/*
+ * End of unittest of change_system_meta()
+ */
+
+/* Unittest of get_quota_from_backup() */
+class get_quota_from_backupTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+
+		METAPATH = (char *)malloc(METAPATHLEN);
+		strcpy(METAPATH, "get_quota_from_backup_dir");
+		mkdir(METAPATH, 0700);
+		mknod("get_quota_from_backup_dir/usermeta", 0700, 0);
+		dec_success = TRUE;
+		json_file_corrupt = FALSE;
+	}
+
+	void TearDown()
+	{
+		unlink("get_quota_from_backup_dir/usermeta");
+		rmdir(METAPATH);
+
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(get_quota_from_backupTest, MetapathNotExist)
+{
+	long long quota;
+
+	unlink("get_quota_from_backup_dir/usermeta");
+
+	EXPECT_EQ(-ENOENT, get_quota_from_backup(&quota));
+}
+
+TEST_F(get_quota_from_backupTest, BackupNotExist)
+{
+	long long quota;
+
+	dec_success = FALSE;
+
+	EXPECT_EQ(-ENOENT, get_quota_from_backup(&quota));
+}
+
+TEST_F(get_quota_from_backupTest, JsonfileCorrupt)
+{
+	long long quota;
+
+	json_file_corrupt = TRUE;
+
+	EXPECT_EQ(-EINVAL, get_quota_from_backup(&quota));
+}
+
+TEST_F(get_quota_from_backupTest, Success)
+{
+	long long quota;
+
+	EXPECT_EQ(0, get_quota_from_backup(&quota));
+	EXPECT_EQ(5566, quota);
+}
+
+/* End of unittest of get_quota_from_backup() */
+
