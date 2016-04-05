@@ -24,6 +24,7 @@
 #include "metaops.h"
 #include "utils.h"
 #include "hcfs_fromcloud.h"
+#include "tocloud_tools.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -475,7 +476,6 @@ int create_progress_file(ino_t inode)
 	char pathname[200];
 	PROGRESS_META progress_meta;
 	ssize_t ret_ssize;
-	FILE *fptr;
 
 	sprintf(pathname, "%s/upload_bullpen", METAPATH);
 
@@ -534,7 +534,6 @@ int init_progress_info(int fd, long long backend_blocks,
 	int errcode;
 	long long offset, ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
-	struct stat tempstat;
 	long long e_index, which_page, current_page, page_pos;
 	long long block;
 	BLOCK_ENTRY_PAGE block_page;
@@ -680,7 +679,7 @@ errcode_handle:
 int fetch_toupload_block_path(char *pathname, ino_t inode,
 	long long block_no, long long seq)
 {
-
+	UNUSED(seq);
 	sprintf(pathname, "/tmp/hcfs_sync_block_%"PRIu64"_%lld.tmp",
 		(uint64_t)inode, block_no);
 
@@ -737,10 +736,8 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 	int ret;
 	size_t read_size;
 	size_t ret_size;
-	ssize_t ret_ssize;
 	FILE *src_ptr, *tar_ptr;
 	char filebuf[4100];
-	long long temp_trunc_size;
 	long ret_pos;
 
 	/* if target file exists, do not copy it.
@@ -1062,13 +1059,11 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 	char finish_init;
 	int ret;
 	PROGRESS_META progress_meta;
-	int which_index;
 
 	finish_init = FALSE;
 	this_mode = data_ptr->this_mode;
 	inode = data_ptr->inode;
 	progress_fd = data_ptr->progress_fd;
-	which_index = data_ptr->which_index;
 
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
@@ -1217,7 +1212,6 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	mode_t this_mode;
 	ino_t inode;
 	int progress_fd;
-	long long total_blocks;
 	ssize_t ret_ssize;
 	int ret;
 	char now_action;
@@ -1344,7 +1338,7 @@ errcode_handle:
  */ 
 int change_action(int fd, char now_action)
 {
-	int ret, errcode;
+	int errcode;
 	ssize_t ret_ssize;
 	PROGRESS_META progress_meta;
 

@@ -267,6 +267,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 	long long to_upload_seq;
 	long long backend_seq;
 
+	UNUSED(inode);
 	finish_uploading = block_info->finish_uploading;
 	to_upload_seq = block_info->to_upload_seq;
 	backend_seq = block_info->backend_seq;
@@ -322,17 +323,18 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	long long block_seq;
 	long long which_page, current_page;
 	long long offset;
-	unsigned char block_objid[OBJID_LENGTH];
 	int ret, errcode;
 	int which_curl;
 	int e_index;
-	BOOL sync_error;
 	ssize_t ret_ssize;
 	char local_metapath[300];
 	FILE *local_metafptr;
 	ssize_t ret_size;
 	long long page_pos;
 	FILE_META_TYPE filemeta;
+#if DEDUP_ENABLE
+	unsigned char block_objid[OBJID_LENGTH];
+#endif
 
 	ret = change_action(progress_fd, delete_which_one);
 	if (ret < 0) {
@@ -445,7 +447,7 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 	BLOCK_ENTRY_PAGE tmppage;
 	char local_metapath[300];
 	FILE *fptr;
-	int errcode, ret;
+	int errcode;
 	ssize_t ret_ssize;
 
 	/* Do nothing when error on page position and entry index */

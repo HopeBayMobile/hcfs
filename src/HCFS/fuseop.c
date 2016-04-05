@@ -6909,7 +6909,6 @@ void *fuse_communication_contact_window(void *data)
 	int communicate_result;
 	struct timespec timer;
 	int ret;
-	char *log_str;
 	int ac_fd;
 	const int socket_fd = *(int *)data;
 
@@ -6958,7 +6957,7 @@ void *fuse_communication_contact_window(void *data)
 
 	write_log(10, "Debug: Terminate fuse communication contact\n");
 
-	return;
+	return NULL;
 }
 
 int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)

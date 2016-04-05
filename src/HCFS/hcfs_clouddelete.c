@@ -52,6 +52,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "metaops.h"
 #include "utils.h"
 #include "hcfs_fromcloud.h"
+#include "atomic_tocloud.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -424,9 +425,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char thismetapath[400];
 	char backend_metapath[400];
 	char objname[500];
-	char truncpath[METAPATHLEN];
 	ino_t this_inode;
-	FILE *backend_metafptr, *truncfptr;
+	FILE *backend_metafptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
@@ -435,20 +435,16 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long page_pos, which_page, current_page;
 	long long count, block_count;
 	long long total_blocks;
-	long long temp_trunc_size;
 	unsigned char block_status;
 	char delete_done;
-	char in_sync;
 	int ret_val, errcode, ret;
 	size_t ret_size;
-	ssize_t ret_ssize;
 	struct timespec time_to_sleep;
 	pthread_t *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
-	char mlock, backend_mlock;
+	char backend_mlock;
 	long long backend_size_change, meta_size_change;
-	long long upload_seq;
 	long long block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
@@ -459,7 +455,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
-	mlock = FALSE;
 	backend_mlock = FALSE;
 	this_inode = ptr->inode;
 	which_dsync_index = ptr->which_index;

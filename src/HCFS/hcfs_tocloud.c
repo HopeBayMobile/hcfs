@@ -144,7 +144,7 @@ static inline int _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 	long long num_blocks, bcount;
 	char block_path[300];
 	struct stat tmpstat;
-	int ret, errcode;
+	int errcode;
 	ssize_t ret_ssize;
 	FILE_META_TYPE tmpmeta;
 	long long current_page, which_page, page_pos;
@@ -301,12 +301,9 @@ void collect_finished_sync_threads(void *ptr)
 using threads_error in sync control. */
 static inline int _upload_terminate_thread(int index)
 {
-	int count2, count1;
-	int which_curl;
+	int count1;
 	int ret, errcode;
-	FILE *toupload_metafptr;
-	char thismetapath[METAPATHLEN], toupload_metapath[200];
-	char blockpath[400], toupload_blockpath[400];
+	char toupload_blockpath[400];
 #if (DEDUP_ENABLE)
 	unsigned char blk_obj_id[OBJID_LENGTH];
 #endif
@@ -315,17 +312,8 @@ static inline int _upload_terminate_thread(int index)
 	long long e_index;
 	long long blockno;
 	long long toupload_block_seq;
-	BLOCK_ENTRY_PAGE temppage;
-	char is_delete;
-	BLOCK_ENTRY *tmp_entry;
-	size_t tmp_size, ret_size;
-	DELETE_THREAD_TYPE *tmp_del;
-	char need_delete_object, is_toupload_meta_lock;
-	BLOCK_UPLOADING_STATUS temp_block_uploading_status;
 	int progress_fd;
 	char toupload_exist, finish_uploading;
-	SYSTEM_DATA_TYPE *statptr;
-	off_t cache_block_size;
 
 	if (upload_ctl.threads_in_use[index] == FALSE)
 		return 0;
@@ -355,7 +343,7 @@ static inline int _upload_terminate_thread(int index)
 	}
 
 	this_inode = upload_ctl.upload_threads[index].inode;
-	is_delete = upload_ctl.upload_threads[index].is_delete;
+	//is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
 	e_index = upload_ctl.upload_threads[index].page_entry_index;
 	blockno = upload_ctl.upload_threads[index].blockno;
@@ -365,7 +353,6 @@ static inline int _upload_terminate_thread(int index)
 	/* Terminate it directly when thread is used to delete
 	 * old data on cloud */
 	if (upload_ctl.upload_threads[index].backend_delete_type != FALSE) {
-		char backend_exist, toupload_exist;
 
 		/* TODO: Maybe we don't care about deleting backend
 		 * blocks when re-connecting */
@@ -492,7 +479,7 @@ errcode_handle:
 
 void collect_finished_upload_threads(void *ptr)
 {
-	int count, ret, count1;
+	int count, ret;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -919,8 +906,7 @@ errcode_handle:
  */
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
-	char toupload_metapath[400], toupload_bpath[400];
-	char objname[500];
+	char toupload_metapath[400];
 	char local_metapath[METAPATHLEN];
 	ino_t this_inode;
 	FILE *toupload_metafptr, *local_metafptr;
@@ -930,31 +916,24 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	FILE_META_TYPE tempfilemeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	DIR_META_TYPE tempdirmeta;
-	BLOCK_ENTRY_PAGE local_temppage, toupload_temppage;
+	BLOCK_ENTRY_PAGE toupload_temppage;
 	int which_curl;
-	long long page_pos, e_index, which_page, current_page;
+	long long page_pos, current_page;
 	long long total_blocks, total_backend_blocks;
 	long long block_count;
-	unsigned char local_block_status, toupload_block_status;
 	int ret, errcode;
 	off_t toupload_size;
-	BLOCK_ENTRY *tmp_entry;
 	long long temp_trunc_size;
-	ssize_t ret_ssize;
 	size_t ret_size;
 	BOOL sync_error;
-	int count1;
-	long long upload_seq;
 	ino_t root_inode;
 	long long backend_size;
 	long long size_diff;
-	long long toupload_block_seq, local_block_seq;
 	int progress_fd;
-	BOOL first_upload, is_local_meta_deleted;
-	BLOCK_UPLOADING_STATUS temp_uploading_status;
-	char toupload_exist, finish_uploading;
+	BOOL is_local_meta_deleted;
 	char is_revert;
 	long long meta_size_diff;
+	long long upload_seq;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1006,7 +985,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 	setbuf(local_metafptr, NULL);
 
-	first_upload = FALSE;
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
 		/* First download backend meta and init backend block info in
@@ -1325,7 +1303,7 @@ store in some other file */
 	}
 
 	/* Upload successfully. Update FS stat in backend */
-	if (first_upload == TRUE)
+	if (upload_seq <= 0)
 		update_backend_stat(root_inode, size_diff, meta_size_diff, 1);
 	else
 		if (size_diff != 0)
@@ -1357,10 +1335,10 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	char objname[400];
 	FILE *fptr;
 	int ret_val, errcode, ret;
+#if (DEDUP_ENABLE)
+	DDT_BTREE_NODE result_node;
 	int ddt_fd = -1;
 	int result_idx = -1;
-	DDT_BTREE_NODE result_node;
-#if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
 	unsigned char old_obj_id[OBJID_LENGTH];
 	unsigned char obj_id[OBJID_LENGTH];
@@ -1560,9 +1538,6 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
 	int which_curl, ret, errcode, which_index;
-	BLOCK_UPLOADING_STATUS temp_block_uploading_status;
-	int count1;
-	char finish_uploading;
 	char local_metapath[300];
 
 	which_curl = thread_ptr->which_curl;
@@ -1628,7 +1603,7 @@ errcode_handle:
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, count1, which_index;
+	int which_curl, ret, which_index;
 	char local_metapath[200];
 
 	which_curl = thread_ptr->which_curl;
@@ -1687,15 +1662,8 @@ int dispatch_upload_block(int which_curl)
 	char thisblockpath[400];
 	char toupload_blockpath[400];
 	char local_metapath[400];
-	int read_size;
-	int count, ret, errcode;
-	size_t ret_size;
-	FILE *fptr, *blockfptr;
+	int ret, errcode;
 	UPLOAD_THREAD_TYPE *upload_ptr;
-	char bopen, topen;
-
-	bopen = FALSE;
-	topen = FALSE;
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
 

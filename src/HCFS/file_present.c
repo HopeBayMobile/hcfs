@@ -1464,7 +1464,6 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret;
 	struct stat tmpstat;
-	long long upload_seq;
 	ino_t inode;
 
 	inode = body_ptr->inode_num;
@@ -1529,8 +1528,8 @@ int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
 		return -EPERM;
 	}
 
-	write_log(10, "Debug sync: Now inode %"PRIu64" has upload_seq %lld\n",
-			(uint64_t)inode, upload_seq);
+	//write_log(10, "Debug sync: Now inode %"PRIu64" has upload_seq %lld\n",
+	//		(uint64_t)inode, upload_seq);
 
 	return 0;
 }
