@@ -907,7 +907,8 @@ off_t check_file_size(const char *path)
 *************************************************************************/
 int change_system_meta(long long system_data_size_delta,
 		long long meta_size_delta, long long cache_data_size_delta,
-		long long cache_blocks_delta, long long dirty_cache_delta)
+		long long cache_blocks_delta, long long dirty_cache_delta,
+		long long unpin_dirty_delta)
 {
 	int ret;
 
@@ -935,6 +936,11 @@ int change_system_meta(long long system_data_size_delta,
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
+
+	/* Unpin & dirty means the space cannot be freed */
+	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_delta;
+	if (hcfs_system->systemdata.unpin_dirty_data_size < 0)
+		hcfs_system->systemdata.unpin_dirty_data_size = 0;
 
 	/* Pinned size includes meta size because meta is never paged out. */
 	hcfs_system->systemdata.pinned_size += meta_size_delta;

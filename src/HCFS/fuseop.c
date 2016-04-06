@@ -1092,7 +1092,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1249,7 +1249,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -2163,7 +2163,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if (delta_meta_size1 + delta_meta_size2 != 0) {
 		change_system_meta(0, delta_meta_size1 + delta_meta_size2,
-				0, 0, 0);
+				0, 0, 0, 0);
 		change_mount_stat(tmpptr, 0,
 				delta_meta_size1 + delta_meta_size2 , 0);
 	}
@@ -2218,7 +2218,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			long long page_index, long long old_last_block,
-			ino_t inode_index, FILE *metafptr)
+			ino_t inode_index, FILE *metafptr, char ispin)
 {
 	int block_count;
 	char thisblockpath[1024];
@@ -2227,6 +2227,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	off_t total_deleted_cache;
 	long long total_deleted_blocks;
 	long long total_deleted_fileblocks;
+	long long unpin_dirty_size;
 	off_t total_deleted_dirty_cache;
 	int ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
@@ -2332,9 +2333,11 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		}
 	}
 	if (total_deleted_blocks > 0) {
+		unpin_dirty_size = (ispin == TRUE ? 0 : -total_deleted_dirty_cache);
 		change_system_meta(0, 0, -total_deleted_cache,
 				   -total_deleted_blocks,
-				   -total_deleted_dirty_cache);
+				   -total_deleted_dirty_cache,
+				   unpin_dirty_size);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				-total_deleted_dirty_cache, inode_index);
@@ -2368,6 +2371,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	long long cache_delta;
 	long long cache_block_delta;
 	long long block_dirty_size, delta_dirty_size;
+	long long unpin_dirty_size;
 	char tmpstatus;
 	BLOCK_ENTRY *last_block_entry;
 
@@ -2505,7 +2509,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 				}
 
 				change_system_meta(0, 0, tempstat.st_size, 1,
-						   tempstat.st_size);
+						   tempstat.st_size, 0);
 				cache_delta += tempstat.st_size;
 				cache_block_delta += 1;
 			}
@@ -2541,8 +2545,11 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			delta_dirty_size = new_block_size;
 		else
 			delta_dirty_size = new_block_size - old_block_size;
+
+		unpin_dirty_size = (tempfilemeta->local_pin == TRUE ?
+				0 : delta_dirty_size);
 		change_system_meta(0, 0, new_block_size - old_block_size,
-				0, delta_dirty_size);
+				0, delta_dirty_size, unpin_dirty_size);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -2620,8 +2627,10 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		 * block. Otherwise it is an old dirty block */
 		block_dirty_size = (tmpstatus == ST_BOTH ? new_block_size :
 				new_block_size - old_block_size);
+		unpin_dirty_size = (tempfilemeta->local_pin == TRUE ?
+				0 : block_dirty_size);
 		change_system_meta(0, 0, new_block_size - old_block_size,
-				0, block_dirty_size);
+				0, block_dirty_size, unpin_dirty_size);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -2800,7 +2809,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, old_last_block,
-				filestat->st_ino, (*body_ptr)->fptr);
+				filestat->st_ino, (*body_ptr)->fptr,
+				tempfilemeta.local_pin);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -2857,7 +2867,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			ret = truncate_delete_block(&temppage, 0,
 				current_page, old_last_block,
-				filestat->st_ino, (*body_ptr)->fptr);
+				filestat->st_ino, (*body_ptr)->fptr,
+				tempfilemeta.local_pin);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -2997,7 +3008,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0, 0);
+	change_system_meta((long long)(offset - filestat->st_size),
+			0, 0, 0, 0, 0);
 
 	ret = change_mount_stat(tmpptr,
 			(long long) (offset - filestat->st_size), 0, 0);
@@ -3379,7 +3391,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				goto error_handling;
 
 			/* Update system meta to reflect correct cache size */
-			change_system_meta(0, 0, tempstat2.st_size, 1, 0);
+			change_system_meta(0, 0, tempstat2.st_size, 1, 0, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -3840,11 +3852,13 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 /* Helper function for the write operation. Will fetch a block from backend. */
 int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
-		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex)
+		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex,
+		char ispin)
 {
 	char thisblockpath[400];
 	struct stat tempstat2;
 	int ret, errcode;
+	long long unpin_dirty_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
@@ -3966,9 +3980,11 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				}
 				return ret;
 			}
-			tmpptr = fh_ptr->meta_cache_ptr;
+			unpin_dirty_size = (ispin == TRUE ?
+					0 : tempstat2.st_size);
 			change_system_meta(0, 0, tempstat2.st_size, 1,
-					tempstat2.st_size);
+					tempstat2.st_size, unpin_dirty_size);
+			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -4019,7 +4035,8 @@ error_handling:
 /* Function for writing to a single block for write operation. Will fetch
 *  block from backend if needed. */
 size_t _write_block(const char *buf, size_t size, long long bindex,
-		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int *reterr)
+		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode,
+		int *reterr, char ispin)
 {
 	long long current_page;
 	char thisblockpath[400];
@@ -4030,6 +4047,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	long long entry_index;
 	int ret, errnum, errcode;
 	long long tmpcachesize, tmpdiff;
+	long long unpin_dirty_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Check system size before writing */
@@ -4124,8 +4142,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			fh_ptr->opened_block = -1;
 		}
 		ret = meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
-			NULL, &temppage, this_page_fpos,
-						fh_ptr->meta_cache_ptr);
+				NULL, &temppage, this_page_fpos,
+				fh_ptr->meta_cache_ptr);
 		if (ret < 0) {
 			*reterr = ret;
 			return 0;
@@ -4167,7 +4185,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			}
 
 			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, 0, 0, 1, 0);
+			change_system_meta(0, 0, 0, 1, 0, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0) {
 				*reterr = ret;
@@ -4203,7 +4221,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		case ST_CtoL:
 			/*Download from backend */
 			ret = _write_fetch_backend(this_inode, bindex, fh_ptr,
-					&temppage, this_page_fpos, entry_index);
+					&temppage, this_page_fpos, entry_index,
+					ispin);
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;
@@ -4249,8 +4268,11 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	new_cache_size = check_file_size(thisblockpath);
 
 	if (old_cache_size != new_cache_size) {
+		unpin_dirty_size = (ispin == TRUE ?
+				0 : new_cache_size - old_cache_size);
 		change_system_meta(0, 0, new_cache_size - old_cache_size, 0,
-				   new_cache_size - old_cache_size);
+				new_cache_size - old_cache_size,
+				unpin_dirty_size);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
@@ -4415,8 +4437,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			target_bytes_written = size - total_bytes_written;
 
 		this_bytes_written = _write_block(&buf[total_bytes_written],
-			target_bytes_written, block_index, current_offset,
-				fh_ptr, fh_ptr->thisinode, &errcode);
+				target_bytes_written, block_index,
+				current_offset, fh_ptr, fh_ptr->thisinode,
+				&errcode, thisfilemeta.local_pin);
 		if ((this_bytes_written == 0) && (errcode < 0)) {
 			if (fh_ptr->meta_cache_ptr != NULL) {
 				fh_ptr->meta_cache_locked = FALSE;
@@ -4470,7 +4493,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
-				- temp_stat.st_size), delta_meta_size, 0, 0, 0);
+				- temp_stat.st_size), delta_meta_size,
+				0, 0, 0, 0);
 		ret = change_mount_stat(tmpptr,
 			(long long) ((offset + total_bytes_written)
 			- temp_stat.st_size), delta_meta_size, 0);
@@ -4487,7 +4511,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
 	} else {
 		if (delta_meta_size != 0) {
-			change_system_meta(0, delta_meta_size, 0, 0, 0);
+			change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 			ret = change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 			if (ret < 0) {
 				fh_ptr->meta_cache_locked = FALSE;
@@ -5601,7 +5625,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -5865,7 +5889,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		delta_meta_size = 0;
 
 	if (delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -6383,7 +6407,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
 	delta_meta_size = new_metasize - old_metasize;
 	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -6590,7 +6614,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 #endif
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
