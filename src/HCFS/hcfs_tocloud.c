@@ -1143,15 +1143,16 @@ store in some other file */
 
 	sem_post(&(upload_ctl.upload_op_sem));
 
-	flock(fileno(local_metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
+	flock(fileno(local_metafptr), LOCK_EX);
+
 	if (!access(local_metapath, F_OK)) {
 		CLOUD_RELATED_DATA cloud_related_data;
 		long long pos;
 		struct stat metastat;
 		long long now_meta_size;
 
-		ret = fstat(fileno(local_metafptr), &metastat);
+		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
 			write_log(0, "Fail to fetch meta %"PRIu64" stat\n",
 					(uint64_t)this_inode);
@@ -1161,22 +1162,22 @@ store in some other file */
 		now_meta_size = metastat.st_size;
 
 		if (S_ISFILE(ptr->this_mode)) {
-			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
-			      local_metafptr);
+			      toupload_metafptr);
 
 			pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
 					sizeof(FILE_STATS_TYPE);
-			FSEEK(local_metafptr, pos, SEEK_SET);
+			FSEEK(toupload_metafptr, pos, SEEK_SET);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
+					1, toupload_metafptr);
 			root_inode = tempfilemeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = (tempfilestat.st_size + now_meta_size) -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
-			/* Update cloud related data */
+			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload =
 					tempfilestat.st_size + now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
@@ -1186,18 +1187,18 @@ store in some other file */
 					1, local_metafptr);
 		}
 		if (S_ISDIR(ptr->this_mode)) {
-			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
-					1, local_metafptr);
+					1, toupload_metafptr);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
+					1, toupload_metafptr);
 			root_inode = tempdirmeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = now_meta_size -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
-			/* Update cloud related data */
+			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
@@ -1207,18 +1208,18 @@ store in some other file */
 					1, local_metafptr);
 		}
 		if (S_ISLNK(ptr->this_mode)) {
-			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
-					local_metafptr);
+					toupload_metafptr);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
+					1, toupload_metafptr);
 			root_inode = tempsymmeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = now_meta_size -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
-			/* Update cloud related data */
+			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;

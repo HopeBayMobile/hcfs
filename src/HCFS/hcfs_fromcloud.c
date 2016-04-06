@@ -102,7 +102,11 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	if ((status >= 200) && (status <= 299)) {
 		errcode = 0;
 	} else {
-		errcode = -EIO;
+		if (status == 404) {
+			errcode = -ENOENT;
+		} else {
+			errcode = -EIO;
+		}
 		free_object_meta(object_meta);
 		fclose(get_fptr);
 		goto errcode_handle;
