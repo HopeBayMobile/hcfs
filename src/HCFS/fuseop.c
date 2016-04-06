@@ -2367,7 +2367,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	int ret, errcode;
 	long long cache_delta;
 	long long cache_block_delta;
-	long long block_dirty_size;
+	long long block_dirty_size, delta_dirty_size;
 	char tmpstatus;
 	BLOCK_ENTRY *last_block_entry;
 
@@ -2538,11 +2538,12 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		if (tmpstatus == ST_BOTH)
-			change_system_meta(0, 0, new_block_size - old_block_size,
-					0, new_block_size);
+			delta_dirty_size = new_block_size;
 		else
-			change_system_meta(0, 0, new_block_size - old_block_size,
-					0, new_block_size - old_block_size);
+			delta_dirty_size = new_block_size - old_block_size;
+		change_system_meta(0, 0, new_block_size - old_block_size,
+				0, delta_dirty_size);
+
 		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
@@ -2551,7 +2552,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		if (ret < 0)
 			return ret;
 		ret = update_file_stats((*body_ptr)->fptr, 0,
-				cache_block_delta, cache_delta, this_inode);
+				cache_block_delta, cache_delta,
+				delta_dirty_size, this_inode);
 		if (ret < 0) {
 			meta_cache_close_file(*body_ptr);
 			return ret;
@@ -4257,8 +4259,9 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			return 0;
 		}
 		ret = update_file_stats(tmpptr->fptr, 0,
-					0, new_cache_size - old_cache_size,
-					fh_ptr->thisinode);
+				0, new_cache_size - old_cache_size,
+				new_cache_size - old_cache_size,
+				fh_ptr->thisinode);
 		if (ret < 0) {
 			*reterr = ret;
 			return 0;
