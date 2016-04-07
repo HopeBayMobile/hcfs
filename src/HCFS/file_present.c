@@ -1234,6 +1234,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 					tempstat.st_mode, FALSE);
 				return ret;
 			}
+			ret = change_unpin_dirty_size(this_inode, TRUE);
+			if (ret < 0)
+				return ret;
 		}
 
 		ret = super_block_mark_pin(this_inode, tempstat.st_mode);
@@ -1365,8 +1368,11 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 
 		/* Deduct from reserved size */
 		if (S_ISREG(tempstat.st_mode)) {
-			 decrease_pinned_size(reserved_release_size,
+			decrease_pinned_size(reserved_release_size,
 			 		tempstat.st_size);
+			ret = change_unpin_dirty_size(this_inode, FALSE);
+			if (ret < 0)
+				return ret;
 		}
 
 		ret = super_block_mark_unpin(this_inode, tempstat.st_mode);

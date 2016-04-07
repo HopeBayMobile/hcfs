@@ -2221,3 +2221,71 @@ errcode_handle:
 
 	return ret;
 }
+
+/**
+ * When pin status changes, unpin-dirty size should be modified. Decrease size
+ * when change from unpin to pin otherwise increase size when change from pin
+ * to unpin.
+ *
+ * @param this_inode Inode number of the meta to be locked and ask dirty size
+ * @param ispin New pinned status. TRUE means from unpin to pin.
+ * 
+ * @return 0 on succes, otherwise negative error code.
+ */
+int change_unpin_dirty_size(ino_t this_inode, char ispin)
+{
+	int ret, errcode;
+	size_t ret_size;
+	META_CACHE_ENTRY_STRUCT *ptr;
+	FILE_STATS_TYPE filestats;
+	BOOL meta_lock;
+
+	meta_lock = FALSE;
+	ptr = meta_cache_lock_entry(this_inode);
+	if (!ptr) {
+		errcode = -ENOMEM;
+		goto errcode_handle;
+	}
+
+	ret = meta_cache_open_file(ptr);
+	if (ret < 0) {
+		errcode = ret;
+		meta_cache_unlock_entry(ptr);
+		goto errcode_handle;
+	}
+
+	meta_lock = TRUE;
+	FSEEK(ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
+	meta_lock = FALSE;
+
+	ret = meta_cache_close_file(ptr);
+	if (ret < 0) {
+		errcode = ret;
+		meta_cache_unlock_entry(ptr);
+		goto errcode_handle;
+	}
+	ret = meta_cache_unlock_entry(ptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	/* when from unpin to pin, decrease unpin-dirty size,
+	 * otherwise increase unpin-dirty size */
+	if (ispin == TRUE)
+		change_system_meta(0, 0, 0, 0, 0, -filestats.dirty_data_size, FALSE);
+	else
+		change_system_meta(0, 0, 0, 0, 0, filestats.dirty_data_size, FALSE);
+
+	return 0;
+
+errcode_handle:
+	if (meta_lock) {
+		meta_cache_close_file(ptr);
+		meta_cache_unlock_entry(ptr);
+	}
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
+	return errcode;
+}
