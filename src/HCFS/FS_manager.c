@@ -466,7 +466,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		errcode = ret;
 		goto errcode_handle;
 	}
-	change_system_meta(0, metasize, 0, 0, 0, 0);
+	change_system_meta(0, metasize, 0, 0, 0, 0, TRUE);
 
 	temp_entry.d_ino = new_FS_ino;
 #ifdef _ANDROID_ENV_
@@ -724,7 +724,7 @@ int delete_filesystem(char *fsname)
 		errcode = ret;
 		goto errcode_handle;
 	}
-	change_system_meta(0, -metasize, 0, 0, 0, 0);
+	change_system_meta(0, -metasize, 0, 0, 0, 0, TRUE);
 
 	/* Delete root inode (follow ll_rmdir) */
 	ret = delete_inode_meta(FS_root);

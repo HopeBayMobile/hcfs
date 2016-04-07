@@ -908,7 +908,7 @@ off_t check_file_size(const char *path)
 int change_system_meta(long long system_data_size_delta,
 		long long meta_size_delta, long long cache_data_size_delta,
 		long long cache_blocks_delta, long long dirty_cache_delta,
-		long long unpin_dirty_delta)
+		long long unpin_dirty_delta, BOOL need_sync)
 {
 	int ret;
 
@@ -948,10 +948,12 @@ int change_system_meta(long long system_data_size_delta,
 		hcfs_system->systemdata.pinned_size = 0;
 
 	ret = 0;
-	ret = sync_hcfs_system_data(FALSE);
-	if (ret < 0)
-		write_log(0, "Error: Fail to sync hcfs system data. Code %d\n",
-				-ret);
+	if (need_sync) {
+		ret = sync_hcfs_system_data(FALSE);
+		if (ret < 0)
+			write_log(0, "Error: Fail to sync hcfs system data."
+				" Code %d\n", -ret);
+	}
 	sem_post(&(hcfs_system->access_sem));
 
 	return ret;

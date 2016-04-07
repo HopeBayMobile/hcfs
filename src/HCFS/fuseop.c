@@ -1092,7 +1092,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1249,7 +1249,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -2163,7 +2163,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if (delta_meta_size1 + delta_meta_size2 != 0) {
 		change_system_meta(0, delta_meta_size1 + delta_meta_size2,
-				0, 0, 0, 0);
+				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0,
 				delta_meta_size1 + delta_meta_size2 , 0);
 	}
@@ -2337,7 +2337,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		change_system_meta(0, 0, -total_deleted_cache,
 				   -total_deleted_blocks,
 				   -total_deleted_dirty_cache,
-				   unpin_dirty_size);
+				   unpin_dirty_size, TRUE);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				-total_deleted_dirty_cache, inode_index);
@@ -2509,7 +2509,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 				}
 
 				change_system_meta(0, 0, tempstat.st_size, 1,
-						   tempstat.st_size, 0);
+						   tempstat.st_size, 0, TRUE);
 				cache_delta += tempstat.st_size;
 				cache_block_delta += 1;
 			}
@@ -2549,7 +2549,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		unpin_dirty_size = (tempfilemeta->local_pin == TRUE ?
 				0 : delta_dirty_size);
 		change_system_meta(0, 0, new_block_size - old_block_size,
-				0, delta_dirty_size, unpin_dirty_size);
+				0, delta_dirty_size, unpin_dirty_size, TRUE);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -2630,7 +2630,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		unpin_dirty_size = (tempfilemeta->local_pin == TRUE ?
 				0 : block_dirty_size);
 		change_system_meta(0, 0, new_block_size - old_block_size,
-				0, block_dirty_size, unpin_dirty_size);
+				0, block_dirty_size, unpin_dirty_size, TRUE);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -3009,7 +3009,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size),
-			0, 0, 0, 0, 0);
+			0, 0, 0, 0, 0, TRUE);
 
 	ret = change_mount_stat(tmpptr,
 			(long long) (offset - filestat->st_size), 0, 0);
@@ -3391,7 +3391,8 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				goto error_handling;
 
 			/* Update system meta to reflect correct cache size */
-			change_system_meta(0, 0, tempstat2.st_size, 1, 0, 0);
+			change_system_meta(0, 0, tempstat2.st_size,
+					1, 0, 0, TRUE);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -3983,7 +3984,8 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			unpin_dirty_size = (ispin == TRUE ?
 					0 : tempstat2.st_size);
 			change_system_meta(0, 0, tempstat2.st_size, 1,
-					tempstat2.st_size, unpin_dirty_size);
+					tempstat2.st_size,
+					unpin_dirty_size, TRUE);
 			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
@@ -4185,7 +4187,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			}
 
 			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, 0, 0, 1, 0, 0);
+			change_system_meta(0, 0, 0, 1, 0, 0, TRUE);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0) {
 				*reterr = ret;
@@ -4272,7 +4274,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				0 : new_cache_size - old_cache_size);
 		change_system_meta(0, 0, new_cache_size - old_cache_size, 0,
 				new_cache_size - old_cache_size,
-				unpin_dirty_size);
+				unpin_dirty_size, TRUE);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
@@ -4494,7 +4496,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
 				- temp_stat.st_size), delta_meta_size,
-				0, 0, 0, 0);
+				0, 0, 0, 0, TRUE);
 		ret = change_mount_stat(tmpptr,
 			(long long) ((offset + total_bytes_written)
 			- temp_stat.st_size), delta_meta_size, 0);
@@ -4511,7 +4513,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
 	} else {
 		if (delta_meta_size != 0) {
-			change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+			change_system_meta(0, delta_meta_size,
+					0, 0, 0, 0, TRUE);
 			ret = change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 			if (ret < 0) {
 				fh_ptr->meta_cache_locked = FALSE;
@@ -5625,7 +5628,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -5889,7 +5892,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		delta_meta_size = 0;
 
 	if (delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -6407,7 +6410,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
 	delta_meta_size = new_metasize - old_metasize;
 	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -6614,7 +6617,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 #endif
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0);
+		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);

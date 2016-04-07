@@ -455,7 +455,8 @@ int super_block_mark_dirty(ino_t this_inode)
 					tempentry.dirty_meta_size =
 							now_meta_size;
 					change_system_meta(0, 0, 0, 0,
-							dirty_delta_meta_size);
+						dirty_delta_meta_size,
+						0, TRUE);
 					need_write = TRUE;
 				}
 			}
@@ -1076,7 +1077,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 					this_entry->dirty_meta_size;
 			this_entry->dirty_meta_size = now_meta_size;
 			change_system_meta(0, 0, 0, 0,
-				dirty_delta_meta_size, 0);
+				dirty_delta_meta_size, 0, TRUE);
 		}
 		return 0;
 	}
@@ -1144,7 +1145,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 		get_meta_size(thisinode, &now_meta_size);
 		if (now_meta_size) {
 			this_entry->dirty_meta_size = now_meta_size;
-			change_system_meta(0, 0, 0, 0, now_meta_size, 0);
+			change_system_meta(0, 0, 0, 0, now_meta_size, 0, TRUE);
 		}
 		break;
 	case TO_BE_DELETED:
@@ -1280,7 +1281,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		/* Update dirty meta size */
 		sys_super_block->head.num_dirty--;
 		change_system_meta(0, 0, 0, 0,
-			-(this_entry->dirty_meta_size), 0);
+			-(this_entry->dirty_meta_size), 0, TRUE);
 		this_entry->dirty_meta_size = 0;
 		break;
 	case TO_BE_DELETED:
