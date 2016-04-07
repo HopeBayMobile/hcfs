@@ -13,7 +13,7 @@
 # limitations under the License.
 MY_LOCAL_PATH := device/acer/s58a
 
-DEVICE_PACKAGE_OVERLAYS := $(MY_LOCAL_PATH)/hopebay_overlay
+DEVICE_PACKAGE_OVERLAYS := $(MY_LOCAL_PATH)/hb_overlay
 
 BOARD_SEPOLICY_DIRS += \
     device/acer/s58a/hb_sepolicy
