@@ -1,0 +1,22 @@
+--- /system/core/libcutils/android_reboot.c	2016-02-18 20:12:30.000000000 +0000
++++ android_reboot.c	2016-04-07 06:36:16.000000000 +0000
+@@ -24,6 +24,9 @@
+ #include <stdio.h>
+ #include <string.h>
+ 
++//Vince
++#include <stdlib.h>
++
+ #include <cutils/android_reboot.h>
+ 
+ #define UNUSED __attribute__((unused))
+@@ -93,6 +96,9 @@
+ {
+     int ret;
+ 
++    //Vince
++    system("HCFSvol terminate"); 
++
+     sync();
+     remount_ro();
+ 

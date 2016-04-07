@@ -1,0 +1,19 @@
+--- /system/vold/PublicVolume.cpp	2016-02-18 20:12:52.000000000 +0000
++++ PublicVolume.cpp	2016-04-07 06:36:16.000000000 +0000
+@@ -181,10 +181,12 @@
+         return -errno;
+     }
+ 
+-    while (before == GetDevice(mFuseWrite)) {
+-        LOG(VERBOSE) << "Waiting for FUSE to spin up...";
+-        usleep(50000); // 50ms
+-    }
++
++    //Vince TODO check mount point?
++    //while (before == GetDevice(mFuseWrite)) {
++    //    LOG(VERBOSE) << "Waiting for FUSE to spin up...";
++    //    usleep(50000); // 50ms
++    //}
+ 
+     return OK;
+ }
