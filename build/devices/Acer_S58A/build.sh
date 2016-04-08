@@ -53,7 +53,7 @@ function cleanup() {
 }
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
-	docker rm -f $DOCKERNAME || :
+	#docker rm -f $DOCKERNAME || :
 }
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
