@@ -5,17 +5,21 @@ type hcfs_socket, file_type;
 type hcfs_data_file, file_type, data_file_type;
 type terafonn_data_file, file_type, data_file_type;
 
-# Domain traistion from init to hcfsd
+# Domain traistion from qti_init_shell to hcfsd
 domain_auto_trans(qti_init_shell, hcfsd_exec, hcfsd)
 tmpfs_domain(hcfsd)
 
 # Capabilities
 allow hcfsd self:capability { sys_admin sys_resource dac_override net_raw };
 
-# Allow operations on /data
+# All files/dirs created in system_data_file:dir will be labeled hcfs_data_file
 file_type_auto_trans(hcfsd, system_data_file, hcfs_data_file)
+
+# Allow permission to mount
+allow hcfsd labeledfs:filesystem { mount unmount };
 allow hcfsd system_data_file:dir { open mounton remove_name };
 allow hcfsd system_data_file:file { r_file_perms };
+allow hcfsd apk_data_file:dir { read open mounton };
 
 # Allow permission to create hcfs_socket file in /dev/shm folder
 allow hcfsd device:dir rw_dir_perms;
@@ -30,9 +34,10 @@ allow hcfsd hcfs_socket:unix_stream_socket connectto;
 allow hcfsd hcfs_data_file:dir create_dir_perms;
 allow hcfsd hcfs_data_file:file create_file_perms;
 
-# Allow hcfsd to access /tmp
+# Allow permission on tmpfs
 allow hcfsd tmpfs:dir create_dir_perms;
 allow hcfsd tmpfs:file create_file_perms;
+allow hcfsd hcfsd_tmpfs:file { create open getattr unlink };
 
 # Allow hcfsd to communicate with hcfsmgmt app
 allow hcfsd terafonn_app:file { read open };
@@ -40,11 +45,13 @@ allow hcfsd terafonn_app:dir search;
 allow hcfsd terafonn_data_file:dir search;
 allow hcfsd terafonn_data_file:file { write getattr setattr read lock open };
 
-# From avc warning
+# Allow permission to communicate with fuse_device
 allow hcfsd fuse_device:chr_file { read write open };
-allow hcfsd hcfsd_tmpfs:file { create open getattr unlink };
-allow hcfsd apk_data_file:dir { read open mounton };
+
+# Allow permission to communicate with qti_init_shell via file descriptors
 allow hcfsd qti_init_shell:fd use;
+
+# Allow permission to access shell_data_file files/dirs
 allow hcfsd shell_data_file:dir { write remove_name search add_name };
 allow hcfsd shell_data_file:file { write getattr read create unlink open };
 
@@ -58,9 +65,6 @@ allow hcfsd netd:unix_stream_socket connectto;
 allow hcfsd port:tcp_socket name_connect;
 allow hcfsd self:tcp_socket { write read getopt create getattr connect };
 allow hcfsd self:udp_socket create;
-
-# comm="hcfs" name="/" dev="fuse" scontext=u:r:hcfsd:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
-allow hcfsd labeledfs:filesystem { mount unmount };
 
 # Allow hcfs to have permission to access directories and files on /proc/<pid> folder
 define(`hcfs_proc_dataset', `{ init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app platform_app untrusted_app isolated_app rild system_server adbd mediaserver hcfsapid terafonn_app qtitetherservice_app location_app shared_relro debuggerd }')
