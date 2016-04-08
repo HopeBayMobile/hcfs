@@ -1,5 +1,7 @@
-# TeraFonn management app
+#============= TeraFonn management app ==============
 type terafonn_app, domain, mlstrustedsubject;
+type terafonn_data_file, file_type, data_file_type;
+
 # Permissions to work likes system app
 app_domain(terafonn_app)
 net_domain(terafonn_app)

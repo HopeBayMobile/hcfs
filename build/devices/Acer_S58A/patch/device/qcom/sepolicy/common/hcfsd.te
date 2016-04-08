@@ -3,7 +3,7 @@ type hcfsd, domain, mlstrustedsubject;
 type hcfsd_exec, exec_type, file_type;
 type hcfs_socket, file_type;
 type hcfs_data_file, file_type, data_file_type;
-type terafonn_data_file, file_type, data_file_type;
+type hcfs, sdcard_type, fs_type, mlstrustedobject;
 
 # Domain traistion from qti_init_shell to hcfsd
 domain_auto_trans(qti_init_shell, hcfsd_exec, hcfsd)
@@ -16,7 +16,7 @@ allow hcfsd self:capability { sys_admin sys_resource dac_override net_raw };
 file_type_auto_trans(hcfsd, system_data_file, hcfs_data_file)
 
 # Allow permission to mount
-allow hcfsd labeledfs:filesystem { mount unmount };
+allow hcfsd hcfs:filesystem { mount unmount };
 allow hcfsd system_data_file:dir { open mounton remove_name };
 allow hcfsd system_data_file:file { r_file_perms };
 allow hcfsd apk_data_file:dir { read open mounton };
@@ -132,7 +132,7 @@ allow sdcardd storage_file:dir getattr;
 allow sdcardd unlabeled:dir { relabelfrom getattr };
 
 #============= zygote ==============
-allow zygote labeledfs:filesystem unmount;
+allow zygote hcfs:filesystem { remount unmount };
 
 #============= gatekeeperd ==============
 # Allow gatekeeperd to read directories, files and symbolic links of the firmware_file type on /firmware folder
@@ -143,7 +143,7 @@ allow init boot_block_device:blk_file setattr;
 
 #============= fuse ==============
 # comm="restorecon" name="/" dev="fuse" scontext=u:object_r:fuse:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
-allow fuse labeledfs:filesystem associate;
+allow fuse hcfs:filesystem associate;
 
 #============= system_app ==============
 allow system_app ipa_dev:chr_file { read write open ioctl };
@@ -176,3 +176,9 @@ allow dpmd hcfsd:tcp_socket { read write };
 # Allow to permission on hcfs log file (adb pull, read)
 allow adbd hcfs_data_file:file { getattr read open };
 allow shell hcfs_data_file:file { open read };
+
+#============= vold ==============
+allow vold hcfs:filesystem { mount unmount remount };
+
+#============= file_type ============
+allow file_type hcfs:filesystem associate;
