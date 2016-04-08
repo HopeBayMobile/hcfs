@@ -92,17 +92,8 @@ function copy_apk_to_source_tree() {
 }
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
-		ccache --max-size=30G
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
-		cd /data/external/sepolicy \&\& \
-		tools/post_process_mac_perms \
-		-s terafonn \
-		-d /data/device/acer/common/apps/HopebayHCFSmgmt \
-		-f mac_permissions.xml \&\& \
-		cat mac_permissions.xml
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
-		bash -ic ":; cd /data/;\
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP ccache --max-size=30G
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ":; cd /data/;\
 	echo BUILD_NUMBER := ${BUILD_NUMBER:-} >> build/core/build_id.mk;\
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk;\
 	cat build/core/build_id.mk;\
