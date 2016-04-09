@@ -335,7 +335,8 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 	while (!feof(local_metafptr)) {
 		/* Linearly read block meta */
 		fseek(local_metafptr, sizeof(struct stat) +
-			sizeof(FILE_META_TYPE) + page_count *
+			sizeof(FILE_META_TYPE) + sizeof(FILE_STATS_TYPE) +
+			sizeof(CLOUD_RELATED_DATA) + page_count *
 			sizeof(BLOCK_ENTRY_PAGE), SEEK_SET);
 		ret_size = fread(&block_page, 1, sizeof(BLOCK_ENTRY_PAGE),
 				local_metafptr);
@@ -347,7 +348,8 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 				block_page.block_entries[i].status = ST_BOTH;
 		}
 		fseek(local_metafptr, sizeof(struct stat) +
-			sizeof(FILE_META_TYPE) + page_count *
+			sizeof(FILE_META_TYPE) + sizeof(FILE_STATS_TYPE) +
+			sizeof(CLOUD_RELATED_DATA) + page_count *
 			sizeof(BLOCK_ENTRY_PAGE), SEEK_SET);
 		fwrite(&block_page, 1, sizeof(BLOCK_ENTRY_PAGE), local_metafptr);
 

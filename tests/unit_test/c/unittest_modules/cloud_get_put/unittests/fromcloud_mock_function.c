@@ -224,4 +224,3 @@ int enc_backup_usermeta(char *json_str)
 {
 	return 0;
 }
->>>>>>> terafonn_beta2

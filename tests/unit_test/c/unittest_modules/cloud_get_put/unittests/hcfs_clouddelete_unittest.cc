@@ -259,7 +259,6 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	meta_stat.st_mode = S_IFREG; 
 	MAX_BLOCK_SIZE = 100;
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
-	tmp_file_meta.upload_seq = 1;
 
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	setbuf(meta, NULL);
@@ -317,7 +316,6 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	mock_thread_info->this_mode = S_IFDIR;	
 	mock_thread_info->which_index = 0;
 	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
-	dirmeta.upload_seq = 1;
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fwrite(&dirmeta, sizeof(DIR_META_TYPE), 1, meta);

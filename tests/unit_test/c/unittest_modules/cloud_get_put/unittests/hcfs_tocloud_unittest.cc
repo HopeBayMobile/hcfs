@@ -767,7 +767,7 @@ protected:
 		fwrite(&mock_statistics, sizeof(FILE_STATS_TYPE), 1, mock_metaptr);
 		fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_metaptr);
 
-		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 			mock_block_page.block_entries[i].status = block_status;
 			mock_block_page.block_entries[i].seqnum = 1;
 
@@ -980,16 +980,32 @@ protected:
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
+		setbuf(mock_file_meta, NULL);
 
 		objname_counter = 0;
 		max_objname_num = 40;
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
 		for (int i = 0 ; i < max_objname_num ; i++) {
-			objname_list[i] = (char *)malloc(sizeof(char) * 20);
+			struct stat empty_stat;
+			DIR_META_TYPE empty_meta;
+			CLOUD_RELATED_DATA mock_cloud_data;
+			FILE *fptr;
 
+			objname_list[i] = (char *)malloc(sizeof(char) * 20);
 			/* Mock toupload meta for each inode */	
 			fetch_toupload_meta_path(toupload_meta, (i + 1) * 5);
-			mknod(toupload_meta, 0700, 0);
+			fptr = fopen(toupload_meta, "w+");
+			setbuf(fptr, NULL);
+			memset(&empty_stat, 0, sizeof(struct stat));
+			memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+			memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+			empty_meta.root_inode = 10;
+			fseek(fptr, 0, SEEK_SET);
+			fwrite(&empty_stat, sizeof(struct stat), 1, fptr);
+			fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, fptr);
+			fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA),
+					1, fptr);
+			fclose(fptr);
 		}
 
 		sem_init(&objname_counter_sem, 0, 1);
@@ -1052,6 +1068,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	struct stat empty_stat;
 	DIR_META_TYPE empty_meta;
 	BLOCK_ENTRY_PAGE mock_block_page;
+	CLOUD_RELATED_DATA mock_cloud_data;
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = TRUE;
@@ -1063,10 +1080,13 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	   been tested in sync_single_inodeTest(). */
 	memset(&empty_stat, 0, sizeof(struct stat));
 	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+	empty_stat.st_mode = S_IFDIR;
 	empty_meta.root_inode = 10;
 	fseek(mock_file_meta, 0, SEEK_SET);
 	fwrite(&empty_stat, sizeof(struct stat), 1, mock_file_meta);
-	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);	
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
 	fclose(mock_file_meta);
 
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
