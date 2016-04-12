@@ -3080,9 +3080,7 @@ int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 {
 	int ret;
 
-	sem_post(&(fh_ptr->block_sem));
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-	sem_wait(&(fh_ptr->block_sem));
 	if (fh_ptr->meta_cache_ptr == NULL)
 		return -ENOMEM;
 	fh_ptr->meta_cache_locked = TRUE;
@@ -3777,9 +3775,9 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			if (hcfs_system->system_going_down == TRUE)
 				return -EBUSY;
 			/*Sleep if cache already full*/
-			sem_post(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			sem_post(&(fh_ptr->block_sem));
 
 			write_log(10, "debug write waiting on full cache\n");
 			ret = sleep_on_cache_full();
@@ -3787,15 +3785,14 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 				return ret;
 
 			/*Re-read status*/
+			sem_wait(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 			if (fh_ptr->meta_cache_ptr == NULL) {
-				sem_wait(&(fh_ptr->block_sem));
 				return -ENOMEM;
 			}
 			fh_ptr->meta_cache_locked = TRUE;
 
-			sem_wait(&(fh_ptr->block_sem));
 			ret = meta_cache_lookup_file_data(fh_ptr->thisinode,
 				NULL, NULL, temppage, this_page_fpos,
 				fh_ptr->meta_cache_ptr);
@@ -4042,7 +4039,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		*reterr = ret;
 		return 0;
 	}
-	sem_wait(&(fh_ptr->block_sem));
 
 	/* Check if cache space is full */
 	if (access(thisblockpath, F_OK) == 0) {
@@ -4058,7 +4054,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->opened_block = -1;
 			}
-			sem_post(&(fh_ptr->block_sem));
 			if (CURRENT_BACKEND == NONE) {
 				*reterr = -ENOSPC;
 				return 0;
@@ -4066,6 +4061,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			/*Sleep if cache already full*/
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			sem_post(&(fh_ptr->block_sem));
 
 			write_log(10, "debug write waiting on full cache\n");
 			ret = sleep_on_cache_full();
@@ -4075,6 +4071,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			}
 
 			/*Re-read status*/
+			sem_wait(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 			if (fh_ptr->meta_cache_ptr == NULL) {
@@ -4082,8 +4079,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				return 0;
 			}
 			fh_ptr->meta_cache_locked = TRUE;
-
-			sem_wait(&(fh_ptr->block_sem));
 		}
 	}
 
@@ -4099,7 +4094,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			NULL, &temppage, this_page_fpos,
 						fh_ptr->meta_cache_ptr);
 		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
 			*reterr = ret;
 			return 0;
 		}
@@ -4107,7 +4101,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		ret = write_wait_full_cache(&temppage, entry_index, fh_ptr,
 							this_page_fpos);
 		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
 			*reterr = ret;
 			return 0;
 		}
@@ -4119,7 +4112,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
 			if (fh_ptr->blockfptr == NULL) {
 				errnum = errno;
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = -EIO;
 				write_log(0, "Error in write. Code %d, %s\n",
 					errnum, strerror(errnum));
@@ -4130,7 +4122,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = -EIO;
 				return 0;
 			}
@@ -4138,7 +4129,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 					NULL, NULL, &temppage, this_page_fpos,
 						fh_ptr->meta_cache_ptr);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = ret;
 				return 0;
 			}
@@ -4147,14 +4137,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			change_system_meta(0, 0, 0, 1, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = ret;
 				return 0;
 			}
 			ret = update_file_stats(tmpptr->fptr, 1,
 						1, 0, fh_ptr->thisinode);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = ret;
 				return 0;
 			}
@@ -4167,7 +4155,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = -EIO;
 				return 0;
 			}
@@ -4175,7 +4162,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 					NULL, NULL, &temppage, this_page_fpos,
 						fh_ptr->meta_cache_ptr);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = ret;
 				return 0;
 			}
@@ -4186,7 +4172,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			ret = _write_fetch_backend(this_inode, bindex, fh_ptr,
 					&temppage, this_page_fpos, entry_index);
 			if (ret < 0) {
-				sem_post(&(fh_ptr->block_sem));
 				*reterr = ret;
 				return 0;
 			}
@@ -4198,7 +4183,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		fh_ptr->blockfptr = fopen(thisblockpath, "r+");
 		if (fh_ptr->blockfptr == NULL) {
 			errnum = errno;
-			sem_post(&(fh_ptr->block_sem));
 			*reterr = -EIO;
 			write_log(0, "Error in write. Code %d, %s\n",
 				errnum, strerror(errnum));
@@ -4210,7 +4194,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	ret = flock(fileno(fh_ptr->blockfptr), LOCK_EX);
 	if (ret < 0) {
 		errnum = errno;
-		sem_post(&(fh_ptr->block_sem));
 		*reterr = -EIO;
 		write_log(0, "Error in write. Code %d, %s\n",
 			errnum, strerror(errnum));
@@ -4239,7 +4222,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
 		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
 			*reterr = ret;
 			return 0;
 		}
@@ -4247,20 +4229,17 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 					0, new_cache_size - old_cache_size,
 					fh_ptr->thisinode);
 		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
 			*reterr = ret;
 			return 0;
 		}
 	}
 
 	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
-	sem_post(&(fh_ptr->block_sem));
 
 	return this_bytes_written;
 
 errcode_handle:
 	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
-	sem_post(&(fh_ptr->block_sem));
 	*reterr = errcode;
 	return 0;
 }
@@ -4343,6 +4322,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
+	sem_wait(&(fh_ptr->block_sem));
 	fh_ptr->meta_cache_locked = TRUE;
 
 	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize);
@@ -4355,6 +4335,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+		sem_post(&(fh_ptr->block_sem));
 		fuse_reply_err(req, -ret);
 		return;
 	}
@@ -4377,6 +4358,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			sem_post(&(fh_ptr->block_sem));
 			fuse_reply_err(req, ENOSPC);
 			return;
 		}
@@ -4462,6 +4444,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			sem_post(&(fh_ptr->block_sem));
 			fuse_reply_err(req, -ret);
 			return;
 		}
@@ -4476,6 +4459,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 				fh_ptr->meta_cache_locked = FALSE;
 				meta_cache_close_file(fh_ptr->meta_cache_ptr);
 				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+				sem_post(&(fh_ptr->block_sem));
 				fuse_reply_err(req, -ret);
 				return;
 			}
@@ -4491,12 +4475,14 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+		sem_post(&(fh_ptr->block_sem));
 		fuse_reply_err(req, -ret);
 		return;
 	}
 
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+	sem_post(&(fh_ptr->block_sem));
 
 	fuse_reply_write(req, total_bytes_written);
 	return;
@@ -4510,6 +4496,8 @@ errcode_handle:
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
 	}
+
+	sem_post(&(fh_ptr->block_sem));
 	fuse_reply_err(req, -errcode);
 }
 
