@@ -348,15 +348,17 @@ int super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 			super_block_exclusive_release();
 			return ret_val;
 		}
-		ret_val = write_super_block_head();
-		if (ret_val < 0) {
-			super_block_exclusive_release();
-			return ret_val;
-		}
 	}
 	if (inode_ptr->in_transit == TRUE)
 		inode_ptr->mod_after_in_transit = TRUE;
+
 	ret_val = write_super_block_entry(this_inode, inode_ptr);
+	if (ret_val < 0) {
+		super_block_exclusive_release();
+		return ret_val;
+	}
+
+	ret_val = write_super_block_head();
 
 	super_block_exclusive_release();
 
@@ -393,11 +395,6 @@ int super_block_update_stat(ino_t this_inode, struct stat *newstat)
 				super_block_exclusive_release();
 				return ret_val;
 			}
-			ret_val = write_super_block_head();
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
-			}
 		}
 		if (tempentry.in_transit == TRUE)
 			tempentry.mod_after_in_transit = TRUE;
@@ -405,6 +402,12 @@ int super_block_update_stat(ino_t this_inode, struct stat *newstat)
 		memcpy(&(tempentry.inode_stat), newstat, sizeof(struct stat));
 		/* Write the updated content back */
 		ret_val = write_super_block_entry(this_inode, &tempentry);
+		if (ret_val < 0) {
+			super_block_exclusive_release();
+			return ret_val;
+		}
+
+		ret_val = write_super_block_head();
 	}
 	super_block_exclusive_release();
 
@@ -438,11 +441,6 @@ int super_block_mark_dirty(ino_t this_inode)
 				super_block_exclusive_release();
 				return ret_val;
 			}
-			ret_val = write_super_block_head();
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
-			}
 			need_write = TRUE;
 		} else if (tempentry.status == IS_DIRTY) {
 			/* When marking dirty again, just update
@@ -468,6 +466,11 @@ int super_block_mark_dirty(ino_t this_inode)
 		if (need_write == TRUE)
 			ret_val = write_super_block_entry(this_inode,
 								&tempentry);
+			if (ret_val < 0) {
+				super_block_exclusive_release();
+				return ret_val;
+			}
+			ret_val = write_super_block_head();
 	}
 	super_block_exclusive_release();
 
@@ -1048,6 +1051,41 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	return this_inode;
 }
 
+int ll_reconstruct_enqueue(SUPER_BLOCK_ENTRY *last_entry)
+{
+
+	SUPER_BLOCK_ENTRY tempentry;
+	int ret, errcode;
+	ssize_t retsize;
+
+	ret = read_super_block_entry(*last_entry->util_ll_next, &tempentry);
+	if (ret < 0)
+		return ret;
+
+	if (tempentry.status != IS_DIRTY)
+	{
+		tempentry.status = IS_DIRTY;
+		sys_super_block->head.num_dirty += 1;
+	}
+	tempentry.util_ll_prev = *last_entry.this_index;
+	tempentry.util_ll_next = 0;
+	sys_super_block->head.last_dirty_inode = tempentry.this_index;
+
+	/* Update real last entry*/
+	ret = write_super_block_entry(tempentry.this_index, &tempentry);
+	if (ret < 0)
+		return ret;
+
+	/* Update superblock head */
+	ret = write_super_block_head();
+	if (ret < 0)
+		return ret;
+
+	memcpy(last_entry, &tempentry, sizeof(SUPER_BLOCK_ENTRY));
+
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: ll_enqueue
@@ -1061,7 +1099,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 *************************************************************************/
 int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 {
-	SUPER_BLOCK_ENTRY tempentry;
+	SUPER_BLOCK_ENTRY tempentry, tempentry2;
 	int ret, errcode;
 	ssize_t retsize;
 	long long now_meta_size, dirty_delta_meta_size;
@@ -1103,41 +1141,46 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
 		} else {
+			ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &tempentry);
+			if (ret < 0)
+				return ret;
+
+			/* Read the second last entry to check integrity of linked list */
+			ret = read_super_block_entry(tempentry.util_ll_prev, &tempentry2);
+			if (ret < 0)
+				return ret;
+
+			if (tempentry2.util_ll_next != tempentry.this_index) {
+			/* In this case, it seems that there was an interrupted dequeue operation here.
+			 * Need to fix the link between these entries.
+			 */
+				tempentry2.util_ll_next = tempentry.this_index;
+				ret = write_super_block_entry(tempentry2.this_index, &tempentry2);
+				if (ret < 0)
+					return ret;
+			}
+
+			if (tempentry.util_ll_next != 0) {
+			/* The superblock may be corrupted, try to fix it.
+			 * In this case, it seems that there was an interrupted enqueue operation here.
+			 * Need to mark the entry as the last entry with dirty status.
+			 */
+				ret = ll_reconstruct_enqueue(&tempentry)
+				if (ret < 0) {
+					return ret;
+				}
+			}
+
 			this_entry->util_ll_prev =
 					sys_super_block->head.last_dirty_inode;
 			sys_super_block->head.last_dirty_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_dirty++;
-			retsize = pread(sys_super_block->iofptr, &tempentry,
-				SB_ENTRY_SIZE, SB_HEAD_SIZE +
-				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
-			if (retsize < 0) {
-				errcode = errno;
-				write_log(0, "IO error in superblock.");
-				write_log(0, " Code %d, %s\n",
-					errcode, strerror(errcode));
-				return -errcode;
-			}
-			if (retsize < SB_ENTRY_SIZE) {
-				write_log(0, "IO error in superblock.");
-				return -EIO;
-			}
 
 			tempentry.util_ll_next = thisinode;
-			retsize = pwrite(sys_super_block->iofptr, &tempentry,
-				SB_ENTRY_SIZE, SB_HEAD_SIZE +
-				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
-			if (retsize < 0) {
-				errcode = errno;
-				write_log(0, "IO error in superblock.");
-				write_log(0, " Code %d, %s\n",
-					errcode, strerror(errcode));
-				return -errcode;
-			}
-			if (retsize < SB_ENTRY_SIZE) {
-				write_log(0, "IO error in superblock.");
-				return -EIO;
-			}
+			ret = write_super_block_entry(tempentry.this_index, &tempentry);
+			if (ret < 0)
+				return ret;
 		}
 		/* Update dirty meta size (from X to DIRTY) */
 		get_meta_size(thisinode, &now_meta_size);
