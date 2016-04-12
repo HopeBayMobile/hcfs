@@ -1049,6 +1049,41 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	return this_inode;
 }
 
+int ll_enqueue_rebuild_dirty(SUPER_BLOCK_ENTRY *last_entry)
+{
+
+	SUPER_BLOCK_ENTRY tempentry;
+	int ret, errcode;
+	ssize_t retsize;
+
+	ret = read_super_block_entry(*last_entry->util_ll_next, &tempentry);
+	if (ret < 0)
+		return ret;
+
+	if (tempentry.status != IS_DIRTY)
+	{
+		tempentry.status = IS_DIRTY;
+		sys_super_block->head.num_dirty += 1;
+	}
+	tempentry.util_ll_prev = *last_entry.this_index;
+	tempentry.util_ll_next = 0;
+	sys_super_block->head.last_dirty_inode = tempentry.this_index;
+
+	/* Update real last entry*/
+	ret = write_super_block_entry(tempentry.this_index, &tempentry);
+	if (ret < 0)
+		return ret;
+
+	/* Update superblock head */
+	ret = write_super_block_head();
+	if (ret < 0)
+		return ret;
+
+	memcpy(last_entry, &tempentry, sizeof(SUPER_BLOCK_ENTRY));
+
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: ll_enqueue
@@ -1105,6 +1140,36 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
 		} else {
+			ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &tempentry);
+			if (ret < 0)
+				return ret;
+
+			/* Read the second last entry to check integrity of linked list */
+			ret = read_super_block_entry(tempentry.util_ll_prev, &tempentry2);
+			if (ret < 0)
+				return ret;
+
+			/* To check if the superblock was corrupted, and try to fix it. */
+			if (tempentry2.util_ll_next != tempentry.this_index) {
+			/* In this case, it seems that there was an interrupted dequeue operation here.
+			 * Need to fix the link between these entries.
+			 */
+				tempentry2.util_ll_next = tempentry.this_index;
+				ret = write_super_block_entry(tempentry2.this_index, &tempentry2);
+				if (ret < 0)
+					return ret;
+			}
+
+			if (tempentry.util_ll_next != 0) {
+			/* In this case, it seems that there was an interrupted enqueue operation here.
+			 * Need to mark the entry as the last entry with dirty status.
+			 */
+				ret = ll_enqueue_rebuild_dirty(&tempentry)
+				if (ret < 0) {
+					return ret;
+				}
+			}
+
 			this_entry->util_ll_prev =
 					sys_super_block->head.last_dirty_inode;
 			sys_super_block->head.last_dirty_inode = thisinode;
