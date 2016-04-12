@@ -1051,7 +1051,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	return this_inode;
 }
 
-int ll_reconstruct_enqueue(SUPER_BLOCK_ENTRY *last_entry)
+int ll_enqueue_rebuild_dirty(SUPER_BLOCK_ENTRY *last_entry)
 {
 
 	SUPER_BLOCK_ENTRY tempentry;
@@ -1150,6 +1150,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			if (ret < 0)
 				return ret;
 
+			/* To check if the superblock was corrupted, and try to fix it. */
 			if (tempentry2.util_ll_next != tempentry.this_index) {
 			/* In this case, it seems that there was an interrupted dequeue operation here.
 			 * Need to fix the link between these entries.
@@ -1161,11 +1162,10 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			}
 
 			if (tempentry.util_ll_next != 0) {
-			/* The superblock may be corrupted, try to fix it.
-			 * In this case, it seems that there was an interrupted enqueue operation here.
+			/* In this case, it seems that there was an interrupted enqueue operation here.
 			 * Need to mark the entry as the last entry with dirty status.
 			 */
-				ret = ll_reconstruct_enqueue(&tempentry)
+				ret = ll_enqueue_rebuild_dirty(&tempentry)
 				if (ret < 0) {
 					return ret;
 				}
