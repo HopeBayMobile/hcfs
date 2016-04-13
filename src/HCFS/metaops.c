@@ -1395,10 +1395,10 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 					dirty_delta = 0;
 
 				unpin_dirty_delta = (file_meta.local_pin == TRUE
-					? 0 : -cache_block_size);
+					? 0 : dirty_delta);
 				change_system_meta(0, 0, -cache_block_size, -1,
 					dirty_delta, unpin_dirty_delta, FALSE);
-				}
+			}
 		}
 		sem_wait(&(hcfs_system->access_sem));
 		if (file_meta.local_pin == TRUE) {
@@ -1700,6 +1700,48 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 }
 
 /**
+ * When pin status changes, unpin-dirty size should be modified. Decrease size
+ * when change from unpin to pin otherwise increase size when change from pin
+ * to unpin.
+ *
+ * @param this_inode Inode number of the meta to be locked and ask dirty size
+ * @param ispin New pinned status. TRUE means from unpin to pin.
+ * 
+ * @return 0 on succes, otherwise negative error code.
+ */
+static int _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FILE_STATS_TYPE filestats;
+
+	ret = meta_cache_open_file(ptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	FSEEK(ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
+
+	/* when from unpin to pin, decrease unpin-dirty size,
+	 * otherwise increase unpin-dirty size */
+	if (ispin == TRUE)
+		change_system_meta(0, 0, 0, 0, 0,
+				-filestats.dirty_data_size, FALSE);
+	else
+		change_system_meta(0, 0, 0, 0, 0,
+				filestats.dirty_data_size, FALSE);
+
+	return 0;
+
+errcode_handle:
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
+	return errcode;
+}
+
+/**
  * Change "local_pin" flag in meta cache. "new_pin_status" is either
  * TRUE or FALSE. local_pin equals TRUE means this inode is pinned at local
  * device but not neccessarily all blocks are local now.
@@ -1740,6 +1782,13 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 			file_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_file_data(this_inode, NULL,
 				&file_meta, NULL, 0, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+			/* Update unpin-dirty data size */
+			ret = _change_unpin_dirty_size(meta_cache_entry,
+					new_pin_status);
 			if (ret < 0) {
 				ret_code = ret;
 				goto error_handling;
@@ -2222,70 +2271,3 @@ errcode_handle:
 	return ret;
 }
 
-/**
- * When pin status changes, unpin-dirty size should be modified. Decrease size
- * when change from unpin to pin otherwise increase size when change from pin
- * to unpin.
- *
- * @param this_inode Inode number of the meta to be locked and ask dirty size
- * @param ispin New pinned status. TRUE means from unpin to pin.
- * 
- * @return 0 on succes, otherwise negative error code.
- */
-int change_unpin_dirty_size(ino_t this_inode, char ispin)
-{
-	int ret, errcode;
-	size_t ret_size;
-	META_CACHE_ENTRY_STRUCT *ptr;
-	FILE_STATS_TYPE filestats;
-	BOOL meta_lock;
-
-	meta_lock = FALSE;
-	ptr = meta_cache_lock_entry(this_inode);
-	if (!ptr) {
-		errcode = -ENOMEM;
-		goto errcode_handle;
-	}
-
-	ret = meta_cache_open_file(ptr);
-	if (ret < 0) {
-		errcode = ret;
-		meta_cache_unlock_entry(ptr);
-		goto errcode_handle;
-	}
-
-	meta_lock = TRUE;
-	FSEEK(ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
-		SEEK_SET);
-	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
-	meta_lock = FALSE;
-
-	ret = meta_cache_close_file(ptr);
-	if (ret < 0) {
-		errcode = ret;
-		meta_cache_unlock_entry(ptr);
-		goto errcode_handle;
-	}
-	ret = meta_cache_unlock_entry(ptr);
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
-	}
-
-	/* when from unpin to pin, decrease unpin-dirty size,
-	 * otherwise increase unpin-dirty size */
-	if (ispin == TRUE)
-		change_system_meta(0, 0, 0, 0, 0, -filestats.dirty_data_size, FALSE);
-	else
-		change_system_meta(0, 0, 0, 0, 0, filestats.dirty_data_size, FALSE);
-
-	return 0;
-
-errcode_handle:
-	if (meta_lock) {
-		meta_cache_close_file(ptr);
-		meta_cache_unlock_entry(ptr);
-	}
-	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
-	return errcode;
-}

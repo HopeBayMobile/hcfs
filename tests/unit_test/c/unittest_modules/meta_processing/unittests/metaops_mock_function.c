@@ -445,12 +445,19 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 
 int change_system_meta(long long system_size_delta, long long meta_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta,
-		long long dirty_cache_delta)
+		long long dirty_cache_delta, long long unpin_dirty_data_size,
+		BOOL need_sync)
 {
+	hcfs_system->systemdata.cache_size += cache_size_delta;
+	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
+	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
+	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_data_size;
+	hcfs_system->systemdata.system_size += system_size_delta;
 	return 0;
 }
 
 int get_meta_size(ino_t inode, long long *metasize)
 {
+	*metasize = 123;
 	return 0;
 }
