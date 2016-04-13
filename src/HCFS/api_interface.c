@@ -1148,6 +1148,14 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
+		case OCCUPIEDSIZE:
+			llretval = hcfs_system->systemdata.unpin_dirty_data_size
+					+ hcfs_system->systemdata.pinned_size;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
+			break;
 		case TESTAPI:
 			/* Simulate a long API call of 5 seconds */
 			sleep(5);

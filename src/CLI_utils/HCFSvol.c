@@ -108,6 +108,8 @@ int main(int argc, char **argv)
 		code = CHANGELOG;
 	else if (strcasecmp(argv[1], "unpindirtysize") == 0)
 		code = UNPINDIRTYSIZE;
+	else if (strcasecmp(argv[1], "occupiedsize") == 0)
+		code = OCCUPIEDSIZE;
 	else
 		code = -1;
 	if (code < 0) {
@@ -253,6 +255,7 @@ int main(int argc, char **argv)
 	case GETVOLSIZE:
 	case GETCLOUDSIZE:
 	case UNPINDIRTYSIZE:
+	case OCCUPIEDSIZE:
 		if (argc >= 3) {
 			cmd_len = strlen(argv[2]) + 1;
 			strcpy(buf, argv[2]);
