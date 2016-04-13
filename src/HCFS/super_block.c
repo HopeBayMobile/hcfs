@@ -1120,10 +1120,10 @@ int ll_rebuild_dirty()
 		if (ret < 0)
 			return ret;
 
-	}
-
-	ret = read_super_block_entry(entry1.util_ll_prev, &entry2);
-	while (entry2.util_ll_prev == 0) {
+	} else {
+		ret = read_super_block_entry(entry1.util_ll_prev, &entry2);
+		if (ret < 0)
+			return ret;
 		if (entry2.util_ll_next != entry1.this_index) {
 			/* Need to fix corrupted link */
 			entry2.util_ll_next = entry1.this_index;
@@ -1131,12 +1131,8 @@ int ll_rebuild_dirty()
 			if (ret < 0)
 				return ret;
 		}
-
-		entry1 = entry2;
-		ret = read_super_block_entry(entry1.util_ll_prev, &entry2);
-		if (ret < 0)
-			return ret;
 	}
+
 
 	return 0;
 }
