@@ -245,12 +245,8 @@ PRODUCT_COPY_FILES += \
 
 ifeq ($(ENABLE_HCFS),1)
   include $(MY_LOCAL_PATH)/products/common/hb-common.mk
-  droid: | patch_hcfs
+  $(shell $(MY_LOCAL_PATH)/products/common/hb_patch.sh)
 else
-  droid: | revert_hcfs_patch
+  $(shell $(MY_LOCAL_PATH)/products/common/hb_unpatch.sh)
 endif
 
-patch_hcfs:
-	set -v ; cd $(ANDROID_BUILD_TOP);! [ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 < {}"
-revert_hcfs_patch:
-	set -v ; cd $(ANDROID_BUILD_TOP);[ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 -R < {}"

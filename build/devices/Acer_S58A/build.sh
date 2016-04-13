@@ -174,7 +174,7 @@ mount_nas
 if [ -n "$IMAGE_TYPE" ]; then
 	build_image_type "$IMAGE_TYPE"
 else
-	for IMAGE_TYPE in user userdebug
+	for IMAGE_TYPE in userdebug user
 	do
 		build_image_type "$IMAGE_TYPE"
 	done
