@@ -287,7 +287,7 @@ int get_meta_size(ino_t inode, int64_t *metasize)
 	return 0;
 }
 
-int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
 {
 	return 0;
 }

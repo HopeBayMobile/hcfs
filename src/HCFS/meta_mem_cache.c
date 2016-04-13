@@ -80,7 +80,7 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */
-int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
 {
 	int ret;
 	int errcode;

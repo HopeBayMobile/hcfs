@@ -424,7 +424,7 @@ int super_block_mark_dirty(ino_t this_inode)
 	int ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 	char need_write;
-	long long now_meta_size, dirty_delta_meta_size;
+	int64_t now_meta_size, dirty_delta_meta_size;
 
 	need_write = FALSE;
 	ret_val = 0;

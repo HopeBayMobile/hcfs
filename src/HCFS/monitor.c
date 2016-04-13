@@ -172,7 +172,7 @@ void update_backend_status(int status, struct timespec *status_time)
 	last_time->tv_nsec = status_time->tv_nsec;
 }
 
-inline void update_sync_state(void)
+void update_sync_state(void)
 {
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == FALSE)

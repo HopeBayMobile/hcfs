@@ -1806,7 +1806,7 @@ protected:
 
 TEST_F(meta_cache_get_meta_sizeTest, MetaOpened_GetSuccess)
 {
-	long long metasize;
+	int64_t metasize;
 
 	EXPECT_EQ(0, meta_cache_get_meta_size(body_ptr, &metasize));
 	EXPECT_EQ(strlen(mock_file_meta), metasize);

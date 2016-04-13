@@ -1232,7 +1232,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	char meta_deleted;
-	int64_t metasize;
+	int64_t metasize, dirty_delta, unpin_dirty_delta;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1388,22 +1388,16 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				cache_block_size =
 						check_file_size(thisblockpath);
 				UNLINK(thisblockpath);
-				sem_wait(&(hcfs_system->access_sem));
-				statptr = &(hcfs_system->systemdata);
-				statptr->cache_size -=
-						(int64_t) cache_block_size;
-				if (statptr->cache_size < 0)
-					statptr->cache_size = 0;
 				if ((block_status == ST_LDISK) ||
 				    (block_status == ST_LtoC))
-					statptr->dirty_cache_size -=
-						(int64_t) cache_block_size;
-				if (statptr->dirty_cache_size < 0)
-					statptr->dirty_cache_size = 0;
-				statptr->cache_blocks -= 1;
-				if (statptr->cache_blocks < 0)
-					statptr->cache_blocks = 0;
-				sem_post(&(hcfs_system->access_sem));
+					dirty_delta = -cache_block_size;
+				else
+					dirty_delta = 0;
+
+				unpin_dirty_delta = (file_meta.local_pin == TRUE
+					? 0 : dirty_delta);
+				change_system_meta(0, 0, -cache_block_size, -1,
+					dirty_delta, unpin_dirty_delta, FALSE);
 			}
 		}
 		sem_wait(&(hcfs_system->access_sem));
@@ -2277,3 +2271,4 @@ errcode_handle:
 
 	return ret;
 }
+
