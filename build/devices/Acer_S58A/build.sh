@@ -97,7 +97,7 @@ function build_system() {
 	echo BUILD_NUMBER := ${BUILD_NUMBER:-} >> build/core/build_id.mk;\
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk;\
 	cat build/core/build_id.mk;\
-	./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
+	ENABLE_HCFS=1 ./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
