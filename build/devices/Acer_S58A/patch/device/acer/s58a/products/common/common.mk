@@ -253,4 +253,4 @@ endif
 patch_hcfs:
 	set -v ; cd $(ANDROID_BUILD_TOP);! [ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 < {}"
 revert_hcfs_patch:
-	set -v ; cd $(ANDROID_BUILD_TOP);[ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 < -R {}"
+	set -v ; cd $(ANDROID_BUILD_TOP);[ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 -R < {}"
