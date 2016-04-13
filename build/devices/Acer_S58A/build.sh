@@ -147,7 +147,6 @@ function build_image_type() {
 if [ -z "$MAKE_HCFS_PATCH" ]; then
 	make_s58a_source_patch
 	MAKE_HCFS_PATCH=1
-	exit
 fi
 	build_system
 	publish_image
@@ -160,7 +159,6 @@ fi
 eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
 eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
 eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
-[ -n "$PUBLISH_DIR" ] && rm -rf "${PUBLISH_DIR}" && mkdir -p "${PUBLISH_DIR}"
 DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-${IMAGE_TYPE}-prebuilt'
 
 echo ========================================
