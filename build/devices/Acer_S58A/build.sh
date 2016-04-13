@@ -118,6 +118,24 @@ function unmount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	umount /mnt/nas
 }
+function make_s58a_source_patch() {
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && git add \
+	hb_patch/ \
+	device/acer/common/apps/HopebayHCFSmgmt/ \
+	device/acer/s58a/products/common/common.mk \
+	device/acer/s58a/products/common/hb-common.mk \
+	device/acer/s58a/hb_overlay/ \
+	device/acer/s58a/hb_sepolicy/ \
+	device/acer/s58a/hopebay/ \
+	device/acer/s58a/init.target.rc; \
+	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch"
+	rsync -v root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
+	if [ -n "$PASSWORD" ]; then
+		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch
+		rm -f Terafonn_${VERSION_NUM}.patch
+		rsync -v Terafonn_${VERSION_NUM}.patch.zip ${PUBLISH_DIR}/
+	fi
+}
 function build_image_type() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	IMAGE_TYPE="$1"
@@ -126,6 +144,11 @@ function build_image_type() {
 	patch_system
 	copy_hcfs_to_source_tree
 	copy_apk_to_source_tree
+if [ -z "$MAKE_HCFS_PATCH" ]; then
+	make_s58a_source_patch
+	MAKE_HCFS_PATCH=1
+	exit
+fi
 	build_system
 	publish_image
 	stop_builder
@@ -137,6 +160,7 @@ function build_image_type() {
 eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
 eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
 eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
+[ -n "$PUBLISH_DIR" ] && rm -rf "${PUBLISH_DIR}" && mkdir -p "${PUBLISH_DIR}"
 DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-${IMAGE_TYPE}-prebuilt'
 
 echo ========================================

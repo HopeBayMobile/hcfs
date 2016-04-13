@@ -243,4 +243,14 @@ PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/res,system/etc/dts) \
     $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/path,system/etc/dts)
 
--include $(MY_LOCAL_PATH)/products/common/hb-common.mk
+ifeq ($(ENABLE_HCFS),1)
+  include $(MY_LOCAL_PATH)/products/common/hb-common.mk
+  droid: | patch_hcfs
+else
+  droid: | revert_hcfs_patch
+endif
+
+patch_hcfs:
+	set -v ; cd $(ANDROID_BUILD_TOP);! [ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 < {}"
+revert_hcfs_patch:
+	set -v ; cd $(ANDROID_BUILD_TOP);[ -f system/core/sdcard/HCFSvol.h ] && find hb_patch -type f -name *.patch | xargs -I {} bash -c "patch -p1 < -R {}"
