@@ -503,7 +503,7 @@ static int _lookup_pkg_status_cb(void *data, int argc, char **argv, char **azCol
  *
  * @return - 0 for success, otherwise -1.
  */
-int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
+int lookup_pkg(char *pkgname, uid_t *uid)
 {
 
 	sqlite3 *db;
@@ -517,13 +517,13 @@ int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 	data = NULL;
 	*uid = 0;
 
-	sem_wait(&(tmpptr->pkg_cache_lock));
-	if (strcmp(pkgname, (tmpptr->pkg_cache_entry).pkgname) == 0) {
-		*uid = (tmpptr->pkg_cache_entry).pkguid;
-		sem_post(&(tmpptr->pkg_cache_lock));
+	sem_wait(&(pkg_cache_lock));
+	if (strcmp(pkgname, pkg_cache_entry.pkgname) == 0) {
+		*uid = pkg_cache_entry.pkguid;
+		sem_post(&(pkg_cache_lock));
 		return 0;
 	}
-	sem_post(&(tmpptr->pkg_cache_lock));
+	sem_post(&(pkg_cache_lock));
 
 	snprintf(sql, sizeof(sql),
 		 "SELECT uid from uid WHERE package_name='%s'",
@@ -553,17 +553,18 @@ int lookup_pkg(char *pkgname, uid_t *uid, MOUNT_T *tmpptr)
 	sqlite3_close(db);
 
 	if (data == NULL) {
-		write_log(4, "Query pkg uid err (sql statement) - pkg not found\n");
-		return -1;
+		write_log(8, "Query pkg uid err (sql statement) - pkg not found\n");
+		*uid = 0;
+	} else {
+		*uid = (uid_t)atoi(data);
+		write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
 	}
 
-	*uid = (uid_t)atoi(data);
-	write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
-	sem_wait(&(tmpptr->pkg_cache_lock));
-	snprintf((tmpptr->pkg_cache_entry).pkgname, sizeof((tmpptr->pkg_cache_entry).pkgname),
+	sem_wait(&(pkg_cache_lock));
+	snprintf(pkg_cache_entry.pkgname, sizeof(pkg_cache_entry.pkgname),
 		 "%s", pkgname);
-	(tmpptr->pkg_cache_entry).pkguid= *uid;
-	sem_post(&(tmpptr->pkg_cache_lock));
+	pkg_cache_entry.pkguid= *uid;
+	sem_post(&(pkg_cache_lock));
 
 	free(data);
 	return 0;
@@ -798,8 +799,10 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 				} else {
 					/* If this is a package folder */
 					/* Need to lookup package uid */
-					lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
-					if (pin_status)
+					lookup_pkg(tmptok_prev, &tmpuid);
+					/* If lookup failed in the previous step,
+					no need to lookup pin status */
+					if ((pin_status) && (tmpuid != 0))
 						_try_get_pin_st(tmptok_prev,
 								pin_status);
 					thisstat->st_uid = tmpuid;
@@ -816,8 +819,10 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 			break;
 		}
 		if (count == 3) {
-			lookup_pkg(tmptok_prev, &tmpuid, tmpptr);
-			if (pin_status)
+			lookup_pkg(tmptok_prev, &tmpuid);
+			/* If lookup failed in the previous step,
+			no need to lookup pin status */
+			if ((pin_status) && (tmpuid != 0))
 				_try_get_pin_st(tmptok_prev,
 						pin_status);
 			thisstat->st_uid = tmpuid;
@@ -1251,6 +1256,17 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 	}
 
+	if (parent_inode == data_data_root) {
+		/*Check if need to cleanup package lookup cache */
+		sem_wait(&(pkg_cache_lock));
+		if (strcmp(selfname, pkg_cache_entry.pkgname) == 0) {
+			/* Resetting cache entry if name is same */
+			write_log(10, "Debug: Resetting pkg cache\n");
+			pkg_cache_entry.pkgname[0] = 0;
+		}
+		sem_post(&(pkg_cache_lock));
+	}
+
 	fuse_reply_entry(req, &(tmp_param));
 
 	gettimeofday(&tmp_time2, NULL);
@@ -1428,6 +1444,18 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
 #endif
+
+	/* TODO: Check if this still works for app to sdcard */
+	if (parent_inode == data_data_root) {
+		/*Check if need to cleanup package lookup cache */
+		sem_wait(&(pkg_cache_lock));
+		if (strcmp(selfname, pkg_cache_entry.pkgname) == 0) {
+			write_log(10, "Debug: Resetting pkg cache\n");
+			/* Resetting cache entry if name is same */
+			pkg_cache_entry.pkgname[0] = 0;
+		}
+		sem_post(&(pkg_cache_lock));
+	}
 
 	fuse_reply_err(req, -ret_val);
 }
@@ -6772,6 +6800,10 @@ int hook_fuse(int argc, char **argv)
 	global_argc = argc;
 	global_argv = argv;
 #endif
+	data_data_root = (ino_t) 0;
+	sem_init(&(pkg_cache_lock), 0, 1);
+	memset(&(pkg_cache_entry), 0, sizeof(PKG_CACHE_ENTRY));
+
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);

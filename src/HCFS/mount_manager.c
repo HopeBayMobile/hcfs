@@ -18,6 +18,8 @@
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -645,9 +647,6 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 			goto errcode_handle;
 		}
 		strcpy((new_info->f_mp), mp);
-		sem_init(&(new_info->pkg_cache_lock), 0, 1);
-		memset(&(new_info->pkg_cache_entry), 0,
-		       sizeof(PKG_CACHE_ENTRY));
 
 		ret = do_mount_FS(mp, new_info);
 		if (ret < 0) {
@@ -671,9 +670,6 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
 	new_info->mp_mode = mp_mode;
-	sem_init(&(new_info->pkg_cache_lock), 0, 1);
-	memset(&(new_info->pkg_cache_entry), 0,
-	       sizeof(PKG_CACHE_ENTRY));
 
 #ifdef _ANDROID_ENV_
 	new_info->volume_type = tmp_entry.d_type;
@@ -772,6 +768,11 @@ int mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 
+	if (strncmp(mp, "/data/data", strlen("data/data")) == 0) {
+		data_data_root = new_info->f_ino;
+		write_log(10, "Debug mount: root of /data/data is %" PRIu64
+		          "\n", (uint64_t) data_data_root);
+	}
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
 
