@@ -1701,11 +1701,12 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 
 /**
  * When pin status changes, unpin-dirty size should be modified. Decrease size
- * when change from unpin to pin otherwise increase size when change from pin
+ * when change from unpin to pin. Otherwise increase size when change from pin
  * to unpin.
  *
- * @param this_inode Inode number of the meta to be locked and ask dirty size
- * @param ispin New pinned status. TRUE means from unpin to pin.
+ * @param ptr Meta cache entry pointer.
+ * @param ispin New pinned status. TRUE means from unpin to pin, and FALSE
+ *              means from pin to unpin
  * 
  * @return 0 on succes, otherwise negative error code.
  */
