@@ -131,8 +131,8 @@ function make_s58a_source_patch() {
 	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch"
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
-	if [ -n "$PASSWORD" -a ! -f ${PUBLISH_DIR}/Terafonn_${VERSION_NUM}.patch.zip ]; then
-		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch
+	if [ -n "$PASSWORD" ]; then
+		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch README.txt
 		rsync -arcv --no-owner --no-group --no-times --remove-source-files \
 			Terafonn_${VERSION_NUM}.patch.zip ${PUBLISH_DIR}/
 	fi
