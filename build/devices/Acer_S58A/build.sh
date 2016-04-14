@@ -129,11 +129,10 @@ function make_s58a_source_patch() {
 	device/acer/s58a/hopebay/ \
 	device/acer/s58a/init.target.rc; \
 	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch"
-	rsync -v root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
 	if [ -n "$PASSWORD" ]; then
-		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch
+		rsync -v root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
+		zip -P "$PASSWORD" -r ${PUBLISH_DIR}/Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch
 		rm -f Terafonn_${VERSION_NUM}.patch
-		rsync -v Terafonn_${VERSION_NUM}.patch.zip ${PUBLISH_DIR}/
 	fi
 }
 function build_image_type() {
