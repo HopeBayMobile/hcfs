@@ -1,0 +1,83 @@
+diff --git device/acer/s58a/init.target.rc device/acer/s58a/init.target.rc
+index 3e47d8d..a92a8b6 100644
+--- device/acer/s58a/init.target.rc
++++ device/acer/s58a/init.target.rc
+@@ -32,6 +32,12 @@ on early-init
+     mkdir /bt_firmware 0771 system system
+     symlink /data/tombstones /tombstones
+ 
++# Vince
++on init
++    mkdir /dev/shm 0700 root root
++    mkdir /tmp 0700 root root
++    mount tmpfs tmpfs /tmp mode=0755,gid=1000
++
+ on post-fs
+     export LD_PRELOAD libNimsWrap.so
+ 
+@@ -41,6 +47,30 @@ on fs
+ 
+     mount_all fstab.qcom
+ 
++    # Aaron
++    restorecon /data
++
++    # Vince
++    #mkdir /data/hcfs
++    #mkdir /data/hcfs/metastorage
++    #mkdir /data/hcfs/blockstorage
++    #start hcfs
++    #wait /dev/shm/hcfs_reporter 60
++    #start hcfs_data_app
++    #wait /tmp/hcfs_ready
++    #start hcfs_api
++
++    start hcfs_data_app
++    wait /tmp/hcfs_ready 60
++    rm /tmp/hcfs_ready
++    start hcfs_api
++
++    # Aaron
++    #restorecon_recursive /data/data
++    #restorecon_recursive /data/app
++    restorecon /data/data
++    restorecon /data/app
++
+     wait /dev/block/bootdevice/by-name/cache
+     mount ext4 /dev/block/bootdevice/by-name/cache /cache nosuid nodev barrier=1
+ 
+@@ -376,3 +406,34 @@ service snid_emmc_init /system/bin/snid_emmc_init
+ 
+ on property:ro.serialno=*
+     start snid_emmc_init
++
++# Hopebay service
++on property:vold.hopebay.hcfs.init=1
++    #trigger init-hcfs
++    start hcfs_data_app
++    wait /tmp/hcfs_ready 60
++    rm /tmp/hcfs_ready
++
++    # Aaron
++    #restorecon_recursive /data/data
++    #restorecon_recursive /data/app
++    restorecon /data/data
++    restorecon /data/app
++
++service hcfs /system/bin/hcfs -oallow_other,big_writes
++    class core
++    //group root system shell
++    oneshot
++    disabled
++
++service hcfs_data_app /system/bin/sh /init.hcfs.sh
++    class core
++    //group root system shell
++    oneshot
++    disabled
++
++service hcfs_api /system/bin/hcfsapid
++    class core
++    //group root system shell
++    //oneshot
++    disabled
