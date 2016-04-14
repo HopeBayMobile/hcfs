@@ -129,11 +129,14 @@ function make_s58a_source_patch() {
 	device/acer/s58a/hopebay/ \
 	device/acer/s58a/init.target.rc; \
 	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch"
-	if [ -n "$PASSWORD" ]; then
-		rsync -v root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
-		zip -P "$PASSWORD" -r ${PUBLISH_DIR}/Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch
-		rm -f Terafonn_${VERSION_NUM}.patch
+	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+		root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
+	if [ -n "$PASSWORD" -a ! -f ${PUBLISH_DIR}/Terafonn_${VERSION_NUM}.patch.zip ]; then
+		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch
+		rsync -arcv --no-owner --no-group --no-times --remove-source-files \
+			Terafonn_${VERSION_NUM}.patch.zip ${PUBLISH_DIR}/
 	fi
+	rm -f Terafonn_${VERSION_NUM}.patch
 }
 function build_image_type() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
