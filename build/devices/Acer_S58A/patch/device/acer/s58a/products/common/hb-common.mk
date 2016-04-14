@@ -13,6 +13,9 @@
 # limitations under the License.
 MY_LOCAL_PATH := device/acer/s58a
 
+ifeq ($(ENABLE_HCFS),1)
+$(shell $(MY_LOCAL_PATH)/hopebay/hb_patch.sh)
+
 DEVICE_PACKAGE_OVERLAYS := $(MY_LOCAL_PATH)/hb_overlay $(DEVICE_PACKAGE_OVERLAYS)
 
 BOARD_SEPOLICY_DIRS += \
@@ -43,3 +46,6 @@ PRODUCT_COPY_FILES += \
 # HCFS management app
 PRODUCT_PACKAGES +=\
     HopebayHCFSmgmt
+else
+  $(shell $(MY_LOCAL_PATH)/hopebay/hb_unpatch.sh)
+endif

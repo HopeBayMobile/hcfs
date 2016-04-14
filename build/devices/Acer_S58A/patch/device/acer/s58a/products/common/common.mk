@@ -243,10 +243,4 @@ PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/res,system/etc/dts) \
     $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/path,system/etc/dts)
 
-ifeq ($(ENABLE_HCFS),1)
-  include $(MY_LOCAL_PATH)/products/common/hb-common.mk
-  $(shell $(MY_LOCAL_PATH)/products/common/hb_patch.sh)
-else
-  $(shell $(MY_LOCAL_PATH)/products/common/hb_unpatch.sh)
-endif
-
+include $(MY_LOCAL_PATH)/products/common/hb-common.mk
