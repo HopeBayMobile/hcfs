@@ -39,6 +39,75 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
+int change_block_status_to_BOTH(ino_t inode, long long blockno,
+		long long page_pos, long long toupload_seq,
+		FILE *local_metafptr)
+{
+	BLOCK_ENTRY_PAGE tmp_page;
+	long long local_seq;
+	char local_status;
+	int e_index;
+	int ret, errcode;
+	ssize_t ret_ssize;
+	char blockpath[300], local_metapath[300];
+	SYSTEM_DATA_TYPE *statptr;
+	off_t cache_block_size;
+
+	/* Change status if local status is ST_LtoC */
+	flock(fileno(local_metafptr), LOCK_EX);
+	fetch_meta_path(local_metapath, inode);
+	if (access(local_metapath, F_OK) < 0) {
+		write_log(8, "meta %"PRIu64" is removed "
+				"when changing to BOTH\n", (uint64_t)inode);
+		flock(fileno(local_metafptr), LOCK_UN);
+		return -ENOENT;
+	}
+
+	PREAD(fileno(local_metafptr), &tmp_page,
+			sizeof(BLOCK_ENTRY_PAGE), page_pos);
+	e_index = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
+	local_status = tmp_page.block_entries[e_index].status;
+	local_seq = tmp_page.block_entries[e_index].seqnum;
+	/* Change status if status is ST_LtoC */
+	if (local_status == ST_LtoC && local_seq == toupload_seq) {
+		tmp_page.block_entries[e_index].status = ST_BOTH;
+		tmp_page.block_entries[e_index].uploaded = TRUE;
+
+		ret = fetch_block_path(blockpath, inode, blockno);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+		ret = set_block_dirty_status(blockpath, NULL, FALSE);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+		/* Remember dirty_cache_size */
+		cache_block_size = check_file_size(blockpath);
+		sem_wait(&(hcfs_system->access_sem));
+		statptr = &(hcfs_system->systemdata);
+		statptr->dirty_cache_size -= cache_block_size;
+		if (statptr->dirty_cache_size < 0)
+			statptr->dirty_cache_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+
+		PWRITE(fileno(local_metafptr), &tmp_page,
+				sizeof(BLOCK_ENTRY_PAGE), page_pos);
+	}
+
+	flock(fileno(local_metafptr), LOCK_UN);
+	write_log(10, "Debug sync: block_%"PRIu64"_%lld"
+			" is changed to ST_BOTH\n",
+			(uint64_t)inode, blockno);
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(local_metafptr), LOCK_UN);
+	return errcode;
+}
+
 /**
  * change_status_to_BOTH()
  *
