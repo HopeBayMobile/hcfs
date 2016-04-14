@@ -1579,10 +1579,23 @@ class change_pin_flagTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		FILE *fptr;
+		struct stat tmpstat;
+		FILE_META_TYPE tmpmeta;
+		FILE_STATS_TYPE tmpstats;
+
+		fptr = fopen("test_meta_file", "w+");
+		fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+		fwrite(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
+		fwrite(&tmpstats, sizeof(FILE_STATS_TYPE), 1, fptr);
+		fclose(fptr);
+		test_change_pin_flag = TRUE;
 	}
 
 	void TearDown()
 	{
+		unlink("test_meta_file");
+		test_change_pin_flag = FALSE;
 	}
 };
 

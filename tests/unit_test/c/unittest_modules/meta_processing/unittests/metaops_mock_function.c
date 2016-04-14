@@ -99,28 +99,41 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
-{	
-	if (this_inode != INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL)
-		return 1;
-	else
+{
+	META_CACHE_ENTRY_STRUCT *bptr;
+
+	if (this_inode != INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL) {
+		bptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		memset(bptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		return bptr;
+	} else {
 		return 0;
+	}
 }
 
 
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	if (!target_ptr) {
+		free(target_ptr);
+		target_ptr = NULL;
+	}
 	return 0;
 }
 
 
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (test_change_pin_flag)
+		body_ptr->fptr = fopen("test_meta_file", "r");
 	return 0;
 }
 
 
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	if (test_change_pin_flag && target_ptr->fptr)
+		fclose(target_ptr->fptr);
 	return 0;
 }
 
