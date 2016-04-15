@@ -1,7 +1,7 @@
-diff --git device/acer/s58a/init.target.rc device/acer/s58a/init.target.rc
+diff --git /device/acer/s58a/init.target.rc /device/acer/s58a/init.target.rc
 index 3e47d8d..a92a8b6 100644
---- device/acer/s58a/init.target.rc
-+++ device/acer/s58a/init.target.rc
+--- /device/acer/s58a/init.target.rc
++++ /device/acer/s58a/init.target.rc
 @@ -32,6 +32,12 @@ on early-init
      mkdir /bt_firmware 0771 system system
      symlink /data/tombstones /tombstones
