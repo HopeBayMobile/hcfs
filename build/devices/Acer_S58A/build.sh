@@ -128,7 +128,7 @@ function make_s58a_source_patch() {
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		$here/README.txt root@$DOCKER_IP:/data/
 	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && \
-	cat README.txt >> README.md && \
+	echo | cat - README.txt >> README.md && \
 	rm -f README.txt && \
 	git checkout -b tf/${VERSION_NUM} && \
 	git add README.md \
