@@ -119,7 +119,13 @@ function unmount_nas() {
 	umount /mnt/nas
 }
 function make_s58a_source_patch() {
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && git add \
+	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+		README.txt root@$DOCKER_IP:/data/
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && \
+	cat README.txt >> README.md && \
+	rm -f README.txt && \
+	git checkout -b tf/${VERSION_NUM} && \
+	git add README.md \
 	hb_patch/ \
 	device/acer/common/apps/HopebayHCFSmgmt/ \
 	device/acer/s58a/products/common/common.mk \
@@ -128,7 +134,11 @@ function make_s58a_source_patch() {
 	device/acer/s58a/hb_sepolicy/ \
 	device/acer/s58a/hopebay/ \
 	device/acer/s58a/init.target.rc; \
-	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch"
+	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch && \
+	git commit -m \"TeraFonn ${VERSION_NUM}\" && \
+	git push hb \"tf/${VERSION_NUM}\" && \
+	git status"
+
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
 	if [ -n "$PASSWORD" ]; then
@@ -146,10 +156,6 @@ function build_image_type() {
 	patch_system
 	copy_hcfs_to_source_tree
 	copy_apk_to_source_tree
-if [ -z "$MAKE_HCFS_PATCH" ]; then
-	make_s58a_source_patch
-	MAKE_HCFS_PATCH=1
-fi
 	build_system
 	publish_image
 	stop_builder
@@ -172,6 +178,18 @@ echo "Environment variables (with defaults):"
 $TRACE
 
 mount_nas
+
+if [ "$MAKE_HCFS_PATCH" = 1 ]; then
+	IMAGE_TYPE="push-branch"
+	start_builder
+	setup_ssh_key
+	patch_system
+	copy_hcfs_to_source_tree
+	copy_apk_to_source_tree
+	make_s58a_source_patch
+	stop_builder
+	exit
+fi
 
 if [ -n "$IMAGE_TYPE" ]; then
 	build_image_type "$IMAGE_TYPE"
