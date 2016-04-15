@@ -126,7 +126,7 @@ function unmount_nas() {
 }
 function make_s58a_source_patch() {
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
-		README.txt root@$DOCKER_IP:/data/
+		$here/README.txt root@$DOCKER_IP:/data/
 	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && \
 	cat README.txt >> README.md && \
 	rm -f README.txt && \
