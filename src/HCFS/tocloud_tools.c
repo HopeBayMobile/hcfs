@@ -539,11 +539,12 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 		int e_index, long long page_filepos)
 {
 	BLOCK_ENTRY_PAGE tmppage;
-	char local_metapath[300];
+	char local_metapath[300], blockpath[300];
 	FILE *fptr;
-	int errcode;
+	int errcode, ret;
 	ssize_t ret_ssize;
 	char status;
+	long long cache_block_size;
 
 	/* Do nothing when error on page position and entry index */
 	if (page_filepos <= 0 || e_index < 0)
@@ -574,15 +575,26 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 	PREAD(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE), page_filepos);
 	status = tmppage.block_entries[e_index].status;
 	if (status == ST_LtoC || status == ST_BOTH) {
-		/* TODO: recover space usage */
 		tmppage.block_entries[e_index].status = ST_LDISK;
 		write_log(8, "Debug: block_%"PRIu64"_%lld is reverted"
 				" to ST_LDISK", (uint64_t)this_inode, blockno);
 		PWRITE(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE),
 				page_filepos);
+		flock(fileno(fptr), LOCK_UN);
+
+		/* Recover dirty size */
+		fetch_block_path(blockpath, this_inode, blockno);
+		ret = set_block_dirty_status(blockpath, NULL, TRUE);
+		if (ret < 0) {
+			fclose(fptr);
+			return ret;
+		}
+		cache_block_size = check_file_size(blockpath);
+		change_system_meta(0, 0, 0, 0, cache_block_size);
+	} else {
+		flock(fileno(fptr), LOCK_UN);
 	}
 
-	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 	return 0;
 
