@@ -561,16 +561,16 @@ int super_block_to_delete(ino_t this_inode)
 				return ret_val;
 			}
 		}
-		tempentry.in_transit = FALSE;
-		tempmode = tempentry.inode_stat.st_mode;
-		memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
-		tempentry.inode_stat.st_mode = tempmode;
-		tempentry.pin_status = ST_DEL;
-		ret_val = write_super_block_entry(this_inode, &tempentry);
+		sys_super_block->head.num_active_inodes--;
+		ret_val = write_super_block_head();
 
 		if (ret_val >= 0) {
-			sys_super_block->head.num_active_inodes--;
-			ret_val = write_super_block_head();
+			tempentry.in_transit = FALSE;
+			tempmode = tempentry.inode_stat.st_mode;
+			memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
+			tempentry.inode_stat.st_mode = tempmode;
+			tempentry.pin_status = ST_DEL;
+			ret_val = write_super_block_entry(this_inode, &tempentry);
 		}
 	}
 	super_block_exclusive_release();
@@ -1076,11 +1076,11 @@ int ll_rebuild_dirty()
 
 	}
 
-	ret = read_super_block_entry(entry1.util_ll_next, &entry2);
-	if (ret < 0)
-		return ret;
+	while (entry1.util_ll_next != 0) {
+		ret = read_super_block_entry(entry1.util_ll_next, &entry2);
+		if (ret < 0)
+			return ret;
 
-	while (entry2.util_ll_next == 0) {
 		if (entry2.util_ll_prev != entry1.this_index) {
 			/* Need to fix corrupted link */
 			entry2.util_ll_prev = entry1.this_index;
@@ -1090,9 +1090,6 @@ int ll_rebuild_dirty()
 		}
 
 		entry1 = entry2;
-		ret = read_super_block_entry(entry1.util_ll_next, &entry2);
-		if (ret < 0)
-			return ret;
 	}
 
 	/* Traveling backward the dirty linked list */
@@ -1120,7 +1117,7 @@ int ll_rebuild_dirty()
 		if (ret < 0)
 			return ret;
 
-	} else {
+	} else if (entry1.util_ll_prev != 0) {
 		ret = read_super_block_entry(entry1.util_ll_prev, &entry2);
 		if (ret < 0)
 			return ret;
@@ -1132,7 +1129,6 @@ int ll_rebuild_dirty()
 				return ret;
 		}
 	}
-
 
 	return 0;
 }
@@ -1154,6 +1150,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 	int ret, errcode;
 	ssize_t retsize;
 	int64_t now_meta_size, dirty_delta_meta_size;
+	int32_t need_rebuild;
 
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */
@@ -1197,14 +1194,22 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			if (ret < 0)
 				return ret;
 
-			/* Read the second last entry to check integrity of linked list */
-			ret = read_super_block_entry(tempentry.util_ll_prev, &tempentry2);
-			if (ret < 0)
-				return ret;
-
+			need_rebuild = FALSE;
 			/* To check if the superblock was corrupted, and try to fix it. */
-			if (tempentry.util_ll_next != 0 ||
-			    tempentry2.util_ll_next != tempentry.this_index) {
+			if (tempentry.util_ll_next != 0)
+				need_rebuild = TRUE;
+
+			if (!need_rebuild && tempentry.util_ll_prev != 0) {
+				/* Need to check the second last entry too */
+				ret = read_super_block_entry(tempentry.util_ll_prev, &tempentry2);
+				if (ret < 0)
+					return ret;
+
+				if (tempentry2.util_ll_next != tempentry.this_index)
+					need_rebuild = TRUE;
+			}
+
+			if (need_rebuild) {
 				ret = ll_rebuild_dirty();
 				if (ret < 0)
 					return ret;
