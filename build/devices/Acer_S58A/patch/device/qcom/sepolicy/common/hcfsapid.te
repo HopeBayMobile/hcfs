@@ -1,5 +1,7 @@
+#============= HCFS API DAEMON ==============
 type hcfsapid, domain, mlstrustedsubject;
 type hcfsapid_exec, exec_type, file_type;
+
 # Domain traistion from init to hcfsapid
 init_daemon_domain(hcfsapid)
 
