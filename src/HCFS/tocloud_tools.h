@@ -18,6 +18,10 @@
 #include <sys/types.h>
 #include <inttypes.h>
 
+
+int change_block_status_to_BOTH(ino_t inode, long long blockno,
+		long long page_pos, long long toupload_seq);
+
 int change_status_to_BOTH(ino_t inode, int progress_fd,
 		FILE *local_metafptr, char *local_metapath);
 

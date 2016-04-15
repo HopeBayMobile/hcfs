@@ -452,6 +452,14 @@ static inline int _upload_terminate_thread(int index)
 	if (access(toupload_blockpath, F_OK) == 0)
 		UNLINK(toupload_blockpath);
 
+	ret = change_block_status_to_BOTH(this_inode, blockno, page_filepos,
+			toupload_block_seq);
+	if (ret < 0) {
+		if (ret != -ENOENT) {
+			write_log(0, "Error: Fail to change status to BOTH\n");
+			return ret;
+		}
+	}
 /*
 #if (DEDUP_ENABLE)
 			 Store hash in block meta too */
@@ -1293,8 +1301,8 @@ store in some other file */
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
-		change_status_to_BOTH(ptr->inode, progress_fd,
-				local_metafptr, local_metapath);
+		//change_status_to_BOTH(ptr->inode, progress_fd,
+		//		local_metafptr, local_metapath);
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, DEL_BACKEND_BLOCKS);
 		fclose(local_metafptr);

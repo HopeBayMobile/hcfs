@@ -40,8 +40,7 @@
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 int change_block_status_to_BOTH(ino_t inode, long long blockno,
-		long long page_pos, long long toupload_seq,
-		FILE *local_metafptr)
+		long long page_pos, long long toupload_seq)
 {
 	BLOCK_ENTRY_PAGE tmp_page;
 	long long local_seq;
@@ -52,12 +51,24 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 	char blockpath[300], local_metapath[300];
 	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
+	FILE *local_metafptr;
 
-	/* Change status if local status is ST_LtoC */
-	flock(fileno(local_metafptr), LOCK_EX);
 	fetch_meta_path(local_metapath, inode);
+	local_metafptr = fopen(local_metapath, "r+");
+	if (!local_metafptr) {
+		errcode = errno;
+		if (errcode == ENOENT)
+			write_log(5, "Warn: meta %"PRIu64" is removed"
+					". Code %d\n", errcode);
+		else
+			write_log(0, "Error: Cannot read meta %"PRIu64
+					". Code %d\n", errcode);
+		return -errcode;
+	}
+
+	flock(fileno(local_metafptr), LOCK_EX);
 	if (access(local_metapath, F_OK) < 0) {
-		write_log(8, "meta %"PRIu64" is removed "
+		write_log(5, "meta %"PRIu64" is removed "
 				"when changing to BOTH\n", (uint64_t)inode);
 		flock(fileno(local_metafptr), LOCK_UN);
 		return -ENOENT;
@@ -68,7 +79,7 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 	e_index = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
 	local_status = tmp_page.block_entries[e_index].status;
 	local_seq = tmp_page.block_entries[e_index].seqnum;
-	/* Change status if status is ST_LtoC */
+	/* Change status if local status is ST_LtoC */
 	if (local_status == ST_LtoC && local_seq == toupload_seq) {
 		tmp_page.block_entries[e_index].status = ST_BOTH;
 		tmp_page.block_entries[e_index].uploaded = TRUE;
@@ -387,6 +398,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	char delete_which_one)
 {
 	BLOCK_UPLOADING_PAGE tmppage;
+	BLOCK_ENTRY_PAGE bentry_page;
 	BLOCK_UPLOADING_STATUS *block_info;
 	long long block_count;
 	long long block_seq;
@@ -401,6 +413,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	ssize_t ret_size;
 	long long page_pos;
 	FILE_META_TYPE filemeta;
+	char status;
 #if DEDUP_ENABLE
 	unsigned char block_objid[OBJID_LENGTH];
 #endif
@@ -417,6 +430,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		"inode_%"PRIu64"\n", (uint64_t)inode);
 
 	fetch_meta_path(local_metapath, inode);
+	local_metafptr = fopen(local_metapath, "r");
 
 	current_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
@@ -439,7 +453,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			 * need this action? */
 			if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
 				page_pos = 0;
-				local_metafptr = fopen(local_metapath, "r");
 				if (local_metafptr != NULL) {
 					flock(fileno(local_metafptr), LOCK_EX);
 					ret_size = pread(fileno(local_metafptr),
@@ -452,7 +465,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 					else
 						page_pos = 0;
 					flock(fileno(local_metafptr), LOCK_UN);
-					fclose(local_metafptr);
 				} else {
 					page_pos = 0;
 				}
@@ -460,10 +472,20 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 			current_page = which_page;
 		}
-
 		e_index = block_count % BLK_INCREMENTS;
-		block_info = &(tmppage.status_entry[e_index]);
+		if (delete_which_one == DEL_TOUPLOAD_BLOCKS &&
+				page_pos != 0) {
+			flock(fileno(local_metafptr), LOCK_EX);
+			PREAD(fileno(local_metafptr), &bentry_page,
+					sizeof(BLOCK_ENTRY_PAGE), page_pos);
+			flock(fileno(local_metafptr), LOCK_UN);
+			status = bentry_page.block_entries[e_index].status;
+			/* Do not delete st_cloud and st_ctol */
+			if (status == ST_CLOUD || status == ST_CtoL)
+				continue;
+		}
 
+		block_info = &(tmppage.status_entry[e_index]);
 #if (DEDUP_ENABLE)
 		ret = _choose_deleted_block(delete_which_one,
 			block_info, block_objid, inode);
@@ -490,6 +512,9 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		dispatch_delete_block(which_curl);
 		sem_post(&(upload_ctl.upload_op_sem));
 	}
+
+	if (local_metafptr)
+		fclose(local_metafptr);
 
 	/* Wait for all deleting threads. */
 	busy_wait_all_specified_upload_threads(inode);
@@ -518,6 +543,7 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 	FILE *fptr;
 	int errcode;
 	ssize_t ret_ssize;
+	char status;
 
 	/* Do nothing when error on page position and entry index */
 	if (page_filepos <= 0 || e_index < 0)
@@ -546,7 +572,9 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 	}
 
 	PREAD(fileno(fptr), &tmppage, sizeof(BLOCK_ENTRY_PAGE), page_filepos);
-	if (tmppage.block_entries[e_index].status == ST_LtoC) {
+	status = tmppage.block_entries[e_index].status;
+	if (status == ST_LtoC || status == ST_BOTH) {
+		/* TODO: recover space usage */
 		tmppage.block_entries[e_index].status = ST_LDISK;
 		write_log(8, "Debug: block_%"PRIu64"_%lld is reverted"
 				" to ST_LDISK", (uint64_t)this_inode, blockno);
