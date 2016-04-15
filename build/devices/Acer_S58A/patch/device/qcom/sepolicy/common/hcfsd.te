@@ -3,26 +3,23 @@ type hcfsd, domain, mlstrustedsubject;
 type hcfsd_exec, exec_type, file_type;
 type hcfs_socket, file_type;
 type hcfs_data_file, file_type, data_file_type;
-type terafonn_data_file, file_type, data_file_type;
+type hcfs, sdcard_type, fs_type, mlstrustedobject;
 
-# Domain traistion from init to hcfsd
+# Domain traistion from qti_init_shell to hcfsd
 domain_auto_trans(qti_init_shell, hcfsd_exec, hcfsd)
 tmpfs_domain(hcfsd)
 
 # Capabilities
 allow hcfsd self:capability { sys_admin sys_resource dac_override net_raw };
 
-# Allow hcfsd to have permissions on /data/hcfs_android_log and /data/testfile
-allow hcfsd system_data_file:dir { write read create remove_name add_name };
-allow hcfsd system_data_file:file { write setattr create unlink open append lock };
+# All files/dirs created in system_data_file:dir will be labeled hcfs_data_file
+file_type_auto_trans(hcfsd, system_data_file, hcfs_data_file)
 
-# Allow hcfsd to have permissions on /data/data
-allow hcfsd system_data_file:dir { open mounton };
-
-# Allow HCFSvol (executed by init.rc) to mount hcfs on /data/data and /data/app
-allow init fuse:filesystem { mount remount };
-allow init system_data_file:dir mounton;
-allow init rootfs:dir relabelfrom;
+# Allow permission to mount
+allow hcfsd hcfs:filesystem { mount unmount };
+allow hcfsd system_data_file:dir { open mounton remove_name };
+allow hcfsd system_data_file:file { r_file_perms };
+allow hcfsd apk_data_file:dir { read open mounton };
 
 # Allow permission to create hcfs_socket file in /dev/shm folder
 allow hcfsd device:dir rw_dir_perms;
@@ -33,13 +30,14 @@ file_type_auto_trans(hcfsd, device, hcfs_socket)
 allow hcfsd hcfs_socket:sock_file create_file_perms;
 allow hcfsd hcfs_socket:unix_stream_socket connectto;
 
-# Allow hcfsd to access /data/hcfs/{metastorage, blockstorage} folders
+# Allow hcfsd to access /data/hcfs/{metastorage, blockstorage} folders and other data files
 allow hcfsd hcfs_data_file:dir create_dir_perms;
 allow hcfsd hcfs_data_file:file create_file_perms;
 
-# Allow hcfsd to access /tmp
+# Allow permission on tmpfs
 allow hcfsd tmpfs:dir create_dir_perms;
 allow hcfsd tmpfs:file create_file_perms;
+allow hcfsd hcfsd_tmpfs:file { create open getattr unlink };
 
 # Allow hcfsd to communicate with hcfsmgmt app
 allow hcfsd terafonn_app:file { read open };
@@ -47,11 +45,13 @@ allow hcfsd terafonn_app:dir search;
 allow hcfsd terafonn_data_file:dir search;
 allow hcfsd terafonn_data_file:file { write getattr setattr read lock open };
 
-# From avc warning
+# Allow permission to communicate with fuse_device
 allow hcfsd fuse_device:chr_file { read write open };
-allow hcfsd hcfsd_tmpfs:file { create open getattr unlink };
-allow hcfsd apk_data_file:dir { read open mounton };
+
+# Allow permission to communicate with qti_init_shell via file descriptors
 allow hcfsd qti_init_shell:fd use;
+
+# Allow permission to access shell_data_file files/dirs
 allow hcfsd shell_data_file:dir { write remove_name search add_name };
 allow hcfsd shell_data_file:file { write getattr read create unlink open };
 
@@ -65,9 +65,6 @@ allow hcfsd netd:unix_stream_socket connectto;
 allow hcfsd port:tcp_socket name_connect;
 allow hcfsd self:tcp_socket { write read getopt create getattr connect };
 allow hcfsd self:udp_socket create;
-
-# comm="hcfs" name="/" dev="fuse" scontext=u:r:hcfsd:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
-allow hcfsd labeledfs:filesystem { mount unmount };
 
 # Allow hcfs to have permission to access directories and files on /proc/<pid> folder
 define(`hcfs_proc_dataset', `{ init installd qti_init_shell shell vold bluetooth radio wcnss_service system_app platform_app untrusted_app isolated_app rild system_server adbd mediaserver hcfsapid terafonn_app qtitetherservice_app location_app shared_relro debuggerd }')
@@ -86,11 +83,6 @@ allow hcfsd storage_stub_file:dir { read getattr open mounton };
 
 # comm="hcfs" name="runtime" dev="tmpfs" scontext=u:r:hcfsd:s0 tcontext=u:object_r:storage_file:s0 tclass=dir permissive=0
 allow hcfsd storage_file:dir search;
-
-# comm="hcfs" name="/" dev="mmcblk0p38", which mmcblk0p38 is /dev/block/bootdevice/by-name/userdata
-allow hcfsd unlabeled:dir search;
-# Allow hcfs to have permission on /data/data and /data/app
-allow hcfsd unlabeled:dir getattr;
 
 # Allow hcfsd to communicate with "u:r:shared_relro:s0" type objects
 allow hcfsd shared_relro:dir { search };
@@ -139,39 +131,19 @@ allow sdcardd shell_exec:file { read execute open execute_no_trans };
 allow sdcardd storage_file:dir getattr;
 allow sdcardd unlabeled:dir { relabelfrom getattr };
 
-#============= installd ==============
-# Allow installd to have permission on /data/data and /data/app folder
-allow installd unlabeled:dir setattr;
-
 #============= zygote ==============
-allow zygote labeledfs:filesystem unmount;
+allow zygote hcfs:filesystem { remount unmount };
 
 #============= gatekeeperd ==============
 # Allow gatekeeperd to read directories, files and symbolic links of the firmware_file type on /firmware folder
 r_dir_file(gatekeeperd, firmware_file)
-
-#============= vold ==============
-# comm="vold" name="/" dev="fuse" scontext=u:r:vold:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir 
-allow vold unlabeled:dir write;
-
-#============= untrusted_app ==============
-# comm="android.vending" path="/storage/emulated" dev="fuse" scontext=u:r:untrusted_app:s0:c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir
-allow untrusted_app unlabeled:dir { read write search getattr remove_name add_name };
-# Allow untrusted_app(RenderThread) to have permissions on /data/data/com.android.systemui/code_cache/com.android.opengl.shaders_cache
-allow untrusted_app unlabeled:file { read write open setattr unlink };
-
-#============= platform_app ==============
-# comm="eaurora.snapcam" path="/storage/emulated" dev="fuse" scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir 
-allow platform_app unlabeled:dir getattr;
-# Allow platform_app(RenderThread) to have permissions on /data/data/com.android.systemui/code_cache/com.android.opengl.shaders_cache
-allow platform_app unlabeled:file { read write unlink open setattr };
 
 #============= init ==============
 allow init boot_block_device:blk_file setattr;
 
 #============= fuse ==============
 # comm="restorecon" name="/" dev="fuse" scontext=u:object_r:fuse:s0 tcontext=u:object_r:labeledfs:s0 tclass=filesystem 
-allow fuse labeledfs:filesystem associate;
+allow fuse hcfs:filesystem associate;
 
 #============= system_app ==============
 allow system_app ipa_dev:chr_file { read write open ioctl };
@@ -204,3 +176,9 @@ allow dpmd hcfsd:tcp_socket { read write };
 # Allow to permission on hcfs log file (adb pull, read)
 allow adbd hcfs_data_file:file { getattr read open };
 allow shell hcfs_data_file:file { open read };
+
+#============= vold ==============
+allow vold hcfs:filesystem { mount unmount remount };
+
+#============= file_type ============
+allow file_type hcfs:filesystem associate;
