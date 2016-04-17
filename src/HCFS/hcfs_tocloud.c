@@ -309,7 +309,6 @@ static inline int _upload_terminate_thread(int index)
 #endif
 	ino_t this_inode;
 	off_t page_filepos;
-	long long e_index;
 	long long blockno;
 	long long toupload_block_seq;
 	int progress_fd;
@@ -345,7 +344,7 @@ static inline int _upload_terminate_thread(int index)
 	this_inode = upload_ctl.upload_threads[index].inode;
 	//is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
-	e_index = upload_ctl.upload_threads[index].page_entry_index;
+	//e_index = upload_ctl.upload_threads[index].page_entry_index;
 	blockno = upload_ctl.upload_threads[index].blockno;
 	progress_fd = upload_ctl.upload_threads[index].progress_fd;
 	toupload_block_seq = upload_ctl.upload_threads[index].seq;
@@ -361,15 +360,11 @@ static inline int _upload_terminate_thread(int index)
 			/*backend_exist = FALSE;
 			set_progress_info(progress_fd, blockno, NULL,
 					&backend_exist, NULL, NULL, NULL);*/
-		/* When deleting to-upload blocks, it is important to recover
-		 * the block status to ST_LDISK */
 		} else if (upload_ctl.upload_threads[index].backend_delete_type
 				== DEL_TOUPLOAD_BLOCKS) {
 			/*toupload_exist = FALSE;
 			set_progress_info(progress_fd, blockno, &toupload_exist,
 					NULL, NULL, NULL, NULL);*/
-			ret = revert_block_status_LDISK(this_inode, blockno,
-					e_index, page_filepos);
 		}
 
 		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
@@ -1301,8 +1296,6 @@ store in some other file */
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
-		//change_status_to_BOTH(ptr->inode, progress_fd,
-		//		local_metafptr, local_metapath);
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, DEL_BACKEND_BLOCKS);
 		fclose(local_metafptr);
@@ -1331,6 +1324,7 @@ errcode_handle:
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	return;
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,

@@ -115,7 +115,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr);
 
-int change_action(int fd, char now_action);
+int change_action(int fd, char new_action);
 
 void fetch_progress_file_path(char *pathname, ino_t inode);
 

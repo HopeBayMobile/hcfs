@@ -1336,7 +1336,7 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */ 
-int change_action(int fd, char now_action)
+int change_action(int fd, char new_action)
 {
 	int errcode;
 	ssize_t ret_ssize;
@@ -1344,7 +1344,7 @@ int change_action(int fd, char now_action)
 
 	flock(fd, LOCK_EX);
 	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	progress_meta.now_action = now_action;
+	progress_meta.now_action = new_action;
 	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	flock(fd, LOCK_UN);
 

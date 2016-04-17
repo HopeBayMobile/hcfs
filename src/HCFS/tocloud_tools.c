@@ -65,6 +65,7 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 					". Code %d\n", errcode);
 		return -errcode;
 	}
+	setbuf(local_metafptr, NULL);
 
 	flock(fileno(local_metafptr), LOCK_EX);
 	if (access(local_metapath, F_OK) < 0) {
@@ -384,6 +385,69 @@ static inline int _choose_deleted_block(char delete_which_one,
 #endif
 
 /**
+ * Revert block status to ST_LDISK when cancelling to sync this time.
+ *
+ * @return 0 on success, -ECANCELED on skipping delete this block on cloud.
+ */ 
+static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
+		long long blockno, long long page_pos, int eindex)
+{
+	char status;
+	int ret, errcode;
+	BLOCK_ENTRY_PAGE bentry_page;
+	char blockpath[300];
+	ssize_t ret_ssize;
+	long long cache_block_size;
+
+	flock(fileno(local_metafptr), LOCK_EX);
+	PREAD(fileno(local_metafptr), &bentry_page,
+			sizeof(BLOCK_ENTRY_PAGE), page_pos);
+	status = bentry_page.block_entries[eindex].status;
+	switch (status) {
+	case ST_CLOUD:
+	case ST_CtoL:
+		/* If this block is paged out, then do NOT deleting the
+		 * block data on cloud. This case tmply let the block
+		 * on cloud be orphan (it cannot be tracked by any meta),
+		 * but it will be adopted after finishing syncing next time */
+		flock(fileno(local_metafptr), LOCK_UN);
+		write_log(10, "Debug: block_%"PRIu64"_%lld is ST_BOTH/ST_CtoL."
+				"Cannot revert", (uint64_t)this_inode, blockno);
+		return -ECANCELED;
+	case ST_BOTH:
+	case ST_LtoC:
+		bentry_page.block_entries[eindex].status = ST_LDISK;
+		PWRITE(fileno(local_metafptr), &bentry_page,
+				sizeof(BLOCK_ENTRY_PAGE), page_pos);
+
+		/* Recover dirty size */
+		fetch_block_path(blockpath, this_inode, blockno);
+		ret = set_block_dirty_status(blockpath, NULL, TRUE);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to set block dirty"
+					" status in %s\n", __func__);
+		}
+		cache_block_size = check_file_size(blockpath);
+		flock(fileno(local_metafptr), LOCK_UN);
+		change_system_meta(0, 0, 0, 0, cache_block_size);
+		write_log(10, "Debug: block_%"PRIu64"_%lld is reverted"
+				" to ST_LDISK", (uint64_t)this_inode, blockno);
+		break;
+	default:
+		/* If status is ST_NONE/ST_TODELETE/ST_LDISK, then do
+		 * nothing because the block had been updated again. */
+		flock(fileno(local_metafptr), LOCK_UN);
+		break;
+	}
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(local_metafptr), LOCK_UN);
+	return errcode;
+}
+
+/**
  * Delete blocks on cloud based on progress file.
  *
  * @param progress_fd File descriptor of this progress file
@@ -398,7 +462,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	char delete_which_one)
 {
 	BLOCK_UPLOADING_PAGE tmppage;
-	BLOCK_ENTRY_PAGE bentry_page;
 	BLOCK_UPLOADING_STATUS *block_info;
 	long long block_count;
 	long long block_seq;
@@ -413,7 +476,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	ssize_t ret_size;
 	long long page_pos;
 	FILE_META_TYPE filemeta;
-	char status;
 #if DEDUP_ENABLE
 	unsigned char block_objid[OBJID_LENGTH];
 #endif
@@ -430,7 +492,9 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		"inode_%"PRIu64"\n", (uint64_t)inode);
 
 	fetch_meta_path(local_metapath, inode);
-	local_metafptr = fopen(local_metapath, "r");
+	local_metafptr = fopen(local_metapath, "r+");
+	if (local_metafptr)
+		setbuf(local_metafptr, NULL);
 
 	current_page = -1;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
@@ -475,14 +539,18 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		e_index = block_count % BLK_INCREMENTS;
 		if (delete_which_one == DEL_TOUPLOAD_BLOCKS &&
 				page_pos != 0) {
-			flock(fileno(local_metafptr), LOCK_EX);
-			PREAD(fileno(local_metafptr), &bentry_page,
-					sizeof(BLOCK_ENTRY_PAGE), page_pos);
-			flock(fileno(local_metafptr), LOCK_UN);
-			status = bentry_page.block_entries[e_index].status;
-			/* Do not delete st_cloud and st_ctol */
-			if (status == ST_CLOUD || status == ST_CtoL)
-				continue;
+			/* In case of deleting those blocks just uploaded,
+			 * try to revert block status if needed. */
+			ret = _revert_block_status(local_metafptr, inode,
+					block_count, page_pos, e_index);
+			if (ret < 0) {
+				if (ret == -ECANCELED) {
+					continue;
+				} else {
+					errcode = ret;
+					goto errcode_handle;
+				}
+			}
 		}
 
 		block_info = &(tmppage.status_entry[e_index]);
@@ -524,6 +592,10 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 errcode_handle:
 	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
+	if (local_metafptr)
+		fclose(local_metafptr);
+	flock(progress_fd, LOCK_UN);
+	busy_wait_all_specified_upload_threads(inode);
 	return errcode;
 }
 
