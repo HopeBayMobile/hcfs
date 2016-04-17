@@ -302,9 +302,10 @@ using threads_error in sync control. */
 static inline int _upload_terminate_thread(int index)
 {
 	int count1;
-	int ret, errcode;
+	int ret;
 	char toupload_blockpath[400];
 #if (DEDUP_ENABLE)
+	int errcode;
 	unsigned char blk_obj_id[OBJID_LENGTH];
 #endif
 	ino_t this_inode;
@@ -445,7 +446,7 @@ static inline int _upload_terminate_thread(int index)
 	fetch_toupload_block_path(toupload_blockpath, this_inode,
 			blockno, toupload_block_seq);
 	if (access(toupload_blockpath, F_OK) == 0)
-		UNLINK(toupload_blockpath);
+		unlink(toupload_blockpath);
 
 	ret = change_block_status_to_BOTH(this_inode, blockno, page_filepos,
 			toupload_block_seq);
@@ -470,14 +471,14 @@ static inline int _upload_terminate_thread(int index)
 
 	return 0;
 
-errcode_handle:
 #if (DEDUP_ENABLE)
+errcode_handle:
 	if (is_toupload_meta_lock == TRUE) {
 		flock(fileno(toupload_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);
 	}
-#endif
 	return errcode;
+#endif
 }
 
 void collect_finished_upload_threads(void *ptr)
