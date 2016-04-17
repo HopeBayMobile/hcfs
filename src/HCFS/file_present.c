@@ -1450,91 +1450,6 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 }
 
 /**
- * update_upload_seq()
- *
- * Update upload_seq after finishing uploading this time. Before updating
- * upload_seq, use meta_cache_sync_later() to ensure it will not be pushed
- * to upload queue again caused by only updating upload_seq.
- *
- * @param body_ptr Meta cache entry, it should be locked.
- *
- * @return 0 on success, otherwise negative error code.
- */
-int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
-{
-	int ret;
-	struct stat tmpstat;
-	ino_t inode;
-
-	inode = body_ptr->inode_num;
-	ret = meta_cache_lookup_file_data(inode, &tmpstat,
-			NULL, NULL, 0, body_ptr);
-	if (ret < 0)
-		return ret;
-
-	ret = meta_cache_sync_later(body_ptr);
-	if (ret < 0)
-		return ret;
-
-	/* update upload_seq */
-	if (S_ISFILE(tmpstat.st_mode)) {
-		FILE_META_TYPE filemeta;
-
-		memset(&filemeta, 0, sizeof(FILE_META_TYPE));
-		ret = meta_cache_lookup_file_data(inode, NULL, &filemeta,
-				NULL, 0, body_ptr);
-		if (ret < 0)
-			return ret;
-		//filemeta.upload_seq++;
-		//upload_seq = filemeta.upload_seq;
-		ret = meta_cache_update_file_data(inode, NULL, &filemeta,
-				NULL, 0, body_ptr);
-		if (ret < 0)
-			return ret;
-
-	} else if (S_ISDIR(tmpstat.st_mode)) {
-		DIR_META_TYPE dirmeta;
-
-		memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
-		ret = meta_cache_lookup_dir_data(inode, NULL, &dirmeta,
-				NULL, body_ptr);
-		if (ret < 0)
-			return ret;
-		//dirmeta.upload_seq++;
-		//upload_seq = dirmeta.upload_seq;
-		ret = meta_cache_update_dir_data(inode, NULL, &dirmeta,
-				NULL, body_ptr);
-		if (ret < 0)
-			return ret;
-
-	} else if (S_ISLNK(tmpstat.st_mode)) {
-		SYMLINK_META_TYPE symmeta;
-
-		memset(&symmeta, 0, sizeof(SYMLINK_META_TYPE));
-		ret = meta_cache_lookup_symlink_data(inode, NULL,
-				&symmeta, body_ptr);
-		if (ret < 0)
-			return ret;
-		//symmeta.upload_seq++;
-		//upload_seq = symmeta.upload_seq;
-		ret = meta_cache_update_symlink_data(inode, NULL,
-				&symmeta, body_ptr);
-		if (ret < 0)
-			return ret;
-
-	} else {
-		write_log(0, "Error: st_mode %d is incorrect.\n",
-				tmpstat.st_mode);
-		return -EPERM;
-	}
-
-	//write_log(10, "Debug sync: Now inode %"PRIu64" has upload_seq %lld\n",
-	//		(uint64_t)inode, upload_seq);
-
-	return 0;
-}
-
-/**
  * Set uploading data in meta cache.
  *
  * This function aims to clone meta file and set uploading info in meta cache.
@@ -1573,12 +1488,10 @@ int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 		return ret;
 	}
 
-
-
 	/* Copy meta if need to upload and is not reverting mode */
 	if (data->is_uploading == TRUE) {
 
-		/* Read toupload_blocks when reverting mode */
+		/* Read toupload_blocks in reverting/continuing mode */
 		if (data->is_revert == TRUE) {
 			flock(data->progress_list_fd, LOCK_EX);
 			PREAD(data->progress_list_fd, &progress_meta,
@@ -1588,7 +1501,6 @@ int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 
 		/* clone meta and record # of toupload_blocks */
 		} else {
-
 			fetch_meta_path(local_metapath, data->inode);
 			ret = access(local_metapath, F_OK);
 			if (ret < 0) {
