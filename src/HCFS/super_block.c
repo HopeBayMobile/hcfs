@@ -1206,8 +1206,9 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				if (ret < 0)
 					return ret;
 
-				if (tempentry2.util_ll_next != tempentry.this_index)
+				if (tempentry2.util_ll_next != sys_super_block->head.last_dirty_inode)
 					need_rebuild = TRUE;
+
 			}
 
 			if (need_rebuild) {
@@ -1230,7 +1231,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			sys_super_block->head.num_dirty++;
 
 			tempentry.util_ll_next = thisinode;
-			ret = write_super_block_entry(tempentry.this_index, &tempentry);
+			ret = write_super_block_entry(this_entry->util_ll_prev, &tempentry);
 			if (ret < 0)
 				return ret;
 		}
@@ -1308,7 +1309,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 	char old_which_ll;
 	ino_t temp_inode;
 	int ret;
-	int need_rebuild;
+	int need_rebuild = FALSE;
 
 	UNUSED(thisinode);
 	old_which_ll = this_entry->status;
@@ -1323,29 +1324,31 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		return 0;
 
 	if (old_which_ll == IS_DIRTY) {
-		need_rebuild = FALSE;
-
 		/* Need to check if the dirty linked list in superblock was currpted */
 		if (this_entry->util_ll_next == 0) {
-		    if (sys_super_block->head.last_dirty_inode != this_entry->this_index)
-			need_rebuild = TRUE;
+			if (sys_super_block->head.last_dirty_inode != thisinode) {
+				need_rebuild = TRUE;
+			}
 		} else {
 			ret = read_super_block_entry(this_entry->util_ll_next, &next);
 			if (ret < 0)
 				return ret;
-			if (next.util_ll_prev != this_entry->this_index)
+			if (next.util_ll_prev != thisinode) {
 				need_rebuild = TRUE;
+			}
 		}
 
 		if (this_entry->util_ll_prev == 0) {
-		    if (sys_super_block->head.first_dirty_inode != this_entry->this_index)
-			need_rebuild = TRUE;
+			if (sys_super_block->head.first_dirty_inode != thisinode) {
+				need_rebuild = TRUE;
+			}
 		} else {
 			ret = read_super_block_entry(this_entry->util_ll_prev, &prev);
 			if (ret < 0)
 				return ret;
-			if (prev.util_ll_next != this_entry->this_index)
+			if (prev.util_ll_next != thisinode) {
 				need_rebuild = TRUE;
+			}
 		}
 
 		if (need_rebuild) {
@@ -1353,7 +1356,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 			if (ret < 0)
 				return ret;
 			/* reload this_entry*/
-			ret = read_super_block_entry(this_entry->this_index, this_entry);
+			ret = read_super_block_entry(thisinode, this_entry);
 			if (ret < 0)
 				return ret;
 		}
@@ -1374,7 +1377,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		}
 	} else {
 		temp_inode = this_entry->util_ll_next;
-		if (need_rebuild) {
+		if (this_entry->status != IS_DIRTY || need_rebuild) {
 			ret = read_super_block_entry(temp_inode, &next);
 			if (ret < 0)
 				return ret;
@@ -1400,7 +1403,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		}
 	} else {
 		temp_inode = this_entry->util_ll_prev;
-		if (need_rebuild) {
+		if (this_entry->status != IS_DIRTY || need_rebuild) {
 			ret = read_super_block_entry(temp_inode, &prev);
 			if (ret < 0)
 				return ret;

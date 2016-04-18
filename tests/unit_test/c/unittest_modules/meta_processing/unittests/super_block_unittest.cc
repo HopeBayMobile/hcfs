@@ -36,7 +36,7 @@ class superblockEnvironment : public ::testing::Environment {
 	::testing::AddGlobalTestEnvironment(new superblockEnvironment);
 
 class MallocSuperBlockBaseClass : public ::testing::Test {
-protected:	
+protected:
 	char *sb_path;
 
 	void SetUp()
@@ -61,7 +61,7 @@ TEST_F(write_super_block_headTest, WriteSuperBlockFail)
 {
 	/* Mock fd to make failure since no such file */
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
-	
+
 	/* Run */
 	EXPECT_EQ(-EBADF, write_super_block_head());
 
@@ -71,7 +71,7 @@ TEST_F(write_super_block_headTest, WriteSuperBlockFail)
 TEST_F(write_super_block_headTest, WriteSuperBlockSUCCESS)
 {
 	sys_super_block->iofptr = open(sb_path, O_CREAT | O_RDWR, 0600);
-	
+
 	/* Run */
 	EXPECT_EQ(0, write_super_block_head());
 
@@ -93,9 +93,9 @@ TEST_F(read_super_block_entryTest, ReadEntryFail)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 7;
-	
+
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
-	
+
 	/* Run */
 	EXPECT_EQ(-EBADF, read_super_block_entry(inode, &sb_entry));
 
@@ -108,7 +108,7 @@ TEST_F(read_super_block_entryTest, ReadEntrySuccess)
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t inode = 2;
 	FILE *ptr;
-	
+
 	/* Write mock sb head & sb entry */
 	ptr = fopen(sb_path, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
@@ -124,7 +124,7 @@ TEST_F(read_super_block_entryTest, ReadEntrySuccess)
 	expected_sb_entry.generation = 9;
 	fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	fclose(ptr);
-		
+
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
 
 	/* Run */
@@ -151,9 +151,9 @@ TEST_F(write_super_block_entryTest, WriteEntryFail)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 2;
-	
+
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
-	
+
 	/* Run */
 	EXPECT_EQ(-EBADF, write_super_block_entry(inode, &sb_entry));
 
@@ -166,7 +166,7 @@ TEST_F(write_super_block_entryTest, WriteEntrySuccess)
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t inode = 7;
 	FILE *ptr;
-	
+
 	/* Write mock sb head & sb entry */
 	ptr = fopen(sb_path, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
@@ -176,7 +176,7 @@ TEST_F(write_super_block_entryTest, WriteEntrySuccess)
 	fclose(ptr);
 
 	sys_super_block->iofptr = open(sb_path, O_RDWR, 0600);
-	
+
 	expected_sb_entry.util_ll_next = 123;
 	expected_sb_entry.util_ll_prev = 456;
 	expected_sb_entry.status = TO_BE_DELETED;
@@ -189,7 +189,7 @@ TEST_F(write_super_block_entryTest, WriteEntrySuccess)
 	EXPECT_EQ(0, write_super_block_entry(inode, &expected_sb_entry));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + (inode - 1) * sizeof(SUPER_BLOCK_ENTRY));
 	EXPECT_EQ(0, memcmp(&expected_sb_entry, &sb_entry, sizeof(SUPER_BLOCK_ENTRY)));
 	close(sys_super_block->iofptr);
@@ -234,7 +234,7 @@ TEST(super_block_initTest, InitSuccess)
 class InitSuperBlockBaseClass : public ::testing::Test {
 protected:
 	void SetUp()
-	{	
+	{
 		SUPERBLOCK = "testpatterns/sb_path";
 		UNCLAIMEDFILE = "testpatterns/unclaimedfile_path";
 		mock_super_block_init();
@@ -250,15 +250,15 @@ protected:
 		unlink(UNCLAIMEDFILE);
 		memset(&(hcfs_system->systemdata), 0, sizeof(SYSTEM_DATA_TYPE));
 	}
-	
+
 	void mock_super_block_init()
 	{
-		sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL)); 
+		sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
 
 		memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
-		sem_init(&(sys_super_block->exclusive_lock_sem), 1, 1); 
-		sem_init(&(sys_super_block->share_lock_sem), 1, 1); 
-		sem_init(&(sys_super_block->share_CR_lock_sem), 1, 1); 
+		sem_init(&(sys_super_block->exclusive_lock_sem), 1, 1);
+		sem_init(&(sys_super_block->share_lock_sem), 1, 1);
+		sem_init(&(sys_super_block->share_CR_lock_sem), 1, 1);
 		sys_super_block->share_counter = 0;
 
 		sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
@@ -266,11 +266,11 @@ protected:
 		if (sys_super_block->iofptr < 0) {
 			sys_super_block->iofptr = open(SUPERBLOCK, O_CREAT | O_RDWR,
 					0600);
-			pwrite(sys_super_block->iofptr, &(sys_super_block->head), 
-					sizeof(SUPER_BLOCK_HEAD), 0); 
+			pwrite(sys_super_block->iofptr, &(sys_super_block->head),
+					sizeof(SUPER_BLOCK_HEAD), 0);
 			close(sys_super_block->iofptr);
 			sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
-		}   
+		}
 		sys_super_block->unclaimed_list_fptr = fopen(UNCLAIMEDFILE, "a+");
 		setbuf(sys_super_block->unclaimed_list_fptr, NULL);
 
@@ -294,8 +294,8 @@ TEST_F(super_block_destroyTest, DestroySuccess)
 	expected_head.num_block_cached = 9;
 	expected_head.num_total_inodes = 95;
 
-	memcpy(&(sys_super_block->head), &expected_head, sizeof(SUPER_BLOCK_HEAD));	
-	
+	memcpy(&(sys_super_block->head), &expected_head, sizeof(SUPER_BLOCK_HEAD));
+
 	/* Run */
 	EXPECT_EQ(0, super_block_destroy());
 
@@ -321,10 +321,10 @@ TEST_F(super_block_readTest, ReadEntryFail)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 7;
-	
+
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
-	
+
 	/* Run */
 	EXPECT_EQ(-EBADF, super_block_read(inode, &sb_entry));
 }
@@ -335,10 +335,10 @@ TEST_F(super_block_readTest, ReadEntrySuccess)
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t inode = 2;
 	FILE *ptr;
-	
+
 	/* Write mock sb head & sb entry */
 	close(sys_super_block->iofptr);
-	
+
 	ptr = fopen(SUPERBLOCK, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
@@ -353,7 +353,7 @@ TEST_F(super_block_readTest, ReadEntrySuccess)
 	expected_sb_entry.generation = 9;
 	fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	fclose(ptr);
-		
+
 	sys_super_block->iofptr = open(SUPERBLOCK, O_RDONLY, 0600);
 
 	/* Run */
@@ -379,13 +379,13 @@ TEST_F(super_block_writeTest, WriteEntryFail)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 7;
-	
-	/* Mock data. open a nonexisted file */	
+
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 	sb_entry.status = IS_DIRTY;
 	sb_entry.in_transit = FALSE;
-		
+
 	/* Run */
 	EXPECT_EQ(-EBADF, super_block_write(inode, &sb_entry));
 }
@@ -394,14 +394,14 @@ TEST_F(super_block_writeTest, AddDirtyNode_Dequeue_Enqueue_andWriteHeadFail)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 7;
-	
-	/* Mock data. open a nonexisted file */	
+
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = FALSE;
 	EXPECT_EQ(0, sys_super_block->head.num_dirty);
-		
+
 	/* Run */
 	EXPECT_EQ(-EBADF, super_block_write(inode, &sb_entry));
 
@@ -413,14 +413,14 @@ TEST_F(super_block_writeTest, ModAfterTransit)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 7;
-	
-	/* Mock data. open a nonexisted file */	
+
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 	sb_entry.status = IS_DIRTY;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
-		
+
 	/* Run */
 	EXPECT_EQ(-EBADF, super_block_write(inode, &sb_entry));
 
@@ -444,7 +444,7 @@ TEST_F(super_block_update_statTest, UpdateFail_SinceReadEntryFail)
 	struct stat new_stat;
 	ino_t inode = 8;
 
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
@@ -453,19 +453,19 @@ TEST_F(super_block_update_statTest, UpdateFail_SinceReadEntryFail)
 }
 
 TEST_F(super_block_update_statTest, UpdateStatSuccess)
-{	
+{
 	struct stat expected_stat;
 	ino_t inode = 8;
 	SUPER_BLOCK_ENTRY sb_entry;
 
 	/* Mock data. Write a entry */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * inode);
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
 	expected_stat.st_dev = 1;  /* expected stat */
@@ -478,7 +478,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 	EXPECT_EQ(0, super_block_update_stat(inode, &expected_stat));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, sizeof(struct stat)));
@@ -502,7 +502,7 @@ TEST_F(super_block_mark_dirtyTest, ReadEntryFail)
 {
 	ino_t inode = 8;
 
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
@@ -519,20 +519,20 @@ TEST_F(super_block_mark_dirtyTest, MarkDirtySuccess)
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * inode);
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
-	
+
 	/* Run */
 	EXPECT_EQ(0, super_block_mark_dirty(inode));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 
@@ -556,7 +556,7 @@ TEST_F(super_block_update_transitTest, ReadEntryFail)
 {
 	ino_t inode = 8;
 
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
@@ -572,21 +572,21 @@ TEST_F(super_block_update_transitTest, Set_is_start_transit_TRUE)
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * inode);
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = FALSE;
 	sb_entry.mod_after_in_transit = FALSE;
 
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
-	
+
 	/* Run */
 	EXPECT_EQ(0, super_block_update_transit(inode, TRUE, FALSE));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
 
 	EXPECT_EQ(TRUE, sb_entry.in_transit);
@@ -601,21 +601,25 @@ TEST_F(super_block_update_transitTest, DequeueDirtyList_CancelTransitSuccess)
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * inode);
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = IS_DIRTY;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
 
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	/* Need to pass dirty inode list check */
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode;
+
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
-	
+
 	/* Run */
 	EXPECT_EQ(0, super_block_update_transit(inode, FALSE, FALSE));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
 
 	EXPECT_EQ(FALSE, sb_entry.in_transit);
@@ -638,7 +642,7 @@ TEST_F(super_block_to_deleteTest, ReadEntryFail)
 {
 	ino_t inode = 7;
 
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
@@ -655,21 +659,21 @@ TEST_F(super_block_to_deleteTest, MarkToDeleteSuccess)
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * inode);
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
-	
+
 	sys_super_block->head.num_active_inodes++;
-		
+
 	/* Run */
 	EXPECT_EQ(0, super_block_to_delete(inode));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 
@@ -689,7 +693,7 @@ TEST_F(super_block_deleteTest, ReadEntryFail)
 {
 	ino_t inode = 7;
 
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
@@ -707,22 +711,22 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * inode);
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
-			
+
 	/* Run */
 	EXPECT_EQ(0, super_block_delete(inode));
 
 	/* Verify */
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos); // Read entry
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0); // Head
-	pread(fileno(sys_super_block->unclaimed_list_fptr), &result_inode, 
+	pread(fileno(sys_super_block->unclaimed_list_fptr), &result_inode,
 		sizeof(ino_t), 0); // Read unclaimed_list from file
 
 	EXPECT_EQ(TO_BE_RECLAIMED, sb_entry.status);
@@ -757,25 +761,25 @@ TEST_F(super_block_reclaimTest, ReclaimSuccess)
 	ino_t now_reclaimed_inode;
 
 	/* Mock unclaimed list, head and entries. */
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * num_inode); // Prepare entry
-	
+
 	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
 		SUPER_BLOCK_ENTRY sb_entry;
 
-		fwrite(&inode, sizeof(ino_t), 1, 
+		fwrite(&inode, sizeof(ino_t), 1,
 			sys_super_block->unclaimed_list_fptr); // Add unclaimed list
 
 		sb_entry.status = TO_BE_RECLAIMED; // Set status
-		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(inode - 1)); // Write entry status
 	}
-	
+
 	sys_super_block->head.num_to_be_reclaimed = num_inode; // Set head data
-	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
+	pwrite(sys_super_block->iofptr, &sys_super_block->head,
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write head data
-	
+
 	/* Run */
 	EXPECT_EQ(0, super_block_reclaim());
 
@@ -784,14 +788,14 @@ TEST_F(super_block_reclaimTest, ReclaimSuccess)
 	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
 		unsigned long file_pos;
 
-		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(now_reclaimed_inode - 1);
 		pread(sys_super_block->iofptr, &now_entry,
 			sizeof(SUPER_BLOCK_ENTRY), file_pos);
-		
+
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
-		
+
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
 	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
@@ -815,11 +819,11 @@ class super_block_reclaim_fullscanTest : public InitSuperBlockBaseClass {
 
 TEST_F(super_block_reclaim_fullscanTest, ReadEntryFail)
 {
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	close(sys_super_block->iofptr);
 	sys_super_block->head.num_total_inodes = 5;
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
-	
+
 	/* Run */
 	EXPECT_EQ(-EBADF, super_block_reclaim_fullscan());
 
@@ -827,12 +831,12 @@ TEST_F(super_block_reclaim_fullscanTest, ReadEntryFail)
 
 TEST_F(super_block_reclaim_fullscanTest, num_total_inodes_EqualsZero)
 {
-	/* Mock data. open a nonexisted file */	
+	/* Mock data. open a nonexisted file */
 	sys_super_block->head.num_total_inodes = 0;
-	
+
 	/* Run */
 	EXPECT_EQ(0, super_block_reclaim_fullscan());
-	
+
 	/* Verify */
 	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
 	EXPECT_EQ(0, sys_super_block->head.num_inode_reclaimed);
@@ -844,17 +848,17 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 	ino_t now_reclaimed_inode;
 	SUPER_BLOCK_ENTRY sb_entry;
 	unsigned long num_inode = 20000;
-	
-	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		num_inode * sizeof(SUPER_BLOCK_ENTRY));
-	
+
 	/* Write mock entries to be reclaimed */
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = TO_BE_RECLAIMED;
 	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
 		sb_entry.this_index = inode;
-		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(inode - 1)); // Write entry status
 	}
 	sys_super_block->head.num_total_inodes = num_inode;
@@ -868,14 +872,14 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 		unsigned long file_pos;
 		SUPER_BLOCK_ENTRY now_entry;
 
-		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(now_reclaimed_inode - 1);
 		pread(sys_super_block->iofptr, &now_entry,
 			sizeof(SUPER_BLOCK_ENTRY), file_pos);
-		
+
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
-		
+
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
 	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
@@ -895,7 +899,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 class super_block_new_inodeTest : public InitSuperBlockBaseClass {
 protected:
 	struct stat expected_stat;
-	
+
 	void SetUp()
 	{
 		InitSuperBlockBaseClass::SetUp();
@@ -923,9 +927,9 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	/* Inode 1 is reserved, so start from 2 */
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since system is empty
 
-	/* Verify */	
+	/* Verify */
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 
 	EXPECT_EQ(1, sys_super_block->head.num_total_inodes); // Just a new inode
@@ -935,7 +939,7 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	EXPECT_EQ(1, sb_entry.generation); // It is first time to be created
 	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(1, generation);
-	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat,
 		sizeof(struct stat)));
 }
 
@@ -972,9 +976,9 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 			sb_entry.util_ll_next = inode + 1;
 		else
 			sb_entry.util_ll_next = 0;
-		
-		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(inode - 1)); // Write entry
 	}
 
@@ -982,16 +986,16 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 	sys_super_block->head.num_total_inodes = num_reclaimed;
 	sys_super_block->head.last_reclaimed_inode = num_reclaimed;
 	sys_super_block->head.first_reclaimed_inode = 2;
-	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
+	pwrite(sys_super_block->iofptr, &sys_super_block->head,
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
-	
+
 	/* Run */
 	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
-	/* Verify */	
+	/* Verify */
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 
 	EXPECT_EQ(num_reclaimed, sb_head.num_total_inodes); // num_total_inodes doesn't change
@@ -1004,7 +1008,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 	EXPECT_EQ(2, sb_entry.generation); // generation++
 	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(2, generation);
-	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat,
 		sizeof(struct stat)));
 }
 
@@ -1014,13 +1018,13 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t ret_node;
-	
+
 	/* Mock one reclaimed inode */
 	hcfs_system->systemdata.pinned_size = MAX_PINNED_LIMIT + 1;
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.generation = 1;
 	sb_entry.util_ll_next = 0;
-	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 		// Write entry
 
@@ -1028,16 +1032,16 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	sys_super_block->head.num_total_inodes = 1; // Just one inode
 	sys_super_block->head.last_reclaimed_inode = 2;
 	sys_super_block->head.first_reclaimed_inode = 2;
-	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
+	pwrite(sys_super_block->iofptr, &sys_super_block->head,
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 
 	/* Run */
 	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
-	/* Verify */	
+	/* Verify */
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
-	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 
 	EXPECT_EQ(1, sb_head.num_total_inodes); // num_total_inodes doesn't change
@@ -1050,7 +1054,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	EXPECT_EQ(2, sb_entry.generation); // generation++
 	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(2, generation);
-	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat,
 		sizeof(struct stat)));
 }
 /*
@@ -1085,6 +1089,10 @@ TEST_F(ll_enqueueTest, Enqueue_NO_LL)
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = IS_DIRTY;
 
+	/* Need to pass dirty inode list check */
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode;
+
 	/* Run */
 	EXPECT_EQ(0, ll_enqueue(inode, NO_LL, &sb_entry));
 }
@@ -1098,6 +1106,10 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_RECLAIMED)
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = IS_DIRTY;
 
+	/* Need to pass dirty inode list check */
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode;
+
 	/* Run */
 	EXPECT_EQ(0, ll_enqueue(inode, TO_BE_RECLAIMED, &sb_entry));
 }
@@ -1109,6 +1121,10 @@ TEST_F(ll_enqueueTest, Enqueue_RECLAIMED)
 
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = IS_DIRTY;
+
+	/* Need to pass dirty inode list check */
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode;
 
 	/* Run */
 	EXPECT_EQ(0, ll_enqueue(inode, RECLAIMED, &sb_entry));
@@ -1129,7 +1145,7 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_WithEmptyList)
 	EXPECT_EQ(inode, sys_super_block->head.first_dirty_inode);
 	EXPECT_EQ(inode, sys_super_block->head.last_dirty_inode);
 	EXPECT_EQ(1, sys_super_block->head.num_dirty);
-	
+
 	EXPECT_EQ(0, sb_entry.util_ll_prev);
 	EXPECT_EQ(0, sb_entry.util_ll_next);
 	EXPECT_EQ(IS_DIRTY, sb_entry.status);
@@ -1150,7 +1166,7 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_WithEmptyList)
 	EXPECT_EQ(inode, sys_super_block->head.first_to_delete_inode);
 	EXPECT_EQ(inode, sys_super_block->head.last_to_delete_inode);
 	EXPECT_EQ(1, sys_super_block->head.num_to_be_deleted);
-	
+
 	EXPECT_EQ(0, sb_entry.util_ll_prev);
 	EXPECT_EQ(0, sb_entry.util_ll_next);
 	EXPECT_EQ(TO_BE_DELETED, sb_entry.status);
@@ -1165,12 +1181,13 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 
 	/* Run */
 	for (ino_t inode = 1; inode <= num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 		sb_entry.status = NO_LL;
+		sb_entry.this_index = inode;
 		EXPECT_EQ(0, ll_enqueue(inode, IS_DIRTY, &sb_entry));
-		pwrite(sys_super_block->iofptr, &sb_entry, 
+		pwrite(sys_super_block->iofptr, &sb_entry,
 			sizeof(SUPER_BLOCK_ENTRY), filepos);
 	}
 
@@ -1178,23 +1195,23 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 	EXPECT_EQ(1, sys_super_block->head.first_dirty_inode);
 	EXPECT_EQ(num_inode, sys_super_block->head.last_dirty_inode);
 	EXPECT_EQ(num_inode, sys_super_block->head.num_dirty);
-		
+
 	ino_t now_inode = sys_super_block->head.first_dirty_inode;
 	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
 		long long filepos;
 
 		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-		filepos = sizeof(SUPER_BLOCK_HEAD) + 
+		filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1);
-		pread(sys_super_block->iofptr, &sb_entry, 
+		pread(sys_super_block->iofptr, &sb_entry,
 			sizeof(SUPER_BLOCK_ENTRY), filepos);
 		/* Check status and inode number */
 		ASSERT_EQ(IS_DIRTY, sb_entry.status) << "status = "
 			<< sb_entry.status << ", need IS_DIRTY";
-		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = " 
+		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = "
 			<< expected_inode << ", now_inode = " << now_inode;
 		ASSERT_EQ(5566, sb_entry.dirty_meta_size);
-		now_inode = sb_entry.util_ll_next; // Go to next dirty inode	
+		now_inode = sb_entry.util_ll_next; // Go to next dirty inode
 	}
 
 	EXPECT_EQ(5566 * num_inode, hcfs_system->systemdata.dirty_cache_size);
@@ -1209,12 +1226,12 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
 
 	/* Run */
 	for (ino_t inode = 1; inode <= num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 		sb_entry.status = NO_LL;
 		EXPECT_EQ(0, ll_enqueue(inode, TO_BE_DELETED, &sb_entry));
-		pwrite(sys_super_block->iofptr, &sb_entry, 
+		pwrite(sys_super_block->iofptr, &sb_entry,
 			sizeof(SUPER_BLOCK_ENTRY), filepos);
 	}
 
@@ -1222,23 +1239,23 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
 	EXPECT_EQ(1, sys_super_block->head.first_to_delete_inode);
 	EXPECT_EQ(num_inode, sys_super_block->head.last_to_delete_inode);
 	EXPECT_EQ(num_inode, sys_super_block->head.num_to_be_deleted);
-		
+
 	ino_t now_inode = sys_super_block->head.first_to_delete_inode;
 	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
 		long long filepos;
-		
-		filepos = sizeof(SUPER_BLOCK_HEAD) + 
+
+		filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1);
-		pread(sys_super_block->iofptr, &sb_entry, 
+		pread(sys_super_block->iofptr, &sb_entry,
 			sizeof(SUPER_BLOCK_ENTRY), filepos);
 		// Check status and inode number
 		ASSERT_EQ(TO_BE_DELETED, sb_entry.status) << "status = "
 			<< sb_entry.status << ", need IS_DIRTY";
-		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = " 
+		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = "
 			<< expected_inode << ", now_inode = " << now_inode;
-		
-		now_inode = sb_entry.util_ll_next; // Go to next dirty inode	
-	}	
+
+		now_inode = sb_entry.util_ll_next; // Go to next dirty inode
+	}
 }
 /*
 	End of unittest of ll_enqueue()
@@ -1264,26 +1281,26 @@ protected:
 		sb_entry.util_ll_next = 2;
 		sb_entry.util_ll_prev = 0;
 		sb_entry.this_index = 1;
-		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 				sizeof(SUPER_BLOCK_HEAD));
-		
+
 		/* General dirty inode */
 		for (ino_t inode = 2 ; inode < num_inode ; inode++) {
-			long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			long long filepos = sizeof(SUPER_BLOCK_HEAD) +
 				sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 			sb_entry.util_ll_next = inode + 1;
 			sb_entry.util_ll_prev = inode - 1;
 			sb_entry.this_index = inode;
-			pwrite(sys_super_block->iofptr, &sb_entry, 
+			pwrite(sys_super_block->iofptr, &sb_entry,
 					sizeof(SUPER_BLOCK_ENTRY), filepos);
 		}
-		
+
 		/* Last dirty inode */
 		sb_entry.util_ll_next = 0;
 		sb_entry.util_ll_prev = num_inode - 1;
 		sb_entry.this_index = num_inode;
-		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 				sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY)
 				* (num_inode - 1));
 
@@ -1298,7 +1315,7 @@ protected:
 			sys_super_block->head.num_to_be_deleted = num_inode;
 		}
 	}
-	
+
 	/* Traverse all entry in dirty_list or to_delete_list */
 	unsigned traverse_all_list_entry(char status)
 	{
@@ -1310,17 +1327,17 @@ protected:
 			now_inode = sys_super_block->head.first_dirty_inode;
 		else
 			now_inode = sys_super_block->head.first_to_delete_inode;
-		
+
 		remaining_inode = 0;
 		while (now_inode) {
 			remaining_inode++;
-			pread(sys_super_block->iofptr, &sb_entry, 
-				sizeof(SUPER_BLOCK_ENTRY), sizeof(SUPER_BLOCK_HEAD) + 
+			pread(sys_super_block->iofptr, &sb_entry,
+				sizeof(SUPER_BLOCK_ENTRY), sizeof(SUPER_BLOCK_HEAD) +
 				sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1));
 
 			now_inode = sb_entry.util_ll_next;
 		}
-		
+
 		return remaining_inode;
 	}
 
@@ -1366,7 +1383,7 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_JustOneElementList)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 5;
-	
+
 	/* Mock data */
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = IS_DIRTY;
@@ -1392,7 +1409,7 @@ TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_JustOneElementList)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 5;
-	
+
 	/* Mock data */
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = TO_BE_DELETED;
@@ -1421,17 +1438,17 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 	unsigned remaining_inode;
 	long long filepos;
 	ino_t now_inode;
-		
-	/* Mock dirty_inode list */	
+
+	/* Mock dirty_inode list */
 	generate_mock_list(num_inode, IS_DIRTY);
 	hcfs_system->systemdata.dirty_cache_size = 5566 * num_inode + 123;
 
 	/* Run */
 	remaining_inode = num_inode;
 	now_inode = num_inode / 2; // Start dequeue from medium dirty inode
-	
+
 	while (remaining_inode) {
-		filepos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+		filepos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(now_inode - 1);
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
@@ -1440,7 +1457,7 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 			filepos);
 
 		remaining_inode--;
-		
+
 		// Check remaining inodes by traversing all list entry
 		ASSERT_EQ(remaining_inode, traverse_all_list_entry(IS_DIRTY));
 		ASSERT_EQ(remaining_inode, sys_super_block->head.num_dirty);
@@ -1450,7 +1467,7 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 
 	/* Verify all inodes */
 	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
@@ -1472,39 +1489,41 @@ TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)
 	unsigned remaining_inode;
 	long long filepos;
 	ino_t now_inode;
-		
-	/* Mock dirty_inode list */	
+
+	/* Mock dirty_inode list */
 	generate_mock_list(num_inode, TO_BE_DELETED);
-		
+
 	/* Run */
 	remaining_inode = num_inode;
 	now_inode = num_inode / 2; // Start dequeue from medium dirty inode
-	
+
 	while (remaining_inode) {
-		filepos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+		filepos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(now_inode - 1);
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
 		ll_dequeue(now_inode, &sb_entry);
+		printf("sb_entry.status is %d\n", sb_entry.status);
 		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
 
 		remaining_inode--;
-		
+		printf("remaining inode is %d\n", remaining_inode);
+
 		// Check remaining inodes by traversing all list entry
 		ASSERT_EQ(remaining_inode, traverse_all_list_entry(TO_BE_DELETED));
 		ASSERT_EQ(remaining_inode, sys_super_block->head.num_to_be_deleted);
-		
+
 		now_inode = (now_inode % num_inode) + 1; // Go to next dirty inode
 	}
 
 	/* Verify all inodes */
 	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
-		
+
 		ASSERT_EQ(0, sb_entry.util_ll_next) << "inode = " << inode;
 		ASSERT_EQ(0, sb_entry.util_ll_prev);
 		ASSERT_EQ(NO_LL, sb_entry.status);
@@ -1533,7 +1552,7 @@ TEST_F(super_block_share_lockingTest, LockingSuccess)
 
 	/* Verify */
 	EXPECT_EQ(num_share_counter, sys_super_block->share_counter);
-	
+
 	sem_getvalue(&sys_super_block->share_lock_sem, &value);
 	EXPECT_EQ(0, value);
 }
@@ -1566,14 +1585,14 @@ TEST_F(super_block_share_releaseTest, ReleaseSuccess)
 	/* Mock locking */
 	for (int lock = 0 ; lock < num_share_counter ; lock++)
 		EXPECT_EQ(0, super_block_share_locking());
-	
+
 	/* Run */
 	for (int lock = 0 ; lock < num_share_counter ; lock++)
 		EXPECT_EQ(0, super_block_share_release());
-	
+
 	/* Verify */
 	EXPECT_EQ(0, sys_super_block->share_counter);
-	
+
 	sem_getvalue(&sys_super_block->share_lock_sem, &value);
 	EXPECT_EQ(1, value);
 }
@@ -1805,7 +1824,7 @@ TEST_F(super_block_mark_pinTest, StatusIsUNPIN_MarkToPIN_CaseRegfile)
 			sizeof(SUPER_BLOCK_ENTRY);
 		pwrite(sys_super_block->iofptr, &sb_entry,
 			sizeof(SUPER_BLOCK_ENTRY), offset);
-		
+
 		pin_ll_enqueue(this_inode, &sb_entry); /* Enqueue */
 	}
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
@@ -2074,7 +2093,7 @@ TEST_F(pin_ll_dequeueTest, DequeueSuccess)
 
 	EXPECT_EQ(2, sys_super_block->head.first_pin_inode);
 	EXPECT_EQ(20, sys_super_block->head.last_pin_inode);
-	
+
 	/* Dequeue half inodes and verify */
 	num_inode = 19;
 	for (ino_t inode = 10; inode <= 20; inode++) {
