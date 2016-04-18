@@ -38,11 +38,17 @@ ifeq "$(INCLUDE_SQLITE)" ""
 endif
 export INCLUDE_SQLITE := 1
 
+# For CI build version
+ifndef VERSION_NUM
+VERSION_NUM := Manual build @ $(shell date --rfc-3339=seconds)
+endif
 include $(CLEAR_VARS)
 LOCAL_MODULE    := hcfs
 LOCAL_CFLAGS    += -pie -fPIE -O0 $(HCFS_CFLAGS) -Wall -Wextra
 LOCAL_CFLAGS    += -D_FILE_OFFSET_BITS=64
-LOCAL_CFLAGS    += -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DDEDUP_ENABLE=0 -DSTAT_VFS_H="<fuse/sys/statvfs.h>" -D_ANDROID_PREMOUNT_
+LOCAL_CFLAGS    += -D_ANDROID_ENV_ -DENCRYPT_ENABLE=0 -DDEDUP_ENABLE=0 \
+		   -DSTAT_VFS_H="<fuse/sys/statvfs.h>" -D_ANDROID_PREMOUNT_ \
+		   -DVERSION_NUM="\"$(VERSION_NUM)\""
 LOCAL_LDFLAGS   += -pie -fPIE -O0 $(HCFS_LDFLAGS)
 LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)../../src/HCFS/*.c)
 LOCAL_C_INCLUDES := $(BUILD_PATH)/include/sqlite3 $(BUILD_PATH)/include $(BUILD_PATH)/include/jansson
