@@ -359,6 +359,12 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 	return 0;
 }
 
+int change_block_status_to_BOTH(ino_t inode, long long blockno,
+		long long page_pos, long long toupload_seq)
+{
+	return 0;
+}
+
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		char delete_which_one)
 {

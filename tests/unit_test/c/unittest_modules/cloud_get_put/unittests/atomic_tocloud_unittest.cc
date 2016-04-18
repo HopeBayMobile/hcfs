@@ -69,6 +69,7 @@ void *mock_sock_connector(void *data)
 	return NULL;
 }
 
+#ifndef _ANDROID_ENV_
 TEST_F(comm2fuseprocTest, FailToConnect_SocketPathNotExist)
 {
 	int ret;
@@ -119,6 +120,22 @@ TEST_F(comm2fuseprocTest, SucceedToConn_ResponseSuccess)
 
 	pthread_join(tid, NULL);
 }
+#else
+TEST_F(comm2fuseprocTest, SucceedToConn_ResponseSuccess)
+{
+	int ret;
+	pthread_t tid;
+	int fd = RESPONSE_SUCCESS;
+	char status = TRUE;
+	ino_t inode = 1;
+
+	ret = 0;
+	ret = comm2fuseproc(inode, status, fd, FALSE, FALSE);
+
+	EXPECT_EQ(0, ret);
+}
+#endif
+
 /*
  * End of unittest for comm2fuseproc()
  */ 

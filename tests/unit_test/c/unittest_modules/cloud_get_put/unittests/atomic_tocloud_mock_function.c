@@ -92,3 +92,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	strcpy(pathname, "/tmp/mock_local_meta");
 }
+
+int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
+{
+	return 0;
+}
