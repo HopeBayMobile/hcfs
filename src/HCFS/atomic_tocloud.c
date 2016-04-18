@@ -25,6 +25,7 @@
 #include "utils.h"
 #include "hcfs_fromcloud.h"
 #include "tocloud_tools.h"
+#include "file_present.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -41,9 +42,12 @@ extern SYSTEM_CONF_STRUCT *system_config;
 int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 		int fd, BOOL is_revert, BOOL finish_sync)
 {
+#ifndef _ANDROID_ENV_
 	int sockfd;
-	int ret, resp, errcode;
+	int resp, errcode;
 	struct sockaddr_un addr;
+#endif
+	int ret;
 	UPLOADING_COMMUNICATION_DATA data;
 
 	/* Prepare data */
@@ -53,6 +57,24 @@ int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 	data.progress_list_fd = fd;
 	data.finish_sync = finish_sync;
 
+#ifdef _ANDROID_ENV_
+	/* In android env, just set info directly. */
+	ret = fuseproc_set_uploading_info(&data);
+	if (ret < 0) {
+		write_log(2, "Fail to tag inode %"PRIu64" in %s",
+				this_inode, __func__);
+	} else {
+		if (is_uploading)
+			write_log(10, "Debug: Succeed in tagging inode %"
+				PRIu64" as UPLOADING\n", (uint64_t)this_inode);
+		else
+			write_log(10, "Debug: Succeed in tagging inode %"
+				PRIu64" as NOT_UPLOADING\n",
+				(uint64_t)this_inode);
+	}
+
+#else
+	/* In non-android env, communicate by socket and set info. */
 	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, FUSE_SOCK_PATH);
@@ -83,6 +105,7 @@ int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 	}
 
 	close(sockfd);
+#endif
 	return ret;
 }
 
@@ -99,7 +122,12 @@ static inline long long longpow(long long base, int power)
 	return tmp;
 }
 
-
+/**
+ * Get sync status page of progress file
+ *
+ * @return offset of given block number on success, otherwise 0
+ *         in case of page not exist or error.
+ */
 long long query_status_page(int fd, long long block_index)
 {
 	long long target_page;
@@ -156,6 +184,12 @@ errcode_handle:
 
 }
 
+/**
+ * Create status page of progress file if page does not exist, or
+ * return the offset if it had been created.
+ *
+ * @return offset on success, otherwise return 0 or negative error code.
+ */
 long long create_status_page(int fd, long long block_index)
 {
 	int which_indirect;
