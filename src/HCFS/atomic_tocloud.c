@@ -576,6 +576,7 @@ int init_progress_info(int fd, long long backend_blocks,
 	PROGRESS_META progress_meta;
 	BLOCK_UPLOADING_PAGE status_page;
 	int entry_index;
+	BOOL write_status_page;
 
 	flock(fd, LOCK_EX);
 
@@ -595,11 +596,22 @@ int init_progress_info(int fd, long long backend_blocks,
 
 	/* Write into progress info */
 	current_page = -1;
+	write_status_page = FALSE;
+	memset(&status_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 	for (block = 0; block < backend_blocks; block++) {
 		e_index = block % BLK_INCREMENTS;
 		which_page = block / BLK_INCREMENTS;
 
 		if (current_page != which_page) {
+			/* Write status page if need */
+			if (write_status_page) {
+				PWRITE(fd, &status_page,
+					sizeof(BLOCK_UPLOADING_PAGE), offset);
+				memset(&status_page, 0,
+					sizeof(BLOCK_UPLOADING_PAGE));
+				write_status_page = FALSE;
+			}
+			/* Seek next page */
 			page_pos = seek_page2(&tempfilemeta,
 				backend_metafptr, which_page, 0);
 			if (page_pos <= 0) {
@@ -626,24 +638,32 @@ int init_progress_info(int fd, long long backend_blocks,
 				block_page.block_entries[e_index].obj_id,
 				sizeof(char) * OBJID_LENGTH);
 #else
-		block_uploading_status.backend_seq =  /* TODO: seq */
+		block_uploading_status.backend_seq =
 			block_page.block_entries[e_index].seqnum;
 
 		write_log(10, "Debug: init progress file block%lld_%lld",
 				block, block_uploading_status.backend_seq);
 #endif
-		/* Write this entry to progress file */
+		/* Copy to syncing status page */
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
-		offset = create_status_page(fd, block);
-		if (offset < 0) {
-			errcode = offset;
-			goto errcode_handle;
-		}
-		PREAD(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 		memcpy(&(status_page.status_entry[entry_index]),
 			&block_uploading_status,
 			sizeof(BLOCK_UPLOADING_STATUS));
-		PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
+		if (write_status_page == FALSE) {
+			/* Create new status page */
+			offset = create_status_page(fd, block);
+			if (offset < 0) {
+				errcode = offset;
+				goto errcode_handle;
+			}
+			write_status_page = TRUE;
+		}
+	}
+
+	if (write_status_page) {
+		PWRITE(fd, &status_page,
+				sizeof(BLOCK_UPLOADING_PAGE), offset);
+		write_status_page = FALSE;
 	}
 
 	/* Finally write meta */
