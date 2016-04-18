@@ -1,0 +1,12 @@
+--- /packages/apps/Settings/src/com/android/settings/deviceinfo/PublicVolumeSettings.java	2016-02-18 20:08:57.000000000 +0000
++++ PublicVolumeSettings.java	2016-04-07 06:36:16.000000000 +0000
+@@ -115,6 +115,9 @@
+         mMount = buildAction(R.string.storage_menu_mount);
+         mUnmount = buildAction(R.string.storage_menu_unmount);
+         mFormatPublic = buildAction(R.string.storage_menu_format);
++
++        // Vince
++        mIsPermittedToAdopt = false; 
+         if (mIsPermittedToAdopt) {
+             mFormatPrivate = buildAction(R.string.storage_menu_format_private);
+         }

@@ -1,0 +1,159 @@
+--- /kernel/fs/namespace.c	2016-02-18 20:07:40.000000000 +0000
++++ namespace.c	2016-04-07 06:36:16.000000000 +0000
+@@ -771,8 +771,12 @@
+ 	return p;
+ }
+ 
+-struct vfsmount *
+-vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data)
++// Vince
++//struct vfsmount *
++//vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data)
++
++static struct vfsmount *
++vfs_kern_mount_subtype(struct file_system_type *type, const char *subtype, int flags, const char *name, void *data)
+ {
+ 	struct mount *mnt;
+ 	struct dentry *root;
+@@ -787,11 +791,20 @@
+ 	if (flags & MS_KERNMOUNT)
+ 		mnt->mnt.mnt_flags = MNT_INTERNAL;
+ 
+-	root = mount_fs(type, flags, name, data);
++        // Vince -
++	//root = mount_fs(type, flags, name, data);
++      
++        // + 
++        if (subtype && strcmp(subtype, "") == 0) {
++            subtype = NULL;
++        } 
++        root = mount_fs(type, subtype, flags, name, data);
++
+ 	if (IS_ERR(root)) {
+ 		free_vfsmnt(mnt);
+ 		return ERR_CAST(root);
+ 	}
++        // end
+ 
+ 	mnt->mnt.mnt_root = root;
+ 	mnt->mnt.mnt_sb = root->d_sb;
+@@ -802,6 +815,15 @@
+ 	br_write_unlock(&vfsmount_lock);
+ 	return &mnt->mnt;
+ }
++
++// Vince
++struct vfsmount *
++vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data)
++{
++        return vfs_kern_mount_subtype(type, NULL, flags, name, data);
++}
++
++
+ EXPORT_SYMBOL_GPL(vfs_kern_mount);
+ 
+ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1943,29 +1965,50 @@
+ 	return err;
+ }
+ 
++// Vince -
++/*
+ static struct vfsmount *fs_set_subtype(struct vfsmount *mnt, const char *fstype)
+ {
+-	int err;
++    int err;
++    const char *subtype = strchr(fstype, '.');
++    if (subtype) {
++        subtype++;
++        err = -EINVAL;
++        if (!subtype[0])
++            goto err;
++
++    } else
++        subtype = "";
++
++    mnt->mnt_sb->s_subtype = kstrdup(subtype, GFP_KERNEL);
++    err = -ENOMEM;
++    if (!mnt->mnt_sb->s_subtype)
++        goto err;
++    return mnt;
++
++err:
++    mntput(mnt);
++    return ERR_PTR(err); 
++}
++*/
++
++// Vince +
++static const char *fs_get_subtype(const char *fstype)
++{
++	//int err;
+ 	const char *subtype = strchr(fstype, '.');
+ 	if (subtype) {
+ 		subtype++;
+-		err = -EINVAL;
++		//err = -EINVAL;
+ 		if (!subtype[0])
+-			goto err;
+-	} else
+-		subtype = "";
+-
+-	mnt->mnt_sb->s_subtype = kstrdup(subtype, GFP_KERNEL);
+-	err = -ENOMEM;
+-	if (!mnt->mnt_sb->s_subtype)
+-		goto err;
+-	return mnt;
++			//goto err;
++                        return ERR_PTR(-EINVAL);
++	} 
+ 
+- err:
+-	mntput(mnt);
+-	return ERR_PTR(err);
++        return subtype;
+ }
+ 
++
+ /*
+  * add a mount into a namespace's mount tree
+  */
+@@ -2022,6 +2065,9 @@
+ 	struct vfsmount *mnt;
+ 	int err;
+ 
++        //Vince +
++        const char *subtype = NULL;
++
+ 	if (!fstype)
+ 		return -EINVAL;
+ 
+@@ -2043,10 +2089,24 @@
+ 		}
+ 	}
+ 
+-	mnt = vfs_kern_mount(type, flags, name, data);
+-	if (!IS_ERR(mnt) && (type->fs_flags & FS_HAS_SUBTYPE) &&
+-	    !mnt->mnt_sb->s_subtype)
+-		mnt = fs_set_subtype(mnt, fstype);
++        // Vince -
++	//mnt = vfs_kern_mount(type, flags, name, data);
++	//if (!IS_ERR(mnt) && (type->fs_flags & FS_HAS_SUBTYPE) &&
++	//    !mnt->mnt_sb->s_subtype)
++	//	mnt = fs_set_subtype(mnt, fstype);
++
++        // +
++        if (type->fs_flags & FS_HAS_SUBTYPE) {
++            subtype = fs_get_subtype(fstype);
++            if (IS_ERR(subtype)) {
++                put_filesystem(type);
++                return PTR_ERR(subtype);
++            }else if (!subtype)
++                subtype = "";
++
++        }
++        mnt = vfs_kern_mount_subtype(type, subtype, flags, name, data);
++        //end
+ 
+ 	put_filesystem(type);
+ 	if (IS_ERR(mnt))

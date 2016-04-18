@@ -1,0 +1,181 @@
+--- /kernel/security/selinux/hooks.c	2016-02-18 20:07:42.000000000 +0000
++++ hooks.c	2016-04-07 06:36:16.000000000 +0000
+@@ -97,6 +97,12 @@
+ #include "audit.h"
+ #include "avc_ss.h"
+ 
++// Vince
++#define SB_TYPE_FMT "%s%s%s"
++#define SB_SUBTYPE(sb) (sb->s_subtype && sb->s_subtype[0])
++#define SB_TYPE_ARGS(sb) sb->s_type->name, SB_SUBTYPE(sb) ? "." : "", SB_SUBTYPE(sb) ? sb->s_subtype : NULL
++//
++
+ #define NUM_SEL_MNT_OPTS 5
+ 
+ extern struct security_operations *security_ops;
+@@ -397,34 +403,56 @@
+ 		   the first boot of the SELinux kernel before we have
+ 		   assigned xattr values to the filesystem. */
+ 		if (!root_inode->i_op->getxattr) {
+-			printk(KERN_WARNING "SELinux: (dev %s, type %s) has no "
+-			       "xattr support\n", sb->s_id, sb->s_type->name);
++                        // Vince
++			//printk(KERN_WARNING "SELinux: (dev %s, type %s) has no "
++			//       "xattr support\n", sb->s_id, sb->s_type->name);
++
++                        printk(KERN_WARNING "SELinux: (dev %s, type "SB_TYPE_FMT") has no "
++			       "xattr support\n", sb->s_id, SB_TYPE_ARGS(sb));
++
+ 			rc = -EOPNOTSUPP;
+ 			goto out;
+ 		}
+ 		rc = root_inode->i_op->getxattr(root, XATTR_NAME_SELINUX, NULL, 0);
+ 		if (rc < 0 && rc != -ENODATA) {
+ 			if (rc == -EOPNOTSUPP)
++                                // Vince
+ 				printk(KERN_WARNING "SELinux: (dev %s, type "
+-				       "%s) has no security xattr handler\n",
+-				       sb->s_id, sb->s_type->name);
++				       //"%s) has no security xattr handler\n",
++				       //sb->s_id, sb->s_type->name);
++                                       SB_TYPE_FMT") has no security xattr handler\n",
++                                       sb->s_id, SB_TYPE_ARGS(sb));
+ 			else
++                                // Vince
+ 				printk(KERN_WARNING "SELinux: (dev %s, type "
+-				       "%s) getxattr errno %d\n", sb->s_id,
+-				       sb->s_type->name, -rc);
++				       //"%s) getxattr errno %d\n", sb->s_id,
++				       //sb->s_type->name, -rc);
++                                       SB_TYPE_FMT") getxattr errno %d\n", sb->s_id,
++                                       SB_TYPE_ARGS(sb), -rc);
+ 			goto out;
+ 		}
+ 	}
+ 
+ 	sbsec->flags |= (SE_SBINITIALIZED | SE_SBLABELSUPP);
+ 
++        
+ 	if (sbsec->behavior > ARRAY_SIZE(labeling_behaviors))
+-		printk(KERN_ERR "SELinux: initialized (dev %s, type %s), unknown behavior\n",
+-		       sb->s_id, sb->s_type->name);
++                // Vince 
++		//printk(KERN_ERR "SELinux: initialized (dev %s, type %s), unknown behavior\n",
++		       //sb->s_id, sb->s_type->name);
++                       //behavior\n", sb->s_id, SB_TYPE_ARGS(sb));
++                printk(KERN_ERR "SELinux: initialized (dev %s, type "
++                       SB_TYPE_FMT") unknown behavior\n", sb->s_id,
++                       SB_TYPE_ARGS(sb));
++
+ 	else
+-		printk(KERN_DEBUG "SELinux: initialized (dev %s, type %s), %s\n",
+-		       sb->s_id, sb->s_type->name,
+-		       labeling_behaviors[sbsec->behavior-1]);
++                // Vince
++		//printk(KERN_DEBUG "SELinux: initialized (dev %s, type %s), %s\n",
++		//       sb->s_id, sb->s_type->name,
++		//       labeling_behaviors[sbsec->behavior-1]);
++
++                printk(KERN_DEBUG "SELinux: initialized (dev %s, type "SB_TYPE_FMT"), %s\n", sb->s_id, SB_TYPE_ARGS(sb), labeling_behaviors[sbsec->behavior-1]);
++        
+ 
+ 	if (sbsec->behavior == SECURITY_FS_USE_GENFS ||
+ 	    sbsec->behavior == SECURITY_FS_USE_MNTPOINT ||
+@@ -590,7 +618,10 @@
+ 	const struct cred *cred = current_cred();
+ 	int rc = 0, i;
+ 	struct superblock_security_struct *sbsec = sb->s_security;
+-	const char *name = sb->s_type->name;
++
++        // Vince -
++	//const char *name = sb->s_type->name;
++
+ 	struct inode *inode = sbsec->sb->s_root->d_inode;
+ 	struct inode_security_struct *root_isec = inode->i_security;
+ 	u32 fscontext_sid = 0, context_sid = 0, rootcontext_sid = 0;
+@@ -643,8 +674,12 @@
+ 					     strlen(mount_options[i]), &sid);
+ 		if (rc) {
+ 			printk(KERN_WARNING "SELinux: security_context_to_sid"
+-			       "(%s) failed for (dev %s, type %s) errno=%d\n",
+-			       mount_options[i], sb->s_id, name, rc);
++                               // Vince
++			       //"(%s) failed for (dev %s, type %s) errno=%d\n",
++			       //mount_options[i], sb->s_id, name, rc);
++                               "(%s) failed for (dev %s, type "SB_TYPE_FMT") errno=%d\n",
++                               mount_options[i], sb->s_id, SB_TYPE_ARGS(sb), rc);
++
+ 			goto out;
+ 		}
+ 		switch (flags[i]) {
+@@ -709,11 +744,19 @@
+ 		sbsec->flags |= SE_SBGENFS;
+ 
+ 	/* Determine the labeling behavior to use for this filesystem type. */
+-	rc = security_fs_use((sbsec->flags & SE_SBPROC) ? "proc" : sb->s_type->name, &sbsec->behavior, &sbsec->sid);
+-	if (rc) {
+-		printk(KERN_WARNING "%s: security_fs_use(%s) returned %d\n",
+-		       __func__, sb->s_type->name, rc);
+-		goto out;
++	
++        // Vince
++        //rc = security_fs_use((sbsec->flags & SE_SBPROC) ? "proc" : sb->s_type->name, &sbsec->behavior, &sbsec->sid);
++        rc = security_fs_use((sbsec->flags & SE_SBPROC) ? "proc" : sb->s_type->name, SB_SUBTYPE(sb) ? sb->s_subtype : NULL, &sbsec->behavior, &sbsec->sid);	
++
++        if (rc) {
++                // Vince
++		//printk(KERN_WARNING "%s: security_fs_use(%s) returned %d\n",
++		//       __func__, sb->s_type->name, rc);
++		
++                printk(KERN_WARNING "%s: security_fs_use("SB_TYPE_FMT") returned %d\n",
++		       __func__, SB_TYPE_ARGS(sb), rc);
++                goto out;
+ 	}
+ 
+ 	/* sets the context of the superblock for the fs being mounted. */
+@@ -784,8 +827,12 @@
+ 	return rc;
+ out_double_mount:
+ 	rc = -EINVAL;
++        // Vince
+ 	printk(KERN_WARNING "SELinux: mount invalid.  Same superblock, different "
+-	       "security settings for (dev %s, type %s)\n", sb->s_id, name);
++	       //"security settings for (dev %s, type %s)\n", sb->s_id, name);
++               "security settings for (dev %s, type "SB_TYPE_FMT")\n", sb->s_id,
++               SB_TYPE_ARGS(sb));
++
+ 	goto out;
+ }
+ 
+@@ -2470,9 +2517,13 @@
+ 		len = strlen(mount_options[i]);
+ 		rc = security_context_to_sid(mount_options[i], len, &sid);
+ 		if (rc) {
++                        // Vince  
+ 			printk(KERN_WARNING "SELinux: security_context_to_sid"
+-			       "(%s) failed for (dev %s, type %s) errno=%d\n",
+-			       mount_options[i], sb->s_id, sb->s_type->name, rc);
++			       //"(%s) failed for (dev %s, type %s) errno=%d\n",
++			       //mount_options[i], sb->s_id, sb->s_type->name, rc);
++                               "(%s) failed for (dev %s, type "SB_TYPE_FMT") errno=%d\n",
++                               mount_options[i], sb->s_id, SB_TYPE_ARGS(sb), rc);
++
+ 			goto out_free_opts;
+ 		}
+ 		rc = -EINVAL;
+@@ -2509,9 +2560,13 @@
+ 	free_secdata(secdata);
+ 	return rc;
+ out_bad_option:
++        // Vince
+ 	printk(KERN_WARNING "SELinux: unable to change security options "
+-	       "during remount (dev %s, type=%s)\n", sb->s_id,
+-	       sb->s_type->name);
++	       //"during remount (dev %s, type=%s)\n", sb->s_id,
++	       //sb->s_type->name);
++               "during remount (dev %s, type "SB_TYPE_FMT")\n", sb->s_id,
++               SB_TYPE_ARGS(sb));
++             
+ 	goto out_free_opts;
+ }
+ 

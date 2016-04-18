@@ -1,0 +1,12 @@
+--- /system/vold/cryptfs.c	2016-04-07 06:40:14.810400806 +0000
++++ cryptfs.c	2016-04-07 06:36:16.000000000 +0000
+@@ -1880,6 +1880,9 @@
+             }
+         }
+ 
++        //Vince
++        property_set("vold.hopebay.hcfs.init", "1");
++
+         property_set("vold.decrypt", "trigger_load_persist_props");
+         /* Create necessary paths on /data */
+         if (prep_data_fs()) {
