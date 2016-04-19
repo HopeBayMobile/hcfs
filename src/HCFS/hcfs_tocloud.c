@@ -1155,6 +1155,7 @@ store in some other file */
 		struct stat metastat;
 		long long now_meta_size;
 
+		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
 			write_log(0, "Fail to fetch meta %"PRIu64" stat\n",

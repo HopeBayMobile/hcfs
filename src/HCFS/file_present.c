@@ -1565,13 +1565,6 @@ int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 			TRUE, data->progress_list_fd,
 			toupload_blocks);
 	} else {
-		/*if (data->finish_sync == TRUE) {
-			ret = update_upload_seq(meta_cache_entry);
-			if (ret < 0) {
-				errcode = ret;
-				goto errcode_handle;
-			}
-		}*/
 		ret = meta_cache_set_uploading_info(meta_cache_entry,
 			FALSE, 0, 0);
 	}
