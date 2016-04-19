@@ -1503,12 +1503,10 @@ TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
 		ll_dequeue(now_inode, &sb_entry);
-		printf("sb_entry.status is %d\n", sb_entry.status);
 		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
 
 		remaining_inode--;
-		printf("remaining inode is %d\n", remaining_inode);
 
 		// Check remaining inodes by traversing all list entry
 		ASSERT_EQ(remaining_inode, traverse_all_list_entry(TO_BE_DELETED));
@@ -2146,3 +2144,285 @@ TEST_F(pin_ll_dequeueTest, DequeueSuccess)
 }
 
 /* End of unittest for pin_ll_dequeue */
+
+/* Unittest for ll_rebuild_dirty */
+class ll_rebuild_dirtyTest : public InitSuperBlockBaseClass {
+protected:
+	char mocksb_path[500] = "testpatterns/mocksb_for_rebuild_dirty";
+
+	int reload_sb_head()
+	{
+
+		int fd = open(mocksb_path, O_RDONLY);
+		pread(fd, &(sys_super_block->head), sizeof(SUPER_BLOCK_HEAD), 0);
+		close(fd);
+		return 0;
+	}
+
+	void gen_test_sblist()
+	{
+		SUPER_BLOCK_HEAD head;
+		SUPER_BLOCK_ENTRY entry;
+		int ino = 2;
+
+		if (access(mocksb_path, F_OK) != -1)
+			unlink(mocksb_path);
+		sys_super_block->iofptr = open(mocksb_path, O_CREAT | O_RDWR, 0600);
+
+		/* SB head */
+		memset(&head, 0, sizeof(SUPER_BLOCK_HEAD));
+		write_super_block_head();
+
+		/* Create some dirty inode */
+		for (; ino < 15; ino++) {
+		        memset(&entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		        entry.this_index = ino;
+		        entry.status = NO_LL;
+		        ll_enqueue(ino, IS_DIRTY, &entry);
+		        write_super_block_entry(ino, &entry);
+		        write_super_block_head();
+		}
+
+		/* Create some inode with status NO_LL */
+		for (; ino < 20; ino++) {
+		        memset(&entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		        entry.this_index = ino;
+		        entry.status = NO_LL;
+		        write_super_block_entry(ino, &entry);
+		}
+	}
+
+	int inject_fault_enqueue(ino_t this_inode, int fault_loc)
+	{
+		int ret;
+		SUPER_BLOCK_ENTRY tempentry;
+
+		ret = read_super_block_entry(this_inode, &tempentry);
+
+		ret = ll_enqueue(this_inode, IS_DIRTY, &tempentry);
+		if (fault_loc == 1)
+			return -81;
+
+		ret = write_super_block_entry(this_inode, &tempentry);
+		if (fault_loc == 2)
+			return -82;
+
+		ret = write_super_block_head();
+
+		return 0;
+	}
+
+	int inject_fault_dequeue(ino_t this_inode, int fault_loc)
+	{
+		int ret;
+		SUPER_BLOCK_ENTRY tempentry;
+
+		ret = read_super_block_entry(this_inode, &tempentry);
+
+		ret = ll_dequeue(this_inode, &tempentry);
+		if (fault_loc == 1)
+			return -91;
+
+		ret = write_super_block_head();
+		if (fault_loc == 2)
+			return -92;
+
+		ret = write_super_block_entry(this_inode, &tempentry);
+		return 0;
+	}
+
+	int check_sblist_integrity()
+	{
+		SUPER_BLOCK_ENTRY entry1, entry2;
+		ino_t first, last;
+
+		first = sys_super_block->head.first_dirty_inode;
+		last = sys_super_block->head.last_dirty_inode;
+
+		/* traveral forward */
+		if ((first == 0 || last == 0) && first != last)
+			return 0;
+
+		/* traveling forward */
+		read_super_block_entry(first, &entry1);
+		if (entry1.util_ll_prev != 0)
+			return -1;
+
+		while (entry1.util_ll_next != 0) {
+			if (entry1.status != IS_DIRTY)
+				return -1;
+			read_super_block_entry(entry1.util_ll_next, &entry2);
+			if (entry2.util_ll_prev != entry1.this_index)
+				return -1;
+			entry1 = entry2;
+		}
+
+		if (entry2.this_index != last)
+			return -1;
+		return 0;
+	}
+};
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_empty_listSUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	sys_super_block->head.first_dirty_inode = 0;
+	sys_super_block->head.last_dirty_inode = 0;
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_noERR_listSUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_enqueueERR_listSUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-81, inject_fault_enqueue(16, 1));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_enqueueERR_list2SUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-82, inject_fault_enqueue(17, 2));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_first_entrySUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-91, inject_fault_dequeue(2, 1));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_first_entry2SUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-92, inject_fault_dequeue(2, 2));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_last_entrySUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-91, inject_fault_dequeue(14, 1));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_last_entry2SUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-92, inject_fault_dequeue(14, 2));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_multiple_dequeueERR_listSUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-91, inject_fault_dequeue(2, 1));
+	EXPECT_EQ(-91, inject_fault_dequeue(5, 1));
+	EXPECT_EQ(-92, inject_fault_dequeue(8, 2));
+	EXPECT_EQ(-92, inject_fault_dequeue(13, 2));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_mix_enqueueERR_dequeueERR_listSUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	EXPECT_EQ(-91, inject_fault_dequeue(2, 1));
+	EXPECT_EQ(-92, inject_fault_dequeue(8, 2));
+	EXPECT_EQ(-82, inject_fault_enqueue(15, 2));
+	reload_sb_head();
+
+	/* Test start */
+	ll_rebuild_dirty();
+
+	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+/* End for ll_rebuild_dirty */
