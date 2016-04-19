@@ -1207,10 +1207,8 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				ret = read_super_block_entry(tempentry.util_ll_prev, &tempentry2);
 				if (ret < 0)
 					return ret;
-
 				if (tempentry2.util_ll_next != sys_super_block->head.last_dirty_inode)
 					need_rebuild = TRUE;
-
 			}
 
 			if (need_rebuild) {
