@@ -10,14 +10,17 @@
 *
 **************************************************************************/
 
-#ifndef GW20_FUSEPROC_COMM_H_
-#define GW20_FUSEPROC_COMM_H_
 #include "fuseproc_comm.h"
 
 #include <errno.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <inttypes.h>
 #include <time.h>
+
+#include "atomic_tocloud.h"
+#include "file_present.h"
+#include "macro.h"
 
 /************************************************************************
 *
@@ -168,4 +171,3 @@ int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd)
 errcode_handle:
 	return errcode;
 }
-#endif

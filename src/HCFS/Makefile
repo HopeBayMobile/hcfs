@@ -44,7 +44,8 @@ OBJS_F := objmeta.o \
 	parent_lookup.o \
 	atomic_tocloud.o \
 	tocloud_tools.o \
-	do_fallocate.o
+	do_fallocate.o \
+	fuseproc_comm.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 hcfs: $(OBJS)
