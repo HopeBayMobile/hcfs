@@ -18,6 +18,7 @@
 **************************************************************************/
 
 /* TODO: Will need to remove parent update from actual_delete_inode */
+/* TODO: Revert ops for partially updated stats / meta */
 
 #include "file_present.h"
 
