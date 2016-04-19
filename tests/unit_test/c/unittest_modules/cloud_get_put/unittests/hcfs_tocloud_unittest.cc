@@ -321,7 +321,7 @@ TEST_F(init_upload_controlTest, DoNothing_JustRun)
 TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 {
 	void *res;
-	int num_block_entry = 80;
+	int num_block_entry = 50;
 	BLOCK_ENTRY_PAGE mock_block_page;
 	FILE *mock_file_meta;
 
@@ -932,11 +932,15 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	metaptr = fopen(metapath, "r+");
 	fseek(metaptr, sizeof(struct stat), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
+	fseek(metaptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA),
+			SEEK_SET);
 	while (!feof(metaptr)) {
 		/* Linearly read block meta */
 		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); 
 		for (int i = 0 ; i < block_page.num_entries ; i++) {
-			ASSERT_EQ(ST_NONE, block_page.block_entries[i].status);
+			ASSERT_EQ(ST_NONE, block_page.block_entries[i].status)
+					<< "i = " << i;
 		}
 	}
 	fclose(metaptr);

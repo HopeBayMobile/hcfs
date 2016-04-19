@@ -840,8 +840,8 @@ static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		write_log(10, "Debug: block_%lld is %s\n", block_count,
 				toupload_block_status == ST_NONE ?
 				"ST_NONE" : "ST_TODELETE");
-
 		if (local_block_status == ST_TODELETE) {
+			write_log(10, "Debug: change ST_TODELETE to ST_NONE\n");
 			memset(tmp_entry, 0, sizeof(BLOCK_ENTRY));
 			tmp_entry->status = ST_NONE;
 			FSEEK(local_metafptr, *page_pos, SEEK_SET);
@@ -849,12 +849,11 @@ static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 					1, local_metafptr);
 		}
 
-		flock(fileno(local_metafptr), LOCK_UN);
-
 		finish_uploading = TRUE;
 		toupload_exist = FALSE;
 		set_progress_info(ptr->progress_fd, block_count,
 			&toupload_exist, NULL, NULL, NULL, &finish_uploading);
+		flock(fileno(local_metafptr), LOCK_UN);
 
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
 				block_count, toupload_block_seq);
@@ -866,7 +865,6 @@ static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	default:
 		write_log(10, "Debug: block_%lld is %d\n", block_count,
 				toupload_block_status);
-		flock(fileno(local_metafptr), LOCK_UN);
 
 		finish_uploading = TRUE;
 		toupload_exist = TRUE;
@@ -879,6 +877,7 @@ static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 			&toupload_exist, NULL, &toupload_block_seq, NULL,
 			&finish_uploading);
 #endif
+		flock(fileno(local_metafptr), LOCK_UN);
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
 			block_count, toupload_block_seq);
 		if (access(toupload_bpath, F_OK) == 0)

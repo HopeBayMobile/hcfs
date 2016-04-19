@@ -362,6 +362,29 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 int change_block_status_to_BOTH(ino_t inode, long long blockno,
 		long long page_pos, long long toupload_seq)
 {
+	FILE *fptr;
+	BLOCK_ENTRY_PAGE tmppage;
+	int i;
+
+	i = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	if (page_pos <= 0)
+		return 0;
+
+	fptr = fopen(MOCK_META_PATH, "r+");
+	if (!fptr)
+		return 0;
+	setbuf(fptr, NULL);
+	flock(fptr, LOCK_EX);
+	fseek(fptr, page_pos, SEEK_SET);
+	fread(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	if (tmppage.block_entries[i].status == ST_LtoC)
+		tmppage.block_entries[i].status = ST_BOTH;
+	fseek(fptr, page_pos, SEEK_SET);
+	fwrite(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	flock(fptr, LOCK_UN);
+	fclose(fptr);
+
 	return 0;
 }
 
