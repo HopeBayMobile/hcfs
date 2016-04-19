@@ -2394,8 +2394,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_multiple_dequeueERR_listSUCCESS)
 	/* Gen mock data for test */
 	gen_test_sblist();
 	EXPECT_EQ(-91, inject_fault_dequeue(2, 1));
-	EXPECT_EQ(-91, inject_fault_dequeue(5, 1));
-	EXPECT_EQ(-92, inject_fault_dequeue(8, 2));
+	reload_sb_head();
 	EXPECT_EQ(-92, inject_fault_dequeue(13, 2));
 	reload_sb_head();
 
@@ -2413,7 +2412,9 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_mix_enqueueERR_dequeueERR_listSUCCESS)
 	/* Gen mock data for test */
 	gen_test_sblist();
 	EXPECT_EQ(-91, inject_fault_dequeue(2, 1));
+	reload_sb_head();
 	EXPECT_EQ(-92, inject_fault_dequeue(8, 2));
+	reload_sb_head();
 	EXPECT_EQ(-82, inject_fault_enqueue(15, 2));
 	reload_sb_head();
 
