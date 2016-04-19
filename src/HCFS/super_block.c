@@ -1061,10 +1061,12 @@ ino_t super_block_new_inode(struct stat *in_stat,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int ll_rebuild_dirty()
+int ll_rebuild_dirty(void)
 {
 	int ret;
 	SUPER_BLOCK_ENTRY entry1, entry2;
+
+	write_log(0, "Start to rebuild dirty inode linked list.\n");
 
 	/* Traveling forward dirty linked list */
 	ret = read_super_block_entry(sys_super_block->head.first_dirty_inode, &entry1);
@@ -1075,7 +1077,6 @@ int ll_rebuild_dirty()
 		ret = write_super_block_entry(entry1.this_index, &entry1);
 		if (ret < 0)
 			return ret;
-
 	}
 
 	while (entry1.util_ll_next != 0) {
@@ -1132,6 +1133,7 @@ int ll_rebuild_dirty()
 		}
 	}
 
+	write_log(0, "Finish rebuilding dirty linked list.\n");
 	return 0;
 }
 
@@ -1212,6 +1214,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			}
 
 			if (need_rebuild) {
+				write_log(0, "Detect corrupted dirty inode linked list in %s.\n", __func__);
 				ret = ll_rebuild_dirty();
 				if (ret < 0)
 					return ret;
@@ -1326,32 +1329,29 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 	if (old_which_ll == IS_DIRTY) {
 		/* Need to check if the dirty linked list in superblock was currpted */
 		if (this_entry->util_ll_next == 0) {
-			if (sys_super_block->head.last_dirty_inode != thisinode) {
+			if (sys_super_block->head.last_dirty_inode != thisinode)
 				need_rebuild = TRUE;
-			}
 		} else {
 			ret = read_super_block_entry(this_entry->util_ll_next, &next);
 			if (ret < 0)
 				return ret;
-			if (next.util_ll_prev != thisinode) {
+			if (next.util_ll_prev != thisinode)
 				need_rebuild = TRUE;
-			}
 		}
 
 		if (this_entry->util_ll_prev == 0) {
-			if (sys_super_block->head.first_dirty_inode != thisinode) {
+			if (sys_super_block->head.first_dirty_inode != thisinode)
 				need_rebuild = TRUE;
-			}
 		} else {
 			ret = read_super_block_entry(this_entry->util_ll_prev, &prev);
 			if (ret < 0)
 				return ret;
-			if (prev.util_ll_next != thisinode) {
+			if (prev.util_ll_next != thisinode)
 				need_rebuild = TRUE;
-			}
 		}
 
 		if (need_rebuild) {
+			write_log(0, "Detect corrupted dirty inode linked list in %s.\n", __func__);
 			ret = ll_rebuild_dirty();
 			if (ret < 0)
 				return ret;
