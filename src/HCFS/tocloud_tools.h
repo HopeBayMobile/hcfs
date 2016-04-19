@@ -22,13 +22,8 @@
 int change_block_status_to_BOTH(ino_t inode, long long blockno,
 		long long page_pos, long long toupload_seq);
 
-//int change_status_to_BOTH(ino_t inode, int progress_fd,
-//		FILE *local_metafptr, char *local_metapath);
-
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		char delete_which_one);
 
 void busy_wait_all_specified_upload_threads(ino_t inode);
 
-//int revert_block_status_LDISK(ino_t this_inode, long long blockno,
-//		int e_index, long long page_filepos);
