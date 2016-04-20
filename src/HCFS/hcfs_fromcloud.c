@@ -105,6 +105,8 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 		if (status == 404) {
 			errcode = -ENOENT;
 		} else {
+			write_log(4, "Warn: http code %d when get %s\n", status,
+				objname);
 			errcode = -EIO;
 		}
 		free_object_meta(object_meta);
