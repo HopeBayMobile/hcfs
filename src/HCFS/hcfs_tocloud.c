@@ -1268,8 +1268,9 @@ store in some other file */
 		sem_post(&(upload_ctl.upload_queue_sem));
 
 		/* Delete those uploaded blocks if local meta is removed */
-		delete_backend_blocks(progress_fd, total_blocks,
-			ptr->inode, DEL_TOUPLOAD_BLOCKS);
+		if (S_ISREG(ptr->this_mode))
+			delete_backend_blocks(progress_fd, total_blocks,
+					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;

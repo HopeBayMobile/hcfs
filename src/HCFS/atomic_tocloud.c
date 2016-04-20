@@ -742,6 +742,7 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 
 int fetch_backend_meta_path(char *pathname, ino_t inode)
 {
+	/*
 	char path[200];
 	int errcode;
 	int ret;
@@ -750,13 +751,13 @@ int fetch_backend_meta_path(char *pathname, ino_t inode)
 
 	if (access(path, F_OK) == -1)
 		MKDIR(path, 0700);
-
-	sprintf(pathname, "%s/hcfs_backend_meta_%"PRIu64".tmp",
-			path, (uint64_t)inode);
+	*/
+	sprintf(pathname, "/tmp/hcfs_backend_meta_%"PRIu64".tmp",
+			(uint64_t)inode);
 	return 0;
 
-errcode_handle:
-	return errcode;
+/*errcode_handle:
+	return errcode;*/
 }
 
 void fetch_del_backend_meta_path(char *pathname, ino_t inode)
@@ -1035,7 +1036,7 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 				fclose(backend_metafptr);
 				unlink(backend_metapath);
 			} else { /* fetch error */
-				write_log(0, "Fail to donwload %s in %s\n",
+				write_log(0, "Fail to download %s in %s\n",
 					objname, __func__);
 				fclose(backend_metafptr);
 				/* Be careful with using macro UNLINK */

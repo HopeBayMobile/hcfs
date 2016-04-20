@@ -287,11 +287,6 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 				"Cannot revert", (uint64_t)this_inode, blockno);
 		return -ECANCELED;
 	case ST_BOTH:
-	case ST_LtoC:
-		bentry_page.block_entries[eindex].status = ST_LDISK;
-		PWRITE(fileno(local_metafptr), &bentry_page,
-				sizeof(BLOCK_ENTRY_PAGE), page_pos);
-
 		/* Recover dirty size */
 		fetch_block_path(blockpath, this_inode, blockno);
 		ret = set_block_dirty_status(blockpath, NULL, TRUE);
@@ -300,8 +295,13 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 					" status in %s\n", __func__);
 		}
 		cache_block_size = check_file_size(blockpath);
-		flock(fileno(local_metafptr), LOCK_UN);
 		change_system_meta(0, 0, 0, 0, cache_block_size);
+		/* Keep running following code */
+	case ST_LtoC:
+		bentry_page.block_entries[eindex].status = ST_LDISK;
+		PWRITE(fileno(local_metafptr), &bentry_page,
+				sizeof(BLOCK_ENTRY_PAGE), page_pos);
+		flock(fileno(local_metafptr), LOCK_UN);
 		write_log(10, "Debug: block_%"PRIu64"_%lld is reverted"
 				" to ST_LDISK", (uint64_t)this_inode, blockno);
 		break;
