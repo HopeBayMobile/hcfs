@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: filetables.c
 * Abstract: The c source code file for file table managing.
@@ -9,6 +9,7 @@
 * 2015/2/10 ~ 11 Jiahong added header for this file, and revising coding style.
 * 2015/2/11  Jiahong moved "seek_page" and "advance_block" to metaops
 * 2015/6/2  Jiahong added error handling
+* 2016/4/20 Jiahong adding operations for dir handle table
 *
 **************************************************************************/
 
@@ -38,11 +39,11 @@ int init_system_fh_table(void)
 {
 	memset(&system_fh_table, 0, sizeof(FH_TABLE_TYPE));
 	/* Init entry_table_flag*/
-	system_fh_table.entry_table_flags = malloc(sizeof(char) *
+	system_fh_table.entry_table_flags = malloc(sizeof(uint8_t) *
 							MAX_OPEN_FILE_ENTRIES);
 	if (system_fh_table.entry_table_flags == NULL)
 		return -ENOMEM;
-	memset(system_fh_table.entry_table_flags, 0, sizeof(char) *
+	memset(system_fh_table.entry_table_flags, 0, sizeof(uint8_t) *
 							MAX_OPEN_FILE_ENTRIES);
 	/* Init entry_table*/
 	system_fh_table.entry_table = malloc(sizeof(FH_ENTRY) *
@@ -54,6 +55,17 @@ int init_system_fh_table(void)
 	memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) *
 							MAX_OPEN_FILE_ENTRIES);
 
+	/* Init dir entry_table*/
+	system_fh_table.direntry_table = malloc(sizeof(DIRH_ENTRY) *
+							MAX_OPEN_FILE_ENTRIES);
+	if (system_fh_table.direntry_table == NULL) {
+		free(system_fh_table.entry_table_flags);
+		free(system_fh_table.entry_table);
+		return -ENOMEM;
+	}
+	memset(system_fh_table.direntry_table, 0, sizeof(DIRH_ENTRY) *
+							MAX_OPEN_FILE_ENTRIES);
+
 	system_fh_table.last_available_index = 0;
 
 	sem_init(&(system_fh_table.fh_table_sem), 0, 1);
@@ -63,14 +75,16 @@ int init_system_fh_table(void)
 /************************************************************************
 *
 * Function name: open_fh
-*        Inputs: ino_t thisinode, int flags
+*        Inputs: ino_t thisinode, int flags, BOOL isdir
 *       Summary: Allocate a file handle for inode number "thisinode".
 *                Also record the file opening flag from "flags".
+*                If "isdir" is true, the handle to open is a directory
+*                instead of a regular file.
 *  Return value: Index of file handle if successful. Otherwise returns
 *                negation of error code.
 *
 *************************************************************************/
-long long open_fh(ino_t thisinode, int flags)
+long long open_fh(ino_t thisinode, int flags, BOOL isdir)
 {
 	long long index;
 
@@ -83,22 +97,29 @@ long long open_fh(ino_t thisinode, int flags)
 	}
 
 	index = system_fh_table.last_available_index % MAX_OPEN_FILE_ENTRIES;
-	while (system_fh_table.entry_table_flags[index] == TRUE) {
+	while (system_fh_table.entry_table_flags[index] != NO_FH) {
 		index++;
 		index = index % MAX_OPEN_FILE_ENTRIES;
 	}
 
-	system_fh_table.entry_table_flags[index] = TRUE;
-	system_fh_table.entry_table[index].meta_cache_ptr = NULL;
-	system_fh_table.entry_table[index].meta_cache_locked = FALSE;
-	system_fh_table.entry_table[index].thisinode = thisinode;
-	system_fh_table.entry_table[index].flags = flags;
+	if (isdir) {
+		system_fh_table.entry_table_flags[index] = IS_DIRH;
+		system_fh_table.direntry_table[index].thisinode = thisinode;
+		system_fh_table.direntry_table[index].flags = flags;
+		system_fh_table.direntry_table[index].snapshot_ptr = NULL;
+	} else {
+		system_fh_table.entry_table_flags[index] = IS_FH;
+		system_fh_table.entry_table[index].meta_cache_ptr = NULL;
+		system_fh_table.entry_table[index].meta_cache_locked = FALSE;
+		system_fh_table.entry_table[index].thisinode = thisinode;
+		system_fh_table.entry_table[index].flags = flags;
 
-	system_fh_table.entry_table[index].blockfptr = NULL;
-	system_fh_table.entry_table[index].opened_block = -1;
-	system_fh_table.entry_table[index].cached_page_index = -1;
-	system_fh_table.entry_table[index].cached_filepos = -1;
-	sem_init(&(system_fh_table.entry_table[index].block_sem), 0, 1);
+		system_fh_table.entry_table[index].blockfptr = NULL;
+		system_fh_table.entry_table[index].opened_block = -1;
+		system_fh_table.entry_table[index].cached_page_index = -1;
+		system_fh_table.entry_table[index].cached_filepos = -1;
+		sem_init(&(system_fh_table.entry_table[index].block_sem), 0, 1);
+	}
 
 	system_fh_table.num_opened_files++;
 	sem_post(&(system_fh_table.fh_table_sem));
@@ -116,11 +137,12 @@ long long open_fh(ino_t thisinode, int flags)
 int close_fh(long long index)
 {
 	FH_ENTRY *tmp_entry;
+	DIRH_ENTRY *tmp_DIRH_entry;
 
 	sem_wait(&(system_fh_table.fh_table_sem));
 
-	tmp_entry = &(system_fh_table.entry_table[index]);
-	if (system_fh_table.entry_table_flags[index] == TRUE) {
+	if (system_fh_table.entry_table_flags[index] == IS_FH) {
+		tmp_entry = &(system_fh_table.entry_table[index]);
 		if (tmp_entry->meta_cache_locked == FALSE) {
 			tmp_entry->meta_cache_ptr =
 				meta_cache_lock_entry(tmp_entry->thisinode);
@@ -135,7 +157,7 @@ int close_fh(long long index)
 		tmp_entry->meta_cache_locked = FALSE;
 		meta_cache_unlock_entry(tmp_entry->meta_cache_ptr);
 
-		system_fh_table.entry_table_flags[index] = FALSE;
+		system_fh_table.entry_table_flags[index] = NO_FH;
 		tmp_entry->thisinode = 0;
 
 		if ((tmp_entry->blockfptr != NULL) &&
@@ -147,6 +169,17 @@ int close_fh(long long index)
 		tmp_entry->opened_block = -1;
 		sem_destroy(&(tmp_entry->block_sem));
 		system_fh_table.last_available_index = index;
+	} else if (system_fh_table.entry_table_flags[index] == IS_DIRH) {
+		tmp_DIRH_entry = &(system_fh_table.direntry_table[index]);
+
+		if (tmp_DIRH_entry->snapshot_ptr != NULL) {
+			fclose(tmp_DIRH_entry->snapshot_ptr);
+			tmp_DIRH_entry->snapshot_ptr = NULL;
+		}
+		system_fh_table.entry_table_flags[index] = NO_FH;
+		tmp_DIRH_entry->thisinode = 0;
+
+		system_fh_table.last_available_index = index;
 	} else {
 		sem_post(&(system_fh_table.fh_table_sem));
 		return -1;
@@ -156,3 +189,52 @@ int close_fh(long long index)
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: handle_dirmeta_snapshot
+*        Inputs: ino_t thisinode
+*       Summary: Scans filetable and create snapshot of meta for inode
+*                "thisinode". "metafptr" points to the file stream
+*                of the source meta file.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
+{
+	int count;
+	DIRH_ENTRY *tmp_entry;
+	BOOL snap_created;
+	char snap_name[METAPATHLEN + 1];
+	int64_t ret_pos;
+	int32_t errcode;
+
+	snap_created = FALSE;
+	sem_wait(&(system_fh_table.fh_table_sem));
+	snprintf(snap_name, METAPATHLEN, "%s/tmp_dirmeta_snap", METAPATH);
+
+	for (count = 0; count < MAX_OPEN_FILE_ENTRIES; count++) {
+		if (system_fh_table.entry_table_flags[index] == IS_DIRH) {
+			tmp_entry = &(system_fh_table.direntry_table[count]);
+			if ((tmp_entry->thisinode == thisinode) &&
+			    (snap_created == FALSE)) {
+				/* Create snapshot */
+				if (access(snap_name, F_OK) == 0)
+					UNLINK(snap_name);
+				flock(fileno(metafptr), LOCK_EX);
+				FTELL(metafptr);
+				/* TODO: Add in snapshot routine */
+
+				FSEEK(metafptr, 0, ret_pos);
+				flock(fileno(metafptr), LOCK_UN);
+				snap_created = TRUE;
+			}
+	}
+
+	if (snap_created)
+		unlink(snap_name);
+	sem_post(&(system_fh_table.fh_table_sem));
+	return 0;
+errcode_handle:
+	sem_post(&(system_fh_table.fh_table_sem));
+	return errcode;
+}

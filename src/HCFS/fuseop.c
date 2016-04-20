@@ -30,6 +30,7 @@
 * 2016/3/17 Jiahong modified permission checking to add capability check
 * 2016/3/22 Jiahong lifted truncate permission check in Android
 *           Let SELinux do the work here.
+* 2016/4/20 Jiahong adding dir handle operations to opendir / closedir
 *
 **************************************************************************/
 
@@ -3090,7 +3091,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		}
 	}
 
-	fh = open_fh(thisinode, file_flags);
+	fh = open_fh(thisinode, file_flags, FALSE);
 	if (fh < 0) {
 		fuse_reply_err(req, ENFILE);
 		return;
@@ -3625,7 +3626,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 
 	thisinode = real_ino(req, ino);
 
-	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
+	if (system_fh_table.entry_table_flags[file_info->fh] != IS_FH) {
 		fuse_reply_err(req, EBADF);
 		return;
 	}
@@ -4307,7 +4308,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	thisinode = real_ino(req, ino);
 
-	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
+	if (system_fh_table.entry_table_flags[file_info->fh] != IS_FH) {
 		fuse_reply_err(req, EBADF);
 		return;
 	}
@@ -4666,7 +4667,7 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
+	if (system_fh_table.entry_table_flags[file_info->fh] != IS_FH) {
 		fuse_reply_err(req, EBADF);
 		return;
 	}
@@ -4717,6 +4718,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	struct stat this_stat;
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
+	long long dirh;
 
 	thisinode = real_ino(req, ino);
 
@@ -4751,6 +4753,14 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	dirh = open_fh(thisinode, 0, TRUE);
+	if (dirh < 0) {
+		fuse_reply_err(req, ENFILE);
+		return;
+	}
+
+	file_info->fh = dirh;
 
 	fuse_reply_open(req, file_info);
 }
@@ -4953,7 +4963,7 @@ errcode_handle:
 * Function name: hfuse_ll_releasedir
 *        Inputs: fuse_req_t req, fuse_ino_t ino,
 *                struct fuse_file_info *file_info
-*       Summary: Close opened directory. Do nothing now.
+*       Summary: Close opened directory.
 *
 *************************************************************************/
 void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
@@ -4961,9 +4971,25 @@ void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
 {
 	ino_t thisinode;
 
-	UNUSED(file_info);
 	thisinode = real_ino(req, ino);
-	UNUSED(thisinode);
+
+	if (file_info->fh >= MAX_OPEN_FILE_ENTRIES) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	if (system_fh_table.entry_table_flags[file_info->fh] != IS_DIRH) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	if (system_fh_table.entry_table[file_info->fh].thisinode
+					!= thisinode) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	close_fh(file_info->fh);
 
 	fuse_reply_err(req, 0);
 }
@@ -5131,7 +5157,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		/* If opened file, check file table first */
 		if (file_info != NULL) {
 			if (system_fh_table.entry_table_flags[file_info->fh]
-			    == FALSE)
+			    != IS_FH)
 				goto continue_check;
 
 			fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
@@ -6601,7 +6627,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	/* In create operation, flag is O_WRONLY when opening */
 	file_flags = fi->flags;
-	fh = open_fh(self_inode, file_flags);
+	fh = open_fh(self_inode, file_flags, FALSE);
 	if (fh < 0) {
 		fuse_reply_err(req, ENFILE);
 		return;
