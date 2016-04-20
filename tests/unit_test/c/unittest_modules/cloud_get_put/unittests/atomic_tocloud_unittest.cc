@@ -1297,7 +1297,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FirstUpload)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks);
+			&total_backend_blocks, 0);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1334,7 +1334,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FailToFetchFromCloud)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks);
+			&total_backend_blocks, 1);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1369,7 +1369,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_NotFirstUpload)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks);
+			&total_backend_blocks, 1);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1409,7 +1409,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_FinishInit)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks);
+			&total_backend_blocks, 1);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1447,7 +1447,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_NotFinishInit)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks);
+			&total_backend_blocks, 1);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);

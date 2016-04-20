@@ -937,6 +937,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	char is_revert;
 	long long meta_size_diff;
 	long long upload_seq;
+	CLOUD_RELATED_DATA cloud_related_data;
+	long long pos;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -993,8 +995,14 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		/* First download backend meta and init backend block info in
 		 * upload progress file. If it is revert mode now, then
 		 * just read progress meta. */
+		pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+				sizeof(FILE_STATS_TYPE);
+		FSEEK(toupload_metafptr, pos, SEEK_SET);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+				1, toupload_metafptr);
 		ret = init_backend_file_info(ptr, &backend_size,
-				&total_backend_blocks);
+				&total_backend_blocks,
+				cloud_related_data.upload_seq);
 		if (ret < 0) {
 			fclose(toupload_metafptr);
 			fclose(local_metafptr);
@@ -1150,8 +1158,6 @@ store in some other file */
 	flock(fileno(local_metafptr), LOCK_EX);
 
 	if (!access(local_metapath, F_OK)) {
-		CLOUD_RELATED_DATA cloud_related_data;
-		long long pos;
 		struct stat metastat;
 		long long now_meta_size;
 

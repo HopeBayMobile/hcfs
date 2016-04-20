@@ -281,7 +281,7 @@ long long query_status_page(int fd, long long block_index)
 }
 
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
-		long long *total_backend_blocks)
+		long long *total_backend_blocks, long long upload_seq)
 {
 	return 0;
 }

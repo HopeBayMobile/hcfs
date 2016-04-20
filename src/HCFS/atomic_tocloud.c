@@ -992,7 +992,7 @@ errcode_handle:
  *         or other negative error code.
  */
 int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
-		long long *total_backend_blocks)
+		long long *total_backend_blocks, long long upload_seq)
 {
 	FILE *backend_metafptr;
 	char backend_metapath[400];
@@ -1024,7 +1024,15 @@ int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
 				progress_meta.total_backend_blocks;
 		}
 
-	} else {	
+	} else {
+
+		if (upload_seq <= 0) {
+			ret = init_progress_info(ptr->progress_fd, 0, 0, NULL);
+			*backend_size = 0;
+			*total_backend_blocks = 0;
+			return 0;
+		}
+
 		/* Try to download backend meta */
 		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, ptr->inode);
