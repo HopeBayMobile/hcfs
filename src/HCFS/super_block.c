@@ -348,17 +348,15 @@ int super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 			super_block_exclusive_release();
 			return ret_val;
 		}
+		ret_val = write_super_block_head();
+		if (ret_val < 0) {
+			super_block_exclusive_release();
+			return ret_val;
+		}
 	}
 	if (inode_ptr->in_transit == TRUE)
 		inode_ptr->mod_after_in_transit = TRUE;
-
 	ret_val = write_super_block_entry(this_inode, inode_ptr);
-	if (ret_val < 0) {
-		super_block_exclusive_release();
-		return ret_val;
-	}
-
-	ret_val = write_super_block_head();
 
 	super_block_exclusive_release();
 
@@ -395,6 +393,11 @@ int super_block_update_stat(ino_t this_inode, struct stat *newstat)
 				super_block_exclusive_release();
 				return ret_val;
 			}
+			ret_val = write_super_block_head();
+			if (ret_val < 0) {
+				super_block_exclusive_release();
+				return ret_val;
+			}
 		}
 		if (tempentry.in_transit == TRUE)
 			tempentry.mod_after_in_transit = TRUE;
@@ -402,12 +405,6 @@ int super_block_update_stat(ino_t this_inode, struct stat *newstat)
 		memcpy(&(tempentry.inode_stat), newstat, sizeof(struct stat));
 		/* Write the updated content back */
 		ret_val = write_super_block_entry(this_inode, &tempentry);
-		if (ret_val < 0) {
-			super_block_exclusive_release();
-			return ret_val;
-		}
-
-		ret_val = write_super_block_head();
 	}
 	super_block_exclusive_release();
 
@@ -441,6 +438,11 @@ int super_block_mark_dirty(ino_t this_inode)
 				super_block_exclusive_release();
 				return ret_val;
 			}
+			ret_val = write_super_block_head();
+			if (ret_val < 0) {
+				super_block_exclusive_release();
+				return ret_val;
+			}
 			need_write = TRUE;
 		} else if (tempentry.status == IS_DIRTY) {
 			/* When marking dirty again, just update
@@ -466,11 +468,6 @@ int super_block_mark_dirty(ino_t this_inode)
 		if (need_write == TRUE)
 			ret_val = write_super_block_entry(this_inode,
 								&tempentry);
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
-			}
-			ret_val = write_super_block_head();
 	}
 	super_block_exclusive_release();
 
@@ -563,16 +560,16 @@ int super_block_to_delete(ino_t this_inode)
 				return ret_val;
 			}
 		}
-		sys_super_block->head.num_active_inodes--;
-		ret_val = write_super_block_head();
+		tempentry.in_transit = FALSE;
+		tempmode = tempentry.inode_stat.st_mode;
+		memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
+		tempentry.inode_stat.st_mode = tempmode;
+		tempentry.pin_status = ST_DEL;
+		ret_val = write_super_block_entry(this_inode, &tempentry);
 
 		if (ret_val >= 0) {
-			tempentry.in_transit = FALSE;
-			tempmode = tempentry.inode_stat.st_mode;
-			memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
-			tempentry.inode_stat.st_mode = tempmode;
-			tempentry.pin_status = ST_DEL;
-			ret_val = write_super_block_entry(this_inode, &tempentry);
+			sys_super_block->head.num_active_inodes--;
+			ret_val = write_super_block_head();
 		}
 	}
 	super_block_exclusive_release();
@@ -1053,92 +1050,6 @@ ino_t super_block_new_inode(struct stat *in_stat,
 
 /************************************************************************
 *
-* Function name: ll_rebuild_dirty
-*        Inputs: None
-*       Summary: To traveling dirty linked list and rebuild if corrupted.
-*                First look forward to fix error previous pointers.
-*                Then look backward to fix error next pointers.
-*  Return value: 0 if successful. Otherwise returns negation of error code.
-*
-*************************************************************************/
-int ll_rebuild_dirty(void)
-{
-	int ret;
-	SUPER_BLOCK_ENTRY entry1, entry2;
-
-	write_log(0, "Start to rebuild dirty inode linked list.\n");
-
-	/* Traveling forward dirty linked list */
-	ret = read_super_block_entry(sys_super_block->head.first_dirty_inode, &entry1);
-	if (ret < 0)
-		return ret;
-	if (entry1.util_ll_prev != 0) {
-		entry1.util_ll_prev = 0;
-		ret = write_super_block_entry(entry1.this_index, &entry1);
-		if (ret < 0)
-			return ret;
-	}
-
-	while (entry1.util_ll_next != 0) {
-		ret = read_super_block_entry(entry1.util_ll_next, &entry2);
-		if (ret < 0)
-			return ret;
-
-		if (entry2.util_ll_prev != entry1.this_index) {
-			/* Need to fix corrupted link */
-			entry2.util_ll_prev = entry1.this_index;
-			ret = write_super_block_entry(entry2.this_index, &entry2);
-			if (ret < 0)
-				return ret;
-		}
-
-		entry1 = entry2;
-	}
-
-	/* Traveling backward the dirty linked list */
-	ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &entry1);
-	if (ret < 0)
-		return ret;
-	if (entry1.util_ll_next != 0) {
-		/* First check if there was an interrupted enqueue operation */
-		SUPER_BLOCK_ENTRY tempentry;
-		ret = read_super_block_entry(entry1.util_ll_next, &tempentry);
-			if (ret < 0)
-				return ret;
-
-		tempentry.status = IS_DIRTY;
-		tempentry.util_ll_next = 0;
-		tempentry.util_ll_prev = entry1.this_index;
-
-		ret = write_super_block_entry(tempentry.this_index, &tempentry);
-		if (ret < 0)
-			return ret;
-
-		sys_super_block->head.last_dirty_inode = tempentry.this_index;
-		sys_super_block->head.num_dirty += 1;
-		ret = write_super_block_head();
-		if (ret < 0)
-			return ret;
-
-	} else if (entry1.util_ll_prev != 0) {
-		ret = read_super_block_entry(entry1.util_ll_prev, &entry2);
-		if (ret < 0)
-			return ret;
-		if (entry2.util_ll_next != entry1.this_index) {
-			/* Need to fix corrupted link */
-			entry2.util_ll_next = entry1.this_index;
-			ret = write_super_block_entry(entry2.this_index, &entry2);
-			if (ret < 0)
-				return ret;
-		}
-	}
-
-	write_log(0, "Finish rebuilding dirty linked list.\n");
-	return 0;
-}
-
-/************************************************************************
-*
 * Function name: ll_enqueue
 *        Inputs: ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 *       Summary: Enqueue super block entry "this_entry" (with inode number
@@ -1150,11 +1061,10 @@ int ll_rebuild_dirty(void)
 *************************************************************************/
 int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 {
-	SUPER_BLOCK_ENTRY tempentry, tempentry2;
+	SUPER_BLOCK_ENTRY tempentry;
 	int ret, errcode;
 	ssize_t retsize;
 	long long now_meta_size, dirty_delta_meta_size;
-	int need_rebuild;
 
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */
@@ -1193,48 +1103,41 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
 		} else {
-			ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &tempentry);
-			if (ret < 0)
-				return ret;
-
-			need_rebuild = FALSE;
-			/* To check if the superblock was corrupted, and try to fix it. */
-			if (tempentry.util_ll_next != 0)
-				need_rebuild = TRUE;
-
-			if (!need_rebuild && tempentry.util_ll_prev != 0) {
-				/* Need to check the second last entry too */
-				ret = read_super_block_entry(tempentry.util_ll_prev, &tempentry2);
-				if (ret < 0)
-					return ret;
-				if (tempentry2.util_ll_next != sys_super_block->head.last_dirty_inode)
-					need_rebuild = TRUE;
-			}
-
-			if (need_rebuild) {
-				write_log(0, "Detect corrupted dirty inode linked list in %s.\n", __func__);
-				ret = ll_rebuild_dirty();
-				if (ret < 0)
-					return ret;
-				/* reload this_entry and last entry */
-				ret = read_super_block_entry(this_entry->this_index, this_entry);
-				if (ret < 0)
-					return ret;
-				ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &tempentry);
-				if (ret < 0)
-					return ret;
-			}
-
 			this_entry->util_ll_prev =
 					sys_super_block->head.last_dirty_inode;
 			sys_super_block->head.last_dirty_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_dirty++;
+			retsize = pread(sys_super_block->iofptr, &tempentry,
+				SB_ENTRY_SIZE, SB_HEAD_SIZE +
+				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
+			if (retsize < 0) {
+				errcode = errno;
+				write_log(0, "IO error in superblock.");
+				write_log(0, " Code %d, %s\n",
+					errcode, strerror(errcode));
+				return -errcode;
+			}
+			if (retsize < SB_ENTRY_SIZE) {
+				write_log(0, "IO error in superblock.");
+				return -EIO;
+			}
 
 			tempentry.util_ll_next = thisinode;
-			ret = write_super_block_entry(this_entry->util_ll_prev, &tempentry);
-			if (ret < 0)
-				return ret;
+			retsize = pwrite(sys_super_block->iofptr, &tempentry,
+				SB_ENTRY_SIZE, SB_HEAD_SIZE +
+				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
+			if (retsize < 0) {
+				errcode = errno;
+				write_log(0, "IO error in superblock.");
+				write_log(0, " Code %d, %s\n",
+					errcode, strerror(errcode));
+				return -errcode;
+			}
+			if (retsize < SB_ENTRY_SIZE) {
+				write_log(0, "IO error in superblock.");
+				return -EIO;
+			}
 		}
 		/* Update dirty meta size (from X to DIRTY) */
 		get_meta_size(thisinode, &now_meta_size);
@@ -1306,11 +1209,10 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 *************************************************************************/
 int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 {
-	SUPER_BLOCK_ENTRY prev, next;
+	SUPER_BLOCK_ENTRY tempentry;
 	char old_which_ll;
 	ino_t temp_inode;
 	int ret;
-	int need_rebuild = FALSE;
 
 	UNUSED(thisinode);
 	old_which_ll = this_entry->status;
@@ -1323,42 +1225,6 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 
 	if (old_which_ll == RECLAIMED)  /*This has its own operations*/
 		return 0;
-
-	if (old_which_ll == IS_DIRTY) {
-		/* Need to check if the dirty linked list in superblock was currpted */
-		if (this_entry->util_ll_next == 0) {
-			if (sys_super_block->head.last_dirty_inode != thisinode)
-				need_rebuild = TRUE;
-		} else {
-			ret = read_super_block_entry(this_entry->util_ll_next, &next);
-			if (ret < 0)
-				return ret;
-			if (next.util_ll_prev != thisinode)
-				need_rebuild = TRUE;
-		}
-
-		if (this_entry->util_ll_prev == 0) {
-			if (sys_super_block->head.first_dirty_inode != thisinode)
-				need_rebuild = TRUE;
-		} else {
-			ret = read_super_block_entry(this_entry->util_ll_prev, &prev);
-			if (ret < 0)
-				return ret;
-			if (prev.util_ll_next != thisinode)
-				need_rebuild = TRUE;
-		}
-
-		if (need_rebuild) {
-			write_log(0, "Detect corrupted dirty inode linked list in %s.\n", __func__);
-			ret = ll_rebuild_dirty();
-			if (ret < 0)
-				return ret;
-			/* reload this_entry*/
-			ret = read_super_block_entry(thisinode, this_entry);
-			if (ret < 0)
-				return ret;
-		}
-	}
 
 	if (this_entry->util_ll_next == 0) {
 		switch (old_which_ll) {
@@ -1375,13 +1241,11 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		}
 	} else {
 		temp_inode = this_entry->util_ll_next;
-		if (this_entry->status != IS_DIRTY || need_rebuild) {
-			ret = read_super_block_entry(temp_inode, &next);
-			if (ret < 0)
-				return ret;
-		}
-		next.util_ll_prev = this_entry->util_ll_prev;
-		ret = write_super_block_entry(temp_inode, &next);
+		ret = read_super_block_entry(temp_inode, &tempentry);
+		if (ret < 0)
+			return ret;
+		tempentry.util_ll_prev = this_entry->util_ll_prev;
+		ret = write_super_block_entry(temp_inode, &tempentry);
 		if (ret < 0)
 			return ret;
 	}
@@ -1401,13 +1265,11 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		}
 	} else {
 		temp_inode = this_entry->util_ll_prev;
-		if (this_entry->status != IS_DIRTY || need_rebuild) {
-			ret = read_super_block_entry(temp_inode, &prev);
-			if (ret < 0)
-				return ret;
-		}
-		prev.util_ll_next = this_entry->util_ll_next;
-		ret = write_super_block_entry(temp_inode, &prev);
+		ret = read_super_block_entry(temp_inode, &tempentry);
+		if (ret < 0)
+			return ret;
+		tempentry.util_ll_next = this_entry->util_ll_next;
+		ret = write_super_block_entry(temp_inode, &tempentry);
 		if (ret < 0)
 			return ret;
 	}
