@@ -727,6 +727,11 @@ int fetch_toupload_meta_path(char *pathname, ino_t inode)
 	return 0;
 
 errcode_handle:
+	if (errcode == -EEXIST) {
+		sprintf(pathname, "%s/hcfs_local_meta_%"PRIu64".tmp",
+				path, (uint64_t)inode);
+		return 0;
+	}
 	return errcode;
 }
 
@@ -734,7 +739,7 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 	long long block_no, long long seq)
 {
 	UNUSED(seq);
-	sprintf(pathname, "/tmp/hcfs_sync_block_%"PRIu64"_%lld.tmp",
+	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%lld.tmp",
 		(uint64_t)inode, block_no);
 
 	return 0;
@@ -742,7 +747,6 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 
 int fetch_backend_meta_path(char *pathname, ino_t inode)
 {
-	/*
 	char path[200];
 	int errcode;
 	int ret;
@@ -751,18 +755,23 @@ int fetch_backend_meta_path(char *pathname, ino_t inode)
 
 	if (access(path, F_OK) == -1)
 		MKDIR(path, 0700);
-	*/
-	sprintf(pathname, "/tmp/hcfs_backend_meta_%"PRIu64".tmp",
-			(uint64_t)inode);
+
+	sprintf(pathname, "%s/hcfs_backend_meta_%"PRIu64".tmp",
+			path, (uint64_t)inode);
 	return 0;
 
-/*errcode_handle:
-	return errcode;*/
+errcode_handle:
+	if (errcode == -EEXIST) {
+		sprintf(pathname, "%s/hcfs_backend_meta_%"PRIu64
+				".tmp", path, (uint64_t)inode);
+		return 0;
+	}
+	return errcode;
 }
 
 void fetch_del_backend_meta_path(char *pathname, ino_t inode)
 {
-	sprintf(pathname, "/tmp/backend_meta_%"PRIu64".del",
+	sprintf(pathname, "/dev/shm/backend_meta_%"PRIu64".del",
 			(uint64_t)inode);
 	return;
 }
