@@ -18,6 +18,7 @@
 **************************************************************************/
 
 /* TODO: Will need to remove parent update from actual_delete_inode */
+/* TODO: Revert ops for partially updated stats / meta */
 
 #include "file_present.h"
 
@@ -229,6 +230,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		sem_post(&(pathlookup_data_lock));
 		return ret_val;
 	}
+	sem_post(&(pathlookup_data_lock));
 
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
@@ -317,6 +319,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	tmpstat.num_local = 1;
 	tmpstat.num_cloud = 0;
 	tmpstat.num_hybrid = 0;
+	sem_wait(&(pathlookup_data_lock));
 	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
 	if (ret_val < 0) {
 		sem_post(&(pathlookup_data_lock));
@@ -1110,6 +1113,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 		sem_post(&(pathlookup_data_lock));
 		goto error_handle;
 	}
+	sem_post(&(pathlookup_data_lock));
 
 	/* Add entry to this dir */
 	ret_val = dir_add_entry(parent_inode, link_inode, newname,
@@ -1126,6 +1130,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	if (ret_val < 0)
 		goto error_handle;
 
+	sem_wait(&(pathlookup_data_lock));
 	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
 	if (ret_val < 0) {
 		sem_post(&(pathlookup_data_lock));
