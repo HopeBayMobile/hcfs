@@ -19,7 +19,6 @@
 #include <time.h>
 
 /* Define socket path for process communicating */
-#define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
 #define MAX_FUSE_COMMUNICATION_THREAD 4
 
 int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd);

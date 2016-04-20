@@ -83,6 +83,8 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define MTIME 2
 #define CTIME 1
 
+#define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
+
 #ifdef _ANDROID_ENV_
 #define  IS_ANDROID_EXTERNAL(type) (((type) == (ANDROID_EXTERNAL)) || \
 		((type) == (ANDROID_MULTIEXTERNAL)))
