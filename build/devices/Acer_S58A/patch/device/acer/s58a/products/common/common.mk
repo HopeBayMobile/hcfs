@@ -243,17 +243,4 @@ PRODUCT_COPY_FILES += \
     $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/res,system/etc/dts) \
     $(call find-copy-subdir-files,*,$(MY_LOCAL_PATH)/dts_data/path,system/etc/dts)
 
-# Hopebay Cloud Filesystem
-PRODUCT_COPY_FILES += \
-    $(MY_LOCAL_PATH)/hopebay/bin/hcfs:system/bin/hcfs \
-    $(MY_LOCAL_PATH)/hopebay/bin/HCFSvol:system/bin/HCFSvol \
-    $(MY_LOCAL_PATH)/hopebay/bin/hcfsapid:system/bin/hcfsapid \
-    $(MY_LOCAL_PATH)/hopebay/bin/hcfsconf:system/bin/hcfsconf \
-    $(MY_LOCAL_PATH)/hopebay/etc/hcfs.conf:system/etc/hcfs.conf \
-    $(MY_LOCAL_PATH)/hopebay/lib64/libfuse.so:system/lib64/libfuse.so \
-    $(MY_LOCAL_PATH)/hopebay/lib64/liblz4.so:system/lib64/liblz4.so \
-    $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
-    $(MY_LOCAL_PATH)/hopebay/lib64/libterafonnapi.so:system/lib64/libterafonnapi.so \
-    $(MY_LOCAL_PATH)/hopebay/lib64/libHCFS_api.so:system/lib64/libHCFS_api.so \
-    $(MY_LOCAL_PATH)/hopebay/lib64/libjansson.so:system/lib64/libjansson.so \
-    $(MY_LOCAL_PATH)/hopebay/root/init.hcfs.sh:root/init.hcfs.sh
+include $(MY_LOCAL_PATH)/products/common/hb-common.mk

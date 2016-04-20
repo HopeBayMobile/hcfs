@@ -1,0 +1,30 @@
+--- /kernel/fs/super.c	2016-02-18 20:07:40.000000000 +0000
++++ super.c	2016-04-07 06:36:16.000000000 +0000
+@@ -1068,7 +1068,9 @@
+ EXPORT_SYMBOL(mount_single);
+ 
+ struct dentry *
+-mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
++// Vince
++//mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
++mount_fs(struct file_system_type *type, const char *subtype, int flags, const char *name, void *data) 
+ {
+ 	struct dentry *root;
+ 	struct super_block *sb;
+@@ -1096,6 +1098,16 @@
+ 	WARN_ON(sb->s_bdi == &default_backing_dev_info);
+ 	sb->s_flags |= MS_BORN;
+ 
++
++        // Vince
++        if (subtype && !sb->s_subtype) {
++            error = -ENOMEM;
++            sb->s_subtype = kstrdup(subtype, GFP_KERNEL);
++            if (!sb->s_subtype)
++                goto out_sb;
++        }
++        
++
+ 	error = security_sb_kern_mount(sb, flags, secdata);
+ 	if (error)
+ 		goto out_sb;

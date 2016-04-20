@@ -382,7 +382,9 @@ int main(int argc, char **argv)
 		exit(ret_val);
 
 	open_log("hcfs_android_log");
-	write_log(2, "\nStart logging\n");
+#ifdef VERSION_NUM
+	write_log(2, "\nVersion: %s\nStart logging\n", VERSION_NUM);
+#endif
 
 	/* Init backend related services */
 	if (CURRENT_BACKEND != NONE) {

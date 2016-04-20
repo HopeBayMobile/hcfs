@@ -4445,12 +4445,12 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	sem_wait(&(fh_ptr->block_sem));
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	if (fh_ptr->meta_cache_ptr == NULL) {
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	sem_wait(&(fh_ptr->block_sem));
 	fh_ptr->meta_cache_locked = TRUE;
 
 	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize);

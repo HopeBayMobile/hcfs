@@ -40,6 +40,12 @@ function _hdr_inc() {
 }
 function start_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
+	if [ "$IMAGE_TYPE" = "push-branch" ];
+	then
+		DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-userdebug-prebuilt'
+	else
+		DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-${IMAGE_TYPE}-prebuilt'
+	fi
 	mkdir -p /data/ccache
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
 	eval docker pull $DOCKER_IMAGE || :
@@ -53,7 +59,7 @@ function cleanup() {
 }
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
-	docker rm -f $DOCKERNAME || :
+	#docker rm -f $DOCKERNAME || :
 }
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
@@ -92,21 +98,12 @@ function copy_apk_to_source_tree() {
 }
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
-		ccache --max-size=30G
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
-		cd /data/external/sepolicy \&\& \
-		tools/post_process_mac_perms \
-		-s terafonn \
-		-d /data/device/acer/common/apps/HopebayHCFSmgmt \
-		-f mac_permissions.xml \&\& \
-		cat mac_permissions.xml
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP \
-		bash -ic ":; cd /data/;\
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP ccache --max-size=30G
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ":; cd /data/;\
 	echo BUILD_NUMBER := ${BUILD_NUMBER:-} >> build/core/build_id.mk;\
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk;\
 	cat build/core/build_id.mk;\
-	./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
+	ENABLE_HCFS=1 ./build.sh -s s58a_aap_gen1 -v ${IMAGE_TYPE}"
 }
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
@@ -127,6 +124,36 @@ function unmount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	umount /mnt/nas
 }
+function make_s58a_source_patch() {
+	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+		$here/README.txt root@$DOCKER_IP:/data/
+	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && \
+	echo | cat - README.txt >> README.md && \
+	rm -f README.txt && \
+	git checkout -b tf/${VERSION_NUM} && \
+	git add README.md \
+	hb_patch/ \
+	device/acer/common/apps/HopebayHCFSmgmt/ \
+	device/acer/s58a/products/common/common.mk \
+	device/acer/s58a/products/common/hb-common.mk \
+	device/acer/s58a/hb_overlay/ \
+	device/acer/s58a/hb_sepolicy/ \
+	device/acer/s58a/hopebay/ \
+	device/acer/s58a/init.target.rc; \
+	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch && \
+	git commit -m \"TeraFonn ${VERSION_NUM}\" && \
+	git push hb \"tf/${VERSION_NUM}\" && \
+	git status"
+
+	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+		root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
+	if [ -n "$PASSWORD" ]; then
+		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch README.txt
+		rsync -arcv --no-owner --no-group --no-times --remove-source-files \
+			Terafonn_${VERSION_NUM}.patch.zip ${PUBLISH_DIR}/
+	fi
+	rm -f Terafonn_${VERSION_NUM}.patch
+}
 function build_image_type() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	IMAGE_TYPE="$1"
@@ -146,7 +173,6 @@ function build_image_type() {
 eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
 eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
 eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
-DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-${IMAGE_TYPE}-prebuilt'
 
 echo ========================================
 echo Jenkins pass-through variables:
@@ -158,10 +184,22 @@ $TRACE
 
 mount_nas
 
+if [ "$MAKE_HCFS_PATCH" = 1 ]; then
+	IMAGE_TYPE="push-branch"
+	start_builder
+	setup_ssh_key
+	patch_system
+	copy_hcfs_to_source_tree
+	copy_apk_to_source_tree
+	make_s58a_source_patch
+	stop_builder
+	exit
+fi
+
 if [ -n "$IMAGE_TYPE" ]; then
 	build_image_type "$IMAGE_TYPE"
 else
-	for IMAGE_TYPE in user userdebug
+	for IMAGE_TYPE in userdebug user
 	do
 		build_image_type "$IMAGE_TYPE"
 	done
