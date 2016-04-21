@@ -504,7 +504,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				FETCH_FILE_META, objname);
 		if (ret < 0) {
 			if (ret == -EIO) {
-				write_log(0, "Error: Fail to download "
+				write_log(5, "Error: Fail to download "
 						"backend meta_%"PRIu64". "
 						"Delete next time.\n",
 						(uint64_t)this_inode);

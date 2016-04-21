@@ -360,8 +360,8 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	}
 
 	if (delete_which_one == DEL_TOUPLOAD_BLOCKS)
-	write_log(4, "Debug: Delete those blocks uploaded just now for "
-		"inode_%"PRIu64"\n", (uint64_t)inode);
+		write_log(6, "Debug: Delete those blocks uploaded just now for "
+			"inode_%"PRIu64"\n", (uint64_t)inode);
 
 	fetch_meta_path(local_metapath, inode);
 	local_metafptr = fopen(local_metapath, "r+");

@@ -1296,7 +1296,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
 
-	write_log(10, "Debug sync: Now begin to revert uploading inode_%"
+	write_log(10, "Debug sync: Now begin to revert/cont. uploading inode_%"
 			PRIu64"\n", (uint64_t)inode);
 
 	/* Check backend meta exist */
