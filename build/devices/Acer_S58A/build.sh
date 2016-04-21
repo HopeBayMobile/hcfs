@@ -77,29 +77,31 @@ function setup_ssh_key() {
 	done
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	ssh-keygen -R $DOCKER_IP
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP pwd
+	ssh -oBatchMode=yes -oStrictHostKeyChecking=no root@$DOCKER_IP pwd
+	touch /tmp/test
+	rsync /tmp/test root@$DOCKER_IP:/tmp/test
 }
 function patch_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+	rsync -arcv --no-owner --no-group --no-times \
 		$repo/build/devices/Acer_S58A/patch/ root@$DOCKER_IP:/data/
 }
 function copy_hcfs_to_source_tree() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+	rsync -arcv --no-owner --no-group --no-times \
 		$LIB_DIR/acer-s58a-hcfs/system/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/
 }
 function copy_apk_to_source_tree() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+	rsync -arcv --no-owner --no-group --no-times \
 		$APP_DIR/*.apk root@$DOCKER_IP:/data/device/acer/common/apps/HopebayHCFSmgmt/
-	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+	rsync -arcv --no-owner --no-group --no-times \
 		$APP_DIR/arm64-v8a/ root@$DOCKER_IP:/data/device/acer/s58a/hopebay/lib64/
 }
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP ccache --max-size=30G
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ":; cd /data/;\
+	ssh root@$DOCKER_IP ccache --max-size=30G
+	ssh root@$DOCKER_IP bash -ic ":; cd /data/;\
 	echo BUILD_NUMBER := ${BUILD_NUMBER:-} >> build/core/build_id.mk;\
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk;\
 	cat build/core/build_id.mk;\
@@ -110,7 +112,8 @@ function publish_image() {
 	IMG_DIR=${PUBLISH_DIR}/HCFS-s58a-image-${IMAGE_TYPE}
 	mkdir -p $IMG_DIR
 	rsync -v $here/resource/* $IMG_DIR
-	rsync -v root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} $IMG_DIR
+	rsync -arcv --no-owner --no-group --no-times \
+		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} $IMG_DIR
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -125,9 +128,9 @@ function unmount_nas() {
 	umount /mnt/nas
 }
 function make_s58a_source_patch() {
-	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+	rsync -arcv --no-owner --no-group --no-times \
 		$here/README.txt root@$DOCKER_IP:/data/README.md
-	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && \
+	ssh root@$DOCKER_IP bash -ic ": && cd /data && \
 	git checkout -b tf/${VERSION_NUM} && \
 	git add README.md \
 	hb_patch/ \
@@ -142,7 +145,7 @@ function make_s58a_source_patch() {
 	git commit -m \"TeraFonn ${VERSION_NUM}\" && \
 	git push hb \"tf/${VERSION_NUM}\""
 
-	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
+	rsync -arcv --no-owner --no-group --no-times \
 		root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
 	if [ -n "$PASSWORD" ]; then
 		zip -P "$PASSWORD" -r Terafonn_${VERSION_NUM}.patch.zip Terafonn_${VERSION_NUM}.patch README.txt
