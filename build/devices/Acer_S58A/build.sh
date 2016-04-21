@@ -42,9 +42,9 @@ function start_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	if [ "$IMAGE_TYPE" = "push-branch" ];
 	then
-		DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-userdebug-prebuilt'
+		DOCKER_IMAGE='docker:5000/s58a-buildbox:userdebug-prebuilt-v5.0419'
 	else
-		DOCKER_IMAGE='docker:5000/s58a-buildbox:v4.0323-${IMAGE_TYPE}-prebuilt'
+		DOCKER_IMAGE='docker:5000/s58a-buildbox:${IMAGE_TYPE}-prebuilt-v5.0419'
 	fi
 	mkdir -p /data/ccache
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
@@ -59,7 +59,7 @@ function cleanup() {
 }
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
-	#docker rm -f $DOCKERNAME || :
+	docker rm -f $DOCKERNAME || :
 }
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
@@ -126,10 +126,8 @@ function unmount_nas() {
 }
 function make_s58a_source_patch() {
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
-		$here/README.txt root@$DOCKER_IP:/data/
+		$here/README.txt root@$DOCKER_IP:/data/README.md
 	ssh -o StrictHostKeyChecking=no root@$DOCKER_IP bash -ic ": && cd /data && \
-	echo | cat - README.txt >> README.md && \
-	rm -f README.txt && \
 	git checkout -b tf/${VERSION_NUM} && \
 	git add README.md \
 	hb_patch/ \
@@ -142,8 +140,7 @@ function make_s58a_source_patch() {
 	device/acer/s58a/init.target.rc; \
 	git diff --staged --binary > Terafonn_${VERSION_NUM}.patch && \
 	git commit -m \"TeraFonn ${VERSION_NUM}\" && \
-	git push hb \"tf/${VERSION_NUM}\" && \
-	git status"
+	git push hb \"tf/${VERSION_NUM}\""
 
 	rsync -arcv --no-owner --no-group --no-times -e "ssh -o StrictHostKeyChecking=no" \
 		root@$DOCKER_IP:/data/Terafonn_${VERSION_NUM}.patch ./
