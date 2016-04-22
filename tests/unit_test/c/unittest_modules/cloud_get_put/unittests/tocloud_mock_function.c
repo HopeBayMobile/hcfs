@@ -237,3 +237,11 @@ int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
 	return 0;
 }
 
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta,
+			long long dirty_data_size_delta,
+			ino_t thisinode)
+{
+	return 0;
+}
