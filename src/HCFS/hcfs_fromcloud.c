@@ -367,9 +367,23 @@ void download_block_manager()
 
 		/* Sleep when number of active threads <= 0 */
 		if (download_thread_ctl.active_th <= 0) {
+			/* No active download threads */
+			if (hcfs_system->xfer_download_in_progress) {
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->xfer_download_in_progress = FALSE;
+				sem_post(&(hcfs_system->access_sem));
+			}
+
 			sem_post(&(download_thread_ctl.ctl_op_sem));
 			sleep(1);
 			continue;
+		}
+
+		/* Some download threads are working */
+		if (!hcfs_system->xfer_download_in_progress) {
+			sem_wait(&(hcfs_system->access_sem));
+			hcfs_system->xfer_download_in_progress = TRUE;
+			sem_post(&(hcfs_system->access_sem));
 		}
 
 		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY; t_idx++) {

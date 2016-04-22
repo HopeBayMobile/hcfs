@@ -111,6 +111,8 @@ int32_t main(int32_t argc, char **argv)
 		code = UNPINDIRTYSIZE;
 	else if (strcasecmp(argv[1], "occupiedsize") == 0)
 		code = OCCUPIEDSIZE;
+	else if (strcasecmp(argv[1], "xferstatus") == 0)
+		code = GETXFERSTATUS;
 	else
 		code = -1;
 	if (code < 0) {
@@ -166,6 +168,7 @@ int32_t main(int32_t argc, char **argv)
 	case CLOUDSTAT:
 	case GETSYNCSWITCH:
 	case GETSYNCSTAT:
+	case GETXFERSTATUS:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -180,6 +183,8 @@ int32_t main(int32_t argc, char **argv)
 		else if (code == GETSYNCSTAT)
 			printf("Sync process is %s\n",
 			       uint32_ret ? "RUNNING(1)" : "PAUSED(0)");
+		else if (code == GETXFERSTATUS)
+			printf("Xfer status is %d\n", uint32_ret);
 		break;
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_

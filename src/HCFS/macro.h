@@ -237,4 +237,14 @@
 		} \
 	} while (0)
 
+
+#define TIMEIT(A)\
+	do {\
+		gettimeofday(&start, NULL);\
+		A;\
+		gettimeofday(&stop, NULL);\
+		timersub(&stop, &start, &diff);\
+		time_spent = diff.tv_sec + (double)diff.tv_usec/1000000;\
+	} while (0)
+
 #endif  /* SRC_HCFS_MACRO_H_ */

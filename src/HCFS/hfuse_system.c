@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 #ifndef _ANDROID_ENV_
 #include <sys/shm.h>
@@ -140,6 +141,9 @@ int init_hcfs_system_data(void)
 				quota);
 		hcfs_system->systemdata.system_quota = quota;
 	}
+
+	/* Init xfer reset time */
+	hcfs_system->last_xfer_reset_time = time(NULL);
 
 	return 0;
 errcode_handle:

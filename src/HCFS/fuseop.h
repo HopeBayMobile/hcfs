@@ -222,6 +222,9 @@ typedef struct {
 	BOOL backend_is_online;
 	BOOL sync_manual_switch;
 	BOOL sync_paused;
+	BOOL xfer_upload_in_progress;
+	BOOL xfer_download_in_progress;
+	time_t last_xfer_reset_time; /* Stats for xfer throughput must be reset in an interval */
 	struct timespec backend_status_last_time;
 } SYSTEM_DATA_HEAD;
 

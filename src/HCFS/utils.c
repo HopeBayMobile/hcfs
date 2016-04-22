@@ -959,6 +959,39 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	return ret;
 }
 
+/************************************************************************
+*
+* Function name: change_xfter_meta
+*        Inputs: long long xfer_size_upload, long long xfer_size_download,
+*        	 long long xfer_throughtput, long long xfer_obj_transit
+*       Summary: Update the parts of xfter statistics in system meta
+*  Return value: 0 if successful. Otherwise returns -1.
+*
+*************************************************************************/
+int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
+		     long long xfer_throughtput, long long xfer_total_obj)
+{
+	int ret = 0;
+
+	sem_wait(&(hcfs_system->access_sem));
+
+	hcfs_system->systemdata.xfer_size_upload +=
+		xfer_size_upload;
+
+	hcfs_system->systemdata.xfer_size_download +=
+		xfer_size_download;
+
+	hcfs_system->systemdata.xfer_throughtput +=
+		xfer_throughtput;
+
+	hcfs_system->systemdata.xfer_total_obj +=
+		xfer_total_obj;
+
+	sem_post(&(hcfs_system->access_sem));
+
+	return ret;
+}
+
 int32_t change_pin_size(int64_t delta_pin_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
