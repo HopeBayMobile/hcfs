@@ -82,3 +82,5 @@ hcfs_android_log
 /build/*/out
 !/build/prebuilt/**/*.so
 !/build/prebuilt/**/*.a
+/containers/**/id_rsa
+/containers/**/id_rsa.pub

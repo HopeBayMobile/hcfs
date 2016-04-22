@@ -8,30 +8,19 @@ FROM phusion/baseimage:0.9.18
 CMD ["/sbin/my_init"]
 
 # ...put your own build instructions here...
-RUN sed -i 's/archive.ubuntu/free.nchc.org.tw/g' /etc/apt/sources.list
-RUN echo 'Acquire::http::Proxy "http://10.0.1.5:8000";' > /etc/apt/apt.conf.d/30aptproxy
+ENV USE_CCACHE=1 PATH=/root/bin:$PATH TERM=xterm
+ADD internal/root/ /root/
 
-# Add android repo
-ADD https://storage.googleapis.com/git-repo-downloads/repo /root/bin/repo
-RUN chmod a+x ~/bin/repo
-ENV USE_CCACHE=1 PATH=/root/bin:$PATH
+ADD internal/00-apt-config /internal/00-apt-config
+RUN /internal/00-apt-config
 
-RUN apt-get update \
-	    && apt-get install -y aptitude \
-	    && aptitude update \
-	    && DEBIAN_FRONTEND=noninteractive aptitude full-upgrade -y \
-	    && DEBIAN_FRONTEND=noninteractive aptitude install -y openjdk-7-jdk \
-	    git-core gnupg flex bison gperf build-essential \
-	    zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 \
-	    lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev ccache \
-	    libgl1-mesa-dev libxml2-utils xsltproc unzip \
-	    make python-networkx \
-	    syslog-ng-core autotools-dev pkg-config libtool vim bc bash-completion \
-	    && apt-get clean
+ADD internal/01-add-google-repo /internal/01-add-google-repo
+RUN /internal/01-add-google-repo
 
-RUN echo "if [ -f /data/bashrc ]; then source /data/bashrc; fi" >> /root/.bashrc
+ADD internal/02-install-pkgs /internal/02-install-pkgs
+RUN /internal/02-install-pkgs
 
-# Clean up APT when done.
-RUN rm -rf /tmp/* /var/tmp/* /etc/service/sshd/down
+ADD internal/03-ssh-known-hosts /internal/03-ssh-known-hosts
+RUN /internal/03-ssh-known-hosts
 
-VOLUME /data
+RUN rm /etc/service/sshd/down
