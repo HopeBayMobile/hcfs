@@ -1370,7 +1370,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 
 		/* Deduct from reserved size */
 		if (S_ISREG(tempstat.st_mode)) {
-			 decrease_pinned_size(reserved_release_size,
+			decrease_pinned_size(reserved_release_size,
 			 		tempstat.st_size);
 		}
 

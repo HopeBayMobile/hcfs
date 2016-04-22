@@ -139,6 +139,7 @@ static inline int _upload_terminate_thread(int index)
 	char need_delete_object;
 	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
+	FILE_META_TYPE tempfilemeta;
 
 	if (upload_ctl.threads_in_use[index] == 0)
 		return 0;
@@ -220,6 +221,9 @@ static inline int _upload_terminate_thread(int index)
 			flock(fileno(metafptr), LOCK_EX);
 			/*Perhaps the file is deleted already*/
 			if (!access(thismetapath, F_OK)) {
+				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+				FREAD(&tempfilemeta, sizeof(FILE_META_TYPE),
+					1, metafptr);
 				FSEEK(metafptr, page_filepos, SEEK_SET);
 				FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
 				      metafptr);
@@ -254,8 +258,17 @@ static inline int _upload_terminate_thread(int index)
 					    cache_block_size;
 					if (statptr->dirty_cache_size < 0)
 						statptr->dirty_cache_size = 0;
+					/* Update unpin-dirty size */
+					if (tempfilemeta.local_pin == FALSE) {
+						statptr->unpin_dirty_data_size -=
+							cache_block_size;
+						if (statptr->unpin_dirty_data_size < 0)
+							statptr->unpin_dirty_data_size = 0;
+					}
 					sem_post(&(hcfs_system->access_sem));
-
+					/* Update dirty size in file meta */
+					update_file_stats(metafptr, 0, 0, 0,
+						-cache_block_size, this_inode);
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 					       metafptr);

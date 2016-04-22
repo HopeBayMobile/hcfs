@@ -1380,6 +1380,82 @@ TEST_F(api_moduleTest, GetTotalCloudSizeSuccess) {
 	ASSERT_EQ(12345566, cloudsize);
 }
 
+TEST_F(api_moduleTest, GetOccupiedSizeSuccess) {
+
+	int ret_val;
+	long long occupiedsize;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = OCCUPIEDSIZE;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.unpin_dirty_data_size = 556677;
+	hcfs_system->systemdata.pinned_size = 655405;
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(long long), size_msg);
+	ret_val = recv(fd, &occupiedsize, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
+	ASSERT_EQ(655405 + 556677, occupiedsize);
+}
+
+TEST_F(api_moduleTest, UnpinDirtySizeSuccess) {
+
+	int ret_val;
+	long long unpindirtysize;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = UNPINDIRTYSIZE;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.unpin_dirty_data_size = 556677;
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(long long), size_msg);
+	ret_val = recv(fd, &unpindirtysize, sizeof(long long), 0);
+	ASSERT_EQ(sizeof(long long), ret_val);
+	ASSERT_EQ(556677, unpindirtysize);
+}
+
+
 /* End of the test case for the function api_module */
 
 /* Begin of the test case for the function api_server_monitor */

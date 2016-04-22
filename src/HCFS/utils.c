@@ -907,7 +907,8 @@ off_t check_file_size(const char *path)
 *************************************************************************/
 int change_system_meta(long long system_data_size_delta,
 		long long meta_size_delta, long long cache_data_size_delta,
-		long long cache_blocks_delta, long long dirty_cache_delta)
+		long long cache_blocks_delta, long long dirty_cache_delta,
+		long long unpin_dirty_delta, BOOL need_sync)
 {
 	int ret;
 
@@ -936,16 +937,23 @@ int change_system_meta(long long system_data_size_delta,
 	if (hcfs_system->systemdata.dirty_cache_size < 0)
 		hcfs_system->systemdata.dirty_cache_size = 0;
 
+	/* Unpin & dirty means the space cannot be freed */
+	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_delta;
+	if (hcfs_system->systemdata.unpin_dirty_data_size < 0)
+		hcfs_system->systemdata.unpin_dirty_data_size = 0;
+
 	/* Pinned size includes meta size because meta is never paged out. */
 	hcfs_system->systemdata.pinned_size += meta_size_delta;
 	if (hcfs_system->systemdata.pinned_size < 0)
 		hcfs_system->systemdata.pinned_size = 0;
 
 	ret = 0;
-	ret = sync_hcfs_system_data(FALSE);
-	if (ret < 0)
-		write_log(0, "Error: Fail to sync hcfs system data. Code %d\n",
-				-ret);
+	if (need_sync) {
+		ret = sync_hcfs_system_data(FALSE);
+		if (ret < 0)
+			write_log(0, "Error: Fail to sync hcfs system data."
+				" Code %d\n", -ret);
+	}
 	sem_post(&(hcfs_system->access_sem));
 
 	return ret;
@@ -1426,7 +1434,9 @@ static inline void _translate_storage_location(FILE_STATS_TYPE *in,
 /* Helper for updating per-file statistics in fuseop.c */
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta, ino_t thisinode)
+			long long cached_size_delta,
+			long long dirty_data_size_delta,
+			ino_t thisinode)
 {
 	int ret, errcode;
 	size_t ret_size;
@@ -1441,6 +1451,9 @@ int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 	meta_stats.num_blocks += num_blocks_delta;
 	meta_stats.num_cached_blocks += num_cached_blocks_delta;
 	meta_stats.cached_size += cached_size_delta;
+	meta_stats.dirty_data_size += dirty_data_size_delta;
+	if (meta_stats.dirty_data_size < 0)
+		meta_stats.dirty_data_size = 0;
 	_translate_storage_location(&meta_stats, &newdirstats);
 
 	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),

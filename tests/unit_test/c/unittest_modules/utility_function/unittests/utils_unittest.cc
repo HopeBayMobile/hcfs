@@ -1083,7 +1083,7 @@ TEST_F(change_system_metaTest, UpdateSuccess)
 {
 	int ret;
 
-	ret = change_system_meta(1, 2, 3, 4, 5);
+	ret = change_system_meta(1, 2, 3, 4, 5, 6, FALSE);
 	EXPECT_EQ(0, ret);
 
 	EXPECT_EQ(1 + 2, hcfs_system->systemdata.system_size);
@@ -1091,6 +1091,7 @@ TEST_F(change_system_metaTest, UpdateSuccess)
 	EXPECT_EQ(2 + 3, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
 	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
+	EXPECT_EQ(6, hcfs_system->systemdata.unpin_dirty_data_size);
 }
 /*
  * End of unittest of change_system_meta()
