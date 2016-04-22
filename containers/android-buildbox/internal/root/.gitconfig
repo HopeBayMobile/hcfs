@@ -1,0 +1,5 @@
+[user]
+	email = terafonn-team@hopebaytech.com
+	name = TeraFonn CI
+[push]
+	default = simple
