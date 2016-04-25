@@ -10,14 +10,8 @@ NDK_PROJECT_PATH := $(abspath .)
 TARGETS          += acer-s58a
 #TARGETS          += acer-z630
 
-all : submodule out $(TARGETS)
+all : out third_party/jansson $(TARGETS)
 	cd out; find -type f ! -name md5sum.md5 -exec md5sum {} \; > md5sum.md5
-
-submodule :
-	@if [ ! -n "$$(grep "^gitlab.hopebaytech.com " ~/.ssh/known_hosts)" ]; \
-		then ssh-keyscan gitlab.hopebaytech.com >> ~/.ssh/known_hosts 2>/dev/null; \
-	fi
-	@git submodule update --init $(build_dir)/third_party/jansson
 
 clean :
 	@rm -rf obj out
@@ -95,5 +89,9 @@ endif
 
 out:
 	@mkdir out
+
+third_party/jansson: third_party/jansson/Android.mk
+third_party/jansson/Android.mk:
+	../utils/init_submodule.sh
 
 .PHONY: clean force copy_s58a_system_libs submodule

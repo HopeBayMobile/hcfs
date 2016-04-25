@@ -20,12 +20,16 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
   endif
 
   ifeq "$(wildcard $(NDK_DIR))" ""
-    $(error Usage: "make NDK_DIR=<path-of-android-ndk-r10e>" )
+    $(error Need NDK_DIR to build lib. Set NDK_DIR before build: "export NDK_DIR=<path-of-android-ndk-r10e>")
   else
     # Save NDK_DIR variable
     $(shell echo "override NDK_DIR=$(NDK_DIR)" > $(NDK_CONFIG))
     # Export NDK_DIR into path
-    PATH := $(PATH):$(NDK_DIR)
+    override PATH := $(PATH):$(NDK_DIR)
+  endif
+
+  ifeq "$(wildcard $(NDK_DIR)/toolchains/llvm-3.6/prebuilt/linux-x86_64/bin/ld.mcld)" ""
+    $(error Please do not use r11 or higher to build hcfs, HCFS/Android.mk requires "-fuse-ld=mcld" but mclinker is removed since r11)
   endif
 
 endif
