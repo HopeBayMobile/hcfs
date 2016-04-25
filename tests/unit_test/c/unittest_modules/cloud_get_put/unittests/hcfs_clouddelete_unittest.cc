@@ -244,6 +244,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	struct stat meta_stat;
 	BLOCK_ENTRY_PAGE tmp_blockentry_page;
 	FILE_META_TYPE tmp_file_meta;
+	CLOUD_RELATED_DATA cloud_related;
 	int total_page = 3;
 	void *res;
 	FILE *backend_meta_fptr;
@@ -259,12 +260,15 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	meta_stat.st_mode = S_IFREG; 
 	MAX_BLOCK_SIZE = 100;
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
+	memset(&cloud_related, 0, sizeof(CLOUD_RELATED_DATA));
+	cloud_related.upload_seq = 1;
 
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	setbuf(meta, NULL);
 	fseek(meta, 0, SEEK_SET);
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
+	fwrite(&cloud_related, sizeof(CLOUD_RELATED_DATA), 1, meta);
 	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 		tmp_blockentry_page.block_entries[i].status = ST_CLOUD;
 		tmp_blockentry_page.block_entries[i].uploaded = 1;
