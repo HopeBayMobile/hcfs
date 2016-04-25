@@ -92,6 +92,6 @@ out:
 
 third_party/jansson: third_party/jansson/Android.mk
 third_party/jansson/Android.mk:
-	../utils/init_submodule.sh
+	$(build_dir)/../utils/init_submodule.sh
 
 .PHONY: clean force copy_s58a_system_libs submodule
