@@ -102,11 +102,10 @@ void collect_finished_sync_threads(void *ptr)
 		if (sync_ctl.total_active_sync_threads <= 0) {
 			/* No active upload threads */
 			if (hcfs_system->xfer_upload_in_progress) {
-				write_log(0, "UPLOAD status change to FALSE\n");
 				sem_wait(&(hcfs_system->access_sem));
 				hcfs_system->xfer_upload_in_progress = FALSE;
 				sem_post(&(hcfs_system->access_sem));
-				write_log(0, "UPLOAD status change to FALSE2\n");
+				write_log(10, "Set upload in progress to FALSE\n");
 			}
 			sem_post(&(sync_ctl.sync_op_sem));
 			nanosleep(&time_to_sleep, NULL);
@@ -116,21 +115,20 @@ void collect_finished_sync_threads(void *ptr)
 		/* Need to reset xfer throughput value? */
 		if (hcfs_system->last_xfer_reset_time < 0 ||
 		    (time(NULL) - hcfs_system->last_xfer_reset_time) > XFER_RESET_WINDOW) {
-			write_log(0, "Reset stats for xfer throughput.");
 			sem_wait(&(hcfs_system->access_sem));
 			hcfs_system->systemdata.xfer_throughtput = 0;
 			hcfs_system->systemdata.xfer_total_obj = 0;
 			hcfs_system->last_xfer_reset_time = time(NULL);
 			sem_post(&(hcfs_system->access_sem));
+			write_log(10, "XFER_RESET_WINDOW exceeded - Reset statistics of xfer throughput.\n");
 		}
 
 		/* Some upload threads are working */
 		if (!hcfs_system->xfer_upload_in_progress) {
-			write_log(0, "UPLOAD status change to TRUE\n");
 			sem_wait(&(hcfs_system->access_sem));
 			hcfs_system->xfer_upload_in_progress = TRUE;
 			sem_post(&(hcfs_system->access_sem));
-			write_log(0, "UPLOAD status change to TRUE2\n");
+			write_log(10, "Set upload in progress to TRUE\n");
 		}
 
 		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)

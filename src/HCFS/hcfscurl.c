@@ -910,7 +910,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
-		write_log(0, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+		write_log(10, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
 					objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -1037,7 +1037,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
-		write_log(0, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+		write_log(10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
 					objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -2017,7 +2017,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
-		write_log(0, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+		write_log(10, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
 					objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -2158,7 +2158,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
-		write_log(0, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+		write_log(10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
 					objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */

@@ -372,6 +372,7 @@ void download_block_manager()
 				sem_wait(&(hcfs_system->access_sem));
 				hcfs_system->xfer_download_in_progress = FALSE;
 				sem_post(&(hcfs_system->access_sem));
+				write_log(10, "Set download in progress to FALSE\n");
 			}
 
 			sem_post(&(download_thread_ctl.ctl_op_sem));
@@ -384,6 +385,7 @@ void download_block_manager()
 			sem_wait(&(hcfs_system->access_sem));
 			hcfs_system->xfer_download_in_progress = TRUE;
 			sem_post(&(hcfs_system->access_sem));
+			write_log(10, "Set download in progress to TRUE\n");
 		}
 
 		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY; t_idx++) {
