@@ -797,7 +797,6 @@ int32_t get_xfer_status(void)
 			return 1;
 
 		average_thpt = total_thpt / num_obj;
-		write_log(0, "Average throughput is %d\n", average_thpt);
 		if (average_thpt < XFER_SLOW_SPEED)
 			return 2;
 		else
