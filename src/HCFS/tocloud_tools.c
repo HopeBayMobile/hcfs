@@ -52,6 +52,7 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
 	FILE *local_metafptr;
+	FILE_META_TYPE tempfilemeta;
 
 	fetch_meta_path(local_metapath, inode);
 	local_metafptr = fopen(local_metapath, "r+");
@@ -72,9 +73,12 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 		write_log(5, "meta %"PRIu64" is removed "
 				"when changing to BOTH\n", (uint64_t)inode);
 		flock(fileno(local_metafptr), LOCK_UN);
+		fclose(local_metafptr);
 		return -ENOENT;
 	}
 
+	PREAD(fileno(local_metafptr), &tempfilemeta, sizeof(FILE_META_TYPE),
+			sizeof(struct stat));
 	PREAD(fileno(local_metafptr), &tmp_page,
 			sizeof(BLOCK_ENTRY_PAGE), page_pos);
 	e_index = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -95,20 +99,30 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 			errcode = ret;
 			goto errcode_handle;
 		}
-		/* Remember dirty_cache_size */
+		/* Remember to decrease dirty_cache_size */
 		cache_block_size = check_file_size(blockpath);
 		sem_wait(&(hcfs_system->access_sem));
 		statptr = &(hcfs_system->systemdata);
 		statptr->dirty_cache_size -= cache_block_size;
 		if (statptr->dirty_cache_size < 0)
 			statptr->dirty_cache_size = 0;
+		/* Update unpin-dirty size */
+		if (tempfilemeta.local_pin == FALSE) {
+			statptr->unpin_dirty_data_size -=
+				cache_block_size;
+			if (statptr->unpin_dirty_data_size < 0)
+				statptr->unpin_dirty_data_size = 0;
+		}
 		sem_post(&(hcfs_system->access_sem));
-
+		/* Update dirty size in file meta */
+		update_file_stats(local_metafptr, 0, 0, 0,
+				-cache_block_size, inode);
 		PWRITE(fileno(local_metafptr), &tmp_page,
 				sizeof(BLOCK_ENTRY_PAGE), page_pos);
 	}
 
 	flock(fileno(local_metafptr), LOCK_UN);
+	fclose(local_metafptr);
 	write_log(10, "Debug sync: block_%"PRIu64"_%lld"
 			" is changed to ST_BOTH\n",
 			(uint64_t)inode, blockno);
@@ -117,6 +131,7 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 
 errcode_handle:
 	flock(fileno(local_metafptr), LOCK_UN);
+	fclose(local_metafptr);
 	return errcode;
 }
 
@@ -267,11 +282,14 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 	char status;
 	int ret, errcode;
 	BLOCK_ENTRY_PAGE bentry_page;
+	FILE_META_TYPE filemeta;
 	char blockpath[300];
 	ssize_t ret_ssize;
-	long long cache_block_size;
+	long long cache_block_size, unpin_dirty_delta;
 
 	flock(fileno(local_metafptr), LOCK_EX);
+	PREAD(fileno(local_metafptr), &filemeta, sizeof(FILE_META_TYPE),
+			sizeof(struct stat));
 	PREAD(fileno(local_metafptr), &bentry_page,
 			sizeof(BLOCK_ENTRY_PAGE), page_pos);
 	status = bentry_page.block_entries[eindex].status;
@@ -295,7 +313,12 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 					" status in %s\n", __func__);
 		}
 		cache_block_size = check_file_size(blockpath);
-		change_system_meta(0, 0, 0, 0, cache_block_size);
+		update_file_stats(local_metafptr, 0, 0, 0,
+				cache_block_size, this_inode);
+		unpin_dirty_delta = (filemeta.local_pin == TRUE ?
+				0 : cache_block_size);
+		change_system_meta(0, 0, 0, 0, cache_block_size,
+				unpin_dirty_delta, FALSE);
 		/* Keep running following code */
 	case ST_LtoC:
 		bentry_page.block_entries[eindex].status = ST_LDISK;
