@@ -1,0 +1,14 @@
+# Use phusion/baseimage as base image. To make your builds reproducible, make
+# sure you lock down to a specific version, not to `latest`!
+# See https://github.com/phusion/baseimage-docker/blob/master/Changelog.md for
+# a list of version numbers.
+FROM docker:5000/s58a-buildbox:user-prebuilt
+
+# Use baseimage-docker's init system.
+#CMD ["/sbin/my_init"]
+
+WORKDIR /data/out/target/product/s58a
+RUN rm -rf boot.img cache.img dt.img persist.img ramdisk-recovery.img ramdisk.img recovery.img system.img userdata.img boot cache dt persist ramdisk-recovery ramdisk recovery system userdata data root
+
+WORKDIR /data
+RUN yes | ./build.sh -s s58a_aap_gen1 -v userdebug

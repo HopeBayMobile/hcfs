@@ -171,6 +171,7 @@ typedef struct {
 	long long num_blocks;
 	long long num_cached_blocks;
 	long long cached_size;
+	long long dirty_data_size;
 } FILE_STATS_TYPE;
 
 /* Defining the structure of symbolic link meta */
@@ -202,6 +203,7 @@ typedef struct {
 	long long cache_size; /* data(local) + meta + sb */
 	long long cache_blocks;
 	long long pinned_size; /* data(pin) + meta + sb */
+	long long unpin_dirty_data_size; /* dirty data w/ unpin property */
 	long long backend_size; /* data(sync) + meta(sync) */
 	long long backend_meta_size;
 	long long backend_inodes;

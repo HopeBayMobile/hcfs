@@ -48,7 +48,8 @@ off_t check_file_size(const char *path);
 
 int change_system_meta(long long system_data_size_delta,
 	long long meta_size_delta, long long cache_data_size_delta,
-	long long cache_blocks_delta, long long dirty_cache_delta);
+	long long cache_blocks_delta, long long dirty_cache_delta,
+	long long unpin_dirty_data_size, BOOL need_sync);
 
 int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
 		long long fs_meta_size_delta, long long fs_num_inodes_delta);
@@ -79,7 +80,9 @@ int update_sb_size();
 
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta, ino_t thisinode);
+			long long cached_size_delta,
+			long long dirty_data_size_delta,
+			ino_t thisinode);
 /* Function for checking if a file is local, cloud, or hybrid */
 int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 

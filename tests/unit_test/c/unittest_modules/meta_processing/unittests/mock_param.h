@@ -87,6 +87,7 @@ char collect_dir_children_flag;
 
 /* change_pin_falg */
 char pin_flag_in_meta;
+char test_change_pin_flag;
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

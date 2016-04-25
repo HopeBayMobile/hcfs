@@ -1231,9 +1231,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	char rootpath[METAPATHLEN];
 	FILE *fptr;
 	FS_STAT_T tmpstat;
-	SYSTEM_DATA_TYPE *statptr;
 	char meta_deleted;
-	long long metasize;
+	long long metasize, dirty_delta, unpin_dirty_delta;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1389,22 +1388,16 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				cache_block_size =
 						check_file_size(thisblockpath);
 				UNLINK(thisblockpath);
-				sem_wait(&(hcfs_system->access_sem));
-				statptr = &(hcfs_system->systemdata);
-				statptr->cache_size -=
-						(long long) cache_block_size;
-				if (statptr->cache_size < 0)
-					statptr->cache_size = 0;
 				if ((block_status == ST_LDISK) ||
 				    (block_status == ST_LtoC))
-					statptr->dirty_cache_size -=
-						(long long) cache_block_size;
-				if (statptr->dirty_cache_size < 0)
-					statptr->dirty_cache_size = 0;
-				statptr->cache_blocks -= 1;
-				if (statptr->cache_blocks < 0)
-					statptr->cache_blocks = 0;
-				sem_post(&(hcfs_system->access_sem));
+					dirty_delta = -cache_block_size;
+				else
+					dirty_delta = 0;
+
+				unpin_dirty_delta = (file_meta.local_pin == TRUE
+					? 0 : dirty_delta);
+				change_system_meta(0, 0, -cache_block_size, -1,
+					dirty_delta, unpin_dirty_delta, FALSE);
 			}
 		}
 		sem_wait(&(hcfs_system->access_sem));
@@ -1442,7 +1435,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		break;
 	}
 
-	change_system_meta(0, -metasize, 0, 0, 0);
+	change_system_meta(0, -metasize, 0, 0, 0, 0, TRUE);
 
 	if (mptr == NULL) {
 		FSEEK(fptr, 0, SEEK_SET);
@@ -1707,6 +1700,49 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 }
 
 /**
+ * When pin status changes, unpin-dirty size should be modified. Decrease size
+ * when change from unpin to pin. Otherwise increase size when change from pin
+ * to unpin.
+ *
+ * @param ptr Meta cache entry pointer.
+ * @param ispin New pinned status. TRUE means from unpin to pin, and FALSE
+ *              means from pin to unpin
+ * 
+ * @return 0 on succes, otherwise negative error code.
+ */
+static int _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FILE_STATS_TYPE filestats;
+
+	ret = meta_cache_open_file(ptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	FSEEK(ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
+
+	/* when from unpin to pin, decrease unpin-dirty size,
+	 * otherwise increase unpin-dirty size */
+	if (ispin == TRUE)
+		change_system_meta(0, 0, 0, 0, 0,
+				-filestats.dirty_data_size, FALSE);
+	else
+		change_system_meta(0, 0, 0, 0, 0,
+				filestats.dirty_data_size, FALSE);
+
+	return 0;
+
+errcode_handle:
+	write_log(0, "Error: IO error in %s. Code %d\n", __func__, -errcode);
+	return errcode;
+}
+
+/**
  * Change "local_pin" flag in meta cache. "new_pin_status" is either
  * TRUE or FALSE. local_pin equals TRUE means this inode is pinned at local
  * device but not neccessarily all blocks are local now.
@@ -1747,6 +1783,13 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 			file_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_file_data(this_inode, NULL,
 				&file_meta, NULL, 0, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+			/* Update unpin-dirty data size */
+			ret = _change_unpin_dirty_size(meta_cache_entry,
+					new_pin_status);
 			if (ret < 0) {
 				ret_code = ret;
 				goto error_handling;
@@ -2319,3 +2362,4 @@ errcode_handle:
 
 	return ret;
 }
+

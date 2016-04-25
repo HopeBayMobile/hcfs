@@ -212,7 +212,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				sync_hcfs_system_data(FALSE);
 				ret = update_file_stats(metafptr, 0, -1,
 							-(tempstat.st_size),
-							this_inode);
+							0, this_inode);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
