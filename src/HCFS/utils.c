@@ -977,15 +977,23 @@ int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
 
 	hcfs_system->systemdata.xfer_size_upload +=
 		xfer_size_upload;
+	if (hcfs_system->systemdata.xfer_size_upload < 0)
+		hcfs_system->systemdata.xfer_size_upload = 0;
 
 	hcfs_system->systemdata.xfer_size_download +=
 		xfer_size_download;
+	if (hcfs_system->systemdata.xfer_size_download < 0)
+		hcfs_system->systemdata.xfer_size_download = 0;
 
 	hcfs_system->systemdata.xfer_throughtput +=
 		xfer_throughtput;
+	if (hcfs_system->systemdata.xfer_throughtput < 0)
+		hcfs_system->systemdata.xfer_throughtput = 0;
 
 	hcfs_system->systemdata.xfer_total_obj +=
 		xfer_total_obj;
+	if (hcfs_system->systemdata.xfer_total_obj < 0)
+		hcfs_system->systemdata.xfer_total_obj = 0;
 
 	sem_post(&(hcfs_system->access_sem));
 

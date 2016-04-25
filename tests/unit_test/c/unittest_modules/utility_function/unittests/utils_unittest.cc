@@ -1062,7 +1062,7 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
 
 /*
  * Unittest of change_system_meta()
- */ 
+ */
 class change_system_metaTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -1092,6 +1092,54 @@ TEST_F(change_system_metaTest, UpdateSuccess)
 	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
 	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
 	EXPECT_EQ(6, hcfs_system->systemdata.unpin_dirty_data_size);
+}
+/*
+ * End of unittest of change_system_meta()
+ */
+
+/*
+ * Unittest of change_xfer_meta()
+ */
+class change_xfer_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(change_xfer_metaTest, UpdateSuccess)
+{
+	int ret;
+
+	ret = change_xfer_meta(1, 2, 3, 4);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1, hcfs_system->systemdata.xfer_size_upload);
+	EXPECT_EQ(2, hcfs_system->systemdata.xfer_size_download);
+	EXPECT_EQ(3, hcfs_system->systemdata.xfer_throughtput);
+	EXPECT_EQ(4, hcfs_system->systemdata.xfer_total_obj);
+}
+
+TEST_F(change_xfer_metaTest, MinIsZero)
+{
+	int ret;
+
+	ret = change_xfer_meta(-1, -2, -3, -4);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_size_upload);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_size_download);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_throughtput);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_total_obj);
 }
 /*
  * End of unittest of change_system_meta()

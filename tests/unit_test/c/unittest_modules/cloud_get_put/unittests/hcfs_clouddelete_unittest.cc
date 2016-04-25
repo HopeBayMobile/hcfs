@@ -63,20 +63,20 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 {
 	void *res;
 	int num_threads = 40;
-	
+
 	/* Run the function to check whether it will terminate threads */
 	init_dsync_control();
-	
+
 	/* Generate threads */
 	for (int i = 0 ; i < num_threads ; i++) {
 		int inode = i+1;
 		int t_index;
-		
+
 		sem_wait(&dsync_ctl.dsync_queue_sem);
 		sem_wait(&dsync_ctl.dsync_op_sem);
 		t_index = -1;
 		for (int idx = 0 ; idx < MAX_DSYNC_CONCURRENCY ; idx++) {
-			if ((dsync_ctl.threads_in_use[idx] == 0) && 
+			if ((dsync_ctl.threads_in_use[idx] == 0) &&
 				(dsync_ctl.threads_created[idx] == FALSE)) {
 				t_index = idx;
 				break;
@@ -86,7 +86,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		dsync_ctl.threads_created[t_index] = TRUE;
 		dsync_ctl.threads_finished[t_index] = TRUE;
 		dsync_ctl.total_active_dsync_threads++;
-		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL, 
+		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL,
 			dsync_test_thread_fn, (void *)&i));
 		sem_post(&dsync_ctl.dsync_op_sem);
 	}
@@ -94,7 +94,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 	EXPECT_EQ(0, pthread_cancel(dsync_ctl.dsync_handler_thread));
 	EXPECT_EQ(0, pthread_join(dsync_ctl.dsync_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	
+
 	/* Check answer */
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);
 	for (int i = 0 ; i < MAX_DSYNC_CONCURRENCY ; i++) {
@@ -121,10 +121,10 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 {
 	void *res;
 	int num_threads = 40;
-		
+
 	/* Run the function to check whether it will terminate threads */
 	init_delete_control();
-	
+
 	/* Generate threads */
 	for (int i = 0 ; i < num_threads ; i++) {
 		int t_index;
@@ -152,7 +152,7 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
 	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	
+
 	/* Check answer */
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads);
 	for (int i = 0 ; i < MAX_DELETE_CONCURRENCY ; i++) {
@@ -195,7 +195,7 @@ protected:
 		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
 	}
 	void destroy_objname_buffer(unsigned num_objname)
-	{	
+	{
 		for (int i = 0 ; i < num_objname ; i++)
 			if(objname_list[i])
 				free(objname_list[i]);
@@ -218,7 +218,7 @@ protected:
 			return -1;
 		} else {
 			char tmp_name[30];
-			int inode1, inode2; 
+			int inode1, inode2;
 			int blocknum1, blocknum2;
 			sscanf(name1, "data_%d_%d", &inode1, &blocknum1);
 			sscanf(name2, "data_%d_%d", &inode2, &blocknum2);
@@ -240,14 +240,14 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	int total_page = 3;
 	expected_num_objname = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	void *res;
-	
+
 	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
 	mock_thread_info->which_index = 0;
 	meta_stat.st_size = 1000000; // Let total_blocks = 1000000/100 = 10000
 	MAX_BLOCK_SIZE = 100;
-	
+
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
@@ -278,7 +278,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	char expected_objname[size_objname];
 	sprintf(expected_objname, "meta_%" PRIu64 "", (uint64_t)mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
-	
+
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
 	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
@@ -294,12 +294,12 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 
 	/* Mock a dir meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
-	mock_thread_info->this_mode = S_IFDIR;	
+	mock_thread_info->this_mode = S_IFDIR;
 	mock_thread_info->which_index = 0;
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fclose(meta);
-	
+
 	/* Begin to test */
 	init_delete_control();
 	init_objname_buffer(expected_num_objname);
@@ -309,9 +309,9 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Check answer */
 	EXPECT_EQ(1, objname_counter); // Check # of object name.
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%d", mock_thread_info->inode); 
+	sprintf(expected_objname, "meta_%d", mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[0]); // Check meta was recorded.
-	
+
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
 	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
@@ -339,7 +339,7 @@ TEST(delete_loopTest, DeleteSuccess)
 		malloc(sizeof(SYSTEM_CONF_STRUCT));
 	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 	hcfs_system->backend_is_online = TRUE;
-	
+
 	size_objname = 50;
 	objname_counter = 0;
 	objname_list = (char **)malloc(sizeof(char *) * 100);

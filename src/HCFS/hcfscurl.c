@@ -39,11 +39,13 @@
 
 #define MAX_RETRIES 5
 
-/* Marco to compute data transfer throughput */
-#define COMPUTE_THPT()\
-	objsize = (objsize <= 32768) ? 32 : objsize / 1024;\
+/* Marco to compute data transfer throughput.
+ * If object size < 32KB, for this computation the size is rounded up to 32KB.
+ */
+#define COMPUTE_THROUGHPUT()\
+	off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;\
 	time_spent = (time_spent <= 0) ? 0.001 : time_spent;\
-	xfer_thpt = (int64_t)(objsize / time_spent);
+	xfer_thpt = (int64_t)(objsize_kb / time_spent);
 
 
 /************************************************************************
@@ -905,7 +907,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	if (_http_is_success(ret_val)) {
 		/* Record xfer throughput */
-		COMPUTE_THPT()
+		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
 		write_log(0, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
@@ -1032,7 +1034,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		FTELL(fptr);
 		objsize = ret_pos;
 		FSEEK(fptr, 0, SEEK_SET);
-		COMPUTE_THPT()
+		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
 		write_log(0, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
@@ -2012,7 +2014,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	UNLINK(header_filename);
 	if (_http_is_success(ret_val)) {
 		/* Record xfer throughput */
-		COMPUTE_THPT()
+		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
 		write_log(0, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
@@ -2153,7 +2155,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		FTELL(fptr);
 		objsize = ret_pos;
 		FSEEK(fptr, 0, SEEK_SET);
-		COMPUTE_THPT()
+		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
 		write_log(0, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",

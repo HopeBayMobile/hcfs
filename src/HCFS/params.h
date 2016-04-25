@@ -101,6 +101,7 @@ typedef struct {
 #define RECLAIMED 4
 
 #define XFER_RESET_WINDOW 180
+#define XFER_SLOW_SPEED 32 /* in KB/s */
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";
