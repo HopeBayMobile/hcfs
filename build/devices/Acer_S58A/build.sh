@@ -76,6 +76,7 @@ function setup_ssh_key() {
 		sleep 2
 	done
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
+	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
 	ssh-keygen -R $DOCKER_IP
 	ssh -oBatchMode=yes -oStrictHostKeyChecking=no root@$DOCKER_IP pwd
 	touch /tmp/test
