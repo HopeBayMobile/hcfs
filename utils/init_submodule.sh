@@ -3,10 +3,10 @@
 #
 # Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 #
-# Abstract:
+# Abstract: init submodules and handles ssh key resisting
 #
 # Revision History
-#   2016/1/18 Jethro unified usage of workspace path
+#   2016/4/25 Jethro init submodule for third_party/jansson
 #
 ##########################################################################
 
