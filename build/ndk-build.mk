@@ -12,10 +12,9 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
 # 1. Find correct ndk-build filepath from arguments
 
   ifneq "$(NDK_DIR)" ""
-    override NDK_BUILD := $(filter %/ndk-build, $(wildcard \
-      $(NDK_DIR) $(NDK_DIR)/ndk-build \
-      $(NDK_BUILD) $(NDK_BUILD)/ndk-build))
-    override NDK_DIR := $(abspath $(dir $(NDK_BUILD)))
+    override NDK_DIR := $(filter %/ndk-build, $(wildcard \
+      $(NDK_DIR) $(NDK_DIR)/ndk-build ))
+    override NDK_DIR := $(abspath $(dir $(NDK_DIR)))
     $(eval $(call test_ndk_read_permission))
   endif
 
@@ -42,6 +41,7 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
   endif
 
   ifeq "$(wildcard $(NDK_DIR)/toolchains/llvm-3.6/prebuilt/linux-x86_64/bin/ld.mcld)" ""
+    $(info $(NDK_DIR)/toolchains/llvm-3.6/prebuilt/linux-x86_64/bin/ld.mcld)
     $(error Please do not use r11 or higher to build hcfs, HCFS/Android.mk requires "-fuse-ld=mcld" but mclinker is removed since r11)
   endif
 
