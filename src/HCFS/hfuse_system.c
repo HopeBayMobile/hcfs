@@ -95,6 +95,8 @@ int32_t init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
+	hcfs_system->monitor_interval = MONITORING_INTERVAL;
+	sem_init(&(hcfs_system->monitor_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
@@ -414,6 +416,7 @@ int32_t main(int32_t argc, char **argv)
 		pthread_join(cache_loop_thread, NULL);
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(upload_loop_thread, NULL);
+		destroy_monitor_loop_thread();
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
 	}

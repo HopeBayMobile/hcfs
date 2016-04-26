@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include <signal.h>
 #include <errno.h>
+#include <semaphore.h>
 extern "C" {
 #include "monitor.h"
 #include "global.h"
@@ -23,6 +24,8 @@ class monitorTest : public ::testing::Test {
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
+		hcfs_system->monitor_interval = 1;
+		sem_init(&(hcfs_system->monitor_sem), 1, 0);
 	}
 
 	void TearDown() { free(hcfs_system); }
@@ -107,12 +110,12 @@ TEST_F(monitorTest, Update_Backend_Status_Without_Timestamp) {
 	ASSERT_NE(0, hcfs_system->backend_status_last_time.tv_nsec);
 }
 
-TEST_F(monitorTest, Write_Log_With_Time) {
-	_write_monitor_loop_status_log(0);
-	fflush(stdout);
-}
-
-TEST_F(monitorTest, Write_Log_Without_Time) {
+TEST_F(monitorTest, Monitor_Log) {
+	hcfs_system->backend_is_online = TRUE;
+	_write_monitor_loop_status_log(0.0);
+	hcfs_system->backend_is_online = FALSE;
+	_write_monitor_loop_status_log(0.0);
+	hcfs_system->backend_is_online = TRUE;
 	_write_monitor_loop_status_log(1.2345);
 	fflush(stdout);
 }

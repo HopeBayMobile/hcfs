@@ -20,14 +20,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "global.h"
+#include "params.h"
+
 #ifdef _ANDROID_ENV_
 void *monitor_loop(void *ptr);
 #else
 void monitor_loop(void);
 #endif
-float diff_time(struct timespec start, struct timespec end);
-void update_backend_status(int32_t status, struct timespec *status_time);
+void check_backend_status(void);
+void destroy_monitor_loop_thread();
+double diff_time(const struct timespec *start, struct timespec *end);
+void update_backend_status(register BOOL status, struct timespec *status_time);
 void update_sync_state(void);
-void _write_monitor_loop_status_log(float duration);
+void _write_monitor_loop_status_log(double duration);
 
 #endif  /* SRC_HCFS_MONITOR_H_ */

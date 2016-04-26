@@ -221,6 +221,7 @@ typedef struct {
 	sem_t check_cache_sem;
 	sem_t check_next_sem;
 	sem_t check_cache_replace_status_sem;
+	sem_t monitor_sem;
 	/* system state controllers */
 	BOOL system_going_down;
 	BOOL backend_is_online;
