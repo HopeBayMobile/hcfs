@@ -968,11 +968,11 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
-		     long long xfer_throughtput, long long xfer_total_obj)
+int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
+			 int64_t xfer_throughtput, int64_t xfer_total_obj)
 {
-	int ret = 0;
-	int now_window;
+	int32_t ret = 0;
+	int32_t now_window;
 
 	sem_wait(&(hcfs_system->access_sem));
 
