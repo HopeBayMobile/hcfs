@@ -61,7 +61,7 @@ int init_system_fh_table(void);
 long long open_fh(ino_t thisinode, int flags, BOOL isdir);
 int close_fh(long long index);
 
-int32_t handle_dirmeta_snapshot(ino_t thisinode);
+int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr);
 
 /*END definition of file handle */
 

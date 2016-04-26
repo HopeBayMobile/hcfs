@@ -22,10 +22,13 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/mman.h>
+#include <sys/file.h>
 
 #include "fuseop.h"
 #include "params.h"
 #include "global.h"
+#include "macro.h"
+#include "utils.h"
 
 /************************************************************************
 *
@@ -192,10 +195,10 @@ int close_fh(long long index)
 /************************************************************************
 *
 * Function name: handle_dirmeta_snapshot
-*        Inputs: ino_t thisinode
+*        Inputs: ino_t thisinode, FILE *metafptr
 *       Summary: Scans filetable and create snapshot of meta for inode
 *                "thisinode". "metafptr" points to the file stream
-*                of the source meta file.
+*                of the source meta file. "metafptr" needs to be locked.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
@@ -206,28 +209,54 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 	BOOL snap_created;
 	char snap_name[METAPATHLEN + 1];
 	int64_t ret_pos;
-	int32_t errcode;
+	int32_t errcode, ret;
+	FILE *snapfptr;
+	size_t ret_size;
+	uint8_t buf[4096];
 
 	snap_created = FALSE;
 	sem_wait(&(system_fh_table.fh_table_sem));
 	snprintf(snap_name, METAPATHLEN, "%s/tmp_dirmeta_snap", METAPATH);
 
 	for (count = 0; count < MAX_OPEN_FILE_ENTRIES; count++) {
-		if (system_fh_table.entry_table_flags[index] == IS_DIRH) {
+		if (system_fh_table.entry_table_flags[count] == IS_DIRH) {
 			tmp_entry = &(system_fh_table.direntry_table[count]);
 			if ((tmp_entry->thisinode == thisinode) &&
 			    (snap_created == FALSE)) {
 				/* Create snapshot */
 				if (access(snap_name, F_OK) == 0)
 					UNLINK(snap_name);
-				flock(fileno(metafptr), LOCK_EX);
 				FTELL(metafptr);
-				/* TODO: Add in snapshot routine */
-
-				FSEEK(metafptr, 0, ret_pos);
-				flock(fileno(metafptr), LOCK_UN);
+				snapfptr = fopen(snap_name, "w");
+				if (snapfptr == NULL) {
+					errcode = -errno;
+					write_log(0, "Error in meta snap\n");
+					write_log(0, "Code %d\n", errcode);
+					errcode = -EIO;
+					goto errcode_handle;
+				}
+				FSEEK(metafptr, 0, SEEK_SET);
+				while (!feof(metafptr)) {
+					FREAD(buf, 1, sizeof(buf), metafptr);
+					if (ret_size == 0)
+						break;
+					FWRITE(buf, 1, ret_size, snapfptr);
+				}
+				FSEEK(metafptr, ret_pos, SEEK_SET);
+				fclose(snapfptr);
 				snap_created = TRUE;
 			}
+			if (tmp_entry->thisinode == thisinode) {
+				tmp_entry->snapshot_ptr = fopen(snap_name, "r");
+				if (tmp_entry->snapshot_ptr == NULL) {
+					errcode = -errno;
+					write_log(0, "Error in meta snap\n");
+					write_log(0, "Code %d\n", errcode);
+					errcode = -EIO;
+					goto errcode_handle;
+				}
+			}
+		}
 	}
 
 	if (snap_created)
@@ -235,6 +264,8 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 	sem_post(&(system_fh_table.fh_table_sem));
 	return 0;
 errcode_handle:
+	if (snap_created)
+		unlink(snap_name);
 	sem_post(&(system_fh_table.fh_table_sem));
 	return errcode;
 }
