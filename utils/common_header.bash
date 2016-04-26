@@ -24,8 +24,9 @@ function install_pkg (){
 	done
 	install="$(echo -e "$install $force_install" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 	if [ -n "$install" ]; then
-		if [ -n "$setup_dev_env_mode" ]; then
-			echo "Require packages for mode $setup_dev_env_mode: $install"
+		echo -e "\nError: Require packages: $install"
+		if [ "$1" = "check_pkg" ]; then
+			return 1
 		fi
 		sudo apt-get update || :
 		sudo apt-get install -y $install $force_install
