@@ -62,11 +62,11 @@ SYSTEM_CONF_STRUCT *system_config = NULL;
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
-	int sub_dir;
-	int errcode, ret;
+	int32_t sub_dir;
+	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -1;
@@ -103,11 +103,11 @@ errcode_handle:
 *          Note: This function is used for post-deletion handling of meta.
 *
 *************************************************************************/
-int fetch_todelete_path(char *pathname, ino_t this_inode)
+int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
-	int sub_dir;
-	int errcode, ret;
+	int32_t sub_dir;
+	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -EPERM;
@@ -135,18 +135,18 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: fetch_block_path
-*        Inputs: char *pathname, ino_t this_inode, long long block_num
+*        Inputs: char *pathname, ino_t this_inode, int64_t block_num
 *       Summary: Given the inode number this_inode,
 *                copy the path to the block "block_num" to "pathname".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char tempname[BLOCKPATHLEN];
-	int sub_dir;
-	int errcode, ret;
+	int32_t sub_dir;
+	int32_t errcode, ret;
 
 	if (BLOCKPATH == NULL)
 		return -EPERM;
@@ -159,7 +159,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 "_%lld",
+	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 "_%"PRId64,
 			BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
 
 	return 0;
@@ -178,10 +178,10 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_ddt_path(char *pathname, unsigned char last_char)
+int32_t fetch_ddt_path(char *pathname, uint8_t last_char)
 {
 	char tempname[METAPATHLEN];
-	int errcode, ret;
+	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -1;
@@ -217,9 +217,9 @@ errcode_handle:
 *
 *************************************************************************/
 /* TODO: remove this function if no further use. */
-int parse_parent_self(const char *pathname, char *parentname, char *selfname)
+int32_t parse_parent_self(const char *pathname, char *parentname, char *selfname)
 {
-	int count;
+	int32_t count;
 
 	if (pathname == NULL)
 		return -1;
@@ -272,14 +272,14 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
+int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
 	char argname[200], argval[200], *tokptr1, *toktmp, *strptr;
-	long long temp_val;
-	int tmp_len;
-	int errcode;
+	int64_t temp_val;
+	int32_t tmp_len;
+	int32_t errcode;
 
 	memset(config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
@@ -646,15 +646,15 @@ int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int validate_system_config(SYSTEM_CONF_STRUCT *config)
+int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 {
 	FILE *fptr;
 	char pathname[400];
 #ifndef _ANDROID_ENV_
 	char tempval[10];
-	int ret_val;
+	int32_t ret_val;
 #endif
-	int errcode;
+	int32_t errcode;
 
 	/* Validating system path settings */
 
@@ -882,7 +882,7 @@ int validate_system_config(SYSTEM_CONF_STRUCT *config)
 off_t check_file_size(const char *path)
 {
 	struct stat block_stat;
-	int errcode;
+	int32_t errcode;
 
 	errcode = stat(path, &block_stat);
 	if (errcode == 0)
@@ -896,21 +896,21 @@ off_t check_file_size(const char *path)
 /************************************************************************
 *
 * Function name: change_system_meta
-*        Inputs: long long system_data_size_delta,
-*                long long meta_size_delta
-*                long long cache_data_size_delta,
-*                long long cache_blocks_delta, long long dirty_cache_delta
+*        Inputs: int64_t system_data_size_delta,
+*                int64_t meta_size_delta
+*                int64_t cache_data_size_delta,
+*                int64_t cache_blocks_delta, int64_t dirty_cache_delta
 *       Summary: Update system meta (total volume size, cache size, num
 *                of cache entries, dirty cache size) and sync to disk.
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int change_system_meta(long long system_data_size_delta,
-		long long meta_size_delta, long long cache_data_size_delta,
-		long long cache_blocks_delta, long long dirty_cache_delta,
-		long long unpin_dirty_delta, BOOL need_sync)
+int32_t change_system_meta(int64_t system_data_size_delta,
+		int64_t meta_size_delta, int64_t cache_data_size_delta,
+		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+		int64_t unpin_dirty_delta, BOOL need_sync)
 {
-	int ret;
+	int32_t ret;
 
 	sem_wait(&(hcfs_system->access_sem));
 	/* System size includes meta size */
@@ -959,7 +959,7 @@ int change_system_meta(long long system_data_size_delta,
 	return ret;
 }
 
-int change_pin_size(long long delta_pin_size)
+int32_t change_pin_size(int64_t delta_pin_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
 	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
@@ -975,11 +975,11 @@ int change_pin_size(long long delta_pin_size)
 	return 0;
 }
 
-int update_sb_size()
+int32_t update_sb_size()
 {
-	long long old_size, new_size;
+	int64_t old_size, new_size;
 	struct stat sbstat;
-	int ret, ret_code;
+	int32_t ret, ret_code;
 
 	sem_wait(&(hcfs_system->access_sem));
 	old_size = hcfs_system->systemdata.super_block_size;
@@ -1028,8 +1028,8 @@ int update_sb_size()
  *
  * @return 0 on success.
  */ 
-int update_backend_usage(long long total_backend_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int32_t update_backend_usage(int64_t total_backend_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.backend_size += total_backend_size_delta;
@@ -1063,10 +1063,10 @@ int update_backend_usage(long long total_backend_size_delta,
  *
  * @return 0 on success, otherwise negative error code.
  */
-int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
-		long long fs_meta_size_delta, long long fs_num_inodes_delta)
+int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
@@ -1100,9 +1100,9 @@ errcode_handle:
 	return errcode;
 }
 
-int set_block_dirty_status(char *path, FILE *fptr, char status)
+int32_t set_block_dirty_status(char *path, FILE *fptr, char status)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 
 #ifdef _ANDROID_ENV_
 
@@ -1209,9 +1209,9 @@ errcode_handle:
 	return errcode;
 }
 
-int get_block_dirty_status(char *path, FILE *fptr, char *status)
+int32_t get_block_dirty_status(char *path, FILE *fptr, char *status)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 #ifndef _ANDROID_ENV_
 	char tmpstr[5];
 #endif
@@ -1315,11 +1315,11 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_stat_path(char *pathname, ino_t this_inode)
+int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
-	int sub_dir;
-	int errcode, ret;
+	int32_t sub_dir;
+	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -EPERM;
@@ -1356,11 +1356,11 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_trunc_path(char *pathname, ino_t this_inode)
+int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
-	int sub_dir;
-	int errcode, ret;
+	int32_t sub_dir;
+	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -EPERM;
@@ -1395,7 +1395,7 @@ errcode_handle:
  *
  * @return 0
  */
-int fetch_error_download_path(char *path, ino_t inode)
+int32_t fetch_error_download_path(char *path, ino_t inode)
 {
 
 	snprintf(path, 200, "/dev/shm/download_error_inode_%"PRIu64"",
@@ -1404,7 +1404,7 @@ int fetch_error_download_path(char *path, ino_t inode)
 	return 0;
 }
 
-void get_system_size(long long *cache_size, long long *pinned_size)
+void get_system_size(int64_t *cache_size, int64_t *pinned_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
 	if (cache_size)
@@ -1432,13 +1432,13 @@ static inline void _translate_storage_location(FILE_STATS_TYPE *in,
 }
 
 /* Helper for updating per-file statistics in fuseop.c */
-int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-			long long num_cached_blocks_delta,
-			long long cached_size_delta,
-			long long dirty_data_size_delta,
+int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+			int64_t num_cached_blocks_delta,
+			int64_t cached_size_delta,
+			int64_t dirty_data_size_delta,
 			ino_t thisinode)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	FILE_STATS_TYPE meta_stats;
 	DIR_STATS_TYPE olddirstats, newdirstats, diffstats;
@@ -1481,9 +1481,9 @@ errcode_handle:
 	return errcode;
 }
 
-int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
+int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	FILE_STATS_TYPE meta_stats;
 
@@ -1501,7 +1501,7 @@ errcode_handle:
 /**
  * Helper function subjecting to check whether new system config is invalid.
  */
-int _check_config(const SYSTEM_CONF_STRUCT *new_config)
+int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 {
 	if (CURRENT_BACKEND == NONE) /* Always ok when backend is now none */
 		return 0;
@@ -1560,9 +1560,9 @@ int _check_config(const SYSTEM_CONF_STRUCT *new_config)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int reload_system_config(const char *config_path)
+int32_t reload_system_config(const char *config_path)
 {
-	int ret;
+	int32_t ret;
 	char enable_related_module;
 	SYSTEM_CONF_STRUCT *temp_config, *new_config;
 
@@ -1613,9 +1613,9 @@ int reload_system_config(const char *config_path)
 	return 0;
 }
 
-void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
 {
-	unsigned int count;
+	uint32_t count;
 
 	for (count = 0; count < secs; count++) {
 		if (wakeup_condition() == TRUE)
@@ -1627,16 +1627,16 @@ void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
 }
 
 /* Signal handler for recording ignored signals */
-void sigpipe_handler(int num)
+void sigpipe_handler(int32_t num)
 {
         write_log(2, "Warning: Received signal %s and ignored.\n",
                   strsignal(num));
 }
 
 /* Helper routine for ignoring SIGPIPE signal */
-int ignore_sigpipe(void)
+int32_t ignore_sigpipe(void)
 {
-	int ret_val;
+	int32_t ret_val;
         struct sigaction newact;
 
         /* For SIGPIPE, only record a warning log for now */
@@ -1662,7 +1662,7 @@ int ignore_sigpipe(void)
  */ 
 BOOL is_natural_number(char *str)
 {
-	int num;
+	int32_t num;
 	size_t i;
 	BOOL ret;
 
@@ -1707,11 +1707,11 @@ BOOL is_natural_number(char *str)
  * @return 0 on success, otherwise negative error code.
  *
  */ 
-int get_meta_size(ino_t inode, long long *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize)
 {
 	char metapath[300];
 	struct stat metastat;
-	int ret, ret_code;
+	int32_t ret, ret_code;
 
 	fetch_meta_path(metapath, inode);
 	ret = stat(metapath, &metastat);
@@ -1737,13 +1737,13 @@ int get_meta_size(ino_t inode, long long *metasize)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int get_quota_from_backup(long long *quota)
+int32_t get_quota_from_backup(int64_t *quota)
 {
 	char path[200];
 	char *json_result;
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
-	int errcode;
+	int32_t errcode;
 
 	*quota = 0;
 	sprintf(path, "%s/usermeta", METAPATH);

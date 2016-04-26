@@ -54,10 +54,10 @@
 *                appropriate error code.
 *
 *************************************************************************/
-int meta_forget_inode(ino_t self_inode)
+int32_t meta_forget_inode(ino_t self_inode)
 {
 	char thismetapath[METAPATHLEN];
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	ret = fetch_meta_path(thismetapath, self_inode);
 	if (ret < 0)
@@ -84,11 +84,11 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		unsigned long *ret_gen, char *ret_pin_status)
+int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
+		uint64_t *ret_gen, char *ret_pin_status)
 {
 	struct stat returned_stat;
-	int ret_code;
+	int32_t ret_code;
 	META_CACHE_ENTRY_STRUCT *temp_entry;
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
@@ -174,7 +174,7 @@ error_handling:
 }
 
 /* Remove entry when this child inode fail to create meta */
-static inline int dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
+static inline int32_t dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
 	const char *childname, mode_t child_mode)
 {
 	META_CACHE_ENTRY_STRUCT *tmp_bodyptr;
@@ -198,17 +198,17 @@ static inline int dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
 *                appropriate error code.
 *
 *************************************************************************/
-int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
+int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino, long long *delta_meta_size, char ispin)
+			struct stat *this_stat, uint64_t this_gen,
+			ino_t root_ino, int64_t *delta_meta_size, char ispin)
 {
-	int ret_val, ret, errcode;
+	int32_t ret_val, ret, errcode;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	long long metasize, old_metasize, new_metasize;
+	int64_t metasize, old_metasize, new_metasize;
 	CLOUD_RELATED_DATA cloud_related_data;
 
 	*delta_meta_size = 0;
@@ -355,16 +355,16 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
+int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, unsigned long this_gen,
-			ino_t root_ino, long long *delta_meta_size, char ispin)
+			struct stat *this_stat, uint64_t this_gen,
+			ino_t root_ino, int64_t *delta_meta_size, char ispin)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
-	int ret_val;
+	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	long long metasize, old_metasize, new_metasize;
+	int64_t metasize, old_metasize, new_metasize;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int ret, errcode;
 	size_t ret_size;
@@ -525,10 +525,10 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
+int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 			const DIR_ENTRY *this_entry)
 {
-	int ret_val;
+	int32_t ret_val;
 	ino_t this_inode;
 	META_CACHE_ENTRY_STRUCT *parent_ptr, *self_ptr;
 	DIR_STATS_TYPE tmpstat;
@@ -669,11 +669,11 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
+int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 			const char *selfname)
 {
 	DIR_META_TYPE tempmeta;
-	int ret_val;
+	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
@@ -749,7 +749,7 @@ error_handling:
 * Function name: symlink_update_meta
 *        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 *                const struct stat *this_stat, const char *link,
-*                const unsigned long generation, const char *name
+*                const uint64_t generation, const char *name
 *                ino_t root_ino
 *       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
 *                and then use meta_cache_update_symlink() to update stat
@@ -759,16 +759,16 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
+int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link,
-	const unsigned long generation, const char *name,
-	ino_t root_ino, long long *delta_meta_size, char ispin)
+	const uint64_t generation, const char *name,
+	ino_t root_ino, int64_t *delta_meta_size, char ispin)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
 	ino_t parent_inode, self_inode;
-	int ret_code;
-	long long metasize, old_metasize, new_metasize;
+	int32_t ret_code;
+	int64_t metasize, old_metasize, new_metasize;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int ret, errcode;
 	size_t ret_size;
@@ -905,7 +905,7 @@ errcode_handle:
 *
 * Function name: fetch_xattr_page
 *        Inputs: META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-*                XATTR_PAGE *xattr_page, long long *xattr_pos
+*                XATTR_PAGE *xattr_page, int64_t *xattr_pos
 *       Summary: Helper of xattr operation in FUSE. The function aims to
 *                fetch xattr page and xattr file position and store them
 *                in "xattr_page" and "xattr_pos", respectively. Do NOT
@@ -916,17 +916,17 @@ errcode_handle:
 *
 *************************************************************************/
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, long long *xattr_pos, BOOL create_page)
+	XATTR_PAGE *xattr_page, int64_t *xattr_pos, BOOL create_page)
 {
-	int ret_code;
+	int32_t ret_code;
 	ino_t this_inode;
 	struct stat stat_data;
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
 	SYMLINK_META_TYPE symlinkmeta;
-	int errcode;
-	int ret;
-	long long ret_pos, ret_size;
+	int32_t errcode;
+	int32_t ret;
+	int64_t ret_pos, ret_size;
 
 	this_inode = meta_cache_entry->inode_num;
 	if (this_inode <= 0) {
@@ -1038,7 +1038,7 @@ errcode_handle:
 *
 * Function name: link_update_meta
 *        Inputs: ino_t link_inode, const char *newname,
-*                struct stat *link_stat, unsigned long *generation,
+*                struct stat *link_stat, uint64_t *generation,
 *                META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry
 *       Summary: Helper of link operation in FUSE. Given the inode numebr
 *                "link_inode", this function will increase link number
@@ -1052,12 +1052,12 @@ errcode_handle:
 *
 *************************************************************************/
 int link_update_meta(ino_t link_inode, const char *newname,
-	struct stat *link_stat, unsigned long *generation,
+	struct stat *link_stat, uint64_t *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {
 	META_CACHE_ENTRY_STRUCT *link_entry;
 	FILE_META_TYPE filemeta;
-	int ret_val;
+	int32_t ret_val;
 	ino_t parent_inode;
 	DIR_STATS_TYPE tmpstat;
 
@@ -1162,10 +1162,10 @@ error_handle:
  * reserved pinned size. If reserved pinned size is insufficient, then it will
  * increase system pinned space.
  */
-int increase_pinned_size(long long *reserved_pinned_size,
-		long long file_size)
+int32_t increase_pinned_size(int64_t *reserved_pinned_size,
+		int64_t file_size)
 {
-	int ret;
+	int32_t ret;
 
 	ret = 0;
 	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
@@ -1207,12 +1207,12 @@ int increase_pinned_size(long long *reserved_pinned_size,
  * @return 0 on success, 1 on case that regfile/symlink had been pinned,
  *         otherwise negative error code.
  */
-int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
+int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 {
-	int ret;
+	int32_t ret;
 	struct stat tempstat;
 	ino_t *dir_node_list, *nondir_node_list;
-	long long count, num_dir_node, num_nondir_node;
+	int64_t count, num_dir_node, num_nondir_node;
 
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
@@ -1301,7 +1301,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
  * This function will deduct pinned space from reserved_release_size. If space
  * is insufficient, it will decrease system pinned size.
  */
-int decrease_pinned_size(long long *reserved_release_size, long long file_size)
+int32_t decrease_pinned_size(int64_t *reserved_release_size, int64_t file_size)
 {
 	*reserved_release_size -= file_size;
 	if (*reserved_release_size < 0) {
@@ -1343,12 +1343,12 @@ int decrease_pinned_size(long long *reserved_release_size, long long file_size)
  *         otherwise negative error code.
  */
 
-int unpin_inode(ino_t this_inode, long long *reserved_release_size)
+int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 {
-	int ret;
+	int32_t ret;
 	struct stat tempstat;
 	ino_t *dir_node_list, *nondir_node_list;
-	long long count, num_dir_node, num_nondir_node;
+	int64_t count, num_dir_node, num_nondir_node;
 
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)

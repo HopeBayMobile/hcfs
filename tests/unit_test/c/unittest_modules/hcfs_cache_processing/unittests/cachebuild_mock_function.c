@@ -7,7 +7,7 @@
 #define TRUE 1
 #define FALSE 0
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	int sub_dir;
 	char tmpname[500];

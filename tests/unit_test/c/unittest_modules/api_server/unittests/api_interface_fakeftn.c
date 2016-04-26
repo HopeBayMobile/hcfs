@@ -133,7 +133,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 }
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return -EIO;
 }
@@ -142,14 +142,14 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return NULL;
 }
 
-int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
+int pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 {
 	if (PIN_INODE_ROLLBACK == TRUE)
 		return -EIO;
 	return 0;
 }
 
-int unpin_inode(ino_t this_inode, long long *reserved_release_size)
+int unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 {
 	if (UNPIN_INODE_FAIL == TRUE)
 		return -EIO;

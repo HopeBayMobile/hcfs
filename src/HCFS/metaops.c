@@ -49,7 +49,7 @@
 #include "FS_manager.h"
 #endif
 
-static inline void logerr(int errcode, char *msg)
+static inline void logerr(int32_t errcode, char *msg)
 {
 	if (errcode > 0)
 		write_log(0, "%s. Code %d, %s\n", msg, errcode,
@@ -62,14 +62,14 @@ static inline void logerr(int errcode, char *msg)
 *
 * Function name: init_dir_page
 *        Inputs: DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
-*                long long this_page_pos
+*                int64_t this_page_pos
 *       Summary: Initialize directory entries for a new directory object.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
-				ino_t parent_inode, long long this_page_pos)
+int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
+				ino_t parent_inode, int64_t this_page_pos)
 {
 	memset(tpage, 0, sizeof(DIR_ENTRY_PAGE));
 
@@ -98,21 +98,21 @@ int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 *                appropriate error code.
 *
 *************************************************************************/
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
+int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	struct stat parent_stat;
 	DIR_META_TYPE parent_meta;
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
-	long long overflow_new_page;
-	int ret, errcode;
+	int64_t overflow_new_page;
+	int32_t ret, errcode;
 	size_t ret_size;
-	int sem_val;
+	int32_t sem_val;
 	char no_need_rewrite;
 	int64_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
-	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
 
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
 	if (sem_val > 0) {
@@ -253,7 +253,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 		/* Initialize the new root node */
 		new_root.parent_page_pos = 0;
 		memset(new_root.child_page_pos, 0,
-				sizeof(long long)*(MAX_DIR_ENTRIES_PER_PAGE+1));
+				sizeof(int64_t)*(MAX_DIR_ENTRIES_PER_PAGE+1));
 		new_root.num_entries = 1;
 		memcpy(&(new_root.dir_entries[0]), &overflow_entry,
 							sizeof(DIR_ENTRY));
@@ -339,20 +339,20 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
+int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 			const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	struct stat parent_stat;
 	DIR_META_TYPE parent_meta;
 	DIR_ENTRY_PAGE tpage;
-	int sem_val;
+	int32_t sem_val;
 	DIR_ENTRY temp_entry;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
-	long long temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	int64_t temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
 
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
 	if (sem_val > 0) {
@@ -451,12 +451,12 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
+int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
-	int count;
-	int ret_val;
+	int32_t count;
+	int32_t ret_val;
 	struct stat tmpstat;
 
 	/* TODO: remove unused parameter ‘parent_inode1’ */
@@ -496,13 +496,13 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *                appropriate error code.
 *
 *************************************************************************/
-int change_dir_entry_inode(ino_t self_inode, const char *targetname,
+int32_t change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		ino_t new_inode, mode_t new_mode,
 		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
-	int count;
-	int ret_val;
+	int32_t count;
+	int32_t ret_val;
 	struct stat tmpstat;
 
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
@@ -562,13 +562,13 @@ int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 *                appropriate error code.
 *
 *************************************************************************/
-int delete_inode_meta(ino_t this_inode)
+int32_t delete_inode_meta(ino_t this_inode)
 {
 	char todelete_metapath[METAPATHLEN];
 	char thismetapath[METAPATHLEN];
 	FILE *todeletefptr, *metafptr;
 	char filebuf[5000];
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size, write_size;
 
 	ret = super_block_to_delete(this_inode);
@@ -648,10 +648,10 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
+int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 {
 	struct stat this_inode_stat;
-	int ret_val;
+	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
@@ -686,10 +686,10 @@ int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 	return ret_val;
 }
 
-static inline long long longpow(long long base, int power)
+static inline int64_t longpow(int64_t base, int32_t power)
 {
-	long long tmp;
-	int count;
+	int64_t tmp;
+	int32_t count;
 
 	tmp = 1;
 
@@ -699,9 +699,9 @@ static inline long long longpow(long long base, int power)
 	return tmp;
 }
 /* Checks if page_index belongs to direct or what indirect page */
-int _check_page_level(long long page_index)
+int32_t _check_page_level(int64_t page_index)
 {
-	long long tmp_index;
+	int64_t tmp_index;
 
 	if (page_index == 0)
 		return 0;   /*direct page (id 0)*/
@@ -729,14 +729,14 @@ int _check_page_level(long long page_index)
 	return 4;
 }
 
-long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
-			FILE *fptr, int level)
+int64_t _load_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
+			FILE *fptr, int32_t level)
 {
-	long long tmp_page_index;
-	long long tmp_pos, tmp_target_pos;
-	long long tmp_ptr_page_index, tmp_ptr_index;
+	int64_t tmp_page_index;
+	int64_t tmp_pos, tmp_target_pos;
+	int64_t tmp_ptr_page_index, tmp_ptr_index;
 	PTR_ENTRY_PAGE tmp_ptr_page;
-	int count, ret, errcode;
+	int32_t count, ret, errcode;
 	size_t ret_size;
 	int64_t ret_pos;
 
@@ -795,8 +795,8 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: seek_page
-*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page
-*                long long hint_page
+*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page
+*                int64_t hint_page
 *       Summary: Given meta cache entry pointed by "body_ptr", find the block
 *                entry page "target_page" and return the file pos of the page.
 *                "hint_page" is used for quickly finding the position of
@@ -807,14 +807,14 @@ errcode_handle:
 *                If file pos is 0, the page is not found.
 *
 *************************************************************************/
-long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
-			long long hint_page)
+int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page,
+			int64_t hint_page)
 {
 	off_t filepos;
-	int sem_val;
+	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
-	int which_indirect;
-	int ret;
+	int32_t which_indirect;
+	int32_t ret;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
 	UNUSED(hint_page);
@@ -889,14 +889,14 @@ long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 }
 
 /* Helper function for creating new page. */
-long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
-			META_CACHE_ENTRY_STRUCT *body_ptr, int level)
+int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
+			META_CACHE_ENTRY_STRUCT *body_ptr, int32_t level)
 {
-	long long tmp_page_index;
-	long long tmp_pos, tmp_target_pos;
-	long long tmp_ptr_page_index, tmp_ptr_index;
+	int64_t tmp_page_index;
+	int64_t tmp_pos, tmp_target_pos;
+	int64_t tmp_ptr_page_index, tmp_ptr_index;
 	PTR_ENTRY_PAGE tmp_ptr_page, empty_ptr_page;
-	int count, ret, errcode;
+	int32_t count, ret, errcode;
 	BLOCK_ENTRY_PAGE temppage;
 	size_t ret_size;
 	int64_t ret_pos;
@@ -1033,21 +1033,21 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: create_page
-*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page
+*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page
 *       Summary: Given meta cache entry pointed by "body_ptr", create the block
 *                entry page "target_page" and return the file pos of the page.
 *  Return value: File pos of the page if successful. Otherwise returns
 *                negation of error code.
 *
 *************************************************************************/
-long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
+int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 {
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
-	int sem_val;
+	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
-	int which_indirect;
-	int ret, errcode;
+	int32_t which_indirect;
+	int32_t ret, errcode;
 	int64_t ret_pos;
 
 	/* First check if meta cache is locked */
@@ -1127,8 +1127,8 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: seek_page2
-*        Inputs: FILE_META_TYPE *temp_meta, FILE *fptr, long long target_page
-*                long long hint_page
+*        Inputs: FILE_META_TYPE *temp_meta, FILE *fptr, int64_t target_page
+*                int64_t hint_page
 *       Summary: Given meta file pointed by "fptr", find the block
 *                entry page "target_page" and return the file pos of the page.
 *                "hint_page" is used for quickly finding the position of
@@ -1140,11 +1140,11 @@ errcode_handle:
 *                If file pos is 0, the page is not found.
 *
 *************************************************************************/
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
-		long long target_page, long long hint_page)
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
+		int64_t target_page, int64_t hint_page)
 {
 	off_t filepos;
-	int which_indirect;
+	int32_t which_indirect;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
 	UNUSED(hint_page);
@@ -1208,22 +1208,22 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 *                negation of error code.
 *
 *************************************************************************/
-int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
+int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			MOUNT_T *mptr)
 {
 	char thisblockpath[400];
 	char thismetapath[400];
-	int ret, errcode;
-	long long count;
-	long long total_blocks;
-	long long current_page;
-	long long page_pos;
+	int32_t ret, errcode;
+	int64_t count;
+	int64_t total_blocks;
+	int64_t current_page;
+	int64_t page_pos;
 	off_t cache_block_size;
 	struct stat this_inode_stat;
         FILE_META_TYPE file_meta;
         BLOCK_ENTRY_PAGE tmppage;
         FILE *metafptr;
-        long long e_index, which_page;
+        int64_t e_index, which_page;
         size_t ret_size;
         struct timeval start_time, end_time;
         float elapsed_time;
@@ -1232,7 +1232,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	char meta_deleted;
-	long long metasize, dirty_delta, unpin_dirty_delta;
+	int64_t metasize, dirty_delta, unpin_dirty_delta;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1461,9 +1461,9 @@ errcode_handle:
 }
 
 /* Mark inode as to delete on disk and lookup count table */
-int mark_inode_delete(fuse_req_t req, ino_t this_inode)
+int32_t mark_inode_delete(fuse_req_t req, ino_t this_inode)
 {
-	int ret;
+	int32_t ret;
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -1476,10 +1476,10 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 }
 
 /* Mark inode as to delete on disk */
-int disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
+int32_t disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
 {
 	char pathname[200];
-	int ret, errcode;
+	int32_t ret, errcode;
 	char *tmppath;
 	FILE *fptr;
 
@@ -1543,10 +1543,10 @@ errcode_handle:
 }
 
 /* Clear inode as to delete on disk */
-int disk_cleardelete(ino_t this_inode, ino_t root_inode)
+int32_t disk_cleardelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
@@ -1570,10 +1570,10 @@ errcode_handle:
 }
 
 /* Check if inode is marked as to delete on disk */
-int disk_checkdelete(ino_t this_inode, ino_t root_inode)
+int32_t disk_checkdelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
-	int errcode;
+	int32_t errcode;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
@@ -1596,15 +1596,15 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 
 /* At system startup, scan to delete markers on disk to determine if
 there are inodes to be deleted. */
-int startup_finish_delete(void)
+int32_t startup_finish_delete(void)
 {
 	DIR *dirp;
 	struct dirent tmpent, *tmpptr;
 	struct stat tmpstat;
 	char pathname[200];
-	int ret_val;
+	int32_t ret_val;
 	ino_t tmp_ino, root_inode;
-	int errcode, ret;
+	int32_t errcode, ret;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
@@ -1672,11 +1672,11 @@ int startup_finish_delete(void)
 /* Given parent "parent", search for "childname" in parent and return
 the directory entry in structure pointed by "dentry" if found. If not or
 if error, return the negation of error code. */
-int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
+int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 {
 	META_CACHE_ENTRY_STRUCT *cache_entry;
 	DIR_ENTRY_PAGE temp_page;
-	int temp_index, ret_val;
+	int32_t temp_index, ret_val;
 
 	cache_entry = meta_cache_lock_entry(parent);
 	if (cache_entry == NULL)
@@ -1710,9 +1710,9 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
  * 
  * @return 0 on succes, otherwise negative error code.
  */
-static int _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin)
+static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	FILE_STATS_TYPE filestats;
 
@@ -1754,13 +1754,13 @@ errcode_handle:
  * @return 0 when succeding in change pin-flag, 1 when new pin-flag is the
  *         same as old one. Otherwise return negative error code.
  */
-int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
+int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 {
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	FILE_META_TYPE file_meta;
 	DIR_META_TYPE dir_meta;
 	SYMLINK_META_TYPE symlink_meta;
-	int ret, ret_code;
+	int32_t ret, ret_code;
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -1855,8 +1855,8 @@ error_handling:
  * Subroutin used to check size of the array and extend the
  * array size if it is full.
  */
-static int _check_extend_size(ino_t **ptr, long long num_elem,
-	long long *max_elem_size)
+static int32_t _check_extend_size(ino_t **ptr, int64_t num_elem,
+	int64_t *max_elem_size)
 {
 	ino_t *tmp_ptr;
 
@@ -1876,8 +1876,8 @@ static int _check_extend_size(ino_t **ptr, long long num_elem,
  * Subroutine used to shrink the array size so that eliminate wasting
  * on memory.
  */
-static int _check_shrink_size(ino_t **ptr, long long num_elem,
-	long long max_elem_size)
+static int32_t _check_shrink_size(ino_t **ptr, int64_t num_elem,
+	int64_t max_elem_size)
 {
 	ino_t *tmp_ptr;
 
@@ -1921,16 +1921,16 @@ static int _check_shrink_size(ino_t **ptr, long long num_elem,
  *
  * @return 0 on success, otherwise negative error code
  */
-int collect_dir_children(ino_t this_inode,
-	ino_t **dir_node_list, long long *num_dir_node,
-	ino_t **nondir_node_list, long long *num_nondir_node)
+int32_t collect_dir_children(ino_t this_inode,
+	ino_t **dir_node_list, int64_t *num_dir_node,
+	ino_t **nondir_node_list, int64_t *num_nondir_node)
 {
 	char metapath[300];
 	FILE *fptr;
-	int ret, errcode;
-	int count;
-	long long ret_size, now_page_pos;
-	long long total_children, half, now_nondir_size, now_dir_size;
+	int32_t ret, errcode;
+	int32_t count;
+	int64_t ret_size, now_page_pos;
+	int64_t total_children, half, now_nondir_size, now_dir_size;
 	DIR_META_TYPE dir_meta;
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *tmpentry;
@@ -2082,20 +2082,20 @@ static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
  *
  * @return 0 on success, otherwise negative errcode.
  */ 
-int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr)
 {
 	META_CACHE_ENTRY_STRUCT *pbody_ptr;
 	XATTR_PAGE p_xattr_page, sel_xattr_page;
 	DIR_META_TYPE dirmeta;
-	long long p_xattr_pos, sel_xattr_pos;
+	int64_t p_xattr_pos, sel_xattr_pos;
 	size_t total_keysize, total_keysize2;
 	const char *key_ptr;
 	char now_key[400], namespace, key[300];
 	char *key_buf, *value_buf;
 	size_t value_buf_size;
 	size_t value_size;
-	int ret;
+	int32_t ret;
 
 	UNUSED(this_inode);
 	key_buf = NULL;

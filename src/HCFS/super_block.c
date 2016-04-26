@@ -424,7 +424,7 @@ int super_block_mark_dirty(ino_t this_inode)
 	int ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 	char need_write;
-	long long now_meta_size, dirty_delta_meta_size;
+	int64_t now_meta_size, dirty_delta_meta_size;
 
 	need_write = FALSE;
 	ret_val = 0;
@@ -672,7 +672,7 @@ int super_block_reclaim(void)
 {
 	int ret_val, errcode;
 	SUPER_BLOCK_ENTRY tempentry;
-	long long count;
+	int64_t count;
 	ino_t last_reclaimed;
 	ino_t *unclaimed_list;
 	size_t num_unclaimed;
@@ -809,7 +809,7 @@ int super_block_reclaim_fullscan(void)
 {
 	int errcode;
 	SUPER_BLOCK_ENTRY tempentry;
-	long long count;
+	int64_t count;
 	off_t thisfilepos, retval;
 	ino_t last_reclaimed, first_reclaimed, old_last_reclaimed;
 	ssize_t retsize;
@@ -1065,7 +1065,7 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 	SUPER_BLOCK_ENTRY tempentry;
 	int ret, errcode;
 	ssize_t retsize;
-	long long now_meta_size, dirty_delta_meta_size;
+	int64_t now_meta_size, dirty_delta_meta_size;
 
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */

@@ -18,21 +18,21 @@
 
 /* The structure for keeping statistics for a directory */
 typedef struct {
-	long long num_local;
-	long long num_cloud;
-	long long num_hybrid;
+	int64_t num_local;
+	int64_t num_cloud;
+	int64_t num_hybrid;
 } DIR_STATS_TYPE;
 
 /* Share with path lookup the same resource lock */
 FILE *dirstat_lookup_data_fptr;
 
-int init_dirstat_lookup();
+int32_t init_dirstat_lookup();
 void destroy_dirstat_lookup();
 
-int reset_dirstat_lookup(ino_t thisinode);
-int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat);
-int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat);
-int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat);
+int32_t reset_dirstat_lookup(ino_t thisinode);
+int32_t update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat);
+int32_t update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat);
+int32_t read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat);
 
 #endif  /* GW20_HCFS_DIR_STATISTICS_H_ */
 

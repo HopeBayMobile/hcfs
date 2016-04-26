@@ -70,9 +70,9 @@ int init_system_fh_table(void)
 *                negation of error code.
 *
 *************************************************************************/
-long long open_fh(ino_t thisinode, int flags)
+int64_t open_fh(ino_t thisinode, int flags)
 {
-	long long index;
+	int64_t index;
 
 	sem_wait(&(system_fh_table.fh_table_sem));
 
@@ -108,12 +108,12 @@ long long open_fh(ino_t thisinode, int flags)
 /************************************************************************
 *
 * Function name: close_fh
-*        Inputs: long long index
+*        Inputs: int64_t index
 *       Summary: Close file handle table entry "index".
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int close_fh(long long index)
+int close_fh(int64_t index)
 {
 	FH_ENTRY *tmp_entry;
 

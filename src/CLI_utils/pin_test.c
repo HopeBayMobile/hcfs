@@ -23,18 +23,18 @@ typedef struct {
 	char d_type;
 } DIR_ENTRY;
 
-int main(int argc, char **argv)
+int32_t main(int32_t argc, char **argv)
 {
-	int fd, status, retcode, code;
-	unsigned int cmd_len, reply_len;
+	int32_t fd, status, retcode, code;
+	uint32_t cmd_len, reply_len;
 	struct sockaddr_un addr;
 	char buf[4096];
 	struct stat tempstat;
 	ino_t this_inode;
-	long long reserved_size = 123;
-	unsigned int num_inodes = 0;
+	int64_t reserved_size = 123;
+	uint32_t num_inodes = 0;
 	ino_t inode_list[1000];
-	int i;
+	int32_t i;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -61,7 +61,8 @@ int main(int argc, char **argv)
 		inode_list[num_inodes] = this_inode;
 		num_inodes++;
 
-		printf("%s - inode %"PRIu64" - num_inode %d\n", argv[i], (uint64_t)this_inode, num_inodes);
+		printf("%s - inode %" PRIu64 " - num_inode %d\n", argv[i],
+		       (uint64_t)this_inode, num_inodes);
 	}
 
 	addr.sun_family = AF_UNIX;
@@ -72,19 +73,19 @@ int main(int argc, char **argv)
 	switch (code) {
 	case PIN:
 
-		cmd_len = sizeof(long long) + sizeof(unsigned int) + 
+		cmd_len = sizeof(int64_t) + sizeof(uint32_t) + 
 			num_inodes * sizeof(ino_t);
-		memcpy(buf, &reserved_size, sizeof(long long)); /* Pre-allocating pinned size (be allowed to be 0) */
-		memcpy(buf + sizeof(long long), &num_inodes, /* # of inodes */
-			sizeof(unsigned int));
-		memcpy(buf + sizeof(long long) + sizeof(unsigned int), /* inode array */
+		memcpy(buf, &reserved_size, sizeof(int64_t)); /* Pre-allocating pinned size (be allowed to be 0) */
+		memcpy(buf + sizeof(int64_t), &num_inodes, /* # of inodes */
+			sizeof(uint32_t));
+		memcpy(buf + sizeof(int64_t) + sizeof(uint32_t), /* inode array */
 			inode_list, sizeof(ino_t) * num_inodes);
-		send(fd, &code, sizeof(unsigned int), 0);
-		send(fd, &cmd_len, sizeof(unsigned int), 0);
+		send(fd, &code, sizeof(uint32_t), 0);
+		send(fd, &cmd_len, sizeof(uint32_t), 0);
 		send(fd, buf, cmd_len, 0);
 
-		recv(fd, &reply_len, sizeof(unsigned int), 0);
-		recv(fd, &retcode, sizeof(int), 0);
+		recv(fd, &reply_len, sizeof(uint32_t), 0);
+		recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
@@ -92,17 +93,17 @@ int main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	case UNPIN:
-		cmd_len = sizeof(unsigned int) + num_inodes * sizeof(ino_t);
-		memcpy(buf, &num_inodes, sizeof(unsigned int)); /* # of inodes */
-		memcpy(buf + sizeof(unsigned int), /* inode array */
+		cmd_len = sizeof(uint32_t) + num_inodes * sizeof(ino_t);
+		memcpy(buf, &num_inodes, sizeof(uint32_t)); /* # of inodes */
+		memcpy(buf + sizeof(uint32_t), /* inode array */
 			inode_list, sizeof(ino_t) * num_inodes);
 
-		send(fd, &code, sizeof(unsigned int), 0);
-		send(fd, &cmd_len, sizeof(unsigned int), 0);
+		send(fd, &code, sizeof(uint32_t), 0);
+		send(fd, &cmd_len, sizeof(uint32_t), 0);
 		send(fd, buf, cmd_len, 0);
 
-		recv(fd, &reply_len, sizeof(unsigned int), 0);
-		recv(fd, &retcode, sizeof(int), 0);
+		recv(fd, &reply_len, sizeof(uint32_t), 0);
+		recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));

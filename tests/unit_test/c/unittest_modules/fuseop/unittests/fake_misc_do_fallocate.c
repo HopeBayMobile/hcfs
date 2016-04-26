@@ -224,7 +224,7 @@ off_t check_file_size(const char *path)
 	return tempstat.st_size;
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	if (access("/tmp/testHCFS/testblock", F_OK) != 0)
 		mkdir("/tmp/testHCFS/testblock", 0700);
@@ -233,8 +233,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	return 0;
 }
 
-int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta)
+int change_system_meta(int64_t system_size_delta,
+		int64_t cache_size_delta, int64_t cache_blocks_delta)
 {
 	hcfs_system->systemdata.system_size += system_size_delta;
 	hcfs_system->systemdata.cache_size += cache_size_delta;
@@ -288,14 +288,14 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 	return 0;
 }
 
-long long open_fh(ino_t thisinode, int flags)
+int64_t open_fh(ino_t thisinode, int flags)
 {
-	long long index;
+	int64_t index;
 
 	if (fail_open_files)
 		return -1;
 
-	index = (long long) thisinode;
+	index = (int64_t) thisinode;
 	system_fh_table.entry_table_flags[index] = TRUE;
 	system_fh_table.entry_table[index].thisinode = thisinode;
 	system_fh_table.entry_table[index].meta_cache_ptr = NULL;
@@ -311,7 +311,7 @@ long long open_fh(ino_t thisinode, int flags)
 	return index;
 }
 
-int close_fh(long long index)
+int close_fh(int64_t index)
 {
 	FH_ENTRY *tmp_entry;
 
@@ -335,8 +335,8 @@ int close_fh(long long index)
 	return 0;
 }
 
-long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
-			long long hint_page)
+int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page,
+			int64_t hint_page)
 {
 	switch (target_page) {
 	case 0:
@@ -347,7 +347,7 @@ long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 	return 0;
 }
 
-long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
+int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 {
 	switch (target_page) {
 	case 0:
@@ -363,7 +363,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	return 0;
 }
 int fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
-		long long block_no)
+		int64_t block_no)
 {
 	char tempbuf[1024];
 	int tmp_len;
@@ -680,7 +680,7 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 }
 
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
-	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	XATTR_PAGE *xattr_page, const int64_t xattr_filepos, 
 	const char name_space, const char *key, 
 	const char *value, const size_t size, const int flag)
 {
@@ -725,7 +725,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 }
 
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	XATTR_PAGE *xattr_page, const int64_t xattr_filepos, 
 	const char name_space, const char *key)
 {
 	if (meta_cache_entry->inode_num == 20)
@@ -735,7 +735,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 }
 
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
-	XATTR_PAGE *xattr_page, long long *xattr_pos)
+	XATTR_PAGE *xattr_page, int64_t *xattr_pos)
 {
 	return 0;
 }
@@ -765,8 +765,8 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	return 0;
 }
 
-int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
 	return 0;
 }
@@ -829,9 +829,9 @@ int super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
-int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-			long long num_cached_blocks_delta,
-			long long cached_size_delta)
+int update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+			int64_t num_cached_blocks_delta,
+			int64_t cached_size_delta)
 {
 	return 0;
 }

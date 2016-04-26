@@ -1100,7 +1100,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: convert_currenttime
-*        Inputs: unsigned char *date_string
+*        Inputs: uint8_t *date_string
 *       Summary: For S3 backend, convert the current time to a format that
 *                can be used for creating signature string.
 *  Return value: None.
@@ -1135,16 +1135,16 @@ void convert_currenttime(char *date_string)
 /************************************************************************
 *
 * Function name: compute_hmac_sha1
-*        Inputs: unsigned char *input_str, unsigned char *output_str,
-*                unsigned char *key, int *outputlen
+*        Inputs: uint8_t *input_str, uint8_t *output_str,
+*                uint8_t *key, int *outputlen
 *       Summary: For S3 backend, compute HMAC-SHA1 string for signature use.
 *  Return value: None.
 *
 *************************************************************************/
-void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
+void compute_hmac_sha1(uint8_t *input_str, uint8_t *output_str,
 		       char *key, int *outputlen)
 {
-	unsigned char finalhash[4096];
+	uint8_t finalhash[4096];
 	unsigned int len_finalhash;
 	HMAC_CTX myctx;
 	/* int count; */
@@ -1171,8 +1171,8 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 /************************************************************************
 *
 * Function name: generate_S3_sig
-*        Inputs: unsigned char *method, unsigned char *date_string,
-*                unsigned char *sig_string, unsigned char *resource_string,
+*        Inputs: uint8_t *method, uint8_t *date_string,
+*                uint8_t *sig_string, uint8_t *resource_string,
 		 HCFS_encode_object_meta
 *       Summary: Compute the signature string for S3 backend.
 *  Return value: None.
@@ -1183,7 +1183,7 @@ void generate_S3_sig(char *method, char *date_string,
 		     HTTP_meta *object_meta)
 {
 	char sig_temp1[4096] = {0};
-	unsigned char sig_temp2[64] = {0};
+	uint8_t sig_temp2[64] = {0};
 	int len_signature, hashlen;
 	char header[1024] = {0};
 
@@ -1207,10 +1207,10 @@ void generate_S3_sig(char *method, char *date_string,
 			resource_string);
 	}
 	write_log(10, "sig temp1: %s\n", sig_temp1);
-	compute_hmac_sha1((unsigned char *)sig_temp1, sig_temp2, S3_SECRET,
+	compute_hmac_sha1((uint8_t *)sig_temp1, sig_temp2, S3_SECRET,
 			  &hashlen);
 	write_log(10, "sig temp2: %s\n", sig_temp2);
-	b64encode_str(sig_temp2, (unsigned char*)sig_string, &len_signature, hashlen);
+	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
 
 	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
 }

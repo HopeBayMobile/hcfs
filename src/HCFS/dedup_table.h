@@ -16,6 +16,7 @@
 
 #include <openssl/sha.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 /*
  * The structure of ddt is a combination of hash table and btree. Each node
@@ -49,62 +50,62 @@
 
 
 typedef struct {
-	unsigned char obj_id[OBJID_LENGTH];
+	uint8_t obj_id[OBJID_LENGTH];
 	off_t obj_size;
 	//char start_bytes[BYTES_TO_CHECK];
 	//char end_bytes[BYTES_TO_CHECK];
-	long long refcount;
+	int64_t refcount;
 } DDT_BTREE_EL;
 
 typedef struct {
-	int num_el;
-	int is_leaf;
-	long long this_node_pos;
+	int32_t num_el;
+	int32_t is_leaf;
+	int64_t this_node_pos;
 	// Elements store in this node
 	DDT_BTREE_EL ddt_btree_el[MAX_EL_PER_NODE];
 	// Parent node
-	long long parent_node_pos;
+	int64_t parent_node_pos;
 	// Child nodes
-	long long child_node_pos[MAX_EL_PER_NODE + 1];
+	int64_t child_node_pos[MAX_EL_PER_NODE + 1];
 	// Point to next reclaimed node
-	long long gc_list_next;
+	int64_t gc_list_next;
 } DDT_BTREE_NODE;
 
 typedef struct {
-	long long tree_root;
-	long long total_el;
+	int64_t tree_root;
+	int64_t total_el;
 	// Point to the first node which can be reclaimed
-	long long node_gc_list;
+	int64_t node_gc_list;
 } DDT_BTREE_META;
 
 
-int initialize_ddt_meta(char *meta_path);
+int32_t initialize_ddt_meta(char *meta_path);
 
-FILE* get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
+FILE* get_ddt_btree_meta(uint8_t key[], DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta);
 
-int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
-				DDT_BTREE_NODE *result_node, int *result_idx);
+int32_t search_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
+				DDT_BTREE_NODE *result_node, int32_t *result_idx);
 
-int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd);
+int32_t traverse_ddt_btree(DDT_BTREE_NODE *tnode, int32_t fd);
 
-int insert_ddt_btree(unsigned char key[], const off_t obj_size,
-				DDT_BTREE_NODE *tnode, int fd,
+int32_t insert_ddt_btree(uint8_t key[], const off_t obj_size,
+				DDT_BTREE_NODE *tnode, int32_t fd,
 				DDT_BTREE_META *this_meta);
 
-int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
-				int fd, DDT_BTREE_META *this_meta, int force_delete);
+int32_t delete_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode,
+				int32_t fd, DDT_BTREE_META *this_meta, int32_t force_delete);
 
-int increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd);
+int32_t increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int32_t s_idx, int32_t fd);
 
-int decrease_ddt_el_refcount(unsigned char key[], DDT_BTREE_NODE *tnode,
-				int fd, DDT_BTREE_META *this_meta);
+int32_t decrease_ddt_el_refcount(uint8_t key[], DDT_BTREE_NODE *tnode,
+				int32_t fd, DDT_BTREE_META *this_meta);
 
 // Util function for data dedup
-int get_obj_id(char *path, unsigned char *hash, unsigned char start_bytes[],
-				unsigned char end_bytes[], off_t *obj_size);
+int32_t get_obj_id(char *path, uint8_t *hash, uint8_t start_bytes[],
+				uint8_t end_bytes[], off_t *obj_size);
 
-int obj_id_to_string(unsigned char obj_id[OBJID_LENGTH],
+int32_t obj_id_to_string(uint8_t obj_id[OBJID_LENGTH],
 				char output_str[OBJID_STRING_LENGTH]);
 
 #endif /* GW20_HCFS_DEDUP_TABLE_H_ */

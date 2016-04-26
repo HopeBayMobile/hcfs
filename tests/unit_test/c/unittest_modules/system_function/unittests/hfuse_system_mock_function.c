@@ -43,7 +43,7 @@ ino_t super_block_new_inode(struct stat *in_stat)
 }
 
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
-                                                long long this_page_pos)
+                                                int64_t this_page_pos)
 {
 	return 0;
 }
@@ -187,7 +187,7 @@ int update_quota()
 	return 0;
 }
 
-int get_quota_from_backup(long long *quota)
+int get_quota_from_backup(int64_t *quota)
 {
 	*quota = 0;
 	return 0;

@@ -66,6 +66,7 @@ to other entries.
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 
@@ -112,7 +113,7 @@ typedef struct {
 	META_CACHE_LOOKUP_ENTRY_STRUCT *last_entry;
 } META_CACHE_HEADER_STRUCT;
 
-int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize);
+int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize);
 int init_meta_cache_headers(void);
 int release_meta_cache_headers(void);
 int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
@@ -123,11 +124,11 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
 int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,

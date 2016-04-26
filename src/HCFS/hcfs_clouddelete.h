@@ -28,7 +28,7 @@
 
 typedef struct {
 	ino_t inode;
-	long long blockno;
+	int64_t blockno;
 #if (DEDUP_ENABLE)
 	unsigned char obj_id[OBJID_LENGTH];
 #endif
@@ -77,7 +77,7 @@ typedef struct {
 DELETE_THREAD_CONTROL delete_ctl;
 DSYNC_THREAD_CONTROL dsync_ctl;
 
-int do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, int64_t block_no,
 #if (DEDUP_ENABLE)
 		    unsigned char *obj_id,
 #endif

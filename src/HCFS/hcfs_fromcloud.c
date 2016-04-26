@@ -43,7 +43,7 @@
 /************************************************************************
 *
 * Function name: fetch_from_cloud
-*        Inputs: FILE *fptr, ino_t this_inode, long long block_no
+*        Inputs: FILE *fptr, ino_t this_inode, int64_t block_no
 *       Summary: Read block "block_no" of inode "this_inode" from backend,
 *                and write to the file pointed by "fptr".
 *  Return value: 0 if successful, or negation of error code.
@@ -53,7 +53,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		     unsigned char *obj_id)
 #else
-		     ino_t this_inode, long long block_no)
+		     ino_t this_inode, int64_t block_no)
 #endif
 {
 	char objname[1000];
@@ -73,7 +73,7 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	obj_id_to_string(obj_id, obj_id_str);
 	sprintf(objname, "data_%s", obj_id_str);
 #else
-	sprintf(objname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
+	sprintf(objname, "data_%" PRIu64 "_%" PRId64, (uint64_t)this_inode, block_no);
 #endif
 
 	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
@@ -422,7 +422,7 @@ void download_block_manager()
 }
 
 static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
-	char from_st, char to_st, long long cache_size_delta)
+	char from_st, char to_st, int64_t cache_size_delta)
 {
 	BLOCK_ENTRY_PAGE block_page;
 	int e_index, ret;
@@ -655,7 +655,7 @@ static inline int _select_thread()
 }
 
 static int _check_fetch_block(const char *metapath, FILE *fptr,
-	ino_t inode, long long blkno, long long page_pos)
+	ino_t inode, int64_t blkno, int64_t page_pos)
 {
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE entry_page;
@@ -731,9 +731,9 @@ int fetch_pinned_blocks(ino_t inode)
 	FILE *fptr;
 	struct stat tempstat;
 	off_t total_size;
-	long long total_blocks, blkno;
-	long long which_page, current_page, page_pos;
-	long long cache_size;
+	int64_t total_blocks, blkno;
+	int64_t which_page, current_page, page_pos;
+	int64_t cache_size;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
 	int ret, ret_code, errcode, t_idx;
@@ -894,7 +894,7 @@ void fetch_quota_from_cloud(void *ptr)
 	FILE *fptr;
 	char *buf;
 	int ret, errcode;
-	long long quota;
+	int64_t quota;
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
 

@@ -83,7 +83,7 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (inode_stat) {
 		inode_stat->st_ino = this_inode;
@@ -119,7 +119,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 
 int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
     const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-    const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+    const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (this_inode == INO_META_CACHE_UPDATE_FILE_SUCCESS)
 		return 0;
@@ -155,7 +155,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 }
 
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
-	long long this_page_pos)
+	int64_t this_page_pos)
 {
 	return 0;
 }
@@ -224,8 +224,8 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 }
 
 int collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
-	long long *num_dir_node, ino_t **nondir_node_list,
-	long long *num_nondir_node)
+	int64_t *num_dir_node, ino_t **nondir_node_list,
+	int64_t *num_nondir_node)
 {
 	*num_dir_node = 0;
 	*num_nondir_node = 0;
@@ -282,12 +282,12 @@ int inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	return 0;
 }
 
-int get_meta_size(ino_t inode, long long *metasize)
+int get_meta_size(ino_t inode, int64_t *metasize)
 {
 	return 0;
 }
 
-int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
 {
 	return 0;
 }

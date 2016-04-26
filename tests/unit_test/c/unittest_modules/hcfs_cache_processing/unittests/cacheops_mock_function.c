@@ -12,7 +12,7 @@ void init_mock_system_config()
 	strcpy(system_config->blockpath, "/tmp/testHCFS/blockpath");
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char block_name[200];
 
@@ -23,7 +23,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	return 0;
 }
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char meta_name[200];
 
@@ -34,12 +34,12 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-int build_cache_usage(void)
+int32_t build_cache_usage(void)
 {
 	return ;
 }
 
-int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *) malloc(sizeof(SUPER_BLOCK_ENTRY));
@@ -50,12 +50,12 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	return 0;
 }
 
-int sync_hcfs_system_data(char need_lock)
+int32_t sync_hcfs_system_data(char need_lock)
 {
 	return 0;
 }
 
-int super_block_mark_dirty(ino_t this_inode)
+int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;	
 }
@@ -68,16 +68,16 @@ CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 	return NULL;
 }
 
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
-	long long target_page, long long hint_page)
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	int64_t target_page, int64_t hint_page)
 {	
-	long long ret = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
+	int64_t ret = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
 		target_page * sizeof(BLOCK_ENTRY_PAGE);
 	
 	return ret;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list ap;
 
@@ -87,10 +87,10 @@ int write_log(int level, char *format, ...)
 
 	return 0;
 }
-int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-			long long num_cached_blocks_delta,
-			long long cached_size_delta,
-			long long dirty_data_size_delta,
+int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+			int64_t num_cached_blocks_delta,
+			int64_t cached_size_delta,
+			int64_t dirty_data_size_delta,
 			ino_t thisinode)
 {
 	return 0;
