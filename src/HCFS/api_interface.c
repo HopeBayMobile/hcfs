@@ -797,6 +797,7 @@ int32_t get_xfer_status(void)
 
 	if (hcfs_system->xfer_upload_in_progress || download_flag > 0) {
 		now_window = hcfs_system->systemdata.xfer_now_window;
+		total_thpt = num_obj = 0;
 		for (idx = 0; idx < XFER_WINDOW_SIZE; idx++) {
 			total_thpt +=
 				(int64_t)hcfs_system->systemdata.xfer_throughtput[now_window];
