@@ -1120,26 +1120,30 @@ TEST_F(change_xfer_metaTest, UpdateSuccess)
 {
 	int ret;
 
+	hcfs_system->systemdata.xfer_now_window = 2;
+
 	ret = change_xfer_meta(1, 2, 3, 4);
 	EXPECT_EQ(0, ret);
 
 	EXPECT_EQ(1, hcfs_system->systemdata.xfer_size_upload);
 	EXPECT_EQ(2, hcfs_system->systemdata.xfer_size_download);
-	EXPECT_EQ(3, hcfs_system->systemdata.xfer_throughtput);
-	EXPECT_EQ(4, hcfs_system->systemdata.xfer_total_obj);
+	EXPECT_EQ(3, hcfs_system->systemdata.xfer_throughtput[2]);
+	EXPECT_EQ(4, hcfs_system->systemdata.xfer_total_obj[2]);
 }
 
 TEST_F(change_xfer_metaTest, MinIsZero)
 {
 	int ret;
 
+	hcfs_system->systemdata.xfer_now_window = 3;
+
 	ret = change_xfer_meta(-1, -2, -3, -4);
 	EXPECT_EQ(0, ret);
 
 	EXPECT_EQ(0, hcfs_system->systemdata.xfer_size_upload);
 	EXPECT_EQ(0, hcfs_system->systemdata.xfer_size_download);
-	EXPECT_EQ(0, hcfs_system->systemdata.xfer_throughtput);
-	EXPECT_EQ(0, hcfs_system->systemdata.xfer_total_obj);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_throughtput[3]);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_total_obj[3]);
 }
 /*
  * End of unittest of change_system_meta()
