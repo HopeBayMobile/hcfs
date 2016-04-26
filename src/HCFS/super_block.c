@@ -1148,7 +1148,7 @@ int ll_rebuild_dirty(void)
 *************************************************************************/
 int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 {
-	SUPER_BLOCK_ENTRY tempentry;
+	SUPER_BLOCK_ENTRY tempentry, tempentry2;
 	int ret, errcode;
 	ssize_t retsize;
 	int64_t now_meta_size, dirty_delta_meta_size;
