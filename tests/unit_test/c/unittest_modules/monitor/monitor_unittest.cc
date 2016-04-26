@@ -13,7 +13,7 @@ extern "C" {
 extern SYSTEM_DATA_HEAD *hcfs_system;
 extern int hcfs_test_backend_register;
 extern int hcfs_test_backend_sleep_nsec;
-extern int monitoring_interval;
+extern int32_t monitor_collisions;
 
 class monitorTest : public ::testing::Test {
 	protected:
@@ -31,56 +31,84 @@ class monitorTest : public ::testing::Test {
 	void TearDown() { free(hcfs_system); }
 };
 
-TEST_F(monitorTest, Backend_Is_Online) {
+TEST_F(monitorTest, Backend_Status_Changed) {
 	pthread_t monitor_loop_thread;
-	struct timespec larger_than_interval;
+	struct timespec wait_monitor_time;
+	wait_monitor_time.tv_sec = 0;
+	wait_monitor_time.tv_nsec = 10000000;
 
 	// Prepare flag to let mock hcfs_test_backend return 200
-	monitoring_interval = 1;
-	larger_than_interval.tv_sec = monitoring_interval;
-	larger_than_interval.tv_nsec = 10000000;
 	hcfs_test_backend_register = 200;
 
 	// create thread to run monitor loop
 	pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
-
-	hcfs_system->backend_is_online = FALSE;
-	nanosleep(&larger_than_interval, NULL);
 	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
 
-	hcfs_system->backend_is_online = FALSE;
-	nanosleep(&larger_than_interval, NULL);
+	// online -> offline
+	hcfs_test_backend_register = 400;
+	update_backend_status(FALSE, NULL);
+	nanosleep(&wait_monitor_time, NULL);
+	ASSERT_EQ(FALSE, hcfs_system->backend_is_online);
+
+	// offline -> online
+	hcfs_test_backend_register = 200;
+	update_backend_status(TRUE, NULL);
+	nanosleep(&wait_monitor_time, NULL);
+	sem_post(&(hcfs_system->monitor_sem));
 	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
 
 	// let system shut down
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(hcfs_system->monitor_sem));
 	// join thread
 	pthread_join(monitor_loop_thread, NULL);
 }
 
-TEST_F(monitorTest, Backend_Is_Offline) {
+TEST_F(monitorTest, Max_Collisions_Number) {
 	pthread_t monitor_loop_thread;
-	struct timespec larger_than_interval;
+	struct timespec wait_monitor_time;
+	wait_monitor_time.tv_sec = 0;
+	wait_monitor_time.tv_nsec = 10000000;
 
-	// Prepare flag to let mock hcfs_test_backend return 401
-	monitoring_interval = 1;
-	larger_than_interval.tv_sec = monitoring_interval;
-	larger_than_interval.tv_nsec = 10000000;
-	hcfs_test_backend_register = 401;
+	// Prepare flag to let mock hcfs_test_backend return 200
+	hcfs_test_backend_register = 200;
 
 	// create thread to run monitor loop
 	pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
 
-	hcfs_system->backend_is_online = TRUE;
-	nanosleep(&larger_than_interval, NULL);
-	ASSERT_EQ(FALSE, hcfs_system->backend_is_online);
-
-	hcfs_system->backend_is_online = TRUE;
-	nanosleep(&larger_than_interval, NULL);
-	ASSERT_EQ(FALSE, hcfs_system->backend_is_online);
+	hcfs_test_backend_register = 400;
+	update_backend_status(FALSE, NULL);
+	for (int i =0; i<15;i++)
+		sem_post(&(hcfs_system->monitor_sem));
+	nanosleep(&wait_monitor_time, NULL);
+	ASSERT_EQ(9, monitor_collisions);
 
 	// let system shut down
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(hcfs_system->monitor_sem));
+	// join thread
+	pthread_join(monitor_loop_thread, NULL);
+}
+
+TEST_F(monitorTest, Offline_Retransmit_Wait_Timeup) {
+	// This is 
+	pthread_t monitor_loop_thread;
+	struct timespec wait_monitor_time;
+	wait_monitor_time.tv_sec = 0;
+	wait_monitor_time.tv_nsec = 1000000;
+
+	hcfs_test_backend_register = 503;
+
+	// create thread to run monitor loop
+	sem_init(&(hcfs_system->monitor_sem), 1, 0);
+	pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+	update_backend_status(FALSE, NULL);
+	nanosleep(&wait_monitor_time, NULL);
+
+	// let system shut down
+	hcfs_system->system_going_down = TRUE;
+	sem_post(&(hcfs_system->monitor_sem));
 	// join thread
 	pthread_join(monitor_loop_thread, NULL);
 }
@@ -88,26 +116,17 @@ TEST_F(monitorTest, Backend_Is_Offline) {
 TEST_F(monitorTest, Update_Backend_Status_With_Timestamp) {
 	struct timespec timestamp;
 	clock_gettime(CLOCK_REALTIME, &timestamp);
-
-	hcfs_system->backend_status_last_time.tv_sec = 0;
-	hcfs_system->backend_status_last_time.tv_nsec = 0;
 	hcfs_system->backend_is_online = FALSE;
 
 	update_backend_status(TRUE, &timestamp);
 	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
-	ASSERT_EQ(timestamp.tv_sec, hcfs_system->backend_status_last_time.tv_sec);
-	ASSERT_EQ(timestamp.tv_nsec, hcfs_system->backend_status_last_time.tv_nsec);
 }
 
 TEST_F(monitorTest, Update_Backend_Status_Without_Timestamp) {
-	hcfs_system->backend_status_last_time.tv_sec = 0;
-	hcfs_system->backend_status_last_time.tv_nsec = 0;
 	hcfs_system->backend_is_online = FALSE;
 
 	update_backend_status(TRUE, NULL);
 	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
-	ASSERT_NE(0, hcfs_system->backend_status_last_time.tv_sec);
-	ASSERT_NE(0, hcfs_system->backend_status_last_time.tv_nsec);
 }
 
 TEST_F(monitorTest, Monitor_Log) {
@@ -118,4 +137,14 @@ TEST_F(monitorTest, Monitor_Log) {
 	hcfs_system->backend_is_online = TRUE;
 	_write_monitor_loop_status_log(1.2345);
 	fflush(stdout);
+}
+TEST_F(monitorTest, destroy_monitor_loop_thread) {
+	destroy_monitor_loop_thread();
+}
+TEST_F(monitorTest, diff_time_With_No_Endtime) {
+	double test_duration = 0.0;
+	struct timespec test_start;
+	clock_gettime(CLOCK_REALTIME, &test_start);
+	test_duration = diff_time(&test_start, NULL);
+	ASSERT_GT(test_duration, 0);
 }

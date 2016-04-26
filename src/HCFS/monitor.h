@@ -28,7 +28,7 @@ void *monitor_loop(void *ptr);
 #else
 void monitor_loop(void);
 #endif
-void check_backend_status(void);
+int32_t check_backend_status(void);
 void destroy_monitor_loop_thread();
 double diff_time(const struct timespec *start, struct timespec *end);
 void update_backend_status(register BOOL status, struct timespec *status_time);

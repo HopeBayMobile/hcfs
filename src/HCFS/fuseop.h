@@ -227,6 +227,7 @@ typedef struct {
 	BOOL backend_is_online;
 	BOOL sync_manual_switch;
 	BOOL sync_paused;
+	uint32_t monitor_interval;
 	BOOL xfer_upload_in_progress;
 	sem_t xfer_download_in_progress_sem; /* Lots of functions will invoke download directly */
 	time_t last_xfer_shift_time; /* Xfer window must be shifted in an interval */
