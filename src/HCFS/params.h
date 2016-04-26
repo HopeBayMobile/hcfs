@@ -100,7 +100,9 @@ typedef struct {
 #define TO_BE_RECLAIMED 3
 #define RECLAIMED 4
 
-#define XFER_RESET_WINDOW 180
+#define XFER_WINDOW_MAX 6
+#define XFER_WINDOW_SIZE 3
+#define XFER_SEC_PER_WINDOW 20
 #define XFER_SLOW_SPEED 32 /* in KB/s */
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";

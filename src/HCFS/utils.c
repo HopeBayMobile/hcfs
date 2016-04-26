@@ -972,8 +972,11 @@ int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
 		     long long xfer_throughtput, long long xfer_total_obj)
 {
 	int ret = 0;
+	int now_window;
 
 	sem_wait(&(hcfs_system->access_sem));
+
+	now_window = hcfs_system->systemdata.xfer_now_window;
 
 	hcfs_system->systemdata.xfer_size_upload +=
 		xfer_size_upload;
@@ -985,15 +988,15 @@ int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
 	if (hcfs_system->systemdata.xfer_size_download < 0)
 		hcfs_system->systemdata.xfer_size_download = 0;
 
-	hcfs_system->systemdata.xfer_throughtput +=
+	hcfs_system->systemdata.xfer_throughtput[now_window] +=
 		xfer_throughtput;
-	if (hcfs_system->systemdata.xfer_throughtput < 0)
-		hcfs_system->systemdata.xfer_throughtput = 0;
+	if (hcfs_system->systemdata.xfer_throughtput[now_window] < 0)
+		hcfs_system->systemdata.xfer_throughtput[now_window] = 0;
 
-	hcfs_system->systemdata.xfer_total_obj +=
+	hcfs_system->systemdata.xfer_total_obj[now_window] +=
 		xfer_total_obj;
-	if (hcfs_system->systemdata.xfer_total_obj < 0)
-		hcfs_system->systemdata.xfer_total_obj = 0;
+	if (hcfs_system->systemdata.xfer_total_obj[now_window] < 0)
+		hcfs_system->systemdata.xfer_total_obj[now_window] = 0;
 
 	sem_post(&(hcfs_system->access_sem));
 

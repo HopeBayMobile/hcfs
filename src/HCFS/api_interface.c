@@ -785,12 +785,28 @@ int32_t set_sync_switch_handle(int32_t sync_switch)
  * */
 int32_t get_xfer_status(void)
 {
+	int32_t ret_val, idx;
+	int32_t download_flag, now_window;
 	int64_t average_thpt, total_thpt, num_obj;
 
-	if (hcfs_system->xfer_upload_in_progress ||
-	    hcfs_system->xfer_download_in_progress) {
-		total_thpt = (int64_t)hcfs_system->systemdata.xfer_throughtput;
-		num_obj = (int64_t)hcfs_system->systemdata.xfer_total_obj;
+	/* Get the number of running download jobs */
+	ret_val = sem_getvalue(&(hcfs_system->xfer_download_in_progress_sem),
+			       &download_flag);
+	if (ret_val < 0)
+		return -errno;
+
+	if (hcfs_system->xfer_upload_in_progress || download_flag > 0) {
+		now_window = hcfs_system->systemdata.xfer_now_window;
+		for (idx = 0; idx < XFER_WINDOW_SIZE; idx++) {
+			total_thpt +=
+				(int64_t)hcfs_system->systemdata.xfer_throughtput[now_window];
+			num_obj +=
+				(int64_t)hcfs_system->systemdata.xfer_total_obj[now_window];
+
+			now_window -= 1;
+			if (now_window < 0)
+				now_window = XFER_WINDOW_MAX - 1;
+		}
 
 		if (num_obj <= 0)
 			/* In the case 0 -> 1, maybe no throughput record here */

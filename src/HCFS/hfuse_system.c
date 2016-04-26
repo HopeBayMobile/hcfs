@@ -142,8 +142,15 @@ int init_hcfs_system_data(void)
 		hcfs_system->systemdata.system_quota = quota;
 	}
 
-	/* Init xfer reset time */
-	hcfs_system->last_xfer_reset_time = time(NULL);
+	/* Xfer related */
+	hcfs_system->last_xfer_shift_time = time(NULL);
+	hcfs_system->xfer_upload_in_progress = FALSE;
+	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 1, 0);
+	hcfs_system->systemdata.xfer_now_window = 0;
+	memset(hcfs_system->systemdata.xfer_throughtput, 0,
+			sizeof(long long) * XFER_WINDOW_MAX);
+	memset(hcfs_system->systemdata.xfer_total_obj, 0,
+			sizeof(long long) * XFER_WINDOW_MAX);
 
 	return 0;
 errcode_handle:

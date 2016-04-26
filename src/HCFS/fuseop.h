@@ -202,10 +202,14 @@ typedef struct {
 	int64_t backend_meta_size;
 	int64_t backend_inodes;
 	int64_t dirty_cache_size; /* data + meta */
-	int64_t xfer_size_download;
-	int64_t xfer_size_upload;
 	int64_t system_quota;
 	int32_t cache_replace_status;
+	/* data for xfer statistics */
+	int64_t xfer_size_download;
+	int64_t xfer_size_upload;
+	int64_t xfer_throughtput[XFER_WINDOW_MAX];
+	int64_t xfer_total_obj[XFER_WINDOW_MAX];
+	int32_t xfer_now_window;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {
@@ -223,8 +227,8 @@ typedef struct {
 	BOOL sync_manual_switch;
 	BOOL sync_paused;
 	BOOL xfer_upload_in_progress;
-	BOOL xfer_download_in_progress;
-	time_t last_xfer_reset_time; /* Stats for xfer throughput must be reset in an interval */
+	sem_t xfer_download_in_progress_sem; /* Lots of functions will invoke download directly */
+	time_t last_xfer_shift_time; /* Xfer window must be shifted in an interval */
 	struct timespec backend_status_last_time;
 } SYSTEM_DATA_HEAD;
 

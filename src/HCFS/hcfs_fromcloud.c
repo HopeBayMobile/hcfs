@@ -68,6 +68,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	if (hcfs_system->sync_paused)
 		return -EIO;
 
+	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
+
 #if (DEDUP_ENABLE)
 	/* Get objname by obj_id */
 	obj_id_to_string(obj_id, obj_id_str);
@@ -151,6 +154,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	/* Finally free download sem */
 
 errcode_handle:
+	sem_trywait(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Download job finished, download_in_progress should minus 1\n");
+
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
 	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
@@ -367,25 +373,9 @@ void download_block_manager()
 
 		/* Sleep when number of active threads <= 0 */
 		if (download_thread_ctl.active_th <= 0) {
-			/* No active download threads */
-			if (hcfs_system->xfer_download_in_progress) {
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->xfer_download_in_progress = FALSE;
-				sem_post(&(hcfs_system->access_sem));
-				write_log(10, "Set download in progress to FALSE\n");
-			}
-
 			sem_post(&(download_thread_ctl.ctl_op_sem));
 			sleep(1);
 			continue;
-		}
-
-		/* Some download threads are working */
-		if (!hcfs_system->xfer_download_in_progress) {
-			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->xfer_download_in_progress = TRUE;
-			sem_post(&(hcfs_system->access_sem));
-			write_log(10, "Set download in progress to TRUE\n");
 		}
 
 		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY; t_idx++) {
