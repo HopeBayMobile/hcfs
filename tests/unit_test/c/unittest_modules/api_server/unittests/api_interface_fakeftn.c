@@ -9,7 +9,7 @@
 #include "meta_mem_cache.h"
 #include "dir_statistics.h"
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 
@@ -19,32 +19,32 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int unmount_all(void)
+int32_t unmount_all(void)
 {
 	UNMOUNTEDALL = TRUE;
 	return 0;
 }
 
-int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 {
 	CREATEDFS = TRUE;
 	strcpy(recvFSname, fsname);
 	return 0;
 }
-int delete_filesystem(char *fsname)
+int32_t delete_filesystem(char *fsname)
 {
 	strcpy(recvFSname, fsname);
 	DELETEDFS = TRUE;
 	return 0;
 }
-int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+int32_t check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 {
 	strcpy(recvFSname, fsname);
 	CHECKEDFS = TRUE;
 	return 0;
 }
-int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
-		unsigned long *ret_num)
+int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
+		uint64_t *ret_num)
 {
 	LISTEDFS = TRUE;
 	if (numlistedFS == 0) {
@@ -57,81 +57,81 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	return 0;
 }
 
-int mount_FS(char *fsname, char *mp, char mp_mode)
+int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 {
 	MOUNTEDFS = TRUE;
 	strcpy(recvFSname, fsname);
 	strcpy(recvmpname, mp);
 	return 0;
 }
-int unmount_FS(char *fsname, char *mp)
+int32_t unmount_FS(char *fsname, char *mp)
 {
 	UNMOUNTEDFS = TRUE;
 	strcpy(recvFSname, fsname);
 	return 0;
 }
-int mount_status(char *fsname)
+int32_t mount_status(char *fsname)
 {
 	CHECKEDMOUNT = TRUE;
 	strcpy(recvFSname, fsname);
 	return 0;
 }
 
-int search_mount(char *fsname, char *mp, MOUNT_T **mt_info)
+int32_t search_mount(char *fsname, char *mp, MOUNT_T **mt_info)
 {
 	return -ENOENT;
 }
 
-int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
+int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 {
 	return -ENOENT;
 }
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	return -EIO;
 }
 
-int fetch_stat_path(char *pathname, ino_t this_inode)
+int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 {
 	return -EIO;
 }
 
-int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
+int32_t read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	return -EIO;
 }
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		unsigned long *ret_gen, char *ret_pin_status)
-{
-	return -EIO;
-}
-
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
-{
-	return -EIO;
-}
-int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
-{
-	return -EIO;
-}
-int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
+		uint64_t *ret_gen, char *ret_pin_status)
 {
 	return -EIO;
 }
 
-int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+{
+	return -EIO;
+}
+int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return -EIO;
+}
+
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return -EIO;
 }
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return -EIO;
 }
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -142,14 +142,14 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return NULL;
 }
 
-int pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
+int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 {
 	if (PIN_INODE_ROLLBACK == TRUE)
 		return -EIO;
 	return 0;
 }
 
-int unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
+int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 {
 	if (UNPIN_INODE_FAIL == TRUE)
 		return -EIO;
@@ -160,12 +160,12 @@ void update_sync_state(void)
 {
 	return;
 }
-int reload_system_config(const char *config_path)
+int32_t reload_system_config(const char *config_path)
 {
 	return 0;
 }
 
-int update_quota()
+int32_t update_quota()
 {
 	hcfs_system->systemdata.system_quota = 5566;
 	return 0;

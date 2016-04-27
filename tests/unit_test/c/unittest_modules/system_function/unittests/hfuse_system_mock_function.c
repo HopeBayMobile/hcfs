@@ -15,22 +15,22 @@
 #include "hcfscurl.h"
 #include "mock_params.h"
 
-int super_block_init(void)
+int32_t super_block_init(void)
 {
 	return 0;
 }
 
-int init_pathname_cache(void)
+int32_t init_pathname_cache(void)
 {
 	return 0;
 }
 
-int init_system_fh_table(void)
+int32_t init_system_fh_table(void)
 {
 	return 0;
 }
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	if (this_inode == 1)
 		strcpy(pathname, "/tmp/root_meta_path");
@@ -42,18 +42,18 @@ ino_t super_block_new_inode(struct stat *in_stat)
 	return 1;
 }
 
-int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
+int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
                                                 int64_t this_page_pos)
 {
 	return 0;
 }
 
-int super_block_mark_dirty(ino_t this_inode)
+int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
 
-int hcfs_init_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	if (hcfs_init_backend_success == TRUE)
 		return 200;
@@ -70,22 +70,22 @@ void ENGINE_load_builtin_engines(void)
 
 }
 
-int ENGINE_register_all_complete(void)
+int32_t ENGINE_register_all_complete(void)
 {
 	return 0;
 }
 
-int read_system_config(char *config_path)
+int32_t read_system_config(char *config_path)
 {
 	return 0;
 }
 
-int validate_system_config(void)
+int32_t validate_system_config(void)
 {
 	return 0;
 }
 
-int hcfs_list_container(CURL_HANDLE *curl_handle)
+int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 {
 	if (hcfs_list_container_success == TRUE)
 		return 200;
@@ -128,35 +128,35 @@ void monitor_loop(void)
 	exit(0);
 }
 #endif
-int hook_fuse(int argc, char **argv)
+int32_t hook_fuse(int32_t argc, char **argv)
 {
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }
 
-int open_log(char *filename)
+int32_t open_log(char *filename)
 {
 	mknod(filename, 0700, 0);
 	return 0;
 }
 
-int close_log(void)
+int32_t close_log(void)
 {
 	return 0;
 }
-int init_mount_mgr(void)
+int32_t init_mount_mgr(void)
 {
 	return 0;
 }
-int init_fs_manager(void)
+int32_t init_fs_manager(void)
 {
 	return 0;
 }
-int init_pathlookup(void)
+int32_t init_pathlookup(void)
 {
 	return 0;
 }
@@ -164,7 +164,7 @@ void destroy_pathlookup(void)
 {
 	return;
 }
-int init_dirstat_lookup()
+int32_t init_dirstat_lookup()
 {
 	return 0;
 }
@@ -177,17 +177,17 @@ void init_sync_stat_control(void)
 void update_sync_state(void)
 {
 }
-int ignore_sigpipe(void)
+int32_t ignore_sigpipe(void)
 {
 	return 0;
 }
 
-int update_quota()
+int32_t update_quota()
 {
 	return 0;
 }
 
-int get_quota_from_backup(int64_t *quota)
+int32_t get_quota_from_backup(int64_t *quota)
 {
 	*quota = 0;
 	return 0;
