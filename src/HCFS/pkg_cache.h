@@ -2,10 +2,12 @@
 #define GW20_HCFS_PKG_LOOKUP_H_
 #include <semaphore.h>
 
+#include "params.h"
+
 #define PKG_HASH_SIZE 8
 #define MAX_PKG_ENTRIES 8
 /* Moved pkg lookup here */
-typedef struct {
+typedef struct PKG_CACHE_ENTRY {
 	char pkgname[MAX_FILENAME_LEN+1];
 	uid_t pkguid;
 	struct PKG_CACHE_ENTRY *next;
@@ -22,12 +24,12 @@ typedef struct {
 	sem_t pkg_cache_lock; /* Lock for package to uid lookup cache */
 } PKG_CACHE;
 
-PKG_CACHE pkg_lookup_cache;
+PKG_CACHE pkg_cache;
 
-int init_pkg_cache();
-int destroy_pkg_cache();
-int lookup_cache_pkg(const char *pkgname, uid_t *uid);
-int insert_cache_pkg(const char *pkgname, uid_t uid);
-int remove_cache_pkg(const char *pkgname);
+int32_t init_pkg_cache();
+int32_t destroy_pkg_cache();
+int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid);
+int32_t insert_cache_pkg(const char *pkgname, uid_t uid);
+int32_t remove_cache_pkg(const char *pkgname);
 
 #endif
