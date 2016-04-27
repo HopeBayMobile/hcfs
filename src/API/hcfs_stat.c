@@ -281,3 +281,16 @@ int32_t get_hcfs_stat(int64_t *quota, int64_t *vol_usage, int64_t *cloud_usage,
 
 	return 0;
 }
+
+int32_t get_occupied_size(int64_t *occupied)
+{
+
+	int32_t ret_code;
+
+	ret_code = _get_usage_val(OCCUPIEDSIZE, occupied);
+	if (ret_code < 0)
+		return ret_code;
+
+	return 0;
+}
+

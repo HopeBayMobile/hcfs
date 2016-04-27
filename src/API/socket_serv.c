@@ -190,6 +190,29 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len, char *resbuf, int32_t 
 	return ret_code;
 }
 
+int32_t do_get_occupied_size(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t occupied;
+
+	printf("Get occupied size\n");
+	ret_code = get_occupied_size(&occupied);
+
+	if (ret_code < 0) {
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+		CONCAT_REPLY(&ret_code, sizeof(int32_t));
+	} else {
+		/* Total size for reply msgs */
+		ret_len = sizeof(int64_t) + sizeof(int32_t);
+
+		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+		CONCAT_REPLY(&occupied, sizeof(int64_t));
+	}
+
+	return ret_code;
+}
+
 int32_t do_reset_xfer_usage(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
@@ -316,6 +339,7 @@ int32_t process_request(int32_t thread_idx)
 		{SETSYNCSWITCH,	do_toggle_cloud_sync},
 		{GETSYNCSWITCH,	do_get_sync_status},
 		{RELOADCONFIG,	do_reload_hcfs_config},
+		{OCCUPIEDSIZE,	do_get_occupied_size},
 	};
 
 	uint32_t n;
