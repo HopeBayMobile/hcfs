@@ -51,7 +51,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const uint64_t generation, const char *name,
 	ino_t root_ino, int64_t *delta_meta_size, char ispin);
 
-int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *xattr_pos, BOOL create_page);
 
 int32_t link_update_meta(ino_t link_inode, const char *newname,

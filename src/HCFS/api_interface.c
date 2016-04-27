@@ -862,7 +862,7 @@ void api_module(void *index)
 	uint32_t num_inode;
 	ino_t *pinned_list, *unpinned_list;
 	uint32_t sync_switch;
-	int loglevel;
+	int32_t loglevel;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -1183,27 +1183,27 @@ void api_module(void *index)
 		case GETQUOTA:
 			llretval = hcfs_system->systemdata.system_quota;
 			retcode = 0;
-			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			ret_len = sizeof(int64_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case UNPINDIRTYSIZE:
 			llretval = hcfs_system->systemdata.unpin_dirty_data_size;
 			retcode = 0;
-			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			ret_len = sizeof(int64_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case OCCUPIEDSIZE:
 			llretval = hcfs_system->systemdata.unpin_dirty_data_size
 					+ hcfs_system->systemdata.pinned_size;
 			retcode = 0;
-			ret_len = sizeof(long long);
-			send(fd1, &ret_len, sizeof(unsigned int), MSG_NOSIGNAL);
+			ret_len = sizeof(int64_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case TESTAPI:
-			/* Simulate a long API call of 5 seconds */
+			/* Simulate a int64_t API call of 5 seconds */
 			sleep(5);
 			retcode = 0;
 			cur_index = *((int32_t *)index);
@@ -1357,7 +1357,7 @@ void api_module(void *index)
 		case TRIGGERUPDATEQUOTA:
 			retcode = update_quota();
 			if (retcode == 0) {
-				ret_len = sizeof(int);
+				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(ret_len),
 				     MSG_NOSIGNAL);
 				send(fd1, &retcode, sizeof(retcode),
@@ -1365,7 +1365,7 @@ void api_module(void *index)
 			}
 			break;
 		case CHANGELOG:
-			memcpy(&loglevel, largebuf, sizeof(int));
+			memcpy(&loglevel, largebuf, sizeof(int32_t));
 			if (0 <= loglevel && loglevel <= 10) {
 				system_config->log_level = loglevel;
 				retcode = 0; 
@@ -1375,7 +1375,7 @@ void api_module(void *index)
 			write_log(10, "Debug: now log level is %d\n",
 					system_config->log_level);
 			if (retcode == 0) {
-				ret_len = sizeof(int);
+				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(ret_len),
 						MSG_NOSIGNAL);
 				send(fd1, &retcode, sizeof(retcode),

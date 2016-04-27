@@ -400,7 +400,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
-		write_log(2, "Name of new filesystem (%s) is too long\n",
+		write_log(2, "Name of new filesystem (%s) is too int64_t\n",
 			  fsname);
 		errcode = -errcode;
 		goto errcode_handle;
@@ -641,7 +641,7 @@ int32_t delete_filesystem(char *fsname)
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
-		write_log(2, "Name of filesystem to delete (%s) is too long\n",
+		write_log(2, "Name of filesystem to delete (%s) is too int64_t\n",
 			  fsname);
 		errcode = -errcode;
 		goto errcode_handle;
@@ -789,7 +789,7 @@ int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
-		write_log(2, "Name of filesystem to delete (%s) is too long\n",
+		write_log(2, "Name of filesystem to delete (%s) is too int64_t\n",
 			  fsname);
 		errcode = -errcode;
 		goto errcode_handle;
