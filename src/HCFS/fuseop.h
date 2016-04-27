@@ -237,15 +237,6 @@ void *mount_single_thread(void *ptr);
 
 int32_t hook_fuse(int32_t argc, char **argv);
 
-/* Moved pkg lookup here */
-typedef struct {
-	char pkgname[MAX_FILENAME_LEN+1];
-	uid_t pkguid;
-} PKG_CACHE_ENTRY;
-
-sem_t pkg_cache_lock; /* Lock for package to uid lookup cache */
-PKG_CACHE_ENTRY pkg_cache_entry;
-
 ino_t data_data_root;
 
 void set_timestamp_now(struct stat *thisstat, char mode);

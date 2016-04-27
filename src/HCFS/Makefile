@@ -50,7 +50,8 @@ OBJS_F := objmeta.o \
 	monitor.o \
 	dir_statistics.o \
 	do_fallocate.o \
-	parent_lookup.o
+	parent_lookup.o \
+	pkg_cache.o
 OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
 
 all: check_pkgs hcfs
