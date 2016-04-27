@@ -1510,7 +1510,13 @@ TEST_F(api_moduleTest, XferStatusNormalTransit) {
 	code = GETXFERSTATUS;
 	cmd_len = 0;
 	memset(buf, 0, 300);
-	hcfs_system->systemdata.xfer_now_window = 0;
+	memset(hcfs_system->systemdata.xfer_throughtput,
+			0, sizeof(int64_t) * 6);
+	memset(hcfs_system->systemdata.xfer_total_obj,
+			0, sizeof(int64_t) * 6);
+	hcfs_system->systemdata.xfer_now_window = 1;
+	hcfs_system->systemdata.xfer_throughtput[1] = 1000;
+	hcfs_system->systemdata.xfer_total_obj[1] = 1;
 	hcfs_system->xfer_upload_in_progress = TRUE;
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 
@@ -1548,6 +1554,10 @@ TEST_F(api_moduleTest, XferStatusSlowTransit) {
 	code = GETXFERSTATUS;
 	cmd_len = 0;
 	memset(buf, 0, 300);
+	memset(hcfs_system->systemdata.xfer_throughtput,
+			0, sizeof(int64_t) * 6);
+	memset(hcfs_system->systemdata.xfer_total_obj,
+			0, sizeof(int64_t) * 6);
 	hcfs_system->systemdata.xfer_now_window = 0;
 	hcfs_system->systemdata.xfer_throughtput[0] = 10;
 	hcfs_system->systemdata.xfer_total_obj[0] = 1;

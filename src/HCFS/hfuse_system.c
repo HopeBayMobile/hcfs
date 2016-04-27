@@ -148,9 +148,9 @@ int init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 1, 0);
 	hcfs_system->systemdata.xfer_now_window = 0;
 	memset(hcfs_system->systemdata.xfer_throughtput, 0,
-			sizeof(long long) * XFER_WINDOW_MAX);
+			sizeof(int64_t) * XFER_WINDOW_MAX);
 	memset(hcfs_system->systemdata.xfer_total_obj, 0,
-			sizeof(long long) * XFER_WINDOW_MAX);
+			sizeof(int64_t) * XFER_WINDOW_MAX);
 
 	return 0;
 errcode_handle:
