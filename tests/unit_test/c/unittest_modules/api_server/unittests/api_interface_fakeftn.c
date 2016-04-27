@@ -156,7 +156,7 @@ int unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 	return 0;
 }
 
-inline void update_sync_state(void)
+void update_sync_state(void)
 {
 	return;
 }
