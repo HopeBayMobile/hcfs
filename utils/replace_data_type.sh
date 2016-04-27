@@ -13,9 +13,22 @@ repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d utils ] ; do cd .
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CI_VERBOSE=false source $repo/utils/common_header.bash
 cd $here
-set -v
 
-files=$(find ../src ../tests/unit_test/c/unittest_modules -name '*.c' -o -name '*.h' -o -name '*.cc')
+if [ "$1" = "-h" -o "$#" -eq 0 ]; then
+	cat <<-EOF
+	Usage:
+	    ./replace_data_type.sh <branch>  # Change datatype in changed files between current branch and '<branch>'
+	    ./replace_data_type.sh -a        # Change datatype in all source codes
+	EOF
+	exit
+fi
+
+if [ "$1" = "-a" ]; then
+	files=$(find ../src ../tests/unit_test/c/unittest_modules -name '*.c' -o -name '*.h' -o -name '*.cc')
+elif [ "$#" -eq 1 ]; then
+	files=$(git diff $@ --name-only | sed -e 's#^#../#' | grep '.*\.c$\|.*\.h$\|.*\.cc$')
+fi 
+
 
 for f in $files
 do
