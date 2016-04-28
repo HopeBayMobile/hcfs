@@ -23,6 +23,15 @@ static inline int32_t _pkg_hash(const char *input)
 	return hash;
 }
 
+/**
+ * Given pkg name, find the element in the linked list pointed by "entry_head".
+ * If hit the pkg, "ret_now" will point to the entry, and ret_prev will point
+ * to the previous entry corresponding to this entry. If hit nothing, then
+ * "ret_now" points to last entry, and "ret_prev" points to previous entry
+ * of last one.
+ *
+ * @return 0 when hit entry, otherwise return -ENOENT.
+ */
 static int32_t _lookup_pkg_list(PKG_ENTRY_HEAD *entry_head,
 		const char *pkgname, PKG_CACHE_ENTRY **ret_prev,
 		PKG_CACHE_ENTRY **ret_now)
@@ -55,6 +64,11 @@ static int32_t _lookup_pkg_list(PKG_ENTRY_HEAD *entry_head,
 	return ret;
 }
 
+/**
+ * Allocate a new pkg entry and init pkg name and uid. Then return the entry.
+ *
+ * @return pointer points to new entry. Otherwise return NULL.
+ */
 static PKG_CACHE_ENTRY *_new_pkg_entry(const char *pkgname, uid_t uid)
 {
 	PKG_CACHE_ENTRY *entry;
@@ -69,7 +83,42 @@ static PKG_CACHE_ENTRY *_new_pkg_entry(const char *pkgname, uid_t uid)
 	return entry;
 }
 
+/* *
+ * Let pkg entry pointed by "now" be the MRU one. If prev is NULL,
+ * it means "now" is the first element in the linked list.
+ *
+ * @return none.
+ */
 static void _promote_pkg_entry(PKG_ENTRY_HEAD *entry_head,
+		PKG_CACHE_ENTRY *prev, PKG_CACHE_ENTRY *now)
+{
+	if (!now)
+		return;	
+
+	/* Prev points to next element of now. */
+	if (prev) {
+		prev->next = now->next;
+		/* Be MRU one */
+		now->next = entry_head->first_pkg_entry;
+		entry_head->first_pkg_entry = now;
+	} else {
+		/* When prev is NULL, check first element */
+		if (entry_head->first_pkg_entry != now) {
+			now->next = entry_head->first_pkg_entry;
+			entry_head->first_pkg_entry = now;
+		}
+	}
+	return;
+}
+
+/**
+ * Remove the entry "now" from linked list points by "entry_head".
+ * "prev" is previous entry of "now" entry. If "prev" is NULL, check
+ * whether "now" is first entry and remove it.
+ *
+ * @return none.
+ */
+static void _kick_entry(PKG_ENTRY_HEAD *entry_head,
 		PKG_CACHE_ENTRY *prev, PKG_CACHE_ENTRY *now)
 {
 	if (!now)
@@ -77,25 +126,10 @@ static void _promote_pkg_entry(PKG_ENTRY_HEAD *entry_head,
 
 	if (prev) {
 		prev->next = now->next;
-		now->next = entry_head->first_pkg_entry;
-		entry_head->first_pkg_entry = now;
 	} else {
-		now->next = entry_head->first_pkg_entry;
-		entry_head->first_pkg_entry = now;
+		if (entry_head->first_pkg_entry == now)
+			entry_head->first_pkg_entry = now->next;
 	}
-	return;
-}
-
-static void _kick_entry(PKG_ENTRY_HEAD *entry_head,
-		PKG_CACHE_ENTRY *prev, PKG_CACHE_ENTRY *now)
-{
-	if (!now)
-		return;	
-
-	if (prev)
-		prev->next = now->next;
-	else
-		entry_head->first_pkg_entry = now->next;
 	free(now);
 	return;
 }
@@ -117,8 +151,10 @@ int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid)
 	sem_wait(&pkg_cache.pkg_cache_lock);
 	ret = _lookup_pkg_list(&(pkg_cache.pkg_hash[hash]),
 			pkgname, &prev, &now);
-	if (ret == 0)
+	if (ret == 0) { /* Hit */
 		*uid = now->pkguid;
+		_promote_pkg_entry(&(pkg_cache.pkg_hash[hash]), prev, now);
+	}
 	sem_post(&pkg_cache.pkg_cache_lock);
 
 	return ret;

@@ -49,7 +49,7 @@ endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest dir_entry_btree_unittest logger_unittest
+TESTS = utils_unittest dir_entry_btree_unittest logger_unittest pkg_cache_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
@@ -150,4 +150,17 @@ logger_unittest.o : $(UNITTEST_DIR)/logger_unittest.cc \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/logger_unittest.cc
 
 logger_unittest : logger.o logger_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+
+# unittest for pkg_cache.c
+
+pkg_cache.o : $(USER_DIR)/pkg_cache.c $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/pkg_cache.c
+
+pkg_cache_unittest.o : $(UNITTEST_DIR)/pkg_cache_unittest.cc \
+                      $(USER_DIR)/pkg_cache.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pkg_cache_unittest.cc
+
+pkg_cache_unittest : pkg_cache.o pkg_cache_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
