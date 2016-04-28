@@ -41,5 +41,6 @@ do
 		-e "s/\<long\>/int64_t/g" \
 		-e "s/\<int\>/int32_t/g" \
 		-e "s/\<unsigned char\>/uint8_t/g" \
+		-e "s/\<unsigned\>/uint32_t/g" \
 		"$f"
 done
