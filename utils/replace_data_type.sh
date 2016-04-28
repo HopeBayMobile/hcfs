@@ -34,13 +34,29 @@ for f in $files
 do
 	echo $f
 	sed -i"" \
-		-e "s/\<unsigned long long\>/uint64_t/g" \
-		-e "s/\<unsigned long\>/uint64_t/g" \
-		-e "s/\<unsigned int\>/uint32_t/g" \
-		-e "s/\<long long\>/int64_t/g" \
-		-e "s/\<long\>/int64_t/g" \
-		-e "s/\<int\>/int32_t/g" \
 		-e "s/\<unsigned char\>/uint8_t/g" \
+		-e "s/\<unsigned long long int\>/uint64_t/g" \
+		-e "s/\<unsigned long long\>/uint64_t/g" \
+		-e "s/\<unsigned long int\>/uint64_t/g" \
+		-e "s/\<unsigned long\>/uint64_t/g" \
+		-e "s/\<unsigned short int\>/uint16_t/g" \
+		-e "s/\<unsigned short\>/uint16_t/g" \
+		-e "s/\<unsigned int\>/uint32_t/g" \
 		-e "s/\<unsigned\>/uint32_t/g" \
+		-e "s/\<signed long long int\>/int64_t/g" \
+		-e "s/\<signed long long\>/int64_t/g" \
+		-e "s/\<signed long int\>/int64_t/g" \
+		-e "s/\<signed long\>/int64_t/g" \
+		-e "s/\<signed short int\>/int16_t/g" \
+		-e "s/\<signed short\>/int16_t/g" \
+		-e "s/\<signed int\>/int32_t/g" \
+		-e "s/\<signed\>/int32_t/g" \
+		-e "s/\<long long int\>/int64_t/g" \
+		-e "s/\<long long\>/int64_t/g" \
+		-e "s/\<long int\>/int64_t/g" \
+		-e "s/\<long\>/int64_t/g" \
+		-e "s/\<short int\>/int16_t/g" \
+		-e "s/\<short\>/int16_t/g" \
+		-e "s/\<int\>/int32_t/g" \
 		"$f"
 done
