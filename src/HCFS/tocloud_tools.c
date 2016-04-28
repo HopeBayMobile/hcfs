@@ -432,6 +432,19 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			current_page = which_page;
 		}
 		e_index = block_count % BLK_INCREMENTS;
+
+		block_info = &(tmppage.status_entry[e_index]);
+#if (DEDUP_ENABLE)
+		ret = _choose_deleted_block(delete_which_one,
+			block_info, block_objid, inode);
+#else
+		block_seq = 0;
+		ret = _choose_deleted_block(delete_which_one,
+			block_info, &block_seq, inode);
+#endif
+		if (ret < 0) /* This block do not need to be deleted */
+			continue;
+
 		if (delete_which_one == DEL_TOUPLOAD_BLOCKS &&
 				page_pos != 0) {
 			/* In case of deleting those blocks just uploaded,
@@ -447,18 +460,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 				}
 			}
 		}
-
-		block_info = &(tmppage.status_entry[e_index]);
-#if (DEDUP_ENABLE)
-		ret = _choose_deleted_block(delete_which_one,
-			block_info, block_objid, inode);
-#else
-		block_seq = 0;
-		ret = _choose_deleted_block(delete_which_one,
-			block_info, &block_seq, inode);
-#endif
-		if (ret < 0)
-			continue;
 
 		sem_wait(&(upload_ctl.upload_queue_sem));
 		sem_wait(&(upload_ctl.upload_op_sem));
