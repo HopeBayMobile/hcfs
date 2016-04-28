@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
+#include <time.h>
 #ifndef _ANDROID_ENV_
 #include <attr/xattr.h>
 #endif
@@ -961,6 +962,61 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 
 /************************************************************************
 *
+* Function name: _shift_xfer_window
+*        Inputs: None
+*       Summary: Helper function to shift the window used to record
+*       	 statistics of xfer throughput.
+*  Return value: None
+*
+*************************************************************************/
+void _shift_xfer_window(void)
+{
+	int32_t time_diff, now_window, window_exceeded, num_shifted;
+	time_t this_time;
+
+	sem_wait(&(hcfs_system->access_sem));
+	/* last_xfer_shift_time initailized failed, reset it */
+	if (hcfs_system->last_xfer_shift_time < 0) {
+		hcfs_system->systemdata.xfer_now_window = 0;
+		memset(hcfs_system->systemdata.xfer_throughtput,
+			0, sizeof(int64_t) * XFER_WINDOW_MAX);
+		memset(hcfs_system->systemdata.xfer_total_obj,
+			0, sizeof(int64_t) * XFER_WINDOW_MAX);
+		sem_post(&(hcfs_system->access_sem));
+		return;
+	}
+
+	this_time = time(NULL);
+	time_diff = (int32_t)(this_time - hcfs_system->last_xfer_shift_time);
+	if (time_diff > XFER_SEC_PER_WINDOW) {
+		now_window = hcfs_system->systemdata.xfer_now_window;
+		window_exceeded = time_diff / XFER_SEC_PER_WINDOW;
+
+		/*  Clear older window */
+		num_shifted = 0;
+		while (num_shifted < XFER_WINDOW_MAX) {
+			hcfs_system->systemdata.xfer_throughtput[now_window] = 0;
+			hcfs_system->systemdata.xfer_total_obj[now_window] = 0;
+
+			if (num_shifted >= window_exceeded)
+				break;
+
+			num_shifted++;
+			now_window++;
+			if (now_window >= XFER_WINDOW_MAX)
+				now_window = 0;
+		}
+		hcfs_system->systemdata.xfer_now_window = now_window;
+		hcfs_system->last_xfer_shift_time = this_time;
+		write_log(10, "Shift xfer window, now window is %d"
+				"(Total %d windows shifted).\n", now_window, num_shifted);
+	}
+	sem_post(&(hcfs_system->access_sem));
+	return;
+}
+
+/************************************************************************
+*
 * Function name: change_xfter_meta
 *        Inputs: long long xfer_size_upload, long long xfer_size_download,
 *        	 long long xfer_throughtput, long long xfer_obj_transit
@@ -973,6 +1029,9 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 {
 	int32_t ret = 0;
 	int32_t now_window;
+
+	/* Need to shift xfer window? */
+	_shift_xfer_window();
 
 	sem_wait(&(hcfs_system->access_sem));
 

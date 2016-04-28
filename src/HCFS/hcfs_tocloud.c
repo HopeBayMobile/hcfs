@@ -88,7 +88,7 @@ static inline void _sync_terminate_thread(int index)
 
 void collect_finished_sync_threads(void *ptr)
 {
-	int count, now_window;
+	int count;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -98,23 +98,6 @@ void collect_finished_sync_threads(void *ptr)
 	while ((hcfs_system->system_going_down == FALSE) ||
 	       (sync_ctl.total_active_sync_threads > 0)) {
 		sem_wait(&(sync_ctl.sync_op_sem));
-
-		/* Check if need to shift xfer window */
-		if (hcfs_system->last_xfer_shift_time < 0 ||
-		    (time(NULL) - hcfs_system->last_xfer_shift_time) > XFER_SEC_PER_WINDOW) {
-			sem_wait(&(hcfs_system->access_sem));
-			if (hcfs_system->systemdata.xfer_now_window >= (XFER_WINDOW_MAX - 1))
-				hcfs_system->systemdata.xfer_now_window = 0;
-			else
-				hcfs_system->systemdata.xfer_now_window += 1;
-
-			now_window = hcfs_system->systemdata.xfer_now_window;
-			hcfs_system->systemdata.xfer_throughtput[now_window] = 0;
-			hcfs_system->systemdata.xfer_total_obj[now_window] = 0;
-			hcfs_system->last_xfer_shift_time = time(NULL);
-			sem_post(&(hcfs_system->access_sem));
-			write_log(10, "Time exceeded - Shift xfer window.\n");
-		}
 
 		if (sync_ctl.total_active_sync_threads <= 0) {
 			/* No active upload threads */
