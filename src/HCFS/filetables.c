@@ -90,6 +90,7 @@ int init_system_fh_table(void)
 int64_t open_fh(ino_t thisinode, int flags, BOOL isdir)
 {
 	int64_t index;
+	DIRH_ENTRY *dirh_ptr;
 
 	sem_wait(&(system_fh_table.fh_table_sem));
 
@@ -107,9 +108,12 @@ int64_t open_fh(ino_t thisinode, int flags, BOOL isdir)
 
 	if (isdir) {
 		system_fh_table.entry_table_flags[index] = IS_DIRH;
-		system_fh_table.direntry_table[index].thisinode = thisinode;
-		system_fh_table.direntry_table[index].flags = flags;
-		system_fh_table.direntry_table[index].snapshot_ptr = NULL;
+		dirh_ptr = &(system_fh_table.direntry_table[index]);
+		dirh_ptr->thisinode = thisinode;
+		dirh_ptr->flags = flags;
+		dirh_ptr->snapshot_ptr = NULL;
+		sem_init(&(dirh_ptr->snap_ref_sem), 0, 0);
+		sem_init(&(dirh_ptr->wait_ref_sem), 0, 1);
 	} else {
 		system_fh_table.entry_table_flags[index] = IS_FH;
 		system_fh_table.entry_table[index].meta_cache_ptr = NULL;
@@ -181,6 +185,8 @@ int close_fh(int64_t index)
 		}
 		system_fh_table.entry_table_flags[index] = NO_FH;
 		tmp_DIRH_entry->thisinode = 0;
+		sem_destroy(&(tmp_DIRH_entry->snap_ref_sem));
+		sem_destroy(&(tmp_DIRH_entry->wait_ref_sem));
 
 		system_fh_table.last_available_index = index;
 	} else {
@@ -255,6 +261,10 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 					errcode = -EIO;
 					goto errcode_handle;
 				}
+				sem_destroy(&(tmp_entry->snap_ref_sem));
+				sem_destroy(&(tmp_entry->wait_ref_sem));
+				sem_init(&(tmp_entry->snap_ref_sem), 0, 0);
+				sem_init(&(tmp_entry->wait_ref_sem), 0, 1);
 			}
 		}
 	}

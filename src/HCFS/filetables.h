@@ -44,6 +44,11 @@ typedef struct {
 	ino_t thisinode;
 	int flags;
 	FILE *snapshot_ptr;
+	/* snap_ref_sem value = how many threads are using the snapshot */
+	sem_t snap_ref_sem;
+	/* wait_ref_sem = whether any thread is waiting for other refs to
+	finish. 0 = Yes, 1 = No */
+	sem_t wait_ref_sem;
 } DIRH_ENTRY;
 
 typedef struct {
