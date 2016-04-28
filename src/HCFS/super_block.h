@@ -101,6 +101,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 				unsigned long *ret_generation, char local_pin);
 int super_block_update_stat(ino_t this_inode, struct stat *newstat);
 
+int ll_rebuild_dirty(void);
 int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry);
 int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry);
 int write_super_block_head(void);
