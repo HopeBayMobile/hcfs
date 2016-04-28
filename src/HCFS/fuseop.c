@@ -4795,14 +4795,42 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	size_t entry_size, ret_size;
 	int ret, errcode;
 	char this_type;
+	DIRH_ENTRY *dirh_ptr;
+	int32_t snap_access_val;
+	struct timespec snap_sleep;
+	BOOL use_snap;
+	ssize_t ret_ssize;
 
-	UNUSED(file_info);
+	snap_sleep.tv_sec = 0;
+	snap_sleep.tv_nsec = 100000000;
+	buf = NULL;
+	use_snap = FALSE;
+
 	gettimeofday(&tmp_time1, NULL);
 
 	this_inode = real_ino(req, ino);
 
 	write_log(10, "DEBUG readdir entering readdir, ");
 	write_log(10, "size %ld, offset %ld\n", size, offset);
+
+	if (system_fh_table.entry_table_flags[file_info->fh] != IS_DIRH) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	dirh_ptr = &(system_fh_table.direntry_table[file_info->fh]);
+
+	if (dirh_ptr == NULL) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	/* Check if ino passed in is the same as the one stored */
+
+	if (dirh_ptr->thisinode != this_inode) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
 	body_ptr = meta_cache_lock_entry(this_inode);
 	if (body_ptr == NULL) {
@@ -4816,6 +4844,35 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		meta_cache_unlock_entry(body_ptr);
 		fuse_reply_err(req, -ret);
 		return;
+	}
+
+	/* If snapshot of dir is created, and offset is 0, need to wait
+	for other snapshot references to finish and then close the snapshot */
+	if (dirh_ptr->snapshot_ptr != NULL) {
+		sem_wait(&(dirh_ptr->wait_ref_sem));
+		if (offset == 0) {
+			/* Need to wait for threads using this snapshot
+			to finish */
+			sem_getvalue(&(dirh_ptr->snap_ref_sem),
+			             &snap_access_val);
+			while (snap_access_val > 0) {
+				nanosleep(&snap_sleep, NULL);
+				sem_getvalue(&(dirh_ptr->snap_ref_sem),
+				             &snap_access_val);
+			}
+
+			sem_wait(&(system_fh_table.fh_table_sem));
+			fclose(dirh_ptr->snapshot_ptr);
+			dirh_ptr->snapshot_ptr = NULL;
+			sem_post(&(system_fh_table.fh_table_sem));
+		}
+		sem_post(&(dirh_ptr->wait_ref_sem));
+		if ((dirh_ptr->snapshot_ptr != NULL) && (offset != 0)) {
+			sem_post(&(dirh_ptr->snap_ref_sem));
+			use_snap = TRUE;
+			PREAD(fileno(dirh_ptr->snapshot_ptr), &tempmeta,
+			      sizeof(DIR_META_TYPE), sizeof(struct stat));
+		}
 	}
 
 	buf = malloc(sizeof(char)*size);
@@ -4868,8 +4925,13 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		countn++;
 		memset(&temp_page, 0, sizeof(DIR_ENTRY_PAGE));
 		temp_page.this_page_pos = thisfile_pos;
-		if ((tempmeta.total_children <= (MAX_DIR_ENTRIES_PER_PAGE-2))
-							&& (page_start == 0)) {
+		if (use_snap == TRUE) {
+			FSEEK(dirh_ptr->snapshot_ptr, thisfile_pos, SEEK_SET);
+			FREAD(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
+			      dirh_ptr->snapshot_ptr);
+		} else if ((tempmeta.total_children <=
+			                        (MAX_DIR_ENTRIES_PER_PAGE-2))
+		           && (page_start == 0)) {
 			ret = meta_cache_lookup_dir_data(this_inode, NULL,
 						NULL, &temp_page, body_ptr);
 			if (ret < 0) {
@@ -4950,12 +5012,21 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	fuse_reply_buf(req, buf, buf_pos);
 
+	free(buf);
+
+	if (use_snap == TRUE)
+		sem_trywait(&(dirh_ptr->snap_ref_sem));
+
 	return;
 
 errcode_handle:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	fuse_reply_err(req, -errcode);
+	if (buf != NULL)
+		free(buf);
+	if (use_snap == TRUE)
+		sem_trywait(&(dirh_ptr->snap_ref_sem));
 }
 
 /************************************************************************
