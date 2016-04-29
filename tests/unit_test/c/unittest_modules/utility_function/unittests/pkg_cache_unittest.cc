@@ -45,6 +45,15 @@ TEST_F(init_pkg_cacheTest, InitSuccess)
 
 	sem_getvalue(&pkg_cache.pkg_cache_lock, &value);
 	EXPECT_EQ(1, value);
+
+	/* Check structure */
+	EXPECT_EQ(0, pkg_cache.num_cache_pkgs);
+
+	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+		EXPECT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
+		EXPECT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
+	}
+
 }
 /*
  * End of unittest of init_pkg_cache()
@@ -211,6 +220,14 @@ TEST_F(lookup_cache_pkgTest, LookupEmptyCache)
 		ret = lookup_cache_pkg(pkg_name, &uid);
 		ASSERT_EQ(-ENOENT, ret);
 	}
+
+	/* Check structure */
+	EXPECT_EQ(0, pkg_cache.num_cache_pkgs);
+
+	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+		EXPECT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
+		EXPECT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
+	}
 }
 
 TEST_F(lookup_cache_pkgTest, LookupHitNothing)
@@ -253,6 +270,326 @@ TEST_F(lookup_cache_pkgTest, LookupHitNothing)
 		idx--;
 	}
 	EXPECT_EQ(-1, idx);
+}
 
+TEST_F(lookup_cache_pkgTest, LookupHitManyTimes)
+{
+	PKG_CACHE_ENTRY *now;
+	char pkg_name[300];
+	uid_t uid;
+	uid_t uids[MAX_PKG_ENTRIES];
+	std::string pkgname[MAX_PKG_ENTRIES];
+	int ret, idx, k = 0;
 
+	/* Generate mock pkgname and uid in the same hash bucket */
+	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+		sprintf(pkg_name, "%d", i);
+		if (hash_pkg(pkg_name) == 0) {
+			pkgname[k] = std::string(pkg_name);
+			uids[k] = k;
+			insert_cache_pkg(pkgname[k].c_str(), uids[k]);
+			k++;
+		}
+	}
+
+	/* Hit many times with reverse order */
+	for (int times = 0; times < 100000; times++) {
+		for (int i = k-1; i >= 0 ; i--) {
+			ret = lookup_cache_pkg(pkgname[i].c_str(), &uid);
+			ASSERT_EQ(0, ret);
+			ASSERT_EQ(uids[i], uid);
+		}
+	}
+
+	/* Check structure */
+	EXPECT_EQ(MAX_PKG_ENTRIES, pkg_cache.pkg_hash[0].num_pkgs);
+	EXPECT_EQ(MAX_PKG_ENTRIES, pkg_cache.num_cache_pkgs);
+
+	now = pkg_cache.pkg_hash[0].first_pkg_entry;
+	idx = 0; /* first one */
+	while (now) {
+		EXPECT_STREQ(pkgname[idx].c_str(), now->pkgname);
+		EXPECT_EQ(uids[idx], now->pkguid);
+		now = now->next;
+		idx++;
+	}
+	EXPECT_EQ(MAX_PKG_ENTRIES, idx);
+}
+
+TEST_F(lookup_cache_pkgTest, LookupHitManyTimes2)
+{
+	PKG_CACHE_ENTRY *now;
+	char pkg_name[300];
+	uid_t uid;
+	uid_t uids[MAX_PKG_ENTRIES];
+	std::string pkgname[MAX_PKG_ENTRIES];
+	int ret, idx, k = 0;
+
+	/* Generate mock pkgname and uid in the same hash bucket */
+	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+		sprintf(pkg_name, "%d", i);
+		if (hash_pkg(pkg_name) == 0) {
+			pkgname[k] = std::string(pkg_name);
+			uids[k] = k;
+			insert_cache_pkg(pkgname[k].c_str(), uids[k]);
+			k++;
+		}
+	}
+
+	/* Hit many times with reverse order */
+	for (int i = k-1; i >= 0 ; i--) {
+		for (int times = 0; times < 100000; times++) {
+			ret = lookup_cache_pkg(pkgname[i].c_str(), &uid);
+			ASSERT_EQ(0, ret);
+			ASSERT_EQ(uids[i], uid);
+		}
+	}
+
+	/* Check structure */
+	EXPECT_EQ(MAX_PKG_ENTRIES, pkg_cache.pkg_hash[0].num_pkgs);
+	EXPECT_EQ(MAX_PKG_ENTRIES, pkg_cache.num_cache_pkgs);
+
+	now = pkg_cache.pkg_hash[0].first_pkg_entry;
+	idx = 0; /* first one */
+	while (now) {
+		EXPECT_STREQ(pkgname[idx].c_str(), now->pkgname);
+		EXPECT_EQ(uids[idx], now->pkguid);
+		now = now->next;
+		idx++;
+	}
+	EXPECT_EQ(MAX_PKG_ENTRIES, idx);
+}
+/*
+ * End of unittest of lookup_cache_pkg()
+ */
+
+/*
+ * Unittest of remove_cache_pkg()
+ */
+class remove_cache_pkgTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		init_pkg_cache();
+	}
+
+	void TearDown()
+	{
+		destroy_pkg_cache();
+	}
+};
+
+TEST_F(remove_cache_pkgTest, RemoveMediumSuccess)
+{
+	PKG_CACHE_ENTRY *now;
+	char pkg_name[300];
+	uid_t uids[MAX_PKG_ENTRIES];
+	std::string pkgname[MAX_PKG_ENTRIES];
+	int ret, idx, k = 0;
+
+	/* Generate mock pkgname and uid in the same hash bucket */
+	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+		sprintf(pkg_name, "%d", i);
+		if (hash_pkg(pkg_name) == 0) {
+			pkgname[k] = std::string(pkg_name);
+			uids[k] = k;
+			insert_cache_pkg(pkgname[k].c_str(), uids[k]);
+			k++;
+		}
+	}
+
+	/* head->7,6,5,4,3,2,1,0 */
+	ret = remove_cache_pkg(pkgname[MAX_PKG_ENTRIES / 2].c_str());
+	ASSERT_EQ(0, ret);
+	/* head->7,6,5,3,2,1,0 */
+
+	/* Check structure */
+	EXPECT_EQ(MAX_PKG_ENTRIES - 1, pkg_cache.pkg_hash[0].num_pkgs);
+	EXPECT_EQ(MAX_PKG_ENTRIES - 1, pkg_cache.num_cache_pkgs);
+
+	now = pkg_cache.pkg_hash[0].first_pkg_entry;
+	idx = MAX_PKG_ENTRIES - 1; /* first one */
+	while (now) {
+		if (idx == MAX_PKG_ENTRIES / 2) {
+			idx--;
+			continue;
+		}
+		EXPECT_STREQ(pkgname[idx].c_str(), now->pkgname);
+		EXPECT_EQ(uids[idx], now->pkguid);
+		now = now->next;
+		idx--;
+	}
+	EXPECT_EQ(-1, idx);
+}
+
+TEST_F(remove_cache_pkgTest, RemoveHeadSuccess)
+{
+	PKG_CACHE_ENTRY *now;
+	char pkg_name[300];
+	uid_t uids[MAX_PKG_ENTRIES];
+	std::string pkgname[MAX_PKG_ENTRIES];
+	int ret, idx, k = 0;
+
+	/* Generate mock pkgname and uid in the same hash bucket */
+	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+		sprintf(pkg_name, "%d", i);
+		if (hash_pkg(pkg_name) == 0) {
+			pkgname[k] = std::string(pkg_name);
+			uids[k] = k;
+			insert_cache_pkg(pkgname[k].c_str(), uids[k]);
+			k++;
+		}
+	}
+
+	/* head->7,6,5,4,3,2,1,0 */
+	ret = remove_cache_pkg(pkgname[MAX_PKG_ENTRIES - 1].c_str());
+	ASSERT_EQ(0, ret);
+	/* head->6,5,4,3,2,1,0 */
+
+	/* Check structure */
+	EXPECT_EQ(MAX_PKG_ENTRIES - 1, pkg_cache.pkg_hash[0].num_pkgs);
+	EXPECT_EQ(MAX_PKG_ENTRIES - 1, pkg_cache.num_cache_pkgs);
+
+	now = pkg_cache.pkg_hash[0].first_pkg_entry;
+	idx = MAX_PKG_ENTRIES - 2; /* first one */
+	while (now) {
+		EXPECT_STREQ(pkgname[idx].c_str(), now->pkgname);
+		EXPECT_EQ(uids[idx], now->pkguid);
+		now = now->next;
+		idx--;
+	}
+	EXPECT_EQ(-1, idx);
+}
+
+TEST_F(remove_cache_pkgTest, RemoveTailSuccess)
+{
+	PKG_CACHE_ENTRY *now;
+	char pkg_name[300];
+	uid_t uids[MAX_PKG_ENTRIES];
+	std::string pkgname[MAX_PKG_ENTRIES];
+	int ret, idx, k = 0;
+
+	/* Generate mock pkgname and uid in the same hash bucket */
+	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+		sprintf(pkg_name, "%d", i);
+		if (hash_pkg(pkg_name) == 0) {
+			pkgname[k] = std::string(pkg_name);
+			uids[k] = k;
+			insert_cache_pkg(pkgname[k].c_str(), uids[k]);
+			k++;
+		}
+	}
+
+	/* head->7,6,5,4,3,2,1,0 */
+	ret = remove_cache_pkg(pkgname[0].c_str());
+	ASSERT_EQ(0, ret);
+	/* head->6,5,4,3,2,1,0 */
+
+	/* Check structure */
+	EXPECT_EQ(MAX_PKG_ENTRIES - 1, pkg_cache.pkg_hash[0].num_pkgs);
+	EXPECT_EQ(MAX_PKG_ENTRIES - 1, pkg_cache.num_cache_pkgs);
+
+	now = pkg_cache.pkg_hash[0].first_pkg_entry;
+	idx = MAX_PKG_ENTRIES - 1; /* first one */
+	while (now) {
+		EXPECT_STREQ(pkgname[idx].c_str(), now->pkgname);
+		EXPECT_EQ(uids[idx], now->pkguid);
+		now = now->next;
+		idx--;
+	}
+	EXPECT_EQ(0, idx);
+}
+
+TEST_F(remove_cache_pkgTest, RemoveHitNothing)
+{
+	PKG_CACHE_ENTRY *now;
+	char pkg_name[300];
+	uid_t uids[MAX_PKG_ENTRIES];
+	std::string pkgname[MAX_PKG_ENTRIES];
+	int ret, idx, k = 0;
+
+	/* Generate mock pkgname and uid in the same hash bucket */
+	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+		sprintf(pkg_name, "%d", i);
+		if (hash_pkg(pkg_name) == 0) {
+			pkgname[k] = std::string(pkg_name);
+			uids[k] = k;
+			insert_cache_pkg(pkgname[k].c_str(), uids[k]);
+			k++;
+		}
+	}
+
+	/* Hit nothing */
+	for (int i = 10000; i < 20000 ; i++) {
+		sprintf(pkg_name, "%d", i);
+		ret = remove_cache_pkg(pkg_name);
+		ASSERT_EQ(-ENOENT, ret);
+	}
+
+	/* Check structure */
+	EXPECT_EQ(MAX_PKG_ENTRIES, pkg_cache.pkg_hash[0].num_pkgs);
+	EXPECT_EQ(MAX_PKG_ENTRIES, pkg_cache.num_cache_pkgs);
+
+	now = pkg_cache.pkg_hash[0].first_pkg_entry;
+	idx = MAX_PKG_ENTRIES - 1; /* first one */
+	while (now) {
+		EXPECT_STREQ(pkgname[idx].c_str(), now->pkgname);
+		EXPECT_EQ(uids[idx], now->pkguid);
+		now = now->next;
+		idx--;
+	}
+	EXPECT_EQ(-1, idx);
+}
+/*
+ * End of unittest of remove_cache_pkg()
+ */
+
+/*
+ * Unittest of destroy_pkg_cache()
+ */
+class destroy_pkg_cacheTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		init_pkg_cache();
+	}
+
+	void TearDown()
+	{
+		destroy_pkg_cache();
+	}
+};
+
+TEST_F(destroy_pkg_cacheTest, DestroyEmptyCache)
+{
+	destroy_pkg_cache();
+
+	/* Check structure */
+	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+		EXPECT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
+		EXPECT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
+	}
+	EXPECT_EQ(0, pkg_cache.num_cache_pkgs);
+}
+
+TEST_F(destroy_pkg_cacheTest, DestroySuccess)
+{
+	for (int i = 0; i < 10000; i++) {
+		char pkg_name[300];
+		sprintf(pkg_name, "%d", i);
+		insert_cache_pkg(pkg_name, i);
+	}
+
+	for (int i = 0; i < PKG_HASH_SIZE; i++)
+		ASSERT_EQ(MAX_PKG_ENTRIES, pkg_cache.pkg_hash[i].num_pkgs);
+	ASSERT_EQ(MAX_PKG_ENTRIES * PKG_HASH_SIZE, pkg_cache.num_cache_pkgs);
+
+	destroy_pkg_cache();
+
+	/* Check structure */
+	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+		ASSERT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
+		ASSERT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
+	}
+	ASSERT_EQ(0, pkg_cache.num_cache_pkgs);
 }

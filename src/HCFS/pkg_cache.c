@@ -219,7 +219,6 @@ int32_t remove_cache_pkg(const char *pkgname)
 	return ret;
 }
 
-
 int32_t destroy_pkg_cache()
 {
 	int32_t hash_idx;
@@ -231,7 +230,10 @@ int32_t destroy_pkg_cache()
 			next = now->next;
 			free(now);
 			now = next;
+			pkg_cache.pkg_hash[hash_idx].num_pkgs--;
+			pkg_cache.num_cache_pkgs--;
 		}
+		pkg_cache.pkg_hash[hash_idx].first_pkg_entry = NULL;
 	}
 	return 0;
 }
