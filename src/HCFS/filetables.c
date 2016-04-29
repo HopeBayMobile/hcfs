@@ -114,6 +114,7 @@ long long open_fh(ino_t thisinode, int flags, BOOL isdir)
 		dirh_ptr->snapshot_ptr = NULL;
 		sem_init(&(dirh_ptr->snap_ref_sem), 0, 0);
 		sem_init(&(dirh_ptr->wait_ref_sem), 0, 1);
+		system_fh_table.have_nonsnap_dir = TRUE;
 	} else {
 		system_fh_table.entry_table_flags[index] = IS_FH;
 		system_fh_table.entry_table[index].meta_cache_ptr = NULL;
@@ -219,14 +220,22 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 	FILE *snapfptr;
 	size_t ret_size;
 	uint8_t buf[4096];
+	BOOL have_opened_nonsnap;
 
 	snap_created = FALSE;
 	sem_wait(&(system_fh_table.fh_table_sem));
+	if (system_fh_table.have_nonsnap_dir == FALSE) {
+		sem_post(&(system_fh_table.fh_table_sem));
+		return 0;
+	}
+
+	have_opened_nonsnap = FALSE;
 	snprintf(snap_name, METAPATHLEN, "%s/tmp_dirmeta_snap", METAPATH);
 
 	for (count = 0; count < MAX_OPEN_FILE_ENTRIES; count++) {
-		if (system_fh_table.entry_table_flags[count] == IS_DIRH) {
-			tmp_entry = &(system_fh_table.direntry_table[count]);
+		tmp_entry = &(system_fh_table.direntry_table[count]);
+		if ((system_fh_table.entry_table_flags[count] == IS_DIRH) &&
+		    (tmp_entry->snapshot_ptr == NULL)) {
 			if ((tmp_entry->thisinode == thisinode) &&
 			    (snap_created == FALSE)) {
 				/* Create snapshot */
@@ -265,9 +274,16 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 				sem_destroy(&(tmp_entry->wait_ref_sem));
 				sem_init(&(tmp_entry->snap_ref_sem), 0, 0);
 				sem_init(&(tmp_entry->wait_ref_sem), 0, 1);
+			} else {
+				have_opened_nonsnap = TRUE;
 			}
 		}
 	}
+
+	if (have_opened_nonsnap)
+		system_fh_table.have_nonsnap_dir = TRUE;
+	else
+		system_fh_table.have_nonsnap_dir = FALSE;
 
 	if (snap_created)
 		unlink(snap_name);
