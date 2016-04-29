@@ -4897,6 +4897,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			sem_wait(&(system_fh_table.fh_table_sem));
 			fclose(dirh_ptr->snapshot_ptr);
 			dirh_ptr->snapshot_ptr = NULL;
+			system_fh_table.have_nonsnap_dir = TRUE;
 			sem_post(&(system_fh_table.fh_table_sem));
 		}
 		sem_post(&(dirh_ptr->wait_ref_sem));

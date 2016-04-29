@@ -56,6 +56,9 @@ typedef struct {
 	uint8_t *entry_table_flags;
 	FH_ENTRY *entry_table;
 	DIRH_ENTRY *direntry_table;
+	/* Use nonsnap flag to indicate if we will need to scan filetable
+	for the need to create dir snapshot if a dir changing op occurs */
+	BOOL have_nonsnap_dir;
 	int64_t last_available_index;
 	sem_t fh_table_sem;
 } FH_TABLE_TYPE;
