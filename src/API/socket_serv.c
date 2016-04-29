@@ -152,7 +152,7 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len, char *resbuf, int32_t 
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
-	int32_t cloud_stat;
+	int32_t cloud_stat, data_transfer;
 	int64_t quota, vol_usage, cloud_usage;
 	int64_t cache_total, cache_used, cache_dirty;
 	int64_t pin_max, pin_total;
@@ -163,14 +163,14 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len, char *resbuf, int32_t 
 				 &cache_total, &cache_used, &cache_dirty,
 				 &pin_max, &pin_total,
 				 &xfer_up, &xfer_down,
-				 &cloud_stat);
+				 &cloud_stat, &data_transfer);
 
 	if (ret_code < 0) {
 		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	} else {
 		/* Total size for reply msgs */
-		ret_len = sizeof(int64_t) * 10 + sizeof(int32_t);
+		ret_len = sizeof(int64_t) * 10 + sizeof(int32_t) * 2;
 
 		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(&quota, sizeof(int64_t));
@@ -184,6 +184,7 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len, char *resbuf, int32_t 
 		CONCAT_REPLY(&xfer_up, sizeof(int64_t));
 		CONCAT_REPLY(&xfer_down, sizeof(int64_t));
 		CONCAT_REPLY(&cloud_stat, sizeof(int32_t));
+		CONCAT_REPLY(&data_transfer, sizeof(int32_t));
 	}
 
 	return ret_code;

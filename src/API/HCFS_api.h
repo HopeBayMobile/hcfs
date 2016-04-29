@@ -77,6 +77,7 @@ void HCFS_reload_config(char **json_res);
  *     xfer_up: Bytes,
  *     xfer_down: Bytes,
  *     cloud_conn: True|False,
+ *     data_transfer: Integer (0 means no data transfer, 1 means data transfer in progress, 2 means data transfer in progress but slow.)
  * }
  * ```
  *
