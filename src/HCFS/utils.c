@@ -978,7 +978,7 @@ void _shift_xfer_window(void)
 	/* last_xfer_shift_time initailized failed, reset it */
 	if (hcfs_system->last_xfer_shift_time < 0) {
 		hcfs_system->systemdata.xfer_now_window = 0;
-		memset(hcfs_system->systemdata.xfer_throughtput,
+		memset(hcfs_system->systemdata.xfer_throughput,
 			0, sizeof(int64_t) * XFER_WINDOW_MAX);
 		memset(hcfs_system->systemdata.xfer_total_obj,
 			0, sizeof(int64_t) * XFER_WINDOW_MAX);
@@ -995,7 +995,7 @@ void _shift_xfer_window(void)
 		/*  Clear older window */
 		num_shifted = 0;
 		while (num_shifted < XFER_WINDOW_MAX) {
-			hcfs_system->systemdata.xfer_throughtput[now_window] = 0;
+			hcfs_system->systemdata.xfer_throughput[now_window] = 0;
 			hcfs_system->systemdata.xfer_total_obj[now_window] = 0;
 
 			if (num_shifted >= window_exceeded)
@@ -1019,13 +1019,13 @@ void _shift_xfer_window(void)
 *
 * Function name: change_xfter_meta
 *        Inputs: long long xfer_size_upload, long long xfer_size_download,
-*        	 long long xfer_throughtput, long long xfer_obj_transit
+*        	 long long xfer_throughput, long long xfer_obj_transit
 *       Summary: Update the parts of xfter statistics in system meta
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
 int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
-			 int64_t xfer_throughtput, int64_t xfer_total_obj)
+			 int64_t xfer_throughput, int64_t xfer_total_obj)
 {
 	int32_t ret = 0;
 	int32_t now_window;
@@ -1047,10 +1047,10 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 	if (hcfs_system->systemdata.xfer_size_download < 0)
 		hcfs_system->systemdata.xfer_size_download = 0;
 
-	hcfs_system->systemdata.xfer_throughtput[now_window] +=
-		xfer_throughtput;
-	if (hcfs_system->systemdata.xfer_throughtput[now_window] < 0)
-		hcfs_system->systemdata.xfer_throughtput[now_window] = 0;
+	hcfs_system->systemdata.xfer_throughput[now_window] +=
+		xfer_throughput;
+	if (hcfs_system->systemdata.xfer_throughput[now_window] < 0)
+		hcfs_system->systemdata.xfer_throughput[now_window] = 0;
 
 	hcfs_system->systemdata.xfer_total_obj[now_window] +=
 		xfer_total_obj;

@@ -800,7 +800,7 @@ int32_t get_xfer_status(void)
 		total_thpt = num_obj = 0;
 		for (idx = 0; idx < XFER_WINDOW_SIZE; idx++) {
 			total_thpt +=
-				(int64_t)hcfs_system->systemdata.xfer_throughtput[now_window];
+				(int64_t)hcfs_system->systemdata.xfer_throughput[now_window];
 			num_obj +=
 				(int64_t)hcfs_system->systemdata.xfer_total_obj[now_window];
 

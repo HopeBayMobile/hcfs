@@ -207,7 +207,7 @@ typedef struct {
 	/* data for xfer statistics */
 	int64_t xfer_size_download;
 	int64_t xfer_size_upload;
-	int64_t xfer_throughtput[XFER_WINDOW_MAX];
+	int64_t xfer_throughput[XFER_WINDOW_MAX];
 	int64_t xfer_total_obj[XFER_WINDOW_MAX];
 	int32_t xfer_now_window;
 } SYSTEM_DATA_TYPE;
