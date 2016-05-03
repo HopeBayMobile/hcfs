@@ -216,6 +216,8 @@ int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
 		entry = _new_pkg_entry(pkgname, uid);
 		if (!entry) {
 			sem_post(&pkg_cache.pkg_cache_lock);
+			write_log(0, "Error: Memory alloc error in %s\n",
+					__func__);
 			return -ENOMEM;
 		}
 
