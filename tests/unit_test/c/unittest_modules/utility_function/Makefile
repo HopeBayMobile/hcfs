@@ -158,9 +158,12 @@ logger_unittest : logger.o logger_unittest.o gtest_main.a
 pkg_cache.o : $(USER_DIR)/pkg_cache.c $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/pkg_cache.c
 
+pkg_cache_mock_ftn.o : $(UNITTEST_DIR)/pkg_cache_mock_ftn.c 
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/pkg_cache_mock_ftn.c
+
 pkg_cache_unittest.o : $(UNITTEST_DIR)/pkg_cache_unittest.cc \
                       $(USER_DIR)/pkg_cache.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pkg_cache_unittest.cc
 
-pkg_cache_unittest : pkg_cache.o pkg_cache_unittest.o gtest_main.a
+pkg_cache_unittest : pkg_cache.o pkg_cache_mock_ftn.o pkg_cache_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
