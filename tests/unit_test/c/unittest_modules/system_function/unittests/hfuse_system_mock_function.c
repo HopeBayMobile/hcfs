@@ -192,3 +192,13 @@ int get_quota_from_backup(int64_t *quota)
 	*quota = 0;
 	return 0;
 }
+
+int32_t init_pkg_cache()
+{
+	return 0;
+}
+
+int32_t destroy_pkg_cache()
+{
+	return 0;
+}

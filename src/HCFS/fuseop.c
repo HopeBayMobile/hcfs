@@ -787,9 +787,19 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 					newpermission = 0771;
 					/* When parent is /0/Android/data/,
 					 * need to check self pkg name */
-					if (selfname && pin_status)
-						_try_get_pin_st(selfname,
+					if (selfname) {
+						if (pin_status)
+						/* Create external pkg
+						 * folder */
+							_try_get_pin_st(
+								selfname,
 								pin_status);
+						else
+						/* Remove external pkg
+						 * folder */
+							remove_cache_pkg(
+								selfname);
+					}
 				}
 				break;
 			case 3:
@@ -1392,7 +1402,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
+		_rewrite_stat(tmpptr, &parent_stat, selfname, NULL);
 	}
 #endif
 

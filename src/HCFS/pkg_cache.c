@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <errno.h>
 
+#include "logger.h"
 #include "params.h"
 
 static inline int32_t _pkg_hash(const char *input)
@@ -59,7 +60,9 @@ static int32_t _lookup_pkg_list(PKG_ENTRY_HEAD *entry_head,
 		ret = 0;
 		*ret_prev = prev;
 		*ret_now = now;
+		pkg_cache.hit_count++;
 	}
+	pkg_cache.query_count++;
 
 	return ret;
 }
@@ -154,6 +157,9 @@ int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid)
 	if (ret == 0) { /* Hit */
 		*uid = now->pkguid;
 		_promote_pkg_entry(&(pkg_cache.pkg_hash[hash]), prev, now);
+		write_log(10, "Debug: Hit %s in pkg cache, hit rate %3lf\n",
+				pkgname, (double)pkg_cache.hit_count /
+				pkg_cache.query_count);
 	}
 	sem_post(&pkg_cache.pkg_cache_lock);
 

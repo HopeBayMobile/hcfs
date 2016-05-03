@@ -21,6 +21,8 @@ typedef struct {
 typedef struct {
 	PKG_ENTRY_HEAD pkg_hash[PKG_HASH_SIZE];
 	int num_cache_pkgs;
+	long long hit_count;
+	long long query_count;
 	sem_t pkg_cache_lock; /* Lock for package to uid lookup cache */
 } PKG_CACHE;
 
