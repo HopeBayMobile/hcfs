@@ -1455,7 +1455,132 @@ TEST_F(api_moduleTest, UnpinDirtySizeSuccess) {
 	ASSERT_EQ(556677, unpindirtysize);
 }
 
+TEST_F(api_moduleTest, XferStatusNoTransit) {
 
+	int ret_val, status;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = GETXFERSTATUS;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	hcfs_system->systemdata.xfer_now_window = 0;
+	hcfs_system->xfer_upload_in_progress = FALSE;
+	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(int), size_msg);
+	ret_val = recv(fd, &status, sizeof(int), 0);
+	ASSERT_EQ(sizeof(int), ret_val);
+	ASSERT_EQ(0, status);
+}
+
+TEST_F(api_moduleTest, XferStatusNormalTransit) {
+
+	int ret_val, status;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = GETXFERSTATUS;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	memset(hcfs_system->systemdata.xfer_throughput,
+			0, sizeof(int64_t) * 6);
+	memset(hcfs_system->systemdata.xfer_total_obj,
+			0, sizeof(int64_t) * 6);
+	hcfs_system->systemdata.xfer_now_window = 1;
+	hcfs_system->systemdata.xfer_throughput[1] = 1000;
+	hcfs_system->systemdata.xfer_total_obj[1] = 1;
+	hcfs_system->xfer_upload_in_progress = TRUE;
+	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(int), size_msg);
+	ret_val = recv(fd, &status, sizeof(int), 0);
+	ASSERT_EQ(sizeof(int), ret_val);
+	ASSERT_EQ(1, status);
+}
+
+TEST_F(api_moduleTest, XferStatusSlowTransit) {
+
+	int ret_val, status;
+	unsigned int code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = GETXFERSTATUS;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+	memset(hcfs_system->systemdata.xfer_throughput,
+			0, sizeof(int64_t) * 6);
+	memset(hcfs_system->systemdata.xfer_total_obj,
+			0, sizeof(int64_t) * 6);
+	hcfs_system->systemdata.xfer_now_window = 0;
+	hcfs_system->systemdata.xfer_throughput[0] = 10;
+	hcfs_system->systemdata.xfer_total_obj[0] = 1;
+	hcfs_system->xfer_upload_in_progress = FALSE;
+	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
+	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ASSERT_EQ(sizeof(int), size_msg);
+	ret_val = recv(fd, &status, sizeof(int), 0);
+	ASSERT_EQ(sizeof(int), ret_val);
+	ASSERT_EQ(2, status);
+}
 /* End of the test case for the function api_module */
 
 /* Begin of the test case for the function api_server_monitor */

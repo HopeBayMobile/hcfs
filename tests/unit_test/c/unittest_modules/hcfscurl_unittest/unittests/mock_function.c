@@ -147,3 +147,7 @@ int32_t ignore_sigpipe(void)
 {
 	return 0;
 }
+
+int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
+		     long long xfer_throughtput, long long xfer_total_obj)
+{}

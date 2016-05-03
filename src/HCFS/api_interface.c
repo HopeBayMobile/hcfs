@@ -777,6 +777,52 @@ int32_t set_sync_switch_handle(int32_t sync_switch)
 	return retcode;
 }
 
+/* To get data transfer status
+ * Cases -
+ * 	0 means no data transfer in progress,
+ * 	1 means data transfer in progress,
+ * 	2 means data transfer in progress but slow
+ * */
+int32_t get_xfer_status(void)
+{
+	int32_t ret_val, idx;
+	int32_t download_flag, now_window;
+	int64_t average_thpt, total_thpt, num_obj;
+
+	/* Get the number of running download jobs */
+	ret_val = sem_getvalue(&(hcfs_system->xfer_download_in_progress_sem),
+			       &download_flag);
+	if (ret_val < 0)
+		return -errno;
+
+	if (hcfs_system->xfer_upload_in_progress || download_flag > 0) {
+		now_window = hcfs_system->systemdata.xfer_now_window;
+		total_thpt = num_obj = 0;
+		for (idx = 0; idx < XFER_WINDOW_SIZE; idx++) {
+			total_thpt +=
+				(int64_t)hcfs_system->systemdata.xfer_throughput[now_window];
+			num_obj +=
+				(int64_t)hcfs_system->systemdata.xfer_total_obj[now_window];
+
+			now_window -= 1;
+			if (now_window < 0)
+				now_window = XFER_WINDOW_MAX - 1;
+		}
+
+		if (num_obj <= 0)
+			/* In the case 0 -> 1, maybe no throughput record here */
+			return 1;
+
+		average_thpt = total_thpt / num_obj;
+		if (average_thpt < XFER_SLOW_SPEED)
+			return 2;
+		else
+			return 1;
+	}
+	return 0;
+}
+
+
 /************************************************************************
 *
 * Function name: api_module
@@ -1335,6 +1381,13 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(retcode),
 						MSG_NOSIGNAL);
 			}
+			break;
+		case GETXFERSTATUS:
+			uint32_ret = get_xfer_status();
+			ret_len = sizeof(uint32_ret);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		default:
 			retcode = ENOTSUP;

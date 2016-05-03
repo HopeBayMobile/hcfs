@@ -100,9 +100,24 @@ void collect_finished_sync_threads(void *ptr)
 		sem_wait(&(sync_ctl.sync_op_sem));
 
 		if (sync_ctl.total_active_sync_threads <= 0) {
+			/* No active upload threads */
+			if (hcfs_system->xfer_upload_in_progress) {
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->xfer_upload_in_progress = FALSE;
+				sem_post(&(hcfs_system->access_sem));
+				write_log(10, "Set upload in progress to FALSE\n");
+			}
 			sem_post(&(sync_ctl.sync_op_sem));
 			nanosleep(&time_to_sleep, NULL);
 			continue;
+		}
+
+		/* Some upload threads are working */
+		if (!hcfs_system->xfer_upload_in_progress) {
+			sem_wait(&(hcfs_system->access_sem));
+			hcfs_system->xfer_upload_in_progress = TRUE;
+			sem_post(&(hcfs_system->access_sem));
+			write_log(10, "Set upload in progress to TRUE\n");
 		}
 
 		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)

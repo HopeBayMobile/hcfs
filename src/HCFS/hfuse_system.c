@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 #ifndef _ANDROID_ENV_
 #include <sys/shm.h>
@@ -140,6 +141,16 @@ int init_hcfs_system_data(void)
 				quota);
 		hcfs_system->systemdata.system_quota = quota;
 	}
+
+	/* Xfer related */
+	hcfs_system->last_xfer_shift_time = time(NULL);
+	hcfs_system->xfer_upload_in_progress = FALSE;
+	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 1, 0);
+	hcfs_system->systemdata.xfer_now_window = 0;
+	memset(hcfs_system->systemdata.xfer_throughput, 0,
+			sizeof(int64_t) * XFER_WINDOW_MAX);
+	memset(hcfs_system->systemdata.xfer_total_obj, 0,
+			sizeof(int64_t) * XFER_WINDOW_MAX);
 
 	return 0;
 errcode_handle:

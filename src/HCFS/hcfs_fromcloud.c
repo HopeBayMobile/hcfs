@@ -68,6 +68,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	if (hcfs_system->sync_paused)
 		return -EIO;
 
+	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
+
 #if (DEDUP_ENABLE)
 	/* Get objname by obj_id */
 	obj_id_to_string(obj_id, obj_id_str);
@@ -151,6 +154,9 @@ int fetch_from_cloud(FILE *fptr, char action_from,
 	/* Finally free download sem */
 
 errcode_handle:
+	sem_trywait(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Download job finished, download_in_progress should minus 1\n");
+
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
 	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/

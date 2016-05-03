@@ -1062,7 +1062,7 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
 
 /*
  * Unittest of change_system_meta()
- */ 
+ */
 class change_system_metaTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -1092,6 +1092,115 @@ TEST_F(change_system_metaTest, UpdateSuccess)
 	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
 	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
 	EXPECT_EQ(6, hcfs_system->systemdata.unpin_dirty_data_size);
+}
+/*
+ * End of unittest of change_system_meta()
+ */
+
+/*
+ * Unittest of _shift_xfer_window()
+ */
+class _shift_xfer_windowTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(_shift_xfer_windowTest, NoShiftOccur)
+{
+	int ret;
+
+	hcfs_system->systemdata.xfer_now_window = 1;
+	hcfs_system->last_xfer_shift_time = time(NULL);
+	sleep(1);
+
+	_shift_xfer_window();
+	EXPECT_EQ(1, hcfs_system->systemdata.xfer_now_window);
+}
+
+TEST_F(_shift_xfer_windowTest, ShiftSuccessful)
+{
+	int idx, now_window, num_shifted;
+	int time_passed = 45;
+
+	hcfs_system->systemdata.xfer_now_window = 1;
+	hcfs_system->last_xfer_shift_time = time(NULL) - time_passed;
+
+	_shift_xfer_window();
+	EXPECT_EQ(3, hcfs_system->systemdata.xfer_now_window);
+
+	now_window = hcfs_system->systemdata.xfer_now_window - 1;
+	now_window = (now_window < 0) ? XFER_WINDOW_MAX - 1 : now_window;
+	num_shifted = time_passed / XFER_SEC_PER_WINDOW;
+	for (idx = 0; idx < num_shifted; idx++) {
+		EXPECT_EQ(0, hcfs_system->systemdata.xfer_throughput[now_window]);
+		EXPECT_EQ(0, hcfs_system->systemdata.xfer_total_obj[now_window]);
+		now_window = now_window - 1;
+		if (now_window < 0)
+			now_window = XFER_WINDOW_MAX - 1;
+	}
+}
+/*
+ * End of unittest of change_system_meta()
+ */
+
+/*
+ * Unittest of change_xfer_meta()
+ */
+class change_xfer_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+};
+
+TEST_F(change_xfer_metaTest, UpdateSuccess)
+{
+	int ret;
+
+	hcfs_system->systemdata.xfer_now_window = 2;
+
+	ret = change_xfer_meta(1, 2, 3, 4);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1, hcfs_system->systemdata.xfer_size_upload);
+	EXPECT_EQ(2, hcfs_system->systemdata.xfer_size_download);
+	EXPECT_EQ(3, hcfs_system->systemdata.xfer_throughput[2]);
+	EXPECT_EQ(4, hcfs_system->systemdata.xfer_total_obj[2]);
+}
+
+TEST_F(change_xfer_metaTest, MinIsZero)
+{
+	int ret;
+
+	hcfs_system->systemdata.xfer_now_window = 3;
+
+	ret = change_xfer_meta(-1, -2, -3, -4);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_size_upload);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_size_download);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_throughput[3]);
+	EXPECT_EQ(0, hcfs_system->systemdata.xfer_total_obj[3]);
 }
 /*
  * End of unittest of change_system_meta()
