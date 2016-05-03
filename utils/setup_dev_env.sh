@@ -47,11 +47,7 @@ while getopts ":vm:" opt; do
 	esac
 done
 
-setup_status_file="${here}/.setup_$setup_dev_env_mode"
-if md5sum --quiet -c "$setup_status_file"; then
-	exit
-fi
-rm -f "$setup_status_file"
+check_script_changes "$here/${BASH_SOURCE[0]}"
 
 if [ $verbose -eq 0 ]; then
 	set +x;
@@ -113,7 +109,7 @@ esac
 
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
 sudo mv -f /tmp/awk_tmp "$configfile"
-md5sum "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
-sudo chmod --reference="$here/setup_dev_env.sh" "$configfile" "$setup_status_file"
-sudo chown --reference="$here/setup_dev_env.sh" "$configfile" "$setup_status_file"
+
+commit_script_changes
+commit_script_changes "$configfile"
 if ${CI_VERBOSE:-false}; then set -x; else set +x; fi

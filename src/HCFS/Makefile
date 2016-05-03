@@ -60,7 +60,7 @@ OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_F))
 all: check_pkgs hcfs
 
 check_pkgs:
-	../../utils/check_compile_pkgs.sh
+	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
 
 hcfs: $(OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LFLAGS)
