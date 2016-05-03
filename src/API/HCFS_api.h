@@ -90,6 +90,27 @@ void HCFS_reload_config(char **json_res);
  */
 void HCFS_stat(char **json_res);
 
+/*Statistic
+ * @json_res result string in json format.
+ *
+ * To fetch the value of occupied size (Unpin-but-dirty size + pin size).
+ *
+ * Return data dict in json_res -
+ * ```json
+ * data: {
+ *     occupied: Bytes,
+ * }
+ * ```
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
+ */
+void HCFS_get_occupied_size(char **json_res);
+
 /*Set property
  * @json_res result string in json format.
  * @key property of HCFS configuration.

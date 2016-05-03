@@ -84,6 +84,11 @@ int32_t main()
 	HCFS_get_sync_status(&res12);
 	printf("sync status - %s\n", res12);
 	free(res12);
+
+	char *res13;
+	HCFS_get_occupied_size(&res13);
+	printf("occupied size - %s\n", res13);
+	free(res13);
 }
 
 
