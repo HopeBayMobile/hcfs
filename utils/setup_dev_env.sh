@@ -47,7 +47,7 @@ while getopts ":vm:" opt; do
 	esac
 done
 
-check_script_changes "$here/${BASH_SOURCE[0]}"
+check_script_changes "$here/$(basename ${BASH_SOURCE[0]})"
 
 if [ $verbose -eq 0 ]; then
 	set +x;
