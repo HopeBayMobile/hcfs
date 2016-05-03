@@ -1962,14 +1962,11 @@ protected:
 TEST_F(hfuse_ll_setxattrTest, SetKeyWithoutValue)
 {
 	int ret;
-	int errcode;
 
 	ret = setxattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa", "", 0, 0);
-	errcode = errno;
 
-	EXPECT_EQ(-1, ret);
-	EXPECT_EQ(EINVAL, errcode);
+	EXPECT_EQ(0, ret);
 }
 
 TEST_F(hfuse_ll_setxattrTest, NamespaceInvalid)
