@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: pkg_cache.c
+* Abstract: The c source code file for improving to lookup uid of package.
+*
+* Revision History
+* 2016/4/27 Kewei create this file. Add ops of "insert", "lookup", "remove"
+*
+**************************************************************************/
+
 #include "pkg_cache.h"
 
 #include <stdlib.h>
@@ -9,6 +21,11 @@
 #include "logger.h"
 #include "params.h"
 
+/**
+ * Hash package name.
+ *
+ * @return bucket index of hash table.
+ */
 static inline int32_t _pkg_hash(const char *input)
 {
 	int32_t hash = 5381;
@@ -137,6 +154,11 @@ static void _kick_entry(PKG_ENTRY_HEAD *entry_head,
 	return;
 }
 
+/**
+ * Initialize a package cache structure.
+ *
+ * @return none.
+ */
 int32_t init_pkg_cache()
 {
 	memset(&pkg_cache, 0, sizeof(PKG_CACHE));
@@ -144,6 +166,12 @@ int32_t init_pkg_cache()
 	return 0;
 }
 
+/**
+ * Given a package name, lookup uid in pkg cache structure. If hit this
+ * pkg entry, then let the entry be head of that linked list (MRU one).
+ *
+ * @return 0 on cache hit, otherwise -ENOENT.
+ */
 int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid)
 {
 	int32_t ret;
@@ -166,6 +194,14 @@ int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid)
 	return ret;
 }
 
+/**
+ * Insert a pair of package name and uid to pkg cache structure. Check if
+ * this entry had already been in this cache before insertion so that avoid
+ * race condition. In case of entry not found, insert it to the head of
+ * linked list and kick the LRU one (last one of that linked list).
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
 {
 	int32_t ret;
@@ -196,7 +232,7 @@ int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
 		_promote_pkg_entry(&(pkg_cache.pkg_hash[hash]), NULL, entry);
 		write_log(10, "Debug: %s miss in cache. Insert it.\n", pkgname);
 	} else {
-		/*  Let the pkg be MRU one.  */
+		/* Hit when insertion. Just let the pkg be MRU one. */
 		_promote_pkg_entry(&(pkg_cache.pkg_hash[hash]), prev, now);
 	}
 	sem_post(&pkg_cache.pkg_cache_lock);
@@ -204,6 +240,11 @@ int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
 	return 0;
 }
 
+/**
+ * Remove a package entry in cache. Do nothing when pkg is not found.
+ *
+ * @return 0 on success. -ENOENT when pkg not found.
+ */
 int32_t remove_cache_pkg(const char *pkgname)
 {
 	int32_t ret;
@@ -226,6 +267,11 @@ int32_t remove_cache_pkg(const char *pkgname)
 	return ret;
 }
 
+/**
+ * Destroy and free all the pkg cache.
+ *
+ * @return 0 on success.
+ */
 int32_t destroy_pkg_cache()
 {
 	int32_t hash_idx;

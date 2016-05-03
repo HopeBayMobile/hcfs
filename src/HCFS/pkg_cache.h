@@ -1,3 +1,16 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: pkg_cache.h
+* Abstract: The c header file for defining structure of package lookup
+*           in memory.
+*
+* Revision History
+* 2016/4/27 Kewei create this file and define data structure.
+*
+**************************************************************************/
+
 #ifndef GW20_HCFS_PKG_LOOKUP_H_
 #define GW20_HCFS_PKG_LOOKUP_H_
 #include <semaphore.h>
@@ -6,8 +19,8 @@
 
 #include "params.h"
 
-#define PKG_HASH_SIZE 8
-#define MAX_PKG_ENTRIES 8
+#define PKG_HASH_SIZE 8 /* Size of hash bucket */
+#define MAX_PKG_ENTRIES 8 /* Max size of MRU linked list */
 /* Moved pkg lookup here */
 typedef struct PKG_CACHE_ENTRY {
 	char pkgname[MAX_FILENAME_LEN+1];
