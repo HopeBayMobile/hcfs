@@ -1,6 +1,8 @@
 #ifndef GW20_HCFS_PKG_LOOKUP_H_
 #define GW20_HCFS_PKG_LOOKUP_H_
 #include <semaphore.h>
+#include <sys/types.h>
+#include <stdint.h>
 
 #include "params.h"
 
@@ -15,14 +17,14 @@ typedef struct PKG_CACHE_ENTRY {
 
 typedef struct {
 	PKG_CACHE_ENTRY *first_pkg_entry;
-	int num_pkgs;
+	int32_t num_pkgs;
 } PKG_ENTRY_HEAD;
 
 typedef struct {
 	PKG_ENTRY_HEAD pkg_hash[PKG_HASH_SIZE];
-	int num_cache_pkgs;
-	long long hit_count;
-	long long query_count;
+	int32_t num_cache_pkgs;
+	int64_t hit_count;
+	int64_t query_count;
 	sem_t pkg_cache_lock; /* Lock for package to uid lookup cache */
 } PKG_CACHE;
 
