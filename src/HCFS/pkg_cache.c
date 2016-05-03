@@ -194,7 +194,7 @@ int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
 		}
 		/* Add to head of list (MRU). */
 		_promote_pkg_entry(&(pkg_cache.pkg_hash[hash]), NULL, entry);
-
+		write_log(10, "Debug: %s miss in cache. Insert it.\n", pkgname);
 	} else {
 		/*  Let the pkg be MRU one.  */
 		_promote_pkg_entry(&(pkg_cache.pkg_hash[hash]), prev, now);
@@ -219,6 +219,7 @@ int32_t remove_cache_pkg(const char *pkgname)
 				prev, now);
 		pkg_cache.pkg_hash[hash].num_pkgs -= 1;
 		pkg_cache.num_cache_pkgs -= 1;
+		write_log(10, "Debug: %s is removed from cache.\n", pkgname);
 	}
 	sem_post(&pkg_cache.pkg_cache_lock);
 
