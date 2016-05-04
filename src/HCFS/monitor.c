@@ -87,6 +87,7 @@ void monitor_loop(void)
 	struct timespec ts;
 	int32_t ret_val;
 	int32_t wait_sec = 0;
+	int32_t min, max;
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 	prctl(PR_SET_NAME, "monitor_loop");
@@ -112,9 +113,12 @@ void monitor_loop(void)
 		monitor_collisions += 1;
 		if (monitor_collisions > 9)
 			monitor_collisions = 9;
-
-		wait_sec = MONITORING_SLOT_TIME *
-			   (rand() % (int32_t)(pow(2, monitor_collisions)));
+		min = (int32_t)pow(2, monitor_collisions - 3);
+		if (min < 1)
+			min = 1;
+		max = (int32_t)pow(2, monitor_collisions);
+		wait_sec = MONITOR_BACKOFF_SLOT;
+		wait_sec *= (min + (rand() % (max - min + 1)));
 		write_log(5, "[Monitor] wait %d seconed before retransmit\n",
 			  wait_sec);
 

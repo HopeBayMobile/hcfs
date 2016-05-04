@@ -95,7 +95,6 @@ int32_t init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
-	hcfs_system->monitor_interval = MONITORING_SLOT_TIME;
 	sem_init(&(hcfs_system->monitor_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
