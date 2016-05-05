@@ -55,7 +55,6 @@ TEST_F(pinning_loopTest, WorkNormally)
 {
 	/* Generate mock data */
 	hcfs_system->sync_paused = FALSE;
-	hcfs_system->monitor_interval = 1;
 	for (int i = 0; i < TOTAL_MOCK_INODES; i++) {
 		mock_inodes[i] = (i + 1) * 15;
 	}

@@ -24,7 +24,6 @@ class monitorTest : public ::testing::Test {
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
-		hcfs_system->monitor_interval = 1;
 		sem_init(&(hcfs_system->monitor_sem), 1, 0);
 	}
 
