@@ -1203,7 +1203,7 @@ void api_module(void *index)
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case TESTAPI:
-			/* Simulate a int64_t API call of 5 seconds */
+			/* Simulate too long API call of 5 seconds */
 			sleep(5);
 			retcode = 0;
 			cur_index = *((int32_t *)index);

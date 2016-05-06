@@ -94,7 +94,7 @@ uint64_t compute_hash(const char *path)
 *        Inputs: int64_t index, char *path, ino_t inode_number
 *       Summary: Replace hash table entry "index" with the provided path
 *                "path" and corresponding inode number "inode_number".
-*  Return value: 0 if replaced, -1 if pathname is too int64_t.
+*  Return value: 0 if replaced, -1 if pathname is too long.
 *
 *************************************************************************/
 int32_t replace_pathname_cache(int64_t index, char *path, ino_t inode_number)
@@ -117,7 +117,7 @@ int32_t replace_pathname_cache(int64_t index, char *path, ino_t inode_number)
 *        Inputs: const char *path
 *       Summary: Invalidate the cache entry for pathname "path" if it is
 *                in the cache.
-*  Return value: 0 if invalidated or not found, -1 if pathname is too int64_t.
+*  Return value: 0 if invalidated or not found, -1 if pathname is too long.
 *
 *************************************************************************/
 int32_t invalidate_pathname_cache_entry(const char *path)
