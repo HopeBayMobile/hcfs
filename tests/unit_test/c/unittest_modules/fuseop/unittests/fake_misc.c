@@ -921,3 +921,18 @@ int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize
 {
 	return 0;
 }
+
+int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid)
+{
+	return 0;
+}
+
+int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
+{
+	return 0;
+}
+
+int32_t remove_cache_pkg(const char *pkgname)
+{
+	return 0;
+}

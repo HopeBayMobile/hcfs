@@ -51,6 +51,7 @@
 #include "FS_manager.h"
 #include "path_reconstruct.h"
 #include "hcfs_fromcloud.h"
+#include "pkg_cache.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -391,6 +392,9 @@ int main(int argc, char **argv)
 	ret_val = init_dirstat_lookup();
 	if (ret_val < 0)
 		exit(ret_val);
+	ret_val = init_pkg_cache();
+	if (ret_val < 0)
+		exit(ret_val);
 
 	open_log("hcfs_android_log");
 #ifdef VERSION_NUM
@@ -416,6 +420,7 @@ int main(int argc, char **argv)
 	close_log();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
+	destroy_pkg_cache();
 #else
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
