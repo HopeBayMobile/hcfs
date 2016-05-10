@@ -42,9 +42,9 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int search_mount(char *fsname, char *mp, MOUNT_T **mt_info)
+int32_t search_mount(char *fsname, char *mp, MOUNT_T **mt_info)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	MOUNT_NODE_T *root;
 
 	root = mount_mgr.root;
@@ -71,10 +71,10 @@ errcode_handle:
 	return errcode;
 }
 
-static int _compare_node(const char *fsname, const char *mp,
+static int32_t _compare_node(const char *fsname, const char *mp,
 		const MOUNT_NODE_T *now_node)
 {
-	int ret;
+	int32_t ret;
 
 	ret = strcmp(fsname, now_node->mt_entry->f_name);
 	if (ret == 0) {
@@ -91,10 +91,10 @@ static int _compare_node(const char *fsname, const char *mp,
 }
 
 /* Helper function for searching binary tree */
-int search_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
+int32_t search_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 		MOUNT_T **mt_info)
 {
-	int ret;
+	int32_t ret;
 	MOUNT_NODE_T *next;
 
 	ret = _compare_node(fsname, mp, node);
@@ -131,9 +131,9 @@ int search_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int insert_mount(char *fsname, MOUNT_T *mt_info)
+int32_t insert_mount(char *fsname, MOUNT_T *mt_info)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	MOUNT_NODE_T *root;
 
 	write_log(10, "Inserting FS %s\n", fsname);
@@ -168,9 +168,9 @@ errcode_handle:
 }
 
 /* Helper function for inserting to binary tree */
-int insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info)
+int32_t insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info)
 {
-	int ret;
+	int32_t ret;
 	MOUNT_NODE_T *next;
 
 	ret = _compare_node(fsname, mt_info->f_mp, node);
@@ -232,9 +232,9 @@ should be handled in the unmount routines */
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int delete_mount(char *fsname, char *mp, MOUNT_NODE_T **ret_node)
+int32_t delete_mount(char *fsname, char *mp, MOUNT_NODE_T **ret_node)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	MOUNT_NODE_T *root;
 
 	root = mount_mgr.root;
@@ -261,7 +261,7 @@ errcode_handle:
 	return errcode;
 }
 
-int replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T **ret_node)
+int32_t replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T **ret_node)
 {
 	if (node->rchild == NULL) {
 
@@ -295,10 +295,10 @@ int replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T **ret_node)
 	return replace_with_largest_child(node->rchild, ret_node);
 }
 
-int delete_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
+int32_t delete_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 					MOUNT_NODE_T **ret_node)
 {
-	int ret;
+	int32_t ret;
 	MOUNT_NODE_T *next;
 	MOUNT_NODE_T *ret_child;
 
@@ -421,7 +421,7 @@ in the two modules */
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_mount_mgr(void)
+int32_t init_mount_mgr(void)
 {
 	memset(&mount_mgr, 0, sizeof(MOUNT_MGR_T));
 	sem_init(&(mount_mgr.mount_lock), 0, 1);
@@ -438,9 +438,9 @@ int init_mount_mgr(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int destroy_mount_mgr(void)
+int32_t destroy_mount_mgr(void)
 {
-	int ret;
+	int32_t ret;
 
 	ret = unmount_all();
 	/* All mounted FS should be processed. */
@@ -450,9 +450,9 @@ int destroy_mount_mgr(void)
 
 /* Returns 0 if entry found, and -ENOENT is not found. Otherwise
 returns error number */
-int FS_is_mounted(char *fsname)
+int32_t FS_is_mounted(char *fsname)
 {
-	int ret;
+	int32_t ret;
 	MOUNT_T *tmpinfo;
 
 	/* This volume is mounted now if there is at least one mp. */
@@ -461,18 +461,18 @@ int FS_is_mounted(char *fsname)
 	return ret;
 }
 
-int do_unmount_FS(MOUNT_T *mount_info);
+int32_t do_unmount_FS(MOUNT_T *mount_info);
 /* Helper for mounting */
-int do_mount_FS(char *mp, MOUNT_T *new_info)
+int32_t do_mount_FS(char *mp, MOUNT_T *new_info)
 {
 	struct fuse_chan *tmp_channel;
 	struct fuse_session *tmp_session;
 	char *mount;
-	int mt, fg;
+	int32_t mt, fg;
 
 #ifdef _ANDROID_PREMOUNT_
 	struct fuse_chan *tmp_ch1;
-	int need_unmount;
+	int32_t need_unmount;
 	need_unmount = FALSE;
 #endif
 
@@ -540,7 +540,7 @@ errcode_handle:
 }
 
 /* Helper for unmounting */
-int do_unmount_FS(MOUNT_T *mount_info)
+int32_t do_unmount_FS(MOUNT_T *mount_info)
 {
 	pthread_join(mount_info->mt_thread, NULL);
 	fuse_remove_signal_handlers(mount_info->session_ptr);
@@ -561,9 +561,9 @@ int do_unmount_FS(MOUNT_T *mount_info)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int mount_FS(char *fsname, char *mp, char mp_mode)
+int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	MOUNT_T *tmp_info, *new_info;
 	DIR_ENTRY tmp_entry;
 	char temppath[METAPATHLEN];
@@ -793,9 +793,9 @@ errcode_handle:
 	return errcode;
 }
 
-static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
+static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 {
-	int ret;
+	int32_t ret;
 	MOUNT_T *tmp_info;
 
 	if (mount_info->volume_type != ANDROID_MULTIEXTERNAL)
@@ -846,9 +846,9 @@ static int _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int unmount_FS(char *fsname, char *mp)
+int32_t unmount_FS(char *fsname, char *mp)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	MOUNT_T *ret_info;
 	MOUNT_NODE_T *ret_node;
 
@@ -905,9 +905,9 @@ errcode_handle:
 *          Note: If is_unmount is set, should not call this when exiting
 *                FUSE loop
 *************************************************************************/
-int unmount_event(char *fsname, char *mp)
+int32_t unmount_event(char *fsname, char *mp)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	MOUNT_T *ret_info;
 	MOUNT_NODE_T *ret_node;
 
@@ -957,9 +957,9 @@ errcode_handle:
 *  Return value: 0 if found. -ENOENT if not found.
 *                On error, returns negation of error code.
 *************************************************************************/
-int mount_status(char *fsname)
+int32_t mount_status(char *fsname)
 {
-	int ret;
+	int32_t ret;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 	sem_wait(&(mount_mgr.mount_lock));
@@ -979,7 +979,7 @@ int mount_status(char *fsname)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int unmount_all(void)
+int32_t unmount_all(void)
 {
 	/* TODO: errcode_handle */
 	MOUNT_T *ret_info;
@@ -1031,10 +1031,10 @@ int unmount_all(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
-	int ret;
+	int32_t ret;
 
 	sem_wait((mptr->stat_lock));
 	(mptr->FS_stat)->system_size += (system_size_delta + meta_size_delta);
@@ -1062,10 +1062,10 @@ int change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int update_FS_statistics(MOUNT_T *mptr)
+int32_t update_FS_statistics(MOUNT_T *mptr)
 {
-	int errcode;
-	int tmpfd;
+	int32_t errcode;
+	int32_t tmpfd;
 	ssize_t ret_ssize;
 
 	tmpfd = fileno(mptr->stat_fptr);
@@ -1089,10 +1089,10 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int read_FS_statistics(MOUNT_T *mptr)
+int32_t read_FS_statistics(MOUNT_T *mptr)
 {
-	int errcode;
-	int tmpfd;
+	int32_t errcode;
+	int32_t tmpfd;
 	ssize_t ret_ssize;
 
 	tmpfd = fileno(mptr->stat_fptr);

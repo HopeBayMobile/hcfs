@@ -27,7 +27,7 @@
 
 CURL_HANDLE monitor_curl_handle;
 /* let it can be changed during unittest*/
-int monitoring_interval = MONITORING_INTERVAL;
+int32_t monitoring_interval = MONITORING_INTERVAL;
 
 void _write_monitor_loop_status_log(float duration)
 {
@@ -145,10 +145,10 @@ inline float diff_time(struct timespec start, struct timespec end)
 /**************************************************************************
  *
  * Function name: update_backend_status
- *        Inputs: int status, struct timespec *status_time
+ *        Inputs: int32_t status, struct timespec *status_time
  *       Summary: Update hcfs_system->backend_is_online and access
  *                time.
- *                int status:
+ *                int32_t status:
  *                    use 1 when status is online, otherwise 0.
  *                struct timespec *status_time:
  *                    time at curl request performed, set to NULL to use
@@ -156,7 +156,7 @@ inline float diff_time(struct timespec start, struct timespec end)
  *  Return value: None (void)
  *
  *************************************************************************/
-void update_backend_status(int status, struct timespec *status_time)
+void update_backend_status(int32_t status, struct timespec *status_time)
 {
 	struct timespec *last_time = &hcfs_system->backend_status_last_time;
 	struct timespec current_time;

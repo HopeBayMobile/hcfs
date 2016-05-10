@@ -59,7 +59,7 @@
 size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 {
 	size_t ret_size;
-	int errcode = -1;
+	int32_t errcode = -1;
 
 	FWRITE(ptr, size, nmemb, (FILE *)fstream);
 
@@ -80,14 +80,14 @@ errcode_handle:
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int parse_swift_auth_header(FILE *fptr)
+int32_t parse_swift_auth_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
 	char *endptr;
 	char temp_string[1024], temp_string2[1024];
-	long ret_num;
-	int retcodenum, ret_val;
-	int ret, errcode;
+	int64_t ret_num;
+	int32_t retcodenum, ret_val;
+	int32_t ret, errcode;
 	char to_stop;
 
 	FSEEK(fptr, 0, SEEK_SET);
@@ -97,7 +97,7 @@ int parse_swift_auth_header(FILE *fptr)
 		return -1;
 
 	ATOL(retcode);
-	retcodenum = (int)ret_num;
+	retcodenum = (int32_t)ret_num;
 
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
@@ -145,13 +145,13 @@ errcode_handle:
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int parse_swift_list_header(FILE *fptr)
+int32_t parse_swift_list_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
 	char temp_string[1024], temp_string2[1024];
-	int ret_val, retcodenum, total_objs;
-	int ret, errcode;
-	long ret_num;
+	int32_t ret_val, retcodenum, total_objs;
+	int32_t ret, errcode;
+	int64_t ret_num;
 	char *endptr, *tmpptr;
 
 	FSEEK(fptr, 0, SEEK_SET);
@@ -165,7 +165,7 @@ int parse_swift_list_header(FILE *fptr)
 		return -1;
 	}
 	ATOL(retcode);
-	retcodenum = (int)ret_num;
+	retcodenum = (int32_t)ret_num;
 
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
@@ -183,7 +183,7 @@ int parse_swift_list_header(FILE *fptr)
 					 "X-Container-Object-Count: %s\n",
 					 temp_string2);
 			ATOL(temp_string2);
-			total_objs = (int)ret_num;
+			total_objs = (int32_t)ret_num;
 
 			write_log(10, "total objects %d\n", total_objs);
 
@@ -205,12 +205,12 @@ errcode_handle:
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int parse_S3_list_header(FILE *fptr)
+int32_t parse_S3_list_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
-	int ret, retcodenum;
-	long ret_num;
-	int errcode;
+	int32_t ret, retcodenum;
+	int64_t ret_num;
+	int32_t errcode;
 	char *endptr, *tmpptr;
 
 	FSEEK(fptr, 0, SEEK_SET);
@@ -224,7 +224,7 @@ int parse_S3_list_header(FILE *fptr)
 		return -1;
 	}
 	ATOL(retcode);
-	retcodenum = (int)ret_num;
+	retcodenum = (int32_t)ret_num;
 
 	return retcodenum;
 errcode_handle:
@@ -240,12 +240,12 @@ errcode_handle:
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int parse_http_header_retcode(FILE *fptr)
+int32_t parse_http_header_retcode(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
-	int ret, retcodenum;
-	long ret_num;
-	int errcode;
+	int32_t ret, retcodenum;
+	int64_t ret_num;
+	int32_t errcode;
 	char *endptr;
 
 	FSEEK(fptr, 0, SEEK_SET);
@@ -254,7 +254,7 @@ int parse_http_header_retcode(FILE *fptr)
 		return -1;
 
 	ATOL(retcode);
-	retcodenum = (int)ret_num;
+	retcodenum = (int32_t)ret_num;
 
 	return retcodenum;
 
@@ -267,21 +267,21 @@ errcode_handle:
  * Function name: parse_http_header_coding_meta
  *        Inputs: HCFS_object_meta *object_meta
  *                char* httpheader,
- *                int header_len
+ *                int32_t header_len
  *       Summary: Parse the HTTP header for general requests and return
  *                write to object_meta
  *  Return value: 0 for success otherwise indicates an error
  *
  *************************************************************************/
-int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
+int32_t parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader, const char *meta,
 				  const char *comp_meta, const char *enc_meta,
 				  const char *nonce_meta)
 {
-	const int meta_len = strlen(meta);
-	const int comp_meta_len = strlen(comp_meta);
-	const int enc_meta_len = strlen(enc_meta);
-	const int nonce_meta_len = strlen(nonce_meta);
+	const int32_t meta_len = strlen(meta);
+	const int32_t comp_meta_len = strlen(comp_meta);
+	const int32_t enc_meta_len = strlen(enc_meta);
+	const int32_t nonce_meta_len = strlen(nonce_meta);
 
 	char *s, *backup;
 
@@ -289,8 +289,8 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 	while (s) {
 		char *s2;
 		char *backup_s2;
-		int s2_len;
-		int len_diff;
+		int32_t s2_len;
+		int32_t len_diff;
 
 		s2 = strtok_r(s, ":", &backup_s2);
 		s2_len = strlen(s2);
@@ -353,7 +353,7 @@ cont:
 void dump_list_body(FILE *fptr)
 {
 	char temp_string[1024];
-	int ret_val;
+	int32_t ret_val;
 
 	fseek(fptr, 0, SEEK_SET);
 	while (!feof(fptr)) {
@@ -375,7 +375,7 @@ void dump_list_body(FILE *fptr)
 void dump_S3_list_body(FILE *fptr)
 {
 	char temp_string[1024];
-	int ret_val;
+	int32_t ret_val;
 
 	fseek(fptr, 0, SEEK_SET);
 	while (!feof(fptr)) {
@@ -396,7 +396,7 @@ void dump_S3_list_body(FILE *fptr)
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
+int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 			CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -404,12 +404,12 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	char auth_url[200];
 	char user_string[1024];
 	char pass_string[1024];
-	int ret_val;
+	int32_t ret_val;
 	FILE *fptr;
 	CURL *curl;
 	char filename[100];
-	int errcode, ret;
-	int num_retries;
+	int32_t errcode, ret;
+	int32_t num_retries;
 
 	sprintf(filename, "/dev/shm/swiftauth%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
@@ -483,10 +483,10 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 {
 	char account_user_string[1000];
-	int ret_code;
+	int32_t ret_code;
 
 	curl_handle->curl = curl_easy_init();
 
@@ -511,7 +511,7 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 *          Note: We do not need to do anything special other than curl init.
 *
 *************************************************************************/
-int hcfs_init_S3_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_S3_backend(CURL_HANDLE *curl_handle)
 {
 	curl_handle->curl = curl_easy_init();
 
@@ -528,10 +528,10 @@ int hcfs_init_S3_backend(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
+int32_t hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 {
 	char account_user_string[1000];
-	int ret_code;
+	int32_t ret_code;
 
 	if (curl_handle->curl != NULL)
 		hcfs_destroy_swift_backend(curl_handle->curl);
@@ -558,7 +558,7 @@ int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_reauth(CURL_HANDLE *curl_handle)
+int32_t hcfs_S3_reauth(CURL_HANDLE *curl_handle)
 {
 
 	if (curl_handle->curl != NULL)
@@ -605,7 +605,7 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 	FILE *fptr;
 	size_t actual_to_read;
 	object_put_control *put_control;
-	int errcode;
+	int32_t errcode;
 	size_t ret_size;
 
 	put_control = (object_put_control *)put_control1;
@@ -636,7 +636,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 {
 	/*TODO: How to actually export the list of objects to other functions*/
 	struct curl_slist *chunk = NULL;
@@ -644,7 +644,7 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val, errcode;
+	int32_t ret_val, errcode;
 
 	snprintf(header_filename, sizeof(header_filename),
 		 "/dev/shm/swiftaccounthead%s.tmp", curl_handle->id);
@@ -703,7 +703,7 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
+int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 {
 	/*TODO: How to actually export the list of objects to other functions*/
 	struct curl_slist *chunk = NULL;
@@ -712,7 +712,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	FILE *swift_header_fptr, *swift_list_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	int ret_val, num_retries, errcode;
+	int32_t ret_val, num_retries, errcode;
 
 	sprintf(header_filename, "/dev/shm/swiftlisthead%s.tmp",
 		curl_handle->id);
@@ -796,7 +796,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			  HTTP_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
@@ -808,8 +808,8 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val, ret, errcode;
-	int num_retries;
+	int32_t ret_val, ret, errcode;
+	int32_t num_retries;
 	int64_t ret_pos;
 	struct timeval stop, start, diff;
 	double time_spent;
@@ -835,7 +835,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 	if (object_meta != NULL) {
-		int i;
+		int32_t i;
 		for (i = 0; i < object_meta->count; i++) {
 			sprintf(object_string, "X-OBJECT-META-%s: %s",
 				object_meta->data[2 * i],
@@ -939,7 +939,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			  HCFS_encode_object_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
@@ -949,8 +949,8 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val, ret, errcode;
-	int num_retries;
+	int32_t ret_val, ret, errcode;
+	int32_t num_retries;
 
 	int64_t ret_pos;
 	off_t objsize;
@@ -1069,7 +1069,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
@@ -1078,8 +1078,8 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val, errcode, ret;
-	int num_retries;
+	int32_t ret_val, errcode, ret;
+	int32_t num_retries;
 
 	sprintf(header_filename, "/dev/shm/swiftdeletehead%s.tmp",
 		curl_handle->id);
@@ -1182,18 +1182,18 @@ void convert_currenttime(char *date_string)
 *
 * Function name: compute_hmac_sha1
 *        Inputs: uint8_t *input_str, uint8_t *output_str,
-*                uint8_t *key, int *outputlen
+*                uint8_t *key, int32_t *outputlen
 *       Summary: For S3 backend, compute HMAC-SHA1 string for signature use.
 *  Return value: None.
 *
 *************************************************************************/
 void compute_hmac_sha1(uint8_t *input_str, uint8_t *output_str,
-		       char *key, int *outputlen)
+		       char *key, int32_t *outputlen)
 {
 	uint8_t finalhash[4096];
-	unsigned int len_finalhash;
+	uint32_t len_finalhash;
 	HMAC_CTX myctx;
-	/* int count; */
+	/* int32_t count; */
 
 	write_log(10, "key: %s\n", key);
 	write_log(10, "input: %s\n", input_str);
@@ -1230,11 +1230,11 @@ void generate_S3_sig(char *method, char *date_string,
 {
 	char sig_temp1[4096] = {0};
 	uint8_t sig_temp2[64] = {0};
-	int len_signature, hashlen;
+	int32_t len_signature, hashlen;
 	char header[1024] = {0};
 
 	if (object_meta != NULL) {
-		int i;
+		int32_t i;
 		for (i = 0; i < object_meta->count; i++) {
 			char tmp[1024] = {0};
 			sprintf(tmp, "x-amz-meta-%s:%s\n",
@@ -1269,7 +1269,7 @@ void generate_S3_sig(char *method, char *date_string,
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
+int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 {
 	/*TODO: How to actually export the list of objects
 		to other functions*/
@@ -1283,8 +1283,8 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	char AWS_auth_string[200];
 	char S3_signature[200];
 	char resource[200];
-	int ret_val, errcode;
-	int num_retries;
+	int32_t ret_val, errcode;
+	int32_t num_retries;
 
 	sprintf(header_filename, "/dev/shm/S3listhead%s.tmp", curl_handle->id);
 	sprintf(body_filename, "/dev/shm/S3listbody%s.tmp", curl_handle->id);
@@ -1376,21 +1376,21 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_test_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_S3_test_backend(CURL_HANDLE *curl_handle)
 {
 	/*TODO: Finish S3 test */
 	UNUSED(curl_handle);
 	return -1;
 }
 
-int _http_is_success(int code)
+int32_t _http_is_success(int32_t code)
 {
 	if ((code >= 200) && (code < 300))
 		return TRUE;
 
 	return FALSE;
 }
-int _swift_http_can_retry(int code)
+int32_t _swift_http_can_retry(int32_t code)
 {
 	if (hcfs_system->system_going_down == TRUE)
 		return FALSE;
@@ -1411,7 +1411,7 @@ int _swift_http_can_retry(int code)
 
 	return FALSE;
 }
-int _S3_http_can_retry(int code)
+int32_t _S3_http_can_retry(int32_t code)
 {
 	if (hcfs_system->system_going_down == TRUE)
 		return FALSE;
@@ -1439,9 +1439,9 @@ int _S3_http_can_retry(int code)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_init_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
-	int ret_val, num_retries;
+	int32_t ret_val, num_retries;
 
         ret_val = ignore_sigpipe();
         if (ret_val < 0)
@@ -1532,9 +1532,9 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 *                It should return HTTP_204_NO_CONTENT if success.
 *
 *************************************************************************/
-int hcfs_test_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 {
-	int ret_val;
+	int32_t ret_val;
 
         ret_val = ignore_sigpipe();
         if (ret_val < 0)
@@ -1586,9 +1586,9 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 /* TODO: nothing is actually returned in list container. FIX THIS*/
-int hcfs_list_container(CURL_HANDLE *curl_handle)
+int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 {
-	int ret_val, num_retries;
+	int32_t ret_val, num_retries;
 
         ret_val = ignore_sigpipe();
         if (ret_val < 0)
@@ -1655,11 +1655,11 @@ int hcfs_list_container(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HTTP_meta *object_meta)
 {
-	int ret_val, num_retries;
-	int ret, errcode;
+	int32_t ret_val, num_retries;
+	int32_t ret, errcode;
 
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
@@ -1732,11 +1732,11 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *object_meta)
 {
-	int ret_val, num_retries;
-	int ret, errcode;
+	int32_t ret_val, num_retries;
+	int32_t ret, errcode;
 
         ret_val = ignore_sigpipe();
         if (ret_val < 0)
@@ -1818,9 +1818,9 @@ errcode_handle:
 *************************************************************************/
 /* TODO: Fix handling in reauthing in SWIFT.
 	Now will try to reauth for any HTTP error*/
-int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
-	int ret_val, num_retries;
+	int32_t ret_val, num_retries;
 
         ret_val = ignore_sigpipe();
         if (ret_val < 0)
@@ -1886,7 +1886,7 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		       HTTP_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
@@ -1903,10 +1903,10 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char date_string_header[100];
 	char AWS_auth_string[200];
 	char S3_signature[200];
-	int ret_val, ret, errcode;
+	int32_t ret_val, ret, errcode;
 	char resource[200];
 	int64_t ret_pos;
-	int num_retries;
+	int32_t num_retries;
 
 	struct timeval stop, start, diff;
 	double time_spent;
@@ -1942,7 +1942,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 	if (object_meta != NULL) {
-		int i;
+		int32_t i;
 		for (i = 0; i < object_meta->count; i++) {
 			sprintf(object_string, "x-amz-meta-%s: %s",
 				object_meta->data[2 * i],
@@ -2047,7 +2047,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		       HCFS_encode_object_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
@@ -2057,14 +2057,14 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	FILE *S3_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val, ret, errcode;
+	int32_t ret_val, ret, errcode;
 
 	char date_string[100];
 	char date_string_header[100];
 	char AWS_auth_string[200];
 	char S3_signature[200];
 	char resource[200];
-	int num_retries;
+	int32_t num_retries;
 
 	int64_t ret_pos;
 	off_t objsize;
@@ -2190,7 +2190,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
@@ -2200,13 +2200,13 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	FILE *S3_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val, errcode, ret;
+	int32_t ret_val, errcode, ret;
 	char date_string[100];
 	char date_string_header[100];
 	char AWS_auth_string[200];
 	char S3_signature[200];
 	char resource[200];
-	int num_retries;
+	int32_t num_retries;
 
 	sprintf(header_filename, "/dev/shm/s3deletehead%s.tmp",
 		curl_handle->id);

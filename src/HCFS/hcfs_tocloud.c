@@ -68,9 +68,9 @@ CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 /* Don't need to collect return code for the per-inode sync thread, as
 the error handling for syncing this inode will be handled in
 sync_single_inode. */
-static inline void _sync_terminate_thread(int index)
+static inline void _sync_terminate_thread(int32_t index)
 {
-	int ret;
+	int32_t ret;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
@@ -88,7 +88,7 @@ static inline void _sync_terminate_thread(int index)
 
 void collect_finished_sync_threads(void *ptr)
 {
-	int count;
+	int32_t count;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -131,21 +131,21 @@ void collect_finished_sync_threads(void *ptr)
 
 /* On error, need to alert thread that dispatch the block upload
 using threads_error in sync control. */
-static inline int _upload_terminate_thread(int index)
+static inline int32_t _upload_terminate_thread(int32_t index)
 {
-	int count2, count1;
-	int which_curl;
-	int ret, errcode;
+	int32_t count2, count1;
+	int32_t which_curl;
+	int32_t ret, errcode;
 	FILE *metafptr;
 	char thismetapath[METAPATHLEN];
 	char blockpath[400];
 #if (DEDUP_ENABLE)
-	unsigned char blk_obj_id[OBJID_LENGTH];
+	uint8_t blk_obj_id[OBJID_LENGTH];
 #endif
 	ino_t this_inode;
 	off_t page_filepos;
-	long long e_index;
-	long long blockno;
+	int64_t e_index;
+	int64_t blockno;
 	BLOCK_ENTRY_PAGE temppage;
 	char is_delete;
 	BLOCK_ENTRY *tmp_entry;
@@ -371,7 +371,7 @@ errcode_handle:
 
 void collect_finished_upload_threads(void *ptr)
 {
-	int count, ret, count1;
+	int32_t count, ret, count1;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -443,8 +443,8 @@ void init_sync_control(void)
 
 void init_upload_control(void)
 {
-	int count;
-	/* int ret_val; */
+	int32_t count;
+	/* int32_t ret_val; */
 
 	memset(&upload_ctl, 0, sizeof(UPLOAD_THREAD_CONTROL));
 	memset(&upload_curl_handles, 0,
@@ -482,7 +482,7 @@ void init_sync_stat_control(void)
 	char *FS_stat_path, *fname;
 	DIR *dirp;
 	struct dirent tmp_entry, *tmpptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	FS_stat_path = (char *)malloc(METAPATHLEN);
 	fname = (char *)malloc(METAPATHLEN);
@@ -532,15 +532,15 @@ errcode_handle:
 	free(fname);
 }
 
-static inline int _select_upload_thread(char is_block, char is_delete,
+static inline int32_t _select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
 					char is_upload,
-					unsigned char old_obj_id[],
+					uint8_t old_obj_id[],
 #endif
-					ino_t this_inode, long long block_count,
-					off_t page_pos, long long e_index)
+					ino_t this_inode, int64_t block_count,
+					off_t page_pos, int64_t e_index)
 {
-	int which_curl, count;
+	int32_t which_curl, count;
 
 	which_curl = -1;
 	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
@@ -585,26 +585,26 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	SYMLINK_META_TYPE tempsymmeta;
 	DIR_META_TYPE tempdirmeta;
 	BLOCK_ENTRY_PAGE temppage;
-	int which_curl;
-	long long page_pos, e_index, which_page, current_page;
-	long long total_blocks;
-	long long count, block_count;
-	unsigned char block_status;
+	int32_t which_curl;
+	int64_t page_pos, e_index, which_page, current_page;
+	int64_t total_blocks;
+	int64_t count, block_count;
+	uint8_t block_status;
 	char upload_done;
-	int ret, errcode;
+	int32_t ret, errcode;
 	off_t tmp_size;
 	struct timespec time_to_sleep;
 	BLOCK_ENTRY *tmp_entry;
-	long long temp_trunc_size;
+	int64_t temp_trunc_size;
 #ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
 #endif
 	size_t ret_size;
 	char sync_error;
-	int count1;
-	long long upload_seq;
+	int32_t count1;
+	int64_t upload_seq;
 	ino_t root_inode;
-	long long size_diff;
+	int64_t size_diff;
 
 	sync_error = FALSE;
 	time_to_sleep.tv_sec = 0;
@@ -657,7 +657,7 @@ store in some other file */
 		if (truncfptr != NULL) {
 			setbuf(truncfptr, NULL);
 			flock(fileno(truncfptr), LOCK_EX);
-			FREAD(&temp_trunc_size, sizeof(long long), 1,
+			FREAD(&temp_trunc_size, sizeof(int64_t), 1,
 			      truncfptr);
 
 			if (tmp_size < temp_trunc_size) {
@@ -668,7 +668,7 @@ store in some other file */
 		}
 #else
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				      &temp_trunc_size, sizeof(long long));
+				      &temp_trunc_size, sizeof(int64_t));
 
 		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
 			tmp_size = temp_trunc_size;
@@ -873,10 +873,10 @@ store in some other file */
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (!access(thismetapath, F_OK)) {
 		CLOUD_RELATED_DATA cloud_related_data;
-		long long pos;
+		int64_t pos;
 		struct stat metastat;
-		long long now_meta_size;
-		long long meta_size_diff;
+		int64_t now_meta_size;
+		int64_t meta_size_diff;
 
 		ret = fstat(fileno(metafptr), &metastat);
 		if (ret < 0) {
@@ -1029,26 +1029,26 @@ errcode_handle:
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 }
 
-int do_block_sync(ino_t this_inode, long long block_no,
+int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 #if (DEDUP_ENABLE)
 		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
-		  unsigned char id_in_meta[])
+		  uint8_t id_in_meta[])
 #else
 		  CURL_HANDLE *curl_handle, char *filename)
 #endif
 {
 	char objname[400];
 	FILE *fptr;
-	int ret_val, errcode, ret;
-	int ddt_fd = -1;
-	int result_idx = -1;
+	int32_t ret_val, errcode, ret;
+	int32_t ddt_fd = -1;
+	int32_t result_idx = -1;
 	DDT_BTREE_NODE result_node;
 #if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
-	unsigned char old_obj_id[OBJID_LENGTH];
-	unsigned char obj_id[OBJID_LENGTH];
-	unsigned char start_bytes[BYTES_TO_CHECK];
-	unsigned char end_bytes[BYTES_TO_CHECK];
+	uint8_t old_obj_id[OBJID_LENGTH];
+	uint8_t obj_id[OBJID_LENGTH];
+	uint8_t start_bytes[BYTES_TO_CHECK];
+	uint8_t end_bytes[BYTES_TO_CHECK];
 	off_t obj_size;
 	FILE *ddt_fptr;
 	DDT_BTREE_NODE tree_root;
@@ -1058,7 +1058,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	write_log(10, "Debug datasync: inode %" PRIu64 ", block %lld\n",
 		  (uint64_t)this_inode, block_no);
 	snprintf(curl_handle->id, sizeof(curl_handle->id),
-		 "upload_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
+		 "upload_blk_%" PRIu64 "_%" PRId64, (uint64_t)this_inode, block_no);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1096,7 +1096,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	/* hash_to_string(hash_key, hash_key_str); */
 	snprintf(objname, sizeof(objname), "data_%s", obj_id_str);
 #else
-	snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%lld",
+	snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%" PRId64,
 		 (uint64_t)this_inode, block_no);
 	/* Force to upload */
 	ret = 1;
@@ -1113,16 +1113,16 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
-		unsigned char *data = NULL;
+		uint8_t *data = NULL;
 		HCFS_encode_object_meta *object_meta = NULL;
 		HTTP_meta *http_meta = NULL;
-		unsigned char *object_key = NULL;
+		uint8_t *object_key = NULL;
 
 #if ENCRYPT_ENABLE
-		unsigned char *key = NULL;
+		uint8_t *key = NULL;
 		key = get_key("this is hopebay testing");
 		object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
-		object_key = calloc(KEY_SIZE, sizeof(unsigned char));
+		object_key = calloc(KEY_SIZE, sizeof(uint8_t));
 		get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
 				COMPRESS_ENABLE);
 		http_meta = new_http_meta();
@@ -1188,10 +1188,10 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	return ret;
 }
 
-int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
+int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 {
 	char objname[1000];
-	int ret_val, errcode, ret;
+	int32_t ret_val, errcode, ret;
 	FILE *fptr;
 
 	snprintf(objname, sizeof(objname), "meta_%" PRIu64 "",
@@ -1207,8 +1207,8 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 			  strerror(errcode));
 		return -errcode;
 	}
-	unsigned char *key = NULL;
-	unsigned char *data = NULL;
+	uint8_t *key = NULL;
+	uint8_t *data = NULL;
 
 #if ENCRYPT_ENABLE
 	key = get_key("this is hopebay testing");
@@ -1241,8 +1241,8 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 /* TODO: use pthread_exit to pass error code here. */
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, errcode, which_index;
-	int count1;
+	int32_t which_curl, ret, errcode, which_index;
+	int32_t count1;
 
 	which_curl = thread_ptr->which_curl;
 	which_index = thread_ptr->which_index;
@@ -1285,7 +1285,7 @@ errcode_handle:
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, count1, which_index;
+	int32_t which_curl, ret, count1, which_index;
 
 	which_curl = thread_ptr->which_curl;
 	which_index = thread_ptr->which_index;
@@ -1318,13 +1318,13 @@ errcode_handle:
 	sem_post(&(sync_ctl.sync_op_sem));
 }
 
-int schedule_sync_meta(FILE *metafptr, int which_curl)
+int32_t schedule_sync_meta(FILE *metafptr, int32_t which_curl)
 {
 	char tempfilename[400];
 	char filebuf[4100];
 	char topen;
-	int read_size;
-	int count, ret, errcode;
+	int32_t read_size;
+	int32_t count, ret, errcode;
 	size_t ret_size;
 	FILE *fptr;
 
@@ -1403,13 +1403,13 @@ errcode_handle:
 	return errcode;
 }
 
-int dispatch_upload_block(int which_curl)
+int32_t dispatch_upload_block(int32_t which_curl)
 {
 	char tempfilename[400];
 	char thisblockpath[400];
 	char filebuf[4100];
-	int read_size;
-	int count, ret, errcode;
+	int32_t read_size;
+	int32_t count, ret, errcode;
 	size_t ret_size;
 	FILE *fptr, *blockfptr;
 	UPLOAD_THREAD_TYPE *upload_ptr;
@@ -1421,7 +1421,7 @@ int dispatch_upload_block(int which_curl)
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
 
 	snprintf(tempfilename, sizeof(tempfilename),
-		 "/dev/shm/hcfs_sync_block_%" PRIu64 "_%lld.tmp",
+		 "/dev/shm/hcfs_sync_block_%" PRIu64 "_%" PRId64 ".tmp",
 		 (uint64_t)upload_ptr->inode, upload_ptr->blockno);
 
 	/* Find an appropriate dispatch-name */
@@ -1431,7 +1431,7 @@ int dispatch_upload_block(int which_curl)
 		if (ret == 0) {
 			count++;
 			snprintf(tempfilename, sizeof(tempfilename),
-				 "/dev/shm/hcfs_sync_block_%" PRIu64 "_%lld.%d",
+				 "/dev/shm/hcfs_sync_block_%" PRIu64 "_%" PRId64 ".%d",
 				 (uint64_t)upload_ptr->inode,
 				 upload_ptr->blockno, count);
 		} else {
@@ -1526,7 +1526,7 @@ errcode_handle:
 	return errcode;
 }
 
-void dispatch_delete_block(int which_curl)
+void dispatch_delete_block(int32_t which_curl)
 {
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
 		       (void *)&delete_object_sync,
@@ -1534,10 +1534,10 @@ void dispatch_delete_block(int which_curl)
 	upload_ctl.threads_created[which_curl] = TRUE;
 }
 
-static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
+static inline int32_t _sync_mark(ino_t this_inode, mode_t this_mode,
 			     SYNC_THREAD_TYPE *sync_threads)
 {
-	int count;
+	int32_t count;
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
@@ -1585,9 +1585,9 @@ void upload_loop(void)
 	ino_t ino_sync, ino_check;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 	SUPER_BLOCK_ENTRY tempentry;
-	int count, sleep_count;
+	int32_t count, sleep_count;
 	char in_sync;
-	int ret_val, ret;
+	int32_t ret_val, ret;
 	char is_start_check;
 	char sync_paused_status = FALSE;
 
@@ -1725,16 +1725,16 @@ void upload_loop(void)
 /************************************************************************
 *
 * Function name: update_backend_stat
-*        Inputs: ino_t root_inode, long long system_size_delta,
-*                long long num_inodes_delta
+*        Inputs: ino_t root_inode, int64_t system_size_delta,
+*                int64_t num_inodes_delta
 *       Summary: Updates per-FS statistics stored in the backend.
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int update_backend_stat(ino_t root_inode, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char fname[METAPATHLEN], tmpname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;

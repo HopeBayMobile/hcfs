@@ -69,6 +69,6 @@ int32_t collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr);
 
-int change_unpin_dirty_size(ino_t this_inode, char ispin);
+int32_t change_unpin_dirty_size(ino_t this_inode, char ispin);
 
 #endif /* GW20_HCFS_METAOPS_H_ */
