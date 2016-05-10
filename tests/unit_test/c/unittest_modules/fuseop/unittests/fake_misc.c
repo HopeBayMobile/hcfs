@@ -84,7 +84,7 @@ ino_t lookup_pathname(const char *path, int *errcode)
 		return 16;
 	}
 	if (strcmp(path, "/testlistdir") == 0) {
-		return 17;
+		return TEST_LISTDIR_INODE;
 	}
 	if (strcmp(path, "/testsetxattr") == 0) {
 		return 18;
@@ -169,7 +169,7 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 			this_type = D_ISREG;
 		}
 		if (strcmp(childname, "testlistdir") == 0) {
-			this_inode = 17;
+			this_inode = TEST_LISTDIR_INODE;
 			this_type = D_ISDIR;
 		}
 		if (strcmp(childname, "testsetxattr") == 0) {
@@ -288,25 +288,37 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 	return 0;
 }
 
-int64_t open_fh(ino_t thisinode, int flags)
+int64_t open_fh(ino_t thisinode, int flags, BOOL isdir)
 {
 	int64_t index;
+	DIRH_ENTRY *dirh_ptr;
 
 	if (fail_open_files)
 		return -1;
 
 	index = (int64_t) thisinode;
-	system_fh_table.entry_table_flags[index] = TRUE;
-	system_fh_table.entry_table[index].thisinode = thisinode;
-	system_fh_table.entry_table[index].meta_cache_ptr = NULL;
-	system_fh_table.entry_table[index].meta_cache_locked = FALSE;
-	system_fh_table.entry_table[index].flags = flags;
+	if (isdir == TRUE) {
+		system_fh_table.entry_table_flags[index] = IS_DIRH;
+		dirh_ptr = &(system_fh_table.direntry_table[index]);
+		dirh_ptr->thisinode = thisinode;
+		dirh_ptr->flags = flags;
+		dirh_ptr->snapshot_ptr = NULL;
+		sem_init(&(dirh_ptr->snap_ref_sem), 0, 0);
+		sem_init(&(dirh_ptr->wait_ref_sem), 0, 1);
+		system_fh_table.have_nonsnap_dir = TRUE;
+	} else {
+		system_fh_table.entry_table_flags[index] = IS_FH;
+		system_fh_table.entry_table[index].thisinode = thisinode;
+		system_fh_table.entry_table[index].meta_cache_ptr = NULL;
+		system_fh_table.entry_table[index].meta_cache_locked = FALSE;
+		system_fh_table.entry_table[index].flags = flags;
 
-	system_fh_table.entry_table[index].blockfptr = NULL;
-	system_fh_table.entry_table[index].opened_block = -1;
-	system_fh_table.entry_table[index].cached_page_index = -1;
-	system_fh_table.entry_table[index].cached_filepos = -1;
-	sem_init(&(system_fh_table.entry_table[index].block_sem), 0, 1);
+		system_fh_table.entry_table[index].blockfptr = NULL;
+		system_fh_table.entry_table[index].opened_block = -1;
+		system_fh_table.entry_table[index].cached_page_index = -1;
+		system_fh_table.entry_table[index].cached_filepos = -1;
+		sem_init(&(system_fh_table.entry_table[index].block_sem), 0, 1);
+	}
 
 	return index;
 }
@@ -314,24 +326,39 @@ int64_t open_fh(ino_t thisinode, int flags)
 int close_fh(int64_t index)
 {
 	FH_ENTRY *tmp_entry;
+	DIRH_ENTRY *tmp_DIRH_entry;
 
-	tmp_entry = &(system_fh_table.entry_table[index]);
-	tmp_entry->meta_cache_locked = FALSE;
-	system_fh_table.entry_table_flags[index] = FALSE;
-	tmp_entry->thisinode = 0;
+	if (system_fh_table.entry_table_flags[index] == IS_FH) {
+		tmp_entry = &(system_fh_table.entry_table[index]);
+		tmp_entry->meta_cache_locked = FALSE;
+		system_fh_table.entry_table_flags[index] = NO_FH;
+		tmp_entry->thisinode = 0;
 
-	if (tmp_entry->meta_cache_ptr != NULL) {
-		if (tmp_entry->meta_cache_ptr->fptr != NULL) {
-			fclose(tmp_entry->meta_cache_ptr->fptr);
-			tmp_entry->meta_cache_ptr->fptr = NULL;
+		if (tmp_entry->meta_cache_ptr != NULL) {
+			if (tmp_entry->meta_cache_ptr->fptr != NULL) {
+				fclose(tmp_entry->meta_cache_ptr->fptr);
+				tmp_entry->meta_cache_ptr->fptr = NULL;
+			}
+
+			free(tmp_entry->meta_cache_ptr);
 		}
+		tmp_entry->meta_cache_ptr = NULL;
+		tmp_entry->blockfptr = NULL;
+		tmp_entry->opened_block = -1;
+		sem_destroy(&(tmp_entry->block_sem));
+	} else {
+		tmp_DIRH_entry = &(system_fh_table.direntry_table[index]);
 
-		free(tmp_entry->meta_cache_ptr);
+		if (tmp_DIRH_entry->snapshot_ptr != NULL) {
+			fclose(tmp_DIRH_entry->snapshot_ptr);
+			tmp_DIRH_entry->snapshot_ptr = NULL;
+		}
+		system_fh_table.entry_table_flags[index] = NO_FH;
+		tmp_DIRH_entry->thisinode = 0;
+		sem_destroy(&(tmp_DIRH_entry->snap_ref_sem));
+		sem_destroy(&(tmp_DIRH_entry->wait_ref_sem));
 	}
-	tmp_entry->meta_cache_ptr = NULL;
-	tmp_entry->blockfptr = NULL;
-	tmp_entry->opened_block = -1;
-	sem_destroy(&(tmp_entry->block_sem));
+
 	return 0;
 }
 

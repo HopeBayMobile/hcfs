@@ -474,3 +474,8 @@ int32_t get_meta_size(ino_t inode, int64_t *metasize)
 	*metasize = 123;
 	return 0;
 }
+
+int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
+{
+	return 0;
+}

@@ -1,5 +1,6 @@
 #include <sys/types.h>
 
+#define TEST_LISTDIR_INODE 17
 int fail_super_block_new_inode;
 int fail_mknod_update_meta;
 int before_mknod_created;
