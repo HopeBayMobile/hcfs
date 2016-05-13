@@ -34,50 +34,50 @@
 #define COMP_ALG_NONE 0
 
 typedef struct encode_object_meta {
-	int enc_alg;
-	int comp_alg;
+	int32_t enc_alg;
+	int32_t comp_alg;
 	char *enc_session_key;
-	int len_enc_session_key;
+	int32_t len_enc_session_key;
 } HCFS_encode_object_meta;
 
 void free_object_meta(HCFS_encode_object_meta *object_meta);
 
-int get_decode_meta(HCFS_encode_object_meta *, unsigned char *session_key,
-		    unsigned char *key, int enc_flag, int compress_flag);
+int32_t get_decode_meta(HCFS_encode_object_meta *, uint8_t *session_key,
+		    uint8_t *key, int32_t enc_flag, int32_t compress_flag);
 
-int generate_random_aes_key(unsigned char *);
+int32_t generate_random_aes_key(uint8_t *);
 
-int generate_random_bytes(unsigned char *, unsigned int);
+int32_t generate_random_bytes(uint8_t *, uint32_t);
 
-int aes_gcm_encrypt_core(unsigned char *, unsigned char *, unsigned int,
-			 unsigned char *, unsigned char *);
+int32_t aes_gcm_encrypt_core(uint8_t *, uint8_t *, uint32_t,
+			 uint8_t *, uint8_t *);
 
-int aes_gcm_decrypt_core(unsigned char *, unsigned char *, unsigned int,
-			 unsigned char *, unsigned char *);
+int32_t aes_gcm_decrypt_core(uint8_t *, uint8_t *, uint32_t,
+			 uint8_t *, uint8_t *);
 
-int aes_gcm_encrypt_fix_iv(unsigned char *, unsigned char *, unsigned int,
-			   unsigned char *);
+int32_t aes_gcm_encrypt_fix_iv(uint8_t *, uint8_t *, uint32_t,
+			   uint8_t *);
 
-int aes_gcm_decrypt_fix_iv(unsigned char *, unsigned char *, unsigned int,
-			   unsigned char *);
+int32_t aes_gcm_decrypt_fix_iv(uint8_t *, uint8_t *, uint32_t,
+			   uint8_t *);
 
-int expect_b64_encode_length(unsigned int);
+int32_t expect_b64_encode_length(uint32_t);
 
-unsigned char *get_key(const char *);
+uint8_t *get_key(const char *);
 
-FILE *transform_encrypt_fd(FILE *, unsigned char *, unsigned char **);
+FILE *transform_encrypt_fd(FILE *, uint8_t *, uint8_t **);
 
-FILE *transform_fd(FILE *, unsigned char *, unsigned char **, int, int);
+FILE *transform_fd(FILE *, uint8_t *, uint8_t **, int32_t, int32_t);
 
-int decrypt_to_fd(FILE *, unsigned char *, unsigned char *, int);
+int32_t decrypt_to_fd(FILE *, uint8_t *, uint8_t *, int32_t);
 
-int decode_to_fd(FILE *, unsigned char *, unsigned char *, int, int, int);
+int32_t decode_to_fd(FILE *, uint8_t *, uint8_t *, int32_t, int32_t, int32_t);
 
-int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
-			unsigned char *key);
+int32_t decrypt_session_key(uint8_t *session_key, char *enc_session_key,
+			uint8_t *key);
 
 FILE *get_decrypt_configfp(const char *);
 
-int enc_backup_usermeta(char *json_str);
+int32_t enc_backup_usermeta(char *json_str);
 char *dec_backup_usermeta(char *path);
 #endif /* GW20_HCFS_ENC_H_ */

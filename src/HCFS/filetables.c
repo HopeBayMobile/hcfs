@@ -38,7 +38,7 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_system_fh_table(void)
+int32_t init_system_fh_table(void)
 {
 	memset(&system_fh_table, 0, sizeof(FH_TABLE_TYPE));
 	/* Init entry_table_flag*/
@@ -78,7 +78,7 @@ int init_system_fh_table(void)
 /************************************************************************
 *
 * Function name: open_fh
-*        Inputs: ino_t thisinode, int flags, BOOL isdir
+*        Inputs: ino_t thisinode, int32_t flags, BOOL isdir
 *       Summary: Allocate a file handle for inode number "thisinode".
 *                Also record the file opening flag from "flags".
 *                If "isdir" is true, the handle to open is a directory
@@ -87,7 +87,7 @@ int init_system_fh_table(void)
 *                negation of error code.
 *
 *************************************************************************/
-int64_t open_fh(ino_t thisinode, int flags, BOOL isdir)
+int64_t open_fh(ino_t thisinode, int32_t flags, BOOL isdir)
 {
 	int64_t index;
 	DIRH_ENTRY *dirh_ptr;
@@ -142,7 +142,7 @@ int64_t open_fh(ino_t thisinode, int flags, BOOL isdir)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int close_fh(int64_t index)
+int32_t close_fh(int64_t index)
 {
 	FH_ENTRY *tmp_entry;
 	DIRH_ENTRY *tmp_DIRH_entry;

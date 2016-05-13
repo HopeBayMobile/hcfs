@@ -45,9 +45,9 @@ PATHNAME_CACHE_ENTRY pathname_cache[PATHNAME_CACHE_ENTRY_NUM];
 *  Return value: 0 if successful.
 *
 *************************************************************************/
-int init_pathname_cache(void)
+int32_t init_pathname_cache(void)
 {
-	long long count;
+	int64_t count;
 
 	for (count = 0; count < PATHNAME_CACHE_ENTRY_NUM; count++) {
 		memset(&(pathname_cache[count]), 0,
@@ -65,13 +65,13 @@ int init_pathname_cache(void)
 *  Return value: Hash value for input string "path".
 *
 *************************************************************************/
-unsigned long long compute_hash(const char *path)
+uint64_t compute_hash(const char *path)
 {
-	unsigned long long seed = 0;
-	long long count;
-	unsigned char temp;
-	unsigned long long temp1;
-	unsigned long long mode_base;
+	uint64_t seed = 0;
+	int64_t count;
+	uint8_t temp;
+	uint64_t temp1;
+	uint64_t mode_base;
 
 	if (PATHNAME_CACHE_ENTRY_NUM > 65536)
 		mode_base = PATHNAME_CACHE_ENTRY_NUM;
@@ -79,8 +79,8 @@ unsigned long long compute_hash(const char *path)
 		mode_base = 65536;
 
 	for (count = 0; count < strlen(path); count++) {
-		temp = (unsigned char) path[count];
-		temp1 = (unsigned long long) temp;
+		temp = (uint8_t) path[count];
+		temp1 = (uint64_t) temp;
 		seed = (3 * seed + (temp1 * 13)) % mode_base;
 	}
 	seed = seed % PATHNAME_CACHE_ENTRY_NUM;
@@ -91,13 +91,13 @@ unsigned long long compute_hash(const char *path)
 /************************************************************************
 *
 * Function name: replace_pathname_cache
-*        Inputs: long long index, char *path, ino_t inode_number
+*        Inputs: int64_t index, char *path, ino_t inode_number
 *       Summary: Replace hash table entry "index" with the provided path
 *                "path" and corresponding inode number "inode_number".
 *  Return value: 0 if replaced, -1 if pathname is too long.
 *
 *************************************************************************/
-int replace_pathname_cache(long long index, char *path, ino_t inode_number)
+int32_t replace_pathname_cache(int64_t index, char *path, ino_t inode_number)
 {
 	if (index < 0 || index >= PATHNAME_CACHE_ENTRY_NUM)
 		return -1;
@@ -120,9 +120,9 @@ int replace_pathname_cache(long long index, char *path, ino_t inode_number)
 *  Return value: 0 if invalidated or not found, -1 if pathname is too long.
 *
 *************************************************************************/
-int invalidate_pathname_cache_entry(const char *path)
+int32_t invalidate_pathname_cache_entry(const char *path)
 {
-	unsigned long long index;
+	uint64_t index;
 
 	if (strlen(path) > MAX_PATHNAME)
 		return -1;
@@ -149,7 +149,7 @@ int invalidate_pathname_cache_entry(const char *path)
 *************************************************************************/
 ino_t check_cached_path(const char *path)
 {
-	unsigned long long index;
+	uint64_t index;
 	ino_t return_val;
 
 	if (strlen(path) > MAX_PATHNAME)
@@ -168,16 +168,16 @@ ino_t check_cached_path(const char *path)
 /************************************************************************
 *
 * Function name: lookup_pathname
-*        Inputs: const char *path, int *errcode
+*        Inputs: const char *path, int32_t *errcode
 *       Summary: Resolve the pathname to find the inode number.
 *  Return value: Inode number if "path" is found in the system,
 *                or 0 otherwise with the error code copied to "*errcode".
 *
 *************************************************************************/
 /* TODO: resolving pathname may result in EACCES */
-ino_t lookup_pathname(const char *path, int *errcode)
+ino_t lookup_pathname(const char *path, int32_t *errcode)
 {
-	int strptr;
+	int32_t strptr;
 	char tempdir[MAX_PATHNAME+10];
 	ino_t cached_inode;
 
@@ -219,8 +219,8 @@ ino_t lookup_pathname(const char *path, int *errcode)
 /************************************************************************
 *
 * Function name: lookup_pathname_recursive
-*        Inputs: ino_t subroot, int prefix_len, const char *partialpath,
-*                const char *fullpath, int *errcode
+*        Inputs: ino_t subroot, int32_t prefix_len, const char *partialpath,
+*                const char *fullpath, int32_t *errcode
 *       Summary: Resolve the path "partialpath" from the directory "subroot".
 *                Full path name to resolve is pointed by "fullpath".
 *                Length for the name of "subroot" is "prefix_len".
@@ -228,18 +228,18 @@ ino_t lookup_pathname(const char *path, int *errcode)
 *                or 0 otherwise with the error code copied to "*errcode".
 *
 *************************************************************************/
-ino_t lookup_pathname_recursive(ino_t subroot, int prefix_len,
-		const char *partialpath, const char *fullpath, int *errcode)
+ino_t lookup_pathname_recursive(ino_t subroot, int32_t prefix_len,
+		const char *partialpath, const char *fullpath, int32_t *errcode)
 {
-	int count;
-	int new_prefix_len;
+	int32_t count;
+	int32_t new_prefix_len;
 	char search_subdir_only;
 	char target_entry_name[400];
 	char tempname[400];
 	ino_t hit_inode;
 	DIR_ENTRY_PAGE temp_page;
-	int temp_index;
-	int ret_val;
+	int32_t temp_index;
+	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *cache_entry;
 
 	if ((partialpath[0] == '/') && (strlen(partialpath) == 1))
@@ -333,11 +333,11 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prefix_len,
 /* Given parent "parent", search for "childname" in parent and return
 the directory entry in structure pointed by "dentry" if found. If not or
 if error, return the negation of error code. */
-int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
+int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 {
 	META_CACHE_ENTRY_STRUCT *cache_entry;
 	DIR_ENTRY_PAGE temp_page;
-	int temp_index, ret_val;
+	int32_t temp_index, ret_val;
 
 	cache_entry = meta_cache_lock_entry(parent);
 	ret_val = meta_cache_seek_dir_entry(parent, &temp_page,

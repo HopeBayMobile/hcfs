@@ -26,17 +26,17 @@ typedef struct {
 	sem_t cache_entry_sem;
 } PATHNAME_CACHE_ENTRY;
 
-ino_t lookup_pathname(const char *path, int *errcode);
-ino_t lookup_pathname_recursive(ino_t subroot, int prefix_len,
-		const char *partialpath, const char *fullpath, int *errcode);
-unsigned long long compute_hash(const char *path);
-int init_pathname_cache(void);
-int replace_pathname_cache(long long index, char *path, ino_t inode_number);
+ino_t lookup_pathname(const char *path, int32_t *errcode);
+ino_t lookup_pathname_recursive(ino_t subroot, int32_t prefix_len,
+		const char *partialpath, const char *fullpath, int32_t *errcode);
+uint64_t compute_hash(const char *path);
+int32_t init_pathname_cache(void);
+int32_t replace_pathname_cache(int64_t index, char *path, ino_t inode_number);
 
 /* If a dir or file is removed or changed, by e.g. rename, move, rm, rmdir,
 	this function has to be called */
-int invalidate_pathname_cache_entry(const char *path);
+int32_t invalidate_pathname_cache_entry(const char *path);
 ino_t check_cached_path(const char *path);
-int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
+int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
 
 #endif  /* GW20_HCFS_DIR_LOOKUP_H_ */
