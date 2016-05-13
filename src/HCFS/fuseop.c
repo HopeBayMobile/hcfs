@@ -99,6 +99,7 @@
 #include "dir_statistics.h"
 #include "parent_lookup.h"
 #include "do_fallocate.h"
+#include "pkg_cache.h"
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
@@ -508,7 +509,7 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 {
 
 	sqlite3 *db;
-	int ret_code;
+	int ret_code, ret;
 	char *data;
 	char *sql_err = 0;
 	char sql[500];
@@ -518,14 +519,15 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 	data = NULL;
 	*uid = 0;
 
-	sem_wait(&(pkg_cache_lock));
-	if (strcmp(pkgname, pkg_cache_entry.pkgname) == 0) {
-		*uid = pkg_cache_entry.pkguid;
-		sem_post(&(pkg_cache_lock));
+	ret = lookup_cache_pkg(pkgname, uid);
+	if (ret == 0) {
 		return 0;
+	} else {
+		if (ret != -ENOENT)
+			return -1;
 	}
-	sem_post(&(pkg_cache_lock));
 
+	/* Find pkg from db */
 	snprintf(sql, sizeof(sql),
 		 "SELECT uid from uid WHERE package_name='%s'",
 		 pkgname);
@@ -561,11 +563,11 @@ int lookup_pkg(char *pkgname, uid_t *uid)
 		write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
 	}
 
-	sem_wait(&(pkg_cache_lock));
-	snprintf(pkg_cache_entry.pkgname, sizeof(pkg_cache_entry.pkgname),
-		 "%s", pkgname);
-	pkg_cache_entry.pkguid= *uid;
-	sem_post(&(pkg_cache_lock));
+	ret = insert_cache_pkg(pkgname, *uid);
+	if (ret < 0) {
+		free(data);
+		return -1;
+	}
 
 	free(data);
 	return 0;
@@ -786,9 +788,19 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 					newpermission = 0771;
 					/* When parent is /0/Android/data/,
 					 * need to check self pkg name */
-					if (selfname && pin_status)
-						_try_get_pin_st(selfname,
+					if (selfname) {
+						if (pin_status)
+						/* Create external pkg
+						 * folder */
+							_try_get_pin_st(
+								selfname,
 								pin_status);
+						else
+						/* Remove external pkg
+						 * folder */
+							remove_cache_pkg(
+								selfname);
+					}
 				}
 				break;
 			case 3:
@@ -1259,13 +1271,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
-		sem_wait(&(pkg_cache_lock));
-		if (strcmp(selfname, pkg_cache_entry.pkgname) == 0) {
-			/* Resetting cache entry if name is same */
-			write_log(10, "Debug: Resetting pkg cache\n");
-			pkg_cache_entry.pkgname[0] = 0;
-		}
-		sem_post(&(pkg_cache_lock));
+		remove_cache_pkg(selfname);
 	}
 
 	fuse_reply_entry(req, &(tmp_param));
@@ -1397,7 +1403,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
+		_rewrite_stat(tmpptr, &parent_stat, selfname, NULL);
 	}
 #endif
 
@@ -1449,13 +1455,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	/* TODO: Check if this still works for app to sdcard */
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
-		sem_wait(&(pkg_cache_lock));
-		if (strcmp(selfname, pkg_cache_entry.pkgname) == 0) {
-			write_log(10, "Debug: Resetting pkg cache\n");
-			/* Resetting cache entry if name is same */
-			pkg_cache_entry.pkgname[0] = 0;
-		}
-		sem_post(&(pkg_cache_lock));
+		remove_cache_pkg(selfname);
 	}
 
 	fuse_reply_err(req, -ret_val);
@@ -6926,8 +6926,6 @@ int hook_fuse(int argc, char **argv)
 	global_argv = argv;
 #endif
 	data_data_root = (ino_t) 0;
-	sem_init(&(pkg_cache_lock), 0, 1);
-	memset(&(pkg_cache_entry), 0, sizeof(PKG_CACHE_ENTRY));
 
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
