@@ -223,6 +223,9 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 	BOOL have_opened_nonsnap;
 
 	snap_created = FALSE;
+	if (metafptr == NULL)
+		return -EIO;
+
 	sem_wait(&(system_fh_table.fh_table_sem));
 	if (system_fh_table.have_nonsnap_dir == FALSE) {
 		sem_post(&(system_fh_table.fh_table_sem));
