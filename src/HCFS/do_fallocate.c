@@ -27,13 +27,13 @@
 	If mode 0 or 1, don't need to zero regions already containing data
 	If mode = 3, need to zero regions.
 */
-static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
+static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 		off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr,
 		fuse_req_t req)
 {
 	FILE_META_TYPE tempfilemeta;
-	int ret;
-	long long sizediff;
+	int32_t ret;
+	int64_t sizediff;
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -61,7 +61,7 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	}
 
 	if (filestat->st_size < offset) {
-		sizediff = (long long) offset - filestat->st_size;
+		sizediff = (int64_t) offset - filestat->st_size;
 		sem_wait(&(hcfs_system->access_sem));
 		/* Check system size and reject if exceeding quota */
 		if (hcfs_system->systemdata.system_size + sizediff >
@@ -86,11 +86,11 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((long long)(offset - filestat->st_size),
+	change_system_meta((int64_t)(offset - filestat->st_size),
 			0, 0, 0, 0, 0, TRUE);
 
 	ret = change_mount_stat(tmpptr,
-			(long long) (offset - filestat->st_size), 0, 0);
+			(int64_t) (offset - filestat->st_size), 0, 0);
 	if (ret < 0)
 		return ret;
 
@@ -100,11 +100,11 @@ static int do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	return 0;
 }
 
-int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
+int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,
 		off_t offset, off_t length,
 		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	switch (mode) {
 	case 0:

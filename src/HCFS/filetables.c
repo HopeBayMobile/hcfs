@@ -34,7 +34,7 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_system_fh_table(void)
+int32_t init_system_fh_table(void)
 {
 	memset(&system_fh_table, 0, sizeof(FH_TABLE_TYPE));
 	/* Init entry_table_flag*/
@@ -63,14 +63,14 @@ int init_system_fh_table(void)
 /************************************************************************
 *
 * Function name: open_fh
-*        Inputs: ino_t thisinode, int flags
+*        Inputs: ino_t thisinode, int32_t flags
 *       Summary: Allocate a file handle for inode number "thisinode".
 *                Also record the file opening flag from "flags".
 *  Return value: Index of file handle if successful. Otherwise returns
 *                negation of error code.
 *
 *************************************************************************/
-int64_t open_fh(ino_t thisinode, int flags)
+int64_t open_fh(ino_t thisinode, int32_t flags)
 {
 	int64_t index;
 
@@ -113,7 +113,7 @@ int64_t open_fh(ino_t thisinode, int flags)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int close_fh(int64_t index)
+int32_t close_fh(int64_t index)
 {
 	FH_ENTRY *tmp_entry;
 

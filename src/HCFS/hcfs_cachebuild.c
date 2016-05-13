@@ -42,9 +42,9 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int cache_usage_hash_init(void)
+int32_t cache_usage_hash_init(void)
 {
-	int count;
+	int32_t count;
 	CACHE_USAGE_NODE *node_ptr, *temp_ptr;
 
 	nonempty_cache_hash_entries = 0;
@@ -74,7 +74,7 @@ int cache_usage_hash_init(void)
 *************************************************************************/
 CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 {
-	int hash_value;
+	int32_t hash_value;
 	CACHE_USAGE_NODE *node_ptr, *next_ptr;
 
 	hash_value = this_inode % CACHE_USAGE_NUM_ENTRIES;
@@ -120,7 +120,7 @@ CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 *************************************************************************/
 void insert_cache_usage_node(ino_t this_inode, CACHE_USAGE_NODE *this_node)
 {
-	int hash_value;
+	int32_t hash_value;
 	CACHE_USAGE_NODE *node_ptr, *next_ptr;
 
 	hash_value = this_inode % CACHE_USAGE_NUM_ENTRIES;
@@ -169,7 +169,7 @@ void insert_cache_usage_node(ino_t this_inode, CACHE_USAGE_NODE *this_node)
 *                0 if does not matter.
 *
 *************************************************************************/
-int compare_cache_usage(CACHE_USAGE_NODE *first_node,
+int32_t compare_cache_usage(CACHE_USAGE_NODE *first_node,
 					CACHE_USAGE_NODE *second_node)
 {
 	time_t first_node_time, second_node_time;
@@ -230,16 +230,16 @@ int compare_cache_usage(CACHE_USAGE_NODE *first_node,
 *
 * Note: Will continue to scan for cache usage even if encountered some error
 *************************************************************************/
-int build_cache_usage(void)
+int32_t build_cache_usage(void)
 {
 	char blockpath[400];
 	char thisblockpath[400];
 	DIR *dirptr;
-	int count;
+	int32_t count;
 	struct dirent temp_dirent;
 	struct dirent *direntptr;
-	int ret, errcode;
-	long long blockno;
+	int32_t ret, errcode;
+	int64_t blockno;
 	ino_t this_inode;
 	struct stat tempstat;
 	CACHE_USAGE_NODE *tempnode;
@@ -288,7 +288,7 @@ int build_cache_usage(void)
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
-			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%lld",
+			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%" PRId64,
 			             (uint64_t *)&this_inode, &blockno);
 			if (ret != 2) {
 				write_log(10, "Scan file does not match\n");
@@ -301,7 +301,7 @@ int build_cache_usage(void)
 				continue;
 			}
 			write_log(10, "Count is now %d, %lu, %lu\n", count,
-			          (unsigned long)&count, (unsigned long)&blockno);
+			          (uint64_t)&count, (uint64_t)&blockno);
 			write_log(10, "Block file for %" PRIu64 " %lld\n",
 			          (uint64_t)this_inode, blockno);
 			ret = fetch_block_path(thisblockpath, this_inode,

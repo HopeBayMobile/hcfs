@@ -366,7 +366,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	int64_t metasize, old_metasize, new_metasize;
 	CLOUD_RELATED_DATA cloud_related_data;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	*delta_meta_size = 0;
@@ -770,7 +770,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	int32_t ret_code;
 	int64_t metasize, old_metasize, new_metasize;
 	CLOUD_RELATED_DATA cloud_related_data;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
@@ -915,7 +915,7 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *xattr_pos, BOOL create_page)
 {
 	int32_t ret_code;
@@ -1051,7 +1051,7 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int link_update_meta(ino_t link_inode, const char *newname,
+int32_t link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, uint64_t *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {

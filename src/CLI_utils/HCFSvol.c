@@ -143,7 +143,7 @@ int32_t main(int32_t argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	/* APIs at here send result in long long */
+	/* APIs at here send result in int64_t */
 	case GETQUOTA:
 	case GETPINSIZE:
 	case GETCACHESIZE:
@@ -170,9 +170,9 @@ int32_t main(int32_t argc, char **argv)
 	case GETSYNCSTAT:
 	case GETXFERSTATUS:
 		cmd_len = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 		size_msg = recv(fd, &uint32_ret, sizeof(uint32_t), 0);
 		if (code == CLOUDSTAT)
 			printf("Backend is %s\n",
@@ -431,10 +431,10 @@ int32_t main(int32_t argc, char **argv)
 			exit(-EINVAL);
 		}
 		loglevel = atoi(argv[2]);
-		cmd_len = sizeof(int);
+		cmd_len = sizeof(int32_t);
 		size_msg = send(fd, &code, sizeof(code), 0);
 		size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
-		size_msg = send(fd, &loglevel, sizeof(int), 0);
+		size_msg = send(fd, &loglevel, sizeof(int32_t), 0);
 
 		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
 		size_msg = recv(fd, &retcode, sizeof(retcode), 0);

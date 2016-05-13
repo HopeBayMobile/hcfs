@@ -18,7 +18,7 @@
 
 #include "meta_mem_cache.h"
 
-int do_fallocate(ino_t this_inode, struct stat *newstat, int mode,
+int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,
 		off_t offset, off_t length,
 		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req);
 

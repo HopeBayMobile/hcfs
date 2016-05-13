@@ -198,7 +198,7 @@ CMD_INFO cmds[] = {
 int32_t main(int32_t argc, char **argv)
 {
 
-	int ret_code = 0;
+	int32_t ret_code = 0;
 	uint32_t i;
 
 	if (argc != 4) {
