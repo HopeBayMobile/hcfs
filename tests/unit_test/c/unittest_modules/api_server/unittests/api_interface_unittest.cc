@@ -24,14 +24,14 @@ extern "C" {
 
 #define UNUSED(x) ((void)x)
 
-extern int api_server_monitor_time;
+extern int32_t api_server_monitor_time;
 SYSTEM_CONF_STRUCT *system_config;
 
 /* Begin of the test case for the function init_api_interface */
 
 class init_api_interfaceTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
@@ -65,7 +65,7 @@ class init_api_interfaceTest : public ::testing::Test {
 /* Testing whether init API server is correct */
 TEST_F(init_api_interfaceTest, TestIntegrity) {
 
-  int ret_val;
+  int32_t ret_val;
 
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
@@ -84,7 +84,7 @@ TEST_F(init_api_interfaceTest, TestIntegrity) {
 /* Testing if can correctly cleanup the environment before init */
 TEST_F(init_api_interfaceTest, TestPreCleanup) {
 
-  int ret_val;
+  int32_t ret_val;
 
   if (access(SOCK_PATH, F_OK) != 0)
     mknod(SOCK_PATH, S_IFREG | O_RDWR, 0);
@@ -107,7 +107,7 @@ TEST_F(init_api_interfaceTest, TestPreCleanup) {
 
 class destroy_api_interfaceTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
@@ -140,7 +140,7 @@ class destroy_api_interfaceTest : public ::testing::Test {
 /* Testing if destory process of API server runs correctly */
 TEST_F(destroy_api_interfaceTest, TestIntegrity) {
 
-  int ret_val, errcode;
+  int32_t ret_val, errcode;
 
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
@@ -170,8 +170,8 @@ TEST_F(destroy_api_interfaceTest, TestIntegrity) {
 class api_moduleTest : public ::testing::Test
 {
 	protected:
-	int count;
-	int fd, status;
+	int32_t count;
+	int32_t fd, status;
 	struct sockaddr_un addr;
 
 	virtual void SetUp()
@@ -227,7 +227,7 @@ class api_moduleTest : public ::testing::Test
     		free(system_config);
 	}
 
-	int connect_sock()
+	int32_t connect_sock()
 	{
 		addr.sun_family = AF_UNIX;
 		strcpy(addr.sun_path, SOCK_PATH);
@@ -236,7 +236,7 @@ class api_moduleTest : public ::testing::Test
 		return status;
 	}
 
-	static int do_delete(const char *fpath, const struct stat *sb, int tflag,
+	static int32_t do_delete(const char *fpath, const struct stat *sb, int32_t tflag,
 		      struct FTW *ftwbuf)
 	{
 		UNUSED(sb);
@@ -258,8 +258,8 @@ class api_moduleTest : public ::testing::Test
 /* Test a single API call */ 
 TEST_F(api_moduleTest, SingleTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
 
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
@@ -271,24 +271,24 @@ TEST_F(api_moduleTest, SingleTest) {
   code = TESTAPI;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
  }
 
 /* Test API call for checking system stat */
 TEST_F(api_moduleTest, StatTest) {
 
-  int ret_val;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val;
+  uint32_t code, cmd_len, size_msg;
   char ans_string[50], tmp_str[50];
 
   hcfs_system->systemdata.system_size = 100000;
@@ -309,13 +309,13 @@ TEST_F(api_moduleTest, StatTest) {
   code = VOLSTAT;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   EXPECT_EQ(strlen(ans_string)+1, size_msg);
   ret_val = recv(fd, tmp_str, size_msg, 0);
   ASSERT_EQ(size_msg, ret_val);
@@ -325,10 +325,10 @@ TEST_F(api_moduleTest, StatTest) {
 /* Test API call correctness for a call with large arg size */
 TEST_F(api_moduleTest, LargeEchoTest) {
 
-  int ret_val, count;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, count;
+  uint32_t code, cmd_len, size_msg;
   char teststr[2048], recvstr[2048];
-  int bytes_recv;
+  int32_t bytes_recv;
 
   /* Fill up test string */
   for (count = 0; count < 2000; count++)
@@ -345,18 +345,18 @@ TEST_F(api_moduleTest, LargeEchoTest) {
   code = ECHOTEST;
   cmd_len = 2001;
   printf("Start sending\n");
-  size_msg = send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg = send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg = send(fd, teststr, 2001, 0);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(2001, size_msg);
   bytes_recv = 0;
-  while ((unsigned int)bytes_recv < size_msg) {
+  while ((uint32_t)bytes_recv < size_msg) {
     ret_val = recv(fd, &(recvstr[bytes_recv]), 2001, 0);
     bytes_recv += ret_val;
     if (ret_val == 0)
@@ -372,8 +372,8 @@ TEST_F(api_moduleTest, LargeEchoTest) {
 /* Test handling for unsupported API calls */
 TEST_F(api_moduleTest, InvalidCode) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
 
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
@@ -385,24 +385,24 @@ TEST_F(api_moduleTest, InvalidCode) {
   code = 99999999;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(ENOTSUP, errcode);
  }
 
 /* Test system termination call */
 TEST_F(api_moduleTest, TerminateTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
 
   UNMOUNTEDALL = FALSE;
   ret_val = init_api_interface();
@@ -415,16 +415,16 @@ TEST_F(api_moduleTest, TerminateTest) {
   code = TERMINATE;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, hcfs_system->system_going_down);
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
@@ -433,8 +433,8 @@ TEST_F(api_moduleTest, TerminateTest) {
 /* Test CREATEVOL API call */ 
 TEST_F(api_moduleTest, CreateFSTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char tmpstr[10];
 
   CREATEDFS = FALSE;
@@ -449,18 +449,18 @@ TEST_F(api_moduleTest, CreateFSTest) {
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, CREATEDFS);
   EXPECT_STREQ("123456789", recvFSname);
@@ -468,8 +468,8 @@ TEST_F(api_moduleTest, CreateFSTest) {
 /* Test DELETEVOL API call */ 
 TEST_F(api_moduleTest, DeleteFSTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char tmpstr[10];
 
   DELETEDFS = FALSE;
@@ -484,18 +484,18 @@ TEST_F(api_moduleTest, DeleteFSTest) {
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, DELETEDFS);
   EXPECT_STREQ("123456789", recvFSname);
@@ -503,8 +503,8 @@ TEST_F(api_moduleTest, DeleteFSTest) {
 /* Test CHECKVOL API call */ 
 TEST_F(api_moduleTest, CheckFSTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char tmpstr[10];
 
   CHECKEDFS = FALSE;
@@ -519,18 +519,18 @@ TEST_F(api_moduleTest, CheckFSTest) {
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, CHECKEDFS);
   EXPECT_STREQ("123456789", recvFSname);
@@ -538,8 +538,8 @@ TEST_F(api_moduleTest, CheckFSTest) {
 /* Test LISTVOL API call */ 
 TEST_F(api_moduleTest, ListFSTestNoFS) {
 
-  int ret_val;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val;
+  uint32_t code, cmd_len, size_msg;
 
   LISTEDFS = FALSE;
   numlistedFS = 0;
@@ -553,13 +553,13 @@ TEST_F(api_moduleTest, ListFSTestNoFS) {
   code = LISTVOL;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, size_msg);
   ASSERT_EQ(TRUE, LISTEDFS);
  }
@@ -567,8 +567,8 @@ TEST_F(api_moduleTest, ListFSTestNoFS) {
 /* Test LISTVOL API call */ 
 TEST_F(api_moduleTest, ListFSTestOneFS) {
 
-  int ret_val;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val;
+  uint32_t code, cmd_len, size_msg;
   DIR_ENTRY tmp_entry;
 
   LISTEDFS = FALSE;
@@ -585,13 +585,13 @@ TEST_F(api_moduleTest, ListFSTestOneFS) {
   code = LISTVOL;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(sizeof(DIR_ENTRY), size_msg);
   ret_val = recv(fd, &tmp_entry, sizeof(DIR_ENTRY), 0);
   ASSERT_EQ(sizeof(DIR_ENTRY), ret_val);
@@ -602,11 +602,11 @@ TEST_F(api_moduleTest, ListFSTestOneFS) {
 /* Test MOUNTVOL API call */ 
 TEST_F(api_moduleTest, MountFSTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char tmpstr[10];
   char mpstr[10];
-  int fsname_len;
+  int32_t fsname_len;
   char mp_mode;
 
   MOUNTEDFS = FALSE;
@@ -618,31 +618,31 @@ TEST_F(api_moduleTest, MountFSTest) {
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
   code = MOUNTVOL;
-  cmd_len = 20 + sizeof(int) + sizeof(char);
+  cmd_len = 20 + sizeof(int32_t) + sizeof(char);
   fsname_len = 10;
   snprintf(tmpstr, 10, "123456789");
   snprintf(mpstr, 10, "123456789");
   mp_mode = MP_DEFAULT;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &mp_mode, sizeof(char), 0);
   ASSERT_EQ(sizeof(char), size_msg);
-  size_msg=send(fd, &fsname_len, sizeof(int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &fsname_len, sizeof(int32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
 
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   size_msg=send(fd, mpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, MOUNTEDFS);
   EXPECT_STREQ("123456789", recvFSname);
@@ -652,8 +652,8 @@ TEST_F(api_moduleTest, MountFSTest) {
 /* Test UNMOUNTVOL API call */ 
 TEST_F(api_moduleTest, UnmountFSTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg, fsname_len;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg, fsname_len;
   char tmpstr[10];
 
   UNMOUNTEDFS = FALSE;
@@ -665,27 +665,27 @@ TEST_F(api_moduleTest, UnmountFSTest) {
   ASSERT_EQ(0, ret_val);
   ASSERT_NE(0, fd);
   code = UNMOUNTVOL;
-  cmd_len = 20 + sizeof(int);
+  cmd_len = 20 + sizeof(int32_t);
   snprintf(tmpstr, 10, "123456789");
   fsname_len = 10;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
 
-  size_msg=send(fd, &fsname_len, sizeof(int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &fsname_len, sizeof(int32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, UNMOUNTEDFS);
   EXPECT_STREQ("123456789", recvFSname);
@@ -694,8 +694,8 @@ TEST_F(api_moduleTest, UnmountFSTest) {
 /* Test CHECKMOUNT API call */ 
 TEST_F(api_moduleTest, CheckMountTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char tmpstr[10];
 
   CHECKEDMOUNT = FALSE;
@@ -710,19 +710,19 @@ TEST_F(api_moduleTest, CheckMountTest) {
   cmd_len = 10;
   snprintf(tmpstr, 10, "123456789");
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
 
   size_msg=send(fd, tmpstr, 10, 0);
   ASSERT_EQ(10, size_msg);
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, CHECKEDMOUNT);
   EXPECT_STREQ("123456789", recvFSname);
@@ -731,8 +731,8 @@ TEST_F(api_moduleTest, CheckMountTest) {
 /* Test UNMOUNTALL API call */
 TEST_F(api_moduleTest, UnmountAllTest) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
 
   UNMOUNTEDALL = FALSE;
   ret_val = init_api_interface();
@@ -745,28 +745,28 @@ TEST_F(api_moduleTest, UnmountAllTest) {
   code = UNMOUNTALL;
   cmd_len = 0;
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
  }
 
 TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char buf[300];
-  long long reserved_size;
-  unsigned int num_inode;
+  int64_t reserved_size;
+  uint32_t num_inode;
 
   PIN_INODE_ROLLBACK = FALSE;
   ret_val = init_api_interface();
@@ -779,36 +779,36 @@ TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
   code = PIN;
   reserved_size = 1000;
   num_inode = 0;
-  cmd_len = sizeof(long long) + sizeof(unsigned int);
-  memcpy(buf, &reserved_size, sizeof(long long));
-  memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
+  cmd_len = sizeof(int64_t) + sizeof(uint32_t);
+  memcpy(buf, &reserved_size, sizeof(int64_t));
+  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
   CACHE_HARD_LIMIT = 300; /* Space not available */
   hcfs_system->systemdata.pinned_size = 0;
   
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &buf, cmd_len, 0);
   ASSERT_EQ(cmd_len, size_msg);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(-ENOSPC, errcode);
  }
 
 TEST_F(api_moduleTest, pin_inodeTest_Success) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char buf[300];
-  long long reserved_size;
-  unsigned int num_inode;
+  int64_t reserved_size;
+  uint32_t num_inode;
   ino_t inode_list[1];
 
   PIN_INODE_ROLLBACK = FALSE; /* pin_inode() success */
@@ -823,38 +823,38 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   reserved_size = 10;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(long long) + sizeof(unsigned int) + sizeof(ino_t);
-  memcpy(buf, &reserved_size, sizeof(long long));
-  memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
-  memcpy(buf + sizeof(long long) + sizeof(unsigned int),
+  cmd_len = sizeof(int64_t) + sizeof(uint32_t) + sizeof(ino_t);
+  memcpy(buf, &reserved_size, sizeof(int64_t));
+  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(int64_t) + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
   CACHE_HARD_LIMIT = 500; 
   hcfs_system->systemdata.pinned_size = 0;
   
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &buf, cmd_len, 0);
   ASSERT_EQ(cmd_len, size_msg);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
  }
 
 TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char buf[300];
-  long long reserved_size;
-  unsigned int num_inode;
+  int64_t reserved_size;
+  uint32_t num_inode;
   ino_t inode_list[1];
 
   PIN_INODE_ROLLBACK = TRUE; /* pin_inode() fail */
@@ -869,37 +869,37 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   reserved_size = 10;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(long long) + sizeof(unsigned int) + sizeof(ino_t);
-  memcpy(buf, &reserved_size, sizeof(long long));
-  memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
-  memcpy(buf + sizeof(long long) + sizeof(unsigned int),
+  cmd_len = sizeof(int64_t) + sizeof(uint32_t) + sizeof(ino_t);
+  memcpy(buf, &reserved_size, sizeof(int64_t));
+  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(int64_t) + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
   CACHE_HARD_LIMIT = 500; 
   hcfs_system->systemdata.pinned_size = 0;
   
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &buf, cmd_len, 0);
   ASSERT_EQ(cmd_len, size_msg);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(-EIO, errcode);
  }
 
 TEST_F(api_moduleTest, unpin_inodeTest_Success) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char buf[300];
-  unsigned int num_inode;
+  uint32_t num_inode;
   ino_t inode_list[1];
 
   UNPIN_INODE_FAIL = FALSE; /* unpin_inode() success */
@@ -914,36 +914,36 @@ TEST_F(api_moduleTest, unpin_inodeTest_Success) {
   code = UNPIN;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(unsigned int) + sizeof(ino_t);
-  memcpy(buf, &num_inode, sizeof(unsigned int));
-  memcpy(buf + sizeof(unsigned int),
+  cmd_len = sizeof(uint32_t) + sizeof(ino_t);
+  memcpy(buf, &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
   CACHE_HARD_LIMIT = 500; 
   hcfs_system->systemdata.pinned_size = 0;
   
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &buf, cmd_len, 0);
   ASSERT_EQ(cmd_len, size_msg);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(0, errcode);
  }
 
 TEST_F(api_moduleTest, unpin_inodeTest_Fail) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   char buf[300];
-  unsigned int num_inode;
+  uint32_t num_inode;
   ino_t inode_list[1];
 
   UNPIN_INODE_FAIL = TRUE; /* unpin_inode() success */
@@ -958,35 +958,35 @@ TEST_F(api_moduleTest, unpin_inodeTest_Fail) {
   code = UNPIN;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(unsigned int) + sizeof(ino_t);
-  memcpy(buf, &num_inode, sizeof(unsigned int));
-  memcpy(buf + sizeof(unsigned int),
+  cmd_len = sizeof(uint32_t) + sizeof(ino_t);
+  memcpy(buf, &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
   CACHE_HARD_LIMIT = 500; 
   hcfs_system->systemdata.pinned_size = 0;
   
   printf("Start sending\n");
-  size_msg=send(fd, &code, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &buf, cmd_len, 0);
   ASSERT_EQ(cmd_len, size_msg);
 
   printf("Start recv\n");
-  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
-  ASSERT_EQ(sizeof(unsigned int), size_msg);
-  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
   ASSERT_EQ(-EIO, errcode);
 }
 
 /* Test CLOUDSTAT API call */
 TEST_F(api_moduleTest, CloudState)
 {
-	int ret_val, retcode;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, retcode;
+	uint32_t code, cmd_len, size_msg;
 
 	ret_val = init_api_interface();
 	ASSERT_EQ(0, ret_val);
@@ -1017,9 +1017,9 @@ TEST_F(api_moduleTest, CloudState)
 /* Test SETSYNCSWITCH API call */
 TEST_F(api_moduleTest, SetSyncSwitchOff)
 {
-	int ret_val, retcode;
-	unsigned int code, cmd_len, size_msg;
-	int status;
+	int32_t ret_val, retcode;
+	uint32_t code, cmd_len, size_msg;
+	int32_t status;
 
 	hcfs_system->backend_is_online = TRUE;
 	ret_val = init_api_interface();
@@ -1055,9 +1055,9 @@ TEST_F(api_moduleTest, SetSyncSwitchOff)
 
 TEST_F(api_moduleTest, SetSyncSwitchOn)
 {
-	int ret_val, retcode;
-	unsigned int code, cmd_len, size_msg;
-	int status;
+	int32_t ret_val, retcode;
+	uint32_t code, cmd_len, size_msg;
+	int32_t status;
 
 	hcfs_system->backend_is_online = TRUE;
 	ret_val = init_api_interface();
@@ -1093,9 +1093,9 @@ TEST_F(api_moduleTest, SetSyncSwitchOn)
 }
 TEST_F(api_moduleTest, SetSyncSwitchOnFail)
 {
-	int ret_val, retcode;
-	unsigned int code, cmd_len, size_msg;
-	int status;
+	int32_t ret_val, retcode;
+	uint32_t code, cmd_len, size_msg;
+	int32_t status;
 
 	hcfs_system->backend_is_online = TRUE;
 	ret_val = init_api_interface();
@@ -1133,8 +1133,8 @@ TEST_F(api_moduleTest, SetSyncSwitchOnFail)
 /* Test GETSYNCSWITCH API call */
 TEST_F(api_moduleTest, GetSyncSwitch)
 {
-	int ret_val, retcode;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, retcode;
+	uint32_t code, cmd_len, size_msg;
 
 	ret_val = init_api_interface();
 	ASSERT_EQ(0, ret_val);
@@ -1164,8 +1164,8 @@ TEST_F(api_moduleTest, GetSyncSwitch)
 /* Test GETSYNCSTAT API call */
 TEST_F(api_moduleTest, GetSyncStat)
 {
-	int ret_val, retcode;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, retcode;
+	uint32_t code, cmd_len, size_msg;
 
 	ret_val = init_api_interface();
 	ASSERT_EQ(0, ret_val);
@@ -1194,8 +1194,8 @@ TEST_F(api_moduleTest, GetSyncStat)
 
 TEST_F(api_moduleTest, ReloadConfigSuccess) {
 
-	int ret_val, errcode;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, errcode;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1211,27 +1211,27 @@ TEST_F(api_moduleTest, ReloadConfigSuccess) {
 	memset(buf, 0, 300);
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
 	ASSERT_EQ(0, errcode);
 }
 
 TEST_F(api_moduleTest, GetQuotaSuccess) {
 
-	int ret_val;
-	unsigned int code, cmd_len, size_msg;
-	long long quota;
+	int32_t ret_val;
+	uint32_t code, cmd_len, size_msg;
+	int64_t quota;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1248,26 +1248,26 @@ TEST_F(api_moduleTest, GetQuotaSuccess) {
 	memset(buf, 0, 300);
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(long long), size_msg);
-	ret_val = recv(fd, &quota, sizeof(long long), 0);
-	ASSERT_EQ(sizeof(long long), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int64_t), size_msg);
+	ret_val = recv(fd, &quota, sizeof(int64_t), 0);
+	ASSERT_EQ(sizeof(int64_t), ret_val);
 	ASSERT_EQ(55667788, quota);
 }
 
 TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 
-	int ret_val, errcode;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, errcode;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1284,19 +1284,19 @@ TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 	hcfs_system->systemdata.system_quota = 0; /* It will be modified */
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
 	ASSERT_EQ(0, errcode);
 
 	EXPECT_EQ(5566, hcfs_system->systemdata.system_quota);
@@ -1304,10 +1304,10 @@ TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 
 TEST_F(api_moduleTest, ChangeLogLevelSuccess) {
 
-	int ret_val, errcode;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, errcode;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
-	int loglevel;
+	int32_t loglevel;
 
 	ret_val = init_api_interface();
 	ASSERT_EQ(0, ret_val);
@@ -1320,24 +1320,24 @@ TEST_F(api_moduleTest, ChangeLogLevelSuccess) {
 	code = CHANGELOG;
 	system_config->log_level = 10; /* Original level */
 	loglevel = 6; /* New level */
-	cmd_len = sizeof(int);
+	cmd_len = sizeof(int32_t);
 	memset(buf, 0, 300);
-	memcpy(buf, &loglevel, sizeof(int));
+	memcpy(buf, &loglevel, sizeof(int32_t));
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
 	ASSERT_EQ(0, errcode);
 
 	EXPECT_EQ(6, system_config->log_level);
@@ -1345,9 +1345,9 @@ TEST_F(api_moduleTest, ChangeLogLevelSuccess) {
 
 TEST_F(api_moduleTest, GetTotalCloudSizeSuccess) {
 
-	int ret_val;
-	long long cloudsize;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val;
+	int64_t cloudsize;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1364,27 +1364,27 @@ TEST_F(api_moduleTest, GetTotalCloudSizeSuccess) {
 	hcfs_system->systemdata.backend_size = 12345566;
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(long long), size_msg);
-	ret_val = recv(fd, &cloudsize, sizeof(long long), 0);
-	ASSERT_EQ(sizeof(long long), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int64_t), size_msg);
+	ret_val = recv(fd, &cloudsize, sizeof(int64_t), 0);
+	ASSERT_EQ(sizeof(int64_t), ret_val);
 	ASSERT_EQ(12345566, cloudsize);
 }
 
 TEST_F(api_moduleTest, GetOccupiedSizeSuccess) {
 
-	int ret_val;
-	long long occupiedsize;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val;
+	int64_t occupiedsize;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1402,27 +1402,27 @@ TEST_F(api_moduleTest, GetOccupiedSizeSuccess) {
 	hcfs_system->systemdata.pinned_size = 655405;
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(long long), size_msg);
-	ret_val = recv(fd, &occupiedsize, sizeof(long long), 0);
-	ASSERT_EQ(sizeof(long long), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int64_t), size_msg);
+	ret_val = recv(fd, &occupiedsize, sizeof(int64_t), 0);
+	ASSERT_EQ(sizeof(int64_t), ret_val);
 	ASSERT_EQ(655405 + 556677, occupiedsize);
 }
 
 TEST_F(api_moduleTest, UnpinDirtySizeSuccess) {
 
-	int ret_val;
-	long long unpindirtysize;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val;
+	int64_t unpindirtysize;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1439,26 +1439,26 @@ TEST_F(api_moduleTest, UnpinDirtySizeSuccess) {
 	hcfs_system->systemdata.unpin_dirty_data_size = 556677;
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(long long), size_msg);
-	ret_val = recv(fd, &unpindirtysize, sizeof(long long), 0);
-	ASSERT_EQ(sizeof(long long), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int64_t), size_msg);
+	ret_val = recv(fd, &unpindirtysize, sizeof(int64_t), 0);
+	ASSERT_EQ(sizeof(int64_t), ret_val);
 	ASSERT_EQ(556677, unpindirtysize);
 }
 
 TEST_F(api_moduleTest, XferStatusNoTransit) {
 
-	int ret_val, status;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, status;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1477,26 +1477,26 @@ TEST_F(api_moduleTest, XferStatusNoTransit) {
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(int), size_msg);
-	ret_val = recv(fd, &status, sizeof(int), 0);
-	ASSERT_EQ(sizeof(int), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int32_t), size_msg);
+	ret_val = recv(fd, &status, sizeof(int32_t), 0);
+	ASSERT_EQ(sizeof(int32_t), ret_val);
 	ASSERT_EQ(0, status);
 }
 
 TEST_F(api_moduleTest, XferStatusNormalTransit) {
 
-	int ret_val, status;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, status;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1521,26 +1521,26 @@ TEST_F(api_moduleTest, XferStatusNormalTransit) {
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(int), size_msg);
-	ret_val = recv(fd, &status, sizeof(int), 0);
-	ASSERT_EQ(sizeof(int), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int32_t), size_msg);
+	ret_val = recv(fd, &status, sizeof(int32_t), 0);
+	ASSERT_EQ(sizeof(int32_t), ret_val);
 	ASSERT_EQ(1, status);
 }
 
 TEST_F(api_moduleTest, XferStatusSlowTransit) {
 
-	int ret_val, status;
-	unsigned int code, cmd_len, size_msg;
+	int32_t ret_val, status;
+	uint32_t code, cmd_len, size_msg;
 	char buf[300];
 
 	ret_val = init_api_interface();
@@ -1566,19 +1566,19 @@ TEST_F(api_moduleTest, XferStatusSlowTransit) {
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 
 	printf("Start sending\n");
-	size_msg=send(fd, &code, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
-	size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), size_msg);
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &buf, cmd_len, 0);
 	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
-	ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
-	ASSERT_EQ(sizeof(unsigned int), ret_val);
-	ASSERT_EQ(sizeof(int), size_msg);
-	ret_val = recv(fd, &status, sizeof(int), 0);
-	ASSERT_EQ(sizeof(int), ret_val);
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int32_t), size_msg);
+	ret_val = recv(fd, &status, sizeof(int32_t), 0);
+	ASSERT_EQ(sizeof(int32_t), ret_val);
 	ASSERT_EQ(2, status);
 }
 /* End of the test case for the function api_module */
@@ -1588,9 +1588,9 @@ TEST_F(api_moduleTest, XferStatusSlowTransit) {
 class api_server_monitorTest : public ::testing::Test {
 
  protected:
-  int count;
-  int fd[10];
-  int status;
+  int32_t count;
+  int32_t fd[10];
+  int32_t status;
   struct sockaddr_un addr;
 
   virtual void SetUp() {
@@ -1630,7 +1630,7 @@ class api_server_monitorTest : public ::testing::Test {
     free(hcfs_system);
    }
 
-  int connect_sock() {
+  int32_t connect_sock() {
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, SOCK_PATH);
     for (count = 0; count < 10; count++) {
@@ -1646,9 +1646,9 @@ class api_server_monitorTest : public ::testing::Test {
 /* Test if number of threads will increase under heavy loading */
 TEST_F(api_server_monitorTest, TestThreadIncrease) {
 
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
-  int count1;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
+  int32_t count1;
 
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
@@ -1661,18 +1661,18 @@ TEST_F(api_server_monitorTest, TestThreadIncrease) {
   cmd_len = 0;
   printf("Start sending\n");
   for (count1 = 0; count1 < 10; count1++) {
-    size_msg=send(fd[count1], &code, sizeof(unsigned int), 0);
-    ASSERT_EQ(sizeof(unsigned int), size_msg);
-    size_msg=send(fd[count1], &cmd_len, sizeof(unsigned int), 0);
-    ASSERT_EQ(sizeof(unsigned int), size_msg);
+    size_msg=send(fd[count1], &code, sizeof(uint32_t), 0);
+    ASSERT_EQ(sizeof(uint32_t), size_msg);
+    size_msg=send(fd[count1], &cmd_len, sizeof(uint32_t), 0);
+    ASSERT_EQ(sizeof(uint32_t), size_msg);
    }
   printf("Start recv\n");
   for (count1 = 0; count1 < 10; count1++) {
-    ret_val = recv(fd[count1], &size_msg, sizeof(unsigned int), 0);
-    ASSERT_EQ(sizeof(unsigned int), ret_val);
-    ASSERT_EQ(sizeof(unsigned int), size_msg);
-    ret_val = recv(fd[count1], &errcode, sizeof(unsigned int), 0);
-    ASSERT_EQ(sizeof(unsigned int), ret_val);
+    ret_val = recv(fd[count1], &size_msg, sizeof(uint32_t), 0);
+    ASSERT_EQ(sizeof(uint32_t), ret_val);
+    ASSERT_EQ(sizeof(uint32_t), size_msg);
+    ret_val = recv(fd[count1], &errcode, sizeof(uint32_t), 0);
+    ASSERT_EQ(sizeof(uint32_t), ret_val);
     ASSERT_EQ(0, errcode);
    }
   sleep(5);

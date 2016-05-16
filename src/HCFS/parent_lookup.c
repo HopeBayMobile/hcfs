@@ -29,7 +29,7 @@
 /************************************************************************
 *
 * Function name: fetch_all_parents
-*        Inputs: ino_t self_inode, int *parentnum, ino_t **parentlist
+*        Inputs: ino_t self_inode, int32_t *parentnum, ino_t **parentlist
 *       Summary: Returns the list of parents for "self_inode" in "parentlist".
 *                The number of parents is returned in "parentnum".
 *                When calling the function, "*parentlist" should be NULL, and
@@ -39,15 +39,15 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t **parentlist)
+int32_t fetch_all_parents(ino_t self_inode, int32_t *parentnum, ino_t **parentlist)
 {
-	int totalnum;
+	int32_t totalnum;
 	PRIMARY_PARENT_T tmpparent;
-	int sem_val;
+	int32_t sem_val;
 	off_t filepos;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
-	int hashval, tmpmaxnum;
+	int32_t hashval, tmpmaxnum;
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
 	uint8_t count;
@@ -138,11 +138,11 @@ errcode_handle:
 }
 
 /* Helper function for allocating a new lookup page */
-static inline int64_t _alloc_new_page(int *reterr)
+static inline int64_t _alloc_new_page(int32_t *reterr)
 {
 	int64_t ret_pos, tmppos;
 	PLOOKUP_PAGE_T tmppage;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
 
 	if (parent_lookup_head.gc_head != 0) {
@@ -164,13 +164,13 @@ errcode_handle:
 	return 0;
 }
 /* Helper function for adding a new page for a new inode to the head */
-static inline int _add_to_head(ino_t self_inode, ino_t parent_inode)
+static inline int32_t _add_to_head(ino_t self_inode, ino_t parent_inode)
 {
-	int hashval;
+	int32_t hashval;
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
 	ssize_t ret_ssize;
-	int errcode;
+	int32_t errcode;
 
 	hashval = self_inode % PLOOKUP_HASH_NUM_ENTRIES;
 	tmppos = _alloc_new_page(&errcode);
@@ -195,13 +195,13 @@ errcode_handle:
 
 /* Helper function for adding a new inode to the end of the hash linked
 list */
-static inline int _add_to_tail(ino_t self_inode, ino_t parent_inode,
+static inline int32_t _add_to_tail(ino_t self_inode, ino_t parent_inode,
                                int64_t prevpos)
 {
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
 	ssize_t ret_ssize;
-	int errcode;
+	int32_t errcode;
 
 	tmppos = _alloc_new_page(&errcode);
 	if (tmppos == 0) {
@@ -231,13 +231,13 @@ errcode_handle:
 
 /* Helper function for adding a new page to the end of the page linked
 list for the same inode */
-static inline int _add_new_page(ino_t self_inode, ino_t parent_inode,
+static inline int32_t _add_new_page(ino_t self_inode, ino_t parent_inode,
                                int64_t prevpos)
 {
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
 	ssize_t ret_ssize;
-	int errcode;
+	int32_t errcode;
 
 	tmppos = _alloc_new_page(&errcode);
 	if (tmppos == 0) {
@@ -275,14 +275,14 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int lookup_add_parent(ino_t self_inode, ino_t parent_inode)
+int32_t lookup_add_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
-	int sem_val;
+	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
-	int hashval;
+	int32_t hashval;
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos, prevpos;
 
@@ -373,15 +373,15 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
+int32_t lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
-	int sem_val;
+	int32_t sem_val;
 	int64_t prevllpos, prevpagepos, tmppos, tmpnextpos;
 	PRIMARY_PARENT_T tmpparent;
-	int hashval;
+	int32_t hashval;
 	PLOOKUP_PAGE_T tmppage, prevpage, nextpage;
 	uint8_t deleteall;
 	int8_t count;
@@ -561,15 +561,15 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
+int32_t lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
 			  ino_t parent_inode2)
 {
 	off_t filepos;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
-	int sem_val;
+	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
-	int hashval;
+	int32_t hashval;
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
 	uint8_t count;

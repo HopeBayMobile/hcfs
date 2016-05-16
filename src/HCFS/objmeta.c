@@ -15,7 +15,7 @@ void delete_http_meta(HTTP_meta *meta)
 		return;
 
 	if (meta->data != NULL) {
-		int i;
+		int32_t i;
 
 		for (i = 0; i < 2 * (meta->count); i++) {
 			free(meta->data[i]);
@@ -24,7 +24,7 @@ void delete_http_meta(HTTP_meta *meta)
 	}
 }
 
-int transform_objdata_to_header(HTTP_meta *meta,
+int32_t transform_objdata_to_header(HTTP_meta *meta,
 				HCFS_encode_object_meta *encode_meta)
 {
 	if (!encode_meta || !meta) {

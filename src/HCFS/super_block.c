@@ -13,7 +13,7 @@
 * 2015/5/26 Kewei added some error handling about function
 *           super_block_reclaim_fullscan() & super_block_share_release(),
 *           and besides modified macro SB_ENTRY_SIZE & SB_HEAD_SIZE to avoid
-*           comparing between signed and unsigned integers.
+*           comparing between int32_t and uint32_t integers.
 * 2015/5/27 Jiahong working on improving error handling
 * 2015/5/28 Jiahong resolving merges
 **************************************************************************/
@@ -42,8 +42,8 @@
 #include "utils.h"
 #include "macro.h"
 
-#define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
-#define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
+#define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
+#define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
 
 /************************************************************************
 *
@@ -53,10 +53,10 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int write_super_block_head(void)
+int32_t write_super_block_head(void)
 {
 	ssize_t ret_val;
-	int errcode;
+	int32_t errcode;
 
 	ret_val = pwrite(sys_super_block->iofptr, &(sys_super_block->head),
 							SB_HEAD_SIZE, 0);
@@ -82,10 +82,10 @@ int write_super_block_head(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	ssize_t ret_val;
-	int errcode;
+	int32_t errcode;
 
 	if (this_inode <= 0) {
 		errcode = EINVAL;
@@ -120,10 +120,10 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	ssize_t ret_val;
-	int errcode;
+	int32_t errcode;
 
 	ret_val = pwrite(sys_super_block->iofptr, inode_ptr, SB_ENTRY_SIZE,
 				SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
@@ -149,12 +149,12 @@ int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_init(void)
+int32_t super_block_init(void)
 {
-	int errcode;
+	int32_t errcode;
 	ssize_t ret;
 #ifndef _ANDROID_ENV_
-	int shm_key;
+	int32_t shm_key;
 #endif
 
 #ifdef _ANDROID_ENV_
@@ -267,11 +267,11 @@ int super_block_init(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_destroy(void)
+int32_t super_block_destroy(void)
 {
-	int errcode;
+	int32_t errcode;
 	ssize_t ret;
-	int ret_val;
+	int32_t ret_val;
 
 	ret_val = 0;
 
@@ -308,9 +308,9 @@ int super_block_destroy(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	ret_val = 0;
 	super_block_share_locking();
@@ -331,9 +331,9 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	ret_val = 0;
 	super_block_exclusive_locking();
@@ -372,9 +372,9 @@ int super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_update_stat(ino_t this_inode, struct stat *newstat)
+int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat)
 {
-	int ret_val;
+	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 
 	super_block_exclusive_locking();
@@ -419,9 +419,9 @@ int super_block_update_stat(ino_t this_inode, struct stat *newstat)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_mark_dirty(ino_t this_inode)
+int32_t super_block_mark_dirty(ino_t this_inode)
 {
-	int ret_val;
+	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 	char need_write;
 	int64_t now_meta_size, dirty_delta_meta_size;
@@ -486,10 +486,10 @@ int super_block_mark_dirty(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_update_transit(ino_t this_inode, char is_start_transit,
+int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 	char transit_incomplete)
 {
-	int ret_val;
+	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 
 	ret_val = 0;
@@ -534,9 +534,9 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_to_delete(ino_t this_inode)
+int32_t super_block_to_delete(ino_t this_inode)
 {
-	int ret_val;
+	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 	mode_t tempmode;
 
@@ -589,9 +589,9 @@ int super_block_to_delete(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_delete(ino_t this_inode)
+int32_t super_block_delete(ino_t this_inode)
 {
-	int ret_val, errcode;
+	int32_t ret_val, errcode;
 	SUPER_BLOCK_ENTRY tempentry;
 	ino_t temp;
 	size_t retsize;
@@ -647,7 +647,7 @@ int super_block_delete(ino_t this_inode)
 }
 
 /* Helper function for sorting entries in the super block */
-static int compino(const void *firstino, const void *secondino)
+static int32_t compino(const void *firstino, const void *secondino)
 {
 	ino_t temp1, temp2;
 
@@ -668,16 +668,16 @@ static int compino(const void *firstino, const void *secondino)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_reclaim(void)
+int32_t super_block_reclaim(void)
 {
-	int ret_val, errcode;
+	int32_t ret_val, errcode;
 	SUPER_BLOCK_ENTRY tempentry;
 	int64_t count;
 	ino_t last_reclaimed;
 	ino_t *unclaimed_list;
 	size_t num_unclaimed;
 	size_t ret_items;
-	long total_bytes;
+	int64_t total_bytes;
 
 	if (sys_super_block->head.num_to_be_reclaimed < RECLAIM_TRIGGER)
 		return 0;
@@ -805,9 +805,9 @@ int super_block_reclaim(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_reclaim_fullscan(void)
+int32_t super_block_reclaim_fullscan(void)
 {
-	int errcode;
+	int32_t errcode;
 	SUPER_BLOCK_ENTRY tempentry;
 	int64_t count;
 	off_t thisfilepos, retval;
@@ -943,15 +943,15 @@ int super_block_reclaim_fullscan(void)
 *
 *************************************************************************/
 ino_t super_block_new_inode(struct stat *in_stat,
-				unsigned long *ret_generation, char local_pin)
+				uint64_t *ret_generation, char local_pin)
 {
 	ssize_t retsize;
 	ino_t this_inode;
 	SUPER_BLOCK_ENTRY tempentry;
 	struct stat tempstat;
 	ino_t new_first_reclaimed;
-	unsigned long this_generation;
-	int errcode, ret;
+	uint64_t this_generation;
+	int32_t errcode, ret;
 	BOOL update_size;
 
 	super_block_exclusive_locking();
@@ -1059,9 +1059,9 @@ ino_t super_block_new_inode(struct stat *in_stat,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int ll_rebuild_dirty(void)
+int32_t ll_rebuild_dirty(void)
 {
-	int ret;
+	int32_t ret;
 	SUPER_BLOCK_ENTRY entry1, entry2;
 
 	write_log(0, "Start to rebuild dirty inode linked list.\n");
@@ -1146,10 +1146,10 @@ int ll_rebuild_dirty(void)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
+int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY tempentry, tempentry2;
-	int ret, errcode;
+	int32_t ret, errcode;
 	ssize_t retsize;
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
@@ -1317,13 +1317,13 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
+int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY prev, next;
 	char old_which_ll;
 	ino_t temp_inode;
-	int ret;
-	int need_rebuild = FALSE;
+	int32_t ret;
+	int32_t need_rebuild = FALSE;
 
 	UNUSED(thisinode);
 	old_which_ll = this_entry->status;
@@ -1454,7 +1454,7 @@ int ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int super_block_share_locking(void)
+int32_t super_block_share_locking(void)
 {
 	sem_wait(&(sys_super_block->exclusive_lock_sem));
 
@@ -1475,7 +1475,7 @@ int super_block_share_locking(void)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int super_block_share_release(void)
+int32_t super_block_share_release(void)
 {
 	sem_wait(&(sys_super_block->share_CR_lock_sem));
 	if (sys_super_block->share_counter == 0) {
@@ -1498,7 +1498,7 @@ int super_block_share_release(void)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int super_block_exclusive_locking(void)
+int32_t super_block_exclusive_locking(void)
 {
 	sem_wait(&(sys_super_block->exclusive_lock_sem));
 	sem_wait(&(sys_super_block->share_lock_sem));
@@ -1513,7 +1513,7 @@ int super_block_exclusive_locking(void)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int super_block_exclusive_release(void)
+int32_t super_block_exclusive_release(void)
 {
 	sem_post(&(sys_super_block->share_lock_sem));
 	sem_post(&(sys_super_block->exclusive_lock_sem));
@@ -1533,10 +1533,10 @@ int super_block_exclusive_release(void)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int super_block_finish_pinning(ino_t this_inode)
+int32_t super_block_finish_pinning(ino_t this_inode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
-	int ret;
+	int32_t ret;
 
 	super_block_exclusive_locking();
 
@@ -1585,10 +1585,10 @@ int super_block_finish_pinning(ino_t this_inode)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
+int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
-	int ret;
+	int32_t ret;
 
 	super_block_exclusive_locking();
 	ret = read_super_block_entry(this_inode, &this_entry);
@@ -1634,10 +1634,10 @@ int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
+int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
-	int ret;
+	int32_t ret;
 
 	super_block_exclusive_locking();
 	ret = read_super_block_entry(this_inode, &this_entry);
@@ -1675,10 +1675,10 @@ int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 	return 0;
 }
 
-int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
+int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY last_entry;
-	int ret;
+	int32_t ret;
 
 	/* Return pin-status if this status is not UNPIN */
 	if (this_entry->pin_status != ST_UNPIN) {
@@ -1726,11 +1726,11 @@ error_handling:
 	return ret;
 }
 
-int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
+int32_t pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY prev_entry, next_entry;
 	ino_t prev_inode, next_inode;
-	int ret;
+	int32_t ret;
 
 	/* Return pin-status if this status is not PINNING */
 	if (this_entry->pin_status != ST_PINNING) {
