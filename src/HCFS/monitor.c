@@ -103,6 +103,7 @@ void monitor_loop(void)
 
 	monitor_collisions = 0;
 	hcfs_system->backend_is_online = check_backend_status();
+	update_sync_state();
 
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->backend_is_online == TRUE) {
@@ -128,8 +129,10 @@ void monitor_loop(void)
 
 		if (ret_val == 0)
 			continue;
-		else if (errno == ETIMEDOUT)
+		else if (errno == ETIMEDOUT) {
 			hcfs_system->backend_is_online = check_backend_status();
+			update_sync_state();
+		}
 	}
 #ifdef _ANDROID_ENV_
 	return NULL;
@@ -223,9 +226,9 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 	BOOL status_changed = (hcfs_system->backend_is_online != status);
 
 	hcfs_system->backend_is_online = status;
+	update_sync_state();
 	if(status_changed)
 		sem_post(&(hcfs_system->monitor_sem));
-	update_sync_state();
 
 	if (status_time == NULL) {
 		clock_gettime(CLOCK_REALTIME, &current_time);
