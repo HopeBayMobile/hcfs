@@ -34,9 +34,9 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_dirstat_lookup()
+int32_t init_dirstat_lookup()
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char pathname[METAPATHLEN+10];
 
 	snprintf(pathname, METAPATHLEN, "%s/dirstat_lookup_db", METAPATH);
@@ -78,11 +78,11 @@ void destroy_dirstat_lookup()
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int reset_dirstat_lookup(ino_t thisinode)
+int32_t reset_dirstat_lookup(ino_t thisinode)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
 
 	if (thisinode <= 0)
@@ -119,14 +119,14 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
+int32_t update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
 	ino_t current_inode;
 	ino_t *parentlist;
-	int errcode, ret;
-	int numparents, count;
+	int32_t errcode, ret;
+	int32_t numparents, count;
 	ssize_t ret_ssize;
 	PRIMARY_PARENT_T tmpparent;
 
@@ -195,14 +195,14 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
+int32_t update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
 	ino_t current_inode;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
-	int sem_val;
+	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
 
 	if (baseinode <= 0)
@@ -245,11 +245,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
+int32_t read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
 
 	if (thisinode <= 0)

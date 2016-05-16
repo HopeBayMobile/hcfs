@@ -28,21 +28,21 @@
 
 typedef struct {
 	ino_t inode;
-	long long blockno;
-	long long seq;
+	int64_t blockno;
+	int64_t seq;
 #if (DEDUP_ENABLE)
-	unsigned char obj_id[OBJID_LENGTH];
+	uint8_t obj_id[OBJID_LENGTH];
 #endif
 	char is_block;
-	int which_curl;
-	int which_index;
-	int dsync_index;
+	int32_t which_curl;
+	int32_t which_index;
+	int32_t dsync_index;
 } DELETE_THREAD_TYPE;
 
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
-	int which_index;
+	int32_t which_index;
 } DSYNC_THREAD_TYPE;
 
 /*delete threads: used for deleting objects to backends*/
@@ -59,7 +59,7 @@ typedef struct {
 	char threads_created[MAX_DELETE_CONCURRENCY];
 	char threads_finished[MAX_DELETE_CONCURRENCY];
 	char threads_error[MAX_DELETE_CONCURRENCY];
-	int total_active_delete_threads;
+	int32_t total_active_delete_threads;
 } DELETE_THREAD_CONTROL;
 
 /*dsync threads: used for dsyncing meta/block in a single inode*/
@@ -72,18 +72,18 @@ typedef struct {
 	char threads_created[MAX_DSYNC_CONCURRENCY];
 	char threads_finished[MAX_DSYNC_CONCURRENCY];
 	char threads_error[MAX_DSYNC_CONCURRENCY];
-	int total_active_dsync_threads;
+	int32_t total_active_dsync_threads;
 } DSYNC_THREAD_CONTROL;
 
 DELETE_THREAD_CONTROL delete_ctl;
 DSYNC_THREAD_CONTROL dsync_ctl;
 
-int do_block_delete(ino_t this_inode, long long block_no, long long seq,
+int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #if (DEDUP_ENABLE)
-		    unsigned char *obj_id,
+		    uint8_t *obj_id,
 #endif
 		    CURL_HANDLE *curl_handle);
-int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
+int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
 
 void init_delete_control(void);
 void init_dsync_control(void);

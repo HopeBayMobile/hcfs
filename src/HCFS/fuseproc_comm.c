@@ -37,13 +37,13 @@
 *************************************************************************/
 void *fuse_communication_contact_window(void *data)
 {
-	int errcode;
+	int32_t errcode;
 	UPLOADING_COMMUNICATION_DATA uploading_data;
-	int communicate_result;
+	int32_t communicate_result;
 	struct timespec timer;
-	int ret;
-	int ac_fd;
-	const int socket_fd = *(int *)data;
+	int32_t ret;
+	int32_t ac_fd;
+	const int32_t socket_fd = *(int32_t *)data;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -84,7 +84,7 @@ void *fuse_communication_contact_window(void *data)
 					(uint64_t)uploading_data.inode);
 		}
 
-		send(ac_fd, &communicate_result, sizeof(int), 0);
+		send(ac_fd, &communicate_result, sizeof(int32_t), 0);
 		close(ac_fd);
 	}
 
@@ -101,11 +101,11 @@ void *fuse_communication_contact_window(void *data)
  *
  * @return 0 on success init, otherwise negative error code.
  */
-int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
+int32_t init_fuse_proc_communication(pthread_t *communicate_tid, int32_t *socket_fd)
 {
-	int ret, i;
-	int errcode;
-	int socket_flag;
+	int32_t ret, i;
+	int32_t errcode;
+	int32_t socket_flag;
 	struct sockaddr_un sock_addr;
 
 	if (!access(FUSE_SOCK_PATH, F_OK))
@@ -154,10 +154,10 @@ errcode_handle:
 	return errcode;
 }
 
-int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd)
+int32_t destroy_fuse_proc_communication(pthread_t *communicate_tid, int32_t socket_fd)
 {
-	int ret, errcode;
-	int i;
+	int32_t ret, errcode;
+	int32_t i;
 
 	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {
 		pthread_join(*communicate_tid, NULL);

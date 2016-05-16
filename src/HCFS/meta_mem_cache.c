@@ -35,7 +35,7 @@
 /* If cache lock not locked, return -EINVAL*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
 	{ \
-		int sem_val; \
+		int32_t sem_val; \
 		sem_getvalue((ptr_sem), &sem_val); \
 		if (sem_val > 0) \
 			return -EINVAL; \
@@ -44,12 +44,12 @@
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
 sem_t num_entry_sem;
-long current_meta_mem_cache_entries;
+int64_t current_meta_mem_cache_entries;
 
 /* Helper function for opening meta file if not already opened */
-static inline int _open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+static inline int32_t _open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int ret_val = 0;
+	int32_t ret_val = 0;
 
 	if ((body_ptr->meta_opened == FALSE) || (body_ptr->fptr == NULL))
 		ret_val = meta_cache_open_file(body_ptr);
@@ -57,10 +57,10 @@ static inline int _open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 }
 
 /* Helper function for reading a directory entry page from meta file */
-static inline int _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
+static inline int32_t _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
 					DIR_ENTRY_PAGE *dir_page)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	FSEEK(ptr->fptr, dir_page->this_page_pos, SEEK_SET);
@@ -87,11 +87,11 @@ inline char is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, long long *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
 {
-	int ret;
-	int errcode;
-	long long ret_pos;
+	int32_t ret;
+	int32_t errcode;
+	int64_t ret_pos;
 
 	*metasize = 0;
 	if (ptr->meta_opened == FALSE || ptr->fptr == NULL) {
@@ -117,10 +117,10 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	char thismetapath[METAPATHLEN];
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	thismetapath[0] = '\0';
 	if ((body_ptr->meta_opened == FALSE) || (body_ptr->fptr == NULL)) {
@@ -168,10 +168,10 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_meta_cache_headers(void)
+int32_t init_meta_cache_headers(void)
 {
-	int count;
-	int ret, errcode;
+	int32_t count;
+	int32_t ret, errcode;
 
 	meta_mem_cache = malloc(sizeof(META_CACHE_HEADER_STRUCT) *
 						NUM_META_MEM_CACHE_HEADERS);
@@ -217,9 +217,9 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int release_meta_cache_headers(void)
+int32_t release_meta_cache_headers(void)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	if (meta_mem_cache == NULL)
 		return -EPERM;
@@ -233,7 +233,7 @@ int release_meta_cache_headers(void)
 }
 
 /* Helper function for caching a new dir entry page and dropping the last one */
-static int _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
+static int32_t _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
 					const DIR_ENTRY_PAGE *temppage)
 {
 	body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
@@ -255,10 +255,10 @@ static int _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
+int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 				const DIR_ENTRY_PAGE *temppage)
 {
-	int ret;
+	int32_t ret;
 
 	ret = 0;
 	if (body_ptr->dir_entry_cache[0] == NULL) {
@@ -291,16 +291,16 @@ int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 /************************************************************************
 *
 * Function name: meta_cache_flush_dir_cache
-*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, int eindex
+*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, int32_t eindex
 *       Summary: Write the content of the cached dir entry page (stored in
 *                index "eindex") of this meta cache entry (body_ptr) to the
 *                meta file.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int eindex)
+int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t eindex)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	/*Assume meta cache entry access sem is already locked*/
 
@@ -325,9 +325,9 @@ errcode_handle:
 
 /* Helper function for syncing content of cached dir entry page to meta file
 	if it is dirty. */
-static inline int _cache_sync(META_CACHE_ENTRY_STRUCT *body_ptr, int index)
+static inline int32_t _cache_sync(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t index)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	if ((body_ptr->dir_entry_cache_dirty[index] == TRUE) &&
@@ -354,9 +354,9 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of errcode.
 *
 *************************************************************************/
-int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -451,9 +451,9 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int flush_clean_all_meta_cache(void)
+int32_t flush_clean_all_meta_cache(void)
 {
-	int count;
+	int32_t count;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *this_ptr, *old_ptr;
 
 	for (count = 0; count < NUM_META_MEM_CACHE_HEADERS; count++) {
@@ -499,7 +499,7 @@ int flush_clean_all_meta_cache(void)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
+int32_t free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 {
 	META_CACHE_ENTRY_STRUCT *entry_body;
 
@@ -527,9 +527,9 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 
 /* Helper function for computing the hash index of an inode number to
 	the meta cache */
-static inline int hash_inode_to_meta_cache(ino_t this_inode)
+static inline int32_t hash_inode_to_meta_cache(ino_t this_inode)
 {
-	return ((int) this_inode % NUM_META_MEM_CACHE_HEADERS);
+	return ((int32_t) this_inode % NUM_META_MEM_CACHE_HEADERS);
 }
 
 /************************************************************************
@@ -537,7 +537,7 @@ static inline int hash_inode_to_meta_cache(ino_t this_inode)
 * Function name: meta_cache_update_file_data
 *        Inputs: ino_t this_inode, struct stat *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-*                long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
+*                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Update the cache content for inode "this_inode". Content
 *                entries not updated are passed as "NULL". If write through
 *                cache is enabled (the only option now), will also write
@@ -546,9 +546,9 @@ static inline int hash_inode_to_meta_cache(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /* Always change dirty status to TRUE here as we always update */
 /* For block entry page lookup or update, only allow one lookup/update at a
@@ -556,7 +556,7 @@ time, and will check page_pos input against the two entries in the cache.
 If does not match any of the two, flush the older page entry first before
 processing the new one */
 
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	UNUSED(this_inode);
@@ -621,7 +621,7 @@ errcode_handle:
 * Function name: meta_cache_lookup_file_data
 *        Inputs: ino_t this_inode, struct stat *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-*                long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
+*                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Read the cache content for inode "this_inode". Content
 *                entries not required are passed as "NULL". Will read from
 *                meta file if there is no cached content for the requested
@@ -630,11 +630,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	UNUSED(this_inode);
@@ -684,11 +684,11 @@ errcode_handle:
 }
 
 /* Helper function for looking up dir entry pages from meta files */
-static inline int _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
+static inline int32_t _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
 					DIR_ENTRY_PAGE *dir_page)
 {
 	off_t tmp_fpos;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	if (ptr->dir_entry_cache[0] == NULL) {
@@ -751,11 +751,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 				META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	UNUSED(this_inode);
@@ -837,7 +837,7 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *bptr)
 {
@@ -847,7 +847,7 @@ and will check page_pos input against the two entries in the cache. If does
 not match any of the two, flush the older page entry first before processing
 the new one */
 
-	int ret;
+	int32_t ret;
 
 	UNUSED(this_inode);
 	write_log(10, "Debug meta cache update dir data\n");
@@ -914,7 +914,7 @@ the new one */
 *
 * Function name: meta_cache_seek_dir_entry
 *        Inputs: ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-*                int *result_index, char *childname,
+*                int32_t *result_index, char *childname,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Find whether the object with name "childname" is the child
 *                of "this_inode". If found, returns the dir entry page
@@ -925,20 +925,20 @@ the new one */
 *                of error code.
 *
 *************************************************************************/
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-	int *result_index, const char *childname,
+int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
+	int32_t *result_index, const char *childname,
 				META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	char thismetapath[METAPATHLEN];
 	DIR_META_TYPE dir_meta;
 	DIR_ENTRY_PAGE temppage, rootpage, tmp_resultpage;
 	DIR_ENTRY_PAGE *tmp_page_ptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
-	long nextfilepos;
+	int64_t nextfilepos;
 	DIR_ENTRY tmp_entry;
-	int tmp_index;
-	int cache_idx;
+	int32_t tmp_index;
+	int32_t cache_idx;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -1071,13 +1071,13 @@ errcode_handle:
 *  Return value: If successful, returns 0. If error, returns -1.
 *
 *************************************************************************/
-int meta_cache_remove(ino_t this_inode)
+int32_t meta_cache_remove(ino_t this_inode)
 {
-	int index;
+	int32_t index;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr, *prev_ptr;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char found_entry;
-	int ret;
+	int32_t ret;
 
 	index = hash_inode_to_meta_cache(this_inode);
 /*First lock corresponding header*/
@@ -1101,7 +1101,7 @@ int meta_cache_remove(ino_t this_inode)
 	}
 
 /*Lock body*/
-/*TODO: May need to add checkpoint here so that long sem wait will
+/*TODO: May need to add checkpoint here so that int64_t sem wait will
 	free all locks*/
 
 	sem_wait(&((current_ptr->body).access_sem));
@@ -1164,10 +1164,10 @@ int meta_cache_remove(ino_t this_inode)
 }
 
 /* Helper function for expiring a cache entry */
-static inline int _expire_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr,
-							int cindex)
+static inline int32_t _expire_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr,
+							int32_t cindex)
 {
-	int ret;
+	int32_t ret;
 
 	ret = flush_single_entry(&(lptr->body));
 	if (ret < 0)
@@ -1220,16 +1220,16 @@ errhandle:
 *                wrap back to 0 if overflow.
 *
 *************************************************************************/
-int expire_meta_mem_cache_entry(void)
+int32_t expire_meta_mem_cache_entry(void)
 {
-	int start_index, cindex;
+	int32_t start_index, cindex;
 	struct timeval current_time, *atime_ptr;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
 	double float_current_time, float_access_time;
-	int ret;
+	int32_t ret;
 
 	gettimeofday(&current_time, NULL);
-	srandom((unsigned int)(current_time.tv_usec));
+	srandom((uint32_t)(current_time.tv_usec));
 	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);
 	cindex = start_index;
 	/* Go through meta_mem_cache[] */
@@ -1282,14 +1282,14 @@ int expire_meta_mem_cache_entry(void)
 *************************************************************************/
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	int ret_val;
-	int index;
+	int32_t ret_val;
+	int32_t index;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
 	char need_new, expire_done;
 	SUPER_BLOCK_ENTRY tempentry;
 	META_CACHE_ENTRY_STRUCT *result_ptr;
 	struct timespec time_to_sleep;
-	int errcount;
+	int32_t errcount;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -1386,7 +1386,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		break;
 	}
 	/*Lock body*/
-	/*TODO: May need to add checkpoint here so that long sem wait
+	/*TODO: May need to add checkpoint here so that int64_t sem wait
 		will free all locks*/
 	result_ptr = &(current_ptr->body);
 
@@ -1408,7 +1408,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 *  Return value: 0 if successful, and -1 if there is an error.
 *
 *************************************************************************/
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	if (!target_ptr)
 		return -ENOMEM;
@@ -1435,9 +1435,9 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 *                an error.
 *
 *************************************************************************/
-int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
@@ -1468,9 +1468,9 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 *  Return value: 0 if successful, and -1 if there is an error.
 *
 *************************************************************************/
-int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -1507,12 +1507,12 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 *  Return value: 0 if successful, otherwise return negative error code.
 *
 *************************************************************************/
-int meta_cache_update_symlink_data(ino_t this_inode,
+int32_t meta_cache_update_symlink_data(ino_t this_inode,
 	const struct stat *inode_stat,
 	const SYMLINK_META_TYPE *symlink_meta_ptr,
 	META_CACHE_ENTRY_STRUCT *bptr)
 {
-	int ret;
+	int32_t ret;
 
 	UNUSED(this_inode);
 	write_log(10, "Debug meta cache update symbolic link data\n");
@@ -1563,10 +1563,10 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 *  Return value: 0 if successful, otherwise return negative error code.
 *
 *************************************************************************/
-int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	UNUSED(this_inode);
@@ -1616,8 +1616,8 @@ errcode_handle:
  *
  * @return 0 for succeeding in setting info, otherwise -1 on error.
  */
-int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-	char is_now_uploading, int new_fd, long long toupload_blocks)
+int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -1641,8 +1641,8 @@ int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
  *
  * @return 0 on success, otherwise -1 on error.
  */
-int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-	char *ret_status, int *ret_fd)
+int32_t meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char *ret_status, int32_t *ret_fd)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -1671,13 +1671,13 @@ int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
  *
  * @return 0 on success, otherwise negative error code.
  */ 
-int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
-	long long bindex, long long seq)
+int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
+	int64_t bindex, int64_t seq)
 {
 	char toupload_bpath[500], local_bpath[500], objname[500];
 	char inode_uploading;
-	int progress_fd;
-	int ret;
+	int32_t progress_fd;
+	int32_t ret;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -1745,7 +1745,7 @@ int meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
  *
  * @return 0 on success, otherwise negative error code.
  */ 
-int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 

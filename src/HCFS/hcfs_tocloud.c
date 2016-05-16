@@ -70,9 +70,9 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
-static inline int _get_inode_sync_error(ino_t inode, BOOL *sync_error)
+static inline int32_t _get_inode_sync_error(ino_t inode, BOOL *sync_error)
 {
-	int count1;
+	int32_t count1;
 
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
@@ -90,9 +90,9 @@ static inline int _get_inode_sync_error(ino_t inode, BOOL *sync_error)
 	}
 }
 
-static inline int _set_inode_sync_error(ino_t inode)
+static inline int32_t _set_inode_sync_error(ino_t inode)
 {
-	int count1;
+	int32_t count1;
 
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
@@ -110,9 +110,9 @@ static inline int _set_inode_sync_error(ino_t inode)
 	}
 }
 
-static inline int _set_inode_continue_nexttime(ino_t inode)
+static inline int32_t _set_inode_continue_nexttime(ino_t inode)
 {
-	int count1;
+	int32_t count1;
 
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
@@ -138,16 +138,16 @@ static inline int _set_inode_continue_nexttime(ino_t inode)
  * uploaded, so remove all of them because uploading this time is cancelled.
  *
  * */
-static inline int _del_toupload_blocks(char *toupload_metapath, ino_t inode)
+static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 {
 	FILE *fptr;
-	long long num_blocks, bcount;
+	int64_t num_blocks, bcount;
 	char block_path[300];
 	struct stat tmpstat;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 	FILE_META_TYPE tmpmeta;
-	long long current_page, which_page, page_pos;
+	int64_t current_page, which_page, page_pos;
 
 	fptr = fopen(toupload_metapath, "r");
 	if (fptr != NULL) {
@@ -194,10 +194,10 @@ errcode_handle:
 /* Don't need to collect return code for the per-inode sync thread, as
 the error handling for syncing this inode will be handled in
 sync_single_inode. */
-static inline void _sync_terminate_thread(int index)
+static inline void _sync_terminate_thread(int32_t index)
 {
-	int ret;
-	int tag_ret;
+	int32_t ret;
+	int32_t tag_ret;
 	ino_t inode;
 	char toupload_metapath[300], local_metapath[400];
 	char finish_sync;
@@ -271,7 +271,7 @@ static inline void _sync_terminate_thread(int index)
 
 void collect_finished_sync_threads(void *ptr)
 {
-	int count;
+	int32_t count;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -299,20 +299,20 @@ void collect_finished_sync_threads(void *ptr)
 
 /* On error, need to alert thread that dispatch the block upload
 using threads_error in sync control. */
-static inline int _upload_terminate_thread(int index)
+static inline int32_t _upload_terminate_thread(int32_t index)
 {
-	int count1;
-	int ret;
+	int32_t count1;
+	int32_t ret;
 	char toupload_blockpath[400];
 #if (DEDUP_ENABLE)
-	int errcode;
-	unsigned char blk_obj_id[OBJID_LENGTH];
+	int32_t errcode;
+	uint8_t blk_obj_id[OBJID_LENGTH];
 #endif
 	ino_t this_inode;
 	off_t page_filepos;
-	long long blockno;
-	long long toupload_block_seq;
-	int progress_fd;
+	int64_t blockno;
+	int64_t toupload_block_seq;
+	int32_t progress_fd;
 	char toupload_exist, finish_uploading;
 
 	if (upload_ctl.threads_in_use[index] == FALSE)
@@ -483,7 +483,7 @@ errcode_handle:
 
 void collect_finished_upload_threads(void *ptr)
 {
-	int count, ret;
+	int32_t count, ret;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -547,8 +547,8 @@ void init_sync_control(void)
 
 void init_upload_control(void)
 {
-	int count;
-	/* int ret_val; */
+	int32_t count;
+	/* int32_t ret_val; */
 
 	memset(&upload_ctl, 0, sizeof(UPLOAD_THREAD_CONTROL));
 	memset(&upload_curl_handles, 0,
@@ -586,7 +586,7 @@ void init_sync_stat_control(void)
 	char *FS_stat_path, *fname;
 	DIR *dirp;
 	struct dirent tmp_entry, *tmpptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	FS_stat_path = (char *)malloc(METAPATHLEN);
 	fname = (char *)malloc(METAPATHLEN);
@@ -643,17 +643,17 @@ errcode_handle:
  *
  * @return usable curl index
  */ 
-int select_upload_thread(char is_block, char is_delete,
+int32_t select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
 				char is_upload,
-				unsigned char old_obj_id[],
+				uint8_t old_obj_id[],
 #endif
-				ino_t this_inode, long long block_count,
-				long long seq, off_t page_pos,
-				long long e_index, int progress_fd,
+				ino_t this_inode, int64_t block_count,
+				int64_t seq, off_t page_pos,
+				int64_t e_index, int32_t progress_fd,
 				char backend_delete_type)
 {
-	int which_curl, count;
+	int32_t which_curl, count;
 
 	which_curl = -1;
 	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
@@ -711,22 +711,22 @@ int select_upload_thread(char is_block, char is_delete,
  *         -EACCES when local meta is gone, -ECANCELED when cancelling
  *         syncing this time.
  */
-static int _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
-		char *local_metapath, long long block_count,
-		long long *current_page, long long *page_pos,
+static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
+		char *local_metapath, int64_t block_count,
+		int64_t *current_page, int64_t *page_pos,
 		BLOCK_ENTRY_PAGE *toupload_temppage,
 		FILE_META_TYPE *toupload_meta, SYNC_THREAD_TYPE *ptr)
 {
-	long long which_page;
-	long long toupload_block_seq, local_block_seq;
-	unsigned char local_block_status, toupload_block_status;
+	int64_t which_page;
+	int64_t toupload_block_seq, local_block_seq;
+	uint8_t local_block_status, toupload_block_status;
 	BLOCK_ENTRY *tmp_entry;
 	BLOCK_ENTRY_PAGE local_temppage;
-	int e_index;
+	int32_t e_index;
 	char toupload_bpath[400];
 	size_t ret_size;
-	int ret, errcode;
-	int which_curl;
+	int32_t ret, errcode;
+	int32_t which_curl;
 	BOOL llock, ulock;
 	char finish_uploading, toupload_exist;
 
@@ -920,25 +920,25 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	SYMLINK_META_TYPE tempsymmeta;
 	DIR_META_TYPE tempdirmeta;
 	BLOCK_ENTRY_PAGE toupload_temppage;
-	int which_curl;
-	long long page_pos, current_page;
-	long long total_blocks, total_backend_blocks;
-	long long block_count;
-	int ret, errcode;
+	int32_t which_curl;
+	int64_t page_pos, current_page;
+	int64_t total_blocks, total_backend_blocks;
+	int64_t block_count;
+	int32_t ret, errcode;
 	off_t toupload_size;
-	long long temp_trunc_size;
+	int64_t temp_trunc_size;
 	size_t ret_size;
 	BOOL sync_error;
 	ino_t root_inode;
-	long long backend_size;
-	long long size_diff;
-	int progress_fd;
+	int64_t backend_size;
+	int64_t size_diff;
+	int32_t progress_fd;
 	BOOL is_local_meta_deleted;
 	char is_revert;
-	long long meta_size_diff;
-	long long upload_seq;
+	int64_t meta_size_diff;
+	int64_t upload_seq;
 	CLOUD_RELATED_DATA cloud_related_data;
-	long long pos;
+	int64_t pos;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1030,7 +1030,7 @@ store in some other file */
 		if (truncfptr != NULL) {
 			setbuf(truncfptr, NULL);
 			flock(fileno(truncfptr), LOCK_EX);
-			FREAD(&temp_trunc_size, sizeof(long long), 1,
+			FREAD(&temp_trunc_size, sizeof(int64_t), 1,
 			      truncfptr);
 
 			if (toupload_size < temp_trunc_size) {
@@ -1041,7 +1041,7 @@ store in some other file */
 		}
 #else
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
+				&temp_trunc_size, sizeof(int64_t));
 
 		if ((ret_ssize >= 0) && (toupload_size < temp_trunc_size)) {
 			toupload_size = temp_trunc_size;
@@ -1159,7 +1159,7 @@ store in some other file */
 
 	if (!access(local_metapath, F_OK)) {
 		struct stat metastat;
-		long long now_meta_size;
+		int64_t now_meta_size;
 
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
@@ -1335,26 +1335,26 @@ errcode_handle:
 	return;
 }
 
-int do_block_sync(ino_t this_inode, long long block_no,
+int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 #if (DEDUP_ENABLE)
 		CURL_HANDLE *curl_handle, char *filename, char uploaded,
-		unsigned char id_in_meta[])
+		uint8_t id_in_meta[])
 #else
-		long long seq, CURL_HANDLE *curl_handle, char *filename)
+		int64_t seq, CURL_HANDLE *curl_handle, char *filename)
 #endif
 {
 	char objname[400];
 	FILE *fptr;
-	int ret_val, errcode, ret;
+	int32_t ret_val, errcode, ret;
 #if (DEDUP_ENABLE)
 	DDT_BTREE_NODE result_node;
-	int ddt_fd = -1;
-	int result_idx = -1;
+	int32_t ddt_fd = -1;
+	int32_t result_idx = -1;
 	char obj_id_str[OBJID_STRING_LENGTH];
-	unsigned char old_obj_id[OBJID_LENGTH];
-	unsigned char obj_id[OBJID_LENGTH];
-	unsigned char start_bytes[BYTES_TO_CHECK];
-	unsigned char end_bytes[BYTES_TO_CHECK];
+	uint8_t old_obj_id[OBJID_LENGTH];
+	uint8_t obj_id[OBJID_LENGTH];
+	uint8_t start_bytes[BYTES_TO_CHECK];
+	uint8_t end_bytes[BYTES_TO_CHECK];
 	off_t obj_size;
 	FILE *ddt_fptr;
 	DDT_BTREE_NODE tree_root;
@@ -1435,16 +1435,16 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
-		unsigned char *data = NULL;
+		uint8_t *data = NULL;
 		HCFS_encode_object_meta *object_meta = NULL;
 		HTTP_meta *http_meta = NULL;
-		unsigned char *object_key = NULL;
+		uint8_t *object_key = NULL;
 
 #if ENCRYPT_ENABLE
-		unsigned char *key = NULL;
+		uint8_t *key = NULL;
 		key = get_key("this is hopebay testing");
 		object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
-		object_key = calloc(KEY_SIZE, sizeof(unsigned char));
+		object_key = calloc(KEY_SIZE, sizeof(uint8_t));
 		get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
 				COMPRESS_ENABLE);
 		http_meta = new_http_meta();
@@ -1495,10 +1495,10 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	return ret;
 }
 
-int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
+int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 {
 	char objname[1000];
-	int ret_val, errcode, ret;
+	int32_t ret_val, errcode, ret;
 	FILE *fptr;
 
 	snprintf(objname, sizeof(objname), "meta_%" PRIu64 "",
@@ -1514,8 +1514,8 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 			  strerror(errcode));
 		return -errcode;
 	}
-	unsigned char *key = NULL;
-	unsigned char *data = NULL;
+	uint8_t *key = NULL;
+	uint8_t *data = NULL;
 
 #if ENCRYPT_ENABLE
 	key = get_key("this is hopebay testing");
@@ -1548,7 +1548,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 /* TODO: use pthread_exit to pass error code here. */
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, errcode, which_index;
+	int32_t which_curl, ret, errcode, which_index;
 	char local_metapath[300];
 
 	which_curl = thread_ptr->which_curl;
@@ -1614,7 +1614,7 @@ errcode_handle:
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, which_index;
+	int32_t which_curl, ret, which_index;
 	char local_metapath[200];
 
 	which_curl = thread_ptr->which_curl;
@@ -1655,7 +1655,7 @@ errcode_handle:
 	return;
 }
 
-int schedule_sync_meta(char *toupload_metapath, int which_curl)
+int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl)
 {
 
 	strncpy(upload_ctl.upload_threads[which_curl].tempfilename,
@@ -1668,12 +1668,12 @@ int schedule_sync_meta(char *toupload_metapath, int which_curl)
 	return 0;
 }
 
-int dispatch_upload_block(int which_curl)
+int32_t dispatch_upload_block(int32_t which_curl)
 {
 	char thisblockpath[400];
 	char toupload_blockpath[400];
 	char local_metapath[400];
-	int ret, errcode;
+	int32_t ret, errcode;
 	UPLOAD_THREAD_TYPE *upload_ptr;
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
@@ -1737,7 +1737,7 @@ errcode_handle:
 	return errcode;
 }
 
-void dispatch_delete_block(int which_curl)
+void dispatch_delete_block(int32_t which_curl)
 {
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
 		       (void *)&delete_object_sync,
@@ -1755,11 +1755,11 @@ void dispatch_delete_block(int which_curl)
  * @return thread index when succeeding in starting uploading.
  *         Otherwise return -1.
  */
-static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
+static inline int32_t _sync_mark(ino_t this_inode, mode_t this_mode,
 			     SYNC_THREAD_TYPE *sync_threads)
 {
-	int count, ret;
-	int progress_fd;
+	int32_t count, ret;
+	int32_t progress_fd;
 	char progress_file_path[300];
 
 	ret = 0;
@@ -1854,9 +1854,9 @@ void upload_loop(void)
 	ino_t ino_sync, ino_check;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 	SUPER_BLOCK_ENTRY tempentry;
-	int count, sleep_count;
+	int32_t count, sleep_count;
 	char in_sync;
-	int ret_val, ret;
+	int32_t ret_val, ret;
 	char is_start_check;
 	char sync_paused_status = FALSE;
 
@@ -2011,16 +2011,16 @@ void upload_loop(void)
 /************************************************************************
 *
 * Function name: update_backend_stat
-*        Inputs: ino_t root_inode, long long system_size_delta,
-*                long long num_inodes_delta
+*        Inputs: ino_t root_inode, int64_t system_size_delta,
+*                int64_t num_inodes_delta
 *       Summary: Updates per-FS statistics stored in the backend.
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int update_backend_stat(ino_t root_inode, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char fname[METAPATHLEN], tmpname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;

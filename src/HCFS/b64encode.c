@@ -21,27 +21,27 @@
 
 #include "logger.h"
 
-unsigned char base64_codes[64] =
+uint8_t base64_codes[64] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /************************************************************************
 *
 * Function name: b64encode_str
-*        Inputs: unsigned char *inputstr, unsigned char *outputstr,
-*                int *outlen, int inputlen
+*        Inputs: uint8_t *inputstr, uint8_t *outputstr,
+*                int32_t *outlen, int32_t inputlen
 *       Summary: b64-encode input string "inputstr" (of length "inputlen")
 *                to output string "outputstr" (of length "*outlen").
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
-		  int *outlen, int inputlen)
+int32_t b64encode_str(uint8_t *inputstr, uint8_t *outputstr,
+		  int32_t *outlen, int32_t inputlen)
 {
-	unsigned char *tmpstr;
-	int count, input_index, output_index;
-	int origin_str_len;
-	unsigned long long tmp;
-	unsigned long long tmp_index;
+	uint8_t *tmpstr;
+	int32_t count, input_index, output_index;
+	int32_t origin_str_len;
+	uint64_t tmp;
+	uint64_t tmp_index;
 
 	origin_str_len = inputlen;
 	tmpstr = malloc(1 + ((origin_str_len + 2) / 3) * 3);
@@ -61,11 +61,11 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 
 	for (input_index = 0; input_index < ((origin_str_len + 2) / 3) * 3;
 	     input_index += 3) {
-		tmp = (unsigned long long)tmpstr[input_index];
+		tmp = (uint64_t)tmpstr[input_index];
 		tmp = tmp << 16;
 		tmp =
-		    tmp + (((unsigned long long)tmpstr[input_index + 1]) << 8);
-		tmp = tmp + ((unsigned long long)tmpstr[input_index + 2]);
+		    tmp + (((uint64_t)tmpstr[input_index + 1]) << 8);
+		tmp = tmp + ((uint64_t)tmpstr[input_index + 2]);
 
 		tmp_index = (tmp & 0xFC0000) >> 18;
 		outputstr[output_index] = base64_codes[tmp_index];
@@ -130,8 +130,8 @@ static char decode_table(char c)
 /************************************************************************
 *
 * Function name: b64decode_str
-*        Inputs: char *inputstr, unsigned char *outputstr,
-*                int *outlen, int inputlen
+*        Inputs: char *inputstr, uint8_t *outputstr,
+*                int32_t *outlen, int32_t inputlen
 *       Summary: b64-decode input string "inputstr" (of length "inputlen")
 *                to output string "outputstr" (of length "*outlen").
 *  Return value: 0 if successful.
@@ -139,12 +139,12 @@ static char decode_table(char c)
 *                -2 if impossible format occurs
 *
 *************************************************************************/
-int b64decode_str(char *inputstr, unsigned char *outputstr, int *outlen,
-		  int inputlen)
+int32_t b64decode_str(char *inputstr, uint8_t *outputstr, int32_t *outlen,
+		  int32_t inputlen)
 {
-	int i = 0;
-	int out_index = 0;
-	int group_count = 0;
+	int32_t i = 0;
+	int32_t out_index = 0;
+	int32_t group_count = 0;
 	char buf[4] = {0};
 
 	while (i < inputlen) {

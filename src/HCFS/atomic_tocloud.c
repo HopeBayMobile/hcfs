@@ -39,15 +39,15 @@ extern SYSTEM_CONF_STRUCT *system_config;
  *
  * @return 0 if succeeding in tagging status, otherwise -1 on error.
  */
-int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
-		int fd, BOOL is_revert, BOOL finish_sync)
+int32_t comm2fuseproc(ino_t this_inode, BOOL is_uploading,
+		int32_t fd, BOOL is_revert, BOOL finish_sync)
 {
 #ifndef _ANDROID_ENV_
-	int sockfd;
-	int resp, errcode;
+	int32_t sockfd;
+	int32_t resp, errcode;
 	struct sockaddr_un addr;
 #endif
-	int ret;
+	int32_t ret;
 	UPLOADING_COMMUNICATION_DATA data;
 
 	/* Prepare data */
@@ -91,7 +91,7 @@ int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 
 	resp = 0;
 	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATION_DATA), 0);
-	recv(sockfd, &resp, sizeof(int), 0);
+	recv(sockfd, &resp, sizeof(int32_t), 0);
 
 	if (resp < 0) {
 		write_log(2, "Communication fail: Response code %d in %s",
@@ -109,10 +109,10 @@ int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 	return ret;
 }
 
-static inline long long longpow(long long base, int power)
+static inline int64_t longpow(int64_t base, int32_t power)
 {
-	long long tmp;
-	int count;
+	int64_t tmp;
+	int32_t count;
 
 	tmp = 1;
 
@@ -128,15 +128,15 @@ static inline long long longpow(long long base, int power)
  * @return offset of given block number on success, otherwise 0
  *         in case of page not exist or error.
  */
-long long query_status_page(int fd, long long block_index)
+int64_t query_status_page(int32_t fd, int64_t block_index)
 {
-	long long target_page;
-	int which_indirect;
-	long long ret_pos;
-	int level, i;
-	int errcode;
+	int64_t target_page;
+	int32_t which_indirect;
+	int64_t ret_pos;
+	int32_t level, i;
+	int32_t errcode;
 	ssize_t ret_ssize;
-	long long ptr_index, ptr_page_index;
+	int64_t ptr_index, ptr_page_index;
 	PROGRESS_META progress_meta;
 	PTR_ENTRY_PAGE temp_ptr_page;
 
@@ -190,19 +190,19 @@ errcode_handle:
  *
  * @return offset on success, otherwise return 0 or negative error code.
  */
-long long create_status_page(int fd, long long block_index)
+int64_t create_status_page(int32_t fd, int64_t block_index)
 {
-	int which_indirect;
-	long long target_page;
+	int32_t which_indirect;
+	int64_t target_page;
 	PROGRESS_META progress_meta;
 	BLOCK_UPLOADING_PAGE temp_page;
 	PTR_ENTRY_PAGE temp_ptr_page, zero_ptr_page;
-	long long tmp_pos;
-	long long ptr_page_index, ptr_index;
-	int errcode;
+	int64_t tmp_pos;
+	int64_t ptr_page_index, ptr_index;
+	int32_t errcode;
 	ssize_t ret_ssize;
 	int64_t ret_pos;
-	int level, i;
+	int32_t level, i;
 
 	target_page = block_index / MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -323,13 +323,13 @@ errcode_handle:
  *         block not found. Otherwise return other negative error
  *         code
  */ 
-int get_progress_info(int fd, long long block_index,
+int32_t get_progress_info(int32_t fd, int64_t block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
-	long long offset;
-	int errcode;
-	long long ret_ssize;
-	int entry_index;
+	int64_t offset;
+	int32_t errcode;
+	int64_t ret_ssize;
+	int32_t entry_index;
 	BLOCK_UPLOADING_PAGE block_page;
 
 	ret_ssize = 0;
@@ -380,15 +380,15 @@ errcode_handle:
  * @return 0 on success, otherwise negative error code.
  */ 
 #if (DEDUP_ENABLE)
-int set_progress_info(int fd, long long block_index,
+int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const unsigned char *toupload_objid, const unsigned char *backend_objid,
+	const uint8_t *toupload_objid, const uint8_t *backend_objid,
 	const char *finish)
 {
-	int errcode;
-	long long offset;
+	int32_t errcode;
+	int64_t offset;
 	ssize_t ret_ssize;
-	int entry_index;
+	int32_t entry_index;
 	BLOCK_UPLOADING_STATUS *block_uploading_status;
 	BLOCK_UPLOADING_PAGE status_page;
 
@@ -414,10 +414,10 @@ int set_progress_info(int fd, long long block_index,
 			(block_uploading_status->block_exist & 1));
 	if (toupload_objid)
 		memcpy(block_uploading_status->to_upload_objid, toupload_objid,
-			sizeof(unsigned char) * OBJID_LENGTH);
+			sizeof(uint8_t) * OBJID_LENGTH);
 	if (backend_objid)
 		memcpy(block_uploading_status->backend_objid, backend_objid,
-			sizeof(unsigned char) * OBJID_LENGTH);
+			sizeof(uint8_t) * OBJID_LENGTH);
 	if (finish)
 		block_uploading_status->finish_uploading = *finish;
 
@@ -437,15 +437,15 @@ errcode_handle:
 }
 
 #else
-int set_progress_info(int fd, long long block_index,
+int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const long long *toupload_seq, const long long *backend_seq,
+	const int64_t *toupload_seq, const int64_t *backend_seq,
 	const char *finish)
 {
-	int errcode;
-	long long offset;
+	int32_t errcode;
+	int64_t offset;
 	ssize_t ret_ssize;
-	int entry_index;
+	int32_t entry_index;
 	BLOCK_UPLOADING_STATUS *block_uploading_status;
 	BLOCK_UPLOADING_PAGE status_page;
 
@@ -502,10 +502,10 @@ errcode_handle:
  *
  * @return file descriptor of progress file, otherwise negative error code.
  */ 
-int create_progress_file(ino_t inode)
+int32_t create_progress_file(ino_t inode)
 {
-	int ret_fd;
-	int errcode, ret;
+	int32_t ret_fd;
+	int32_t errcode, ret;
 	char filename[200];
 	char pathname[200];
 	PROGRESS_META progress_meta;
@@ -562,20 +562,20 @@ errcode_handle:
  * @return 0 if succeed. Otherwise negative error code.
  *
  */
-int init_progress_info(int fd, long long backend_blocks,
-		long long backend_size, FILE *backend_metafptr)
+int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
+		int64_t backend_size, FILE *backend_metafptr)
 {
-	int errcode;
-	long long offset, ret_ssize;
+	int32_t errcode;
+	int64_t offset, ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
-	long long e_index, which_page, current_page, page_pos;
-	long long block;
+	int64_t e_index, which_page, current_page, page_pos;
+	int64_t block;
 	BLOCK_ENTRY_PAGE block_page;
 	FILE_META_TYPE tempfilemeta;
 	char cloud_status;
 	PROGRESS_META progress_meta;
 	BLOCK_UPLOADING_PAGE status_page;
-	int entry_index;
+	int32_t entry_index;
 	BOOL write_status_page;
 
 	flock(fd, LOCK_EX);
@@ -692,10 +692,10 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */ 
-int del_progress_file(int fd, ino_t inode)
+int32_t del_progress_file(int32_t fd, ino_t inode)
 {
 	char filename[200];
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	fetch_progress_file_path(filename, inode);
 
@@ -711,9 +711,9 @@ errcode_handle:
 	return errcode;
 }
 
-int fetch_toupload_meta_path(char *pathname, ino_t inode)
+int32_t fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
-	int errcode, ret;
+	int32_t errcode, ret;
 	char path[200];
 
 	sprintf(path, "%s/upload_bullpen", METAPATH);
@@ -735,8 +735,8 @@ errcode_handle:
 	return errcode;
 }
 
-int fetch_toupload_block_path(char *pathname, ino_t inode,
-	long long block_no, long long seq)
+int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
+	int64_t block_no, int64_t seq)
 {
 	UNUSED(seq);
 	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%lld.tmp",
@@ -745,11 +745,11 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 	return 0;
 }
 
-int fetch_backend_meta_path(char *pathname, ino_t inode)
+int32_t fetch_backend_meta_path(char *pathname, ino_t inode)
 {
 	char path[200];
-	int errcode;
-	int ret;
+	int32_t errcode;
+	int32_t ret;
 
 	sprintf(path, "%s/upload_bullpen", METAPATH);
 
@@ -794,15 +794,15 @@ void fetch_progress_file_path(char *pathname, ino_t inode)
  *
  * @return 0 if succeed in copy, -EEXIST in case of target file existing.
  */
-int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
+int32_t check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 {
-	int errcode;
-	int ret;
+	int32_t errcode;
+	int32_t ret;
 	size_t read_size;
 	size_t ret_size;
 	FILE *src_ptr, *tar_ptr;
 	char filebuf[4100];
-	long ret_pos;
+	int64_t ret_pos;
 
 	/* if target file exists, do not copy it.
 	   (it may be copied by another process) */
@@ -913,10 +913,10 @@ int check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
 	/* Copy xattr "trunc_size" if it exists */
 #ifndef _ANDROID_ENV_
 	ret_ssize = fgetxattr(fileno(src_ptr), "user.trunc_size",
-		&temp_trunc_size, sizeof(long long));
+		&temp_trunc_size, sizeof(int64_t));
 	if (ret_ssize >= 0) {
 		fsetxattr(fileno(tar_ptr), "user.trunc_size",
-			&temp_trunc_size, sizeof(long long), 0);
+			&temp_trunc_size, sizeof(int64_t), 0);
 
 		fremovexattr(fileno(src_ptr), "user.trunc_size");
 		write_log(10, "Debug: trunc_size = %lld",temp_trunc_size);
@@ -943,9 +943,9 @@ errcode_handle:
 	return errcode;
 }
 
-char did_block_finish_uploading(int fd, long long blockno)
+char did_block_finish_uploading(int32_t fd, int64_t blockno)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	ssize_t ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 	PROGRESS_META progress_meta;
@@ -991,14 +991,14 @@ errcode_handle:
  * @return 0 on success, -ECANCELED when cancelling to sync,
  *         or other negative error code.
  */
-int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
-		long long *total_backend_blocks, long long upload_seq)
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
+		int64_t *total_backend_blocks, int64_t upload_seq)
 {
 	FILE *backend_metafptr;
 	char backend_metapath[400];
 	char objname[400];
 	struct stat tempfilestat;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
 	BOOL first_upload;
 
@@ -1122,14 +1122,14 @@ void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr)
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
 	char local_meta_path[200];
-	int errcode;
+	int32_t errcode;
 	mode_t this_mode;
 	ino_t inode;
-	int progress_fd;
-	long long total_backend_blocks, total_toupload_blocks;
+	int32_t progress_fd;
+	int64_t total_backend_blocks, total_toupload_blocks;
 	ssize_t ret_ssize;
 	char finish_init;
-	int ret;
+	int32_t ret;
 	PROGRESS_META progress_meta;
 
 	finish_init = FALSE;
@@ -1280,12 +1280,12 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	char toupload_meta_exist, backend_meta_exist;
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
-	int errcode;
+	int32_t errcode;
 	mode_t this_mode;
 	ino_t inode;
-	int progress_fd;
+	int32_t progress_fd;
 	ssize_t ret_ssize;
-	int ret;
+	int32_t ret;
 	char now_action;
 	PROGRESS_META progress_meta;
 
@@ -1408,9 +1408,9 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */ 
-int change_action(int fd, char new_action)
+int32_t change_action(int32_t fd, char new_action)
 {
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 	PROGRESS_META progress_meta;
 

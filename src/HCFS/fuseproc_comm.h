@@ -21,6 +21,6 @@
 /* Define socket path for process communicating */
 #define MAX_FUSE_COMMUNICATION_THREAD 4
 
-int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd);
-int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd);
+int32_t init_fuse_proc_communication(pthread_t *communicate_tid, int32_t *socket_fd);
+int32_t destroy_fuse_proc_communication(pthread_t *communicate_tid, int32_t socket_fd);
 #endif

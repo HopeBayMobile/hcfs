@@ -66,9 +66,9 @@ CURL_HANDLE delete_curl_handles[MAX_DELETE_CONCURRENCY];
 /* Don't need to collect return code for the per-inode dsync thread, as
 the error handling for sync-for-deletion for this inode will be handled in
 dsync_single_inode. */
-static inline void _dsync_terminate_thread(int index)
+static inline void _dsync_terminate_thread(int32_t index)
 {
-	int ret;
+	int32_t ret;
 
 	if ((dsync_ctl.threads_in_use[index] != 0) &&
 			((dsync_ctl.threads_finished[index] == TRUE) &&
@@ -98,7 +98,7 @@ static inline void _dsync_terminate_thread(int index)
 *************************************************************************/
 void collect_finished_dsync_threads(void *ptr)
 {
-	int count;
+	int32_t count;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -125,10 +125,10 @@ void collect_finished_dsync_threads(void *ptr)
 
 /* Helper function for terminating threads in deleting backend objects */
 /* Delete threads are the ones that delete a single backend object. */
-static inline void _delete_terminate_thread(int index)
+static inline void _delete_terminate_thread(int32_t index)
 {
-	int ret;
-	int dsync_index;
+	int32_t ret;
+	int32_t dsync_index;
 
 	if (((delete_ctl.threads_in_use[index] != 0) &&
 		(delete_ctl.delete_threads[index].is_block == TRUE)) &&
@@ -164,7 +164,7 @@ static inline void _delete_terminate_thread(int index)
 *************************************************************************/
 void collect_finished_delete_threads(void *ptr)
 {
-	int count;
+	int32_t count;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -217,9 +217,9 @@ void init_dsync_control(void)
 }
 
 /* Helper for initializing curl handles for deleting backend objects */
-static inline int _init_delete_handle(int index)
+static inline int32_t _init_delete_handle(int32_t index)
 {
-	/* int ret_val; */
+	/* int32_t ret_val; */
 
 	snprintf(delete_curl_handles[index].id, 255,
 				"delete_thread_%d", index);
@@ -252,7 +252,7 @@ static inline int _init_delete_handle(int index)
 *************************************************************************/
 void init_delete_control(void)
 {
-	int count;
+	int32_t count;
 
 	memset(&delete_ctl, 0, sizeof(DELETE_THREAD_CONTROL));
 	memset(&delete_curl_handles, 0,
@@ -275,13 +275,13 @@ void init_delete_control(void)
 }
 
 /* Helper function for marking a delete thread as in use */
-static inline int _use_delete_thread(int index, int dsync_index,
+static inline int32_t _use_delete_thread(int32_t index, int32_t dsync_index,
 				char is_blk_flag,
 #if (DEDUP_ENABLE)
-		ino_t this_inode, long long blockno, long long seq,
-		unsigned char *obj_id)
+		ino_t this_inode, int64_t blockno, int64_t seq,
+		uint8_t *obj_id)
 #else
-		ino_t this_inode, long long blockno, long long seq)
+		ino_t this_inode, int64_t blockno, int64_t seq)
 #endif
 {
 	if (delete_ctl.threads_in_use[index] != FALSE)
@@ -313,7 +313,7 @@ static inline void _check_del_progress_file(ino_t inode)
 	BOOL now_sync;
 	char toupload_metapath[300], backend_metapath[300];
 	char progress_path[300];
-	int idx, ret[3] = {0};
+	int32_t idx, ret[3] = {0};
 
 	now_sync = FALSE;
 	sem_wait(&sync_ctl.sync_op_sem);
@@ -343,16 +343,16 @@ static inline void _check_del_progress_file(ino_t inode)
 	}
 }
 
-static inline int _read_meta(char *todel_metapath, mode_t this_mode,
+static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 		ino_t *root_inode, BOOL *meta_on_cloud,
-		long long *backend_size_change, long long *meta_size_change)
+		int64_t *backend_size_change, int64_t *meta_size_change)
 {
 	FILE *metafptr;
 	FILE_META_TYPE tempfilemeta;
 	DIR_META_TYPE tempdirmeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	CLOUD_RELATED_DATA cloud_related_data;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	metafptr = fopen(todel_metapath, "r+");
@@ -430,26 +430,26 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
-	int curl_id, which_dsync_index;
-	long long current_index;
-	long long page_pos, which_page, current_page;
-	long long count, block_count;
-	long long total_blocks;
-	unsigned char block_status;
+	int32_t curl_id, which_dsync_index;
+	int64_t current_index;
+	int64_t page_pos, which_page, current_page;
+	int64_t count, block_count;
+	int64_t total_blocks;
+	uint8_t block_status;
 	char delete_done;
-	int ret_val, errcode, ret;
+	int32_t ret_val, errcode, ret;
 	size_t ret_size;
 	struct timespec time_to_sleep;
 	pthread_t *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char backend_mlock;
-	long long backend_size_change, meta_size_change;
-	long long block_seq;
+	int64_t backend_size_change, meta_size_change;
+	int64_t block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
 #ifndef _ANDROID_ENV_
-	long long ret_ssize;
+	int64_t ret_ssize;
 #endif
 
 	time_to_sleep.tv_sec = 0;
@@ -724,10 +724,10 @@ errcode_handle:
 *  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
+int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
-	int ret_val, ret;
+	int32_t ret_val, ret;
 
 	sprintf(objname, "meta_%" PRIu64 "", (uint64_t)this_inode);
 	write_log(10, "Debug meta deletion: objname %s, inode %" PRIu64 "\n",
@@ -748,27 +748,27 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 /************************************************************************
 *
 * Function name: do_block_delete
-*        Inputs: ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle
+*        Inputs: ino_t this_inode, int64_t block_no, CURL_HANDLE *curl_handle
 *       Summary: Given curl handle "curl_handle", delete the block object
 *                of inode number "this_inode", block no "block_no" from backend.
 *  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-int do_block_delete(ino_t this_inode, long long block_no, long long seq,
+int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #if (DEDUP_ENABLE)
-				unsigned char *obj_id, CURL_HANDLE *curl_handle)
+				uint8_t *obj_id, CURL_HANDLE *curl_handle)
 #else
 				CURL_HANDLE *curl_handle)
 #endif
 {
 	char objname[400];
-	int ret_val, ret, ddt_ret;
+	int32_t ret_val, ret, ddt_ret;
 #if (DEDUP_ENABLE)
 	DDT_BTREE_NODE tree_root;
 	DDT_BTREE_META ddt_meta;
 	char obj_id_str[OBJID_STRING_LENGTH];
 	FILE *ddt_fptr;
-	int ddt_fd;
+	int32_t ddt_fd;
 #endif
 
 /* Handle objname - consider platforms, dedup flag  */
@@ -837,9 +837,9 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 *************************************************************************/
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
-	int which_curl;
-	int which_index;
-	int ret;
+	int32_t which_curl;
+	int32_t which_index;
+	int32_t ret;
 
 	which_curl = delete_thread_ptr->which_curl;
 	which_index = delete_thread_ptr->which_index;
@@ -864,7 +864,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 }
 
 /* Helper for creating threads for deletion */
-int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
+int32_t _dsync_use_thread(int32_t index, ino_t this_inode, mode_t this_mode)
 {
 	if (dsync_ctl.threads_in_use[index] != 0)
 		return -1;
@@ -909,9 +909,9 @@ void delete_loop(void)
 {
 	ino_t inode_to_dsync, inode_to_check;
 	SUPER_BLOCK_ENTRY tempentry;
-	int count;
+	int32_t count;
 	char in_dsync;
-	int ret_val;
+	int32_t ret_val;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);

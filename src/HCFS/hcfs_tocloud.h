@@ -32,31 +32,31 @@
 
 typedef struct {
 	off_t page_filepos;
-	long long page_entry_index;
+	int64_t page_entry_index;
 	ino_t inode;
-	long long blockno;
-	long long seq;
+	int64_t blockno;
+	int64_t seq;
 	char is_block;
 	char is_delete;
 	char backend_delete_type; /* FALSE, TOUPLOAD_BLOCKS, BACKEND_BLOCKS */
-	int which_curl;
-	int progress_fd;
+	int32_t which_curl;
+	int32_t progress_fd;
 	char tempfilename[400];
-	int which_index;
+	int32_t which_index;
 #if (DEDUP_ENABLE)
 	char is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
 	and decrease the refcount of old_hash_key*/
-	unsigned char obj_id[OBJID_LENGTH];
+	uint8_t obj_id[OBJID_LENGTH];
 #endif
 } UPLOAD_THREAD_TYPE;
 
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
-	int progress_fd;
+	int32_t progress_fd;
 	char is_revert;
-	int which_index;
+	int32_t which_index;
 } SYNC_THREAD_TYPE;
 
 typedef struct {
@@ -71,7 +71,7 @@ typedef struct {
 	char threads_in_use[MAX_UPLOAD_CONCURRENCY];
 	char threads_created[MAX_UPLOAD_CONCURRENCY];
 	char threads_finished[MAX_UPLOAD_CONCURRENCY];
-	int total_active_upload_threads;
+	int32_t total_active_upload_threads;
 	/*upload threads: used for upload objects to backends*/
 } UPLOAD_THREAD_CONTROL;
 
@@ -83,7 +83,7 @@ typedef struct {
 
 	ino_t threads_in_use[MAX_SYNC_CONCURRENCY]; /* Now syncing inode */
 
-	int progress_fd[MAX_SYNC_CONCURRENCY]; /* File descriptor of uploading
+	int32_t progress_fd[MAX_SYNC_CONCURRENCY]; /* File descriptor of uploading
 						  progress file */
 
 	char threads_created[MAX_SYNC_CONCURRENCY]; /* This thread is created */
@@ -103,7 +103,7 @@ typedef struct {
 							system going down,
 							continue uploading
 							next time */
-	int total_active_sync_threads;
+	int32_t total_active_sync_threads;
 	/*sync threads: used for syncing meta/block in a single inode*/
 } SYNC_THREAD_CONTROL;
 
@@ -116,15 +116,15 @@ STAT_OP_T sync_stat_ctl;
 UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
-int do_block_sync(ino_t this_inode, long long block_no,
+int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 #if (DEDUP_ENABLE)
 		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
-		  unsigned char *hash_in_meta);
+		  uint8_t *hash_in_meta);
 #else
-		  long long seq, CURL_HANDLE *curl_handle, char *filename);
+		  int64_t seq, CURL_HANDLE *curl_handle, char *filename);
 #endif
 
-int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
+int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);
 void init_sync_control(void);
@@ -132,9 +132,9 @@ void init_sync_stat_control(void);
 void sync_single_inode(SYNC_THREAD_TYPE *ptr);
 void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
-int dispatch_upload_block(int which_curl);
-void dispatch_delete_block(int which_curl);
-int schedule_sync_meta(char *toupload_metapath, int which_curl);
+int32_t dispatch_upload_block(int32_t which_curl);
+void dispatch_delete_block(int32_t which_curl);
+int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 #ifdef _ANDROID_ENV_
@@ -142,17 +142,17 @@ void *upload_loop(void *ptr);
 #else
 void upload_loop(void);
 #endif
-int update_backend_stat(ino_t root_inode, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta);
+int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta);
 
-int select_upload_thread(char is_block, char is_delete,
+int32_t select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
 		char is_upload,
-		unsigned char old_obj_id[],
+		uint8_t old_obj_id[],
 #endif
-		ino_t this_inode, long long block_count,
-		long long seq, off_t page_pos,
-		long long e_index, int progress_fd,
+		ino_t this_inode, int64_t block_count,
+		int64_t seq, off_t page_pos,
+		int64_t e_index, int32_t progress_fd,
 		char backend_delete_type);
 
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

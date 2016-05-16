@@ -23,21 +23,21 @@
 #include "global.h"
 #include "HCFSvol.h"
 
-int main(int argc, char **argv)
+int32_t main(int32_t argc, char **argv)
 {
-	int fd, size_msg, status, count, retcode, code, fsname_len;
-	unsigned int cmd_len, reply_len, total_recv, to_recv;
-	int total_entries;
+	int32_t fd, size_msg, status, count, retcode, code, fsname_len;
+	uint32_t cmd_len, reply_len, total_recv, to_recv;
+	int32_t total_entries;
 	struct sockaddr_un addr;
 	char buf[4096];
 	DIR_ENTRY *tmp;
 	char *ptr;
 	ino_t tmpino;
-	long long num_local, num_cloud, num_hybrid, retllcode;
+	int64_t num_local, num_cloud, num_hybrid, retllcode;
 	uint32_t uint32_ret;
-	long long downxfersize, upxfersize;
+	int64_t downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
-	int first_size, rest_size, loglevel;
+	int32_t first_size, rest_size, loglevel;
 	char vol_mode;
 
 	if (argc < 2) {
@@ -129,18 +129,18 @@ int main(int argc, char **argv)
 	case RELOADCONFIG:
 	case TRIGGERUPDATEQUOTA:
 		cmd_len = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n", -retcode,
 			       strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	/* APIs at here send result in long long */
+	/* APIs at here send result in int64_t */
 	case GETQUOTA:
 	case GETPINSIZE:
 	case GETCACHESIZE:
@@ -148,13 +148,13 @@ int main(int argc, char **argv)
 	case GETMAXCACHESIZE:
 	case GETDIRTYCACHESIZE:
 		cmd_len = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retllcode, sizeof(long long), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retllcode, sizeof(int64_t), 0);
 		if (retllcode < 0) {
-			retcode = (int) retllcode;
+			retcode = (int32_t) retllcode;
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		} else {
@@ -166,9 +166,9 @@ int main(int argc, char **argv)
 	case GETSYNCSWITCH:
 	case GETSYNCSTAT:
 		cmd_len = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 		size_msg = recv(fd, &uint32_ret, sizeof(uint32_t), 0);
 		if (code == CLOUDSTAT)
 			printf("Backend is %s\n",
@@ -195,12 +195,12 @@ int main(int argc, char **argv)
 			exit(-ENOTSUP);
 		}
 
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n", -retcode,
 			       strerror(-retcode));
@@ -211,24 +211,24 @@ int main(int argc, char **argv)
 	case UNMOUNTVOL:
 		memset(buf, 0, sizeof(buf));
 		fsname_len = strlen(argv[2]);
-		cmd_len = sizeof(int) + strlen(argv[2]) + 1;
+		cmd_len = sizeof(int32_t) + strlen(argv[2]) + 1;
 		if (argc >= 4)
 			cmd_len += (strlen(argv[3]) + 1);
 		else
 			cmd_len += 1;
 
-		memcpy(buf, &fsname_len, sizeof(int));
-		strcpy(buf + sizeof(int), argv[2]);
+		memcpy(buf, &fsname_len, sizeof(int32_t));
+		strcpy(buf + sizeof(int32_t), argv[2]);
 		if (argc >= 4)
-			strcpy(buf + sizeof(int) + fsname_len + 1, argv[3]);
+			strcpy(buf + sizeof(int32_t) + fsname_len + 1, argv[3]);
 		else
-			buf[sizeof(int) + fsname_len + 1] = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+			buf[sizeof(int32_t) + fsname_len + 1] = 0;
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n", -retcode,
 			       strerror(-retcode));
@@ -240,12 +240,12 @@ int main(int argc, char **argv)
 	case CHECKMOUNT:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n", -retcode,
 			       strerror(-retcode));
@@ -263,14 +263,14 @@ int main(int argc, char **argv)
 			cmd_len = 1;
 			buf[0] = 0;
 		}
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retllcode, sizeof(long long), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retllcode, sizeof(int64_t), 0);
 		if (retllcode < 0) {
-			retcode = (int) retllcode;
+			retcode = (int32_t) retllcode;
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		} else {
@@ -280,30 +280,30 @@ int main(int argc, char **argv)
 	case CHECKDIRSTAT:
 		tmpino = atol(argv[2]);
 		cmd_len = sizeof(ino_t);
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, &tmpino, sizeof(ino_t), 0);
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		if (reply_len == (3 * sizeof(long long))) {
-			size_msg = recv(fd, &num_local, sizeof(long long), 0);
-			size_msg = recv(fd, &num_cloud, sizeof(long long), 0);
-			size_msg = recv(fd, &num_hybrid, sizeof(long long), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		if (reply_len == (3 * sizeof(int64_t))) {
+			size_msg = recv(fd, &num_local, sizeof(int64_t), 0);
+			size_msg = recv(fd, &num_cloud, sizeof(int64_t), 0);
+			size_msg = recv(fd, &num_hybrid, sizeof(int64_t), 0);
 			printf("Reply len %d\n", reply_len);
 			printf("Num: local %lld, cloud %lld, hybrid %lld\n",
 				num_local, num_cloud, num_hybrid);
 		} else {
-			size_msg = recv(fd, &retcode, sizeof(int), 0);
+			size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		}
 		break;
 	case GETXFERSTAT:
 		cmd_len = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &downxfersize, sizeof(long long), 0);
-		size_msg = recv(fd, &upxfersize, sizeof(long long), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &downxfersize, sizeof(int64_t), 0);
+		size_msg = recv(fd, &upxfersize, sizeof(int64_t), 0);
 		printf("Reply len %d\n", reply_len);
 		printf("Download %lld bytes, upload %lld bytes\n",
 				downxfersize, upxfersize);
@@ -312,11 +312,11 @@ int main(int argc, char **argv)
 	case CHECKPIN:
 		tmpino = atol(argv[2]);
 		cmd_len = sizeof(ino_t);
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, &tmpino, sizeof(ino_t), 0);
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
@@ -342,10 +342,10 @@ int main(int argc, char **argv)
 		}
 		buf[0] = vol_mode;
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 +
-			sizeof(int) + sizeof(char);
+			sizeof(int32_t) + sizeof(char);
 		fsname_len = strlen(argv[2]) + 1;
-		memcpy(buf + 1, &fsname_len, sizeof(int)); /* first byte is vol mode */
-		first_size = sizeof(int) + 1;
+		memcpy(buf + 1, &fsname_len, sizeof(int32_t)); /* first byte is vol mode */
+		first_size = sizeof(int32_t) + 1;
 		rest_size = sizeof(buf) - first_size;
 
 		/* [mp mode][fsname len][fsname][mp] */
@@ -353,12 +353,12 @@ int main(int argc, char **argv)
 		snprintf(&(buf[first_size + fsname_len]), 4092 - fsname_len,
 			 "%s", argv[3]);
 
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n", -retcode,
 			       strerror(-retcode));
@@ -367,10 +367,10 @@ int main(int argc, char **argv)
 		break;
 	case LISTVOL:
 		cmd_len = 0;
-		size_msg = send(fd, &code, sizeof(unsigned int), 0);
-		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 		tmp = malloc(reply_len);
 		if (tmp == NULL) {
 			printf("Out of memory\n");
@@ -425,10 +425,10 @@ int main(int argc, char **argv)
 			exit(-EINVAL);
 		}
 		loglevel = atoi(argv[2]);
-		cmd_len = sizeof(int);
+		cmd_len = sizeof(int32_t);
 		size_msg = send(fd, &code, sizeof(code), 0);
 		size_msg = send(fd, &cmd_len, sizeof(cmd_len), 0);
-		size_msg = send(fd, &loglevel, sizeof(int), 0);
+		size_msg = send(fd, &loglevel, sizeof(int32_t), 0);
 
 		size_msg = recv(fd, &reply_len, sizeof(reply_len), 0);
 		size_msg = recv(fd, &retcode, sizeof(retcode), 0);

@@ -34,20 +34,20 @@
 
 /* Message format for an API request:
 	(From the first byte)
-	API code, size (unsigned int)
-	Total length of arguments, size (unsigned int)
+	API code, size (uint32_t)
+	Total length of arguments, size (uint32_t)
 	Arguments (To be stored in a char array and pass to the handler
 		for each API)
 
    Message format for an API response:
 	(From the first byte)
-	Total length of response, size (unsigned int)
+	Total length of response, size (uint32_t)
 	Response (as a char string)
 */
 
 typedef struct {
 	struct sockaddr_un addr;
-	int fd;
+	int32_t fd;
 } SOCKET;
 
 typedef struct {
@@ -55,8 +55,8 @@ typedef struct {
 	/* API thread (using local socket) */
 	pthread_t local_thread[MAX_API_THREADS];
 	pthread_t monitor_thread;
-	int num_threads;
-	int job_count[PROCESS_WINDOW];
+	int32_t num_threads;
+	int32_t job_count[PROCESS_WINDOW];
 	float job_totaltime[PROCESS_WINDOW];
 	time_t last_update;
 	sem_t job_lock;
@@ -64,8 +64,8 @@ typedef struct {
 
 API_SERVER_TYPE *api_server;
 
-int init_api_interface(void);
-int destroy_api_interface(void);
+int32_t init_api_interface(void);
+int32_t destroy_api_interface(void);
 void api_module(void *index);
 void api_server_monitor(void);
 

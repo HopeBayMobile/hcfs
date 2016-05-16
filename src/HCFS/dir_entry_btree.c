@@ -36,8 +36,8 @@
 /************************************************************************
 *
 * Function name: dentry_binary_search
-*        Inputs: DIR_ENTRY *entry_array, int num_entries,
-*                DIR_ENTRY *new_entry, int *index_to_insert
+*        Inputs: DIR_ENTRY *entry_array, int32_t num_entries,
+*                DIR_ENTRY *new_entry, int32_t *index_to_insert
 *       Summary: Binary search the directory entry element (new_entry) in
 *                "entry_array". "num_entries" indicates the number of
 *                entries in "entry_array".
@@ -46,11 +46,11 @@
 *                element should be inserted.
 *
 *************************************************************************/
-int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
-			const DIR_ENTRY *new_entry, int *index_to_insert)
+int32_t dentry_binary_search(const DIR_ENTRY *entry_array, const int32_t num_entries,
+			const DIR_ENTRY *new_entry, int32_t *index_to_insert)
 {
-	int compare_entry, compare_result;
-	int start_index, end_index;
+	int32_t compare_entry, compare_result;
+	int32_t start_index, end_index;
 
 	if (num_entries < 1) {
 		*index_to_insert = 0;
@@ -98,7 +98,7 @@ int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 *
 * Function name: search_dir_entry_btree
 *        Inputs: const char *target_name, DIR_ENTRY_PAGE *tnode,
-		int fh, int *result_index, DIR_ENTRY_PAGE *result_node
+		int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node
 *       Summary: Recursive search routine for B-tree search.
 *                Searches for the directory entry with name "target_name"
 *                in B-tree node "tnode". If found, returns the result by
@@ -109,13 +109,13 @@ int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 *                -ENOENT. If error, return negation of error code;
 *
 *************************************************************************/
-int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
-		int fh, int *result_index, DIR_ENTRY_PAGE *result_node)
+int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
+		int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node)
 {
 	DIR_ENTRY temp_entry;
-	int s_index, ret_val;
+	int32_t s_index, ret_val;
 	DIR_ENTRY_PAGE temp_page;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	strcpy(temp_entry.d_name, target_name);
@@ -148,10 +148,10 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: insert_dir_entry_btree
-*        Inputs: DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode, int fh,
-*                DIR_ENTRY *overflow_median, long long *overflow_new_page,
+*        Inputs: DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode, int32_t fh,
+*                DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 *                DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-*                long long *temp_child_page_pos
+*                int64_t *temp_child_page_pos
 *       Summary: Recursive insertion routine for B-tree search.
 *                Insert the directory entry "new_entry" to B-tree. "tnode"
 *                is the B-tree node currently being processed. "fh" is the
@@ -173,18 +173,18 @@ errcode_handle:
 *                negation of error code if an error occurs.
 *
 *************************************************************************/
-int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
-	int fh, DIR_ENTRY *overflow_median, long long *overflow_new_page,
+int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
+	int32_t fh, DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-						long long *temp_child_page_pos)
+						int64_t *temp_child_page_pos)
 {
-	int s_index, ret_val, median_entry;
+	int32_t s_index, ret_val, median_entry;
 	DIR_ENTRY_PAGE newpage, temppage, temp_page2;
 	DIR_ENTRY tmp_overflow_median;
-	int temp_total;
-	long long tmp_overflow_new_page;
+	int32_t temp_total;
+	int64_t tmp_overflow_new_page;
 	size_t tmp_size;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 	off_t ret_pos;
 
@@ -288,7 +288,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 		/* Parent of new node is the same as the parent of the old
 			node */
 		newpage.parent_page_pos = tnode->parent_page_pos;
-		memset(newpage.child_page_pos, 0, sizeof(long long) *
+		memset(newpage.child_page_pos, 0, sizeof(int64_t) *
 						(MAX_DIR_ENTRIES_PER_PAGE+1));
 		newpage.num_entries = temp_total - median_entry - 1;
 		memcpy(newpage.dir_entries, &(tmp_entries[median_entry+1]),
@@ -336,7 +336,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 			memcpy(&(tnode->dir_entries[s_index+1]),
 						&(tmp_entries[0]), tmp_size);
 
-			tmp_size = sizeof(long long) *
+			tmp_size = sizeof(int64_t) *
 						(tnode->num_entries - s_index);
 			memcpy(&(temp_child_page_pos[0]),
 				&(tnode->child_page_pos[s_index+1]), tmp_size);
@@ -370,11 +370,11 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 
 	if (s_index > 0)
 		memcpy(temp_child_page_pos, tnode->child_page_pos,
-						sizeof(long long)*(s_index+1));
+						sizeof(int64_t)*(s_index+1));
 
 	temp_child_page_pos[s_index+1] = tmp_overflow_new_page;
 	if (s_index < tnode->num_entries) {
-		tmp_size = sizeof(long long) * (tnode->num_entries - s_index);
+		tmp_size = sizeof(int64_t) * (tnode->num_entries - s_index);
 		memcpy(&(temp_child_page_pos[s_index+2]),
 				&(tnode->child_page_pos[s_index+1]), tmp_size);
 	}
@@ -392,7 +392,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	memcpy(tnode->dir_entries, tmp_entries,
 					sizeof(DIR_ENTRY) * median_entry);
 	memcpy(tnode->child_page_pos, temp_child_page_pos,
-					sizeof(long long) * (median_entry+1));
+					sizeof(int64_t) * (median_entry+1));
 
 	/* Create a new node and copy all items to the right of median
 		to the new node */
@@ -430,12 +430,12 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	/* Parent of new node is the same as the parent of the old node*/
 	newpage.parent_page_pos = tnode->parent_page_pos;
 	memset(newpage.child_page_pos, 0,
-			sizeof(long long) * (MAX_DIR_ENTRIES_PER_PAGE+1));
+			sizeof(int64_t) * (MAX_DIR_ENTRIES_PER_PAGE+1));
 	newpage.num_entries = temp_total - median_entry - 1;
 	memcpy(newpage.dir_entries, &(tmp_entries[median_entry+1]),
 				sizeof(DIR_ENTRY) * newpage.num_entries);
 	memcpy(newpage.child_page_pos, &(temp_child_page_pos[median_entry+1]),
-				sizeof(long long)*(newpage.num_entries+1));
+				sizeof(int64_t)*(newpage.num_entries+1));
 
 	/* Write to disk after finishing */
 	PWRITE(fh, &newpage, sizeof(DIR_ENTRY_PAGE), newpage.this_page_pos);
@@ -454,8 +454,8 @@ errcode_handle:
 *
 * Function name: delete_dir_entry_btree
 *        Inputs: DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
-*                int fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-*                long long *temp_child_page_pos
+*                int32_t fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
+*                int64_t *temp_child_page_pos
 *       Summary: Delete dir entry "to_delete_entry" from the B-tree. "tnode"
 *                is the B-tree node currently being processed. "fh" is the
 *                file handle of the meta file. "this_meta" is the meta head
@@ -469,15 +469,15 @@ errcode_handle:
 *                code.
 *
 *************************************************************************/
-int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
-		int fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-		long long *temp_child_page_pos)
+int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
+		int32_t fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
+		int64_t *temp_child_page_pos)
 {
-	int s_index, ret_val, entry_to_delete;
+	int32_t s_index, ret_val, entry_to_delete;
 	DIR_ENTRY_PAGE temppage;
 	DIR_ENTRY extracted_child;
 	size_t tmp_size;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	/* First search for the index to insert or traverse */
@@ -603,9 +603,9 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: rebalance_btree
-*        Inputs: DIR_ENTRY_PAGE *tnode, int fh, DIR_META_TYPE *this_meta,
-*                int selected_child, DIR_ENTRY *tmp_entries,
-*                long long *temp_child_page_pos
+*        Inputs: DIR_ENTRY_PAGE *tnode, int32_t fh, DIR_META_TYPE *this_meta,
+*                int32_t selected_child, DIR_ENTRY *tmp_entries,
+*                int64_t *temp_child_page_pos
 *       Summary: Check if the child "selected_child" of the B-tree node
 *                "tnode" contains fewer elements than the lower bound after
 *                deletion, so needs rebalancing.
@@ -626,9 +626,9 @@ errcode_handle:
 *                Negation of error code if an error occurred.
 *
 *************************************************************************/
-int rebalance_btree(DIR_ENTRY_PAGE *tnode, int fh, DIR_META_TYPE *this_meta,
-			int selected_child, DIR_ENTRY *tmp_entries,
-						long long *temp_child_page_pos)
+int32_t rebalance_btree(DIR_ENTRY_PAGE *tnode, int32_t fh, DIR_META_TYPE *this_meta,
+			int32_t selected_child, DIR_ENTRY *tmp_entries,
+						int64_t *temp_child_page_pos)
 {
 /* How to rebalance: if num_entries of child <= MIN_DIR_ENTRIES_PER_PAGE,
 check if its right (or left) sibling contains child <
@@ -644,12 +644,12 @@ If the sibling contains child > MAX_DIR_ENTRIES_PER_PAGE / 2, pool the elements
 from the two nodes, plus the parent item in between, and split the pooled
 elements into two, using the median as the new parent item. */
 
-	int selected_sibling, left_node, /*right_node,*/ to_return;
+	int32_t selected_sibling, left_node, /*right_node,*/ to_return;
 	DIR_ENTRY_PAGE left_page, right_page, temp_page;
-	int temp_total, median_entry;
+	int32_t temp_total, median_entry;
 	char merging;
 	size_t tmp_size;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	/* Index out of bound */
@@ -700,7 +700,7 @@ elements into two, using the median as the new parent item. */
 	memcpy(&(tmp_entries[0]), &(left_page.dir_entries[0]),
 				sizeof(DIR_ENTRY) * left_page.num_entries);
 	memcpy(&(temp_child_page_pos[0]), &(left_page.child_page_pos[0]),
-				sizeof(long long) * (left_page.num_entries+1));
+				sizeof(int64_t) * (left_page.num_entries+1));
 	memcpy(&(tmp_entries[left_page.num_entries]),
 			&(tnode->dir_entries[left_node]), sizeof(DIR_ENTRY));
 	memcpy(&(tmp_entries[left_page.num_entries+1]),
@@ -708,7 +708,7 @@ elements into two, using the median as the new parent item. */
 				sizeof(DIR_ENTRY) * right_page.num_entries);
 	memcpy(&(temp_child_page_pos[left_page.num_entries+1]),
 				&(right_page.child_page_pos[0]),
-				sizeof(long long) * (right_page.num_entries+1));
+				sizeof(int64_t) * (right_page.num_entries+1));
 
 	if (merging == TRUE) {
 		/* Merge the two nodes and process node deletion */
@@ -718,7 +718,7 @@ elements into two, using the median as the new parent item. */
 					sizeof(DIR_ENTRY) * temp_total);
 		memcpy(&(left_page.child_page_pos[0]),
 					&(temp_child_page_pos[0]),
-					sizeof(long long) * (temp_total + 1));
+					sizeof(int64_t) * (temp_total + 1));
 		left_page.num_entries = temp_total;
 
 		/* Drop the right node and update related info, including
@@ -840,7 +840,7 @@ elements into two, using the median as the new parent item. */
 			memcpy(&(tnode->dir_entries[left_node]),
 						&(tmp_entries[0]), tmp_size);
 
-			tmp_size = sizeof(long long) *
+			tmp_size = sizeof(int64_t) *
 					(tnode->num_entries - (left_node + 1));
 			memcpy(&(temp_child_page_pos[0]),
 					&(tnode->child_page_pos[left_node+2]),
@@ -872,7 +872,7 @@ elements into two, using the median as the new parent item. */
 					sizeof(DIR_ENTRY) * median_entry);
 	memcpy(&(left_page.child_page_pos[0]),
 				&(temp_child_page_pos[0]),
-				sizeof(long long) * (median_entry + 1));
+				sizeof(int64_t) * (median_entry + 1));
 	left_page.num_entries = median_entry;
 	PWRITE(fh, &left_page, sizeof(DIR_ENTRY_PAGE),
 						left_page.this_page_pos);
@@ -884,7 +884,7 @@ elements into two, using the median as the new parent item. */
 			sizeof(DIR_ENTRY) * ((temp_total - median_entry)-1));
 	memcpy(&(right_page.child_page_pos[0]),
 			&(temp_child_page_pos[median_entry+1]),
-			sizeof(long long) * (temp_total - median_entry));
+			sizeof(int64_t) * (temp_total - median_entry));
 	right_page.num_entries = (temp_total - median_entry)-1;
 	PWRITE(fh, &right_page, sizeof(DIR_ENTRY_PAGE),
 						right_page.this_page_pos);
@@ -904,9 +904,9 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: extract_largest_child
-*        Inputs: DIR_ENTRY_PAGE *tnode, int fh, DIR_META_TYPE *this_meta,
+*        Inputs: DIR_ENTRY_PAGE *tnode, int32_t fh, DIR_META_TYPE *this_meta,
 *                DIR_ENTRY *extracted_child, DIR_ENTRY *tmp_entries,
-*                long long *temp_child_page_pos
+*                int64_t *temp_child_page_pos
 *       Summary: Select and delete the largest element in this subtree.
 *                "tnode" is the B-tree node being processed. "fh" is the
 *                file handle of the meta file. "this_meta" is the meta head
@@ -924,9 +924,9 @@ errcode_handle:
 *                Negation of error code if an error occurred.
 *
 *************************************************************************/
-int extract_largest_child(DIR_ENTRY_PAGE *tnode, int fh,
+int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 			DIR_META_TYPE *this_meta, DIR_ENTRY *extracted_child,
-			DIR_ENTRY *tmp_entries, long long *temp_child_page_pos)
+			DIR_ENTRY *tmp_entries, int64_t *temp_child_page_pos)
 {
 	/*Select and remove the largest element from the left subtree of
 		entry_to_delete*/
@@ -934,9 +934,9 @@ int extract_largest_child(DIR_ENTRY_PAGE *tnode, int fh,
 		function */
 	/* Return the largest element using extracted_child pointer */
 
-	int s_index, ret_val;
+	int32_t s_index, ret_val;
 	DIR_ENTRY_PAGE temppage;
-	int errcode;
+	int32_t errcode;
 	ssize_t ret_ssize;
 
 	s_index = tnode->num_entries;

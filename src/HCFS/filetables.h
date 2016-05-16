@@ -25,29 +25,29 @@
 
 typedef struct {
 	ino_t thisinode;
-	int flags;
+	int32_t flags;
 	META_CACHE_ENTRY_STRUCT *meta_cache_ptr;
 	char meta_cache_locked;
 	FILE *blockfptr;
-	long long opened_block;
-	long long cached_page_index;
-	long long cached_filepos;
+	int64_t opened_block;
+	int64_t cached_page_index;
+	int64_t cached_filepos;
 	sem_t block_sem;
 } FH_ENTRY;
 
 typedef struct {
-	long long num_opened_files;
+	int64_t num_opened_files;
 	char *entry_table_flags;
 	FH_ENTRY *entry_table;
-	long long last_available_index;
+	int64_t last_available_index;
 	sem_t fh_table_sem;
 } FH_TABLE_TYPE;
 
 FH_TABLE_TYPE system_fh_table;
 
-int init_system_fh_table(void);
-long long open_fh(ino_t thisinode, int flags);
-int close_fh(long long index);
+int32_t init_system_fh_table(void);
+int64_t open_fh(ino_t thisinode, int32_t flags);
+int32_t close_fh(int64_t index);
 
 /*END definition of file handle */
 

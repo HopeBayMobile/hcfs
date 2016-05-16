@@ -63,16 +63,16 @@
 *                appropriate error code.
 *
 *************************************************************************/
-int init_hcfs_system_data(void)
+int32_t init_hcfs_system_data(void)
 {
-	int errcode, ret;
+	int32_t errcode, ret;
 	size_t ret_size;
-	long long quota;
+	int64_t quota;
 
 #ifdef _ANDROID_ENV_
 	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 #else
-	int shm_key;
+	int32_t shm_key;
 
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
 	if (shm_key < 0) {
@@ -157,9 +157,9 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int sync_hcfs_system_data(char need_lock)
+int32_t sync_hcfs_system_data(char need_lock)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	if (need_lock == TRUE)
@@ -185,9 +185,9 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int init_hfuse(void)
+int32_t init_hfuse(void)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	ret_val = init_hcfs_system_data();
 	if (ret_val < 0)
@@ -211,9 +211,9 @@ int init_hfuse(void)
 }
 
 /* Helper function to initialize curl handles for downloading objects */
-int _init_download_curl(int count)
+int32_t _init_download_curl(int32_t count)
 {
-	int ret_val;
+	int32_t ret_val;
 
 	snprintf(download_curl_handles[count].id,
 		 sizeof(((CURL_HANDLE *)0)->id) - 1, "download_thread_%d",
@@ -251,7 +251,7 @@ int _init_download_curl(int count)
  */
 void init_backend_related_module(void)
 {
-	int count;
+	int32_t count;
 
 	if (CURRENT_BACKEND != NONE) {
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
@@ -279,19 +279,19 @@ void init_backend_related_module(void)
 /************************************************************************
 *
 * Function name: main
-*        Inputs: int argc, char **argv
+*        Inputs: int32_t argc, char **argv
 *       Summary: Main function for HCFS system.
 *  Return value: 0 if successful.
 *
 *************************************************************************/
 /*TODO: Error handling after validating system config*/
-int main(int argc, char **argv)
+int32_t main(int32_t argc, char **argv)
 {
 	CURL_HANDLE curl_handle;
-	int ret_val;
+	int32_t ret_val;
 	struct rlimit nofile_limit;
 #ifndef _ANDROID_ENV_
-	int count;
+	int32_t count;
 #endif
 
 	ret_val = ignore_sigpipe();

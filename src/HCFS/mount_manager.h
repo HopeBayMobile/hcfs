@@ -45,15 +45,15 @@ Pointers to the FUSE session and channel used for this mount
 */
 
 typedef struct {
-	long long system_size;
-	long long meta_size;
-	long long num_inodes;
+	int64_t system_size;
+	int64_t meta_size;
+	int64_t num_inodes;
 } FS_STAT_T;
 
 typedef struct {
-	long long backend_system_size;
-	long long backend_meta_size;
-	long long backend_num_inodes;
+	int64_t backend_system_size;
+	int64_t backend_meta_size;
+	int64_t backend_num_inodes;
 } FS_CLOUD_STAT_T;
 
 typedef struct {
@@ -88,7 +88,7 @@ struct mount_node_template {
 typedef struct mount_node_template MOUNT_NODE_T;
 
 typedef struct {
-	long num_mt_FS;
+	int64_t num_mt_FS;
 	MOUNT_NODE_T *root;
 	sem_t mount_lock;
 } MOUNT_MGR_T;
@@ -98,38 +98,38 @@ MOUNT_MGR_T mount_mgr;
 /* Routines should also lock FS manager if needed to prevent inconsistency
 in the two modules */
 
-int init_mount_mgr(void);
-int destroy_mount_mgr(void); /* Will call unmount_all */
+int32_t init_mount_mgr(void);
+int32_t destroy_mount_mgr(void); /* Will call unmount_all */
 
-int mount_FS(char *fsname, char *mp, char mp_mode);
-int unmount_FS(char *fsname, char *mp); /* Need to unmount FUSE and set is_unmount */
-int unmount_all(void);
+int32_t mount_FS(char *fsname, char *mp, char mp_mode);
+int32_t unmount_FS(char *fsname, char *mp); /* Need to unmount FUSE and set is_unmount */
+int32_t unmount_all(void);
 
 /* If is_unmount is set, FUSE destroy routine should not call
 unmount_event */
-int unmount_event(char *fsname, char *mp);
-int mount_status(char *fsname);
+int32_t unmount_event(char *fsname, char *mp);
+int32_t mount_status(char *fsname);
 
 /* Below are helper functions. Will not process lock / unlock in these
 functions */
-int FS_is_mounted(char *fsname);
+int32_t FS_is_mounted(char *fsname);
 
-int search_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
+int32_t search_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 		MOUNT_T **mt_info);
-int search_mount(char *fsname, char *mp, MOUNT_T **mt_info);
-int insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info);
-int insert_mount(char *fsname, MOUNT_T *mt_info);
+int32_t search_mount(char *fsname, char *mp, MOUNT_T **mt_info);
+int32_t insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info);
+int32_t insert_mount(char *fsname, MOUNT_T *mt_info);
 
 /* For delete from tree, the tree node will not be freed immediately. This
 should be handled in the unmount routines */
-int delete_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
+int32_t delete_mount_node(char *fsname, char *mp, MOUNT_NODE_T *node,
 					MOUNT_NODE_T **ret_node);
-int delete_mount(char *fsname, char *mp, MOUNT_NODE_T **ret_node);
+int32_t delete_mount(char *fsname, char *mp, MOUNT_NODE_T **ret_node);
 
-int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
-		long long meta_size_delta, long long num_inodes_delta);
-int update_FS_statistics(MOUNT_T *mptr);
+int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta);
+int32_t update_FS_statistics(MOUNT_T *mptr);
 
-int read_FS_statistics(MOUNT_T *mptr);
+int32_t read_FS_statistics(MOUNT_T *mptr);
 #endif  /* GW20_HCFS_MOUNT_MANAGER_H_ */
 

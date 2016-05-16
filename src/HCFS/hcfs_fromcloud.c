@@ -43,21 +43,21 @@
 /************************************************************************
 *
 * Function name: fetch_from_cloud
-*        Inputs: FILE *fptr, ino_t this_inode, long long block_no
+*        Inputs: FILE *fptr, ino_t this_inode, int64_t block_no
 *       Summary: Read block "block_no" of inode "this_inode" from backend,
 *                and write to the file pointed by "fptr".
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
 #if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
 #endif
-	int status;
-	int which_curl_handle;
-	int ret, errcode;
-	long tmplen;
+	int32_t status;
+	int32_t which_curl_handle;
+	int32_t ret, errcode;
+	int64_t tmplen;
 
 	if (hcfs_system->sync_paused)
 		return -EIO;
@@ -125,15 +125,15 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	fclose(get_fptr);
 
-	unsigned char *object_key = NULL;
+	uint8_t *object_key = NULL;
 #if ENCRYPT_ENABLE
-	unsigned char *key = get_key("this is hopebay testing");
-	object_key = calloc(KEY_SIZE, sizeof(unsigned char));
+	uint8_t *key = get_key("this is hopebay testing");
+	object_key = calloc(KEY_SIZE, sizeof(uint8_t));
 	decrypt_session_key(object_key, object_meta->enc_session_key, key);
 	OPENSSL_free(key);
 #endif
 
-	decode_to_fd(fptr, object_key, (unsigned char *)get_fptr_data, len,
+	decode_to_fd(fptr, object_key, (uint8_t *)get_fptr_data, len,
 		     object_meta->enc_alg, object_meta->comp_alg);
 
 	free_object_meta(object_meta);
@@ -176,9 +176,9 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	char objname[1000];
 	char thismetapath[METAPATHLEN];
 	BLOCK_ENTRY_PAGE temppage;
-	int entry_index;
+	int32_t entry_index;
 	struct stat tempstat;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 	char block, mlock, bopen, mopen;
 
@@ -306,7 +306,7 @@ errcode_handle:
 	free(ptr);
 }
 
-int init_download_control()
+int32_t init_download_control()
 {
 	memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 	sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
@@ -319,7 +319,7 @@ int init_download_control()
 	return 0;
 }
 
-int destroy_download_control()
+int32_t destroy_download_control()
 {
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 	sem_destroy(&(download_thread_ctl.ctl_op_sem));
@@ -341,8 +341,8 @@ int destroy_download_control()
  */
 void download_block_manager()
 {
-	int t_idx;
-	int ret;
+	int32_t t_idx;
+	int32_t ret;
 	pthread_t *tid;
 	DOWNLOAD_BLOCK_INFO *block_info;
 	struct timespec time_to_sleep;
@@ -419,11 +419,11 @@ void download_block_manager()
 	}
 }
 
-static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
-	char from_st, char to_st, long long cache_size_delta)
+static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
+	char from_st, char to_st, int64_t cache_size_delta)
 {
 	BLOCK_ENTRY_PAGE block_page;
-	int e_index, ret;
+	int32_t e_index, ret;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	char metapath[300];
 
@@ -505,7 +505,7 @@ void fetch_backend_block(void *ptr)
 	char objname[600];
 	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
-	int ret;
+	int32_t ret;
 	struct stat blockstat;
 
 	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
@@ -643,9 +643,9 @@ thread_error:
 	return;
 }
 
-static inline int _select_thread()
+static inline int32_t _select_thread()
 {
-	int count;
+	int32_t count;
 	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++) {
 		if (download_thread_ctl.block_info[count].active == FALSE)
 			break;
@@ -654,15 +654,15 @@ static inline int _select_thread()
 	return count;
 }
 
-static int _check_fetch_block(const char *metapath, FILE *fptr,
-	ino_t inode, long long blkno, long long page_pos)
+static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
+	ino_t inode, int64_t blkno, int64_t page_pos)
 {
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE entry_page;
 	BLOCK_ENTRY *temp_entry;
-	int e_index;
-	int which_th;
-	int ret, errcode;
+	int32_t e_index;
+	int32_t which_th;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	e_index = blkno % MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -726,18 +726,18 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */
-int fetch_pinned_blocks(ino_t inode)
+int32_t fetch_pinned_blocks(ino_t inode)
 {
 	char metapath[300];
 	FILE *fptr;
 	struct stat tempstat;
 	off_t total_size;
-	long long total_blocks, blkno;
-	long long which_page, current_page, page_pos;
-	long long cache_size;
+	int64_t total_blocks, blkno;
+	int64_t which_page, current_page, page_pos;
+	int64_t cache_size;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
-	int ret, ret_code, errcode, t_idx;
+	int32_t ret, ret_code, errcode, t_idx;
 	char all_thread_terminate;
 	struct timespec time_to_sleep;
 	char error_path[200];
@@ -889,13 +889,13 @@ static BOOL quota_wakeup()
  */
 void fetch_quota_from_cloud(void *ptr)
 {
-	int status;
+	int32_t status;
 	char objname[100];
 	char download_path[256];
 	FILE *fptr;
 	char *buf;
-	int ret, errcode;
-	long long quota;
+	int32_t ret, errcode;
+	int64_t quota;
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
 
@@ -1008,7 +1008,7 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */
-int update_quota()
+int32_t update_quota()
 {
 	if (CURRENT_BACKEND == NONE) {
 		write_log(5, "Cannot trigger updating quota without backend\n");

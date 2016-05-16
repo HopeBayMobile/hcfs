@@ -58,25 +58,25 @@ sync in upload process */
  * @return 0 on succeeding in removing the inode, 1 on skipping the inode,
  *         otherwise negative error code.
  */
-int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
-							long *seconds_slept)
+int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
+							int64_t *seconds_slept)
 {
 	SUPER_BLOCK_ENTRY tempentry;
 	char thismetapath[METAPATHLEN];
 	FILE *metafptr;
-	long long current_block;
-	long long total_blocks;
+	int64_t current_block;
+	int64_t total_blocks;
 	struct stat temphead_stat;
 	struct stat tempstat;
 	FILE_META_TYPE temphead;
-	long long pagepos;
+	int64_t pagepos;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
-	int page_index;
-	long long timediff;
+	int32_t page_index;
+	int64_t timediff;
 	struct timeval currenttime;
 	BLOCK_ENTRY *blk_entry_ptr;
-	int ret, errcode;
+	int32_t ret, errcode;
 	size_t ret_size;
 
 	write_log(10, "Begin remove sync block inode %" PRIu64 "\n",
@@ -309,7 +309,7 @@ errcode_handle:
 }
 
 
-static int _check_cache_replace_result(long long *num_removed_inode)
+static int32_t _check_cache_replace_result(int64_t *num_removed_inode)
 {
 	/* If number of removed inodes = 0, and cache size is full, and
 	 * backend is offline, then wake them up and tell them cannot
@@ -355,13 +355,13 @@ void run_cache_loop(void)
 {
 	ino_t this_inode;
 	struct timeval builttime, currenttime;
-	long seconds_slept;
-	int e_index;
+	int64_t seconds_slept;
+	int32_t e_index;
 	char skip_recent, do_something;
 	time_t node_time;
 	CACHE_USAGE_NODE *this_cache_node;
-	int ret;
-	long long num_removed_inode;
+	int32_t ret;
+	int64_t num_removed_inode;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -536,9 +536,9 @@ void run_cache_loop(void)
 *  Return value: None
 *
 *************************************************************************/
-int sleep_on_cache_full(void)
+int32_t sleep_on_cache_full(void)
 {
-	int cache_replace_status;
+	int32_t cache_replace_status;
 
 	/* Check cache replacement status */
 	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
@@ -564,9 +564,9 @@ int sleep_on_cache_full(void)
 *  Return value: None
 *
 *************************************************************************/
-void notify_sleep_on_cache(int cache_replace_status)
+void notify_sleep_on_cache(int32_t cache_replace_status)
 {
-	int num_cache_sleep_sem_value;
+	int32_t num_cache_sleep_sem_value;
 
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.cache_replace_status = cache_replace_status;

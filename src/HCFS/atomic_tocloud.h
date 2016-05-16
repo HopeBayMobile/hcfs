@@ -34,7 +34,7 @@ typedef struct {
 	char is_uploading;
 	BOOL is_revert;
 	BOOL finish_sync;
-	int progress_list_fd;
+	int32_t progress_list_fd;
 } UPLOADING_COMMUNICATION_DATA;
 
 /* Info entry for a specified block in uploading progress file */
@@ -42,11 +42,11 @@ typedef struct {
 	char finish_uploading;
 	char block_exist; /*first bit means toupload block, second means cloud*/
 #if (DEDUP_ENABLE)
-	unsigned char to_upload_objid[OBJID_LENGTH];
-	unsigned char backend_objid[OBJID_LENGTH];
+	uint8_t to_upload_objid[OBJID_LENGTH];
+	uint8_t backend_objid[OBJID_LENGTH];
 #else
-	long long to_upload_seq;
-	long long backend_seq;
+	int64_t to_upload_seq;
+	int64_t backend_seq;
 #endif
 } BLOCK_UPLOADING_STATUS;
 
@@ -57,65 +57,65 @@ typedef struct {
 
 typedef struct {
 	char now_action;
-	long long backend_size;
-	long long total_backend_blocks;
-	long long toupload_size;
-	long long total_toupload_blocks;
-	long long direct;
-	long long single_indirect;
-	long long double_indirect;
-	long long triple_indirect;
-	long long quadruple_indirect;
+	int64_t backend_size;
+	int64_t total_backend_blocks;
+	int64_t toupload_size;
+	int64_t total_toupload_blocks;
+	int64_t direct;
+	int64_t single_indirect;
+	int64_t double_indirect;
+	int64_t triple_indirect;
+	int64_t quadruple_indirect;
 } PROGRESS_META;
 
-int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
-	int fd, BOOL is_revert, BOOL finish_sync);
+int32_t comm2fuseproc(ino_t this_inode, BOOL is_uploading,
+	int32_t fd, BOOL is_revert, BOOL finish_sync);
 
-int get_progress_info(int fd, long long block_index,
+int32_t get_progress_info(int32_t fd, int64_t block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
 #if (DEDUP_ENABLE)
-int set_progress_info(int fd, long long block_index,
+int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const unsigned char *toupload_objid, const unsigned char *backend_objid,
+	const uint8_t *toupload_objid, const uint8_t *backend_objid,
 	const char *finish);
 #else
-int set_progress_info(int fd, long long block_index,
+int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const long long *toupload_seq, const long long *backend_seq,
+	const int64_t *toupload_seq, const int64_t *backend_seq,
 	const char *finish);
 #endif
 
-int init_progress_info(int fd, long long backend_blocks, long long backend_size,
+int32_t init_progress_info(int32_t fd, int64_t backend_blocks, int64_t backend_size,
 	FILE *backend_metafptr);
 
-int create_progress_file(ino_t inode);
+int32_t create_progress_file(ino_t inode);
 
-int del_progress_file(int fd, ino_t inode);
+int32_t del_progress_file(int32_t fd, ino_t inode);
 
-int check_and_copy_file(const char *srcpath, const char *tarpath,
+int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 		BOOL lock_src);
 
-int fetch_toupload_meta_path(char *pathname, ino_t inode);
+int32_t fetch_toupload_meta_path(char *pathname, ino_t inode);
 
-int fetch_toupload_block_path(char *pathname, ino_t inode,
-	long long block_no, long long seq);
+int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
+	int64_t block_no, int64_t seq);
 
-int fetch_backend_meta_path(char *pathname, ino_t inode);
+int32_t fetch_backend_meta_path(char *pathname, ino_t inode);
 void fetch_del_backend_meta_path(char *pathname, ino_t inode);
 
-char did_block_finish_uploading(int fd, long long blockno);
+char did_block_finish_uploading(int32_t fd, int64_t blockno);
 
-long long query_status_page(int fd, long long block_index);
+int64_t query_status_page(int32_t fd, int64_t block_index);
 
 void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr);
 
-int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
-		long long *total_backend_blocks, long long upload_seq);
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
+		int64_t *total_backend_blocks, int64_t upload_seq);
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr);
 
-int change_action(int fd, char new_action);
+int32_t change_action(int32_t fd, char new_action);
 
 void fetch_progress_file_path(char *pathname, ino_t inode);
 

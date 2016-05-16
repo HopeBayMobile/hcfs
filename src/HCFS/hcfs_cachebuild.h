@@ -22,17 +22,17 @@
 
 typedef struct usage_node_template {
 	ino_t this_inode;
-	long long clean_cache_size;
-	long long dirty_cache_size;
+	int64_t clean_cache_size;
+	int64_t dirty_cache_size;
 	time_t last_access_time;
 	time_t last_mod_time;
 	struct usage_node_template *next_node;
 } CACHE_USAGE_NODE;
 
 CACHE_USAGE_NODE *inode_cache_usage_hash[CACHE_USAGE_NUM_ENTRIES];
-int nonempty_cache_hash_entries;
+int32_t nonempty_cache_hash_entries;
 
-int cache_usage_hash_init(void);
+int32_t cache_usage_hash_init(void);
 
 /*Pops the entry from the linked list if found, else NULL is returned*/
 CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode);
@@ -42,8 +42,8 @@ void insert_cache_usage_node(ino_t this_inode, CACHE_USAGE_NODE *this_node);
 needs to be placed in front of the second node, returns zero if does not matter,
 returns a positive number (> 0) if the second node needs to be placed in front
 of the first node*/
-int compare_cache_usage(CACHE_USAGE_NODE *first_node,
+int32_t compare_cache_usage(CACHE_USAGE_NODE *first_node,
 					CACHE_USAGE_NODE *second_node);
-int build_cache_usage(void);
+int32_t build_cache_usage(void);
 
 #endif  /* GW20_HCFS_HCFS_CACHEBUILD_H_ */

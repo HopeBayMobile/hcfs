@@ -100,118 +100,118 @@ typedef struct {
 
 /* Defining the structure of directory object meta */
 typedef struct {
-	long long total_children;  /*Total children not including "." and "..*/
-	long long root_entry_page;
-	long long next_xattr_page;
-	long long entry_page_gc_list;
-	long long tree_walk_list_head;
-	unsigned long generation;
-	unsigned char source_arch;
-	unsigned long long metaver;
+	int64_t total_children;  /*Total children not including "." and "..*/
+	int64_t root_entry_page;
+	int64_t next_xattr_page;
+	int64_t entry_page_gc_list;
+	int64_t tree_walk_list_head;
+	uint64_t generation;
+	uint8_t source_arch;
+	uint64_t metaver;
 	ino_t root_inode;
-	long long finished_seq;
+	int64_t finished_seq;
 	char local_pin;
 } DIR_META_TYPE;
 
 /* Defining the structure for a page of directory entries */
 typedef struct {
-	int num_entries;
+	int32_t num_entries;
 	DIR_ENTRY dir_entries[MAX_DIR_ENTRIES_PER_PAGE];
-	long long this_page_pos; /*File pos of the current node*/
+	int64_t this_page_pos; /*File pos of the current node*/
 	/* File pos of child pages for this node, b-tree style */
-	long long child_page_pos[MAX_DIR_ENTRIES_PER_PAGE+1];
+	int64_t child_page_pos[MAX_DIR_ENTRIES_PER_PAGE+1];
 	/*File pos of parent. If this is the root, the value is 0 */
-	long long parent_page_pos;
+	int64_t parent_page_pos;
 	/*File pos of the next gc entry if on gc list*/
-	long long gc_list_next;
-	long long tree_walk_next;
-	long long tree_walk_prev;
+	int64_t gc_list_next;
+	int64_t tree_walk_next;
+	int64_t tree_walk_prev;
 } DIR_ENTRY_PAGE;
 
 /* Structures for regular files */
 /* Defining one block status entry in meta files */
 typedef struct {
-	unsigned char status;
-	unsigned char uploaded;
+	uint8_t status;
+	uint8_t uploaded;
 #if (DEDUP_ENABLE)
-	unsigned char obj_id[OBJID_LENGTH];
+	uint8_t obj_id[OBJID_LENGTH];
 #endif
-	long long seqnum;
+	int64_t seqnum;
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
 typedef struct {
-	int num_entries;
+	int32_t num_entries;
 	BLOCK_ENTRY block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
 } BLOCK_ENTRY_PAGE;
 
 /* Defining the structure of pointer page (pointers to other pages) */
 typedef struct {
-	long long ptr[POINTERS_PER_PAGE];
+	int64_t ptr[POINTERS_PER_PAGE];
 } PTR_ENTRY_PAGE;
 
 /* Defining the structure of file meta */
 typedef struct {
-	long long next_xattr_page;
-	long long direct;
-	long long single_indirect;
-	long long double_indirect;
-	long long triple_indirect;
-	long long quadruple_indirect;
-	unsigned long generation;
-        unsigned char source_arch;
-	unsigned long long metaver;
+	int64_t next_xattr_page;
+	int64_t direct;
+	int64_t single_indirect;
+	int64_t double_indirect;
+	int64_t triple_indirect;
+	int64_t quadruple_indirect;
+	uint64_t generation;
+        uint8_t source_arch;
+	uint64_t metaver;
 	ino_t root_inode;
-	long long finished_seq;
+	int64_t finished_seq;
 	char local_pin;
 } FILE_META_TYPE;
 
 /* The structure for keeping statistics for a file */
 typedef struct {
-	long long num_blocks;
-	long long num_cached_blocks;
-	long long cached_size;
-	long long dirty_data_size;
+	int64_t num_blocks;
+	int64_t num_cached_blocks;
+	int64_t cached_size;
+	int64_t dirty_data_size;
 } FILE_STATS_TYPE;
 
 /* Defining the structure of symbolic link meta */
 typedef struct {
-	long long next_xattr_page;
-	unsigned link_len;
-	unsigned long generation;
+	int64_t next_xattr_page;
+	uint32_t link_len;
+	uint64_t generation;
 	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
-        unsigned char source_arch;
-	unsigned long long metaver;
+        uint8_t source_arch;
+	uint64_t metaver;
 	ino_t root_inode;
-	long long finished_seq;
+	int64_t finished_seq;
 	char local_pin;
 } SYMLINK_META_TYPE;
 
 typedef struct {
-	long long size_last_upload; /* Record data + meta */
-	long long meta_last_upload; /* Record meta only */
-	long long upload_seq;
+	int64_t size_last_upload; /* Record data + meta */
+	int64_t meta_last_upload; /* Record meta only */
+	int64_t upload_seq;
 } CLOUD_RELATED_DATA;
 
 /*END META definition*/
 
 /* Defining the system meta resources */
 typedef struct {
-	long long system_size; /* data + meta + sb */
-	long long system_meta_size; /* meta */
-	long long super_block_size; /* sb */
-	long long cache_size; /* data(local) + meta + sb */
-	long long cache_blocks;
-	long long pinned_size; /* data(pin) + meta + sb */
-	long long unpin_dirty_data_size; /* dirty data w/ unpin property */
-	long long backend_size; /* data(sync) + meta(sync) */
-	long long backend_meta_size;
-	long long backend_inodes;
-	long long dirty_cache_size; /* data + meta */
-	long long xfer_size_download;
-	long long xfer_size_upload;
-	long long system_quota;
-	int cache_replace_status;
+	int64_t system_size; /* data + meta + sb */
+	int64_t system_meta_size; /* meta */
+	int64_t super_block_size; /* sb */
+	int64_t cache_size; /* data(local) + meta + sb */
+	int64_t cache_blocks;
+	int64_t pinned_size; /* data(pin) + meta + sb */
+	int64_t unpin_dirty_data_size; /* dirty data w/ unpin property */
+	int64_t backend_size; /* data(sync) + meta(sync) */
+	int64_t backend_meta_size;
+	int64_t backend_inodes;
+	int64_t dirty_cache_size; /* data + meta */
+	int64_t xfer_size_download;
+	int64_t xfer_size_upload;
+	int64_t system_quota;
+	int32_t cache_replace_status;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {
@@ -233,7 +233,7 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
-int global_argc;
+int32_t global_argc;
 char **global_argv;
 struct fuse_args global_fuse_args;
 
@@ -241,7 +241,7 @@ struct fuse_args global_fuse_args;
 void *mount_multi_thread(void *ptr);
 void *mount_single_thread(void *ptr);
 
-int hook_fuse(int argc, char **argv);
+int32_t hook_fuse(int32_t argc, char **argv);
 
 /* Moved pkg lookup here */
 typedef struct {
