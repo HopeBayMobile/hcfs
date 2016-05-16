@@ -40,8 +40,8 @@ class FS_managerEnvironment : public ::testing::Environment {
 	::testing::AddGlobalTestEnvironment(new FS_managerEnvironment);
 
 
-static int do_delete (const char *fpath, const struct stat *sb,
-		int tflag, struct FTW *ftwbuf)
+static int32_t do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {
 		case FTW_D:
@@ -60,7 +60,7 @@ static int do_delete (const char *fpath, const struct stat *sb,
 
 class init_fs_managerTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpbackuppath[100];
   virtual void SetUp() {
@@ -92,7 +92,7 @@ class init_fs_managerTest : public ::testing::Test {
  };
 
 TEST_F(init_fs_managerTest, InitFSManager) {
-  int ret, lock_val;
+  int32_t ret, lock_val;
   off_t testlen;
 
   if (access(tmpmgrpath, F_OK) == 0)
@@ -116,11 +116,11 @@ TEST_F(init_fs_managerTest, InitFSManager) {
  }
 
 TEST_F(init_fs_managerTest, OpenFSManager) {
-  int ret, lock_val;
+  int32_t ret, lock_val;
   off_t testlen;
   FILE *fptr;
   DIR_META_TYPE tmp_head;
-  unsigned char testuuid[20], verifyuuid[16];
+  uint8_t testuuid[20], verifyuuid[16];
 
   snprintf((char *)testuuid, 20, "1234567890abcdef");
   if (access(tmpmgrpath, F_OK) == 0)
@@ -156,7 +156,7 @@ TEST_F(init_fs_managerTest, OpenFSManager) {
 /* Begin of the test case for the function destroy_fs_manager */
 class destroy_fs_managerTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpbackuppath[100];
   virtual void SetUp() {
@@ -182,7 +182,7 @@ class destroy_fs_managerTest : public ::testing::Test {
 
 TEST_F(destroy_fs_managerTest, Runtest) {
 
-  int ret;
+  int32_t ret;
 
   if (access(tmpmgrpath, F_OK) == 0)
     unlink(tmpmgrpath);
@@ -206,7 +206,7 @@ TEST_F(destroy_fs_managerTest, Runtest) {
 
 class add_filesystemTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpsyncpath[100];
   char tmpbackuppath[100];
@@ -249,7 +249,7 @@ class add_filesystemTest : public ::testing::Test {
  };
 
 TEST_F(add_filesystemTest, AddOneFS) {
-  int ret, lock_val;
+  int32_t ret, lock_val;
   DIR_ENTRY tmp_entry;
   char tmppath[100];
   DIR_META_TYPE tmpmeta;
@@ -294,7 +294,7 @@ TEST_F(add_filesystemTest, AddOneFS) {
  }
 
 TEST_F(add_filesystemTest, AddThreeFSSplit) {
-  int ret, lock_val;
+  int32_t ret, lock_val;
   DIR_ENTRY tmp_entry;
   char tmppath[100];
   DIR_META_TYPE tmpmeta;
@@ -390,9 +390,9 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
  }
 TEST_F(add_filesystemTest, NameTooLong) {
-  int ret;
+  int32_t ret;
   char verylongname[300];
-  int count;
+  int32_t count;
   DIR_ENTRY tmp_entry;
 
   for (count = 0; count < 290; count++)
@@ -416,7 +416,7 @@ TEST_F(add_filesystemTest, NameTooLong) {
 
 class delete_filesystemTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpsyncpath[100];
   char tmpbackuppath[100];
@@ -458,7 +458,7 @@ class delete_filesystemTest : public ::testing::Test {
  };
 
 TEST_F(delete_filesystemTest, NoFSDelete) {
-  int ret;
+  int32_t ret;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -467,9 +467,9 @@ TEST_F(delete_filesystemTest, NoFSDelete) {
   EXPECT_EQ(-ENOENT, ret);
  }
 TEST_F(delete_filesystemTest, NameTooLong) {
-  int ret;
+  int32_t ret;
   char verylongname[300];
-  int count;
+  int32_t count;
 
   for (count = 0; count < 290; count++)
     verylongname[count] = '0' + (count % 10);
@@ -482,7 +482,7 @@ TEST_F(delete_filesystemTest, NameTooLong) {
   EXPECT_EQ(-ENAMETOOLONG, ret);
  }
 TEST_F(delete_filesystemTest, NoRootMeta) {
-  int ret, lock_val;
+  int32_t ret, lock_val;
   DIR_ENTRY tmp_entry;
   ssize_t retsize;
   char tmppath[100];
@@ -509,7 +509,7 @@ TEST_F(delete_filesystemTest, NoRootMeta) {
   EXPECT_EQ(-ENOENT, ret);
  }
 TEST_F(delete_filesystemTest, RootNotEmpty) {
-  int ret, lock_val;
+  int32_t ret, lock_val;
   DIR_ENTRY tmp_entry;
   char tmppath[100];
   DIR_META_TYPE tmpmeta;
@@ -552,7 +552,7 @@ TEST_F(delete_filesystemTest, RootNotEmpty) {
  }
 
 TEST_F(delete_filesystemTest, DeleteOneFS) {
-  int ret, lock_val, errcode;
+  int32_t ret, lock_val, errcode;
   DIR_ENTRY tmp_entry;
   char tmppath[100];
   DIR_META_TYPE tmpmeta;
@@ -590,7 +590,7 @@ TEST_F(delete_filesystemTest, DeleteOneFS) {
 
 class check_filesystemTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpsyncpath[100];
   char tmpbackuppath[100];
@@ -631,9 +631,9 @@ class check_filesystemTest : public ::testing::Test {
  };
 
 TEST_F(check_filesystemTest, NameTooLong) {
-  int ret;
+  int32_t ret;
   char verylongname[300];
-  int count;
+  int32_t count;
   DIR_ENTRY tmp_entry;
 
   for (count = 0; count < 290; count++)
@@ -647,7 +647,7 @@ TEST_F(check_filesystemTest, NameTooLong) {
   EXPECT_EQ(-ENAMETOOLONG, ret);
  }
 TEST_F(check_filesystemTest, NoFSCheck) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry;
 
   ret = init_fs_manager();
@@ -658,7 +658,7 @@ TEST_F(check_filesystemTest, NoFSCheck) {
  }
 
 TEST_F(check_filesystemTest, FSFound) {
-  int ret, lock_val, errcode;
+  int32_t ret, lock_val, errcode;
   DIR_ENTRY tmp_entry;
   char tmppath[100];
   DIR_META_TYPE tmpmeta;
@@ -689,7 +689,7 @@ TEST_F(check_filesystemTest, FSFound) {
  }
 
 TEST_F(check_filesystemTest, FSNotFound) {
-  int ret, lock_val, errcode;
+  int32_t ret, lock_val, errcode;
   DIR_ENTRY tmp_entry;
   char tmppath[100];
   DIR_META_TYPE tmpmeta;
@@ -724,7 +724,7 @@ TEST_F(check_filesystemTest, FSNotFound) {
 
 class list_filesystemTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpbackuppath[100];
   FILE *fptr;
@@ -762,9 +762,9 @@ class list_filesystemTest : public ::testing::Test {
  };
 
 TEST_F(list_filesystemTest, NoFS) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry[10];
-  unsigned long retval;
+  uint64_t retval;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -775,9 +775,9 @@ TEST_F(list_filesystemTest, NoFS) {
  }  
 
 TEST_F(list_filesystemTest, MoreFSthanBuf) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry[10];
-  unsigned long retval;
+  uint64_t retval;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -790,9 +790,9 @@ TEST_F(list_filesystemTest, MoreFSthanBuf) {
  }  
 
 TEST_F(list_filesystemTest, ReturnFSnumOnly) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry[10];
-  unsigned long retval;
+  uint64_t retval;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -804,9 +804,9 @@ TEST_F(list_filesystemTest, ReturnFSnumOnly) {
  }  
 
 TEST_F(list_filesystemTest, ListFSOneNode) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry[10];
-  unsigned long retval;
+  uint64_t retval;
   DIR_META_TYPE tmphead;
   DIR_ENTRY_PAGE tmppage;
 
@@ -839,9 +839,9 @@ TEST_F(list_filesystemTest, ListFSOneNode) {
  }  
 
 TEST_F(list_filesystemTest, ListFSTwoNodes) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry[20];
-  unsigned long retval;
+  uint64_t retval;
   DIR_META_TYPE tmphead;
   DIR_ENTRY_PAGE tmppage, tmppage2;
 
@@ -892,9 +892,9 @@ TEST_F(list_filesystemTest, ListFSTwoNodes) {
  }  
 
 TEST_F(list_filesystemTest, RecomputeNum) {
-  int ret;
+  int32_t ret;
   DIR_ENTRY tmp_entry[20];
-  unsigned long retval;
+  uint64_t retval;
   DIR_META_TYPE tmphead;
   DIR_ENTRY_PAGE tmppage, tmppage2;
 
@@ -954,7 +954,7 @@ TEST_F(list_filesystemTest, RecomputeNum) {
 
 class backup_FS_databaseTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpbackuppath[100];
   FILE *fptr;
@@ -994,7 +994,7 @@ class backup_FS_databaseTest : public ::testing::Test {
  };
 
 TEST_F(backup_FS_databaseTest, CannotCreate) {
-  int ret;
+  int32_t ret;
   FILE *tmpfptr;
 
   mknod("/tmp/FSmgr_upload", S_IFREG | 0400, 0);
@@ -1010,7 +1010,7 @@ TEST_F(backup_FS_databaseTest, CannotCreate) {
  }
 
 TEST_F(backup_FS_databaseTest, UploadDone) {
-  int ret, errcode;
+  int32_t ret, errcode;
   DIR_META_TYPE tmphead;
 
   ret = init_fs_manager();
@@ -1043,7 +1043,7 @@ TEST_F(backup_FS_databaseTest, UploadDone) {
 /* Init backend is done in get object op now */
 /*
 TEST_F(backup_FS_databaseTest, FailedInit) {
-  int ret, errcode;
+  int32_t ret, errcode;
   DIR_META_TYPE tmphead;
 
   ret = init_fs_manager();
@@ -1075,7 +1075,7 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
  }
 */
 TEST_F(backup_FS_databaseTest, FailedPut) {
-  int ret, errcode;
+  int32_t ret, errcode;
   DIR_META_TYPE tmphead;
 
   ret = init_fs_manager();
@@ -1111,7 +1111,7 @@ TEST_F(backup_FS_databaseTest, FailedPut) {
 
 class restore_FS_databaseTest : public ::testing::Test {
  protected:
-  int count;
+  int32_t count;
   char tmpmgrpath[100];
   char tmpbackuppath[100];
   FILE *fptr;
@@ -1145,7 +1145,7 @@ class restore_FS_databaseTest : public ::testing::Test {
  };
 
 TEST_F(restore_FS_databaseTest, CannotCreate) {
-  int ret;
+  int32_t ret;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -1167,7 +1167,7 @@ TEST_F(restore_FS_databaseTest, CannotCreate) {
 /* Init backend is done in get object op now */
 /*
 TEST_F(restore_FS_databaseTest, CurlInitFailed) {
-  int ret;
+  int32_t ret;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -1188,7 +1188,7 @@ TEST_F(restore_FS_databaseTest, CurlInitFailed) {
 */
 
 TEST_F(restore_FS_databaseTest, CurlGetFailed) {
-  int ret;
+  int32_t ret;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
@@ -1208,7 +1208,7 @@ TEST_F(restore_FS_databaseTest, CurlGetFailed) {
  }
 
 TEST_F(restore_FS_databaseTest, DownloadDone) {
-  int ret;
+  int32_t ret;
 
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);

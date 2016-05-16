@@ -66,10 +66,10 @@ void free_tree(MOUNT_NODE_T *node) {
   free_node(node);
  }
 
-MOUNT_NODE_T* build_subtree(MOUNT_NODE_T *parent, int start1, int end1) {
+MOUNT_NODE_T* build_subtree(MOUNT_NODE_T *parent, int32_t start1, int32_t end1) {
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
-  int midval, start, end;
+  int32_t midval, start, end;
 
   midval = (start1 + end1) / 2;
   snprintf(fsname, 10, "%4d", midval);
@@ -94,7 +94,7 @@ MOUNT_NODE_T* build_subtree(MOUNT_NODE_T *parent, int start1, int end1) {
   return tmpnode;
  }
 
-void build_tree(int num_nodes) {
+void build_tree(int32_t num_nodes) {
   mount_mgr.root = build_subtree(NULL, 0, num_nodes - 1);
  }
 
@@ -115,7 +115,7 @@ class search_mountTest : public ::testing::Test {
  };
 
 TEST_F(search_mountTest, EmptyDatabase) {
-  int ret;
+  int32_t ret;
   MOUNT_T *tmpinfo;
 
   mount_mgr.root = NULL;
@@ -125,7 +125,7 @@ TEST_F(search_mountTest, EmptyDatabase) {
  }
 
 TEST_F(search_mountTest, MultipleFSFound) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo;
   char fsname[10];
 
@@ -139,7 +139,7 @@ TEST_F(search_mountTest, MultipleFSFound) {
 
  }
 TEST_F(search_mountTest, MultipleFSNotFound) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo;
   char fsname[10];
 
@@ -173,7 +173,7 @@ class insert_mountTest : public ::testing::Test {
  };
 
 TEST_F(insert_mountTest, MultipleFS) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1, *tmpinfo2;
   MOUNT_T *tmpptr[100];
   char fsname[10];
@@ -199,7 +199,7 @@ TEST_F(insert_mountTest, MultipleFS) {
 
  }
 TEST_F(insert_mountTest, MultipleFSReverse) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1, *tmpinfo2;
   MOUNT_T *tmpptr[100];
   char fsname[10];
@@ -245,7 +245,7 @@ class delete_mountTest : public ::testing::Test {
  };
 
 TEST_F(delete_mountTest, MultipleFS) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1;
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
@@ -268,7 +268,7 @@ TEST_F(delete_mountTest, MultipleFS) {
  }
 
 TEST_F(delete_mountTest, MultipleFSReverse) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1;
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
@@ -291,7 +291,7 @@ TEST_F(delete_mountTest, MultipleFSReverse) {
  }
 
 TEST_F(delete_mountTest, MultipleFSReverse1) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1;
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
@@ -314,7 +314,7 @@ TEST_F(delete_mountTest, MultipleFSReverse1) {
  }
 
 TEST_F(delete_mountTest, MultipleFSReverse2) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1;
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
@@ -337,7 +337,7 @@ TEST_F(delete_mountTest, MultipleFSReverse2) {
  }
 
 TEST_F(delete_mountTest, MultipleFS1) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1;
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
@@ -360,7 +360,7 @@ TEST_F(delete_mountTest, MultipleFS1) {
  }
 
 TEST_F(delete_mountTest, MultipleFS2) {
-  int ret, count;
+  int32_t ret, count;
   MOUNT_T *tmpinfo1;
   MOUNT_NODE_T *tmpnode;
   char fsname[10];
@@ -400,7 +400,7 @@ class init_mount_mgrTest : public ::testing::Test {
  };
 
 TEST_F(init_mount_mgrTest, InitMgr) {
-  int ret;
+  int32_t ret;
 
   ret = init_mount_mgr();
   ASSERT_EQ(0, ret);
@@ -438,7 +438,7 @@ class destroy_mount_mgrTest : public ::testing::Test {
  };
 
 TEST_F(destroy_mount_mgrTest, DestroyMgr) {
-  int ret;
+  int32_t ret;
 
   ret = destroy_mount_mgr();
   ASSERT_EQ(0, ret);
@@ -463,7 +463,7 @@ class FS_is_mountedTest : public ::testing::Test {
  };
 
 TEST_F(FS_is_mountedTest, EmptyDatabase) {
-  int ret;
+  int32_t ret;
 
   mount_mgr.root = NULL;
   ret = FS_is_mounted("anyFS");
@@ -472,7 +472,7 @@ TEST_F(FS_is_mountedTest, EmptyDatabase) {
  }
 
 TEST_F(FS_is_mountedTest, MultipleFSFound) {
-  int ret, count;
+  int32_t ret, count;
   char fsname[10];
 
   build_tree(100);
@@ -485,7 +485,7 @@ TEST_F(FS_is_mountedTest, MultipleFSFound) {
 
  }
 TEST_F(FS_is_mountedTest, MultipleFSNotFound) {
-  int ret, count;
+  int32_t ret, count;
   char fsname[10];
 
   build_tree(100);
@@ -546,7 +546,7 @@ class mount_FSTest : public ::testing::Test {
  };
 
 TEST_F(mount_FSTest, AlreadyMounted) {
-  int ret;
+  int32_t ret;
   char fsname[10];
 
   build_tree(100);
@@ -557,7 +557,7 @@ TEST_F(mount_FSTest, AlreadyMounted) {
  }
 
 TEST_F(mount_FSTest, FSNotExist) {
-  int ret;
+  int32_t ret;
   char fsname[10];
 
   FS_CORE_FAILED = -ENOENT;
@@ -567,7 +567,7 @@ TEST_F(mount_FSTest, FSNotExist) {
  }
 
 TEST_F(mount_FSTest, FSCoreError) {
-  int ret;
+  int32_t ret;
   char fsname[10];
 
   FS_CORE_FAILED = -EACCES;
@@ -577,7 +577,7 @@ TEST_F(mount_FSTest, FSCoreError) {
  }
 
 TEST_F(mount_FSTest, MountedFS) {
-  int ret;
+  int32_t ret;
   char fsname[10];
 
   snprintf(fsname, 10, "%4d", 10);
@@ -618,7 +618,7 @@ class unmount_FSTest : public ::testing::Test {
  };
 
 TEST_F(unmount_FSTest, NotMounted) {
-  int ret;
+  int32_t ret;
   char fsname[10];
 
   snprintf(fsname, 10, "%4d", 99);
@@ -626,10 +626,10 @@ TEST_F(unmount_FSTest, NotMounted) {
   EXPECT_EQ(-ENOENT, ret);
  }
 TEST_F(unmount_FSTest, UnmountMountedFS) {
-  int ret;
+  int32_t ret;
   char fsname[10];
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   sigset_t sigset, testset;
   struct timespec waittime;
   struct timeval curtime;
@@ -689,7 +689,7 @@ class unmount_eventTest : public ::testing::Test {
  };
 
 TEST_F(unmount_eventTest, UnmountMountedFS) {
-  int ret, ret_val;
+  int32_t ret, ret_val;
   char fsname[10];
   sigset_t sigset, testset;
   struct sigaction newact, oldact;
@@ -758,7 +758,7 @@ class mount_statusTest : public ::testing::Test {
  };
 
 TEST_F(mount_statusTest, EmptyDatabase) {
-  int ret;
+  int32_t ret;
 
   mount_mgr.root = NULL;
   ret = mount_status("anyFS");
@@ -767,7 +767,7 @@ TEST_F(mount_statusTest, EmptyDatabase) {
  }
 
 TEST_F(mount_statusTest, MultipleFSFound) {
-  int ret, count;
+  int32_t ret, count;
   char fsname[10];
 
   build_tree(100);
@@ -780,7 +780,7 @@ TEST_F(mount_statusTest, MultipleFSFound) {
 
  }
 TEST_F(mount_statusTest, MultipleFSNotFound) {
-  int ret, count;
+  int32_t ret, count;
   char fsname[10];
 
   build_tree(100);
@@ -839,10 +839,10 @@ class unmount_allTest : public ::testing::Test {
  };
 
 TEST_F(unmount_allTest, UnmountAll) {
-  int ret, count;
+  int32_t ret, count;
   char fsname[10];
-  int ret_val, errcode;
-  unsigned int code, cmd_len, size_msg;
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
   sigset_t sigset, testset;
   struct timespec waittime;
   struct timeval curtime;
@@ -907,7 +907,7 @@ class change_mount_statTest : public ::testing::Test {
  };
 
 TEST_F(change_mount_statTest, TestChange) {
-  int ret;
+  int32_t ret;
 
   tmp_mount.FS_stat->system_size = 100000;
   tmp_mount.FS_stat->meta_size = 100;
