@@ -88,7 +88,7 @@ ifneq "$(PASSWORD)" ""
 endif
 
 out:
-	@mkdir out
+	mkdir -p $@
 
 third_party/jansson: third_party/jansson/Android.mk
 third_party/jansson/Android.mk:

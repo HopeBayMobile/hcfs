@@ -8,6 +8,8 @@ ifeq "$(CCACHE_MK_INCLUDED)" ""
     export CCACHE_COMPILERCHECK := content
 
     $(shell /usr/bin/ccache -M 12G > /dev/null)
+  else
+    $(info ### Yout are not using ccache. Installing ccache can speedup rebuild time about 4x ###)
   endif
 endif
 export CCACHE_MK_INCLUDED := 1

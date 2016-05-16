@@ -86,7 +86,7 @@ $(OBJ_DIR)/gtest_main.a : $(OBJ_DIR)/gtest-all.o $(OBJ_DIR)/gtest_main.o
 # Auto maintain compiling and dependency
 ###########################################################################
 $(OBJ_DIR):
-	mkdir $@
+	mkdir -p $@
 
 # pull in dependency info for *existing* .o files
 include $(OBJS:%.o=%.d)
