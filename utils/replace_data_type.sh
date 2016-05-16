@@ -58,8 +58,8 @@ do
 		-e "s/\<short int\>/int16_t/g" \
 		-e "s/\<short\>/int16_t/g" \
 		-e "s/\<int\>/int32_t/g" \
-		-e "s/\<too int64_t\>/too long/g" \
-		-e "s/\<a int64_t\>/too long/g" \
-		-e "s/\<a int16_t\>/a short/g" \
+		-e "s/\<\(too\) int64_t\>/\1 long/gI" \
+		-e "s/\<\(a\) int64_t\>/\1 long/gI" \
+		-e "s/\<\(a\) int16_t\>/\1 short/gI" \
 		"$f"
 done

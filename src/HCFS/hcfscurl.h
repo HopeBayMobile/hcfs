@@ -31,7 +31,7 @@ typedef struct {
 typedef struct {
 	CURL *curl;
 
-	/*A int16_t name representing the unique identity of the handle*/
+	/*A short name representing the unique identity of the handle*/
 	char id[256];
 	int32_t curl_backend;
 } CURL_HANDLE;
