@@ -54,7 +54,13 @@ OBJS_F := objmeta.o \
 	monitor.o \
 	dir_statistics.o \
 	do_fallocate.o \
-	parent_lookup.o
+	parent_lookup.o \
+
+# obj file used in android env
+ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"
+	OBJS_F += pkg_cache.o
+endif
+
 OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_F))
 
 all: check_pkgs hcfs
