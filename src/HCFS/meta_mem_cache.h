@@ -57,7 +57,7 @@ has to wait for the completion of the other. This is to ensure the
 atomic completion of adding and deleting cache entries.
 If deleting cache entry, will need to acquire both the header lock and
 the entry lock before proceeding. If cache entry lock cannot be acquired
-immediately, should release header lock and sleep for a int16_t time, or skip
+immediately, should release header lock and sleep for a short time, or skip
 to other entries.
 */
 
