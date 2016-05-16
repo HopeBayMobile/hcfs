@@ -113,7 +113,7 @@ TEST_F(read_super_block_entryTest, ReadEntrySuccess)
 	ptr = fopen(sb_path, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	for (int i = 0 ; i < inode - 1 ; i++)
+	for (int32_t i = 0 ; i < inode - 1 ; i++)
 		fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	expected_sb_entry.util_ll_next = 123;
 	expected_sb_entry.util_ll_prev = 456;
@@ -171,7 +171,7 @@ TEST_F(write_super_block_entryTest, WriteEntrySuccess)
 	ptr = fopen(sb_path, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	for (int i = 0 ; i < inode ; i++)
+	for (int32_t i = 0 ; i < inode ; i++)
 		fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	fclose(ptr);
 
@@ -342,7 +342,7 @@ TEST_F(super_block_readTest, ReadEntrySuccess)
 	ptr = fopen(SUPERBLOCK, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	for (int i = 0 ; i < inode - 1 ; i++)
+	for (int32_t i = 0 ; i < inode - 1 ; i++)
 		fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	expected_sb_entry.util_ll_next = 123;
 	expected_sb_entry.util_ll_prev = 456;
@@ -515,7 +515,7 @@ TEST_F(super_block_mark_dirtyTest, MarkDirtySuccess)
 	ino_t inode = 8;
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
-	unsigned long entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
@@ -568,7 +568,7 @@ TEST_F(super_block_update_transitTest, Set_is_start_transit_TRUE)
 {
 	ino_t inode = 8;
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned long entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
@@ -597,7 +597,7 @@ TEST_F(super_block_update_transitTest, DequeueDirtyList_CancelTransitSuccess)
 {
 	ino_t inode = 7;
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned long entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
@@ -655,7 +655,7 @@ TEST_F(super_block_to_deleteTest, MarkToDeleteSuccess)
 	ino_t inode = 7;
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
-	unsigned long entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
@@ -707,7 +707,7 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 	ino_t result_inode;
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
-	unsigned long entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
 		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 	/* Mock data. Write a entry */
@@ -755,7 +755,7 @@ TEST_F(super_block_reclaimTest, ReclaimNotTrigger)
 
 TEST_F(super_block_reclaimTest, ReclaimSuccess)
 {
-	unsigned long num_inode = RECLAIM_TRIGGER + 123;
+	uint64_t num_inode = RECLAIM_TRIGGER + 123;
 	SUPER_BLOCK_ENTRY now_entry;
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t now_reclaimed_inode;
@@ -786,7 +786,7 @@ TEST_F(super_block_reclaimTest, ReclaimSuccess)
 	/* Verify */
 	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode;
 	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
-		unsigned long file_pos;
+		uint64_t file_pos;
 
 		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
 			(now_reclaimed_inode - 1);
@@ -847,7 +847,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 {
 	ino_t now_reclaimed_inode;
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned long num_inode = 20000;
+	uint64_t num_inode = 20000;
 
 	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
 		num_inode * sizeof(SUPER_BLOCK_ENTRY));
@@ -869,7 +869,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 	/* Verify */
 	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode; // first entry
 	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
-		unsigned long file_pos;
+		uint64_t file_pos;
 		SUPER_BLOCK_ENTRY now_entry;
 
 		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
@@ -914,7 +914,7 @@ protected:
 
 TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 {
-	unsigned long generation;
+	uint64_t generation;
 	ino_t ret_node;
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
@@ -945,7 +945,7 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 
 TEST_F(super_block_new_inodeTest, NoReclaimedNodes_ExceedPinSizeLimit)
 {
-	unsigned long generation;
+	uint64_t generation;
 	ino_t ret_node;
 
 	/* Mock stat */
@@ -959,8 +959,8 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes_ExceedPinSizeLimit)
 
 TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes)
 {
-	unsigned long num_reclaimed;
-	unsigned long generation;
+	uint64_t num_reclaimed;
+	uint64_t generation;
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t ret_node;
@@ -1014,7 +1014,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 
 TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNode)
 {
-	unsigned long generation;
+	uint64_t generation;
 	SUPER_BLOCK_ENTRY sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
 	ino_t ret_node;
@@ -1075,7 +1075,7 @@ TEST_F(ll_enqueueTest, AlreadyInQueue_StatusTheSame)
 	char test_status[] = {NO_LL, TO_BE_RECLAIMED, RECLAIMED, IS_DIRTY, TO_BE_DELETED};
 
 	/* Run */
-	for (unsigned int st = 0 ; st < sizeof(test_status) / sizeof(char) ; st++) {
+	for (uint32_t st = 0 ; st < sizeof(test_status) / sizeof(char) ; st++) {
 		sb_entry.status = test_status[st];
 		EXPECT_EQ(0, ll_enqueue(inode, test_status[st], &sb_entry));
 	}
@@ -1175,13 +1175,13 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_WithEmptyList)
 TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned long num_inode = 20000;
+	uint64_t num_inode = 20000;
 
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 
 	/* Run */
 	for (ino_t inode = 1; inode <= num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
+		int64_t filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 		sb_entry.status = NO_LL;
@@ -1198,7 +1198,7 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 
 	ino_t now_inode = sys_super_block->head.first_dirty_inode;
 	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
-		long long filepos;
+		int64_t filepos;
 
 		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 		filepos = sizeof(SUPER_BLOCK_HEAD) +
@@ -1220,13 +1220,13 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned long num_inode = 20000;
+	uint64_t num_inode = 20000;
 
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 
 	/* Run */
 	for (ino_t inode = 1; inode <= num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
+		int64_t filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 		sb_entry.status = NO_LL;
@@ -1242,7 +1242,7 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
 
 	ino_t now_inode = sys_super_block->head.first_to_delete_inode;
 	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
-		long long filepos;
+		int64_t filepos;
 
 		filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1);
@@ -1268,7 +1268,7 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
 class ll_dequeueTest : public InitSuperBlockBaseClass {
 protected:
 	/* Generate a mock dirt_list or to_delete_list */
-	void generate_mock_list(unsigned num_inode, char status)
+	void generate_mock_list(uint32_t num_inode, char status)
 	{
 		SUPER_BLOCK_ENTRY sb_entry;
 
@@ -1286,7 +1286,7 @@ protected:
 
 		/* General dirty inode */
 		for (ino_t inode = 2 ; inode < num_inode ; inode++) {
-			long long filepos = sizeof(SUPER_BLOCK_HEAD) +
+			int64_t filepos = sizeof(SUPER_BLOCK_HEAD) +
 				sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 
 			sb_entry.util_ll_next = inode + 1;
@@ -1317,10 +1317,10 @@ protected:
 	}
 
 	/* Traverse all entry in dirty_list or to_delete_list */
-	unsigned traverse_all_list_entry(char status)
+	uint32_t traverse_all_list_entry(char status)
 	{
 		ino_t now_inode;
-		unsigned remaining_inode;
+		uint32_t remaining_inode;
 		SUPER_BLOCK_ENTRY sb_entry;
 
 		if (status == IS_DIRTY)
@@ -1434,9 +1434,9 @@ TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_JustOneElementList)
 TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned num_inode = 200;
-	unsigned remaining_inode;
-	long long filepos;
+	uint32_t num_inode = 200;
+	uint32_t remaining_inode;
+	int64_t filepos;
 	ino_t now_inode;
 
 	/* Mock dirty_inode list */
@@ -1467,7 +1467,7 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 
 	/* Verify all inodes */
 	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
+		int64_t filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
@@ -1485,9 +1485,9 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
-	unsigned num_inode = 200;
-	unsigned remaining_inode;
-	long long filepos;
+	uint32_t num_inode = 200;
+	uint32_t remaining_inode;
+	int64_t filepos;
 	ino_t now_inode;
 
 	/* Mock dirty_inode list */
@@ -1517,7 +1517,7 @@ TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)
 
 	/* Verify all inodes */
 	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
-		long long filepos = sizeof(SUPER_BLOCK_HEAD) +
+		int64_t filepos = sizeof(SUPER_BLOCK_HEAD) +
 			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
 		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			filepos);
@@ -1541,11 +1541,11 @@ class super_block_share_lockingTest : public InitSuperBlockBaseClass {
 
 TEST_F(super_block_share_lockingTest, LockingSuccess)
 {
-	int value;
-	int num_share_counter = 56;
+	int32_t value;
+	int32_t num_share_counter = 56;
 
 	/* Run */
-	for (int lock = 0 ; lock < num_share_counter ; lock++)
+	for (int32_t lock = 0 ; lock < num_share_counter ; lock++)
 		EXPECT_EQ(0, super_block_share_locking());
 
 	/* Verify */
@@ -1568,24 +1568,24 @@ class super_block_share_releaseTest : public InitSuperBlockBaseClass {
 
 TEST_F(super_block_share_releaseTest, ReleaseFail)
 {
-	int num_share_counter = 10;
+	int32_t num_share_counter = 10;
 
 	/* Run */
-	for (int lock = 0 ; lock < num_share_counter ; lock++)
+	for (int32_t lock = 0 ; lock < num_share_counter ; lock++)
 		EXPECT_EQ(-1, super_block_share_release());
 }
 
 TEST_F(super_block_share_releaseTest, ReleaseSuccess)
 {
-	int value;
-	int num_share_counter = 56;
+	int32_t value;
+	int32_t num_share_counter = 56;
 
 	/* Mock locking */
-	for (int lock = 0 ; lock < num_share_counter ; lock++)
+	for (int32_t lock = 0 ; lock < num_share_counter ; lock++)
 		EXPECT_EQ(0, super_block_share_locking());
 
 	/* Run */
-	for (int lock = 0 ; lock < num_share_counter ; lock++)
+	for (int32_t lock = 0 ; lock < num_share_counter ; lock++)
 		EXPECT_EQ(0, super_block_share_release());
 
 	/* Verify */
@@ -1982,7 +1982,7 @@ TEST_F(pin_ll_enqueueTest, EnqueueManyTimes_Success)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	off_t offset;
-	long long now_pos;
+	int64_t now_pos;
 	ino_t now_inode, expected_inode;
 
 	for (ino_t inode = 2; inode <= 20; inode ++) {
@@ -2073,9 +2073,9 @@ TEST_F(pin_ll_dequeueTest, DequeueSuccess)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	off_t offset;
-	long long now_pos;
+	int64_t now_pos;
 	ino_t now_inode, expected_inode;
-	int num_inode, ret;
+	int32_t num_inode, ret;
 
 	/* Run enqueue */
 	for (ino_t inode = 2; inode <= 20; inode ++) {
@@ -2150,10 +2150,10 @@ class ll_rebuild_dirtyTest : public InitSuperBlockBaseClass {
 protected:
 	char mocksb_path[500] = "testpatterns/mocksb_for_rebuild_dirty";
 
-	int reload_sb_head()
+	int32_t reload_sb_head()
 	{
 
-		int fd = open(mocksb_path, O_RDONLY);
+		int32_t fd = open(mocksb_path, O_RDONLY);
 		pread(fd, &(sys_super_block->head), sizeof(SUPER_BLOCK_HEAD), 0);
 		close(fd);
 		return 0;
@@ -2163,7 +2163,7 @@ protected:
 	{
 		SUPER_BLOCK_HEAD head;
 		SUPER_BLOCK_ENTRY entry;
-		int ino = 2;
+		int32_t ino = 2;
 
 		if (access(mocksb_path, F_OK) != -1)
 			unlink(mocksb_path);
@@ -2192,9 +2192,9 @@ protected:
 		}
 	}
 
-	int inject_fault_enqueue(ino_t this_inode, int fault_loc)
+	int32_t inject_fault_enqueue(ino_t this_inode, int32_t fault_loc)
 	{
-		int ret;
+		int32_t ret;
 		SUPER_BLOCK_ENTRY tempentry;
 
 		ret = read_super_block_entry(this_inode, &tempentry);
@@ -2212,9 +2212,9 @@ protected:
 		return 0;
 	}
 
-	int inject_fault_dequeue(ino_t this_inode, int fault_loc)
+	int32_t inject_fault_dequeue(ino_t this_inode, int32_t fault_loc)
 	{
-		int ret;
+		int32_t ret;
 		SUPER_BLOCK_ENTRY tempentry;
 
 		ret = read_super_block_entry(this_inode, &tempentry);
@@ -2231,7 +2231,7 @@ protected:
 		return 0;
 	}
 
-	int check_sblist_integrity()
+	int32_t check_sblist_integrity()
 	{
 		SUPER_BLOCK_ENTRY entry1, entry2;
 		ino_t first, last;

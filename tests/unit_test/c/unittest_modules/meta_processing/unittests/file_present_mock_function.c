@@ -10,7 +10,7 @@
 #include "global.h"
 #include "dir_statistics.h"
 
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -32,7 +32,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 }
 
 
-int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
     const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
     META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -55,14 +55,14 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return tmpptr;
 }
 
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	free(target_ptr);
 	return 0;
 }
 
 
-int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (body_ptr->fptr == NULL)
 		body_ptr->fptr = fopen(MOCK_META_PATH, "w+");
@@ -70,7 +70,7 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 }
 
 
-int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	if (target_ptr->fptr != NULL) {
 		fclose(target_ptr->fptr);
@@ -81,7 +81,7 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 }
 
 
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -117,7 +117,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
-int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
     const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
     const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -128,7 +128,7 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	return 0;
 }
 
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (parent_inode == INO_DIR_ADD_ENTRY_SUCCESS)
@@ -138,7 +138,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	return 0;
 }
 
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, 
+int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, 
 	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (parent_inode == INO_DIR_REMOVE_ENTRY_FAIL)
@@ -148,39 +148,39 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	return 0;
 }
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 
-int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
+int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
 	int64_t this_page_pos)
 {
 	return 0;
 }
 
-int decrease_nlink_inode_file(ino_t this_inode)
+int32_t decrease_nlink_inode_file(ino_t this_inode)
 {
 	return 0;
 }
 
-int mark_inode_delete(ino_t this_inode)
+int32_t mark_inode_delete(ino_t this_inode)
 {
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }
 
-int flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
+int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
 {
 	return 0;
 }
 
-int meta_cache_update_symlink_data(ino_t this_inode, 
+int32_t meta_cache_update_symlink_data(ino_t this_inode, 
 	const struct stat *inode_stat, 
 	const SYMLINK_META_TYPE *symlink_meta_ptr, 
 	META_CACHE_ENTRY_STRUCT *bptr)
@@ -196,7 +196,7 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 	return 0;
 }
 
-int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
         SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (symlink_meta_ptr) {
@@ -209,12 +209,12 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	}
 	return 0;
 }
-int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+int32_t pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
 
-int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
+int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 {
 	if (this_inode == 1) /* Case of failure */
 		return -ENOMEM;
@@ -223,7 +223,7 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 	return 0;
 }
 
-int collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
+int32_t collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 	int64_t *num_dir_node, ino_t **nondir_node_list,
 	int64_t *num_nondir_node)
 {
@@ -244,45 +244,45 @@ int collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 	return 0;
 }
 
-int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
+int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 {
 	return 0;
 }
 
-int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
+int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 {
 	return 0;
 }
 
-int reset_dirstat_lookup(ino_t thisinode)
+int32_t reset_dirstat_lookup(ino_t thisinode)
 {
 	return 0;
 }
 
-int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
+int32_t update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 {
 	return 0;
 }
-int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
+int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 {
 	return 0;
 }
-int lookup_add_parent(ino_t self_inode, ino_t parent_inode)
+int32_t lookup_add_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
-int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
+int32_t lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
 
-int inherit_xattr(ino_t parent_inode, ino_t this_inode,
+int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr)
 {
 	return 0;
 }
 
-int get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize)
 {
 	return 0;
 }

@@ -16,7 +16,7 @@ extern "C" {
  */
 class parse_xattr_namespaceTest : public ::testing::Test {
 protected:
-	int ret;
+	int32_t ret;
 	char name_space;
 	char key[300];
 
@@ -41,7 +41,7 @@ TEST_F(parse_xattr_namespaceTest, EmptyName)
 
 TEST_F(parse_xattr_namespaceTest, NoNamespace)
 {
-	int ret1, ret2;
+	int32_t ret1, ret2;
 
 	/* Run */
 	ret1 = parse_xattr_namespace("aloha", &name_space, key);
@@ -143,7 +143,7 @@ class XattrOperationBase : public ::testing::Test {
 protected:
 	META_CACHE_ENTRY_STRUCT *mock_meta_cache;
 	XATTR_PAGE *mock_xattr_page;
-	long long xattr_page_pos;
+	int64_t xattr_page_pos;
 	const char *meta_path;
 
 	void SetUp()
@@ -176,14 +176,14 @@ protected:
 		free(mock_xattr_page);
 	}
 
-	void gen_random_string(std::string &str, const int len) {
+	void gen_random_string(std::string &str, const int32_t len) {
 		static const char alphanum[] =
 			"0123456789_.-"
 			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			"abcdefghijklmnopqrstuvwxyz";
 		char s[len + 1];
 
-		for (int i = 0; i < len; ++i) {
+		for (int32_t i = 0; i < len; ++i) {
 			s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
 		}
 
@@ -199,16 +199,16 @@ protected:
 class find_key_entryTest : public XattrOperationBase {
 protected:
 	void gen_key_page(KEY_LIST_PAGE &key_page, string *mock_keys,
-		const int &total_keys, int &index)
+		const int32_t &total_keys, int32_t &index)
 	{
-		int num_insert;
+		int32_t num_insert;
 
 		if (index + MAX_KEY_ENTRY_PER_LIST < total_keys)
 			num_insert = MAX_KEY_ENTRY_PER_LIST;
 		else
 			num_insert = total_keys - index;
 
-		for (int i = 0; i < num_insert ; i++) {
+		for (int32_t i = 0; i < num_insert ; i++) {
 			strcpy(key_page.key_list[i].key, mock_keys[index].c_str());
 			key_page.key_list[i].key_size = mock_keys[index].length();
 
@@ -221,8 +221,8 @@ protected:
 
 TEST_F(find_key_entryTest, FirstKeyPageIsEmpty)
 {
-	int index;
-	int ret;
+	int32_t index;
+	int32_t ret;
 
 	ret = find_key_entry(mock_meta_cache, 0, NULL, &index,
 		NULL, "key", NULL, NULL);
@@ -234,14 +234,14 @@ TEST_F(find_key_entryTest, FirstKeyPageIsEmpty)
 TEST_F(find_key_entryTest, KeysAllFound)
 {
 	KEY_LIST_PAGE target_key_page, prev_key_page, tmp_key_page;
-	long long target_pos, prev_pos, first_key_page_pos;
-	int index, now_index, count;
-	int ret;
-	int num_keys = MAX_KEY_ENTRY_PER_LIST * 10;
+	int64_t target_pos, prev_pos, first_key_page_pos;
+	int32_t index, now_index, count;
+	int32_t ret;
+	int32_t num_keys = MAX_KEY_ENTRY_PER_LIST * 10;
 	string mock_keys[num_keys];
 
 	/* Gen mock keys and mock key_pages */
-	for (int i = 0 ; i < num_keys ; i++) {
+	for (int32_t i = 0 ; i < num_keys ; i++) {
 		char tmp_key[30];
 		sprintf(tmp_key, "test_key-%d", i);
 		mock_keys[i] = string(tmp_key);
@@ -265,7 +265,7 @@ TEST_F(find_key_entryTest, KeysAllFound)
 
 	/* Run & Verify */
 	first_key_page_pos = sizeof(XATTR_PAGE);
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		ret = find_key_entry(mock_meta_cache, first_key_page_pos,
 			&target_key_page, &index, &target_pos,
 			mock_keys[i].c_str(), &prev_key_page, &prev_pos);
@@ -286,15 +286,15 @@ TEST_F(find_key_entryTest, KeysAllNotFound_KeyPageAllFull)
 {
 	KEY_LIST_PAGE target_key_page, prev_key_page, tmp_key_page;
 	KEY_LIST_PAGE last_key_page;
-	long long target_pos, prev_pos;
-	long long first_key_page_pos, last_key_page_pos;
-	int index, now_index, count;
-	int ret;
-	int num_keys = MAX_KEY_ENTRY_PER_LIST * 10;
+	int64_t target_pos, prev_pos;
+	int64_t first_key_page_pos, last_key_page_pos;
+	int32_t index, now_index, count;
+	int32_t ret;
+	int32_t num_keys = MAX_KEY_ENTRY_PER_LIST * 10;
 	string mock_keys[num_keys];
 
 	/* Gen mock keys and mock key_pages */
-	for (int i = 0 ; i < num_keys ; i++) {
+	for (int32_t i = 0 ; i < num_keys ; i++) {
 		char tmp_key[30];
 		sprintf(tmp_key, "test_key-%d", i);
 		mock_keys[i] = string(tmp_key);
@@ -323,7 +323,7 @@ TEST_F(find_key_entryTest, KeysAllNotFound_KeyPageAllFull)
 	last_key_page_pos = sizeof(XATTR_PAGE) +
 		(count - 1) * sizeof(KEY_LIST_PAGE);
 	memcpy(&last_key_page, &tmp_key_page, sizeof(KEY_LIST_PAGE));
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		char tmp_key[30];
 
 		sprintf(tmp_key, "test_key_not_found-%d", i);
@@ -342,15 +342,15 @@ TEST_F(find_key_entryTest, KeysAllNotFound_KeyPageAllFull)
 TEST_F(find_key_entryTest, KeysAllNotFound_KeyPageNotFull_ReturnFittedIndex)
 {
 	KEY_LIST_PAGE target_key_page, tmp_key_page;
-	long long target_pos, first_key_page_pos, now_pos;
-	int index, now_index, count;
-	int ret;
-	int num_keys = MAX_KEY_ENTRY_PER_LIST * 10;
+	int64_t target_pos, first_key_page_pos, now_pos;
+	int32_t index, now_index, count;
+	int32_t ret;
+	int32_t num_keys = MAX_KEY_ENTRY_PER_LIST * 10;
 	string mock_keys[num_keys];
 	KEY_ENTRY tmp_key_buf[MAX_KEY_ENTRY_PER_LIST + 1];
 
 	/* Gen mock keys and mock key_pages */
-	for (int i = 0 ; i < num_keys ; i++) {
+	for (int32_t i = 0 ; i < num_keys ; i++) {
 		char tmp_key[30];
 		sprintf(tmp_key, "test_key-%d", i);
 		mock_keys[i] = string(tmp_key);
@@ -381,7 +381,7 @@ TEST_F(find_key_entryTest, KeysAllNotFound_KeyPageNotFull_ReturnFittedIndex)
 		fseek(mock_meta_cache->fptr, now_pos, SEEK_SET);
 		fread(&tmp_key_page, sizeof(KEY_LIST_PAGE), 1,
 			mock_meta_cache->fptr);
-		for (unsigned i = 0; i < tmp_key_page.num_xattr; i++) {
+		for (uint32_t i = 0; i < tmp_key_page.num_xattr; i++) {
 
 			/* Remove the target key in current such that
 			   the function cannot find the key and also
@@ -441,17 +441,17 @@ class insert_xattrTest : public XattrOperationBase {
 
 TEST_F(insert_xattrTest, DefaultInsertManyKeys)
 {
-	int ret;
+	int32_t ret;
 #ifdef ARM_32bit_
-	int num_keys = 20000;
+	int32_t num_keys = 20000;
 #else
-	int num_keys = 60000;
+	int32_t num_keys = 60000;
 #endif
 	size_t value_size = 30;
 	pair<string, string> mock_xattr[num_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -462,7 +462,7 @@ TEST_F(insert_xattrTest, DefaultInsertManyKeys)
 
 	/* Insert keys */
 	cout << "Test: Begin to insert " << num_keys << " key-value pairs" << endl;
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
 			USER, mock_xattr[i].first.c_str(), mock_xattr[i].second.c_str(),
 			value_size, 0); // flag = 0 (default)
@@ -471,7 +471,7 @@ TEST_F(insert_xattrTest, DefaultInsertManyKeys)
 	cout << "Test: Insertion done." << endl;
 
 	/* Verify */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[100];
 
@@ -491,13 +491,13 @@ TEST_F(insert_xattrTest, DefaultInsertManyKeys)
 
 TEST_F(insert_xattrTest, CreateKey_WithoutValue_Success)
 {
-	int ret;
-	int num_keys = 600;
+	int32_t ret;
+	int32_t num_keys = 600;
 	size_t value_size = 0;
 	pair<string, string> mock_xattr[num_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -507,7 +507,7 @@ TEST_F(insert_xattrTest, CreateKey_WithoutValue_Success)
 	}
 
 	/* Insert keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
 			USER, mock_xattr[i].first.c_str(), mock_xattr[i].second.c_str(),
 			value_size, XATTR_CREATE); /* flag = CREATE */
@@ -515,7 +515,7 @@ TEST_F(insert_xattrTest, CreateKey_WithoutValue_Success)
 	}
 
 	/* Verify */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[500];
 
@@ -535,13 +535,13 @@ TEST_F(insert_xattrTest, CreateKey_WithoutValue_Success)
 
 TEST_F(insert_xattrTest, CreateKeySuccess)
 {
-	int ret;
-	int num_keys = 600;
+	int32_t ret;
+	int32_t num_keys = 600;
 	size_t value_size = 300;
 	pair<string, string> mock_xattr[num_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -551,7 +551,7 @@ TEST_F(insert_xattrTest, CreateKeySuccess)
 	}
 
 	/* Insert keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
 			USER, mock_xattr[i].first.c_str(), mock_xattr[i].second.c_str(),
 			value_size, XATTR_CREATE); // flag = CREATE
@@ -559,7 +559,7 @@ TEST_F(insert_xattrTest, CreateKeySuccess)
 	}
 
 	/* Verify */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[500];
 
@@ -579,14 +579,14 @@ TEST_F(insert_xattrTest, CreateKeySuccess)
 
 TEST_F(insert_xattrTest, ReplaceWithLongerValueSuccess)
 {
-	int ret;
-	int num_keys = 600;
+	int32_t ret;
+	int32_t num_keys = 600;
 	size_t value_size = 30; // Original value size
 	size_t replace_value_size = MAX_VALUE_BLOCK_SIZE * 3; // Replaced value size
 	pair<string, string> mock_xattr[num_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -596,7 +596,7 @@ TEST_F(insert_xattrTest, ReplaceWithLongerValueSuccess)
 	}
 
 	/* Create keys and replace keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_value;
 
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
@@ -609,7 +609,7 @@ TEST_F(insert_xattrTest, ReplaceWithLongerValueSuccess)
 		mock_xattr[i].second = mock_value;
 	}
 
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
 			USER, mock_xattr[i].first.c_str(), mock_xattr[i].second.c_str(),
 			replace_value_size, XATTR_REPLACE); // Then insert with flag = REPLACE
@@ -617,7 +617,7 @@ TEST_F(insert_xattrTest, ReplaceWithLongerValueSuccess)
 	}
 
 	/* Verify */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[replace_value_size + 10];
 
@@ -638,16 +638,16 @@ TEST_F(insert_xattrTest, ReplaceWithLongerValueSuccess)
 
 TEST_F(insert_xattrTest, ReplaceWithShorterValueSuccess)
 {
-	int ret;
-	int num_keys = 600;
+	int32_t ret;
+	int32_t num_keys = 600;
 	size_t value_size = MAX_VALUE_BLOCK_SIZE * 3; // Original value size
 	size_t replace_value_size = 20; // Replaced value size
-	long long now_pos;
-	int reclaimed_count;
+	int64_t now_pos;
+	int32_t reclaimed_count;
 	pair<string, string> mock_xattr[num_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -657,7 +657,7 @@ TEST_F(insert_xattrTest, ReplaceWithShorterValueSuccess)
 	}
 
 	/* Create keys and replace keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_value;
 
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
@@ -670,7 +670,7 @@ TEST_F(insert_xattrTest, ReplaceWithShorterValueSuccess)
 		mock_xattr[i].second = mock_value;
 	}
 
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
 			USER, mock_xattr[i].first.c_str(), mock_xattr[i].second.c_str(),
 			replace_value_size, XATTR_REPLACE); // Then insert with flag = REPLACE
@@ -678,7 +678,7 @@ TEST_F(insert_xattrTest, ReplaceWithShorterValueSuccess)
 	}
 
 	/* Verify */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[replace_value_size + 10];
 
@@ -709,15 +709,15 @@ TEST_F(insert_xattrTest, ReplaceWithShorterValueSuccess)
 
 TEST_F(insert_xattrTest, ReplaceWithNotExistKey_Fail)
 {
-	int ret;
-	int num_keys = MAX_KEY_HASH_ENTRY - 1;
-	int num_not_exist_keys = 5000;
+	int32_t ret;
+	int32_t num_keys = MAX_KEY_HASH_ENTRY - 1;
+	int32_t num_not_exist_keys = 5000;
 	size_t value_size = 30;
 	pair<string, string> mock_xattr[num_keys];
 	pair<string, string> mock_not_exist_xattr[num_not_exist_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -726,7 +726,7 @@ TEST_F(insert_xattrTest, ReplaceWithNotExistKey_Fail)
 		mock_xattr[i] = make_pair(mock_key, mock_value);
 	}
 
-	for (int i = 0; i < num_not_exist_keys ; i++) {
+	for (int32_t i = 0; i < num_not_exist_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -736,7 +736,7 @@ TEST_F(insert_xattrTest, ReplaceWithNotExistKey_Fail)
 	}
 
 	/* Create keys and replace fail */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_value;
 
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
@@ -745,7 +745,7 @@ TEST_F(insert_xattrTest, ReplaceWithNotExistKey_Fail)
 		ASSERT_EQ(0, ret);
 	}
 
-	for (int i = 0; i < num_not_exist_keys ; i++) {
+	for (int32_t i = 0; i < num_not_exist_keys ; i++) {
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
 			USER, mock_not_exist_xattr[i].first.c_str(),
 			mock_not_exist_xattr[i].second.c_str(),
@@ -754,7 +754,7 @@ TEST_F(insert_xattrTest, ReplaceWithNotExistKey_Fail)
 	}
 
 	/* Verify whether original keys exist */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[value_size + 10];
 
@@ -775,13 +775,13 @@ TEST_F(insert_xattrTest, ReplaceWithNotExistKey_Fail)
 
 TEST_F(insert_xattrTest, CreateExistKey_Fail)
 {
-	int ret;
-	int num_keys = 1000;
+	int32_t ret;
+	int32_t num_keys = 1000;
 	size_t value_size = 30;
 	pair<string, string> mock_xattr[num_keys];
 
 	/* Generate mock keys */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_key;
 		string mock_value;
 
@@ -791,7 +791,7 @@ TEST_F(insert_xattrTest, CreateExistKey_Fail)
 	}
 
 	/* Create keys twice fail */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		string mock_value;
 
 		ret = insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
@@ -806,7 +806,7 @@ TEST_F(insert_xattrTest, CreateExistKey_Fail)
 	}
 
 	/* Verify whether keys still exist */
-	for (int i = 0; i < num_keys ; i++) {
+	for (int32_t i = 0; i < num_keys ; i++) {
 		size_t actual_size;
 		char value_buffer[value_size + 10];
 
@@ -842,7 +842,7 @@ TEST_F(get_xattrTest, KeyNotFound)
 	const char *value = "test_value";
 	char buf[100];
 	size_t actual_size;
-	int ret;
+	int32_t ret;
 
 	/* Insert key and get value */
 	insert_xattr(mock_meta_cache, mock_xattr_page, xattr_page_pos,
@@ -860,7 +860,7 @@ TEST_F(get_xattrTest, KeyFound_GetSizeSuccess)
 	const char *value = "test_value";
 	char buf[100];
 	size_t actual_size;
-	int ret;
+	int32_t ret;
 
 	actual_size = 0;
 
@@ -881,7 +881,7 @@ TEST_F(get_xattrTest, KeyFound_RangeError)
 	const char *value = "test_value";
 	char buf[100];
 	size_t actual_size;
-	int ret;
+	int32_t ret;
 
 	actual_size = 0;
 
@@ -902,7 +902,7 @@ TEST_F(get_xattrTest, KeyFound_GetValueSuccess)
 	const char *value = "test_value";
 	char buf[100] = {0};
 	size_t actual_size;
-	int ret;
+	int32_t ret;
 
 	actual_size = 0;
 
@@ -942,12 +942,12 @@ protected:
 		XattrOperationBase::TearDown();
 	}
 
-	int gen_mock_keys(int num_keys, size_t value_size, int namespace_len,
+	int32_t gen_mock_keys(int32_t num_keys, size_t value_size, int32_t namespace_len,
 		size_t &total_needed_size, pair<string, string> *mock_xattr)
 	{
-		int ret;
+		int32_t ret;
 
-		for (int i = 0; i < num_keys ; i++) {
+		for (int32_t i = 0; i < num_keys ; i++) {
 			char mock_key[200];
 			string mock_value;
 
@@ -969,9 +969,9 @@ protected:
 
 TEST_F(list_xattrTest, GetNeededKeySizeSuccess)
 {
-	int ret;
-	int num_keys = 20000;
-	int namespace_len = 0;
+	int32_t ret;
+	int32_t num_keys = 20000;
+	int32_t namespace_len = 0;
 	size_t value_size = 30;
 	size_t total_needed_size = 0;
 	size_t actual_size;
@@ -992,9 +992,9 @@ TEST_F(list_xattrTest, GetNeededKeySizeSuccess)
 
 TEST_F(list_xattrTest, KeyBufferRangeError)
 {
-	int ret;
-	int num_keys = 4000;
-	int namespace_len = 0;
+	int32_t ret;
+	int32_t num_keys = 4000;
+	int32_t namespace_len = 0;
 	size_t value_size = 30;
 	size_t total_needed_size = 0;
 	size_t actual_size;
@@ -1017,9 +1017,9 @@ TEST_F(list_xattrTest, KeyBufferRangeError)
 
 TEST_F(list_xattrTest, ListAllKeySuccess)
 {
-	int ret;
-	int num_keys = 4000;
-	int namespace_len = 0;
+	int32_t ret;
+	int32_t num_keys = 4000;
+	int32_t namespace_len = 0;
 	size_t value_size = 30;
 	size_t total_needed_size = 0;
 	size_t actual_size;
@@ -1047,7 +1047,7 @@ TEST_F(list_xattrTest, ListAllKeySuccess)
 	while (tail_index < total_needed_size) {
 		if (key_buf[tail_index] == '\0') {
 			char tmp_key_name[100];
-			int verified_num;
+			int32_t verified_num;
 
 			memcpy(tmp_key_name, key_buf + head_index,
 				sizeof(char) * (tail_index - head_index));
@@ -1063,7 +1063,7 @@ TEST_F(list_xattrTest, ListAllKeySuccess)
 		}
 	}
 
-	for (int i = 0; i < num_keys; i++) // Check all keys are recorded
+	for (int32_t i = 0; i < num_keys; i++) // Check all keys are recorded
 		ASSERT_EQ(true, check_number[i]) << i;
 }
 /*
@@ -1075,12 +1075,12 @@ TEST_F(list_xattrTest, ListAllKeySuccess)
  */
 class remove_xattrTest : public XattrOperationBase {
 protected:
-	int gen_mock_keys(int &num_keys, pair<string, string> *mock_xattr,
+	int32_t gen_mock_keys(int32_t &num_keys, pair<string, string> *mock_xattr,
 		size_t &value_size)
 	{
-		int ret;
+		int32_t ret;
 
-		for (int i = 0; i < num_keys; i++) {
+		for (int32_t i = 0; i < num_keys; i++) {
 			char mock_key[200];
 			string mock_value;
 
@@ -1101,8 +1101,8 @@ protected:
 
 TEST_F(remove_xattrTest, RemovedEntryNotFound)
 {
-	int ret;
-	int num_keys = MAX_KEY_HASH_ENTRY - 1;
+	int32_t ret;
+	int32_t num_keys = MAX_KEY_HASH_ENTRY - 1;
 	size_t value_size = 10;
 	pair<string, string> mock_xattr[num_keys];
 
@@ -1111,7 +1111,7 @@ TEST_F(remove_xattrTest, RemovedEntryNotFound)
 	ASSERT_EQ(0, ret);
 
 	/* Run remove_xattr(), return -ENODATA */
-	for (int i = 0; i < 1000; i++) {
+	for (int32_t i = 0; i < 1000; i++) {
 		char key_not_found[100];
 
 		sprintf(key_not_found, "test-key-not-found%d", i);
@@ -1124,16 +1124,16 @@ TEST_F(remove_xattrTest, RemovedEntryNotFound)
 
 TEST_F(remove_xattrTest, RemoveManyKeysSuccess)
 {
-	int ret;
+	int32_t ret;
 #ifdef ARM_32bit_
-	int num_keys = 10000;
+	int32_t num_keys = 10000;
 #else
-	int num_keys = 30000;
+	int32_t num_keys = 30000;
 #endif
-	int reclaimed_count, expected_reclaimed_count;
+	int32_t reclaimed_count, expected_reclaimed_count;
 	size_t actual_size;
 	size_t value_size = MAX_VALUE_BLOCK_SIZE * 3 - 1;
-	long long xattr_pos, now_pos;
+	int64_t xattr_pos, now_pos;
 	pair<string, string> mock_xattr[num_keys];
 	KEY_LIST_PAGE tmp_key_page;
 
@@ -1146,8 +1146,8 @@ TEST_F(remove_xattrTest, RemoveManyKeysSuccess)
 	// to be relcaimed later.
 
 	expected_reclaimed_count = 0;
-	for (int hash_count = 0; hash_count < MAX_KEY_HASH_ENTRY ; hash_count++) {
-		long long pos;
+	for (int32_t hash_count = 0; hash_count < MAX_KEY_HASH_ENTRY ; hash_count++) {
+		int64_t pos;
 		NAMESPACE_PAGE *namespace_page;
 
 		namespace_page = &(mock_xattr_page->namespace_page[USER]);
@@ -1163,7 +1163,7 @@ TEST_F(remove_xattrTest, RemoveManyKeysSuccess)
 
 	cout << "Test: Begin to test remove_xattr()" << endl;
 	/* Run remove_xattr() and check structure return -ENODATA */
-	for (int i = 0; i < num_keys; i++) {
+	for (int32_t i = 0; i < num_keys; i++) {
 
 		ret = remove_xattr(mock_meta_cache, mock_xattr_page,
 			xattr_pos, USER, mock_xattr[i].first.c_str());
@@ -1173,7 +1173,7 @@ TEST_F(remove_xattrTest, RemoveManyKeysSuccess)
 
 		// Check structure when half and end
 		if ((i + 1) % (num_keys / 3) == 0) {
-			for (int verify = 0; verify < num_keys ; verify++) {
+			for (int32_t verify = 0; verify < num_keys ; verify++) {
 				char value_buf[value_size + 1];
 
 				ret = get_xattr(mock_meta_cache, mock_xattr_page,

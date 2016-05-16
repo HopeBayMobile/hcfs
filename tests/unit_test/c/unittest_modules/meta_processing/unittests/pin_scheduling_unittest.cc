@@ -46,7 +46,7 @@ protected:
 	}
 };
 
-int compare (const void * a, const void * b)
+int32_t compare (const void * a, const void * b)
 {
 	  return ( *(ino_t*)a - *(ino_t*)b );
 }
@@ -55,7 +55,7 @@ TEST_F(pinning_loopTest, WorkNormally)
 {
 	/* Generate mock data */
 	hcfs_system->sync_paused = FALSE;
-	for (int i = 0; i < TOTAL_MOCK_INODES; i++) {
+	for (int32_t i = 0; i < TOTAL_MOCK_INODES; i++) {
 		mock_inodes[i] = (i + 1) * 15;
 	}
 	sys_super_block->head.num_pinning_inodes = TOTAL_MOCK_INODES;
@@ -65,7 +65,7 @@ TEST_F(pinning_loopTest, WorkNormally)
 	/* Run */
 	hcfs_system->system_going_down = FALSE;
 	init_pin_scheduler();
-	for (int i = 0; i < 100; i++) {
+	for (int32_t i = 0; i < 100; i++) {
 		nanosleep(&UT_sleep, NULL);
 		if (TOTAL_MOCK_INODES == verified_inodes_counter)
 			break;
@@ -114,7 +114,7 @@ void mock_thread_fctnl(void *ptr)
 
 TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 {
-	int idx, val;
+	int32_t idx, val;
 	char zero[MAX_PINNING_FILE_CONCURRENCY];
 
 	/* Create pinning collector */
@@ -122,7 +122,7 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 			(void *)pinning_collect, NULL);
 
 	/* Create 100 threads */
-	for (int i = 0; i < 100 ; i++) {
+	for (int32_t i = 0; i < 100 ; i++) {
 		sem_wait(&pinning_scheduler.pinning_sem);
 		sem_wait(&pinning_scheduler.ctl_op_sem);
 		for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++) {
