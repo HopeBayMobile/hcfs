@@ -8,7 +8,7 @@
 #include "enc.h"
 #include "meta_mem_cache.h"
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	if (OPEN_META_PATH_FAIL == TRUE)
 		strcpy(pathname, "");
@@ -17,7 +17,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
+int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	if (OPEN_BLOCK_PATH_FAIL == TRUE)
 		strcpy(pathname, "");
@@ -26,9 +26,9 @@ int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 	return 0;
 }
 
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
+int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
-	int inode, block_no;
+	int32_t inode, block_no;
 
 	if (FETCH_BACKEND_BLOCK_TESTING == TRUE)
 		return 200;
@@ -53,22 +53,22 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_en
 	}
 }
 
-int sync_hcfs_system_data(char need_lock)
+int32_t sync_hcfs_system_data(char need_lock)
 {
 	return 0;
 }
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }
 
-int decode_to_fd(FILE *fptr, unsigned char *key, unsigned char *input, int input_length, int enc_flag, int compress_flag){
+int32_t decode_to_fd(FILE *fptr, uint8_t *key, uint8_t *input, int32_t input_length, int32_t enc_flag, int32_t compress_flag){
 
   ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
 	return 0;
 }
 
-unsigned char *get_key(const char *keywords){
+uint8_t *get_key(const char *keywords){
   return NULL;
 }
 
@@ -77,12 +77,12 @@ void free_object_meta(HCFS_encode_object_meta *object_meta)
     return;
 }
 
-int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
-                    unsigned char *key){
+int32_t decrypt_session_key(uint8_t *session_key, char *enc_session_key,
+                    uint8_t *key){
     return 0;
 }
 
-int set_block_dirty_status(char *path, FILE *fptr, char status)
+int32_t set_block_dirty_status(char *path, FILE *fptr, char status)
 {
 	fsetxattr(fileno(fptr), "user.dirty", "F", 1, 0);
 	return 0;
@@ -93,14 +93,14 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 }
 
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	if (target_ptr)
 		free(target_ptr);
 	return 0;
 }
 
-int update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 		int64_t num_cached_blocks_delta,
 		int64_t cached_size_delta)
 {
@@ -120,18 +120,18 @@ void get_system_size(int64_t *cache_size, int64_t *pinned_size)
 	return 0;
 }
 
-int fetch_error_download_path(char *path, ino_t inode)
+int32_t fetch_error_download_path(char *path, ino_t inode)
 {
 	sprintf(path, "/tmp/mock_error_path_%ju", (uintmax_t)inode);
 	return 0;
 }
 
-int super_block_mark_dirty(ino_t this_inode)
+int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
 
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -145,19 +145,19 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
-int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int change_system_meta(int64_t system_size_delta,
+int32_t change_system_meta(int64_t system_size_delta,
 		int64_t cache_size_delta, int64_t cache_blocks_delta)
 {
 	return 0;
@@ -206,13 +206,13 @@ char *json_dumps(const json_t *root, size_t flags)
 	return (char *)malloc(1);
 }
 
-void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
 {
 	sleep(1);
 	return;
 }
 
-int enc_backup_usermeta(char *json_str)
+int32_t enc_backup_usermeta(char *json_str)
 {
 	return 0;
 }

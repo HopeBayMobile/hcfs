@@ -4,7 +4,7 @@
 
 SYSTEM_CONF_STRUCT *system_config;
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list argptr;
 	va_start(argptr, format);
