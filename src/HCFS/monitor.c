@@ -189,16 +189,17 @@ void destroy_monitor_loop_thread(void)
  *  Return value: double, duration between [start] and [end]
  *
  *************************************************************************/
-inline double diff_time(const struct timespec *start, struct timespec *end)
+inline double diff_time(const struct timespec *start, const struct timespec *end)
 {
 	struct timespec now;
 
-	if (end == NULL) {
+	if(end) {
+		now = *end;
+	} else {
 		clock_gettime(CLOCK_REALTIME, &now);
-		end = &now;
 	}
-	return end->tv_sec - start->tv_sec +
-	       0.000000001 * (end->tv_nsec - start->tv_nsec);
+	return now.tv_sec - start->tv_sec +
+	       0.000000001 * (now.tv_nsec - start->tv_nsec);
 }
 
 /**************************************************************************
