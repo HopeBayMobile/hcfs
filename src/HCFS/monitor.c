@@ -30,7 +30,7 @@
 
 CURL_HANDLE monitor_curl_handle;
 
-int32_t monitor_collisions = 0;
+int32_t backoff_exponent = 0;
 
 void _write_monitor_loop_status_log(double duration)
 {
@@ -101,23 +101,20 @@ void monitor_loop(void)
 
 	write_log(2, "[Monitor] Start monitor loop\n");
 
-	monitor_collisions = 0;
+	backoff_exponent = 0;
 	hcfs_system->backend_is_online = check_backend_status();
 	update_sync_state();
 
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->backend_is_online == TRUE) {
-			monitor_collisions = 0;
+			backoff_exponent = 0;
 			sem_wait(&(hcfs_system->monitor_sem));
 			continue;
 		}
-		monitor_collisions += 1;
-		if (monitor_collisions > 9)
-			monitor_collisions = 9;
-		min = (int32_t)pow(2, monitor_collisions - 3);
-		if (min < 1)
-			min = 1;
-		max = (int32_t)pow(2, monitor_collisions);
+		if (backoff_exponent < MONITOR_MAX_BACKOFF_EXPONENT)
+			backoff_exponent += 1;
+		max = (int32_t)pow(2, backoff_exponent);
+		min = (max >= 8) ? max / 8 : 1;
 		wait_sec = MONITOR_BACKOFF_SLOT;
 		wait_sec *= (min + (rand() % (max - min + 1)));
 		write_log(5, "[Monitor] wait %d seconed before retransmit\n",
