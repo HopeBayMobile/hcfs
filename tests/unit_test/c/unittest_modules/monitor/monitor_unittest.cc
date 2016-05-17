@@ -13,7 +13,7 @@ extern "C" {
 extern SYSTEM_DATA_HEAD *hcfs_system;
 extern int hcfs_test_backend_register;
 extern int hcfs_test_backend_sleep_nsec;
-extern int32_t monitor_collisions;
+extern int32_t backoff_exponent;
 
 class monitorTest : public ::testing::Test {
 	protected:
@@ -81,7 +81,7 @@ TEST_F(monitorTest, Max_Collisions_Number) {
 	for (int i =0; i<15;i++)
 		sem_post(&(hcfs_system->monitor_sem));
 	nanosleep(&wait_monitor_time, NULL);
-	ASSERT_EQ(9, monitor_collisions);
+	ASSERT_EQ(MONITOR_MAX_BACKOFF_EXPONENT, backoff_exponent);
 
 	// let system shut down
 	hcfs_system->system_going_down = TRUE;
