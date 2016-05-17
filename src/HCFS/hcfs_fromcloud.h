@@ -33,7 +33,7 @@ typedef struct {
 	ino_t this_inode;
 	int64_t block_no;
 	off_t page_start_fpos;
-	int entry_index;
+	int32_t entry_index;
 } PREFETCH_STRUCT_TYPE;
 
 typedef struct {
@@ -50,7 +50,7 @@ typedef struct {
 	pthread_t download_thread[MAX_PIN_DL_CONCURRENCY];
 	pthread_t manager_thread;
 	DOWNLOAD_BLOCK_INFO block_info[MAX_PIN_DL_CONCURRENCY];
-	int active_th;
+	int32_t active_th;
 } DOWNLOAD_THREAD_CTL;
 
 typedef struct {
@@ -64,19 +64,19 @@ DOWNLOAD_USERMETA_CTL download_usermeta_ctl;
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int fetch_from_cloud(FILE *fptr, char action_from,
+int32_t fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
-		unsigned char *obj_id);
+		uint8_t *obj_id);
 #else
 		ino_t this_inode, int64_t block_no);
 #endif
 
 void download_block_manager();
-int init_download_control();
-int destroy_download_control();
+int32_t init_download_control();
+int32_t destroy_download_control();
 void fetch_backend_block(void *ptr);
-int fetch_pinned_blocks(ino_t inode);
+int32_t fetch_pinned_blocks(ino_t inode);
 void fetch_quota_from_cloud(void *ptr);
-int update_quota();
+int32_t update_quota();
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

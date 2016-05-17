@@ -43,10 +43,10 @@
 *
 *************************************************************************/
 
-int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
+int32_t lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
 {
-	int count;
-	int ret_val, errcode;
+	int32_t count;
+	int32_t ret_val, errcode;
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -67,7 +67,7 @@ int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
 *
 * Function name: lookup_increase
 *        Inputs: LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
-*                int amount, char d_type
+*                int32_t amount, char d_type
 *        Output: The updated lookup count if successful, or negation of
 *                error code if not.
 *       Summary: Increase the inode lookup count for this_inode, creating
@@ -75,11 +75,11 @@ int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
 *
 *************************************************************************/
 
-int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
-				int amount, char d_type)
+int32_t lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+				int32_t amount, char d_type)
 {
-	int index;
-	int ret_val, errcode;
+	int32_t index;
+	int32_t ret_val, errcode;
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
@@ -147,7 +147,7 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 *
 * Function name: lookup_decrease
 *        Inputs: LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
-*                int amount, char *d_type, char *need_delete
+*                int32_t amount, char *d_type, char *need_delete
 *        Output: The updated lookup count if successful, or negation of error
 *                code if not.
 *       Summary: Decrease the inode lookup count for this_inode. If lookup
@@ -156,11 +156,11 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 *
 *************************************************************************/
 
-int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
-			int amount, char *d_type, char *need_delete)
+int32_t lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+			int32_t amount, char *d_type, char *need_delete)
 {
-	int index;
-	int ret_val, result_lookup, errcode;
+	int32_t index;
+	int32_t ret_val, result_lookup, errcode;
 	char found;
 	LOOKUP_NODE_TYPE *ptr, *prev_ptr;
 
@@ -245,10 +245,10 @@ int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 *
 *************************************************************************/
 
-int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
+int32_t lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 {
-	int index;
-	int ret_val, result_lookup, errcode;
+	int32_t index;
+	int32_t ret_val, result_lookup, errcode;
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
@@ -315,10 +315,10 @@ int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 *
 *************************************************************************/
 
-int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
+int32_t lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 {
-	int count;
-	int ret_val, errcode;
+	int32_t count;
+	int32_t ret_val, errcode;
 	LOOKUP_NODE_TYPE *ptr, *oldptr;
 
 	write_log(10, "Debug lookup destroy\n");

@@ -29,9 +29,9 @@
 #include "global.h"
 #include "utils.h"
 
-int open_log(char *filename)
+int32_t open_log(char *filename)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char log_file[500];
 
 	if (logptr != NULL) {
@@ -94,7 +94,7 @@ int open_log(char *filename)
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 	struct timeval tmptime;
@@ -114,7 +114,7 @@ int write_log(int level, char *format, ...)
 			strftime(timestr, 90, "%F %T", &tmptm);
 
 			printf("%s.%06d\t", timestr,
-				(unsigned int)tmptime.tv_usec);
+				(uint32_t)tmptime.tv_usec);
 
 			vprintf(format, alist);
 			if (add_newline == TRUE)
@@ -128,7 +128,7 @@ int write_log(int level, char *format, ...)
 
 			sem_wait(&(logptr->logsem));
 			fprintf(logptr->fptr, "%s.%06d\t", timestr,
-				(unsigned int)tmptime.tv_usec);
+				(uint32_t)tmptime.tv_usec);
 			vfprintf(logptr->fptr, format, alist);
 			if (add_newline == TRUE)
 				fprintf(logptr->fptr, "\n");
@@ -142,7 +142,7 @@ int write_log(int level, char *format, ...)
 
 }
 
-int close_log(void)
+int32_t close_log(void)
 {
 	if (logptr == NULL)
 		return 0;
