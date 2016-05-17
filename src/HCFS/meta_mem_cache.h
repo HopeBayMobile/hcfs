@@ -23,7 +23,7 @@ after several seconds). */
 /* A hard limit defines the upper bound on the number of entries
 	(or mem used?) */
 /* Dynamically allocate memory and release memory when not being used
-	for too long time (controlled by a parameter) */
+	for a long time (controlled by a parameter) */
 
 /* Will keep cache entry even after file is closed, until expired or need
 	to be replaced */

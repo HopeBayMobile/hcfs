@@ -33,7 +33,7 @@ fi
 for f in $files
 do
 	echo $f
-	sed -i"" \
+	sed -r -i"" \
 		-e "s/\<unsigned char\>/uint8_t/g" \
 		-e "s/\<unsigned long long int\>/uint64_t/g" \
 		-e "s/\<unsigned long long\>/uint64_t/g" \
@@ -58,8 +58,7 @@ do
 		-e "s/\<short int\>/int16_t/g" \
 		-e "s/\<short\>/int16_t/g" \
 		-e "s/\<int\>/int32_t/g" \
-		-e "s/\<\(too\) int64_t\>/\1 long/gI" \
-		-e "s/\<\(a\) int64_t\>/\1 long/gI" \
-		-e "s/\<\(a\) int16_t\>/\1 short/gI" \
+		-e "/\/\*/,/\*\//s/([a-zA-Z]) \<int64_t\>/\1 long/gI" \
+		-e "/\/\*/,/\*\//s/([a-zA-Z]) \<int16_t\>/\1 short/gI" \
 		"$f"
 done

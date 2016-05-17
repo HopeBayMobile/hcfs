@@ -18,7 +18,7 @@
 * will be created so that the inode number of inodes to be deleted can be
 * touched here, and removed when actually deleted.
 *           3. in lookup_decrease, should delete nodes when lookup drops
-* to zero (to save space in the int64_t run).
+* to zero (to save space in the long run).
 *           4. in unmount, can pick either scanning lookup table for inodes
 * to delete or list the folder.
 */

@@ -1089,7 +1089,7 @@ int32_t meta_cache_remove(ino_t this_inode)
 	}
 
 /*Lock body*/
-/*TODO: May need to add checkpoint here so that int64_t sem wait will
+/*TODO: May need to add checkpoint here so that long sem wait will
 	free all locks*/
 
 	sem_wait(&((current_ptr->body).access_sem));
@@ -1374,7 +1374,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		break;
 	}
 	/*Lock body*/
-	/*TODO: May need to add checkpoint here so that int64_t sem wait
+	/*TODO: May need to add checkpoint here so that long sem wait
 		will free all locks*/
 	result_ptr = &(current_ptr->body);
 
