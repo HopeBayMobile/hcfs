@@ -60,5 +60,7 @@ do
 		-e "s/\<int\>/int32_t/g" \
 		-e "/\/\*/,/\*\//s/([a-zA-Z]) \<int64_t\>/\1 long/gI" \
 		-e "/\/\*/,/\*\//s/([a-zA-Z]) \<int16_t\>/\1 short/gI" \
+		-e "/\/\*/,/\*\//s/const \<long\>/const int64_t/gI" \
+		-e "/\/\*/,/\*\//s/const \<short\>/const short/gI" \
 		"$f"
 done
