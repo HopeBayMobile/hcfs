@@ -61,6 +61,9 @@ function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
 	docker rm -f $DOCKERNAME || :
 }
+function check-ssh-agent() {
+	[ -S "$SSH_AUTH_SOCK" ] && { ssh-add -l >& /dev/null || [ $? -ne 2 ]; }
+}
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	if [ ! -f ~/.ssh/id_rsa.pub ]; then
@@ -68,7 +71,8 @@ function setup_ssh_key() {
 	fi
 	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
 		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
-	eval $(ssh-agent)
+	check-ssh-agent || export SSH_AUTH_SOCK=~/.tmp/ssh-agent.sock
+	check-ssh-agent || eval "$(mkdir -p ~/.tmp && ssh-agent -s -a ~/.tmp/ssh-agent.sock)" > /dev/null
 	ssh-add ~/.ssh/id_rsa
 	until docker top $DOCKERNAME | grep -q /usr/sbin/sshd
 	do

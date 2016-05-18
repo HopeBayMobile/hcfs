@@ -124,7 +124,7 @@ int32_t main(int32_t argc, char **argv)
 	strncpy(addr.sun_path, shm_hcfs_reporter, sizeof(addr.sun_path));
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
-	printf("status is %d, err %s\n", status, strerror(errno));
+	printf("status is %d, %s.\n", status, strerror(errno));
 	switch (code) {
 	case TERMINATE:
 	case UNMOUNTALL:
@@ -408,12 +408,16 @@ int32_t main(int32_t argc, char **argv)
 #endif
 		break;
 	case SETSYNCSWITCH:
+		if (argc != 3) {
+			printf("./HCFSvol setsyncswitch [on|off]\n");
+			exit(-EINVAL);
+		}
 		if (strcasecmp(argv[2], "on") == 0) {
 			status = TRUE;
 		} else if (strcasecmp(argv[2], "off") == 0) {
 			status = FALSE;
 		} else {
-			printf("Unsupported switch arg: %s, should be on/off\n", argv[2]);
+			printf("./HCFSvol setsyncswitch [on|off]\n");
 			exit(-ENOTSUP);
 		}
 
