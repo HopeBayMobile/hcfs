@@ -12,9 +12,10 @@
 
 #ifndef GW20_SRC_PARAMS_H_
 #define GW20_SRC_PARAMS_H_
+#include <inttypes.h>
 
 typedef struct {
-	int log_level;
+	int32_t log_level;
 	char *log_path;
 	char *metapath;
 	char *blockpath;
@@ -22,11 +23,11 @@ typedef struct {
 	char *unclaimed_name;
 	char *hcfssystem_name;
 	char *hcfspausesync_name;
-	long long cache_soft_limit;
-	long long cache_hard_limit;
-	long long cache_update_delta;
-	long long max_block_size;
-	int current_backend;
+	int64_t cache_soft_limit;
+	int64_t cache_hard_limit;
+	int64_t cache_update_delta;
+	int64_t max_block_size;
+	int32_t current_backend;
 	char *swift_account;
 	char *swift_user;
 	char *swift_pass;

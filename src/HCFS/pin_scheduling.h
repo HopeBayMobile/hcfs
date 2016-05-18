@@ -17,7 +17,7 @@
 
 typedef struct {
 	ino_t this_inode;
-	int t_idx;
+	int32_t t_idx;
 } PINNING_INFO;
 
 typedef struct {
@@ -29,14 +29,14 @@ typedef struct {
 	BOOL thread_finish[MAX_PINNING_FILE_CONCURRENCY];
 	sem_t pinning_sem; /* Max active threads simultaneously */
 	sem_t ctl_op_sem; /* Control semaphore */
-	int total_active_pinning;
+	int32_t total_active_pinning;
 	BOOL deep_sleep;
 } PINNING_SCHEDULER;
 
 PINNING_SCHEDULER pinning_scheduler;
 
 void pinning_loop();
-int init_pin_scheduler();
-int destroy_pin_scheduler();
+int32_t init_pin_scheduler();
+int32_t destroy_pin_scheduler();
 void pinning_collect();
 void pinning_worker(void *ptr);

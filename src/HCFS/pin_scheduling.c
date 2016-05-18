@@ -24,7 +24,7 @@
 #include "logger.h"
 #include "utils.h"
 
-int init_pin_scheduler()
+int32_t init_pin_scheduler()
 {
 	memset(&pinning_scheduler, 0, sizeof(PINNING_SCHEDULER));
 	sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
@@ -40,7 +40,7 @@ int init_pin_scheduler()
 	return 0;
 }
 
-int destroy_pin_scheduler()
+int32_t destroy_pin_scheduler()
 {
 	pthread_join(pinning_scheduler.pinning_manager, NULL);
 	pthread_join(pinning_scheduler.pinning_collector, NULL);
@@ -56,9 +56,9 @@ static BOOL _pinning_wakeup_fn()
 	return hcfs_system->system_going_down;
 }
 
-void _sleep_a_while(unsigned int *rest_times)
+void _sleep_a_while(uint32_t *rest_times)
 {
-	unsigned int level;
+	uint32_t level;
 
 	level = (*rest_times) / 60;
 
@@ -84,7 +84,7 @@ void _sleep_a_while(unsigned int *rest_times)
  */
 void pinning_collect()
 {
-	int idx;
+	int32_t idx;
 	struct timespec time_to_sleep;
 
 	time_to_sleep.tv_sec = 0;
@@ -146,7 +146,7 @@ void pinning_worker(void *ptr)
 {
 	PINNING_INFO *pinning_info;
 	ino_t this_inode;
-	int t_idx, ret;
+	int32_t t_idx, ret;
 
 	pinning_info = (PINNING_INFO *)ptr;
 	this_inode = pinning_info->this_inode;
@@ -206,8 +206,8 @@ void pinning_worker(void *ptr)
 void pinning_loop()
 {
 	ino_t now_inode;
-	unsigned int rest_times;
-	int ret, i, t_idx;
+	uint32_t rest_times;
+	int32_t ret, i, t_idx;
 	char found, start_from_head;
 	SUPER_BLOCK_ENTRY sb_entry;
 

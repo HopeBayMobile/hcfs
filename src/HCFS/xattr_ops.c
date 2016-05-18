@@ -42,10 +42,10 @@
  *
  * @return 0 if success, otherwise corresponding negavite error code.
  */
-int parse_xattr_namespace(const char *name, char *name_space, char *key)
+int32_t parse_xattr_namespace(const char *name, char *name_space, char *key)
 {
-	int index;
-	int key_len;
+	int32_t index;
+	int32_t key_len;
 	char namespace_string[20];
 
 	/* Find '.' which is used to concatenate namespace and key.
@@ -99,10 +99,10 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
  *
  * @return hash result
  */
-static unsigned hash(const char *input)
+static uint32_t hash(const char *input)
 {
-	unsigned hash = 5381;
-	int index;
+	uint32_t hash = 5381;
+	int32_t index;
 
 	index = 0;
 	while (input[index]) {
@@ -139,14 +139,14 @@ static inline void copy_key_entry(KEY_ENTRY *key_entry, const char *key,
  *
  * @return 0 if success, and usable position is stored in "usable_pos".
  */
-int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *usable_pos)
 {
 	int64_t ret_pos;
 	KEY_LIST_PAGE key_list_page;
-	int errcode;
-	int ret;
-	int ret_size;
+	int32_t errcode;
+	int32_t ret;
+	int32_t ret_size;
 	KEY_LIST_PAGE empty_page;
 
 	/* First get reclaimed page if exist */
@@ -192,11 +192,11 @@ errcode_handle:
  *
  * @return 0 if entry is found. Otherwise return -1.
  */
-int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
-	int *index)
+int32_t key_binary_search(KEY_ENTRY *key_list, uint32_t num_xattr, const char *key,
+	int32_t *index)
 {
-	int start_index, end_index, mid_index;
-	int cmp_result;
+	int32_t start_index, end_index, mid_index;
+	int32_t cmp_result;
 
 	start_index = 0;
 	end_index = num_xattr;
@@ -210,7 +210,7 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 		}
 
 		/* can insert key to last position */
-		if ((unsigned)mid_index >= num_xattr)
+		if ((uint32_t)mid_index >= num_xattr)
 			break;
 
 		cmp_result = strcmp(key, key_list[mid_index].key);
@@ -263,19 +263,19 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
  *
  * @return 0 if entry is found, 1 if entry not found. Return -1 on error.
  */
-int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int64_t first_key_list_pos, KEY_LIST_PAGE *target_key_list_page,
-	int *key_index, int64_t *target_key_list_pos, const char *key,
+	int32_t *key_index, int64_t *target_key_list_pos, const char *key,
 	KEY_LIST_PAGE *prev_page, int64_t *prev_pos)
 {
 	int64_t key_list_pos, prev_key_list_pos;
 	KEY_LIST_PAGE now_key_page, prev_key_page;
-	int ret;
-	int index;
+	int32_t ret;
+	int32_t index;
 	char find_first_insert;
 	char hit_key_entry;
-	int errcode;
-	int ret_size;
+	int32_t errcode;
+	int32_t ret_size;
 
 	if (first_key_list_pos == 0) { /* Never happen in insert_xattr */
 		write_log(10, "Debug xattr: first_key_list_pos is 0\n");
@@ -372,16 +372,16 @@ errcode_handle:
  *
  * @return 0 if success, otherwise negative error code.
  */
-int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *replace_value_block_pos,
 	int64_t *usable_value_pos)
 {
 	VALUE_BLOCK value_block;
 	VALUE_BLOCK empty_block;
-	int errcode;
-	int ret;
-	int ret_size;
-	int ret_pos;
+	int32_t errcode;
+	int32_t ret;
+	int32_t ret_size;
+	int32_t ret_pos;
 
 	/* Priority 1: reuse the replace_value_block_pos when replacing */
 	if (*replace_value_block_pos > 0) {
@@ -439,16 +439,16 @@ errcode_handle:
  *
  * @return 0 for success, otherwise negative error code.
  */
-int write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+int32_t write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	int64_t *replace_value_block_pos, int64_t first_value_pos,
 	const char *value, size_t size)
 {
 	size_t index;
 	VALUE_BLOCK tmp_value_block;
 	int64_t now_pos, next_pos;
-	int ret_code;
-	int errcode;
-	int ret, ret_size;
+	int32_t ret_code;
+	int32_t errcode;
+	int32_t ret, ret_size;
 
 
 	index = 0;
@@ -497,15 +497,15 @@ errcode_handle:
  *
  * @return 0 for success, otherwise negative error code.
  */
-int read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	KEY_ENTRY *key_entry, char *value_buf)
 {
 	VALUE_BLOCK tmp_value_block;
 	size_t value_size;
 	size_t index;
 	int64_t now_pos;
-	int errcode;
-	int ret, ret_size;
+	int32_t errcode;
+	int32_t ret, ret_size;
 
 	index = 0;
 	value_size = key_entry->value_size;
@@ -546,14 +546,14 @@ errcode_handle:
  *
  * @return 0 for success, otherwise negative error code.
  */
-int reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *replace_value_block_pos)
 {
 
 	int64_t head_pos;
 	int64_t tail_pos;
 	VALUE_BLOCK tmp_value_block;
-	int errcode, ret, ret_size;
+	int32_t errcode, ret, ret_size;
 
 	if (*replace_value_block_pos == 0) /* Nothing has to be reclaimed */
 		return 0;
@@ -592,7 +592,7 @@ errcode_handle:
 /*** A debugged function used to print key-value in a key page. ***/
 static void print_keys_to_log(KEY_LIST_PAGE *key_page)
 {
-	unsigned int i;
+	uint32_t i;
 	for (i = 0 ; i < key_page->num_xattr ; i++) {
 		write_log(10,
 			"Debug: key[%d] = %s, len = %d, data_pos = %lld\n", i,
@@ -625,24 +625,24 @@ static void print_keys_to_log(KEY_LIST_PAGE *key_page)
  *
  * @return 0 if success to set xattr, otherwise negative error code.
  */
-int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	const int64_t xattr_filepos, const char name_space_c, const char *key,
-	const char *value, const size_t size, const int flag)
+	const char *value, const size_t size, const int32_t flag)
 {
-	unsigned hash_entry;
+	uint32_t hash_entry;
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE target_key_list_page;
 	KEY_ENTRY *now_key_entry;
 	KEY_ENTRY buf_key_list[MAX_KEY_ENTRY_PER_LIST];
-	int ret_code;
-	int key_index;
+	int32_t ret_code;
+	int32_t key_index;
 	int64_t first_key_list_pos;
 	int64_t target_key_list_pos;
 	int64_t value_pos; /* Record position of first value block */
-	int errcode;
-	int ret;
-	int ret_size;
-	int name_space = name_space_c;
+	int32_t errcode;
+	int32_t ret;
+	int32_t ret_size;
+	int32_t name_space = name_space_c;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(flag);
@@ -737,7 +737,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 				/* It can be inserted to existed
 					target_key_list_page */
 				KEY_ENTRY *key_list;
-				unsigned num_remaining;
+				uint32_t num_remaining;
 
 				key_list = target_key_list_page.key_list;
 				num_remaining =
@@ -856,7 +856,7 @@ errcode_handle:
  * @return 0 if success to get xattr or to get needed buffer size,
  *         and error code on error.
  */
-int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+int32_t get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	const char name_space_c, const char *key, char *value_buf,
 	const size_t size, size_t *actual_size)
 {
@@ -865,10 +865,10 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	KEY_LIST_PAGE target_key_list_page;
 	int64_t target_key_list_pos;
 	int64_t first_key_list_pos;
-	unsigned hash_index;
-	int key_index;
-	int ret_code;
-	int name_space = name_space_c;
+	uint32_t hash_index;
+	int32_t key_index;
+	int32_t ret_code;
+	int32_t name_space = name_space_c;
 
 	*actual_size = 0;
 
@@ -924,13 +924,13 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
  *
  * @return 0 if success, -1 when size is too small.
  */
-static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
+static int32_t fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
 	const size_t size, size_t *actual_size, const char *namespace_prefix)
 {
-	unsigned key_index;
+	uint32_t key_index;
 	char tmp_buf[MAX_KEY_SIZE + 50];
-	int key_size;
-	int namespace_len;
+	int32_t key_size;
+	int32_t namespace_len;
 
 	namespace_len = strlen(namespace_prefix);
 
@@ -970,14 +970,14 @@ static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
  * @return 0 if success to fill the name buffer or to find out needed size,
  *         otherwise return negative error code.
  */
-int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	char *key_buf, const size_t size, size_t *actual_size)
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE key_page;
-	int ns_count;
-	int hash_count;
-	int ret, ret_size, errcode;
+	int32_t ns_count;
+	int32_t hash_count;
+	int32_t ret, ret_size, errcode;
 	char namespace_prefix[30];
 
 	*actual_size = 0;
@@ -1044,7 +1044,7 @@ errcode_handle:
  *
  * @return 0 if key exists and success to delete, otherwise return error code.
  */
-int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		XATTR_PAGE *xattr_page,
 	const int64_t xattr_filepos, const char name_space_c, const char *key)
 {
@@ -1056,12 +1056,12 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int64_t first_key_list_pos;
 	int64_t prev_key_list_pos;
 	int64_t first_value_pos;
-	int key_index;
-	int hash_index;
-	int ret_code;
-	int num_remaining;
-	int errcode, ret, ret_size;
-	int name_space = name_space_c;
+	int32_t key_index;
+	int32_t hash_index;
+	int32_t ret_code;
+	int32_t num_remaining;
+	int32_t errcode, ret, ret_size;
+	int32_t name_space = name_space_c;
 
 	hash_index = hash(key); /* Hash the key */
 	namespace_page = &(xattr_page->namespace_page[name_space]);
