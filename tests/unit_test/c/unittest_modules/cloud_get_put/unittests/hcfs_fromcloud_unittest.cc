@@ -621,7 +621,7 @@ protected:
 			rmdir(METAPATH);
 		mkdir(METAPATH, 0700);
 		hcfs_system->system_going_down = FALSE;
-		hcfs_system->sync_paused = OFF;
+		hcfs_system->backend_is_online = TRUE;
 
 		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
@@ -698,7 +698,7 @@ protected:
 		download_usermeta_ctl.active = FALSE;
 
     		hcfs_system->system_going_down = FALSE;
-		hcfs_system->sync_paused = FALSE;
+		hcfs_system->backend_is_online = TRUE;
 	}
 
 	void TearDown()
@@ -730,7 +730,7 @@ TEST_F(update_quotaTest, CreateThreadSuccess)
 {
 	/* Let thread sleep in the loop */
     	hcfs_system->system_going_down = FALSE;
-	hcfs_system->sync_paused = TRUE;
+	hcfs_system->backend_is_online = FALSE;
 	download_usermeta_ctl.active = FALSE;
 	CURRENT_BACKEND = SWIFT;
 
