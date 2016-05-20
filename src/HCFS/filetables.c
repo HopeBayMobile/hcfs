@@ -10,6 +10,7 @@
 * 2015/2/11  Jiahong moved "seek_page" and "advance_block" to metaops
 * 2015/6/2  Jiahong added error handling
 * 2016/4/20 Jiahong adding operations for dir handle table
+* 2016/5/20 Jiahong fixing a hang issue due to meta handling in close_fh
 *
 **************************************************************************/
 
@@ -146,24 +147,29 @@ int32_t close_fh(int64_t index)
 {
 	FH_ENTRY *tmp_entry;
 	DIRH_ENTRY *tmp_DIRH_entry;
+	META_CACHE_ENTRY_STRUCT *tmp_ptr;
+	BOOL need_close_cache, need_open_cache;
+	ino_t tmpinode;
+
+	need_close_cache = FALSE;
+	need_open_cache = FALSE;
+	tmp_ptr = NULL;
+	tmpinode = 0;
 
 	sem_wait(&(system_fh_table.fh_table_sem));
 
 	if (system_fh_table.entry_table_flags[index] == IS_FH) {
 		tmp_entry = &(system_fh_table.entry_table[index]);
-		if (tmp_entry->meta_cache_locked == FALSE) {
-			tmp_entry->meta_cache_ptr =
-				meta_cache_lock_entry(tmp_entry->thisinode);
-			if (tmp_entry->meta_cache_ptr == NULL) {
-				sem_post(&(system_fh_table.fh_table_sem));
-				return -1;
-			}
-			tmp_entry->meta_cache_locked = TRUE;
+		tmpinode = tmp_entry->thisinode;
+		need_close_cache = TRUE;
+		if (tmp_entry->meta_cache_locked == TRUE) {
+			tmp_ptr = tmp_entry->meta_cache_ptr;
+		} else {
+			need_open_cache = TRUE;
+			tmpinode = tmp_entry->thisinode;
 		}
-		meta_cache_close_file(tmp_entry->meta_cache_ptr);
 
 		tmp_entry->meta_cache_locked = FALSE;
-		meta_cache_unlock_entry(tmp_entry->meta_cache_ptr);
 
 		system_fh_table.entry_table_flags[index] = NO_FH;
 		tmp_entry->thisinode = 0;
@@ -196,6 +202,15 @@ int32_t close_fh(int64_t index)
 	}
 	system_fh_table.num_opened_files--;
 	sem_post(&(system_fh_table.fh_table_sem));
+	if (need_open_cache == TRUE) {
+		tmp_ptr = meta_cache_lock_entry(tmpinode);
+		if (tmp_ptr == NULL)
+			return 0;
+	}
+	if (need_close_cache == TRUE) {
+		meta_cache_close_file(tmp_ptr);
+		meta_cache_unlock_entry(tmp_ptr);
+	}
 	return 0;
 }
 
