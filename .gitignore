@@ -84,3 +84,4 @@ hcfs_android_log
 !/build/prebuilt/**/*.a
 /containers/**/id_rsa
 /containers/**/id_rsa.pub
+/utils/.done_*

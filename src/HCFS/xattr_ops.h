@@ -42,8 +42,8 @@ typedef struct {
 /* A key entry includes key size, value size, the key string, and a file
    offset pointing to first value block. */
 typedef struct {
-	unsigned key_size;
-	unsigned value_size;
+	uint32_t key_size;
+	uint32_t value_size;
 	char key[MAX_KEY_SIZE]; /* Key is null-terminated string  */
 	int64_t first_value_block_pos;
 } KEY_ENTRY;
@@ -52,7 +52,7 @@ typedef struct {
    If the KEY_LIST is the first one, prev_list_pos is set to 0. If it is the
    last one, then next_list_pos is set to 0. */
 typedef struct {
-	unsigned num_xattr;
+	uint32_t num_xattr;
 	KEY_ENTRY key_list[MAX_KEY_ENTRY_PER_LIST];
 	int64_t next_list_pos;
 } KEY_LIST_PAGE;
@@ -60,7 +60,7 @@ typedef struct {
 /* NAMESPACE_PAGE includes a hash table which is used to hash the input key.
    Each hash entry points to a KEY_LIST. */
 typedef struct {
-	unsigned num_xattr;
+	uint32_t num_xattr;
 	int64_t key_hash_table[MAX_KEY_HASH_ENTRY];
 } NAMESPACE_PAGE;
 
@@ -72,28 +72,28 @@ typedef struct {
 	NAMESPACE_PAGE namespace_page[4];
 } XATTR_PAGE;
 
-int parse_xattr_namespace(const char *name, char *name_space, char *key);
+int32_t parse_xattr_namespace(const char *name, char *name_space, char *key);
 
-int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, const int64_t xattr_filepos,
 	const char name_space, const char *key,
-	const char *value, const size_t size, const int flag);
+	const char *value, const size_t size, const int32_t flag);
 
-int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+int32_t get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	const char name_space, const char *key, char *value, const size_t size,
 	size_t *actual_size);
 
-int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, char *key_buf, const size_t size,
 	size_t *actual_size);
 
-int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, const int64_t xattr_filepos,
 	const char name_space, const char *key);
 
-int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int64_t first_key_list_pos, KEY_LIST_PAGE *target_key_list_page,
-	int *key_index, int64_t *target_key_list_pos, const char *key,
+	int32_t *key_index, int64_t *target_key_list_pos, const char *key,
 	KEY_LIST_PAGE *prev_page, int64_t *prev_pos);
 
 #endif

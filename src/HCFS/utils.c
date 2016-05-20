@@ -1018,8 +1018,8 @@ void _shift_xfer_window(void)
 /************************************************************************
 *
 * Function name: change_xfter_meta
-*        Inputs: long long xfer_size_upload, long long xfer_size_download,
-*        	 long long xfer_throughput, long long xfer_obj_transit
+*        Inputs: int64_t xfer_size_upload, int64_t xfer_size_download,
+*        	 int64_t xfer_throughput, int64_t xfer_obj_transit
 *       Summary: Update the parts of xfter statistics in system meta
 *  Return value: 0 if successful. Otherwise returns -1.
 *

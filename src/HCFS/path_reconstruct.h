@@ -28,7 +28,7 @@ struct path_lookup {
 	ino_t child;
 	ino_t parent;
 	char childname[MAX_FILENAME_LEN+1];
-	long long lookupcount;
+	int64_t lookupcount;
 	struct path_lookup *prev;
 	struct path_lookup *next;
 	struct path_lookup *gprev;
@@ -46,7 +46,7 @@ typedef struct {
 typedef struct {
 	PATH_HEAD_ENTRY hashtable[NUM_LOOKUP_ENTRY];
 	PATH_LOOKUP *gfirst;
-	int num_nodes;
+	int32_t num_nodes;
 	sem_t pathcache_lock;
 	ino_t root_inode;
 } PATH_CACHE;
@@ -56,21 +56,21 @@ FILE *pathlookup_data_fptr;
 
 /* API for calling from outside */
 PATH_CACHE * init_pathcache(ino_t root_inode);
-int destroy_pathcache(PATH_CACHE *cacheptr);
+int32_t destroy_pathcache(PATH_CACHE *cacheptr);
 
-int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode);
-int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
-		int bufsize);
+int32_t lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode);
+int32_t construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+		int32_t bufsize);
 
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+int32_t construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
                    ino_t rootinode);
 
-int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete);
+int32_t delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete);
 
-int init_pathlookup(void);
+int32_t init_pathlookup(void);
 void destroy_pathlookup(void);
-int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode);
-int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr);
+int32_t pathlookup_write_parent(ino_t self_inode, ino_t parent_inode);
+int32_t pathlookup_read_parent(ino_t self_inode, ino_t *parentptr);
 
 #endif  /* GW20_HCFS_PATH_RECONSTRUCT_H_ */
 

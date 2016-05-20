@@ -11,15 +11,16 @@
 *
 **************************************************************************/
 
-#include "params.h"
-#include "pthread.h"
-
 #ifndef GW20_SRC_HFUSE_SYSTEM_H_
 #define GW20_SRC_HFUSE_SYSTEM_H_
 
-int init_hfuse(void);
-int init_hcfs_system_data(void);
-int sync_hcfs_system_data(char need_lock);
+#include "params.h"
+#include "pthread.h"
+#include "inttypes.h"
+
+int32_t init_hfuse(void);
+int32_t init_hcfs_system_data(void);
+int32_t sync_hcfs_system_data(char need_lock);
 void init_backend_related_module();
 
 pthread_t delete_loop_thread;
@@ -30,7 +31,7 @@ pthread_t cache_loop_thread;
 #else
 pid_t child_pids[CHILD_NUM];
 pid_t this_pid;
-int proc_idx;
+int32_t proc_idx;
 #endif /* _ANDROID_ENV_ */
 
 #define CHILD_NUM 2

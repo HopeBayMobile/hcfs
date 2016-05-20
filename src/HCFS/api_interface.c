@@ -1368,7 +1368,7 @@ void api_module(void *index)
 			memcpy(&loglevel, largebuf, sizeof(int32_t));
 			if (0 <= loglevel && loglevel <= 10) {
 				system_config->log_level = loglevel;
-				retcode = 0; 
+				retcode = 0;
 			} else {
 				retcode = -EINVAL;
 			}

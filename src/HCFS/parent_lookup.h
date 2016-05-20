@@ -47,10 +47,10 @@ PLOOKUP_HEAD_T parent_lookup_head;
 FILE *plookup2_fptr;
 /* API for calling from outside */
 
-int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t **parentlist);
-int lookup_add_parent(ino_t self_inode, ino_t parent_inode);
-int lookup_delete_parent(ino_t self_inode, ino_t parent_inode);
-int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
+int32_t fetch_all_parents(ino_t self_inode, int32_t *parentnum, ino_t **parentlist);
+int32_t lookup_add_parent(ino_t self_inode, ino_t parent_inode);
+int32_t lookup_delete_parent(ino_t self_inode, ino_t parent_inode);
+int32_t lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
 			  ino_t parent_inode2);
 
 #endif  /* GW20_HCFS_PARENT_LOOKUP_H_ */

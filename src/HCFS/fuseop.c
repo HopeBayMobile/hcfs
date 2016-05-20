@@ -5918,6 +5918,9 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
+	if (name_space == SECURITY)
+		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
 		NULL, NULL, 0, meta_cache_entry);
@@ -5948,6 +5951,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	}
 
+fetch_xattr:
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {
@@ -6053,6 +6057,9 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
+	if (name_space == SECURITY)
+		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
 		NULL, NULL, 0, meta_cache_entry);
@@ -6083,6 +6090,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	}
 
+fetch_xattr:
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {
@@ -6320,6 +6328,9 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	if (retcode < 0)
 		goto error_handle;
 
+	if (name_space == SECURITY)
+		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
 		NULL, NULL, 0, meta_cache_entry);
@@ -6350,6 +6361,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 	}
 
+fetch_xattr:
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {

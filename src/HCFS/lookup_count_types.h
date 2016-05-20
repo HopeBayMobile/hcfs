@@ -20,7 +20,7 @@
 
 typedef struct lookup_template {
 	ino_t this_inode;
-	int lookup_count;
+	int32_t lookup_count;
 	char to_delete;
 	char d_type;
 	struct lookup_template *next;
