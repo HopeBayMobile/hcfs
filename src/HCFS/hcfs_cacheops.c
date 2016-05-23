@@ -318,10 +318,20 @@ static int32_t _check_cache_replace_result(int64_t *num_removed_inode)
 	if (*num_removed_inode == 0) { /* No inodes be removed */
 		if ((hcfs_system->systemdata.cache_size >=
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
-			(hcfs_system->sync_paused))
+			(hcfs_system->sync_paused)) {
 			/* Wake them up and tell them cannot do this action */
 			notify_sleep_on_cache(-EIO);
-		sleep(1);
+			sleep(2);
+			/* Try again after 2 seconds just in case some thread
+			slipped by status changes
+			before we wait on something_to_replace*/
+			notify_sleep_on_cache(-EIO);
+		}
+		/* If in the previous round no replace is done,
+		need to sleep until cache replacement is
+		possible */
+		sem_wait(&(hcfs_system->something_to_replace));
+		sem_post(&(hcfs_system->something_to_replace));
 	}
 
 	*num_removed_inode = 0;
@@ -360,8 +370,9 @@ void run_cache_loop(void)
 	char skip_recent, do_something;
 	time_t node_time;
 	CACHE_USAGE_NODE *this_cache_node;
-	int32_t ret;
+	int32_t ret, semval;
 	int64_t num_removed_inode;
+	sem_t *semptr;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -393,11 +404,14 @@ void run_cache_loop(void)
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
+
 			write_log(10, "Need to throw out something\n");
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
 				write_log(10, "Recomputing cache usage\n");
 				_check_cache_replace_result(&num_removed_inode);
+				do_something = FALSE;
+
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -407,7 +421,6 @@ void run_cache_loop(void)
 				gettimeofday(&builttime, NULL);
 				e_index = 0;
 				skip_recent = TRUE;
-				do_something = FALSE;
 			}
 
 			/* End of hash table. Restart at index 0 */
@@ -416,6 +429,7 @@ void run_cache_loop(void)
 						(skip_recent == FALSE)) {
 					write_log(10, "Recomputing cache usage part 2\n");
 					_check_cache_replace_result(&num_removed_inode);
+					do_something = FALSE;
 					ret = build_cache_usage();
 					if (ret < 0) {
 						write_log(0,
@@ -426,7 +440,6 @@ void run_cache_loop(void)
 					gettimeofday(&builttime, NULL);
 					e_index = 0;
 					skip_recent = TRUE;
-					do_something = FALSE;
 				} else {
 					if ((do_something == FALSE) &&
 							(skip_recent == TRUE))
@@ -492,6 +505,8 @@ void run_cache_loop(void)
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 
+		semptr = &(hcfs_system->something_to_replace);
+
 		while (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT) {
 			gettimeofday(&currenttime, NULL);
 			/*Rebuild cache usage every five minutes if cache usage
@@ -499,6 +514,17 @@ void run_cache_loop(void)
 			write_log(10, "Checking cache size %lld, %lld\n",
 			          hcfs_system->systemdata.cache_size,
 			          CACHE_SOFT_LIMIT);
+
+			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
+							(seconds_slept > 300)) {
+				semval = 0;
+				ret = sem_getvalue(semptr, &semval);
+				if ((ret == 0) && (semval == 0)) {
+					seconds_slept = 0;
+					gettimeofday(&builttime, NULL);
+				}
+			}
+
 			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
 							(seconds_slept > 300)) {
 				ret = build_cache_usage();
@@ -557,8 +583,8 @@ int32_t sleep_on_cache_full(void)
 
 /************************************************************************
 *
-* Function name: sleep_on_cache_full
-*        Inputs: None
+* Function name: notify_sleep_on_cache
+*        Inputs: int32_t cache_replace_status
 *       Summary: Routine for waking threads/processes sleeping from using
 *                sleep_on_cache_full.
 *  Return value: None
