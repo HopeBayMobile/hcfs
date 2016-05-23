@@ -120,7 +120,7 @@ TEST_F(close_fhTest, meta_cache_lock_entry_ReturnNull)
 	index = open_fh(INO__META_CACHE_LOCK_ENTRY_FAIL, 0, FALSE);
 	ASSERT_NE(-1, index);
 	/* Test */
-	ASSERT_EQ(-1, close_fh(index));
+	ASSERT_EQ(0, close_fh(index));
 }
 
 TEST_F(close_fhTest, CloseSuccess)
