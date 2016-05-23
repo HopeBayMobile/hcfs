@@ -62,7 +62,7 @@ OBJS_F := objmeta.o \
 	event_notification.o \
 	event_filter.o \
 	rebuild_super_block.o \
-	rebuild_parent_dirstat \
+	rebuild_parent_dirstat
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"
