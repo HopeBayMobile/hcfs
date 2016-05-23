@@ -38,8 +38,6 @@ TEST_F(monitorTest, Backend_Status_Changed) {
 
 	// Prepare flag to let mock hcfs_test_backend return 200
 	backoff_exponent = 1;
-	larger_than_interval.tv_sec = backoff_exponent;
-	larger_than_interval.tv_nsec = 10000000;
 	hcfs_test_backend_register = 200;
 
 	// create thread to run monitor loop
