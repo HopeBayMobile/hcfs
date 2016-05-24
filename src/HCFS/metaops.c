@@ -2156,6 +2156,7 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 	return 0;
 }
 	
+/**
  * collect_dir_children
  *
  * Given a dir inode, collect all the children and classify them as
