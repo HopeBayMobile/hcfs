@@ -36,9 +36,15 @@ typedef struct SB_THREAD_POOL {
 
 typedef struct REBUILD_SB_MGR {
 	SB_THREAD_POOL thread_pool;
-	REBUILD_SB_MGR jobs;
-	BOOL finish; 
 	sem_t mgr_sem;
-} REBUILD_SB_MGR;
+	BOOL finish; 
+	pthread_attr_t mgr_attr;
+	pthread_t mgr_tid;
+} REBUILD_SB_MGR_INFO;
 
-REBUILD_SB_MGR *rebuild_sb_mgr_info;
+REBUILD_SB_MGR_INFO *rebuild_sb_mgr_info;
+REBUILD_INODE_JOBS *jobs;
+
+int32_t rebuild_super_block_entry(ino_t this_inode,
+		struct stat *this_stat, BOOL local_pin);
+int32_t init_rebuild_sb();
