@@ -1935,33 +1935,14 @@ static int32_t _check_shrink_size(ino_t **ptr, int64_t num_elem,
 	return 0;
 }
 
-/**
- * collect_dir_children
- *
- * Given a dir inode, collect all the children and classify them as
- * dir nodes and non-dir nodes. This function takes advantage of
- * tree-walk pointer in meta of a dir.
- *
- * @param this_inode The inode number of the dir
- * @param dir_node_list Address of a pointer used to point to dir-children-array
- * @param num_dir_node Number of elements in the dir-array
- * @param nondir_node_list Address of a pointer used to point to
- *                         non-dir-children-array
- * @param num_nondir_node Number of elements in the non-dir-array
- *
- * @return 0 on success, otherwise negative error code
- */
-int32_t collect_dir_children(ino_t this_inode,
-	ino_t **dir_node_list, int64_t *num_dir_node,
-	ino_t **nondir_node_list, int64_t *num_nondir_node)
+int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
+		ino_t **dir_node_list, int64_t *num_dir_node,
+		ino_t **nondir_node_list, int64_t *num_nondir_node)
 {
-	char metapath[300];
-	FILE *fptr;
 	int32_t ret, errcode;
 	int32_t count;
 	int64_t ret_size, now_page_pos;
 	int64_t total_children, half, now_nondir_size, now_dir_size;
-	DIR_META_TYPE dir_meta;
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *tmpentry;
 
@@ -1970,36 +1951,10 @@ int32_t collect_dir_children(ino_t this_inode,
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
 
-	ret = fetch_meta_path(metapath, this_inode);
-	if (ret < 0)
-		return ret;
-
-	fptr = fopen(metapath, "r");
-	if (fptr == NULL) {
-		ret = errno;
-		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
-			(uint64_t)this_inode, __func__, ret);
-		return -ret;
-	}
-
-	flock(fileno(fptr), LOCK_EX);
-	if (access(metapath, F_OK) < 0) {
-		write_log(5, "meta %"PRIu64" does not exist in %s\n",
-			(uint64_t)this_inode, __func__);
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return -ENOENT;
-	}
-
-	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
-	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
-	total_children = dir_meta.total_children;
-	now_page_pos = dir_meta.tree_walk_list_head;
-	if (total_children == 0 || now_page_pos == 0) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
+	total_children = dir_meta->total_children;
+	now_page_pos = dir_meta->tree_walk_list_head;
+	if (total_children == 0 || now_page_pos == 0)
 		return 0;
-	}
 
 	half = total_children / 2 + 1; /* Avoid zero malloc */
 	now_dir_size = half;
@@ -2050,9 +2005,6 @@ int32_t collect_dir_children(ino_t this_inode,
 		now_page_pos = dir_page.tree_walk_next;
 	}
 
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
-
 	/* Shrink dir_node_list size */
 	ret = _check_shrink_size(dir_node_list, *num_dir_node, now_dir_size);
 	if (ret < 0) {
@@ -2079,8 +2031,6 @@ int32_t collect_dir_children(ino_t this_inode,
 	return 0;
 
 errcode_handle:
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
 	free(*dir_node_list);
 	free(*nondir_node_list);
 	*dir_node_list = NULL;
@@ -2196,6 +2146,76 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 	return 0;
 }
 	
+ * collect_dir_children
+ *
+ * Given a dir inode, collect all the children and classify them as
+ * dir nodes and non-dir nodes. This function takes advantage of
+ * tree-walk pointer in meta of a dir.
+ *
+ * @param this_inode The inode number of the dir
+ * @param dir_node_list Address of a pointer used to point to dir-children-array
+ * @param num_dir_node Number of elements in the dir-array
+ * @param nondir_node_list Address of a pointer used to point to
+ *                         non-dir-children-array
+ * @param num_nondir_node Number of elements in the non-dir-array
+ *
+ * @return 0 on success, otherwise negative error code
+ */
+int32_t collect_dir_children(ino_t this_inode,
+	ino_t **dir_node_list, int64_t *num_dir_node,
+	ino_t **nondir_node_list, int64_t *num_nondir_node)
+{
+	int32_t ret, errcode;
+	int64_t ret_size;
+	char metapath[300];
+	FILE *fptr;
+	DIR_META_TYPE dir_meta;
+
+	ret = fetch_meta_path(metapath, this_inode);
+	if (ret < 0)
+		return ret;
+
+	fptr = fopen(metapath, "r");
+	if (fptr == NULL) {
+		ret = errno;
+		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
+			(uint64_t)this_inode, __func__, ret);
+		return -ret;
+	}
+
+	flock(fileno(fptr), LOCK_EX);
+	if (access(metapath, F_OK) < 0) {
+		write_log(5, "meta %"PRIu64" does not exist in %s\n",
+			(uint64_t)this_inode, __func__);
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return -ENOENT;
+	}
+
+	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
+	ret = collect_dirmeta_children(&dir_meta, fptr, dir_node_list,
+			num_dir_node, nondir_node_list, num_nondir_node);
+	if (ret < 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return ret;
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
+	return errcode;
+}
+
 static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
 {
 	if (namespace == SECURITY) {
