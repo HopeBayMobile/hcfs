@@ -52,7 +52,6 @@ typedef struct SB_THREAD_POOL {
 	sem_t tpool_access_sem;
 } SB_THREAD_POOL;
 
-
 //typedef struct REBUILD_SB_MGR {
 //	SB_THREAD_POOL tpool;
 //	sem_t mgr_access_sem;

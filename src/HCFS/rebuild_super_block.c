@@ -820,4 +820,3 @@ errcode_handle:
 	fclose(fptr);
 	return errcode;
 }
-
