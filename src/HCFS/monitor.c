@@ -27,6 +27,8 @@
 #include "hcfscurl.h"
 #include "macro.h"
 #include "params.h"
+#include "hcfs_cacheops.h"
+#include "utils.h"
 
 CURL_HANDLE monitor_curl_handle;
 
@@ -236,8 +238,17 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 void update_sync_state(void)
 {
 	if (hcfs_system->backend_is_online == FALSE ||
-	    hcfs_system->sync_manual_switch == FALSE)
+	    hcfs_system->sync_manual_switch == FALSE) {
 		hcfs_system->sync_paused = TRUE;
-	else
+		/* Notify threads sleeping on cache full */
+		if (hcfs_system->systemdata.cache_size >=
+			CACHE_HARD_LIMIT - CACHE_DELTA)
+			notify_sleep_on_cache(-EIO);
+	} else {
 		hcfs_system->sync_paused = FALSE;
+		/* Threads can sleep on cache full now */
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.cache_replace_status = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
 }

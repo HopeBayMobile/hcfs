@@ -247,8 +247,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 						timediff = 0;
 					/*Rebuild cache usage every five
 					minutes if cache usage not near full*/
-					if ((timediff > 300) ||
-						((*seconds_slept) > 300))
+					if ((timediff > SCAN_INT) ||
+						((*seconds_slept) > SCAN_INT))
 						break;
 					sleep(1);
 					(*seconds_slept)++;
@@ -265,8 +265,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 
 				if ((hcfs_system->systemdata.cache_size <
 							CACHE_SOFT_LIMIT) &&
-					((timediff > 300) ||
-						((*seconds_slept) > 300)))
+					((timediff > SCAN_INT) ||
+						((*seconds_slept) > SCAN_INT)))
 					break;
 
 				flock(fileno(metafptr), LOCK_EX);
@@ -474,7 +474,8 @@ void run_cache_loop(void)
 					node_time =
 						inode_cache_usage_hash[e_index]
 							->last_mod_time;
-				if ((currenttime.tv_sec - node_time) < 300) {
+				if ((currenttime.tv_sec - node_time) <
+				     SCAN_INT) {
 					e_index++;
 					write_log(10, "Skipping, part 3\n");
 					continue;
@@ -515,8 +516,9 @@ void run_cache_loop(void)
 			          hcfs_system->systemdata.cache_size,
 			          CACHE_SOFT_LIMIT);
 
-			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
-							(seconds_slept > 300)) {
+			if (((currenttime.tv_sec-builttime.tv_sec) >
+			      SCAN_INT) ||
+			     (seconds_slept > SCAN_INT)) {
 				semval = 0;
 				ret = sem_getvalue(semptr, &semval);
 				if ((ret == 0) && (semval == 0)) {
@@ -525,8 +527,9 @@ void run_cache_loop(void)
 				}
 			}
 
-			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
-							(seconds_slept > 300)) {
+			if (((currenttime.tv_sec-builttime.tv_sec) >
+			      SCAN_INT) ||
+			     (seconds_slept > SCAN_INT)) {
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -565,6 +568,10 @@ void run_cache_loop(void)
 int32_t sleep_on_cache_full(void)
 {
 	int32_t cache_replace_status;
+
+	/* If cannot connect to backend, fail sleep immediately */
+	if (hcfs_system->sync_paused == TRUE)
+		return -EIO;
 
 	/* Check cache replacement status */
 	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
