@@ -5,7 +5,7 @@
 
 #define UNUSED(x) ((void)x)
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 
@@ -16,9 +16,9 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int hcfs_test_backend_register = 401;
-int hcfs_test_backend_sleep_nsec = 0;
-int hcfs_test_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_test_backend_register = 401;
+int32_t hcfs_test_backend_sleep_nsec = 0;
+int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 {
 	struct timespec larger_than_interval;
 

@@ -3,16 +3,16 @@
 #include "mock_param.h"
 #include "global.h"
 
-int super_block_share_locking(void)
+int32_t super_block_share_locking(void)
 {
 	return 0;
 }
-int super_block_share_release(void)
+int32_t super_block_share_release(void)
 {
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 	va_start(alist, format);
@@ -21,7 +21,7 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int super_block_finish_pinning(ino_t this_inode)
+int32_t super_block_finish_pinning(ino_t this_inode)
 {
 	FINISH_PINNING = TRUE;
 	sem_wait(&verified_inodes_sem);
@@ -31,7 +31,7 @@ int super_block_finish_pinning(ino_t this_inode)
 	return 0;
 }
 
-int fetch_pinned_blocks(ino_t inode)
+int32_t fetch_pinned_blocks(ino_t inode)
 {
 	switch (inode) {
 	case INO_PINNING_ENOSPC:
@@ -46,7 +46,7 @@ int fetch_pinned_blocks(ino_t inode)
 	return 0;
 }
 
-int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	if (mock_inodes_counter == TOTAL_MOCK_INODES) {
 		inode_ptr->pin_ll_next = 0;
@@ -60,7 +60,7 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 struct timespec UT_sleep;
 
-void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
 {
 	UT_sleep.tv_sec = 0;
 	UT_sleep.tv_nsec = 99999999 ;
