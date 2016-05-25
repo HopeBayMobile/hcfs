@@ -19,17 +19,17 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	}
 }
 
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }

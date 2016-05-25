@@ -11,7 +11,7 @@ class DirLookupEnv : public ::testing::Environment {
 		char long_path[2 * MAX_PATHNAME];
 		virtual void SetUp()
 		{
-			for (int i = 0 ; i < 2 * MAX_PATHNAME ; i++)
+			for (int32_t i = 0 ; i < 2 * MAX_PATHNAME ; i++)
 				long_path[i] = 'A';
 			long_path[2 * MAX_PATHNAME - 1] = '\0';
 
@@ -34,8 +34,8 @@ TEST(init_pathname_cachetest, InitSuccess)
 
 	memset(&zero_entry, 0, sizeof(PATHNAME_CACHE_ENTRY));
 	ASSERT_EQ(0, init_pathname_cache());
-	for (int i = 0 ; i < PATHNAME_CACHE_ENTRY_NUM ; i++) {
-		int val;
+	for (int32_t i = 0 ; i < PATHNAME_CACHE_ENTRY_NUM ; i++) {
+		int32_t val;
 		sem_getvalue(&(pathname_cache[i].cache_entry_sem), &val);
 		ASSERT_EQ(1, val);
 		ASSERT_EQ(0, pathname_cache[i].inode_number);
@@ -52,7 +52,7 @@ TEST(init_pathname_cachetest, InitSuccess)
 
 TEST(replace_pathname_cacheTest, IndexOutOfBound)
 {
-	long long index = 5 * PATHNAME_CACHE_ENTRY_NUM;
+	int64_t index = 5 * PATHNAME_CACHE_ENTRY_NUM;
 	char *path = "/tmp/test";
 	ino_t inode = 2;
 	/* Test */
@@ -66,14 +66,14 @@ TEST(replace_pathname_cacheTest, IndexOutOfBound)
 TEST(replace_pathname_cacheTest, PathnameTooLong)
 {
 	ino_t inode = 2;
-	long long index = 5;
+	int64_t index = 5;
 	/* Test */
 	EXPECT_EQ(-1, replace_pathname_cache(index, env->long_path, inode));
 }
 
 TEST(replace_pathname_cacheTest, RepalceSuccess)
 {
-	long long index = 5;
+	int64_t index = 5;
 	char *path = "/tmp/test";
 	ino_t inode = 2;
 	/* Test */
@@ -98,7 +98,7 @@ TEST(invalidate_pathname_cache_entryTest, PathnameTooLong)
 
 TEST(invalidate_pathname_cache_entryTest, PathNotInCache)
 {
-	unsigned long long index;
+	uint64_t index;
 	char *path = "/tmp/test";
 	/* Mock data */
 	index = compute_hash(path);
@@ -112,7 +112,7 @@ TEST(invalidate_pathname_cache_entryTest, PathNotInCache)
 
 TEST(invalidate_pathname_cache_entryTest, InvalidateCacheSuccess)
 {
-	unsigned long long index;
+	uint64_t index;
 	char *path = "/tmp/test";
 	/* Mock data */
 	index = compute_hash(path);
@@ -140,7 +140,7 @@ TEST(check_cached_pathTest, PathnameTooLong)
 
 TEST(check_cached_pathTest, PathNotInCache)
 {
-	unsigned long long index;
+	uint64_t index;
 	char *path = "/tmp/test";
 	/* Mock data */
 	index = compute_hash(path);
@@ -152,9 +152,9 @@ TEST(check_cached_pathTest, PathNotInCache)
 
 TEST(check_cached_pathTest, CheckCacheSuccess)
 {
-	unsigned long long index;
+	uint64_t index;
 	/* Test for 500 times */	
-	for (int times = 0 ; times < 500 ; times++) {
+	for (int32_t times = 0 ; times < 500 ; times++) {
 		char path[30];
 		sprintf(path, "/tmp/test%d", times);
 		/* Mock data */
@@ -176,14 +176,14 @@ TEST(check_cached_pathTest, CheckCacheSuccess)
 
 TEST(lookup_pathnameTest, LookupRootPathSuccess)
 {
-	int errcode;
+	int32_t errcode;
 	EXPECT_EQ(1, lookup_pathname("/", &errcode));
 }
 
 TEST(lookup_pathnameTest, PathFoundInCache)
 {
-	int errcode;
-	unsigned long long index;
+	int32_t errcode;
+	uint64_t index;
 	ino_t test_inode = 123;
 	char path[] = "/tmp/test1/test2/test3";
 	
@@ -198,8 +198,8 @@ TEST(lookup_pathnameTest, PathFoundInCache)
 
 TEST(lookup_pathnameTest, PrefixPathFoundInCache_With_Recursion_1_Layer)
 {
-	int errcode;
-	unsigned long long index;
+	int32_t errcode;
+	uint64_t index;
 	char complete_path[] = "/tmp/file1/file2/file3";
 	/* init and mock data */
 	ASSERT_EQ(0, init_pathname_cache());
@@ -212,8 +212,8 @@ TEST(lookup_pathnameTest, PrefixPathFoundInCache_With_Recursion_1_Layer)
 
 TEST(lookup_pathnameTest, PrefixPathFoundInCache_With_Recursion_MultiLayer)
 {
-	int errcode;
-	unsigned long long index;
+	int32_t errcode;
+	uint64_t index;
 	char complete_path[] = "/tmp/file1/file2/file3/file4";
 	/* init and mock data */
 	ASSERT_EQ(0, init_pathname_cache());
@@ -226,8 +226,8 @@ TEST(lookup_pathnameTest, PrefixPathFoundInCache_With_Recursion_MultiLayer)
 
 TEST(lookup_pathnameTest, PrefixPathNotFoundInCache)
 {
-	int errcode;
-	unsigned long long index;
+	int32_t errcode;
+	uint64_t index;
 	char complete_path[] = "/file1/file2/file3/file4";
 	/* init and mock data */
 	ASSERT_EQ(0, init_pathname_cache());
@@ -237,7 +237,7 @@ TEST(lookup_pathnameTest, PrefixPathNotFoundInCache)
 
 TEST(lookup_pathnameTest, FailToFindPrefixPath)
 {
-	int errcode;
+	int32_t errcode;
 	/* init and mock data */
 	ASSERT_EQ(0, init_pathname_cache());
 	/* Test */
@@ -250,7 +250,7 @@ TEST(lookup_pathnameTest, FailToFindPrefixPath)
 	End of unittest of lookup_pathname()
  */
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 {
 	env = new DirLookupEnv;
 	testing::AddGlobalTestEnvironment(env);
