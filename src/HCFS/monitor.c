@@ -119,7 +119,7 @@ void monitor_loop(void)
 		min = (max >= 8) ? max / 8 : 1;
 		wait_sec = MONITOR_BACKOFF_SLOT;
 		wait_sec *= (min + (rand() % (max - min + 1)));
-		write_log(5, "[Monitor] wait %d seconed before retransmit\n",
+		write_log(5, "[Monitor] wait %d seconds before retransmit\n",
 			  wait_sec);
 
 		clock_gettime(CLOCK_REALTIME, &ts);
