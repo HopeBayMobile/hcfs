@@ -312,6 +312,7 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	int num_block_entry = 80;
 	BLOCK_ENTRY_PAGE mock_block_page;
 	FILE *mock_file_meta;
+	int32_t semval;
 
 	/* Run tested function */
 	init_upload_control();
@@ -327,6 +328,8 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
 		ASSERT_EQ(FALSE, upload_ctl.threads_created[i]) << "thread " << i << " is in use";
 	}
+
+	/* Make sure that block upload will trigger cache replacement */
 	mock_file_meta = fopen(MOCK_META_PATH, "r+");
 	fread(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
 	for (int i = 0 ; i < num_block_entry ; i++) {
@@ -539,7 +542,7 @@ protected:
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char) * 20);
-
+		sem_init(&(hcfs_system->something_to_replace), 0, 0);
 	}
 	void TearDown()
 	{
@@ -562,7 +565,7 @@ protected:
 		pthread_cancel(sync_ctl.sync_handler_thread);
 		pthread_join(sync_ctl.sync_handler_thread, &res);
 	}
-	void write_mock_meta_file(char *metapath, int total_page, unsigned char block_status)
+	void write_mock_meta_file(char *metapath, int total_page, unsigned char block_status, BOOL topin)
 	{
 		struct stat mock_stat;
 		FILE_META_TYPE mock_file_meta;
@@ -576,6 +579,7 @@ protected:
 		mock_stat.st_size = 1000000; // Let total_blocks = 1000000/1000 = 1000
 		mock_stat.st_mode = S_IFREG;
 		mock_file_meta.root_inode = 10;
+		mock_file_meta.local_pin = topin;
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
 		fwrite(&mock_statistics, sizeof(FILE_STATS_TYPE), 1, mock_metaptr);
@@ -623,7 +627,7 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 	sync_single_inode(&mock_thread_type);
 }
 
-TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
+TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
 	char metapath[] = MOCK_META_PATH;
@@ -632,9 +636,10 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	BLOCK_ENTRY_PAGE block_page;
 	FILE_META_TYPE filemeta;
 	FILE *metaptr;
+	int32_t semval;
 
 	/* Mock data */
-	write_mock_meta_file(metapath, total_page, ST_LDISK);
+	write_mock_meta_file(metapath, total_page, ST_LDISK, FALSE);
 
 	system_config->max_block_size = 100;
 	mock_thread_type.inode = 1;
@@ -651,6 +656,78 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	init_sync_stat_control();
 	sync_single_inode(&mock_thread_type);
 	sleep(2);
+
+	/* Check if cache replacement is triggered */
+	sem_getvalue(&(hcfs_system->something_to_replace), &semval);
+	EXPECT_LT(0, semval);
+
+	hcfs_system->system_going_down = TRUE;
+	sleep(1);
+
+	/* Verify */
+	printf("Begin to verify sync blocks\n");
+	EXPECT_EQ(num_total_blocks, objname_counter);
+	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
+	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
+		char expected_objname[50];
+		sprintf(expected_objname, "data_%lld_%d",
+				mock_thread_type.inode, blockno);
+		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
+		sprintf(expected_objname, "/tmp/testHCFS/data_%" PRIu64 "_%d",
+				(uint64_t)mock_thread_type.inode, blockno);
+		unlink(expected_objname);
+	}
+	printf("Begin to check block status\n");
+	metaptr = fopen(metapath, "r+");
+	fseek(metaptr, sizeof(struct stat), SEEK_SET);
+	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
+	fseek(metaptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA),
+			SEEK_SET);
+	while (!feof(metaptr)) {
+		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); // Linearly read block meta
+		for (int i = 0 ; i < block_page.num_entries ; i++) {
+			ASSERT_EQ(ST_BOTH, block_page.block_entries[i].status); // Check status
+		}
+	}
+	fclose(metaptr);
+	unlink(metapath);
+}
+
+TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
+{
+	SYNC_THREAD_TYPE mock_thread_type;
+	char metapath[] = MOCK_META_PATH;
+	int total_page = 3;
+	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
+	BLOCK_ENTRY_PAGE block_page;
+	FILE_META_TYPE filemeta;
+	FILE *metaptr;
+	int32_t semval;
+
+	/* Mock data */
+	write_mock_meta_file(metapath, total_page, ST_LDISK, TRUE);
+
+	system_config->max_block_size = 100;
+	mock_thread_type.inode = 1;
+	mock_thread_type.this_mode = S_IFREG;
+	mock_thread_type.which_index = 0;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
+
+	/* Run tested function */
+	init_upload_control();
+	init_sync_stat_control();
+	sync_single_inode(&mock_thread_type);
+	sleep(2);
+
+	/* No cache replacement triggered */
+	sem_getvalue(&(hcfs_system->something_to_replace), &semval);
+	EXPECT_EQ(0, semval);
+
 	hcfs_system->system_going_down = TRUE;
 	sleep(1);
 
@@ -699,7 +776,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	hcfs_system->sync_manual_switch = ON;
 	hcfs_system->sync_paused = OFF;
 	/* Mock data */
-	write_mock_meta_file(metapath, total_page, ST_TODELETE);
+	write_mock_meta_file(metapath, total_page, ST_TODELETE, FALSE);
 
 	system_config->max_block_size = 1000;
 	mock_thread_type.inode = 1;
