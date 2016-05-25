@@ -11,8 +11,24 @@ Known Issues / Limitations / Features to be Implemented
   7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
   8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
 
+v 2.0.6.0673 (release2.2.1_base)
+=====
+## New Features
+  - Power Consumption/[Backend Monitoring Design](https://docs.google.com/presentation/d/1n851y5R_x3Y07UehvKN3ac1wfdeZF1hBvpX94KwmDzk/edit) (!357)
+    - Reconnection waiting time increase exponentially if backend is not available (5XX code, connection timed out).
+    - HCFS will switch to offline mode and pause sync if received 5xx return code from server.
+  - Performance/Enhance pkg lookup. (!363)
+  - Performance/Skip xattr permission check if domain is SECURITY (!383)
+
+## CI / Refactoring
+  - Refactoring/normalize data type 3 (!358)
+  - Refactoring/normalize data type 4 (!371)
+  - Refactoring/normalize_data_type_5 (!376)
+
 v 2.0.6.0617
 =====
+
+----
 ## New Features
   - Feature/more xfer statistics (!351)
   - Feature/selinux allow pull hcfs log (!294)
