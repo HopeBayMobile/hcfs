@@ -11,12 +11,17 @@
 #define NUM_THREADS_IN_POOL 4
 #define NUM_CACHED_INODES 4096
 
-typedef struct REBUILD_INODE_JOBS {
+typedef struct CACHED_JOBS {
 	ino_t cached_inodes[NUM_CACHED_INODES];
 	int32_t num_cached_inode;
 	int32_t cache_idx;
+} CACHED_JOBS;
+
+typedef struct REBUILD_INODE_JOBS {
+	CACHED_JOBS cache_jobs;
 	int32_t queue_fh;
-	int64_t fptr_offset;
+	int64_t remaining_jobs;
+	int64_t job_count;
 	pthread_mutex_t job_mutex;
 	pthread_cond_t job_cond;
 } REBUILD_SB_JOBS;

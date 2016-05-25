@@ -53,19 +53,24 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots, int32_t *fh)
+int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots)
 {
 	char queue_filepath[200];
 	int32_t errcode;
+	int32_t fh;
 	ssize_t ret_ssize;
 
 	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
-	*fh = open(queue_filepath, O_CREAT | O_RDWR);
-	if (*fh < 0) {
+	fh = open(queue_filepath, O_CREAT | O_RDWR);
+	if (fh < 0) {
 		errcode = errno;
 		return -errcode;
 	}
-	PWRITE(*fh, roots, sizeof(ino_t) * num_roots, 0);
+	PWRITE(fh, roots, sizeof(ino_t) * num_roots, 0);
+	rebuild_sb_jobs->queue_fh = fh;
+	rebuild_sb_jobs->remaining_jobs = num_roots;
+	rebuild_sb_jobs->job_count = 0;
+
 	return 0;
 
 errcode_handle:
@@ -133,12 +138,15 @@ errcode_handle:
 int32_t init_rebuild_sb()
 {
 	char sb_path[200];
+	char queue_filepath[200];
 	int32_t ret, errcode;
 	ino_t *roots;
 	int64_t num_roots;
 	SUPER_BLOCK_HEAD head;
 	ssize_t ret_ssize;
 	FILE *fptr;
+	struct stat tmpstat;
+	int64_t ret_pos;
 
 	/* Allocate memory for jobs */
 	rebuild_sb_jobs = (REBUILD_SB_JOBS *)
@@ -159,8 +167,10 @@ int32_t init_rebuild_sb()
 		return -ENOMEM;
 	}
 
-	//sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
+	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
 	sprintf(sb_path, "%s/superblock", METAPATH);
+
+	/* Rebuild superblock */
 	if (access(sb_path, F_OK) < 0) {
 		errcode = errno;
 		if (errcode == ENOENT) {
@@ -169,8 +179,7 @@ int32_t init_rebuild_sb()
 			if (ret < 0)
 				return ret;
 			/* Init queue file */
-			ret = _init_rebuild_queue_file(roots, num_roots,
-					&(rebuild_sb_jobs->queue_fh));
+			ret = _init_rebuild_queue_file(roots, num_roots);
 			if (ret < 0)
 				return ret;
 			/* Init sb header */
@@ -180,7 +189,9 @@ int32_t init_rebuild_sb()
 		} else {
 			return -errcode;
 		}
+
 	} else {
+		/* Check superblock and keep rebuilding */
 		fptr = fopen(sb_path, "r+");
 		if (!fptr) {
 			errcode = errno;
@@ -206,17 +217,76 @@ int32_t init_rebuild_sb()
 				return 0;
 			}
 		}
-		ret = super_block_init();
-		if (ret < 0)
-			return ret;
+
+		/* Check queue file and open it */
+		if (access(queue_filepath, F_OK) == 0) {
+			rebuild_sb_jobs->queue_fh =
+				open(queue_filepath, O_RDWR);
+			if (rebuild_sb_jobs->queue_fh <= 0) {
+				errcode = errno;
+				return -errcode;
+			}
+			ret_pos = lseek(rebuild_sb_jobs->queue_fh, 0, SEEK_END);
+			rebuild_sb_jobs->remaining_jobs =
+				ret_pos / sizeof(ino_t);
+		} else {
+			errcode = errno;
+			if (errcode != ENOENT)
+				return -errcode;
+			ret = _get_root_inodes(&roots, &num_roots);
+			if (ret < 0)
+				return ret;
+			ret = _init_rebuild_queue_file(roots, num_roots);
+			if (ret < 0)
+				return ret;
+		}
 	}
+	ret = super_block_init();
+	if (ret < 0)
+		return ret;
+	return 0;
+}
+
+/* Need mutex lock */
+int32_t pull_inode_job(ino_t *inode_job)
+{
+	CACHED_JOBS *cache_job;
+	ssize_t ret_ssize;
+
+	if (rebuild_sb_jobs->remaining_jobs <= 0)
+		return -ENOENT;
+
+	cache_job = &(rebuild_sb_jobs->cache_jobs);
+	if (cache_job->cache_idx >= cache_job->num_cached_inode) {
+		flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
+		ret_ssize = pread(rebuild_sb_jobs->queue_fh,
+				cache_job->cached_inodes,
+				sizeof(ino_t) * NUM_CACHED_INODES,
+				sizeof(ino_t) * rebuild_sb_jobs->job_count);
+		flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+		if (ret_ssize > 0) {
+			cache_job->num_cached_inode = ret_ssize / sizeof(ino_t);
+			cache_job->cache_idx = 0;
+			if (cache_job->num_cached_inode == 0) {
+				write_log(0, "Error: Queue file is corrupted?\n");
+				rebuild_sb_jobs->remaining_jobs = 0;
+				return -ENOENT;
+			}
+		} else {
+			write_log(0, "Error: Queue file is corrupted?\n");
+			rebuild_sb_jobs->remaining_jobs = 0;
+			return -ENOENT;
+		}
+	}
+	*inode_job = cache_job->cached_inodes[cache_job->cache_idx];
+	cache_job->cache_idx++;
+	rebuild_sb_jobs->job_count++;
+	rebuild_sb_jobs->remaining_jobs--;
 	return 0;
 }
 
 int32_t rebuild_sb_manager()
 {
-	
-
 	/* Create queue file */
 	/* Get root inodes if file is empty */
 	/* write to queue file */
