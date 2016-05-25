@@ -15,11 +15,11 @@ typedef struct REBUILD_INODE_JOBS {
 	ino_t cached_inodes[NUM_CACHED_INODES];
 	int32_t num_cached_inode;
 	int32_t cache_idx;
-	FILE *queue_fptr;
+	int32_t queue_fh;
 	int64_t fptr_offset;
 	pthread_mutex_t job_mutex;
 	pthread_cond_t job_cond;
-} REBUILD_INODE_JOBS;
+} REBUILD_SB_JOBS;
 
 typedef struct SB_THREAD {
 	pthread_t tid;
@@ -43,7 +43,7 @@ typedef struct REBUILD_SB_MGR {
 } REBUILD_SB_MGR_INFO;
 
 REBUILD_SB_MGR_INFO *rebuild_sb_mgr_info;
-REBUILD_INODE_JOBS *jobs;
+REBUILD_SB_JOBS *rebuild_sb_jobs;
 
 int32_t rebuild_super_block_entry(ino_t this_inode,
 		struct stat *this_stat, BOOL local_pin);

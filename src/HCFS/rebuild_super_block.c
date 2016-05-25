@@ -30,7 +30,7 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 			return -errcode;
 		}
 	}
-	fsmgr_fptr = fopen(fsmgr_path, "r");
+	fsmgr_fptr = fopen(fsmgr_path, "r+");
 	if (!fsmgr_fptr) {
 		errcode = errno;
 		return -errcode;
@@ -53,13 +53,113 @@ errcode_handle:
 	return errcode;
 }
 
+int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots, int32_t *fh)
+{
+	char queue_filepath[200];
+	int32_t errcode;
+	ssize_t ret_ssize;
+
+	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
+	*fh = open(queue_filepath, O_CREAT | O_RDWR);
+	if (*fh < 0) {
+		errcode = errno;
+		return -errcode;
+	}
+	PWRITE(*fh, roots, sizeof(ino_t) * num_roots, 0);
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
+int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
+{
+	ino_t root_inode, max_inode;
+	int64_t idx;
+	int32_t ret, errcode;
+	size_t ret_size;
+	char fstatpath[300], sb_path[300];
+	FILE *fptr, *sb_fptr;
+	FS_CLOUD_STAT_T fs_cloud_stat;
+	SUPER_BLOCK_HEAD head;
+
+	max_inode = 1;
+	for (idx = 0 ; idx < num_roots ; idx++) {
+		root_inode = roots[idx];
+		snprintf(fstatpath, METAPATHLEN - 1,
+				"%s/FS_sync/FSstat%" PRIu64 "",
+				METAPATH, (uint64_t)root_inode);
+		if (access(fstatpath, F_OK) < 0) {
+			errcode = errno;
+			if (errcode == ENOENT) {
+				/* TODO:Get FSstat from cloud */
+			} else {
+				return -errcode;
+			}
+		}
+		fptr = fopen(fstatpath, "r");
+		if (!fptr) {
+			errcode = errno;
+			return -errcode;
+		}
+		FSEEK(fptr, 0, SEEK_SET);
+		FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		fclose(fptr);
+		if (max_inode < fs_cloud_stat.max_inode)
+			max_inode = fs_cloud_stat.max_inode;
+	}
+
+	/* init head */
+	sprintf(sb_path, "%s/superblock", METAPATH);
+	sb_fptr = fopen(sb_path, "r+");
+	if (!sb_fptr)
+		return -errno;
+	memset(&head, 0, sizeof(SUPER_BLOCK_HEAD));
+	head.num_total_inodes = max_inode;
+	head.now_rebuild = TRUE;
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&head, sizeof(SUPER_BLOCK_HEAD), 1, sb_fptr);
+	fclose(sb_fptr);
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
+/**
+ * Init rebuild superblock. Init sb header, queuing file.
+ */
 int32_t init_rebuild_sb()
 {
 	char sb_path[200];
 	int32_t ret, errcode;
 	ino_t *roots;
 	int64_t num_roots;
+	SUPER_BLOCK_HEAD head;
+	ssize_t ret_ssize;
+	FILE *fptr;
 
+	/* Allocate memory for jobs */
+	rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+	if (!rebuild_sb_jobs) {
+		write_log(0, "Error: Fail to allocate memory in %s\n",
+				__func__);
+		return -ENOMEM;
+	}
+
+	/* Allocate memory for mgr */
+	rebuild_sb_mgr_info = (REBUILD_SB_MGR_INFO *)
+			calloc(sizeof(REBUILD_SB_MGR_INFO), 1);
+	if (!rebuild_sb_mgr_info) {
+		write_log(0, "Error: Fail to allocate memory in %s\n",
+				__func__);
+		free(rebuild_sb_jobs);
+		return -ENOMEM;
+	}
+
+	//sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
 	sprintf(sb_path, "%s/superblock", METAPATH);
 	if (access(sb_path, F_OK) < 0) {
 		errcode = errno;
@@ -68,27 +168,54 @@ int32_t init_rebuild_sb()
 			ret = _get_root_inodes(&roots, &num_roots);
 			if (ret < 0)
 				return ret;
-			/* TODO:Init head */
+			/* Init queue file */
+			ret = _init_rebuild_queue_file(roots, num_roots,
+					&(rebuild_sb_jobs->queue_fh));
+			if (ret < 0)
+				return ret;
+			/* Init sb header */
+			ret = _init_sb_head(roots, num_roots);
+			if (ret < 0)
+				return ret;
 		} else {
 			return -errcode;
 		}
+	} else {
+		fptr = fopen(sb_path, "r+");
+		if (!fptr) {
+			errcode = errno;
+			return -errcode;
+		}
+		setbuf(fptr, NULL);
+		ret_ssize = pread(fileno(fptr), &head,
+				sizeof(SUPER_BLOCK_HEAD), 0);
+		fclose(fptr);
+		if (ret_ssize < (int64_t)sizeof(SUPER_BLOCK_HEAD)) {
+			/* Get roots */
+			ret = _get_root_inodes(&roots, &num_roots);
+			if (ret < 0)
+				return ret;
+			/* Init sb header */
+			ret = _init_sb_head(roots, num_roots);
+			if (ret < 0)
+				return ret;
+		} else {
+			if (head.now_rebuild == FALSE) {
+				free(rebuild_sb_mgr_info);
+				free(rebuild_sb_jobs);
+				return 0;
+			}
+		}
+		ret = super_block_init();
+		if (ret < 0)
+			return ret;
 	}
-	ret = super_block_init();
-	if (ret < 0)
-		return ret;
-
 	return 0;
 }
 
 int32_t rebuild_sb_manager()
 {
-	rebuild_sb_mgr_info = (REBUILD_SB_MGR_INFO *)
-			calloc(sizeof(REBUILD_SB_MGR_INFO), 1);
-	if (!rebuild_sb_mgr_info) {
-		write_log(0, "Error: Fail to allocate memory in %s\n",
-				__func__);
-		return -ENOMEM;
-	}
+	
 
 	/* Create queue file */
 	/* Get root inodes if file is empty */
