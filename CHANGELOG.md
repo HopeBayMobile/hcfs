@@ -27,8 +27,6 @@ v 2.0.6.0673 (release2.2.1_base)
 
 v 2.0.6.0617
 =====
-
-----
 ## New Features
   - Feature/more xfer statistics (!351)
   - Feature/selinux allow pull hcfs log (!294)
