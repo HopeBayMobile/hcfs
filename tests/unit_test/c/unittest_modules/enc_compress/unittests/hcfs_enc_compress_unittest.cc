@@ -18,7 +18,7 @@ class enc : public testing::Test
 {
       protected:
 	char *input;
-	int input_size;
+	int32_t input_size;
 	virtual void SetUp()
 	{
 		system_config = (SYSTEM_CONF_STRUCT *)
@@ -28,7 +28,7 @@ class enc : public testing::Test
 		input =
 		    (char *)calloc(sizeof(char), system_config->max_block_size);
 		input_size = system_config->max_block_size;
-		RAND_bytes((unsigned char *)input, input_size);
+		RAND_bytes((uint8_t *)input, input_size);
 	}
 	virtual void TearDown() { free(input); free(system_config); }
 };
@@ -38,7 +38,7 @@ class compress : public testing::Test
 {
       protected:
 	char *input;
-	int input_size;
+	int32_t input_size;
 	virtual void SetUp()
 	{
 		system_config = (SYSTEM_CONF_STRUCT *)
@@ -48,18 +48,18 @@ class compress : public testing::Test
 		input =
 		    (char *)calloc(sizeof(char), system_config->max_block_size);
 		input_size = system_config->max_block_size;
-		RAND_bytes((unsigned char *)input, input_size);
+		RAND_bytes((uint8_t *)input, input_size);
 	}
 	virtual void TearDown() { free(input); free(system_config); }
 };
 
 TEST_F(compress, compress)
 {
-	int output_max_size = compress_bound_f(input_size);
+	int32_t output_max_size = compress_bound_f(input_size);
 	char *compressed = (char *)calloc(output_max_size, sizeof(char));
-	int compress_size = compress_f(input, compressed, input_size);
+	int32_t compress_size = compress_f(input, compressed, input_size);
 	char *back = (char *)calloc(MAX_BLOCK_SIZE, sizeof(char));
-	int back_size =
+	int32_t back_size =
 	    decompress_f(compressed, back, compress_size, MAX_BLOCK_SIZE);
 	EXPECT_TRUE(back_size == input_size);
 	EXPECT_EQ(memcmp(input, back, input_size), 0);
@@ -71,13 +71,13 @@ TEST_F(compress, transform_compress_fd)
 {
 
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *data;
+	uint8_t *data;
 	FILE *new_compress_fd = transform_compress_fd(in_file, &data);
 	EXPECT_TRUE(new_compress_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(
-	    compress_bound_f(input_size), sizeof(unsigned char));
-	int read_count = fread(ptr, sizeof(unsigned char),
+	uint8_t *ptr = (uint8_t *)calloc(
+	    compress_bound_f(input_size), sizeof(uint8_t));
+	int32_t read_count = fread(ptr, sizeof(uint8_t),
 			       compress_bound_f(input_size), new_compress_fd);
 	char *ptr2 = NULL;
 	size_t t = 0;
@@ -98,13 +98,13 @@ TEST_F(compress, transform_compress_fd)
 TEST(base64, encode_then_decode)
 {
 	uint8_t *input = (uint8_t *)calloc(60, sizeof(uint8_t));
-  generate_random_bytes((unsigned char*)input, 60);
-	int length_encode = expect_b64_encode_length(60);
+  generate_random_bytes((uint8_t*)input, 60);
+	int32_t length_encode = expect_b64_encode_length(60);
 	char *code = (char *)calloc(length_encode, sizeof(char));
-	int out_len = 0;
+	int32_t out_len = 0;
 	b64encode_str(input, code, &out_len, 60);
-	unsigned char *decode =
-	    (unsigned char *)calloc(out_len + 1, sizeof(unsigned char));
+	uint8_t *decode =
+	    (uint8_t *)calloc(out_len + 1, sizeof(uint8_t));
 	b64decode_str(code, decode, &out_len, out_len);
 	EXPECT_EQ(memcmp(input, decode, 60), 0);
   free(input);
@@ -114,15 +114,15 @@ TEST(base64, encode_then_decode)
 
 TEST_F(enc, encrypt_with_fix_iv)
 {
-	unsigned char *key = get_key(PASSPHRASE);
-	unsigned char iv[IV_SIZE] = {0};
-	unsigned char *output1 = (unsigned char *)calloc(input_size + TAG_SIZE,
-							 sizeof(unsigned char));
-	unsigned char *output2 = (unsigned char *)calloc(input_size + TAG_SIZE,
-							 sizeof(unsigned char));
-	int ret1 = aes_gcm_encrypt_core(output1, (unsigned char *)input,
+	uint8_t *key = get_key(PASSPHRASE);
+	uint8_t iv[IV_SIZE] = {0};
+	uint8_t *output1 = (uint8_t *)calloc(input_size + TAG_SIZE,
+							 sizeof(uint8_t));
+	uint8_t *output2 = (uint8_t *)calloc(input_size + TAG_SIZE,
+							 sizeof(uint8_t));
+	int32_t ret1 = aes_gcm_encrypt_core(output1, (uint8_t *)input,
 					input_size, key, iv);
-	int ret2 = aes_gcm_encrypt_fix_iv(output2, (unsigned char *)input,
+	int32_t ret2 = aes_gcm_encrypt_fix_iv(output2, (uint8_t *)input,
 					  input_size, key);
 	EXPECT_EQ(ret1, 0);
 	EXPECT_EQ(ret2, 0);
@@ -134,13 +134,13 @@ TEST_F(enc, encrypt_with_fix_iv)
 
 TEST_F(enc, encrypt_then_decrypt)
 {
-	unsigned char *key = get_key(PASSPHRASE);
-	unsigned char *output = (unsigned char *)calloc(input_size + TAG_SIZE,
-							sizeof(unsigned char));
-	unsigned char *decode =
-	    (unsigned char *)calloc(input_size, sizeof(unsigned char));
+	uint8_t *key = get_key(PASSPHRASE);
+	uint8_t *output = (uint8_t *)calloc(input_size + TAG_SIZE,
+							sizeof(uint8_t));
+	uint8_t *decode =
+	    (uint8_t *)calloc(input_size, sizeof(uint8_t));
 
-	int ret = aes_gcm_encrypt_fix_iv(output, (unsigned char *)input,
+	int32_t ret = aes_gcm_encrypt_fix_iv(output, (uint8_t *)input,
 					 input_size, key);
 	EXPECT_EQ(ret, 0);
 	ret =
@@ -155,14 +155,14 @@ TEST_F(enc, encrypt_then_decrypt)
 TEST_F(enc, transform_encrypt_fd)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *key = get_key(PASSPHRASE);
-	unsigned char *data;
+	uint8_t *key = get_key(PASSPHRASE);
+	uint8_t *data;
 	FILE *new_encrypt_fd = transform_encrypt_fd(in_file, key, &data);
 	EXPECT_TRUE(new_encrypt_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(input_size + TAG_SIZE,
-						     sizeof(unsigned char));
-	fread(ptr, sizeof(unsigned char), input_size + TAG_SIZE,
+	uint8_t *ptr = (uint8_t *)calloc(input_size + TAG_SIZE,
+						     sizeof(uint8_t));
+	fread(ptr, sizeof(uint8_t), input_size + TAG_SIZE,
 	      new_encrypt_fd);
 	char *ptr2 = NULL;
 	size_t t = 0;
@@ -182,16 +182,16 @@ TEST_F(enc, transform_encrypt_fd)
 
 TEST_F(enc, transform_fd_no_flag)
 {
-	unsigned char *data;
+	uint8_t *data;
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
 	FILE *new_file = transform_fd(in_file, NULL, &data, 0, 0);
 	EXPECT_TRUE(new_file != NULL);
 	EXPECT_TRUE(new_file == in_file);
 
-	unsigned char *ptr =
-	    (unsigned char *)calloc(input_size, sizeof(unsigned char));
-	int read_count =
-	    fread(ptr, sizeof(unsigned char), input_size, new_file);
+	uint8_t *ptr =
+	    (uint8_t *)calloc(input_size, sizeof(uint8_t));
+	int32_t read_count =
+	    fread(ptr, sizeof(uint8_t), input_size, new_file);
 	char *ptr2 = NULL;
 	size_t t = 0;
 	FILE *in_fd = open_memstream(&ptr2, &t);
@@ -211,14 +211,14 @@ TEST_F(enc, transform_fd_no_flag)
 TEST_F(enc, transform_fd_enc_flag)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *key = get_key(PASSPHRASE);
-	unsigned char *data;
+	uint8_t *key = get_key(PASSPHRASE);
+	uint8_t *data;
 	FILE *new_encrypt_fd = transform_fd(in_file, key, &data, 1, 0);
 	EXPECT_TRUE(new_encrypt_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(input_size + TAG_SIZE,
-						     sizeof(unsigned char));
-	fread(ptr, sizeof(unsigned char), input_size + TAG_SIZE,
+	uint8_t *ptr = (uint8_t *)calloc(input_size + TAG_SIZE,
+						     sizeof(uint8_t));
+	fread(ptr, sizeof(uint8_t), input_size + TAG_SIZE,
 	      new_encrypt_fd);
 	char *ptr2 = NULL;
 	size_t t = 0;
@@ -240,13 +240,13 @@ TEST_F(enc, transform_fd_enc_flag)
 TEST_F(enc, transform_fd_compress_flag)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *data;
+	uint8_t *data;
 	FILE *new_compress_fd = transform_fd(in_file, NULL, &data, 0, 1);
 	EXPECT_TRUE(new_compress_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(
-	    compress_bound_f(input_size), sizeof(unsigned char));
-	int read_count = fread(ptr, sizeof(unsigned char),
+	uint8_t *ptr = (uint8_t *)calloc(
+	    compress_bound_f(input_size), sizeof(uint8_t));
+	int32_t read_count = fread(ptr, sizeof(uint8_t),
 			       compress_bound_f(input_size), new_compress_fd);
 	char *ptr2 = NULL;
 	size_t t = 0;
@@ -266,20 +266,20 @@ TEST_F(enc, transform_fd_compress_flag)
 TEST_F(enc, transform_fd_both_flag)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
-	unsigned char *key = get_key(PASSPHRASE);
-	unsigned char *data;
+	uint8_t *key = get_key(PASSPHRASE);
+	uint8_t *data;
 	FILE *new_encrypt_fd = transform_fd(in_file, key, &data, 1, 1);
 	EXPECT_TRUE(new_encrypt_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(
-	    compress_bound_f(input_size) + TAG_SIZE, sizeof(unsigned char));
-	int read_count =
-	    fread(ptr, sizeof(unsigned char),
+	uint8_t *ptr = (uint8_t *)calloc(
+	    compress_bound_f(input_size) + TAG_SIZE, sizeof(uint8_t));
+	int32_t read_count =
+	    fread(ptr, sizeof(uint8_t),
 		  compress_bound_f(input_size) + TAG_SIZE, new_encrypt_fd);
 	char *ptr2 = NULL;
 	size_t t = 0;
 	FILE *in_fd = open_memstream(&ptr2, &t);
-	int ret = decode_to_fd(in_fd, key, ptr, read_count, 1, 1);
+	int32_t ret = decode_to_fd(in_fd, key, ptr, read_count, 1, 1);
 	EXPECT_EQ(ret, 0);
 
 	fclose(in_fd);
@@ -296,16 +296,16 @@ TEST_F(enc, transform_fd_both_flag)
 
 TEST_F(enc, get_decode_meta){
   HCFS_encode_object_meta object_meta;
-  unsigned char *session_key = (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
-  //unsigned char *iv = (unsigned char *)calloc(IV_SIZE, sizeof(unsigned char));
-  unsigned char *key = get_key(PASSPHRASE);
+  uint8_t *session_key = (uint8_t *)calloc(KEY_SIZE, sizeof(uint8_t));
+  //uint8_t *iv = (uint8_t *)calloc(IV_SIZE, sizeof(uint8_t));
+  uint8_t *key = get_key(PASSPHRASE);
 
-  int ret = get_decode_meta(&object_meta, session_key, key, 1, 1);
+  int32_t ret = get_decode_meta(&object_meta, session_key, key, 1, 1);
   EXPECT_EQ(ret, 0);
 
   printf("%s\n", object_meta.enc_session_key);
 
-  unsigned char *back_session_key = (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
+  uint8_t *back_session_key = (uint8_t *)calloc(KEY_SIZE, sizeof(uint8_t));
   ret = decrypt_session_key(back_session_key, object_meta.enc_session_key, key);
   EXPECT_EQ(ret, 0);
   //EXPECT_TRUE(memcmp(session_key, back_session_key, KEY_SIZE) == 0);
@@ -322,7 +322,7 @@ TEST(get_decrypt_configfpTEST, config_path_not_found)
 	const char path[100] = "/path/not/existed";
 	FILE* ret_fp = get_decrypt_configfp(path);
 
-	int ret = (ret_fp) ? 0 : -1;
+	int32_t ret = (ret_fp) ? 0 : -1;
 
 	EXPECT_EQ(ret, -1);
 }
@@ -332,7 +332,7 @@ TEST(get_decrypt_configfpTEST, config_content_error)
 	const char path[100] = "testpatterns/not_encrypted.conf";
 	FILE* ret_fp = get_decrypt_configfp(path);
 
-	int ret = (ret_fp) ? 0 : -1;
+	int32_t ret = (ret_fp) ? 0 : -1;
 
 	EXPECT_EQ(ret, -1);
 }
@@ -346,7 +346,7 @@ TEST(get_decrypt_configfpTEST, getOK)
 	FILE *enc_fp = NULL;
 
 	enc_fp = get_decrypt_configfp(enc_path);
-	int ret = (enc_fp) ? 0 : -1;
+	int32_t ret = (enc_fp) ? 0 : -1;
 	EXPECT_EQ(ret, 0);
 
 	unenc_fp = fopen(unenc_path, "r");
