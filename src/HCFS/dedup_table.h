@@ -16,6 +16,7 @@
 
 #include <openssl/sha.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 /*
  * The structure of ddt is a combination of hash table and btree. Each node

@@ -739,7 +739,7 @@ int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
 	int64_t block_no, int64_t seq)
 {
 	UNUSED(seq);
-	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%lld.tmp",
+	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%"PRId64".tmp",
 		(uint64_t)inode, block_no);
 
 	return 0;

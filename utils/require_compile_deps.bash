@@ -20,4 +20,3 @@ packages+=" libssl-dev"
 packages+=" libsqlite3-dev"
 packages+=" libjansson-dev"
 packages+=" libcap-dev"
-echo $packages

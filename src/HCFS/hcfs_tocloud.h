@@ -154,5 +154,4 @@ int32_t select_upload_thread(char is_block, char is_delete,
 		int64_t seq, off_t page_pos,
 		int64_t e_index, int32_t progress_fd,
 		char backend_delete_type);
-
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

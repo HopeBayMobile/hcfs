@@ -26,39 +26,43 @@ extern SYSTEM_CONF_STRUCT *system_config;
 /*BEGIN string utility definition*/
 
 /*Will copy the filename of the meta file to pathname*/
-int fetch_meta_path(char *pathname, ino_t this_inode);
+int32_t fetch_meta_path(char *pathname, ino_t this_inode);
 
-int fetch_stat_path(char *pathname, ino_t this_inode);
+int32_t fetch_stat_path(char *pathname, ino_t this_inode);
 
-int fetch_trunc_path(char *pathname, ino_t this_inode);
+int32_t fetch_trunc_path(char *pathname, ino_t this_inode);
 
 /*Will copy the filename of the block file to pathname*/
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num);
-int parse_parent_self(const char *pathname, char *parentname, char *selfname);
+int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num);
+int32_t parse_parent_self(const char *pathname, char *parentname, char *selfname);
 
 /*Will copy the filename of the meta file in todelete folder to pathname*/
-int fetch_todelete_path(char *pathname, ino_t this_inode);
+int32_t fetch_todelete_path(char *pathname, ino_t this_inode);
 
 /*END string utility definition*/
 
-int read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config);
-int validate_system_config(SYSTEM_CONF_STRUCT *config);
+int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config);
+int32_t validate_system_config(SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 
-int change_system_meta(long long system_data_size_delta,
-	long long meta_size_delta, long long cache_data_size_delta,
-	long long cache_blocks_delta, long long dirty_cache_delta,
-	long long unpin_dirty_data_size, BOOL need_sync);
+int32_t change_system_meta(int64_t system_data_size_delta,
+	int64_t meta_size_delta, int64_t cache_data_size_delta,
+	int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+	int64_t unpin_dirty_data_size, BOOL need_sync);
 
-int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
-		long long fs_meta_size_delta, long long fs_num_inodes_delta);
+void _shift_xfer_window(void);
+int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
+		int64_t xfer_throughput, int64_t xfer_total_obj);
 
-int update_backend_usage(long long total_backend_size_delta,
-		long long meta_size_delta, long long num_inodes_delta);
+int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta);
 
-int set_block_dirty_status(char *path, FILE *fptr, char status);
-int get_block_dirty_status(char *path, FILE *fptr, char *status);
+int32_t update_backend_usage(int64_t total_backend_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta);
+
+int32_t set_block_dirty_status(char *path, FILE *fptr, char status);
+int32_t get_block_dirty_status(char *path, FILE *fptr, char *status);
 
 void fetch_backend_block_objname(char *objname,
 #if DEDUP_ENABLE
@@ -70,31 +74,31 @@ void fetch_backend_block_objname(char *objname,
 void fetch_backend_meta_objname(char *objname, ino_t inode);
 
 /* Will copy the filename of ddt meta file to pathname */
-int fetch_ddt_path(char *pathname, unsigned char last_char);
+int32_t fetch_ddt_path(char *pathname, uint8_t last_char);
 
-int fetch_error_download_path(char *path, ino_t inode);
+int32_t fetch_error_download_path(char *path, ino_t inode);
 
-void get_system_size(long long *cache_size, long long *pinned_size);
+void get_system_size(int64_t *cache_size, int64_t *pinned_size);
 
-int update_sb_size();
+int32_t update_sb_size();
 
-int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-			long long num_cached_blocks_delta,
-			long long cached_size_delta,
-			long long dirty_data_size_delta,
+int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+			int64_t num_cached_blocks_delta,
+			int64_t cached_size_delta,
+			int64_t dirty_data_size_delta,
 			ino_t thisinode);
 /* Function for checking if a file is local, cloud, or hybrid */
-int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
+int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
-int reload_system_config(const char *config_path);
+int32_t reload_system_config(const char *config_path);
 
-void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)());
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)());
 
-int ignore_sigpipe(void);
+int32_t ignore_sigpipe(void);
 
 BOOL is_natural_number(char *str);
 
-int get_meta_size(ino_t inode, long long *metasize);
+int32_t get_meta_size(ino_t inode, int64_t *metasize);
 
-int get_quota_from_backup(long long *quota);
+int32_t get_quota_from_backup(int64_t *quota);
 #endif  /* SRC_HCFS_UTILS_H_ */

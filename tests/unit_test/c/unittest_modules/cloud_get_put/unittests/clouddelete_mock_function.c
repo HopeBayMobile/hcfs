@@ -9,7 +9,7 @@
 #include "params.h"
 #include "fuseop.h"
 
-int hcfs_init_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	return HTTP_OK;
 }
@@ -20,7 +20,7 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 	return;
 }
 
-int fetch_todelete_path(char *pathname, ino_t this_inode)
+int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
 		strcpy(pathname, TODELETE_PATH);
@@ -41,17 +41,17 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 	}
 }
 
-int super_block_delete(ino_t this_inode)
+int32_t super_block_delete(ino_t this_inode)
 {
 	return 0;
 }
 
-int super_block_reclaim(void)
+int32_t super_block_reclaim(void)
 {
 	return 0;
 }
 
-int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], objname);
@@ -61,12 +61,12 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	return 200;
 }
 
-int super_block_share_locking(void)
+int32_t super_block_share_locking(void)
 {
 	return 0;
 }
 
-int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	if (this_inode == 0)
 		return -1;
@@ -82,14 +82,14 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	return 0;
 }
 
-int super_block_share_release(void)
+int32_t super_block_share_release(void)
 {
 	return 0;
 }
 
 /* A mock function to return linear block indexing */
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
-	long long target_page, long long hint_page) 
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	int64_t target_page, int64_t hint_page) 
 {
 	if (target_page >= 3)
 		return 0;
@@ -99,24 +99,24 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	return ret_page_pos;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }
 
-int update_backend_stat(ino_t root_inode, long long system_size_delta,
-			long long num_inodes_delta)
+int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
+			int64_t num_inodes_delta)
 {
 	return 0;
 }
 
-int fetch_trunc_path(char *pathname, ino_t this_inode)
+int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
 
-void nonblock_sleep(unsigned int secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
 {
 	sleep(secs);
 	return;

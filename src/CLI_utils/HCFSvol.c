@@ -19,6 +19,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "HCFSvol.h"
@@ -110,6 +111,8 @@ int32_t main(int32_t argc, char **argv)
 		code = UNPINDIRTYSIZE;
 	else if (strcasecmp(argv[1], "occupiedsize") == 0)
 		code = OCCUPIEDSIZE;
+	else if (strcasecmp(argv[1], "xferstatus") == 0)
+		code = GETXFERSTATUS;
 	else
 		code = -1;
 	if (code < 0) {
@@ -121,7 +124,7 @@ int32_t main(int32_t argc, char **argv)
 	strncpy(addr.sun_path, shm_hcfs_reporter, sizeof(addr.sun_path));
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
-	printf("status is %d, err %s\n", status, strerror(errno));
+	printf("status is %d, %s.\n", status, strerror(errno));
 	switch (code) {
 	case TERMINATE:
 	case UNMOUNTALL:
@@ -158,13 +161,14 @@ int32_t main(int32_t argc, char **argv)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		} else {
-			printf("Returned value is %lld\n", retllcode);
+			printf("Returned value is %" PRId64 "\n", retllcode);
 		}
 		break;
 	/* APIs at here send result in uint32_t */
 	case CLOUDSTAT:
 	case GETSYNCSWITCH:
 	case GETSYNCSTAT:
+	case GETXFERSTATUS:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -179,6 +183,8 @@ int32_t main(int32_t argc, char **argv)
 		else if (code == GETSYNCSTAT)
 			printf("Sync process is %s\n",
 			       uint32_ret ? "RUNNING(1)" : "PAUSED(0)");
+		else if (code == GETXFERSTATUS)
+			printf("Xfer status is %d\n", uint32_ret);
 		break;
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_
@@ -274,7 +280,7 @@ int32_t main(int32_t argc, char **argv)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		} else {
-			printf("Returned value is %lld\n", retllcode);
+			printf("Returned value is %" PRId64 "\n", retllcode);
 		}
 		break;
 	case CHECKDIRSTAT:
@@ -289,7 +295,7 @@ int32_t main(int32_t argc, char **argv)
 			size_msg = recv(fd, &num_cloud, sizeof(int64_t), 0);
 			size_msg = recv(fd, &num_hybrid, sizeof(int64_t), 0);
 			printf("Reply len %d\n", reply_len);
-			printf("Num: local %lld, cloud %lld, hybrid %lld\n",
+			printf("Num: local %" PRId64 ", cloud %" PRId64 ", hybrid %" PRId64 "\n",
 				num_local, num_cloud, num_hybrid);
 		} else {
 			size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
@@ -305,7 +311,7 @@ int32_t main(int32_t argc, char **argv)
 		size_msg = recv(fd, &downxfersize, sizeof(int64_t), 0);
 		size_msg = recv(fd, &upxfersize, sizeof(int64_t), 0);
 		printf("Reply len %d\n", reply_len);
-		printf("Download %lld bytes, upload %lld bytes\n",
+		printf("Download %" PRId64 " bytes, upload %" PRId64 " bytes\n",
 				downxfersize, upxfersize);
 		break;
 	case CHECKLOC:
@@ -402,12 +408,16 @@ int32_t main(int32_t argc, char **argv)
 #endif
 		break;
 	case SETSYNCSWITCH:
+		if (argc != 3) {
+			printf("./HCFSvol setsyncswitch [on|off]\n");
+			exit(-EINVAL);
+		}
 		if (strcasecmp(argv[2], "on") == 0) {
 			status = TRUE;
 		} else if (strcasecmp(argv[2], "off") == 0) {
 			status = FALSE;
 		} else {
-			printf("Unsupported switch arg: %s, should be on/off\n", argv[2]);
+			printf("./HCFSvol setsyncswitch [on|off]\n");
 			exit(-ENOTSUP);
 		}
 

@@ -211,7 +211,7 @@ int32_t traverse_ddt_btree(DDT_BTREE_NODE *tnode, int32_t fd)
 			     ++tmp_idx)
 				printf("%02x", tnode->ddt_btree_el[search_idx]
 						   .obj_id[tmp_idx]);
-			printf(" with refcount (%lld) in node - %lld\n",
+			printf(" with refcount (%" PRId64 ") in node - %" PRId64 "\n",
 			       tnode->ddt_btree_el[search_idx].refcount,
 			       tnode->this_node_pos);
 		}
@@ -231,7 +231,7 @@ int32_t traverse_ddt_btree(DDT_BTREE_NODE *tnode, int32_t fd)
 			     ++tmp_idx)
 				printf("%02x", tnode->ddt_btree_el[search_idx]
 						   .obj_id[tmp_idx]);
-			printf(" with refcount (%lld) in node - %lld\n",
+			printf(" with refcount (%" PRId64 ") in node - %" PRId64 "\n",
 			       tnode->ddt_btree_el[search_idx].refcount,
 			       tnode->this_node_pos);
 		}
@@ -576,7 +576,7 @@ int32_t delete_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
 
 	if (tnode->num_el <= 0) {
 		/* This node doesn't contained any elements */
-		printf("This node doesn't contain any elements - node (%lld)\n",
+		printf("This node doesn't contain any elements - node (%" PRId64 ")\n",
 		       tnode->this_node_pos);
 		return -1;
 	}
@@ -964,7 +964,7 @@ static int32_t _rebalance_btree(DDT_BTREE_NODE *tnode, int32_t selected_child, i
 			(tnode->num_el)--;
 		} else {
 			if (tnode->parent_node_pos == 0) {
-				// printf("Reclaim root - %lld\n",
+				// printf("Reclaim root - %" PRIu64 "\n",
 				// sibling_node.this_node_pos);
 				/* Sibling node is new root */
 				sibling_node.parent_node_pos = 0;

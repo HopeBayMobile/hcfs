@@ -288,7 +288,7 @@ int32_t build_cache_usage(void)
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
-			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%lld",
+			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%" PRId64,
 			             (uint64_t *)&this_inode, &blockno);
 			if (ret != 2) {
 				write_log(10, "Scan file does not match\n");

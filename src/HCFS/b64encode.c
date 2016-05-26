@@ -18,23 +18,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "logger.h"
 
-uint8_t base64_codes[64] =
+const char base64_codes[64] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /************************************************************************
 *
 * Function name: b64encode_str
-*        Inputs: uint8_t *inputstr, uint8_t *outputstr,
+*        Inputs: uint8_t *inputstr, char *outputstr,
 *                int32_t *outlen, int32_t inputlen
 *       Summary: b64-encode input string "inputstr" (of length "inputlen")
 *                to output string "outputstr" (of length "*outlen").
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t b64encode_str(uint8_t *inputstr, uint8_t *outputstr,
+int32_t b64encode_str(uint8_t *inputstr, char *outputstr,
 		  int32_t *outlen, int32_t inputlen)
 {
 	uint8_t *tmpstr;

@@ -5,14 +5,14 @@
 
 typedef struct {
 	char **data;
-	int count;
+	int32_t count;
 } HTTP_meta;
 
 HTTP_meta *new_http_meta();
 
 void delete_http_meta(HTTP_meta *);
 
-int transform_objdata_to_header(HTTP_meta *meta,
+int32_t transform_objdata_to_header(HTTP_meta *meta,
 				HCFS_encode_object_meta *encode_meta);
 
 #endif

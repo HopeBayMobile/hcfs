@@ -13,10 +13,13 @@
 
 #include "monitor.h"
 
-#include <time.h>
-#include <string.h>
+#include <assert.h>
+#include <math.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/prctl.h>
+#include <time.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -26,10 +29,10 @@
 #include "params.h"
 
 CURL_HANDLE monitor_curl_handle;
-/* let it can be changed during unittest*/
-int32_t monitoring_interval = MONITORING_INTERVAL;
 
-void _write_monitor_loop_status_log(float duration)
+int32_t backoff_exponent = 0;
+
+void _write_monitor_loop_status_log(double duration)
 {
 	static BOOL init = TRUE;
 	static BOOL backend_is_online;
@@ -49,17 +52,16 @@ void _write_monitor_loop_status_log(float duration)
 		backend_is_online = hcfs_system->backend_is_online;
 		sync_manual_switch = hcfs_system->sync_manual_switch;
 		sync_paused = hcfs_system->sync_paused;
-		if (duration)
-			write_log(10, "%s backend [%s] (time %.3f)\n",
-				  "Debug: [Monitor]",
+		if (duration != 0)
+			write_log(5, "[Monitor] backend [%s] (%.2lf ms)\n",
 				  backend_is_online ? "online" : "offline",
-				  duration);
+				  duration * 1000);
 		else
-			write_log(10, "Debug: [Monitor] backend [%s]\n",
+			write_log(5, "[Monitor] backend [%s]\n",
 				  backend_is_online ? "online" : "offline");
-		write_log(10, "Debug: [Monitor] sync switch [%s]\n",
+		write_log(5, "[Monitor] sync switch [%s]\n",
 			  sync_manual_switch ? "on" : "off");
-		write_log(10, "Debug: [Monitor] hcfs sync state [%s]\n",
+		write_log(5, "[Monitor] hcfs sync state [%s]\n",
 			  sync_paused ? "paused" : "syncing");
 	}
 }
@@ -82,43 +84,52 @@ void *monitor_loop(void *ptr)
 void monitor_loop(void)
 #endif
 {
-	const struct timespec sleep_time = {1, 0}; /* sleep 1 second */
-	struct timespec *last_time = &hcfs_system->backend_status_last_time;
-	struct timespec loop_start_time;
-	struct timespec test_stop;
-	float test_duration;
-	float idle_time;
+	struct timespec ts;
 	int32_t ret_val;
+	int32_t wait_sec = 0;
+	int32_t min, max;
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 	prctl(PR_SET_NAME, "monitor_loop");
 #endif /* _ANDROID_ENV_ */
 
-	last_time->tv_sec = 0;
-	last_time->tv_nsec = 0;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	srand( ts.tv_sec * 1000 * 1000 + ts.tv_nsec);
+
 	monitor_curl_handle.curl_backend = NONE;
 	monitor_curl_handle.curl = NULL;
 
 	write_log(2, "[Monitor] Start monitor loop\n");
 
+	backoff_exponent = 0;
+	hcfs_system->backend_is_online = check_backend_status();
+	update_sync_state();
+
 	while (hcfs_system->system_going_down == FALSE) {
-		clock_gettime(CLOCK_REALTIME, &loop_start_time);
-		idle_time = diff_time(*last_time, loop_start_time);
-
-		test_duration = 0;
-		if (idle_time >= monitoring_interval) {
-			ret_val = hcfs_test_backend(&monitor_curl_handle);
-			if ((ret_val >= 200) && (ret_val <= 299))
-				update_backend_status(TRUE, &loop_start_time);
-			else
-				update_backend_status(FALSE, &loop_start_time);
-
-			clock_gettime(CLOCK_REALTIME, &test_stop);
-			test_duration = diff_time(loop_start_time, test_stop);
+		if (hcfs_system->backend_is_online == TRUE) {
+			backoff_exponent = 0;
+			sem_wait(&(hcfs_system->monitor_sem));
+			continue;
 		}
-		_write_monitor_loop_status_log(test_duration);
-		/* wait 1 second */
-		nanosleep(&sleep_time, NULL);
+		if (backoff_exponent < MONITOR_MAX_BACKOFF_EXPONENT)
+			backoff_exponent += 1;
+		max = (int32_t)pow(2, backoff_exponent);
+		min = (max >= 8) ? max / 8 : 1;
+		wait_sec = MONITOR_BACKOFF_SLOT;
+		wait_sec *= (min + (rand() % (max - min + 1)));
+		write_log(5, "[Monitor] wait %d seconed before retransmit\n",
+			  wait_sec);
+
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_sec += wait_sec;
+		ret_val = sem_timedwait(&(hcfs_system->monitor_sem), &ts);
+
+		if (ret_val == 0)
+			continue;
+		else if (errno == ETIMEDOUT) {
+			hcfs_system->backend_is_online = check_backend_status();
+			update_sync_state();
+		}
 	}
 #ifdef _ANDROID_ENV_
 	return NULL;
@@ -129,26 +140,75 @@ void monitor_loop(void)
 
 /**************************************************************************
  *
+ * Function name: check_backend_status
+ *        Inputs: none
+ *       Summary: 
+ *  Return value: none
+ *
+ *************************************************************************/
+int32_t check_backend_status(void) {
+	double test_duration = 0.0;
+	struct timespec test_stop, test_start;
+	BOOL status;
+	int32_t ret_val;
+
+	write_log(5, "[Monitor] check_backend_status\n");
+	clock_gettime(CLOCK_REALTIME, &test_start);
+
+	ret_val = hcfs_test_backend(&monitor_curl_handle);
+	status = ((ret_val >= 200) && (ret_val <= 299));
+
+	clock_gettime(CLOCK_REALTIME, &test_stop);
+	test_duration = diff_time(&test_start, &test_stop);
+	_write_monitor_loop_status_log(test_duration);
+
+	return status;
+}
+
+
+/**************************************************************************
+ *
+ * Function name: destroy_monitor_loop_thread
+ *        Inputs: none
+ *       Summary: awake monitor_loop and prepaire for process
+ *       termination, require hcfs_system->system_going_down == FALSE,
+ *       otherwise loop will wait again immediately.
+ *  Return value: none
+ *
+ *************************************************************************/
+void destroy_monitor_loop_thread(void)
+{
+	sem_post(&(hcfs_system->monitor_sem));
+}
+/**************************************************************************
+ *
  * Function name: diff_time
  *        Inputs: timespec start
  *                timespec end
  *       Summary: Calculate time duration between [start] and [end]
- *  Return value: float, duration between [start] and [end]
+ *  Return value: double, duration between [start] and [end]
  *
  *************************************************************************/
-inline float diff_time(struct timespec start, struct timespec end)
+inline double diff_time(const struct timespec *start, const struct timespec *end)
 {
-	return end.tv_sec - start.tv_sec +
-	       0.000000001 * (end.tv_nsec - start.tv_nsec);
+	struct timespec now;
+
+	if(end) {
+		now = *end;
+	} else {
+		clock_gettime(CLOCK_REALTIME, &now);
+	}
+	return now.tv_sec - start->tv_sec +
+	       0.000000001 * (now.tv_nsec - start->tv_nsec);
 }
 
 /**************************************************************************
  *
  * Function name: update_backend_status
- *        Inputs: int32_t status, struct timespec *status_time
+ *        Inputs: BOOL status, struct timespec *status_time
  *       Summary: Update hcfs_system->backend_is_online and access
  *                time.
- *                int32_t status:
+ *                BOOL status:
  *                    use 1 when status is online, otherwise 0.
  *                struct timespec *status_time:
  *                    time at curl request performed, set to NULL to use
@@ -156,23 +216,24 @@ inline float diff_time(struct timespec start, struct timespec end)
  *  Return value: None (void)
  *
  *************************************************************************/
-void update_backend_status(int32_t status, struct timespec *status_time)
+void update_backend_status(BOOL status_in, struct timespec *status_time)
 {
-	struct timespec *last_time = &hcfs_system->backend_status_last_time;
 	struct timespec current_time;
+	BOOL status = !!status_in;
+	BOOL status_changed = (hcfs_system->backend_is_online != status);
 
-	hcfs_system->backend_is_online = status ? TRUE : FALSE;
+	hcfs_system->backend_is_online = status;
 	update_sync_state();
+	if(status_changed)
+		sem_post(&(hcfs_system->monitor_sem));
 
 	if (status_time == NULL) {
 		clock_gettime(CLOCK_REALTIME, &current_time);
 		status_time = &current_time;
 	}
-	last_time->tv_sec = status_time->tv_sec;
-	last_time->tv_nsec = status_time->tv_nsec;
 }
 
-inline void update_sync_state(void)
+void update_sync_state(void)
 {
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == FALSE)

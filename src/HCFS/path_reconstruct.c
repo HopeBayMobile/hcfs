@@ -40,7 +40,7 @@
 *************************************************************************/
 PATH_CACHE * init_pathcache(ino_t root_inode)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	PATH_CACHE *tmpptr;
 
 	tmpptr = malloc(sizeof(PATH_CACHE));
@@ -78,10 +78,10 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int destroy_pathcache(PATH_CACHE *cacheptr)
+int32_t destroy_pathcache(PATH_CACHE *cacheptr)
 {
 	PATH_LOOKUP *tmp, *next;
-	int count, ret, errcode;
+	int32_t count, ret, errcode;
 
 	if (cacheptr == NULL)
 		return -EINVAL;
@@ -116,7 +116,7 @@ errcode_handle:
 entries */
 void drop_cache_entry(PATH_CACHE *cacheptr)
 {
-	int num_dropped, hashval;
+	int32_t num_dropped, hashval;
 	PATH_LOOKUP *tmpptr;
 
 	num_dropped = 0;
@@ -150,7 +150,7 @@ void drop_cache_entry(PATH_CACHE *cacheptr)
 /* Queue the new node to the tail of the ring */
 void add_cache_entry(PATH_CACHE *cacheptr, PATH_LOOKUP *newnode)
 {
-	int hashindex;
+	int32_t hashindex;
 
 	if (cacheptr->num_nodes >= MAX_LOOKUP_NODES)
 		drop_cache_entry(cacheptr);
@@ -176,7 +176,7 @@ void add_cache_entry(PATH_CACHE *cacheptr, PATH_LOOKUP *newnode)
 }
 
 /* Helper function for repositioning the node according to usage */
-void _node_reposition(PATH_LOOKUP *tmpptr, int hashindex, PATH_CACHE *cacheptr)
+void _node_reposition(PATH_LOOKUP *tmpptr, int32_t hashindex, PATH_CACHE *cacheptr)
 {
 	PATH_LOOKUP *tmpprev, *tmpgnext;
 	while (tmpptr->prev != NULL) {
@@ -220,13 +220,13 @@ void _node_reposition(PATH_LOOKUP *tmpptr, int hashindex, PATH_CACHE *cacheptr)
 	}
 }
 
-int search_inode(ino_t parent, ino_t child, DIR_ENTRY *dentry)
+int32_t search_inode(ino_t parent, ino_t child, DIR_ENTRY *dentry)
 {
 	META_CACHE_ENTRY_STRUCT *cache_entry;
 	DIR_META_TYPE tempmeta;
 	DIR_ENTRY_PAGE temp_page;
-	int ret, errcode;
-	int count;
+	int32_t ret, errcode;
+	int32_t count;
 
 	cache_entry = meta_cache_lock_entry(parent);
 	if (cache_entry == NULL)
@@ -284,13 +284,13 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
+int32_t lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 {
-	int ret, errcode;
-	int hashindex;
+	int32_t ret, errcode;
+	int32_t hashindex;
 	PATH_LOOKUP *tmpptr;
 	ino_t parentinode, *parentlist;
-	int numparents;
+	int32_t numparents;
 	DIR_ENTRY tmpentry;
 
 	hashindex = thisinode % NUM_LOOKUP_ENTRY;
@@ -377,20 +377,20 @@ errcode_handle:
 *
 * Function name: construct_path_iterate
 *        Inputs: PATH_CACHE *cacheptr, ino_t thisinode, char **result,
-*                int bufsize
+*                int32_t bufsize
 *       Summary: Recursively prepend the name of thisinode to the
 *                pathname pointed by *result. bufsize indicates the
 *                buffer size storing the pathname.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
-		int bufsize)
+int32_t construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+		int32_t bufsize)
 {
 	char *current_path, *tmpptr;
 	PATH_LOOKUP cachenode;
 	ino_t parent_inode;
-	int ret, pathlen, errcode;
+	int32_t ret, pathlen, errcode;
 
 	write_log(10, "Debug path iterate %" PRIu64 "\n",
 		  (uint64_t) thisinode);
@@ -467,10 +467,10 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
+int32_t construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
                    ino_t rootinode)
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char *tmpbuf;
 	char pathname[200];
 	FILE *fptr;
@@ -549,10 +549,10 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
+int32_t delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 {
-	int ret, errcode;
-	int hashindex;
+	int32_t ret, errcode;
+	int32_t hashindex;
 	PATH_LOOKUP *tmpptr;
 
 	ret = sem_wait(&(cacheptr->pathcache_lock));
@@ -611,9 +611,9 @@ int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int init_pathlookup()
+int32_t init_pathlookup()
 {
-	int ret, errcode;
+	int32_t ret, errcode;
 	char pathname[METAPATHLEN+10];
 	BOOL need_init;
 	ssize_t ret_ssize;
@@ -697,11 +697,11 @@ void destroy_pathlookup()
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+int32_t pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
 	PRIMARY_PARENT_T tmpparent;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
 
 	ret = sem_wait(&(pathlookup_data_lock));
@@ -735,11 +735,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr)
+int32_t pathlookup_read_parent(ino_t self_inode, ino_t *parentptr)
 {
 	off_t filepos;
 	PRIMARY_PARENT_T tmpparent;
-	int errcode, ret;
+	int32_t errcode, ret;
 	ssize_t ret_ssize;
 
 	ret = sem_wait(&(pathlookup_data_lock));

@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 #ifndef _ANDROID_ENV_
 #include <sys/shm.h>
@@ -50,6 +51,7 @@
 #include "FS_manager.h"
 #include "path_reconstruct.h"
 #include "hcfs_fromcloud.h"
+#include "pkg_cache.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -93,6 +95,7 @@ int32_t init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
+	sem_init(&(hcfs_system->monitor_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
@@ -140,6 +143,16 @@ int32_t init_hcfs_system_data(void)
 				quota);
 		hcfs_system->systemdata.system_quota = quota;
 	}
+
+	/* Xfer related */
+	hcfs_system->last_xfer_shift_time = time(NULL);
+	hcfs_system->xfer_upload_in_progress = FALSE;
+	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 1, 0);
+	hcfs_system->systemdata.xfer_now_window = 0;
+	memset(hcfs_system->systemdata.xfer_throughput, 0,
+			sizeof(int64_t) * XFER_WINDOW_MAX);
+	memset(hcfs_system->systemdata.xfer_total_obj, 0,
+			sizeof(int64_t) * XFER_WINDOW_MAX);
 
 	return 0;
 errcode_handle:
@@ -380,6 +393,9 @@ int32_t main(int32_t argc, char **argv)
 	ret_val = init_dirstat_lookup();
 	if (ret_val < 0)
 		exit(ret_val);
+	ret_val = init_pkg_cache();
+	if (ret_val < 0)
+		exit(ret_val);
 
 	open_log("hcfs_android_log");
 #ifdef VERSION_NUM
@@ -399,12 +415,14 @@ int32_t main(int32_t argc, char **argv)
 		pthread_join(cache_loop_thread, NULL);
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(upload_loop_thread, NULL);
+		destroy_monitor_loop_thread();
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
 	}
 	close_log();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
+	destroy_pkg_cache();
 #else
 	ret_val = init_pathlookup();
 	if (ret_val < 0)

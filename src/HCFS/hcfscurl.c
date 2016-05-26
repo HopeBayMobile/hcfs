@@ -39,6 +39,15 @@
 
 #define MAX_RETRIES 5
 
+/* Marco to compute data transfer throughput.
+ * If object size < 32KB, for this computation the size is rounded up to 32KB.
+ */
+#define COMPUTE_THROUGHPUT()\
+	off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;\
+	time_spent = (time_spent <= 0) ? 0.001 : time_spent;\
+	xfer_thpt = (int64_t)(objsize_kb / time_spent);
+
+
 /************************************************************************
 *
 * Function name: write_file_function
@@ -444,6 +453,8 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	}
 
 	ret_val = parse_swift_auth_header(fptr);
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	/*TODO: add retry routines somewhere for failed attempts*/
 
@@ -762,6 +773,8 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	}
 
 	ret_val = parse_swift_list_header(swift_header_fptr);
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	if ((ret_val >= 200) && (ret_val < 300))
 		dump_list_body(swift_list_body_fptr);
@@ -802,6 +815,10 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	int32_t ret_val, ret, errcode;
 	int32_t num_retries;
 	int64_t ret_pos;
+	struct timeval stop, start, diff;
+	double time_spent;
+	int64_t xfer_thpt;
+
 
 	sprintf(header_filename, "/dev/shm/swiftputhead%s.tmp",
 		curl_handle->id);
@@ -865,7 +882,7 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
-	HTTP_PERFORM_RETRY(curl);
+	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
@@ -873,6 +890,8 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
 
@@ -881,18 +900,28 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	if (ret_val < 0) {
 		fclose(swift_header_fptr);
 		unlink(header_filename);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	fclose(swift_header_fptr);
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
 	if (_http_is_success(ret_val)) {
+		/* Record xfer throughput */
+		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
-		sem_wait(&(hcfs_system->access_sem));
-		(hcfs_system->systemdata).xfer_size_upload += objsize;
-		sem_post(&(hcfs_system->access_sem));
+		change_xfer_meta(objsize, 0, xfer_thpt, 1);
+		write_log(10, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+					objname, objsize, time_spent, xfer_thpt);
+	} else {
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 	}
 
 	return ret_val;
@@ -929,6 +958,11 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	char header_filename[100];
 	int32_t ret_val, ret, errcode;
 	int32_t num_retries;
+	int64_t ret_pos;
+	off_t objsize;
+	struct timeval stop, start, diff;
+	double time_spent;
+	int64_t xfer_thpt;
 
 	sprintf(header_filename, "/dev/shm/swiftgethead%s.tmp",
 		curl_handle->id);
@@ -968,7 +1002,7 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	HTTP_PERFORM_RETRY(curl);
+	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
@@ -976,6 +1010,8 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
 
@@ -984,8 +1020,14 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	if (ret_val < 0) {
 		fclose(swift_header_fptr);
 		unlink(header_filename);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
+
 	/* get object meta data */
 	if (_http_is_success(ret_val) && object_meta) {
 		char header[1024] = {0};
@@ -996,6 +1038,20 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		parse_http_header_coding_meta(object_meta, header,
 					      "X-Object-Meta-", "Comp", "Enc",
 					      "Nonce");
+
+		/* Record xfer throughput */
+		FSEEK(fptr, 0, SEEK_END);
+		FTELL(fptr);
+		objsize = ret_pos;
+		FSEEK(fptr, 0, SEEK_SET);
+		COMPUTE_THROUGHPUT()
+		/* Update xfer statistics if successful */
+		change_xfer_meta(0, objsize, xfer_thpt, 1);
+		write_log(10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+					objname, objsize, time_spent, xfer_thpt);
+	} else {
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 	}
 
 	fclose(swift_header_fptr);
@@ -1088,6 +1144,9 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 		unlink(header_filename);
 		return -1;
 	}
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	fclose(swift_header_fptr);
 	UNLINK(header_filename);
@@ -1210,7 +1269,7 @@ void generate_S3_sig(char *method, char *date_string,
 	compute_hmac_sha1((uint8_t *)sig_temp1, sig_temp2, S3_SECRET,
 			  &hashlen);
 	write_log(10, "sig temp2: %s\n", sig_temp2);
-	b64encode_str(sig_temp2, (uint8_t*)sig_string, &len_signature, hashlen);
+	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
 
 	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
 }
@@ -1310,6 +1369,9 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	if ((ret_val >= 200) && (ret_val < 300))
 		dump_S3_list_body(S3_list_body_fptr);
 	/*TODO: add retry routines somewhere for failed attempts*/
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	write_log(10, "return val is: %d\n", ret_val);
 
@@ -1691,7 +1753,6 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 {
 	int32_t ret_val, num_retries;
 	int32_t ret, errcode;
-	int64_t ret_pos;
 
         ret_val = ignore_sigpipe();
         if (ret_val < 0)
@@ -1752,14 +1813,6 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	/* Truncate output if not successful */
 	if (!_http_is_success(ret_val)) {
 		FTRUNCATE(fileno(fptr), 0);
-	} else {
-		/* Update xfer statistics if successful */
-		sem_wait(&(hcfs_system->access_sem));
-		FSEEK(fptr, 0, SEEK_END);
-		FTELL(fptr);
-		FSEEK(fptr, 0, SEEK_SET);
-		(hcfs_system->systemdata).xfer_size_download += ret_pos;
-		sem_post(&(hcfs_system->access_sem));
 	}
 
 	return ret_val;
@@ -1870,6 +1923,9 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char resource[200];
 	int64_t ret_pos;
 	int32_t num_retries;
+	struct timeval stop, start, diff;
+	double time_spent;
+	int64_t xfer_thpt;
 
 	sprintf(header_filename, "/dev/shm/s3puthead%s.tmp", curl_handle->id);
 	sprintf(resource, "%s/%s", S3_BUCKET, objname);
@@ -1943,7 +1999,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
-	HTTP_PERFORM_RETRY(curl);
+	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
@@ -1951,7 +2007,8 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
-
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
 
@@ -1961,17 +2018,27 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	if (ret_val < 0) {
 		fclose(S3_header_fptr);
 		unlink(header_filename);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	fclose(S3_header_fptr);
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
 	if (_http_is_success(ret_val)) {
+		/* Record xfer throughput */
+		COMPUTE_THROUGHPUT()
 		/* Update xfer statistics if successful */
-		sem_wait(&(hcfs_system->access_sem));
-		(hcfs_system->systemdata).xfer_size_upload += objsize;
-		sem_post(&(hcfs_system->access_sem));
+		change_xfer_meta(objsize, 0, xfer_thpt, 1);
+		write_log(10, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+					objname, objsize, time_spent, xfer_thpt);
+	} else {
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 	}
 
 	return ret_val;
@@ -2015,6 +2082,11 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char S3_signature[200];
 	char resource[200];
 	int32_t num_retries;
+	int64_t ret_pos;
+	off_t objsize;
+	struct timeval stop, start, diff;
+	double time_spent;
+	int64_t xfer_thpt;
 
 	sprintf(header_filename, "/dev/shm/s3gethead%s.tmp", curl_handle->id);
 
@@ -2061,7 +2133,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
-	HTTP_PERFORM_RETRY(curl);
+	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
@@ -2069,6 +2141,8 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
 
@@ -2077,8 +2151,13 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	if (ret_val < 0) {
 		fclose(S3_header_fptr);
 		unlink(header_filename);
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	/* get object meta data */
 	if (_http_is_success(ret_val) && object_meta) {
@@ -2089,6 +2168,20 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			  header);
 		parse_http_header_coding_meta(
 		    object_meta, header, "x-amz-meta-", "comp", "enc", "nonce");
+
+		/* Record xfer throughput */
+		FSEEK(fptr, 0, SEEK_END);
+		FTELL(fptr);
+		objsize = ret_pos;
+		FSEEK(fptr, 0, SEEK_SET);
+		COMPUTE_THROUGHPUT()
+		/* Update xfer statistics if successful */
+		change_xfer_meta(0, objsize, xfer_thpt, 1);
+		write_log(10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+					objname, objsize, time_spent, xfer_thpt);
+	} else {
+		/* We still need to record this failure for xfer throughput */
+		change_xfer_meta(0, 0, 0, 1);
 	}
 
 	fclose(S3_header_fptr);
@@ -2199,6 +2292,9 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 		unlink(header_filename);
 		return -1;
 	}
+
+	if (ret_val >= 500 && ret_val <= 505)
+		update_backend_status(FALSE, NULL);
 
 	fclose(S3_header_fptr);
 	UNLINK(header_filename);

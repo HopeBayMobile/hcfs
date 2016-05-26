@@ -12,6 +12,7 @@
 
 #ifndef GW20_SRC_PARAMS_H_
 #define GW20_SRC_PARAMS_H_
+#include <inttypes.h>
 
 typedef struct {
 	int32_t log_level;
@@ -88,7 +89,8 @@ typedef struct {
 #define BLOCKPATHLEN 400
 #define MAX_FILENAME_LEN 255
 #define MONITOR_TEST_TIMEOUT 10
-#define MONITORING_INTERVAL 60
+#define MONITOR_BACKOFF_SLOT 1
+#define MONITOR_MAX_BACKOFF_EXPONENT 9
 
 #define NUMSUBDIR 1000
 
@@ -99,6 +101,11 @@ typedef struct {
 #define TO_BE_DELETED 2
 #define TO_BE_RECLAIMED 3
 #define RECLAIMED 4
+
+#define XFER_WINDOW_MAX 6
+#define XFER_WINDOW_SIZE 3
+#define XFER_SEC_PER_WINDOW 20
+#define XFER_SLOW_SPEED 32 /* in KB/s */
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";

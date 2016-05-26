@@ -139,7 +139,7 @@ void HCFS_stat(char **json_res)
 {
 
 	int32_t fd, status, size_msg, ret_code;
-	int32_t cloud_stat;
+	int32_t cloud_stat, data_transfer;
 	uint32_t code, reply_len, cmd_len, buf_idx;
 	int64_t quota, vol_usage, cloud_usage;
 	int64_t cache_total, cache_used, cache_dirty;
@@ -182,6 +182,9 @@ void HCFS_stat(char **json_res)
 		memcpy(&cloud_stat, &(buf[buf_idx]), sizeof(int32_t));
 		buf_idx += sizeof(int32_t);
 
+		memcpy(&data_transfer, &(buf[buf_idx]), sizeof(int32_t));
+		buf_idx += sizeof(int32_t);
+
 		data = json_object();
 		json_object_set_new(data, "quota", json_integer(quota));
 		json_object_set_new(data, "vol_used", json_integer(vol_usage));
@@ -194,6 +197,47 @@ void HCFS_stat(char **json_res)
 		json_object_set_new(data, "xfer_up", json_integer(xfer_up));
 		json_object_set_new(data, "xfer_down", json_integer(xfer_down));
 		json_object_set_new(data, "cloud_conn", json_boolean(cloud_stat));
+		json_object_set_new(data, "data_transfer", json_integer(data_transfer));
+
+		_json_response(json_res, TRUE, 0, data);
+	}
+
+	close(fd);
+}
+
+void HCFS_get_occupied_size(char **json_res)
+{
+
+	int32_t fd, status, size_msg, ret_code;
+	uint32_t code, reply_len, cmd_len, buf_idx;
+	int64_t occupied;
+	char buf[512];
+	json_t *data;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = OCCUPIEDSIZE;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	if (reply_len == 0) {
+		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	} else {
+		size_msg = recv(fd, buf, reply_len, 0);
+		buf_idx = 0;
+
+		READ_LL_ARGS(occupied);
+
+		data = json_object();
+		json_object_set_new(data, "occupied", json_integer(occupied));
 
 		_json_response(json_res, TRUE, 0, data);
 	}

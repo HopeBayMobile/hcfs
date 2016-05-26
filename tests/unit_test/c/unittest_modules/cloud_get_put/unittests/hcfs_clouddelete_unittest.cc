@@ -54,7 +54,7 @@ class deleteEnvironment : public ::testing::Environment {
  */
 void *dsync_test_thread_fn(void *data)
 {
-	usleep(10000 * *(int *)data);
+	usleep(10000 * *(int32_t *)data);
 	return NULL;
 }
 
@@ -63,21 +63,21 @@ extern DSYNC_THREAD_CONTROL dsync_ctl;
 TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 {
 	void *res;
-	int num_threads = 40;
-	
+	int32_t num_threads = 40;
+
 	/* Run the function to check whether it will terminate threads */
 	init_dsync_control();
-	
+
 	/* Generate threads */
-	for (int i = 0 ; i < num_threads ; i++) {
-		int inode = i+1;
-		int t_index;
-		
+	for (int32_t i = 0 ; i < num_threads ; i++) {
+		int32_t inode = i+1;
+		int32_t t_index;
+
 		sem_wait(&dsync_ctl.dsync_queue_sem);
 		sem_wait(&dsync_ctl.dsync_op_sem);
 		t_index = -1;
-		for (int idx = 0 ; idx < MAX_DSYNC_CONCURRENCY ; idx++) {
-			if ((dsync_ctl.threads_in_use[idx] == 0) && 
+		for (int32_t idx = 0 ; idx < MAX_DSYNC_CONCURRENCY ; idx++) {
+			if ((dsync_ctl.threads_in_use[idx] == 0) &&
 				(dsync_ctl.threads_created[idx] == FALSE)) {
 				t_index = idx;
 				break;
@@ -87,7 +87,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		dsync_ctl.threads_created[t_index] = TRUE;
 		dsync_ctl.threads_finished[t_index] = TRUE;
 		dsync_ctl.total_active_dsync_threads++;
-		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL, 
+		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL,
 			dsync_test_thread_fn, (void *)&i));
 		sem_post(&dsync_ctl.dsync_op_sem);
 	}
@@ -95,10 +95,10 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 	EXPECT_EQ(0, pthread_cancel(dsync_ctl.dsync_handler_thread));
 	EXPECT_EQ(0, pthread_join(dsync_ctl.dsync_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	
+
 	/* Check answer */
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);
-	for (int i = 0 ; i < MAX_DSYNC_CONCURRENCY ; i++) {
+	for (int32_t i = 0 ; i < MAX_DSYNC_CONCURRENCY ; i++) {
 		ASSERT_EQ(0, dsync_ctl.threads_in_use[i]) << "thread_no = " << i;
 		ASSERT_EQ(FALSE, dsync_ctl.threads_created[i]) << "thread_no = " << i;
 	}
@@ -112,7 +112,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
  */
 void *delete_test_thread_fn(void *data)
 {
-	usleep(10000 * *(int *)data);
+	usleep(10000 * *(int32_t *)data);
 	return NULL;
 }
 
@@ -121,19 +121,19 @@ extern DELETE_THREAD_CONTROL delete_ctl;
 TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 {
 	void *res;
-	int num_threads = 40;
-		
+	int32_t num_threads = 40;
+
 	/* Run the function to check whether it will terminate threads */
 	init_delete_control();
-	
+
 	/* Generate threads */
-	for (int i = 0 ; i < num_threads ; i++) {
-		int t_index;
+	for (int32_t i = 0 ; i < num_threads ; i++) {
+		int32_t t_index;
 
 		sem_wait(&delete_ctl.delete_queue_sem);
 		sem_wait(&delete_ctl.delete_op_sem);
 		t_index = -1;
-		for (int idx = 0 ; idx < MAX_DELETE_CONCURRENCY ; idx++) {
+		for (int32_t idx = 0 ; idx < MAX_DELETE_CONCURRENCY ; idx++) {
 			if((delete_ctl.threads_in_use[idx] == FALSE) &&
 				(delete_ctl.threads_created[idx] == FALSE)) {
 				t_index = idx;
@@ -153,10 +153,10 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
 	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	
+
 	/* Check answer */
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads);
-	for (int i = 0 ; i < MAX_DELETE_CONCURRENCY ; i++) {
+	for (int32_t i = 0 ; i < MAX_DELETE_CONCURRENCY ; i++) {
 		ASSERT_EQ(FALSE, delete_ctl.threads_in_use[i]) << "thread_no = " << i;
 		ASSERT_EQ(FALSE, delete_ctl.threads_created[i]) << "thread_no = " << i;
 	}
@@ -195,18 +195,18 @@ protected:
 		if (!access(backend_meta, F_OK))
 			unlink(backend_meta);
 	}
-	void init_objname_buffer(unsigned num_objname)
+	void init_objname_buffer(uint32_t num_objname)
 	{
 		size_objname = 50;
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * num_objname);
-		for (int i = 0 ; i < num_objname ; i++)
+		for (int32_t i = 0 ; i < num_objname ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
 		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
 	}
-	void destroy_objname_buffer(unsigned num_objname)
-	{	
-		for (int i = 0 ; i < num_objname ; i++)
+	void destroy_objname_buffer(uint32_t num_objname)
+	{
+		for (int32_t i = 0 ; i < num_objname ; i++)
 			if(objname_list[i])
 				free(objname_list[i]);
 		if (objname_list)
@@ -215,10 +215,10 @@ protected:
 	void init_sync_ctl()
 	{
 		sem_init(&(sync_ctl.sync_op_sem), 0, 1);
-		for (int i = 0 ; i < MAX_SYNC_CONCURRENCY ; i++)
+		for (int32_t i = 0 ; i < MAX_SYNC_CONCURRENCY ; i++)
 			sync_ctl.threads_in_use[i] = 0;
 	}
-	static int objname_cmp(const void *s1, const void *s2)
+	static int32_t objname_cmp(const void *s1, const void *s2)
 	{
 		char *name1 = *(char **)s1;
 		char *name2 = *(char **)s2;
@@ -228,8 +228,8 @@ protected:
 			return -1;
 		} else {
 			char tmp_name[30];
-			int inode1, inode2; 
-			int blocknum1, blocknum2;
+			int32_t inode1, inode2;
+			int32_t blocknum1, blocknum2;
 			sscanf(name1, "data_%d_%d", &inode1, &blocknum1);
 			sscanf(name2, "data_%d_%d", &inode2, &blocknum2);
 			return  -blocknum2 + blocknum1;
@@ -269,12 +269,12 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
 	fwrite(&cloud_related, sizeof(CLOUD_RELATED_DATA), 1, meta);
-	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
+	for (int32_t i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 		tmp_blockentry_page.block_entries[i].status = ST_CLOUD;
 		tmp_blockentry_page.block_entries[i].uploaded = 1;
 	}
 	tmp_blockentry_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
-	for (int page_num = 0 ; page_num < total_page ; page_num++) {
+	for (int32_t page_num = 0 ; page_num < total_page ; page_num++) {
 		fwrite(&tmp_blockentry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta); // Write block page
 	}
 	fclose(meta);
@@ -291,7 +291,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	EXPECT_EQ(expected_num_objname, objname_counter); // Check # of object name.
 	qsort(objname_list, expected_num_objname, sizeof(char *),
 			dsync_single_inodeTest::objname_cmp);
-	for (int block = 0 ; block < expected_num_objname - 1 ; block++) {
+	for (int32_t block = 0 ; block < expected_num_objname - 1 ; block++) {
 		char expected_objname[size_objname];
 		sprintf(expected_objname, "data_%" PRIu64 "_%d",
 				(uint64_t)mock_thread_info->inode, block);
@@ -300,7 +300,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	char expected_objname[size_objname];
 	sprintf(expected_objname, "meta_%" PRIu64 "", (uint64_t)mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
-	
+
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
 	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
@@ -317,7 +317,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 
 	/* Mock a dir meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
-	mock_thread_info->this_mode = S_IFDIR;	
+	mock_thread_info->this_mode = S_IFDIR;
 	mock_thread_info->which_index = 0;
 	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
@@ -334,9 +334,9 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Check answer */
 	EXPECT_EQ(1, objname_counter); // Check # of object name.
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%d", mock_thread_info->inode); 
+	sprintf(expected_objname, "meta_%d", mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[0]); // Check meta was recorded.
-	
+
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
 	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
@@ -349,37 +349,37 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 /*
 	Unittest of delete_loop()
  */
-int inode_cmp(const void *a, const void *b)
+int32_t inode_cmp(const void *a, const void *b)
 {
-	return *(int *)a - *(int *)b;
+	return *(int32_t *)a - *(int32_t *)b;
 }
 
 TEST(delete_loopTest, DeleteSuccess)
 {
 	pthread_t thread;
 	void *res;
-	int size_objname;
+	int32_t size_objname;
 
 	system_config = (SYSTEM_CONF_STRUCT *)
 		malloc(sizeof(SYSTEM_CONF_STRUCT));
 	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 	hcfs_system->backend_is_online = TRUE;
-	
+
 	size_objname = 50;
 	objname_counter = 0;
 	objname_list = (char **)malloc(sizeof(char *) * 100);
-	for (int i = 0 ; i < 100 ; i++)
+	for (int32_t i = 0 ; i < 100 ; i++)
 		objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
 
 	test_data.num_inode = 40;
-	test_data.to_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	test_data.to_handle_inode = (int32_t *)malloc(sizeof(int32_t) * test_data.num_inode);
 	test_data.tohandle_counter = 0;
 
-	to_verified_data.record_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	to_verified_data.record_handle_inode = (int32_t *)malloc(sizeof(int32_t) * test_data.num_inode);
 	to_verified_data.record_inode_counter = 0;
 	sem_init(&(to_verified_data.record_inode_sem), 0, 1);
 
-	for (int i = 0 ; i < test_data.num_inode ; i++)
+	for (int32_t i = 0 ; i < test_data.num_inode ; i++)
 		test_data.to_handle_inode[i] = (i + 1) * 5; // mock inode
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
 	sys_super_block->head.first_to_delete_inode = test_data.to_handle_inode[0];
@@ -390,8 +390,8 @@ TEST(delete_loopTest, DeleteSuccess)
 
 	/* Check answer */
 	EXPECT_EQ(test_data.num_inode, to_verified_data.record_inode_counter);
-	qsort(&(to_verified_data.record_handle_inode), to_verified_data.record_inode_counter, sizeof(int), inode_cmp);
-	for (int i = 0 ; i < to_verified_data.record_inode_counter ; i++)
+	qsort(&(to_verified_data.record_handle_inode), to_verified_data.record_inode_counter, sizeof(int32_t), inode_cmp);
+	for (int32_t i = 0 ; i < to_verified_data.record_inode_counter ; i++)
 		ASSERT_EQ(test_data.to_handle_inode[i], to_verified_data.record_handle_inode[i]);
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads);

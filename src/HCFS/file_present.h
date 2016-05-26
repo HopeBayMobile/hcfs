@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fuse/fuse_lowlevel.h>
+#include <inttypes.h>
 
 #include "meta_mem_cache.h"
 #include "xattr_ops.h"

@@ -214,11 +214,35 @@ int32_t get_cloud_stat(int32_t *cloud_stat)
 	return 0;
 }
 
+int32_t get_data_transfer(int32_t *data_transfer)
+{
+
+	int32_t fd, ret_code, size_msg;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = GETXFERSTATUS;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(uint32_t), 0);
+	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	*data_transfer = ret_code;
+	close(fd);
+	return 0;
+}
+
 int32_t get_hcfs_stat(int64_t *quota, int64_t *vol_usage, int64_t *cloud_usage,
 		      int64_t *cache_total, int64_t *cache_used, int64_t *cache_dirty,
 		      int64_t *pin_max, int64_t *pin_total,
 		      int64_t *xfer_up, int64_t *xfer_down,
-		      int32_t *cloud_stat)
+		      int32_t *cloud_stat, int32_t *data_transfer)
 {
 
 	int32_t ret_code;
@@ -251,5 +275,22 @@ int32_t get_hcfs_stat(int64_t *quota, int64_t *vol_usage, int64_t *cloud_usage,
 	if (ret_code < 0)
 		return ret_code;
 
+	ret_code = get_data_transfer(data_transfer);
+	if (ret_code < 0)
+		return ret_code;
+
 	return 0;
 }
+
+int32_t get_occupied_size(int64_t *occupied)
+{
+
+	int32_t ret_code;
+
+	ret_code = _get_usage_val(OCCUPIEDSIZE, occupied);
+	if (ret_code < 0)
+		return ret_code;
+
+	return 0;
+}
+

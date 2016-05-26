@@ -185,7 +185,7 @@ int32_t _init_backend_stat(ino_t root_inode)
 
 	write_log(10, "Debug creating backend stat file\n");
 
-	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64,
 		 METAPATH, (uint64_t)root_inode);
 	write_log(10, "Creating stat for backend\n");
 	fptr = fopen(fname, "w");
@@ -592,7 +592,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
-	write_log(10, "Total filesystem is now %lld\n",
+	write_log(10, "Total filesystem is now %" PRId64 "\n",
 		  tmp_head.total_children);
 
 	memcpy(ret_entry, &temp_entry, sizeof(DIR_ENTRY));
@@ -743,7 +743,7 @@ int32_t delete_filesystem(char *fsname)
 	}
 
 	tmp_head.total_children--;
-	write_log(10, "TOTAL CHILDREN is now %lld\n", tmp_head.total_children);
+	write_log(10, "TOTAL CHILDREN is now %" PRId64 "\n", tmp_head.total_children);
 	/* Write head back */
 
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);

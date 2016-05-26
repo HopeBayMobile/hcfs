@@ -283,9 +283,24 @@ void collect_finished_sync_threads(void *ptr)
 		sem_wait(&(sync_ctl.sync_op_sem));
 
 		if (sync_ctl.total_active_sync_threads <= 0) {
+			/* No active upload threads */
+			if (hcfs_system->xfer_upload_in_progress) {
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->xfer_upload_in_progress = FALSE;
+				sem_post(&(hcfs_system->access_sem));
+				write_log(10, "Set upload in progress to FALSE\n");
+			}
 			sem_post(&(sync_ctl.sync_op_sem));
 			nanosleep(&time_to_sleep, NULL);
 			continue;
+		}
+
+		/* Some upload threads are working */
+		if (!hcfs_system->xfer_upload_in_progress) {
+			sem_wait(&(hcfs_system->access_sem));
+			hcfs_system->xfer_upload_in_progress = TRUE;
+			sem_post(&(hcfs_system->access_sem));
+			write_log(10, "Set upload in progress to TRUE\n");
 		}
 
 		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
@@ -1160,7 +1175,6 @@ store in some other file */
 	if (!access(local_metapath, F_OK)) {
 		struct stat metastat;
 		int64_t now_meta_size;
-
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
@@ -1364,7 +1378,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 	write_log(10, "Debug datasync: inode %" PRIu64 ", block %lld\n",
 		  (uint64_t)this_inode, block_no);
 	snprintf(curl_handle->id, sizeof(curl_handle->id),
-		 "upload_blk_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
+		 "upload_blk_%" PRIu64 "_%" PRId64, (uint64_t)this_inode, block_no);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1657,7 +1671,6 @@ errcode_handle:
 
 int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl)
 {
-
 	strncpy(upload_ctl.upload_threads[which_curl].tempfilename,
 		toupload_metapath, sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,

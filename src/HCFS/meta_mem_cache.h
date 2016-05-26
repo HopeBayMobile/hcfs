@@ -66,6 +66,7 @@ to other entries.
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 

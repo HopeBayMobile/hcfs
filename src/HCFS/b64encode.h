@@ -14,7 +14,9 @@
 #ifndef GW20_HCFS_B64ENCODE_H_
 #define GW20_HCFS_B64ENCODE_H_
 
-int32_t b64encode_str(uint8_t *inputstr, uint8_t *outputstr,
+#include <inttypes.h>
+
+int32_t b64encode_str(uint8_t *inputstr, char *outputstr,
 						int32_t *outlen, int32_t inputlen);
 
 int32_t b64decode_str(char *inputstr, uint8_t *outputstr,

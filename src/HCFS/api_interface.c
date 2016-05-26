@@ -504,7 +504,7 @@ int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
 
 	for (count = 0; count < num_inode; count++) {
 		write_log(10, "Debug: Prepare to pin inode %"PRIu64
-			", remaining reserved pinned size %lld\n",
+			", remaining reserved pinned size %" PRId64 "\n",
 			(uint64_t)pinned_list[count], total_reserved_size);
 		retcode = pin_inode(pinned_list[count], &total_reserved_size);
 		if (retcode < 0) {
@@ -530,7 +530,7 @@ int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
 							&zero_size);
 			}
 
-			write_log(10, "Debug: After roll back, %s%lld\n",
+			write_log(10, "Debug: After roll back, %s%" PRId64 "\n",
 				  "now system pinned size is ",
 				  hcfs_system->systemdata.pinned_size);
 
@@ -540,7 +540,7 @@ int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
 
 	/* Remaining size, return these space */
 	if (total_reserved_size > 0) {
-		write_log(10, "Debug: Remaining reserved pinned size %lld\n",
+		write_log(10, "Debug: Remaining reserved pinned size %" PRId64 "\n",
 				total_reserved_size);
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size -=
@@ -552,7 +552,7 @@ int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
 		sem_post(&(hcfs_system->access_sem));
 	}
 
-	write_log(10, "Debug: After pinning, now system pinned size is %lld\n",
+	write_log(10, "Debug: After pinning, now system pinned size is %" PRId64 "\n",
 			hcfs_system->systemdata.pinned_size);
 	return retcode;
 }
@@ -577,7 +577,7 @@ int32_t unpin_inode_handle(ino_t *unpinned_list, uint32_t num_inode)
 		}
 	}
 
-	write_log(10, "Debug:After unpinning, now system pinned size is %lld\n",
+	write_log(10, "Debug:After unpinning, now system pinned size is %" PRId64 "\n",
 		hcfs_system->systemdata.pinned_size);
 
 	return retcode;
@@ -751,7 +751,7 @@ int32_t check_dir_stat_handle(int32_t arg_len, char *largebuf, DIR_STATS_TYPE *t
 		tmpstats->num_cloud = retcode;
 		tmpstats->num_hybrid = retcode;
 	}
-	write_log(10, "Dir stat lookup %lld, %lld, %lld\n",
+	write_log(10, "Dir stat lookup %" PRId64 ", %" PRId64 ", %" PRId64 "\n",
 		tmpstats->num_local, tmpstats->num_cloud, tmpstats->num_hybrid);
 	return retcode;
 }
@@ -776,6 +776,52 @@ int32_t set_sync_switch_handle(int32_t sync_switch)
 	}
 	return retcode;
 }
+
+/* To get data transfer status
+ * Cases -
+ * 	0 means no data transfer in progress,
+ * 	1 means data transfer in progress,
+ * 	2 means data transfer in progress but slow
+ * */
+int32_t get_xfer_status(void)
+{
+	int32_t ret_val, idx;
+	int32_t download_flag, now_window;
+	int64_t average_thpt, total_thpt, num_obj;
+
+	/* Get the number of running download jobs */
+	ret_val = sem_getvalue(&(hcfs_system->xfer_download_in_progress_sem),
+			       &download_flag);
+	if (ret_val < 0)
+		return -errno;
+
+	if (hcfs_system->xfer_upload_in_progress || download_flag > 0) {
+		now_window = hcfs_system->systemdata.xfer_now_window;
+		total_thpt = num_obj = 0;
+		for (idx = 0; idx < XFER_WINDOW_SIZE; idx++) {
+			total_thpt +=
+				(int64_t)hcfs_system->systemdata.xfer_throughput[now_window];
+			num_obj +=
+				(int64_t)hcfs_system->systemdata.xfer_total_obj[now_window];
+
+			now_window -= 1;
+			if (now_window < 0)
+				now_window = XFER_WINDOW_MAX - 1;
+		}
+
+		if (num_obj <= 0)
+			/* In the case 0 -> 1, maybe no throughput record here */
+			return 1;
+
+		average_thpt = total_thpt / num_obj;
+		if (average_thpt < XFER_SLOW_SPEED)
+			return 2;
+		else
+			return 1;
+	}
+	return 0;
+}
+
 
 /************************************************************************
 *
@@ -944,7 +990,7 @@ void api_module(void *index)
 			sem_post(&(hcfs_system->access_sem));
 			write_log(
 			    10,
-			    "Debug: Preallocate pinned size %lld. %s %lld\n",
+			    "Debug: Preallocate pinned size %" PRId64 ". %s %" PRId64 "\n",
 			    reserved_pinned_size, "Now system pinned size",
 			    hcfs_system->systemdata.pinned_size);
 
@@ -1041,7 +1087,7 @@ void api_module(void *index)
 			buf[0] = 0;
 			retcode = 0;
 			sem_wait(&(hcfs_system->access_sem));
-			snprintf(buf, sizeof(buf), "%lld %lld %lld",
+			snprintf(buf, sizeof(buf), "%" PRId64 " %" PRId64 " %" PRId64,
 				hcfs_system->systemdata.system_size,
 				hcfs_system->systemdata.cache_size,
 				hcfs_system->systemdata.cache_blocks);
@@ -1157,7 +1203,7 @@ void api_module(void *index)
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
 		case TESTAPI:
-			/* Simulate a int64_t API call of 5 seconds */
+			/* Simulate too long API call of 5 seconds */
 			sleep(5);
 			retcode = 0;
 			cur_index = *((int32_t *)index);
@@ -1268,11 +1314,11 @@ void api_module(void *index)
 			}
 			break;
 		case CLOUDSTAT:
-			uint32_ret = (uint32_t)hcfs_system->backend_is_online;
-			ret_len = sizeof(uint32_ret);
+			retcode = (int32_t)hcfs_system->backend_is_online;
+			ret_len = sizeof(retcode);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
-			uint32_ret = 0;
+			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
+			retcode = 0;
 			break;
 		case SETSYNCSWITCH:
 			memcpy(&sync_switch, largebuf, sizeof(uint32_t));
@@ -1322,7 +1368,7 @@ void api_module(void *index)
 			memcpy(&loglevel, largebuf, sizeof(int32_t));
 			if (0 <= loglevel && loglevel <= 10) {
 				system_config->log_level = loglevel;
-				retcode = 0; 
+				retcode = 0;
 			} else {
 				retcode = -EINVAL;
 			}
@@ -1335,6 +1381,13 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(retcode),
 						MSG_NOSIGNAL);
 			}
+			break;
+		case GETXFERSTATUS:
+			uint32_ret = get_xfer_status();
+			ret_len = sizeof(uint32_ret);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		default:
 			retcode = ENOTSUP;

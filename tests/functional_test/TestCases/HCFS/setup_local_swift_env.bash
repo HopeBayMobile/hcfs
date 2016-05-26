@@ -57,8 +57,9 @@ SWIFT_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SWIF
 
 
 echo "########## Generate hcfs config file"
-sed -r -e "s@\%repo\%@$repo@g" -e "s@\%SWIFT_IP\%@$SWIFT_IP@g" \
-	$here/hcfs_docker_swift.conf | sudo tee /etc/hcfs.conf
+sudo mkdir -p /data
+sed -r -e "s@\%repo\%@$repo@g" -e "s@\%SWIFT_IP\%@$SWIFT_IP@g" -e "s@\%WORKSPACE\%@$repo@g" \
+	$here/hcfs_docker_swift.conf | sudo tee /etc/hcfs.conf | sudo tee /data/hcfs.conf.plain
 
 echo "########## Wait swift ready"
 # Fix proxy error

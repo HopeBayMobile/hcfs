@@ -12,6 +12,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <inttypes.h>
 #if COMPRESS_ENABLE
 #include <lz4.h>
 #endif

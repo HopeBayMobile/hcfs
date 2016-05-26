@@ -9,7 +9,7 @@
 
 extern SYSTEM_CONF_STRUCT *system_config;
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 
@@ -19,8 +19,8 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
-		int fh, int *result_index, DIR_ENTRY_PAGE *result_node)
+int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
+		int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node)
 {
 	if (entry_in_database == FALSE)
 		return -ENOENT;
@@ -32,10 +32,10 @@ int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 }
 
 /* if returns 1, then there is an entry to be added to the parent */
-int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
-	int fh, DIR_ENTRY *overflow_median, long long *overflow_new_page,
+int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
+	int32_t fh, DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	long long *temp_child_page_pos)
+	int64_t *temp_child_page_pos)
 {
 	off_t tmp_pos;
 	DIR_ENTRY_PAGE tmppage;
@@ -68,12 +68,12 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	return 1;
 }
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	snprintf(pathname, 100, "%s/meta%ld", METAPATH, this_inode);
 	return 0;
 }
-int fetch_stat_path(char *pathname, ino_t this_inode)
+int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 {
         snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
         return 0;
@@ -81,12 +81,12 @@ int fetch_stat_path(char *pathname, ino_t this_inode)
 
 
 ino_t super_block_new_inode(struct stat *in_stat,
-				unsigned long *ret_generation)
+				uint64_t *ret_generation)
 {
 	return fakeino;
 }
 
-int super_block_mark_dirty(ino_t this_inode)
+int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
@@ -94,12 +94,12 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 {
 	return 0;
 }
-int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
-						long long this_page_pos)
+int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
+						int64_t this_page_pos)
 {
 	return 0;
 }
-int hcfs_init_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	if (failedcurlinit == TRUE)
 		return 404;
@@ -109,7 +109,7 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return 200;
 }
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HTTP_meta *meta)
 {
 	if (failedput == TRUE)
@@ -118,20 +118,20 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	fread(&headbuf, sizeof(DIR_META_TYPE), 1, fptr);
 	return 200;
 }
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *object_meta)
 {
 	if (failedget == TRUE)
 		return 404;
 	return 200;
 }
-int FS_is_mounted(char *fsname)
+int32_t FS_is_mounted(char *fsname)
 {
 
 	return -ENOENT;
 }
 
-int delete_inode_meta(ino_t this_inode)
+int32_t delete_inode_meta(ino_t this_inode)
 {
 	char tmppath[100];
 
@@ -140,25 +140,25 @@ int delete_inode_meta(ino_t this_inode)
 
 	return 0;
 }
-int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
-	int fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	long long *temp_child_page_pos)
+int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
+	int32_t fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
+	int64_t *temp_child_page_pos)
 {
 	return 0;
 }
 
-int update_FS_statistics(char *pathname, long long system_size,
-		long long num_inodes)
+int32_t update_FS_statistics(char *pathname, int64_t system_size,
+		int64_t num_inodes)
 {
 	return 0;
 }
 
-int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+int32_t pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
 
-int destroy_pathcache(PATH_CACHE *cacheptr)
+int32_t destroy_pathcache(PATH_CACHE *cacheptr)
 {
 	return 0;
 }
@@ -167,19 +167,19 @@ PATH_CACHE * init_pathcache(ino_t root_inode)
 {
 	return NULL;
 }
-int reset_dirstat_lookup(ino_t thisinode)
+int32_t reset_dirstat_lookup(ino_t thisinode)
 {
 	return 0;
 }
 
-int get_meta_size(ino_t inode, long long *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize)
 {
 	return 0;
 }
 
-int change_system_meta(long long system_data_size_delta,
-	long long meta_size_delta, long long cache_data_size_delta,
-	long long cache_blocks_delta, long long dirty_cache_delta)
+int32_t change_system_meta(int64_t system_data_size_delta,
+	int64_t meta_size_delta, int64_t cache_data_size_delta,
+	int64_t cache_blocks_delta, int64_t dirty_cache_delta)
 {
 	return 0;
 }

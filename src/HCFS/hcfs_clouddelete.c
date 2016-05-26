@@ -796,7 +796,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 		write_log(10,
 			"Debug delete object: objname %s, inode %" PRIu64 ", block %lld\n",
 			objname, (uint64_t)this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%"PRIu64"_%lld_%lld",
+		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%" PRId64"_%"PRId64,
 				(uint64_t)this_inode, block_no, seq);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */

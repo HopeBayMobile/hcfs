@@ -16,14 +16,14 @@
 #include "lookup_count_types.h"
 #include "mount_manager.h"
 
-int lookup_init(LOOKUP_HEAD_TYPE *lookup_table);
-int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
-				int amount, char d_type);
-int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
-			int amount, char *d_type, char *need_delete);
-int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode);
+int32_t lookup_init(LOOKUP_HEAD_TYPE *lookup_table);
+int32_t lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+				int32_t amount, char d_type);
+int32_t lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+			int32_t amount, char *d_type, char *need_delete);
+int32_t lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode);
 
-int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr);
+int32_t lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr);
 
 #endif  /* GW20_HCFS_LOOKUP_COUNT_H_ */
 

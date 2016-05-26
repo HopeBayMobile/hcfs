@@ -2,15 +2,14 @@ Repository for Gateway 2.0 HCFS
 ===============================
 
 Latest source code under 'src/HCFS'.
-Latest unittest code under 'tests/unit_test' (run the script
-run_unittests for all unittests).
+Latest unittest code under 'tests/unit_test' (run the script run_unittests for all unittests).
 Latest source code for command-line utilities under 'src/CLI_utils'.
 
 Config file
 -----------
 
 Please put the following as a text file under /etc/hcfs.conf
-
+```
 METAPATH = (Directory of meta file storage, must exist)
 BLOCKPATH = (Diectory of block file storage, must exist)
 CACHE_SOFT_LIMIT = (Soft limit for triggering cache replacement, in bytes)
@@ -32,9 +31,10 @@ S3_PROTOCOL = (protocol for S3 connection (https for now))
 LOG_LEVEL = (To which log level the log messages should be dumped) (Ranged from 0 to 10 now, with 0 being the most critical level)
 LOG_PATH = (A directory that create hcfs log files. This setting is optional and hcfs will create log file at current path if this term is not set.
            This will be ignored if the path is invalid, and create log file at current path if it is ignored.)
+```
 
 Example:
-
+```
 METAPATH= /home/jiahongwu/testHCFS/metastorage
 BLOCKPATH = /home/jiahongwu/testHCFS/blockstorage
 CACHE_SOFT_LIMIT = 53687091
@@ -55,21 +55,26 @@ S3_BUCKET = testgateway
 S3_PROTOCOL = https
 LOG_LEVEL = 10
 LOG_PATH = /home/kewei/
+```
+
+To change configuration:
+-----------------
+  1. Use "adb pull /etc/hcfs.conf hcfs.conf" to pull configuration file template.
+  2. Edit configuration (might need to change cache size and log level too)
+  3. Use "adb push hcfs.conf /data/hcfs.conf.tmp" to push configuration file to a temp location.
+  4. Remove /data/hcfs.conf if the file exists.
+  5. Use "hcfsconf enc /data/hcfs.conf.tmp /data/hcfs.conf" to encrypt the config file.
+  6. Delete /data/hcfs.conf.tmp
+  7. Reboot.
+
 Required packages
 -----------------
-
-ATTR
-FUSE
-CURL
-OPENSSL
-LZ4
-
-Required by Dev
----------------
-
-libattr1-dev
-libfuse-dev
-libcurl4-openssl-dev
-libssl-dev
-liblz4-dev
-python-swiftclient
+    build-essential
+    libattr1-dev
+    libfuse-dev
+    libcurl4-openssl-dev
+    liblz4-dev
+    libssl-dev
+    libsqlite3-dev
+    libjansson-dev
+    libcap-dev

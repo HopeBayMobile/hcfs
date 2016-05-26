@@ -62,6 +62,9 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	if (hcfs_system->sync_paused)
 		return -EIO;
 
+	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
+
 	/* Get sem if action is from pinning file or from download meta. */
 	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
 		sem_wait(&pin_download_curl_sem);
@@ -124,7 +127,6 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 #endif
 
 	fclose(get_fptr);
-
 	uint8_t *object_key = NULL;
 #if ENCRYPT_ENABLE
 	uint8_t *key = get_key("this is hopebay testing");
@@ -145,6 +147,9 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	/* Finally free download sem */
 
 errcode_handle:
+	sem_trywait(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Download job finished, download_in_progress should minus 1\n");
+
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
 
@@ -873,7 +878,7 @@ errcode_handle:
 static BOOL quota_wakeup()
 {
 	if ((hcfs_system->system_going_down == TRUE) ||
-			(hcfs_system->sync_paused == FALSE))
+			(hcfs_system->backend_is_online == TRUE))
 		return TRUE;
 	else
 		return FALSE;
@@ -906,7 +911,7 @@ void fetch_quota_from_cloud(void *ptr)
 	/* Download usermeta.json from cloud */
 	fptr = NULL;
 	while (hcfs_system->system_going_down == FALSE) {
-		if (hcfs_system->sync_paused) {
+		if (hcfs_system->backend_is_online == FALSE) {
 			nonblock_sleep(5, quota_wakeup);
 			continue;
 		}

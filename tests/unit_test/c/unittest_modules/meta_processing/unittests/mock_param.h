@@ -80,7 +80,7 @@ size_t TOTAL_KEY_SIZE;
 size_t XATTR_VALUE_SIZE; 
 char xattr_key[3][100];
 char global_mock_namespace;
-int xattr_count;
+int32_t xattr_count;
 
 /* pin_inode() */
 char collect_dir_children_flag;
@@ -162,10 +162,10 @@ enum {
 /* Used in pinning_loop() */
 #define TOTAL_MOCK_INODES 50
 ino_t mock_inodes[TOTAL_MOCK_INODES];
-int mock_inodes_counter;
+int32_t mock_inodes_counter;
 
 ino_t verified_inodes[TOTAL_MOCK_INODES];
-int verified_inodes_counter;
+int32_t verified_inodes_counter;
 sem_t verified_inodes_sem;
 
 #endif

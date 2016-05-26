@@ -12,13 +12,13 @@
 #include "atomic_tocloud.h"
 #include "mount_manager.h"
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
@@ -40,12 +40,12 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	return;
 }
 
-int hcfs_init_backend(CURL_HANDLE *curl_handle)
+int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	return HTTP_OK;
 }
 
-int super_block_update_transit(ino_t this_inode, char is_start_transit,
+int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 	char transit_incomplete)
 {
 	if (this_inode > 1 && transit_incomplete == FALSE) { // inode > 1 is used to test upload_loop()
@@ -61,11 +61,11 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 	return 0;
 }
 
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
+int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
 {
 	char objectpath[40];
 	FILE *objptr;
-	int readsize1, readsize2;
+	int32_t readsize1, readsize2;
 	char filebuf1[4096], filebuf2[4096];
 
 	if (strncmp(objname, "FSstat", 6) == 0)
@@ -85,10 +85,10 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 }
 
 #if (DEDUP_ENABLE)
-int do_block_delete(ino_t this_inode, long long block_no, unsigned char *obj_id,
+int32_t do_block_delete(ino_t this_inode, int64_t block_no, uint8_t *obj_id,
 		    CURL_HANDLE *curl_handle)
 #else
-int do_block_delete(ino_t this_inode, long long block_no, long long seq,
+int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 		    CURL_HANDLE *curl_handle)
 #endif
 {
@@ -104,12 +104,12 @@ int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 	return 0;
 }
 
-int super_block_exclusive_locking(void)
+int32_t super_block_exclusive_locking(void)
 {
 	return 0;
 }
 
-int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	if (this_inode == 0)
 		return -1;
@@ -129,21 +129,21 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	return 0;
 }
 
-int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	return 0;
 }
 
-int super_block_exclusive_release(void)
+int32_t super_block_exclusive_release(void)
 {
 	return 0;
 }
 
 /* A mock function to return linear block indexing */
-long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
-	long long target_page, long long hint_page)
+int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	int64_t target_page, int64_t hint_page)
 {
-	long long ret_page_pos;
+	int64_t ret_page_pos;
 
 	/* target_page starts from 0 */
 	if (target_page >= mock_total_page)
@@ -156,7 +156,7 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	return ret_page_pos;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 
@@ -166,7 +166,7 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
+int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
@@ -182,13 +182,13 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_en
 	return 200;
 }
 
-int set_block_dirty_status(char *path, FILE *fptr, char status)
+int32_t set_block_dirty_status(char *path, FILE *fptr, char status)
 {
 	setxattr(path, "user.dirty", "F", 1, 0);
 	return 0;
 }
 
-int fetch_trunc_path(char *pathname, ino_t this_inode)
+int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
@@ -197,7 +197,7 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 off_t check_file_size(const char *path)
 {
 	struct stat block_stat;
-	int errcode;
+	int32_t errcode;
 
 	errcode = stat(path, &block_stat);
 	if (errcode == 0)
@@ -207,12 +207,12 @@ off_t check_file_size(const char *path)
 			errcode, strerror(errcode));
 	return -errcode;
 }
-int sync_hcfs_system_data(char need_lock)
+int32_t sync_hcfs_system_data(char need_lock)
 {
 	return 0;
 }
 
-int backup_FS_database(void)
+int32_t backup_FS_database(void)
 {
 	return 0;
 }
@@ -224,8 +224,8 @@ void fetch_backend_block_objname(char *objname, ino_t inode,
 	return;
 }
 
-int fetch_toupload_block_path(char *pathname, ino_t inode,
-		long long block_no, long long seq)
+int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
+		int64_t block_no, int64_t seq)
 {
 	sprintf(pathname, "mock_meta_folder/mock_toupload_block_%"PRIu64"_%lld",
 			(uint64_t)inode, block_no);
@@ -253,9 +253,9 @@ int del_progress_file(int fd, ino_t inode)
 	return 0;
 }
 
-int set_progress_info(int fd, long long block_index,
+int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const long long *toupload_seq, const long long *backend_seq,
+	const int64_t *toupload_seq, const int64_t *backend_seq,
 	const char *finish)
 {
 	BLOCK_UPLOADING_STATUS block_entry;
@@ -274,14 +274,14 @@ int set_progress_info(int fd, long long block_index,
 	return 0;
 }
 
-long long query_status_page(int fd, long long block_index)
+int64_t query_status_page(int32_t fd, int64_t block_index)
 {
 	return (block_index / MAX_BLOCK_ENTRIES_PER_PAGE) *
 		sizeof(BLOCK_UPLOADING_PAGE);
 }
 
-int init_backend_file_info(const SYNC_THREAD_TYPE *ptr, long long *backend_size,
-		long long *total_backend_blocks, long long upload_seq)
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
+		int64_t *total_backend_blocks, int64_t upload_seq)
 {
 	return 0;
 }
@@ -298,7 +298,7 @@ void fetch_progress_file_path(char *pathname, ino_t inode)
 	return;
 }
 
-char did_block_finish_uploading(int fd, long long blockno)
+char did_block_finish_uploading(int32_t fd, int64_t blockno)
 {
 	return TRUE;
 }
@@ -405,14 +405,14 @@ int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 	return 0;
 }
 
-int update_backend_usage(long long total_backend_size_delta,
-		long long meta_size_delta, long long num_inodes_delta)
+int32_t update_backend_usage(int64_t total_backend_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
 	return 0;
 }
 
-int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
-		long long fs_meta_size_delta, long long fs_num_inodes_delta)
+int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta)
 {
 	FS_CLOUD_STAT_T	fs_cloud_stat;
 
@@ -427,10 +427,10 @@ int update_fs_backend_usage(FILE *fptr, long long fs_total_size_delta,
 	return 0;
 }
 
-int update_file_stats(FILE *metafptr, long long num_blocks_delta,
-			long long num_cached_blocks_delta,
-			long long cached_size_delta,
-			long long dirty_data_size_delta,
+int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
+			int64_t num_cached_blocks_delta,
+			int64_t cached_size_delta,
+			int64_t dirty_data_size_delta,
 			ino_t thisinode)
 {
 	return 0;

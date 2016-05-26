@@ -15,6 +15,7 @@ repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
+set -v
 
 exec 1> >(while read line; do echo -e "        $line"; done;)
 exec 2> >(while read line; do echo -e "        $line" >&2; done;)
@@ -42,9 +43,18 @@ function cleanup {
 echo "########## Compile binary files"
 $here/compile_hcfs_bin.bash
 . $here/path_config.sh
+cd $repo/src/API
+make hcfsconf
+rm -f /data/hcfs.conf
+./hcfsconf enc /data/hcfs.conf.plain /data/hcfs.conf
 
 echo "########## Start hcfs deamon"
 cleanup
 set -x
+cd $repo/tmp
 $hcfs -d -oallow_other |& cut -c -120 &
+until [ -f $repo/tmp/hcfs_android_log ]
+do
+	sleep 1
+done
 set +x

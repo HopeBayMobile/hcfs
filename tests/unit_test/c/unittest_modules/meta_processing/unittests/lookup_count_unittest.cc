@@ -15,13 +15,13 @@ LOOKUP_HEAD_TYPE lookup_table[NUM_LOOKUP_ENTRIES];
 
 TEST(lookup_initTest, InitLookupTableSuccess)
 {
-	int val;
+	int32_t val;
 
 	/* Run  */
 	EXPECT_EQ(0, lookup_init(lookup_table));
 
 	/* Verify */
-	for (int i = 0; i < NUM_LOOKUP_ENTRIES; i++) {
+	for (int32_t i = 0; i < NUM_LOOKUP_ENTRIES; i++) {
 		EXPECT_EQ(NULL, lookup_table[i].head);
 
 		sem_getvalue(&lookup_table[i].entry_sem, &val);
@@ -41,7 +41,7 @@ class InitLookupTableBaseClass : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-		for (int count = 0; count < NUM_LOOKUP_ENTRIES; count++) { 
+		for (int32_t count = 0; count < NUM_LOOKUP_ENTRIES; count++) { 
 			sem_init(&(lookup_table[count].entry_sem), 0, 1); 
 			lookup_table[count].head = NULL;
 		}
@@ -49,7 +49,7 @@ protected:
 
 	void TearDown()
 	{
-		for (int count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
+		for (int32_t count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
 			LOOKUP_NODE_TYPE *prev_node;
 			LOOKUP_NODE_TYPE *node = lookup_table[count].head;
 			
@@ -63,12 +63,12 @@ protected:
 
 	}
 
-	void insert_many_mock_nodes(int num)
+	void insert_many_mock_nodes(int32_t num)
 	{
 		LOOKUP_NODE_TYPE *ptr;
 
-		for (int i = 0; i < num; i++) {
-			int index = i % NUM_LOOKUP_ENTRIES;
+		for (int32_t i = 0; i < num; i++) {
+			int32_t index = i % NUM_LOOKUP_ENTRIES;
 			/* inode i has lookup_count = i */
 			ptr = (LOOKUP_NODE_TYPE *)malloc(sizeof(LOOKUP_NODE_TYPE));
 			memset(ptr, 0, sizeof(LOOKUP_NODE_TYPE));
@@ -83,7 +83,7 @@ protected:
 
 	LOOKUP_NODE_TYPE *find_lookup_entry(ino_t inode)
 	{
-		int index;
+		int32_t index;
 		LOOKUP_NODE_TYPE *ptr = NULL;
 
 		index = inode % NUM_LOOKUP_ENTRIES;	
@@ -105,8 +105,8 @@ class lookup_increaseTest : public InitLookupTableBaseClass {
 TEST_F(lookup_increaseTest, InsertOneNode_InEmptyTable)
 {
 	LOOKUP_NODE_TYPE *expected_node;
-	unsigned ret_count;
-	int index;
+	uint32_t ret_count;
+	int32_t index;
 
 	expected_node = (LOOKUP_NODE_TYPE *) malloc(sizeof(LOOKUP_NODE_TYPE));
 	memset(expected_node, 0, sizeof(LOOKUP_NODE_TYPE));
@@ -134,8 +134,8 @@ TEST_F(lookup_increaseTest, InsertOneNode_InNonemptyTable)
 {
 	LOOKUP_NODE_TYPE *expected_node;
 	LOOKUP_NODE_TYPE *ptr;
-	unsigned num_insert_node;
-	unsigned ret_count;
+	uint32_t num_insert_node;
+	uint32_t ret_count;
 
 	num_insert_node = NUM_LOOKUP_ENTRIES * 3;
 	insert_many_mock_nodes(num_insert_node);
@@ -166,9 +166,9 @@ TEST_F(lookup_increaseTest, InsertOneNode_InNonemptyTable)
 TEST_F(lookup_increaseTest, IncreaseManyNode)
 {
 	LOOKUP_NODE_TYPE *ptr;
-	unsigned num_insert_node;
-	unsigned ret_count;
-	unsigned add_amount;
+	uint32_t num_insert_node;
+	uint32_t ret_count;
+	uint32_t add_amount;
 	char expected_type;
 
 	num_insert_node = NUM_LOOKUP_ENTRIES * 3;
@@ -178,7 +178,7 @@ TEST_F(lookup_increaseTest, IncreaseManyNode)
 
 	/* Run */ 
 	for (ino_t inode = 1 ; inode <= num_insert_node ; inode++) {
-		unsigned  init_amount = inode;
+		uint32_t  init_amount = inode;
 
 		ret_count = lookup_increase(lookup_table,
 			inode, init_amount, expected_type);
@@ -218,7 +218,7 @@ class lookup_decreaseTest : public InitLookupTableBaseClass {
 TEST_F(lookup_decreaseTest, Arg_need_delete_IsNull)
 {
 	ino_t inode = 2;
-	int amount = 123;
+	int32_t amount = 123;
 	char d_type;
 
 	/* Run */
@@ -229,7 +229,7 @@ TEST_F(lookup_decreaseTest, Arg_need_delete_IsNull)
 TEST_F(lookup_decreaseTest, DecreaseInode_ButNotFound)
 {
 	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
-	int amount = 123;
+	int32_t amount = 123;
 	char need_delete;
 	char d_type;
 
@@ -242,11 +242,11 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsPositiveNumber)
 {
 	LOOKUP_NODE_TYPE *ptr;	
 	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
-	int amount;
+	int32_t amount;
 	char need_delete;
 	char d_type;
-	unsigned num_insert_inode;
-	int expected_count;
+	uint32_t num_insert_inode;
+	int32_t expected_count;
 
 	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
 	insert_many_mock_nodes(num_insert_inode);
@@ -269,10 +269,10 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsZero)
 {
 	LOOKUP_NODE_TYPE *ptr;	
 	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
-	int amount;
+	int32_t amount;
 	char need_delete;
 	char d_type;
-	unsigned num_insert_inode;
+	uint32_t num_insert_inode;
 
 	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
 	insert_many_mock_nodes(num_insert_inode);
@@ -292,10 +292,10 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsNegativeNumber)
 {
 	LOOKUP_NODE_TYPE *ptr;	
 	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
-	int amount;
+	int32_t amount;
 	char need_delete;
 	char d_type;
-	unsigned num_insert_inode;
+	uint32_t num_insert_inode;
 
 	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
 	insert_many_mock_nodes(num_insert_inode);
@@ -325,7 +325,7 @@ class lookup_markdeleteTest : public InitLookupTableBaseClass {
 
 TEST_F(lookup_markdeleteTest, MarkDeleteFail_LookupEntryNotFound)
 {	
-	unsigned num_insert_inode;
+	uint32_t num_insert_inode;
 	ino_t inode_markdelete;
 
 	/* Insert many inodes */
@@ -343,7 +343,7 @@ TEST_F(lookup_markdeleteTest, MarkDeleteFail_LookupEntryNotFound)
 
 TEST_F(lookup_markdeleteTest, MarkDeleteSuccess)
 {	
-	unsigned num_insert_inode;
+	uint32_t num_insert_inode;
 
 	/* Insert many inodes */
 	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
@@ -399,7 +399,7 @@ TEST_F(lookup_destroyTest, DestroyEmptyTableSuccess)
 
 TEST_F(lookup_destroyTest, DestroyTableSuccess)
 {
-	unsigned num_insert_inode;
+	uint32_t num_insert_inode;
 	MOUNT_T mount_t;
 
 	/* Insert many inodes */

@@ -61,7 +61,8 @@ int32_t main(int32_t argc, char **argv)
 		inode_list[num_inodes] = this_inode;
 		num_inodes++;
 
-		printf("%s - inode %"PRIu64" - num_inode %d\n", argv[i], (uint64_t)this_inode, num_inodes);
+		printf("%s - inode %" PRIu64 " - num_inode %d\n", argv[i],
+		       (uint64_t)this_inode, num_inodes);
 	}
 
 	addr.sun_family = AF_UNIX;

@@ -9,7 +9,7 @@
 /*
 	Mock fetch_meta_path() function
  */
-int fetch_meta_path(char *path, ino_t inode)
+int32_t fetch_meta_path(char *path, ino_t inode)
 {
 	switch(inode){
 	case INO__FETCH_META_PATH_FAIL:
@@ -25,20 +25,20 @@ int fetch_meta_path(char *path, ino_t inode)
 }
 
 
-int super_block_mark_dirty(ino_t this_inode)
+int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
 
-int super_block_update_stat(ino_t this_inode, struct stat *newstat)
+int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat)
 {
 	return 0;
 }
 
 
-int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries, DIR_ENTRY *new_entry, int *index_to_insert)
+int32_t dentry_binary_search(DIR_ENTRY *entry_array, int32_t num_entries, DIR_ENTRY *new_entry, int32_t *index_to_insert)
 {
-	int i;
+	int32_t i;
 	for (i=0 ; i<num_entries ; i++) {
 		if (strcmp(new_entry->d_name, entry_array[i].d_name) == 0) {
 			memcpy(new_entry, &entry_array[i], sizeof(DIR_ENTRY));
@@ -48,11 +48,11 @@ int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries, DIR_ENTRY *new
 	return -1;
 }
 
-int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int fh, int *result_index, DIR_ENTRY_PAGE *result_node)
+int32_t search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node)
 {
 	DIR_ENTRY tmp_entry;
-	int tmp_index;
-	int ret;
+	int32_t tmp_index;
+	int32_t ret;
 
 	strcpy(tmp_entry.d_name, target_name);
 	ret = dentry_binary_search(tnode->dir_entries, tnode->num_entries,
@@ -79,7 +79,7 @@ struct stat *generate_mock_stat(ino_t inode_num)
 	return test_stat;
 }
 
-int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *)malloc(sizeof(SUPER_BLOCK_ENTRY));
@@ -88,7 +88,7 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }

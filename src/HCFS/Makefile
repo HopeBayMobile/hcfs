@@ -1,12 +1,16 @@
 # For CI build version
 ifndef VERSION_NUM
-VERSION_NUM := Manual build @ $(shell date --rfc-3339=seconds)
+VERSION_NUM:=Manual build $(shell date +%Y%m%d-%H%M%S)
+empty:=
+space:= $(empty) $(empty)
+VERSION_NUM := $(subst $(space),_,$(VERSION_NUM))
+#$(error $(VERSION_NUM))
 endif
 
 CC = gcc
 CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 \
 	   -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_ \
-	   -DVERSION_NUM="\"$(VERSION_NUM)\""
+	   -DVERSION_NUM=\"$(VERSION_NUM)\"
 
 CFLAGS = -g -pthread -Wall -Wextra -Werror
 LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
@@ -18,7 +22,7 @@ endif
 # [Autodependencies with GNU make]
 # http://scottmcpeak.com/autodepend/autodepend.html
 
-OBJS_DIR = obj/
+OBJS_DIR = obj
 OBJS_F := objmeta.o \
 	mount_manager.o \
 	FS_manager.o \
@@ -53,23 +57,37 @@ OBJS_F := objmeta.o \
 	atomic_tocloud.o \
 	tocloud_tools.o \
 	do_fallocate.o \
-	fuseproc_comm.o
-OBJS = $(addprefix $(OBJS_DIR), $(OBJS_F))
+	fuseproc_comm.o \
+
+# obj file used in android env
+ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"
+	OBJS_F += pkg_cache.o
+endif
+
+OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_F))
+
+all: check_pkgs hcfs
+
+check_pkgs:
+	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
 
 hcfs: $(OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LFLAGS)
 
 # pull in dependency info for *existing* .o files
--include $(OBJS:.o=.d)
+include $(wildcard $(OBJS_DIR)/*.d)
 
 # compile and generate dependency info
-$(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)$*.o
-	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)$*.d
-	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(OBJS_DIR)$*.d
+$(OBJS_DIR)/%.o: %.c | $(OBJS_DIR)
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)/$*.o
+	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)/$*.d
+	@sed -i"" -r -e 's#.*\.o#obj/&#g' \
+		-e ':a;$$!N;$$!ba;s# \\\n##g' \
+		-e 'p;s/\\ //g' -e 's/.*: //' \
+		-e '$$s/ |$$/:\n/g' $(OBJS_DIR)/$*.d
 
 $(OBJS_DIR):
 	mkdir $@
 
 clean:
-	rm -rf hcfs $(OBJS_DIR)*.o $(OBJS_DIR)*.d
+	rm -rf hcfs $(OBJS_DIR)/*.o $(OBJS_DIR)/*.d
