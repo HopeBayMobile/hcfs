@@ -113,6 +113,8 @@ void HCFS_stat(char **json_res);
  */
 void HCFS_get_occupied_size(char **json_res);
 
+/* REVIEW TODO: Perhaps functions that are not implemented should not stay in the header
+to avoid confusion (especially if the header file is used for document generation) */
 /*Set property
  * @json_res result string in json format.
  * @key property of HCFS configuration.

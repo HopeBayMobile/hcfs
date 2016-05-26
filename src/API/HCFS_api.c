@@ -178,6 +178,8 @@ void HCFS_stat(char **json_res)
 		size_msg = recv(fd, buf, reply_len, 0);
 		buf_idx = 0;
 
+/* REVIEW TODO: Is it possible to use common structure to send / read a collection
+of variables, instead of sending them one by one? */
 		READ_LL_ARGS(quota);
 		READ_LL_ARGS(vol_usage);
 		READ_LL_ARGS(cloud_usage);
