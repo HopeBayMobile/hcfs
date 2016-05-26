@@ -116,7 +116,7 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 
 	/* init head */
 	sprintf(sb_path, "%s/superblock", METAPATH);
-	sb_fptr = fopen(sb_path, "r+");
+	sb_fptr = fopen(sb_path, "w+");
 	if (!sb_fptr)
 		return -errno;
 	memset(&head, 0, sizeof(SUPER_BLOCK_HEAD));
@@ -135,17 +135,12 @@ errcode_handle:
 /**
  * Init rebuild superblock. Init sb header, queuing file.
  */
-int32_t init_rebuild_sb()
+int32_t init_rebuild_sb(char rebuild_action)
 {
-	char sb_path[200];
 	char queue_filepath[200];
 	int32_t ret, errcode;
 	ino_t *roots;
 	int64_t num_roots;
-	SUPER_BLOCK_HEAD head;
-	ssize_t ret_ssize;
-	FILE *fptr;
-	struct stat tmpstat;
 	int64_t ret_pos;
 
 	/* Allocate memory for jobs */
@@ -168,55 +163,23 @@ int32_t init_rebuild_sb()
 	}
 
 	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
-	sprintf(sb_path, "%s/superblock", METAPATH);
 
 	/* Rebuild superblock */
-	if (access(sb_path, F_OK) < 0) {
-		errcode = errno;
-		if (errcode == ENOENT) {
-			/* Get roots */
-			ret = _get_root_inodes(&roots, &num_roots);
-			if (ret < 0)
-				return ret;
-			/* Init queue file */
-			ret = _init_rebuild_queue_file(roots, num_roots);
-			if (ret < 0)
-				return ret;
-			/* Init sb header */
-			ret = _init_sb_head(roots, num_roots);
-			if (ret < 0)
-				return ret;
-		} else {
-			return -errcode;
-		}
+	if (rebuild_action == START_REBUILD_SB) {
+		/* Get roots */
+		ret = _get_root_inodes(&roots, &num_roots);
+		if (ret < 0)
+			return ret;
+		/* Init queue file */
+		ret = _init_rebuild_queue_file(roots, num_roots);
+		if (ret < 0)
+			return ret;
+		/* Init sb header */
+		ret = _init_sb_head(roots, num_roots);
+		if (ret < 0)
+			return ret;
 
-	} else {
-		/* Check superblock and keep rebuilding */
-		fptr = fopen(sb_path, "r+");
-		if (!fptr) {
-			errcode = errno;
-			return -errcode;
-		}
-		setbuf(fptr, NULL);
-		ret_ssize = pread(fileno(fptr), &head,
-				sizeof(SUPER_BLOCK_HEAD), 0);
-		fclose(fptr);
-		if (ret_ssize < (int64_t)sizeof(SUPER_BLOCK_HEAD)) {
-			/* Get roots */
-			ret = _get_root_inodes(&roots, &num_roots);
-			if (ret < 0)
-				return ret;
-			/* Init sb header */
-			ret = _init_sb_head(roots, num_roots);
-			if (ret < 0)
-				return ret;
-		} else {
-			if (head.now_rebuild == FALSE) {
-				free(rebuild_sb_mgr_info);
-				free(rebuild_sb_jobs);
-				return 0;
-			}
-		}
+	} else if (rebuild_action == KEEP_REBUILD_SB){
 
 		/* Check queue file and open it */
 		if (access(queue_filepath, F_OK) == 0) {
@@ -240,10 +203,10 @@ int32_t init_rebuild_sb()
 			if (ret < 0)
 				return ret;
 		}
+	} else {
+		write_log(0, "Error: Invalid type\n");
+		return -EINVAL;
 	}
-	ret = super_block_init();
-	if (ret < 0)
-		return ret;
 	return 0;
 }
 
@@ -256,32 +219,47 @@ int32_t pull_inode_job(ino_t *inode_job)
 	if (rebuild_sb_jobs->remaining_jobs <= 0)
 		return -ENOENT;
 
+	*inode_job = 0;
 	cache_job = &(rebuild_sb_jobs->cache_jobs);
-	if (cache_job->cache_idx >= cache_job->num_cached_inode) {
-		flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
-		ret_ssize = pread(rebuild_sb_jobs->queue_fh,
+
+	while (rebuild_sb_jobs->remaining_jobs > 0) {
+		if (cache_job->cache_idx >= cache_job->num_cached_inode) {
+			/* Fetch many inodes */
+			flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
+			ret_ssize = pread(rebuild_sb_jobs->queue_fh,
 				cache_job->cached_inodes,
 				sizeof(ino_t) * NUM_CACHED_INODES,
 				sizeof(ino_t) * rebuild_sb_jobs->job_count);
-		flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
-		if (ret_ssize > 0) {
-			cache_job->num_cached_inode = ret_ssize / sizeof(ino_t);
-			cache_job->cache_idx = 0;
-			if (cache_job->num_cached_inode == 0) {
-				write_log(0, "Error: Queue file is corrupted?\n");
+			flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+			/* Set num of cached inodes */
+			if (ret_ssize > 0) {
+				cache_job->num_cached_inode =
+						ret_ssize / sizeof(ino_t);
+				cache_job->cache_idx = 0;
+				if (cache_job->num_cached_inode == 0) {
+					write_log(0,"Error: Queue file"
+						" is corrupted?\n");
+					rebuild_sb_jobs->remaining_jobs = 0;
+					return -ENOENT;
+				}
+			} else {
+				write_log(0, "Error: Queue file "
+					"is corrupted?\n");
 				rebuild_sb_jobs->remaining_jobs = 0;
 				return -ENOENT;
 			}
-		} else {
-			write_log(0, "Error: Queue file is corrupted?\n");
-			rebuild_sb_jobs->remaining_jobs = 0;
-			return -ENOENT;
 		}
+		*inode_job = cache_job->cached_inodes[cache_job->cache_idx];
+		cache_job->cache_idx++;
+		rebuild_sb_jobs->job_count++;
+		rebuild_sb_jobs->remaining_jobs--;
+		if (*inode_job > 0)
+			break;
 	}
-	*inode_job = cache_job->cached_inodes[cache_job->cache_idx];
-	cache_job->cache_idx++;
-	rebuild_sb_jobs->job_count++;
-	rebuild_sb_jobs->remaining_jobs--;
+
+	if (*inode_job == 0)
+		return -ENOENT;
+
 	return 0;
 }
 

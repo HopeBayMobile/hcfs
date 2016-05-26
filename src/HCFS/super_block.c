@@ -28,6 +28,7 @@
 #include <sys/shm.h>
 #endif
 #include <sys/time.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
@@ -42,6 +43,7 @@
 #include "utils.h"
 #include "macro.h"
 #include "hcfs_cacheops.h"
+#include "rebuild_super_block.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -1874,3 +1876,79 @@ error_handling:
 	return ret;
 }
 
+int32_t check_init_super_block()
+{
+	char fsmgr_path[200];
+	FILE *fsmgr_fptr, *sb_fptr;
+	DIR_META_TYPE dirmeta;
+	SUPER_BLOCK_HEAD head;
+	int32_t errcode, ret;
+	int64_t ret_ssize;
+
+	sprintf(fsmgr_path, "%s/fsmgr", METAPATH);
+	if (access(fsmgr_path, F_OK) < 0) {
+		errcode = errno;
+		if (errcode == ENOENT) {
+			/* TODO:Get fsmgr from cloud */
+		} else {
+			return -errcode;
+		}
+	}
+	fsmgr_fptr = fopen(fsmgr_path, "r+");
+	if (!fsmgr_fptr) {
+		errcode = errno;
+		return -errcode;
+	}
+	flock(fileno(fsmgr_fptr), LOCK_EX);
+	PREAD(fileno(fsmgr_fptr), &dirmeta, sizeof(DIR_META_TYPE), 16);
+	flock(fileno(fsmgr_fptr), LOCK_UN);
+	fclose(fsmgr_fptr);
+
+	if (dirmeta.total_children <= 0) {
+		ret = super_block_init();
+		return ret;
+	}
+
+	/* Check superblock status */
+	if (access(SUPERBLOCK, F_OK) < 0) {
+		/* Rebuild SB */
+		ret = init_rebuild_sb(START_REBUILD_SB);
+		ret = super_block_init();
+		/* Create rebuild sb mgr */
+	} else {
+		/* Read SB and check status */
+		sb_fptr = fopen(SUPERBLOCK, "r");
+		if (!sb_fptr) {
+			errcode = errno;
+			return -errcode;
+		}
+		flock(fileno(sb_fptr), LOCK_EX);
+		ret_ssize = pread(fileno(sb_fptr), &head,
+				sizeof(SUPER_BLOCK_HEAD), 0);
+		flock(fileno(sb_fptr), LOCK_UN);
+		fclose(sb_fptr);
+		if (ret_ssize < (int64_t)sizeof(SUPER_BLOCK_HEAD)) {
+			unlink(SUPERBLOCK);
+			/* Rebuild SB */
+			ret = init_rebuild_sb(START_REBUILD_SB);
+			ret = super_block_init();
+			/* Create rebuild sb mgr */
+		} else {
+			if (head.now_rebuild) {
+				/* Keep rebuilding SB */
+				ret = init_rebuild_sb(KEEP_REBUILD_SB);
+				ret = super_block_init();
+				/* Create rebuild sb mgr */
+			} else {
+				ret = super_block_init();
+			}
+		}
+	}
+
+	return ret;
+
+errcode_handle:
+	flock(fileno(fsmgr_fptr), LOCK_UN);
+	fclose(fsmgr_fptr);
+	return errcode;
+}

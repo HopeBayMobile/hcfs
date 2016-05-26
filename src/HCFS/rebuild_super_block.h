@@ -11,6 +11,8 @@
 #define NUM_THREADS_IN_POOL 4
 #define NUM_CACHED_INODES 4096
 
+enum { START_REBUILD_SB, KEEP_REBUILD_SB };
+
 typedef struct CACHED_JOBS {
 	ino_t cached_inodes[NUM_CACHED_INODES];
 	int32_t num_cached_inode;
@@ -52,4 +54,4 @@ REBUILD_SB_JOBS *rebuild_sb_jobs;
 
 int32_t rebuild_super_block_entry(ino_t this_inode,
 		struct stat *this_stat, BOOL local_pin);
-int32_t init_rebuild_sb();
+int32_t init_rebuild_sb(char rebuild_action);
