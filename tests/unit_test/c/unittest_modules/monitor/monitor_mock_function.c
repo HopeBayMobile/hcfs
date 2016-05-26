@@ -1,4 +1,6 @@
-/* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved. */
+/* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved. */
+
+#include "mock_params.h"
 #include "logger.h"
 #include "hcfscurl.h"
 #include "time.h"
@@ -27,4 +29,9 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 	larger_than_interval.tv_nsec = hcfs_test_backend_sleep_nsec;
 	nanosleep(&larger_than_interval, NULL);
 	return hcfs_test_backend_register;
+}
+
+void notify_sleep_on_cache(int32_t cache_replace_status)
+{
+	mock_status = cache_replace_status;
 }

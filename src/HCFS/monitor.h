@@ -1,15 +1,15 @@
-/*************************************************************************
-*
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
-*
-* File Name: hcfs_clouddelete.h
-* Abstract: The c header file for deleting meta or data from
-*           backend.
-*
-* Revision History
-* 2015/2/13 Jiahong added header for this file, and revising coding style.
-*
-**************************************************************************/
+/**************************************************************************
+ *
+ * Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+ *
+ * File Name: monitor.c
+ * Abstract: The c source code file for monitor backend thread and
+ *           sync control (upload/download/delete).
+ *
+ * Revision History
+ * 2015/10/30 Jethro
+ *
+ *************************************************************************/
 #ifndef SRC_HCFS_MONITOR_H_
 #define SRC_HCFS_MONITOR_H_
 
