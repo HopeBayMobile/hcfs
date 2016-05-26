@@ -68,7 +68,7 @@ protected:
 	{
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
-		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
+		for (int32_t i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
 
 		num_obj = 35; // fetch 35 blocks
@@ -76,7 +76,7 @@ protected:
 		expected_obj_counter = 0; // Counter of recording expected value
 		sem_init(&objname_counter_sem, 0, 1);
 		objname_list = (char **)malloc(sizeof(char *)*num_obj);
-		for (int i = 0 ; i < num_obj ; i++)
+		for (int32_t i = 0 ; i < num_obj ; i++)
 			objname_list[i] = (char *)malloc(sizeof(char)*40);
 
 		hcfs_system->backend_is_online = TRUE;
@@ -87,7 +87,7 @@ protected:
 		sem_destroy(&download_curl_sem);
 		sem_destroy(&download_curl_control_sem);
 		sem_destroy(&objname_counter_sem);
-		for (int i = 0 ; i < num_obj ; i++)
+		for (int32_t i = 0 ; i < num_obj ; i++)
 			free(objname_list[i]);
 		free(objname_list);
 	}
@@ -96,26 +96,26 @@ protected:
 	{
 		char tmp_filename[50];
 		FILE *fptr;
-		int ret;
+		int32_t ret;
 
-		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int *)block_no);
+		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int32_t *)block_no);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, READ_BLOCK, 1, *(int *)block_no);
+		ret = fetch_from_cloud(fptr, READ_BLOCK, 1, *(int32_t *)block_no);
 		fclose(fptr);
 		unlink(tmp_filename);
 		return NULL;
 	}
 	std::string expected_objname[100]; // Expected answer list
-	int expected_obj_counter;
-	int num_obj;
+	int32_t expected_obj_counter;
+	int32_t num_obj;
 };
 
-int objname_cmp(const void *s1, const void *s2)
+int32_t objname_cmp(const void *s1, const void *s2)
 {
 	char *name1 = *(char **)s1;
 	char *name2 = *(char **)s2;
-	int inode1, block1;
-	int inode2, block2;
+	int32_t inode1, block1;
+	int32_t inode2, block2;
 	sscanf(name1, "data_%d_%d", &inode1, &block1);
 	sscanf(name2, "data_%d_%d", &inode2, &block2);
 	return block1 - block2;
@@ -132,10 +132,10 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
 	pthread_t tid[num_obj];
-	int block_no[num_obj];
+	int32_t block_no[num_obj];
 
 	/* Run fetch_from_cloud() with multi-threads */
-	for (int i = 0 ; i < num_obj ; i++) {
+	for (int32_t i = 0 ; i < num_obj ; i++) {
 		char tmp_filename[20];
 		block_no[i] = (i + 1)*5;
 		EXPECT_EQ(0, pthread_create(&tid[i], NULL,
@@ -149,7 +149,7 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 	/* Check answer */
 	EXPECT_EQ(num_obj, objname_counter);
 	qsort(objname_list, objname_counter, sizeof(char *), objname_cmp); // Sort actual value
-	for (int i = 0 ; i < num_obj ; i++) {
+	for (int32_t i = 0 ; i < num_obj ; i++) {
 		pthread_join(tid[i], NULL);
 		ASSERT_STREQ(expected_objname[i].c_str(), objname_list[i]);
 	}
@@ -177,7 +177,7 @@ protected:
 		/* Used to fetch_from_cloud */
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
-		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
+		for (int32_t i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
 
 		hcfs_system->backend_is_online = TRUE;
@@ -219,10 +219,10 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	FILE *metafptr;
 	BLOCK_ENTRY_PAGE mock_page;
 	BLOCK_ENTRY_PAGE result_page;
-	int entry_index;
-	int meta_fpos;
+	int32_t entry_index;
+	int32_t meta_fpos;
 	char xattr_result;
-	int ret, errcode;
+	int32_t ret, errcode;
 
 	entry_index = prefetch_ptr->entry_index;
 	meta_fpos = prefetch_ptr->page_start_fpos;
@@ -302,7 +302,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 			(void *)&download_block_manager, NULL);
 
-	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
+	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
 		download_thread_ctl.block_info[i].dl_error = FALSE;
 		download_thread_ctl.block_info[i].active = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
@@ -319,7 +319,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 
 	/* Verify */
 	EXPECT_EQ(0, download_thread_ctl.active_th);
-	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
+	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		ASSERT_EQ(FALSE,
 			download_thread_ctl.block_info[i].active);
 	}
@@ -336,7 +336,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 			(void *)&download_block_manager, NULL);
 
-	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
+	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].active = TRUE;
 		download_thread_ctl.block_info[i].dl_error = TRUE;
 		download_thread_ctl.block_info[i].this_inode = i;
@@ -354,7 +354,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 
 	/* Verify */
 	EXPECT_EQ(0, download_thread_ctl.active_th);
-	for (int i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
+	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		char error_path[200];
 
 		fetch_error_download_path(error_path, (ino_t)i);
@@ -621,7 +621,7 @@ protected:
 			rmdir(METAPATH);
 		mkdir(METAPATH, 0700);
 		hcfs_system->system_going_down = FALSE;
-		hcfs_system->sync_paused = OFF;
+		hcfs_system->backend_is_online = TRUE;
 
 		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
@@ -698,7 +698,7 @@ protected:
 		download_usermeta_ctl.active = FALSE;
 
     		hcfs_system->system_going_down = FALSE;
-		hcfs_system->sync_paused = FALSE;
+		hcfs_system->backend_is_online = TRUE;
 	}
 
 	void TearDown()
@@ -730,7 +730,7 @@ TEST_F(update_quotaTest, CreateThreadSuccess)
 {
 	/* Let thread sleep in the loop */
     	hcfs_system->system_going_down = FALSE;
-	hcfs_system->sync_paused = TRUE;
+	hcfs_system->backend_is_online = FALSE;
 	download_usermeta_ctl.active = FALSE;
 	CURRENT_BACKEND = SWIFT;
 

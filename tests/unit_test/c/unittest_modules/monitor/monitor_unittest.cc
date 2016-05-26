@@ -12,8 +12,8 @@ extern "C" {
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
-extern int hcfs_test_backend_register;
-extern int hcfs_test_backend_sleep_nsec;
+extern int32_t hcfs_test_backend_register;
+extern int32_t hcfs_test_backend_sleep_nsec;
 extern int32_t backoff_exponent;
 
 class monitorTest : public ::testing::Test {
@@ -46,6 +46,7 @@ TEST_F(monitorTest, Backend_Status_Changed) {
 	wait_monitor_time.tv_nsec = 10000000;
 
 	// Prepare flag to let mock hcfs_test_backend return 200
+	backoff_exponent = 1;
 	hcfs_test_backend_register = 200;
 
 	// create thread to run monitor loop
@@ -87,7 +88,7 @@ TEST_F(monitorTest, Max_Collisions_Number) {
 
 	hcfs_test_backend_register = 400;
 	update_backend_status(FALSE, NULL);
-	for (int i =0; i<15;i++)
+	for (int32_t i =0; i<15;i++)
 		sem_post(&(hcfs_system->monitor_sem));
 	nanosleep(&wait_monitor_time, NULL);
 	ASSERT_EQ(MONITOR_MAX_BACKOFF_EXPONENT, backoff_exponent);

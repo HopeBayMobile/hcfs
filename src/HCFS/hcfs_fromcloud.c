@@ -878,7 +878,7 @@ errcode_handle:
 static BOOL quota_wakeup()
 {
 	if ((hcfs_system->system_going_down == TRUE) ||
-			(hcfs_system->sync_paused == FALSE))
+			(hcfs_system->backend_is_online == TRUE))
 		return TRUE;
 	else
 		return FALSE;
@@ -911,7 +911,7 @@ void fetch_quota_from_cloud(void *ptr)
 	/* Download usermeta.json from cloud */
 	fptr = NULL;
 	while (hcfs_system->system_going_down == FALSE) {
-		if (hcfs_system->sync_paused) {
+		if (hcfs_system->backend_is_online == FALSE) {
 			nonblock_sleep(5, quota_wakeup);
 			continue;
 		}

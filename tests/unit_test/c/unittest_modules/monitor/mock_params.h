@@ -19,8 +19,8 @@
 #define MOCK_META_PATH "/tmp/testHCFS/mock_file_meta"
 
 char **objname_list;
-int objname_counter;
-int mock_total_page;
+int32_t objname_counter;
+int32_t mock_total_page;
 sem_t objname_counter_sem;
 
 char no_backend_stat;
@@ -37,14 +37,14 @@ char FETCH_BACKEND_BLOCK_TESTING;
 int32_t mock_status;
 
 typedef struct {
-	int *to_handle_inode; // inode_t to be deleted by delete_loop()
-	int tohandle_counter; // counter used by super_block
-	int num_inode; // total number of to_delete_inode
+	int32_t *to_handle_inode; // inode_t to be deleted by delete_loop()
+	int32_t tohandle_counter; // counter used by super_block
+	int32_t num_inode; // total number of to_delete_inode
 } LoopTestData;
 
 typedef struct{
-	int *record_handle_inode; // Recorded in inode array when inode is called
-	int record_inode_counter;
+	int32_t *record_handle_inode; // Recorded in inode array when inode is called
+	int32_t record_inode_counter;
 	sem_t record_inode_sem;
 } LoopToVerifiedData;
 

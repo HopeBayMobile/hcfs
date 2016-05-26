@@ -37,7 +37,7 @@ protected:
 
 TEST_F(parse_http_header, Parse_Header){
     HCFS_encode_object_meta *object_meta = (HCFS_encode_object_meta *)calloc(1, sizeof(HCFS_encode_object_meta));
-    int ret = parse_http_header_coding_meta(object_meta, httpheader, "X-Object-Meta-", "Comp", "Enc", "Nonce");
+    int32_t ret = parse_http_header_coding_meta(object_meta, httpheader, "X-Object-Meta-", "Comp", "Enc", "Nonce");
     printf("%d\n", object_meta->len_enc_session_key);
     EXPECT_EQ(object_meta->comp_alg, 1);
     EXPECT_EQ(object_meta->enc_alg, 1);

@@ -14,7 +14,7 @@ extern "C" {
 TEST(init_system_fh_tableTest, InitSuccess)
 {
 	/* Generate answer */
-	int val;
+	int32_t val;
 	char *flags_ans = (char *)malloc(sizeof(char) * MAX_OPEN_FILE_ENTRIES);
 	FH_ENTRY *entry_table_ans =
 		 (FH_ENTRY *)malloc(sizeof(FH_ENTRY) * MAX_OPEN_FILE_ENTRIES);
@@ -61,8 +61,8 @@ TEST_F(open_fhTest, num_opened_files_LimitExceeded)
 TEST_F(open_fhTest, OpenfhSuccess)
 {
 	ino_t inode;
-	int index;
-	for (int times = 0 ; times < 500 ; times++) {
+	int32_t index;
+	for (int32_t times = 0 ; times < 500 ; times++) {
 		/* Mock inode number */
 		srand(time(NULL));
 		inode = times;
@@ -97,7 +97,7 @@ TEST_F(close_fhTest, CloseEmptyEntry)
 
 TEST_F(close_fhTest, meta_cache_lock_entry_ReturnNull)
 {
-	int index;
+	int32_t index;
 	/* Mock data */
 	index = open_fh(INO__META_CACHE_LOCK_ENTRY_FAIL, 0);
 	ASSERT_NE(-1, index);
@@ -107,22 +107,22 @@ TEST_F(close_fhTest, meta_cache_lock_entry_ReturnNull)
 
 TEST_F(close_fhTest, CloseSuccess)
 {
-	std::vector<int> index_list;
-	int ans_num_opened_files = 0;
+	std::vector<int32_t> index_list;
+	int32_t ans_num_opened_files = 0;
 
 	init_system_fh_table();
 	/* Mock data */
-	for (int num_inode = 0; num_inode < 500 ; num_inode++) {
-		int index;
-		int inode = num_inode * 27;
+	for (int32_t num_inode = 0; num_inode < 500 ; num_inode++) {
+		int32_t index;
+		int32_t inode = num_inode * 27;
 		index = open_fh(inode, 0);
 		ASSERT_NE(-1, index) << "Fail to open fh with inode " << inode;
 		index_list.push_back(index);
 		ans_num_opened_files++;
 	}
 	/* Test */
-	for (int i = 0 ; i < index_list.size() ; i++) {
-		int index = index_list[i];
+	for (int32_t i = 0 ; i < index_list.size() ; i++) {
+		int32_t index = index_list[i];
 		ASSERT_EQ(0, close_fh(index)) << "Fail to open fh with inode " << index;
 		ASSERT_EQ(FALSE, system_fh_table.entry_table_flags[index]);
 		ASSERT_EQ(--ans_num_opened_files, system_fh_table.num_opened_files);

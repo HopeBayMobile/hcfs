@@ -7,7 +7,7 @@
 #include "fake_misc.h"
 #include "global.h"
 
-int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	printf("Debug inode is %lld\n", body_ptr->inode_num);
 	switch(body_ptr->inode_num) {
@@ -28,7 +28,7 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 	}
 	return 0;
 }
-int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (body_ptr->fptr != NULL) {
 		fclose(body_ptr->fptr);
@@ -36,9 +36,9 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 	}
 	return 0;
 }
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
-	int fh;
+	int32_t fh;
 
 	fh = target_ptr->inode_num % 100;
 	sem_post(&(target_ptr->access_sem));
@@ -56,7 +56,7 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 	return 0;
 }
 
-int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -79,7 +79,7 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	return 0;
 }
 
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -224,14 +224,14 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
-int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -274,7 +274,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
 	META_CACHE_ENTRY_STRUCT *ptr;
-	int fh;
+	int32_t fh;
 
 	fh = this_inode % 100;
 
@@ -299,28 +299,28 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return ptr;
 }
 
-int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int init_meta_cache_headers(void)
+int32_t init_meta_cache_headers(void)
 {
 	return 0;
 }
 
-int release_meta_cache_headers(void)
+int32_t release_meta_cache_headers(void)
 {
 	return 0;
 }
 
-int meta_cache_remove(ino_t this_inode)
+int32_t meta_cache_remove(ino_t this_inode)
 {
 	return 0;
 }
 
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-		int *result_index, const char *childname,
+int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
+		int32_t *result_index, const char *childname,
 		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	*result_index = -1;
@@ -374,7 +374,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 }
 
 
-int meta_cache_update_symlink_data(ino_t this_inode,
+int32_t meta_cache_update_symlink_data(ino_t this_inode,
 	const struct stat *inode_stat,
         const SYMLINK_META_TYPE *symlink_meta_ptr,
 	META_CACHE_ENTRY_STRUCT *bptr)
@@ -382,7 +382,7 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 	return 0;
 }
 
-int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
         SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	char *target = "I_am_target_link";

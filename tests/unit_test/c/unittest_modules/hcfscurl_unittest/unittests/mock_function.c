@@ -121,7 +121,7 @@ int32_t HMAC_Update(HMAC_CTX *ctx, const uint8_t *data, size_t len)
 	return 0;
 }
 
-int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
+int32_t HMAC_Final(HMAC_CTX *ctx, uint8_t *md, uint32_t *len)
 {
 	*len = strlen("test_hmac_final");
 	strcpy(md, "test_hmac_final");
@@ -148,6 +148,6 @@ int32_t ignore_sigpipe(void)
 	return 0;
 }
 
-int change_xfer_meta(long long xfer_size_upload, long long xfer_size_download,
-		     long long xfer_throughtput, long long xfer_total_obj)
+int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
+		     int64_t xfer_throughtput, int64_t xfer_total_obj)
 {}

@@ -39,10 +39,10 @@ MOUNT_T unittest_mount;
 
 static void _mount_test_fuse(MOUNT_T *tmpmount) {
   char **argv;
-  int ret_val;
+  int32_t ret_val;
   struct fuse_chan *tmp_channel;
   struct fuse_session *tmp_session;
-  int mt, fg;
+  int32_t mt, fg;
   char *mount;
 
   argv = (char **) malloc(sizeof(char *)*3);
@@ -125,7 +125,7 @@ class fuseopEnvironment : public ::testing::Environment {
   }
 
   virtual void TearDown() {
-    int ret_val, tmp_err;
+    int32_t ret_val, tmp_err;
 
     sleep(3);
     if (fork() == 0)
@@ -181,8 +181,8 @@ TEST_F(hfuse_getattrTest, EmptyTest) {
   ASSERT_EQ(access("/tmp/test_fuse",F_OK),0);
 }
 TEST_F(hfuse_getattrTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = access("/tmp/test_fuse/does_not_exist",F_OK);
   tmp_err = errno;
@@ -190,8 +190,8 @@ TEST_F(hfuse_getattrTest, FileNotExist) {
   EXPECT_EQ(tmp_err, ENOENT);
 }
 TEST_F(hfuse_getattrTest, TestRoot) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = stat("/tmp/test_fuse", &tempstat);
@@ -220,8 +220,8 @@ class hfuse_mknodTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_mknodTest, ParentNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = mknod("/tmp/test_fuse/does_not_exist/test", 0700, tmp_dev);
   tmp_err = errno;
@@ -231,8 +231,8 @@ TEST_F(hfuse_mknodTest, ParentNotExist) {
 }
 
 TEST_F(hfuse_mknodTest, ParentNotDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = mknod("/tmp/test_fuse/testfile/test", 0700, tmp_dev);
   tmp_err = errno;
@@ -241,8 +241,8 @@ TEST_F(hfuse_mknodTest, ParentNotDir) {
   EXPECT_EQ(tmp_err, ENOTDIR);
 }
 TEST_F(hfuse_mknodTest, SuperBlockError) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   fail_super_block_new_inode = TRUE;
   ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
@@ -254,8 +254,8 @@ TEST_F(hfuse_mknodTest, SuperBlockError) {
   EXPECT_EQ(tmp_err, ENOSPC);
 }
 TEST_F(hfuse_mknodTest, MknodUpdateError) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   fail_mknod_update_meta = TRUE;
   ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
@@ -267,8 +267,8 @@ TEST_F(hfuse_mknodTest, MknodUpdateError) {
   EXPECT_EQ(tmp_err, 1);
 }
 TEST_F(hfuse_mknodTest, MknodOK) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
   tmp_err = errno;
@@ -295,8 +295,8 @@ class hfuse_mkdirTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_mkdirTest, ParentNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = mkdir("/tmp/test_fuse/does_not_exist/test", 0700);
   tmp_err = errno;
@@ -306,8 +306,8 @@ TEST_F(hfuse_mkdirTest, ParentNotExist) {
 }
 
 TEST_F(hfuse_mkdirTest, ParentNotDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = mkdir("/tmp/test_fuse/testfile/test", 0700);
   tmp_err = errno;
@@ -316,8 +316,8 @@ TEST_F(hfuse_mkdirTest, ParentNotDir) {
   EXPECT_EQ(tmp_err, ENOTDIR);
 }
 TEST_F(hfuse_mkdirTest, SuperBlockError) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   fail_super_block_new_inode = TRUE;
   ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
@@ -329,8 +329,8 @@ TEST_F(hfuse_mkdirTest, SuperBlockError) {
   EXPECT_EQ(tmp_err, ENOSPC);
 }
 TEST_F(hfuse_mkdirTest, MkdirUpdateError) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   fail_mkdir_update_meta = TRUE;
   ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
@@ -342,8 +342,8 @@ TEST_F(hfuse_mkdirTest, MkdirUpdateError) {
   EXPECT_EQ(tmp_err, 1);
 }
 TEST_F(hfuse_mkdirTest, MkdirOK) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
   tmp_err = errno;
@@ -369,8 +369,8 @@ class hfuse_unlinkTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_unlinkTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = unlink("/tmp/test_fuse/does_not_exist");
   tmp_err = errno;
@@ -380,8 +380,8 @@ TEST_F(hfuse_unlinkTest, FileNotExist) {
 }
 
 TEST_F(hfuse_unlinkTest, ParentNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = unlink("/tmp/test_fuse/does_not_exist/test");
   tmp_err = errno;
@@ -391,8 +391,8 @@ TEST_F(hfuse_unlinkTest, ParentNotExist) {
 }
 
 TEST_F(hfuse_unlinkTest, NotRegFile) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mkdir_created = FALSE;
   ret_val = unlink("/tmp/test_fuse/testmkdir");
@@ -403,8 +403,8 @@ TEST_F(hfuse_unlinkTest, NotRegFile) {
 }
 
 TEST_F(hfuse_unlinkTest, PathNotDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = unlink("/tmp/test_fuse/testfile/afile");
   tmp_err = errno;
@@ -414,8 +414,8 @@ TEST_F(hfuse_unlinkTest, PathNotDir) {
 }
 
 TEST_F(hfuse_unlinkTest, DeleteSuccess) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mknod_created = FALSE;
   ret_val = unlink("/tmp/test_fuse/testcreate");
@@ -447,8 +447,8 @@ class hfuse_rmdirTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_rmdirTest, DirNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rmdir("/tmp/test_fuse/does_not_exist");
   tmp_err = errno;
@@ -458,8 +458,8 @@ TEST_F(hfuse_rmdirTest, DirNotExist) {
 }
 
 TEST_F(hfuse_rmdirTest, ParentNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rmdir("/tmp/test_fuse/does_not_exist/test");
   tmp_err = errno;
@@ -469,8 +469,8 @@ TEST_F(hfuse_rmdirTest, ParentNotExist) {
 }
 
 TEST_F(hfuse_rmdirTest, NotDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mknod_created = FALSE;
   ret_val = rmdir("/tmp/test_fuse/testcreate");
@@ -481,8 +481,8 @@ TEST_F(hfuse_rmdirTest, NotDir) {
 }
 
 TEST_F(hfuse_rmdirTest, PathNotDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rmdir("/tmp/test_fuse/testfile/adir");
   tmp_err = errno;
@@ -492,8 +492,8 @@ TEST_F(hfuse_rmdirTest, PathNotDir) {
 }
 
 TEST_F(hfuse_rmdirTest, DeleteSelf) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mkdir_created = FALSE;
   ret_val = rmdir("/tmp/test_fuse/testmkdir/.");
@@ -504,8 +504,8 @@ TEST_F(hfuse_rmdirTest, DeleteSelf) {
 }
 
 TEST_F(hfuse_rmdirTest, DeleteParent) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mkdir_created = FALSE;
   ret_val = rmdir("/tmp/test_fuse/testmkdir/..");
@@ -516,8 +516,8 @@ TEST_F(hfuse_rmdirTest, DeleteParent) {
 }
 
 TEST_F(hfuse_rmdirTest, DeleteSuccess) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mkdir_created = FALSE;
   ret_val = rmdir("/tmp/test_fuse/testmkdir");
@@ -547,8 +547,8 @@ class hfuse_renameTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_renameTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/does_not_exist", "/tmp/test_fuse/test");
   tmp_err = errno;
@@ -558,8 +558,8 @@ TEST_F(hfuse_renameTest, FileNotExist) {
 }
 
 TEST_F(hfuse_renameTest, PrefixCheck) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   before_mkdir_created = FALSE;
   ret_val = rename("/tmp/test_fuse/testmkdir", "/tmp/test_fuse/testmkdir/test");
@@ -570,8 +570,8 @@ TEST_F(hfuse_renameTest, PrefixCheck) {
 }
 
 TEST_F(hfuse_renameTest, Parent1NotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/does_not_exist/test2", "/tmp/test_fuse/test");
   tmp_err = errno;
@@ -580,8 +580,8 @@ TEST_F(hfuse_renameTest, Parent1NotExist) {
   EXPECT_EQ(tmp_err, ENOENT);
 }
 TEST_F(hfuse_renameTest, Parent2NotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testfile",
 			"/tmp/test_fuse/does_not_exist/test2");
@@ -591,8 +591,8 @@ TEST_F(hfuse_renameTest, Parent2NotExist) {
   EXPECT_EQ(tmp_err, ENOENT);
 }
 TEST_F(hfuse_renameTest, SameFile) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testfile",
 			"/tmp/test_fuse/testsamefile");
@@ -601,8 +601,8 @@ TEST_F(hfuse_renameTest, SameFile) {
   EXPECT_EQ(ret_val, 0);
 }
 TEST_F(hfuse_renameTest, SelfDirTargetFile) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testdir1",
 			"/tmp/test_fuse/testfile1");
@@ -612,8 +612,8 @@ TEST_F(hfuse_renameTest, SelfDirTargetFile) {
   EXPECT_EQ(tmp_err, ENOTDIR);
 }
 TEST_F(hfuse_renameTest, SelfFileTargetDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testfile2",
 			"/tmp/test_fuse/testdir2");
@@ -623,8 +623,8 @@ TEST_F(hfuse_renameTest, SelfFileTargetDir) {
   EXPECT_EQ(tmp_err, EISDIR);
 }
 TEST_F(hfuse_renameTest, TargetDirNotEmpty) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testdir1/",
 			"/tmp/test_fuse/testdir2/");
@@ -634,8 +634,8 @@ TEST_F(hfuse_renameTest, TargetDirNotEmpty) {
   EXPECT_EQ(tmp_err, ENOTEMPTY);
 }
 TEST_F(hfuse_renameTest, RenameFile) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testfile1",
 			"/tmp/test_fuse/testfile2");
@@ -658,8 +658,8 @@ class hfuse_chmodTest : public ::testing::Test {
   }
 };
 TEST_F(hfuse_chmodTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = chmod("/tmp/test_fuse/does_not_exist", 0700);
   tmp_err = errno;
@@ -669,8 +669,8 @@ TEST_F(hfuse_chmodTest, FileNotExist) {
 }
 
 TEST_F(hfuse_chmodTest, ChmodFile) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = chmod("/tmp/test_fuse/testfile1", 0444);
@@ -681,8 +681,8 @@ TEST_F(hfuse_chmodTest, ChmodFile) {
   EXPECT_EQ(tempstat.st_mode, S_IFREG | 0444);
 }
 TEST_F(hfuse_chmodTest, ChmodDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = chmod("/tmp/test_fuse/testdir1", 0550);
@@ -707,8 +707,8 @@ class hfuse_chownTest : public ::testing::Test {
   }
 };
 TEST_F(hfuse_chownTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = chown("/tmp/test_fuse/does_not_exist", 1002, 1003);
   tmp_err = errno;
@@ -718,8 +718,8 @@ TEST_F(hfuse_chownTest, FileNotExist) {
 }
 
 TEST_F(hfuse_chownTest, ChownNotRoot) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = chown("/tmp/test_fuse/testfile1", 1, 1);
@@ -731,8 +731,8 @@ TEST_F(hfuse_chownTest, ChownNotRoot) {
 /* Cannot test this if not root */
 /*
 TEST_F(hfuse_chownTest, ChownDir) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = chown("/tmp/test_fuse/testdir1", 1, 1);
@@ -758,8 +758,8 @@ class hfuse_utimensTest : public ::testing::Test {
   }
 };
 TEST_F(hfuse_utimensTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct utimbuf target_time;
 
   ret_val = utime("/tmp/test_fuse/does_not_exist", &target_time);
@@ -770,8 +770,8 @@ TEST_F(hfuse_utimensTest, FileNotExist) {
 }
 
 TEST_F(hfuse_utimensTest, UtimeTest) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct utimbuf target_time;
   struct stat tempstat;
 
@@ -792,8 +792,8 @@ TEST_F(hfuse_utimensTest, UtimeTest) {
 #endif
 }
 TEST_F(hfuse_utimensTest, UtimensatTest) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct timespec target_time[2];
   struct stat tempstat;
 
@@ -816,9 +816,9 @@ TEST_F(hfuse_utimensTest, UtimensatTest) {
 #endif
 }
 TEST_F(hfuse_utimensTest, FutimensTest) {
-  int ret_val;
-  int tmp_err;
-  int fd;
+  int32_t ret_val;
+  int32_t tmp_err;
+  int32_t fd;
   struct timespec target_time[2];
   struct stat tempstat;
 
@@ -874,8 +874,8 @@ class hfuse_truncateTest : public ::testing::Test {
   }
 };
 TEST_F(hfuse_truncateTest, FileNotExist) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = truncate("/tmp/test_fuse/does_not_exist", 100);
   tmp_err = errno;
@@ -884,8 +884,8 @@ TEST_F(hfuse_truncateTest, FileNotExist) {
   EXPECT_EQ(tmp_err, ENOENT);
 }
 TEST_F(hfuse_truncateTest, IsNotFile) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
 
   ret_val = truncate("/tmp/test_fuse/testdir1", 100);
   tmp_err = errno;
@@ -894,8 +894,8 @@ TEST_F(hfuse_truncateTest, IsNotFile) {
   EXPECT_EQ(tmp_err, EISDIR);
 }
 TEST_F(hfuse_truncateTest, NoSizeChange) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = truncate("/tmp/test_fuse/testfile2", 1024);
@@ -907,8 +907,8 @@ TEST_F(hfuse_truncateTest, NoSizeChange) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
 }
 TEST_F(hfuse_truncateTest, ExtendSize) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = truncate("/tmp/test_fuse/testfile2", 102400);
@@ -920,8 +920,8 @@ TEST_F(hfuse_truncateTest, ExtendSize) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 + (102400 - 1024));
 }
 TEST_F(hfuse_truncateTest, ExtendExceedQuota) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = truncate("/tmp/test_fuse/testfile2", 102400000);
@@ -934,8 +934,8 @@ TEST_F(hfuse_truncateTest, ExtendExceedQuota) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
 }
 TEST_F(hfuse_truncateTest, TruncateZeroNoBlock) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   fake_block_status = ST_NONE;
@@ -948,8 +948,8 @@ TEST_F(hfuse_truncateTest, TruncateZeroNoBlock) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 102400);
 }
 TEST_F(hfuse_truncateTest, TruncateZeroBlockTodelete) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
 
   fake_block_status = ST_TODELETE;
@@ -962,8 +962,8 @@ TEST_F(hfuse_truncateTest, TruncateZeroBlockTodelete) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 102400);
 }
 TEST_F(hfuse_truncateTest, TruncateZeroBlockLdisk) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
 
@@ -982,11 +982,11 @@ TEST_F(hfuse_truncateTest, TruncateZeroBlockLdisk) {
 }
 
 TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
-  int fd;
+  int32_t fd;
 
   fetch_block_path(temppath, 14, 0);
   fd = creat(temppath, 0700);
@@ -1010,11 +1010,11 @@ TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
   EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
 }
 TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
-  int fd;
+  int32_t fd;
 
   fetch_block_path(temppath, 14, 0);
   if (access(temppath, F_OK) == 0)
@@ -1032,11 +1032,11 @@ TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
   EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
 }
 TEST_F(hfuse_truncateTest, TruncateHalfCloud) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
-  int fd;
+  int32_t fd;
 
   fetch_block_path(temppath, 14, 0);
 
@@ -1076,8 +1076,8 @@ class hfuse_openTest : public ::testing::Test {
   }
 };
 TEST_F(hfuse_openTest, FileNotExist) {
-  int tmp_err;
-  int ret_val;
+  int32_t tmp_err;
+  int32_t ret_val;
 
   fptr = fopen("/tmp/test_fuse/does_not_exist", "r");
   tmp_err = errno;
@@ -1090,8 +1090,8 @@ TEST_F(hfuse_openTest, FileNotExist) {
 }
 
 TEST_F(hfuse_openTest, FailOpenFh) {
-  int tmp_err;
-  int ret_val;
+  int32_t tmp_err;
+  int32_t ret_val;
 
   fail_open_files = TRUE;
   fptr = fopen("/tmp/test_fuse/testfile1", "r");
@@ -1105,8 +1105,8 @@ TEST_F(hfuse_openTest, FailOpenFh) {
 }
 
 TEST_F(hfuse_openTest, OpenFileOK) {
-  int tmp_err;
-  int ret_val;
+  int32_t tmp_err;
+  int32_t ret_val;
 
   fptr = fopen("/tmp/test_fuse/testfile1", "r");
   tmp_err = errno;
@@ -1152,12 +1152,12 @@ class hfuse_readTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_readTest, ReadZeroByte) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
-  int fd;
+  int32_t fd;
   size_t ret_items;
 
   fetch_block_path(temppath, 15, 0);
@@ -1172,12 +1172,12 @@ TEST_F(hfuse_readTest, ReadZeroByte) {
 }
 
 TEST_F(hfuse_readTest, ReadPastEnd) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
-  int fd;
+  int32_t fd;
   size_t ret_items;
 
   fetch_block_path(temppath, 15, 0);
@@ -1193,13 +1193,13 @@ TEST_F(hfuse_readTest, ReadPastEnd) {
 }
 
 TEST_F(hfuse_readTest, ReadEmptyContent) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
+  int32_t count;
 
   fetch_block_path(temppath, 15, 0);
   fake_block_status = ST_NONE;
@@ -1222,14 +1222,14 @@ TEST_F(hfuse_readTest, ReadEmptyContent) {
 }
 
 TEST_F(hfuse_readTest, ReadLocalContent) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
-  int tmp_len;
+  int32_t count;
+  int32_t tmp_len;
 
   fetch_block_path(temppath, 15, 0);
   fake_block_status = ST_LDISK;
@@ -1250,14 +1250,14 @@ TEST_F(hfuse_readTest, ReadLocalContent) {
 }
 
 TEST_F(hfuse_readTest, ReadCloudContent) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
-  int tmp_len;
+  int32_t count;
+  int32_t tmp_len;
 
   test_fetch_from_backend = TRUE;
   fetch_block_path(temppath, 15, 0);
@@ -1276,14 +1276,14 @@ TEST_F(hfuse_readTest, ReadCloudContent) {
 }
 
 TEST_F(hfuse_readTest, ReadCloudWaitCache) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
-  int tmp_len;
+  int32_t count;
+  int32_t tmp_len;
 
   hcfs_system->systemdata.cache_size = 5000000;
 
@@ -1336,12 +1336,12 @@ class hfuse_ll_writeTest : public ::testing::Test {
 };
 
 TEST_F(hfuse_ll_writeTest, WriteZeroByte) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
-  int fd;
+  int32_t fd;
   size_t ret_items;
 
   fetch_block_path(temppath, 16, 0);
@@ -1356,12 +1356,12 @@ TEST_F(hfuse_ll_writeTest, WriteZeroByte) {
 }
 
 TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
-  int ret_val;
-  int tmp_err, tmp_len;
+  int32_t ret_val;
+  int32_t tmp_err, tmp_len;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
-  int fd;
+  int32_t fd;
   size_t ret_items;
 
   hcfs_system->systemdata.system_quota = 12800000 - 1;
@@ -1383,12 +1383,12 @@ TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
 }
 
 TEST_F(hfuse_ll_writeTest, WritePastEnd) {
-  int ret_val;
-  int tmp_err, tmp_len;
+  int32_t ret_val;
+  int32_t tmp_err, tmp_len;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
-  int fd;
+  int32_t fd;
   size_t ret_items;
 
   fetch_block_path(temppath, 16, 0);
@@ -1413,14 +1413,14 @@ TEST_F(hfuse_ll_writeTest, WritePastEnd) {
 }
 
 TEST_F(hfuse_ll_writeTest, ReWriteLocalContent) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
-  int tmp_len;
+  int32_t count;
+  int32_t tmp_len;
 
   fetch_block_path(temppath, 16, 0);
   fake_block_status = ST_LDISK;
@@ -1448,14 +1448,14 @@ TEST_F(hfuse_ll_writeTest, ReWriteLocalContent) {
 }
 
 TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
-  int tmp_len;
+  int32_t count;
+  int32_t tmp_len;
 
   test_fetch_from_backend = TRUE;
   fetch_block_path(temppath, 16, 0);
@@ -1481,14 +1481,14 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
 }
 
 TEST_F(hfuse_ll_writeTest, ReWriteCloudWaitCache) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
-  int count;
-  int tmp_len;
+  int32_t count;
+  int32_t tmp_len;
 
   hcfs_system->systemdata.cache_size = 5000000;
 
@@ -1542,9 +1542,9 @@ class hfuse_ll_statfsTest : public ::testing::Test {
 TEST_F(hfuse_ll_statfsTest, SmallSysStat) {
 
   struct statfs tmpstat;
-  int ret_val;
-  int ret;
-  long long total_blocks;
+  int32_t ret_val;
+  int32_t ret;
+  int64_t total_blocks;
 
   if (sys_super_block == NULL)
     ret = 1;
@@ -1573,8 +1573,8 @@ TEST_F(hfuse_ll_statfsTest, SmallSysStat) {
 TEST_F(hfuse_ll_statfsTest, EmptySysStat) {
 
   struct statfs tmpstat;
-  int ret_val;
-  long long total_blocks;
+  int32_t ret_val;
+  int64_t total_blocks;
 
   hcfs_system->systemdata.system_size = 0;
   hcfs_system->systemdata.cache_size = 0;
@@ -1601,8 +1601,8 @@ TEST_F(hfuse_ll_statfsTest, EmptySysStat) {
 TEST_F(hfuse_ll_statfsTest, BorderStat) {
 
   struct statfs tmpstat;
-  int ret_val;
-  long long total_blocks;
+  int32_t ret_val;
+  int64_t total_blocks;
 
   hcfs_system->systemdata.system_size = 4096;
   hcfs_system->systemdata.cache_size = 0;
@@ -1627,8 +1627,8 @@ TEST_F(hfuse_ll_statfsTest, BorderStat) {
 TEST_F(hfuse_ll_statfsTest, LargeSysStat) {
 
   struct statfs tmpstat;
-  int ret_val;
-  long long sys_blocks;
+  int32_t ret_val;
+  int64_t sys_blocks;
 
   hcfs_system->systemdata.system_size = 512*powl(1024,3) + 1;
   hcfs_system->systemdata.system_quota = 512*powl(1024,3) + 1; /* set quota */
@@ -1653,8 +1653,8 @@ TEST_F(hfuse_ll_statfsTest, LargeSysStat) {
 TEST_F(hfuse_ll_statfsTest, ExceedSysStat) {
 
   struct statfs tmpstat;
-  int ret_val;
-  long long sys_blocks;
+  int32_t ret_val;
+  int64_t sys_blocks;
 
   hcfs_system->systemdata.system_size = 512*powl(1024,3) + 1;
   hcfs_system->systemdata.system_quota = 256*powl(1024,3) + 1; /* set quota */
@@ -1701,7 +1701,7 @@ TEST_F(hfuse_ll_readdirTest, NoEntry) {
   DIR_ENTRY_PAGE temppage;
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
-  int ret_val;
+  int32_t ret_val;
   struct stat tempstat;
 
   fptr = fopen(readdir_metapath, "w");
@@ -1747,7 +1747,7 @@ TEST_F(hfuse_ll_readdirTest, SingleEntry) {
   DIR_ENTRY_PAGE temppage;
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
-  int ret_val;
+  int32_t ret_val;
   struct stat tempstat;
 
   fptr = fopen(readdir_metapath, "w");
@@ -1804,7 +1804,7 @@ TEST_F(hfuse_ll_readdirTest, OneMaxPageEntries) {
   DIR_ENTRY_PAGE temppage;
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
-  int ret_val, count;
+  int32_t ret_val, count;
   struct stat tempstat;
   char filename[100];
 
@@ -1867,7 +1867,7 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
   DIR_ENTRY_PAGE temppage;
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
-  int ret_val, count;
+  int32_t ret_val, count;
   struct stat tempstat;
   char filename[100];
 
@@ -1961,7 +1961,7 @@ protected:
 
 TEST_F(hfuse_ll_setxattrTest, SetKeyWithoutValue)
 {
-	int ret;
+	int32_t ret;
 
 	ret = setxattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa", "", 0, 0);
@@ -1971,8 +1971,8 @@ TEST_F(hfuse_ll_setxattrTest, SetKeyWithoutValue)
 
 TEST_F(hfuse_ll_setxattrTest, NamespaceInvalid)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = setxattr("/tmp/test_fuse/testsetxattr", 
 		"aloha.aaa", "123", 3, 0);
@@ -1984,8 +1984,8 @@ TEST_F(hfuse_ll_setxattrTest, NamespaceInvalid)
 
 TEST_F(hfuse_ll_setxattrTest, PermissionDenied)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = setxattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
 		"user.aaa", "123", 3, 0);
@@ -1997,8 +1997,8 @@ TEST_F(hfuse_ll_setxattrTest, PermissionDenied)
 
 TEST_F(hfuse_ll_setxattrTest, SecurityAlwaysAllow)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = setxattr("/tmp/test_fuse/testsetxattr", 
 		"security.aaa", "123", 3, 0);
@@ -2010,8 +2010,8 @@ TEST_F(hfuse_ll_setxattrTest, SecurityAlwaysAllow)
 
 TEST_F(hfuse_ll_setxattrTest, InsertXattrReturnFail)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = setxattr("/tmp/test_fuse/testsetxattr_fail", 
 		"user.aaa", "123", 3, 0);
@@ -2023,8 +2023,8 @@ TEST_F(hfuse_ll_setxattrTest, InsertXattrReturnFail)
 
 TEST_F(hfuse_ll_setxattrTest, InsertXattrSuccess)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = setxattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa", "123", 3, 0);
@@ -2051,8 +2051,8 @@ protected:
 
 TEST_F(hfuse_ll_getxattrTest, NamespaceInvalid)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[10];
 
 	ret = getxattr("/tmp/test_fuse/testsetxattr", 
@@ -2065,8 +2065,8 @@ TEST_F(hfuse_ll_getxattrTest, NamespaceInvalid)
 
 TEST_F(hfuse_ll_getxattrTest, PermissionDenied)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[10];
 	
 	ret = getxattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
@@ -2079,8 +2079,8 @@ TEST_F(hfuse_ll_getxattrTest, PermissionDenied)
 
 TEST_F(hfuse_ll_getxattrTest, SecurityAlwaysAllow)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[10];
 	
 	ret = getxattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
@@ -2091,8 +2091,8 @@ TEST_F(hfuse_ll_getxattrTest, SecurityAlwaysAllow)
 
 TEST_F(hfuse_ll_getxattrTest, GetCorrectValueSizeSuccess)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[10];
 	
 	ret = getxattr("/tmp/test_fuse/testsetxattr", 
@@ -2103,8 +2103,8 @@ TEST_F(hfuse_ll_getxattrTest, GetCorrectValueSizeSuccess)
 
 TEST_F(hfuse_ll_getxattrTest, GetValueFail)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[100];
 	
 	ret = getxattr("/tmp/test_fuse/testsetxattr_fail", 
@@ -2117,8 +2117,8 @@ TEST_F(hfuse_ll_getxattrTest, GetValueFail)
 
 TEST_F(hfuse_ll_getxattrTest, GetValueSuccess)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[100];
 	const char *ans = "hello!getxattr:)";
 	
@@ -2149,8 +2149,8 @@ protected:
 
 TEST_F(hfuse_ll_listxattrTest, GetCorrectValueSizeSuccess)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[10];
 	
 	ret = listxattr("/tmp/test_fuse/testsetxattr", 
@@ -2161,8 +2161,8 @@ TEST_F(hfuse_ll_listxattrTest, GetCorrectValueSizeSuccess)
 
 TEST_F(hfuse_ll_listxattrTest, GetValueFail)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[100];
 	
 	ret = listxattr("/tmp/test_fuse/testsetxattr_fail", 
@@ -2175,8 +2175,8 @@ TEST_F(hfuse_ll_listxattrTest, GetValueFail)
 
 TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char buf[100];
 	const char *ans = "hello!listxattr:)";
 	
@@ -2208,8 +2208,8 @@ protected:
 
 TEST_F(hfuse_ll_removexattrTest, NamespaceInvalid)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = removexattr("/tmp/test_fuse/testsetxattr", 
 		"aloha.aaa");
@@ -2221,8 +2221,8 @@ TEST_F(hfuse_ll_removexattrTest, NamespaceInvalid)
 
 TEST_F(hfuse_ll_removexattrTest, PermissionDenied)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = removexattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
 		"user.aaa");
@@ -2234,8 +2234,8 @@ TEST_F(hfuse_ll_removexattrTest, PermissionDenied)
 
 TEST_F(hfuse_ll_removexattrTest, SecurityAlwaysAllow)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = removexattr("/tmp/test_fuse/testsetxattr", 
 		"security.aaa");
@@ -2247,8 +2247,8 @@ TEST_F(hfuse_ll_removexattrTest, SecurityAlwaysAllow)
 
 TEST_F(hfuse_ll_removexattrTest, RemoveXattrReturnFail)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	
 	ret = removexattr("/tmp/test_fuse/testsetxattr_fail", 
 		"user.aaa");
@@ -2260,7 +2260,7 @@ TEST_F(hfuse_ll_removexattrTest, RemoveXattrReturnFail)
 
 TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
 {
-	int ret;
+	int32_t ret;
 
 	ret = removexattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa");
@@ -2288,8 +2288,8 @@ protected:
 
 TEST_F(hfuse_ll_symlinkTest, FileExists)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	errcode = 0;
 	ret = symlink("name_not_used", "/tmp/test_fuse/testsymlink");
@@ -2301,8 +2301,8 @@ TEST_F(hfuse_ll_symlinkTest, FileExists)
 
 TEST_F(hfuse_ll_symlinkTest, SelfNameTooLong)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char selfname[MAX_FILENAME_LEN + 50];
 
 	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
@@ -2320,8 +2320,8 @@ TEST_F(hfuse_ll_symlinkTest, SelfNameTooLong)
 
 TEST_F(hfuse_ll_symlinkTest, LinkPathTooLong)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char link_path[MAX_LINK_PATH + 1];
 
 	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
@@ -2338,8 +2338,8 @@ TEST_F(hfuse_ll_symlinkTest, LinkPathTooLong)
 
 TEST_F(hfuse_ll_symlinkTest, FileExistInSymlink)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	errcode = 0;
 
@@ -2353,8 +2353,8 @@ TEST_F(hfuse_ll_symlinkTest, FileExistInSymlink)
 
 TEST_F(hfuse_ll_symlinkTest, UpdateMetaFail)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	errcode = 0;
 
@@ -2368,7 +2368,7 @@ TEST_F(hfuse_ll_symlinkTest, UpdateMetaFail)
 
 TEST_F(hfuse_ll_symlinkTest, SymlinkSuccess)
 {
-	int ret;
+	int32_t ret;
 
 	ret = symlink("update_meta_success", 
 		"/tmp/test_fuse/testsymlink_not_exist_in_symlink");
@@ -2396,8 +2396,8 @@ protected:
 TEST_F(hfuse_ll_readlinkTest, FileNotExist)
 {
 	char buf[100];
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = readlink("/tmp/test_fuse/test_readlink_not_exist", buf, 100);
 	errcode = errno;
@@ -2410,8 +2410,8 @@ TEST_F(hfuse_ll_readlinkTest, ReadLinkSuccess)
 {
 	char buf[100];
 	char *ans = "I_am_target_link";
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = readlink("/tmp/test_fuse/testsymlink", buf, 100);
 	buf[ret] = '\0';
@@ -2439,8 +2439,8 @@ protected:
 
 TEST_F(hfuse_ll_linkTest, OldlinkNotExists)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = link("/tmp/test_fuse/old_link_not_exists",
 		"/tmp/test_fuse/new_link");
@@ -2453,8 +2453,8 @@ TEST_F(hfuse_ll_linkTest, OldlinkNotExists)
 
 TEST_F(hfuse_ll_linkTest, NewlinkExists)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = link("/tmp/test_fuse/testlink",
 		"/tmp/test_fuse/testlink");
@@ -2466,8 +2466,8 @@ TEST_F(hfuse_ll_linkTest, NewlinkExists)
 
 TEST_F(hfuse_ll_linkTest, NewlinkNameTooLong)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char linkname[MAX_FILENAME_LEN + 50];
 
 	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
@@ -2485,8 +2485,8 @@ TEST_F(hfuse_ll_linkTest, NewlinkNameTooLong)
 
 TEST_F(hfuse_ll_linkTest, ParentDirPermissionDenied)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = link("/tmp/test_fuse/testlink",
 		"/tmp/test_fuse/testlink_dir_perm_denied/new_link");
@@ -2499,8 +2499,8 @@ TEST_F(hfuse_ll_linkTest, ParentDirPermissionDenied)
 
 TEST_F(hfuse_ll_linkTest, ParentIsNotDir)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = link("/tmp/test_fuse/testlink",
 		"/tmp/test_fuse/testfile/new_link");
@@ -2513,8 +2513,8 @@ TEST_F(hfuse_ll_linkTest, ParentIsNotDir)
 
 TEST_F(hfuse_ll_linkTest, link_update_metaFail)
 {
-	int ret;
-	int errcode;
+	int32_t ret;
+	int32_t errcode;
 	char hardlink[500] = "/tmp/test_fuse/new_link_update_meta_fail";
 
 	ret = link("/tmp/test_fuse/testlink", hardlink);
@@ -2526,7 +2526,7 @@ TEST_F(hfuse_ll_linkTest, link_update_metaFail)
 
 TEST_F(hfuse_ll_linkTest, LinkSuccess)
 {
-	int ret;
+	int32_t ret;
 	char hardlink[500] = "/tmp/test_fuse/xxxxxxx";
 
 	ret = link("/tmp/test_fuse/testlink", hardlink);
@@ -2543,7 +2543,7 @@ TEST_F(hfuse_ll_linkTest, LinkSuccess)
  */
 class hfuse_ll_createTest : public ::testing::Test {
 protected:
-	int fd;
+	int32_t fd;
 
 	void SetUp()
 	{
@@ -2559,7 +2559,7 @@ protected:
 TEST_F(hfuse_ll_createTest, NameTooLong)
 {
 	char name[MAX_FILENAME_LEN + 100];
-	int errcode;
+	int32_t errcode;
 
 	memset(name, 0, MAX_FILENAME_LEN + 100);
 	memset(name, 'a', MAX_FILENAME_LEN + 90);
@@ -2575,7 +2575,7 @@ TEST_F(hfuse_ll_createTest, NameTooLong)
 TEST_F(hfuse_ll_createTest, ParentIsNotDir)
 {
 	char *name = "/tmp/test_fuse/testfile/creat_test";
-	int errcode;
+	int32_t errcode;
 
 
 	fd = creat(name, 0777);
@@ -2588,7 +2588,7 @@ TEST_F(hfuse_ll_createTest, ParentIsNotDir)
 TEST_F(hfuse_ll_createTest, ParentPermissionDenied)
 {
 	char *name = "/tmp/test_fuse/testlink_dir_perm_denied/creat_test";
-	int errcode;
+	int32_t errcode;
 
 	fd = creat(name, 0777);
 	errcode = errno;
@@ -2600,7 +2600,7 @@ TEST_F(hfuse_ll_createTest, ParentPermissionDenied)
 TEST_F(hfuse_ll_createTest, super_block_new_inodeFail)
 {
 	char *name = "/tmp/test_fuse/creat_test";
-	int errcode;
+	int32_t errcode;
 
 	fail_super_block_new_inode = TRUE;
 	fd = creat(name, 0777);
@@ -2615,7 +2615,7 @@ TEST_F(hfuse_ll_createTest, super_block_new_inodeFail)
 TEST_F(hfuse_ll_createTest, mknod_update_metaFail)
 {
 	char *name = "/tmp/test_fuse/creat_test";
-	int errcode;
+	int32_t errcode;
 
 	fail_mknod_update_meta = TRUE;
 	fd = creat(name, 0777);
@@ -2629,7 +2629,7 @@ TEST_F(hfuse_ll_createTest, mknod_update_metaFail)
 TEST_F(hfuse_ll_createTest, open_fhFail)
 {
 	char *name = "/tmp/test_fuse/creat_test";
-	int errcode;
+	int32_t errcode;
 
 	fail_open_files = TRUE;
 	fd = creat(name, 0777);
@@ -2643,7 +2643,7 @@ TEST_F(hfuse_ll_createTest, open_fhFail)
 TEST_F(hfuse_ll_createTest, CreateSuccess)
 {
 	char *name = "/tmp/test_fuse/creat_test";
-	int errcode;
+	int32_t errcode;
 
 	fd = creat(name, 0777);
 	errcode = errno;
@@ -2680,8 +2680,8 @@ class hfuse_ll_fallocateTest : public ::testing::Test {
   }
 };
 TEST_F(hfuse_ll_fallocateTest, ExtendSize) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 
@@ -2697,8 +2697,8 @@ TEST_F(hfuse_ll_fallocateTest, ExtendSize) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 + (102400 - 1024));
 }
 TEST_F(hfuse_ll_fallocateTest, ExtendSize2) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 
@@ -2714,8 +2714,8 @@ TEST_F(hfuse_ll_fallocateTest, ExtendSize2) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 + 102400);
 }
 TEST_F(hfuse_ll_fallocateTest, ModeNotSupported) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 
@@ -2729,8 +2729,8 @@ TEST_F(hfuse_ll_fallocateTest, ModeNotSupported) {
   ASSERT_EQ(ENOTSUP, tmp_err);
 }
 TEST_F(hfuse_ll_fallocateTest, NoExtend) {
-  int ret_val;
-  int tmp_err;
+  int32_t ret_val;
+  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 

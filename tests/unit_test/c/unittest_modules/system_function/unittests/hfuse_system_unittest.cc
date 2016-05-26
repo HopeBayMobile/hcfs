@@ -225,8 +225,8 @@ TEST_F(mainTest, ListContainerFail)
 
 TEST_F(mainTest, MainFunctionSuccess)
 {
-	int saved_stdout = dup(fileno(stdout));
-	int saved_stderr = dup(fileno(stderr));
+	int32_t saved_stdout = dup(fileno(stdout));
+	int32_t saved_stderr = dup(fileno(stderr));
 
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = TRUE;
