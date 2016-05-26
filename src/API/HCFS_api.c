@@ -1,4 +1,5 @@
-/* TODO: Add header for this file */
+/* REVIEW TODO: Add header for this file */
+/* REVIEW TODO: Comments for the functions */
 
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -19,6 +20,8 @@
 #include "utils.h"
 
 
+/* REVIEW TODO: error handling for the jansson lib functions may be needed */
+/* For example, json_object_set_new will return -1 if an error occurs */
 void _json_response(char **json_str, char result, int32_t code, json_t *data)
 {
 
@@ -45,8 +48,11 @@ int32_t _api_socket_conn()
 
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, API_SOCK_PATH);
+/* REVIEW TODO: socket function call might fail, so error handling is required here */
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	status = connect(fd, &addr, sizeof(addr));
+/* REVIEW TODO: Could errno change during return? If so, perhaps it is a good idea
+to first assign the value to some other variable */
 	if (status < 0)
 		return -errno;
 
@@ -73,6 +79,8 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 	CONCAT_ARGS(key);
 	CONCAT_ARGS(value)
 
+/* REVIEW TODO: perhaps can remove size_msg here if not used (or maybe add error handling?) */
+/* Same in the next function */
 	size_msg = send(fd, &code, sizeof(uint32_t), 0);
 	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
