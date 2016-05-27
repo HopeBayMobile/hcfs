@@ -9,13 +9,13 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	return ret_entry;
 }
 
-int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	return 0;
 }
 
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-		        int *result_index, const char *childname,
+int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
+		        int32_t *result_index, const char *childname,
 			META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	switch (body_ptr->inode_num) {
@@ -49,7 +49,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	return -1;
 }
 
-int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	free(body_ptr);
 	return 0;

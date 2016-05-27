@@ -60,14 +60,14 @@ protected:
 		char meta_name[200];
 		char block_name[200];
 		
-		for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
+		for (int32_t i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
 			ino_t inode = inode_cache_usage_hash[i]->this_inode;
 
 			sprintf(meta_name,
 				"/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
 				(uint64_t)inode);
 			unlink(meta_name);
-			for (int blockno = 0; blockno < 10 ; blockno++) {	
+			for (int32_t blockno = 0; blockno < 10 ; blockno++) {	
 				sprintf(block_name,
 					"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d", 
 					(uint64_t)inode, blockno);
@@ -83,7 +83,7 @@ protected:
 	{
 		cache_usage_init();
 		nonempty_cache_hash_entries = 0;
-		for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
+		for (int32_t i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
 			CACHE_USAGE_NODE *node = (CACHE_USAGE_NODE *)
 				malloc(sizeof(CACHE_USAGE_NODE));
 			node->this_inode = (i + 1) * 5;
@@ -104,7 +104,7 @@ private:
 		CACHE_USAGE_NODE *node_ptr, *temp_ptr;
 
 		nonempty_cache_hash_entries = 0;
-		for (int count = 0; count < CACHE_USAGE_NUM_ENTRIES; count++) {
+		for (int32_t count = 0; count < CACHE_USAGE_NUM_ENTRIES; count++) {
 			node_ptr = inode_cache_usage_hash[count];
 			while (node_ptr != NULL) {
 				temp_ptr = node_ptr;
@@ -126,7 +126,7 @@ private:
 
 		file_stat.st_size = 1000; // block_num = 1000/100 = 10 = 1 page in meta
 		file_entry.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
-		for (int i = 0; i < file_entry.num_entries ; i++)
+		for (int32_t i = 0; i < file_entry.num_entries ; i++)
 			file_entry.block_entries[i].status = ST_BOTH;
 
 		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
@@ -138,7 +138,7 @@ private:
 		fwrite(&file_entry, sizeof(BLOCK_ENTRY_PAGE), 1, fptr); // Just write one page
 		fclose(fptr);
 
-		for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
+		for (int32_t blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
 			sprintf(meta_name,
 				"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d",
 				(uint64_t)inode, blockno);
@@ -194,8 +194,8 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 	sleep(2);
 
 	/* Verify */
-	int expected_block_num = CURRENT_BLOCK_NUM;
-	for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
+	int32_t expected_block_num = CURRENT_BLOCK_NUM;
+	for (int32_t i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
 		struct stat file_stat;
 		ino_t inode;
 		
@@ -210,7 +210,7 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 		fseek(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
 		fread(&file_entry, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
 		//** Verify status is changed to ST_CLOUD and block is removed. **
-		for (int entry = 0; entry < file_stat.st_size/MAX_BLOCK_SIZE; entry++) {
+		for (int32_t entry = 0; entry < file_stat.st_size/MAX_BLOCK_SIZE; entry++) {
 			char block_name[200];
 			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);

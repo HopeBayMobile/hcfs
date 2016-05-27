@@ -2,18 +2,18 @@
 #include "mock_param.h"
 #include "global.h"
 
-int actual_delete_inode(ino_t this_inode, char d_type)
+int32_t actual_delete_inode(ino_t this_inode, char d_type)
 {
 	check_actual_delete_table[this_inode] = TRUE;
 	return 0;
 }
 
-int disk_checkdelete(ino_t this_inode)
+int32_t disk_checkdelete(ino_t this_inode)
 {
 	return 1;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }

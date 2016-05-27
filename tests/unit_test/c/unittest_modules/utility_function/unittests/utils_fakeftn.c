@@ -1,24 +1,25 @@
 #include <errno.h>
 #include <jansson.h>
+#include <inttypes.h>
 #include "dir_statistics.h"
 #include "string.h"
 #include "mock_params.h"
 
-int sync_hcfs_system_data(char need_lock)
+int32_t sync_hcfs_system_data(char need_lock)
 {
 	return 0;
 }
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
 }
-int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
+int32_t update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	return 0;
 }
 
-int prepare_FS_database_backup(void)
+int32_t prepare_FS_database_backup(void)
 {
 	return 0;
 }
@@ -31,7 +32,7 @@ void init_backend_related_module()
 /* For encrypted config */
 #define KEY_SIZE 32
 
-FILE *get_decrypt_configfp(unsigned char *config_path)
+FILE *get_decrypt_configfp(uint8_t *config_path)
 {
 	FILE *configfp = NULL;
 
@@ -39,10 +40,10 @@ FILE *get_decrypt_configfp(unsigned char *config_path)
 	return configfp;
 }
 
-unsigned char *get_key(char *passphrase)
+uint8_t *get_key(char *passphrase)
 {
-	unsigned char *ret =
-	    (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
+	uint8_t *ret =
+	    (uint8_t *)calloc(KEY_SIZE, sizeof(uint8_t));
 
 	sprintf(ret, "mock encrypt key for test");
 	return ret;

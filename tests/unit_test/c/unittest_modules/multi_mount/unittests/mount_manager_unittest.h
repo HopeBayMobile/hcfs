@@ -1,4 +1,4 @@
 #include <sys/types.h>
 
-int FS_CORE_FAILED;
+int32_t FS_CORE_FAILED;
 

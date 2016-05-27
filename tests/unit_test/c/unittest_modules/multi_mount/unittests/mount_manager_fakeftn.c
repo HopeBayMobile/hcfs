@@ -10,7 +10,7 @@
 #include "lookup_count.h"
 
 struct fuse_chan {
-	int test
+	int32_t test
 } tmpchan;
 extern SYSTEM_CONF_STRUCT *system_config;
 
@@ -23,10 +23,10 @@ struct fuse_lowlevel_ops hfuse_ops = {
 	.init = temp_init,
 };
 struct fuse_session {
-	int test;
+	int32_t test;
 } tmpsession;
 
-int write_log(int level, char *format, ...)
+int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
 
@@ -45,7 +45,7 @@ struct fuse_session* fuse_lowlevel_new(struct fuse_args *args,
 {
 	return &tmpsession;
 }
-int fuse_set_signal_handlers(struct fuse_session *ptr)
+int32_t fuse_set_signal_handlers(struct fuse_session *ptr)
 {
 	return 0;
 }
@@ -80,7 +80,7 @@ void fuse_session_destroy(struct fuse_session *ptr)
 	return;
 }
 
-int fuse_parse_cmdline(struct fuse_args *ptr, char **mp, int *mt, int *fg)
+int32_t fuse_parse_cmdline(struct fuse_args *ptr, char **mp, int32_t *mt, int32_t *fg)
 {
 	return 0;
 }
@@ -93,23 +93,23 @@ void fuse_unmount(const char *mp, struct fuse_chan *ptr2)
 	return;
 }
 
-int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
+int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 {
 	ret_entry->d_ino = 100;
 	return FS_CORE_FAILED;
 }
 
-int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
+int32_t lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
 {
 	return 0;
 }
 
-int fetch_meta_path(char *pathname, ino_t this_inode)
+int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	return 0;
 }
 
-int fetch_stat_path(char *pathname, ino_t this_inode)
+int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 {
         snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
         return 0;
@@ -118,12 +118,12 @@ PATH_CACHE * init_pathcache(ino_t root_inode)
 {
 	return (PATH_CACHE *) malloc(sizeof(PATH_CACHE));
 }
-int destroy_pathcache(PATH_CACHE *cacheptr)
+int32_t destroy_pathcache(PATH_CACHE *cacheptr)
 {
 	return 0;
 }
 
-int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
+int32_t lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 {
 	return 0;
 }
