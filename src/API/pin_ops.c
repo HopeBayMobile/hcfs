@@ -1,3 +1,5 @@
+/* REVIEW TODO: header for this file */
+
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -125,6 +127,7 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
+/* REVIEW TODO: Perhaps convert the following printf to write debug log? */
 	printf("Pin result - %d\n", ret_code);
 
 	close(fd);
@@ -132,6 +135,8 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 
 }
 
+/* REVIEW TODO: Perhaps should make sure that there will be no more
+inodes than the array of 1600 bytes can handle */
 int32_t pin_by_path(char *buf, uint32_t arg_len)
 {
 
@@ -249,7 +254,9 @@ int32_t check_pin_status(char *buf, uint32_t arg_len)
 	char path[400];
 	ino_t tmp_inode;
 
-
+/* REVIEW TODO: Is it possible to pass buf directly as the
+input to _get_path_stat (memcpy does not look necessary)? */
+/* Same for memcpy in other functions */
 	memcpy(path, &(buf[0]), arg_len);
 	ret_code = _get_path_stat(path, &tmp_inode, NULL);
 	if (ret_code < 0)

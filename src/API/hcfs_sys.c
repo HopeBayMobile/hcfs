@@ -1,3 +1,6 @@
+/* REVIEW TODO: header for this file */
+/* REVIEW TODO: comments for the functions */
+
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -150,6 +153,10 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 	char *tmp_ptr, *line, *token;
 	FILE *conf = NULL;
 	FILE *tmp_conf = NULL;
+/*REVIEW TODO: Memory overflow might occur if content in the config
+is larger than the buffer size (1K). Perhaps could first check the
+size of the config file, then allocate enough memory for reading in
+the entire content after decryption */
 	uint8_t data_buf[1024];
 	int32_t data_size = 0;
 
@@ -194,6 +201,7 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 
 		str_len = strlen(buf);
 		memcpy(&(data_buf[data_size]), buf, str_len + 1);
+/* REVIEW TODO: If data_size > 1024 then we might have some trouble */
 		data_size += str_len;
 
 		free(tmp_ptr);
@@ -459,6 +467,8 @@ int32_t query_pkg_uid(char *arg_buf, uint32_t arg_len, char **uid)
 
 	snprintf(sql, sizeof(sql), "SELECT uid from uid WHERE package_name='%s'", pkg_name);
 
+/* REVIEW TODO: Is it possible to open the sqlite db just once when API service is setup?
+(Same for sqlite service in HCFS) */
 	ret_code = sqlite3_open(DB_PATH, &db);
 	if (ret_code != 0) {
 	        printf("Failed to open sqlite db - err is %s\n", sqlite3_errmsg(db));
