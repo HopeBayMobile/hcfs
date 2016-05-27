@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <jansson.h>
 
+/* REVIEW TODO: This header file should be the first one, before the standard
+headers (according to the current coding style */
 #include "HCFS_api.h"
 
 #include "pin_ops.h"
