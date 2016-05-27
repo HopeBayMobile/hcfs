@@ -108,8 +108,6 @@ char did_block_finish_uploading(int32_t fd, int64_t blockno);
 
 int64_t query_status_page(int32_t fd, int64_t block_index);
 
-void continue_inode_upload(SYNC_THREAD_TYPE *data_ptr);
-
 int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
 		int64_t *total_backend_blocks, int64_t upload_seq);
 
