@@ -1,5 +1,8 @@
+/* REVIEW TODO: header for this file */
+
 #include <inttypes.h>
 
+/* REVIEW TODO: The header file for the source code should be the first one being included */
 #include "enc.h"
 
 /************************************************************************

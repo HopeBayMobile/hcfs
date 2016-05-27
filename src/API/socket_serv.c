@@ -1,3 +1,5 @@
+/* REVIEW TODO: header for this file */
+
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -29,6 +31,7 @@ int32_t do_pin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *r
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
+/* REVIEW TODO: Perhaps should change all printf function calls to write logs */
 	printf("Pin by path\n");
 	ret_code = pin_by_path(largebuf, arg_len);
 
@@ -302,6 +305,8 @@ int32_t process_request(int32_t thread_idx)
 	printf("API code is %d\n", api_code);
 
 	if (reads(fd, &arg_len, sizeof(uint32_t))) {
+/* REVIEW TODO: The following message should be written
+to an error log */
 		printf("Failed to recv arg length\n");
 		goto error;
 	}
@@ -321,6 +326,8 @@ int32_t process_request(int32_t thread_idx)
 		goto error;
 	}
 
+/* REVIEW TODO: Is it possible to move the following definition to
+other places? This breaks the flow of code reading. */
 	struct cmd {
 		uint32_t name;
 		int32_t (*cmd_fn)(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size);
@@ -368,6 +375,9 @@ done:
 	return ret_code;
 }
 
+/* REVIEW TODO: Perhaps we should add some error log if socket
+init or other IOs encounter errors, so that we can know the source
+of errors */
 int32_t init_server()
 {
 

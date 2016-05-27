@@ -1,3 +1,6 @@
+/* REVIEW TODO: header for this file */
+/* REVIEW TODO: Perhaps could include macro.h from HCFS for IO error handling here */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -81,6 +84,8 @@ int32_t _enc_config(char *source_path, char *out_path)
 	if (__enc_config(enc_data, data_buf, data_size) != 0)
 		return errno;
 
+/* REVIEW TODO: Perhaps we need some error handling if cannot write
+the entire content to disk */
 	enc_config = fopen(out_path, "w");
 	if (enc_config == NULL)
 		return errno;

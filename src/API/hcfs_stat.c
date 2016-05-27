@@ -9,6 +9,7 @@
 /* REVIEW TODO:  According to the coding style we are following, the
 header file with this c code should be the first one
 to be included (before the standard header files) */
+/* Same for other source files */
 #include "hcfs_stat.h"
 
 #include "global.h"
