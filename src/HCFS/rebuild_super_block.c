@@ -263,6 +263,21 @@ int32_t pull_inode_job(ino_t *inode_job)
 	return 0;
 }
 
+/* Need mutex lock */
+int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes)
+{
+	int64_t total_jobs;
+
+	total_jobs = rebuild_sb_jobs->remaining_jobs +
+			rebuild_sb_jobs->job_count;
+	flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
+	PWRITE(rebuild_sb_jobs->queue_fh, inode_jobs,
+			sizeof(ino_t) * num_inodes,
+			sizeof(ino_t) * total_jobs);
+	flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+
+}
+
 int32_t rebuild_sb_manager()
 {
 	/* Create queue file */
