@@ -1,4 +1,14 @@
-/* REVIEW TODO: Add header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: HCFS_api.h
+* Abstract: This c header file for entry point of HCFSAPI.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
 #ifndef GW20_HCFS_API_H_
 #define GW20_HCFS_API_H_
@@ -113,30 +123,6 @@ void HCFS_stat(char **json_res);
  */
 void HCFS_get_occupied_size(char **json_res);
 
-/* REVIEW TODO: Perhaps functions that are not implemented should not stay in the header
-to avoid confusion (especially if the header file is used for document generation) */
-/*Set property
- * @json_res result string in json format.
- * @key property of HCFS configuration.
- * @value value for input key.
- *
- * To set property with value for HCFS.
- *
- * >| Key supported | Valid value |
- * | ------------- |:-------------|
- * | cloudsync     | on/off|
- * | clouddl       | on/off|
- */
-//void HCFS_set_property(char **json_res, char *key, char *value);
-
-/*Get property
- * @json_res result string in json format.
- * @key property of HCFS configuration.
- *
- * To get value of property for HCFS. (Supported keys are listed in <HCFS_set_property>.)
- */
-//void HCFS_get_property(char **json_res, char *key);
-
 /*Toggle sync
  * @json_res result string in json format.
  * @enabled 1 to turn on sync, 0 to turn off sync.
@@ -172,23 +158,6 @@ void HCFS_toggle_sync(char **json_res, int32_t enabled);
  * | False | Linux errors.|
  */
 void HCFS_get_sync_status(char **json_res);
-
-/*Volume mount
- * @json_res result string in json format.
- * @vol_name target volume name.
- * @mpt target mountpoint.
- *
- * To mount HCFS volume.
- */
-//void HCFS_vol_mount(char **json_res, char *vol_name, char *mpt);
-
-/*Volume umount
- * @json_res result string in json format.
- * @vol_name target volume name.
- *
- * To unmount HCFS volume.
- */
-//void HCFS_vol_umount(char **json_res, char *vol_name);
 
 /*Pin file
  * @json_res result string in json format.

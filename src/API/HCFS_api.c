@@ -1,5 +1,16 @@
-/* REVIEW TODO: Add header for this file */
-/* REVIEW TODO: Comments for the functions */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: HCFS_api.c
+* Abstract: This c source file for entry point of HCFSAPI.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include "HCFS_api.h"
 
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -11,10 +22,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <jansson.h>
-
-/* REVIEW TODO: This header file should be the first one, before the standard
-headers (according to the current coding style */
-#include "HCFS_api.h"
 
 #include "pin_ops.h"
 #include "global.h"

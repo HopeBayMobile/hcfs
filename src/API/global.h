@@ -1,13 +1,12 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: global.h
-* Abstract: The header file for global settings for HCFS
+* Abstract: This c header file for global settings for HCFS.
 *
 * Revision History
-* 2015/2/11 Jiahong added header for this file and revised coding style.
-* 2015/7/21 Jiahong moving API codes to global.h
+* 2016/5/27 Modified after first code review.
 *
 **************************************************************************/
 
@@ -17,8 +16,8 @@ point to global.h in HCFS, and then include that symlink for the common
 declarations? */
 /* REVIEW TODO: Copyright of this file is up-to-date? */
 
-#ifndef GW20_API_GLOBAL_H_
-#define GW20_API_GLOBAL_H_
+#ifndef GW20_HCFSAPI_GLOBAL_H_
+#define GW20_HCFSAPI_GLOBAL_H_
 
 #define TRUE 1
 #define FALSE 0
@@ -73,4 +72,4 @@ declarations? */
 #define SYSREBOOT 51
 #define QUERYPKGUID 52
 
-#endif  /* GW20_API_GLOBAL_H_ */
+#endif  /* GW20_HCFSAPI_GLOBAL_H_ */

@@ -1,4 +1,16 @@
-/* REVIEW TODO: header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: pin_ops.c
+* Abstract: This c source file for pin related operations.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include "pin_ops.h"
 
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -9,8 +21,6 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
-
-#include "pin_ops.h"
 
 #include "global.h"
 #include "utils.h"

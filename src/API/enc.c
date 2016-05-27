@@ -1,9 +1,19 @@
-/* REVIEW TODO: header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: enc.c
+* Abstract: This c source file for some encryption helper.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include "enc.h"
 
 #include <inttypes.h>
 
-/* REVIEW TODO: The header file for the source code should be the first one being included */
-#include "enc.h"
 
 /************************************************************************
  * *

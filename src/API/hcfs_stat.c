@@ -1,16 +1,22 @@
-/* REVIEW TODO: header for this file */
 /* REVIEW TODO: Please run both style checkers after changing the code */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hcfs_stat.c
+* Abstract: This c source file for statistics operations.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include "hcfs_stat.h"
 
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
-
-/* REVIEW TODO:  According to the coding style we are following, the
-header file with this c code should be the first one
-to be included (before the standard header files) */
-/* Same for other source files */
-#include "hcfs_stat.h"
 
 #include "global.h"
 #include "utils.h"

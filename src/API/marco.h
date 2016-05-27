@@ -1,7 +1,17 @@
-/* REVIEW TODO: header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: marco.h
+* Abstract: This c header file for marcos.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
-#ifndef GW20_API_MARCO_H_
-#define GW20_API_MARCO_H_
+#ifndef GW20_HCFSAPI_MARCO_H_
+#define GW20_HCFSAPI_MARCO_H_
 
 #define CONCAT_ARGS(A)\
 	{\
@@ -32,4 +42,4 @@
 		buf_idx += sizeof(int64_t);\
 	}
 
-#endif  /* GW20_API_MARCO_H_ */
+#endif  /* GW20_HCFSAPI_MARCO_H_ */

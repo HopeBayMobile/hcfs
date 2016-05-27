@@ -1,7 +1,17 @@
-/* REVIEW TODO: header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: socket_serv.h
+* Abstract: This c header file for HCFSAPI socket server.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
-#ifndef GW20_API_SERV_H_
-#define GW20_API_SERV_H_
+#ifndef GW20_HCFSAPI_SERV_H_
+#define GW20_HCFSAPI_SERV_H_
 
 #include <pthread.h>
 
@@ -15,4 +25,4 @@ typedef struct {
 	int32_t fd;
 } SOCK_THREAD;
 
-#endif  /* GW20_API_SERV_H_ */
+#endif  /* GW20_HCFSAPI_SERV_H_ */

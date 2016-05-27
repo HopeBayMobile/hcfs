@@ -1,4 +1,16 @@
-/* REVIEW TODO: header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: socket_serv.c
+* Abstract: This c source file for HCFSAPI socket server.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include "socket_serv.h"
 
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -14,8 +26,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <inttypes.h>
-
-#include "socket_serv.h"
 
 #include "socket_util.h"
 #include "global.h"

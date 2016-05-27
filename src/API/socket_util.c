@@ -1,4 +1,16 @@
-/* REVIEW TODO: header for this file */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: socket_util.c
+* Abstract: This c source file for socket helpers.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include <socket_util.h>
 
 #include <stdio.h>
 #include <stdlib.h>

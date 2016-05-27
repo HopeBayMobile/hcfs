@@ -1,5 +1,15 @@
-/* REVIEW TODO: header for this file */
 /* REVIEW TODO: Perhaps could include macro.h from HCFS for IO error handling here */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hcfsconf.c
+* Abstract: This c source file for hcfsconf binary.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>

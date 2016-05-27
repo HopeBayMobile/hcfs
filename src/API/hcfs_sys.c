@@ -1,5 +1,15 @@
-/* REVIEW TODO: header for this file */
 /* REVIEW TODO: comments for the functions */
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hcfs_sys.c
+* Abstract: This c source file for hcfs system operations.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
 #include <sys/socket.h>
 #include <stdio.h>
@@ -423,68 +433,3 @@ int32_t reset_xfer_usage()
 	return ret_code;
 }
 
-/* Callback function for sql statement */
-static int32_t _sqlite_exec_cb(void *data, int32_t argc, char **argv, char **azColName)
-{
-
-	size_t uid_len;
-	char **uid = (char **)data;
-
-	uid_len = argv[0] ? strlen(argv[0]) : strlen("NULL");
-	*uid = malloc(sizeof(char) * (uid_len + 1));
-	snprintf(*uid, uid_len + 1, "%s", argv[0]);
-
-	return 0;
-}
-
-int32_t query_pkg_uid(char *arg_buf, uint32_t arg_len, char **uid)
-{
-
-	int32_t idx, ret_code;
-	uint32_t msg_len;
-	ssize_t str_len;
-	char pkg_name[400];
-	char sql[1000];
-	sqlite3 *db;
-	char *sql_err = 0;
-
-
-	msg_len = 0;
-	str_len = 0;
-	memcpy(&str_len, &(arg_buf[msg_len]), sizeof(ssize_t));
-	msg_len += sizeof(ssize_t);
-
-	memcpy(pkg_name, &(arg_buf[msg_len]), str_len);
-	pkg_name[str_len] = 0;
-	msg_len += str_len;
-
-	printf("pkg name is %s\n", pkg_name);
-
-	if (msg_len != arg_len) {
-		printf("Arg len is different\n");
-		return -EINVAL;
-	}
-
-	snprintf(sql, sizeof(sql), "SELECT uid from uid WHERE package_name='%s'", pkg_name);
-
-/* REVIEW TODO: Is it possible to open the sqlite db just once when API service is setup?
-(Same for sqlite service in HCFS) */
-	ret_code = sqlite3_open(DB_PATH, &db);
-	if (ret_code != 0) {
-	        printf("Failed to open sqlite db - err is %s\n", sqlite3_errmsg(db));
-		return ret_code;
-	}
-
-	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb, (void *)uid, &sql_err);
-	if( ret_code != SQLITE_OK ){
-		printf("Failed to execute sql statement - err is %s\n", sql_err);
-		sqlite3_free(sql_err);
-	}
-
-	sqlite3_close(db);
-
-	if (ret_code == 0 && *uid == NULL)
-		return -ENOENT;
-	else
-		return ret_code;
-}
