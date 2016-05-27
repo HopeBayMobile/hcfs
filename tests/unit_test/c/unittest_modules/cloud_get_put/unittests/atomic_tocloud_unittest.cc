@@ -885,9 +885,9 @@ TEST_F(check_and_copy_fileTest, CopySuccess)
  */ 
 
 /* 
- * Unittest for continue_inode_upload()
+ * Unittest for continue_inode_sync()
  */
-class continue_inode_uploadTest : public ::testing::Test {
+class continue_inode_syncTest : public ::testing::Test {
 protected:
 	char bullpen_path[200];
 	char progress_path[200];
@@ -948,7 +948,7 @@ protected:
 };
 
 
-TEST_F(continue_inode_uploadTest, Revert_NonRegfile)
+TEST_F(continue_inode_syncTest, Revert_NonRegfile)
 {
 	int ret;
 	int fd;
@@ -977,7 +977,7 @@ TEST_F(continue_inode_uploadTest, Revert_NonRegfile)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 
 	/* Verify */
 	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
@@ -991,12 +991,13 @@ TEST_F(continue_inode_uploadTest, Revert_NonRegfile)
 }
 
 
-TEST_F(continue_inode_uploadTest, Crash_AfterOpenProgressFile)
+TEST_F(continue_inode_syncTest, Crash_AfterOpenProgressFile)
 {
 	int ret;
 	int fd;
 	int inode;
 	pthread_t terminate_tid;
+	PROGRESS_META tmp_meta;
 	SYNC_THREAD_TYPE sync_type;
 
 	/* Prepare mock data */
@@ -1004,6 +1005,9 @@ TEST_F(continue_inode_uploadTest, Crash_AfterOpenProgressFile)
 	sprintf(progress_path, "%s/upload_progress_inode_%d",
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	tmp_meta.now_action = PREPARING; // Finish init
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 	sync_type.this_mode = S_IFREG;
 	sync_type.inode = inode;
 	sync_type.progress_fd = fd;
@@ -1012,7 +1016,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterOpenProgressFile)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1022,7 +1026,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterOpenProgressFile)
 	unlink(progress_path);
 }
 
-TEST_F(continue_inode_uploadTest, Crash_AfterCopyLocalMeta)
+TEST_F(continue_inode_syncTest, Crash_AfterCopyLocalMeta)
 {
 	int ret;
 	int fd;
@@ -1037,6 +1041,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterCopyLocalMeta)
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	tmp_meta.now_action = PREPARING; // Finish init
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 
 	fetch_toupload_meta_path(toupload_metapath, inode);
@@ -1049,7 +1054,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterCopyLocalMeta)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1061,7 +1066,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterCopyLocalMeta)
 	unlink(progress_path);
 }
 
-TEST_F(continue_inode_uploadTest, Crash_AfterDownloadBackendMeta_BeforeFinishInit)
+TEST_F(continue_inode_syncTest, Crash_AfterDownloadBackendMeta_BeforeFinishInit)
 {
 	int ret;
 	int fd;
@@ -1075,6 +1080,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterDownloadBackendMeta_BeforeFinishIni
 		bullpen_path, inode);
 	fd = open(progress_path, O_CREAT | O_RDWR);
 	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	tmp_meta.now_action = PREPARING; // Finish init
 	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
 	
 	fetch_toupload_meta_path(toupload_metapath, inode);
@@ -1089,7 +1095,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterDownloadBackendMeta_BeforeFinishIni
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1103,7 +1109,7 @@ TEST_F(continue_inode_uploadTest, Crash_AfterDownloadBackendMeta_BeforeFinishIni
 	unlink(progress_path);
 }
 
-TEST_F(continue_inode_uploadTest, Crash_AfterFinishInit_ProgressFile)
+TEST_F(continue_inode_syncTest, Crash_AfterFinishInit_ProgressFile)
 {
 	int ret;
 	int fd;
@@ -1122,8 +1128,6 @@ TEST_F(continue_inode_uploadTest, Crash_AfterFinishInit_ProgressFile)
 
 	fetch_toupload_meta_path(toupload_metapath, inode);
 	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
-	fetch_backend_meta_path(backend_metapath, inode);
-	mknod(backend_metapath, 0700, 0); // make a backend_meta
 	sync_type.this_mode = S_IFREG;
 	sync_type.inode = inode;
 	sync_type.progress_fd = fd;
@@ -1132,20 +1136,16 @@ TEST_F(continue_inode_uploadTest, Crash_AfterFinishInit_ProgressFile)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 
 	/* Verify */
 	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
 	EXPECT_EQ(ENOENT, errno);
-	EXPECT_EQ(-1, access(backend_metapath, F_OK));
-	EXPECT_EQ(ENOENT, errno);
 	EXPECT_EQ(0, access(progress_path, F_OK));
-	EXPECT_EQ(TRUE, sync_ctl.threads_error[0]);
-	EXPECT_EQ(TRUE, sync_ctl.threads_finished[0]);
 	unlink(progress_path);	
 }
 
-TEST_F(continue_inode_uploadTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
+TEST_F(continue_inode_syncTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 {
 	int ret;
 	int fd;
@@ -1172,24 +1172,23 @@ TEST_F(continue_inode_uploadTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 	close(fd);
 
 	/* Verify */
-	EXPECT_EQ(0, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(ENOENT, errno);
 	EXPECT_EQ(-1, access(backend_metapath, F_OK));
 	EXPECT_EQ(ENOENT, errno);
 	EXPECT_EQ(0, access(progress_path, F_OK));
 	EXPECT_EQ(1, test_sync_struct.total_inode);
 	EXPECT_EQ(inode, test_sync_struct.record_uploading_inode[0]);
-	EXPECT_EQ(FALSE, sync_ctl.threads_error[0]);
-	EXPECT_EQ(FALSE, sync_ctl.threads_finished[0]);
 
 	unlink(toupload_metapath);
 	unlink(progress_path);	
 }
 
-TEST_F(continue_inode_uploadTest, Crash_When_DeleteOldData_KeepDeleting)
+TEST_F(continue_inode_syncTest, Crash_When_DeleteOldData_KeepDeleting)
 {
 	int ret;
 	int fd;
@@ -1217,7 +1216,7 @@ TEST_F(continue_inode_uploadTest, Crash_When_DeleteOldData_KeepDeleting)
 	sync_ctl.threads_finished[0] = FALSE;
 
 	/* Run */
-	continue_inode_upload(&sync_type);
+	continue_inode_sync(&sync_type);
 	close(fd);
 
 	/* Verify */
@@ -1228,14 +1227,14 @@ TEST_F(continue_inode_uploadTest, Crash_When_DeleteOldData_KeepDeleting)
 	EXPECT_EQ(0, access(progress_path, F_OK));
 	EXPECT_EQ(1, test_delete_struct.total_inode);
 	EXPECT_EQ(inode, test_delete_struct.record_uploading_inode[0]);
-	EXPECT_EQ(FALSE, sync_ctl.threads_error[0]);
+	EXPECT_EQ(TRUE, sync_ctl.threads_error[0]);
 	EXPECT_EQ(TRUE, sync_ctl.threads_finished[0]);
 
 	unlink(toupload_metapath);
 	unlink(progress_path);
 }
 /* 
- * Unittest for continue_inode_upload()
+ * Unittest for continue_inode_sync()
  */
 
 /*

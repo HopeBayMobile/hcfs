@@ -1316,6 +1316,14 @@ store in some other file */
 		return;
 	}
 
+	/* Upload successfully. Update FS stat in backend */
+	if (upload_seq <= 0)
+		update_backend_stat(root_inode, size_diff, meta_size_diff, 1);
+	else
+		if (size_diff != 0)
+			update_backend_stat(root_inode, size_diff,
+					meta_size_diff, 0);
+
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
 		delete_backend_blocks(progress_fd, total_backend_blocks,
@@ -1325,14 +1333,6 @@ store in some other file */
 	} else {
 		fclose(local_metafptr);
 	}
-
-	/* Upload successfully. Update FS stat in backend */
-	if (upload_seq <= 0)
-		update_backend_stat(root_inode, size_diff, meta_size_diff, 1);
-	else
-		if (size_diff != 0)
-			update_backend_stat(root_inode, size_diff,
-					meta_size_diff, 0);
 
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 	return;

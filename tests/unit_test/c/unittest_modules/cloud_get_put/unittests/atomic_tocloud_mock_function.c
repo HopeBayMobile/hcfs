@@ -15,6 +15,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	test_sync_struct.record_uploading_inode[test_sync_struct.total_inode++] = ptr->inode;
 	sem_post(&test_sync_struct.record_sem);
 
+	fetch_toupload_meta_path(toupload_metapath, ptr->inode);
+	unlink(toupload_metapath);
 	return;
 }
 

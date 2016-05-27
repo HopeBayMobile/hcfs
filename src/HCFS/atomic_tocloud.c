@@ -1174,7 +1174,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
-	/* If it is not regfile (strange), then just remove all and upload
+	/* If it is not regfile, then just remove all and upload
 	 * it again. */
 	if (!S_ISREG(this_mode)) {
 		if (toupload_meta_exist == TRUE)
@@ -1229,6 +1229,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 		UNLINK(toupload_meta_path);
 	if (backend_meta_exist == TRUE)
 		UNLINK(backend_meta_path);
+	/* Sync again so that ensure data consistency */
 	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
 	return;
