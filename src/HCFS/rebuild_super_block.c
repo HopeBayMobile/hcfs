@@ -151,6 +151,8 @@ int32_t init_rebuild_sb(char rebuild_action)
 				__func__);
 		return -ENOMEM;
 	}
+	pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+	pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
 
 	/* Allocate memory for mgr */
 	rebuild_sb_mgr_info = (REBUILD_SB_MGR_INFO *)
@@ -161,6 +163,8 @@ int32_t init_rebuild_sb(char rebuild_action)
 		free(rebuild_sb_jobs);
 		return -ENOMEM;
 	}
+	sem_init(&(rebuild_sb_mgr_info->mgr_access_sem), 0, 1);
+	sem_init(&(rebuild_sb_mgr_info->tpool.tpool_access_sem), 0, 1);
 
 	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
 
@@ -207,6 +211,11 @@ int32_t init_rebuild_sb(char rebuild_action)
 		write_log(0, "Error: Invalid type\n");
 		return -EINVAL;
 	}
+
+	ret = super_block_init();
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
@@ -263,19 +272,28 @@ int32_t pull_inode_job(ino_t *inode_job)
 	return 0;
 }
 
-/* Need mutex lock */
+/* Do not need pre-lock job queue */
 int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes)
 {
 	int64_t total_jobs;
+	ssize_t ret_ssize;
+	int32_t errcode;
 
+	pthread_mutex_lock(&(rebuild_sb_jobs->job_mutex));
 	total_jobs = rebuild_sb_jobs->remaining_jobs +
 			rebuild_sb_jobs->job_count;
+	rebuild_sb_jobs->remaining_jobs += num_inodes;
+	pthread_mutex_unlock(&(rebuild_sb_jobs->job_mutex));
+
 	flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
 	PWRITE(rebuild_sb_jobs->queue_fh, inode_jobs,
 			sizeof(ino_t) * num_inodes,
 			sizeof(ino_t) * total_jobs);
 	flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+	return 0;
 
+errcode_handle:
+	return errcode;
 }
 
 int32_t rebuild_sb_manager()
@@ -295,5 +313,13 @@ int32_t create_sb_rebuilder()
 		write_log(5, "Cannot restore without network conn\n");
 		return -EPERM;
 	}
+	sem_wait(&(rebuild_sb_mgr_info->mgr_access_sem));
+	pthread_attr_init(&(rebuild_sb_mgr_info->mgr_attr));
+	pthread_attr_setdetachstate(&(rebuild_sb_mgr_info->mgr_attr),
+			PTHREAD_CREATE_DETACHED);
+	pthread_create(&(rebuild_sb_mgr_info->mgr_tid),
+			&(rebuild_sb_mgr_info->mgr_attr),
+			(void *)rebuild_sb_manager, NULL);
+	sem_post(&(rebuild_sb_mgr_info->mgr_access_sem));
 	return 0;
 }

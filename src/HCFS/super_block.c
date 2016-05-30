@@ -1913,8 +1913,10 @@ int32_t check_init_super_block()
 	if (access(SUPERBLOCK, F_OK) < 0) {
 		/* Rebuild SB */
 		ret = init_rebuild_sb(START_REBUILD_SB);
-		ret = super_block_init();
+		if (ret < 0)
+			return ret;
 		/* Create rebuild sb mgr */
+		ret = create_sb_rebuilder();
 	} else {
 		/* Read SB and check status */
 		sb_fptr = fopen(SUPERBLOCK, "r");
@@ -1931,14 +1933,18 @@ int32_t check_init_super_block()
 			unlink(SUPERBLOCK);
 			/* Rebuild SB */
 			ret = init_rebuild_sb(START_REBUILD_SB);
-			ret = super_block_init();
+			if (ret < 0)
+				return ret;
 			/* Create rebuild sb mgr */
+			ret = create_sb_rebuilder();
 		} else {
 			if (head.now_rebuild) {
 				/* Keep rebuilding SB */
 				ret = init_rebuild_sb(KEEP_REBUILD_SB);
-				ret = super_block_init();
+				if (ret < 0)
+					return ret;
 				/* Create rebuild sb mgr */
+				ret = create_sb_rebuilder();
 			} else {
 				ret = super_block_init();
 			}
