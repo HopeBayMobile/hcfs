@@ -445,7 +445,7 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(fptr);
 		unlink(filename);
 		curl_slist_free_all(chunk);
@@ -685,7 +685,7 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	if (res == CURLE_OK)
 		curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &ret_val);
 	else
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 
 	fclose(swift_header_fptr);
 	unlink(header_filename);
@@ -763,7 +763,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		fclose(swift_list_body_fptr);
@@ -886,7 +886,7 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
@@ -1006,7 +1006,7 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
@@ -1130,7 +1130,7 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
@@ -1355,7 +1355,7 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(S3_list_header_fptr);
 		unlink(header_filename);
 		fclose(S3_list_body_fptr);
@@ -2003,7 +2003,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
@@ -2137,7 +2137,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
@@ -2278,7 +2278,7 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	update_backend_status((res == CURLE_OK), NULL);
 
 	if (res != CURLE_OK) {
-		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
