@@ -13,8 +13,12 @@
 #ifndef GW20_HCFSAPI_SOCKUTIL_H_
 #define GW20_HCFSAPI_SOCKUTIL_H_
 
-int32_t reads(int32_t fd, char *buf, int32_t count);
+#include <inttypes.h>
 
-int32_t sends(int32_t fd, const char *buf, int32_t count);
+int32_t get_hcfs_socket_conn();
+
+int32_t reads(int32_t fd, void *buf, int32_t count);
+
+int32_t sends(int32_t fd, const void *buf, int32_t count);
 
 #endif /* GW20_HCFSAPI_SOCKUTIL_H_ */

@@ -14,7 +14,6 @@
 global.h in HCFS is changed. Perhaps should consider using a symlink to
 point to global.h in HCFS, and then include that symlink for the common
 declarations? */
-/* REVIEW TODO: Copyright of this file is up-to-date? */
 
 #ifndef GW20_HCFSAPI_GLOBAL_H_
 #define GW20_HCFSAPI_GLOBAL_H_

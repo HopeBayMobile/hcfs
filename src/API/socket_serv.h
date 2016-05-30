@@ -14,8 +14,15 @@
 #define GW20_HCFSAPI_SERV_H_
 
 #include <pthread.h>
+#include <inttypes.h>
 
 #define MAX_THREAD 16
+
+typedef struct {
+	uint32_t name;
+	int32_t (*cmd_fn)(char *largebuf, int32_t arg_len,
+			  char *resbuf, int32_t *res_size);
+} SOCK_CMDS;
 
 
 typedef struct {

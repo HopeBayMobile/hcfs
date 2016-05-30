@@ -26,32 +26,42 @@
 #include "pin_ops.h"
 #include "global.h"
 #include "marco.h"
-#include "utils.h"
+#include "socket_util.h"
+#include "hcfs_stat.h"
 
 
 /* REVIEW TODO: error handling for the jansson lib functions may be needed */
 /* For example, json_object_set_new will return -1 if an error occurs */
 void _json_response(char **json_str, char result, int32_t code, json_t *data)
 {
-
 	json_t *res_obj;
 
 	res_obj = json_object();
-	json_object_set_new(res_obj, "result", json_boolean(result));
-	json_object_set_new(res_obj, "code", json_integer(code));
-	if (data == NULL)
-		json_object_set_new(res_obj, "data", json_object());
-	else
-		json_object_set_new(res_obj, "data", data);
+	if (res_obj == NULL)
+		goto error;
+
+	JSON_OBJ_SET_NEW(res_obj, "result", json_boolean(result));
+	JSON_OBJ_SET_NEW(res_obj, "code", json_integer(code));
+	if (data == NULL) {
+		JSON_OBJ_SET_NEW(res_obj, "data", json_object());
+	} else {
+		JSON_OBJ_SET_NEW(res_obj, "data", data);
+	}
 
 	*json_str = json_dumps(res_obj, JSON_COMPACT);
 
+	goto end;
+
+error:
+	json_decref(data);
+	*json_str = NULL;
+end:
 	json_decref(res_obj);
+	return;
 }
 
 int32_t _api_socket_conn()
 {
-
 	int32_t fd, status;
 	struct sockaddr_un addr;
 
@@ -59,6 +69,8 @@ int32_t _api_socket_conn()
 	strcpy(addr.sun_path, API_SOCK_PATH);
 /* REVIEW TODO: socket function call might fail, so error handling is required here */
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
+		return -errno;
 	status = connect(fd, &addr, sizeof(addr));
 /* REVIEW TODO: Could errno change during return? If so, perhaps it is a good idea
 to first assign the value to some other variable */
@@ -70,7 +82,6 @@ to first assign the value to some other variable */
 
 void HCFS_set_config(char **json_res, char *key, char *value)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
@@ -107,7 +118,6 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 
 void HCFS_get_config(char **json_res, char *key)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
@@ -135,7 +145,9 @@ void HCFS_get_config(char **json_res, char *key)
 		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 		if (ret_code == 1) {
 			data = json_object();
-			json_object_set_new(data, key, json_string(""));
+			if (data == NULL)
+				goto error;
+			JSON_OBJ_SET_NEW(data, key, json_string(""));
 
 			_json_response(json_res, TRUE, 0, data);
 		} else {
@@ -146,25 +158,28 @@ void HCFS_get_config(char **json_res, char *key)
 		value[reply_len] = 0;
 
 		data = json_object();
-		json_object_set_new(data, key, json_string(value));
+		if (data == NULL)
+			goto error;
+		JSON_OBJ_SET_NEW(data, key, json_string(value));
 
 		_json_response(json_res, TRUE, 0, data);
 	}
 
+	goto end;
+
+error:
+	json_decref(data);
+	*json_res = NULL;
+end:
 	close(fd);
+	return;
 }
 
 void HCFS_stat(char **json_res)
 {
-
 	int32_t fd, status, size_msg, ret_code;
-	int32_t cloud_stat, data_transfer;
 	uint32_t code, reply_len, cmd_len, buf_idx;
-	int64_t quota, vol_usage, cloud_usage;
-	int64_t cache_total, cache_used, cache_dirty;
-	int64_t pin_max, pin_total;
-	int64_t xfer_up, xfer_down;
-	char buf[512];
+	HCFS_STAT_TYPE hcfs_stats;
 	json_t *data;
 
 	fd = _api_socket_conn();
@@ -184,51 +199,42 @@ void HCFS_stat(char **json_res)
 		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
-		size_msg = recv(fd, buf, reply_len, 0);
-		buf_idx = 0;
+		size_msg = recv(fd, &hcfs_stats, reply_len, 0);
 
 /* REVIEW TODO: Is it possible to use common structure to send / read a collection
 of variables, instead of sending them one by one? */
-		READ_LL_ARGS(quota);
-		READ_LL_ARGS(vol_usage);
-		READ_LL_ARGS(cloud_usage);
-		READ_LL_ARGS(cache_total);
-		READ_LL_ARGS(cache_used);
-		READ_LL_ARGS(cache_dirty);
-		READ_LL_ARGS(pin_max);
-		READ_LL_ARGS(pin_total);
-		READ_LL_ARGS(xfer_up);
-		READ_LL_ARGS(xfer_down);
-
-		memcpy(&cloud_stat, &(buf[buf_idx]), sizeof(int32_t));
-		buf_idx += sizeof(int32_t);
-
-		memcpy(&data_transfer, &(buf[buf_idx]), sizeof(int32_t));
-		buf_idx += sizeof(int32_t);
-
 		data = json_object();
-		json_object_set_new(data, "quota", json_integer(quota));
-		json_object_set_new(data, "vol_used", json_integer(vol_usage));
-		json_object_set_new(data, "cloud_used", json_integer(cloud_usage));
-		json_object_set_new(data, "cache_total", json_integer(cache_total));
-		json_object_set_new(data, "cache_used", json_integer(cache_used));
-		json_object_set_new(data, "cache_dirty", json_integer(cache_dirty));
-		json_object_set_new(data, "pin_max", json_integer(pin_max));
-		json_object_set_new(data, "pin_total", json_integer(pin_total));
-		json_object_set_new(data, "xfer_up", json_integer(xfer_up));
-		json_object_set_new(data, "xfer_down", json_integer(xfer_down));
-		json_object_set_new(data, "cloud_conn", json_boolean(cloud_stat));
-		json_object_set_new(data, "data_transfer", json_integer(data_transfer));
+		if (data == NULL)
+			goto error;
+		JSON_OBJ_SET_NEW(data, "quota", json_integer(hcfs_stats.quota));
+		JSON_OBJ_SET_NEW(data, "vol_used", json_integer(hcfs_stats.vol_usage));
+		JSON_OBJ_SET_NEW(data, "cloud_used", json_integer(hcfs_stats.cloud_usage));
+		JSON_OBJ_SET_NEW(data, "cache_total", json_integer(hcfs_stats.cache_total));
+		JSON_OBJ_SET_NEW(data, "cache_used", json_integer(hcfs_stats.cache_used));
+		JSON_OBJ_SET_NEW(data, "cache_dirty", json_integer(hcfs_stats.cache_dirty));
+		JSON_OBJ_SET_NEW(data, "pin_max", json_integer(hcfs_stats.pin_max));
+		JSON_OBJ_SET_NEW(data, "pin_total", json_integer(hcfs_stats.pin_total));
+		JSON_OBJ_SET_NEW(data, "xfer_up", json_integer(hcfs_stats.xfer_up));
+		JSON_OBJ_SET_NEW(data, "xfer_down", json_integer(hcfs_stats.xfer_down));
+		JSON_OBJ_SET_NEW(data, "cloud_conn", json_boolean(hcfs_stats.cloud_stat));
+		JSON_OBJ_SET_NEW(data, "data_transfer",
+				 json_integer(hcfs_stats.data_transfer));
 
 		_json_response(json_res, TRUE, 0, data);
 	}
 
+	goto end;
+
+error:
+	json_decref(data);
+	*json_res = NULL;
+end:
 	close(fd);
+	return;
 }
 
 void HCFS_get_occupied_size(char **json_res)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len, buf_idx;
 	int64_t occupied;
@@ -258,17 +264,25 @@ void HCFS_get_occupied_size(char **json_res)
 		READ_LL_ARGS(occupied);
 
 		data = json_object();
-		json_object_set_new(data, "occupied", json_integer(occupied));
+		if (data == NULL)
+			goto error;
+		JSON_OBJ_SET_NEW(data, "occupied", json_integer(occupied));
 
 		_json_response(json_res, TRUE, 0, data);
 	}
 
+	goto end;
+
+error:
+	json_decref(data);
+	*json_res = NULL;
+end:
 	close(fd);
+	return;
 }
 
 void HCFS_reload_config(char **json_res)
 {
-
 	int32_t fd, size_msg, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
@@ -298,7 +312,6 @@ void HCFS_reload_config(char **json_res)
 
 void HCFS_toggle_sync(char **json_res, int32_t enabled)
 {
-
 	int32_t fd, size_msg, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
@@ -329,7 +342,6 @@ void HCFS_toggle_sync(char **json_res, int32_t enabled)
 
 void HCFS_get_sync_status(char **json_res)
 {
-
 	int32_t fd, size_msg, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
@@ -354,17 +366,25 @@ void HCFS_get_sync_status(char **json_res)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	} else {
 		data = json_object();
-		json_object_set_new(data, "enabled", json_boolean(ret_code));
+		if (data == NULL)
+			goto error;
+		JSON_OBJ_SET_NEW(data, "enabled", json_boolean(ret_code));
 
 		_json_response(json_res, TRUE, 0, data);
 	}
 
+	goto end;
+
+error:
+	json_decref(data);
+	*json_res = NULL;
+end:
 	close(fd);
+	return;
 }
 
 void HCFS_pin_path(char **json_res, char *pin_path)
 {
-
 	int32_t fd, size_msg, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
@@ -400,7 +420,6 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 		  char *sd0_path, char *sd1_path)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
@@ -438,7 +457,6 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 
 void HCFS_unpin_path(char **json_res, char *pin_path)
 {
-
 	int32_t fd, size_msg, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	ssize_t str_len;
@@ -475,7 +493,6 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 		    char *sd0_path, char *sd1_path)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
@@ -513,7 +530,6 @@ void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 
 void HCFS_pin_status(char **json_res, char *pathname)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
@@ -543,7 +559,6 @@ void HCFS_pin_status(char **json_res, char *pathname)
 
 void HCFS_dir_status(char **json_res, char *pathname)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len, buf_idx;
 	int64_t num_local, num_cloud, num_hybrid;
@@ -576,19 +591,27 @@ void HCFS_dir_status(char **json_res, char *pathname)
 		READ_LL_ARGS(num_hybrid);
 
 		data = json_object();
-		json_object_set_new(data, "num_local", json_integer(num_local));
-		json_object_set_new(data, "num_cloud", json_integer(num_cloud));
-		json_object_set_new(data, "num_hybrid", json_integer(num_hybrid));
+		if (data == NULL)
+			goto error;
+		JSON_OBJ_SET_NEW(data, "num_local", json_integer(num_local));
+		JSON_OBJ_SET_NEW(data, "num_cloud", json_integer(num_cloud));
+		JSON_OBJ_SET_NEW(data, "num_hybrid", json_integer(num_hybrid));
 
 		_json_response(json_res, TRUE, 0, data);
 	}
 
+	goto end;
+
+error:
+	json_decref(data);
+	*json_res = NULL;
+end:
 	close(fd);
+	return;
 }
 
 void HCFS_file_status(char **json_res, char *pathname)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
@@ -618,7 +641,6 @@ void HCFS_file_status(char **json_res, char *pathname)
 
 void HCFS_reset_xfer(char **json_res)
 {
-
 	int32_t fd, status, size_msg, ret_code;
 	uint32_t code, reply_len, cmd_len;
 

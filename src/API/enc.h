@@ -14,12 +14,14 @@
 #define GW20_HCFSAPI_ENC_H_
 
 #include <string.h>
+#include <inttypes.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #ifdef OPENSSL_IS_BORINGSSL
 #include <openssl/mem.h>
 #endif
+
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32

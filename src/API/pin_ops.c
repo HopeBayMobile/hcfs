@@ -23,16 +23,26 @@
 #include <errno.h>
 
 #include "global.h"
-#include "utils.h"
+#include "socket_util.h"
 
 
 #define DATA_PREFIX "/data/data"
 #define APP_PREFIX "/data/app"
 #define EXTERNAL_PREFIX "/storage/emulated"
 
+
+/************************************************************************
+ * *
+ * * Function name: _walk_folder
+ * *        Inputs: char *pathname, int64_t *total_size
+ * *       Summary: Traverse a given folder (pathname) and calculate total
+ * *		    size of it.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t _walk_folder(char *pathname, int64_t *total_size)
 {
-
 	char tmp_path[400];
 	struct stat stat_buf;
 	DIR *dir;
@@ -58,8 +68,19 @@ int32_t _walk_folder(char *pathname, int64_t *total_size)
 	} while (dent = readdir(dir));
 
 	closedir(dir);
+	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: _validate_hcfs_path
+ * *        Inputs: char *pathname
+ * *       Summary: To check if this (pathname) is located in hcfs mountpoint.
+ * *
+ * *  Return value: 0 if pathname is in hcfs mountpoint.
+ * *		    Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t _validate_hcfs_path(char *pathname)
 {
 	int32_t ret_code = -ENOENT;
@@ -70,7 +91,7 @@ int32_t _validate_hcfs_path(char *pathname)
 	if (resolved_path == NULL)
 		return ret_code;
 
-	/* Check if this pathname is located in hcfs mountpoints */
+	/* Following are mountpoints used in Android system. */
 	if (!strncmp(resolved_path, DATA_PREFIX, sizeof(DATA_PREFIX) - 1)
 	    || !strncmp(resolved_path, APP_PREFIX, sizeof(APP_PREFIX) - 1)
 	    || !strncmp(resolved_path, EXTERNAL_PREFIX, sizeof(EXTERNAL_PREFIX) - 1))
@@ -80,6 +101,15 @@ int32_t _validate_hcfs_path(char *pathname)
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: _get_path_stat
+ * *        Inputs: char *pathname, ino_t *inode, int64_t *total_size
+ * *       Summary: To get the inode info and size(optional) of (pathname).
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t _get_path_stat(char *pathname, ino_t *inode, int64_t *total_size)
 {
 
@@ -104,8 +134,18 @@ int32_t _get_path_stat(char *pathname, ino_t *inode, int64_t *total_size)
 
 }
 
+/************************************************************************
+ * *
+ * * Function name: _pin_by_inode
+ * *        Inputs: const int64_t reserved_size, const uint32_t num_inodes
+ * *                const char *inode_array
+ * *       Summary: To pin all inodes in (inode_array)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
-		  const char *inode_array)
+		      const char *inode_array)
 {
 
 	int32_t fd, size_msg, count, ret_code;
@@ -147,13 +187,21 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 
 /* REVIEW TODO: Perhaps should make sure that there will be no more
 inodes than the array of 1600 bytes can handle */
+/************************************************************************
+ * *
+ * * Function name: pin_by_path
+ * *        Inputs: char *buf, uint32_t arg_len
+ * *       Summary: To pin a given pathname.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t pin_by_path(char *buf, uint32_t arg_len)
 {
-
 	int32_t ret_code;
 	uint32_t msg_len, num_inodes;
 	int64_t total_size = 0;
-	char inode_array[1600];
+	char inode_array[sizeof(ino_t) * 5];
 	char path[400];
 	ssize_t path_len;
 	ino_t tmp_inode;
@@ -185,9 +233,17 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
 
 }
 
+/************************************************************************
+ * *
+ * * Function name: _unpin_by_inode
+ * *        Inputs: const uint32_t num_inodes, const char *inode_array
+ * *       Summary: To unpin all inodes in (inode_array)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t _unpin_by_inode(const uint32_t num_inodes, const char *inode_array)
 {
-
 	int32_t fd, size_msg, count, ret_code;
 	int32_t buf_idx;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
@@ -220,9 +276,17 @@ int32_t _unpin_by_inode(const uint32_t num_inodes, const char *inode_array)
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: unpin_by_path
+ * *        Inputs: char *buf, uint32_t arg_len
+ * *       Summary: To unpin a given pathname.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t unpin_by_path(char *buf, uint32_t arg_len)
 {
-
 	int32_t ret_code;
 	uint32_t msg_len, num_inodes;
 	char inode_array[1600];
@@ -256,19 +320,23 @@ int32_t unpin_by_path(char *buf, uint32_t arg_len)
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: check_pin_status
+ * *        Inputs: char *buf, uint32_t arg_len
+ * *       Summary: To check if a pathname is pinned or not.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t check_pin_status(char *buf, uint32_t arg_len)
 {
 
 	int32_t fd, size_msg, count, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
-	char path[400];
 	ino_t tmp_inode;
 
-/* REVIEW TODO: Is it possible to pass buf directly as the
-input to _get_path_stat (memcpy does not look necessary)? */
-/* Same for memcpy in other functions */
-	memcpy(path, &(buf[0]), arg_len);
-	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	ret_code = _get_path_stat(buf, &tmp_inode, NULL);
 	if (ret_code < 0)
 		return ret_code;
 
@@ -290,19 +358,28 @@ input to _get_path_stat (memcpy does not look necessary)? */
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: check_dir_status
+ * *        Inputs: char *buf, uint32_t arg_len
+ * *		    int64_t *num_local, int64_t *num_cloud,
+ * *		    int64_t *num_hybrid
+ * *       Summary: To get locations statistics of files in a folder.
+ * *		    (local; hybrid; cloud)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t check_dir_status(char *buf, uint32_t arg_len,
-		     int64_t *num_local, int64_t *num_cloud,
-		     int64_t *num_hybrid)
+			 int64_t *num_local, int64_t *num_cloud,
+			 int64_t *num_hybrid)
 {
 
 	int32_t fd, size_msg, count, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
-	char path[400];
 	ino_t tmp_inode;
 
-
-	memcpy(path, &(buf[0]), arg_len);
-	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	ret_code = _get_path_stat(buf, &tmp_inode, NULL);
 	if (ret_code < 0)
 		return ret_code;
 
@@ -330,17 +407,23 @@ int32_t check_dir_status(char *buf, uint32_t arg_len,
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: check_file_loc
+ * *        Inputs: char *buf, uint32_t arg_len
+ * *       Summary: To get the location info of a file.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t check_file_loc(char *buf, uint32_t arg_len)
 {
 
 	int32_t fd, size_msg, count, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
-	char path[400];
 	ino_t tmp_inode;
 
-
-	memcpy(path, &(buf[0]), arg_len);
-	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	ret_code = _get_path_stat(buf, &tmp_inode, NULL);
 	if (ret_code < 0)
 		return ret_code;
 

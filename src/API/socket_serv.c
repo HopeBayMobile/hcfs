@@ -36,7 +36,8 @@
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 
-int32_t do_pin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_pin_by_path(char *largebuf, int32_t arg_len,
+		       char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -53,7 +54,8 @@ int32_t do_pin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *r
 	return ret_code;
 }
 
-int32_t do_unpin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_unpin_by_path(char *largebuf, int32_t arg_len,
+			 char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -69,7 +71,8 @@ int32_t do_unpin_by_path(char *largebuf, int32_t arg_len, char *resbuf, int32_t 
 	return ret_code;
 }
 
-int32_t do_check_dir_status(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_check_dir_status(char *largebuf, int32_t arg_len,
+			    char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -97,7 +100,8 @@ int32_t do_check_dir_status(char *largebuf, int32_t arg_len, char *resbuf, int32
 	return ret_code;
 }
 
-int32_t do_check_file_loc(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_check_file_loc(char *largebuf, int32_t arg_len,
+			  char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -111,7 +115,8 @@ int32_t do_check_file_loc(char *largebuf, int32_t arg_len, char *resbuf, int32_t
 	return ret_code;
 }
 
-int32_t do_check_pin_status(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_check_pin_status(char *largebuf, int32_t arg_len,
+			    char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -125,7 +130,8 @@ int32_t do_check_pin_status(char *largebuf, int32_t arg_len, char *resbuf, int32
 	return ret_code;
 }
 
-int32_t do_set_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_set_hcfs_config(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -139,7 +145,8 @@ int32_t do_set_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_
 	return ret_code;
 }
 
-int32_t do_get_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_get_hcfs_config(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -161,49 +168,32 @@ int32_t do_get_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_
 	return ret_code;
 }
 
-int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len,
+			 char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
-	int32_t cloud_stat, data_transfer;
-	int64_t quota, vol_usage, cloud_usage;
-	int64_t cache_total, cache_used, cache_dirty;
-	int64_t pin_max, pin_total;
-	int64_t xfer_up, xfer_down;
+	HCFS_STAT_TYPE stats;
 
 	printf("Get statistics\n");
-	ret_code = get_hcfs_stat(&quota, &vol_usage, &cloud_usage,
-				 &cache_total, &cache_used, &cache_dirty,
-				 &pin_max, &pin_total,
-				 &xfer_up, &xfer_down,
-				 &cloud_stat, &data_transfer);
+	ret_code = get_hcfs_stat(&stats);
 
 	if (ret_code < 0) {
 		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	} else {
 		/* Total size for reply msgs */
-		ret_len = sizeof(int64_t) * 10 + sizeof(int32_t) * 2;
+		ret_len = sizeof(HCFS_STAT_TYPE);
 
 		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
-		CONCAT_REPLY(&quota, sizeof(int64_t));
-		CONCAT_REPLY(&vol_usage, sizeof(int64_t));
-		CONCAT_REPLY(&cloud_usage, sizeof(int64_t));
-		CONCAT_REPLY(&cache_total, sizeof(int64_t));
-		CONCAT_REPLY(&cache_used, sizeof(int64_t));
-		CONCAT_REPLY(&cache_dirty, sizeof(int64_t));
-		CONCAT_REPLY(&pin_max, sizeof(int64_t));
-		CONCAT_REPLY(&pin_total, sizeof(int64_t));
-		CONCAT_REPLY(&xfer_up, sizeof(int64_t));
-		CONCAT_REPLY(&xfer_down, sizeof(int64_t));
-		CONCAT_REPLY(&cloud_stat, sizeof(int32_t));
-		CONCAT_REPLY(&data_transfer, sizeof(int32_t));
+		CONCAT_REPLY(&stats, ret_len);
 	}
 
 	return ret_code;
 }
 
-int32_t do_get_occupied_size(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_get_occupied_size(char *largebuf, int32_t arg_len,
+			     char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -226,7 +216,8 @@ int32_t do_get_occupied_size(char *largebuf, int32_t arg_len, char *resbuf, int3
 	return ret_code;
 }
 
-int32_t do_reset_xfer_usage(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_reset_xfer_usage(char *largebuf, int32_t arg_len,
+			    char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -240,7 +231,8 @@ int32_t do_reset_xfer_usage(char *largebuf, int32_t arg_len, char *resbuf, int32
 	return ret_code;
 }
 
-int32_t do_toggle_cloud_sync(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_toggle_cloud_sync(char *largebuf, int32_t arg_len,
+			     char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -254,7 +246,8 @@ int32_t do_toggle_cloud_sync(char *largebuf, int32_t arg_len, char *resbuf, int3
 	return ret_code;
 }
 
-int32_t do_get_sync_status(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_get_sync_status(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -268,7 +261,8 @@ int32_t do_get_sync_status(char *largebuf, int32_t arg_len, char *resbuf, int32_
 	return ret_code;
 }
 
-int32_t do_reload_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size)
+int32_t do_reload_hcfs_config(char *largebuf, int32_t arg_len,
+			      char *resbuf, int32_t *res_size)
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -284,7 +278,6 @@ int32_t do_reload_hcfs_config(char *largebuf, int32_t arg_len, char *resbuf, int
 
 int32_t _get_unused_thread()
 {
-
 	int32_t idx;
 
 	for (idx = 0; idx < MAX_THREAD; idx++) {
@@ -297,9 +290,18 @@ int32_t _get_unused_thread()
 	return -1;
 }
 
+/************************************************************************
+ * *
+ * * Function name: process_request
+ * *        Inputs: int32_t thread_idx
+ * *       Summary: To process an API request by creating a new
+ * *		    thread (thread_idx).
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t process_request(int32_t thread_idx)
 {
-
 	int32_t fd, ret_code, res_size;
 	uint32_t api_code, arg_len;
 	char buf_reused;
@@ -338,12 +340,7 @@ to an error log */
 
 /* REVIEW TODO: Is it possible to move the following definition to
 other places? This breaks the flow of code reading. */
-	struct cmd {
-		uint32_t name;
-		int32_t (*cmd_fn)(char *largebuf, int32_t arg_len, char *resbuf, int32_t *res_size);
-	};
-
-	struct cmd cmds[] = {
+	SOCK_CMDS cmds[] = {
 		{PIN,		do_pin_by_path},
 		{UNPIN,		do_unpin_by_path},
 		{CHECKDIRSTAT,	do_check_dir_status},
@@ -388,9 +385,17 @@ done:
 /* REVIEW TODO: Perhaps we should add some error log if socket
 init or other IOs encounter errors, so that we can know the source
 of errors */
+/************************************************************************
+ * *
+ * * Function name: init_server
+ * *        Inputs:
+ * *       Summary: To initialize the HCFSAPI socket server.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t init_server()
 {
-
 	int32_t sock_fd, sock_flag;
 	int32_t new_sock_fd, thread_idx, ret_code, count;
 	char sock_path[200];
@@ -452,8 +457,9 @@ int32_t init_server()
 			if (thread_idx < 0) {
 				nanosleep(&timer, NULL);
 				continue;
-			} else
+			} else {
 				break;
+			}
 		}
 
 		thread_pool[thread_idx].fd = new_sock_fd;

@@ -13,6 +13,15 @@
 #ifndef GW20_HCFSAPI_MARCO_H_
 #define GW20_HCFSAPI_MARCO_H_
 
+/* json helper */
+#define JSON_OBJ_SET_NEW(A, B, C)\
+	{\
+		if (json_object_set_new(A, B, C) == -1) {\
+			goto error;\
+		}\
+	}
+
+/* marcos for argument operations */
 #define CONCAT_ARGS(A)\
 	{\
 		if (A != NULL) {\

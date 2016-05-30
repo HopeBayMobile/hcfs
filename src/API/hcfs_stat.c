@@ -1,4 +1,3 @@
-/* REVIEW TODO: Please run both style checkers after changing the code */
 /*************************************************************************
 *
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
@@ -19,12 +18,20 @@
 #include <inttypes.h>
 
 #include "global.h"
-#include "utils.h"
+#include "socket_util.h"
 
 
+/************************************************************************
+ * *
+ * * Function name: _get_usage_val
+ * *        Inputs: uint32_t api_code, int64_t *res_val
+ * *       Summary: To get retrun value stored in (res_val) with (api_code).
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t _get_usage_val(uint32_t api_code, int64_t *res_val)
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 	int64_t ll_ret_code;
@@ -54,9 +61,17 @@ int32_t _get_usage_val(uint32_t api_code, int64_t *res_val)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_quota
+ * *        Inputs: int64_t *quota
+ * *       Summary: To get value of quota.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_quota(int64_t *quota)
 {
-
 	int32_t ret_code;
 
 	ret_code = _get_usage_val(GETQUOTA, quota);
@@ -66,9 +81,17 @@ int32_t get_quota(int64_t *quota)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_volume_usage
+ * *        Inputs: int64_t *vol_usage
+ * *       Summary: To get value of volume usage.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_volume_usage(int64_t *vol_usage)
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 	int64_t ll_ret_code;
@@ -101,9 +124,17 @@ int32_t get_volume_usage(int64_t *vol_usage)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_cloud_usage
+ * *        Inputs: int64_t *cloud_usage
+ * *       Summary: To get value of cloud usage.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_cloud_usage(int64_t *cloud_usage)
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 	int64_t ll_ret_code;
@@ -136,10 +167,19 @@ int32_t get_cloud_usage(int64_t *cloud_usage)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_cache_usage
+ * *        Inputs: int64_t *cache_total, int64_t *cache_used
+ * *		    int64_t *cache_dirty
+ * *       Summary: To get values of cache usage. (total; used; dirty)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
 		        int64_t *cache_dirty)
 {
-
 	int32_t ret_code;
 
 	ret_code = _get_usage_val(GETMAXCACHESIZE, cache_total);
@@ -157,9 +197,17 @@ int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_pin_usage
+ * *        Inputs: int64_t *pin_max, int64_t *pin_total
+ * *       Summary: To get values of pin usgae. (max; total)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_pin_usage(int64_t *pin_max, int64_t *pin_total)
 {
-
 	int32_t ret_code;
 
 	ret_code = _get_usage_val(GETMAXPINSIZE, pin_max);
@@ -173,9 +221,17 @@ int32_t get_pin_usage(int64_t *pin_max, int64_t *pin_total)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_xfer_usage
+ * *        Inputs: int64_t *xfer_up, int64_t *xfer_down
+ * *       Summary: To get values of xfer usage. (upload; download)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_xfer_usage(int64_t *xfer_up, int64_t *xfer_down)
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 
@@ -203,9 +259,17 @@ int32_t get_xfer_usage(int64_t *xfer_up, int64_t *xfer_down)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_cloud_stat
+ * *        Inputs: int64_t *quota
+ * *       Summary: To get value of cloud stat. (online; offline)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_cloud_stat(int32_t *cloud_stat)
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 
@@ -227,9 +291,18 @@ int32_t get_cloud_stat(int32_t *cloud_stat)
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_data_transfer
+ * *        Inputs: int64_t *data_transfer
+ * *       Summary: To get status of data transfer.
+ * *		    (not int progress; in progress; slow)
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_data_transfer(int32_t *data_transfer)
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 
@@ -251,53 +324,69 @@ int32_t get_data_transfer(int32_t *data_transfer)
 	return 0;
 }
 
-int32_t get_hcfs_stat(int64_t *quota, int64_t *vol_usage, int64_t *cloud_usage,
-		      int64_t *cache_total, int64_t *cache_used, int64_t *cache_dirty,
-		      int64_t *pin_max, int64_t *pin_total,
-		      int64_t *xfer_up, int64_t *xfer_down,
-		      int32_t *cloud_stat, int32_t *data_transfer)
+/************************************************************************
+ * *
+ * * Function name: get_hcfs_stat
+ * *        Inputs: HCFS_STAT_TYPE *hcfs_stats
+ * *       Summary: To get a struct (hcfs_stats) stores hcfs statistics.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
+int32_t get_hcfs_stat(HCFS_STAT_TYPE *hcfs_stats)
 {
-
 	int32_t ret_code;
 
-	ret_code = get_quota(quota);
+	ret_code = get_quota(&(hcfs_stats->quota));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_volume_usage(vol_usage);
+	ret_code = get_volume_usage(&(hcfs_stats->vol_usage));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_cloud_usage(cloud_usage);
+	ret_code = get_cloud_usage(&(hcfs_stats->cloud_usage));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_cache_usage(cache_total, cache_used, cache_dirty);
+	ret_code = get_cache_usage(&(hcfs_stats->cache_total),
+				   &(hcfs_stats->cache_used),
+				   &(hcfs_stats->cache_dirty));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_pin_usage(pin_max, pin_total);
+	ret_code = get_pin_usage(&(hcfs_stats->pin_max),
+				 &(hcfs_stats->pin_total));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_xfer_usage(xfer_up, xfer_down);
+	ret_code = get_xfer_usage(&(hcfs_stats->xfer_up),
+				  &(hcfs_stats->xfer_down));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_cloud_stat(cloud_stat);
+	ret_code = get_cloud_stat(&(hcfs_stats->cloud_stat));
 	if (ret_code < 0)
 		return ret_code;
 
-	ret_code = get_data_transfer(data_transfer);
+	ret_code = get_data_transfer(&(hcfs_stats->data_transfer));
 	if (ret_code < 0)
 		return ret_code;
 
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_occupied_size
+ * *        Inputs: int64_t *occupied
+ * *       Summary: To get value of occupied size (unpin but dirty + pin size).
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_occupied_size(int64_t *occupied)
 {
-
 	int32_t ret_code;
 
 	ret_code = _get_usage_val(OCCUPIEDSIZE, occupied);

@@ -1,4 +1,3 @@
-/* REVIEW TODO: comments for the functions */
 /*************************************************************************
 *
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
@@ -24,13 +23,21 @@
 #include "hcfs_sys.h"
 
 #include "global.h"
-#include "utils.h"
+#include "socket_util.h"
 #include "enc.h"
 
 
+/************************************************************************
+ * *
+ * * Function name: _validate_config_key
+ * *        Inputs: char *key
+ * *       Summary: To validate a given section (key) in config file.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns -1 on errors.
+ * *
+ * *************************************************************************/
 int32_t _validate_config_key(char *key)
 {
-
 	int32_t idx, num_keys;
 	char *keys[] = {\
 		"current_backend",\
@@ -52,15 +59,21 @@ int32_t _validate_config_key(char *key)
 	return -1;
 }
 
-/*
- * NOTE:
- *     The size of *output* should be larger than
- *     input_len + IV_SIZE + TAG_SIZE.
- */
+/************************************************************************
+ * *
+ * * Function name: _encrypt_config
+ * *        Inputs: uint8_t *output, uint8_t *input
+ * *		    int64_t input_len
+ * *       Summary: To encrypt data (input) and store the encrypted content
+ * *		    in (output). The size of *output* should be larger than
+ * *    	    input_len + IV_SIZE + TAG_SIZE.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns -1 on errors.
+ * *
+ * *************************************************************************/
 int32_t _encrypt_config(uint8_t *output, uint8_t *input,
-		   int64_t input_len)
+		        int64_t input_len)
 {
-
 	int32_t ret;
 	uint8_t iv[IV_SIZE] = {0};
 	uint8_t *enc_key, *enc_data;
@@ -87,9 +100,20 @@ int32_t _encrypt_config(uint8_t *output, uint8_t *input,
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: _get_decrypt_configfp
+ * *        Inputs: uint8_t *output, uint8_t *input
+ * *		    int64_t input_len
+ * *       Summary: To encrypt data (input) and store the encrypted content
+ * *		    in (output). The size of *output* should be larger than
+ * *    	    input_len + IV_SIZE + TAG_SIZE.
+ * *
+ * *  Return value: FILE pointer to decrypted file.
+ * *
+ * *************************************************************************/
 FILE *_get_decrypt_configfp()
 {
-
 	int64_t file_size, enc_size, data_size;
 	FILE *datafp = NULL;
 	uint8_t *iv_buf = NULL;
@@ -151,9 +175,17 @@ end:
 	return tmp_file;
 }
 
+/************************************************************************
+ * *
+ * * Function name: set_hcfs_config
+ * *        Inputs: char *arg_buf, uint32_t arg_len
+ * *       Summary: To set a section in config file with input value.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 {
-
 	int32_t idx, ret_code;
 	uint32_t msg_len;
 	ssize_t str_len;
@@ -167,8 +199,9 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 is larger than the buffer size (1K). Perhaps could first check the
 size of the config file, then allocate enough memory for reading in
 the entire content after decryption */
-	uint8_t data_buf[1024];
+	uint8_t *data_buf, *enc_data;
 	int32_t data_size = 0;
+	int64_t data_buf_size;
 
 
 	msg_len = 0;
@@ -202,6 +235,12 @@ the entire content after decryption */
 		goto error;
 	}
 
+	fseek(conf, 0, SEEK_END);
+	data_buf_size = ftell(conf);
+	rewind(conf);
+	data_buf =
+		(uint8_t*)malloc(sizeof(char) * (data_buf_size + arg_len));
+
 	data_size = str_len = 0;
 	while (fgets(buf, sizeof(buf), conf) != NULL) {
 		tmp_ptr = line = strdup(buf);
@@ -217,7 +256,7 @@ the entire content after decryption */
 		free(tmp_ptr);
 	}
 
-	uint8_t *enc_data =
+	enc_data =
 		(uint8_t*)malloc(sizeof(char) * (data_size + IV_SIZE + TAG_SIZE));
 	if (enc_data == NULL)
 		goto error;
@@ -254,9 +293,17 @@ end:
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_hcfs_config
+ * *        Inputs: char *arg_buf, uint32_t arg_len, char **value
+ * *       Summary: Return the value of input section in config file.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
 {
-
 	int32_t idx, ret_code;
 	uint32_t msg_len;
 	ssize_t str_len;
@@ -332,9 +379,17 @@ int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
 		return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: reload_hcfs_config
+ * *        Inputs:
+ * *       Summary: To notify hcfs to reload config.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t reload_hcfs_config()
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 
@@ -356,9 +411,17 @@ int32_t reload_hcfs_config()
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: toggle_cloud_sync
+ * *        Inputs: char *arg_buf, uint32_t arg_len
+ * *       Summary: To notify hcfs to turn on/off cloud synchronizing.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 {
-
 	int32_t fd, ret_code, size_msg, enabled;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
@@ -385,9 +448,17 @@ int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_sync_status
+ * *        Inputs:
+ * *       Summary: To get status of cloud synchronizing.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_sync_status()
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len;
 
@@ -409,9 +480,18 @@ int32_t get_sync_status()
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: reset_xfer_usage
+ * *        Inputs:
+ * *       Summary: To notify hcfs to reset the value of data transfer
+ * *		    statistics.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t reset_xfer_usage()
 {
-
 	int32_t fd, ret_code, size_msg;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
