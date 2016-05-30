@@ -198,6 +198,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	fetch_meta_path(thismetapath, ptr->this_inode);
 	fetch_block_path(thisblockpath, ptr->this_inode, ptr->block_no);
 
+/* FEATURE TODO: fetch meta */
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
 		free(ptr);
@@ -794,6 +795,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	fetch_meta_path(metapath, inode);
+/* FEATURE TODO: fetch meta */
 	fptr = fopen(metapath, "r+");
 	if (fptr == NULL) {
 		write_log(2, "Cannot open %s in %s\n", metapath, __func__);

@@ -26,6 +26,9 @@
 #include "logger.h"
 #include "utils.h"
 
+/* TODO: If local deduplication is enabled for any reason, restoration of
+dedupe table should be designed and implemented. */
+
 int32_t initialize_ddt_meta(char *meta_path)
 {
 
@@ -94,6 +97,8 @@ FILE *get_ddt_btree_meta(uint8_t key[], DDT_BTREE_NODE *root,
 		goto errcode_handle;
 	}
 
+	/* TODO: If in the future we need to implement local dedup table
+	restoration, the code here should be modified */
 	/* Initialize tree if not existed */
 	if (access(meta_path, F_OK | W_OK) < 0) {
 		ret = initialize_ddt_meta(meta_path);

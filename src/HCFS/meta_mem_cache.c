@@ -128,7 +128,7 @@ int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 		ret = fetch_meta_path(thismetapath, body_ptr->inode_num);
 		if (ret < 0)
 			return ret;
-
+/* FEATURE TODO: fetch meta */
 		body_ptr->fptr = fopen(thismetapath, "r+");
 		if (body_ptr->fptr == NULL) {
 			/*File may not exist*/
@@ -323,7 +323,7 @@ int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t ei
 		(body_ptr->dir_entry_cache[eindex])->this_page_pos, SEEK_SET);
 	FWRITE(body_ptr->dir_entry_cache[eindex], sizeof(DIR_ENTRY_PAGE),
 							1, body_ptr->fptr);
-
+/* FEATURE TODO: rebuild super block */
 	ret = super_block_mark_dirty((body_ptr->this_stat).st_ino);
 
 	return ret;
@@ -877,6 +877,7 @@ static inline int32_t _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
 		FSEEK(ptr->fptr, tmp_fpos, SEEK_SET);
 		FWRITE(ptr->dir_entry_cache[1],
 			sizeof(DIR_ENTRY_PAGE), 1, ptr->fptr);
+/* FEATURE TODO: rebuild super block */
 		ret = super_block_mark_dirty((ptr->this_stat).st_ino);
 		if (ret < 0)
 			return ret;
@@ -1135,7 +1136,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 					body_ptr->inode_num);
 			if (ret < 0)
 				return ret;
-
+/* FEATURE TODO: fetch meta */
 			body_ptr->fptr = fopen(thismetapath, "r+");
 			if (body_ptr->fptr == NULL) {
 				errcode = errno;
@@ -1169,7 +1170,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 		ret = fetch_meta_path(thismetapath, body_ptr->inode_num);
 		if (ret < 0)
 			return ret;
-
+/* FEATURE TODO: fetch meta */
 		body_ptr->fptr = fopen(thismetapath, "r+");
 		if (body_ptr->fptr == NULL) {
 			errcode = errno;
@@ -1505,6 +1506,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 			sem_post(&num_entry_sem);
 		}
 
+/* FEATURE TODO: rebuild super block */
 		ret_val = super_block_read(this_inode, &tempentry);
 		if (ret_val < 0) {
 			sem_post(&(meta_mem_cache[index].header_sem));

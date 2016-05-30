@@ -596,6 +596,7 @@ int32_t delete_inode_meta(ino_t this_inode)
 	if (ret < 0)
 		return ret;
 
+/* FEATURE TODO: fetch meta */
 	/*Try a rename first*/
 	ret = rename(thismetapath, todelete_metapath);
 	write_log(10, "%s, %s, %d\n", thismetapath, todelete_metapath, ret);
@@ -1253,6 +1254,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
 			return ret;
+/* TODO: fetch stat meta */
 		fptr = fopen(rootpath, "r+");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -1307,6 +1309,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
+/* FEATURE TODO: fetch meta */
 		if (access(thismetapath, F_OK) != 0) {
 			errcode = errno;
 			if (errcode != ENOENT) {
@@ -1951,10 +1954,37 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
 
-	total_children = dir_meta->total_children;
-	now_page_pos = dir_meta->tree_walk_list_head;
-	if (total_children == 0 || now_page_pos == 0)
+	ret = fetch_meta_path(metapath, this_inode);
+	if (ret < 0)
+		return ret;
+
+/* FEATURE TODO: fetch meta */
+	fptr = fopen(metapath, "r");
+	if (fptr == NULL) {
+		ret = errno;
+		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
+			(uint64_t)this_inode, __func__, ret);
+		return -ret;
+	}
+
+	flock(fileno(fptr), LOCK_EX);
+	if (access(metapath, F_OK) < 0) {
+		write_log(5, "meta %"PRIu64" does not exist in %s\n",
+			(uint64_t)this_inode, __func__);
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return -ENOENT;
+	}
+
+	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
+	total_children = dir_meta.total_children;
+	now_page_pos = dir_meta.tree_walk_list_head;
+	if (total_children == 0 || now_page_pos == 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
 		return 0;
+	}
 
 	half = total_children / 2 + 1; /* Avoid zero malloc */
 	now_dir_size = half;

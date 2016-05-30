@@ -178,6 +178,7 @@ void pinning_worker(void *ptr)
 		return; /* Do not dequeue when failing in pinning */
 	}
 
+/* FEATURE TODO: rebuild super block */
 	ret = super_block_finish_pinning(this_inode);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to mark inode %"PRIu64" as"

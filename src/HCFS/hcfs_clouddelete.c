@@ -709,6 +709,7 @@ errcode_handle:
 
 	_check_del_progress_file(this_inode);
 	unlink(thismetapath);
+/* FEATURE TODO: rebuild super block */
 	super_block_delete(this_inode);
 	super_block_reclaim();
 	dsync_ctl.threads_finished[which_dsync_index] = TRUE;
@@ -951,7 +952,7 @@ void delete_loop(void)
 		inode_to_dsync = 0;
 		if (inode_to_check != 0) {
 			inode_to_dsync = inode_to_check;
-
+/* FEATURE TODO: rebuild super block */
 			ret_val = read_super_block_entry(inode_to_dsync,
 								&tempentry);
 

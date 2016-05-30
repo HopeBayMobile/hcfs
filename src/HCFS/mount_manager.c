@@ -743,6 +743,7 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 
+/* FEATURE TODO: fetch stat meta */
 	new_info->stat_fptr = fopen(temppath, "r+");
 	if (new_info->stat_fptr == NULL) {
 		errcode = errno;

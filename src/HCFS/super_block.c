@@ -90,6 +90,9 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	ssize_t ret_val;
 	int32_t errcode;
 
+/* FEATURE TODO: fetch meta and rebuild super block entry. Warning:
+super block lock is aquired in this function, so need to watch out
+for deadlocks. */
 	if (this_inode <= 0) {
 		errcode = EINVAL;
 		write_log(0,
@@ -185,6 +188,7 @@ int32_t super_block_init(void)
 	sem_init(&(sys_super_block->share_CR_lock_sem), 1, 1);
 	sys_super_block->share_counter = 0;
 
+/* FEATURE TODO: integrate super block rebuild mechanism */
 	sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
 
 	if (sys_super_block->iofptr < 0) {
@@ -340,6 +344,7 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	ret_val = 0;
 	super_block_exclusive_locking();
+/* FEATURE TODO: download meta and rebuild super block entry */
 	if (inode_ptr->status != IS_DIRTY) { /* Add to dirty node list */
 		ret_val = ll_dequeue(this_inode, inode_ptr);
 		if (ret_val < 0) {
@@ -750,6 +755,8 @@ int32_t super_block_reclaim(void)
 	*  from that in superblock head */
 
 	/* Sort the list of unclaimed inodes. */
+/* FEATURE TODO: rebuild unclaimed list or reclaimed list at the end
+of restoration */
 	qsort(unclaimed_list, num_unclaimed, sizeof(ino_t), compino);
 
 	last_reclaimed = sys_super_block->head.first_reclaimed_inode;
