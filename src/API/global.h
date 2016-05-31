@@ -21,14 +21,12 @@ declarations? */
 #define TRUE 1
 #define FALSE 0
 
-//#define CONFIG_PATH "/data/hcfs.conf"
-#define CONFIG_PATH "hcfs.conf"
+#define CONFIG_PATH "/data/hcfs.conf"
 #define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
-//#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock"
-#define API_SOCK_PATH "/dev/shm/hcfsapid_sock"
+#define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock"
 
-#define LOG_PATH "/tmp"
+#define LOG_PATH "/data"
 #define LOG_NAME "hcfsapid.log"
 #define LOG_LEVEL 4
 
