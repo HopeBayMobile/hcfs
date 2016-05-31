@@ -177,9 +177,6 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
 
-/* REVIEW TODO: Perhaps convert the following printf to write debug log? */
-	printf("Pin result - %d\n", ret_code);
-
 	close(fd);
 	return ret_code;
 
@@ -269,8 +266,6 @@ int32_t _unpin_by_inode(const uint32_t num_inodes, const char *inode_array)
 
 	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
-
-	printf("Pin result - %d\n", ret_code);
 
 	close(fd);
 	return ret_code;

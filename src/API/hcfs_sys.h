@@ -13,6 +13,8 @@
 #ifndef GW20_HCFSAPI_SYS_H_
 #define GW20_HCFSAPI_SYS_H_
 
+#include <inttypes.h>
+
 #define PASSPHRASE "lets encrypt configuration"
 
 int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len);

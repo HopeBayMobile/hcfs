@@ -33,6 +33,7 @@
 #include "hcfs_stat.h"
 #include "hcfs_sys.h"
 #include "marco.h"
+#include "logger.h"
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 
@@ -43,7 +44,7 @@ int32_t do_pin_by_path(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 
 /* REVIEW TODO: Perhaps should change all printf function calls to write logs */
-	printf("Pin by path\n");
+	write_log(8, "Start pin by path\n");
 	ret_code = pin_by_path(largebuf, arg_len);
 
 	if (ret_code > 0) ret_code = 0;
@@ -51,6 +52,7 @@ int32_t do_pin_by_path(char *largebuf, int32_t arg_len,
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End pin by path\n");
 	return ret_code;
 }
 
@@ -60,7 +62,7 @@ int32_t do_unpin_by_path(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Unpin by path\n");
+	write_log(8, "Start unpin by path\n");
 	ret_code = unpin_by_path(largebuf, arg_len);
 
 	if (ret_code > 0) ret_code = 0;
@@ -68,6 +70,7 @@ int32_t do_unpin_by_path(char *largebuf, int32_t arg_len,
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End unpin by path\n");
 	return ret_code;
 }
 
@@ -78,12 +81,11 @@ int32_t do_check_dir_status(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 	int64_t num_local, num_cloud, num_hybrid;
 
-	printf("Check dir stat\n");
+	write_log(8, "Start check dir stat\n");
 	ret_code = check_dir_status(largebuf, arg_len,
 				    &num_local, &num_cloud,
 				    &num_hybrid);
 
-	printf("%d\n", ret_code);
 	if (ret_code < 0) {
 		CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 		CONCAT_REPLY(&ret_code, sizeof(int32_t));
@@ -97,6 +99,7 @@ int32_t do_check_dir_status(char *largebuf, int32_t arg_len,
 		CONCAT_REPLY(&num_hybrid, sizeof(int64_t));
 	}
 
+	write_log(8, "End check dir stat\n");
 	return ret_code;
 }
 
@@ -106,12 +109,13 @@ int32_t do_check_file_loc(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Check file location\n");
+	write_log(8, "Start check file location\n");
 	ret_code = check_file_loc(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End check file location\n");
 	return ret_code;
 }
 
@@ -121,12 +125,13 @@ int32_t do_check_pin_status(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Check pin status\n");
+	write_log(8, "Start check pin status\n");
 	ret_code = check_pin_status(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End check pin status\n");
 	return ret_code;
 }
 
@@ -136,12 +141,13 @@ int32_t do_set_hcfs_config(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Set config\n");
+	write_log(8, "Start set config\n");
 	ret_code = set_hcfs_config(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End set config\n");
 	return ret_code;
 }
 
@@ -152,7 +158,7 @@ int32_t do_get_hcfs_config(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 	char *value;
 
-	printf("Get config\n");
+	write_log(8, "Start get config\n");
 	ret_code = get_hcfs_config(largebuf, arg_len, &value);
 
 	if (ret_code == 0) {
@@ -165,6 +171,7 @@ int32_t do_get_hcfs_config(char *largebuf, int32_t arg_len,
 		CONCAT_REPLY(&ret_code, sizeof(int32_t));
 	}
 
+	write_log(8, "End get config\n");
 	return ret_code;
 }
 
@@ -175,7 +182,7 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 	HCFS_STAT_TYPE stats;
 
-	printf("Get statistics\n");
+	write_log(8, "Start get statistics\n");
 	ret_code = get_hcfs_stat(&stats);
 
 	if (ret_code < 0) {
@@ -189,6 +196,7 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len,
 		CONCAT_REPLY(&stats, ret_len);
 	}
 
+	write_log(8, "End get statistics\n");
 	return ret_code;
 }
 
@@ -199,7 +207,7 @@ int32_t do_get_occupied_size(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 	int64_t occupied;
 
-	printf("Get occupied size\n");
+	write_log(8, "Start get occupied size\n");
 	ret_code = get_occupied_size(&occupied);
 
 	if (ret_code < 0) {
@@ -213,6 +221,7 @@ int32_t do_get_occupied_size(char *largebuf, int32_t arg_len,
 		CONCAT_REPLY(&occupied, sizeof(int64_t));
 	}
 
+	write_log(8, "End get occupied size\n");
 	return ret_code;
 }
 
@@ -222,12 +231,13 @@ int32_t do_reset_xfer_usage(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Reset xfer\n");
+	write_log(8, "Start reset xfer stats\n");
 	ret_code = reset_xfer_usage(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End reset xfer stats\n");
 	return ret_code;
 }
 
@@ -237,12 +247,13 @@ int32_t do_toggle_cloud_sync(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Toggle sync\n");
+	write_log(8, "Start toggle sync\n");
 	ret_code = toggle_cloud_sync(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End toggle sync\n");
 	return ret_code;
 }
 
@@ -252,12 +263,13 @@ int32_t do_get_sync_status(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Get sync status\n");
+	write_log(8, "Start get sync status\n");
 	ret_code = get_sync_status(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End get sync status\n");
 	return ret_code;
 }
 
@@ -267,15 +279,26 @@ int32_t do_reload_hcfs_config(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-	printf("Reload config\n");
+	write_log(8, "Start reload config\n");
 	ret_code = reload_hcfs_config(largebuf, arg_len);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
+	write_log(8, "End reload config\n");
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: _get_unused_thread
+ * *        Inputs:
+ * *       Summary: To find an unused thread.
+ * *
+ * *  Return value: thread id if successful.
+ * *		    Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
 int32_t _get_unused_thread()
 {
 	int32_t idx;
@@ -309,20 +332,22 @@ int32_t process_request(int32_t thread_idx)
 	char *largebuf;
 
 	fd = thread_pool[thread_idx].fd;
+	write_log(8, "Process a new request with socket fd %d\n", fd);
 
 	if (reads(fd, &api_code, sizeof(uint32_t))) {
-		printf("Failed to recv API code");
+		write_log(0, "Failed to receive API code\n");
 		goto error;
 	}
-	printf("API code is %d\n", api_code);
+	write_log(8, "API code is %d\n", api_code);
 
 	if (reads(fd, &arg_len, sizeof(uint32_t))) {
 /* REVIEW TODO: The following message should be written
 to an error log */
-		printf("Failed to recv arg length\n");
+		write_log(0, "Failed to receive arg length. (API code %d)\n",
+				api_code);
 		goto error;
 	}
-	printf("Argument length is %d\n", arg_len);
+	write_log(8, "Argument length is %d\n", arg_len);
 
 	if (arg_len < 500) {
 		largebuf = buf;
@@ -334,7 +359,8 @@ to an error log */
 	}
 
 	if (reads(fd, largebuf, arg_len)) {
-		printf("Failed to recv args\n");
+		write_log(0, "Failed to receive args. (API code %d)\n",
+				api_code);
 		goto error;
 	}
 
@@ -365,13 +391,14 @@ other places? This breaks the flow of code reading. */
 			goto done;
 		}
 	}
-	printf("API code not found\n");
+	write_log(0, "API code not found (API code %d)\n",
+			api_code);
 
 error:
 	ret_code = -1;
 
 done:
-	printf("Get API code - %d from fd - %d\n", api_code, fd);
+	write_log(8, "API %d done with fd %d", api_code, fd);
 
 	close(fd);
 	if (largebuf != NULL && !buf_reused)
@@ -414,10 +441,12 @@ int32_t init_server()
 	/* To wait api socket path ready */
 	sock_dir = dirname(sock_path);
 	while (1) {
-		if (access(sock_dir, F_OK | W_OK) == 0)
+		if (access(sock_dir, F_OK | W_OK) == 0) {
 			break;
-		else
+		} else {
+			write_log(0, "Waiting socket path ready...\n");
 			sleep(1);
+		}
 	}
 
 	if (access(API_SOCK_PATH, F_OK) == 0)
@@ -427,20 +456,31 @@ int32_t init_server()
 	strcpy(addr.sun_path, API_SOCK_PATH);
 
 	sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (sock_fd < 0)
-		return -1;
+	if (sock_fd < 0) {
+		write_log(0, "Failed to get socket fd. Code %d, %s\n",
+				errno, strerror(errno));
+		return -errno;
+	}
 
 	if (bind(sock_fd, (struct sockaddr*) &addr,
-		 sizeof(struct sockaddr_un)) < 0)
-		return -1;
+	    sizeof(struct sockaddr_un)) < 0) {
+		write_log(0, "Failed to assign name to socket. Code %d, %s\n",
+				errno, strerror(errno));
+		return -errno;
+	}
 
 	sock_flag = fcntl(sock_fd, F_GETFL, 0);
 	sock_flag = sock_flag | O_NONBLOCK;
 	fcntl(sock_fd, F_SETFL, sock_flag);
 
 	ret_code = listen(sock_fd, 16);
-	if (ret_code < 0)
-		return -1;
+	if (ret_code < 0) {
+		write_log(0, "Failed to listen socket. Code %d, %s\n",
+				errno, strerror(errno));
+		return -errno;
+	}
+
+	write_log(0, "HCFSAPID is ready.\n");
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -478,6 +518,9 @@ int32_t init_server()
 
 int32_t main()
 {
+	open_log(LOG_NAME);
+	write_log(0, "Start HCFSAPID\n");
 	init_server();
+	write_log(0, "End HCFSAPID\n");
 	return 0;
 }

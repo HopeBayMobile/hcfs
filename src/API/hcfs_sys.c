@@ -10,6 +10,8 @@
 *
 **************************************************************************/
 
+#include "hcfs_sys.h"
+
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,8 +21,6 @@
 #include <errno.h>
 #include <sqlite3.h>
 #include <inttypes.h>
-
-#include "hcfs_sys.h"
 
 #include "global.h"
 #include "socket_util.h"
@@ -199,7 +199,8 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 is larger than the buffer size (1K). Perhaps could first check the
 size of the config file, then allocate enough memory for reading in
 the entire content after decryption */
-	uint8_t *data_buf, *enc_data;
+	uint8_t *data_buf = NULL;
+	uint8_t *enc_data = NULL;
 	int32_t data_size = 0;
 	int64_t data_buf_size;
 
@@ -290,6 +291,10 @@ end:
 		fclose(conf);
 	if (tmp_conf)
 		fclose(tmp_conf);
+	if (data_buf)
+		free(data_buf);
+	if (enc_data)
+		free(enc_data);
 	return ret_code;
 }
 

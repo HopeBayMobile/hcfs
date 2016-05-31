@@ -107,7 +107,8 @@ typedef struct {
 #define XFER_SEC_PER_WINDOW 20
 #define XFER_SLOW_SPEED 32 /* in KB/s */
 
-static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
+//static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
+static const char DEFAULT_CONFIG_PATH[] = "tmpuse/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";
 static const char USERMETA_PASSPHRASE[] = "hey! kewei enc usermeta :)";
 
