@@ -107,6 +107,7 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	} else {
 		if (status == 404) {
 			errcode = -ENOENT;
+			write_log(5, "Object %s not found\n", objname);
 		} else {
 			write_log(4, "Warn: http code %d when get %s\n", status,
 				objname);

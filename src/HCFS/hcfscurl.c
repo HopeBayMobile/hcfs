@@ -1018,6 +1018,11 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	curl_slist_free_all(chunk);
 	ret_val = parse_http_header_retcode(swift_header_fptr);
 	if (ret_val < 0) {
+		char header[1024] = {0};
+		fseek(swift_header_fptr, 0, SEEK_SET);
+		fread(header, sizeof(char), 1000, swift_header_fptr);
+		write_log(4, "Error: Fail to parse %s header:\n%s", objname,
+			  header);
 		fclose(swift_header_fptr);
 		unlink(header_filename);
 		/* We still need to record this failure for xfer throughput */
