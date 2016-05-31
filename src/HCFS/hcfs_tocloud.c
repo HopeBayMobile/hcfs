@@ -1135,9 +1135,27 @@ store in some other file */
 		 * if needed */
 		sync_error = sync_ctl.threads_error[ptr->which_index];
 		if (sync_error == TRUE) {
-			if (sync_ctl.continue_nexttime[ptr->which_index] == FALSE)
+			if (sync_ctl.continue_nexttime[ptr->which_index] ==
+					FALSE) {
+				/* Restore cloud usage statistics */
+				pos = sizeof(struct stat) +
+					sizeof(FILE_META_TYPE) +
+					sizeof(FILE_STATS_TYPE);
+				FSEEK(toupload_metafptr, pos, SEEK_SET);
+				FREAD(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, toupload_metafptr);
+				flock(fileno(local_metafptr), LOCK_EX);
+				FSEEK(local_metafptr, pos, SEEK_SET);
+				FWRITE(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, local_metafptr);
+				flock(fileno(local_metafptr), LOCK_UN);
+				/* Delete pre-upload blocks */
 				delete_backend_blocks(progress_fd, total_blocks,
-						ptr->inode, DEL_TOUPLOAD_BLOCKS);
+					ptr->inode, DEL_TOUPLOAD_BLOCKS);
+
+			}
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -1254,7 +1272,6 @@ store in some other file */
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
-		fclose(toupload_metafptr);
 
 		schedule_sync_meta(toupload_metapath, which_curl);
 
@@ -1297,7 +1314,6 @@ store in some other file */
 	}
 
 	if (sync_error == TRUE) {
-		fclose(local_metafptr);
 		write_log(0, "Sync inode %"PRIu64" to backend incomplete.\n",
 				(uint64_t)ptr->inode);
 		/* Delete to-upload blocks when it fails by anything but
@@ -1305,6 +1321,22 @@ store in some other file */
 		if (S_ISREG(ptr->this_mode)) {
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
+				/* Restore cloud usage statistics */
+				pos = sizeof(struct stat) +
+					sizeof(FILE_META_TYPE) +
+					sizeof(FILE_STATS_TYPE);
+				FSEEK(toupload_metafptr, pos, SEEK_SET);
+				FREAD(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, toupload_metafptr);
+				flock(fileno(local_metafptr), LOCK_EX);
+				FSEEK(local_metafptr, pos, SEEK_SET);
+				FWRITE(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, local_metafptr);
+				flock(fileno(local_metafptr), LOCK_UN);
+
+				/* Delete pre-upload blocks */
 				delete_backend_blocks(progress_fd, total_blocks,
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 			}
@@ -1312,9 +1344,14 @@ store in some other file */
 			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
 		}
 
+		fclose(toupload_metafptr);
+		fclose(local_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
+
+	fclose(toupload_metafptr);
+	fclose(local_metafptr);
 
 	/* Upload successfully. Update FS stat in backend */
 	if (upload_seq <= 0)
@@ -1328,12 +1365,7 @@ store in some other file */
 	if (S_ISREG(ptr->this_mode)) {
 		delete_backend_blocks(progress_fd, total_backend_blocks,
 				ptr->inode, DEL_BACKEND_BLOCKS);
-		fclose(local_metafptr);
-
-	} else {
-		fclose(local_metafptr);
 	}
-
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 	return;
 
