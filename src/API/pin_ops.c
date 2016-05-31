@@ -148,7 +148,7 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 		      const char *inode_array)
 {
 
-	int32_t fd, size_msg, count, ret_code;
+	int32_t fd, count, ret_code;
 	int32_t buf_idx;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 	char buf[1000];
@@ -170,12 +170,12 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 	buf_idx += sizeof(uint32_t);
 	memcpy(&(buf[buf_idx]), inode_array, sizeof(ino_t)*num_inodes);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 	return ret_code;
@@ -241,7 +241,7 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
  * *************************************************************************/
 int32_t _unpin_by_inode(const uint32_t num_inodes, const char *inode_array)
 {
-	int32_t fd, size_msg, count, ret_code;
+	int32_t fd, count, ret_code;
 	int32_t buf_idx;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 	char buf[1000];
@@ -260,12 +260,12 @@ int32_t _unpin_by_inode(const uint32_t num_inodes, const char *inode_array)
 	buf_idx += sizeof(uint32_t);
 	memcpy(&(buf[buf_idx]), inode_array, sizeof(ino_t)*num_inodes);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 	return ret_code;
@@ -327,7 +327,7 @@ int32_t unpin_by_path(char *buf, uint32_t arg_len)
 int32_t check_pin_status(char *buf, uint32_t arg_len)
 {
 
-	int32_t fd, size_msg, count, ret_code;
+	int32_t fd, count, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 	ino_t tmp_inode;
 
@@ -342,12 +342,12 @@ int32_t check_pin_status(char *buf, uint32_t arg_len)
 	code = CHECKPIN;
 	cmd_len = sizeof(ino_t);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, &tmp_inode, sizeof(ino_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &tmp_inode, sizeof(ino_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 	return ret_code;
@@ -370,7 +370,7 @@ int32_t check_dir_status(char *buf, uint32_t arg_len,
 			 int64_t *num_hybrid)
 {
 
-	int32_t fd, size_msg, count, ret_code;
+	int32_t fd, count, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 	ino_t tmp_inode;
 
@@ -385,17 +385,17 @@ int32_t check_dir_status(char *buf, uint32_t arg_len,
 	code = CHECKDIRSTAT;
 	cmd_len = sizeof(ino_t);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, &tmp_inode, sizeof(ino_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &tmp_inode, sizeof(ino_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	if (reply_len > sizeof(uint32_t)) {
-		size_msg = recv(fd, num_local, sizeof(int64_t), 0);
-		size_msg = recv(fd, num_cloud, sizeof(int64_t), 0);
-		size_msg = recv(fd, num_hybrid, sizeof(int64_t), 0);
+		recv(fd, num_local, sizeof(int64_t), 0);
+		recv(fd, num_cloud, sizeof(int64_t), 0);
+		recv(fd, num_hybrid, sizeof(int64_t), 0);
 	} else {
-		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+		recv(fd, &ret_code, sizeof(int32_t), 0);
 	}
 
 	close(fd);
@@ -414,7 +414,7 @@ int32_t check_dir_status(char *buf, uint32_t arg_len,
 int32_t check_file_loc(char *buf, uint32_t arg_len)
 {
 
-	int32_t fd, size_msg, count, ret_code;
+	int32_t fd, count, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 	ino_t tmp_inode;
 
@@ -429,12 +429,12 @@ int32_t check_file_loc(char *buf, uint32_t arg_len)
 	code = CHECKLOC;
 	cmd_len = sizeof(ino_t);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, &tmp_inode, sizeof(ino_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &tmp_inode, sizeof(ino_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 	return ret_code;

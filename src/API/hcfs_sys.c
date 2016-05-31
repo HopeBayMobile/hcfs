@@ -395,7 +395,7 @@ int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
  * *************************************************************************/
 int32_t reload_hcfs_config()
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -405,11 +405,11 @@ int32_t reload_hcfs_config()
 	code = RELOADCONFIG;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
@@ -427,7 +427,7 @@ int32_t reload_hcfs_config()
  * *************************************************************************/
 int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 {
-	int32_t fd, ret_code, size_msg, enabled;
+	int32_t fd, ret_code, enabled;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
 	memcpy(&enabled, arg_buf, sizeof(int32_t));
@@ -441,12 +441,12 @@ int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 	code = SETSYNCSWITCH;
 	cmd_len = sizeof(int32_t);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, &enabled, sizeof(int32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &enabled, sizeof(int32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
@@ -464,7 +464,7 @@ int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
  * *************************************************************************/
 int32_t get_sync_status()
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -474,11 +474,11 @@ int32_t get_sync_status()
 	code = GETSYNCSWITCH;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
@@ -497,7 +497,7 @@ int32_t get_sync_status()
  * *************************************************************************/
 int32_t reset_xfer_usage()
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
 	fd = get_hcfs_socket_conn();
@@ -507,11 +507,11 @@ int32_t reset_xfer_usage()
 	code = RESETXFERSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 

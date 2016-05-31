@@ -32,7 +32,7 @@
  * *************************************************************************/
 int32_t _get_usage_val(uint32_t api_code, int64_t *res_val)
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	int64_t ll_ret_code;
 
@@ -43,11 +43,11 @@ int32_t _get_usage_val(uint32_t api_code, int64_t *res_val)
 	code = api_code;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ll_ret_code, sizeof(int64_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ll_ret_code, sizeof(int64_t), 0);
 
 	if (ll_ret_code < 0) {
 		*res_val = 0;
@@ -92,7 +92,7 @@ int32_t get_quota(int64_t *quota)
  * *************************************************************************/
 int32_t get_volume_usage(int64_t *vol_usage)
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	int64_t ll_ret_code;
 	char buf[1];
@@ -105,12 +105,12 @@ int32_t get_volume_usage(int64_t *vol_usage)
 	cmd_len = 1;
 	buf[0] = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ll_ret_code, sizeof(int64_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ll_ret_code, sizeof(int64_t), 0);
 
 	if (ll_ret_code < 0) {
 		*vol_usage = 0;
@@ -135,7 +135,7 @@ int32_t get_volume_usage(int64_t *vol_usage)
  * *************************************************************************/
 int32_t get_cloud_usage(int64_t *cloud_usage)
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 	int64_t ll_ret_code;
 	char buf[1];
@@ -148,12 +148,12 @@ int32_t get_cloud_usage(int64_t *cloud_usage)
 	cmd_len = 1;
 	buf[0] = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, buf, cmd_len, 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ll_ret_code, sizeof(int64_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ll_ret_code, sizeof(int64_t), 0);
 
 	if (ll_ret_code < 0) {
 		*cloud_usage = 0;
@@ -232,7 +232,7 @@ int32_t get_pin_usage(int64_t *pin_max, int64_t *pin_total)
  * *************************************************************************/
 int32_t get_xfer_usage(int64_t *xfer_up, int64_t *xfer_down)
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -242,15 +242,15 @@ int32_t get_xfer_usage(int64_t *xfer_up, int64_t *xfer_down)
 	code = GETXFERSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	if (reply_len > sizeof(int32_t)) {
-		size_msg = recv(fd, xfer_down, sizeof(int64_t), 0);
-		size_msg = recv(fd, xfer_up, sizeof(int64_t), 0);
+		recv(fd, xfer_down, sizeof(int64_t), 0);
+		recv(fd, xfer_up, sizeof(int64_t), 0);
 	} else {
-		size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+		recv(fd, &ret_code, sizeof(int32_t), 0);
 		close(fd);
 		return ret_code;
 	}
@@ -270,7 +270,7 @@ int32_t get_xfer_usage(int64_t *xfer_up, int64_t *xfer_down)
  * *************************************************************************/
 int32_t get_cloud_stat(int32_t *cloud_stat)
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -280,11 +280,11 @@ int32_t get_cloud_stat(int32_t *cloud_stat)
 	code = CLOUDSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	*cloud_stat = ret_code;
 	close(fd);
@@ -303,7 +303,7 @@ int32_t get_cloud_stat(int32_t *cloud_stat)
  * *************************************************************************/
 int32_t get_data_transfer(int32_t *data_transfer)
 {
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -313,11 +313,11 @@ int32_t get_data_transfer(int32_t *data_transfer)
 	code = GETXFERSTATUS;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	*data_transfer = ret_code;
 	close(fd);
