@@ -987,6 +987,9 @@ ino_t super_block_new_inode(struct stat *in_stat,
 
 	super_block_exclusive_locking();
 
+/* FEATURE TODO: (need to integrate with Kewei's code) in restore mode, need
+to allocate new inode from inode number larger than the current ones,
+not reclaimed ones used before */
 	if (sys_super_block->head.num_inode_reclaimed > 0) {
 		this_inode = sys_super_block->head.first_reclaimed_inode;
 		retsize = pread(sys_super_block->iofptr, &tempentry,
@@ -1631,7 +1634,7 @@ int32_t super_block_finish_pinning(ino_t this_inode)
 	int32_t ret;
 
 	super_block_exclusive_locking();
-
+/* FEATURE TODO: fetch meta and rebuild super block entry */
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
@@ -1683,6 +1686,7 @@ int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 	int32_t ret;
 
 	super_block_exclusive_locking();
+/* FEATURE TODO: fetch meta and rebuild super block entry */
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
@@ -1732,6 +1736,7 @@ int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 	int32_t ret;
 
 	super_block_exclusive_locking();
+/* FEATURE TODO: fetch meta and rebuild super block entry */
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
