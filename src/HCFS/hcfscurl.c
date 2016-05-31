@@ -832,6 +832,7 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 			  strerror(errcode));
 		return -1;
 	}
+	setbuf(swift_header_fptr, NULL);
 	chunk = NULL;
 
 	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
@@ -975,6 +976,7 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 			  strerror(errcode));
 		return -1;
 	}
+	setbuf(swift_header_fptr, NULL);
 
 	chunk = NULL;
 
