@@ -43,8 +43,9 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 		return ret;
 	flock(fileno(fsmgr_fptr), LOCK_UN);
 	fclose(fsmgr_fptr);
-	*num_inodes = num_dir;
-	*roots = dir_nodes;
+	*num_inodes = num_nondir;
+	*roots = nondir_nodes;
+	write_log(4, "Number of roots is %"PRId64, *num_inodes);
 
 	return 0;
 errcode_handle:
@@ -114,6 +115,7 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 			max_inode = fs_cloud_stat.max_inode;
 	}
 
+	write_log(0, "Now max inode number is %"PRIu64, (uint64_t)max_inode);
 	/* init head */
 	sprintf(sb_path, "%s/superblock", METAPATH);
 	sb_fptr = fopen(sb_path, "w+");
@@ -122,7 +124,7 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	memset(&head, 0, sizeof(SUPER_BLOCK_HEAD));
 	head.num_total_inodes = max_inode;
 	head.now_rebuild = TRUE;
-	FSEEK(fptr, 0, SEEK_SET);
+	FSEEK(sb_fptr, 0, SEEK_SET);
 	FWRITE(&head, sizeof(SUPER_BLOCK_HEAD), 1, sb_fptr);
 	fclose(sb_fptr);
 
@@ -298,6 +300,9 @@ errcode_handle:
 
 int32_t rebuild_sb_manager()
 {
+	write_log(4, "Now begin to rebuild sb\n");
+	write_log(4, "Number of remaining jobs %lld\n",
+			rebuild_sb_jobs->remaining_jobs);
 	/* Create queue file */
 	/* Get root inodes if file is empty */
 	/* write to queue file */

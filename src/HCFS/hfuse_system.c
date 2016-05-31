@@ -241,9 +241,9 @@ int32_t init_hfuse(void)
 	ret_val = init_hcfs_system_data();
 	if (ret_val < 0)
 		return ret_val;
-	ret_val = super_block_init();
-	if (ret_val < 0)
-		return ret_val;
+	//ret_val = super_block_init();
+	//if (ret_val < 0)
+	//	return ret_val;
 	ret_val = init_system_fh_table();
 	if (ret_val < 0)
 		return ret_val;
@@ -306,7 +306,7 @@ void init_backend_related_module(void)
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
-		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		//pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
@@ -401,7 +401,7 @@ int32_t _is_battery_low()
 int32_t main(int32_t argc, char **argv)
 {
 	CURL_HANDLE curl_handle;
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	struct rlimit nofile_limit;
 #ifndef _ANDROID_ENV_
 	int32_t count;
@@ -499,7 +499,15 @@ int32_t main(int32_t argc, char **argv)
 
 	/* Init backend related services */
 	if (CURRENT_BACKEND != NONE) {
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		ret = check_init_super_block();
+		if (ret < 0)
+			exit(ret);
 		init_backend_related_module();
+	} else {
+		ret = check_init_super_block();
+		if (ret < 0)
+			exit(ret);
 	}
 
 	hook_fuse(argc, argv);

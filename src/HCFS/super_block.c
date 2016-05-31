@@ -1883,6 +1883,12 @@ error_handling:
 	return ret;
 }
 
+#define _ASSERT_BACKEND_EXIST_() \
+	{\
+		if (CURRENT_BACKEND == NONE) \
+		return -ENOTCONN; \
+	}
+
 int32_t check_init_super_block()
 {
 	char fsmgr_path[200];
@@ -1896,6 +1902,7 @@ int32_t check_init_super_block()
 	if (access(fsmgr_path, F_OK) < 0) {
 		errcode = errno;
 		if (errcode == ENOENT) {
+			_ASSERT_BACKEND_EXIST_();
 			/* TODO:Get fsmgr from cloud */
 		} else {
 			return -errcode;
@@ -1919,6 +1926,7 @@ int32_t check_init_super_block()
 	/* Check superblock status */
 	if (access(SUPERBLOCK, F_OK) < 0) {
 		/* Rebuild SB */
+		_ASSERT_BACKEND_EXIST_();
 		ret = init_rebuild_sb(START_REBUILD_SB);
 		if (ret < 0)
 			return ret;
@@ -1939,6 +1947,7 @@ int32_t check_init_super_block()
 		if (ret_ssize < (int64_t)sizeof(SUPER_BLOCK_HEAD)) {
 			unlink(SUPERBLOCK);
 			/* Rebuild SB */
+			_ASSERT_BACKEND_EXIST_();
 			ret = init_rebuild_sb(START_REBUILD_SB);
 			if (ret < 0)
 				return ret;
@@ -1947,6 +1956,7 @@ int32_t check_init_super_block()
 		} else {
 			if (head.now_rebuild) {
 				/* Keep rebuilding SB */
+				_ASSERT_BACKEND_EXIST_();
 				ret = init_rebuild_sb(KEEP_REBUILD_SB);
 				if (ret < 0)
 					return ret;
