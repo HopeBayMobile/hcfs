@@ -262,14 +262,19 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 		FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 		if (stat(thisblockpath, &tempstat) == 0) {
-			(temppage).block_entries[entry_index].status = ST_BOTH;
-			ret = set_block_dirty_status(NULL, blockfptr, FALSE);
-			if (ret < 0) {
-				goto errcode_handle;
+			if ((temppage).block_entries[entry_index].status ==
+					ST_CtoL) {
+				(temppage).block_entries[entry_index].status =
+						ST_BOTH;
+				ret = set_block_dirty_status(NULL,
+						blockfptr, FALSE);
+				if (ret < 0) {
+					goto errcode_handle;
+				}
+				FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
+				FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
+						metafptr);
 			}
-			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
-			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
-			       metafptr);
 			ret = update_file_stats(metafptr, 0, 1,
 						tempstat.st_size,
 						0, ptr->this_inode);

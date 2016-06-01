@@ -824,7 +824,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 				return -ECANCELED;
 			}
 		}
-	
+
 		flock(fileno(local_metafptr), LOCK_UN);
 		sem_wait(&(upload_ctl.upload_queue_sem));
 		sem_wait(&(upload_ctl.upload_op_sem));

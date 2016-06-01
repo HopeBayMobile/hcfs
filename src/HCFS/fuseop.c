@@ -3452,26 +3452,28 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		}
 
 		if (stat(thisblockpath, &tempstat2) == 0) {
-			(tpage->block_entries[eindex]).status = ST_BOTH;
-			tmpptr = fh_ptr->meta_cache_ptr;
-			ret = set_block_dirty_status(NULL,
-				fh_ptr->blockfptr, FALSE);
-			if (ret < 0) {
-				fh_ptr->meta_cache_locked = FALSE;
-				meta_cache_close_file(tmpptr);
-				meta_cache_unlock_entry(tmpptr);
-				if (fh_ptr->blockfptr != NULL) {
-					fclose(fh_ptr->blockfptr);
-					fh_ptr->blockfptr = NULL;
+			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
+				(tpage->block_entries[eindex]).status = ST_BOTH;
+				tmpptr = fh_ptr->meta_cache_ptr;
+				ret = set_block_dirty_status(NULL,
+						fh_ptr->blockfptr, FALSE);
+				if (ret < 0) {
+					fh_ptr->meta_cache_locked = FALSE;
+					meta_cache_close_file(tmpptr);
+					meta_cache_unlock_entry(tmpptr);
+					if (fh_ptr->blockfptr != NULL) {
+						fclose(fh_ptr->blockfptr);
+						fh_ptr->blockfptr = NULL;
+					}
+					return -EIO;
 				}
-				return -EIO;
+				ret = meta_cache_update_file_data(
+						fh_ptr->thisinode,
+						NULL, NULL, tpage, page_fpos,
+						fh_ptr->meta_cache_ptr);
+				if (ret < 0)
+					goto error_handling;
 			}
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
-					NULL, NULL, tpage, page_fpos,
-					fh_ptr->meta_cache_ptr);
-			if (ret < 0)
-				goto error_handling;
-
 			/* Update system meta to reflect correct cache size */
 			change_system_meta(0, 0, tempstat2.st_size,
 					1, 0, 0, TRUE);
@@ -4290,11 +4292,13 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			}
 			break;
 		case ST_LDISK:
-			meta_cache_check_uploading(fh_ptr->meta_cache_ptr, this_inode, bindex, now_seq);
+			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+					this_inode, bindex, now_seq);
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
-			meta_cache_check_uploading(fh_ptr->meta_cache_ptr, this_inode, bindex, now_seq);
+			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+					this_inode, bindex, now_seq);
 			(temppage).block_entries[entry_index].status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
