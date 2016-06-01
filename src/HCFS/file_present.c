@@ -324,18 +324,21 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		return ret_val;
 
-	/* Storage location for new file is local */
-	DIR_STATS_TYPE tmpstat;
-	tmpstat.num_local = 1;
-	tmpstat.num_cloud = 0;
-	tmpstat.num_hybrid = 0;
-	sem_wait(&(pathlookup_data_lock));
-	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
-	if (ret_val < 0) {
+	/* Only update dir statistics if this is a regular file */
+	if (S_ISREG(this_stat->st_mode)) {
+		/* Storage location for new file is local */
+		DIR_STATS_TYPE tmpstat;
+		tmpstat.num_local = 1;
+		tmpstat.num_cloud = 0;
+		tmpstat.num_hybrid = 0;
+		sem_wait(&(pathlookup_data_lock));
+		ret_val = update_dirstat_parent(parent_inode, &tmpstat);
+		if (ret_val < 0) {
+			sem_post(&(pathlookup_data_lock));
+			return ret_val;
+		}
 		sem_post(&(pathlookup_data_lock));
-		return ret_val;
 	}
-	sem_post(&(pathlookup_data_lock));
 
 	if (old_metasize > 0 && new_metasize > 0)
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
