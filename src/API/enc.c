@@ -1,6 +1,20 @@
-#include <inttypes.h>
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: enc.c
+* Abstract: This c source file for some encryption helper.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
 #include "enc.h"
+
+#include <inttypes.h>
+
+#include "logger.h"
 
 /************************************************************************
  * *
@@ -34,11 +48,11 @@ int32_t generate_random_bytes(uint8_t *bytes, uint32_t length)
 	case 1:
 		return 0;
 	case -1:
-		printf("RAND_bytes not supported");
+		write_log(0, "In %s, RAND_bytes not supported", __func__);
 		return -2;
 	default:
-		printf("RAND_bytes: some openssl error may occurs: %ld",
-			  ERR_peek_last_error());
+		write_log("In %s, RAND_bytes: some openssl error may occurs: %ld",
+			  __func__, ERR_peek_last_error());
 		return -3;
 	}
 }
