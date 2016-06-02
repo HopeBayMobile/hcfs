@@ -435,3 +435,9 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 {
 	return 0;
 }
+
+int32_t get_progress_info(int32_t fd, int64_t block_index,
+		BLOCK_UPLOADING_STATUS *block_uploading_status)
+{
+	return 0;
+}
