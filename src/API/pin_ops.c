@@ -182,8 +182,6 @@ int32_t _pin_by_inode(const int64_t reserved_size, const uint32_t num_inodes,
 
 }
 
-/* REVIEW TODO: Perhaps should make sure that there will be no more
-inodes than the array of 1600 bytes can handle */
 /************************************************************************
  * *
  * * Function name: pin_by_path

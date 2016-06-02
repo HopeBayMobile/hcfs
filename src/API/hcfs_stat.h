@@ -30,8 +30,6 @@ typedef struct {
 	int32_t data_transfer;
 } HCFS_STAT_TYPE;
 
-/* REVIEW TODO: There are quite a few parameters here. Could we aggregate those
-into a structure (easier to read and maintain)? */
 int32_t get_hcfs_stat(HCFS_STAT_TYPE *hcfs_stats);
 
 int32_t get_occupied_size(int64_t *occupied);

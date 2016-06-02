@@ -43,7 +43,6 @@ int32_t do_pin_by_path(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 
-/* REVIEW TODO: Perhaps should change all printf function calls to write logs */
 	write_log(8, "Start pin by path\n");
 	ret_code = pin_by_path(largebuf, arg_len);
 
@@ -341,8 +340,6 @@ int32_t process_request(int32_t thread_idx)
 	write_log(8, "API code is %d\n", api_code);
 
 	if (reads(fd, &arg_len, sizeof(uint32_t))) {
-/* REVIEW TODO: The following message should be written
-to an error log */
 		write_log(0, "Failed to receive arg length. (API code %d)\n",
 				api_code);
 		goto error;
@@ -364,8 +361,6 @@ to an error log */
 		goto error;
 	}
 
-/* REVIEW TODO: Is it possible to move the following definition to
-other places? This breaks the flow of code reading. */
 	SOCK_CMDS cmds[] = {
 		{PIN,		do_pin_by_path},
 		{UNPIN,		do_unpin_by_path},
@@ -409,9 +404,6 @@ done:
 	return ret_code;
 }
 
-/* REVIEW TODO: Perhaps we should add some error log if socket
-init or other IOs encounter errors, so that we can know the source
-of errors */
 /************************************************************************
  * *
  * * Function name: init_server

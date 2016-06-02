@@ -71,10 +71,8 @@ int32_t reads(int32_t fd, void *_buf, int32_t count)
 		r = recv(fd, buf + total, count - total,
 			 MSG_NOSIGNAL);
 		if (r < 0) {
-/* REVIEW TODO: The style of the if statement here is not correct */
 			if (errno == EINTR)
 				continue;
-/* REVIEW TODO: Is it possible to return errno here to indicate the nature of the errors? */
 			return -errno;
 		}
 		if (r == 0)
@@ -84,7 +82,6 @@ int32_t reads(int32_t fd, void *_buf, int32_t count)
 	return 0;
 }
 
-/* REVIEW TODO: Same for the function sends */
 /************************************************************************
  * *
  * * Function name: sends

@@ -195,10 +195,6 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 	char *tmp_ptr, *line, *token;
 	FILE *conf = NULL;
 	FILE *tmp_conf = NULL;
-/*REVIEW TODO: Memory overflow might occur if content in the config
-is larger than the buffer size (1K). Perhaps could first check the
-size of the config file, then allocate enough memory for reading in
-the entire content after decryption */
 	uint8_t *data_buf = NULL;
 	uint8_t *enc_data = NULL;
 	int32_t data_size = 0;
@@ -251,7 +247,6 @@ the entire content after decryption */
 
 		str_len = strlen(buf);
 		memcpy(&(data_buf[data_size]), buf, str_len + 1);
-/* REVIEW TODO: If data_size > 1024 then we might have some trouble */
 		data_size += str_len;
 
 		free(tmp_ptr);
