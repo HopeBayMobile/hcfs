@@ -424,11 +424,12 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
+/*
 	if (finish)
 		if (block_uploading_status->finish_uploading == TRUE)
 			write_log(10, "Debug: block_%lld finished uploading - "
 				"fd = %d\n", block_index, fd);
-
+*/
 	return 0;
 
 errcode_handle:
@@ -479,11 +480,12 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
+/*
 	if (finish)
 		if (block_uploading_status->finish_uploading == TRUE)
 			write_log(10, "Debug: block_%lld finished uploading - "
 				"fd = %d\n", block_index, fd);
-
+*/
 	return 0;
 
 errcode_handle:
@@ -641,8 +643,8 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 		block_uploading_status.backend_seq =
 			block_page.block_entries[e_index].seqnum;
 
-		write_log(10, "Debug: init progress file block%lld_%lld",
-				block, block_uploading_status.backend_seq);
+		/*write_log(10, "Debug: init progress file block%lld_%lld",
+				block, block_uploading_status.backend_seq);*/
 #endif
 		/* Copy to syncing status page */
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;

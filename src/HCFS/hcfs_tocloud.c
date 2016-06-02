@@ -744,6 +744,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	int32_t which_curl;
 	BOOL llock, ulock;
 	char finish_uploading, toupload_exist;
+	BLOCK_UPLOADING_STATUS block_uploading_status;
 
 	llock = FALSE;
 	ulock = FALSE;
@@ -842,6 +843,9 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		sem_post(&(upload_ctl.upload_op_sem));
 		ret = dispatch_upload_block(which_curl);
 		if (ret < 0) {
+			write_log(4, "Error: Fail to dipatch and upload"
+				" block_%"PRIu64"_%lld. Code %d",
+				(uint64_t)ptr->inode, block_count, -ret);
 			if (ret == -ENOENT)
 				ret = -ECANCELED;
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
@@ -852,7 +856,8 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	/*** Case 2: Local block is deleted or none. Do nothing ***/
 	case ST_TODELETE:
 	case ST_NONE:
-		write_log(10, "Debug: block_%lld is %s\n", block_count,
+		write_log(10, "Debug: block_%"PRIu64"_%lld is %s\n",
+				(uint64_t)ptr->inode, block_count,
 				toupload_block_status == ST_NONE ?
 				"ST_NONE" : "ST_TODELETE");
 		if (local_block_status == ST_TODELETE) {
@@ -878,8 +883,21 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		break;
 	/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
 	default:
-		write_log(10, "Debug: block_%lld is %d\n", block_count,
+		write_log(10, "Debug: Sataus of block_%"PRIu64"_%lld is %d\n",
+				(uint64_t)ptr->inode,
+				block_count,
 				toupload_block_status);
+		get_progress_info(ptr->progress_fd, block_count,
+				&block_uploading_status);
+		if (toupload_block_seq != block_uploading_status.backend_seq) {
+			write_log(0, "Error: Seq of block_%"PRIu64"_%lld does"
+				"not match. Local seq %lld, cloud seq %lld. But"
+				" status is %d\n",
+				(uint64_t)ptr->inode, block_count,
+				toupload_block_seq,
+				block_uploading_status.backend_seq,
+				toupload_block_status);
+		}
 
 		finish_uploading = TRUE;
 		toupload_exist = TRUE;
