@@ -466,6 +466,9 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(-1);
 
+/* FEATURE TODO: should check if system is started as restoring mode here */
+/* FEATURE TODO: If so, set hcfs_system->system_restoring to true here */
+
 	/* TODO: error handling for log files */
 	init_sync_stat_control();
 

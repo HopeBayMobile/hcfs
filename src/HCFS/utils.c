@@ -1540,7 +1540,7 @@ errcode_handle:
 *        Inputs: char *pathname, ino_t this_inode
 *        Output: Integer
 *       Summary: Given the inode number this_inode,
-*                copy the filename to the stat file
+*                copy the filename of the stat file
 *                to the space pointed by pathname.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.

@@ -2228,7 +2228,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
 
 /* FEATURE TODO: Make sure that FSstat is downloaded before restoration
-begins */
+begins, and the local stat file is inited accordingly */
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 METAPATH, (uint64_t)root_inode);
 	snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%" PRIu64,

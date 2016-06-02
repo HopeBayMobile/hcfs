@@ -357,7 +357,8 @@ int64_t get_vol_size(int32_t arg_len, char *largebuf)
 		llretval = (int64_t) ret;
 		goto error_handling;
 	}
-/* FEATURE TODO: fetch stat meta */
+	/* FS_stat should exists even in restoration, as it will be
+	downloaded first before restoration begins. */
 	statfptr = fopen(temppath, "r+");
 	if (statfptr == NULL) {
 		ret = (int64_t) errno;
@@ -424,7 +425,6 @@ int64_t get_cloud_size(int32_t arg_len, char *largebuf)
 	snprintf(temppath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64,
 		 METAPATH, (uint64_t)temp_entry.d_ino);
 	write_log(10, "Checking for FS stat in backend\n");
-/* FEATURE TODO: FS stat */
 	statfptr = fopen(temppath, "r");
 	if (statfptr == NULL) {
 		ret = (int64_t) errno;
