@@ -82,4 +82,6 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 		ino_t **dir_node_list, int64_t *num_dir_node,
 		ino_t **nondir_node_list, int64_t *num_nondir_node);
 
+int32_t restore_meta_file(ino_t this_inode);
+
 #endif /* GW20_HCFS_METAOPS_H_ */

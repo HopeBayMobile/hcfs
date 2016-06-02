@@ -76,5 +76,5 @@ void fetch_backend_block(void *ptr);
 int32_t fetch_pinned_blocks(ino_t inode);
 void fetch_quota_from_cloud(void *ptr);
 int32_t update_quota();
-
+int32_t fetch_meta_from_cloud(FILE *fptr, char *objname);
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

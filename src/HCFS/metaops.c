@@ -46,6 +46,7 @@
 #include "lookup_count.h"
 #include "super_block.h"
 #include "filetables.h"
+#include "hcfs_fromcloud.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #include "FS_manager.h"
@@ -2459,3 +2460,53 @@ errcode_handle:
 	return ret;
 }
 
+int32_t restore_meta_file(ino_t this_inode)
+{
+	char metapath[300], objname[300];
+	FILE *fptr;
+	int32_t errcode, ret;
+
+	fetch_meta_path(metapath, this_inode);
+	/* Meta file had been restored. */
+	if (!access(metapath, F_OK))
+		return 0;
+
+	/* Begin to restore */
+	fptr = fopen(metapath, "a+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errno));
+		return -EIO;
+	}
+	fclose(fptr);
+	fptr = fopen(metapath, "r+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errno));
+		return -EIO;
+	}
+	ret = flock(fileno(fptr), LOCK_EX);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errno));
+		if (fptr != NULL) {
+			fclose(fptr);
+			fptr = NULL;
+		}
+		return -EIO;
+	}
+
+	/* Fetch meta from cloud */
+	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
+	ret = fetch_meta_from_cloud(fptr, objname);
+	if (ret < 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return ret;
+	}
+
+	return 0;
+}

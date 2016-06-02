@@ -328,3 +328,55 @@ int32_t create_sb_rebuilder()
 	sem_post(&(rebuild_sb_mgr_info->mgr_access_sem));
 	return 0;
 }
+
+/**
+ * Rebuild a super block entry. Do nothing when this entry had been
+ * rebuilded before.
+ *
+ * @param this_inode Entry of the inode in superblock to be rebuild.
+ * @param this_stat Stat data to be filled into superblock entry.
+ * @param pin_status Pin status of the file.
+ *
+ * @return 0 on success. Otherwise negative error code.
+ */
+int32_t rebuild_super_block_entry(ino_t this_inode,
+	struct stat *this_stat, char pin_status)
+{
+	int32_t ret;
+	SUPER_BLOCK_ENTRY sb_entry;
+
+	/* Check whether this entry had been rebuilded */
+	ret = super_block_read(this_inode, &sb_entry);
+	if (ret < 0)
+		return ret;
+	if (sb_entry.this_index <= 0)
+		return 0;
+
+	/* Rebuild entry */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	memcpy(&(sb_entry.inode_stat), this_stat, sizeof(struct stat));
+	sb_entry.this_index = this_inode;
+	sb_entry.generation = 1;
+	sb_entry.status = NO_LL;
+	sb_entry.pin_status = ST_UNPIN;
+
+	super_block_exclusive_locking();
+	if (pin_status == PIN) {
+		if (S_ISREG(this_stat->st_mode)) {
+			/* Enqueue and set as ST_PINNING */
+			ret = pin_ll_enqueue(this_inode, &sb_entry);
+			sb_entry.pin_status = ST_PINNING;
+		} else {
+			sb_entry.pin_status = ST_PIN;
+		}
+	}
+	ret = write_super_block_entry(this_inode, &sb_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;
+	}
+	super_block_exclusive_release();
+	write_log(10, "Debug: Rebuilding sb entry %"PRIu64" has completed.\n",
+			(uint64_t)this_inode);
+	return 0;
+}

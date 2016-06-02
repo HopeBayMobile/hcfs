@@ -1082,3 +1082,66 @@ int32_t update_quota()
 	sem_post(&(download_usermeta_ctl.access_sem));
 	return 0;
 }
+
+
+/* NOTE: Temp use this function to download meta file. It will be removed
+ * when atomic_upload merge to android-dev */
+int32_t fetch_meta_from_cloud(FILE *fptr, char *objname)
+{
+	int32_t status;
+	int32_t which_curl_handle;
+	int32_t ret, errcode;
+
+	if (hcfs_system->sync_paused)
+		return -EIO;
+
+	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
+
+
+	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
+		sem_wait(&pin_download_curl_sem);
+	sem_wait(&download_curl_sem);
+	sem_wait(&download_curl_control_sem);
+	for (which_curl_handle = 0;
+	     which_curl_handle < MAX_DOWNLOAD_CURL_HANDLE;
+	     which_curl_handle++) {
+		if (curl_handle_mask[which_curl_handle] == FALSE) {
+			curl_handle_mask[which_curl_handle] = TRUE;
+			break;
+		}
+	}
+	sem_post(&download_curl_control_sem);
+
+	FSEEK(fptr, 0, SEEK_SET);
+	FTRUNCATE(fileno(fptr), 0);
+
+        HCFS_encode_object_meta *object_meta =
+            calloc(1, sizeof(HCFS_encode_object_meta));
+
+        status = hcfs_get_object(fptr, objname,
+                                 &(download_curl_handles[which_curl_handle]),
+                                 object_meta);
+	if ((status >= 200) && (status <= 299)) {
+		errcode = 0;
+	} else {
+		errcode = -EIO;
+		free_object_meta(object_meta);
+		fclose(fptr);
+		goto errcode_handle;
+	}
+	fflush(fptr);
+
+errcode_handle:
+	sem_trywait(&(hcfs_system->xfer_download_in_progress_sem));
+	write_log(10, "Download job finished, download_in_progress should minus 1\n");
+
+	sem_wait(&download_curl_control_sem);
+	curl_handle_mask[which_curl_handle] = FALSE;
+	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
+		sem_post(&pin_download_curl_sem);
+	sem_post(&download_curl_sem);
+	sem_post(&download_curl_control_sem);
+
+	return errcode;
+}
