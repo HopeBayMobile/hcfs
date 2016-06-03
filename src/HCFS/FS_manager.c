@@ -69,8 +69,8 @@ int32_t init_fs_manager(void)
 
 	sem_init(&(fs_mgr_head->op_lock), 0, 1);
 
-/* FEATURE TODO: Check if need to restore FS manager (or this
-will be done in some previous steps) */
+/* FEATURE TODO: Need to remember to download FS manager before restoring
+mode begins */
 	errcode = 0;
 	if (access(fs_mgr_path, F_OK) != 0) {
 		errcode = errno;
@@ -698,7 +698,15 @@ int32_t delete_filesystem(char *fsname)
 	       sizeof(DIR_ENTRY));
 	FS_root = temp_entry.d_ino;
 
-/* FEATURE TODO: fetch meta */
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_file(FS_root);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
 	ret = fetch_meta_path(thismetapath, FS_root);
 	metafptr = NULL;
 	metafptr = fopen(thismetapath, "r");

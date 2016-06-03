@@ -1100,6 +1100,9 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	int32_t tmp_index;
 	int32_t cache_idx;
 
+/* FEATURE TODO: rebuild parent lookup / dir statistics here
+(excluding . and ..), for every successful return */
+
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 

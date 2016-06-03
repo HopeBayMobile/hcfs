@@ -5471,6 +5471,9 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			else if (this_type == D_ISSOCK)
 				tempstat.st_mode = S_IFSOCK;
 
+/* FEATURE TODO: rebuild parent lookup / dir statistics here
+(excluding . and ..), for every pair of (parent / child) discovered here */
+
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],

@@ -593,11 +593,13 @@ int32_t delete_inode_meta(ino_t this_inode)
 	if (ret < 0)
 		return ret;
 
+	/* Meta file should be downloaded already in unlink, rmdir, or
+	rename ops */
+
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
 		return ret;
 
-/* FEATURE TODO: fetch meta */
 	/*Try a rename first*/
 	ret = rename(thismetapath, todelete_metapath);
 	write_log(10, "%s, %s, %d\n", thismetapath, todelete_metapath, ret);
@@ -1255,7 +1257,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
 			return ret;
-/* TODO: fetch stat meta */
+
 		fptr = fopen(rootpath, "r+");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -1310,7 +1312,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
-/* FEATURE TODO: fetch meta */
+		/* Meta file should be downloaded already in unlink, rmdir, or
+		rename ops */
+
 		if (access(thismetapath, F_OK) != 0) {
 			errcode = errno;
 			if (errcode != ENOENT) {
@@ -1959,7 +1963,13 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	if (ret < 0)
 		return ret;
 
-/* FEATURE TODO: fetch meta */
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_file(this_inode);
+		if (ret < 0)
+			return ret;
+	}
+
 	fptr = fopen(metapath, "r");
 	if (fptr == NULL) {
 		ret = errno;
