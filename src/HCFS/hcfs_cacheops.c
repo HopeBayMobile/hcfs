@@ -170,6 +170,13 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				/*Only delete blocks that exists on both
 					cloud and local*/
 				blk_entry_ptr->status = ST_CLOUD;
+				/* Increase the counter for the number of times
+				this block is paged out. Reset to zero if
+				overflow */
+				blk_entry_ptr->paged_out_count++;
+				if (blk_entry_ptr->paged_out_count >
+				    (UINT32_MAX - 10))
+					blk_entry_ptr->paged_out_count = 0;
 				write_log(10,
 					"Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
 						current_block, this_inode);

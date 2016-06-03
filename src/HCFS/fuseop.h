@@ -133,6 +133,7 @@ typedef struct {
 #if (DEDUP_ENABLE)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
+	uint32_t paged_out_count;
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
