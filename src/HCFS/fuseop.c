@@ -3571,17 +3571,33 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 
 	sem_wait(&(fh_ptr->block_sem));
 	fill_zeros = FALSE;
+
+	ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
+	if (ret < 0) {
+		sem_post(&(fh_ptr->block_sem));
+		*reterr = ret;
+		return 0;
+	}
+
+	/* Close opened block file if not sure there is a valid local copy */
+	switch ((temppage).block_entries[entry_index].status) {
+	case ST_NONE:
+	case ST_TODELETE:
+	case ST_CLOUD:
+	case ST_CtoL:
+		if (fh_ptr->opened_block == bindex) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		break;
+	default:
+		break;
+	}
+
 	while (fh_ptr->opened_block != bindex) {
 		if (fh_ptr->opened_block != -1) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
-		}
-
-		ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
-		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
-			*reterr = ret;
-			return 0;
 		}
 
 		ret = read_wait_full_cache(&temppage, entry_index, fh_ptr,
@@ -3649,6 +3665,13 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 				write_log(2, " Perhaps replaced?\n");
 				fh_ptr->opened_block = -1;
 			}
+			ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
+			if (ret < 0) {
+				sem_post(&(fh_ptr->block_sem));
+				*reterr = ret;
+				return 0;
+			}
+
 		} else {
 			break;
 		}
