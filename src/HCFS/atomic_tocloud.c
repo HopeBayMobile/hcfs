@@ -844,22 +844,6 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_
 	if (lock_src == TRUE)
 		flock(fileno(src_ptr), LOCK_EX);
 
-	/* Check again to avoid race condition*/
-	if (access(tarpath, F_OK) == 0) {
-		if (lock_src == TRUE)
-			flock(fileno(src_ptr), LOCK_UN);
-		fclose(src_ptr);
-		return -EEXIST;
-	}
-
-	if (access(srcpath, F_OK) < 0) {
-		errcode = errno;
-		if (lock_src == TRUE)
-			flock(fileno(src_ptr), LOCK_UN);
-		fclose(src_ptr);
-		return -errcode;
-	}
-
 	tar_ptr = fopen(tarpath, "a+");
 	if (tar_ptr == NULL) {
 		errcode = errno;
@@ -940,8 +924,8 @@ errcode_handle:
 	flock(fileno(tar_ptr), LOCK_UN);
 	fclose(src_ptr);
 	fclose(tar_ptr);
-	if (access(srcpath, F_OK) == 0)
-		unlink(srcpath);
+	if (access(tarpath, F_OK) == 0)
+		unlink(tarpath);
 	return errcode;
 }
 
