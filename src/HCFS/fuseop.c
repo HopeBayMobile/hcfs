@@ -3487,17 +3487,41 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 
 	sem_wait(&(fh_ptr->block_sem));
 	fill_zeros = FALSE;
+
+	ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
+	if (ret < 0) {
+		sem_post(&(fh_ptr->block_sem));
+		*reterr = ret;
+		return 0;
+	}
+
+	/* If status of the current block indicates the block file
+	may not exist locally, close the opened block file */
+	switch ((temppage).block_entries[entry_index].status) {
+	case ST_NONE:
+	case ST_TODELETE:
+	case ST_CLOUD:
+	case ST_CtoL:
+		if (fh_ptr->opened_block == bindex) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		break;
+	default:
+		/* Close the cached file if paged out previously */
+		if ((temppage).block_entries[entry_index].paged_out_count !=
+		    fh_ptr->cached_paged_out_count) { 
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		break;
+		break;
+	}
+
 	while (fh_ptr->opened_block != bindex) {
 		if (fh_ptr->opened_block != -1) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
-		}
-
-		ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
-		if (ret < 0) {
-			sem_post(&(fh_ptr->block_sem));
-			*reterr = ret;
-			return 0;
 		}
 
 		ret = read_wait_full_cache(&temppage, entry_index, fh_ptr,
@@ -3557,6 +3581,11 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 			if (fh_ptr->blockfptr != NULL) {
 				setbuf(fh_ptr->blockfptr, NULL);
 				fh_ptr->opened_block = bindex;
+
+				BLOCK_ENTRY *tptr;
+				tptr = &(temppage.block_entries[entry_index]);
+				fh_ptr->cached_paged_out_count =
+					tptr->paged_out_count;
 			} else {
 			/* Some exception that block file is deleted in
 			*  the middle of the status check*/
@@ -3565,6 +3594,13 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 				write_log(2, " Perhaps replaced?\n");
 				fh_ptr->opened_block = -1;
 			}
+			ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
+			if (ret < 0) {
+				sem_post(&(fh_ptr->block_sem));
+				*reterr = ret;
+				return 0;
+			}
+
 		} else {
 			break;
 		}
@@ -4135,6 +4171,36 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 	}
 
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
+			NULL, &temppage, this_page_fpos,
+			fh_ptr->meta_cache_ptr);
+	if (ret < 0) {
+		*reterr = ret;
+		return 0;
+	}
+
+	/* If status of the current block indicates the block file
+	may not exist locally, close the opened block file */
+	switch ((temppage).block_entries[entry_index].status) {
+	case ST_NONE:
+	case ST_TODELETE:
+	case ST_CLOUD:
+	case ST_CtoL:
+		if (fh_ptr->opened_block == bindex) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		break;
+	default:
+		/* Close the cached file if paged out previously */
+		if ((temppage).block_entries[entry_index].paged_out_count !=
+		    fh_ptr->cached_paged_out_count) { 
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		break;
+	}
+
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		/* If the cached block is not the one we are writing to,
@@ -4142,13 +4208,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		if (fh_ptr->opened_block != -1) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
-		}
-		ret = meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
-				NULL, &temppage, this_page_fpos,
-				fh_ptr->meta_cache_ptr);
-		if (ret < 0) {
-			*reterr = ret;
-			return 0;
 		}
 
 		ret = write_wait_full_cache(&temppage, entry_index, fh_ptr,
@@ -4244,7 +4303,32 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		setbuf(fh_ptr->blockfptr, NULL);
 		fh_ptr->opened_block = bindex;
+		fh_ptr->cached_paged_out_count =
+			(temppage).block_entries[entry_index].paged_out_count;
+	} else {
+		switch ((temppage).block_entries[entry_index].status) {
+		case ST_BOTH:
+		case ST_LtoC:
+			(temppage).block_entries[entry_index].status = ST_LDISK;
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
+			if (ret < 0) {
+				*reterr = -EIO;
+				return 0;
+			}
+			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+					NULL, NULL, &temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
+			if (ret < 0) {
+				*reterr = ret;
+				return 0;
+			}
+			break;
+		default:
+			break;
+		}
 	}
+
 	ret = flock(fileno(fh_ptr->blockfptr), LOCK_EX);
 	if (ret < 0) {
 		errnum = errno;
