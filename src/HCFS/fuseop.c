@@ -4249,6 +4249,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
+		int64_t now_seq;
 		/* If the cached block is not the one we are writing to,
 		*  close the one already opened. */
 		if (fh_ptr->opened_block != -1) {
@@ -4263,7 +4264,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			return 0;
 		}
 
-		int64_t now_seq;
 		now_seq = temppage.block_entries[entry_index].seqnum;
 
 		switch ((temppage).block_entries[entry_index].status) {
@@ -4356,7 +4356,10 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		setbuf(fh_ptr->blockfptr, NULL);
 		fh_ptr->opened_block = bindex;
+
 	} else {
+		int64_t now_seq;
+		now_seq = temppage.block_entries[entry_index].seqnum;
 		/* Check if there is a need for status change */
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_BOTH:

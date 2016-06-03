@@ -883,14 +883,16 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		break;
 	/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
 	default:
-		write_log(10, "Debug: Sataus of block_%"PRIu64"_%lld is %d\n",
+		write_log(10, "Debug: Status of block_%"PRIu64"_%lld is %d\n",
 				(uint64_t)ptr->inode,
 				block_count,
 				toupload_block_status);
+		/* Check seq num and just print log when not match */
 		get_progress_info(ptr->progress_fd, block_count,
 				&block_uploading_status);
-		if (toupload_block_seq != block_uploading_status.backend_seq) {
-			write_log(0, "Error: Seq of block_%"PRIu64"_%lld does"
+		if (block_uploading_status.backend_seq > 0 &&
+		    toupload_block_seq != block_uploading_status.backend_seq) {
+			write_log(0, "Error: Seq of block_%"PRIu64"_%lld does "
 				"not match. Local seq %lld, cloud seq %lld. But"
 				" status is %d\n",
 				(uint64_t)ptr->inode, block_count,
@@ -899,6 +901,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 				toupload_block_status);
 		}
 
+		/* Set progress file */
 		finish_uploading = TRUE;
 		toupload_exist = TRUE;
 #if (DEDUP_ENABLE)
