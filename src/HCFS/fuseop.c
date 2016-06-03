@@ -4223,6 +4223,30 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 	}
 
+	/* Check latest block status */
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
+			NULL, &temppage, this_page_fpos,
+			fh_ptr->meta_cache_ptr);
+	if (ret < 0) {
+		*reterr = ret;
+		return 0;
+	}
+
+	/* Close opened block file if not sure there is a valid local copy */
+	switch ((temppage).block_entries[entry_index].status) {
+	case ST_NONE:
+	case ST_TODELETE:
+	case ST_CLOUD:
+	case ST_CtoL:
+		if (fh_ptr->opened_block == bindex) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		break;
+	default:
+		break;
+	}
+
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		/* If the cached block is not the one we are writing to,
@@ -4230,13 +4254,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		if (fh_ptr->opened_block != -1) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
-		}
-		ret = meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
-				NULL, &temppage, this_page_fpos,
-				fh_ptr->meta_cache_ptr);
-		if (ret < 0) {
-			*reterr = ret;
-			return 0;
 		}
 
 		ret = write_wait_full_cache(&temppage, entry_index, fh_ptr,
@@ -4339,6 +4356,31 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		setbuf(fh_ptr->blockfptr, NULL);
 		fh_ptr->opened_block = bindex;
+	} else {
+		/* Check if there is a need for status change */
+		switch ((temppage).block_entries[entry_index].status) {
+		case ST_BOTH:
+		case ST_LtoC:
+			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+					this_inode, bindex, now_seq);
+			(temppage).block_entries[entry_index].status = ST_LDISK;
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
+			if (ret < 0) {
+				*reterr = -EIO;
+				return 0;
+			}
+			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+					NULL, NULL, &temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
+			if (ret < 0) {
+				*reterr = ret;
+				return 0;
+			}
+			break;
+		default:
+			break;
+		}
 	}
 	ret = flock(fileno(fh_ptr->blockfptr), LOCK_EX);
 	if (ret < 0) {
