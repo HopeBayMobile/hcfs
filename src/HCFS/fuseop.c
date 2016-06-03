@@ -4362,6 +4362,10 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		now_seq = temppage.block_entries[entry_index].seqnum;
 		/* Check if there is a need for status change */
 		switch ((temppage).block_entries[entry_index].status) {
+		case ST_LDISK:
+			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+					this_inode, bindex, now_seq);
+			break;
 		case ST_BOTH:
 		case ST_LtoC:
 			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
