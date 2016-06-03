@@ -2470,6 +2470,129 @@ errcode_handle:
 	return ret;
 }
 
+int32_t restore_meta_structure(FILE *fptr)
+{
+	int32_t errcode, ret;
+	struct stat this_stat, meta_stat;
+	FILE_META_TYPE file_meta;
+	BLOCK_ENTRY_PAGE tmppage;
+	int64_t page_pos, current_page, which_page;
+	int64_t total_blocks, count;
+	int32_t e_index;
+	BOOL block_status;
+	BOOL write_page;
+	size_t ret_size;
+	FILE_STATS_TYPE file_stats;
+	CLOUD_RELATED_DATA cloud_data;
+
+	FSEEK(fptr, 0, SEEK_SET);
+	fstat(fileno(fptr), &meta_stat);
+	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
+	if (S_ISDIR(this_stat.st_mode)) {
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		cloud_data.size_last_upload = meta_stat.st_size;
+		cloud_data.meta_last_upload = meta_stat.st_size;
+		cloud_data.upload_seq = 1;
+		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		return 0;
+	} else if (S_ISLNK(this_stat.st_mode)) {
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		cloud_data.size_last_upload = meta_stat.st_size;
+		cloud_data.meta_last_upload = meta_stat.st_size;
+		cloud_data.upload_seq = 1;
+		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		return 0;
+	}
+
+	/* Restore status and statistics */
+
+	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
+	total_blocks = (this_stat.st_size == 0) ? 0 :
+		((this_stat.st_size - 1) / MAX_BLOCK_SIZE + 1);
+
+	current_page = -1;
+	write_page = FALSE;
+	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+	
+	for (count = 0; count < total_blocks; count++) {
+		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+		if (current_page != which_page) {
+			if (write_page == TRUE) {
+				FSEEK(fptr, page_pos, SEEK_SET);
+				FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+						1, fptr);
+				write_page = FALSE;
+			}
+			page_pos = seek_page2(&file_meta, fptr,
+					which_page, 0);
+			if (page_pos <= 0) {
+				count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
+				continue;
+			}
+			current_page = which_page;
+			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+
+			FSEEK(fptr, page_pos, SEEK_SET);
+			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, fptr);
+		}
+		block_status = tmppage.block_entries[e_index].status;
+		switch (block_status) {
+		case ST_TODELETE:
+			tmppage.block_entries[e_index].status = ST_NONE;
+			break;
+		case ST_LtoC:
+		case ST_CtoL:
+		case ST_BOTH:
+			tmppage.block_entries[e_index].status = ST_CLOUD;
+			break;
+		default: /* Do nothing when st is ST_CLOUD / ST_NONE */
+			break;
+		}
+	}
+	if (write_page == TRUE) {
+		FSEEK(fptr, page_pos, SEEK_SET);
+		FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+				1, fptr);
+	}
+
+	/* Restore file statistics */
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	FREAD(&file_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
+	file_stats.num_cached_blocks = 0;
+	file_stats.dirty_data_size = 0;
+	file_stats.cached_size = 0;
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
+	/* Restore cloud related data */
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+	cloud_data.size_last_upload = this_stat.st_size + meta_stat.st_size;
+	cloud_data.meta_last_upload = meta_stat.st_size;
+	cloud_data.upload_seq = 1;
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+	return 0;
+errcode_handle:
+	return errcode;
+
+}
+
 int32_t restore_meta_file(ino_t this_inode)
 {
 	char metapath[300], objname[300];
@@ -2517,6 +2640,15 @@ int32_t restore_meta_file(ino_t this_inode)
 		fclose(fptr);
 		return ret;
 	}
+
+	ret = restore_meta_structure(fptr);
+	if (ret < 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return ret;
+	}
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
 
 	return 0;
 }

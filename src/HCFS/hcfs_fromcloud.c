@@ -1098,9 +1098,8 @@ int32_t fetch_meta_from_cloud(FILE *fptr, char *objname)
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
 
-
-	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
-		sem_wait(&pin_download_curl_sem);
+	sem_wait(&pin_download_curl_sem);
+	
 	sem_wait(&download_curl_sem);
 	sem_wait(&download_curl_control_sem);
 	for (which_curl_handle = 0;
@@ -1138,8 +1137,8 @@ errcode_handle:
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
-	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
-		sem_post(&pin_download_curl_sem);
+		
+	sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 
