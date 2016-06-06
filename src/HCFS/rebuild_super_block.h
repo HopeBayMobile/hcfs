@@ -13,6 +13,13 @@
 
 enum { START_REBUILD_SB, KEEP_REBUILD_SB };
 
+enum { WORKING, IDLE }; /* Status of a worker */
+
+typedef struct INODE_JOB_HANDLE {
+	ino_t inode;
+	int64_t queue_file_pos;
+} INODE_JOB_HANDLE;
+
 typedef struct CACHED_JOBS {
 	ino_t cached_inodes[NUM_CACHED_INODES];
 	int32_t num_cached_inode;
@@ -24,6 +31,7 @@ typedef struct REBUILD_INODE_JOBS {
 	int32_t queue_fh;
 	int64_t remaining_jobs;
 	int64_t job_count;
+	BOOL job_finish; 
 	pthread_mutex_t job_mutex;
 	pthread_cond_t job_cond;
 } REBUILD_SB_JOBS;
@@ -31,25 +39,27 @@ typedef struct REBUILD_INODE_JOBS {
 typedef struct SB_THREAD {
 	pthread_t tid;
 	BOOL active;
-	uint8_t status; /* WORKING, IDLE */
+	char status; /* WORKING, IDLE */
+	pthread_attr_t t_attr;
 } SB_THREAD;
 
 typedef struct SB_THREAD_POOL {
 	SB_THREAD thread[NUM_THREADS_IN_POOL];
+	int32_t tmaster;
 	int32_t num_active;
 	int32_t num_idle;
 	sem_t tpool_access_sem;
 } SB_THREAD_POOL;
 
-typedef struct REBUILD_SB_MGR {
-	SB_THREAD_POOL tpool;
-	sem_t mgr_access_sem;
-	BOOL finish; 
-	pthread_attr_t mgr_attr;
-	pthread_t mgr_tid;
-} REBUILD_SB_MGR_INFO;
 
-REBUILD_SB_MGR_INFO *rebuild_sb_mgr_info;
+//typedef struct REBUILD_SB_MGR {
+//	SB_THREAD_POOL tpool;
+//	sem_t mgr_access_sem;
+	//pthread_attr_t mgr_attr;
+	//pthread_t mgr_tid;
+//} REBUILD_SB_MGR_INFO;
+
+SB_THREAD_POOL *rebuild_sb_tpool;
 REBUILD_SB_JOBS *rebuild_sb_jobs;
 
 int32_t rebuild_super_block_entry(ino_t this_inode,

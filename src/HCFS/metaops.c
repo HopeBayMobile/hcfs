@@ -2595,7 +2595,8 @@ errcode_handle:
 
 int32_t restore_meta_file(ino_t this_inode)
 {
-	char metapath[300], restored_metapath[300], objname[100];
+	char metapath[METAPATHLEN];
+	char restored_metapath[300], objname[100];
 	FILE *fptr;
 	int32_t errcode, ret;
 
