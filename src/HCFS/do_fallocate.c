@@ -17,6 +17,7 @@
 #include "mount_manager.h"
 #include "utils.h"
 #include "logger.h"
+#include "fuseop.h"
 
 /* TODO: Implement mode 1 and 3 if needed or in the future
 	if mode = 0, default op. (If offset+ length is smaller than org size,
@@ -34,6 +35,7 @@ static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	FILE_META_TYPE tempfilemeta;
 	int32_t ret;
 	int64_t sizediff;
+	int64_t max_pinned_size;
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -74,9 +76,13 @@ static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 		extension */
 		/* If pinned space is available, add the amount of changes
 		to the total usage first */
-		if (tempfilemeta.local_pin == TRUE) {
+		if (P_IS_PIN(tempfilemeta.local_pin)) {
+			if (tempfilemeta.local_pin == P_HIGH_PRI_PIN)
+				max_pinned_size = RESERVED_PINNED_LIMIT;
+			else
+				max_pinned_size = MAX_PINNED_LIMIT;
 			if ((hcfs_system->systemdata.pinned_size + sizediff)
-					> MAX_PINNED_LIMIT) {
+					> max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				return -ENOSPC;
 			}

@@ -127,7 +127,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		/* Skip if inode is pinned */
-		if (temphead.local_pin == TRUE) {
+		if (P_IS_PIN(temphead.local_pin)) {
 			write_log(10, "Debug: inode %"PRIu64" is pinned. "
 				"Skip to page it out.\n", (uint64_t)this_inode);
 			flock(fileno(metafptr), LOCK_UN);
@@ -282,7 +282,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 				FREAD(&temphead, sizeof(FILE_META_TYPE),
 					1, metafptr);
-				if (temphead.local_pin == TRUE) {
+				if (P_IS_PIN(temphead.local_pin)) {
 					write_log(10, "Debug: inode %"PRIu64" "
 						"is pinned when paging it out. "
 						"Stop\n", (uint64_t)this_inode);

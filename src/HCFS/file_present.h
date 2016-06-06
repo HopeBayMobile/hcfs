@@ -60,7 +60,7 @@ int32_t link_update_meta(ino_t link_inode, const char *newname,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry);
 
 int32_t increase_pinned_size(int64_t *reserved_pinned_size,
-		int64_t file_size);
+		int64_t file_size, char local_pin);
 
 int32_t decrease_pinned_size(int64_t *reserved_release_size,
 		int64_t file_size);

@@ -41,6 +41,7 @@
 #include "logger.h"
 #include "utils.h"
 #include "macro.h"
+#include "hcfs_cacheops.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -951,8 +952,9 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	struct stat tempstat;
 	ino_t new_first_reclaimed;
 	uint64_t this_generation;
-	int32_t errcode, ret;
+	int32_t errcode, ret, ret_val;
 	BOOL update_size;
+	int64_t max_pinned_size, max_cache_size;
 
 	super_block_exclusive_locking();
 
@@ -988,7 +990,22 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		this_generation = tempentry.generation + 1;
 		update_size = FALSE;
 	} else {
-		if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
+		if (local_pin == P_HIGH_PRI_PIN) {
+			max_pinned_size = RESERVED_PINNED_LIMIT;
+			max_cache_size = RESERVED_CACHE_LIMIT;
+		} else {
+			max_pinned_size = MAX_PINNED_LIMIT;
+			max_cache_size = CACHE_HARD_LIMIT;
+		}
+
+		if (hcfs_system->systemdata.cache_size > max_cache_size) {
+			ret_val = sleep_on_cache_full();
+			if (ret_val < 0) {
+				super_block_exclusive_release();
+				return 0;
+			}
+		}
+		if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
 			super_block_exclusive_release();
 			return 0;
 		}
@@ -1004,7 +1021,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 
 	/*Update the new super inode entry*/
 	memset(&tempentry, 0, SB_ENTRY_SIZE);
-	tempentry.pin_status = (local_pin == TRUE ? ST_PIN : ST_UNPIN);
+	tempentry.pin_status = (P_IS_PIN(local_pin) ? ST_PIN : ST_UNPIN);
 	tempentry.this_index = this_inode;
 	tempentry.generation = this_generation;
 	if (ret_generation != NULL)

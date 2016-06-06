@@ -1062,6 +1062,7 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 	return ret;
 }
 
+/* Unused function */
 int32_t change_pin_size(int64_t delta_pin_size)
 {
 	sem_wait(&(hcfs_system->access_sem));

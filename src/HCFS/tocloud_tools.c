@@ -110,7 +110,7 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 		if (statptr->dirty_cache_size < 0)
 			statptr->dirty_cache_size = 0;
 		/* Update unpin-dirty size */
-		if (tempfilemeta.local_pin == FALSE) {
+		if (P_IS_UNPIN(tempfilemeta.local_pin)) {
 			statptr->unpin_dirty_data_size -=
 				cache_block_size;
 			if (statptr->unpin_dirty_data_size < 0)
@@ -124,7 +124,7 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 				sizeof(BLOCK_ENTRY_PAGE), page_pos);
 		/* If unpin, post cache management
 		 * control */
-		if (tempfilemeta.local_pin == FALSE) {
+		if (P_IS_UNPIN(tempfilemeta.local_pin)) {
 			semval = 0;
 			ret = sem_getvalue(semptr, &semval);
 			if ((ret == 0) && (semval == 0))
@@ -326,8 +326,8 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 		cache_block_size = check_file_size(blockpath);
 		update_file_stats(local_metafptr, 0, 0, 0,
 				cache_block_size, this_inode);
-		unpin_dirty_delta = (filemeta.local_pin == TRUE ?
-				0 : cache_block_size);
+		unpin_dirty_delta = (P_IS_UNPIN(filemeta.local_pin) ?
+				cache_block_size : 0);
 		change_system_meta(0, 0, 0, 0, cache_block_size,
 				unpin_dirty_delta, FALSE);
 		/* Keep running following code */

@@ -264,8 +264,8 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.local_pin = ispin;
-	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, ispin == TRUE? "PIN" : "UNPIN");
+	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
+		selfname, ispin);
 
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
@@ -433,8 +433,8 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.root_inode = root_ino;
 	this_meta.finished_seq = 0;
 	this_meta.local_pin = ispin;
-	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, ispin == TRUE? "PIN" : "UNPIN");
+	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
+		selfname, ispin);
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
@@ -455,7 +455,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		meta_cache_unlock_entry(body_ptr);
 		dir_remove_fail_node(parent_inode, self_inode,
 			selfname, this_stat->st_mode);
-		return ret_val;	
+		return ret_val;
 	}
 
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
@@ -847,8 +847,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.finished_seq = 0;
 	symlink_meta.local_pin = ispin;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
-	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		name, ispin == TRUE? "PIN" : "UNPIN");
+	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
+		name, ispin);
 
 	/* Update self meta data */
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
@@ -1189,17 +1189,22 @@ error_handle:
  * increase system pinned space.
  */
 int32_t increase_pinned_size(int64_t *reserved_pinned_size,
-		int64_t file_size)
+		int64_t file_size, char local_pin)
 {
 	int32_t ret;
+	int64_t max_pinned_size;
 
 	ret = 0;
 	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
 	if (*reserved_pinned_size <= 0) { /* Need more space than expectation */
+		if (local_pin == P_HIGH_PRI_PIN)
+			max_pinned_size = RESERVED_PINNED_LIMIT;
+		else
+			max_pinned_size = MAX_PINNED_LIMIT;
 		ret = 0;
 		sem_wait(&(hcfs_system->access_sem));
 		if (hcfs_system->systemdata.pinned_size -
-			(*reserved_pinned_size) <= MAX_PINNED_LIMIT) {
+			(*reserved_pinned_size) <= max_pinned_size) {
 			hcfs_system->systemdata.pinned_size -=
 				(*reserved_pinned_size);
 			*reserved_pinned_size = 0;
@@ -1257,7 +1262,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.st_mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
-					tempstat.st_size);
+					tempstat.st_size, TRUE);
 			if (ret == -ENOSPC) {
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
