@@ -27,3 +27,8 @@ int32_t update_sb_size()
 {
 	return 0;
 }
+
+sleep_on_cache_full(void)
+{
+	return;
+}

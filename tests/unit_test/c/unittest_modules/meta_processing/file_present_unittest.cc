@@ -914,7 +914,7 @@ TEST_F(increase_pinned_sizeTest, QuotaIsSufficient)
 	file_size = 20;
 	hcfs_system->systemdata.pinned_size = 200;
 
-	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size, 1));
 	EXPECT_EQ(100 - 20, quota_size);
 	EXPECT_EQ(200, hcfs_system->systemdata.pinned_size);
 }
@@ -929,7 +929,7 @@ TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemSufficient)
 	CACHE_HARD_LIMIT = 200; /* pinned space = 0.8 * hard_limit */
 	hcfs_system->systemdata.pinned_size = 0;
 
-	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size, 1));
 	EXPECT_EQ(0, quota_size);
 	EXPECT_EQ((50 - 10), hcfs_system->systemdata.pinned_size);
 }
@@ -944,7 +944,7 @@ TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemInsufficient)
 	CACHE_HARD_LIMIT = 20; /* pinned space = 0.8 * hard_limit */
 	hcfs_system->systemdata.pinned_size = 0;
 
-	EXPECT_EQ(-ENOSPC, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(-ENOSPC, increase_pinned_size(&quota_size, file_size, 1));
 	EXPECT_EQ(10, quota_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.pinned_size);
 }
