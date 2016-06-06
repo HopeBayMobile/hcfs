@@ -1,18 +1,17 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: global.h
-* Abstract: The header file for global settings for HCFS
+* Abstract: This c header file for global settings for HCFS.
 *
 * Revision History
-* 2015/2/11 Jiahong added header for this file and revised coding style.
-* 2015/7/21 Jiahong moving API codes to global.h
+* 2016/5/27 Modified after first code review.
 *
 **************************************************************************/
 
-#ifndef GW20_API_GLOBAL_H_
-#define GW20_API_GLOBAL_H_
+#ifndef GW20_HCFSAPI_GLOBAL_H_
+#define GW20_HCFSAPI_GLOBAL_H_
 
 #define TRUE 1
 #define FALSE 0
@@ -21,6 +20,10 @@
 #define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
 #define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock"
+
+#define LOG_PATH "/data"
+#define LOG_NAME "hcfsapid.log"
+#define LOG_LEVEL 4
 
 /* List of API codes */
 #define TERMINATE 0
@@ -67,4 +70,4 @@
 #define SYSREBOOT 51
 #define QUERYPKGUID 52
 
-#endif  /* GW20_API_GLOBAL_H_ */
+#endif  /* GW20_HCFSAPI_GLOBAL_H_ */

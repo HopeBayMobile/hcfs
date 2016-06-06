@@ -70,7 +70,7 @@ TEST(fetch_inode_statTest, FetchInodeStatSuccess)
 TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 {
 	struct stat inode_stat;
-	unsigned long gen;
+	uint64_t gen;
 	ino_t inode = INO_REGFILE;
 
 	gen = 0;
@@ -85,7 +85,7 @@ TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 TEST(fetch_inode_statTest, FetchFIFOFileGenerationSuccess)
 {
 	struct stat inode_stat;
-	unsigned long gen;
+	uint64_t gen;
 	ino_t inode = INO_FIFO;
 
 	gen = 0;
@@ -100,7 +100,7 @@ TEST(fetch_inode_statTest, FetchFIFOFileGenerationSuccess)
 TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 {
 	struct stat inode_stat;
-	unsigned long gen;
+	uint64_t gen;
 	ino_t inode = INO_DIR;
 
 	gen = 0;
@@ -115,7 +115,7 @@ TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 {
 	struct stat inode_stat;
-	unsigned long gen;
+	uint64_t gen;
 	ino_t inode = INO_LNK;
 
 	gen = 0;
@@ -154,7 +154,7 @@ TEST_F(mknod_update_metaTest, FailTo_dir_add_entry)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
 	struct stat tmp_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	tmp_stat.st_mode = S_IFREG;
 
@@ -167,7 +167,7 @@ TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 	ino_t parent_inode = 1;
 	struct stat tmp_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	tmp_stat.st_mode = S_IFREG;
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
@@ -179,8 +179,8 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	struct stat tmp_stat;
-	long long delta_metasize;
-	int ret;
+	int64_t delta_metasize;
+	int32_t ret;
 
 	tmp_stat.st_mode = S_IFREG;
 
@@ -200,7 +200,7 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
 	struct stat tmp_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	tmp_stat.st_mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
@@ -214,7 +214,7 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
 	ino_t parent_inode = 1;
 	struct stat tmp_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	tmp_stat.st_mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
@@ -227,7 +227,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	struct stat tmp_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	tmp_stat.st_mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
@@ -413,7 +413,7 @@ protected:
 
 TEST_F(fetch_xattr_pageTest, InodeNumLessThanZero_FetchFail)
 {
-	int ret;
+	int32_t ret;
 
 	mock_meta_entry->inode_num = 0;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, NULL, FALSE);
@@ -423,7 +423,7 @@ TEST_F(fetch_xattr_pageTest, InodeNumLessThanZero_FetchFail)
 
 TEST_F(fetch_xattr_pageTest, XattrPageNULL)
 {
-	int ret;
+	int32_t ret;
 
 	mock_meta_entry->inode_num = 1;
 	ret = fetch_xattr_page(mock_meta_entry, NULL, NULL, FALSE);
@@ -433,8 +433,8 @@ TEST_F(fetch_xattr_pageTest, XattrPageNULL)
 
 TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 
 	xattr_pos = 0;
 	mock_meta_entry->inode_num = INO_FIFO;
@@ -451,8 +451,8 @@ TEST_F(fetch_xattr_pageTest, FetchFIFOfileXattr_EPERM)
 
 TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 
 	mock_meta_entry->inode_num = INO_REGFILE;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
@@ -463,8 +463,8 @@ TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
 
 TEST_F(fetch_xattr_pageTest, FetchRegFileXattr_WithFlagFalse_ReturnNOENT)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 
 	mock_meta_entry->inode_num = INO_REGFILE;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, FALSE);
@@ -474,8 +474,8 @@ TEST_F(fetch_xattr_pageTest, FetchRegFileXattr_WithFlagFalse_ReturnNOENT)
 
 TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 	XATTR_PAGE expected_xattr_page;
 
 	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
@@ -495,8 +495,8 @@ TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
 
 TEST_F(fetch_xattr_pageTest, FetchDirXattrSuccess)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 
 	mock_meta_entry->inode_num = INO_DIR;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
@@ -507,8 +507,8 @@ TEST_F(fetch_xattr_pageTest, FetchDirXattrSuccess)
 
 TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 	XATTR_PAGE expected_xattr_page;
 
 	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
@@ -528,8 +528,8 @@ TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 
 TEST_F(fetch_xattr_pageTest, FetchSymlinkXattrSuccess)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 
 	mock_meta_entry->inode_num = INO_LNK;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos, TRUE);
@@ -540,8 +540,8 @@ TEST_F(fetch_xattr_pageTest, FetchSymlinkXattrSuccess)
 
 TEST_F(fetch_xattr_pageTest, FetchExistSymlinkXattrSuccess)
 {
-	int ret;
-	long long xattr_pos;
+	int32_t ret;
+	int64_t xattr_pos;
 	XATTR_PAGE expected_xattr_page;
 
 	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
@@ -588,7 +588,7 @@ protected:
 TEST_F(symlink_update_metaTest, AddDirEntryFail)
 {
 	struct stat mock_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
@@ -601,7 +601,7 @@ TEST_F(symlink_update_metaTest, AddDirEntryFail)
 TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 {
 	struct stat mock_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
@@ -614,7 +614,7 @@ TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 {
 	struct stat mock_stat;
-	long long delta_metasize;
+	int64_t delta_metasize;
 
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
@@ -654,7 +654,7 @@ TEST_F(link_update_metaTest, HardlinkToDirFail)
 {
 	ino_t link_inode;
 	struct stat link_stat;
-	unsigned long gen;
+	uint64_t gen;
 
 	link_inode = INO_DIR;
 
@@ -666,7 +666,7 @@ TEST_F(link_update_metaTest, TooManyLinks)
 {
 	ino_t link_inode;
 	struct stat link_stat;
-	unsigned long gen;
+	uint64_t gen;
 
 	link_inode = INO_TOO_MANY_LINKS;
 
@@ -678,7 +678,7 @@ TEST_F(link_update_metaTest, UpdateMetaFail)
 {
 	ino_t link_inode;
 	struct stat link_stat;
-	unsigned long gen;
+	uint64_t gen;
 
 	link_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 
@@ -690,7 +690,7 @@ TEST_F(link_update_metaTest, AddEntryToParentDirFail)
 {
 	ino_t link_inode;
 	struct stat link_stat;
-	unsigned long gen;
+	uint64_t gen;
 
 	link_inode = INO_REGFILE;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
@@ -706,7 +706,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 {
 	ino_t link_inode;
 	struct stat link_stat;
-	unsigned long gen;
+	uint64_t gen;
 
 	link_inode = INO_REGFILE;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
@@ -725,7 +725,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 /* Unittest for pin_inode() */
 class pin_inodeTest : public ::testing::Test {
 protected:
-	long long mock_reserved_size;
+	int64_t mock_reserved_size;
 
 	void SetUp()
 	{
@@ -810,7 +810,7 @@ TEST_F(pin_inodeTest, PinDirSuccess_ManyChildren)
 /* Unittest for unpin_inode() */
 class unpin_inodeTest : public ::testing::Test {
 protected:
-	long long mock_reserved_size;
+	int64_t mock_reserved_size;
 
 	void SetUp()
 	{
@@ -900,8 +900,8 @@ protected:
 
 TEST_F(increase_pinned_sizeTest, QuotaIsSufficient)
 {
-	long long quota_size;
-	long long file_size;
+	int64_t quota_size;
+	int64_t file_size;
 
 	quota_size = 100;
 	file_size = 20;
@@ -914,8 +914,8 @@ TEST_F(increase_pinned_sizeTest, QuotaIsSufficient)
 
 TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemSufficient)
 {
-	long long quota_size;
-	long long file_size;
+	int64_t quota_size;
+	int64_t file_size;
 
 	quota_size = 10;
 	file_size = 50;
@@ -929,8 +929,8 @@ TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemSufficient)
 
 TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemInsufficient)
 {
-	long long quota_size;
-	long long file_size;
+	int64_t quota_size;
+	int64_t file_size;
 
 	quota_size = 10;
 	file_size = 50;
@@ -962,8 +962,8 @@ protected:
 
 TEST_F(decrease_pinned_sizeTest, QuotaIsSufficient)
 {
-	long long quota_size;
-	long long file_size;
+	int64_t quota_size;
+	int64_t file_size;
 
 	quota_size = 100;
 	file_size = 20;
@@ -976,8 +976,8 @@ TEST_F(decrease_pinned_sizeTest, QuotaIsSufficient)
 
 TEST_F(decrease_pinned_sizeTest, QuotaIsInsufficient)
 {
-	long long quota_size;
-	long long file_size;
+	int64_t quota_size;
+	int64_t file_size;
 
 	quota_size = 10;
 	file_size = 40;

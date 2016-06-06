@@ -5,7 +5,7 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
 
   define test_ndk_read_permission =
     ifneq "$$(NDK_DIR)" ""
-      $$(info $$(shell ls $$(NDK_DIR) > /dev/null ))
+      test = $$(info $$(shell ls $$(NDK_DIR) > /dev/null ))
     endif
   endef
 

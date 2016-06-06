@@ -28,7 +28,7 @@ extern "C" {
 static const ino_t self_inode = 10;
 static const ino_t parent_inode = 5;
 
-extern int DELETE_DIR_ENTRY_BTREE_RESULT;
+extern int32_t DELETE_DIR_ENTRY_BTREE_RESULT;
 extern SYSTEM_CONF_STRUCT *system_config;
 
 class metaopsEnvironment : public ::testing::Environment {
@@ -53,7 +53,7 @@ class metaopsEnvironment : public ::testing::Environment {
  */
 TEST(init_dir_pageTest, InitOK) 
 {
-        long long pos = 1000;
+        int64_t pos = 1000;
 
 	DIR_ENTRY_PAGE *temppage;
 
@@ -172,7 +172,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
 	DIR_ENTRY_PAGE tmp_dir_page;
 
 	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
-	for (int i = 0 ; i < 5 ; i++) // 5 pages
+	for (int32_t i = 0 ; i < 5 ; i++) // 5 pages
 		fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
@@ -193,7 +193,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
 	DIR_ENTRY_PAGE tmp_dir_page;
 
 	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
-	for (int i = 0 ; i < 5 ; i++) // 5 pages
+	for (int32_t i = 0 ; i < 5 ; i++) // 5 pages
 		fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
@@ -447,8 +447,8 @@ protected:
 		bool is_diff = false;
 		while (!feof(f1) || !feof(f2)) {
 			char buf1[5000], buf2[5000];
-			int read_size1 = fread(buf1, 1, 4096, f1);
-			int read_size2 = fread(buf2, 1, 4096, f2);
+			int32_t read_size1 = fread(buf1, 1, 4096, f1);
+			int32_t read_size2 = fread(buf2, 1, 4096, f2);
 			if ((read_size1 > 0) && (read_size1 == read_size2)) {
 				if (memcmp(buf1, buf2, 4096) != 0) {
 					is_diff = true;
@@ -470,7 +470,7 @@ protected:
 		fseek(src, 0, SEEK_SET);
 		fseek(tar, 0, SEEK_SET);
 		while (!feof(src)) {
-			int read_size = fread(filebuf, 1, 4096, src);
+			int32_t read_size = fread(filebuf, 1, 4096, src);
 			if (read_size > 0)
 				fwrite(filebuf, 1, read_size, tar);
 			else
@@ -613,7 +613,7 @@ class seek_pageTest : public ::testing::Test {
 protected:
 	char *metapath;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	long long pointers_per_page[5]; // A lookup table to find pow(POINTERS_PER_PAGE, k)
+	int64_t pointers_per_page[5]; // A lookup table to find pow(POINTERS_PER_PAGE, k)
 
 	void SetUp()
 	{
@@ -629,7 +629,7 @@ protected:
 		body_ptr->meta_opened = TRUE;
 		
 		pointers_per_page[0] = 1;
-		for (int i = 1 ; i < 5 ; i++) // build power table
+		for (int32_t i = 1 ; i < 5 ; i++) // build power table
 			pointers_per_page[i] = pointers_per_page[i - 1] * POINTERS_PER_PAGE;
 	}
 
@@ -641,17 +641,17 @@ protected:
 		free(body_ptr);
 	}
 
-	void write_mock_file_meta(int deep, long long target_page, long long expected_pos)
+	void write_mock_file_meta(int32_t deep, int64_t target_page, int64_t expected_pos)
 	{
-		long long tmp_target_page;
+		int64_t tmp_target_page;
 		PTR_ENTRY_PAGE ptr_entry_page;
 
 		memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE)); // Init all entry as 0
 		tmp_target_page = target_page;
-		for (int level = 0 ; level < deep ; level++) 
+		for (int32_t level = 0 ; level < deep ; level++) 
 			tmp_target_page -= pointers_per_page[level];
-		for (int level = 1 ; level <= deep ; level++) { // Write level 1, 2, 3 index
-			int level_index = (tmp_target_page) / pointers_per_page[deep - level];
+		for (int32_t level = 1 ; level <= deep ; level++) { // Write level 1, 2, 3 index
+			int32_t level_index = (tmp_target_page) / pointers_per_page[deep - level];
 			ptr_entry_page.ptr[level_index] = (level == deep ? expected_pos :
 					sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * level);
 			fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
@@ -664,9 +664,9 @@ protected:
 
 TEST_F(seek_pageTest, DirectPageSuccess)
 {
-	long long actual_pos;
-	long long expected_pos = sizeof(FILE_META_TYPE);
-	long long target_page = 0;
+	int64_t actual_pos;
+	int64_t expected_pos = sizeof(FILE_META_TYPE);
+	int64_t target_page = 0;
 
 	body_ptr->inode_num = INO_DIRECT_SUCCESS;
 	
@@ -682,10 +682,10 @@ TEST_F(seek_pageTest, SingleIndirectPageSuccess)
 {
 	/* Mock data */
 	PTR_ENTRY_PAGE ptr_entry_page;
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page = POINTERS_PER_PAGE / 2; // Medium of range(1, 1024)
-	long long tmp_target_page = target_page - 1;
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page = POINTERS_PER_PAGE / 2; // Medium of range(1, 1024)
+	int64_t tmp_target_page = target_page - 1;
 	
 	body_ptr->inode_num = INO_SINGLE_INDIRECT_SUCCESS;
 	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
@@ -705,10 +705,10 @@ TEST_F(seek_pageTest, DoubleIndirectPageSuccess)
 {
 	/* Mock data */
 	PTR_ENTRY_PAGE ptr_entry_page;
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page, tmp_target_page;
-	int level1_index, level2_index;
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page, tmp_target_page;
+	int32_t level1_index, level2_index;
 
 	target_page = POINTERS_PER_PAGE / 2 *
 		(POINTERS_PER_PAGE + 1); // Medium of range(1024, 1024^2)
@@ -741,9 +741,9 @@ TEST_F(seek_pageTest, DoubleIndirectPageSuccess)
 TEST_F(seek_pageTest, TripleIndirectPageSuccess)
 {
 	/* Mock data */
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page;
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page;
 
 	target_page = (pointers_per_page[2] + 
 		pointers_per_page[3]) / 4 * 3; // In range(1024^2, 1024^3)
@@ -762,9 +762,9 @@ TEST_F(seek_pageTest, TripleIndirectPageSuccess)
 TEST_F(seek_pageTest, QuadrupleIndirectPageSuccess)
 {
 	/* Mock data */
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page;
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page;
 
 	target_page = (pointers_per_page[3] + 
 		pointers_per_page[4]) / 4 * 3; // In range(1024^3, 1024^4)
@@ -791,7 +791,7 @@ TEST_F(seek_pageTest, QuadrupleIndirectPageSuccess)
 class create_pageTest : public ::testing::Test {
 protected:
 	char *metapath;
-	long long pointers_per_page[5];
+	int64_t pointers_per_page[5];
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	void SetUp()
@@ -811,7 +811,7 @@ protected:
 		body_ptr->meta_opened = TRUE;
 		
 		pointers_per_page[0] = 1;
-		for (int i = 1 ; i < 5 ; i++)
+		for (int32_t i = 1 ; i < 5 ; i++)
 			pointers_per_page[i] = pointers_per_page[i - 1] * POINTERS_PER_PAGE;
 
 	}
@@ -824,20 +824,20 @@ protected:
 	}
 	/* Following function is used ot trace the indirect page and find final empty block.
 	   Return true if block exist and all set 0. */	
-	bool verify_mock_file_meta(int deep, long long target_page)
+	bool verify_mock_file_meta(int32_t deep, int64_t target_page)
 	{
-		long long tmp_target_page;
+		int64_t tmp_target_page;
 		PTR_ENTRY_PAGE ptr_entry_page;
 		BLOCK_ENTRY_PAGE created_block_page, zero_block_page;
-		int result;
+		int32_t result;
 
 		tmp_target_page = target_page;
-		for (int level = 0 ; level < deep ; level++) 
+		for (int32_t level = 0 ; level < deep ; level++) 
 			tmp_target_page -= pointers_per_page[level];
 		
 		fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
-		for (int level = 1 ; level <= deep ; level++) { // Write level 1, 2, 3 index
-			int level_index = tmp_target_page / pointers_per_page[deep - level];
+		for (int32_t level = 1 ; level <= deep ; level++) { // Write level 1, 2, 3 index
+			int32_t level_index = tmp_target_page / pointers_per_page[deep - level];
 			fread(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 			fseek(body_ptr->fptr, ptr_entry_page.ptr[level_index], SEEK_SET);
 			printf("Test: level %d: ptr_page_index = %d, next_filepos = %lld\n", 
@@ -867,9 +867,9 @@ TEST_F(create_pageTest, NegativeTargetPageError)
 TEST_F(create_pageTest, DirectPageCreateSuccess)
 {
 	/* Mock data */
-	long long target_page;
-	long long result_pos;
-	long long expected_pos;
+	int64_t target_page;
+	int64_t result_pos;
+	int64_t expected_pos;
 	FILE_META_TYPE file_meta;
 	
 	target_page = 0;
@@ -889,9 +889,9 @@ TEST_F(create_pageTest, DirectPageCreateSuccess)
 TEST_F(create_pageTest, SingleIndirectPageCreateSuccess)
 {
 	/* Mock data */
-	long long target_page;
-	long long result_pos;
-	long long expected_pos;
+	int64_t target_page;
+	int64_t result_pos;
+	int64_t expected_pos;
 	
 	target_page = pointers_per_page[1] / 2;
 	expected_pos = sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE);
@@ -909,9 +909,9 @@ TEST_F(create_pageTest, SingleIndirectPageCreateSuccess)
 TEST_F(create_pageTest, DoubleIndirectPageCreateSuccess)
 {
 	/* Mock data */
-	long long target_page;
-	long long result_pos;
-	long long expected_pos;
+	int64_t target_page;
+	int64_t result_pos;
+	int64_t expected_pos;
 	
 	target_page = (pointers_per_page[1] + pointers_per_page[2]) / 4 * 3;
 	expected_pos = sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * 2;
@@ -929,9 +929,9 @@ TEST_F(create_pageTest, DoubleIndirectPageCreateSuccess)
 TEST_F(create_pageTest, TripleIndirectPageCreateSuccess)
 {
 	/* Mock data */
-	long long target_page;
-	long long result_pos;
-	long long expected_pos;
+	int64_t target_page;
+	int64_t result_pos;
+	int64_t expected_pos;
 	
 	target_page = (pointers_per_page[2] + pointers_per_page[3]) / 4 * 3;
 	expected_pos = sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * 3;
@@ -949,9 +949,9 @@ TEST_F(create_pageTest, TripleIndirectPageCreateSuccess)
 TEST_F(create_pageTest, QuadrupleIndirectPageCreateSuccess)
 {
 	/* Mock data */
-	long long target_page;
-	long long result_pos;
-	long long expected_pos;
+	int64_t target_page;
+	int64_t result_pos;
+	int64_t expected_pos;
 	
 	target_page = (pointers_per_page[3] + pointers_per_page[4]) / 4 * 3;
 	expected_pos = sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * 4;
@@ -980,9 +980,9 @@ class seek_page2Test : public seek_pageTest {
 
 TEST_F(seek_page2Test, DirectPageSuccess)
 {
-	long long actual_pos;
-	long long expected_pos = sizeof(FILE_META_TYPE);
-	long long target_page = 0;
+	int64_t actual_pos;
+	int64_t expected_pos = sizeof(FILE_META_TYPE);
+	int64_t target_page = 0;
 	FILE_META_TYPE meta;
 
 	meta.direct = sizeof(FILE_META_TYPE);
@@ -999,9 +999,9 @@ TEST_F(seek_page2Test, SingleIndirectPageSuccess)
 {
 	/* Mock data */
 	FILE_META_TYPE meta;
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page = pointers_per_page[1] / 4 * 3; // In range(1, 1024)
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page = pointers_per_page[1] / 4 * 3; // In range(1, 1024)
 	
 	meta.single_indirect = sizeof(FILE_META_TYPE);
 	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
@@ -1019,9 +1019,9 @@ TEST_F(seek_page2Test, DoubleIndirectPageSuccess)
 {
 	/* Mock data */
 	FILE_META_TYPE meta;
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page = (pointers_per_page[1] + 
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page = (pointers_per_page[1] + 
 		pointers_per_page[2]) / 4 * 3; // In range(1, 1024)
 	
 	meta.double_indirect = sizeof(FILE_META_TYPE);
@@ -1040,9 +1040,9 @@ TEST_F(seek_page2Test, TripleIndirectPageSuccess)
 {
 	/* Mock data */
 	FILE_META_TYPE meta;
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page = (pointers_per_page[2] + 
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page = (pointers_per_page[2] + 
 		pointers_per_page[3]) / 4 * 3; // In range(1, 1024)
 	
 	meta.triple_indirect = sizeof(FILE_META_TYPE);
@@ -1061,9 +1061,9 @@ TEST_F(seek_page2Test, QuadrupleIndirectPageSuccess)
 {
 	/* Mock data */
 	FILE_META_TYPE meta;
-	long long actual_pos;
-	long long expected_pos = 5566;
-	long long target_page = (pointers_per_page[3] + 
+	int64_t actual_pos;
+	int64_t expected_pos = 5566;
+	int64_t target_page = (pointers_per_page[3] + 
 		pointers_per_page[4]) / 4 * 3; // In range(1, 1024)
 	
 	meta.quadruple_indirect = sizeof(FILE_META_TYPE);
@@ -1282,7 +1282,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	hcfs_system->systemdata.unpin_dirty_data_size = MOCK_CACHE_SIZE;
 	hcfs_system->systemdata.pinned_size = MOCK_CACHE_SIZE;
 
-	for (int i = 0; i < NUM_BLOCKS; i++) {
+	for (int32_t i = 0; i < NUM_BLOCKS; i++) {
 		fetch_block_path(thisblockpath, mock_inode, i);
 		tmp_fp = fopen(thisblockpath, "w");
 		fclose(tmp_fp);
@@ -1293,7 +1293,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	memset(&block_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 	memset(&mock_stat, 0, sizeof(struct stat));
 	memset(&mock_meta, 0, sizeof(FILE_META_TYPE));
-	for (int i = 0; i < NUM_BLOCKS; i++)
+	for (int32_t i = 0; i < NUM_BLOCKS; i++)
 		block_entry_page.block_entries[i].status = ST_LDISK;
 	mock_stat.st_size = NUM_BLOCKS * MAX_BLOCK_SIZE + TRUNC_SIZE;
 	mock_stat.st_ino = mock_inode;
@@ -1324,7 +1324,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 		hcfs_system->systemdata.cache_blocks);
 	
 	block_file_existed = false;
-	for (int i = 0; i < NUM_BLOCKS; i++) {
+	for (int32_t i = 0; i < NUM_BLOCKS; i++) {
 		fetch_block_path(thisblockpath, mock_inode, i);
 		tmp_fp = fopen(thisblockpath, "r");
 		if (tmp_fp) {
@@ -1487,7 +1487,7 @@ TEST(disk_checkdeleteTest, InodeNotExist_Return0)
 
 class startup_finish_deleteTest : public ::testing::Test {
 protected:
-	int num_inode;
+	int32_t num_inode;
 	FILE *statfptr;
 	FS_STAT_T tmp_stat;
 	char statpath[100];
@@ -1510,7 +1510,7 @@ protected:
 	void TearDown()
 	{
 		unlink(statpath);
-		for (int i = 0 ; i < num_inode ; i++) {
+		for (int32_t i = 0 ; i < num_inode ; i++) {
 			char pathname[200];
 			sprintf(pathname, "testpatterns/markdelete/inode%d_%d",
 				i, ROOT_INODE);
@@ -1547,7 +1547,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 	if (access("testpatterns/markdelete", F_OK) < 0)
 		mkdir("testpatterns/markdelete", 0700);
 
-	for (int i = 0 ; i < num_inode ; i++) {
+	for (int32_t i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d_%d",
 			i, ROOT_INODE);
@@ -1561,7 +1561,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 	EXPECT_EQ(0, startup_finish_delete());
 
 	/* Verify */
-	for (int i = 0 ; i < num_inode ; i++) {
+	for (int32_t i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d_%d",
 			i, ROOT_INODE);
@@ -1683,7 +1683,7 @@ TEST_F(change_pin_flagTest, PinLinkSuccess)
 /* Unittest for collect_dir_children */
 class collect_dir_childrenTest : public ::testing::Test {
 protected:
-	long long num_dir_node, num_nondir_node;
+	int64_t num_dir_node, num_nondir_node;
 	ino_t *dir_node_list, *nondir_node_list;
 	
 	void SetUp()
@@ -1761,7 +1761,7 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	/* First page */
 	temppage.num_entries = 10;
 	child_inode = 1;
-	for (int i = 0; i < 10; i++, child_inode++) {
+	for (int32_t i = 0; i < 10; i++, child_inode++) {
 		strcpy(temppage.dir_entries[i].d_name, "aaa");
 		temppage.dir_entries[i].d_ino = child_inode;
 		temppage.dir_entries[i].d_type = child_inode % 2 ?
@@ -1773,7 +1773,7 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 
 	/* Second page */
 	temppage.num_entries = 10;
-	for (int i = 0; i < 10; i++, child_inode++) {
+	for (int32_t i = 0; i < 10; i++, child_inode++) {
 		strcpy(temppage.dir_entries[i].d_name, "aaa");
 		temppage.dir_entries[i].d_ino = child_inode;
 		temppage.dir_entries[i].d_type = child_inode % 2 ?
@@ -1792,11 +1792,11 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	EXPECT_EQ(10, num_nondir_node);
 
 	child_inode = 1;
-	for (int i = 0; i < num_dir_node; i++, child_inode += 2)
+	for (int32_t i = 0; i < num_dir_node; i++, child_inode += 2)
 		EXPECT_EQ(child_inode, dir_node_list[i]);
 
 	child_inode = 2;
-	for (int i = 0; i < num_nondir_node; i++, child_inode += 2)
+	for (int32_t i = 0; i < num_nondir_node; i++, child_inode += 2)
 		EXPECT_EQ(child_inode, nondir_node_list[i]);
 
 	unlink(metapath);

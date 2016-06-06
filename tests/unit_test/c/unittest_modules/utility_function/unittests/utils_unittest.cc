@@ -68,7 +68,7 @@ TEST_F(fetch_meta_pathTest, NullMetaPath) {
  }
 TEST_F(fetch_meta_pathTest, MetaPathNotCreatable) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
   ret_code = 0;
@@ -88,7 +88,7 @@ TEST_F(fetch_meta_pathTest, MetaPathNotCreatable) {
  }
 TEST_F(fetch_meta_pathTest, MetaPathNotAccessible) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
   ret_code = 0;
@@ -107,7 +107,7 @@ TEST_F(fetch_meta_pathTest, MetaPathNotAccessible) {
  }
 TEST_F(fetch_meta_pathTest, MkMetaPathSuccess) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
   ret_code = 0;
@@ -127,7 +127,7 @@ TEST_F(fetch_meta_pathTest, MkMetaPathSuccess) {
 TEST_F(fetch_meta_pathTest, SubDirMod) {
   char pathname[METAPATHLEN];
   char expected_pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
 
@@ -182,7 +182,7 @@ TEST_F(fetch_todelete_pathTest, NullMetaPath) {
  }
 TEST_F(fetch_todelete_pathTest, ToDeletePathNotCreatable) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
   ret_code = 0;
@@ -209,7 +209,7 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotCreatable) {
 TEST_F(fetch_todelete_pathTest, ToDeletePathNotAccessible) {
   char pathname[METAPATHLEN];
   char todelete_path[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
   ret_code = 0;
@@ -239,7 +239,7 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotAccessible) {
  }
 TEST_F(fetch_todelete_pathTest, MkMetaPathSuccess) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
   ret_code = 0;
@@ -260,7 +260,7 @@ TEST_F(fetch_todelete_pathTest, MkMetaPathSuccess) {
 TEST_F(fetch_todelete_pathTest, SubDirMod) {
   char pathname[METAPATHLEN];
   char expected_pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
 
@@ -318,7 +318,7 @@ TEST_F(fetch_block_pathTest, NullBlockPath) {
  }
 TEST_F(fetch_block_pathTest, BlockPathNotCreatable) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
   ret_code = 0;
@@ -338,7 +338,7 @@ TEST_F(fetch_block_pathTest, BlockPathNotCreatable) {
  }
 TEST_F(fetch_block_pathTest, BlockPathNotAccessible) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
   ret_code = 0;
@@ -357,7 +357,7 @@ TEST_F(fetch_block_pathTest, BlockPathNotAccessible) {
  }
 TEST_F(fetch_block_pathTest, MkBlockPathSuccess) {
   char pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
   ret_code = 0;
@@ -377,7 +377,7 @@ TEST_F(fetch_block_pathTest, MkBlockPathSuccess) {
 TEST_F(fetch_block_pathTest, SubDirMod) {
   char pathname[METAPATHLEN];
   char expected_pathname[METAPATHLEN];
-  int ret_code;
+  int32_t ret_code;
 
   ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
 
@@ -890,7 +890,7 @@ protected:
 TEST_F(reload_system_configTest, NewConfigInvalid)
 {
 	char pathname[200];
-	int ret;
+	int32_t ret;
 
 	strcpy(pathname,"testpatterns/test_good_hcfs.conf");
 	read_system_config(pathname, system_config);
@@ -911,7 +911,7 @@ TEST_F(reload_system_configTest, NewConfigInvalid)
 TEST_F(reload_system_configTest, NewConfig_TheSame)
 {
 	char pathname[200];
-	int ret;
+	int32_t ret;
 
 	strcpy(pathname,"testpatterns/test_good_hcfs.conf");
 	read_system_config(pathname, system_config);
@@ -932,7 +932,7 @@ TEST_F(reload_system_configTest, NewConfig_TheSame)
 TEST_F(reload_system_configTest, Set_Backend_Success)
 {
 	char pathname[200];
-	int ret;
+	int32_t ret;
 
 	strcpy(pathname,"testpatterns/test_hcfs_backend_none.conf");
 	read_system_config(pathname, system_config);
@@ -1081,7 +1081,7 @@ protected:
 
 TEST_F(change_system_metaTest, UpdateSuccess)
 {
-	int ret;
+	int32_t ret;
 
 	ret = change_system_meta(1, 2, 3, 4, 5, 6, FALSE);
 	EXPECT_EQ(0, ret);
@@ -1118,7 +1118,7 @@ protected:
 
 TEST_F(_shift_xfer_windowTest, NoShiftOccur)
 {
-	int ret;
+	int32_t ret;
 
 	hcfs_system->systemdata.xfer_now_window = 1;
 	hcfs_system->last_xfer_shift_time = time(NULL);
@@ -1130,8 +1130,8 @@ TEST_F(_shift_xfer_windowTest, NoShiftOccur)
 
 TEST_F(_shift_xfer_windowTest, ShiftSuccessful)
 {
-	int idx, now_window, num_shifted;
-	int time_passed = 45;
+	int32_t idx, now_window, num_shifted;
+	int32_t time_passed = 45;
 
 	hcfs_system->systemdata.xfer_now_window = 1;
 	hcfs_system->last_xfer_shift_time = time(NULL) - time_passed;
@@ -1175,7 +1175,7 @@ protected:
 
 TEST_F(change_xfer_metaTest, UpdateSuccess)
 {
-	int ret;
+	int32_t ret;
 
 	hcfs_system->systemdata.xfer_now_window = 2;
 
@@ -1190,7 +1190,7 @@ TEST_F(change_xfer_metaTest, UpdateSuccess)
 
 TEST_F(change_xfer_metaTest, MinIsZero)
 {
-	int ret;
+	int32_t ret;
 
 	hcfs_system->systemdata.xfer_now_window = 3;
 

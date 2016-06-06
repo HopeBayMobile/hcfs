@@ -23,7 +23,7 @@ SYSTEM_CONF_STRUCT *system_config;
 class open_logTest : public ::testing::Test {
  protected:
   char tmpfilename[25];
-  int outfileno, errfileno;
+  int32_t outfileno, errfileno;
   virtual void SetUp() {
     system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
@@ -50,14 +50,14 @@ class open_logTest : public ::testing::Test {
  };
 
 TEST_F(open_logTest, LogOpenOK) {
-  int ret;
+  int32_t ret;
 
   ret = open_log(tmpfilename);
   EXPECT_EQ(0, ret);
  }
 
 TEST_F(open_logTest, LogDoubleOpenError) {
-  int ret;
+  int32_t ret;
 
   ret = open_log(tmpfilename);
   ASSERT_EQ(0, ret);
@@ -66,7 +66,7 @@ TEST_F(open_logTest, LogDoubleOpenError) {
  }
 
 TEST_F(open_logTest, LogFileOpenError) {
-  int ret;
+  int32_t ret;
 
   mknod(tmpfilename, S_IFREG | 0400, 0);
   ret = open_log(tmpfilename);
@@ -81,7 +81,7 @@ TEST_F(open_logTest, LogFileOpenError) {
 class write_logTest : public ::testing::Test {
  protected:
   char tmpfilename[25];
-  int outfileno, errfileno;
+  int32_t outfileno, errfileno;
   virtual void SetUp() {
     system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
@@ -106,7 +106,7 @@ class write_logTest : public ::testing::Test {
  };
 
 TEST_F(write_logTest, LogWriteOK) {
-  int ret;
+  int32_t ret;
   FILE *fptr;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
@@ -127,7 +127,7 @@ TEST_F(write_logTest, LogWriteOK) {
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
 TEST_F(write_logTest, NoLogEntry) {
-  int ret;
+  int32_t ret;
   FILE *fptr;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
@@ -147,9 +147,9 @@ TEST_F(write_logTest, NoLogEntry) {
   EXPECT_EQ(EOF, ret);
  }
 TEST_F(write_logTest, NoLogWriteOK) {
-  int ret, failed;
+  int32_t ret, failed;
   FILE *fptr;
-  int errcode;
+  int32_t errcode;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
   fptr = fopen(tmpfilename, "a+");

@@ -37,14 +37,14 @@ class do_fallocateTest : public ::testing::Test {
 };
 
 TEST_F(do_fallocateTest, WrongMode) {
-  int ret;
+  int32_t ret;
   fuse_req_t req1;
 
   ret = do_fallocate(10, NULL, 4, 0, 0, NULL, req1);
   ASSERT_EQ(-ENOTSUP, ret);
 }
 TEST_F(do_fallocateTest, NoExtend) {
-  int ret;
+  int32_t ret;
   fuse_req_t req1;
   struct stat tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
@@ -59,7 +59,7 @@ TEST_F(do_fallocateTest, NoExtend) {
 }
 
 TEST_F(do_fallocateTest, Extend) {
-  int ret;
+  int32_t ret;
   fuse_req_t req1;
   struct stat tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
@@ -74,7 +74,7 @@ TEST_F(do_fallocateTest, Extend) {
 }
 
 TEST_F(do_fallocateTest, ExceedPinSize) {
-  int ret;
+  int32_t ret;
   fuse_req_t req1;
   struct stat tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
@@ -91,7 +91,7 @@ TEST_F(do_fallocateTest, ExceedPinSize) {
 }
 
 TEST_F(do_fallocateTest, ExceedSystemQuota) {
-  int ret;
+  int32_t ret;
   fuse_req_t req1;
   struct stat tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;

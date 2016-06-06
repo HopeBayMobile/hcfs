@@ -39,7 +39,7 @@ protected:
 
 TEST_F(init_pkg_cacheTest, InitSuccess)
 {
-	int value;
+	int32_t value;
 
 	init_pkg_cache();
 
@@ -49,7 +49,7 @@ TEST_F(init_pkg_cacheTest, InitSuccess)
 	/* Check structure */
 	EXPECT_EQ(0, pkg_cache.num_cache_pkgs);
 
-	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+	for (int32_t i = 0; i < PKG_HASH_SIZE; i++) {
 		EXPECT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
 		EXPECT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
 	}
@@ -79,14 +79,14 @@ TEST_F(insert_cache_pkgTest, InsertSomething)
 {
 	uid_t uids[] = {2, 4, 6, 8};
 	std::string pkgname[] = {"a", "b", "c", "d"};
-	int hash[4];
+	int32_t hash[4];
 
-	for (int i = 0; i < 4; i++) {
+	for (int32_t i = 0; i < 4; i++) {
 		insert_cache_pkg(pkgname[i].c_str(), uids[i]);
 		hash[i] = hash_pkg(pkgname[i].c_str());
 	}
 
-	for (int i = 0; i < 4; i++) {
+	for (int32_t i = 0; i < 4; i++) {
 		EXPECT_EQ(1, pkg_cache.pkg_hash[hash[i]].num_pkgs);
 		EXPECT_STREQ(pkgname[i].c_str(),
 			pkg_cache.pkg_hash[hash[i]].first_pkg_entry->pkgname);
@@ -105,10 +105,10 @@ TEST_F(insert_cache_pkgTest, ElementLimitExceeds)
 	uid_t uids[MAX_PKG_ENTRIES + 2];
 	std::string pkgname[MAX_PKG_ENTRIES + 2];
 	char pkg_name[300];
-	int idx, k = 0;
+	int32_t idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES + 2; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES + 2; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -118,7 +118,7 @@ TEST_F(insert_cache_pkgTest, ElementLimitExceeds)
 	}
 
 	/* Insert all of them */
-	for (int i = 0; i < k; i++)
+	for (int32_t i = 0; i < k; i++)
 		insert_cache_pkg(pkgname[i].c_str(), uids[i]);
 
 	/* Verify */
@@ -143,10 +143,10 @@ TEST_F(insert_cache_pkgTest, InsertExistEntry)
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
 	char pkg_name[300];
-	int idx, k = 0;
+	int32_t idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -155,7 +155,7 @@ TEST_F(insert_cache_pkgTest, InsertExistEntry)
 		}
 	}
 	/* Insert all of them */
-	for (int i = 0; i < k; i++)
+	for (int32_t i = 0; i < k; i++)
 		insert_cache_pkg(pkgname[i].c_str(), uids[i]);
 
 	/* head->7,6,5,4,3,2,1,0 */
@@ -213,9 +213,9 @@ TEST_F(lookup_cache_pkgTest, LookupEmptyCache)
 {
 	char pkg_name[300];
 	uid_t uid;
-	int ret;
+	int32_t ret;
 
-	for (int i = 0; i < 10000 ; i++) {
+	for (int32_t i = 0; i < 10000 ; i++) {
 		sprintf(pkg_name, "%d", i);
 		ret = lookup_cache_pkg(pkg_name, &uid);
 		ASSERT_EQ(-ENOENT, ret);
@@ -224,7 +224,7 @@ TEST_F(lookup_cache_pkgTest, LookupEmptyCache)
 	/* Check structure */
 	EXPECT_EQ(0, pkg_cache.num_cache_pkgs);
 
-	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+	for (int32_t i = 0; i < PKG_HASH_SIZE; i++) {
 		EXPECT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
 		EXPECT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
 	}
@@ -237,10 +237,10 @@ TEST_F(lookup_cache_pkgTest, LookupHitNothing)
 	uid_t uid;
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -251,7 +251,7 @@ TEST_F(lookup_cache_pkgTest, LookupHitNothing)
 	}
 
 	/* Hit nothing */
-	for (int i = 10000; i < 20000 ; i++) {
+	for (int32_t i = 10000; i < 20000 ; i++) {
 		sprintf(pkg_name, "%d", i);
 		ret = lookup_cache_pkg(pkg_name, &uid);
 		ASSERT_EQ(-ENOENT, ret);
@@ -279,10 +279,10 @@ TEST_F(lookup_cache_pkgTest, LookupHitManyTimes)
 	uid_t uid;
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -293,8 +293,8 @@ TEST_F(lookup_cache_pkgTest, LookupHitManyTimes)
 	}
 
 	/* Hit many times with reverse order */
-	for (int times = 0; times < 100000; times++) {
-		for (int i = k-1; i >= 0 ; i--) {
+	for (int32_t times = 0; times < 100000; times++) {
+		for (int32_t i = k-1; i >= 0 ; i--) {
 			ret = lookup_cache_pkg(pkgname[i].c_str(), &uid);
 			ASSERT_EQ(0, ret);
 			ASSERT_EQ(uids[i], uid);
@@ -323,10 +323,10 @@ TEST_F(lookup_cache_pkgTest, LookupHitManyTimes2)
 	uid_t uid;
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -337,8 +337,8 @@ TEST_F(lookup_cache_pkgTest, LookupHitManyTimes2)
 	}
 
 	/* Hit many times with reverse order */
-	for (int i = k-1; i >= 0 ; i--) {
-		for (int times = 0; times < 100000; times++) {
+	for (int32_t i = k-1; i >= 0 ; i--) {
+		for (int32_t times = 0; times < 100000; times++) {
 			ret = lookup_cache_pkg(pkgname[i].c_str(), &uid);
 			ASSERT_EQ(0, ret);
 			ASSERT_EQ(uids[i], uid);
@@ -385,10 +385,10 @@ TEST_F(remove_cache_pkgTest, RemoveMediumSuccess)
 	char pkg_name[300];
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -428,10 +428,10 @@ TEST_F(remove_cache_pkgTest, RemoveHeadSuccess)
 	char pkg_name[300];
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -467,10 +467,10 @@ TEST_F(remove_cache_pkgTest, RemoveTailSuccess)
 	char pkg_name[300];
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -506,10 +506,10 @@ TEST_F(remove_cache_pkgTest, RemoveHitNothing)
 	char pkg_name[300];
 	uid_t uids[MAX_PKG_ENTRIES];
 	std::string pkgname[MAX_PKG_ENTRIES];
-	int ret, idx, k = 0;
+	int32_t ret, idx, k = 0;
 
 	/* Generate mock pkgname and uid in the same hash bucket */
-	for (int i = 0; k < MAX_PKG_ENTRIES; i++) {
+	for (int32_t i = 0; k < MAX_PKG_ENTRIES; i++) {
 		sprintf(pkg_name, "%d", i);
 		if (hash_pkg(pkg_name) == 0) {
 			pkgname[k] = std::string(pkg_name);
@@ -520,7 +520,7 @@ TEST_F(remove_cache_pkgTest, RemoveHitNothing)
 	}
 
 	/* Hit nothing */
-	for (int i = 10000; i < 20000 ; i++) {
+	for (int32_t i = 10000; i < 20000 ; i++) {
 		sprintf(pkg_name, "%d", i);
 		ret = remove_cache_pkg(pkg_name);
 		ASSERT_EQ(-ENOENT, ret);
@@ -565,7 +565,7 @@ TEST_F(destroy_pkg_cacheTest, DestroyEmptyCache)
 	destroy_pkg_cache();
 
 	/* Check structure */
-	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+	for (int32_t i = 0; i < PKG_HASH_SIZE; i++) {
 		EXPECT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
 		EXPECT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
 	}
@@ -574,20 +574,20 @@ TEST_F(destroy_pkg_cacheTest, DestroyEmptyCache)
 
 TEST_F(destroy_pkg_cacheTest, DestroySuccess)
 {
-	for (int i = 0; i < 10000; i++) {
+	for (int32_t i = 0; i < 10000; i++) {
 		char pkg_name[300];
 		sprintf(pkg_name, "%d", i);
 		insert_cache_pkg(pkg_name, i);
 	}
 
-	for (int i = 0; i < PKG_HASH_SIZE; i++)
+	for (int32_t i = 0; i < PKG_HASH_SIZE; i++)
 		ASSERT_EQ(MAX_PKG_ENTRIES, pkg_cache.pkg_hash[i].num_pkgs);
 	ASSERT_EQ(MAX_PKG_ENTRIES * PKG_HASH_SIZE, pkg_cache.num_cache_pkgs);
 
 	destroy_pkg_cache();
 
 	/* Check structure */
-	for (int i = 0; i < PKG_HASH_SIZE; i++) {
+	for (int32_t i = 0; i < PKG_HASH_SIZE; i++) {
 		ASSERT_EQ(0, pkg_cache.pkg_hash[i].num_pkgs);
 		ASSERT_EQ(0, pkg_cache.pkg_hash[i].first_pkg_entry);
 	}

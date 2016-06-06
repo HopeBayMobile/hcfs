@@ -1,6 +1,27 @@
-#ifndef GW20_API_MARCO_H_
-#define GW20_API_MARCO_H_
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: marco.h
+* Abstract: This c header file for marcos.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
 
+#ifndef GW20_HCFSAPI_MARCO_H_
+#define GW20_HCFSAPI_MARCO_H_
+
+/* json helper */
+#define JSON_OBJ_SET_NEW(A, B, C)\
+	{\
+		if (json_object_set_new(A, B, C) == -1) {\
+			goto error;\
+		}\
+	}
+
+/* marcos for argument operations */
 #define CONCAT_ARGS(A)\
 	{\
 		if (A != NULL) {\
@@ -30,4 +51,4 @@
 		buf_idx += sizeof(int64_t);\
 	}
 
-#endif  /* GW20_API_MARCO_H_ */
+#endif  /* GW20_HCFSAPI_MARCO_H_ */
