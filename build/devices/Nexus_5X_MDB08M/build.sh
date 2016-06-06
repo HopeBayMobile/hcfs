@@ -127,17 +127,21 @@ function setup_ssh_key() {
 RSYNC_SETTING="-arcv --no-owner --no-group --no-times"
 function patch_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $here/patch/ root@$DOCKER_IP:/data/
+	rsync $RSYNC_SETTING $here/patch/ \
+		root@$DOCKER_IP:/data/
 }
 function pull_hcfs_binaay() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $LIB_DIR/$BINARY_TARGET/system/ $here/patch/$HCFS_COMPOMENT_BASE/hopebay/
+	rsync $RSYNC_SETTING $LIB_DIR/$BINARY_TARGET/system/ \
+		root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/
 }
 
 function pull_management_app() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $APP_DIR/*.apk $here/patch/$HCFS_COMPOMENT_BASE/HopebayHCFSmgmt/
-	rsync $RSYNC_SETTING $APP_DIR/arm64-v8a/ $here/patch/$HCFS_COMPOMENT_BASE/hopebay/lib64/
+	rsync $RSYNC_SETTING $APP_DIR/*.apk \
+		root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/HopebayHCFSmgmt/
+	rsync $RSYNC_SETTING $APP_DIR/arm64-v8a/ \
+		root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/lib64/
 }
 
 function build_system() {
