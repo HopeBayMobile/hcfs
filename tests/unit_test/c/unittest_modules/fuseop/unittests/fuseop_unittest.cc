@@ -1275,6 +1275,139 @@ TEST_F(hfuse_readTest, ReadCloudContent) {
   fptr = NULL;
 }
 
+TEST_F(hfuse_readTest, ReadPagedOutRead) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+  struct stat tmpstat;
+  ino_t tmpino;
+  FILE *tmpfptr;
+  int fd;
+
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_LDISK;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  stat("/tmp/test_fuse/testread", &tmpstat);
+  fd = open("/tmp/test_fuse/testread", O_RDONLY | O_DIRECT);
+  fptr = fdopen(fd, "r");
+  setbuf(fptr, NULL);
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+
+  tmpino = (int64_t) tmpstat.st_ino;
+  tmpfptr = system_fh_table.entry_table[tmpino].blockfptr;
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
+  /* Delete the block file */
+  unlink(temppath);
+  /* Then write something bogus */
+  fseek(tmpfptr, 0, SEEK_SET);
+  fprintf(tmpfptr, "This is not correct");
+
+  fseek(fptr, 0, SEEK_SET);
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is not correct", 
+            strlen("This is not correct")), 0);
+
+  test_fetch_from_backend = TRUE;
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_CLOUD;
+  tempbuf[0] = 0;
+  fflush(fptr);
+
+  fseek(fptr, 0, SEEK_SET);
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_readTest, ReadPagedOutReRead) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+  struct stat tmpstat;
+  ino_t tmpino;
+  FILE *tmpfptr, *fptr1;
+  int fd;
+
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_LDISK;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  stat("/tmp/test_fuse/testread", &tmpstat);
+  fd = open("/tmp/test_fuse/testread", O_RDONLY | O_DIRECT);
+  fptr = fdopen(fd, "r");
+  setbuf(fptr, NULL);
+  ASSERT_NE(fptr != NULL, 0);
+
+  fake_paged_out_count = 10;
+
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+
+  tmpino = (int64_t) tmpstat.st_ino;
+  tmpfptr = system_fh_table.entry_table[tmpino].blockfptr;
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
+  /* Delete the block file */
+  unlink(temppath);
+  /* Then write something bogus */
+  fseek(tmpfptr, 0, SEEK_SET);
+  fprintf(tmpfptr, "This is not correct");
+
+  fseek(fptr, 0, SEEK_SET);
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is not correct",
+            strlen("This is not correct")), 0);
+
+  /* Recreate the block */
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_LDISK;
+  fptr1 = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr1);
+  fclose(fptr1);
+
+  fake_paged_out_count = 11;
+
+  fseek(fptr, 0, SEEK_SET);
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+  fclose(fptr);
+  fptr = NULL;
+}
+
 TEST_F(hfuse_readTest, ReadCloudWaitCache) {
   int ret_val;
   int tmp_err;
@@ -1470,6 +1603,202 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
   snprintf(tempbuf, 10, "temp");
   ret_items = fwrite(tempbuf, 4, 1, fptr);
   EXPECT_EQ(ret_items, 1);
+  fclose(fptr);
+  fptr = NULL;
+
+  fptr = fopen(temppath,"r");
+  fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+}
+
+TEST_F(hfuse_ll_writeTest, ReWritePagedOutLocal) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+  ino_t tmpino;
+  FILE *tmpfptr, *fptr1;
+  int fd;
+  struct stat tmpstat;
+
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_LDISK;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  stat("/tmp/test_fuse/testwrite", &tmpstat);
+  fd = open("/tmp/test_fuse/testwrite", O_RDWR | O_DIRECT);
+  fptr = fdopen(fd, "r+");
+  setbuf(fptr, NULL);
+  ASSERT_NE(fptr != NULL, 0);
+
+  fake_paged_out_count = 10;
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+
+  tmpino = (int64_t) tmpstat.st_ino;
+  tmpfptr = system_fh_table.entry_table[tmpino].blockfptr;
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
+  /* Delete the block file */
+  unlink(temppath);
+  /* Then write something bogus */
+  fseek(tmpfptr, 0, SEEK_SET);
+  fprintf(tmpfptr, "This is not correct");
+
+  /* Recreate the block file */
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_LDISK;
+  fptr1 = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr1);
+  fclose(fptr1);
+
+  fake_paged_out_count = 11;
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
+  fclose(fptr);
+  fptr = NULL;
+
+  fptr = fopen(temppath,"r");
+  fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+}
+
+TEST_F(hfuse_ll_writeTest, ReWritePagedOut) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+  ino_t tmpino;
+  FILE *tmpfptr;
+  int fd;
+  struct stat tmpstat;
+
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_LDISK;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  stat("/tmp/test_fuse/testwrite", &tmpstat);
+  fd = open("/tmp/test_fuse/testwrite", O_RDWR | O_DIRECT);
+  fptr = fdopen(fd, "r+");
+  setbuf(fptr, NULL);
+  ASSERT_NE(fptr != NULL, 0);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+
+  tmpino = (int64_t) tmpstat.st_ino;
+  tmpfptr = system_fh_table.entry_table[tmpino].blockfptr;
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
+  /* Delete the block file */
+  unlink(temppath);
+  /* Then write something bogus */
+  fseek(tmpfptr, 0, SEEK_SET);
+  fprintf(tmpfptr, "This is not correct");
+
+  test_fetch_from_backend = TRUE;
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_CLOUD;
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
+  fclose(fptr);
+  fptr = NULL;
+
+  fptr = fopen(temppath,"r");
+  fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+}
+
+TEST_F(hfuse_ll_writeTest, ReWriteSynced) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+  ino_t tmpino;
+  FILE *tmpfptr;
+  int fd;
+  struct stat tmpstat;
+
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_BOTH;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  stat("/tmp/test_fuse/testwrite", &tmpstat);
+  fd = open("/tmp/test_fuse/testwrite", O_RDWR | O_DIRECT);
+  fptr = fdopen(fd, "r+");
+  setbuf(fptr, NULL);
+  ASSERT_NE(fptr != NULL, 0);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+
+  tmpino = (int64_t) tmpstat.st_ino;
+  tmpfptr = system_fh_table.entry_table[tmpino].blockfptr;
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+  EXPECT_EQ(ST_LDISK, updated_block_page.block_entries[0].status);
+
+  /* Fake synced block */
+  fake_block_status = ST_BOTH;
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(ST_LDISK, updated_block_page.block_entries[0].status);
+
+  EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
+
   fclose(fptr);
   fptr = NULL;
 

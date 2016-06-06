@@ -211,6 +211,8 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 				block_page->num_entries = 1;
 				block_page->block_entries[0].status
 					= fake_block_status;
+				block_page->block_entries[0].paged_out_count
+					= fake_paged_out_count;
 			}
 			break;
 		default:

@@ -126,8 +126,11 @@ private:
 
 		file_stat.st_size = 1000; // block_num = 1000/100 = 10 = 1 page in meta
 		file_entry.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
-		for (int i = 0; i < file_entry.num_entries ; i++)
+		for (int i = 0; i < file_entry.num_entries ; i++) {
 			file_entry.block_entries[i].status = ST_BOTH;
+			file_entry.block_entries[i].paged_out_count =
+				UINT32_MAX - 10 - i;
+		}
 
 		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
 				(uint64_t)inode);
@@ -214,6 +217,12 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 			char block_name[200];
 			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);
+			if (entry == 0)
+				EXPECT_EQ(0,
+					file_entry.block_entries[entry].paged_out_count);
+			else
+				EXPECT_EQ(UINT32_MAX - 9 - entry,
+					file_entry.block_entries[entry].paged_out_count);
 			sprintf(block_name,
 				"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d",
 				(uint64_t)inode, entry);

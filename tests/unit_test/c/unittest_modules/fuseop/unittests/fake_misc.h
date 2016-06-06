@@ -12,6 +12,7 @@ int root_updated;
 int after_update_block_page;
 int test_fetch_from_backend;
 unsigned char fake_block_status;
+uint32_t fake_paged_out_count;
 char readdir_metapath[100];
 int fail_open_files;
 
