@@ -890,7 +890,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		/* Check seq num and just print log when not match */
 		get_progress_info(ptr->progress_fd, block_count,
 				&block_uploading_status);
-		if (block_uploading_status.backend_seq > 0 &&
+		if (CLOUD_BLOCK_EXIST(block_uploading_status.block_exist) &&
 		    toupload_block_seq != block_uploading_status.backend_seq) {
 			write_log(0, "Error: Seq of block_%"PRIu64"_%lld does "
 				"not match. Local seq %lld, cloud seq %lld. But"
