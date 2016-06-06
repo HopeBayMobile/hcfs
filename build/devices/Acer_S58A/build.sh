@@ -50,6 +50,7 @@ function start_builder() {
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
 	eval docker pull $DOCKER_IMAGE || :
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
 	trap cleanup INT TERM
 }
 function cleanup() {
@@ -60,6 +61,7 @@ function cleanup() {
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
 	docker rm -f $DOCKERNAME || :
+	rm -f DOCKERNAME
 }
 function check-ssh-agent() {
 	[ -S "$SSH_AUTH_SOCK" ] && { ssh-add -l >& /dev/null || [ $? -ne 2 ]; }
