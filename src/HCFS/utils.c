@@ -107,6 +107,12 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
+void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+{
+	snprintf(pathname, METAPATHLEN, "/dev/shm/restored_meta_%" PRIu64 "",
+			(uint64_t)this_inode);
+}
+
 /************************************************************************
 *
 * Function name: fetch_todelete_path

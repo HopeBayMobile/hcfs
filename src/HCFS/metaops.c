@@ -2595,7 +2595,7 @@ errcode_handle:
 
 int32_t restore_meta_file(ino_t this_inode)
 {
-	char metapath[300], objname[300];
+	char metapath[300], restored_metapath[300], objname[100];
 	FILE *fptr;
 	int32_t errcode, ret;
 
@@ -2604,8 +2604,12 @@ int32_t restore_meta_file(ino_t this_inode)
 	if (!access(metapath, F_OK))
 		return 0;
 
-	/* Begin to restore */
-	fptr = fopen(metapath, "a+");
+	/* Begin to restore. Download meta file and restore content */
+	if (hcfs_system->backend_is_online == FALSE)
+		return -ENOTCONN;
+
+	fetch_restored_meta_path(restored_metapath, this_inode);
+	fptr = fopen(restored_metapath, "a+");
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
@@ -2613,7 +2617,7 @@ int32_t restore_meta_file(ino_t this_inode)
 		return -EIO;
 	}
 	fclose(fptr);
-	fptr = fopen(metapath, "r+");
+	fptr = fopen(restored_metapath, "r+");
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
@@ -2631,24 +2635,34 @@ int32_t restore_meta_file(ino_t this_inode)
 		}
 		return -EIO;
 	}
+	if (!access(metapath, F_OK)) { /* Check again when get lock */
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return 0;
+	}
+	setbuf(fptr, NULL);
 
 	/* Fetch meta from cloud */
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
 	ret = fetch_meta_from_cloud(fptr, objname);
-	if (ret < 0) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return ret;
-	}
+	if (ret < 0)
+		goto errcode_handle;
 
 	ret = restore_meta_structure(fptr);
-	if (ret < 0) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return ret;
-	}
+	if (ret < 0)
+		goto errcode_handle;
+
+	ret = rename(restored_metapath, metapath);
+	if (ret < 0)
+		goto errcode_handle;
+
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 
 	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return ret;
 }
