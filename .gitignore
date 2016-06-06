@@ -79,8 +79,6 @@ hcfs_android_log
 /build/out
 /build/*/obj
 /build/*/out
-!/build/**/*.so
-!/build/**/*.a
 /containers/**/id_rsa
 /containers/**/id_rsa.pub
 /utils/.done_*
