@@ -83,6 +83,13 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	write_log(10, "Begin remove sync block inode %" PRIu64 "\n",
 	          (uint64_t)this_inode);
 
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_file(this_inode);
+		if (ret < 0)
+			return ret;
+	}
+
 /* FEATURE TODO: rebuild super block entry */
 	ret = super_block_read(this_inode, &tempentry);
 
@@ -101,7 +108,6 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		if (ret < 0)
 			return ret;
 
-/* FEATURE TODO: fetch meta from backend */
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;

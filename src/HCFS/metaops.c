@@ -1959,43 +1959,10 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
 
-	ret = fetch_meta_path(metapath, this_inode);
-	if (ret < 0)
-		return ret;
-
-	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
-		ret = restore_meta_file(this_inode);
-		if (ret < 0)
-			return ret;
-	}
-
-	fptr = fopen(metapath, "r");
-	if (fptr == NULL) {
-		ret = errno;
-		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
-			(uint64_t)this_inode, __func__, ret);
-		return -ret;
-	}
-
-	flock(fileno(fptr), LOCK_EX);
-	if (access(metapath, F_OK) < 0) {
-		write_log(5, "meta %"PRIu64" does not exist in %s\n",
-			(uint64_t)this_inode, __func__);
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return -ENOENT;
-	}
-
-	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
-	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
-	total_children = dir_meta.total_children;
-	now_page_pos = dir_meta.tree_walk_list_head;
-	if (total_children == 0 || now_page_pos == 0) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
+	total_children = dir_meta->total_children;
+	now_page_pos = dir_meta->tree_walk_list_head;
+	if (total_children == 0 || now_page_pos == 0)
 		return 0;
-	}
 
 	half = total_children / 2 + 1; /* Avoid zero malloc */
 	now_dir_size = half;
@@ -2215,6 +2182,13 @@ int32_t collect_dir_children(ino_t this_inode,
 	ret = fetch_meta_path(metapath, this_inode);
 	if (ret < 0)
 		return ret;
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_file(this_inode);
+		if (ret < 0)
+			return ret;
+	}
 
 	fptr = fopen(metapath, "r");
 	if (fptr == NULL) {

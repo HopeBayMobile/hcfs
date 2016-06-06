@@ -105,6 +105,7 @@
 #ifndef _ANDROID_ENV_
 #include "fuseproc_comm.h"
 #endif
+#include "rebuild_parent_dirstat.h"
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
@@ -5295,7 +5296,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	int64_t countn;
 	off_t nextentry_pos;
 	int32_t page_start;
-	char *buf;
+	char *buf, *tmpstrptr;;
 	off_t buf_pos;
 	size_t entry_size, ret_size;
 	int32_t ret, errcode;
@@ -5471,8 +5472,16 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			else if (this_type == D_ISSOCK)
 				tempstat.st_mode = S_IFSOCK;
 
-/* FEATURE TODO: rebuild parent lookup / dir statistics here
-(excluding . and ..), for every pair of (parent / child) discovered here */
+			/* Rebuild parent lookup / dir statistics here
+			(excluding . and ..), for every pair of (parent / child)
+			discovered here */
+			if (hcfs_system->system_restoring) {
+				tmpstrptr = temp_page.dir_entries[count].d_name;
+				if ((strcmp(tmpstrptr, ".") != 0) &&
+				    (strcmp(tmpstrptr, "..") != 0))
+					rebuild_parent_stat(tempstat.st_ino,
+						this_inode, this_type);
+			}
 
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
