@@ -166,8 +166,7 @@ function build_system() {
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
-	rm -rf out/target/product/bullhead && \
-	make \$PARALLEL_JOBS"'
+	make \$PARALLEL_JOBS dist"'
 }
 
 function publish_image() {
@@ -180,7 +179,7 @@ function publish_image() {
 		$here/resource/* \
 		${IMG_DIR}
 	rsync $RSYNC_SETTING \
-		root@$DOCKER_IP:/data/out/target/product/*/{boot,system,userdata,vendor,recovery}.img \
+		root@$DOCKER_IP:/data/out/dist/*-img-* \
 		${IMG_DIR}
 	touch ${PUBLISH_DIR}
 	touch ${IMG_DIR}
