@@ -171,13 +171,14 @@ function build_system() {
 
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	mkdir -p $IMG_DIR
+	mkdir -p ${IMG_DIR}
 	rsync $RSYNC_SETTING --delete \
 		$here/resource/* \
-		$IMG_DIR
+		${IMG_DIR}
 	rsync $RSYNC_SETTING \
 		root@$DOCKER_IP:/data/out/target/product/*/{boot,system,userdata,vendor,recovery,cache}.img \
-		$IMG_DIR
+		${IMG_DIR}
+	touch ${PUBLISH_DIR} ${IMG_DIR}
 }
 
 function mount_nas() {
