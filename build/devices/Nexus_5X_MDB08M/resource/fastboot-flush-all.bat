@@ -17,13 +17,7 @@ PATH=%PATH%;"%SYSTEMROOT%\System32"
 
 @ECHO ON
 fastboot oem unlock-go
-fastboot flash boot boot.img || goto :error
-fastboot flash system system.img || goto :error
-fastboot flash userdata userdata.img || goto :error
-fastboot flash recovery recovery.img || goto :error
-fastboot flash vendor vendor.img || goto :error
-fastboot erase cache || goto :error
-fastboot reboot
+fastboot.exe update aosp_bullhead-img-*.zip
 @ECHO OFF
 echo Press any key to exit...
 pause >nul
