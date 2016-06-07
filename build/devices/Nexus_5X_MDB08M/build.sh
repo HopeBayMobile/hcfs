@@ -166,13 +166,17 @@ function build_system() {
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
+	rm -rf out/target/product/bullhead && \
 	make \$PARALLEL_JOBS"'
 }
 
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
+	if [ -d ${IMG_DIR} ]; then
+		rm -rf ${IMG_DIR}
+	fi
 	mkdir -p ${IMG_DIR}
-	rsync $RSYNC_SETTING -L --delete \
+	rsync $RSYNC_SETTING -L \
 		$here/resource/* \
 		${IMG_DIR}
 	rsync $RSYNC_SETTING \
