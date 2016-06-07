@@ -1227,7 +1227,7 @@ int32_t increase_pinned_size(int64_t *reserved_pinned_size,
 /**
  * pin_inode
  *
- * Change local pin flag in meta cache to "TRUE" and set pin_status
+ * Change local pin flag in meta cache to "pin_type" and set pin_status
  * in super block to ST_PINNING in case of regfile, ST_PIN for dir/ symlink.
  * When a regfile is set to ST_PINNING, it will be pushed into pinning queue
  * and all blocks will be fetched from cloud by other thread.
@@ -1238,7 +1238,7 @@ int32_t increase_pinned_size(int64_t *reserved_pinned_size,
  * @return 0 on success, 1 on case that regfile/symlink had been pinned,
  *         otherwise negative error code.
  */
-int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
+int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type)
 {
 	int32_t ret;
 	struct stat tempstat;
@@ -1250,7 +1250,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		return ret;
 
 
-	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
+	ret = change_pin_flag(this_inode, tempstat.st_mode, pin_type);
 	if (ret < 0) {
 		return ret;
 
@@ -1262,12 +1262,12 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.st_mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
-					tempstat.st_size, TRUE);
+					tempstat.st_size, pin_type);
 			if (ret == -ENOSPC) {
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
 				change_pin_flag(this_inode,
-					tempstat.st_mode, FALSE);
+					tempstat.st_mode, P_UNPIN);
 				return ret;
 			}
 		}
@@ -1299,7 +1299,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		ret = 0;
 		for (count = 0; count < num_nondir_node; count++) {
 			ret = pin_inode(nondir_node_list[count],
-				reserved_pinned_size);
+				reserved_pinned_size, pin_type);
 			if (ret < 0)
 				break;
 		}
@@ -1314,7 +1314,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		ret = 0;
 		for (count = 0; count < num_dir_node; count++) {
 			ret = pin_inode(dir_node_list[count],
-				reserved_pinned_size);
+				reserved_pinned_size, pin_type);
 			if (ret < 0)
 				break;
 		}
@@ -1386,7 +1386,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		return ret;
 
 
-	ret = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
+	ret = change_pin_flag(this_inode, tempstat.st_mode, P_UNPIN);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to unpin inode %"PRIu64"."
 			" Code %d\n", (uint64_t)-ret);
