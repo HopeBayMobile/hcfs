@@ -15,6 +15,7 @@
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
 * 2015/2/18, Kewei finish atomic upload.
 * 2016/5/23 Jiahong added control for cache mgmt
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -67,6 +68,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "tocloud_tools.h"
 #include "utils.h"
 #include "hcfs_cacheops.h"
+#include "rebuild_super_block.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -1050,7 +1052,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		  ptr->this_mode);
 
 	if (ret < 0) {
-<<<<<<< HEAD
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
@@ -1063,33 +1064,18 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		write_log(0, "IO error in %s. Code %d, %s\n",
 			__func__, errcode, strerror(errcode));
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
-=======
-/* FEATURE TODO: rebuild super block */
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
->>>>>>> Marking location to modify
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
-<<<<<<< HEAD
 	/* Open local meta */
 	local_metafptr = fopen(local_metapath, "r+");
 	if (local_metafptr == NULL) {
-=======
-/* FEATURE TODO: fetch meta */
-	metafptr = fopen(thismetapath, "r+");
-	if (metafptr == NULL) {
->>>>>>> Marking location to modify
 		errcode = errno;
 		if (errcode != ENOENT) {
 			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
 				  errcode, strerror(errcode));
-<<<<<<< HEAD
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
-=======
-/* FEATURE TODO: rebuild super block */
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
->>>>>>> Marking location to modify
 		}
 		/* If meta file is gone, the inode is deleted and we don't need
 		to sync this object anymore. */
@@ -1255,7 +1241,6 @@ store in some other file */
 		}
 	}
 
-<<<<<<< HEAD
 	/* Abort sync to cloud if system is going down */
 	if (hcfs_system->system_going_down == TRUE) {
 		/* When system going down, re-upload it later */
@@ -1263,18 +1248,6 @@ store in some other file */
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
-=======
-	/*Check if metafile still exists. If not, forget the meta upload*/
-	if (access(thismetapath, F_OK) < 0) {
-		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		return;
-	}
-
-	/* Abort sync to cloud if error occured or system is going down */
-	if ((sync_error == TRUE) || (hcfs_system->system_going_down == TRUE)) {
-/* FEATURE TODO: rebuild super block */
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
->>>>>>> Marking location to modify
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
@@ -1395,19 +1368,10 @@ store in some other file */
 			write_log(10, "Checking for other error\n");
 			sync_error = sync_ctl.threads_error[ptr->which_index];
 		}
-<<<<<<< HEAD
-
 	} else { /* meta is removed */
 		flock(fileno(local_metafptr), LOCK_UN);
 		fclose(local_metafptr);
 		fclose(toupload_metafptr);
-=======
-/* FEATURE TODO: rebuild super block */
-		super_block_update_transit(ptr->inode, FALSE, sync_error);
-	} else {
-		flock(fileno(metafptr), LOCK_UN);
-		fclose(metafptr);
->>>>>>> Marking location to modify
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1483,7 +1447,6 @@ store in some other file */
 	return;
 
 errcode_handle:
-<<<<<<< HEAD
 	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 	flock(fileno(toupload_metafptr), LOCK_UN);
@@ -1491,12 +1454,6 @@ errcode_handle:
 	delete_backend_blocks(progress_fd, total_blocks,
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
-=======
-	flock(fileno(metafptr), LOCK_UN);
-	fclose(metafptr);
-/* FEATURE TODO: rebuild super block */
-	super_block_update_transit(ptr->inode, FALSE, TRUE);
->>>>>>> Marking location to modify
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 	return;
 }
@@ -2054,6 +2011,9 @@ void upload_loop(void)
 
 	write_log(2, "Start upload loop\n");
 
+/* FEATURE TODO: Turn off sync in restoring mode, and some mechanism
+to notify sync to resume when restoring is done */
+
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			/* Backup FS db if needed at the beginning of a round
@@ -2118,7 +2078,7 @@ void upload_loop(void)
 		if (ino_check != 0) {
 			ino_sync = ino_check;
 
-/* FEATURE TODO: rebuild super block */
+/* FEATURE TODO: double check that super block entry will be reconstructed here */
 			ret_val = read_super_block_entry(ino_sync, &tempentry);
 
 			if ((ret_val < 0) || (tempentry.status != IS_DIRTY)) {

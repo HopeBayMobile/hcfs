@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: super_block.c
 * Abstract: The c source code file for meta processing involving super
@@ -16,6 +16,8 @@
 *           comparing between int32_t and uint32_t integers.
 * 2015/5/27 Jiahong working on improving error handling
 * 2015/5/28 Jiahong resolving merges
+* 2016/6/7 Jiahong changing code for recovering mode
+*
 **************************************************************************/
 
 /* TODO: Consider to convert super inode to multiple files and use striping
@@ -90,9 +92,6 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	ssize_t ret_val;
 	int32_t errcode;
 
-/* FEATURE TODO: fetch meta and rebuild super block entry. Warning:
-super block lock is aquired in this function, so need to watch out
-for deadlocks. */
 	if (this_inode <= 0) {
 		errcode = EINVAL;
 		write_log(0,
@@ -188,7 +187,6 @@ int32_t super_block_init(void)
 	sem_init(&(sys_super_block->share_CR_lock_sem), 1, 1);
 	sys_super_block->share_counter = 0;
 
-/* FEATURE TODO: integrate super block rebuild mechanism */
 	sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
 
 	if (sys_super_block->iofptr < 0) {
@@ -342,9 +340,15 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	int32_t ret_val;
 
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret_val = restore_meta_super_block_entry(this_inode, NULL);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
 	ret_val = 0;
 	super_block_exclusive_locking();
-/* FEATURE TODO: download meta and rebuild super block entry */
 	if (inode_ptr->status != IS_DIRTY) { /* Add to dirty node list */
 		ret_val = ll_dequeue(this_inode, inode_ptr);
 		if (ret_val < 0) {
@@ -1634,7 +1638,7 @@ int32_t super_block_finish_pinning(ino_t this_inode)
 	int32_t ret;
 
 	super_block_exclusive_locking();
-/* FEATURE TODO: fetch meta and rebuild super block entry */
+
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
@@ -1685,8 +1689,14 @@ int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 	SUPER_BLOCK_ENTRY this_entry;
 	int32_t ret;
 
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_super_block_entry(this_inode, NULL);
+		if (ret < 0)
+			return ret;
+	}
+
 	super_block_exclusive_locking();
-/* FEATURE TODO: fetch meta and rebuild super block entry */
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();
@@ -1735,8 +1745,14 @@ int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 	SUPER_BLOCK_ENTRY this_entry;
 	int32_t ret;
 
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_super_block_entry(this_inode, NULL);
+		if (ret < 0)
+			return ret;
+	}
+
 	super_block_exclusive_locking();
-/* FEATURE TODO: fetch meta and rebuild super block entry */
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
 		super_block_exclusive_release();

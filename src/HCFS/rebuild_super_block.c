@@ -701,6 +701,8 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, struct stat *ret_stat)
 
 	/* Check whether this entry had been rebuilded */
 	ret = super_block_read(this_inode, &sb_entry);
+/* FEATURE TODO: Check if truncate super block to max inode num in
+restoring mode is early enough so that read will always be successful here */
 	if (ret < 0)
 		return ret;
 	if (sb_entry.this_index > 0) {

@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hfuse_cacheops.c
 * Abstract: The c source code file for cache management operations.
@@ -9,6 +9,7 @@
 * 2015/2/11~12 Jiahong added header for this file, and revising coding style.
 * 2015/6/3 Jiahong added error handling
 * 2015/10/22 Kewei added mechanism skipping pinned inodes.
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -40,6 +41,7 @@
 #include "macro.h"
 #include "metaops.h"
 #include "utils.h"
+#include "rebuild_super_block.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -85,16 +87,17 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 
 	/* Try fetching meta file from backend if in restoring mode */
 	if (hcfs_system->system_restoring == TRUE) {
-		ret = restore_meta_file(this_inode);
+		ret = restore_meta_super_block_entry(this_inode,
+		                                     &(tempentry.inode_stat));
+		if (ret < 0)
+			return ret;
+	} else {
+
+		ret = super_block_read(this_inode, &tempentry);
+
 		if (ret < 0)
 			return ret;
 	}
-
-/* FEATURE TODO: rebuild super block entry */
-	ret = super_block_read(this_inode, &tempentry);
-
-	if (ret < 0)
-		return ret;
 
 	/* If inode is not dirty or in transit, or if cache is
 	already full, check if can replace uploaded blocks */

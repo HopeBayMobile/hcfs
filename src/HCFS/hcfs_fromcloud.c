@@ -9,6 +9,7 @@
 * Revision History
 * 2015/2/12 Jiahong added header for this file, and revising coding style.
 * 2015/6/4 Jiahong added error handling
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -39,6 +40,7 @@
 #include "dedup_table.h"
 #include "metaops.h"
 #include "super_block.h"
+#include "rebuild_super_block.h"
 
 /************************************************************************
 *
@@ -198,7 +200,13 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	fetch_meta_path(thismetapath, ptr->this_inode);
 	fetch_block_path(thisblockpath, ptr->this_inode, ptr->block_no);
 
-/* FEATURE TODO: fetch meta */
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_super_block_entry(ptr->this_inode, NULL);
+		if (ret < 0)
+			return;
+	}
+
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
 		free(ptr);
@@ -795,7 +803,17 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	fetch_meta_path(metapath, inode);
-/* FEATURE TODO: fetch meta */
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == TRUE) {
+		ret = restore_meta_super_block_entry(inode, &tempstat);
+		if (ret < 0)
+			return ret;
+		/* If not a regular file, do nothing */
+		if (!S_ISREG(tempstat.st_mode))
+			return 0;
+	}
+
 	fptr = fopen(metapath, "r+");
 	if (fptr == NULL) {
 		write_log(2, "Cannot open %s in %s\n", metapath, __func__);
@@ -804,12 +822,17 @@ int32_t fetch_pinned_blocks(ino_t inode)
 
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
-	FSEEK(fptr, 0, SEEK_SET);
-	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
-	if (!S_ISREG(tempstat.st_mode)) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return 0;
+	if (hcfs_system->system_restoring == TRUE) {
+		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	} else {
+		FSEEK(fptr, 0, SEEK_SET);
+		FREAD(&tempstat, sizeof(struct stat), 1, fptr);
+		/* If not a regular file, do nothing */
+		if (!S_ISREG(tempstat.st_mode)) {
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			return 0;
+		}
 	}
 	/* Do not need to re-load meta in loop because just need to check those
 	blocks that existing before setting local_pin = true.*/

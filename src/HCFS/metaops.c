@@ -19,6 +19,7 @@
 * 2016/1/18 Jiahong revised actual_delete_inode routine
 * 2016/1/19 Jiahong revised disk_markdelete
 * 2016/4/26 Jiahong adding routines for snapshotting dir meta before modifying
+* 2016/6/7 Jiahong changing code for recovering mode
 **************************************************************************/
 #include "metaops.h"
 
@@ -51,6 +52,7 @@
 #include "path_reconstruct.h"
 #include "FS_manager.h"
 #endif
+#include "rebuild_super_block.h"
 
 static inline void logerr(int32_t errcode, char *msg)
 {
@@ -2185,7 +2187,7 @@ int32_t collect_dir_children(ino_t this_inode,
 
 	/* Try fetching meta file from backend if in restoring mode */
 	if (hcfs_system->system_restoring == TRUE) {
-		ret = restore_meta_file(this_inode);
+		ret = restore_meta_super_block_entry(this_inode, NULL);
 		if (ret < 0)
 			return ret;
 	}
