@@ -22,7 +22,7 @@ fastboot flash system system.img || goto :error
 fastboot flash userdata userdata.img || goto :error
 fastboot flash recovery recovery.img || goto :error
 fastboot flash vendor vendor.img || goto :error
-fastboot erase cache
+fastboot erase cache || goto :error
 fastboot reboot
 @ECHO OFF
 echo Press any key to exit...
