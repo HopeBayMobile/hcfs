@@ -21,7 +21,6 @@ file_type_auto_trans(hcfsapid, system_data_file, hcfs_data_file)
 allow hcfsapid hcfs_data_file:dir create_file_perms;
 allow hcfsapid hcfs_data_file:file create_file_perms;
 allow hcfsapid system_data_file:dir remove_name;
-allow hcfsapid system_data_file:file { append write create open };
 
 allow hcfsapid app_data_file:dir open;
 

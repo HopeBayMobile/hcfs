@@ -1,0 +1,18 @@
+if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
+	. /etc/bash_completion
+fi
+
+export USE_CCACHE=1
+export CCACHE_BASEDIR=/data
+export CCACHE_DIR=/ccache
+export CCACHE_UMASK=000
+export CCACHE_TEMPDIR=/ccache_tmp
+_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
+export PARALLEL_JOBS="-j`expr $_nr_cpu + $_nr_cpu`"
+export USER=$(whoami)
+
+cd /data; source build/envsetup.sh
+set -v
+alias buildud='cd /data && lunch aosp_bullhead-userdebug && make $PARALLEL_JOBS'
+alias buildu='cd /data && lunch aosp_bullhead-user && make $PARALLEL_JOBS'
+set +v

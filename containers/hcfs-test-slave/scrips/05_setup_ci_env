@@ -19,7 +19,9 @@ if [ "$UID" -ne 0 ]; then
 	exit 1
 fi
 # use cache server to speed up docker building
-echo 'Acquire::http::Proxy "http://cache:8000";' | tee /etc/apt/apt.conf.d/30autoproxy
+if [ -e /.dockerinit ]; then
+	echo 'Acquire::http::Proxy "http://cache:8000";' | tee /etc/apt/apt.conf.d/30autoproxy
+fi
 export http_proxy="http://cache:8000"
 sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list
 

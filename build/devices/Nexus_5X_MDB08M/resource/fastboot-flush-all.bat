@@ -16,11 +16,16 @@
 PATH=%PATH%;"%SYSTEMROOT%\System32"
 
 @ECHO ON
-adb kill-server
-adb wait-for-device
-adb root
-adb wait-for-device
-:: adb shell "set -- `ps | grep hcfs`; kill -9 $2"
-adb reboot bootloader
-call fastboot-flush-all.bat
-adb kill-server
+fastboot oem unlock-go
+fastboot.exe update aosp_bullhead-img-*.zip
+@ECHO OFF
+echo Press any key to exit...
+pause >nul
+exit
+
+:error
+@ECHO OFF
+echo Failed with error #%errorlevel%.
+echo Press any key to exit...
+pause >nul
+exit /b %errorlevel%
