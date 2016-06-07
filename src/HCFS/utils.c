@@ -1874,6 +1874,8 @@ int32_t reload_system_config(const char *config_path)
 			write_log(0, "Error: Fail to prepare FS backup."
 				" Code %d\n", -ret);
 		}
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		init_download_module();
 		init_backend_related_module();
 	}
 

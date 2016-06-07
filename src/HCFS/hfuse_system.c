@@ -241,9 +241,6 @@ int32_t init_hfuse(void)
 	ret_val = init_hcfs_system_data();
 	if (ret_val < 0)
 		return ret_val;
-	//ret_val = super_block_init();
-	//if (ret_val < 0)
-	//	return ret_val;
 	ret_val = init_system_fh_table();
 	if (ret_val < 0)
 		return ret_val;
@@ -300,13 +297,19 @@ int32_t _init_download_curl(int32_t count)
  */
 void init_backend_related_module(void)
 {
-	int32_t count;
-
 	if (CURRENT_BACKEND != NONE) {
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
 		//pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+	}
+}
+
+void init_download_module(void)
+{
+	int32_t count;
+
+	if (CURRENT_BACKEND != NONE) {
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
@@ -323,6 +326,7 @@ void init_backend_related_module(void)
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
 		update_quota();
 	}
+
 }
 
 int32_t init_event_notify_module(void)
@@ -500,13 +504,20 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(ret_val);
 
-	/* Init backend related services */
+	/* Init backend related services and super block */
 	if (CURRENT_BACKEND != NONE) {
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		init_download_module();
 		ret = check_init_super_block();
-		if (ret < 0)
+		if (ret < 0) {
 			exit(ret);
-		init_backend_related_module();
+		} else if (ret > 0) { /* Just open old superblock */
+			init_backend_related_module();
+		} else {
+			/* Rebuild superblock.
+			 * Do NOT init upload/delete/cache mgmt */
+		}
+
 	} else {
 		ret = check_init_super_block();
 		if (ret < 0)

@@ -846,6 +846,7 @@ int32_t super_block_reclaim_fullscan(void)
 	int64_t count;
 	off_t thisfilepos, retval;
 	ino_t last_reclaimed, first_reclaimed, old_last_reclaimed;
+	ino_t this_inode;
 	ssize_t retsize;
 
 	last_reclaimed = 0;
@@ -864,8 +865,9 @@ int32_t super_block_reclaim_fullscan(void)
 		return -errcode;
 	}
 	/* Traverse all entries and reclaim. */
-	for (count = 0; count < sys_super_block->head.num_total_inodes;
+	for (count = 1; count < sys_super_block->head.num_total_inodes;
 								count++) {
+		this_inode = count + 1;
 		thisfilepos = SB_HEAD_SIZE + count * SB_ENTRY_SIZE;
 		retsize = pread(sys_super_block->iofptr, &tempentry,
 						SB_ENTRY_SIZE, thisfilepos);
@@ -880,12 +882,22 @@ int32_t super_block_reclaim_fullscan(void)
 		if (retsize < SB_ENTRY_SIZE)
 			break;
 
+		/* Reclaim all unused inode entries */
 		if ((tempentry.status == TO_BE_RECLAIMED) ||
-				((tempentry.inode_stat.st_ino == 0) &&
-					(tempentry.status != TO_BE_DELETED))) {
+			(tempentry.status == RECLAIMED) ||
+			(tempentry.this_index == 0) ||
+			((tempentry.inode_stat.st_ino == 0) &&
+				(tempentry.status != TO_BE_DELETED))) {
 
 			/* Modify status and reclaim the entry. */
 			tempentry.status = RECLAIMED;
+			if (tempentry.this_index != this_inode) {
+				write_log(10, "Debug: Entry inode is %"
+					PRIu64", inode is %"PRIu64,
+					(uint64_t)(tempentry.this_index),
+					(uint64_t)this_inode);
+				tempentry.this_index = this_inode;
+			}
 			sys_super_block->head.num_inode_reclaimed++;
 			tempentry.util_ll_next = 0;
 			retsize = pwrite(sys_super_block->iofptr, &tempentry,
@@ -1941,7 +1953,10 @@ int32_t check_init_super_block()
 
 	if (dirmeta.total_children <= 0) {
 		ret = super_block_init();
-		return ret;
+		if (ret < 0)
+			return ret;
+		else
+			return 1;
 	}
 
 	/* Check superblock status */
@@ -1985,6 +2000,10 @@ int32_t check_init_super_block()
 				ret = create_sb_rebuilder();
 			} else {
 				ret = super_block_init();
+				if (ret < 0)
+					return ret;
+				else
+					return 1;
 			}
 		}
 	}

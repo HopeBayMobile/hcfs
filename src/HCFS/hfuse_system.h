@@ -23,6 +23,7 @@ int32_t init_hcfs_system_data(void);
 int32_t sync_hcfs_system_data(char need_lock);
 void init_backend_related_module();
 int32_t init_event_notify_module(void);
+void init_download_module(void);
 
 pthread_t delete_loop_thread;
 pthread_t monitor_loop_thread;

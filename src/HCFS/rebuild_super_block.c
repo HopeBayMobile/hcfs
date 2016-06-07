@@ -11,6 +11,7 @@
 #include "metaops.h"
 #include "macro.h"
 #include "hcfs_fromcloud.h"
+#include "hfuse_system.h"
 
 /**
  * Helper of init_rebuild_sb(). Help the caller to get all root inodes
@@ -504,7 +505,6 @@ void rebuild_sb_worker(void *t_idx)
 		ret = _worker_get_job(tidx, &inode_job);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
-				write_log(4, "Rebuilding all inodes completed\n");
 				if (rebuild_sb_jobs->job_finish)
 					break;
 				else
@@ -583,14 +583,35 @@ void rebuild_sb_worker(void *t_idx)
 		rebuild_sb_tpool->thread[tidx].active = FALSE;
 		rebuild_sb_tpool->num_active--;
 		sem_post(&(rebuild_sb_tpool->tpool_access_sem));
-		write_log(10, "Worker %d comes off work :)\n", tidx);
+		write_log(10, "Worker %d comes off work. Happy!\n", tidx);
 		return;
 	}
 	sem_post(&(rebuild_sb_tpool->tpool_access_sem));
 
 	/* Reclaim all unused inode */
-	write_log(10, "Debug: Poor master is %d\n", tidx);
+	char queue_filepath[400];
 
+	write_log(10, "Debug: Poor master is %d\n", tidx);
+	close(rebuild_sb_jobs->queue_fh);
+	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
+	if (!access(queue_filepath, F_OK))
+		unlink(queue_filepath);
+	ret = super_block_reclaim_fullscan();
+	if (ret < 0) {
+		write_log(0, "Error: Fail to reclaim inodes. Code %d\n", -ret);
+	}
+
+	write_log(10, "Debug: Rebuilding superblock completes."
+			" Enable backend services");
+
+	/* Enable backend related services */
+	init_backend_related_module();
+
+	/* Free resource */
+	while (rebuild_sb_tpool->num_active > 1)
+		sleep(1);
+	free(rebuild_sb_jobs);
+	free(rebuild_sb_tpool);
 	return;
 }
 
