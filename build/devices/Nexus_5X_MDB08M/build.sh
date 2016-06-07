@@ -26,7 +26,7 @@ set +v -e -o functrace
 
 function require_var (){
 	if eval '[ -n "$'$1'" ]'; then
-		echo -e $1:\t$1
+		echo -e [$1]: $1
 	else
 		echo Error: required environment variables $1 does not exist
 		exit 1
@@ -51,7 +51,6 @@ require_var BOXNAME
 require_var BINARY_TARGET
 require_var HCFS_COMPOMENT_BASE
 echo ================================================================================
-exit
 
 
 function main()
