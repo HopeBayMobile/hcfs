@@ -1,0 +1,1 @@
+../../Acer_S58A/resource/flush-all.bat
