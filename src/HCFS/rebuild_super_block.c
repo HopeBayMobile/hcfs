@@ -417,70 +417,13 @@ static int32_t _worker_get_job(int32_t tidx, INODE_JOB_HANDLE *inode_job)
 	return ret;
 }
 
-int32_t _worker_do_inode_job(INODE_JOB_HANDLE *inode_job, mode_t *this_mode)
-{
-	char metapath[300];
-	int32_t errcode, ret;
-	size_t ret_size;
-	char pin_status;
-	struct stat this_stat;
-	FILE_META_TYPE this_meta;
-	FILE *fptr;
-
-	fetch_meta_path(metapath, inode_job->inode);
-
-	/* Restore meta file */
-	ret = restore_meta_file(inode_job->inode);
-	if (ret < 0) {
-		write_log(2, "Warn: Fail to restore meta%"PRIu64"\n",
-			(uint64_t)inode_job->inode);
-		return ret;
-	}
-
-	fptr = fopen(metapath, "r");
-	if (!fptr) {
-		/* Something wrong? */
-		errcode = errno;
-		return -errcode;
-	}
-	flock(fileno(fptr), LOCK_EX);
-	FSEEK(fptr, 0, SEEK_SET);
-	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
-	*this_mode = this_stat.st_mode;
-	if (S_ISREG(this_stat.st_mode)) {
-		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
-		FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
-		pin_status = this_meta.local_pin;
-	} else {
-		pin_status = PIN;
-	}
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
-
-	/* Rebuild sb entry */
-	ret = rebuild_super_block_entry(inode_job->inode,
-		&this_stat, pin_status);
-	if (ret < 0) {
-		write_log(2, "Warn: Fail to rebuild meta%"PRIu64
-			" superblock entry\n", (uint64_t)inode_job->inode);
-		return ret;
-	}
-
-	return 0;
-
-errcode_handle:
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
-	return errcode;
-}
-
 void rebuild_sb_worker(void *t_idx)
 {
 	int32_t ret;
 	int32_t tidx;
 	BOOL leave;
-	mode_t this_mode;
 	INODE_JOB_HANDLE inode_job;
+	struct stat this_stat;
 
 	write_log(4, "Now begin to rebuild sb\n");
 	write_log(4, "Number of remaining jobs %lld\n",
@@ -509,7 +452,8 @@ void rebuild_sb_worker(void *t_idx)
 			(uint64_t)(inode_job.inode));
 
 		/* Restore meta file and rebuild this entry */
-		ret = _worker_do_inode_job(&inode_job, &this_mode);
+		ret = restore_meta_super_block_entry(inode_job.inode,
+				&this_stat);
 		if (ret < 0) {
 			push_inode_job(&(inode_job.inode), 1);
 			erase_inode_job(&inode_job);
@@ -517,7 +461,7 @@ void rebuild_sb_worker(void *t_idx)
 		}
 
 		/* Push new job */
-		if (S_ISDIR(this_mode)) {
+		if (S_ISDIR(this_stat.st_mode)) {
 			ino_t *dir_list, *nondir_list;
 			int64_t num_dir, num_nondir;
 			ret = collect_dir_children(inode_job.inode,
@@ -599,12 +543,14 @@ int32_t create_sb_rebuilder()
 		pthread_attr_setdetachstate(
 			&(rebuild_sb_tpool->thread[idx].t_attr),
 			PTHREAD_CREATE_DETACHED);
-		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
-			&(rebuild_sb_tpool->thread[idx].t_attr),
-			(void *)rebuild_sb_worker, (void *)&idx);
+		rebuild_sb_tpool->tidx[idx] = idx;
 		rebuild_sb_tpool->thread[idx].active = TRUE;
 		rebuild_sb_tpool->thread[idx].status = WORKING;
 		rebuild_sb_tpool->num_active += 1;
+		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
+			&(rebuild_sb_tpool->thread[idx].t_attr),
+			(void *)rebuild_sb_worker,
+			(void *)&(rebuild_sb_tpool->tidx[idx]));
 	}
 	sem_post(&(rebuild_sb_tpool->tpool_access_sem));
 	//sem_post(&(rebuild_sb_mgr_info->mgr_access_sem));
@@ -662,3 +608,87 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 			(uint64_t)this_inode);
 	return 0;
 }
+
+/**
+ * Given an inode number, restore meta and then rebuild super block entry.
+ * This function first check super block entry so that ensure whether this
+ * meta and super block entry had been restored. If it inode numebr field is
+ * empty, then try to restore meta file and rebuild super block entry.
+ * "ret_stat" will store stat data of an inode meta.
+ *
+ * @param this_inode Inode numebr to be restored.
+ * @param ret_stat Stat data to be returned to caller.
+ *
+ * @return 0 on success. Otherwise negative error code.
+ */
+int32_t restore_meta_super_block_entry(ino_t this_inode, struct stat *ret_stat)
+{
+	char metapath[300];
+	int32_t errcode, ret;
+	size_t ret_size;
+	char pin_status;
+	struct stat this_stat;
+	FILE_META_TYPE this_meta;
+	FILE *fptr;
+	SUPER_BLOCK_ENTRY sb_entry;
+
+	/* Check whether this entry had been rebuilded */
+	ret = super_block_read(this_inode, &sb_entry);
+	if (ret < 0)
+		return ret;
+	if (sb_entry.this_index > 0) {
+		if (ret_stat)
+			memcpy(ret_stat, &(sb_entry.inode_stat),
+					sizeof(struct stat));
+		return 0;
+	}
+
+	/* Restore meta file */
+	ret = restore_meta_file(this_inode);
+	if (ret < 0) {
+		write_log(2, "Warn: Fail to restore meta%"PRIu64". Code %d",
+			(uint64_t)this_inode, -ret);
+		return ret;
+	}
+
+	fetch_meta_path(metapath, this_inode);
+	fptr = fopen(metapath, "r");
+	if (!fptr) {
+		/* Something wrong? */
+		errcode = errno;
+		write_log(0, "Error: Fail to open meta in %s. Code %d\n",
+				__func__, errcode);
+		return -errcode;
+	}
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
+	if (S_ISREG(this_stat.st_mode)) {
+		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
+		pin_status = this_meta.local_pin == TRUE ? PIN : UNPIN;
+	} else {
+		pin_status = PIN;
+	}
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+
+	/* Rebuild sb entry */
+	ret = rebuild_super_block_entry(this_inode,
+		&this_stat, pin_status);
+	if (ret < 0) {
+		write_log(2, "Warn: Fail to rebuild meta%"PRIu64
+			" superblock entry\n", (uint64_t)this_inode);
+		return ret;
+	}
+
+	if (ret_stat)
+		memcpy(ret_stat, &this_stat, sizeof(struct stat));
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
+

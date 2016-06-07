@@ -1121,6 +1121,7 @@ int32_t fetch_meta_from_cloud(FILE *fptr, char *objname)
         status = hcfs_get_object(fptr, objname,
                                  &(download_curl_handles[which_curl_handle]),
                                  object_meta);
+	write_log(10, "Debug: Download object %s. ret status is %d\n", objname, status);
 	if ((status >= 200) && (status <= 299)) {
 		errcode = 0;
 	} else {

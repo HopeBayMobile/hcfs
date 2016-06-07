@@ -109,7 +109,7 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 
 void fetch_restored_meta_path(char *pathname, ino_t this_inode)
 {
-	snprintf(pathname, METAPATHLEN, "/dev/shm/restored_meta_%" PRIu64 "",
+	snprintf(pathname, METAPATHLEN, "/tmp/restored_meta_%" PRIu64 "",
 			(uint64_t)this_inode);
 }
 

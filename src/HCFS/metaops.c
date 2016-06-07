@@ -2620,16 +2620,25 @@ int32_t restore_meta_file(ino_t this_inode)
 	/* Fetch meta from cloud */
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
 	ret = fetch_meta_from_cloud(fptr, objname);
-	if (ret < 0)
+	if (ret < 0) {
+		write_log(0, "Error: Fail to fetch meta from cloud in %s."
+			" Code %d", __func__, -ret);
 		goto errcode_handle;
+	}
 
 	ret = restore_meta_structure(fptr);
-	if (ret < 0)
+	if (ret < 0) {
+		write_log(0, "Error: Fail to restore meta struct in %s."
+			" Code %d", __func__, -ret);
 		goto errcode_handle;
+	}
 
 	ret = rename(restored_metapath, metapath);
-	if (ret < 0)
+	if (ret < 0) {
+		write_log(0, "Error: Fail to rename to meta path in %s."
+			" Code %d", __func__, -ret);
 		goto errcode_handle;
+	}
 
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);

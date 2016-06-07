@@ -45,6 +45,7 @@ typedef struct SB_THREAD {
 
 typedef struct SB_THREAD_POOL {
 	SB_THREAD thread[NUM_THREADS_IN_POOL];
+	int32_t tidx[NUM_THREADS_IN_POOL];
 	int32_t tmaster;
 	int32_t num_active;
 	int32_t num_idle;
@@ -64,5 +65,7 @@ REBUILD_SB_JOBS *rebuild_sb_jobs;
 
 int32_t rebuild_super_block_entry(ino_t this_inode,
 		struct stat *this_stat, char pin_status);
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+		struct stat *ret_stat);
 int32_t init_rebuild_sb(char rebuild_action);
 int32_t create_sb_rebuilder();
