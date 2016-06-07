@@ -32,6 +32,7 @@
 #include "logger.h"
 #include "utils.h"
 #include "atomic_tocloud.h"
+#include "rebuild_parent_dirstat.h"
 
 /* If cache lock not locked, return -EINVAL*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
@@ -1099,9 +1100,8 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	DIR_ENTRY tmp_entry;
 	int32_t tmp_index;
 	int32_t cache_idx;
-
-/* FEATURE TODO: rebuild parent lookup / dir statistics here
-(excluding . and ..), for every successful return */
+	ino_t tmpino;
+	char this_type;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -1122,6 +1122,19 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			memcpy(result_page, tmp_page_ptr,
 				sizeof(DIR_ENTRY_PAGE));
 			gettimeofday(&(body_ptr->last_access_time), NULL);
+
+			/* Rebuild parent lookup / dir statistics here
+			(excluding . and ..), for every pair of (parent / child)
+			discovered here */
+			tmpino = result_page->dir_entries[ret].d_ino;
+			this_type = result_page->dir_entries[ret].d_type;
+			if (hcfs_system->system_restoring) {
+				if ((strcmp(childname, ".") != 0) &&
+				    (strcmp(childname, "..") != 0))
+					rebuild_parent_stat(tmpino,
+						this_inode, this_type);
+			}
+
 			return 0;
 		}
 	}
@@ -1213,6 +1226,18 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 	*result_index = tmp_index;
 	memcpy(result_page, &tmp_resultpage, sizeof(DIR_ENTRY_PAGE));
+
+	/* Rebuild parent lookup / dir statistics here
+	(excluding . and ..), for every pair of (parent / child)
+	discovered here */
+	tmpino = result_page->dir_entries[*result_index].d_ino;
+	this_type = result_page->dir_entries[*result_index].d_type;
+	if (hcfs_system->system_restoring) {
+		if ((strcmp(childname, ".") != 0) &&
+		    (strcmp(childname, "..") != 0))
+			rebuild_parent_stat(tmpino,
+				this_inode, this_type);
+	}
 
 	return 0;
 
