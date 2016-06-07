@@ -2619,7 +2619,7 @@ int32_t restore_meta_file(ino_t this_inode)
 
 	/* Fetch meta from cloud */
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
-	ret = fetch_meta_from_cloud(fptr, objname);
+	ret = fetch_object_from_cloud(fptr, objname);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch meta from cloud in %s."
 			" Code %d", __func__, -ret);

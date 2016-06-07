@@ -10,10 +10,16 @@
 #include "utils.h"
 #include "metaops.h"
 #include "macro.h"
+#include "hcfs_fromcloud.h"
 
+/**
+ * Helper of init_rebuild_sb(). Help the caller to get all root inodes
+ * from object "FSmgr" on cloud. Download the object if "FSmgr" does
+ * not exist in local device.
+ */
 int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 {
-	char fsmgr_path[200];
+	char fsmgr_path[METAPATHLEN], objname[200];
 	FILE *fsmgr_fptr;
 	DIR_META_TYPE dirmeta;
 	int32_t errcode, ret;
@@ -25,7 +31,21 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	if (access(fsmgr_path, F_OK) < 0) {
 		errcode = errno;
 		if (errcode == ENOENT) {
-			/* TODO:Get fsmgr from cloud */
+			/* Get fsmgr from cloud */
+			sprintf(objname, "FSmgr_backup");
+			fsmgr_fptr = fopen(fsmgr_path, "w+");
+			if (!fsmgr_fptr) {
+				errcode = errno;
+				return -errcode;
+			}
+			flock(fileno(fsmgr_fptr), LOCK_EX);
+			ret = fetch_object_from_cloud(fsmgr_fptr, objname);
+			flock(fileno(fsmgr_fptr), LOCK_UN);
+			fclose(fsmgr_fptr);
+			if (ret < 0) {
+				unlink(fsmgr_path);
+				return ret;
+			}
 		} else {
 			return -errcode;
 		}
@@ -60,6 +80,10 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Helper of init_rebuild_sb(). Initialize the queue file and push all
+ * root inodes into the queue file.
+ */
 int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots)
 {
 	char queue_filepath[200];
@@ -84,6 +108,11 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Helper of init_rebuild_sb(). Download FS backend statistics file "FSstat<x>"
+ * and find the maximum inode number. Finally create superblock and initialize
+ * the superblock head.
+ */
 int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 {
 	ino_t root_inode, max_inode;
@@ -91,11 +120,13 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	int32_t ret, errcode;
 	size_t ret_size;
 	char fstatpath[300], sb_path[300];
+	char objname[300];
 	FILE *fptr, *sb_fptr;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 	SUPER_BLOCK_HEAD head;
 
 	max_inode = 1;
+	/* Find maximum inode number */
 	for (idx = 0 ; idx < num_roots ; idx++) {
 		root_inode = roots[idx];
 		snprintf(fstatpath, METAPATHLEN - 1,
@@ -104,11 +135,28 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		if (access(fstatpath, F_OK) < 0) {
 			errcode = errno;
 			if (errcode == ENOENT) {
-				/* TODO:Get FSstat from cloud */
+				/* Get FSstat from cloud */
+				sprintf(objname, "FSstat%"PRIu64,
+					(uint64_t)root_inode);
+				fptr = fopen(fstatpath, "w+");
+				if (!fptr) {
+					errcode = errno;
+					return -errcode;
+				}
+				flock(fileno(fptr), LOCK_EX);
+				ret = fetch_object_from_cloud(fptr,
+						objname);
+				flock(fileno(fptr), LOCK_UN);
+				fclose(fptr);
+				if (ret < 0) {
+					unlink(fstatpath);
+					return ret;
+				}
 			} else {
 				return -errcode;
 			}
 		}
+		/* Get max inode number from FS cloud stat */
 		fptr = fopen(fstatpath, "r");
 		if (!fptr) {
 			errcode = errno;
@@ -119,6 +167,25 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		fclose(fptr);
 		if (max_inode < fs_cloud_stat.max_inode)
 			max_inode = fs_cloud_stat.max_inode;
+
+		/* Check if FS local stat exist and init it. */
+		fetch_stat_path(fstatpath, root_inode);
+		if (access(fstatpath, F_OK) < 0) {
+			FS_STAT_T fs_stat;
+
+			fptr = fopen(fstatpath, "w+");
+			if (!fptr) {
+				errcode = errno;
+				write_log(0, "Error: IO error in %s. Code %d",
+					__func__, errcode);
+				return -errcode;
+			}
+			fs_stat.system_size = fs_cloud_stat.backend_system_size;
+			fs_stat.meta_size = fs_cloud_stat.backend_meta_size;
+			fs_stat.num_inodes = fs_cloud_stat.backend_num_inodes;
+			FWRITE(&fs_stat, sizeof(FS_STAT_T), 1, fptr);
+			fclose(fptr);
+		}
 	}
 
 	write_log(0, "Now max inode number is %"PRIu64, (uint64_t)max_inode);

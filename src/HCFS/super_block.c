@@ -1891,7 +1891,7 @@ error_handling:
 #define _ASSERT_BACKEND_EXIST_() \
 	{\
 		if (CURRENT_BACKEND == NONE) \
-		return -ENOTCONN; \
+			return -ENOTCONN; \
 	}
 
 int32_t check_init_super_block()

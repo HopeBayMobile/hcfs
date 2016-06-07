@@ -1086,7 +1086,7 @@ int32_t update_quota()
 
 /* NOTE: Temp use this function to download meta file. It will be removed
  * when atomic_upload merge to android-dev */
-int32_t fetch_meta_from_cloud(FILE *fptr, char *objname)
+int32_t fetch_object_from_cloud(FILE *fptr, char *objname)
 {
 	int32_t status;
 	int32_t which_curl_handle;
