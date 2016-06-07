@@ -21,34 +21,50 @@ echo -e "\n======== ${BASH_SOURCE[0]} ========"
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
-
-pwd;ls -la
-set -e -o functrace
 TRACE="set -xv"; UNTRACE="set +xv"
+set +v -e -o functrace
 
-eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
-eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
-eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
+function require_var (){
+	if eval '[ -n "$'$1'" ]'; then
+		echo -e $1:\t$1
+	else
+		echo Error: required environment variables $1 does not exist
+		exit 1
+	fi
+}
+
+DEVICE=Nexus_5X_MDB08M
+BOXNAME=nexus-5x-buildbox
+BINARY_TARGET=nexus-5x-hcfs
+HCFS_COMPOMENT_BASE=device/lge/bullhead
+
+pwd
+ls -la
+echo ================================================================================
+# Environment variables enjected by jenkins upstream jobs
+require_var LIB_DIR
+require_var APP_DIR
+require_var PUBLISH_DIR
+# local variables in this script
+require_var DEVICE
+require_var BOXNAME
+require_var BINARY_TARGET
+require_var HCFS_COMPOMENT_BASE
+echo ================================================================================
+exit
+
 
 function main()
 {
+	$UNTRACE
 	IMAGE_TYPE=$1
-	DEVICE=Nexus_5X_MDB08M
-	BOXNAME=nexus-5x-buildbox
-	BINARY_TARGET=nexus-5x-hcfs
-	HCFS_COMPOMENT_BASE=device/lge/bullhead
 	IMG_DIR=${PUBLISH_DIR}/HCFS-nexus-5x-image-${IMAGE_TYPE}
 	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-6.0.0_r26_MDB08M_20160530"
-
-
-
-	echo ========================================
-	echo Jenkins pass-through variables:
-	echo LIB_DIR: ${LIB_DIR}
-	echo PUBLISH_DIR: ${PUBLISH_DIR}
-	echo ========================================
-	echo "Environment variables (with defaults):"
-
+	echo ================================================================================
+	require_var IMAGE_TYPE
+	require_var IMG_DIR
+	require_var DOCKER_IMAGE
+	echo ================================================================================
 	$TRACE
 
 	mount_nas
@@ -176,6 +192,7 @@ function unmount_nas() {
 }
 
 
+$TRACE
 if [ -n "$1" ]; then
 	main $1
 else
