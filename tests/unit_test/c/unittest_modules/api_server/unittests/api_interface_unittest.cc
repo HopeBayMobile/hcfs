@@ -817,6 +817,7 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   uint32_t code, cmd_len, size_msg;
   char buf[300];
   int64_t reserved_size;
+  char pin_type;
   uint32_t num_inode;
   ino_t inode_list[1];
 
@@ -830,16 +831,19 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   ASSERT_NE(0, fd);
   code = PIN;
   reserved_size = 10;
+  pin_type = 1;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(int64_t) + sizeof(uint32_t) + sizeof(ino_t);
+  cmd_len = sizeof(int64_t) + +sizeof(char) +
+	  	sizeof(uint32_t) + sizeof(ino_t);
   memcpy(buf, &reserved_size, sizeof(int64_t));
-  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
-  memcpy(buf + sizeof(int64_t) + sizeof(uint32_t),
+  memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+  memcpy(buf + sizeof(int64_t) + sizeof(char), &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(int64_t) + sizeof(char) + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
-  CACHE_HARD_LIMIT = 500; 
+  CACHE_HARD_LIMIT = 500;
   hcfs_system->systemdata.pinned_size = 0;
-  
+
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);
@@ -863,6 +867,7 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   uint32_t code, cmd_len, size_msg;
   char buf[300];
   int64_t reserved_size;
+  char pin_type;
   uint32_t num_inode;
   ino_t inode_list[1];
 
@@ -876,16 +881,19 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   ASSERT_NE(0, fd);
   code = PIN;
   reserved_size = 10;
+  pin_type = 1;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(int64_t) + sizeof(uint32_t) + sizeof(ino_t);
+  cmd_len = sizeof(int64_t) + sizeof(char) +
+	 	sizeof(uint32_t) + sizeof(ino_t);
   memcpy(buf, &reserved_size, sizeof(int64_t));
-  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
-  memcpy(buf + sizeof(int64_t) + sizeof(uint32_t),
+  memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+  memcpy(buf + sizeof(int64_t) + sizeof(char), &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(int64_t) + sizeof(char) + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
-  CACHE_HARD_LIMIT = 500; 
+  CACHE_HARD_LIMIT = 500;
   hcfs_system->systemdata.pinned_size = 0;
-  
+
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);

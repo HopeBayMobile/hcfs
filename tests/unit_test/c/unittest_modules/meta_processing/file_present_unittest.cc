@@ -749,14 +749,14 @@ TEST_F(pin_inodeTest, FailIn_fetch_inode_stat)
 {
 	ino_t inode = 0;
 
-	EXPECT_EQ(-ENOENT, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(-ENOENT, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, FailIn_change_pin_flag)
 {
 	ino_t inode = 1; /* this inode # will fail in change_pin_flag() */
 
-	EXPECT_EQ(-ENOMEM, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(-ENOMEM, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, PinRegfile_ENOSPC)
@@ -764,7 +764,7 @@ TEST_F(pin_inodeTest, PinRegfile_ENOSPC)
 	ino_t inode = INO_REGFILE;
 
 	CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
-	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, PinRegfileSuccess)
@@ -772,21 +772,21 @@ TEST_F(pin_inodeTest, PinRegfileSuccess)
 	ino_t inode = INO_REGFILE;
 
 	CACHE_HARD_LIMIT = NUM_BLOCKS * MOCK_BLOCK_SIZE * 2;
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, PinFIFOSuccess)
 {
 	ino_t inode = INO_FIFO;
 
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, PinSymlinkSuccess)
 {
 	ino_t inode = INO_LNK;
 
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, PinDirSuccess)
@@ -794,7 +794,7 @@ TEST_F(pin_inodeTest, PinDirSuccess)
 	ino_t inode = INO_DIR;
 
 	collect_dir_children_flag = FALSE;
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 TEST_F(pin_inodeTest, PinDirSuccess_ManyChildren)
@@ -802,7 +802,7 @@ TEST_F(pin_inodeTest, PinDirSuccess_ManyChildren)
 	ino_t inode = INO_DIR;
 
 	collect_dir_children_flag = TRUE;
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, 1));
 }
 
 /* End of unittest for pin_inode() */
