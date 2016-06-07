@@ -28,12 +28,12 @@ init_hcfs() {
     chown system:system /data/data
     chmod 771 /data/data
 
-    #mkdir /data/app
-    #/system/bin/HCFSvol create hcfs_app internal
-    #/system/bin/HCFSvol mount hcfs_app /data/app
+    mkdir /data/app
+    /system/bin/HCFSvol create hcfs_app internal
+    /system/bin/HCFSvol mount hcfs_app /data/app
 
-    #chown system:system /data/app
-    #chmod 771 /data/app
+    chown system:system /data/app
+    chmod 771 /data/app
 
     #start hcfs_api
 }
