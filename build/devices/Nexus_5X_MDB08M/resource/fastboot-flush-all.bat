@@ -20,9 +20,9 @@ fastboot oem unlock-go
 fastboot flash boot boot.img || goto :error
 fastboot flash system system.img || goto :error
 fastboot flash userdata userdata.img || goto :error
-fastboot flash cache cache.img || goto :error
 fastboot flash recovery recovery.img || goto :error
 fastboot flash vendor vendor.img || goto :error
+fastboot erase cache
 fastboot reboot
 @ECHO OFF
 echo Press any key to exit...

@@ -176,7 +176,7 @@ function publish_image() {
 		$here/resource/* \
 		${IMG_DIR}
 	rsync $RSYNC_SETTING \
-		root@$DOCKER_IP:/data/out/target/product/*/{boot,system,userdata,vendor,recovery,cache}.img \
+		root@$DOCKER_IP:/data/out/target/product/*/{boot,system,userdata,vendor,recovery}.img \
 		${IMG_DIR}
 	touch ${PUBLISH_DIR}
 	touch ${IMG_DIR}
