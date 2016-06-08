@@ -532,9 +532,11 @@ int32_t main(int32_t argc, char **argv)
 	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
-		pthread_join(cache_loop_thread, NULL);
-		pthread_join(delete_loop_thread, NULL);
-		pthread_join(upload_loop_thread, NULL);
+		if (hcfs_system->system_restoring == FALSE) {
+			pthread_join(cache_loop_thread, NULL);
+			pthread_join(delete_loop_thread, NULL);
+			pthread_join(upload_loop_thread, NULL);
+		}
 		destroy_monitor_loop_thread();
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");

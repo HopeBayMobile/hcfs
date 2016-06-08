@@ -296,7 +296,53 @@ int32_t init_rebuild_sb(char rebuild_action)
 	if (ret < 0)
 		return ret;
 
+	/* Check system_restoring flag */
+	sem_wait(&(hcfs_system->access_sem));
+	if (hcfs_system->system_restoring == FALSE)
+		hcfs_system->system_restoring = TRUE;
+	sem_post(&(hcfs_system->access_sem));
+
 	return 0;
+}
+
+void destroy_rebuild_sb(void)
+{
+	char queue_filepath[400];
+	int32_t idx;
+
+	for (idx = 0; idx < NUM_THREADS_IN_POOL; idx++)
+		pthread_join(rebuild_sb_tpool->thread[idx].tid, NULL);
+
+	close(rebuild_sb_jobs->queue_fh);
+	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
+	if (!access(queue_filepath, F_OK))
+		unlink(queue_filepath);
+
+	/* Free resource */
+	free(rebuild_sb_jobs);
+	free(rebuild_sb_tpool);
+	return;
+}
+
+void wake_sb_rebuilder(void)
+{
+	/* Lock hcfs_system to avoid race condition */
+	sem_wait(&hcfs_system->access_sem);
+	if (hcfs_system->system_restoring == FALSE) {
+		sem_post(&hcfs_system->access_sem);
+		return;
+	}
+
+	pthread_mutex_lock(&(rebuild_sb_jobs->job_mutex));
+	if (rebuild_sb_jobs->job_finish == FALSE) {
+		if (rebuild_sb_tpool->num_idle > 0) {
+			pthread_cond_broadcast(
+				&(rebuild_sb_jobs->job_cond));
+		}
+	}
+	pthread_mutex_unlock(&(rebuild_sb_jobs->job_mutex));
+	sem_post(&(hcfs_system->access_sem));
+	return;
 }
 
 /* Need mutex lock */
@@ -461,7 +507,9 @@ static int32_t _worker_get_job(int32_t tidx, INODE_JOB_HANDLE *inode_job)
 			break;
 		}
 
-		if (rebuild_sb_jobs->remaining_jobs <= 0) {
+		/* Sleep if backend is offline or there are no jobs */
+		if (hcfs_system->backend_is_online == FALSE ||
+				rebuild_sb_jobs->remaining_jobs <= 0) {
 			_change_worker_status(tidx, IDLE);
 			/* Wait for job */
 			pthread_cond_wait(&(rebuild_sb_jobs->job_cond),
@@ -515,8 +563,8 @@ void rebuild_sb_worker(void *t_idx)
 				break;
 			}
 		}
-		write_log(10, "Debug: Begin to restore meta %"PRIu64,
-			(uint64_t)(inode_job.inode));
+		write_log(10, "Debug: Woker %d begins to restore meta %"PRIu64,
+				tidx, (uint64_t)(inode_job.inode));
 
 		/* Restore meta file and rebuild this entry */
 		ret = restore_meta_super_block_entry(inode_job.inode,
@@ -588,31 +636,23 @@ void rebuild_sb_worker(void *t_idx)
 	}
 	sem_post(&(rebuild_sb_tpool->tpool_access_sem));
 
-	/* Reclaim all unused inode */
-	char queue_filepath[400];
+	write_log(10, "Debug: Poor master is worker %d\n", tidx);
 
-	write_log(10, "Debug: Poor master is %d\n", tidx);
-	close(rebuild_sb_jobs->queue_fh);
-	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
-	if (!access(queue_filepath, F_OK))
-		unlink(queue_filepath);
+	/* Reclaim all unused inode */
 	ret = super_block_reclaim_fullscan();
 	if (ret < 0) {
 		write_log(0, "Error: Fail to reclaim inodes. Code %d\n", -ret);
 	}
 
-	write_log(10, "Debug: Rebuilding superblock completes."
-			" Enable backend services");
+	write_log(10, "Debug: Rebuilding superblock completed.");
+	sem_wait(&(rebuild_sb_tpool->tpool_access_sem));
+	rebuild_sb_tpool->thread[tidx].active = FALSE;
+	rebuild_sb_tpool->num_active--;
+	sem_post(&(rebuild_sb_tpool->tpool_access_sem));
 
-	/* Enable backend related services */
-	init_backend_related_module();
-
-	/* Free resource */
-	while (rebuild_sb_tpool->num_active > 1)
-		sleep(1);
-	free(rebuild_sb_jobs);
-	free(rebuild_sb_tpool);
+	sem_post(&(hcfs_system->fuse_sem));
 	return;
+
 }
 
 int32_t create_sb_rebuilder()
@@ -636,8 +676,7 @@ int32_t create_sb_rebuilder()
 		rebuild_sb_tpool->thread[idx].status = WORKING;
 		rebuild_sb_tpool->num_active += 1;
 		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
-			&(rebuild_sb_tpool->thread[idx].t_attr),
-			(void *)rebuild_sb_worker,
+			NULL, (void *)rebuild_sb_worker,
 			(void *)&(rebuild_sb_tpool->tidx[idx]));
 	}
 	sem_post(&(rebuild_sb_tpool->tpool_access_sem));

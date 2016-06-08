@@ -106,7 +106,8 @@
 #include "fuseproc_comm.h"
 #endif
 #include "rebuild_parent_dirstat.h"
-
+#include "rebuild_super_block.h"
+#include "hfuse_system.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
 	1. in lookup_count, add a field "to_delete". rmdir, unlink
@@ -7586,7 +7587,24 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	database at least once after the network is enabled */
 
 	/* Wait on the fuse semaphore, until waked up by api_interface */
-	sem_wait(&(hcfs_system->fuse_sem));
+	while (!hcfs_system->system_going_down) {
+		/* Wait */
+		sem_wait(&(hcfs_system->fuse_sem));
+
+		/* Check if restoring completed. */
+		sem_wait(&(hcfs_system->access_sem));
+		if (hcfs_system->system_restoring) {
+			if (rebuild_sb_jobs->job_finish) {
+				destroy_rebuild_sb();
+				hcfs_system->system_restoring = FALSE;
+				/* Enable backend related services */
+				init_backend_related_module();
+				write_log(10, "Debug: Finish rebuilding."
+					" Now Enable sync/upload/cache mgmt");
+			}
+		}
+		sem_post(&(hcfs_system->access_sem));
+	}
 
 	destroy_mount_mgr();
 	destroy_fs_manager();
@@ -7599,6 +7617,10 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));
+
+	/* Join thread if still restoring */
+	if (hcfs_system->system_restoring)
+		destroy_rebuild_sb();
 
 	return 0;
 }
