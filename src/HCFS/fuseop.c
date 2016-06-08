@@ -3520,7 +3520,6 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 			fh_ptr->opened_block = -1;
 		}
 		break;
-		break;
 	}
 
 	while (fh_ptr->opened_block != bindex) {
