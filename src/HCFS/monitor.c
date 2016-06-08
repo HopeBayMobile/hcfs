@@ -240,10 +240,6 @@ void update_sync_state(void)
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == FALSE) {
 		hcfs_system->sync_paused = TRUE;
-		/* Notify threads sleeping on cache full */
-		if (hcfs_system->systemdata.cache_size >=
-			CACHE_HARD_LIMIT - CACHE_DELTA)
-			notify_sleep_on_cache(-EIO);
 	} else {
 		hcfs_system->sync_paused = FALSE;
 		/* Threads can sleep on cache full now */

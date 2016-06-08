@@ -161,7 +161,6 @@ TEST_F(monitorTest, UpdateSyncStateTest) {
   hcfs_system->backend_is_online = FALSE;
   update_sync_state();
   EXPECT_EQ(TRUE, hcfs_system->sync_paused);
-  EXPECT_EQ(-EIO, mock_status);
   hcfs_system->backend_is_online = TRUE;
   update_sync_state();
   EXPECT_EQ(FALSE, hcfs_system->sync_paused);
