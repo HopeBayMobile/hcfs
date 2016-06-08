@@ -29,6 +29,7 @@ export NOGCOVR=1
 
 ulimit -c unlimited
 make clean
+ulimit -c unlimited 
 make
 make test
 
