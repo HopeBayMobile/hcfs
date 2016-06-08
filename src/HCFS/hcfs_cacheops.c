@@ -569,10 +569,6 @@ int32_t sleep_on_cache_full(void)
 {
 	int32_t cache_replace_status;
 
-	/* If cannot connect to backend, fail sleep immediately */
-	if (hcfs_system->sync_paused == TRUE)
-		return -EIO;
-
 	/* Check cache replacement status */
 	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
 	if (cache_replace_status < 0)

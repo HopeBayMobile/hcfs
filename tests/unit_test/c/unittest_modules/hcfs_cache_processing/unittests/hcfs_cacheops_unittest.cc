@@ -316,22 +316,6 @@ TEST_F(sleep_on_cache_fullTest, SleepAndChangeStatus)
 	pthread_join(thread1, (void **) &ptrret);
 	EXPECT_EQ(-EIO, retval);
 }
-TEST_F(sleep_on_cache_fullTest, NoSleepIfSyncPaused)
-{
-	pthread_t thread1;
-	int32_t semval, retval;
-	int32_t *ptrret;
-
-	hcfs_system->systemdata.cache_replace_status = 0;
-	hcfs_system->sync_paused = TRUE;
-	pthread_create(&thread1, NULL, wrapper_sleep_on_cache_full, (void *) &retval);
-	sleep(2);
-	sem_getvalue(&(hcfs_system->num_cache_sleep_sem), &semval);
-	EXPECT_EQ(0, semval);
-	ptrret = &retval;
-	pthread_join(thread1, (void **) &ptrret);
-	EXPECT_EQ(-EIO, retval);
-}
 TEST_F(sleep_on_cache_fullTest, NoSleepIfNegativeStatus)
 {
 	pthread_t thread1;
