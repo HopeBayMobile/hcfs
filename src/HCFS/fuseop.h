@@ -11,6 +11,7 @@
 * 2015/5/11 Jiahong modifying file meta for new block indexing / searching
 * 2015/6/1 Jiahong adding structure for logger.
 * 2015/6/30 Jiahong moved dir and file meta defs to other files
+* 2016/5/23 Jiahong adding semaphore for cache management
 *
 **************************************************************************/
 
@@ -222,14 +223,22 @@ typedef struct {
 	sem_t check_next_sem;
 	sem_t check_cache_replace_status_sem;
 	sem_t monitor_sem;
+
+	/* Semaphore for controlling cache management */
+	sem_t something_to_replace;
+
 	/* system state controllers */
 	BOOL system_going_down;
 	BOOL backend_is_online;
 	BOOL sync_manual_switch;
 	BOOL sync_paused;
 	BOOL xfer_upload_in_progress;
-	sem_t xfer_download_in_progress_sem; /* Lots of functions will invoke download directly */
-	time_t last_xfer_shift_time; /* Xfer window must be shifted in an interval */
+
+	/* Lots of functions will invoke download directly */
+	sem_t xfer_download_in_progress_sem;
+	/* Xfer window must be shifted in an interval */
+	time_t last_xfer_shift_time;
+
 	struct timespec backend_status_last_time;
 } SYSTEM_DATA_HEAD;
 

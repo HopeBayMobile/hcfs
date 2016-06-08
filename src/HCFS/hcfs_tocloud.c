@@ -13,6 +13,7 @@
 *           unmount.
 * 2015/6/4, 6/5 Jiahong added error handling.
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
+* 2016/5/23 Jiahong added control for cache mgmt
 *
 **************************************************************************/
 
@@ -135,7 +136,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 {
 	int32_t count2, count1;
 	int32_t which_curl;
-	int32_t ret, errcode;
+	int32_t ret, errcode, semval;
 	FILE *metafptr;
 	char thismetapath[METAPATHLEN];
 	char blockpath[400];
@@ -155,6 +156,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
 	FILE_META_TYPE tempfilemeta;
+	sem_t *semptr;
 
 	if (upload_ctl.threads_in_use[index] == 0)
 		return 0;
@@ -218,6 +220,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 		return ret;
 
 	need_delete_object = FALSE;
+	semptr = &(hcfs_system->something_to_replace);
 
 	/* Perhaps the file is deleted already. If not, modify the block
 	  status in file meta. */
@@ -287,6 +290,17 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 					       metafptr);
+
+					/* if unpin, post cache management
+					control */
+					if (tempfilemeta.local_pin == FALSE) {
+						semval = 0;
+						ret = sem_getvalue(semptr,
+						                   &semval);
+						if ((ret == 0) &&
+						    (semval == 0))
+							sem_post(semptr);
+					}
 				} else {
 					if ((tmp_entry->status ==
 					     ST_TODELETE) &&

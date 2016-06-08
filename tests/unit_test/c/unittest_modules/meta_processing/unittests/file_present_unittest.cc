@@ -819,6 +819,7 @@ protected:
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 			malloc(sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
+		sem_init(&(hcfs_system->something_to_replace), 0, 0);
 	}
 
 	void TearDown()
@@ -846,15 +847,21 @@ TEST_F(unpin_inodeTest, FailIn_change_pin_flag)
 TEST_F(unpin_inodeTest, UnpinRegfileSuccess)
 {
 	ino_t inode = INO_REGFILE;
+	int32_t semval;
 
 	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+	sem_getvalue(&(hcfs_system->something_to_replace), &semval);
+	ASSERT_EQ(1, semval);
 }
 
 TEST_F(unpin_inodeTest, UnpinFIFOSuccess)
 {
 	ino_t inode = INO_FIFO;
+	int32_t semval;
 
 	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
+	sem_getvalue(&(hcfs_system->something_to_replace), &semval);
+	ASSERT_EQ(1, semval);
 }
 
 TEST_F(unpin_inodeTest, UnpinSymlinkSuccess)

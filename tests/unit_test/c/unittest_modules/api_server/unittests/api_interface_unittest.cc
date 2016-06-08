@@ -39,6 +39,7 @@ class init_api_interfaceTest : public ::testing::Test {
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
     sem_init(&(hcfs_system->fuse_sem), 0, 0);
+    sem_init(&(hcfs_system->something_to_replace), 0, 0);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
   }
@@ -428,6 +429,10 @@ TEST_F(api_moduleTest, TerminateTest) {
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, hcfs_system->system_going_down);
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
+  /* Check if terminate will indeed signal threads sleeping on
+  something_to_replace */
+  sem_getvalue(&(hcfs_system->something_to_replace), &ret_val);
+  ASSERT_EQ(1, ret_val);
  }
 
 /* Test CREATEVOL API call */ 

@@ -222,6 +222,7 @@ protected:
 			delete_mock_dir(BLOCKPATH);
 		else
 			mkdir(BLOCKPATH, 0700);
+		sem_init(&(hcfs_system->something_to_replace), 0, 2);
 	}
 	void TearDown()
 	{
@@ -328,6 +329,7 @@ TEST_F(build_cache_usageTest, Nothing_in_Directory)
 
 TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 {
+	int32_t semval;
 	/* generate mock data */
 	for (int32_t i = 0 ; i < NUMSUBDIR ; i++) {
 		char tmp_path[100];
@@ -338,6 +340,9 @@ TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 	
 	/* Run function to be tested */	
 	build_cache_usage();
+
+	sem_getvalue(&(hcfs_system->something_to_replace), &semval);
+	EXPECT_EQ(0, semval);
 
 	/* Check answer */
 	for (int32_t i = 0 ; i < answer_node_list.size() ; i++) {
