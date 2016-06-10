@@ -14,6 +14,12 @@
 #define GW20_SRC_PARAMS_H_
 #include <inttypes.h>
 
+/* cache limit parameters */
+#define NUM_PIN_TYPES 3
+#define RESERVED_CACHE_SPACE system_config->cache_reserved_space
+#define GET_CACHE_LIMIT(p) (system_config->max_cache_limit[(int32_t)p])
+#define GET_PINNED_LIMIT(p) (system_config->max_pinned_limit[(int32_t)p])
+
 typedef struct {
 	int32_t log_level;
 	char *log_path;
@@ -26,6 +32,10 @@ typedef struct {
 	int64_t cache_soft_limit;
 	int64_t cache_hard_limit;
 	int64_t cache_update_delta;
+	int64_t cache_reserved_space;
+	/* Cache management thresholds */
+	int64_t max_cache_limit[NUM_PIN_TYPES];
+	int64_t max_pinned_limit[NUM_PIN_TYPES];
 	int64_t max_block_size;
 	int32_t current_backend;
 	char *swift_account;
@@ -106,10 +116,6 @@ typedef struct {
 #define XFER_WINDOW_SIZE 3
 #define XFER_SEC_PER_WINDOW 20
 #define XFER_SLOW_SPEED 32 /* in KB/s */
-
-#define RESERVED_CACHE_SPACE 536870912
-#define RESERVED_PINNED_LIMIT MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE
-#define RESERVED_CACHE_LIMIT CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";

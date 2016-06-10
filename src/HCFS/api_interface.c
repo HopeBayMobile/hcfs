@@ -860,7 +860,7 @@ void api_module(void *index)
 	char *tmpptr;
 	DIR_STATS_TYPE tmpstat;
 
-	int64_t reserved_pinned_size, max_pinned_size;
+	int64_t reserved_pinned_size;
 	char pin_type;
 	uint32_t num_inode;
 	ino_t *pinned_list, *unpinned_list;
@@ -982,17 +982,13 @@ void api_module(void *index)
 				sizeof(char));
 
 			/* Check required size */
-			if (!P_IS_VALID_PIN(pin_type)) {
+			if (!P_IS_PIN(pin_type)) {
 				retcode = -EINVAL;
 				break;
-			} else if (pin_type == P_HIGH_PRI_PIN) {
-				max_pinned_size = RESERVED_PINNED_LIMIT;
-			} else {
-				max_pinned_size = MAX_PINNED_LIMIT;
 			}
 			sem_wait(&(hcfs_system->access_sem));
 			if (hcfs_system->systemdata.pinned_size +
-				reserved_pinned_size >= max_pinned_size) {
+				reserved_pinned_size >= GET_PINNED_LIMIT(pin_type)) {
 				sem_post(&(hcfs_system->access_sem));
 				write_log(5, "No pinned space available\n");
 				retcode = -ENOSPC;

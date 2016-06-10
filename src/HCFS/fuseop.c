@@ -967,7 +967,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_pinned_size, max_cache_size;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -1017,16 +1016,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	ispin = local_pin;
 #endif
 
-	if (ispin == P_HIGH_PRI_PIN) {
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	} else {
-		max_pinned_size = MAX_PINNED_LIMIT;
-		max_cache_size = CACHE_HARD_LIMIT;
-	}
-
 	/* Reject if no more cache size */
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
+	if (hcfs_system->systemdata.cache_size > GET_CACHE_LIMIT(ispin)) {
 		ret_val = sleep_on_cache_full();
 		if (ret_val < 0) {
 			fuse_reply_err(req, ret_val);
@@ -1035,7 +1026,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (hcfs_system->systemdata.pinned_size > GET_PINNED_LIMIT(ispin)) {
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
@@ -1155,7 +1146,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_pinned_size, max_cache_size;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -1197,16 +1187,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	ispin = local_pin;
 #endif
 
-	if (ispin == P_HIGH_PRI_PIN) {
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	} else {
-		max_pinned_size = MAX_PINNED_LIMIT;
-		max_cache_size = CACHE_HARD_LIMIT;
-	}
-
 	/* Reject if no more cache size */
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
+	if (hcfs_system->systemdata.cache_size > GET_CACHE_LIMIT(ispin)) {
 		ret_val = sleep_on_cache_full();
 		if (ret_val < 0) {
 			fuse_reply_err(req, ret_val);
@@ -1215,7 +1197,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (hcfs_system->systemdata.pinned_size > GET_PINNED_LIMIT(ispin)) {
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
@@ -2241,16 +2223,11 @@ int32_t truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	int32_t entry_index)
 {
 	int32_t ret_val;
-	int64_t max_cache_size;
-
-	if (file_meta_ptr->local_pin == P_HIGH_PRI_PIN)
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	else
-		max_cache_size = CACHE_HARD_LIMIT;
 
 	while (((block_page)->block_entries[entry_index].status == ST_CLOUD) ||
 		((block_page)->block_entries[entry_index].status == ST_CtoL)) {
-		if (hcfs_system->systemdata.cache_size > max_cache_size) {
+		if (hcfs_system->systemdata.cache_size >
+				GET_CACHE_LIMIT(file_meta_ptr->local_pin)) {
 			if (hcfs_system->system_going_down == TRUE)
 				return -EBUSY;
 
@@ -2863,7 +2840,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t last_index;
-	int64_t temp_trunc_size, sizediff, max_pinned_size;
+	int64_t temp_trunc_size, sizediff;
 #ifndef _ANDROID_ENV_
 	ssize_t ret_ssize;
 #endif
@@ -2914,12 +2891,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		/* If pinned space is available, add the amount of changes
 		to the total usage first */
 		if (P_IS_PIN(tempfilemeta.local_pin)) {
-			if (tempfilemeta.local_pin == P_HIGH_PRI_PIN)
-				max_pinned_size = RESERVED_PINNED_LIMIT;
-			else
-				max_pinned_size = MAX_PINNED_LIMIT;
 			if ((hcfs_system->systemdata.pinned_size + sizediff)
-					> max_pinned_size) {
+					> GET_PINNED_LIMIT(tempfilemeta.local_pin)) {
 				sem_post(&(hcfs_system->access_sem));
 				return -ENOSPC;
 			}
@@ -4053,7 +4026,6 @@ int32_t write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 		FH_ENTRY *fh_ptr, off_t this_page_fpos, char ispin)
 {
 	int32_t ret;
-	int64_t max_cache_size;
 
 	/* Adding cache check for new or deleted blocks */
 	while (
@@ -4062,17 +4034,12 @@ int32_t write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 	    (((temppage->block_entries[entry_index]).status == ST_TODELETE) ||
 	     ((temppage->block_entries[entry_index]).status == ST_NONE))) {
 
-		if (ispin == P_HIGH_PRI_PIN)
-			max_cache_size = RESERVED_CACHE_LIMIT;
-		else
-			max_cache_size = CACHE_HARD_LIMIT;
-
 		write_log(10,
 			"Debug write checking if need to wait for cache\n");
 		write_log(10, "%lld, %lld\n",
 			hcfs_system->systemdata.cache_size,
-			max_cache_size);
-		if (hcfs_system->systemdata.cache_size > max_cache_size) {
+			GET_CACHE_LIMIT(ispin));
+		if (hcfs_system->systemdata.cache_size > GET_CACHE_LIMIT(ispin)) {
 			if (CURRENT_BACKEND == NONE)
 				return -ENOSPC;
 			if (hcfs_system->system_going_down == TRUE)
@@ -4312,7 +4279,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	int32_t ret, errnum, errcode;
 	int64_t tmpcachesize, tmpdiff;
 	int64_t unpin_dirty_size;
-	int64_t max_cache_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Check system size before writing */
@@ -4363,12 +4329,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		tmpdiff = (offset + (off_t) size) - old_cache_size;
 		write_log(10, "%zu, %lld, %lld, %lld, %lld\n", size,
 			(off_t) size, tmpdiff, offset, old_cache_size);
-		if (ispin == P_HIGH_PRI_PIN)
-			max_cache_size = RESERVED_CACHE_LIMIT;
-		else
-			max_cache_size = CACHE_HARD_LIMIT;
 		if ((tmpdiff > 0) &&
-			((tmpdiff + tmpcachesize) > max_cache_size)) {
+			((tmpdiff + tmpcachesize) > GET_CACHE_LIMIT(ispin))) {
 			/* Need to sleep for full here or return ENOSPC */
 			if (fh_ptr->opened_block != -1) {
 				fclose(fh_ptr->blockfptr);
@@ -4823,7 +4785,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
 	          offset, size);
 	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.st_size,
-	          hcfs_system->systemdata.pinned_size, max_pinned_size);
+	          hcfs_system->systemdata.pinned_size,
+		  GET_PINNED_LIMIT(thisfilemeta.local_pin));
 	amount_preallocated = 0;
 	if (P_IS_PIN(thisfilemeta.local_pin) &&
 	    ((offset + (off_t)size) > temp_stat.st_size)) {
@@ -4833,7 +4796,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		write_log(10, "Write details: %lld, %lld\n", sizediff,
 		          (off_t) size);
 		if ((hcfs_system->systemdata.pinned_size + sizediff)
-			> max_pinned_size) {
+			> GET_PINNED_LIMIT(thisfilemeta.local_pin)) {
 			sem_post(&(hcfs_system->access_sem));
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -6014,7 +5977,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	int64_t delta_meta_size;
-	int64_t max_pinned_size, max_cache_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6087,17 +6049,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 
-	/* Check cache thresholds */
-	if (local_pin == P_HIGH_PRI_PIN) {
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	} else {
-		max_pinned_size = MAX_PINNED_LIMIT;
-		max_cache_size = CACHE_HARD_LIMIT;
-	}
-
 	/* Reject if no more cache size */
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
+	if (hcfs_system->systemdata.cache_size > GET_CACHE_LIMIT(local_pin)) {
 		ret_val = sleep_on_cache_full();
 		if (ret_val < 0) {
 			errcode = ret_val;
@@ -6106,7 +6059,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (hcfs_system->systemdata.pinned_size > GET_PINNED_LIMIT(local_pin)) {
 		errcode = -ENOSPC;
 		goto error_handle;
 	}
@@ -6337,7 +6290,6 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	struct fuse_ctx *temp_context;
 	int64_t old_metasize, new_metasize, delta_meta_size;
 	FILE_META_TYPE this_filemeta;
-	int64_t max_pinned_size, max_cache_size;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6377,23 +6329,17 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	if (this_filemeta.local_pin == P_HIGH_PRI_PIN) {
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	} else {
-		max_pinned_size = MAX_PINNED_LIMIT;
-		max_cache_size = CACHE_HARD_LIMIT;
-	}
-
 	/* Reject if no more cache size */
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
+	if (hcfs_system->systemdata.cache_size >
+			GET_CACHE_LIMIT(this_filemeta.local_pin)) {
 		retcode = sleep_on_cache_full();
 		if (retcode < 0)
 			goto error_handle;
 	}
 
 	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (hcfs_system->systemdata.pinned_size >
+			GET_PINNED_LIMIT(this_filemeta.local_pin)) {
 		retcode = -ENOSPC;
 		goto error_handle;
 	}
@@ -6904,7 +6850,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	MOUNT_T *tmpptr;
 	int64_t old_metasize, new_metasize, delta_meta_size;
 	char local_pin;
-	int64_t max_pinned_size, max_cache_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6914,12 +6859,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 #endif
-
-	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > MAX_PINNED_LIMIT) {
-		fuse_reply_err(req, ENOSPC);
-		return;
-	}
 
 	parent_inode = real_ino(req, newparent);
 	link_inode = real_ino(req, ino);
@@ -6963,16 +6902,9 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if (local_pin == P_HIGH_PRI_PIN) {
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	} else {
-		max_pinned_size = MAX_PINNED_LIMIT;
-		max_cache_size = CACHE_HARD_LIMIT;
-	}
-
 	/* Reject if no more cache size */
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
+	if (hcfs_system->systemdata.cache_size >
+			GET_CACHE_LIMIT(local_pin)) {
 		ret_val = sleep_on_cache_full();
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
@@ -6981,7 +6913,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (hcfs_system->systemdata.pinned_size >
+			GET_PINNED_LIMIT(local_pin)) {
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
@@ -7094,7 +7027,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_pinned_size, max_cache_size;
 
 	parent_inode = real_ino(req, parent);
 
@@ -7140,16 +7072,9 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	ispin = local_pin;
 #endif
 
-	if (ispin == P_HIGH_PRI_PIN) {
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-		max_cache_size = RESERVED_CACHE_LIMIT;
-	} else {
-		max_pinned_size = MAX_PINNED_LIMIT;
-		max_cache_size = CACHE_HARD_LIMIT;
-	}
-
 	/* Reject if no more cache size */
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
+	if (hcfs_system->systemdata.cache_size >
+			GET_CACHE_LIMIT(ispin)) {
 		ret_val = sleep_on_cache_full();
 		if (ret_val < 0) {
 			fuse_reply_err(req, ret_val);
@@ -7158,7 +7083,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Reject if no more pinned size */
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (hcfs_system->systemdata.pinned_size >
+			GET_PINNED_LIMIT(ispin)) {
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}

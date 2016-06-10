@@ -1189,27 +1189,29 @@ error_handle:
  * increase system pinned space.
  */
 int32_t increase_pinned_size(int64_t *reserved_pinned_size,
-		int64_t file_size, char local_pin)
+		int64_t file_size, char pin_type)
 {
 	int32_t ret;
-	int64_t max_pinned_size;
 
 	ret = 0;
 	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
 	if (*reserved_pinned_size <= 0) { /* Need more space than expectation */
-		if (local_pin == P_HIGH_PRI_PIN)
-			max_pinned_size = RESERVED_PINNED_LIMIT;
-		else
-			max_pinned_size = MAX_PINNED_LIMIT;
+		/* YUXUN TEMP */
+		write_log(0, "reserved pinned size is %lld\n", (long long)*reserved_pinned_size);
+		write_log(0, "system pinned size is   %lld\n", hcfs_system->systemdata.pinned_size);
+		write_log(0, "max pinned size is      %lld\n", GET_PINNED_LIMIT(pin_type));
+
 		ret = 0;
 		sem_wait(&(hcfs_system->access_sem));
 		if (hcfs_system->systemdata.pinned_size -
-			(*reserved_pinned_size) <= max_pinned_size) {
+			(*reserved_pinned_size) <= GET_PINNED_LIMIT(pin_type)) {
 			hcfs_system->systemdata.pinned_size -=
 				(*reserved_pinned_size);
 			*reserved_pinned_size = 0;
 
 		} else {
+			/* YUXUN TEMP */
+			write_log(0, "Return ENOSPC in %s\n", __func__);
 			ret = -ENOSPC;
 			*reserved_pinned_size += file_size; /* Recover */
 		}
@@ -1245,6 +1247,9 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 	ino_t *dir_node_list, *nondir_node_list;
 	int64_t count, num_dir_node, num_nondir_node;
 
+	/* YUXUN TEMP */
+	write_log(0, "Enter %s\n", __func__);
+
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;
@@ -1252,6 +1257,8 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 
 	ret = change_pin_flag(this_inode, tempstat.st_mode, pin_type);
 	if (ret < 0) {
+		/* YUXUN TEMP */
+		write_log(0, "Return 1 in %s\n", __func__);
 		return ret;
 
 	} else if (ret > 0) {
@@ -1264,6 +1271,8 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 			ret = increase_pinned_size(reserved_pinned_size,
 					tempstat.st_size, pin_type);
 			if (ret == -ENOSPC) {
+				/* YUXUN TEMP */
+				write_log(0, "Return ENOSPC in %s\n", __func__);
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
 				change_pin_flag(this_inode,
@@ -1306,6 +1315,8 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 		if (ret < 0) {
 			free(nondir_node_list);
 			free(dir_node_list);
+			/* YUXUN TEMP */
+			write_log(0, "Return 2 in %s\n", __func__);
 			return ret; /* Return fail */
 		}
 		free(nondir_node_list);

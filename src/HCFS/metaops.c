@@ -1801,12 +1801,19 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 				ret_code = ret;
 				goto error_handling;
 			}
-			/* Update unpin-dirty data size */
-			ret = _change_unpin_dirty_size(meta_cache_entry,
-					new_pin_status);
-			if (ret < 0) {
-				ret_code = ret;
-				goto error_handling;
+
+			if (P_IS_PIN(file_meta.local_pin) &&
+				P_IS_PIN(new_pin_status)) {
+				/* Only change pin flag */
+				ret_code = 1;
+			} else {
+				/* Update unpin-dirty data size */
+				ret = _change_unpin_dirty_size(meta_cache_entry,
+						new_pin_status);
+				if (ret < 0) {
+					ret_code = ret;
+					goto error_handling;
+				}
 			}
 		}
 	/* Case dir */
@@ -1827,6 +1834,12 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 			if (ret < 0) {
 				ret_code = ret;
 				goto error_handling;
+			}
+
+			if (P_IS_PIN(dir_meta.local_pin) &&
+				P_IS_PIN(new_pin_status)) {
+				/* Only change pin flag */
+				ret_code = 1;
 			}
 		}
 

@@ -83,9 +83,9 @@ int32_t main(int32_t argc, char **argv)
 			num_inodes * sizeof(ino_t);
 		memcpy(buf, &reserved_size, sizeof(int64_t)); /* Pre-allocating pinned size (be allowed to be 0) */
 		memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
-		memcpy(buf + sizeof(char) + sizeof(int64_t), &num_inodes, /* # of inodes */
+		memcpy(buf + sizeof(int64_t) + sizeof(char), &num_inodes, /* # of inodes */
 			sizeof(uint32_t));
-		memcpy(buf + sizeof(char) + sizeof(int64_t) + sizeof(uint32_t), /* inode array */
+		memcpy(buf + sizeof(int64_t) + sizeof(char) + sizeof(uint32_t), /* inode array */
 			inode_list, sizeof(ino_t) * num_inodes);
 		send(fd, &code, sizeof(uint32_t), 0);
 		send(fd, &cmd_len, sizeof(uint32_t), 0);

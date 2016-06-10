@@ -446,6 +446,17 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			config->cache_update_delta = temp_val;
 			continue;
 		}
+		if (strcasecmp(argname, "cache_reserved") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				write_log(0, "Number conversion error: %s\n", argname);
+				return -1;
+			}
+			config->cache_reserved_space = temp_val;
+			continue;
+		}
 		if (strcasecmp(argname, "max_block_size") == 0) {
 			errno = 0;
 			temp_val = strtoll(argval, &num_check_ptr, 10);

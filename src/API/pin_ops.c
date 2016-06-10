@@ -144,7 +144,7 @@ int32_t _get_path_stat(char *pathname, ino_t *inode, int64_t *total_size)
  * *  Return value: 0 if successful. Otherwise returns negation of error code.
  * *
  * *************************************************************************/
-int32_t _pin_by_inode(const int64_t reserved_size, const char pin_status,
+int32_t _pin_by_inode(const int64_t reserved_size, const char pin_type,
 		      const uint32_t num_inodes, const char *inode_array)
 {
 
@@ -165,7 +165,7 @@ int32_t _pin_by_inode(const int64_t reserved_size, const char pin_status,
 	memcpy(&(buf[buf_idx]), &reserved_size, sizeof(int64_t));
 	buf_idx += sizeof(int64_t);
 
-	memcpy(&(buf[buf_idx]), &pin_status, sizeof(int64_t));
+	memcpy(&(buf[buf_idx]), &pin_type, sizeof(char));
 	buf_idx += sizeof(char);
 
 	memcpy(&(buf[buf_idx]), &num_inodes, sizeof(uint32_t));
@@ -225,7 +225,7 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
 		num_inodes += 1;
 	}
 
-	ret_code = _pin_by_inode(total_size, 1, num_inodes, inode_array);
+	ret_code = _pin_by_inode(total_size, 2, num_inodes, inode_array);
 
 	return ret_code;
 

@@ -59,6 +59,38 @@
 
 /************************************************************************
 *
+* Function name: init_cache_thresholds
+*        Inputs: SYSTEM_CONF_STRUCT *config
+*       Summary: Initialize max_pinned_limit and max_cache_limit for
+*       	 different pin tyeps.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
+{
+	if (config->cache_hard_limit < 0)
+		return -EINVAL;
+
+	if (config->cache_reserved_space < 0)
+		return -EINVAL;
+
+	config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
+	config->max_pinned_limit[P_UNPIN] = 0;
+
+	config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT;
+	config->max_pinned_limit[P_PIN] = MAX_PINNED_LIMIT;
+
+	config->max_cache_limit[P_HIGH_PRI_PIN] =
+		CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
+	config->max_pinned_limit[P_HIGH_PRI_PIN] =
+		MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+
+	return 0;
+}
+
+/************************************************************************
+*
 * Function name: init_hcfs_system_data
 *        Inputs: None
 *       Summary: Initialize HCFS system data.
@@ -344,6 +376,11 @@ int32_t main(int32_t argc, char **argv)
 		exit(-1);
 
 	ret_val = validate_system_config(system_config);
+
+	if (ret_val < 0)
+		exit(-1);
+
+	ret_val = init_cache_thresholds(system_config);
 
 	if (ret_val < 0)
 		exit(-1);
