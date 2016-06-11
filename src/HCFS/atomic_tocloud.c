@@ -796,29 +796,16 @@ void fetch_progress_file_path(char *pathname, ino_t inode)
  *
  * @return 0 if succeed in copy, -EEXIST in case of target file existing.
  */
-int32_t check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_src)
+int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
+		BOOL lock_src, BOOL reject_if_nospc)
 {
 	int32_t errcode;
 	int32_t ret;
-	size_t read_size;
+	size_t read_size, total_size;
 	size_t ret_size;
 	FILE *src_ptr, *tar_ptr;
 	char filebuf[4100];
 	int64_t ret_pos;
-
-	/* if target file exists, do not copy it.
-	   (it may be copied by another process) */
-	ret = access(tarpath, F_OK);
-	if (ret == 0) {
-		return -EEXIST;
-	} else {
-		errcode = errno;
-		if (errcode != ENOENT) {
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
-			return -errcode;
-		}
-	}
 
 	/* source file should exist */
 	if (access(srcpath, F_OK) != 0) {
@@ -882,15 +869,25 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_
 		return 0;
 	}
 
+	/* Do not copy when no space */
+	if (reject_if_nospc == TRUE) {
+		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			errcode = -ENOSPC;
+			goto errcode_handle;
+		}
+	}
+
 	setbuf(tar_ptr, NULL);
 	/* Begin to copy */
 	FSEEK(src_ptr, 0, SEEK_SET);
 	FSEEK(tar_ptr, 0, SEEK_SET);
+	total_size = 0;
 	while (!feof(src_ptr)) {
 		FREAD(filebuf, 1, 4096, src_ptr);
 		read_size = ret_size;
 		if (read_size > 0) {
 			FWRITE(filebuf, 1, read_size, tar_ptr);
+			total_size += read_size;
 		} else {
 			break;
 		}
@@ -916,20 +913,22 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath, BOOL lock_
 	fclose(src_ptr);
 	fclose(tar_ptr);
 
+	change_system_meta(total_size, 0, total_size, 0, 0, 0, FALSE);
+
 	return 0;
 
 errcode_handle:
+	if (access(tarpath, F_OK) == 0)
+		ftruncate(fileno(tar_ptr), 0);
 	if (lock_src == TRUE)
 		flock(fileno(src_ptr), LOCK_UN);
 	flock(fileno(tar_ptr), LOCK_UN);
 	fclose(src_ptr);
 	fclose(tar_ptr);
-	if (access(tarpath, F_OK) == 0)
-		unlink(tarpath);
 	return errcode;
 }
 
-char did_block_finish_uploading(int32_t fd, int64_t blockno)
+char block_finish_uploading(int32_t fd, int64_t blockno)
 {
 	int32_t ret, errcode;
 	ssize_t ret_ssize;
@@ -1164,7 +1163,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	 * it again. */
 	if (!S_ISREG(this_mode)) {
 		if (toupload_meta_exist == TRUE)
-			UNLINK(toupload_meta_path);
+			unlink_upload_file(toupload_meta_path);
 		if (backend_meta_exist == TRUE)
 			UNLINK(backend_meta_path);
 		sync_ctl.threads_error[data_ptr->which_index] = TRUE;
@@ -1190,10 +1189,13 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 			/* Maybe toupload_meta is uploaded
 			 * and now_action flag is not set to
 			 * DEL_BACKEND_BLOCKS because of 
-			 * unexpected crash. mm...perhaps do
-			 * nothing and re-upload next time. */
+			 * unexpected crash. Keep working.
+			 * Delete old blocks on cloud. */
 			write_log(2, "sync warn: inode %"PRIu64" toupload meta"
 				"disappear. Perhaps crash?\n", (uint64_t)inode);
+			delete_backend_blocks(progress_fd,
+					progress_meta.total_backend_blocks,
+					inode, DEL_BACKEND_BLOCKS);
 		}
 	
 	} else if (now_action == DEL_TOUPLOAD_BLOCKS) {
@@ -1212,7 +1214,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	}
 
 	if (toupload_meta_exist == TRUE)
-		UNLINK(toupload_meta_path);
+		unlink_upload_file(toupload_meta_path);
 	if (backend_meta_exist == TRUE)
 		UNLINK(backend_meta_path);
 	/* Sync again so that ensure data consistency */
@@ -1224,7 +1226,7 @@ errcode_handle:
 	write_log(0, "Error: Fail to revert/continue uploading inode %"PRIu64"\n",
 			(uint64_t)inode);
 	if (toupload_meta_exist == TRUE)
-		unlink(toupload_meta_path);
+		unlink_upload_file(toupload_meta_path);
 	if (backend_meta_exist == TRUE)
 		unlink(backend_meta_path);
 	sync_ctl.threads_error[data_ptr->which_index] = TRUE;

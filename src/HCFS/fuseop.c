@@ -2300,8 +2300,10 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 		case ST_TODELETE:
 			break;
 		case ST_LDISK:
-			meta_cache_check_uploading(body_ptr, inode_index,
-					block_count, tmpentry->seqnum);
+			ret_val = meta_cache_check_uploading(body_ptr,
+				inode_index, block_count, tmpentry->seqnum);
+			if (ret_val < 0)
+				return ret_val;
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
@@ -2333,8 +2335,6 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			total_deleted_fileblocks++;
 			break;
 		case ST_BOTH:
-			meta_cache_check_uploading(body_ptr, inode_index,
-					block_count, tmpentry->seqnum);
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
@@ -2351,8 +2351,10 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			total_deleted_fileblocks++;
 			break;
 		case ST_LtoC:
-			meta_cache_check_uploading(body_ptr, inode_index,
-					block_count, tmpentry->seqnum);
+			ret_val = meta_cache_check_uploading(body_ptr,
+				inode_index, block_count, tmpentry->seqnum);
+			if (ret_val < 0)
+				return ret_val;
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
@@ -2522,7 +2524,7 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 					fclose(blockfptr);
 					blockfptr = NULL;
 				}
-				return ret;
+				return -EIO;
 			}
 
 			/*Re-read status*/
@@ -2631,8 +2633,10 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 		tmpstatus = (temppage->block_entries[last_index]).status;
 
-		meta_cache_check_uploading(*body_ptr, this_inode, last_block,
+		ret = meta_cache_check_uploading(*body_ptr, this_inode, last_block,
 				(temppage->block_entries[last_index]).seqnum);
+		if (ret < 0)
+			return ret;
 
 		/* TODO: Error handling here if block status is not ST_NONE
 			but cannot find block on local disk */
@@ -3421,7 +3425,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
-			return ret;
+			return -EIO;
 		}
 
 		/* Do not process cache update and stored_where change if block
@@ -4044,7 +4048,7 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->blockfptr = NULL;
 			}
-			return ret;
+			return -EIO;
 		}
 		/*Do not process cache update and stored_where change if block
 		* is actually deleted by other ops such as truncate*/
@@ -4332,13 +4336,25 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			}
 			break;
 		case ST_LDISK:
-			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+			ret = meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
 					this_inode, bindex, now_seq);
+			if (ret < 0) {
+				*reterr = ret;
+				return 0;
+			}
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
-			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
-					this_inode, bindex, now_seq);
+			if ((temppage).block_entries[entry_index].status ==
+					ST_LtoC) {
+				ret = meta_cache_check_uploading(
+						fh_ptr->meta_cache_ptr,
+						this_inode, bindex, now_seq);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
+			}
 			(temppage).block_entries[entry_index].status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
@@ -4386,13 +4402,25 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		/* Check if there is a need for status change */
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_LDISK:
-			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+			ret = meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
 					this_inode, bindex, now_seq);
+			if (ret < 0) {
+				*reterr = ret;
+				return 0;
+			}
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
-			meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
-					this_inode, bindex, now_seq);
+			if ((temppage).block_entries[entry_index].status ==
+					ST_LtoC) {
+				ret = meta_cache_check_uploading(
+						fh_ptr->meta_cache_ptr,
+						this_inode, bindex, now_seq);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
+			}
 			(temppage).block_entries[entry_index].status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);

@@ -94,7 +94,7 @@ int32_t create_progress_file(ino_t inode);
 int32_t del_progress_file(int32_t fd, ino_t inode);
 
 int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
-		BOOL lock_src);
+		BOOL lock_src, BOOL reject_if_nospc);
 
 int32_t fetch_toupload_meta_path(char *pathname, ino_t inode);
 
@@ -104,7 +104,7 @@ int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
 int32_t fetch_backend_meta_path(char *pathname, ino_t inode);
 void fetch_del_backend_meta_path(char *pathname, ino_t inode);
 
-char did_block_finish_uploading(int32_t fd, int64_t blockno);
+char block_finish_uploading(int32_t fd, int64_t blockno);
 
 int64_t query_status_page(int32_t fd, int64_t block_index);
 

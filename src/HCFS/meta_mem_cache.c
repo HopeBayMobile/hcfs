@@ -1693,7 +1693,7 @@ int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inod
 		/* Do nothing when block index + 1 more than # of blocks
 		 * of to-upload data */
 		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
-			write_log(10, "Debug: Ask if block_%"PRIu64
+			write_log(10, "Debug: Check if block_%"PRIu64
 				"_%lld was uploaded in %s, but # of to-upload "
 				"blocks is %lld\n", (uint64_t)inode, bindex,
 				__func__, body_ptr->uploading_info.toupload_blocks);
@@ -1707,14 +1707,15 @@ int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inod
 		}
 
 		/* Check if this block finished uploading */
-		if (did_block_finish_uploading(progress_fd, bindex) == TRUE)
+		if (block_finish_uploading(progress_fd, bindex) == TRUE)
 			return 0;
 
 		fetch_block_path(local_bpath, inode, bindex);
 		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
 		fetch_backend_block_objname(objname, inode, bindex, seq);
 		write_log(10, "Debug: begin to copy block, obj is %s", objname);
-		ret = check_and_copy_file(local_bpath, toupload_bpath, TRUE);
+		ret = check_and_copy_file(local_bpath, toupload_bpath,
+				TRUE, TRUE);
 		if (ret < 0) {
 			/* -EEXIST means target had been copied, and -ENOENT
 			 * means src file is deleted. */
@@ -1723,6 +1724,10 @@ int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inod
 					" been copied in %s\n", (uint64_t)inode,
 					bindex, __func__);
 				return 0;
+			} else if (ret == -ENOSPC) {
+				write_log(4, "Warn: Fail to copy %s"
+					" because of no space\n", objname);
+				return ret;
 
 			} else {
 				write_log(0, "Error: Copy block error in %s. "

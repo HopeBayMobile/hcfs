@@ -70,6 +70,39 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
+/**
+ * When remove a temp file used to uplaod to backend, the file size
+ * should be considered in system size and cache size after unlink it.
+ *
+ * @param filename File path to be remove.
+ *
+ * return 0 on success. Otherwise negative error code.
+ */
+int32_t unlink_upload_file(char *filename)
+{
+	struct stat filestat;
+	int64_t filesize;
+	int32_t ret, errcode;
+
+	ret = stat(filename, &filestat);
+	if (ret == 0) {
+		filesize = filestat.st_size;
+		UNLINK(filename);
+		change_system_meta(-filesize, 0, -filesize,
+				0, 0, 0, FALSE);
+	} else {
+		int32_t errcode;
+		errcode = errno;
+		write_log(0, "Fail to stat file in %s. Code %d\n",
+				__func__, errcode);
+		return -errcode;
+	}
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
 static inline int32_t _get_inode_sync_error(ino_t inode, BOOL *sync_error)
 {
 	int32_t count1;
@@ -179,7 +212,7 @@ static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 			/* TODO: consider truncating situation */
 			fetch_toupload_block_path(block_path, inode, bcount, 0);
 			if (access(block_path, F_OK) == 0)
-				unlink(block_path);
+				unlink_upload_file(block_path);
 		}
 		fclose(fptr);
 		flock(fileno(fptr), LOCK_UN);
@@ -255,7 +288,7 @@ static inline void _sync_terminate_thread(int32_t index)
 				del_progress_file(sync_ctl.progress_fd[index],
 						inode);
 				if (access(toupload_metapath, F_OK) == 0)
-					unlink(toupload_metapath);
+					unlink_upload_file(toupload_metapath);
 			}
 
 			sync_ctl.threads_in_use[index] = 0;
@@ -461,7 +494,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	fetch_toupload_block_path(toupload_blockpath, this_inode,
 			blockno, toupload_block_seq);
 	if (access(toupload_blockpath, F_OK) == 0)
-		unlink(toupload_blockpath);
+		unlink_upload_file(toupload_blockpath);
 
 	ret = change_block_status_to_BOTH(this_inode, blockno, page_filepos,
 			toupload_block_seq);
@@ -878,7 +911,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
 				block_count, toupload_block_seq);
 		if (access(toupload_bpath, F_OK) == 0)
-			unlink(toupload_bpath);
+			unlink_upload_file(toupload_bpath);
 
 		break;
 	/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
@@ -917,7 +950,9 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
 			block_count, toupload_block_seq);
 		if (access(toupload_bpath, F_OK) == 0)
-			unlink(toupload_bpath);
+			unlink_upload_file(toupload_bpath);
+
+		break;
 	}
 
 	return 0;
@@ -1106,7 +1141,7 @@ store in some other file */
 				break;
 
 			if (is_revert == TRUE) {
-				if (did_block_finish_uploading(progress_fd,
+				if (block_finish_uploading(progress_fd,
 					block_count) == TRUE)
 					continue;
 			}
@@ -1617,6 +1652,19 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
 	int32_t which_curl, ret, errcode, which_index;
 	char local_metapath[300];
+	struct stat filestat;
+	int64_t filesize;
+
+	filesize = 0;
+	ret = stat(thread_ptr->tempfilename, &filestat);
+	if (ret == 0) {
+		filesize = filestat.st_size;
+	} else {
+		errcode = errno;
+		write_log(0, "Error: Fail to stat file in %s. Code %d\n",
+				__func__, errcode);
+		goto errcode_handle;
+	}
 
 	which_curl = thread_ptr->which_curl;
 	which_index = thread_ptr->which_index;
@@ -1656,6 +1704,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 		goto errcode_handle;
 
 	UNLINK(thread_ptr->tempfilename);
+	change_system_meta(-filesize, 0, -filesize, 0, 0, 0, FALSE);
 	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 
@@ -1673,8 +1722,12 @@ errcode_handle:
 	/* Unlink toupload block if we terminates uploading, but
 	 * do NOT unlink toupload meta because it will be re-upload
 	 * next time.*/
-	if (thread_ptr->is_block == TRUE)
-		unlink(thread_ptr->tempfilename);
+	if (thread_ptr->is_block == TRUE) {
+		ret = unlink(thread_ptr->tempfilename);
+		if (ret == 0)
+			change_system_meta(-filesize, 0, -filesize,
+					0, 0, 0, FALSE);
+	}
 	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 }
@@ -1759,7 +1812,8 @@ int32_t dispatch_upload_block(int32_t which_curl)
 		goto errcode_handle;
 	}
 
-	ret = check_and_copy_file(thisblockpath, toupload_blockpath, TRUE);
+	ret = check_and_copy_file(thisblockpath, toupload_blockpath,
+			TRUE, FALSE);
 	if (ret < 0) {
 		/* -EEXIST means target had been copied when writing */
 		/* If ret == -ENOENT, it means file is deleted. */

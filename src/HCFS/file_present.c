@@ -1523,7 +1523,7 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 				unlink(toupload_metapath);
 			}
 			ret = check_and_copy_file(local_metapath,
-					toupload_metapath, FALSE);
+					toupload_metapath, FALSE, FALSE);
 			if (ret < 0) {
 				meta_cache_close_file(meta_cache_entry);
 				meta_cache_unlock_entry(meta_cache_entry);
