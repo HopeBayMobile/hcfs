@@ -839,7 +839,7 @@ TEST_F(check_and_copy_fileTest, SourceFileNotExist)
 
 	EXPECT_EQ(-ENOENT, ret);
 	EXPECT_EQ(-1, access(mock_source, F_OK));
-	EXPECT_EQ(-1, access(mock_target, F_OK));
+	EXPECT_EQ(0, access(mock_target, F_OK));
 	EXPECT_EQ(0, hcfs_system->systemdata.system_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_size);
 }

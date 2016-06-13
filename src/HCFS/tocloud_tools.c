@@ -63,10 +63,10 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 		errcode = errno;
 		if (errcode == ENOENT)
 			write_log(5, "Warn: meta %"PRIu64" is removed"
-					". Code %d\n", errcode);
+				". Code %d\n", (uint64_t)inode, errcode);
 		else
 			write_log(0, "Error: Cannot read meta %"PRIu64
-					". Code %d\n", errcode);
+				". Code %d\n", (uint64_t)inode, errcode);
 		return -errcode;
 	}
 	setbuf(local_metafptr, NULL);

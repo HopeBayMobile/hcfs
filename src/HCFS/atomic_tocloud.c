@@ -810,39 +810,11 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	char filebuf[4100];
 	int64_t ret_pos;
 
-	/* source file should exist */
-	if (access(srcpath, F_OK) != 0) {
-		errcode = errno;
-		if (errcode == ENOENT)
-			write_log(2, "Warn: Source file does not exist. In %s\n",
-				__func__);
-		else
-			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
-		return -errcode;
-	}
-
-	src_ptr = fopen(srcpath, "r");
-	if (src_ptr == NULL) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-			errcode, strerror(errcode));
-		return -errcode;
-	}
-
-	/* Lock source if needed */
-	if (lock_src == TRUE)
-		flock(fileno(src_ptr), LOCK_EX);
-
 	tar_ptr = fopen(tarpath, "a+");
 	if (tar_ptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
 			errcode, strerror(errcode));
-
-		if (lock_src == TRUE)
-			flock(fileno(src_ptr), LOCK_UN);
-		fclose(src_ptr);
 		return -errcode;
 	}
 	fclose(tar_ptr);
@@ -851,10 +823,6 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
 			errcode, strerror(errcode));
-
-		if (lock_src == TRUE)
-			flock(fileno(src_ptr), LOCK_UN);
-		fclose(src_ptr);
 		return -errcode;
 	}
 	flock(fileno(tar_ptr), LOCK_EX);
@@ -864,10 +832,7 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	FSEEK(tar_ptr, 0, SEEK_END);
 	FTELL(tar_ptr);
 	if (ret_pos > 0) {
-		if (lock_src == TRUE)
-			flock(fileno(src_ptr), LOCK_UN);
 		flock(fileno(tar_ptr), LOCK_UN);
-		fclose(src_ptr);
 		fclose(tar_ptr);
 		return 0;
 	}
@@ -875,12 +840,44 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	/* Do not copy when no space */
 	if (reject_if_nospc == TRUE) {
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
-			errcode = -ENOSPC;
-			goto errcode_handle;
+			flock(fileno(tar_ptr), LOCK_UN);
+			fclose(tar_ptr);
+			return -ENOSPC;
 		}
 	}
 
 	setbuf(tar_ptr, NULL);
+
+	/* source file should exist */
+	if (access(srcpath, F_OK) != 0) {
+		errcode = errno;
+		if (errcode == ENOENT)
+			write_log(2, "Warn: Source file does not exist. In %s\n",
+				__func__);
+		else
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+
+		flock(fileno(tar_ptr), LOCK_UN);
+		fclose(tar_ptr);
+		return -errcode;
+	}
+
+	src_ptr = fopen(srcpath, "r");
+	if (src_ptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+
+		flock(fileno(tar_ptr), LOCK_UN);
+		fclose(tar_ptr);
+		return -errcode;
+	}
+
+	/* Lock source if needed */
+	if (lock_src == TRUE)
+		flock(fileno(src_ptr), LOCK_EX);
+
 	/* Begin to copy */
 	FSEEK(src_ptr, 0, SEEK_SET);
 	FSEEK(tar_ptr, 0, SEEK_SET);
