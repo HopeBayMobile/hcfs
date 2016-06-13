@@ -115,6 +115,8 @@ class destroy_api_interfaceTest : public ::testing::Test {
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
+    sem_init(&(hcfs_system->fuse_sem), 0, 0);
+    sem_init(&(hcfs_system->something_to_replace), 0, 0);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
    }
@@ -187,6 +189,8 @@ class api_moduleTest : public ::testing::Test
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->access_sem), 0, 1);
+		sem_init(&(hcfs_system->fuse_sem), 0, 0);
+		sem_init(&(hcfs_system->something_to_replace), 0, 0);
 		if (access(SOCK_PATH, F_OK) == 0)
 			unlink(SOCK_PATH);
 		fd = 0;
@@ -1604,6 +1608,8 @@ class api_server_monitorTest : public ::testing::Test {
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
+    sem_init(&(hcfs_system->fuse_sem), 0, 0);
+    sem_init(&(hcfs_system->something_to_replace), 0, 0);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
     for (count = 0; count < 10; count++)

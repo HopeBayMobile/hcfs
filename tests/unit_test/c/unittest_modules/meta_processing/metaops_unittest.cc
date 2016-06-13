@@ -96,8 +96,8 @@ class dir_add_entryTest : public ::testing::Test {
                        	strcpy(mock_metaname, 
 				"/tmp/mock_meta_used_in_dir_add_entry"); 
 			self_name = "selfname";
-			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(
-				sizeof(META_CACHE_ENTRY_STRUCT));
+			body_ptr = (META_CACHE_ENTRY_STRUCT *)calloc(
+			    1, sizeof(META_CACHE_ENTRY_STRUCT));
 			sem_init(&(body_ptr->access_sem), 0, 1);
 			body_ptr->fptr = fopen(mock_metaname, "w+");
 			/* Init meta & stat to be verified */
@@ -124,6 +124,7 @@ TEST_F(dir_add_entryTest, insert_dir_entryFail)
 {
 	/* Mock data */
 	DIR_ENTRY_PAGE tmp_dir_page;
+	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
 	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	sem_wait(&body_ptr->access_sem);
 	
@@ -136,6 +137,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
 {
 	/* Mock data */
 	DIR_ENTRY_PAGE tmp_dir_page;
+	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
 	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
 	to_verified_stat.st_nlink = LINK_NUM;
@@ -153,6 +155,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
 {
 	/* Mock data */
 	DIR_ENTRY_PAGE tmp_dir_page;
+	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
 	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
 	to_verified_stat.st_nlink = LINK_NUM;
@@ -230,7 +233,7 @@ class dir_remove_entryTest : public ::testing::Test {
                         self_name = "selfname";
 			metapath = "/tmp/dir_remove_entry_meta_file";
 
-			testpage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
+			testpage = (DIR_ENTRY_PAGE*)calloc(1, sizeof(DIR_ENTRY_PAGE));
 			/* Create mock meta file */
 			fp = fopen(metapath, "w+");
 			fwrite(testpage, sizeof(DIR_ENTRY_PAGE), 1, fp); // mock root_page used to read
@@ -618,6 +621,7 @@ protected:
 	void SetUp()
 	{
 		FILE_META_TYPE empty_file_meta;
+		memset(&empty_file_meta, 0, sizeof(FILE_META_TYPE));
 
 		metapath = "testpatterns/seek_page_meta_file";
 		body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
@@ -1504,7 +1508,7 @@ protected:
 		fsync(fileno(statfptr));
 
 		fclose(statfptr);
-
+		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
 	}
 
 	void TearDown()
@@ -1525,6 +1529,7 @@ protected:
 		
 		if (!access(TO_DELETE_METAPATH, F_OK))
 			unlink(TO_DELETE_METAPATH);
+		free(hcfs_system);
 	}
 };
 
@@ -1746,6 +1751,7 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	struct stat tempstat;
 	DIR_META_TYPE dirmeta;
 	DIR_ENTRY_PAGE temppage;
+	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
 	inode = 5;
 	fetch_meta_path(metapath, inode);
