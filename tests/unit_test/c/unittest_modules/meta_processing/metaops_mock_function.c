@@ -135,8 +135,11 @@ int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
-	if (test_change_pin_flag && target_ptr->fptr)
+	if (test_change_pin_flag && target_ptr->fptr) {
+		printf("fileno %d\n", fileno(target_ptr->fptr));
 		fclose(target_ptr->fptr);
+		target_ptr->fptr = NULL;
+	}
 	return 0;
 }
 
