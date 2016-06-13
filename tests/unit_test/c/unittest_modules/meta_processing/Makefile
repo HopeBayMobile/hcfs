@@ -70,4 +70,4 @@ endif
 
 $(RUN_TESTS) :
 	./$(@:test-%=%) --gtest_output=xml:$(OBJ_DIR)/$(@:test-%=%).xml || \
-	    ( if [ -f core ]; then { gdb -ex "set pagination 0" -ex "thread apply all bt" -batch ./$(@:test-%=%) ./core; rm ./core; } fi; exit 1)
+	    ( if [ -f core ]; then { gdb -ex "set pagination 0" -ex "thread apply all bt" -batch ./$(@:test-%=%) ./core; mv core $(@:test-%=%).core; } fi; exit 1)
