@@ -287,7 +287,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 }
 
 int check_and_copy_file(const char *srcpath, const char *tarpath,
-		BOOL lock_src)
+		BOOL lock_src, BOOL reject_if_nospc)
 {
 	mknod(tarpath, 0700, 0);
 	return 0;
@@ -298,7 +298,7 @@ void fetch_progress_file_path(char *pathname, ino_t inode)
 	return;
 }
 
-char did_block_finish_uploading(int32_t fd, int64_t blockno)
+char block_finish_uploading(int32_t fd, int64_t blockno)
 {
 	return TRUE;
 }
@@ -438,6 +438,14 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 
 int32_t get_progress_info(int32_t fd, int64_t block_index,
 		BLOCK_UPLOADING_STATUS *block_uploading_status)
+{
+	return 0;
+}
+
+int32_t change_system_meta(int64_t system_data_size_delta,
+		int64_t meta_size_delta, int64_t cache_data_size_delta,
+		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+		int64_t unpin_dirty_data_size, BOOL need_sync)
 {
 	return 0;
 }

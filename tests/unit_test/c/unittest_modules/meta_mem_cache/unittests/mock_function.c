@@ -93,7 +93,7 @@ int32_t write_log(int32_t level, char *format, ...)
 	return 0;
 }
 
-char did_block_finish_uploading(int fd, long long blockno)
+char block_finish_uploading(int fd, long long blockno)
 {
 	return MOCK_FINISH_UPLOADING;
 }

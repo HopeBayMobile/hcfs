@@ -828,7 +828,7 @@ TEST_F(check_and_copy_fileTest, SourceFileNotExist)
 	mock_source = "/tmp/hahaha";
 	mock_target = "/tmp/copy_target";
 
-	ret = check_and_copy_file(mock_source, mock_target, TRUE);
+	ret = check_and_copy_file(mock_source, mock_target, TRUE, FALSE);
 
 	EXPECT_EQ(-ENOENT, ret);
 	EXPECT_EQ(-1, access(mock_source, F_OK));
@@ -838,17 +838,30 @@ TEST_F(check_and_copy_fileTest, SourceFileNotExist)
 TEST_F(check_and_copy_fileTest, TargetFileExist)
 {
 	int ret;
+	FILE *src, *tar;
+	char src_buf[200], tar_buf[200];
 
 	mock_source = "unittests/atomic_tocloud_unittest.cc";
 	mock_target = "/tmp/copy_target";
 
 	mknod(mock_target, 0700, 0);
-	ret = check_and_copy_file(mock_source, mock_target, TRUE);
+	ret = check_and_copy_file(mock_source, mock_target, TRUE, FALSE);
 
-	EXPECT_EQ(-EEXIST, ret);
+	EXPECT_EQ(0, ret);
 	EXPECT_EQ(0, access(mock_source, F_OK));
 	EXPECT_EQ(0, access(mock_target, F_OK));
+	src = fopen(mock_source, "r");
+	tar = fopen(mock_target, "r");
+	ASSERT_TRUE(src != NULL);
+	ASSERT_TRUE(tar != NULL);
+	while (fgets(src_buf, 150, src)) {
+		fgets(tar_buf, 150, tar);
+		ASSERT_EQ(0, strcmp(src_buf, tar_buf));
+	}
 
+	/* Recycle */
+	fclose(src);
+	fclose(tar);
 	unlink(mock_target);
 }
 
@@ -861,7 +874,7 @@ TEST_F(check_and_copy_fileTest, CopySuccess)
 	mock_source = "unittests/atomic_tocloud_unittest.cc";
 	mock_target = "/tmp/copy_target";
 
-	ret = check_and_copy_file(mock_source, mock_target, TRUE);
+	ret = check_and_copy_file(mock_source, mock_target, TRUE, FALSE);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(0, access(mock_source, F_OK));

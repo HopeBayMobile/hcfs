@@ -2059,6 +2059,13 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Update meta sequence number.
+ *
+ * @param bptr Meta memory cache entry of the meta file.
+ *
+ * @return 0 on success. Otherwise negative error code.
+ */
 int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 {
 	int32_t ret;
@@ -2121,6 +2128,11 @@ error_handling:
 	return ret;
 }
 
+/**
+ * Update seq number of block "bindex" to "now_seq".
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 		int64_t eindex, int64_t bindex, int64_t now_seq)
 {
