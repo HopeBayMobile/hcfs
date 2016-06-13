@@ -14,6 +14,7 @@
 * 2015/7/9 Kewei added function symlink_update_meta().
 * 2016/1/18 Jiahong moved lookup_add_parent to reduce impact of crashes
 * 2016/1/21 Kewei added feature that inherit xattrs from parent.
+* 2016/5/23 Jiahong added control for cache mgmt
 *
 **************************************************************************/
 
@@ -1370,7 +1371,7 @@ int32_t decrease_pinned_size(int64_t *reserved_release_size, int64_t file_size)
 
 int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 {
-	int32_t ret;
+	int32_t ret, semval;
 	struct stat tempstat;
 	ino_t *dir_node_list, *nondir_node_list;
 	int64_t count, num_dir_node, num_nondir_node;
@@ -1406,6 +1407,13 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 
 	/* After unpinning itself, unpin all its children for dir */
 	if (S_ISFILE(tempstat.st_mode)) {
+		/* First post the control for cache mangement */
+		semval = 0;
+		ret = sem_getvalue(&(hcfs_system->something_to_replace),
+		                   &semval);
+		if ((ret == 0) && (semval == 0))
+			sem_post(&(hcfs_system->something_to_replace));
+
 		return ret;
 
 	} else if (S_ISLNK(tempstat.st_mode)) {

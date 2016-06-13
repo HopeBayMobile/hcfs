@@ -1076,6 +1076,8 @@ void api_module(void *index)
 			/* Terminate the system */
 			unmount_all();
 			hcfs_system->system_going_down = TRUE;
+			/* Wake up potential sleeping threads */
+			sem_post(&(hcfs_system->something_to_replace));
 			sem_post(&(hcfs_system->fuse_sem));
 			retcode = 0;
 			ret_len = sizeof(int32_t);

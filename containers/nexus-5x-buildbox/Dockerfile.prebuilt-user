@@ -1,0 +1,13 @@
+# Use phusion/baseimage as base image. To make your builds reproducible, make
+# sure you lock down to a specific version, not to `latest`!
+# See https://github.com/phusion/baseimage-docker/blob/master/Changelog.md for
+# a list of version numbers.
+FROM docker:5000/nexus-5x-buildbox:source-only
+
+# Use baseimage-docker's init system.
+#CMD ["/sbin/my_init"]
+
+WORKDIR /data
+RUN bash -i -c "buildu && \
+	cd out/target/product/* && \
+	rm -rvf boot.img cache.img dt.img persist.img ramdisk-recovery.img ramdisk.img recovery.img system.img userdata.img boot cache dt persist ramdisk-recovery ramdisk recovery system userdata data root vendor vendor.img"

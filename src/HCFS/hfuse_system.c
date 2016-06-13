@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hfuse_system.c
 * Abstract: The c source code file for HCFS system main function.
@@ -10,6 +10,7 @@
 *           Also changed inclusion of hcfs_cache.h to hcfs_cacheops.h.
 * 2015/6/1 Jiahong working on improving error handling
 * 2015/6/1 Jiahong changing logger
+* 2016/5/23 Jiahong adding cache control init
 *
 **************************************************************************/
 #include "hfuse_system.h"
@@ -90,6 +91,10 @@ int32_t init_hcfs_system_data(void)
 
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 1, 1);
+
+	/* Init cache management control */
+	sem_init(&(hcfs_system->something_to_replace), 1, 1);
+
 	sem_init(&(hcfs_system->fuse_sem), 1, 0);
 	sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);

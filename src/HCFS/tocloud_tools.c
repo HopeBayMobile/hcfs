@@ -43,17 +43,20 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 		long long page_pos, long long toupload_seq)
 {
 	BLOCK_ENTRY_PAGE tmp_page;
-	long long local_seq;
+	int64_t local_seq;
 	char local_status;
-	int e_index;
-	int ret, errcode;
+	int32_t e_index;
+	int32_t ret, errcode;
+	int32_t semval;
 	ssize_t ret_ssize;
 	char blockpath[300], local_metapath[300];
 	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
 	FILE *local_metafptr;
 	FILE_META_TYPE tempfilemeta;
+	sem_t *semptr;
 
+	semptr = &(hcfs_system->something_to_replace);
 	fetch_meta_path(local_metapath, inode);
 	local_metafptr = fopen(local_metapath, "r+");
 	if (!local_metafptr) {
@@ -119,6 +122,14 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 				-cache_block_size, inode);
 		PWRITE(fileno(local_metafptr), &tmp_page,
 				sizeof(BLOCK_ENTRY_PAGE), page_pos);
+		/* If unpin, post cache management
+		 * control */
+		if (tempfilemeta.local_pin == FALSE) {
+			semval = 0;
+			ret = sem_getvalue(semptr, &semval);
+			if ((ret == 0) && (semval == 0))
+				sem_post(semptr);
+		}
 	}
 
 	flock(fileno(local_metafptr), LOCK_UN);

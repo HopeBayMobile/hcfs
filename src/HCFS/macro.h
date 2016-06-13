@@ -227,7 +227,8 @@
 		num_retries = 0;\
 		while (num_retries < MAX_RETRIES) {\
 			res = curl_easy_perform(A);\
-			if (res == CURLE_OPERATION_TIMEDOUT) {\
+			if ((res == CURLE_OPERATION_TIMEDOUT) &&\
+			    (hcfs_system->backend_is_online == TRUE)) {\
 				num_retries++;\
 				if (num_retries < MAX_RETRIES)\
 					continue;\

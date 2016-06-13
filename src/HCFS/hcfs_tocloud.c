@@ -14,6 +14,7 @@
 * 2015/6/4, 6/5 Jiahong added error handling.
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
 * 2015/2/18, Kewei finish atomic upload.
+* 2016/5/23 Jiahong added control for cache mgmt
 *
 **************************************************************************/
 

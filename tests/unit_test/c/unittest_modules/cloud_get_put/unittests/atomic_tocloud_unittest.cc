@@ -810,6 +810,11 @@ protected:
 
 	virtual void SetUp()
 	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+				malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		if (!access(mock_target, F_OK))
 			unlink(mock_target);
 	}
@@ -818,6 +823,8 @@ protected:
 	{
 		if (!access(mock_target, F_OK))
 			unlink(mock_target);
+		free(hcfs_system);
+		free(system_config);
 	}
 };
 
@@ -833,16 +840,22 @@ TEST_F(check_and_copy_fileTest, SourceFileNotExist)
 	EXPECT_EQ(-ENOENT, ret);
 	EXPECT_EQ(-1, access(mock_source, F_OK));
 	EXPECT_EQ(-1, access(mock_target, F_OK));
+	EXPECT_EQ(0, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(0, hcfs_system->systemdata.cache_size);
 }
 
-TEST_F(check_and_copy_fileTest, TargetFileExist)
+TEST_F(check_and_copy_fileTest, TargetFileExist_CopySuccess)
 {
 	int ret;
 	FILE *src, *tar;
 	char src_buf[200], tar_buf[200];
+	int64_t filesize;
+	struct stat tmpstat;
 
 	mock_source = "unittests/atomic_tocloud_unittest.cc";
 	mock_target = "/tmp/copy_target";
+	stat(mock_source, &tmpstat);
+	filesize = tmpstat.st_size;
 
 	mknod(mock_target, 0700, 0);
 	ret = check_and_copy_file(mock_source, mock_target, TRUE, FALSE);
@@ -858,10 +871,36 @@ TEST_F(check_and_copy_fileTest, TargetFileExist)
 		fgets(tar_buf, 150, tar);
 		ASSERT_EQ(0, strcmp(src_buf, tar_buf));
 	}
+	EXPECT_EQ(filesize, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(filesize, hcfs_system->systemdata.cache_size);
 
 	/* Recycle */
 	fclose(src);
 	fclose(tar);
+	unlink(mock_target);
+}
+
+TEST_F(check_and_copy_fileTest, CopyFail_NoSpace)
+{
+	int ret;
+	struct stat tmpstat;
+
+	mock_source = "unittests/atomic_tocloud_unittest.cc";
+	mock_target = "/tmp/copy_target";
+
+	CACHE_HARD_LIMIT = 123456;
+	hcfs_system->systemdata.cache_size = CACHE_HARD_LIMIT + 1;
+	ret = check_and_copy_file(mock_source, mock_target, TRUE, TRUE);
+
+	EXPECT_EQ(-ENOSPC, ret);
+	EXPECT_EQ(0, access(mock_source, F_OK));
+	EXPECT_EQ(0, access(mock_target, F_OK));
+	stat(mock_target, &tmpstat);
+	EXPECT_EQ(0, tmpstat.st_size);
+	EXPECT_EQ(0, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(CACHE_HARD_LIMIT + 1, hcfs_system->systemdata.cache_size);
+
+	/* Recycle */
 	unlink(mock_target);
 }
 

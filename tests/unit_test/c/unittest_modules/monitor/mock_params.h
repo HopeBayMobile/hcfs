@@ -26,13 +26,15 @@ sem_t objname_counter_sem;
 char no_backend_stat;
 
 char upload_ctl_todelete_blockno[100];
-SYSTEM_CONF_STRUCT system_config;
+SYSTEM_CONF_STRUCT *system_config;
 
 char CACHE_FULL;
 char OPEN_BLOCK_PATH_FAIL;
 char OPEN_META_PATH_FAIL;
 char NOW_STATUS;
 char FETCH_BACKEND_BLOCK_TESTING;
+
+int32_t mock_status;
 
 typedef struct {
 	int32_t *to_handle_inode; // inode_t to be deleted by delete_loop()

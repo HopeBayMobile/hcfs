@@ -50,6 +50,7 @@ function start_builder() {
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
 	eval docker pull $DOCKER_IMAGE || :
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
 	trap cleanup INT TERM
 }
 function cleanup() {
@@ -60,6 +61,7 @@ function cleanup() {
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
 	docker rm -f $DOCKERNAME || :
+	rm -f DOCKERNAME
 }
 function check-ssh-agent() {
 	[ -S "$SSH_AUTH_SOCK" ] && { ssh-add -l >& /dev/null || [ $? -ne 2 ]; }
@@ -115,10 +117,11 @@ function build_system() {
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	IMG_DIR=${PUBLISH_DIR}/HCFS-s58a-image-${IMAGE_TYPE}
-	mkdir -p $IMG_DIR
-	rsync -v $here/resource/* $IMG_DIR
+	mkdir -p ${IMG_DIR}
+	rsync -v $here/resource/* ${IMG_DIR}
 	rsync -arcv --no-owner --no-group --no-times \
-		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} $IMG_DIR
+		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${IMG_DIR}
+	touch ${PUBLISH_DIR} ${IMG_DIR}
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
@@ -177,7 +180,7 @@ function build_image_type() {
 # PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/0.0.0.ci.test}
 eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
 eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
-eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
+eval '[ -n "${PUBLISH_DIR}" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
 
 echo ========================================
 echo Jenkins pass-through variables:

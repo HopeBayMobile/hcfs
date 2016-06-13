@@ -23,3 +23,4 @@ adb wait-for-device
 :: adb shell "set -- `ps | grep hcfs`; kill -9 $2"
 adb reboot bootloader
 call fastboot-flush-all.bat
+adb kill-server

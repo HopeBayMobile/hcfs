@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <semaphore.h>
+#include "mock_params.h"
 extern "C" {
 #include "monitor.h"
 #include "global.h"
@@ -25,9 +26,17 @@ class monitorTest : public ::testing::Test {
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->monitor_sem), 1, 0);
+		sem_init(&(hcfs_system->access_sem), 1, 1);
+
+	system_config = (SYSTEM_CONF_STRUCT *)
+		malloc(sizeof(SYSTEM_CONF_STRUCT));
+	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 	}
 
-	void TearDown() { free(hcfs_system); }
+	void TearDown() {
+		free(hcfs_system);
+		free(system_config);
+	}
 };
 
 TEST_F(monitorTest, Backend_Status_Changed) {
@@ -147,4 +156,13 @@ TEST_F(monitorTest, diff_time_With_No_Endtime) {
 	clock_gettime(CLOCK_REALTIME, &test_start);
 	test_duration = diff_time(&test_start, NULL);
 	ASSERT_GT(test_duration, 0);
+}
+TEST_F(monitorTest, UpdateSyncStateTest) {
+  hcfs_system->backend_is_online = FALSE;
+  update_sync_state();
+  EXPECT_EQ(TRUE, hcfs_system->sync_paused);
+  hcfs_system->backend_is_online = TRUE;
+  update_sync_state();
+  EXPECT_EQ(FALSE, hcfs_system->sync_paused);
+  EXPECT_EQ(0, hcfs_system->systemdata.cache_replace_status);
 }

@@ -1,12 +1,13 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hfuse_cachebuild.c
 * Abstract: The c source code file for building structure for cache usage.
 *
 * Revision History
 * 2015/2/11 Jiahong added header for this file, and revising coding style.
+* 2016/5/23 Jiahong adding more cache mgmt control.
 *
 **************************************************************************/
 
@@ -252,6 +253,18 @@ int32_t build_cache_usage(void)
 		return ret;
 
 	write_log(10, "Initialized cache usage hash table\n");
+
+	/* Marking something_to_replace as false */
+	do {
+		ret = sem_trywait(&(hcfs_system->something_to_replace));
+		if (ret < 0) {
+			errcode = (int32_t) errno;
+			if (errcode != EAGAIN)
+				return -errcode;
+		} else {
+			errcode = 0;
+		}
+	} while (errcode == 0);
 
 	for (count = 0; count < NUMSUBDIR; count++) {
 		write_log(10, "Now processing subfolder %d\n", count);
