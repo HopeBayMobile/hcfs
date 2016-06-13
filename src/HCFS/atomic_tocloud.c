@@ -165,7 +165,7 @@ int64_t query_status_page(int32_t fd, int64_t block_index)
 	for (i = 1; i < which_indirect; i++)
 		ptr_index -= longpow(POINTERS_PER_PAGE, i);
 
-	for(level = which_indirect - 1; level >= 0; level--) {
+	for (level = which_indirect - 1; level >= 0; level--) {
 		PREAD(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE), ret_pos);
 		if (level == 0)
 			break;

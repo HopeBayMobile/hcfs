@@ -1622,9 +1622,9 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (body_ptr->uploading_info.is_uploading == is_now_uploading) {
-		write_log(0, "Error: Old status is the same as new one in %s\n",
+		write_log(4, "Warn: Old status is the same as new one in %s\n",
 			__func__);
-		return -1;
+		return -EINVAL;
 	}
 
 	body_ptr->uploading_info.is_uploading = is_now_uploading;

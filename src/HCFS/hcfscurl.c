@@ -1023,7 +1023,7 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		char header[1024] = {0};
 		fseek(swift_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, swift_header_fptr);
-		write_log(4, "Error: Fail to parse %s header:\n%s", objname,
+		write_log(5, "Warn: Fail to parse %s header:\n%s", objname,
 			  header);
 		fclose(swift_header_fptr);
 		unlink(header_filename);
