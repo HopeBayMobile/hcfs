@@ -2122,22 +2122,21 @@ error_handling:
 }
 
 int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
-		int64_t eindex, int64_t bindex)
+		int64_t eindex, int64_t bindex, int64_t now_seq)
 {
-	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE bentry_page;
 	int32_t ret;
 
 	if (!S_ISREG(bptr->this_stat.st_mode))
 		return -EINVAL;
 
-	ret = meta_cache_lookup_file_data(bptr->inode_num, NULL, &filemeta,
+	ret = meta_cache_lookup_file_data(bptr->inode_num, NULL, NULL,
 			&bentry_page, page_fpos, bptr);
 	if (ret < 0)
 		return ret;
 
 	/* Update seqnum */
-	bentry_page.block_entries[eindex].seqnum = filemeta.finished_seq;
+	bentry_page.block_entries[eindex].seqnum = now_seq;
 
 	ret = meta_cache_update_file_data(bptr->inode_num, NULL, NULL,
 			&bentry_page, page_fpos, bptr);
@@ -2145,7 +2144,7 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 		return ret;
 
 	write_log(10, "Debug: block %"PRIu64"_%lld now seq is %lld",
-		bptr->inode_num, bindex, filemeta.finished_seq);
+		bptr->inode_num, bindex, now_seq);
 
 	return 0;
 }

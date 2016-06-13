@@ -2756,6 +2756,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	size_t ret_size;
 	FILE *truncfptr;
 	char truncpath[METAPATHLEN];
+	int64_t now_seq;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -2773,6 +2774,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	if (ret < 0)
 		return ret;
+
+	now_seq = tempfilemeta.finished_seq;
 
 	if (filestat->st_size == offset) {
 		/*Do nothing if no change needed */
@@ -2865,7 +2868,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 				/* Update block seq number and reload meta */
 				ret = update_block_seq(*body_ptr, filepos,
-						last_index, last_block);
+						last_index, last_block,
+						now_seq);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
@@ -4153,7 +4157,7 @@ error_handling:
 *  block from backend if needed. */
 size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode,
-		int32_t *reterr, char ispin)
+		int32_t *reterr, char ispin, int64_t now_seq)
 {
 	int64_t current_page;
 	char thisblockpath[400];
@@ -4489,7 +4493,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	/* Update block seq num */
 	ret = update_block_seq(fh_ptr->meta_cache_ptr, this_page_fpos,
-			entry_index, bindex);
+			entry_index, bindex, now_seq);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -4532,6 +4536,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	FILE_META_TYPE thisfilemeta;
 	int64_t sizediff, amount_preallocated;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t now_seq;
 
 	write_log(10, "Debug write: size %zu, offset %lld\n", size,
 	          offset);
@@ -4588,6 +4593,18 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize);
 
+	/* Move update_meta_seq() here so that avoid race condition
+	 * caused from write by multi-threads */
+	ret = update_meta_seq(fh_ptr->meta_cache_ptr);
+	if (ret < 0) {
+		fh_ptr->meta_cache_locked = FALSE;
+		meta_cache_close_file(fh_ptr->meta_cache_ptr);
+		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+		sem_post(&(fh_ptr->block_sem));
+		fuse_reply_err(req, -ret);
+		return;
+	}
+
 	/* If the file is pinned, need to change the pinned_size
 	first if necessary */
 	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
@@ -4600,6 +4617,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		fuse_reply_err(req, -ret);
 		return;
 	}
+
+	/* Remember now sequence number */
+	now_seq = thisfilemeta.finished_seq;
 
 	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
@@ -4645,7 +4665,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		this_bytes_written = _write_block(&buf[total_bytes_written],
 				target_bytes_written, block_index,
 				current_offset, fh_ptr, fh_ptr->thisinode,
-				&errcode, thisfilemeta.local_pin);
+				&errcode, thisfilemeta.local_pin, now_seq);
 		if ((this_bytes_written == 0) && (errcode < 0)) {
 			if (fh_ptr->meta_cache_ptr != NULL) {
 				fh_ptr->meta_cache_locked = FALSE;
@@ -4743,12 +4763,6 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		sem_post(&(fh_ptr->block_sem));
 		fuse_reply_err(req, -ret);
 		return;
-	}
-
-	ret = update_meta_seq(fh_ptr->meta_cache_ptr);
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
 	}
 
 	fh_ptr->meta_cache_locked = FALSE;
@@ -5358,6 +5372,14 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		return;
 	}
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	ret_val = meta_cache_lookup_file_data(this_inode, &newstat,
 			NULL, NULL, 0, body_ptr);
 
@@ -5561,14 +5583,6 @@ allow_truncate:
 				sizeof(struct timespec));
 #endif
 		}
-	}
-
-	ret_val = update_meta_seq(body_ptr);
-	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		fuse_reply_err(req, -ret_val);
-		return;
 	}
 
 	ret_val = meta_cache_update_file_data(this_inode, &newstat,
