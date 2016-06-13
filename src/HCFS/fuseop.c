@@ -4280,7 +4280,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
-		int64_t now_seq;
+		int64_t seq;
 		/* If the cached block is not the one we are writing to,
 		*  close the one already opened. */
 		if (fh_ptr->opened_block != -1) {
@@ -4295,7 +4295,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			return 0;
 		}
 
-		now_seq = temppage.block_entries[entry_index].seqnum;
+		seq = temppage.block_entries[entry_index].seqnum;
 
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
@@ -4341,7 +4341,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			break;
 		case ST_LDISK:
 			ret = meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
-					this_inode, bindex, now_seq);
+					this_inode, bindex, seq);
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;
@@ -4353,7 +4353,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					ST_LtoC) {
 				ret = meta_cache_check_uploading(
 						fh_ptr->meta_cache_ptr,
-						this_inode, bindex, now_seq);
+						this_inode, bindex, seq);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
@@ -4401,13 +4401,13 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		fh_ptr->opened_block = bindex;
 
 	} else {
-		int64_t now_seq;
-		now_seq = temppage.block_entries[entry_index].seqnum;
+		int64_t seq;
+		seq = temppage.block_entries[entry_index].seqnum;
 		/* Check if there is a need for status change */
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_LDISK:
 			ret = meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
-					this_inode, bindex, now_seq);
+					this_inode, bindex, seq);
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;
@@ -4419,7 +4419,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					ST_LtoC) {
 				ret = meta_cache_check_uploading(
 						fh_ptr->meta_cache_ptr,
-						this_inode, bindex, now_seq);
+						this_inode, bindex, seq);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
