@@ -393,7 +393,7 @@ void run_cache_loop(void)
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
-		//	write_log(10, "Need to throw out something\n");
+			write_log(10, "Need to throw out something\n");
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
 				write_log(10, "Recomputing cache usage\n");

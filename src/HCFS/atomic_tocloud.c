@@ -464,9 +464,12 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 		return offset;
 	}
 
+	/* First bit of block_exist indicates if local to-upload block exist. */
 	if (toupload_exist)
 		block_uploading_status->block_exist = (((*toupload_exist) & 1) |
 			(block_uploading_status->block_exist & 2));
+
+	/* Second bit of block_exist indicates if backend old block exist. */
 	if (backend_exist)
 		block_uploading_status->block_exist = (((*backend_exist) << 1) |
 			(block_uploading_status->block_exist & 1));
@@ -521,7 +524,7 @@ int32_t create_progress_file(ino_t inode)
 	fetch_progress_file_path(filename, inode);
 
 	if (access(filename, F_OK) == 0) {
-		write_log(0, "Error: Open \"%s\" but it exist. Unlink it\n",
+		write_log(4, "Warn: Open \"%s\" but it exist. Unlink it\n",
 			filename);
 		UNLINK(filename);
 	}

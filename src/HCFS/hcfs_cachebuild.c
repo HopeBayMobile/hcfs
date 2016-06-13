@@ -254,7 +254,7 @@ int32_t build_cache_usage(void)
 	write_log(10, "Initialized cache usage hash table\n");
 
 	for (count = 0; count < NUMSUBDIR; count++) {
-	//	write_log(10, "Now processing subfolder %d\n", count);
+		write_log(10, "Now processing subfolder %d\n", count);
 		sprintf(blockpath, "%s/sub_%d", BLOCKPATH, count);
 
 		if (access(blockpath, F_OK) < 0)
