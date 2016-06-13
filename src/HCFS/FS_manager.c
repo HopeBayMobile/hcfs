@@ -212,7 +212,7 @@ errcode_handle:
 
 /* Helper function for allocating a new inode as root */
 #ifdef _ANDROID_ENV_
-ino_t _create_root_inode(char voltype)
+ino_t _create_root_inode(char *fsname, char voltype)
 #else
 ino_t _create_root_inode()
 #endif
@@ -241,10 +241,15 @@ ino_t _create_root_inode()
 
 #ifdef _ANDROID_ENV_
 	self_mode = S_IFDIR | 0770;
-	if (voltype == ANDROID_INTERNAL) /* Default pin internal storage */
-		ispin = TRUE;
-	else
+	if (voltype == ANDROID_INTERNAL) { /* Default pin internal storage */
+		if (strncasecmp(fsname, APP_FS_NAME,
+				strlen(APP_FS_NAME)) == 0)
+			ispin = P_HIGH_PRI_PIN;
+		else
+			ispin = P_PIN;
+	} else {
 		ispin = DEFAULT_PIN;
+	}
 #else
 	self_mode = S_IFDIR | 0775;
 	ispin = DEFAULT_PIN;
@@ -448,7 +453,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	memset(&overflow_entry, 0, sizeof(DIR_ENTRY));
 
 #ifdef _ANDROID_ENV_
-	new_FS_ino = _create_root_inode(voltype);
+	new_FS_ino = _create_root_inode(fsname, voltype);
 #else
 	new_FS_ino = _create_root_inode();
 #endif
