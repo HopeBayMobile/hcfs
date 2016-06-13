@@ -977,7 +977,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
@@ -1147,7 +1147,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	gettimeofday(&tmp_time1, NULL);
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
@@ -1306,7 +1306,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
         write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
                         (uint64_t)parent_inode);
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
@@ -1385,7 +1385,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
 			(uint64_t)parent_inode);
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
@@ -1494,7 +1494,7 @@ a directory (for NFS) */
 	write_log(8, "Debug lookup parent %" PRIu64 ", name %s\n",
 			(uint64_t)parent_inode, selfname);
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
@@ -1678,13 +1678,13 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
                         (uint64_t)parent_inode2);
 
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname1) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(selfname2) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
@@ -5737,9 +5737,9 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	parent_inode = real_ino(req, parent);
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
-		write_log(0, "File name is too int64_t\n");
+		write_log(0, "File name is too long\n");
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
@@ -5748,9 +5748,9 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 
-	/* Reject if link path too int64_t */
+	/* Reject if link path too long */
 	if (strlen(link) >= MAX_LINK_PATH) {
-		write_log(0, "Link path is too int64_t\n");
+		write_log(0, "Link path is too long\n");
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
@@ -6591,9 +6591,9 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	parent_inode = real_ino(req, newparent);
 	link_inode = real_ino(req, ino);
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(newname) > MAX_FILENAME_LEN) {
-		write_log(0, "File name is too int64_t\n");
+		write_log(0, "File name is too long\n");
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
@@ -6749,7 +6749,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	/* Reject if name too int64_t */
+	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
