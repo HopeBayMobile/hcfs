@@ -189,6 +189,7 @@ function mount_nas() {
 	service rpcbind start || :
 	if ! mount  | grep 'nas:/ubuntu on /mnt/nas'; then
 		umount /mnt/nas || :
+		mkdir -p /mnt/nas
 		mount nas:/ubuntu /mnt/nas
 	fi
 }
