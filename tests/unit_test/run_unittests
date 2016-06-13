@@ -30,10 +30,6 @@ export NOGCOVR=1
 ulimit -c unlimited
 make clean
 make
-make $UNITTEST_MAKE_FLAG test || {
-	if [[ "$UNITTEST_MAKE_FLAG" = *-k* ]]; then
-		make $UNITTEST_MAKE_FLAG test
-	fi;
-}
+make test
 
 gcovr -r $repo/src .
