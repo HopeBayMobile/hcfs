@@ -374,7 +374,7 @@ end:
 	return;
 }
 
-void HCFS_pin_path(char **json_res, char *pin_path)
+void HCFS_pin_path(char **json_res, char *pin_path, char pin_type)
 {
 	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
@@ -390,46 +390,12 @@ void HCFS_pin_path(char **json_res, char *pin_path)
 	code = PIN;
 	cmd_len = 0;
 
+	/* Pin type */
+	memcpy(&buf[0], &pin_type, sizeof(char));
+	cmd_len += sizeof(char);
+
 	/* Append paths to socket msg */
 	CONCAT_ARGS(pin_path);
-
-	send(fd, &code, sizeof(uint32_t), 0);
-	send(fd, &cmd_len, sizeof(uint32_t), 0);
-	send(fd, buf, cmd_len, 0);
-
-	recv(fd, &reply_len, sizeof(uint32_t), 0);
-	recv(fd, &ret_code, sizeof(int32_t), 0);
-
-	if (ret_code < 0)
-		_json_response(json_res, FALSE, -ret_code, NULL);
-	else
-		_json_response(json_res, TRUE, ret_code, NULL);
-
-	close(fd);
-}
-
-void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
-		  char *sd0_path, char *sd1_path)
-{
-	int32_t fd, status, ret_code;
-	uint32_t code, reply_len, cmd_len;
-	ssize_t str_len;
-	char buf[1000];
-
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = PIN;
-	cmd_len = 0;
-
-	/* Append paths to socket msg */
-	CONCAT_ARGS(app_path)
-	CONCAT_ARGS(data_path)
-	CONCAT_ARGS(sd0_path)
-	CONCAT_ARGS(sd1_path)
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -464,45 +430,6 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 
 	/* Append paths to socket msg */
 	CONCAT_ARGS(pin_path);
-
-	send(fd, &code, sizeof(uint32_t), 0);
-	send(fd, &cmd_len, sizeof(uint32_t), 0);
-	send(fd, buf, cmd_len, 0);
-
-	recv(fd, &reply_len, sizeof(uint32_t), 0);
-	recv(fd, &ret_code, sizeof(int32_t), 0);
-
-	if (ret_code < 0)
-		_json_response(json_res, FALSE, -ret_code, NULL);
-	else
-		_json_response(json_res, TRUE, ret_code, NULL);
-
-	close(fd);
-}
-
-
-void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
-		    char *sd0_path, char *sd1_path)
-{
-	int32_t fd, status, ret_code;
-	uint32_t code, reply_len, cmd_len;
-	ssize_t str_len;
-	char buf[1000];
-
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = UNPIN;
-	cmd_len = 0;
-
-	/* Append paths to socket msg */
-	CONCAT_ARGS(app_path)
-	CONCAT_ARGS(data_path)
-	CONCAT_ARGS(sd0_path)
-	CONCAT_ARGS(sd1_path)
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);

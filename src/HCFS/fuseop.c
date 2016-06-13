@@ -665,14 +665,14 @@ static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 	ret = lookup_pkg_status(tmptok_prev, &ispin, &issys);
 	/* Get pin st if success */
 	if (ret == 0) {
-		if (P_IS_PIN(issys)) {
-			*pin_status = TRUE;
+		if (issys == TRUE) {
+			*pin_status = P_HIGH_PRI_PIN;
 		} else {
 			if (P_IS_VALID_PIN(ispin))
 				*pin_status = (char)ispin;
 			else
 				write_log(0, "Error: Lookup pin status "
-						"is not bool\n");
+						"is not valid value\n");
 		}
 	} else {
 		write_log(4, "Pin status of pkg %s is not found\n",

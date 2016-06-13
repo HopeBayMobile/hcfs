@@ -802,6 +802,12 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 			  "cache_soft_limit + cache_delta\n");
 		return -1;
 	}
+	if (config->cache_reserved_space < config->max_block_size) {
+		write_log(0, "%s%s",
+			"cache_reserved_space must be at least max_block_size,",
+			" set to default value\n");
+		config->cache_reserved_space = DEFAULT_RESERVED_CACHE;
+	}
 
 	/* Validate that the information for the assigned backend
 		is complete. */

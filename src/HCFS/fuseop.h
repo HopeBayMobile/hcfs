@@ -92,7 +92,7 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define P_HIGH_PRI_PIN 2
 /* Marcos to check pin property */
 #define P_IS_VALID_PIN(p) (p <= 2) /* To valid pin property */
-#define P_IS_PIN(p) (p != P_UNPIN)
+#define P_IS_PIN(p) ((p == P_PIN) || (p == P_HIGH_PRI_PIN))
 #define P_IS_UNPIN(p) (p == P_UNPIN)
 
 #ifdef _ANDROID_ENV_

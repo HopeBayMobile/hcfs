@@ -18,6 +18,7 @@
 #include "pthread.h"
 #include "inttypes.h"
 
+int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config);
 int32_t init_hfuse(void);
 int32_t init_hcfs_system_data(void);
 int32_t sync_hcfs_system_data(char need_lock);

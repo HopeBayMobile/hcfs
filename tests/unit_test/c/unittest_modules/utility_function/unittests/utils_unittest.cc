@@ -514,6 +514,7 @@ TEST_F(read_system_configTest, GoodConfig) {
   EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
   EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
   EXPECT_EQ(CACHE_DELTA, 10485760);
+  EXPECT_EQ(RESERVED_CACHE_SPACE, 53687091);
   EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
   EXPECT_EQ(CURRENT_BACKEND, SWIFT);
   EXPECT_STREQ(SWIFT_ACCOUNT,"hopebay");
@@ -846,6 +847,20 @@ TEST_F(validate_system_configTest, MissingS3Config) {
   EXPECT_EQ(-1,validate_system_config(system_config));
   S3_PROTOCOL = tmpptr;
 
+ }
+
+TEST_F(validate_system_configTest, NoReservedCacheSection) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_no_reserved_section.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
+
+  ASSERT_EQ(0,validate_system_config(system_config));
+
+  EXPECT_EQ(RESERVED_CACHE_SPACE, DEFAULT_RESERVED_CACHE);
  }
 /* End of the test case for the function validate_system_config*/
 

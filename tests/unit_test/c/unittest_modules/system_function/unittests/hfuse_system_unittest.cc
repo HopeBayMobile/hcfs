@@ -254,3 +254,59 @@ TEST_F(mainTest, MainFunctionSuccess)
 /*
 	End of unittest of main function
  */
+/*
+        Unittest for init_cache_thresholds()
+ */
+class init_cache_thresholdsTest : public ::testing::Test {
+	protected:
+		virtual void SetUp()
+		{
+			CACHE_HARD_LIMIT = 0;
+			RESERVED_CACHE_SPACE = 0;
+		}
+};
+
+TEST_F(init_cache_thresholdsTest, Successful)
+{
+	int32_t ret;
+
+	CACHE_HARD_LIMIT = 100;
+	RESERVED_CACHE_SPACE = 100;
+	ret = init_cache_thresholds(system_config);
+
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(GET_CACHE_LIMIT(P_UNPIN), CACHE_HARD_LIMIT);
+	EXPECT_EQ(GET_PINNED_LIMIT(P_UNPIN), 0);
+	EXPECT_EQ(GET_CACHE_LIMIT(P_PIN), CACHE_HARD_LIMIT);
+	EXPECT_EQ(GET_PINNED_LIMIT(P_PIN), MAX_PINNED_LIMIT);
+	EXPECT_EQ(GET_CACHE_LIMIT(P_HIGH_PRI_PIN),
+			CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE);
+	EXPECT_EQ(GET_PINNED_LIMIT(P_HIGH_PRI_PIN),
+			MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE);
+}
+
+TEST_F(init_cache_thresholdsTest, ErrCacheHardLimit)
+{
+	int32_t ret;
+
+	CACHE_HARD_LIMIT = -1;
+	RESERVED_CACHE_SPACE = 100;
+	ret = init_cache_thresholds(system_config);
+
+	EXPECT_EQ(ret, -EINVAL);
+}
+
+TEST_F(init_cache_thresholdsTest, ErrReservedCacheSpace)
+{
+	int32_t ret;
+
+	CACHE_HARD_LIMIT = 100;
+	RESERVED_CACHE_SPACE = -1;
+	ret = init_cache_thresholds(system_config);
+
+	EXPECT_EQ(ret, -EINVAL);
+}
+
+/*
+        End of unittest of init_cache_thresholds()
+ */

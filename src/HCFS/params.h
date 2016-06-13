@@ -16,6 +16,7 @@
 
 /* cache limit parameters */
 #define NUM_PIN_TYPES 3
+#define DEFAULT_RESERVED_CACHE 536870912
 #define RESERVED_CACHE_SPACE system_config->cache_reserved_space
 #define GET_CACHE_LIMIT(p) (system_config->max_cache_limit[(int32_t)p])
 #define GET_PINNED_LIMIT(p) (system_config->max_pinned_limit[(int32_t)p])

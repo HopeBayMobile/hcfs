@@ -201,11 +201,15 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
 	int64_t total_size = 0;
 	char inode_array[sizeof(ino_t) * 5];
 	char path[400];
+	char pin_type;
 	ssize_t path_len;
 	ino_t tmp_inode;
 
 	num_inodes = 0;
 	msg_len = 0;
+
+	memcpy(&pin_type, &(buf[msg_len]), sizeof(char));
+	msg_len += sizeof(char);
 
 	while (msg_len < arg_len) {
 		path_len = 0;
@@ -225,7 +229,7 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
 		num_inodes += 1;
 	}
 
-	ret_code = _pin_by_inode(total_size, 2, num_inodes, inode_array);
+	ret_code = _pin_by_inode(total_size, pin_type, num_inodes, inode_array);
 
 	return ret_code;
 
