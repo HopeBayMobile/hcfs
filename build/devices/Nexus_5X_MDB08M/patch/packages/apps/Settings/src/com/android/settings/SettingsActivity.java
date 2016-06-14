@@ -136,8 +136,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.android.settings.dashboard.DashboardTile.TILE_ID_UNDEFINED;
-
 public class SettingsActivity extends Activity
         implements PreferenceManager.OnPreferenceTreeClickListener,
         PreferenceFragment.OnPreferenceStartFragmentCallback,
