@@ -15,8 +15,24 @@ Known Issues / Limitations / Features to be Implemented
 v 2.2.1.
 =====
 ## New Features
+  - Atomic upload android
+    1. atomic upload(robust data integrity during file changing)
+    2. able to resume file sync after disconnection (!204)
+  - Pause cache management (!387)
+  - Add Tera feature to Settings app
+    1. Support launch Tera management app by Settings app
+    2. Support show cloud storage usage in Settings app (!400)
+
+## Fixes
+  - Fix readdir issue (!374)
+  - Fix unittest no init sem issue (!398)
+  - Fix status inconsistency in read/write (!394)
+  - Fix image build failure (!399)
 
 ## CI / Refactoring
+  - Auto build nexus 5x (!389)(!391)(!393)(!397)
+  - Reviewing API (!388)
+  - Update version num format (!375)
 
 v 2.2.1.0675 (release2.2.1_base)
 =====
