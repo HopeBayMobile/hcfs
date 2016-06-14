@@ -49,7 +49,7 @@ endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest atomic_tocloud_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
@@ -179,3 +179,21 @@ clouddelete_mock_function.o : $(UNITTEST_DIR)/clouddelete_mock_function.c
 
 hcfs_clouddelete_unittest : clouddelete_mock_function.o hcfs_clouddelete.o hcfs_clouddelete_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# atomic_tocloud_unittest
+atomic_tocloud.o : $(USER_DIR)/atomic_tocloud.c $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/atomic_tocloud.c
+
+atomic_tocloud_mock_function.o : $(UNITTEST_DIR)/atomic_tocloud_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/atomic_tocloud_mock_function.c
+
+atomic_tocloud_unittest.o : $(UNITTEST_DIR)/atomic_tocloud_unittest.cc \
+                      $(USER_DIR)/hcfs_tocloud.h $(USER_DIR)/hcfs_tocloud.c \
+		      $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/atomic_tocloud_unittest.cc
+
+atomic_tocloud_unittest : atomic_tocloud_mock_function.o atomic_tocloud.o \
+	atomic_tocloud_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+

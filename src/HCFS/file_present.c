@@ -219,6 +219,13 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
 	/* Get old meta size before adding new entry */
 	meta_cache_get_meta_size(body_ptr, &old_metasize);
 
@@ -253,7 +260,8 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
-        this_meta.source_arch = ARCH_CODE;
+        this_meta.finished_seq = 0;
+	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.local_pin = ispin;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
@@ -376,6 +384,10 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
 	meta_cache_get_meta_size(body_ptr, &old_metasize);
 
 	/* Add parent to lookup db */
@@ -419,6 +431,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
+	this_meta.finished_seq = 0;
 	this_meta.local_pin = ispin;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
 		selfname, ispin == TRUE? "PIN" : "UNPIN");
@@ -541,6 +554,10 @@ int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	parent_ptr = meta_cache_lock_entry(parent_inode);
 	if (parent_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = update_meta_seq(parent_ptr);
+	if (ret_val < 0)
+		goto error_handling;
 
 	self_ptr = meta_cache_lock_entry(this_inode);
 	if (self_ptr == NULL)
@@ -677,6 +694,7 @@ int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
+	/* Get meta and check whether it is empty */
 	body_ptr = meta_cache_lock_entry(this_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
@@ -710,13 +728,19 @@ int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
+	ret_val = update_meta_seq(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
 		return ret_val;
 	}
 	ret_val = meta_cache_unlock_entry(body_ptr);
-
 	if (ret_val < 0)
 		return ret_val;
 
@@ -820,6 +844,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.metaver = CURRENT_META_VER;
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
+	symlink_meta.finished_seq = 0;
 	symlink_meta.local_pin = ispin;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
@@ -869,7 +894,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		write_log(0, "Error: inode %"PRIu64" fails to inherit"
 				" xattrs from parent inode %"PRIu64".\n",
 				(uint64_t)self_inode, (uint64_t)parent_inode);
-	
+
 	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
 	if (!parent_meta_cache_entry) {
 		meta_cache_close_file(self_meta_cache_entry);
@@ -1435,5 +1460,151 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 	}
 
 	return 0;
+}
+
+/**
+ * Set uploading data in meta cache.
+ *
+ * This function aims to clone meta file and set uploading info in meta cache.
+ * If is_uploading is TRUE, then:
+ *   Case 1: Copy local meta to to-upload meta if NOT revert mode
+ *   Case 2: Open progress file and read # of to-upload blocks
+ *   - Finally set uploading info in meta cache.
+ * else, if is_uploading is FALSE, then:
+ *   - Set uploading info in meta cache.
+ *   - Update upload_seq if finish_sync is TRUE.
+ *
+ * @param data Uploading info
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
+{
+	int32_t ret;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	char toupload_metapath[300], local_metapath[300];
+	PROGRESS_META progress_meta;
+	struct stat tmpstat;
+	int32_t errcode;
+	ssize_t ret_ssize;
+	int64_t toupload_blocks;
+
+	meta_cache_entry = NULL;
+	meta_cache_entry = meta_cache_lock_entry(data->inode);
+	if (!meta_cache_entry) {
+		write_log(0, "Fail to lock meta cache entry in %s\n", __func__);
+		return -ENOMEM;
+	}
+	ret = meta_cache_open_file(meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+
+	/* Copy meta if need to upload and is not reverting mode */
+	if (data->is_uploading == TRUE) {
+
+		/* Read toupload_blocks in reverting/continuing mode */
+		if (data->is_revert == TRUE) {
+			flock(data->progress_list_fd, LOCK_EX);
+			PREAD(data->progress_list_fd, &progress_meta,
+					sizeof(PROGRESS_META), 0);
+			flock(data->progress_list_fd, LOCK_UN);
+			toupload_blocks = progress_meta.total_toupload_blocks;
+
+		/* clone meta and record # of toupload_blocks */
+		} else {
+			fetch_meta_path(local_metapath, data->inode);
+			ret = access(local_metapath, F_OK);
+			if (ret < 0) {
+				write_log(2, "meta %"PRIu64" not exist. Code %d in %s\n",
+						(uint64_t)data->inode, ret, __func__);
+				errcode = ret;
+				goto errcode_handle;
+			}
+
+			fetch_toupload_meta_path(toupload_metapath,
+					data->inode);
+			if (access(toupload_metapath, F_OK) == 0) {
+				write_log(2, "Cannot copy since "
+						"%s exists", toupload_metapath);
+				unlink(toupload_metapath);
+			}
+			ret = check_and_copy_file(local_metapath,
+					toupload_metapath, FALSE, FALSE);
+			if (ret < 0) {
+				meta_cache_close_file(meta_cache_entry);
+				meta_cache_unlock_entry(meta_cache_entry);
+				return ret;
+			}
+
+			ret = meta_cache_lookup_file_data(data->inode, &tmpstat,
+					NULL, NULL, 0, meta_cache_entry);
+			if (ret < 0) {
+				meta_cache_close_file(meta_cache_entry);
+				meta_cache_unlock_entry(meta_cache_entry);
+				return ret;
+			}
+
+			/* Update info of to-upload blocks and size */
+			if (S_ISREG(tmpstat.st_mode)) {
+				flock(data->progress_list_fd, LOCK_EX);
+				PREAD(data->progress_list_fd, &progress_meta,
+						sizeof(PROGRESS_META), 0);
+				progress_meta.toupload_size = tmpstat.st_size;
+				toupload_blocks = (tmpstat.st_size == 0) ?
+						0 : (tmpstat.st_size - 1) /
+						MAX_BLOCK_SIZE + 1;
+				progress_meta.total_toupload_blocks =
+						toupload_blocks;
+				PWRITE(data->progress_list_fd, &progress_meta,
+						sizeof(PROGRESS_META), 0);
+				flock(data->progress_list_fd, LOCK_UN);
+
+				write_log(10, "Debug: toupload_size %lld,"
+					" total_toupload_blocks %lld\n",
+					progress_meta.toupload_size,
+					progress_meta.total_toupload_blocks);
+
+			} else {
+				toupload_blocks = 0;
+			}
+		}
+	}
+
+	/* Set uploading information */
+	if (data->is_uploading == TRUE) {
+		ret = meta_cache_set_uploading_info(meta_cache_entry,
+			TRUE, data->progress_list_fd,
+			toupload_blocks);
+	} else {
+		ret = meta_cache_set_uploading_info(meta_cache_entry,
+			FALSE, 0, 0);
+	}
+	if (ret < 0) {
+		write_log(0, "Fail to set uploading info in %s\n", __func__);
+		meta_cache_close_file(meta_cache_entry);
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+
+	/* Unlock meta cache */
+	ret = meta_cache_close_file(meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+	ret = meta_cache_unlock_entry(meta_cache_entry);
+	if (ret < 0) {
+		write_log(0, "Fail to unlock entry in %s\n", __func__);
+		return ret;
+	}
+
+	return 0;
+
+errcode_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return errcode;
 }
 

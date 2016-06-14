@@ -8,6 +8,7 @@
 *
 * Revision History
 * 2015/2/16 Jiahong added header for this file, and revising coding style.
+* 2016/1/6 Kewei Add flag of continuing uploading.
 *
 **************************************************************************/
 #ifndef GW20_HCFS_HCFS_TOCLOUD_H_
@@ -34,9 +35,12 @@ typedef struct {
 	int64_t page_entry_index;
 	ino_t inode;
 	int64_t blockno;
+	int64_t seq;
 	char is_block;
 	char is_delete;
+	char backend_delete_type; /* FALSE, TOUPLOAD_BLOCKS, BACKEND_BLOCKS */
 	int32_t which_curl;
+	int32_t progress_fd;
 	char tempfilename[400];
 	int32_t which_index;
 #if (DEDUP_ENABLE)
@@ -50,6 +54,8 @@ typedef struct {
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
+	int32_t progress_fd;
+	char is_revert;
 	int32_t which_index;
 } SYNC_THREAD_TYPE;
 
@@ -74,10 +80,29 @@ typedef struct {
 	sem_t sync_queue_sem; /*similar to upload_queue_sem*/
 	pthread_t sync_handler_thread;
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
-	ino_t threads_in_use[MAX_SYNC_CONCURRENCY];
-	char threads_created[MAX_SYNC_CONCURRENCY];
-	char threads_finished[MAX_SYNC_CONCURRENCY];
-	char threads_error[MAX_SYNC_CONCURRENCY];
+
+	ino_t threads_in_use[MAX_SYNC_CONCURRENCY]; /* Now syncing inode */
+
+	int32_t progress_fd[MAX_SYNC_CONCURRENCY]; /* File descriptor of uploading
+						  progress file */
+
+	char threads_created[MAX_SYNC_CONCURRENCY]; /* This thread is created */
+
+	char threads_finished[MAX_SYNC_CONCURRENCY]; /* This thread finished
+							uploading, and it can be
+							reclaimed */
+
+	char threads_error[MAX_SYNC_CONCURRENCY]; /* When error occur, cancel
+						     uploading this time */
+
+	BOOL is_revert[MAX_SYNC_CONCURRENCY]; /* Check whether syncing this time
+						 keeps going syncing last
+						 time of given uploaded inode */
+
+	BOOL continue_nexttime[MAX_SYNC_CONCURRENCY]; /* When disconnection or
+							system going down,
+							continue uploading
+							next time */
 	int32_t total_active_sync_threads;
 	/*sync threads: used for syncing meta/block in a single inode*/
 } SYNC_THREAD_CONTROL;
@@ -96,7 +121,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
 		  uint8_t *hash_in_meta);
 #else
-		  CURL_HANDLE *curl_handle, char *filename);
+		  int64_t seq, CURL_HANDLE *curl_handle, char *filename);
 #endif
 
 int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
@@ -109,7 +134,7 @@ void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
 int32_t dispatch_upload_block(int32_t which_curl);
 void dispatch_delete_block(int32_t which_curl);
-int32_t schedule_sync_meta(FILE *metafptr, int32_t which_curl);
+int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 #ifdef _ANDROID_ENV_
@@ -119,4 +144,15 @@ void upload_loop(void);
 #endif
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta);
+
+int32_t select_upload_thread(char is_block, char is_delete,
+#if (DEDUP_ENABLE)
+		char is_upload,
+		uint8_t old_obj_id[],
+#endif
+		ino_t this_inode, int64_t block_count,
+		int64_t seq, off_t page_pos,
+		int64_t e_index, int32_t progress_fd,
+		char backend_delete_type);
+int32_t unlink_upload_file(char *filename);
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_clouddelete.h
 * Abstract: The c header file for deleting meta or data from
@@ -29,6 +29,7 @@
 typedef struct {
 	ino_t inode;
 	int64_t blockno;
+	int64_t seq;
 #if (DEDUP_ENABLE)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
@@ -77,7 +78,7 @@ typedef struct {
 DELETE_THREAD_CONTROL delete_ctl;
 DSYNC_THREAD_CONTROL dsync_ctl;
 
-int32_t do_block_delete(ino_t this_inode, int64_t block_no,
+int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #if (DEDUP_ENABLE)
 		    uint8_t *obj_id,
 #endif

@@ -949,7 +949,7 @@ void api_module(void *index)
 
 		msg_index = 0;
 		while (TRUE) {
-			if (msg_len >= arg_len)
+			if ((uint32_t)msg_len >= arg_len)
 				break;
 			if ((arg_len - msg_len) > 1024)
 				to_recv = 1024;
@@ -960,10 +960,10 @@ void api_module(void *index)
 			if (size_msg <= 0)
 				break;
 			msg_len += size_msg;
-			if (msg_len >= arg_len)
+			if ((uint32_t)msg_len >= arg_len)
 				break;
 		}
-		if (msg_len < arg_len) {
+		if ((uint32_t)msg_len < arg_len) {
 			/* Error reading arguments. Return EINVAL. */
 			write_log(5, "Error when reading API arguments\n");
 			retcode = EINVAL;

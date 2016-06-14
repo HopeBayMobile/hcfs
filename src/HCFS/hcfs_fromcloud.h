@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_fromcloud.h
 * Abstract: The c header file for retrieving meta or data from backend.
@@ -28,10 +28,12 @@
 #define MAX_PIN_DL_CONCURRENCY ((MAX_DOWNLOAD_CURL_HANDLE) / 2)
 #define READ_BLOCK 0
 #define PIN_BLOCK 1
+#define FETCH_FILE_META 2
 
 typedef struct {
 	ino_t this_inode;
 	int64_t block_no;
+	int64_t seqnum;
 	off_t page_start_fpos;
 	int32_t entry_index;
 } PREFETCH_STRUCT_TYPE;
@@ -39,6 +41,7 @@ typedef struct {
 typedef struct {
 	ino_t this_inode;
 	int64_t block_no;
+	int64_t seqnum;
 	off_t page_pos;
 	char dl_error;
 	char active;
@@ -64,12 +67,7 @@ DOWNLOAD_USERMETA_CTL download_usermeta_ctl;
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int32_t fetch_from_cloud(FILE *fptr, char action_from,
-#if (DEDUP_ENABLE)
-		uint8_t *obj_id);
-#else
-		ino_t this_inode, int64_t block_no);
-#endif
+int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname);
 
 void download_block_manager();
 int32_t init_download_control();

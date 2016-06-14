@@ -123,8 +123,8 @@ function setup_ssh_key() {
 	fi
 	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
 		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
-	check-ssh-agent || export SSH_AUTH_SOCK=~/.tmp/ssh-agent.sock
-	check-ssh-agent || eval "$(mkdir -p ~/.tmp && ssh-agent -s -a ~/.tmp/ssh-agent.sock)" > /dev/null
+	check-ssh-agent || export SSH_AUTH_SOCK=$repo/tmp/ssh-agent.sock
+	check-ssh-agent || eval "$(mkdir -p $repo/tmp && ssh-agent -s -a $repo/tmp/ssh-agent.sock)" > /dev/null
 	ssh-add ~/.ssh/id_rsa
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
@@ -188,15 +188,9 @@ function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	service rpcbind start || :
 	if ! mount  | grep 'nas:/ubuntu on /mnt/nas'; then
-		umount /mnt/nas || :
 		mkdir -p /mnt/nas
-		mount nas:/ubuntu /mnt/nas
+		mount nas:/ubuntu /mnt/nas || :
 	fi
-}
-
-function unmount_nas() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	umount /mnt/nas
 }
 
 

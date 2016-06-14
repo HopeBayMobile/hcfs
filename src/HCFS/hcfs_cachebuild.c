@@ -292,10 +292,10 @@ int32_t build_cache_usage(void)
 			closedir(dirptr);
 			continue;
 		}
-		write_log(10, "count is now %d\n", count);
+	//	write_log(10, "count is now %d\n", count);
 
 		while (direntptr != NULL) {
-			write_log(10, "count is now %d\n", count);
+	//		write_log(10, "count is now %d\n", count);
 			write_log(10, "Scanning file name %s\n",
 			          temp_dirent.d_name);
 			if (hcfs_system->system_going_down == TRUE)
@@ -337,7 +337,7 @@ int32_t build_cache_usage(void)
 			}
 
 			write_log(10, "Fetching cache usage node\n");
-			write_log(10, "count is now %d\n", count);
+//			write_log(10, "count is now %d\n", count);
 			tempnode = return_cache_usage_node(this_inode);
 			if (tempnode == NULL) {
 				write_log(10, "Not found. Alloc a new one\n");
@@ -367,14 +367,14 @@ int32_t build_cache_usage(void)
 							tempstat.st_size;
 
 			write_log(10, "Inserting the node\n");
-			write_log(10, "count is now %d\n", count);
+//			write_log(10, "count is now %d\n", count);
 			insert_cache_usage_node(this_inode, tempnode);
 			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
 			if (ret > 0) {
 				errcode = ret;
 				break;
 			}
-			write_log(10, "count is now %d\n", count);
+//			write_log(10, "count is now %d\n", count);
 		}
 
 		if (errcode > 0) {

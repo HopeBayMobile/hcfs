@@ -84,6 +84,8 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define MTIME 2
 #define CTIME 1
 
+#define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
+
 #ifdef _ANDROID_ENV_
 #define  IS_ANDROID_EXTERNAL(type) (((type) == (ANDROID_EXTERNAL)) || \
 		((type) == (ANDROID_MULTIEXTERNAL)))
@@ -108,6 +110,7 @@ typedef struct {
 	uint8_t source_arch;
 	uint64_t metaver;
 	ino_t root_inode;
+	int64_t finished_seq;
 	char local_pin;
 } DIR_META_TYPE;
 
@@ -135,6 +138,7 @@ typedef struct {
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
 	uint32_t paged_out_count;
+	int64_t seqnum;
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
@@ -160,6 +164,7 @@ typedef struct {
         uint8_t source_arch;
 	uint64_t metaver;
 	ino_t root_inode;
+	int64_t finished_seq;
 	char local_pin;
 } FILE_META_TYPE;
 
@@ -180,6 +185,7 @@ typedef struct {
         uint8_t source_arch;
 	uint64_t metaver;
 	ino_t root_inode;
+	int64_t finished_seq;
 	char local_pin;
 } SYMLINK_META_TYPE;
 

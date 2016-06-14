@@ -54,8 +54,11 @@ OBJS_F := objmeta.o \
 	pin_scheduling.o \
 	monitor.o \
 	dir_statistics.o \
-	do_fallocate.o \
 	parent_lookup.o \
+	atomic_tocloud.o \
+	tocloud_tools.o \
+	do_fallocate.o \
+	fuseproc_comm.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <curl/curl.h>
 #include <semaphore.h>
+#include <inttypes.h>
 #include <jansson.h>
 #include "hcfscurl.h"
 #include "mock_params.h"
@@ -167,6 +168,13 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		int64_t target_page, int64_t hint_page)
 {
 	return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+}
+
+void fetch_backend_block_objname(char *objname, ino_t inode,
+		long long block_no, long long seqnum)
+{
+	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
+	return;
 }
 
 void json_delete(json_t *json)

@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_fromcloud.c
 * Abstract: The c source code file for retrieving meta or data from
@@ -49,14 +49,8 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int32_t fetch_from_cloud(FILE *fptr, char action_from,
-#if (DEDUP_ENABLE)
-		     uint8_t *obj_id)
-#else
-		     ino_t this_inode, int64_t block_no)
-#endif
+int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
-	char objname[1000];
 #if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
 #endif
@@ -71,15 +65,8 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from,
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
 
-#if (DEDUP_ENABLE)
-	/* Get objname by obj_id */
-	obj_id_to_string(obj_id, obj_id_str);
-	sprintf(objname, "data_%s", obj_id_str);
-#else
-	sprintf(objname, "data_%" PRIu64 "_%" PRId64, (uint64_t)this_inode, block_no);
-#endif
-
-	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
+	/* Get sem if action is from pinning file or from download meta. */
+	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
 		sem_wait(&pin_download_curl_sem);
 	sem_wait(&download_curl_sem);
 	sem_wait(&download_curl_control_sem);
@@ -118,7 +105,14 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from,
 	if ((status >= 200) && (status <= 299)) {
 		errcode = 0;
 	} else {
-		errcode = -EIO;
+		if (status == 404) {
+			errcode = -ENOENT;
+			write_log(5, "Object %s not found\n", objname);
+		} else {
+			write_log(4, "Warn: http code %d when get %s\n", status,
+				objname);
+			errcode = -EIO;
+		}
 		free_object_meta(object_meta);
 		fclose(get_fptr);
 		goto errcode_handle;
@@ -159,7 +153,9 @@ errcode_handle:
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
-	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
+
+	/*Release sem if action from pinning file*/
+	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
 		sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
@@ -183,6 +179,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	FILE *metafptr;
 	FILE *blockfptr;
 	char thisblockpath[400];
+	char objname[1000];
 	char thismetapath[METAPATHLEN];
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t entry_index;
@@ -245,13 +242,15 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
+
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-			temppage.block_entries[entry_index].obj_id);
+		fetch_backend_block_objname(objname,
+				temppage.block_entries[entry_index].obj_id);
 #else
-		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-			ptr->this_inode, ptr->block_no);
+		fetch_backend_block_objname(objname, ptr->this_inode,
+				ptr->block_no, ptr->seqnum);
 #endif
+		ret = fetch_from_cloud(blockfptr, READ_BLOCK, objname);
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;
@@ -263,14 +262,19 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 		FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 		if (stat(thisblockpath, &tempstat) == 0) {
-			(temppage).block_entries[entry_index].status = ST_BOTH;
-			ret = set_block_dirty_status(NULL, blockfptr, FALSE);
-			if (ret < 0) {
-				goto errcode_handle;
+			if ((temppage).block_entries[entry_index].status ==
+					ST_CtoL) {
+				(temppage).block_entries[entry_index].status =
+						ST_BOTH;
+				ret = set_block_dirty_status(NULL,
+						blockfptr, FALSE);
+				if (ret < 0) {
+					goto errcode_handle;
+				}
+				FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
+				FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
+						metafptr);
 			}
-			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
-			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
-			       metafptr);
 			ret = update_file_stats(metafptr, 0, 1,
 						tempstat.st_size,
 						0, ptr->this_inode);
@@ -312,7 +316,6 @@ errcode_handle:
 		fclose(metafptr);
 	free(ptr);
 }
-
 
 int32_t init_download_control()
 {
@@ -510,6 +513,7 @@ static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 void fetch_backend_block(void *ptr)
 {
 	char block_path[400];
+	char objname[600];
 	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
 	int32_t ret;
@@ -561,8 +565,9 @@ void fetch_backend_block(void *ptr)
 	}
 
 	/* Fetch block from cloud */
-	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, block_info->this_inode,
-						block_info->block_no);
+	fetch_backend_block_objname(objname, block_info->this_inode,
+			block_info->block_no, block_info->seqnum);
+	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;
@@ -702,6 +707,7 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 		which_th = _select_thread();
 		download_thread_ctl.block_info[which_th].this_inode = inode;
 		download_thread_ctl.block_info[which_th].block_no = blkno;
+		download_thread_ctl.block_info[which_th].seqnum = temp_entry->seqnum;
 		download_thread_ctl.block_info[which_th].page_pos = page_pos;
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;

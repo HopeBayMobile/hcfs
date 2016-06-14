@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: meta_mem_cache.h
 * Abstract: The c header file for meta cache operations in HCFS.
@@ -23,7 +23,7 @@ after several seconds). */
 /* A hard limit defines the upper bound on the number of entries
 	(or mem used?) */
 /* Dynamically allocate memory and release memory when not being used
-	for a long time (controlled by a parameter) */
+	for a int64_t time (controlled by a parameter) */
 
 /* Will keep cache entry even after file is closed, until expired or need
 	to be replaced */
@@ -57,7 +57,7 @@ has to wait for the completion of the other. This is to ensure the
 atomic completion of adding and deleting cache entries.
 If deleting cache entry, will need to acquire both the header lock and
 the entry lock before proceeding. If cache entry lock cannot be acquired
-immediately, should release header lock and sleep for a short time, or skip
+immediately, should release header lock and sleep for a int16_t time, or skip
 to other entries.
 */
 
@@ -69,6 +69,14 @@ to other entries.
 #include <inttypes.h>
 
 #include "fuseop.h"
+
+/* Structure UPLOADING_INFO includes some information used to 
+check whether this inode is now uploading or not */
+typedef struct {
+	char is_uploading; /* TRUE or FALSE */
+	int32_t progress_list_fd;
+	int64_t toupload_blocks;
+} UPLOADING_INFO;
 
 typedef struct {
 	struct stat this_stat;
@@ -95,6 +103,15 @@ typedef struct {
 	/*TODO: Need to think whether system clock change could affect the
 	involved operations*/
 	struct timeval last_access_time;
+	UPLOADING_INFO uploading_info; /* Only in memory */
+	BOOL can_be_synced_cloud_later; /* This is always false unless calling
+					   meta_cache_sync_later() before 
+					   meta_cache_update_xxx(). This flag
+					   is used to avoid inode to be pushed
+					   into dirty list in meta_cache_update
+					   and flush_single_entry(). It will be
+					   set to false in flush_single_entry().
+					   */
 } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {
@@ -162,5 +179,13 @@ int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int32_t meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int32_t expire_meta_mem_cache_entry(void);
+
+int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char is_now_uploading, int32_t new_fd, int64_t toupload_blocks);
+
+int32_t meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr);
+
+int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
+	int64_t bindex, int64_t seq);
 
 #endif  /* GW20_HCFS_META_MEM_CACHE_H_ */

@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: meta_mem_cache.c
 * Abstract: The c source code file for meta cache operations in HCFS.
@@ -21,6 +21,7 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "params.h"
@@ -29,6 +30,7 @@
 #include "macro.h"
 #include "logger.h"
 #include "utils.h"
+#include "atomic_tocloud.h"
 
 /* If cache lock not locked, return -EINVAL*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
@@ -69,6 +71,11 @@ static inline int32_t _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
 	return 0;
 errcode_handle:
 	return errcode;
+}
+
+inline char is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return body_ptr->uploading_info.is_uploading;
 }
 
 /**
@@ -415,11 +422,16 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 		get pushed to cloud */
 	/* TODO: May need to simply this so that only dirty status in super
 		inode is updated */
-	ret = super_block_update_stat(body_ptr->inode_num,
+	if (body_ptr->can_be_synced_cloud_later == TRUE) { /* Skip sync */
+		body_ptr->can_be_synced_cloud_later = FALSE;
+
+	} else {
+		ret = super_block_update_stat(body_ptr->inode_num,
 				&(body_ptr->this_stat));
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	}
 
 	body_ptr->something_dirty = FALSE;
@@ -1089,7 +1101,7 @@ int32_t meta_cache_remove(ino_t this_inode)
 	}
 
 /*Lock body*/
-/*TODO: May need to add checkpoint here so that long sem wait will
+/*TODO: May need to add checkpoint here so that int64_t sem wait will
 	free all locks*/
 
 	sem_wait(&((current_ptr->body).access_sem));
@@ -1374,7 +1386,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		break;
 	}
 	/*Lock body*/
-	/*TODO: May need to add checkpoint here so that long sem wait
+	/*TODO: May need to add checkpoint here so that int64_t sem wait
 		will free all locks*/
 	result_ptr = &(current_ptr->body);
 
@@ -1593,4 +1605,155 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat
 errcode_handle:
 	meta_cache_close_file(body_ptr);
 	return errcode;
+}
+
+/**
+ * Set info about inode uploading
+ *
+ * Set uploading information used when updating data or meta. If inode
+ * is now uploading, then "copy on upload" for those updated-blocks so that
+ * we can assure the data is consistency on backend.
+ *
+ * @return 0 for succeeding in setting info, otherwise -1 on error.
+ */
+int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (body_ptr->uploading_info.is_uploading == is_now_uploading) {
+		write_log(4, "Warn: Old status is the same as new one in %s\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	body_ptr->uploading_info.is_uploading = is_now_uploading;
+	body_ptr->uploading_info.progress_list_fd = new_fd;
+	body_ptr->uploading_info.toupload_blocks = toupload_blocks;
+
+	return 0;
+}
+
+/**
+ * Get info about inode uploading
+ *
+ * Get useful info about inode uploading.
+ *
+ * @return 0 on success, otherwise -1 on error.
+ */
+int32_t meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char *ret_status, int32_t *ret_fd)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (ret_status != NULL)
+		*ret_status = body_ptr->uploading_info.is_uploading;
+	if (ret_fd != NULL)
+		*ret_fd = body_ptr->uploading_info.progress_list_fd;
+
+	return 0;
+}
+
+/**
+ * meta_cache_check_uploading
+ *
+ * This function is used to check if this file is now uploading.
+ * Case 1: The file is uploading and this block finish upload,
+ *         so just do nothing.
+ * Case 2: The file is uploading and this block does NOT be uploaded,
+ *         so try to copy this block to to-upload block.
+ * Case 3: The file is not uploading, so do nothing and return;
+ *
+ * @param body_ptr This meta cache entry.
+ * @param inode This inode to check if it is now uploading.
+ * @param bindex Block index of this inode.
+ * @param seq Sequence number of this block
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
+int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
+	int64_t bindex, int64_t seq)
+{
+	char toupload_bpath[500], local_bpath[500], objname[500];
+	char inode_uploading;
+	int32_t progress_fd;
+	int32_t ret;
+
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	inode_uploading = body_ptr->uploading_info.is_uploading;
+	progress_fd = body_ptr->uploading_info.progress_list_fd;
+
+	/* Return directly when inode is not uploading */
+	if (inode_uploading == FALSE) {
+		return 0;
+
+	} else {
+
+		/* Do nothing when block index + 1 more than # of blocks
+		 * of to-upload data */
+		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
+			write_log(10, "Debug: Check if block_%"PRIu64
+				"_%lld was uploaded in %s, but # of to-upload "
+				"blocks is %lld\n", (uint64_t)inode, bindex,
+				__func__, body_ptr->uploading_info.toupload_blocks);
+			return 0;
+		}
+
+		if (progress_fd <= 0) {
+			write_log(0, "Error: fd error of inode %"PRIu64" in %s\n",
+					(uint64_t)inode, __func__);
+			return -EIO;
+		}
+
+		/* Check if this block finished uploading */
+		if (block_finish_uploading(progress_fd, bindex) == TRUE)
+			return 0;
+
+		fetch_block_path(local_bpath, inode, bindex);
+		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
+		fetch_backend_block_objname(objname, inode, bindex, seq);
+		write_log(10, "Debug: begin to copy block, obj is %s", objname);
+		ret = check_and_copy_file(local_bpath, toupload_bpath,
+				TRUE, TRUE);
+		if (ret < 0) {
+			/* -EEXIST means target had been copied, and -ENOENT
+			 * means src file is deleted. */
+			if (ret == -EEXIST || ret == -ENOENT) {
+				write_log(10, "Debug: block_%"PRIu64"_%lld had"
+					" been copied in %s\n", (uint64_t)inode,
+					bindex, __func__);
+				return 0;
+			} else if (ret == -ENOSPC) {
+				write_log(4, "Warn: Fail to copy %s"
+					" because of no space\n", objname);
+				return ret;
+
+			} else {
+				write_log(0, "Error: Copy block error in %s. "
+					"Code %d\n", __func__, -ret);
+				return ret;
+			}
+		}
+		return 0;
+	}
+}
+
+/**
+ * meta_cache_sync_later
+ *
+ * Set can_be_synced_cloud_later flag on so that this inode will not
+ * be marked as dirty after update meta cache data next time. The flag
+ * will be set as FALSE in flush_single_entry().
+ *
+ * @param body_ptr Meta cache entry of this inode.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */ 
+int32_t meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	body_ptr->can_be_synced_cloud_later = TRUE;
+	return 0;
 }

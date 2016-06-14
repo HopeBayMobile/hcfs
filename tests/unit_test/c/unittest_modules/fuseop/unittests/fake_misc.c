@@ -5,7 +5,7 @@
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
-
+#include <inttypes.h>
 #include <stdarg.h>
 #include <fuse/fuse_lowlevel.h>
 
@@ -16,6 +16,7 @@
 #include "global.h"
 #include "mount_manager.h"
 #include "dir_statistics.h"
+#include "atomic_tocloud.h"
 
 #include "fake_misc.h"
 
@@ -362,11 +363,15 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	return 0;
 }
-int32_t fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
-		int64_t block_no)
+int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
 	char tempbuf[1024];
-	int32_t tmp_len;
+	int tmp_len;
+	ino_t this_inode;
+	long long block_no, seqnum;
+
+	sscanf(objname, "data_%"PRIu64"_%lld_%lld",
+			(uint64_t *)&this_inode, &block_no, &seqnum);
 
 	switch (this_inode) {
 	case 14:
@@ -431,12 +436,12 @@ int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, uint64_t *ge
 		inode_stat->st_ino = 4;
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
-		break;	
+		break;
 	case 6:
 		inode_stat->st_ino = 6;
 		inode_stat->st_mode = S_IFDIR | 0700;
 		inode_stat->st_atime = 100000;
-		break;	
+		break;
 	case 10:
 		inode_stat->st_ino = 10;
 		inode_stat->st_mode = S_IFREG | 0700;
@@ -704,7 +709,7 @@ int32_t get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_p
 	size_t *actual_size)
 {
 	if (meta_cache_entry->inode_num == 20)
-		return -EEXIST;	
+		return -EEXIST;
 
 	if (size == 0) {
 		*actual_size = CORRECT_VALUE_SIZE;
@@ -721,7 +726,7 @@ int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	const size_t size, size_t *actual_size)
 {
 	if (meta_cache_entry->inode_num == 20)
-		return -EEXIST;	
+		return -EEXIST;
 
 	if (size == 0) {
 		*actual_size = CORRECT_VALUE_SIZE;
@@ -888,9 +893,62 @@ int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 }
 
+int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
+{
+	return 0;
+}
+
+int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
+		off_t page_fpos, long long eindex, long long bindex)
+{
+	return 0;
+}
+
 BOOL is_natural_number(char *str)
 {
 	return TRUE;
+}
+
+void fetch_backend_block_objname(char *objname,
+#if DEDUP_ENABLE
+		unsigned char *obj_id)
+#else
+	ino_t inode, long long block_no, long long seqnum)
+#endif
+{
+#if DEDUP_ENABLE
+	char obj_id_str[OBJID_STRING_LENGTH];
+
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
+#else
+	sprintf(objname, "data_%"PRIu64"_%lld_%lld",
+			(uint64_t)inode, block_no, seqnum);
+#endif
+
+	return;
+}
+
+int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr,
+		ino_t inode, int64_t bindex, int64_t seq)
+{
+	return 0;
+}
+
+int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+		char is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
+{
+	return 0;
+}
+
+int update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
+int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
+{
+	return 0;
 }
 
 int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,

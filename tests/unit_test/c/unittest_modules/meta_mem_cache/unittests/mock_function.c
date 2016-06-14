@@ -93,3 +93,30 @@ int32_t write_log(int32_t level, char *format, ...)
 	return 0;
 }
 
+char block_finish_uploading(int fd, long long blockno)
+{
+	return MOCK_FINISH_UPLOADING;
+}
+
+int fetch_toupload_block_path(char *pathname, ino_t inode,
+		long long block_no, long long seq)
+{
+	return 0;
+}
+
+void fetch_backend_block_objname(char *objname, ino_t inode,
+		long long block_no, long long seqnum)
+{
+	return 0;
+}
+
+int check_and_copy_file(const char *srcpath, const char *tarpath,
+		BOOL lock_src)
+{
+	return MOCK_RETURN_VAL;
+}
+
+int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+{
+	return 0;
+}

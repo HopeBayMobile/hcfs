@@ -64,6 +64,15 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
 int32_t set_block_dirty_status(char *path, FILE *fptr, char status);
 int32_t get_block_dirty_status(char *path, FILE *fptr, char *status);
 
+void fetch_backend_block_objname(char *objname,
+#if DEDUP_ENABLE
+	unsigned char *obj_id);
+#else
+	ino_t inode, long long block_no, long long seqnum);
+#endif
+
+void fetch_backend_meta_objname(char *objname, ino_t inode);
+
 /* Will copy the filename of ddt meta file to pathname */
 int32_t fetch_ddt_path(char *pathname, uint8_t last_char);
 

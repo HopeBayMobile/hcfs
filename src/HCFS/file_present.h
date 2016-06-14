@@ -24,6 +24,7 @@
 
 #include "meta_mem_cache.h"
 #include "xattr_ops.h"
+#include "atomic_tocloud.h"
 
 int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		uint64_t *ret_gen, char *ret_pin_status);
@@ -66,5 +67,9 @@ int32_t decrease_pinned_size(int64_t *reserved_release_size,
 
 int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size);
 int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size);
+
+int32_t update_upload_seq(META_CACHE_ENTRY_STRUCT *body_ptr);
+
+int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data);
 
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */

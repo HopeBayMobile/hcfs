@@ -60,12 +60,19 @@ int32_t disk_checkdelete(ino_t this_inode, ino_t root_inode);
 int32_t startup_finish_delete(void);
 
 int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
+
+int32_t check_page_level(int64_t page_index);
+
 int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status);
 
 int32_t collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 	int64_t *num_dir_node, ino_t **nondir_node_list,
 	int64_t *num_nondir_node);
 
+int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr);
+
+int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
+		int64_t eindex, int64_t bindex, int64_t now_seq);
 int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr);
 

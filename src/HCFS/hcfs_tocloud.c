@@ -13,6 +13,7 @@
 *           unmount.
 * 2015/6/4, 6/5 Jiahong added error handling.
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
+* 2015/2/18, Kewei finish atomic upload.
 * 2016/5/23 Jiahong added control for cache mgmt
 *
 **************************************************************************/
@@ -42,6 +43,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #ifndef _ANDROID_ENV_
 #include <attr/xattr.h>
 #endif
@@ -58,13 +60,170 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "metaops.h"
 #include "dedup_table.h"
 #include "utils.h"
+#include "atomic_tocloud.h"
 #include "hfuse_system.h"
 #include "FS_manager.h"
+#include "hcfs_fromcloud.h"
+#include "tocloud_tools.h"
 #include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
+
+/**
+ * When remove a temp file used to uplaod to backend, the file size
+ * should be considered in system size and cache size after unlink it.
+ *
+ * @param filename File path to be remove.
+ *
+ * return 0 on success. Otherwise negative error code.
+ */
+int32_t unlink_upload_file(char *filename)
+{
+	struct stat filestat;
+	int64_t filesize;
+	int32_t ret, errcode;
+
+	ret = stat(filename, &filestat);
+	if (ret == 0) {
+		filesize = filestat.st_size;
+		UNLINK(filename);
+		change_system_meta(-filesize, 0, -filesize,
+				0, 0, 0, FALSE);
+	} else {
+		int32_t errcode;
+		errcode = errno;
+		write_log(0, "Fail to stat file in %s. Code %d\n",
+				__func__, errcode);
+		return -errcode;
+	}
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
+static inline int32_t _get_inode_sync_error(ino_t inode, BOOL *sync_error)
+{
+	int32_t count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		*sync_error = sync_ctl.threads_error[count1];
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
+
+static inline int32_t _set_inode_sync_error(ino_t inode)
+{
+	int32_t count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		sync_ctl.threads_error[count1] = TRUE;
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
+
+static inline int32_t _set_inode_continue_nexttime(ino_t inode)
+{
+	int32_t count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		sync_ctl.continue_nexttime[count1] = TRUE;
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
+
+
+/*
+ * _del_toupload_blocks()
+ *
+ * When sync error, perhaps there are many copied blocks prepared to be
+ * uploaded, so remove all of them because uploading this time is cancelled.
+ *
+ * */
+static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
+{
+	FILE *fptr;
+	int64_t num_blocks, bcount;
+	char block_path[300];
+	struct stat tmpstat;
+	int32_t errcode;
+	ssize_t ret_ssize;
+	FILE_META_TYPE tmpmeta;
+	int64_t current_page, which_page, page_pos;
+
+	fptr = fopen(toupload_metapath, "r");
+	if (fptr != NULL) {
+		flock(fileno(fptr), LOCK_EX);
+		PREAD(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
+		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
+				sizeof(struct stat));
+
+		if (!S_ISREG(tmpstat.st_mode)) { /* Return when not regfile */
+			fclose(fptr);
+			return 0;
+		}
+
+		num_blocks = ((tmpstat.st_size == 0) ? 0
+				: (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1);
+
+		current_page = -1;
+		for (bcount = 0; bcount < num_blocks; bcount++) {
+			which_page = bcount / MAX_BLOCK_ENTRIES_PER_PAGE;
+			if (current_page != which_page) {
+				page_pos = seek_page2(&tmpmeta, fptr,
+						which_page, 0);
+				current_page = which_page;
+				if (page_pos <= 0) {
+					bcount += (BLK_INCREMENTS - 1);
+					continue;
+				}
+			}
+			/* TODO: consider truncating situation */
+			fetch_toupload_block_path(block_path, inode, bcount, 0);
+			if (access(block_path, F_OK) == 0)
+				unlink_upload_file(block_path);
+		}
+		fclose(fptr);
+		flock(fileno(fptr), LOCK_UN);
+	}
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
 
 /* Don't need to collect return code for the per-inode sync thread, as
 the error handling for syncing this inode will be handled in
@@ -72,15 +231,72 @@ sync_single_inode. */
 static inline void _sync_terminate_thread(int32_t index)
 {
 	int32_t ret;
+	int32_t tag_ret;
+	ino_t inode;
+	char toupload_metapath[300], local_metapath[400];
+	char finish_sync;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
 	     (sync_ctl.threads_created[index] == TRUE))) {
 		ret = pthread_join(sync_ctl.inode_sync_thread[index], NULL);
 		if (ret == 0) {
+			inode = sync_ctl.threads_in_use[index];
+			finish_sync = sync_ctl.threads_error[index] == TRUE ?
+					FALSE : TRUE;
+			fetch_toupload_meta_path(toupload_metapath, inode);
+
+			/* Tell memory cache that finish uploading if
+			 * meta exist */
+			fetch_meta_path(local_metapath, inode);
+			if (access(local_metapath, F_OK) == 0) {
+				tag_ret = comm2fuseproc(inode, FALSE, 0,
+					sync_ctl.is_revert[index], finish_sync);
+				if (tag_ret < 0) {
+					write_log(0, "Fail to tag inode %lld "
+						"as NOT_UPLOADING in %s\n",
+						inode, __func__);
+				}
+			} else {
+				sync_ctl.threads_error[index] = TRUE;
+				sync_ctl.continue_nexttime[index] = FALSE;
+			}
+
+			/* Dequeue from dirty list */
+			if (finish_sync == TRUE)
+				super_block_update_transit(inode, FALSE, FALSE);
+			else
+				super_block_update_transit(inode, FALSE, TRUE);
+
+			/* When threads error occur (no matter whether it is
+			 * caused by disconnection or not), delete all to-upload
+			 * blocks. */
+			if (sync_ctl.threads_error[index] == TRUE) {
+				ret = _del_toupload_blocks(toupload_metapath,
+						inode);
+				if (ret < 0)
+					write_log(0, "Error: Fail to remove"
+						"toupload block. Code %d\n",
+						-ret);
+			}
+
+			/* If need to continue nexttime, then just close
+			 * progress file. Otherwise delete it. */
+			if (sync_ctl.continue_nexttime[index] == TRUE) {
+				close(sync_ctl.progress_fd[index]);
+
+			} else {
+				del_progress_file(sync_ctl.progress_fd[index],
+						inode);
+				if (access(toupload_metapath, F_OK) == 0)
+					unlink_upload_file(toupload_metapath);
+			}
+
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.threads_finished[index] = FALSE;
+			sync_ctl.threads_error[index] = FALSE;
+			sync_ctl.is_revert[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
@@ -134,31 +350,21 @@ void collect_finished_sync_threads(void *ptr)
 using threads_error in sync control. */
 static inline int32_t _upload_terminate_thread(int32_t index)
 {
-	int32_t count2, count1;
-	int32_t which_curl;
-	int32_t ret, errcode, semval;
-	FILE *metafptr;
-	char thismetapath[METAPATHLEN];
-	char blockpath[400];
+	int32_t count1;
+	int32_t ret;
+	char toupload_blockpath[400];
 #if (DEDUP_ENABLE)
+	int32_t errcode;
 	uint8_t blk_obj_id[OBJID_LENGTH];
 #endif
 	ino_t this_inode;
 	off_t page_filepos;
-	int64_t e_index;
 	int64_t blockno;
-	BLOCK_ENTRY_PAGE temppage;
-	char is_delete;
-	BLOCK_ENTRY *tmp_entry;
-	size_t tmp_size, ret_size;
-	DELETE_THREAD_TYPE *tmp_del;
-	char need_delete_object;
-	SYSTEM_DATA_TYPE *statptr;
-	off_t cache_block_size;
-	FILE_META_TYPE tempfilemeta;
-	sem_t *semptr;
+	int64_t toupload_block_seq;
+	int32_t progress_fd;
+	char toupload_exist, finish_uploading;
 
-	if (upload_ctl.threads_in_use[index] == 0)
+	if (upload_ctl.threads_in_use[index] == FALSE)
 		return 0;
 
 	if (upload_ctl.upload_threads[index].is_block != TRUE)
@@ -185,6 +391,42 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 		return ret;
 	}
 
+	this_inode = upload_ctl.upload_threads[index].inode;
+	//is_delete = upload_ctl.upload_threads[index].is_delete;
+	page_filepos = upload_ctl.upload_threads[index].page_filepos;
+	//e_index = upload_ctl.upload_threads[index].page_entry_index;
+	blockno = upload_ctl.upload_threads[index].blockno;
+	progress_fd = upload_ctl.upload_threads[index].progress_fd;
+	toupload_block_seq = upload_ctl.upload_threads[index].seq;
+
+	/* Terminate it directly when thread is used to delete
+	 * old data on cloud */
+	if (upload_ctl.upload_threads[index].backend_delete_type != FALSE) {
+
+		/* TODO: Maybe we don't care about deleting backend
+		 * blocks when re-connecting */
+		if (upload_ctl.upload_threads[index].backend_delete_type ==
+				DEL_BACKEND_BLOCKS) {
+			/*backend_exist = FALSE;
+			set_progress_info(progress_fd, blockno, NULL,
+					&backend_exist, NULL, NULL, NULL);*/
+		} else if (upload_ctl.upload_threads[index].backend_delete_type
+				== DEL_TOUPLOAD_BLOCKS) {
+			/*toupload_exist = FALSE;
+			set_progress_info(progress_fd, blockno, &toupload_exist,
+					NULL, NULL, NULL, NULL);*/
+		}
+
+		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
+		upload_ctl.threads_in_use[index] = FALSE;
+		upload_ctl.threads_created[index] = FALSE;
+		upload_ctl.threads_finished[index] = FALSE;
+		upload_ctl.total_active_upload_threads--;
+		sem_post(&(upload_ctl.upload_queue_sem));
+
+		return 0;
+	}
+
 	/* Find the sync-inode correspond to the block-inode */
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
@@ -196,10 +438,12 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	if (count1 < MAX_SYNC_CONCURRENCY) {
 		if (sync_ctl.threads_error[count1] == TRUE) {
 			sem_post(&(sync_ctl.sync_op_sem));
+
 			upload_ctl.threads_in_use[index] = FALSE;
 			upload_ctl.threads_created[index] = FALSE;
 			upload_ctl.threads_finished[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
+
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0; /* Error already marked */
 		}
@@ -207,166 +451,65 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	sem_post(&(sync_ctl.sync_op_sem));
 
 #if (DEDUP_ENABLE)
+	/* copy new object id to toupload meta */
 	memcpy(blk_obj_id, upload_ctl.upload_threads[index].obj_id,
-	       OBJID_LENGTH);
+		OBJID_LENGTH);
+
+	fetch_toupload_meta_path(toupload_metapath, this_inode);
+	toupload_metafptr = fopen(toupload_metapath, "r+");
+	if (toupload_metafptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+		return -errcode;
+	}
+	setbuf(toupload_metafptr, NULL);
+
+	flock(fileno(toupload_metafptr), LOCK_EX);
+	is_toupload_meta_lock = TRUE;
+
+	/* Record object id on to-upload meta */
+	FSEEK(toupload_metafptr, page_filepos, SEEK_SET);
+	FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, toupload_metafptr);
+	memcpy(temppage.block_entries[e_index].obj_id, blk_obj_id,
+		OBJID_LENGTH);
+	FSEEK(toupload_metafptr, page_filepos, SEEK_SET);
+	FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, toupload_metafptr);
+
+	flock(fileno(toupload_metafptr), LOCK_UN);
+	fclose(toupload_metafptr);
+	is_toupload_meta_lock = FALSE;
+
+	/* Set this block as FINISH */
+	finish_uploading = TRUE;
+	toupload_exist = TRUE;
+	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
+		blk_obj_id, NULL, &finish_uploading);
+
+#else
+	toupload_exist = TRUE;
+	finish_uploading = TRUE;
+	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
+		&toupload_block_seq, NULL, &finish_uploading);
 #endif
-	this_inode = upload_ctl.upload_threads[index].inode;
-	is_delete = upload_ctl.upload_threads[index].is_delete;
-	page_filepos = upload_ctl.upload_threads[index].page_filepos;
-	e_index = upload_ctl.upload_threads[index].page_entry_index;
-	blockno = upload_ctl.upload_threads[index].blockno;
-	ret = fetch_meta_path(thismetapath, this_inode);
-	if (ret < 0)
-		return ret;
+	fetch_toupload_block_path(toupload_blockpath, this_inode,
+			blockno, toupload_block_seq);
+	if (access(toupload_blockpath, F_OK) == 0)
+		unlink_upload_file(toupload_blockpath);
 
-	need_delete_object = FALSE;
-	semptr = &(hcfs_system->something_to_replace);
-
-	/* Perhaps the file is deleted already. If not, modify the block
-	  status in file meta. */
-	if (access(thismetapath, F_OK) == 0) {
-		metafptr = fopen(thismetapath, "r+");
-		if (metafptr == NULL) {
-			errcode = errno;
-			if (errcode != ENOENT) {
-				write_log(0, "IO error in %s. Code %d, %s\n",
-					  __func__, errcode, strerror(errcode));
-				return -errcode;
-			}
-		}
-		if (metafptr != NULL) {
-			setbuf(metafptr, NULL);
-			flock(fileno(metafptr), LOCK_EX);
-			/*Perhaps the file is deleted already*/
-			if (!access(thismetapath, F_OK)) {
-				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-				FREAD(&tempfilemeta, sizeof(FILE_META_TYPE),
-					1, metafptr);
-				FSEEK(metafptr, page_filepos, SEEK_SET);
-				FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-				      metafptr);
-				tmp_entry = &(temppage.block_entries[e_index]);
-				tmp_size = sizeof(BLOCK_ENTRY_PAGE);
-				if ((tmp_entry->status == ST_LtoC) &&
-				    (is_delete == FALSE)) {
-					tmp_entry->status = ST_BOTH;
-					tmp_entry->uploaded = TRUE;
-#if (DEDUP_ENABLE)
-					/* Store hash in block meta too */
-					memcpy(tmp_entry->obj_id, blk_obj_id,
-					       OBJID_LENGTH);
-#endif
-					ret = fetch_block_path(
-					    blockpath, this_inode, blockno);
-					if (ret < 0) {
-						errcode = ret;
-						goto errcode_handle;
-					}
-					ret = set_block_dirty_status(
-					    blockpath, NULL, FALSE);
-					if (ret < 0) {
-						errcode = ret;
-						goto errcode_handle;
-					}
-					cache_block_size =
-					    check_file_size(blockpath);
-					sem_wait(&(hcfs_system->access_sem));
-					statptr = &(hcfs_system->systemdata);
-					statptr->dirty_cache_size -=
-					    cache_block_size;
-					if (statptr->dirty_cache_size < 0)
-						statptr->dirty_cache_size = 0;
-					/* Update unpin-dirty size */
-					if (tempfilemeta.local_pin == FALSE) {
-						statptr->unpin_dirty_data_size -=
-							cache_block_size;
-						if (statptr->unpin_dirty_data_size < 0)
-							statptr->unpin_dirty_data_size = 0;
-					}
-					sem_post(&(hcfs_system->access_sem));
-					/* Update dirty size in file meta */
-					update_file_stats(metafptr, 0, 0, 0,
-						-cache_block_size, this_inode);
-					FSEEK(metafptr, page_filepos, SEEK_SET);
-					FWRITE(&temppage, tmp_size, 1,
-					       metafptr);
-
-					/* if unpin, post cache management
-					control */
-					if (tempfilemeta.local_pin == FALSE) {
-						semval = 0;
-						ret = sem_getvalue(semptr,
-						                   &semval);
-						if ((ret == 0) &&
-						    (semval == 0))
-							sem_post(semptr);
-					}
-				} else {
-					if ((tmp_entry->status ==
-					     ST_TODELETE) &&
-					    (is_delete == TRUE)) {
-						tmp_entry->status = ST_NONE;
-						tmp_entry->uploaded = FALSE;
-						FSEEK(metafptr, page_filepos,
-						      SEEK_SET);
-						FWRITE(&temppage, tmp_size, 1,
-						       metafptr);
-					}
-				}
-				/*Check if status is ST_NONE. If so,
-				the block is removed due to truncating.
-				(And perhaps block deletion thread finished
-				earlier than upload, and deleted nothing.)
-				Need to schedule block for deletion due to
-				truncating*/
-				if ((tmp_entry->status == ST_NONE) &&
-				    (is_delete == FALSE)) {
-					write_log(5,
-						  "Debug upload block gone\n");
-					need_delete_object = TRUE;
-				}
-			}
-			flock(fileno(metafptr), LOCK_UN);
-			fclose(metafptr);
+	ret = change_block_status_to_BOTH(this_inode, blockno, page_filepos,
+			toupload_block_seq);
+	if (ret < 0) {
+		if (ret != -ENOENT) {
+			write_log(0, "Error: Fail to change status to BOTH\n");
+			return ret;
 		}
 	}
-
-	/* If file is deleted or block already deleted, create deleted-thread
-	   to delete cloud block data. */
-	if ((access(thismetapath, F_OK) == -1) || (need_delete_object)) {
-		sem_wait(&(delete_ctl.delete_queue_sem));
-		sem_wait(&(delete_ctl.delete_op_sem));
-		which_curl = -1;
-		for (count2 = 0; count2 < MAX_DELETE_CONCURRENCY; count2++) {
-			if (delete_ctl.threads_in_use[count2] == FALSE) {
-				delete_ctl.threads_in_use[count2] = TRUE;
-				delete_ctl.threads_created[count2] = FALSE;
-				delete_ctl.threads_finished[count2] = FALSE;
-
-				tmp_del = &(delete_ctl.delete_threads[count2]);
-				tmp_del->is_block = TRUE;
-				tmp_del->inode = this_inode;
-				tmp_del->blockno = blockno;
-				tmp_del->which_curl = count2;
-				tmp_del->which_index = count2;
+/*
 #if (DEDUP_ENABLE)
-				memcpy(tmp_del->obj_id, blk_obj_id,
-				       OBJID_LENGTH);
-#endif
-
-				delete_ctl.total_active_delete_threads++;
-				which_curl = count2;
-				break;
-			}
-		}
-		sem_post(&(delete_ctl.delete_op_sem));
-		pthread_create(
-		    &(delete_ctl.threads_no[which_curl]), NULL,
-		    (void *)&con_object_dsync,
-		    (void *)&(delete_ctl.delete_threads[which_curl]));
-
-		delete_ctl.threads_created[which_curl] = TRUE;
-	}
+			 Store hash in block meta too */
+/*			memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
+#endif */
 
 	/* Finally reclaim the uploaded-thread. */
 	upload_ctl.threads_in_use[index] = FALSE;
@@ -377,15 +520,19 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 
 	return 0;
 
+#if (DEDUP_ENABLE)
 errcode_handle:
-	flock(fileno(metafptr), LOCK_UN);
-	fclose(metafptr);
+	if (is_toupload_meta_lock == TRUE) {
+		flock(fileno(toupload_metafptr), LOCK_UN);
+		fclose(toupload_metafptr);
+	}
 	return errcode;
+#endif
 }
 
 void collect_finished_upload_threads(void *ptr)
 {
-	int32_t count, ret, count1;
+	int32_t count, ret;
 	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
@@ -409,17 +556,9 @@ void collect_finished_upload_threads(void *ptr)
 			if (ret >= 0)
 				continue;
 			/* Record the error in sync_thread */
-			sem_wait(&(sync_ctl.sync_op_sem));
-			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
-			     count1++) {
-				if (sync_ctl.threads_in_use[count1] ==
-				    upload_ctl.upload_threads[count].inode)
-					break;
-			}
+			_set_inode_sync_error(
+				upload_ctl.upload_threads[count].inode);
 			write_log(10, "Recording error in %s\n", __func__);
-			if (count1 < MAX_SYNC_CONCURRENCY)
-				sync_ctl.threads_error[count1] = TRUE;
-			sem_post(&(sync_ctl.sync_op_sem));
 
 #if (DEDUP_ENABLE)
 			/* Reset uploaded flag for upload thread */
@@ -546,13 +685,22 @@ errcode_handle:
 	free(fname);
 }
 
-static inline int32_t _select_upload_thread(char is_block, char is_delete,
+/**
+ * select_upload_thread()
+ *
+ * Select an appropriate thread to upload/delete a block or meta.
+ *
+ * @return usable curl index
+ */ 
+int32_t select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
-					char is_upload,
-					uint8_t old_obj_id[],
+				char is_upload,
+				uint8_t old_obj_id[],
 #endif
-					ino_t this_inode, int64_t block_count,
-					off_t page_pos, int64_t e_index)
+				ino_t this_inode, int64_t block_count,
+				int64_t seq, off_t page_pos,
+				int64_t e_index, int32_t progress_fd,
+				char backend_delete_type)
 {
 	int32_t which_curl, count;
 
@@ -566,11 +714,16 @@ static inline int32_t _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].is_delete = is_delete;
 			upload_ctl.upload_threads[count].inode = this_inode;
 			upload_ctl.upload_threads[count].blockno = block_count;
+			upload_ctl.upload_threads[count].seq = seq;
+			upload_ctl.upload_threads[count].progress_fd =
+								progress_fd;
 			upload_ctl.upload_threads[count].page_filepos =
 			    page_pos;
 			upload_ctl.upload_threads[count].page_entry_index =
 			    e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
+			upload_ctl.upload_threads[count].backend_delete_type =
+							backend_delete_type;
 			upload_ctl.upload_threads[count].which_index = count;
 #if (DEDUP_ENABLE)
 			upload_ctl.upload_threads[count].is_upload = is_upload;
@@ -588,77 +741,355 @@ static inline int32_t _select_upload_thread(char is_block, char is_delete,
 	return which_curl;
 }
 
+/**
+ * Check block status from to-upload meta, and compare the status with
+ * corresponding status in local meta. Finally decide if this block should
+ * be uploaded and record in progress file
+ *
+ * @param toupload_metafptr File pointer of toupload meta.
+ * @param local_metafptr File pointer of local meta.
+ * @param local_metapath Local meta path.
+ * @param block_count Block number to be checked and uploaded this time.
+ * @param current_page Current page, which is corresponding to "toupload_temppage"
+ * @param page_pos Page poisition of current page
+ * @param toupload_temppage Cached block entry page of toupload meta
+ * @param toupload_meta To-upload meta, which cannot be changed.
+ * @param ptr Data of synced inode.
+ *
+ * @return 0 on success, -ENOENT when page of this block does not exist,
+ *         -EACCES when local meta is gone, -ECANCELED when cancelling
+ *         syncing this time.
+ */
+static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
+		char *local_metapath, int64_t block_count,
+		int64_t *current_page, int64_t *page_pos,
+		BLOCK_ENTRY_PAGE *toupload_temppage,
+		FILE_META_TYPE *toupload_meta, SYNC_THREAD_TYPE *ptr)
+{
+	int64_t which_page;
+	int64_t toupload_block_seq, local_block_seq;
+	uint8_t local_block_status, toupload_block_status;
+	BLOCK_ENTRY *tmp_entry;
+	BLOCK_ENTRY_PAGE local_temppage;
+	int32_t e_index;
+	char toupload_bpath[400];
+	size_t ret_size;
+	int32_t ret, errcode;
+	int32_t which_curl;
+	BOOL llock, ulock;
+	char finish_uploading, toupload_exist;
+	BLOCK_UPLOADING_STATUS block_uploading_status;
+
+	llock = FALSE;
+	ulock = FALSE;
+
+	e_index = block_count % BLK_INCREMENTS;
+	which_page = block_count / BLK_INCREMENTS;
+
+	if (*current_page != which_page) {
+		flock(fileno(toupload_metafptr), LOCK_EX);
+		ulock = TRUE;
+		*page_pos = seek_page2(toupload_meta, toupload_metafptr,
+				which_page, 0);
+		if (*page_pos <= 0) {
+			flock(fileno(toupload_metafptr), LOCK_UN);
+			return -ENOENT;
+		}
+		*current_page = which_page;
+		/* Do not need to read again in the same
+		   page position because toupload_meta cannot
+		   be modified by other processes. */
+		FSEEK(toupload_metafptr, *page_pos, SEEK_SET);
+		FREAD(toupload_temppage, sizeof(BLOCK_ENTRY_PAGE),
+				1, toupload_metafptr);
+		flock(fileno(toupload_metafptr), LOCK_UN);
+		ulock = FALSE;
+	}
+	tmp_entry = &(toupload_temppage->block_entries[e_index]);
+	toupload_block_status = tmp_entry->status;
+	toupload_block_seq = tmp_entry->seqnum;
+
+	/* Lock local meta. Read local meta and update status.
+	   This should be read again even in the same page pos
+	   because someone may modify it. */
+	flock(fileno(local_metafptr), LOCK_EX);
+	llock = TRUE;
+	if (access(local_metapath, F_OK) < 0) {
+		flock(fileno(local_metafptr), LOCK_UN);
+		return -EACCES;
+	}
+
+	FSEEK(local_metafptr, *page_pos, SEEK_SET);
+	FREAD(&local_temppage, sizeof(BLOCK_ENTRY_PAGE), 1, local_metafptr);
+	tmp_entry = &(local_temppage.block_entries[e_index]);
+	local_block_status = tmp_entry->status;
+	local_block_seq = tmp_entry->seqnum;
+
+	/*** Case 1: Local is dirty. Update status & upload ***/
+	switch(toupload_block_status) {
+	case ST_LDISK:
+	case ST_LtoC:
+		/* Update status if this block is
+		   not deleted or is NOT newer than to-upload
+		   version. */
+		if ((local_block_status == ST_LDISK) &&
+				(local_block_seq == toupload_block_seq)) {
+
+			tmp_entry->status = ST_LtoC;
+			FSEEK(local_metafptr, *page_pos, SEEK_SET);
+			FWRITE(&local_temppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, local_metafptr);
+
+		} else if ((local_block_status == ST_LtoC) &&
+				(local_block_seq == toupload_block_seq)) {
+			/* Tmp do nothing */
+
+		} else {
+			/* In continue mode, directly
+			 * return when to-upload meta does
+			 * not match local meta */
+			if (ptr->is_revert == TRUE) {
+				write_log(4, "When continue uploading inode %"
+					PRIu64", cancel to continue uploading"
+					" because block %lld has local_seq %lld"
+					" and toupload seq %lld\n", (uint64_t)
+					ptr->inode, block_count,
+					local_block_seq, toupload_block_seq);
+				flock(fileno(local_metafptr), LOCK_UN);
+				return -ECANCELED;
+			}
+		}
+
+		flock(fileno(local_metafptr), LOCK_UN);
+		sem_wait(&(upload_ctl.upload_queue_sem));
+		sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
+		which_curl = select_upload_thread(TRUE, FALSE, TRUE,
+				tmp_entry->obj_id, ptr->inode, block_count,
+				toupload_block_seq, *page_pos, e_index,
+				ptr->progress_fd, FALSE);
+#else
+		which_curl = select_upload_thread(TRUE, FALSE, ptr->inode,
+				block_count, toupload_block_seq, *page_pos,
+				e_index, ptr->progress_fd, FALSE);
+#endif
+
+		sem_post(&(upload_ctl.upload_op_sem));
+		ret = dispatch_upload_block(which_curl);
+		if (ret < 0) {
+			write_log(4, "Error: Fail to dipatch and upload"
+				" block_%"PRIu64"_%lld. Code %d",
+				(uint64_t)ptr->inode, block_count, -ret);
+			if (ret == -ENOENT)
+				ret = -ECANCELED;
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
+			return ret;
+		}
+		
+		break;
+	/*** Case 2: Local block is deleted or none. Do nothing ***/
+	case ST_TODELETE:
+	case ST_NONE:
+		write_log(10, "Debug: block_%"PRIu64"_%lld is %s\n",
+				(uint64_t)ptr->inode, block_count,
+				toupload_block_status == ST_NONE ?
+				"ST_NONE" : "ST_TODELETE");
+		if (local_block_status == ST_TODELETE) {
+			write_log(10, "Debug: change ST_TODELETE to ST_NONE\n");
+			memset(tmp_entry, 0, sizeof(BLOCK_ENTRY));
+			tmp_entry->status = ST_NONE;
+			FSEEK(local_metafptr, *page_pos, SEEK_SET);
+			FWRITE(&local_temppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, local_metafptr);
+		}
+
+		finish_uploading = TRUE;
+		toupload_exist = FALSE;
+		set_progress_info(ptr->progress_fd, block_count,
+			&toupload_exist, NULL, NULL, NULL, &finish_uploading);
+		flock(fileno(local_metafptr), LOCK_UN);
+
+		fetch_toupload_block_path(toupload_bpath, ptr->inode,
+				block_count, toupload_block_seq);
+		if (access(toupload_bpath, F_OK) == 0)
+			unlink_upload_file(toupload_bpath);
+
+		break;
+	/*** Case 3: ST_BOTH, ST_CtoL, ST_CLOUD. Do nothing ***/
+	default:
+		write_log(10, "Debug: Status of block_%"PRIu64"_%lld is %d\n",
+				(uint64_t)ptr->inode,
+				block_count,
+				toupload_block_status);
+		/* Check seq num and just print log when not match */
+		get_progress_info(ptr->progress_fd, block_count,
+				&block_uploading_status);
+		if (CLOUD_BLOCK_EXIST(block_uploading_status.block_exist) &&
+		    toupload_block_seq != block_uploading_status.backend_seq) {
+			write_log(0, "Error: Seq of block_%"PRIu64"_%lld does "
+				"not match. Local seq %lld, cloud seq %lld. But"
+				" status is %d\n",
+				(uint64_t)ptr->inode, block_count,
+				toupload_block_seq,
+				block_uploading_status.backend_seq,
+				toupload_block_status);
+		}
+
+		/* Set progress file */
+		finish_uploading = TRUE;
+		toupload_exist = TRUE;
+#if (DEDUP_ENABLE)
+		set_progress_info(ptr->progress_fd, block_count,
+			&toupload_exist, NULL, tmp_entry->obj_id, NULL,
+			&finish_uploading);
+#else
+		set_progress_info(ptr->progress_fd, block_count,
+			&toupload_exist, NULL, &toupload_block_seq, NULL,
+			&finish_uploading);
+#endif
+		flock(fileno(local_metafptr), LOCK_UN);
+		fetch_toupload_block_path(toupload_bpath, ptr->inode,
+			block_count, toupload_block_seq);
+		if (access(toupload_bpath, F_OK) == 0)
+			unlink_upload_file(toupload_bpath);
+
+		break;
+	}
+
+	return 0;
+
+errcode_handle:
+	write_log(0, "IO error in %s\n", __func__);
+	if (llock)
+		flock(fileno(local_metafptr), LOCK_UN);
+	if (ulock)
+		flock(fileno(toupload_metafptr), LOCK_UN);
+	return errcode;
+}
+
+/**
+ * Main function to upload all block and meta
+ *
+ * This function aims to upload all meta data and block data to cloud.
+ * If it is a regfile, upload all blocks first and then upload meta when finish
+ * uploading all blocks. Finally delete old blocks on backend.
+ * If it is not a regfile, then just upload metadata to cloud.
+ *
+ * @param ptr Pointer of data of inode uploading this time.
+ *
+ * @return none
+ */
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
-	char thismetapath[METAPATHLEN];
-	char truncpath[METAPATHLEN];
+	char toupload_metapath[400];
+	char local_metapath[METAPATHLEN];
 	ino_t this_inode;
-	FILE *metafptr, *truncfptr;
+	FILE *toupload_metafptr, *local_metafptr;
+	char truncpath[METAPATHLEN];
+	FILE *truncfptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	DIR_META_TYPE tempdirmeta;
-	BLOCK_ENTRY_PAGE temppage;
+	BLOCK_ENTRY_PAGE toupload_temppage;
 	int32_t which_curl;
-	int64_t page_pos, e_index, which_page, current_page;
-	int64_t total_blocks;
-	int64_t count, block_count;
-	uint8_t block_status;
-	char upload_done;
+	int64_t page_pos, current_page;
+	int64_t total_blocks, total_backend_blocks;
+	int64_t block_count;
 	int32_t ret, errcode;
-	off_t tmp_size;
-	struct timespec time_to_sleep;
-	BLOCK_ENTRY *tmp_entry;
+	off_t toupload_size;
 	int64_t temp_trunc_size;
-#ifndef _ANDROID_ENV_
-	ssize_t ret_ssize;
-#endif
 	size_t ret_size;
-	char sync_error;
-	int32_t count1;
-	int64_t upload_seq;
+	BOOL sync_error;
 	ino_t root_inode;
+	int64_t backend_size;
 	int64_t size_diff;
+	int32_t progress_fd;
+	BOOL is_local_meta_deleted;
+	char is_revert;
+	int64_t meta_size_diff;
+	int64_t upload_seq;
+	CLOUD_RELATED_DATA cloud_related_data;
+	int64_t pos;
 
-	sync_error = FALSE;
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
-
+	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
+	is_revert = ptr->is_revert;
+	sync_error = FALSE;
 
-	ret = fetch_meta_path(thismetapath, this_inode);
-
-	write_log(10, "Sync inode %" PRIu64 ", mode %d\n", (uint64_t)ptr->inode,
-		  ptr->this_mode);
+	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
-	metafptr = fopen(thismetapath, "r+");
-	if (metafptr == NULL) {
+	ret = fetch_meta_path(local_metapath, this_inode);
+	write_log(10, "Sync inode %" PRIu64 ", mode %d\n", (uint64_t)ptr->inode,
+		  ptr->this_mode);
+
+	if (ret < 0) {
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		return;
+	}
+
+	/* Open temp meta to be uploaded. */
+	toupload_metafptr = fopen(toupload_metapath, "r");
+	if (toupload_metafptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		return;
+	}
+
+	/* Open local meta */
+	local_metafptr = fopen(local_metapath, "r+");
+	if (local_metafptr == NULL) {
 		errcode = errno;
 		if (errcode != ENOENT) {
 			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
 				  errcode, strerror(errcode));
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
 		}
 		/* If meta file is gone, the inode is deleted and we don't need
 		to sync this object anymore. */
+		fclose(toupload_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
-
-	setbuf(metafptr, NULL);
+	setbuf(local_metafptr, NULL);
 
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
-		flock(fileno(metafptr), LOCK_EX);
-		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
-		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		/* First download backend meta and init backend block info in
+		 * upload progress file. If it is revert mode now, then
+		 * just read progress meta. */
+		pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+				sizeof(FILE_STATS_TYPE);
+		FSEEK(toupload_metafptr, pos, SEEK_SET);
+		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+				1, toupload_metafptr);
+		ret = init_backend_file_info(ptr, &backend_size,
+				&total_backend_blocks,
+				cloud_related_data.upload_seq);
+		if (ret < 0) {
+			fclose(toupload_metafptr);
+			fclose(local_metafptr);
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			return;
+		}
 
-		tmp_size = tempfilestat.st_size;
+		FSEEK(toupload_metafptr, 0, SEEK_SET);
+		FREAD(&tempfilestat, sizeof(struct stat), 1,
+			toupload_metafptr);
+		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
+			toupload_metafptr);
+
+		toupload_size = tempfilestat.st_size;
 		root_inode = tempfilemeta.root_inode;
 
 /* Check if need to sync past the current size */
@@ -674,225 +1105,153 @@ store in some other file */
 			FREAD(&temp_trunc_size, sizeof(int64_t), 1,
 			      truncfptr);
 
-			if (tmp_size < temp_trunc_size) {
-				tmp_size = temp_trunc_size;
+			if (toupload_size < temp_trunc_size) {
+				toupload_size = temp_trunc_size;
 				UNLINK(truncpath);
 			}
 			fclose(truncfptr);
 		}
 #else
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				      &temp_trunc_size, sizeof(int64_t));
+				&temp_trunc_size, sizeof(int64_t));
 
-		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
-			tmp_size = temp_trunc_size;
-			fremovexattr(fileno(metafptr), "user.trunc_size");
+		if ((ret_ssize >= 0) && (toupload_size < temp_trunc_size)) {
+			toupload_size = temp_trunc_size;
 		}
-
 #endif
 
-		if (tmp_size == 0)
+		/* Compute number of blocks */
+		if (toupload_size == 0)
 			total_blocks = 0;
 		else
-			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
+			total_blocks = ((toupload_size - 1)
+				/ MAX_BLOCK_SIZE) + 1;
 
-		flock(fileno(metafptr), LOCK_UN);
-
+		/* Begin to upload blocks */
+		page_pos = 0;
 		current_page = -1;
+		is_local_meta_deleted = FALSE;
 		for (block_count = 0; block_count < total_blocks;
-		     block_count++) {
+							block_count++) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 
-			flock(fileno(metafptr), LOCK_EX);
-
-			/*Perhaps the file is deleted already*/
-			if (access(thismetapath, F_OK) < 0) {
-				flock(fileno(metafptr), LOCK_UN);
+			/* Check if needs to continue uploading next time */
+			if (sync_ctl.continue_nexttime[ptr->which_index] ==
+					TRUE)
 				break;
-			}
 
-			e_index = block_count % BLK_INCREMENTS;
-			which_page = block_count / BLK_INCREMENTS;
-
-			if (current_page != which_page) {
-				page_pos = seek_page2(&tempfilemeta, metafptr,
-						      which_page, 0);
-				if (page_pos <= 0) {
-					block_count += BLK_INCREMENTS - 1;
-					flock(fileno(metafptr), LOCK_UN);
+			if (is_revert == TRUE) {
+				if (block_finish_uploading(progress_fd,
+					block_count) == TRUE)
 					continue;
-				}
-				current_page = which_page;
 			}
 
-			/*TODO: error handling here if cannot read correctly*/
-
-			ret = fseek(metafptr, page_pos, SEEK_SET);
-
+			ret = _check_block_sync(toupload_metafptr,
+					local_metafptr, local_metapath,
+					block_count, &current_page, &page_pos,
+					&toupload_temppage, &tempfilemeta,
+					ptr);
 			if (ret < 0) {
-				errcode = errno;
-				write_log(0, "IO error in %s. Code %d, %s\n",
-					  __func__, errcode, strerror(errcode));
-				sync_error = TRUE;
-				flock(fileno(metafptr), LOCK_UN);
-				break;
-			}
-
-			ret = fread(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-				    metafptr);
-			if (ret < 1) {
-				errcode = ferror(metafptr);
-				write_log(0, "IO error in %s.\n", __func__);
-				if (errcode != 0)
-					write_log(0, "Code %d, %s\n", errcode,
-						  strerror(errcode));
-				sync_error = TRUE;
-				flock(fileno(metafptr), LOCK_UN);
-				break;
-			}
-			tmp_entry = &(temppage.block_entries[e_index]);
-			block_status = tmp_entry->status;
-
-			if (((block_status == ST_LDISK) ||
-			     (block_status == ST_LtoC)) &&
-			    (block_count < total_blocks)) {
-				if (block_status == ST_LDISK) {
-					tmp_entry->status = ST_LtoC;
-					ret =
-					    fseek(metafptr, page_pos, SEEK_SET);
-					if (ret < 0) {
-						errcode = errno;
-						write_log(0,
-							  "IO error in %s.\n",
-							  __func__);
-						write_log(0, "Code %d, %s\n",
-							  errcode,
-							  strerror(errcode));
-						sync_error = TRUE;
-						flock(fileno(metafptr),
-						      LOCK_UN);
-						break;
-					}
-
-					ret = fwrite(&temppage,
-						     sizeof(BLOCK_ENTRY_PAGE),
-						     1, metafptr);
-					if (ret < 1) {
-						errcode = ferror(metafptr);
-						write_log(0,
-							  "IO error in %s.\n",
-							  __func__);
-						write_log(0, "Code %d, %s\n",
-							  errcode,
-							  strerror(errcode));
-						sync_error = TRUE;
-						flock(fileno(metafptr),
-						      LOCK_UN);
-						break;
-					}
-				}
-				flock(fileno(metafptr), LOCK_UN);
-				sem_wait(&(upload_ctl.upload_queue_sem));
-				sem_wait(&(upload_ctl.upload_op_sem));
-#if (DEDUP_ENABLE)
-				which_curl = _select_upload_thread(
-				    TRUE, FALSE, tmp_entry->uploaded,
-				    tmp_entry->obj_id, ptr->inode, block_count,
-				    page_pos, e_index);
-#else
-				which_curl = _select_upload_thread(
-				    TRUE, FALSE, ptr->inode, block_count,
-				    page_pos, e_index);
-#endif
-				sem_post(&(upload_ctl.upload_op_sem));
-				ret = dispatch_upload_block(which_curl);
-				if (ret < 0) {
-					sync_error = TRUE;
+				if (ret == -ENOENT) {
+					block_count += (BLK_INCREMENTS - 1);
+					continue;
+				} else if (ret == -EACCES) {
+					is_local_meta_deleted = TRUE;
+					break;
+				} else if (ret == -ECANCELED) {
+					sync_ctl.threads_error[ptr->which_index]
+					       = TRUE;
+					break;
+				} else {
+					sync_ctl.threads_error[ptr->which_index]
+					       = TRUE;
 					break;
 				}
-				/*TODO: Maybe should also first copy block
-					out first*/
-				continue;
 			}
-			if (block_status == ST_TODELETE) {
-				flock(fileno(metafptr), LOCK_UN);
-				sem_wait(&(upload_ctl.upload_queue_sem));
-				sem_wait(&(upload_ctl.upload_op_sem));
-#if (DEDUP_ENABLE)
-				which_curl = _select_upload_thread(
-				    TRUE, TRUE, TRUE, tmp_entry->obj_id,
-				    ptr->inode, block_count, page_pos, e_index);
-#else
-				which_curl = _select_upload_thread(
-				    TRUE, TRUE, ptr->inode, block_count,
-				    page_pos, e_index);
-#endif
-				sem_post(&(upload_ctl.upload_op_sem));
-				dispatch_delete_block(which_curl);
-				/* TODO: Maybe should also first copy
-					block out first*/
-			} else {
-				flock(fileno(metafptr), LOCK_UN);
-			}
+
 		}
+		/* ---End of syncing blocks loop--- */
+
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
+		busy_wait_all_specified_upload_threads(ptr->inode);
 
-		upload_done = FALSE;
-		while ((upload_done == FALSE) &&
-		       (hcfs_system->system_going_down == FALSE)) {
-			nanosleep(&time_to_sleep, NULL);
-			upload_done = TRUE;
-			sem_wait(&(upload_ctl.upload_op_sem));
-			for (count = 0; count < MAX_UPLOAD_CONCURRENCY;
-			     count++) {
-				if ((upload_ctl.threads_in_use[count] ==
-				     TRUE) &&
-				    (upload_ctl.upload_threads[count].inode ==
-				     ptr->inode)) {
-					upload_done = FALSE;
-					break;
-				}
+		/* If meta is deleted when uploading, delete backend blocks */
+		if (is_local_meta_deleted == TRUE) {
+			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
+			delete_backend_blocks(progress_fd, total_blocks,
+				ptr->inode, DEL_TOUPLOAD_BLOCKS);
+			fclose(local_metafptr);
+			fclose(toupload_metafptr);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			return;
+		}
+
+		/* If sync error, then return and delete to-upload blocks
+		 * if needed */
+		sync_error = sync_ctl.threads_error[ptr->which_index];
+		if (sync_error == TRUE) {
+			if (sync_ctl.continue_nexttime[ptr->which_index] ==
+					FALSE) {
+				/* Restore cloud usage statistics */
+				pos = sizeof(struct stat) +
+					sizeof(FILE_META_TYPE) +
+					sizeof(FILE_STATS_TYPE);
+				FSEEK(toupload_metafptr, pos, SEEK_SET);
+				FREAD(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, toupload_metafptr);
+				flock(fileno(local_metafptr), LOCK_EX);
+				FSEEK(local_metafptr, pos, SEEK_SET);
+				FWRITE(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, local_metafptr);
+				flock(fileno(local_metafptr), LOCK_UN);
+				/* Delete pre-upload blocks */
+				delete_backend_blocks(progress_fd, total_blocks,
+					ptr->inode, DEL_TOUPLOAD_BLOCKS);
+
 			}
-			sem_post(&(upload_ctl.upload_op_sem));
+			fclose(local_metafptr);
+			fclose(toupload_metafptr);
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			return;
 		}
 	}
 
-	/*Check if metafile still exists. If not, forget the meta upload*/
-	if (access(thismetapath, F_OK) < 0) {
+	/* Abort sync to cloud if system is going down */
+	if (hcfs_system->system_going_down == TRUE) {
+		/* When system going down, re-upload it later */
+		sync_ctl.continue_nexttime[ptr->which_index] = TRUE;
+		fclose(toupload_metafptr);
+		fclose(local_metafptr);
+		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
-	/* Abort sync to cloud if error occured or system is going down */
-	if ((sync_error == TRUE) || (hcfs_system->system_going_down == TRUE)) {
-		super_block_update_transit(ptr->inode, FALSE, TRUE);
-		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		return;
-	}
-
+	/* Begin to upload meta */
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
 #if (DEDUP_ENABLE)
-	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL,
-					   ptr->inode, 0, 0, 0);
+	which_curl = select_upload_thread(FALSE, FALSE, FALSE, NULL,
+		ptr->inode, 0, 0, 0, 0, progress_fd, FALSE);
 #else
-	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode, 0, 0, 0);
+	which_curl = select_upload_thread(FALSE, FALSE,
+		ptr->inode, 0, 0, 0, 0, progress_fd, FALSE);
 #endif
 
 	sem_post(&(upload_ctl.upload_op_sem));
 
-	flock(fileno(metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
-	if (!access(thismetapath, F_OK)) {
-		CLOUD_RELATED_DATA cloud_related_data;
-		int64_t pos;
+	flock(fileno(local_metafptr), LOCK_EX);
+
+	if (!access(local_metapath, F_OK)) {
 		struct stat metastat;
 		int64_t now_meta_size;
-		int64_t meta_size_diff;
-
-		ret = fstat(fileno(metafptr), &metastat);
+		/* TODO: Refactor following code */
+		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
 			write_log(0, "Fail to fetch meta %"PRIu64" stat\n",
 					(uint64_t)this_inode);
@@ -902,85 +1261,78 @@ store in some other file */
 		now_meta_size = metastat.st_size;
 
 		if (S_ISFILE(ptr->this_mode)) {
-			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
-			      metafptr);
+			      toupload_metafptr);
+
 			pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
 					sizeof(FILE_STATS_TYPE);
-			FSEEK(metafptr, pos, SEEK_SET);
+			FSEEK(toupload_metafptr, pos, SEEK_SET);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, metafptr);
+					1, toupload_metafptr);
 			root_inode = tempfilemeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = (tempfilestat.st_size + now_meta_size) -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
-			/* Update cloud related data */
+			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload =
 					tempfilestat.st_size + now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(metafptr, pos, SEEK_SET);
+			FSEEK(local_metafptr, pos, SEEK_SET);
 			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, metafptr);
+					1, local_metafptr);
 		}
-
 		if (S_ISDIR(ptr->this_mode)) {
-			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
+			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
+					1, toupload_metafptr);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, metafptr);
+					1, toupload_metafptr);
 			root_inode = tempdirmeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = now_meta_size -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
-			/* Update cloud related data */
+			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(metafptr, sizeof(struct stat) +
+			FSEEK(local_metafptr, sizeof(struct stat) +
 					sizeof(DIR_META_TYPE), SEEK_SET);
 			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, metafptr);
+					1, local_metafptr);
 		}
-
 		if (S_ISLNK(ptr->this_mode)) {
-			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
-					metafptr);
+					toupload_metafptr);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, metafptr);
+					1, toupload_metafptr);
 			root_inode = tempsymmeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = now_meta_size -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
-			/* Update cloud related data */
+			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(metafptr, sizeof(struct stat) +
+			FSEEK(local_metafptr, sizeof(struct stat) +
 					sizeof(SYMLINK_META_TYPE), SEEK_SET);
 			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, metafptr);
+					1, local_metafptr);
 		}
 
-		ret = schedule_sync_meta(metafptr, which_curl);
-		if (ret < 0) {
-			write_log(0, "Error: schedule_sync_meta fails."
-					" Code %d\n", -ret);
-			sync_error = TRUE;
-		}
-		flock(fileno(metafptr), LOCK_UN);
-		fclose(metafptr);
+		flock(fileno(local_metafptr), LOCK_UN);
+
+		schedule_sync_meta(toupload_metapath, which_curl);
 
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
-		/*TODO: Need to check if metafile still exists.
-			If not, schedule the deletion of meta*/
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -993,36 +1345,13 @@ store in some other file */
 		if (sync_error == FALSE) {
 			/* Check the error in sync_thread */
 			write_log(10, "Checking for other error\n");
-			sem_wait(&(sync_ctl.sync_op_sem));
-			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
-			     count1++) {
-				if (sync_ctl.threads_in_use[count1] ==
-				    ptr->inode)
-					break;
-			}
-			if (count1 < MAX_SYNC_CONCURRENCY)
-				sync_error = sync_ctl.threads_error[count1];
-			sem_post(&(sync_ctl.sync_op_sem));
+			sync_error = sync_ctl.threads_error[ptr->which_index];
 		}
-		if (sync_error == TRUE) {
-			write_log(10, "Sync inode %" PRIu64
-				      " to backend incomplete.\n",
-				  (uint64_t)ptr->inode);
-			/* TODO: Revert info re last upload if upload
-				fails */
-		} else {
-			/* Upload successfully. Update FS stat in backend */
-			if (upload_seq == 0)
-				update_backend_stat(root_inode, size_diff,
-						meta_size_diff, 1);
-			else if (size_diff != 0)
-				update_backend_stat(root_inode, size_diff,
-						meta_size_diff, 0);
-		}
-		super_block_update_transit(ptr->inode, FALSE, sync_error);
-	} else {
-		flock(fileno(metafptr), LOCK_UN);
-		fclose(metafptr);
+
+	} else { /* meta is removed */
+		flock(fileno(local_metafptr), LOCK_UN);
+		fclose(local_metafptr);
+		fclose(toupload_metafptr);
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1031,33 +1360,99 @@ store in some other file */
 		upload_ctl.total_active_upload_threads--;
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
+
+		/* Delete those uploaded blocks if local meta is removed */
+		if (S_ISREG(ptr->this_mode))
+			delete_backend_blocks(progress_fd, total_blocks,
+					ptr->inode, DEL_TOUPLOAD_BLOCKS);
+
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		return;
+	}
+
+	if (sync_error == TRUE) {
+		write_log(0, "Sync inode %"PRIu64" to backend incomplete.\n",
+				(uint64_t)ptr->inode);
+		/* Delete to-upload blocks when it fails by anything but
+		 * disconnection */
+		if (S_ISREG(ptr->this_mode)) {
+			if (sync_ctl.continue_nexttime[ptr->which_index] ==
+					FALSE) {
+				/* Restore cloud usage statistics */
+				pos = sizeof(struct stat) +
+					sizeof(FILE_META_TYPE) +
+					sizeof(FILE_STATS_TYPE);
+				FSEEK(toupload_metafptr, pos, SEEK_SET);
+				FREAD(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, toupload_metafptr);
+				flock(fileno(local_metafptr), LOCK_EX);
+				FSEEK(local_metafptr, pos, SEEK_SET);
+				FWRITE(&cloud_related_data,
+					sizeof(CLOUD_RELATED_DATA),
+					1, local_metafptr);
+				flock(fileno(local_metafptr), LOCK_UN);
+
+				/* Delete pre-upload blocks */
+				delete_backend_blocks(progress_fd, total_blocks,
+					ptr->inode, DEL_TOUPLOAD_BLOCKS);
+			}
+		} else { /* Just re-upload for dir/slnk/fifo/socket */
+			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
+		}
+
+		fclose(toupload_metafptr);
+		fclose(local_metafptr);
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		return;
+	}
+
+	fclose(toupload_metafptr);
+	fclose(local_metafptr);
+
+	/* Upload successfully. Update FS stat in backend */
+	if (upload_seq <= 0)
+		update_backend_stat(root_inode, size_diff, meta_size_diff, 1);
+	else
+		if (size_diff != 0)
+			update_backend_stat(root_inode, size_diff,
+					meta_size_diff, 0);
+
+	/* Delete old block data on backend and wait for those threads */
+	if (S_ISREG(ptr->this_mode)) {
+		delete_backend_blocks(progress_fd, total_backend_blocks,
+				ptr->inode, DEL_BACKEND_BLOCKS);
 	}
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
-
 	return;
 
 errcode_handle:
-	flock(fileno(metafptr), LOCK_UN);
-	fclose(metafptr);
-	super_block_update_transit(ptr->inode, FALSE, TRUE);
+	flock(fileno(local_metafptr), LOCK_UN);
+	fclose(local_metafptr);
+	flock(fileno(toupload_metafptr), LOCK_UN);
+	fclose(toupload_metafptr);
+	delete_backend_blocks(progress_fd, total_blocks,
+			ptr->inode, DEL_TOUPLOAD_BLOCKS);
+	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	return;
 }
 
 int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 #if (DEDUP_ENABLE)
-		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
-		  uint8_t id_in_meta[])
+		CURL_HANDLE *curl_handle, char *filename, char uploaded,
+		uint8_t id_in_meta[])
 #else
-		  CURL_HANDLE *curl_handle, char *filename)
+		int64_t seq, CURL_HANDLE *curl_handle, char *filename)
 #endif
 {
 	char objname[400];
 	FILE *fptr;
 	int32_t ret_val, errcode, ret;
+#if (DEDUP_ENABLE)
+	DDT_BTREE_NODE result_node;
 	int32_t ddt_fd = -1;
 	int32_t result_idx = -1;
-	DDT_BTREE_NODE result_node;
-#if (DEDUP_ENABLE)
 	char obj_id_str[OBJID_STRING_LENGTH];
 	uint8_t old_obj_id[OBJID_LENGTH];
 	uint8_t obj_id[OBJID_LENGTH];
@@ -1107,11 +1502,14 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 
 	/* Get objname - Object named by hash key */
 	obj_id_to_string(obj_id, obj_id_str);
+
 	/* hash_to_string(hash_key, hash_key_str); */
 	snprintf(objname, sizeof(objname), "data_%s", obj_id_str);
+
 #else
-	snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%" PRId64,
-		 (uint64_t)this_inode, block_no);
+	fetch_backend_block_objname(objname, this_inode, block_no, seq);
+	//snprintf(objname, sizeof(objname), "data_%" PRIu64 "_%lld_%lld",
+	//	 (uint64_t)this_inode, block_no, seq);
 	/* Force to upload */
 	ret = 1;
 #endif
@@ -1120,10 +1518,23 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		/* Find a same object in cloud
 		 * Just increase the refcount of the origin block
 		 */
-		write_log(
-		    10, "Debug datasync: find same obj %s - Aborted to upload",
-		    objname);
+#if (DEDUP_ENABLE)
+		write_log(10,
+			"Debug datasync: find same obj %s - Aborted to upload",
+			objname);
+
+		if (!memcmp(old_obj_id, id_in_meta, OBJID_LENGTH)) {
+			write_log(10, "Debug datasync: old obj id the same as"
+				"new obj id for block_%ld_%lld\n", this_inode,
+				block_no);
+			flock(ddt_fd, LOCK_UN);
+			fclose(ddt_fptr);
+			return ret;
+		}
+
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
+#endif
+
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
@@ -1180,21 +1591,6 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
-
-	/* Since the object mapped by this block is changed, need to remove old
-	 * object
-	 * Sync was successful
-	 */
-	if (ret == 0 && uploaded) {
-		printf("Start to delete obj %02x...%02x\n", old_obj_id[0],
-		       old_obj_id[31]);
-		/* Delete old object in cloud */
-		do_block_delete(this_inode, block_no, old_obj_id, curl_handle);
-
-		printf("Delete result - %d\n", ret);
-		printf("Delete obj - %02x...%02x\n", old_obj_id[0],
-		       old_obj_id[31]);
-	}
 #else
 	}
 #endif
@@ -1240,7 +1636,7 @@ int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 
 	fclose(fptr);
 	/* Already retried in get object if necessary */
-	if ((ret_val >= 200) && (ret_val <= 299))
+	if ((200 <= ret_val) && (ret_val <= 299))
 		ret = 0;
 	else
 		ret = -EIO;
@@ -1256,210 +1652,151 @@ int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
 	int32_t which_curl, ret, errcode, which_index;
-	int32_t count1;
+	char local_metapath[300];
+	struct stat filestat;
+	int64_t filesize;
+
+	filesize = 0;
+	ret = stat(thread_ptr->tempfilename, &filestat);
+	if (ret == 0) {
+		filesize = filestat.st_size;
+	} else {
+		errcode = errno;
+		write_log(0, "Error: Fail to stat file in %s. Code %d\n",
+				__func__, errcode);
+		goto errcode_handle;
+	}
 
 	which_curl = thread_ptr->which_curl;
 	which_index = thread_ptr->which_index;
-	if (thread_ptr->is_block == TRUE)
+	if (thread_ptr->is_block == TRUE) {
 #if (DEDUP_ENABLE)
+		/* Get old object id (object id on cloud) */
+		ret = get_progress_info(thread_ptr->progress_fd,
+			thread_ptr->blockno, &temp_block_uploading_status);
+		if (ret < 0)
+			goto errcode_handle;
+
+		/* The obj id should be read from progress file. This is used
+		 * to compare between old and new object id, and then decide
+		 * whether needs to upload the object. thread_ptr->obj_id
+		 * will be replaced with new object id after uploading */
+		memcpy(thread_ptr->obj_id,
+			temp_block_uploading_status.backend_objid,
+			OBJID_LENGTH);
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				    &(upload_curl_handles[which_curl]),
-				    thread_ptr->tempfilename,
-				    thread_ptr->is_upload, thread_ptr->obj_id);
+				&(upload_curl_handles[which_curl]),
+				thread_ptr->tempfilename,
+				thread_ptr->is_upload, thread_ptr->obj_id);
+
 #else
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				    &(upload_curl_handles[which_curl]),
-				    thread_ptr->tempfilename);
+				thread_ptr->seq,
+				&(upload_curl_handles[which_curl]),
+				thread_ptr->tempfilename);
 #endif
-	else
+	} else {
 		ret = do_meta_sync(thread_ptr->inode,
-				   &(upload_curl_handles[which_curl]),
-				   thread_ptr->tempfilename);
+				&(upload_curl_handles[which_curl]),
+				thread_ptr->tempfilename);
+	}
+
 	if (ret < 0)
 		goto errcode_handle;
 
 	UNLINK(thread_ptr->tempfilename);
+	change_system_meta(-filesize, 0, -filesize, 0, 0, 0, FALSE);
 	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 
 errcode_handle:
 	write_log(10, "Recording error in %s\n", __func__);
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == thread_ptr->inode)
-			break;
+	_set_inode_sync_error(thread_ptr->inode);
+
+	/* If upload caused by disconnection, then upload next time */
+	fetch_meta_path(local_metapath, thread_ptr->inode);
+	if (access(local_metapath, F_OK) == 0) {
+		if (hcfs_system->sync_paused == TRUE)
+			_set_inode_continue_nexttime(thread_ptr->inode);
 	}
-	if (count1 < MAX_SYNC_CONCURRENCY)
-		sync_ctl.threads_error[count1] = TRUE;
+
+	/* Unlink toupload block if we terminates uploading, but
+	 * do NOT unlink toupload meta because it will be re-upload
+	 * next time.*/
+	if (thread_ptr->is_block == TRUE) {
+		ret = unlink(thread_ptr->tempfilename);
+		if (ret == 0)
+			change_system_meta(-filesize, 0, -filesize,
+					0, 0, 0, FALSE);
+	}
 	upload_ctl.threads_finished[which_index] = TRUE;
-	/* Unlink the temp file if we terminates uploading */
-	unlink(thread_ptr->tempfilename);
-	sem_post(&(sync_ctl.sync_op_sem));
+	return;
 }
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int32_t which_curl, ret, count1, which_index;
+	int32_t which_curl, ret, which_index;
+	char local_metapath[200];
 
 	which_curl = thread_ptr->which_curl;
 	which_index = thread_ptr->which_index;
-	if (thread_ptr->is_block == TRUE)
+	if (thread_ptr->is_block == TRUE) {
 #if (DEDUP_ENABLE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
-				      thread_ptr->obj_id,
-				      &(upload_curl_handles[which_curl]));
+					thread_ptr->seq,
+					thread_ptr->obj_id,
+					&(upload_curl_handles[which_curl]));
 #else
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
-				      &(upload_curl_handles[which_curl]));
+					thread_ptr->seq,
+					&(upload_curl_handles[which_curl]));
 #endif
+	}
+
+	/* Do not care about object not found on cloud. */
 	if (ret < 0)
-		goto errcode_handle;
+		if (ret != -ENOENT)
+			goto errcode_handle;
 
 	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 
 errcode_handle:
 	write_log(10, "Recording error in %s\n", __func__);
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == thread_ptr->inode)
-			break;
+	_set_inode_sync_error(thread_ptr->inode);
+
+	/* If upload caused by disconnection, then upload next time */
+	fetch_meta_path(local_metapath, thread_ptr->inode);
+	if (access(local_metapath, F_OK) == 0) {
+		if (hcfs_system->sync_paused == TRUE)
+			_set_inode_continue_nexttime(thread_ptr->inode);
 	}
-	if (count1 < MAX_SYNC_CONCURRENCY)
-		sync_ctl.threads_error[count1] = TRUE;
 
 	upload_ctl.threads_finished[which_index] = TRUE;
-	sem_post(&(sync_ctl.sync_op_sem));
+	return;
 }
 
-int32_t schedule_sync_meta(FILE *metafptr, int32_t which_curl)
+int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl)
 {
-	char tempfilename[400];
-	char filebuf[4100];
-	char topen;
-	int32_t read_size;
-	int32_t count, ret, errcode;
-	size_t ret_size;
-	FILE *fptr;
-
-	topen = FALSE;
-	snprintf(tempfilename, sizeof(tempfilename),
-		 "/dev/shm/hcfs_sync_meta_%" PRIu64 ".tmp",
-		 (uint64_t)upload_ctl.upload_threads[which_curl].inode);
-
-	/* Find a appropriate copied-meta name */
-	count = 0;
-	while (TRUE) {
-		ret = access(tempfilename, F_OK);
-		if (ret == 0) {
-			count++;
-			snprintf(tempfilename, sizeof(tempfilename),
-				 "/dev/shm/hcfs_sync_meta_%" PRIu64 ".%d",
-				 (uint64_t)upload_ctl.upload_threads[which_curl]
-				     .inode,
-				 count);
-		} else {
-			errcode = errno;
-			break;
-		}
-	}
-
-	if (errcode != ENOENT) {
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
-			  strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-
-	fptr = fopen(tempfilename, "w");
-	if (fptr == NULL) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
-			  strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-
-	topen = TRUE;
-
-	/* Copy meta file */
-	FSEEK(metafptr, 0, SEEK_SET);
-	while (!feof(metafptr)) {
-		FREAD(filebuf, 1, 4096, metafptr);
-		read_size = ret_size;
-		if (read_size > 0)
-			FWRITE(filebuf, 1, read_size, fptr);
-		else
-			break;
-	}
-	fclose(fptr);
-
 	strncpy(upload_ctl.upload_threads[which_curl].tempfilename,
-		tempfilename, sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
+		toupload_metapath, sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
 		       (void *)&con_object_sync,
 		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
 
 	return 0;
-
-errcode_handle:
-	sem_wait(&(upload_ctl.upload_op_sem));
-	upload_ctl.threads_in_use[which_curl] = FALSE;
-	upload_ctl.threads_created[which_curl] = FALSE;
-	upload_ctl.threads_finished[which_curl] = FALSE;
-	upload_ctl.total_active_upload_threads--;
-	sem_post(&(upload_ctl.upload_op_sem));
-	sem_post(&(upload_ctl.upload_queue_sem));
-
-	if (topen == TRUE)
-		fclose(fptr);
-	return errcode;
 }
 
 int32_t dispatch_upload_block(int32_t which_curl)
 {
-	char tempfilename[400];
 	char thisblockpath[400];
-	char filebuf[4100];
-	int32_t read_size;
-	int32_t count, ret, errcode;
-	size_t ret_size;
-	FILE *fptr, *blockfptr;
+	char toupload_blockpath[400];
+	char local_metapath[400];
+	int32_t ret, errcode;
 	UPLOAD_THREAD_TYPE *upload_ptr;
-	char bopen, topen;
-
-	bopen = FALSE;
-	topen = FALSE;
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
-
-	snprintf(tempfilename, sizeof(tempfilename),
-		 "/dev/shm/hcfs_sync_block_%" PRIu64 "_%" PRId64 ".tmp",
-		 (uint64_t)upload_ptr->inode, upload_ptr->blockno);
-
-	/* Find an appropriate dispatch-name */
-	count = 0;
-	while (TRUE) {
-		ret = access(tempfilename, F_OK);
-		if (ret == 0) {
-			count++;
-			snprintf(tempfilename, sizeof(tempfilename),
-				 "/dev/shm/hcfs_sync_block_%" PRIu64 "_%" PRId64 ".%d",
-				 (uint64_t)upload_ptr->inode,
-				 upload_ptr->blockno, count);
-		} else {
-			errcode = errno;
-			break;
-		}
-	}
-
-	if (errcode != ENOENT) {
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
-			  strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
 
 	/* Open source block (origin block in blockpath) */
 	ret = fetch_block_path(thisblockpath, upload_ptr->inode,
@@ -1469,57 +1806,42 @@ int32_t dispatch_upload_block(int32_t which_curl)
 		goto errcode_handle;
 	}
 
-	blockfptr = fopen(thisblockpath, "r");
-	if (blockfptr == NULL) {
-		errcode = errno;
-		if (errcode == ENOENT) {
-			/* Block deleted already, log and skip */
-			write_log(10, "Block file %s gone. Perhaps deleted.\n",
-				  thisblockpath);
-			errcode = 0;
+	ret = fetch_toupload_block_path(toupload_blockpath,
+		upload_ptr->inode, upload_ptr->blockno, upload_ptr->seq);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	ret = check_and_copy_file(thisblockpath, toupload_blockpath,
+			TRUE, FALSE);
+	if (ret < 0) {
+		/* -EEXIST means target had been copied when writing */
+		/* If ret == -ENOENT, it means file is deleted. */
+		if (ret == -ENOENT) {
+			/* Return if meta is deleted */
+			fetch_meta_path(local_metapath, upload_ptr->inode);
+			if (access(local_metapath, F_OK) < 0) {
+				errcode = 0;
+				goto errcode_handle;
+			}
+			/* block is deleted but not be copied, return error */
+			if (access(toupload_blockpath, F_OK) < 0) {
+				errcode = errno;
+				goto errcode_handle;
+			}
+		}
+		if (ret != -EEXIST) {
+			errcode = ret;
 			goto errcode_handle;
 		}
-		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
-			  errcode, strerror(errcode));
-		write_log(10, "Debug path %s\n", thisblockpath);
-		errcode = -errcode;
-		goto errcode_handle;
 	}
 
-	bopen = TRUE;
+	strcpy(upload_ptr->tempfilename, toupload_blockpath);
+	pthread_create(&(upload_ctl.upload_threads_no[which_curl]),
+		NULL, (void *)&con_object_sync,	(void *)upload_ptr);
 
-	flock(fileno(blockfptr), LOCK_EX);
-	/* Open target block and prepare to copy */
-	fptr = fopen(tempfilename, "w");
-	if (fptr == NULL) {
-		errcode = errno;
-		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
-			  errcode, strerror(errcode));
-		write_log(10, "Debug path %s\n", tempfilename);
-		write_log(10, "Double check %d\n", access(tempfilename, F_OK));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-	topen = TRUE;
-	/* Copy block */
-	while (!feof(blockfptr)) {
-		FREAD(filebuf, 1, 4096, blockfptr);
-		read_size = ret_size;
-		if (read_size > 0)
-			FWRITE(filebuf, 1, read_size, fptr);
-		else
-			break;
-	}
-	flock(fileno(blockfptr), LOCK_UN);
-	fclose(blockfptr);
-	fclose(fptr);
-
-	strncpy(upload_ptr->tempfilename, tempfilename,
-		sizeof(upload_ptr->tempfilename));
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
-		       (void *)&con_object_sync, (void *)upload_ptr);
 	upload_ctl.threads_created[which_curl] = TRUE;
-
 	return 0;
 
 errcode_handle:
@@ -1533,10 +1855,6 @@ errcode_handle:
 	upload_ctl.total_active_upload_threads--;
 	sem_post(&(upload_ctl.upload_op_sem));
 	sem_post(&(upload_ctl.upload_queue_sem));
-	if (bopen == TRUE)
-		fclose(blockfptr);
-	if (topen == TRUE)
-		fclose(fptr);
 	return errcode;
 }
 
@@ -1548,35 +1866,93 @@ void dispatch_delete_block(int32_t which_curl)
 	upload_ctl.threads_created[which_curl] = TRUE;
 }
 
+/**
+ * Find a thread and let it start uploading inode
+ *
+ * This function is used to find an available thread and then nominate it
+ * to upload data of "this_inode". sync_single_inode() is main function for
+ * uploading a inode.
+ *
+ * @return thread index when succeeding in starting uploading.
+ *         Otherwise return -1.
+ */
 static inline int32_t _sync_mark(ino_t this_inode, mode_t this_mode,
 			     SYNC_THREAD_TYPE *sync_threads)
 {
-	int32_t count;
+	int32_t count, ret;
+	int32_t progress_fd;
+	char progress_file_path[300];
+
+	ret = 0;
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
+			/* Open progress file. If it exist, then revert
+			uploading. Otherwise open a new progress file */
+			fetch_progress_file_path(progress_file_path,
+				this_inode);
+			if (access(progress_file_path, F_OK) == 0) {
+				progress_fd = open(progress_file_path, O_RDWR);
+				if (progress_fd < 0) {
+					ret = -errno;
+					break;
+				}
+				sync_ctl.is_revert[count] = TRUE;
+				sync_threads[count].is_revert = TRUE;
+			} else {
+				progress_fd = create_progress_file(this_inode);
+				if (progress_fd < 0) {
+					ret = -1;
+					break;
+				}
+				sync_ctl.is_revert[count] = FALSE;
+				sync_threads[count].is_revert = FALSE;
+			}
+
+			/* Notify fuse process that it is going to upload */
+			ret = comm2fuseproc(this_inode, TRUE,
+					progress_fd, sync_ctl.is_revert[count],
+					FALSE);
+			if (ret < 0) {
+				write_log(2, "Fail to tagging inode %lld as "
+					"UPLOADING.\n", this_inode);
+				del_progress_file(progress_fd, this_inode);
+				break;
+			}
+			/* Prepare data */
 			sync_ctl.threads_in_use[count] = this_inode;
 			sync_ctl.threads_created[count] = FALSE;
 			sync_ctl.threads_finished[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
+			sync_ctl.continue_nexttime[count] = FALSE;
+			sync_ctl.progress_fd[count] = progress_fd;
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
+			sync_threads[count].progress_fd = progress_fd;
 			sync_threads[count].which_index = count;
 
 			write_log(10, "Before syncing: inode %" PRIu64
 				      ", mode %d\n",
 				  (uint64_t)sync_threads[count].inode,
 				  sync_threads[count].this_mode);
-			pthread_create(&(sync_ctl.inode_sync_thread[count]),
-				       NULL, (void *)&sync_single_inode,
-				       (void *)&(sync_threads[count]));
+
+			if (sync_ctl.is_revert[count] == TRUE)
+				pthread_create(
+					&(sync_ctl.inode_sync_thread[count]),
+					NULL, (void *)&continue_inode_sync,
+					(void *)&(sync_threads[count]));
+			else
+				pthread_create(
+					&(sync_ctl.inode_sync_thread[count]),
+					NULL, (void *)&sync_single_inode,
+					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
 			break;
 		}
 	}
 
-	return count;
+	return ret;
 }
 
 static inline void _write_upload_loop_status_log(char *sync_paused_status)
@@ -1670,8 +2046,11 @@ void upload_loop(void)
 		}
 
 		super_block_exclusive_locking();
-		if (ino_check == 0)
+		if (ino_check == 0) {
 			ino_check = sys_super_block->head.first_dirty_inode;
+			write_log(10, "Debug: first dirty inode is inode %lld\n"
+				, ino_check);
+		}
 		ino_sync = 0;
 		if (ino_check != 0) {
 			ino_sync = ino_check;
@@ -1683,6 +2062,8 @@ void upload_loop(void)
 				ino_check = 0;
 			} else {
 				if (tempentry.in_transit == TRUE) {
+					/* TODO: Revert in_transit inode after
+					crashing. (Maybe in superblock?) */
 					ino_check = tempentry.util_ll_next;
 				} else {
 					tempentry.in_transit = TRUE;
@@ -1713,11 +2094,23 @@ void upload_loop(void)
 			}
 
 			if (in_sync == FALSE) {
-				ret_val = _sync_mark(
-				    ino_sync, tempentry.inode_stat.st_mode,
-				    sync_threads);
-				sem_post(&(sync_ctl.sync_op_sem));
-			} else { /*If already syncing to cloud*/
+				ret_val = _sync_mark(ino_sync,
+						tempentry.inode_stat.st_mode,
+								sync_threads);
+				if (ret_val < 0) { /* Sync next time */
+					ret = super_block_update_transit(
+						ino_sync, FALSE, TRUE);
+					if (ret < 0) {
+						ino_sync = 0;
+						ino_check = 0;
+					}
+					sem_post(&(sync_ctl.sync_queue_sem));
+					sem_post(&(sync_ctl.sync_op_sem));
+				} else {
+					sem_post(&(sync_ctl.sync_op_sem));
+				}
+			} else {  /*If already syncing to cloud*/
+
 				sem_post(&(sync_ctl.sync_op_sem));
 				sem_post(&(sync_ctl.sync_queue_sem));
 			}
@@ -1756,7 +2149,10 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
-	write_log(10, "Debug entering update backend stat\n");
+	write_log(10, "Debug: entering update backend stat\n");
+	write_log(10, "Debug: root %"PRIu64" change %lld bytes and %lld "
+		"inodes on backend\n", (uint64_t)root_inode, system_size_delta,
+		num_inodes_delta);
 
 	/* TODO: Perhaps need to backup sum of backend data to backend as well
 	*/

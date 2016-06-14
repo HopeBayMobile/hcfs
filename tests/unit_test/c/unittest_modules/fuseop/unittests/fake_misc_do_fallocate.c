@@ -362,7 +362,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	return 0;
 }
-int32_t fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
+/*int32_t fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
 		int64_t block_no)
 {
 	char tempbuf[1024];
@@ -388,7 +388,7 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, ino_t this_inode,
 		break;
 	}
 	return 0;
-}
+}*/
 
 void sleep_on_cache_full(void)
 {

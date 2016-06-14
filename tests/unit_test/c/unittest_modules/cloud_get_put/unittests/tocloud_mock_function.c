@@ -9,11 +9,12 @@
 #include "global.h"
 #include "fuseop.h"
 #include "enc.h"
+#include "atomic_tocloud.h"
 #include "mount_manager.h"
 
 int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	strcpy(pathname, "/tmp/testHCFS/mock_file_meta");
+	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 
@@ -47,7 +48,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 	char transit_incomplete)
 {
-	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
+	if (this_inode > 1 && transit_incomplete == FALSE) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
 		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
 			this_inode; // Record the inode number to verify.
@@ -87,7 +88,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTT
 int32_t do_block_delete(ino_t this_inode, int64_t block_no, uint8_t *obj_id,
 		    CURL_HANDLE *curl_handle)
 #else
-int32_t do_block_delete(ino_t this_inode, int64_t block_no,
+int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 		    CURL_HANDLE *curl_handle)
 #endif
 {
@@ -210,7 +211,196 @@ int32_t sync_hcfs_system_data(char need_lock)
 {
 	return 0;
 }
+
 int32_t backup_FS_database(void)
+{
+	return 0;
+}
+
+void fetch_backend_block_objname(char *objname, ino_t inode,
+		long long block_no, long long seqnum)
+{
+	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
+	return;
+}
+
+int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
+		int64_t block_no, int64_t seq)
+{
+	sprintf(pathname, "mock_meta_folder/mock_toupload_block_%"PRIu64"_%lld",
+			(uint64_t)inode, block_no);
+	return 0;
+}
+
+int fetch_toupload_meta_path(char *pathname, ino_t inode)
+{
+	sprintf(pathname, "mock_meta_folder/mock_toupload_meta_%"PRIu64,
+			(uint64_t)inode);
+
+	return 0;
+}
+
+int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
+		int fd, BOOL is_revert, BOOL finish_sync)
+{
+	return 0;
+}
+
+int del_progress_file(int fd, ino_t inode)
+{
+	close(fd);
+	unlink("/tmp/mock_progress_file");
+	return 0;
+}
+
+int32_t set_progress_info(int32_t fd, int64_t block_index,
+	const char *toupload_exist, const char *backend_exist,
+	const int64_t *toupload_seq, const int64_t *backend_seq,
+	const char *finish)
+{
+	BLOCK_UPLOADING_STATUS block_entry;
+
+	if (toupload_seq)
+		block_entry.to_upload_seq = *toupload_seq;
+	if (backend_seq)
+		block_entry.backend_seq = *backend_seq;
+	if (finish)
+		block_entry.finish_uploading = *finish;
+
+	/* Linear mock */	
+	pwrite(fd, &block_entry, sizeof(BLOCK_UPLOADING_STATUS),
+			block_index * sizeof(BLOCK_UPLOADING_STATUS));
+
+	return 0;
+}
+
+int64_t query_status_page(int32_t fd, int64_t block_index)
+{
+	return (block_index / MAX_BLOCK_ENTRIES_PER_PAGE) *
+		sizeof(BLOCK_UPLOADING_PAGE);
+}
+
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
+		int64_t *total_backend_blocks, int64_t upload_seq)
+{
+	return 0;
+}
+
+int check_and_copy_file(const char *srcpath, const char *tarpath,
+		BOOL lock_src, BOOL reject_if_nospc)
+{
+	mknod(tarpath, 0700, 0);
+	return 0;
+}
+
+void fetch_progress_file_path(char *pathname, ino_t inode)
+{
+	return;
+}
+
+char block_finish_uploading(int32_t fd, int64_t blockno)
+{
+	return TRUE;
+}
+
+int create_progress_file(ino_t inode)
+{
+	return 0;
+}
+
+void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
+{
+	return;
+}
+
+int change_action(int fd, char now_action)
+{
+	return 0;
+}
+
+int change_status_to_BOTH(ino_t inode, int progress_fd,
+		FILE *local_metafptr, char *local_metapath)
+{
+	FILE_META_TYPE filemeta;
+	BLOCK_ENTRY_PAGE block_page;
+	int i;
+	long long pos;
+	long long page_count;
+	size_t ret_size;
+
+	printf("Begin to change status to BOTH\n");
+	page_count = 0;
+	fseek(local_metafptr, sizeof(struct stat), SEEK_SET);
+	fread(&filemeta, sizeof(FILE_META_TYPE), 1, local_metafptr);
+	while (!feof(local_metafptr)) {
+		/* Linearly read block meta */
+		fseek(local_metafptr, sizeof(struct stat) +
+			sizeof(FILE_META_TYPE) + sizeof(FILE_STATS_TYPE) +
+			sizeof(CLOUD_RELATED_DATA) + page_count *
+			sizeof(BLOCK_ENTRY_PAGE), SEEK_SET);
+		ret_size = fread(&block_page, 1, sizeof(BLOCK_ENTRY_PAGE),
+				local_metafptr);
+		if (ret_size != sizeof(BLOCK_ENTRY_PAGE))
+			break;
+
+		for (i = 0 ; i < block_page.num_entries ; i++) {
+			if (block_page.block_entries[i].status == ST_LtoC)
+				block_page.block_entries[i].status = ST_BOTH;
+		}
+		fseek(local_metafptr, sizeof(struct stat) +
+			sizeof(FILE_META_TYPE) + sizeof(FILE_STATS_TYPE) +
+			sizeof(CLOUD_RELATED_DATA) + page_count *
+			sizeof(BLOCK_ENTRY_PAGE), SEEK_SET);
+		fwrite(&block_page, 1, sizeof(BLOCK_ENTRY_PAGE), local_metafptr);
+
+		page_count++;
+	}
+
+	return 0;
+}
+
+int change_block_status_to_BOTH(ino_t inode, long long blockno,
+		long long page_pos, long long toupload_seq)
+{
+	FILE *fptr;
+	BLOCK_ENTRY_PAGE tmppage;
+	int i;
+
+	i = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	if (page_pos <= 0)
+		return 0;
+
+	fptr = fopen(MOCK_META_PATH, "r+");
+	if (!fptr)
+		return 0;
+	setbuf(fptr, NULL);
+	flock(fptr, LOCK_EX);
+	fseek(fptr, page_pos, SEEK_SET);
+	fread(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	if (tmppage.block_entries[i].status == ST_LtoC)
+		tmppage.block_entries[i].status = ST_BOTH;
+	fseek(fptr, page_pos, SEEK_SET);
+	fwrite(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	flock(fptr, LOCK_UN);
+	fclose(fptr);
+
+	return 0;
+}
+
+int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
+		char delete_which_one)
+{
+	return 0;
+}
+
+void busy_wait_all_specified_upload_threads(ino_t inode)
+{
+	return;
+}
+
+int revert_block_status_LDISK(ino_t this_inode, long long blockno,
+		int e_index, long long page_filepos)
 {
 	return 0;
 }
@@ -242,6 +432,20 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 			int64_t cached_size_delta,
 			int64_t dirty_data_size_delta,
 			ino_t thisinode)
+{
+	return 0;
+}
+
+int32_t get_progress_info(int32_t fd, int64_t block_index,
+		BLOCK_UPLOADING_STATUS *block_uploading_status)
+{
+	return 0;
+}
+
+int32_t change_system_meta(int64_t system_data_size_delta,
+		int64_t meta_size_delta, int64_t cache_data_size_delta,
+		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+		int64_t unpin_dirty_data_size, BOOL need_sync)
 {
 	return 0;
 }

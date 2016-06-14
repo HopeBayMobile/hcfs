@@ -491,6 +491,15 @@ int32_t main(int32_t argc, char **argv)
 	case 2:
 		open_log("backend_upload.log");
 		write_log(2, "\nStart logging backend upload\n");
+		
+		/* Init curl handle */
+		sem_init(&download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
+		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
+				count++)
+			_init_download_curl(count, "upload_loop");
+
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		upload_loop();

@@ -459,7 +459,7 @@ void run_cache_loop(void)
 			/* skip empty bucket */
 			if (inode_cache_usage_hash[e_index] == NULL) {
 				e_index++;
-				write_log(10, "Skipping, part 1\n");
+			//	write_log(10, "Skipping, part 1\n");
 				continue;
 			}
 
@@ -467,7 +467,7 @@ void run_cache_loop(void)
 			if (inode_cache_usage_hash[e_index]->clean_cache_size
 									<= 0) {
 				e_index++;
-				write_log(10, "Skipping, part 2\n");
+			//	write_log(10, "Skipping, part 2\n");
 				continue;
 			}
 
@@ -484,7 +484,7 @@ void run_cache_loop(void)
 				if ((currenttime.tv_sec - node_time) <
 				     SCAN_INT) {
 					e_index++;
-					write_log(10, "Skipping, part 3\n");
+			//		write_log(10, "Skipping, part 3\n");
 					continue;
 				}
 			}

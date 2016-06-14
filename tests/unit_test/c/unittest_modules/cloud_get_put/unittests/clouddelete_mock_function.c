@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <curl/curl.h>
 #include <semaphore.h>
+#include <inttypes.h>
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include "super_block.h"
@@ -92,9 +93,9 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 {
 	if (target_page >= 3)
 		return 0;
-	int64_t ret_page_pos = sizeof(struct stat) + 
-		sizeof(FILE_META_TYPE) + target_page *
-		sizeof(BLOCK_ENTRY_PAGE);
+	long long ret_page_pos = sizeof(struct stat) + 
+		sizeof(FILE_META_TYPE) + sizeof(CLOUD_RELATED_DATA) +
+		target_page * sizeof(BLOCK_ENTRY_PAGE);
 	return ret_page_pos;
 }
 
@@ -119,4 +120,55 @@ void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
 {
 	sleep(secs);
 	return;
+}
+
+int fetch_toupload_meta_path(char *pathname, ino_t inode)
+{
+	return 0;
+}
+
+void fetch_backend_meta_objname(char *objname, ino_t inode)
+{
+	return;
+}
+
+void fetch_backend_block_objname(char *objname,
+	ino_t inode, long long block_no, long long seqnum)
+{
+	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
+	return;
+}
+
+int fetch_backend_meta_path(char *pathname, ino_t inode)
+{
+	return 0;
+}
+
+void fetch_progress_file_path(char *pathname, ino_t inode)
+{
+	return 0;
+}
+
+int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+{
+	FILE *src;
+	char buf[4100];
+	size_t size;
+
+	src = fopen(TODELETE_PATH, "r");
+
+	fseek(fptr, 0, SEEK_SET);
+	fseek(src, 0, SEEK_SET);
+	while (size = fread(buf, 1, 4096, src)) {
+		fwrite(buf, 1, size, fptr);
+	}
+
+	close(src);
+
+	return 0;
+}
+
+void fetch_del_backend_meta_path(char *backend_metapath, ino_t this_inode)
+{
+	sprintf(backend_metapath, "/tmp/mock_backend_meta");
 }
