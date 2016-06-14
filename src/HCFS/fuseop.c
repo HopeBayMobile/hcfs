@@ -2264,22 +2264,23 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 	while (hcfs_system->system_going_down == FALSE) {
 		ret = meta_cache_check_uploading(*body_ptr,
 				this_inode, blockno, seq);
-		if (ret < 0) {
-			if (ret == -ENOSPC) {
-				ret = meta_cache_unlock_entry(*body_ptr);
-				if (ret < 0)
-					break;
-				ret = sleep_on_cache_full();
-				if (ret < 0)
-					break;
-				*body_ptr = meta_cache_lock_entry(this_inode);
-				if (*body_ptr == NULL) {
-					ret = -ENOMEM;
-					break;
-				}
-			} else {
+		if (ret == -ENOSPC) {
+			ret = meta_cache_unlock_entry(*body_ptr);
+			if (ret < 0)
+				break;
+			ret = sleep_on_cache_full();
+			if (ret < 0) {
+				*body_ptr = meta_cache_lock_entry(
+						this_inode);
 				break;
 			}
+			*body_ptr = meta_cache_lock_entry(this_inode);
+			if (*body_ptr == NULL) {
+				ret = -ENOMEM;
+				break;
+			}
+		} else {
+			break;
 		}
 	}
 
