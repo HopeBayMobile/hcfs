@@ -96,6 +96,10 @@ class fuseopEnvironment : public ::testing::Environment {
 
     system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+    system_config->max_cache_limit =
+        (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+    system_config->max_pinned_limit =
+        (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     sem_init(&(hcfs_system->access_sem), 0, 1);
     sys_super_block = (SUPER_BLOCK_CONTROL *)

@@ -75,6 +75,16 @@ int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
 	if (config->cache_reserved_space < 0)
 		return -EINVAL;
 
+	config->max_cache_limit =
+		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+	if (config->max_cache_limit == NULL)
+		return -ENOMEM;
+
+	config->max_pinned_limit =
+		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+	if (config->max_pinned_limit == NULL)
+		return -ENOMEM;
+
 	config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
 	config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
 

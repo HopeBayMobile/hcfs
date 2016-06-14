@@ -18,6 +18,10 @@ class do_fallocateTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    system_config->max_cache_limit =
+        (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+    system_config->max_pinned_limit =
+        (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
     before_update_file_data = TRUE;
     root_updated = FALSE;
     fake_block_status = ST_NONE;

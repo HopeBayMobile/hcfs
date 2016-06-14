@@ -17,6 +17,12 @@ class file_presentEnvironment : public ::testing::Environment {
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
+			system_config->max_cache_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+
+			system_config->max_pinned_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		}
 		void TearDown()
 		{
@@ -732,7 +738,6 @@ protected:
 	{
 		pin_type = 1;
 		mock_reserved_size = 0;
-		CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 			malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->systemdata.pinned_size = 0;

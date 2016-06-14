@@ -181,6 +181,10 @@ class api_moduleTest : public ::testing::Test
 	{
     		system_config = (SYSTEM_CONF_STRUCT *)
 			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->max_cache_limit =
+			(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+		system_config->max_pinned_limit =
+			(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		api_server_monitor_time = 1;
 		hcfs_system =
 		    (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
