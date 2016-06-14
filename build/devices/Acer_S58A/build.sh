@@ -127,14 +127,9 @@ function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	service rpcbind start || :
 	if ! mount  | grep 'nas:/ubuntu on /mnt/nas'; then
-		umount /mnt/nas || :
 		mkdir -p /mnt/nas
-		mount nas:/ubuntu /mnt/nas
+		mount nas:/ubuntu /mnt/nas || :
 	fi
-}
-function unmount_nas() {
-	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
-	umount /mnt/nas
 }
 function make_s58a_source_patch() {
 	rsync -arcv --no-owner --no-group --no-times \
