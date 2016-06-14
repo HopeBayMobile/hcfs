@@ -128,7 +128,7 @@ function setup_ssh_key() {
 	ssh-add ~/.ssh/id_rsa
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
-	ssh-keygen -R $DOCKER_IP
+	ssh-keygen -R $DOCKER_IP || :
 	until ssh -oBatchMode=yes -oStrictHostKeyChecking=no root@$DOCKER_IP pwd
 	do
 		: "Wait builder sshd.."
@@ -189,6 +189,7 @@ function mount_nas() {
 	service rpcbind start || :
 	if ! mount  | grep 'nas:/ubuntu on /mnt/nas'; then
 		umount /mnt/nas || :
+		mkdir -p /mnt/nas
 		mount nas:/ubuntu /mnt/nas
 	fi
 }
