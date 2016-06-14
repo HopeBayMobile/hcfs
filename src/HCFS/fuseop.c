@@ -2257,7 +2257,8 @@ int32_t truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
  * unlock meta entry and sleep. Then wait for cache space and copy block again.
  */
 int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
-		ino_t this_inode, int64_t blockno, int64_t seq)
+		ino_t this_inode, int64_t blockno, int64_t seq,
+		BLOCK_ENTRY_PAGE *temppage, int64_t pagepos)
 {
 	int ret;
 
@@ -2265,20 +2266,31 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 		ret = meta_cache_check_uploading(*body_ptr,
 				this_inode, blockno, seq);
 		if (ret == -ENOSPC) {
+			meta_cache_update_file_data(this_inode, NULL,
+					NULL, temppage, pagepos, *body_ptr);
 			ret = meta_cache_unlock_entry(*body_ptr);
 			if (ret < 0)
 				break;
+
+			/* Wait for free cache space */
 			ret = sleep_on_cache_full();
 			if (ret < 0) {
 				*body_ptr = meta_cache_lock_entry(
 						this_inode);
+				meta_cache_lookup_file_data(this_inode, NULL,
+						NULL, temppage, pagepos,
+						*body_ptr);
 				break;
 			}
+
 			*body_ptr = meta_cache_lock_entry(this_inode);
 			if (*body_ptr == NULL) {
 				ret = -ENOMEM;
 				break;
 			}
+			/* Lookup again. Page may be modified by others. */
+			meta_cache_lookup_file_data(this_inode, NULL,
+					NULL, temppage, pagepos, *body_ptr);
 		} else {
 			break;
 		}
@@ -2294,8 +2306,9 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 *  "old_last_block". "inode_index" is the inode number of the file being
 *  truncated. */
 int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
-			int64_t page_index, int64_t old_last_block,
-			ino_t inode_index, META_CACHE_ENTRY_STRUCT *body_ptr,
+			int64_t page_index, int64_t page_pos,
+			int64_t old_last_block, ino_t inode_index,
+			META_CACHE_ENTRY_STRUCT *body_ptr,
 			FILE_META_TYPE *filemeta)
 {
 	int32_t block_count;
@@ -2337,7 +2350,8 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			break;
 		case ST_LDISK:
 			ret_val = _check_sync_wait_full_cache(&body_ptr,
-				inode_index, block_count, tmpentry->seqnum);
+				inode_index, block_count, tmpentry->seqnum,
+				temppage, page_pos);
 			if (ret_val < 0)
 				return ret_val;
 			ret_val = fetch_block_path(thisblockpath, inode_index,
@@ -2345,25 +2359,28 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			if (ret_val < 0)
 				return ret_val;
 
-			cache_block_size =
+			if (tmpentry->status == ST_LDISK) {
+				cache_block_size =
 					check_file_size(thisblockpath);
-			ret_val = unlink(thisblockpath);
-			if (ret_val < 0) {
-				errcode = errno;
-				write_log(0, "IO error in truncate. ");
-				write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
-			}
-			if (tmpentry->uploaded == TRUE)
-				tmpentry->status = ST_TODELETE;
-			else
-				tmpentry->status = ST_NONE;
+				ret_val = unlink(thisblockpath);
+				if (ret_val < 0) {
+					errcode = errno;
+					write_log(0, "IO error in truncate. ");
+					write_log(0, "Code %d, %s\n", errcode,
+							strerror(errcode));
+				}
+				if (tmpentry->uploaded == TRUE)
+					tmpentry->status = ST_TODELETE;
+				else
+					tmpentry->status = ST_NONE;
 
-			total_deleted_cache += (int64_t) cache_block_size;
-			total_deleted_dirty_cache +=
-						(int64_t) cache_block_size;
-			total_deleted_blocks += 1;
-			total_deleted_fileblocks++;
+				total_deleted_cache += (int64_t)
+						cache_block_size;
+				total_deleted_dirty_cache +=
+					(int64_t) cache_block_size;
+				total_deleted_blocks += 1;
+				total_deleted_fileblocks++;
+			}
 			break;
 		case ST_CLOUD:
 			tmpentry->status =
@@ -2388,25 +2405,28 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			break;
 		case ST_LtoC:
 			ret_val = _check_sync_wait_full_cache(&body_ptr,
-				inode_index, block_count, tmpentry->seqnum);
+				inode_index, block_count, tmpentry->seqnum,
+				temppage, page_pos);
 			if (ret_val < 0)
 				return ret_val;
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
 			if (ret_val < 0)
 				return ret_val;
-			if (access(thisblockpath, F_OK) == 0) {
-				cache_block_size =
-					check_file_size(thisblockpath);
-				unlink(thisblockpath);
-				total_deleted_cache +=
-					(int64_t) cache_block_size;
-				total_deleted_dirty_cache +=
-					(int64_t) cache_block_size;
-				total_deleted_blocks += 1;
+			if (tmpentry->status == ST_LtoC) {
+				if (access(thisblockpath, F_OK) == 0) {
+					cache_block_size =
+						check_file_size(thisblockpath);
+					unlink(thisblockpath);
+					total_deleted_cache +=
+						(int64_t) cache_block_size;
+					total_deleted_dirty_cache +=
+						(int64_t) cache_block_size;
+					total_deleted_blocks += 1;
+				}
+				tmpentry->status = ST_TODELETE;
+				total_deleted_fileblocks++;
 			}
-			tmpentry->status = ST_TODELETE;
-			total_deleted_fileblocks++;
 			break;
 		case ST_CtoL:
 			ret_val = fetch_block_path(thisblockpath, inode_index,
@@ -2667,13 +2687,14 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 		if (last_block_entry->status == ST_NONE)
 			return 0;
 
-		tmpstatus = (temppage->block_entries[last_index]).status;
-
 		ret = _check_sync_wait_full_cache(body_ptr, this_inode,
 				last_block,
-				(temppage->block_entries[last_index]).seqnum);
+				(temppage->block_entries[last_index]).seqnum,
+				temppage, currentfilepos);
 		if (ret < 0)
 			return ret;
+
+		tmpstatus = (temppage->block_entries[last_index]).status;
 
 		/* TODO: Error handling here if block status is not ST_NONE
 			but cannot find block on local disk */
@@ -2932,7 +2953,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 
 			ret = truncate_delete_block(&temppage, last_index+1,
-				current_page, old_last_block,
+				current_page, filepos, old_last_block,
 				filestat->st_ino, (*body_ptr), &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
@@ -2989,7 +3010,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				goto errcode_handle;
 			}
 			ret = truncate_delete_block(&temppage, 0,
-				current_page, old_last_block,
+				current_page, filepos, old_last_block,
 				filestat->st_ino, (*body_ptr), &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
@@ -4318,6 +4339,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		int64_t seq;
+		char now_status;
 		/* If the cached block is not the one we are writing to,
 		*  close the one already opened. */
 		if (fh_ptr->opened_block != -1) {
@@ -4379,7 +4401,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		case ST_LDISK:
 			ret = _check_sync_wait_full_cache(
 					&(fh_ptr->meta_cache_ptr),
-					this_inode, bindex, seq);
+					this_inode, bindex, seq,
+					&temppage, this_page_fpos);
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;
@@ -4391,25 +4414,32 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					ST_LtoC) {
 				ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
-						this_inode, bindex, seq);
+						this_inode, bindex, seq,
+						&temppage, this_page_fpos);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
 				}
 			}
-			(temppage).block_entries[entry_index].status = ST_LDISK;
-			ret = set_block_dirty_status(thisblockpath,
+			now_status =
+				(temppage).block_entries[entry_index].status;
+			if (now_status == ST_LtoC || now_status == ST_BOTH) {
+				(temppage).block_entries[entry_index].status =
+						ST_LDISK;
+				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
-			if (ret < 0) {
-				*reterr = -EIO;
-				return 0;
-			}
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+				if (ret < 0) {
+					*reterr = -EIO;
+					return 0;
+				}
+				ret = meta_cache_update_file_data(
+					fh_ptr->thisinode,
 					NULL, NULL, &temppage, this_page_fpos,
-						fh_ptr->meta_cache_ptr);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
+					fh_ptr->meta_cache_ptr);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
 			}
 			break;
 		case ST_CLOUD:
@@ -4440,13 +4470,15 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	} else {
 		int64_t seq;
+		char now_status;
 		seq = temppage.block_entries[entry_index].seqnum;
 		/* Check if there is a need for status change */
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_LDISK:
 			ret = _check_sync_wait_full_cache(
 					&(fh_ptr->meta_cache_ptr),
-					this_inode, bindex, seq);
+					this_inode, bindex, seq,
+					&temppage, this_page_fpos);
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;
@@ -4458,25 +4490,32 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					ST_LtoC) {
 				ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
-						this_inode, bindex, seq);
+						this_inode, bindex, seq,
+						&temppage, this_page_fpos);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
 				}
 			}
-			(temppage).block_entries[entry_index].status = ST_LDISK;
-			ret = set_block_dirty_status(thisblockpath,
+			now_status =
+				(temppage).block_entries[entry_index].status;
+			if (now_status == ST_LtoC || now_status == ST_BOTH) {
+				(temppage).block_entries[entry_index].status =
+						ST_LDISK;
+				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
-			if (ret < 0) {
-				*reterr = -EIO;
-				return 0;
-			}
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+				if (ret < 0) {
+					*reterr = -EIO;
+					return 0;
+				}
+				ret = meta_cache_update_file_data(
+					fh_ptr->thisinode,
 					NULL, NULL, &temppage, this_page_fpos,
-						fh_ptr->meta_cache_ptr);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
+					fh_ptr->meta_cache_ptr);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
 			}
 			break;
 		default:
