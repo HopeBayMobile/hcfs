@@ -7,7 +7,6 @@ int32_t before_mknod_created;
 int32_t fail_mkdir_update_meta;
 int32_t before_mkdir_created;
 
-uint32_t fake_paged_out_count;
 int32_t before_update_file_data;
 int32_t root_updated;
 int32_t after_update_block_page;
