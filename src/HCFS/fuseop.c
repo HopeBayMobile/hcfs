@@ -2276,7 +2276,9 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 
 			/* Wait for free cache space */
 			sleep_times++;
+			write_log(10, "Debug: Sleep and wait free cache\n");
 			ret = sleep_on_cache_full();
+			write_log(10, "Debug: Wake up and keep check sync\n");
 			if (ret < 0) {
 				*body_ptr = meta_cache_lock_entry(
 						this_inode);
@@ -2293,6 +2295,7 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 				ret = -ENOMEM;
 				break;
 			}
+			meta_cache_open_file(*body_ptr);
 			/* Lookup again. Page may be modified by others. */
 			meta_cache_lookup_file_data(this_inode, NULL,
 					NULL, temppage, pagepos, *body_ptr);
@@ -2351,22 +2354,26 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 
 		tmpentry = &(temppage->block_entries[block_count]);
 
-		switch (tmpentry->status) {
-		case ST_NONE:
-		case ST_TODELETE:
-			break;
-		case ST_LDISK:
-			ret_val = _check_sync_wait_full_cache(&body_ptr,
-				inode_index, block_count, tmpentry->seqnum,
-				temppage, page_pos);
-			if (ret_val < 0)
-				return ret_val;
-			ret_val = fetch_block_path(thisblockpath, inode_index,
-				tmp_blk_index);
-			if (ret_val < 0)
-				return ret_val;
+		while (hcfs_system->system_going_down == FALSE) {
+			switch (tmpentry->status) {
+			case ST_NONE:
+			case ST_TODELETE:
+				break;
+			case ST_LDISK:
+				ret_val = _check_sync_wait_full_cache(&body_ptr,
+					inode_index, block_count,
+					tmpentry->seqnum,
+					temppage, page_pos);
+				if (ret_val < 0)
+					return ret_val;
+				else if (ret_val > 0) /* Check status again */
+					continue;
 
-			if (tmpentry->status == ST_LDISK) {
+				ret_val = fetch_block_path(thisblockpath,
+					inode_index, tmp_blk_index);
+				if (ret_val < 0)
+					return ret_val;
+
 				cache_block_size =
 					check_file_size(thisblockpath);
 				ret_val = unlink(thisblockpath);
@@ -2382,45 +2389,46 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 					tmpentry->status = ST_NONE;
 
 				total_deleted_cache += (int64_t)
-						cache_block_size;
+					cache_block_size;
 				total_deleted_dirty_cache +=
 					(int64_t) cache_block_size;
 				total_deleted_blocks += 1;
 				total_deleted_fileblocks++;
-			}
-			break;
-		case ST_CLOUD:
-			tmpentry->status =
-				ST_TODELETE;
-			total_deleted_fileblocks++;
-			break;
-		case ST_BOTH:
-			ret_val = fetch_block_path(thisblockpath, inode_index,
-				tmp_blk_index);
-			if (ret_val < 0)
-				return ret_val;
-			if (access(thisblockpath, F_OK) == 0) {
-				cache_block_size =
-					check_file_size(thisblockpath);
-				unlink(thisblockpath);
-				total_deleted_cache +=
-					(int64_t) cache_block_size;
-				total_deleted_blocks += 1;
-			}
-			tmpentry->status = ST_TODELETE;
-			total_deleted_fileblocks++;
-			break;
-		case ST_LtoC:
-			ret_val = _check_sync_wait_full_cache(&body_ptr,
-				inode_index, block_count, tmpentry->seqnum,
-				temppage, page_pos);
-			if (ret_val < 0)
-				return ret_val;
-			ret_val = fetch_block_path(thisblockpath, inode_index,
-				tmp_blk_index);
-			if (ret_val < 0)
-				return ret_val;
-			if (tmpentry->status == ST_LtoC) {
+				break;
+			case ST_CLOUD:
+				tmpentry->status =
+						ST_TODELETE;
+				total_deleted_fileblocks++;
+				break;
+			case ST_BOTH:
+				ret_val = fetch_block_path(thisblockpath,
+					inode_index, tmp_blk_index);
+				if (ret_val < 0)
+					return ret_val;
+				if (access(thisblockpath, F_OK) == 0) {
+					cache_block_size =
+						check_file_size(thisblockpath);
+					unlink(thisblockpath);
+					total_deleted_cache +=
+						(int64_t) cache_block_size;
+					total_deleted_blocks += 1;
+				}
+				tmpentry->status = ST_TODELETE;
+				total_deleted_fileblocks++;
+				break;
+			case ST_LtoC:
+				ret_val = _check_sync_wait_full_cache(&body_ptr,
+					inode_index, block_count,
+					tmpentry->seqnum,
+					temppage, page_pos);
+				if (ret_val < 0)
+					return ret_val;
+				else if (ret_val > 0) /* Check status again */
+					continue;
+				ret_val = fetch_block_path(thisblockpath,
+					inode_index, tmp_blk_index);
+				if (ret_val < 0)
+					return ret_val;
 				if (access(thisblockpath, F_OK) == 0) {
 					cache_block_size =
 						check_file_size(thisblockpath);
@@ -2433,19 +2441,22 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 				}
 				tmpentry->status = ST_TODELETE;
 				total_deleted_fileblocks++;
+				break;
+			case ST_CtoL:
+				ret_val = fetch_block_path(thisblockpath,
+						inode_index, tmp_blk_index);
+				if (ret_val < 0)
+					return ret_val;
+				if (access(thisblockpath, F_OK) == 0)
+					unlink(thisblockpath);
+				tmpentry->status = ST_TODELETE;
+				total_deleted_fileblocks++;
+				break;
+			default:
+				break;
 			}
-			break;
-		case ST_CtoL:
-			ret_val = fetch_block_path(thisblockpath, inode_index,
-				tmp_blk_index);
-			if (ret_val < 0)
-				return ret_val;
-			if (access(thisblockpath, F_OK) == 0)
-				unlink(thisblockpath);
-			tmpentry->status = ST_TODELETE;
-			total_deleted_fileblocks++;
-			break;
-		default:
+
+			/* Leave loop directly */
 			break;
 		}
 
@@ -2458,7 +2469,7 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 				   -total_deleted_blocks,
 				   -total_deleted_dirty_cache,
 				   unpin_dirty_size, TRUE);
-		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
+		ret = update_file_stats(body_ptr->fptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				-total_deleted_dirty_cache, inode_index);
 		if (ret < 0) {
@@ -4373,7 +4384,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		int64_t seq;
-		char now_status;
 		/* If the cached block is not the one we are writing to,
 		*  close the one already opened. */
 		if (fh_ptr->opened_block != -1) {
@@ -4388,64 +4398,53 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			return 0;
 		}
 
-		seq = temppage.block_entries[entry_index].seqnum;
+		while (hcfs_system->system_going_down == FALSE) {
+			seq = temppage.block_entries[entry_index].seqnum;
+			switch ((temppage).block_entries[entry_index].status) {
+			case ST_NONE:
+			case ST_TODELETE:
+				/*If not stored anywhere, make it on local disk*/
+				fh_ptr->blockfptr = fopen(thisblockpath, "a+");
+				if (fh_ptr->blockfptr == NULL) {
+					errnum = errno;
+					*reterr = -EIO;
+					write_log(0, "Error in write. Code %d, %s\n",
+						errnum, strerror(errnum));
+					return 0;
+				}
+				fclose(fh_ptr->blockfptr);
+				(temppage).block_entries[entry_index].status =
+						ST_LDISK;
+				ret = set_block_dirty_status(thisblockpath,
+							NULL, TRUE);
+				if (ret < 0) {
+					*reterr = -EIO;
+					return 0;
+				}
+				ret = meta_cache_update_file_data(
+					fh_ptr->thisinode, NULL, NULL,
+					&temppage, this_page_fpos,
+					fh_ptr->meta_cache_ptr);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
 
-		switch ((temppage).block_entries[entry_index].status) {
-		case ST_NONE:
-		case ST_TODELETE:
-			/*If not stored anywhere, make it on local disk*/
-			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
-			if (fh_ptr->blockfptr == NULL) {
-				errnum = errno;
-				*reterr = -EIO;
-				write_log(0, "Error in write. Code %d, %s\n",
-					errnum, strerror(errnum));
-				return 0;
-			}
-			fclose(fh_ptr->blockfptr);
-			(temppage).block_entries[entry_index].status = ST_LDISK;
-			ret = set_block_dirty_status(thisblockpath,
-						NULL, TRUE);
-			if (ret < 0) {
-				*reterr = -EIO;
-				return 0;
-			}
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
-					NULL, NULL, &temppage, this_page_fpos,
-						fh_ptr->meta_cache_ptr);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
-			}
-
-			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, 0, 0, 1, 0, 0, TRUE);
-			ret = meta_cache_open_file(tmpptr);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
-			}
-			ret = update_file_stats(tmpptr->fptr, 1,
+				tmpptr = fh_ptr->meta_cache_ptr;
+				change_system_meta(0, 0, 0, 1, 0, 0, TRUE);
+				ret = meta_cache_open_file(tmpptr);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
+				ret = update_file_stats(tmpptr->fptr, 1,
 						1, 0, 0, fh_ptr->thisinode);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
-			}
-			break;
-		case ST_LDISK:
-			ret = _check_sync_wait_full_cache(
-					&(fh_ptr->meta_cache_ptr),
-					this_inode, bindex, seq,
-					&temppage, this_page_fpos);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
-			}
-			break;
-		case ST_BOTH:
-		case ST_LtoC:
-			if ((temppage).block_entries[entry_index].status ==
-					ST_LtoC) {
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
+				break;
+			case ST_LDISK:
 				ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4453,13 +4452,27 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
+				} else if (ret > 0) {
+					continue;
 				}
-			}
-			now_status =
-				(temppage).block_entries[entry_index].status;
-			if (now_status == ST_LtoC || now_status == ST_BOTH) {
+				break;
+			case ST_BOTH:
+			case ST_LtoC:
+				if ((temppage).block_entries[entry_index].status ==
+						ST_LtoC) {
+					ret = _check_sync_wait_full_cache(
+						&(fh_ptr->meta_cache_ptr),
+						this_inode, bindex, seq,
+						&temppage, this_page_fpos);
+					if (ret < 0) {
+						*reterr = ret;
+						return 0;
+					} else if (ret > 0) {
+						continue;
+					}
+				}
 				(temppage).block_entries[entry_index].status =
-						ST_LDISK;
+					ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
@@ -4467,27 +4480,31 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					return 0;
 				}
 				ret = meta_cache_update_file_data(
-					fh_ptr->thisinode,
-					NULL, NULL, &temppage, this_page_fpos,
-					fh_ptr->meta_cache_ptr);
+						fh_ptr->thisinode,
+						NULL, NULL, &temppage,
+						this_page_fpos,
+						fh_ptr->meta_cache_ptr);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
 				}
+				break;
+			case ST_CLOUD:
+			case ST_CtoL:
+				/*Download from backend */
+				ret = _write_fetch_backend(this_inode, bindex,
+					fh_ptr, &temppage, this_page_fpos,
+					entry_index, ispin);
+				if (ret < 0) {
+					*reterr = ret;
+					return 0;
+				}
+				break;
+			default:
+				break;
 			}
-			break;
-		case ST_CLOUD:
-		case ST_CtoL:
-			/*Download from backend */
-			ret = _write_fetch_backend(this_inode, bindex, fh_ptr,
-					&temppage, this_page_fpos, entry_index,
-					ispin);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
-			}
-			break;
-		default:
+
+			/* Leave loop */
 			break;
 		}
 
@@ -4505,36 +4522,38 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			(temppage).block_entries[entry_index].paged_out_count;
 	} else {
 		int64_t seq;
-		char now_status;
-		seq = temppage.block_entries[entry_index].seqnum;
-		/* Check if there is a need for status change */
-		switch ((temppage).block_entries[entry_index].status) {
-		case ST_LDISK:
-			ret = _check_sync_wait_full_cache(
+
+		while (hcfs_system->system_going_down == FALSE) {
+			seq = temppage.block_entries[entry_index].seqnum;
+			/* Check if there is a need for status change */
+			switch ((temppage).block_entries[entry_index].status) {
+			case ST_LDISK:
+				ret = _check_sync_wait_full_cache(
 					&(fh_ptr->meta_cache_ptr),
 					this_inode, bindex, seq,
 					&temppage, this_page_fpos);
-			if (ret < 0) {
-				*reterr = ret;
-				return 0;
-			}
-			break;
-		case ST_BOTH:
-		case ST_LtoC:
-			if ((temppage).block_entries[entry_index].status ==
-					ST_LtoC) {
-				ret = _check_sync_wait_full_cache(
-						&(fh_ptr->meta_cache_ptr),
-						this_inode, bindex, seq,
-						&temppage, this_page_fpos);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
+				} else if (ret > 0) {
+					continue;
 				}
-			}
-			now_status =
-				(temppage).block_entries[entry_index].status;
-			if (now_status == ST_LtoC || now_status == ST_BOTH) {
+				break;
+			case ST_BOTH:
+			case ST_LtoC:
+				if ((temppage).block_entries[entry_index].status
+						== ST_LtoC) {
+					ret = _check_sync_wait_full_cache(
+						&(fh_ptr->meta_cache_ptr),
+						this_inode, bindex, seq,
+						&temppage, this_page_fpos);
+					if (ret < 0) {
+						*reterr = ret;
+						return 0;
+					} else if (ret > 0) {
+						continue;
+					}
+				}
 				(temppage).block_entries[entry_index].status =
 						ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
@@ -4544,16 +4563,19 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					return 0;
 				}
 				ret = meta_cache_update_file_data(
-					fh_ptr->thisinode,
-					NULL, NULL, &temppage, this_page_fpos,
-					fh_ptr->meta_cache_ptr);
+						fh_ptr->thisinode, NULL, NULL,
+						&temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
 				}
+				break;
+			default:
+				break;
 			}
-			break;
-		default:
+
+			/* Leave loop */
 			break;
 		}
 	}
