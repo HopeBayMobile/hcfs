@@ -117,7 +117,7 @@ typedef struct {
 #define GET_CACHE_LIMIT(p) (system_config->max_cache_limit[(int32_t)p])
 #define GET_PINNED_LIMIT(p) (system_config->max_pinned_limit[(int32_t)p])
 
-static const char DEFAULT_CONFIG_PATH[] = "tmpuse/hcfs.conf";
+static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";
 static const char USERMETA_PASSPHRASE[] = "hey! kewei enc usermeta :)";
 
