@@ -288,7 +288,7 @@ int32_t parse_parent_self(const char *pathname, char *parentname, char *selfname
 	return 0;
 }
 
-int64_t open_fh(ino_t thisinode, int32_t flags)
+int64_t open_fh(ino_t thisinode, int32_t flags, BOOL isdir)
 {
 	int64_t index;
 

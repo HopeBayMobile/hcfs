@@ -20,7 +20,7 @@ int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 		body_ptr->fptr = fopen("/tmp/testHCFS/hcfs_unittest_write", "w");
 		unlink("/tmp/testHCFS/hcfs_unittest_write");
 		break;
-	case 17:
+	case TEST_LISTDIR_INODE:
 		body_ptr->fptr = fopen(readdir_metapath, "r");
 		break;
 	default:
@@ -144,8 +144,8 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			inode_stat->st_atime = 100000;
 			inode_stat->st_size = 204800;
 			break;
-		case 17:
-			inode_stat->st_ino = 17;
+		case TEST_LISTDIR_INODE:
+			inode_stat->st_ino = TEST_LISTDIR_INODE;
 			inode_stat->st_mode = S_IFDIR | 0700;
 			inode_stat->st_atime = 100000;
 			break;
@@ -243,7 +243,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		case 13:
 			dir_meta_ptr->total_children = 2;
 			break;
-		case 17:
+		case TEST_LISTDIR_INODE:
 			if (readdir_metapath == NULL)
 				break;
 			fptr = fopen(readdir_metapath, "r");
@@ -258,7 +258,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	}
 	if (dir_page != NULL) {
 		switch (this_inode) {
-		case 17:
+		case TEST_LISTDIR_INODE:
 			if (readdir_metapath == NULL)
 				break;
 			fptr = fopen(readdir_metapath, "r");

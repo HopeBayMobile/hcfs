@@ -18,6 +18,7 @@
 * 2015/6/2 Jiahong moving lookup_dir to this file
 * 2016/1/18 Jiahong revised actual_delete_inode routine
 * 2016/1/19 Jiahong revised disk_markdelete
+* 2016/4/26 Jiahong adding routines for snapshotting dir meta before modifying
 **************************************************************************/
 #include "metaops.h"
 
@@ -44,6 +45,7 @@
 #include "mount_manager.h"
 #include "lookup_count.h"
 #include "super_block.h"
+#include "filetables.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #include "FS_manager.h"
@@ -151,6 +153,12 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 
 	if (ret < 0)
 		return ret;
+
+	ret = handle_dirmeta_snapshot(parent_inode, body_ptr->fptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
 
@@ -386,6 +394,12 @@ int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 	ret = meta_cache_open_file(body_ptr);
 	if (ret < 0)
 		return ret;
+
+	ret = handle_dirmeta_snapshot(parent_inode, body_ptr->fptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	/* Drop all cached pages first before deleting */
 	/* TODO: Future changes could remove this limitation if can update cache
