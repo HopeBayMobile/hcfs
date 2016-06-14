@@ -11,6 +11,13 @@ Known Issues / Limitations / Features to be Implemented
   7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
   8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
 
+
+v 2.2.1.
+=====
+## New Features
+
+## CI / Refactoring
+
 v 2.2.1.0675 (release2.2.1_base)
 =====
 ## New Features
