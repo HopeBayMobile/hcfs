@@ -1,5 +1,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <errno.h>
 #include "gtest/gtest.h"
 extern "C" {
 #include "hcfs_cacheops.h"
@@ -235,3 +236,109 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 
 	EXPECT_EQ(expected_block_num, hcfs_system->systemdata.cache_blocks);
 }
+
+class sleep_on_cache_fullTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+
+		sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0);
+		sem_init(&(hcfs_system->check_cache_sem), 1, 0);
+		sem_init(&(hcfs_system->check_next_sem), 1, 0);
+		sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
+		system_config = (SYSTEM_CONF_STRUCT *)
+			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
+	}
+	
+	void TearDown()
+	{
+		
+		free(hcfs_system);
+		free(system_config);
+	}
+};
+
+void *wrapper_sleep_on_cache_full(void *ptr)
+{
+	int32_t retval;
+	retval = sleep_on_cache_full();
+	*((int32_t *) ptr) = retval;
+	return ptr;
+}
+TEST_F(sleep_on_cache_fullTest, SleepAndWakeOneThread)
+{
+	pthread_t thread1;
+	int32_t semval, retval;
+	int32_t *ptrret;
+
+	hcfs_system->systemdata.cache_replace_status = 0;
+	hcfs_system->sync_paused = FALSE;
+	pthread_create(&thread1, NULL, wrapper_sleep_on_cache_full, (void *) &retval);
+	sleep(2);
+	sem_getvalue(&(hcfs_system->num_cache_sleep_sem), &semval);
+	EXPECT_EQ(1, semval);
+	sem_post(&(hcfs_system->check_cache_sem));
+	ptrret = &retval;
+	pthread_join(thread1, (void **) &ptrret);
+	EXPECT_EQ(0, retval);
+}
+TEST_F(sleep_on_cache_fullTest, SleepAndWakeTwoThreads)
+{
+	pthread_t thread1, thread2;
+	int32_t semval, retval, retval2;
+	int32_t *ptrret, *ptrret2;
+
+	hcfs_system->systemdata.cache_replace_status = 0;
+	hcfs_system->sync_paused = FALSE;
+	pthread_create(&thread1, NULL, wrapper_sleep_on_cache_full, (void *) &retval);
+	pthread_create(&thread2, NULL, wrapper_sleep_on_cache_full, (void *) &retval2);
+	sleep(2);
+	sem_getvalue(&(hcfs_system->num_cache_sleep_sem), &semval);
+	EXPECT_EQ(2, semval);
+	sem_post(&(hcfs_system->check_cache_sem));
+	sem_post(&(hcfs_system->check_cache_sem));
+	ptrret = &retval;
+	pthread_join(thread1, (void **) &ptrret);
+	EXPECT_EQ(0, retval);
+	ptrret2 = &retval2;
+	pthread_join(thread2, (void **) &ptrret2);
+	EXPECT_EQ(0, retval2);
+}
+TEST_F(sleep_on_cache_fullTest, SleepAndChangeStatus)
+{
+	pthread_t thread1;
+	int32_t semval, retval;
+	int32_t *ptrret;
+
+	hcfs_system->systemdata.cache_replace_status = 0;
+	hcfs_system->sync_paused = FALSE;
+	pthread_create(&thread1, NULL, wrapper_sleep_on_cache_full, (void *) &retval);
+	sleep(2);
+	sem_getvalue(&(hcfs_system->num_cache_sleep_sem), &semval);
+	EXPECT_EQ(1, semval);
+	hcfs_system->systemdata.cache_replace_status = -EIO;
+	sem_post(&(hcfs_system->check_cache_sem));
+	ptrret = &retval;
+	pthread_join(thread1, (void **) &ptrret);
+	EXPECT_EQ(-EIO, retval);
+}
+TEST_F(sleep_on_cache_fullTest, NoSleepIfNegativeStatus)
+{
+	pthread_t thread1;
+	int32_t semval, retval;
+	int32_t *ptrret;
+
+	hcfs_system->systemdata.cache_replace_status = -3;
+	hcfs_system->sync_paused = FALSE;
+	pthread_create(&thread1, NULL, wrapper_sleep_on_cache_full, (void *) &retval);
+	sleep(2);
+	sem_getvalue(&(hcfs_system->num_cache_sleep_sem), &semval);
+	EXPECT_EQ(0, semval);
+	ptrret = &retval;
+	pthread_join(thread1, (void **) &ptrret);
+	EXPECT_EQ(-3, retval);
+}
+

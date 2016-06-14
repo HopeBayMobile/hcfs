@@ -27,12 +27,10 @@ export TERM=xterm-color
 export GTEST_COLOR=yes
 export NOGCOVR=1
 
+ulimit -c unlimited
 make clean
+ulimit -c unlimited 
 make
-make $UNITTEST_MAKE_FLAG test || {
-	if [[ "$UNITTEST_MAKE_FLAG" = *-k* ]]; then
-		make $UNITTEST_MAKE_FLAG test
-	fi;
-}
+make test
 
 gcovr -r $repo/src .

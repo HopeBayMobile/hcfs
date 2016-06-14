@@ -3,6 +3,8 @@ ifeq "$(CCACHE_MK_INCLUDED)" ""
   CCACHE := /usr/bin/ccache
   ifneq "$(wildcard $(CCACHE))" ""
     export USE_CCACHE := 1
+    export CCACHE_BASEDIR=$(shell pwd)
+    export CCACHE_UMASK=000
     export NDK_CCACHE := $(CCACHE)
     export CCACHE_CPP2 := yes
     export CCACHE_COMPILERCHECK := content

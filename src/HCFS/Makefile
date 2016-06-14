@@ -1,3 +1,5 @@
+include ../../build/ccache.mk
+
 # For CI build version
 ifndef VERSION_NUM
   VERSION_NUM:=Manual build $(shell date +%Y%m%d-%H%M%S)

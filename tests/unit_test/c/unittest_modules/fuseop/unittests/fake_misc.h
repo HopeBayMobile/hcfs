@@ -13,6 +13,7 @@ int32_t root_updated;
 int32_t after_update_block_page;
 int32_t test_fetch_from_backend;
 uint8_t fake_block_status;
+uint32_t fake_paged_out_count;
 char readdir_metapath[100];
 int32_t fail_open_files;
 
