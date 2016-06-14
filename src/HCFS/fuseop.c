@@ -2260,7 +2260,7 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 		ino_t this_inode, int64_t blockno, int64_t seq,
 		BLOCK_ENTRY_PAGE *temppage, int64_t pagepos)
 {
-	int ret;
+	int32_t ret;
 
 	while (hcfs_system->system_going_down == FALSE) {
 		ret = meta_cache_check_uploading(*body_ptr,
@@ -2277,9 +2277,11 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 			if (ret < 0) {
 				*body_ptr = meta_cache_lock_entry(
 						this_inode);
-				meta_cache_lookup_file_data(this_inode, NULL,
-						NULL, temppage, pagepos,
+				if ((*body_ptr) != NULL) {
+					meta_cache_lookup_file_data(this_inode,
+						NULL, NULL, temppage, pagepos,
 						*body_ptr);
+				}
 				break;
 			}
 
