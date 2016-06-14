@@ -2251,6 +2251,41 @@ int32_t truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
+/**
+ * When write or truncate a block with status ST_LDISK/ST_LtoC, check if
+ * this file is now syncing and try to copy the block. If cache is full,
+ * unlock meta entry and sleep. Then wait for cache space and copy block again.
+ */
+int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
+		ino_t this_inode, int64_t blockno, int64_t seq)
+{
+	int ret;
+
+	while (hcfs_system->system_going_down == FALSE) {
+		ret = meta_cache_check_uploading(*body_ptr,
+				this_inode, blockno, seq);
+		if (ret < 0) {
+			if (ret == -ENOSPC) {
+				ret = meta_cache_unlock_entry(*body_ptr);
+				if (ret < 0)
+					break;
+				ret = sleep_on_cache_full();
+				if (ret < 0)
+					break;
+				*body_ptr = meta_cache_lock_entry(this_inode);
+				if (*body_ptr == NULL) {
+					ret = -ENOMEM;
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+	}
+
+	return ret;
+}
+
 /* Helper function for truncate operation. Will delete all blocks in the page
 *  pointed by temppage starting from "start_index". Track the current page
 *  using "page_index". "old_last_block" indicates the last block
@@ -2300,7 +2335,7 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 		case ST_TODELETE:
 			break;
 		case ST_LDISK:
-			ret_val = meta_cache_check_uploading(body_ptr,
+			ret_val = _check_sync_wait_full_cache(&body_ptr,
 				inode_index, block_count, tmpentry->seqnum);
 			if (ret_val < 0)
 				return ret_val;
@@ -2351,7 +2386,7 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			total_deleted_fileblocks++;
 			break;
 		case ST_LtoC:
-			ret_val = meta_cache_check_uploading(body_ptr,
+			ret_val = _check_sync_wait_full_cache(&body_ptr,
 				inode_index, block_count, tmpentry->seqnum);
 			if (ret_val < 0)
 				return ret_val;
@@ -2633,7 +2668,8 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 		tmpstatus = (temppage->block_entries[last_index]).status;
 
-		ret = meta_cache_check_uploading(*body_ptr, this_inode, last_block,
+		ret = _check_sync_wait_full_cache(body_ptr, this_inode,
+				last_block,
 				(temppage->block_entries[last_index]).seqnum);
 		if (ret < 0)
 			return ret;
@@ -4340,7 +4376,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			}
 			break;
 		case ST_LDISK:
-			ret = meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+			ret = _check_sync_wait_full_cache(
+					&(fh_ptr->meta_cache_ptr),
 					this_inode, bindex, seq);
 			if (ret < 0) {
 				*reterr = ret;
@@ -4351,8 +4388,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		case ST_LtoC:
 			if ((temppage).block_entries[entry_index].status ==
 					ST_LtoC) {
-				ret = meta_cache_check_uploading(
-						fh_ptr->meta_cache_ptr,
+				ret = _check_sync_wait_full_cache(
+						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq);
 				if (ret < 0) {
 					*reterr = ret;
@@ -4406,7 +4443,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		/* Check if there is a need for status change */
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_LDISK:
-			ret = meta_cache_check_uploading(fh_ptr->meta_cache_ptr,
+			ret = _check_sync_wait_full_cache(
+					&(fh_ptr->meta_cache_ptr),
 					this_inode, bindex, seq);
 			if (ret < 0) {
 				*reterr = ret;
@@ -4417,8 +4455,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		case ST_LtoC:
 			if ((temppage).block_entries[entry_index].status ==
 					ST_LtoC) {
-				ret = meta_cache_check_uploading(
-						fh_ptr->meta_cache_ptr,
+				ret = _check_sync_wait_full_cache(
+						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq);
 				if (ret < 0) {
 					*reterr = ret;
