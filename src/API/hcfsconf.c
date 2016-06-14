@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hcfsconf.c
+* Abstract: This c source file for hcfsconf binary.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -34,7 +46,8 @@ int32_t __enc_config(uint8_t *output, uint8_t *input,
 
 	int32_t ret;
 	uint8_t iv[IV_SIZE] = {0};
-	uint8_t *enc_key, *enc_data;
+	uint8_t *enc_key;
+	uint8_t *enc_data = NULL;
 
 	/* Key and iv */
 	enc_key = get_key(PASSPHRASE);
@@ -42,6 +55,8 @@ int32_t __enc_config(uint8_t *output, uint8_t *input,
 
 	enc_data =
 		(uint8_t*)malloc(sizeof(uint8_t) * (input_len + TAG_SIZE));
+	if (enc_data == NULL)
+		return -1;
 
 	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
 	if (ret != 0) {
@@ -61,8 +76,9 @@ int32_t _enc_config(char *source_path, char *out_path)
 
 	char buf[300];
 	uint8_t data_buf[1024];
-	int64_t data_size = 0;
-	int32_t str_len;
+	int32_t data_size = 0;
+	int32_t enc_data_size = 0;
+	int32_t str_len, ret_size;
 	FILE *config = NULL;
 	FILE *enc_config = NULL;
 
@@ -77,7 +93,8 @@ int32_t _enc_config(char *source_path, char *out_path)
 	}
 	fclose(config);
 
-	uint8_t enc_data[data_size + IV_SIZE + TAG_SIZE];
+	enc_data_size = data_size + IV_SIZE + TAG_SIZE;
+	uint8_t enc_data[enc_data_size];
 	if (__enc_config(enc_data, data_buf, data_size) != 0)
 		return errno;
 
@@ -85,10 +102,14 @@ int32_t _enc_config(char *source_path, char *out_path)
 	if (enc_config == NULL)
 		return errno;
 
-	fwrite(enc_data, sizeof(uint8_t),
-	       data_size + IV_SIZE + TAG_SIZE, enc_config);
-	fclose(enc_config);
+	ret_size = fwrite(enc_data, sizeof(uint8_t),
+			  enc_data_size, enc_config);
+	if ((ssize_t)ret_size < (ssize_t)enc_data_size) {
+		fclose(enc_config);
+		return EIO;
+	}
 
+	fclose(enc_config);
 	return 0;
 }
 
@@ -108,6 +129,7 @@ int32_t _dec_config(char *source_path, char *out_path)
 {
 
 	int32_t ret_code = 0;
+	int32_t ret_size = 0;
         int64_t file_size, enc_size, data_size;
         FILE *config = NULL;
         FILE *dec_config = NULL;
@@ -148,8 +170,14 @@ int32_t _dec_config(char *source_path, char *out_path)
         dec_config = fopen(out_path, "w");
         if (dec_config == NULL)
                 goto error;
-        fwrite(data_buf, sizeof(uint8_t), data_size,
-		dec_config);
+
+        ret_size = fwrite(data_buf, sizeof(uint8_t), data_size,
+			  dec_config);
+	if ((ssize_t)ret_size < (ssize_t)data_size) {
+		ret_code = EIO;
+		goto end;
+	}
+
 
 	goto end;
 

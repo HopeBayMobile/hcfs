@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policy>
+
+<!--
+
+    * A signature is a hex encoded X.509 certificate or a tag defined in
+      keys.conf and is required for each signer tag.
+    * A signer tag may contain a seinfo tag and multiple package stanzas.
+    * A default tag is allowed that can contain policy for all apps not signed with a
+      previously listed cert. It may not contain any inner package stanzas.
+    * Each signer/default/package tag is allowed to contain one seinfo tag. This tag
+      represents additional info that each app can use in setting a SELinux security
+      context on the eventual process.
+    * When a package is installed the following logic is used to determine what seinfo
+      value, if any, is assigned.
+      - All signatures used to sign the app are checked first.
+      - If a signer stanza has inner package stanzas, those stanza will be checked
+        to try and match the package name of the app. If the package name matches
+        then that seinfo tag is used. If no inner package matches then the outer
+        seinfo tag is assigned.
+      - The default tag is consulted last if needed.
+-->
+
+    <!-- Platform dev key in AOSP -->
+    <signer signature="@PLATFORM" >
+      <seinfo value="platform" />
+    </signer>
+
+    <!-- All other keys -->
+    <default>
+      <seinfo value="default" />
+    </default>
+
+    <signer signature="308203853082026da003020102020468ac59ae300d06092a864886f70d01010b05003073310f300d0603550406130654616977616e310f300d06035504071306546569706169311e301c060355040a1315486f70652042617920546563686e6f6c6f67696573311b3019060355040b13124d6f62696c6520446576656c6f706d656e7431123010060355040313094161726f6e20436875301e170d3135313231343037333435315a170d3430313230373037333435315a3073310f300d0603550406130654616977616e310f300d06035504071306546569706169311e301c060355040a1315486f70652042617920546563686e6f6c6f67696573311b3019060355040b13124d6f62696c6520446576656c6f706d656e7431123010060355040313094161726f6e2043687530820122300d06092a864886f70d01010105000382010f003082010a02820101008dbbda7ab44701bf784344674e0edacd9429324f6a61f1db17dcdc2f35e3d49a608c326c3fd24b386cc6b5821b3051a4b7f95e71a8ca5428702492e6475dff11fc128dca8dce1d352c8f95d2b6817811840afe1d9d606f07bb1ee735e6033ea350e7aa0bf224b12953ec95d4eff99b0895aa8f64b98011b92b51a268bb5b0410b58d5ca15c28c16adf7fe4103c013420ac0daeaca1a59a137b2ea500570a419a3b5c5927ab559b190f1978e578785dd3a774284d057bd8f3e9b3f6a09fa9ed082cf3e9b8aec7eb8a00273a25bf5534c2f70cba60215088bb53e49e5936a5b2a7a3a5e9c79cedb90b87f582cff22bda359979e049260c3c6b9deb6ec9053eccdb0203010001a321301f301d0603551d0e04160414821aeb644297bf922f8313cd6e20bf4e3b37937c300d06092a864886f70d01010b050003820101005610dc125690d800897125e4ee4cab9cf662748c79562b0499b45842bbe2d65c2e1c2615ea66f3457cb88a30626018341bb4efabf5fac73a528f3b093ffc5b9f1eac25182f24db43bdb91b9da0f800cf68974d1f10e9152ae25e0ade0762db9f7bda2dedabb56e7cb1128069906ed0eaa02c580078802ea7190d2f32a6e3e76b2936c1e80fd50e6984cf0950466ec5b403e575de41f394c56c0f3c676d78b455fa764a18b144c4876f1a79a6c7194ba5594f537eb6965372e46aab3ff161116e3e98b0726e9ffb1d3bc530881b7b8246a7f1ee739a1c767003fbcb9f402e6aec67db2a1b83bbfdbf0c43935b586712fa732a3e63c68dc396a65c6764cf5071f0"><seinfo value="terafonn"/>
+    </signer>
+
+</policy>

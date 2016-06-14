@@ -20,6 +20,8 @@
 
 #include "fuseop.h"
 
+#define SCAN_INT 300
+
 int32_t sleep_on_cache_full(void);
 void notify_sleep_on_cache(int32_t cache_replace_status);
 #ifdef _ANDROID_ENV_

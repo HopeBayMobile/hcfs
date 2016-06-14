@@ -5,7 +5,7 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
 
   define test_ndk_read_permission =
     ifneq "$$(NDK_DIR)" ""
-      $$(info $$(shell ls $$(NDK_DIR) > /dev/null ))
+      test = $$(info $$(shell ls $$(NDK_DIR) > /dev/null ))
     endif
   endef
 
@@ -38,11 +38,6 @@ ifeq "$(ANDROID_NDK_MK_INCLUDED)" ""
     $(shell echo "override NDK_DIR=$(NDK_DIR)" > $(NDK_CONFIG))
     # Export NDK_DIR into path
     override PATH := $(PATH):$(NDK_DIR)
-  endif
-
-  ifeq "$(wildcard $(NDK_DIR)/toolchains/llvm-3.6/prebuilt/linux-x86_64/bin/ld.mcld)" ""
-    $(info $(NDK_DIR)/toolchains/llvm-3.6/prebuilt/linux-x86_64/bin/ld.mcld)
-    $(error Please do not use r11 or higher to build hcfs, HCFS/Android.mk requires "-fuse-ld=mcld" but mclinker is removed since r11)
   endif
 
 endif

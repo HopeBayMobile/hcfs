@@ -1,6 +1,6 @@
 /**************************************************************************
  *
- * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+ * Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
  *
  * File Name: monitor.c
  * Abstract: The c source code file for monitor backend thread and
@@ -27,6 +27,8 @@
 #include "hcfscurl.h"
 #include "macro.h"
 #include "params.h"
+#include "hcfs_cacheops.h"
+#include "utils.h"
 
 CURL_HANDLE monitor_curl_handle;
 
@@ -117,7 +119,7 @@ void monitor_loop(void)
 		min = (max >= 8) ? max / 8 : 1;
 		wait_sec = MONITOR_BACKOFF_SLOT;
 		wait_sec *= (min + (rand() % (max - min + 1)));
-		write_log(5, "[Monitor] wait %d seconed before retransmit\n",
+		write_log(5, "[Monitor] wait %d seconds before retransmit\n",
 			  wait_sec);
 
 		clock_gettime(CLOCK_REALTIME, &ts);
@@ -236,8 +238,13 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 void update_sync_state(void)
 {
 	if (hcfs_system->backend_is_online == FALSE ||
-	    hcfs_system->sync_manual_switch == FALSE)
+	    hcfs_system->sync_manual_switch == FALSE) {
 		hcfs_system->sync_paused = TRUE;
-	else
+	} else {
 		hcfs_system->sync_paused = FALSE;
+		/* Threads can sleep on cache full now */
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.cache_replace_status = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
 }

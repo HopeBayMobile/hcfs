@@ -50,6 +50,7 @@ function start_builder() {
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
 	eval docker pull $DOCKER_IMAGE || :
 	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
 	trap cleanup INT TERM
 }
 function cleanup() {
@@ -60,6 +61,7 @@ function cleanup() {
 function stop_builder() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME $1; } 2>/dev/null
 	docker rm -f $DOCKERNAME || :
+	rm -f DOCKERNAME
 }
 function check-ssh-agent() {
 	[ -S "$SSH_AUTH_SOCK" ] && { ssh-add -l >& /dev/null || [ $? -ne 2 ]; }
@@ -81,7 +83,7 @@ function setup_ssh_key() {
 	done
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
-	ssh-keygen -R $DOCKER_IP
+	ssh-keygen -R $DOCKER_IP || :
 	ssh -oBatchMode=yes -oStrictHostKeyChecking=no root@$DOCKER_IP pwd
 	touch /tmp/test
 	rsync /tmp/test root@$DOCKER_IP:/tmp/test
@@ -115,16 +117,18 @@ function build_system() {
 function publish_image() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	IMG_DIR=${PUBLISH_DIR}/HCFS-s58a-image-${IMAGE_TYPE}
-	mkdir -p $IMG_DIR
-	rsync -v $here/resource/* $IMG_DIR
+	mkdir -p ${IMG_DIR}
+	rsync -v $here/resource/* ${IMG_DIR}
 	rsync -arcv --no-owner --no-group --no-times \
-		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} $IMG_DIR
+		root@$DOCKER_IP:/data/out/target/product/s58a/{boot.img,system.img,userdata.img} ${IMG_DIR}
+	touch ${PUBLISH_DIR} ${IMG_DIR}
 }
 function mount_nas() {
 	{ _hdr_inc - - Doing $FUNCNAME; } 2>/dev/null
 	service rpcbind start || :
 	if ! mount  | grep 'nas:/ubuntu on /mnt/nas'; then
 		umount /mnt/nas || :
+		mkdir -p /mnt/nas
 		mount nas:/ubuntu /mnt/nas
 	fi
 }
@@ -177,7 +181,7 @@ function build_image_type() {
 # PUBLISH_DIR=${PUBLISH_DIR:-/mnt/nas/CloudDataSolution/TeraFonn_CI_build/0.0.0.ci.test}
 eval '[ -n "$LIB_DIR" ]' || { echo Error: required parameter LIB_DIR does not exist; exit 1; }
 eval '[ -n "$APP_DIR" ]' || { echo Error: required parameter APP_DIR does not exist; exit 1; }
-eval '[ -n "$PUBLISH_DIR" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
+eval '[ -n "${PUBLISH_DIR}" ]' || { echo Error: required parameter PUBLISH_DIR does not exist; exit 1; }
 
 echo ========================================
 echo Jenkins pass-through variables:

@@ -1,3 +1,17 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hcfs_sys.c
+* Abstract: This c source file for hcfs system operations.
+*
+* Revision History
+* 2016/5/27 Modified after first code review.
+*
+**************************************************************************/
+
+#include "hcfs_sys.h"
+
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,16 +22,22 @@
 #include <sqlite3.h>
 #include <inttypes.h>
 
-#include "hcfs_sys.h"
-
 #include "global.h"
-#include "utils.h"
+#include "socket_util.h"
 #include "enc.h"
 
 
+/************************************************************************
+ * *
+ * * Function name: _validate_config_key
+ * *        Inputs: char *key
+ * *       Summary: To validate a given section (key) in config file.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns -1 on errors.
+ * *
+ * *************************************************************************/
 int32_t _validate_config_key(char *key)
 {
-
 	int32_t idx, num_keys;
 	char *keys[] = {\
 		"current_backend",\
@@ -39,15 +59,21 @@ int32_t _validate_config_key(char *key)
 	return -1;
 }
 
-/*
- * NOTE:
- *     The size of *output* should be larger than
- *     input_len + IV_SIZE + TAG_SIZE.
- */
+/************************************************************************
+ * *
+ * * Function name: _encrypt_config
+ * *        Inputs: uint8_t *output, uint8_t *input
+ * *		    int64_t input_len
+ * *       Summary: To encrypt data (input) and store the encrypted content
+ * *		    in (output). The size of *output* should be larger than
+ * *    	    input_len + IV_SIZE + TAG_SIZE.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns -1 on errors.
+ * *
+ * *************************************************************************/
 int32_t _encrypt_config(uint8_t *output, uint8_t *input,
-		   int64_t input_len)
+		        int64_t input_len)
 {
-
 	int32_t ret;
 	uint8_t iv[IV_SIZE] = {0};
 	uint8_t *enc_key, *enc_data;
@@ -74,9 +100,20 @@ int32_t _encrypt_config(uint8_t *output, uint8_t *input,
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: _get_decrypt_configfp
+ * *        Inputs: uint8_t *output, uint8_t *input
+ * *		    int64_t input_len
+ * *       Summary: To encrypt data (input) and store the encrypted content
+ * *		    in (output). The size of *output* should be larger than
+ * *    	    input_len + IV_SIZE + TAG_SIZE.
+ * *
+ * *  Return value: FILE pointer to decrypted file.
+ * *
+ * *************************************************************************/
 FILE *_get_decrypt_configfp()
 {
-
 	int64_t file_size, enc_size, data_size;
 	FILE *datafp = NULL;
 	uint8_t *iv_buf = NULL;
@@ -138,9 +175,17 @@ end:
 	return tmp_file;
 }
 
+/************************************************************************
+ * *
+ * * Function name: set_hcfs_config
+ * *        Inputs: char *arg_buf, uint32_t arg_len
+ * *       Summary: To set a section in config file with input value.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 {
-
 	int32_t idx, ret_code;
 	uint32_t msg_len;
 	ssize_t str_len;
@@ -150,8 +195,10 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 	char *tmp_ptr, *line, *token;
 	FILE *conf = NULL;
 	FILE *tmp_conf = NULL;
-	uint8_t data_buf[1024];
+	uint8_t *data_buf = NULL;
+	uint8_t *enc_data = NULL;
 	int32_t data_size = 0;
+	int64_t data_buf_size;
 
 
 	msg_len = 0;
@@ -185,6 +232,12 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 		goto error;
 	}
 
+	fseek(conf, 0, SEEK_END);
+	data_buf_size = ftell(conf);
+	rewind(conf);
+	data_buf =
+		(uint8_t*)malloc(sizeof(char) * (data_buf_size + arg_len));
+
 	data_size = str_len = 0;
 	while (fgets(buf, sizeof(buf), conf) != NULL) {
 		tmp_ptr = line = strdup(buf);
@@ -199,7 +252,7 @@ int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 		free(tmp_ptr);
 	}
 
-	uint8_t *enc_data =
+	enc_data =
 		(uint8_t*)malloc(sizeof(char) * (data_size + IV_SIZE + TAG_SIZE));
 	if (enc_data == NULL)
 		goto error;
@@ -233,12 +286,24 @@ end:
 		fclose(conf);
 	if (tmp_conf)
 		fclose(tmp_conf);
+	if (data_buf)
+		free(data_buf);
+	if (enc_data)
+		free(enc_data);
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_hcfs_config
+ * *        Inputs: char *arg_buf, uint32_t arg_len, char **value
+ * *       Summary: Return the value of input section in config file.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
 {
-
 	int32_t idx, ret_code;
 	uint32_t msg_len;
 	ssize_t str_len;
@@ -314,10 +379,18 @@ int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
 		return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: reload_hcfs_config
+ * *        Inputs:
+ * *       Summary: To notify hcfs to reload config.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t reload_hcfs_config()
 {
-
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -327,21 +400,29 @@ int32_t reload_hcfs_config()
 	code = RELOADCONFIG;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: toggle_cloud_sync
+ * *        Inputs: char *arg_buf, uint32_t arg_len
+ * *       Summary: To notify hcfs to turn on/off cloud synchronizing.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 {
-
-	int32_t fd, ret_code, size_msg, enabled;
+	int32_t fd, ret_code, enabled;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
 	memcpy(&enabled, arg_buf, sizeof(int32_t));
@@ -355,22 +436,30 @@ int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 	code = SETSYNCSWITCH;
 	cmd_len = sizeof(int32_t);
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
-	size_msg = send(fd, &enabled, sizeof(int32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &enabled, sizeof(int32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_sync_status
+ * *        Inputs:
+ * *       Summary: To get status of cloud synchronizing.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t get_sync_status()
 {
-
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
@@ -380,21 +469,30 @@ int32_t get_sync_status()
 	code = GETSYNCSWITCH;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: reset_xfer_usage
+ * *        Inputs:
+ * *       Summary: To notify hcfs to reset the value of data transfer
+ * *		    statistics.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
 int32_t reset_xfer_usage()
 {
-
-	int32_t fd, ret_code, size_msg;
+	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
 
 	fd = get_hcfs_socket_conn();
@@ -404,77 +502,14 @@ int32_t reset_xfer_usage()
 	code = RESETXFERSTAT;
 	cmd_len = 0;
 
-	size_msg = send(fd, &code, sizeof(uint32_t), 0);
-	size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
 
-	size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
-	size_msg = recv(fd, &ret_code, sizeof(int32_t), 0);
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
 
 	close(fd);
 
 	return ret_code;
 }
 
-/* Callback function for sql statement */
-static int32_t _sqlite_exec_cb(void *data, int32_t argc, char **argv, char **azColName)
-{
-
-	size_t uid_len;
-	char **uid = (char **)data;
-
-	uid_len = argv[0] ? strlen(argv[0]) : strlen("NULL");
-	*uid = malloc(sizeof(char) * (uid_len + 1));
-	snprintf(*uid, uid_len + 1, "%s", argv[0]);
-
-	return 0;
-}
-
-int32_t query_pkg_uid(char *arg_buf, uint32_t arg_len, char **uid)
-{
-
-	int32_t idx, ret_code;
-	uint32_t msg_len;
-	ssize_t str_len;
-	char pkg_name[400];
-	char sql[1000];
-	sqlite3 *db;
-	char *sql_err = 0;
-
-
-	msg_len = 0;
-	str_len = 0;
-	memcpy(&str_len, &(arg_buf[msg_len]), sizeof(ssize_t));
-	msg_len += sizeof(ssize_t);
-
-	memcpy(pkg_name, &(arg_buf[msg_len]), str_len);
-	pkg_name[str_len] = 0;
-	msg_len += str_len;
-
-	printf("pkg name is %s\n", pkg_name);
-
-	if (msg_len != arg_len) {
-		printf("Arg len is different\n");
-		return -EINVAL;
-	}
-
-	snprintf(sql, sizeof(sql), "SELECT uid from uid WHERE package_name='%s'", pkg_name);
-
-	ret_code = sqlite3_open(DB_PATH, &db);
-	if (ret_code != 0) {
-	        printf("Failed to open sqlite db - err is %s\n", sqlite3_errmsg(db));
-		return ret_code;
-	}
-
-	ret_code = sqlite3_exec(db, sql, _sqlite_exec_cb, (void *)uid, &sql_err);
-	if( ret_code != SQLITE_OK ){
-		printf("Failed to execute sql statement - err is %s\n", sql_err);
-		sqlite3_free(sql_err);
-	}
-
-	sqlite3_close(db);
-
-	if (ret_code == 0 && *uid == NULL)
-		return -ENOENT;
-	else
-		return ret_code;
-}

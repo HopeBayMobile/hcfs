@@ -1,10 +1,11 @@
+include ../../build/ccache.mk
+
 # For CI build version
 ifndef VERSION_NUM
-VERSION_NUM:=Manual build $(shell date +%Y%m%d-%H%M%S)
-empty:=
-space:= $(empty) $(empty)
-VERSION_NUM := $(subst $(space),_,$(VERSION_NUM))
-#$(error $(VERSION_NUM))
+  VERSION_NUM:=Manual build $(shell date +%Y%m%d-%H%M%S)
+  empty:=
+  space:= $(empty) $(empty)
+  VERSION_NUM := $(subst $(space),_,$(VERSION_NUM))
 endif
 
 CC = gcc
@@ -84,7 +85,7 @@ $(OBJS_DIR)/%.o: %.c | $(OBJS_DIR)
 		-e '$$s/ |$$/:\n/g' $(OBJS_DIR)/$*.d
 
 $(OBJS_DIR):
-	mkdir $@
+	mkdir -p $@
 
 clean:
 	rm -rf hcfs $(OBJS_DIR)/*.o $(OBJS_DIR)/*.d
