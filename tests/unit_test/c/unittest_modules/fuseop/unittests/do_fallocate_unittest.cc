@@ -27,7 +27,8 @@ class do_fallocateTest : public ::testing::Test {
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     hcfs_system->systemdata.pinned_size = 10000;
-    CACHE_HARD_LIMIT = 1024768000;
+    system_config->max_cache_limit[1] = 1024768000;
+    system_config->max_pinned_limit[1] = 1024768000 * 0.8;
     sem_init(&(hcfs_system->access_sem), 0, 1);
   }
 
@@ -79,8 +80,9 @@ TEST_F(do_fallocateTest, ExceedPinSize) {
   struct stat tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
 
-  CACHE_HARD_LIMIT = 1024768;
   hcfs_system->systemdata.pinned_size = 10000;
+  system_config->max_cache_limit[1] = 1024768;
+  system_config->max_pinned_limit[1] = 1024768 * 0.8;
   tempstat.st_size = 1024;
   tempstat.st_mode = S_IFREG;
   ret = do_fallocate(14, &tempstat, 0, 0, 1024768, &tmpptr, req1);

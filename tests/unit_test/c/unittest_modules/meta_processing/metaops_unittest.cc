@@ -1616,7 +1616,7 @@ TEST_F(change_pin_flagTest, RegfileHadBeenPinned)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = TRUE; 
+	pin_flag_in_meta = TRUE;
 	EXPECT_EQ(1, change_pin_flag(inode, S_IFREG, TRUE));
 }
 
@@ -1625,7 +1625,7 @@ TEST_F(change_pin_flagTest, PinRegfileSuccess)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = FALSE; 
+	pin_flag_in_meta = FALSE;
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFREG, TRUE));
 }
 
@@ -1634,7 +1634,7 @@ TEST_F(change_pin_flagTest, PinFIFOfileSuccess)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = FALSE; 
+	pin_flag_in_meta = FALSE;
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFIFO, TRUE));
 }
 
@@ -1643,7 +1643,7 @@ TEST_F(change_pin_flagTest, PinSocketfileSuccess)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = FALSE; 
+	pin_flag_in_meta = FALSE;
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFSOCK, TRUE));
 }
 
