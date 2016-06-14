@@ -3646,19 +3646,32 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 		*reterr = ret;
 		return 0;
 	}
+	write_log(10, "Debug read status %d\n",
+	          (temppage).block_entries[entry_index].status);
 
+	/* If status of the current block indicates the block file
+	may not exist locally, close the opened block file */
 	/* Close opened block file if not sure there is a valid local copy */
 	switch ((temppage).block_entries[entry_index].status) {
 	case ST_NONE:
 	case ST_TODELETE:
 	case ST_CLOUD:
 	case ST_CtoL:
+		write_log(10, "Debug opened block %" PRIu64 ", bindex %"
+		          PRIu64 "\n", fh_ptr->opened_block, bindex);
 		if (fh_ptr->opened_block == bindex) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
 		}
 		break;
 	default:
+		/* Close the cached file if paged out previously */
+		if (((temppage).block_entries[entry_index].paged_out_count !=
+		    fh_ptr->cached_paged_out_count) &&
+		    (fh_ptr->opened_block != -1)) { 
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
 		break;
 	}
 
@@ -3725,6 +3738,11 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 			if (fh_ptr->blockfptr != NULL) {
 				setbuf(fh_ptr->blockfptr, NULL);
 				fh_ptr->opened_block = bindex;
+
+				BLOCK_ENTRY *tptr;
+				tptr = &(temppage.block_entries[entry_index]);
+				fh_ptr->cached_paged_out_count =
+					tptr->paged_out_count;
 			} else {
 			/* Some exception that block file is deleted in
 			*  the middle of the status check*/
@@ -4323,6 +4341,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		return 0;
 	}
 
+	/* If status of the current block indicates the block file
+	may not exist locally, close the opened block file */
 	/* Close opened block file if not sure there is a valid local copy */
 	switch ((temppage).block_entries[entry_index].status) {
 	case ST_NONE:
@@ -4335,6 +4355,13 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		break;
 	default:
+		/* Close the cached file if paged out previously */
+		if (((temppage).block_entries[entry_index].paged_out_count !=
+		    fh_ptr->cached_paged_out_count) &&
+		    (fh_ptr->opened_block != -1)) { 
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
 		break;
 	}
 
@@ -4469,7 +4496,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		setbuf(fh_ptr->blockfptr, NULL);
 		fh_ptr->opened_block = bindex;
-
+		fh_ptr->cached_paged_out_count =
+			(temppage).block_entries[entry_index].paged_out_count;
 	} else {
 		int64_t seq;
 		char now_status;
@@ -4524,6 +4552,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			break;
 		}
 	}
+
 	ret = flock(fileno(fh_ptr->blockfptr), LOCK_EX);
 	if (ret < 0) {
 		errnum = errno;

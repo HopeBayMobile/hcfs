@@ -32,6 +32,7 @@ typedef struct {
 	int64_t opened_block;
 	int64_t cached_page_index;
 	int64_t cached_filepos;
+	uint32_t cached_paged_out_count;
 	sem_t block_sem;
 } FH_ENTRY;
 

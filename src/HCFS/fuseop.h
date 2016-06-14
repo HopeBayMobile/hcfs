@@ -137,6 +137,7 @@ typedef struct {
 #if (DEDUP_ENABLE)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
+	uint32_t paged_out_count;
 	int64_t seqnum;
 } BLOCK_ENTRY;
 
