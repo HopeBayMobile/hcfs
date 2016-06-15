@@ -449,3 +449,8 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 {
 	return 0;
 }
+
+void notify_sleep_on_cache(int32_t cache_replace_status)
+{
+	return;
+}

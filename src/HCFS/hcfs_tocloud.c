@@ -66,6 +66,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "hcfs_fromcloud.h"
 #include "tocloud_tools.h"
 #include "utils.h"
+#include "hcfs_cacheops.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -84,13 +85,26 @@ int32_t unlink_upload_file(char *filename)
 	struct stat filestat;
 	int64_t filesize;
 	int32_t ret, errcode;
+	int64_t old_cachesize, new_cachesize, threshold;
 
 	ret = stat(filename, &filestat);
 	if (ret == 0) {
 		filesize = filestat.st_size;
 		UNLINK(filename);
+		old_cachesize = hcfs_system->systemdata.cache_size;
 		change_system_meta(-filesize, 0, -filesize,
 				0, 0, 0, FALSE);
+		if (old_cachesize > CACHE_SOFT_LIMIT) {
+			/* After temp block is removed, check if cache_size
+			 * drop below hard limit - delta. */
+			new_cachesize = hcfs_system->systemdata.cache_size;
+			threshold = CACHE_HARD_LIMIT - CACHE_DELTA;
+			if (old_cachesize > threshold &&
+					new_cachesize < threshold)
+				/* Some ops may sleep because these
+				 * temp blocks occupied cache space. */
+				notify_sleep_on_cache(0);
+		}
 	} else {
 		int32_t errcode;
 		errcode = errno;

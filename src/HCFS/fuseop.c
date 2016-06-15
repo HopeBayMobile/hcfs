@@ -2295,6 +2295,7 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 				ret = -ENOMEM;
 				break;
 			}
+
 			meta_cache_open_file(*body_ptr);
 			/* Lookup again. Page may be modified by others. */
 			meta_cache_lookup_file_data(this_inode, NULL,
@@ -2332,14 +2333,12 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 	off_t total_deleted_dirty_cache;
 	int32_t ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
-	FILE *metafptr;
 	char ispin;
 
 	total_deleted_cache = 0;
 	total_deleted_dirty_cache = 0;
 	total_deleted_blocks = 0;
 	total_deleted_fileblocks = 0;
-	metafptr = body_ptr->fptr;
 	ispin = filemeta->local_pin;
 
 	write_log(10, "Debug truncate_delete_block, start %d, old_last %lld,",
@@ -2469,7 +2468,8 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 				   -total_deleted_blocks,
 				   -total_deleted_dirty_cache,
 				   unpin_dirty_size, TRUE);
-		ret = update_file_stats(body_ptr->fptr, -total_deleted_fileblocks,
+		ret = update_file_stats(body_ptr->fptr,
+				-total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				-total_deleted_dirty_cache, inode_index);
 		if (ret < 0) {
