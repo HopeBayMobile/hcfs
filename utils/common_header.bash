@@ -1,6 +1,6 @@
 set +x
 export TERM=xterm-256color
-umask 0000 # Fix common file permission error
+umask 000 # fix CI error
 
 script_error_report() {
 	set +x
