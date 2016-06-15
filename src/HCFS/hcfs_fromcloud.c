@@ -61,15 +61,20 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	int32_t ret, errcode;
 	int64_t tmplen;
 
-	if (hcfs_system->sync_paused)
-		return -EIO;
+	if (action_from == RESTORE_FETCH_OBJ) {
+		if (hcfs_system->backend_is_online == FALSE)
+			return -EIO;
+	} else {
+		if (hcfs_system->sync_paused)
+			return -EIO;
+	}
 
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
 
 	/* Get sem if action is from pinning file or from download meta. */
-	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
-		sem_wait(&pin_download_curl_sem);
+	if (action_from != READ_BLOCK) 
+		sem_wait(&nonread_download_curl_sem);
 	sem_wait(&download_curl_sem);
 	sem_wait(&download_curl_control_sem);
 	for (which_curl_handle = 0;
@@ -157,8 +162,8 @@ errcode_handle:
 	curl_handle_mask[which_curl_handle] = FALSE;
 
 	/*Release sem if action from pinning file*/
-	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
-		sem_post(&pin_download_curl_sem);
+	if (action_from != READ_BLOCK) 
+		sem_post(&nonread_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 
@@ -1106,6 +1111,47 @@ int32_t update_quota()
 	return 0;
 }
 
+int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
+{
+	int32_t ret, errcode;
+	struct timespec time_to_sleep;
+
+	time_to_sleep.tv_sec = 0;
+	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
+
+	if (CURRENT_BACKEND == NONE)
+		return -ENOTCONN;
+
+	ret = 0;
+	while (hcfs_system->system_going_down == FALSE) {
+		if (hcfs_system->backend_is_online) {
+			flock(fileno(fptr), LOCK_EX);
+			FTRUNCATE(fileno(fptr), 0);
+			ret = fetch_from_cloud(fptr,
+				action_from, objname);
+			flock(fileno(fptr), LOCK_UN);
+			if (ret < 0) {
+				if (ret == -ENOENT)
+					break;
+				else
+					continue;
+			}
+
+			break;
+		} else {
+			nanosleep(&time_to_sleep, NULL);
+		}
+	}
+
+	if (hcfs_system->system_going_down == TRUE)
+		ret = -ESHUTDOWN;
+
+	return ret;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	return errcode;
+}
 
 /* NOTE: Temp use this function to download meta file. It will be removed
  * when atomic_upload merge to android-dev */
@@ -1121,7 +1167,7 @@ int32_t fetch_object_from_cloud(FILE *fptr, char *objname)
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
 
-	sem_wait(&pin_download_curl_sem);
+	sem_wait(&nonread_download_curl_sem);
 	
 	sem_wait(&download_curl_sem);
 	sem_wait(&download_curl_control_sem);
@@ -1162,7 +1208,7 @@ errcode_handle:
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
 		
-	sem_post(&pin_download_curl_sem);
+	sem_post(&nonread_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 

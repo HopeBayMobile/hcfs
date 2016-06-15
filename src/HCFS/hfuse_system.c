@@ -312,7 +312,7 @@ void init_download_module(void)
 	if (CURRENT_BACKEND != NONE) {
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
-		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
 		/* Init usermeta curl handle */
@@ -511,17 +511,26 @@ int32_t main(int32_t argc, char **argv)
 		ret = check_init_super_block();
 		if (ret < 0) {
 			exit(ret);
-		} else if (ret > 0) { /* Just open old superblock */
+		} else if (ret > 0) { /* It just opened old superblock */
+			write_log(10, "Debug: Open old superblock.\n");
 			init_backend_related_module();
 		} else {
+			write_log(10, "Debug: Rebuild superblock.\n");
 			/* Rebuild superblock.
 			 * Do NOT init upload/delete/cache mgmt */
 		}
 
 	} else {
 		ret = check_init_super_block();
-		if (ret < 0)
+		if (ret < 0) {
 			exit(ret);
+		} else if (ret > 0) { /* It just opened old superblock */
+			init_backend_related_module();
+		} else {
+			write_log(0, "Error: Cannot restore because"
+				" there is no backend info.\n");
+			exit(-1);
+		}
 	}
 
 	hook_fuse(argc, argv);
@@ -575,7 +584,7 @@ int32_t main(int32_t argc, char **argv)
 		open_log("fuse.log");
 		write_log(2, "\nStart logging fuse\n");
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		sem_init(&download_curl_control_sem, 0, 1);
 
 		if (CURRENT_BACKEND != NONE) {

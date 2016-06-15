@@ -48,6 +48,7 @@
 #include "super_block.h"
 #include "filetables.h"
 #include "hcfs_fromcloud.h"
+#include "utils.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #include "FS_manager.h"
@@ -2447,6 +2448,16 @@ errcode_handle:
 	return ret;
 }
 
+/**
+ * When restoring the meta file, system statistics and meta statistics
+ * should be updated. All the status of blocks existing on cloud should
+ * be modified to ST_CLOUD. Also need to update pin space usage if a file
+ * is pinned.
+ *
+ * @param fptr File pointer of the restored file. It should be locked.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t restore_meta_structure(FILE *fptr)
 {
 	int32_t errcode, ret;
@@ -2476,7 +2487,11 @@ int32_t restore_meta_structure(FILE *fptr)
 		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+		/* Update statistics */
+		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
 		return 0;
+
 	} else if (S_ISLNK(this_stat.st_mode)) {
 		/* Restore cloud related data */
 		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
@@ -2488,11 +2503,13 @@ int32_t restore_meta_structure(FILE *fptr)
 		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+		/* Update statistics */
+		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
 		return 0;
 	}
 
 	/* Restore status and statistics */
-
 	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
 	total_blocks = (this_stat.st_size == 0) ? 0 :
 		((this_stat.st_size - 1) / MAX_BLOCK_SIZE + 1);
@@ -2529,11 +2546,14 @@ int32_t restore_meta_structure(FILE *fptr)
 		switch (block_status) {
 		case ST_TODELETE:
 			tmppage.block_entries[e_index].status = ST_NONE;
+			write_page = TRUE;
 			break;
+		case ST_LDISK:
 		case ST_LtoC:
 		case ST_CtoL:
 		case ST_BOTH:
 			tmppage.block_entries[e_index].status = ST_CLOUD;
+			write_page = TRUE;
 			break;
 		default: /* Do nothing when st is ST_CLOUD / ST_NONE */
 			break;
@@ -2564,12 +2584,35 @@ int32_t restore_meta_structure(FILE *fptr)
 			sizeof(FILE_STATS_TYPE), SEEK_SET);
 	FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
+	/* Update statistics */
+	change_system_meta(this_stat.st_size, meta_stat.st_size,
+			0, 0, 0, 0, TRUE);
+	if (file_meta.local_pin == TRUE) {
+		ret = change_pin_size(this_stat.st_size);
+		if (ret < 0) {
+			/* If no space, change pin status? */
+			file_meta.local_pin = FALSE;
+			FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+			FREAD(&file_meta,
+				sizeof(FILE_META_TYPE), 1, fptr);
+		}
+	}
+
 	return 0;
+
 errcode_handle:
 	return errcode;
-
 }
 
+/**
+ * Restore a meta file from cloud. Downlaod the meta file
+ * to a temp file, and rename to the correct meta file path.
+ *
+ * @param this_inode Inode number of the meta file to be restored.
+ *
+ * @return 0 on success or meta file had been restored. Otherwise
+ *         negative error code.
+ */
 int32_t restore_meta_file(ino_t this_inode)
 {
 	char metapath[METAPATHLEN];
@@ -2602,6 +2645,8 @@ int32_t restore_meta_file(ino_t this_inode)
 				__func__, errcode, strerror(errno));
 		return -EIO;
 	}
+
+	/* Get file lock */
 	ret = flock(fileno(fptr), LOCK_EX);
 	if (ret < 0) {
 		errcode = errno;

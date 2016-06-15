@@ -39,9 +39,9 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 				errcode = errno;
 				return -errcode;
 			}
-			flock(fileno(fsmgr_fptr), LOCK_EX);
-			ret = fetch_object_from_cloud(fsmgr_fptr, objname);
-			flock(fileno(fsmgr_fptr), LOCK_UN);
+			setbuf(fsmgr_fptr, NULL);
+			ret = fetch_object_busywait_conn(fsmgr_fptr,
+					RESTORE_FETCH_OBJ, objname);
 			fclose(fsmgr_fptr);
 			if (ret < 0) {
 				unlink(fsmgr_path);
@@ -144,10 +144,9 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 					errcode = errno;
 					return -errcode;
 				}
-				flock(fileno(fptr), LOCK_EX);
-				ret = fetch_object_from_cloud(fptr,
-						objname);
-				flock(fileno(fptr), LOCK_UN);
+				setbuf(fptr, NULL);
+				ret = fetch_object_busywait_conn(fptr,
+						RESTORE_FETCH_OBJ, objname);
 				fclose(fptr);
 				if (ret < 0) {
 					unlink(fstatpath);
@@ -203,6 +202,12 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	FTRUNCATE(fileno(sb_fptr), sizeof(SUPER_BLOCK_HEAD) +
 			max_inode * sizeof(SUPER_BLOCK_ENTRY));
 	fclose(sb_fptr);
+
+	/* Reset and update superblock size */
+	sem_wait(&(hcfs_system->access_sem));
+	hcfs_system->systemdata.super_block_size = 0;
+	sem_post(&(hcfs_system->access_sem));
+	update_sb_size();
 
 	return 0;
 
@@ -522,7 +527,8 @@ static int32_t _worker_get_job(int32_t tidx, INODE_JOB_HANDLE *inode_job)
 				if (ret == -ENOENT)
 					continue;
 				else
-					write_log(0, "Error:");
+					write_log(0, "Error: Fail to"
+						" pull job. Code %d\n", -ret);
 			}
 			break;
 		}
@@ -555,7 +561,7 @@ void rebuild_sb_worker(void *t_idx)
 			if (ret == -ENOENT) {
 				if (rebuild_sb_jobs->job_finish)
 					break;
-				else
+				else 
 					continue;
 			} else if (ret == -ESHUTDOWN) {
 				write_log(4, "System shutdown\n");
@@ -652,9 +658,13 @@ void rebuild_sb_worker(void *t_idx)
 
 	sem_post(&(hcfs_system->fuse_sem));
 	return;
-
 }
 
+/**
+ * Create many threads to rebuild super block.
+ *
+ * @return 0 on success.
+ */
 int32_t create_sb_rebuilder()
 {
 	int32_t idx;
@@ -663,7 +673,6 @@ int32_t create_sb_rebuilder()
 		write_log(5, "Cannot restore without network conn\n");
 		return -EPERM;
 	}
-	//sem_wait(&(rebuild_sb_mgr_info->mgr_access_sem));
 	sem_wait(&(rebuild_sb_tpool->tpool_access_sem));
 	for (idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
 		pthread_attr_init(
@@ -680,7 +689,6 @@ int32_t create_sb_rebuilder()
 			(void *)&(rebuild_sb_tpool->tidx[idx]));
 	}
 	sem_post(&(rebuild_sb_tpool->tpool_access_sem));
-	//sem_post(&(rebuild_sb_mgr_info->mgr_access_sem));
 	return 0;
 }
 
@@ -698,7 +706,7 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 	struct stat *this_stat, char pin_status)
 {
 	int32_t ret;
-	SUPER_BLOCK_ENTRY sb_entry;
+	SUPER_BLOCK_ENTRY sb_entry, tmp_sb_entry;
 
 	/* Check whether this entry had been rebuilded */
 	ret = super_block_read(this_inode, &sb_entry);
@@ -716,6 +724,18 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 	sb_entry.pin_status = ST_UNPIN;
 
 	super_block_exclusive_locking();
+	/* Check again */
+	ret = read_super_block_entry(this_inode, &tmp_sb_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;
+	}
+	if (tmp_sb_entry.this_index > 0) {
+		super_block_exclusive_release();
+		return 0;
+	}
+
+	/* Begin to write entry */
 	if (pin_status == PIN) {
 		if (S_ISREG(this_stat->st_mode)) {
 			/* Enqueue and set as ST_PINNING */
@@ -790,6 +810,7 @@ restoring mode is early enough so that read will always be successful here */
 		return -errcode;
 	}
 	flock(fileno(fptr), LOCK_EX);
+	/* Get pin status */
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
 	if (S_ISREG(this_stat.st_mode)) {

@@ -87,6 +87,7 @@ int32_t fetch_error_download_path(char *path, ino_t inode);
 
 void get_system_size(int64_t *cache_size, int64_t *pinned_size);
 
+int32_t change_pin_size(int64_t delta_pin_size);
 int32_t update_sb_size();
 
 int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,

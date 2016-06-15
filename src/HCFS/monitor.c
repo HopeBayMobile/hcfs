@@ -111,7 +111,8 @@ void monitor_loop(void)
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->backend_is_online == TRUE) {
 			backoff_exponent = 0;
-			wake_sb_rebuilder();
+			if (hcfs_system->system_restoring)
+				wake_sb_rebuilder();
 			sem_wait(&(hcfs_system->monitor_sem));
 			continue;
 		}
@@ -135,7 +136,8 @@ void monitor_loop(void)
 			update_sync_state();
 		}
 	}
-	wake_sb_rebuilder();
+	if (hcfs_system->system_restoring)
+		wake_sb_rebuilder();
 #ifdef _ANDROID_ENV_
 	return NULL;
 #else

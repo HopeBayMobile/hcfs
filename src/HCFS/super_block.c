@@ -46,6 +46,7 @@
 #include "macro.h"
 #include "hcfs_cacheops.h"
 #include "rebuild_super_block.h"
+#include "hcfs_fromcloud.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -1924,7 +1925,7 @@ error_handling:
 
 int32_t check_init_super_block()
 {
-	char fsmgr_path[200];
+	char fsmgr_path[400], objname[300];
 	FILE *fsmgr_fptr, *sb_fptr;
 	DIR_META_TYPE dirmeta;
 	SUPER_BLOCK_HEAD head;
@@ -1936,12 +1937,26 @@ int32_t check_init_super_block()
 		errcode = errno;
 		if (errcode == ENOENT) {
 			_ASSERT_BACKEND_EXIST_();
-			/* TODO:Get fsmgr from cloud */
+			/* Get fsmgr from cloud */
+			sprintf(objname, "FSmgr_backup");
+			fsmgr_fptr = fopen(fsmgr_path, "w+");
+			if (!fsmgr_fptr) {
+				errcode = errno;
+				return -errcode;
+			}
+			setbuf(fsmgr_fptr, NULL);
+			ret = fetch_object_busywait_conn(fsmgr_fptr,
+					RESTORE_FETCH_OBJ, objname);
+			fclose(fsmgr_fptr);
+			if (ret < 0) {
+				unlink(fsmgr_path);
+				return ret;
+			}
 		} else {
 			return -errcode;
 		}
 	}
-	fsmgr_fptr = fopen(fsmgr_path, "r+");
+	fsmgr_fptr = fopen(fsmgr_path, "r");
 	if (!fsmgr_fptr) {
 		errcode = errno;
 		return -errcode;
