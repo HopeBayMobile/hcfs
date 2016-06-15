@@ -90,7 +90,11 @@ TEST_F(monitorTest, Max_Collisions_Number) {
 	update_backend_status(FALSE, NULL);
 	for (int32_t i =0; i<15;i++)
 		sem_post(&(hcfs_system->monitor_sem));
-	nanosleep(&wait_monitor_time, NULL);
+	for (int32_t i =0; i<100;i++) {
+		nanosleep(&wait_monitor_time, NULL);
+		if(MONITOR_MAX_BACKOFF_EXPONENT == backoff_exponent)
+			break;
+	}
 	ASSERT_EQ(MONITOR_MAX_BACKOFF_EXPONENT, backoff_exponent);
 
 	// let system shut down
