@@ -123,8 +123,9 @@ function setup_ssh_key() {
 	fi
 	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
 		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
-	check-ssh-agent || export SSH_AUTH_SOCK=$repo/tmp/ssh-agent.sock
-	check-ssh-agent || eval "$(mkdir -p $repo/tmp && ssh-agent -s -a $repo/tmp/ssh-agent.sock)" > /dev/null
+	mkdir -p ~/.tmp
+	check-ssh-agent || export SSH_AUTH_SOCK=~/.tmp/ssh-agent.sock
+	check-ssh-agent || { rm -f ~/.tmp/ssh-agent.sock && eval "$(ssh-agent -s -a ~/.tmp/ssh-agent.sock)"; } > /dev/null
 	ssh-add ~/.ssh/id_rsa
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
