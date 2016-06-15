@@ -17,7 +17,7 @@ PATH=%PATH%;"%SYSTEMROOT%\System32"
 
 @ECHO ON
 fastboot oem unlock-go
-FOR %%f IN (aosp_bullhead-img-*.zip) DO fastboot.exe update %%f
+FOR %%f IN (aosp_bullhead-img-*.zip) DO fastboot.exe -w update %%f
 @ECHO OFF
 echo Press any key to exit...
 pause >nul
