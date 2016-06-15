@@ -18,14 +18,14 @@ v 2.2.1.
   - Add Tera feature to Settings app (!400)
     1. Support launch Tera management app by Settings app
     2. Support show cloud storage usage in Settings app
-  - Pause cache management (!387)
+  - Pause cache management (!387). Now cache management will not actively trying to find cache blocks to page out if none is available.
   - Atomic upload android (!204)
     1. atomic upload(robust data integrity during file changing)
     2. able to resume file sync after disconnection
 
 ## Fixes
-  - Fix status inconsistency in read/write (!394)
-  - Fix readdir issue (!374)
+  - Fix status inconsistency in read/write (!394). Read / write operations opening a data block will now reload block status if needed.
+  - Fix readdir issue (!374). Fixed the issue on deleting a directory of many files under CTS.
 
 ## CI / Refactoring
   - Fix image build failure (!399)
