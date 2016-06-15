@@ -166,6 +166,7 @@ function build_system() {
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
+	rm -rf out/target/product/*/obj && \
 	make \$PARALLEL_JOBS dist"'
 }
 
