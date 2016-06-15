@@ -2256,6 +2256,9 @@ int32_t truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
  * When write or truncate a block with status ST_LDISK/ST_LtoC, check if
  * this file is now syncing and try to copy the block. If cache is full,
  * unlock meta entry and sleep. Then wait for cache space and copy block again.
+ *
+ * @return 0 on success. Positive integer means it had ever slept.
+ *         Otherwise return negative error code.
  */
 int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 		ino_t this_inode, int64_t blockno, int64_t seq,
@@ -2276,9 +2279,13 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 
 			/* Wait for free cache space */
 			sleep_times++;
-			write_log(10, "Debug: Sleep and wait free cache\n");
+			write_log(10, "Debug: Sleep and wait free cache."
+				" Now check block_%"PRIu64"_%"PRId64,
+				(uint64_t)this_inode, blockno);
 			ret = sleep_on_cache_full();
-			write_log(10, "Debug: Wake up and keep check sync\n");
+			write_log(10, "Debug: Wake up and keep check sync."
+				" Now check block_%"PRIu64"_%"PRId64,
+				(uint64_t)this_inode, blockno);
 			if (ret < 0) {
 				*body_ptr = meta_cache_lock_entry(
 						this_inode);
@@ -2296,7 +2303,9 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 				break;
 			}
 
-			meta_cache_open_file(*body_ptr);
+			ret = meta_cache_open_file(*body_ptr);
+			if (ret < 0)
+				break;
 			/* Lookup again. Page may be modified by others. */
 			meta_cache_lookup_file_data(this_inode, NULL,
 					NULL, temppage, pagepos, *body_ptr);
@@ -2305,8 +2314,11 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 		}
 	}
 
+	/* If it had ever slept and succeed in check block sync status,
+	 * then return a positive integer. */
 	if (sleep_times > 0 && ret == 0)
-			return sleep_times;
+		return sleep_times;
+
 	return ret;
 }
 
@@ -4452,7 +4464,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
-				} else if (ret > 0) {
+				} else if (ret > 0) { /* Check status again */
 					continue;
 				}
 				break;
@@ -4467,7 +4479,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					if (ret < 0) {
 						*reterr = ret;
 						return 0;
-					} else if (ret > 0) {
+					/* Check status again */
+					} else if (ret > 0) { 
 						continue;
 					}
 				}
@@ -4535,7 +4548,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
-				} else if (ret > 0) {
+				} else if (ret > 0) { /* Check status again */
 					continue;
 				}
 				break;
@@ -4550,6 +4563,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 					if (ret < 0) {
 						*reterr = ret;
 						return 0;
+					/* Check status again */
 					} else if (ret > 0) {
 						continue;
 					}

@@ -95,15 +95,18 @@ int32_t unlink_upload_file(char *filename)
 		change_system_meta(-filesize, 0, -filesize,
 				0, 0, 0, FALSE);
 		if (old_cachesize > CACHE_SOFT_LIMIT) {
-			/* After temp block is removed, check if cache_size
-			 * drop below hard limit - delta. */
+			/* Once temp block is removed, check if cache_size
+			 * drop below hard_limit - delta. */
 			new_cachesize = hcfs_system->systemdata.cache_size;
 			threshold = CACHE_HARD_LIMIT - CACHE_DELTA;
 			if (old_cachesize > threshold &&
-					new_cachesize < threshold)
+					new_cachesize < threshold) {
 				/* Some ops may sleep because these
 				 * temp blocks occupied cache space. */
 				notify_sleep_on_cache(0);
+				write_log(10, "Debug: Notify sleeping threads"
+					" in %s", __func__);
+			}
 		}
 	} else {
 		int32_t errcode;
