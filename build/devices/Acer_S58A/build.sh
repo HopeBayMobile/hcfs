@@ -49,7 +49,7 @@ function start_builder() {
 	mkdir -p /data/ccache
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
 	eval docker pull $DOCKER_IMAGE || :
-	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	eval docker run -d --name=$DOCKERNAME $DOCKER_IMAGE
 	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
 	trap cleanup INT TERM
 }
