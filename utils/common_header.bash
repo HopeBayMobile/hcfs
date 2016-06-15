@@ -1,5 +1,7 @@
 set +x
 export TERM=xterm-256color
+umask 000 # fix CI error
+
 script_error_report() {
 	set +x
 	local script="$1"

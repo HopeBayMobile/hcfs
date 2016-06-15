@@ -49,7 +49,7 @@ function start_builder() {
 	mkdir -p /data/ccache
 	DOCKERNAME=s58a-build-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}
 	eval docker pull $DOCKER_IMAGE || :
-	eval docker run -d --name=$DOCKERNAME -v /data/ccache:/root/.ccache $DOCKER_IMAGE
+	eval docker run -d --name=$DOCKERNAME $DOCKER_IMAGE
 	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
 	trap cleanup INT TERM
 }
@@ -77,15 +77,14 @@ function setup_ssh_key() {
 	check-ssh-agent || export SSH_AUTH_SOCK=~/.tmp/ssh-agent.sock
 	check-ssh-agent || { rm -f ~/.tmp/ssh-agent.sock && eval "$(ssh-agent -s -a ~/.tmp/ssh-agent.sock)"; } > /dev/null
 	ssh-add ~/.ssh/id_rsa
-	until docker top $DOCKERNAME | grep -q /usr/sbin/sshd
+	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
+	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
+	ssh-keygen -R $DOCKER_IP || :
+	until ssh -oBatchMode=yes -oStrictHostKeyChecking=no root@$DOCKER_IP pwd
 	do
 		: "Wait builder sshd.."
 		sleep 2
 	done
-	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
-	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
-	ssh-keygen -R $DOCKER_IP || :
-	ssh -oBatchMode=yes -oStrictHostKeyChecking=no root@$DOCKER_IP pwd
 	touch /tmp/test
 	rsync /tmp/test root@$DOCKER_IP:/tmp/test
 }

@@ -98,7 +98,7 @@ function start_builder() {
 	DOCKERNAME="$BOXNAME-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}"
 	eval docker pull $DOCKER_IMAGE || :
 	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
-	eval docker run -d --name=$DOCKERNAME $DOCKER_IMAGE
+	eval docker run -v /data/ccache:/ccache -d --name=$DOCKERNAME $DOCKER_IMAGE
 }
 
 function cleanup() {
@@ -119,7 +119,7 @@ function check-ssh-agent() {
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	if [ ! -f ~/.ssh/id_rsa.pub ]; then
-		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N "" || :
 	fi
 	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
 		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
@@ -142,21 +142,17 @@ function setup_ssh_key() {
 RSYNC_SETTING="-arcv --no-owner --no-group --no-times"
 function patch_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $here/patch/ \
-		root@$DOCKER_IP:/data/
+	rsync $RSYNC_SETTING $here/patch/ root@$DOCKER_IP:/data/
 }
 function pull_hcfs_binaay() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $LIB_DIR/$BINARY_TARGET/system/ \
-		root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/
+	rsync $RSYNC_SETTING $LIB_DIR/$BINARY_TARGET/system/ root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/
 }
 
 function pull_management_app() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $APP_DIR/*.apk \
-		root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/HopebayHCFSmgmt/
-	rsync $RSYNC_SETTING $APP_DIR/arm64-v8a/ \
-		root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/lib64/
+	rsync $RSYNC_SETTING $APP_DIR/*.apk root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/HopebayHCFSmgmt/
+	rsync $RSYNC_SETTING $APP_DIR/arm64-v8a/ root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/lib64/
 }
 
 function build_system() {
@@ -166,6 +162,7 @@ function build_system() {
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
+	make clean && \
 	make \$PARALLEL_JOBS dist"'
 }
 
@@ -175,12 +172,8 @@ function publish_image() {
 		rm -rf ${IMG_DIR}
 	fi
 	mkdir -p ${IMG_DIR}
-	rsync $RSYNC_SETTING -L \
-		$here/resource/* \
-		${IMG_DIR}
-	rsync $RSYNC_SETTING \
-		root@$DOCKER_IP:/data/out/dist/*-img-* \
-		${IMG_DIR}
+	rsync $RSYNC_SETTING -L $here/resource/* ${IMG_DIR}
+	rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-img-* ${IMG_DIR}
 	touch ${PUBLISH_DIR}
 	touch ${IMG_DIR}
 }
