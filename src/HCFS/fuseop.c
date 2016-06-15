@@ -4691,7 +4691,6 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	int64_t sizediff, amount_preallocated;
 	int64_t old_metasize, new_metasize, delta_meta_size;
 	int64_t now_seq;
-	int64_t max_pinned_size;
 
 	write_log(10, "Debug write: size %zu, offset %lld\n", size,
 	          offset);
@@ -4775,11 +4774,6 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	/* Remember now sequence number */
 	now_seq = thisfilemeta.finished_seq;
-
-	if (thisfilemeta.local_pin == P_HIGH_PRI_PIN)
-		max_pinned_size = RESERVED_PINNED_LIMIT;
-	else
-		max_pinned_size = MAX_PINNED_LIMIT;
 
 	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
