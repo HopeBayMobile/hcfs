@@ -98,7 +98,7 @@ function start_builder() {
 	DOCKERNAME="$BOXNAME-${IMAGE_TYPE}-${BUILD_NUMBER:-`date +%m%d-%H%M%S`}"
 	eval docker pull $DOCKER_IMAGE || :
 	echo ${DOCKERNAME} > DOCKERNAME # Leave container name for jenkins to cleanup
-	eval docker run -d --name=$DOCKERNAME $DOCKER_IMAGE
+	eval docker run -v /data/ccache:/ccache -d --name=$DOCKERNAME $DOCKER_IMAGE
 }
 
 function cleanup() {
@@ -166,7 +166,6 @@ function build_system() {
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
-	rm -rf /ccache/*;\
 	make \$PARALLEL_JOBS dist"'
 }
 
@@ -180,6 +179,7 @@ function publish_image() {
 		$here/resource/* \
 		${IMG_DIR}
 	rsync $RSYNC_SETTING \
+		root@$DOCKER_IP:/data/out/target/product/*/userdata.img
 		root@$DOCKER_IP:/data/out/dist/*-img-* \
 		${IMG_DIR}
 	touch ${PUBLISH_DIR}
