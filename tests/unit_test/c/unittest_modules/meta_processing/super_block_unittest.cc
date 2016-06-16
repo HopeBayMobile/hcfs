@@ -2236,6 +2236,9 @@ protected:
 		SUPER_BLOCK_ENTRY entry1, entry2;
 		ino_t first, last;
 
+		memset(&entry1, 0, sizeof(SUPER_BLOCK_ENTRY));
+		memset(&entry2, 0, sizeof(SUPER_BLOCK_ENTRY));
+
 		first = sys_super_block->head.first_dirty_inode;
 		last = sys_super_block->head.last_dirty_inode;
 
@@ -2257,7 +2260,7 @@ protected:
 			entry1 = entry2;
 		}
 
-		if (entry2.this_index != last)
+		if (entry1.this_index != last)
 			return -1;
 		return 0;
 	}
@@ -2271,9 +2274,27 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_empty_listSUCCESS)
 	sys_super_block->head.last_dirty_inode = 0;
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
+
+	close(sys_super_block->iofptr);
+	unlink(mocksb_path);
+}
+
+TEST_F(ll_rebuild_dirtyTest, rebuild_single_inodeSUCCESS)
+{
+	/* Gen mock data for test */
+	gen_test_sblist();
+	sys_super_block->head.first_dirty_inode = 0;
+	sys_super_block->head.last_dirty_inode = 0;
+
+	/* Test start */
+	ll_rebuild_dirty(10);
+
+	EXPECT_EQ(0, check_sblist_integrity());
+	EXPECT_EQ(10, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(10, sys_super_block->head.last_dirty_inode);
 
 	close(sys_super_block->iofptr);
 	unlink(mocksb_path);
@@ -2285,7 +2306,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_noERR_listSUCCESS)
 	gen_test_sblist();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2301,7 +2322,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_enqueueERR_listSUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2317,7 +2338,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_enqueueERR_list2SUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2333,7 +2354,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_first_entrySUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2349,7 +2370,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_first_entry2SUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2365,7 +2386,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_last_entrySUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2381,7 +2402,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_dequeueERR_last_entry2SUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2399,7 +2420,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_multiple_dequeueERR_listSUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 
@@ -2419,7 +2440,7 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_mix_enqueueERR_dequeueERR_listSUCCESS)
 	reload_sb_head();
 
 	/* Test start */
-	ll_rebuild_dirty();
+	ll_rebuild_dirty(0);
 
 	EXPECT_EQ(0, check_sblist_integrity());
 

@@ -1096,6 +1096,15 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 		sys_super_block->head.last_dirty_inode = missing_inode;
 		/* TODO: Now assume that the other inodes are clean. This
 		should be fixed later */
+		ret = read_super_block_entry(missing_inode, &entry1);
+		if (ret < 0)
+			return ret;
+		entry1.util_ll_prev = 0;
+		entry1.util_ll_next = 0;
+		ret = write_super_block_entry(missing_inode, &entry1);
+		if (ret < 0)
+			return ret;
+
 		sys_super_block->head.num_dirty = 1;
 		ret = write_super_block_head();
 		if (ret < 0)
