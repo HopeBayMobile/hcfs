@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 
-#define CACHE_USAGE_NUM_ENTRIES 65536
+#define CACHE_USAGE_NUM_ENTRIES 128
 
 typedef struct usage_node_template {
 	ino_t this_inode;

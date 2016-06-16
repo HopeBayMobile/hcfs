@@ -529,7 +529,7 @@ int32_t create_progress_file(ino_t inode)
 		UNLINK(filename);
 	}
 
-	ret_fd = open(filename, O_CREAT | O_RDWR);
+	ret_fd = open(filename, O_CREAT | O_RDWR, 0600);
 	if (ret_fd < 0) {
 		errcode = errno;
 		write_log(0, "Error: Fail to open uploading progress file"
@@ -913,7 +913,8 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	fclose(src_ptr);
 	fclose(tar_ptr);
 
-	change_system_meta(total_size, 0, total_size, 0, 0, 0, FALSE);
+	/* Now only change cache size, not system size */
+	change_system_meta(0, 0, total_size, 0, 0, 0, FALSE);
 
 	return 0;
 
