@@ -13,6 +13,9 @@
 #include "hcfs_fromcloud.h"
 #include "hfuse_system.h"
 
+#define LOCK_QUEUE_FILE() sem_wait(&(rebuild_sb_jobs->queue_file_sem))
+#define UNLOCK_QUEUE_FILE() sem_post(&(rebuild_sb_jobs->queue_file_sem))
+
 /**
  * Helper of init_rebuild_sb(). Help the caller to get all root inodes
  * from object "FSmgr" on cloud. Download the object if "FSmgr" does
@@ -237,6 +240,7 @@ int32_t init_rebuild_sb(char rebuild_action)
 	memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
 	pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
 	pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+	sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
 
 	/* Allocate memory for mgr */
 	rebuild_sb_tpool = (SB_THREAD_POOL *)
@@ -365,12 +369,12 @@ int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job)
 	while (rebuild_sb_jobs->remaining_jobs > 0) {
 		if (cache_job->cache_idx >= cache_job->num_cached_inode) {
 			/* Fetch many inodes */
-			flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
+			LOCK_QUEUE_FILE();
 			ret_ssize = pread(rebuild_sb_jobs->queue_fh,
 				cache_job->cached_inodes,
 				sizeof(ino_t) * NUM_CACHED_INODES,
 				sizeof(ino_t) * rebuild_sb_jobs->job_count);
-			flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+			UNLOCK_QUEUE_FILE();
 			/* Set num of cached inodes */
 			if (ret_ssize > 0) {
 				cache_job->num_cached_inode =
@@ -420,16 +424,16 @@ int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes)
 			rebuild_sb_jobs->job_count;
 	rebuild_sb_jobs->remaining_jobs += num_inodes;
 
-	flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
+	LOCK_QUEUE_FILE();
 	PWRITE(rebuild_sb_jobs->queue_fh, inode_jobs,
 			sizeof(ino_t) * num_inodes,
 			sizeof(ino_t) * total_jobs);
-	flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+	UNLOCK_QUEUE_FILE();
 	pthread_mutex_unlock(&(rebuild_sb_jobs->job_mutex));
 	return 0;
 
 errcode_handle:
-	flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+	UNLOCK_QUEUE_FILE();
 	pthread_mutex_unlock(&(rebuild_sb_jobs->job_mutex));
 	return errcode;
 }
@@ -441,14 +445,14 @@ int32_t erase_inode_job(INODE_JOB_HANDLE *inode_job)
 	int32_t errcode;
 
 	empty_inode = 0;
-	flock(rebuild_sb_jobs->queue_fh, LOCK_EX);
+	LOCK_QUEUE_FILE();
 	PWRITE(rebuild_sb_jobs->queue_fh, &empty_inode, 1,
 		inode_job->queue_file_pos);
-	flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+	UNLOCK_QUEUE_FILE();
 	return 0;
 
 errcode_handle:
-	flock(rebuild_sb_jobs->queue_fh, LOCK_UN);
+	UNLOCK_QUEUE_FILE();
 	return errcode;
 }
 

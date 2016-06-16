@@ -28,6 +28,7 @@ typedef struct CACHED_JOBS {
 
 typedef struct REBUILD_INODE_JOBS {
 	CACHED_JOBS cache_jobs;
+	sem_t queue_file_sem;
 	int32_t queue_fh;
 	int64_t remaining_jobs;
 	int64_t job_count;
