@@ -350,6 +350,8 @@ static int32_t _check_cache_replace_result(int64_t *num_removed_inode)
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
 			(hcfs_system->sync_paused)) {
 			/* Wake them up and tell them cannot do this action */
+			write_log(4, "Cache size exceeds threshold, "
+				"but nothing can be paged out\n");
 			notify_sleep_on_cache(-EIO);
 			sleep(2);
 			/* Try again after 2 seconds just in case some thread
