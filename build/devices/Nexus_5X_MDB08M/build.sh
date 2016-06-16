@@ -57,7 +57,8 @@ function main()
 {
 	$UNTRACE
 	IMAGE_TYPE=$1
-	IMG_DIR=${PUBLISH_DIR}/HCFS-nexus-5x-image-${IMAGE_TYPE}
+        DEVICE_IMG=HCFS-nexus-5x-image
+        IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-6.0.0_r26_MDB08M_20160530"
 	echo ================================================================================
 	require_var IMAGE_TYPE
@@ -119,13 +120,12 @@ function check-ssh-agent() {
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	if [ ! -f ~/.ssh/id_rsa.pub ]; then
-		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N "" || :
+		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
 	fi
 	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
 		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
-	mkdir -p ~/.tmp
-	check-ssh-agent || export SSH_AUTH_SOCK=~/.tmp/ssh-agent.sock
-	check-ssh-agent || { rm -f ~/.tmp/ssh-agent.sock && eval "$(ssh-agent -s -a ~/.tmp/ssh-agent.sock)"; } > /dev/null
+	check-ssh-agent || export SSH_AUTH_SOCK=$repo/tmp/ssh-agent.sock
+	check-ssh-agent || eval "$(mkdir -p $repo/tmp && ssh-agent -s -a $repo/tmp/ssh-agent.sock)" > /dev/null
 	ssh-add ~/.ssh/id_rsa
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
@@ -171,9 +171,44 @@ function publish_image() {
 	if [ -d ${IMG_DIR} ]; then
 		rm -rf ${IMG_DIR}
 	fi
+
+	CI_PATH=/mnt/nas/CloudDataSolution/TeraFonn_CI_build
+	record_tmp=${PUBLISH_DIR}/recode.tmp
+	if [ -e "$record_tmp" ]; then
+		last_version_path=`cat ${record_tmp}`
+	else
+		last_version_path=`ls ${CI_PATH} | grep android-dev | tail -1`
+	fi
+
+	last_version=`echo $last_version_path | awk -F- {'print $1'}`
+	last_target=`find ${CI_PATH}/${last_version_path} -path */${DEVICE_IMG}-${IMAGE_TYPE}/*-target_files-*.zip`
+
 	mkdir -p ${IMG_DIR}
 	rsync $RSYNC_SETTING -L $here/resource/* ${IMG_DIR}
-	rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-img-* ${IMG_DIR}
+
+	if [ "$gitlabSourceBranch" = "android-dev" ]; then
+		if [ -e "$last_target" ]; then
+			rsync $RSYNC_SETTING ${last_target} root@$DOCKER_IP:/data/old.zip
+
+			ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c \
+			"/data/build/tools/releasetools/ota_from_target_files -i \
+			/data/old.zip \
+			/data/out/dist/*-target_files-* \
+			/data/out/dist/'${VERSION_NUM}'-from-'${last_version}'.zip"'
+
+			rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-from-* ${IMG_DIR}
+		fi
+		rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/{*-img-*,*-ota-*,*-target_files-*} ${IMG_DIR}
+	else
+		rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-img-* ${IMG_DIR}
+	fi
+
+	if [ -e "$record_tmp" ]; then
+		rm -f ${record_tmp}
+	else
+		echo $last_version_path > ${record_tmp}
+	fi
+
 	touch ${PUBLISH_DIR}
 	touch ${IMG_DIR}
 }
