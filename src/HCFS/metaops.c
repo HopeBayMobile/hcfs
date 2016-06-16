@@ -1948,7 +1948,8 @@ static int32_t _check_shrink_size(ino_t **ptr, int64_t num_elem,
 
 int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 		ino_t **dir_node_list, int64_t *num_dir_node,
-		ino_t **nondir_node_list, int64_t *num_nondir_node)
+		ino_t **nondir_node_list, int64_t *num_nondir_node,
+		char **nondir_type_list)
 {
 	int32_t ret, errcode;
 	int32_t count;
@@ -1975,6 +1976,15 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	if ((*dir_node_list == NULL) || (*nondir_node_list == NULL)) {
 		errcode = -ENOMEM;
 		goto errcode_handle;
+	}
+
+	if (nondir_type_list) { /* Malloc type array if needed */
+		*nondir_type_list = (char *)malloc(sizeof(char) *
+				(total_children + 1));
+		if (*nondir_type_list == NULL) {
+			errcode = -ENOMEM;
+			goto errcode_handle;
+		}
 	}
 
 	/* Collect all file in this dir */
@@ -2007,6 +2017,9 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 					errcode = ret;
 					goto errcode_handle;
 				}
+				if (nondir_type_list) /* Get type if need */
+					(*nondir_type_list)[*num_nondir_node] =
+							tmpentry->d_type;
 				(*nondir_node_list)[*num_nondir_node] =
 								tmpentry->d_ino;
 				(*num_nondir_node)++;
@@ -2020,6 +2033,10 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	ret = _check_shrink_size(dir_node_list, *num_dir_node, now_dir_size);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to malloc in %s\n", __func__);
+		if (nondir_type_list && *nondir_type_list) {
+			free(*nondir_type_list);
+			*nondir_type_list = NULL;
+		}
 		free(*dir_node_list);
 		free(*nondir_node_list);
 		*dir_node_list = NULL;
@@ -2032,6 +2049,10 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 			now_nondir_size);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to malloc in %s\n", __func__);
+		if (nondir_type_list && *nondir_type_list) {
+			free(*nondir_type_list);
+			*nondir_type_list = NULL;
+		}
 		free(*dir_node_list);
 		free(*nondir_node_list);
 		*dir_node_list = NULL;
@@ -2039,9 +2060,20 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 		return -ENOMEM;
 	}
 
+	if (nondir_type_list) {
+		if (*num_nondir_node == 0) {
+			free(*nondir_type_list);
+			*nondir_type_list = NULL;
+		}
+	}
+
 	return 0;
 
 errcode_handle:
+	if (nondir_type_list && *nondir_type_list) {
+		free(*nondir_type_list);
+		*nondir_type_list = NULL;
+	}
 	free(*dir_node_list);
 	free(*nondir_node_list);
 	*dir_node_list = NULL;
@@ -2175,7 +2207,8 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
  */
 int32_t collect_dir_children(ino_t this_inode,
 	ino_t **dir_node_list, int64_t *num_dir_node,
-	ino_t **nondir_node_list, int64_t *num_nondir_node)
+	ino_t **nondir_node_list, int64_t *num_nondir_node,
+	char **nondir_type_list)
 {
 	int32_t ret, errcode;
 	int64_t ret_size;
@@ -2214,7 +2247,8 @@ int32_t collect_dir_children(ino_t this_inode,
 	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	ret = collect_dirmeta_children(&dir_meta, fptr, dir_node_list,
-			num_dir_node, nondir_node_list, num_nondir_node);
+			num_dir_node, nondir_node_list, num_nondir_node,
+			nondir_type_list);
 	if (ret < 0) {
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
@@ -2542,6 +2576,7 @@ int32_t restore_meta_structure(FILE *fptr)
 			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
 					1, fptr);
 		}
+		/* TODO: Perhaps check and delete local block? */
 		block_status = tmppage.block_entries[e_index].status;
 		switch (block_status) {
 		case ST_TODELETE:
@@ -2667,7 +2702,7 @@ int32_t restore_meta_file(ino_t this_inode)
 
 	/* Fetch meta from cloud */
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
-	ret = fetch_object_from_cloud(fptr, objname);
+	ret = fetch_from_cloud(fptr, RESTORE_FETCH_OBJ, objname);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch meta from cloud in %s."
 			" Code %d", __func__, -ret);

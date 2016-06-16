@@ -62,7 +62,7 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	flock(fileno(fsmgr_fptr), LOCK_EX);
 	PREAD(fileno(fsmgr_fptr), &dirmeta, sizeof(DIR_META_TYPE), 16);
 	ret = collect_dirmeta_children(&dirmeta, fsmgr_fptr, &dir_nodes,
-			&num_dir, &nondir_nodes, &num_nondir);
+			&num_dir, &nondir_nodes, &num_nondir, NULL);
 	if (ret < 0)
 		return ret;
 	flock(fileno(fsmgr_fptr), LOCK_UN);
@@ -271,6 +271,7 @@ int32_t init_rebuild_sb(char rebuild_action)
 		ret = _init_sb_head(roots, num_roots);
 		if (ret < 0)
 			return ret;
+		free(roots);
 
 	} else if (rebuild_action == KEEP_REBUILD_SB){
 
@@ -295,6 +296,7 @@ int32_t init_rebuild_sb(char rebuild_action)
 			ret = _init_rebuild_queue_file(roots, num_roots);
 			if (ret < 0)
 				return ret;
+			free(roots);
 		}
 	} else {
 		write_log(0, "Error: Invalid type\n");
@@ -589,8 +591,10 @@ void rebuild_sb_worker(void *t_idx)
 		if (S_ISDIR(this_stat.st_mode)) {
 			ino_t *dir_list, *nondir_list;
 			int64_t num_dir, num_nondir;
+			char *nondir_type_list;
 			ret = collect_dir_children(inode_job.inode,
-				&dir_list, &num_dir, &nondir_list, &num_nondir);
+				&dir_list, &num_dir, &nondir_list, &num_nondir,
+				&nondir_type_list);
 			if (ret < 0) {
 				push_inode_job(&(inode_job.inode), 1);
 				erase_inode_job(&inode_job);
@@ -603,6 +607,7 @@ void rebuild_sb_worker(void *t_idx)
 					erase_inode_job(&inode_job);
 					continue;
 				}
+				free(dir_list);
 			}
 			if (num_nondir > 0) {
 				ret = push_inode_job(nondir_list, num_nondir);
@@ -611,6 +616,8 @@ void rebuild_sb_worker(void *t_idx)
 					erase_inode_job(&inode_job);
 					continue;
 				}
+				free(nondir_list);
+				free(nondir_type_list); /* TODO: Add parent stat */
 			}
 			/* Job completed */
 			erase_inode_job(&inode_job);

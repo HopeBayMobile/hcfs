@@ -1292,7 +1292,8 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 		dir_node_list = NULL;
 		nondir_node_list = NULL;
 		ret = collect_dir_children(this_inode, &dir_node_list,
-			&num_dir_node, &nondir_node_list, &num_nondir_node);
+			&num_dir_node, &nondir_node_list,
+			&num_nondir_node, NULL);
 		if (ret < 0)
 			return ret;
 
@@ -1431,7 +1432,8 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		dir_node_list = NULL;
 		nondir_node_list = NULL;
 		ret = collect_dir_children(this_inode, &dir_node_list,
-			&num_dir_node, &nondir_node_list, &num_nondir_node);
+			&num_dir_node, &nondir_node_list,
+			&num_nondir_node, NULL);
 		if (ret < 0)
 			return ret;
 
