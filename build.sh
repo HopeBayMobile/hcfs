@@ -36,6 +36,8 @@ ACTION:
             respectively. Script will build both type if not specified.
         --test
             test image build process.
+    pyhcfs [--test]
+        Build python library "pyhcfs" at dist/
 OPTIONS:
     -h
         Show usage
@@ -44,6 +46,7 @@ EOF
 
 function parse_options()
 {
+	TEST=0
 	while [[ $# -gt 0 ]]; do
 		case $1 in
 		lib)
@@ -52,11 +55,15 @@ function parse_options()
 			TARGET="$1"; shift ;;
 		unittest) 
 			TARGET="$1"; shift ;;
+		pyhcfs)
+			TARGET="$1"; shift ;;
 		-d ) 
 			if [ -z "$2" ] ; then echo "Invalid argument for -d"; usage; exit 1; fi
 			export SET_NDK_BUILD="$2"; shift 2 ;;
 		-h ) 
 			usage; exit ;;
+		--test)
+			TEST=1; shift 1;;
 		*) 
 			exec 2>&1 ;echo "Invalid option: $@"; usage; exit 1 ;;
 		esac
@@ -94,6 +101,15 @@ function lib()
 	set -x
 	make $PARALLEL_JOBS
 	exit
+}
+
+function pyhcfs()
+{
+	if [ "$TEST" -eq 1 ]; then
+		python setup.py test
+	else
+		python setup.py bdist_egg
+	fi
 }
 
 parse_options "$@"
