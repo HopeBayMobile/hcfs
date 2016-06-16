@@ -1,3 +1,15 @@
+#!/usr/bin/python
+# vim: set fileencoding=UTF-8 :
+#########################################################################
+#
+# Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+#
+# Abstract: build & test script for hcfs's python lib
+#
+# Revision History
+#   2016/6/16 Add header and encoding comments
+#
+##########################################################################
 import sys
 
 from setuptools import setup, find_packages, Extension
@@ -5,7 +17,6 @@ from setuptools.command.test import test as TestCommand
 
 
 class PyTest(TestCommand):
-    user_options = [('pytest-args=', 'a', "Arguments to pass to py.test")]
 
     def initialize_options(self):
         TestCommand.initialize_options(self)
