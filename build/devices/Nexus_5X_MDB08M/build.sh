@@ -5,6 +5,10 @@
 #
 # Abstract:
 #   Auto build nexus_5x image with jenkins server
+# export VERSION_NUM=2.2.1.9999
+# export PUBLISH_DIR=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/0.0.0.ci.test
+# export LIB_DIR=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.2.1.0908-android-dev/HCFS-android-binary
+# export APP_DIR=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.2.1.0908-android-dev/HCFS-terafonn-apk
 #
 # Required Env Variable:
 #   PUBLISH_DIR  Absolute path for current branch on nas, start with
@@ -57,13 +61,13 @@ function main()
 {
 	$UNTRACE
 	IMAGE_TYPE=$1
-        DEVICE_IMG=HCFS-nexus-5x-image
-        IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
+	DEVICE_IMG=HCFS-nexus-5x-image
+	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-6.0.0_r26_MDB08M_20160530"
 	echo ================================================================================
-	require_var IMAGE_TYPE
-	require_var IMG_DIR
-	require_var DOCKER_IMAGE
+	echo $IMAGE_TYPE
+	echo $IMG_DIR
+	echo $DOCKER_IMAGE
 	echo ================================================================================
 	$TRACE
 
@@ -120,12 +124,13 @@ function check-ssh-agent() {
 function setup_ssh_key() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	if [ ! -f ~/.ssh/id_rsa.pub ]; then
-		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+		ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N "" || :
 	fi
 	cat ~/.ssh/id_rsa.pub | docker exec -i $DOCKERNAME \
 		bash -c "cat >> /root/.ssh/authorized_keys; echo;cat /root/.ssh/authorized_keys"
-	check-ssh-agent || export SSH_AUTH_SOCK=$repo/tmp/ssh-agent.sock
-	check-ssh-agent || eval "$(mkdir -p $repo/tmp && ssh-agent -s -a $repo/tmp/ssh-agent.sock)" > /dev/null
+	mkdir -p ~/.tmp
+	check-ssh-agent || export SSH_AUTH_SOCK=~/.tmp/ssh-agent.sock
+	check-ssh-agent || { rm -f ~/.tmp/ssh-agent.sock && eval "$(ssh-agent -s -a ~/.tmp/ssh-agent.sock)"; } > /dev/null
 	ssh-add ~/.ssh/id_rsa
 	DOCKER_IP=`docker inspect --format "{{.NetworkSettings.IPAddress}}" $DOCKERNAME`
 	if [ -f $HOME/.ssh/known_hosts.old ]; then rm -f $HOME/.ssh/known_hosts.old; fi
