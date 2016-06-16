@@ -5,6 +5,10 @@
 #
 # Abstract:
 #   Auto build nexus_5x image with jenkins server
+# export VERSION_NUM=2.2.1.9999
+# export PUBLISH_DIR=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/0.0.0.ci.test
+# export LIB_DIR=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.2.1.0908-android-dev/HCFS-android-binary
+# export APP_DIR=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/2.2.1.0908-android-dev/HCFS-terafonn-apk
 #
 # Required Env Variable:
 #   PUBLISH_DIR  Absolute path for current branch on nas, start with
@@ -57,12 +61,13 @@ function main()
 {
 	$UNTRACE
 	IMAGE_TYPE=$1
-	IMG_DIR=${PUBLISH_DIR}/HCFS-nexus-5x-image-${IMAGE_TYPE}
+	DEVICE_IMG=HCFS-nexus-5x-image
+	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-6.0.0_r26_MDB08M_20160530"
 	echo ================================================================================
-	require_var IMAGE_TYPE
-	require_var IMG_DIR
-	require_var DOCKER_IMAGE
+	echo $IMAGE_TYPE
+	echo $IMG_DIR
+	echo $DOCKER_IMAGE
 	echo ================================================================================
 	$TRACE
 
@@ -171,9 +176,44 @@ function publish_image() {
 	if [ -d ${IMG_DIR} ]; then
 		rm -rf ${IMG_DIR}
 	fi
+
+	CI_PATH=/mnt/nas/CloudDataSolution/TeraFonn_CI_build
+	record_tmp=${PUBLISH_DIR}/recode.tmp
+	if [ -e "$record_tmp" ]; then
+		last_version_path=`cat ${record_tmp}`
+	else
+		last_version_path=`ls ${CI_PATH} | grep android-dev | tail -1`
+	fi
+
+	last_version=`echo $last_version_path | awk -F- {'print $1'}`
+	last_target=`find ${CI_PATH}/${last_version_path} -path */${DEVICE_IMG}-${IMAGE_TYPE}/*-target_files-*.zip`
+
 	mkdir -p ${IMG_DIR}
 	rsync $RSYNC_SETTING -L $here/resource/* ${IMG_DIR}
-	rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-img-* ${IMG_DIR}
+
+	if [ "$gitlabSourceBranch" = "android-dev" ]; then
+		if [ -e "$last_target" ]; then
+			rsync $RSYNC_SETTING ${last_target} root@$DOCKER_IP:/data/old.zip
+
+			ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c \
+			"/data/build/tools/releasetools/ota_from_target_files -i \
+			/data/old.zip \
+			/data/out/dist/*-target_files-* \
+			/data/out/dist/'${VERSION_NUM}'-from-'${last_version}'.zip"'
+
+			rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-from-* ${IMG_DIR}
+		fi
+		rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/{*-img-*,*-ota-*,*-target_files-*} ${IMG_DIR}
+	else
+		rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-img-* ${IMG_DIR}
+	fi
+
+	if [ -e "$record_tmp" ]; then
+		rm -f ${record_tmp}
+	else
+		echo $last_version_path > ${record_tmp}
+	fi
+
 	touch ${PUBLISH_DIR}
 	touch ${IMG_DIR}
 }
