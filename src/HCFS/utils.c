@@ -890,6 +890,48 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 
 /************************************************************************
 *
+* Function name: init_cache_thresholds
+*        Inputs: SYSTEM_CONF_STRUCT *config
+*       Summary: Initialize max_pinned_limit and max_cache_limit for
+*       	 different pin tyeps.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
+{
+	if (config->cache_hard_limit < 0)
+		return -EINVAL;
+
+	if (config->cache_reserved_space < 0)
+		return -EINVAL;
+
+	config->max_cache_limit =
+		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+	if (config->max_cache_limit == NULL)
+		return -ENOMEM;
+
+	config->max_pinned_limit =
+		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+	if (config->max_pinned_limit == NULL)
+		return -ENOMEM;
+
+	config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
+	config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
+
+	config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT;
+	config->max_pinned_limit[P_PIN] = MAX_PINNED_LIMIT;
+
+	config->max_cache_limit[P_HIGH_PRI_PIN] =
+		CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
+	config->max_pinned_limit[P_HIGH_PRI_PIN] =
+		MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+
+	return 0;
+}
+
+/************************************************************************
+*
 * Function name: check_file_size
 *        Inputs: const char *path
 *       Summary: Check the file length of "path.
@@ -1731,9 +1773,17 @@ int32_t reload_system_config(const char *config_path)
 		return ret;
 	}
 
+	ret = init_cache_thresholds(new_config);
+	if (ret < 0) {
+		free(new_config);
+		return ret;
+	}
+
 	/* Compare old config and new config*/
 	ret = _check_config(new_config);
 	if (ret < 0) {
+		free(new_config->max_cache_limit);
+		free(new_config->max_pinned_limit);
 		free(new_config);
 		return ret;
 	}
@@ -1746,6 +1796,8 @@ int32_t reload_system_config(const char *config_path)
 
 	temp_config = system_config;
 	system_config = new_config;
+	free(temp_config->max_cache_limit);
+	free(temp_config->max_pinned_limit);
 	free(temp_config);
 
 	/* Init backend related threads */
