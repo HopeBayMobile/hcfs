@@ -2626,6 +2626,10 @@ int32_t restore_meta_structure(FILE *fptr)
 		ret = change_pin_size(this_stat.st_size);
 		if (ret < 0) {
 			/* If no space, change pin status? */
+/* FEATURE TODO: Need to keep pin status if possible. If new pin
+requests surface before meta restoration is completed, should
+limit number / size of the requests, or should consider soft pin?
+*/
 			file_meta.local_pin = FALSE;
 			FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&file_meta,
