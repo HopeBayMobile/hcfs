@@ -743,11 +743,29 @@ errcode_handle:
 int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
 	int64_t block_no, int64_t seq)
 {
+	char path[200];
+	int32_t errcode;
+	int32_t ret;
+
 	UNUSED(seq);
-	sprintf(pathname, "/dev/shm/hcfs_sync_block_%"PRIu64"_%"PRId64".tmp",
-		(uint64_t)inode, block_no);
+	sprintf(path, "%s/upload_temp_block", BLOCKPATH);
+
+	if (access(path, F_OK) == -1)
+		MKDIR(path, 0700);
+
+	sprintf(pathname, "%s/hcfs_sync_block_%"PRIu64"_%"PRId64".tmp",
+		path, (uint64_t)inode, block_no);
 
 	return 0;
+
+errcode_handle:
+	if (errcode == -EEXIST) {
+		sprintf(pathname, "%s/hcfs_sync_block_%"PRIu64"_%"PRId64".tmp",
+				path, (uint64_t)inode, block_no);
+		return 0;
+	}
+	return errcode;
+
 }
 
 int32_t fetch_backend_meta_path(char *pathname, ino_t inode)
