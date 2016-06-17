@@ -96,7 +96,7 @@ int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots)
 	ssize_t ret_ssize;
 
 	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
-	fh = open(queue_filepath, O_CREAT | O_RDWR);
+	fh = open(queue_filepath, O_CREAT | O_RDWR, 0600);
 	if (fh < 0) {
 		errcode = errno;
 		return -errcode;
@@ -219,7 +219,15 @@ errcode_handle:
 }
 
 /**
- * Init rebuild superblock. Init sb header, queuing file.
+ * Init sb header, queuing file, and allocate some resource. If rebuild_action
+ * is START_REBUILD_SB, then get root inodes and start to rebuild superblock.
+ * Otherwise read queue file and continue to rebuild. Finally set flag
+ * system_restoring as true.
+ *
+ * @param rebuild_action A flag used to distinguish between rebuild at the
+ *                       begining and keep rebuilding using existed queue file.
+ *
+ * @return 0 on success, otherwise negative error code.
  */
 int32_t init_rebuild_sb(char rebuild_action)
 {
@@ -330,6 +338,10 @@ void destroy_rebuild_sb(void)
 		unlink(queue_filepath);
 
 	/* Free resource */
+	pthread_mutex_destroy(&(rebuild_sb_jobs->job_mutex));
+	pthread_cond_destroy(&(rebuild_sb_jobs->job_cond));
+	sem_destroy(&(rebuild_sb_jobs->queue_file_sem));
+	sem_destroy(&(rebuild_sb_tpool->tpool_access_sem));
 	free(rebuild_sb_jobs);
 	free(rebuild_sb_tpool);
 	return;
@@ -440,6 +452,13 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Erase an inode number in queue file.
+ *
+ * @param inode_job Job handle with inode number and pos in queue file.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t erase_inode_job(INODE_JOB_HANDLE *inode_job)
 {
 	int64_t empty_inode;
@@ -545,6 +564,18 @@ static int32_t _worker_get_job(int32_t tidx, INODE_JOB_HANDLE *inode_job)
 	return ret;
 }
 
+/**
+ * Superblock rebuilder. Each thread get an inode number and try to restore
+ * meta file and superblock entry. Once all the jobs are completed. The last
+ * working thread will be the master and wake all the other threads up. The
+ * master thread then reclaims unused inode numbers in superblock and finally
+ * wake up fuse thread to set flag "system_restoring" as FALSE. It means
+ * restoration is finished.
+ *
+ * @param t_idx Thread index of itself.
+ *
+ * @return none.
+ */
 void rebuild_sb_worker(void *t_idx)
 {
 	int32_t ret;

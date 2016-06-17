@@ -17,48 +17,44 @@ enum { WORKING, IDLE }; /* Status of a worker */
 
 typedef struct INODE_JOB_HANDLE {
 	ino_t inode;
-	int64_t queue_file_pos;
+	int64_t queue_file_pos; /* position of inode number in queue file */
 } INODE_JOB_HANDLE;
 
+/* Job structure includes cached inodes structure and 
+ * queue file handle. */
 typedef struct CACHED_JOBS {
 	ino_t cached_inodes[NUM_CACHED_INODES];
-	int32_t num_cached_inode;
-	int32_t cache_idx;
+	int32_t num_cached_inode; /* # of cached inodes */
+	int32_t cache_idx; /* now inode index */
 } CACHED_JOBS;
 
 typedef struct REBUILD_INODE_JOBS {
 	CACHED_JOBS cache_jobs;
-	sem_t queue_file_sem;
+	sem_t queue_file_sem; /* Queue file semaphore */
 	int32_t queue_fh;
-	int64_t remaining_jobs;
+	int64_t remaining_jobs; /* # of remaining jobs */
 	int64_t job_count;
 	BOOL job_finish; 
-	pthread_mutex_t job_mutex;
-	pthread_cond_t job_cond;
+	pthread_mutex_t job_mutex; /* job resource lock */
+	pthread_cond_t job_cond; /* job condition */
 } REBUILD_SB_JOBS;
 
+/* Thread pool structure */
 typedef struct SB_THREAD {
 	pthread_t tid;
 	BOOL active;
-	char status; /* WORKING, IDLE */
+	char status; /* binary status: WORKING, IDLE */
 	pthread_attr_t t_attr;
 } SB_THREAD;
 
 typedef struct SB_THREAD_POOL {
 	SB_THREAD thread[NUM_THREADS_IN_POOL];
-	int32_t tidx[NUM_THREADS_IN_POOL];
-	int32_t tmaster;
-	int32_t num_active;
-	int32_t num_idle;
-	sem_t tpool_access_sem;
+	int32_t tidx[NUM_THREADS_IN_POOL]; /* thread index */
+	int32_t tmaster; /* Master thread index */
+	int32_t num_active; /* # of active threads */
+	int32_t num_idle; /* # of conditional wait threads */
+	sem_t tpool_access_sem; /* thread pool access semaphore */
 } SB_THREAD_POOL;
-
-//typedef struct REBUILD_SB_MGR {
-//	SB_THREAD_POOL tpool;
-//	sem_t mgr_access_sem;
-	//pthread_attr_t mgr_attr;
-	//pthread_t mgr_tid;
-//} REBUILD_SB_MGR_INFO;
 
 SB_THREAD_POOL *rebuild_sb_tpool;
 REBUILD_SB_JOBS *rebuild_sb_jobs;
