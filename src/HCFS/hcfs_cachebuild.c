@@ -387,5 +387,6 @@ int32_t build_cache_usage(void)
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 	}
+	/* TODO: Perhaps could merge linked lists from all hash entries */
 	return 0;
 }
