@@ -267,12 +267,16 @@ static inline void _sync_terminate_thread(int32_t index)
 			 * meta exist */
 			fetch_meta_path(local_metapath, inode);
 			if (access(local_metapath, F_OK) == 0) {
-				tag_ret = comm2fuseproc(inode, FALSE, 0,
-					sync_ctl.is_revert[index], finish_sync);
-				if (tag_ret < 0) {
-					write_log(0, "Fail to tag inode %lld "
-						"as NOT_UPLOADING in %s\n",
-						inode, __func__);
+				if (hcfs_system->system_going_down == FALSE) {
+					tag_ret = comm2fuseproc(inode, FALSE, 0,
+						sync_ctl.is_revert[index],
+						finish_sync);
+					if (tag_ret < 0) {
+						write_log(0, "Fail to tag"
+							" inode %lld as "
+							"NOT_UPLOADING in %s\n",
+							inode, __func__);
+					}
 				}
 			} else {
 				sync_ctl.threads_error[index] = TRUE;
