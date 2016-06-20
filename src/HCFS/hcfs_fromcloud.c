@@ -184,7 +184,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t entry_index;
 	struct stat tempstat;
-	int32_t ret, errcode;
+	int32_t ret, errcode, semval;
 	size_t ret_size;
 	char block, mlock, bopen, mopen;
 
@@ -290,6 +290,15 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			hcfs_system->systemdata.cache_blocks++;
 			sync_hcfs_system_data(FALSE);
 			sem_post(&(hcfs_system->access_sem));
+
+			/* Signal cache management that something can be paged
+			out */
+			semval = 0;
+			ret = sem_getvalue(&(hcfs_system->something_to_replace),
+			                   &semval);
+			if ((ret == 0) && (semval == 0))
+				sem_post(&(hcfs_system->something_to_replace));
+
 			ret = super_block_mark_dirty(ptr->this_inode);
 			if (ret < 0) {
 				errcode = ret;
@@ -516,7 +525,7 @@ void fetch_backend_block(void *ptr)
 	char objname[600];
 	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
-	int32_t ret;
+	int32_t ret, semval;
 	struct stat blockstat;
 
 	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
@@ -582,6 +591,14 @@ void fetch_backend_block(void *ptr)
 		change_system_meta(0, 0, blockstat.st_size, 1, 0, 0, TRUE);
 		write_log(10, "Debug: Now cache size %lld",
 			hcfs_system->systemdata.cache_size);
+		/* Signal cache management that something can be paged
+		out */
+		semval = 0;
+		ret = sem_getvalue(&(hcfs_system->something_to_replace),
+	              	     &semval);
+		if ((ret == 0) && (semval == 0))
+			sem_post(&(hcfs_system->something_to_replace));
+
 	} else {
 		ret = errno;
 		if (ret != ENOENT) {

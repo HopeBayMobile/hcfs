@@ -1052,24 +1052,73 @@ ino_t super_block_new_inode(struct stat *in_stat,
 /************************************************************************
 *
 * Function name: ll_rebuild_dirty
-*        Inputs: None
+*        Inputs: Inode number of the inode that is dirty but not in the 
+*                linked list.
 *       Summary: To traveling dirty linked list and rebuild if corrupted.
 *                First look forward to fix error previous pointers.
 *                Then look backward to fix error next pointers.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t ll_rebuild_dirty(void)
+int32_t ll_rebuild_dirty(ino_t missing_inode)
 {
 	int32_t ret;
 	SUPER_BLOCK_ENTRY entry1, entry2;
+	ino_t first_dirty, last_dirty;
+	BOOL is_missing;
 
 	write_log(0, "Start to rebuild dirty inode linked list.\n");
+	if (missing_inode != 0)
+		is_missing = TRUE;
+	else
+		is_missing = FALSE;
 
 	/* Traveling forward dirty linked list */
-	ret = read_super_block_entry(sys_super_block->head.first_dirty_inode, &entry1);
-	if (ret < 0)
-		return ret;
+	first_dirty = sys_super_block->head.first_dirty_inode;
+	last_dirty = sys_super_block->head.last_dirty_inode;
+	if (first_dirty != 0) {
+		ret = read_super_block_entry(first_dirty, &entry1);
+		if (ret < 0)
+			return ret;
+	} else {
+		memset(&entry1, 0, sizeof(SUPER_BLOCK_ENTRY));
+	}
+	if (is_missing) {
+		if (first_dirty == missing_inode)
+			is_missing = FALSE;
+		if (last_dirty == missing_inode)
+			is_missing = FALSE;
+	}
+	/* Now just fix the case that first and last dirty inode is 0 */
+	if (((first_dirty == 0) && (last_dirty == 0)) && (is_missing)) {
+		/* Set the missing inode as both the first and the last */
+		sys_super_block->head.first_dirty_inode = missing_inode;
+		sys_super_block->head.last_dirty_inode = missing_inode;
+		/* TODO: Now assume that the other inodes are clean. This
+		should be fixed later */
+		ret = read_super_block_entry(missing_inode, &entry1);
+		if (ret < 0)
+			return ret;
+		entry1.util_ll_prev = 0;
+		entry1.util_ll_next = 0;
+		ret = write_super_block_entry(missing_inode, &entry1);
+		if (ret < 0)
+			return ret;
+
+		sys_super_block->head.num_dirty = 1;
+		ret = write_super_block_head();
+		if (ret < 0)
+			return ret;
+		return 0;
+	}
+
+
+	/* TODO: If the dirty inode is missing from the linked list, need
+	to insert it */
+
+	/* TODO: Perhaps should check the prev linked list to find out if
+	can recover dirty inodes on the prev linked list that could not
+	be recovered later */
 	if (entry1.util_ll_prev != 0) {
 		entry1.util_ll_prev = 0;
 		ret = write_super_block_entry(entry1.this_index, &entry1);
@@ -1077,6 +1126,8 @@ int32_t ll_rebuild_dirty(void)
 			return ret;
 	}
 
+	/* TODO: Did not consider the situation when super_block_head data
+	is corrupted so that head and tail of the linked list is missing */
 	while (entry1.util_ll_next != 0) {
 		ret = read_super_block_entry(entry1.util_ll_next, &entry2);
 		if (ret < 0)
@@ -1094,9 +1145,14 @@ int32_t ll_rebuild_dirty(void)
 	}
 
 	/* Traveling backward the dirty linked list */
-	ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &entry1);
-	if (ret < 0)
-		return ret;
+	if (last_dirty != 0) {
+		ret = read_super_block_entry(last_dirty, &entry1);
+		if (ret < 0)
+			return ret;
+	} else {
+		memset(&entry1, 0, sizeof(SUPER_BLOCK_ENTRY));
+	}
+
 	if (entry1.util_ll_next != 0) {
 		/* First check if there was an interrupted enqueue operation */
 		SUPER_BLOCK_ENTRY tempentry;
@@ -1212,7 +1268,7 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 
 			if (need_rebuild) {
 				write_log(0, "Detect corrupted dirty inode linked list in %s.\n", __func__);
-				ret = ll_rebuild_dirty();
+				ret = ll_rebuild_dirty(0);
 				if (ret < 0)
 					return ret;
 				/* reload this_entry and last entry */
@@ -1338,7 +1394,7 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		return 0;
 
 	if (old_which_ll == IS_DIRTY) {
-		/* Need to check if the dirty linked list in superblock was currpted */
+		/* Need to check if the dirty linked list in superblock was currupted */
 		if (this_entry->util_ll_next == 0) {
 			if (sys_super_block->head.last_dirty_inode != thisinode)
 				need_rebuild = TRUE;
@@ -1363,7 +1419,7 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 
 		if (need_rebuild) {
 			write_log(0, "Detect corrupted dirty inode linked list in %s.\n", __func__);
-			ret = ll_rebuild_dirty();
+			ret = ll_rebuild_dirty(thisinode);
 			if (ret < 0)
 				return ret;
 			/* reload this_entry*/
