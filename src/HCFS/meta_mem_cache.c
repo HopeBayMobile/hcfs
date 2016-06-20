@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/9 Jiahong added header for this file, and revising coding style.
 * 2015/7/8 Kewei added meta cache processing about symlink.
+* 2016/6/20 Jiahong added the option of not sync to backend on meta change
 *
 **************************************************************************/
 #include "meta_mem_cache.h"
@@ -418,16 +419,18 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 		}
 	}
 
-	/* Update stat info in super inode no matter what so that meta file
-		get pushed to cloud */
-	/* TODO: May need to simply this so that only dirty status in super
-		inode is updated */
+	/* Update stat info in super inode and push to cloud if needed */
 	if (body_ptr->can_be_synced_cloud_later == TRUE) { /* Skip sync */
 		body_ptr->can_be_synced_cloud_later = FALSE;
-
+		ret = super_block_update_stat(body_ptr->inode_num,
+				&(body_ptr->this_stat), TRUE);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	} else {
 		ret = super_block_update_stat(body_ptr->inode_num,
-				&(body_ptr->this_stat));
+				&(body_ptr->this_stat), FALSE);
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -598,6 +601,57 @@ processing the new one */
 
 	if (body_ptr->something_dirty == FALSE)
 		body_ptr->something_dirty = TRUE;
+
+	/* Write changes to meta file if write through is enabled */
+	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = flush_single_entry(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
+	return 0;
+
+/* Exception handling from here */
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: meta_cache_update_fstat_nosync
+*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*                META_CACHE_ENTRY_STRUCT *body_ptr
+*       Summary: Write file struct stat to disk but do not sync to backend
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int32_t meta_cache_update_fstat_nosync(ino_t this_inode,
+                                       const struct stat *inode_stat,
+                                       META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	int32_t ret, errcode;
+
+	UNUSED(this_inode);
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (inode_stat != NULL) {
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		body_ptr->stat_dirty = TRUE;
+	}
+
+	gettimeofday(&(body_ptr->last_access_time), NULL);
+
+	if (body_ptr->something_dirty == FALSE)
+		body_ptr->something_dirty = TRUE;
+
+	ret = meta_cache_sync_later(body_ptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	/* Write changes to meta file if write through is enabled */
 	if (META_CACHE_FLUSH_NOW == TRUE) {

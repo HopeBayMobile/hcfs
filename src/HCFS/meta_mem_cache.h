@@ -143,6 +143,10 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_s
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
+int32_t meta_cache_update_fstat_nosync(ino_t this_inode,
+                                       const struct stat *inode_stat,
+                                       META_CACHE_ENTRY_STRUCT *body_ptr);
+
 int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);

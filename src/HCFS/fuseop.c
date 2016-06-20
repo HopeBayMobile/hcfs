@@ -3998,8 +3998,9 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 
 		set_timestamp_now(&temp_stat, ATIME);
 
-		ret = meta_cache_update_file_data(fh_ptr->thisinode,
-			&temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+		/* Write changes to disk but do not sync to backend */
+		ret = meta_cache_update_fstat_nosync(fh_ptr->thisinode,
+		                       &temp_stat, fh_ptr->meta_cache_ptr);
 		if (ret < 0) {
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
