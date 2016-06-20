@@ -78,3 +78,8 @@ int32_t init_rebuild_sb(char rebuild_action);
 void destroy_rebuild_sb(void);
 int32_t create_sb_rebuilder();
 void wake_sb_rebuilder(void);
+
+
+int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job);
+int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes);
+int32_t erase_inode_job(INODE_JOB_HANDLE *inode_job);

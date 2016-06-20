@@ -135,16 +135,23 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	int64_t idx;
 	int32_t ret, errcode;
 	size_t ret_size;
-	char fstatpath[300], sb_path[300];
+	char fstatpath[400], fs_sync_path[400];
+	char sb_path[300];
 	char objname[300];
 	FILE *fptr, *sb_fptr;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 	SUPER_BLOCK_HEAD head;
 
+	sprintf(fs_sync_path, "%s/FS_sync", METAPATH);
+	if (access(fs_sync_path, F_OK) < 0)
+		MKDIR(fs_sync_path, 0700);
+
 	max_inode = 1;
 	/* Find maximum inode number */
 	for (idx = 0 ; idx < num_roots ; idx++) {
 		root_inode = roots[idx];
+		write_log(10, "Debug: root %"PRIu64"\n", (uint64_t)root_inode);
+
 		snprintf(fstatpath, METAPATHLEN - 1,
 				"%s/FS_sync/FSstat%" PRIu64 "",
 				METAPATH, (uint64_t)root_inode);
