@@ -42,4 +42,5 @@ PRODUCT_COPY_FILES += \
 
 # HCFS management app
 PRODUCT_PACKAGES +=\
-    HopebayHCFSmgmt
+    HopebayHCFSmgmt \
+	HBTUpdater
