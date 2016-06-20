@@ -17,7 +17,7 @@ ffi.set_source( '_pyhcfs',
     """ // passed to the real C compiler
     #include "pyhcfs.h"
     """,
-    include_dirs=[here+'/../HCFS'],
+    include_dirs=[here+'/../HCFS', here],
     sources=[here+'/pyhcfs.c'],
     extra_compile_args=['-D_ANDROID_ENV_'])
 
