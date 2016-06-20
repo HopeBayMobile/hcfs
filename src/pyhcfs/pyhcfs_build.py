@@ -12,13 +12,13 @@ ffi = FFI()
 # set_source takes mostly the same arguments as distutils' Extension, see:
 # https://cffi.readthedocs.org/en/latest/cdef.html#ffi-set-source-preparing-out-of-line-modules
 # https://docs.python.org/3/distutils/apiref.html#distutils.core.Extension
-here = os.path.dirname( os.path.realpath( __file__ ) )
-ffi.set_source( '_pyhcfs',
-    """ // passed to the real C compiler
+here = os.path.abspath(os.path.dirname( __file__ ))
+ffi.set_source( 'pyhcfs._pyhcfs',
+    source="""
     #include "pyhcfs.h"
     """,
-    include_dirs=[here+'/../HCFS', here],
-    sources=[here+'/pyhcfs.c'],
+    include_dirs=['src/HCFS', 'src/pyhcfs'],
+    sources=['src/pyhcfs/pyhcfs.c'],
     extra_compile_args=['-D_ANDROID_ENV_'])
 
 # declare the functions, variables, etc. from the stuff in set_source

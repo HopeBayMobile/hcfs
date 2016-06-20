@@ -1,7 +1,8 @@
 all: _pyhcfs.so pyhcfs
 
 _pyhcfs.so: pyhcfs.c pyhcfs.h
-	python pyhcfs_build.py
+	cd ../../; ./build.sh pyhcfs
+
 pyhcfs: pyhcfs.c pyhcfs.h
 	cc -D_ANDROID_ENV_  -I../HCFS  pyhcfs.c pyhcfs.h  -g -o pyhcfs
 
