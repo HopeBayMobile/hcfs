@@ -298,7 +298,7 @@ int32_t _init_download_curl(int32_t count)
 void init_backend_related_module(void)
 {
 	if (CURRENT_BACKEND != NONE) {
-		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		//pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
 		//pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
@@ -507,6 +507,7 @@ int32_t main(int32_t argc, char **argv)
 	/* Init backend related services and super block */
 	if (CURRENT_BACKEND != NONE) {
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		init_download_module();
 		ret = check_init_super_block();
 		if (ret < 0) {
