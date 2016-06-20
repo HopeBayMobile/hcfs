@@ -1,4 +1,5 @@
 # See CFFI docs at https://cffi.readthedocs.org/en/latest/
+import os
 from cffi import FFI
 
 
@@ -11,13 +12,13 @@ ffi = FFI()
 # set_source takes mostly the same arguments as distutils' Extension, see:
 # https://cffi.readthedocs.org/en/latest/cdef.html#ffi-set-source-preparing-out-of-line-modules
 # https://docs.python.org/3/distutils/apiref.html#distutils.core.Extension
-ffi.set_source(
-    'pyhcfs._parser',
-    """
+here = os.path.dirname( os.path.realpath( __file__ ) )
+ffi.set_source( '_pyhcfs',
+    """ // passed to the real C compiler
     #include "pyhcfs.h"
     """,
-    include_dirs=['src/HCFS'],
-    sources=['pyhcfs.c'],
+    include_dirs=[here+'/../HCFS'],
+    sources=[here+'/pyhcfs.c'],
     extra_compile_args=['-D_ANDROID_ENV_'])
 
 # declare the functions, variables, etc. from the stuff in set_source
@@ -26,9 +27,12 @@ ffi.set_source(
 ffi.cdef(
     """
     typedef struct {
-	ino_t d_ino;
-	char d_name[MAX_FILENAME_LEN + 1];
-	char d_type;                                            
-    } DIR_ENTRY;                                                    
-    int32_t list_external_volume(char *meta_path , DIR_ENTRY **ptr_ret_entry, uint64_t *ret_num);                            
+	uint64_t inode;
+	char name[256];
+    } PORTABLE_DIR_ENTRY;                                                                
+    int32_t list_external_volume(char *meta_path , PORTABLE_DIR_ENTRY **ptr_ret_entry,   
+                                 uint64_t *ret_num);                                     
     """)
+
+if __name__ == "__main__":
+        ffi.compile(verbose=True)

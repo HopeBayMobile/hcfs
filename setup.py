@@ -40,7 +40,7 @@ setup(
     package_dir={'':'src'},
     packages=find_packages("src"),
     setup_requires=['cffi >= 1.1'],
-    cffi_modules=['src/pyhcfs/parser_build.py:ffi'],
+    cffi_modules=['src/pyhcfs/pyhcfs_build.py:ffi'],
     install_requires=['cffi >= 1.1'],
     tests_require=['pytest >= 2.7.3'],
     cmdclass={'test': PyTest})

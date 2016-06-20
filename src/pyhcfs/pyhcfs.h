@@ -1,5 +1,9 @@
-#include "../HCFS/fuseop.h"
-#include "../HCFS/FS_manager.h"
+#include "fuseop.h"
+#include "FS_manager.h"
 
-int32_t list_external_volume(char *meta_path , DIR_ENTRY **ptr_ret_entry,
+typedef struct {
+	uint64_t inode;
+	char name[256];
+} PORTABLE_DIR_ENTRY;
+int32_t list_external_volume(char *meta_path , PORTABLE_DIR_ENTRY **ptr_ret_entry,
 			     uint64_t *ret_num);
