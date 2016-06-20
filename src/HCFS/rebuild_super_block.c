@@ -1,3 +1,14 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: rebuild_super_block.c
+* Abstract: The c source file for rebuilding super block.
+*
+* Revision History
+* 2016/5/27 Kewei created this file.
+**************************************************************************/
+
 #include "rebuild_super_block.h"
 
 #include <unistd.h>
@@ -12,6 +23,7 @@
 #include "macro.h"
 #include "hcfs_fromcloud.h"
 #include "hfuse_system.h"
+#include "rebuild_parent_dirstat.h"
 
 #define LOCK_QUEUE_FILE() sem_wait(&(rebuild_sb_jobs->queue_file_sem))
 #define UNLOCK_QUEUE_FILE() sem_post(&(rebuild_sb_jobs->queue_file_sem))
@@ -72,7 +84,7 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	*roots = (ino_t *)malloc(sizeof(ino_t) * (*num_inodes));
 	memcpy(*roots, dir_nodes, sizeof(ino_t) * num_dir);
 	memcpy(*roots + num_dir, nondir_nodes, sizeof(ino_t) * num_nondir);
-	
+
 	free(dir_nodes);
 	free(nondir_nodes);
 	write_log(4, "Number of roots is %"PRId64, *num_inodes);
@@ -522,7 +534,7 @@ static int32_t _worker_get_job(int32_t tidx, INODE_JOB_HANDLE *inode_job)
 				rebuild_sb_jobs->remaining_jobs <= 0) {
 			write_log(10, "Debug: Master is worker %d\n", tidx);
 			rebuild_sb_jobs->job_finish = TRUE;
-			/* Be master */				
+			/* Be master */
 			sem_wait(&(rebuild_sb_tpool->tpool_access_sem));
 			if (rebuild_sb_tpool->tmaster == -1) {
 				write_log(10, "Debug: Master is worker %d\n",
@@ -598,7 +610,7 @@ void rebuild_sb_worker(void *t_idx)
 			if (ret == -ENOENT) {
 				if (rebuild_sb_jobs->job_finish)
 					break;
-				else 
+				else
 					continue;
 			} else if (ret == -ESHUTDOWN) {
 				write_log(4, "System shutdown\n");
@@ -613,8 +625,15 @@ void rebuild_sb_worker(void *t_idx)
 		ret = restore_meta_super_block_entry(inode_job.inode,
 				&this_stat);
 		if (ret < 0) {
-			push_inode_job(&(inode_job.inode), 1);
-			erase_inode_job(&inode_job);
+			if (ret == -ENOENT) {
+				write_log(0, "Error: meta %"PRIu64" not found."
+					"  Cannot restore it",
+					(uint64_t)inode_job.inode);
+				erase_inode_job(&inode_job);
+			} else {
+				push_inode_job(&(inode_job.inode), 1);
+				erase_inode_job(&inode_job);
+			}
 			continue;
 		}
 
@@ -623,6 +642,8 @@ void rebuild_sb_worker(void *t_idx)
 			ino_t *dir_list, *nondir_list;
 			int64_t num_dir, num_nondir;
 			char *nondir_type_list;
+			int32_t idx;
+
 			ret = collect_dir_children(inode_job.inode,
 				&dir_list, &num_dir, &nondir_list, &num_nondir,
 				&nondir_type_list);
@@ -638,6 +659,16 @@ void rebuild_sb_worker(void *t_idx)
 					erase_inode_job(&inode_job);
 					continue;
 				}
+				/* Rebuild parent stat */
+				for (idx = 0; idx < num_dir; idx++) {
+					ret = rebuild_parent_stat(
+						dir_list[idx],
+						inode_job.inode, D_ISDIR);
+					if (ret < 0)
+						write_log(0, "Error; Fail"
+							" to rebuild parent"
+							" stat. Code %d", -ret);
+				}
 				free(dir_list);
 			}
 			if (num_nondir > 0) {
@@ -647,9 +678,21 @@ void rebuild_sb_worker(void *t_idx)
 					erase_inode_job(&inode_job);
 					continue;
 				}
+				/* Rebuild parent stat */
+				for (idx = 0; idx < num_nondir; idx++) {
+					ret = rebuild_parent_stat(
+						nondir_list[idx],
+						inode_job.inode,
+						nondir_type_list[idx]);
+					if (ret < 0)
+						write_log(0, "Error; Fail"
+							" to rebuild parent"
+							" stat. Code %d", -ret);
+				}
 				free(nondir_list);
-				free(nondir_type_list); /* TODO: Add parent stat */
+				free(nondir_type_list);
 			}
+
 			/* Job completed */
 			erase_inode_job(&inode_job);
 			write_log(10, "Debug: Finish restore meta%"PRIu64,

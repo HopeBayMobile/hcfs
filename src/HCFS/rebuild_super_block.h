@@ -1,3 +1,14 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: rebuild_super_block.h
+* Abstract: The c header file for rebuilding super block.
+*
+* Revision History
+* 2016/5/24 Kewei created this file.
+**************************************************************************/
+
 #include <semaphore.h>
 #include <sys/types.h>
 #include <sys/stat.h>

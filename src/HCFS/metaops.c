@@ -2632,7 +2632,7 @@ limit number / size of the requests, or should consider soft pin?
 */
 			file_meta.local_pin = FALSE;
 			FSEEK(fptr, sizeof(struct stat), SEEK_SET);
-			FREAD(&file_meta,
+			FWRITE(&file_meta,
 				sizeof(FILE_META_TYPE), 1, fptr);
 		}
 	}
@@ -2700,6 +2700,7 @@ int32_t restore_meta_file(ino_t this_inode)
 	if (!access(metapath, F_OK)) { /* Check again when get lock */
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
+		unlink(restored_metapath);
 		return 0;
 	}
 	setbuf(fptr, NULL);
