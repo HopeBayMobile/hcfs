@@ -735,6 +735,12 @@ void rebuild_sb_worker(void *t_idx)
 		write_log(0, "Error: Fail to reclaim inodes. Code %d\n", -ret);
 	}
 
+	/* Rebuild completed. Set flag now_rebuild = FALSE */
+	super_block_exclusive_locking();
+	sys_super_block->head.now_rebuild = FALSE;
+	write_super_block_head();
+	super_block_exclusive_release();
+
 	write_log(10, "Debug: Rebuilding superblock completed.");
 	sem_wait(&(rebuild_sb_tpool->tpool_access_sem));
 	rebuild_sb_tpool->thread[tidx].active = FALSE;
