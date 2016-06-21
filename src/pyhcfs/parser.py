@@ -72,8 +72,7 @@ def hcfs_parse_meta(meta_path):
             'st_mtime_nsec': '',
             'st_ctime': 1465788148,
             'st_ctime_nsec': ''
-        },
-        'page_offset': 2685
+        }
     }
 
     return resp

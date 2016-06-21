@@ -32,9 +32,10 @@ int main(void)
 {
 	PORTABLE_DIR_ENTRY *ret_entry;
 	uint64_t ret_num;
+	int32_t i;
 
 	list_external_volume("testdata/fsmgr", &ret_entry, &ret_num);
-	for (int i = 0; i < ret_num; i++)
+	for (i = 0; i < ret_num; i++)
 		printf("%lu %s\n", ret_entry[i].inode, ret_entry[i].name);
 }
 
