@@ -207,6 +207,9 @@ function publish_image() {
 	else
 		rsync $RSYNC_SETTING root@$DOCKER_IP:/data/out/dist/*-img-* ${IMG_DIR}
 	fi
+	pushd ${IMG_DIR}
+	unzip *-img-*.zip
+	popd
 
 	if [ -e "$record_tmp" ]; then
 		rm -f ${record_tmp}
