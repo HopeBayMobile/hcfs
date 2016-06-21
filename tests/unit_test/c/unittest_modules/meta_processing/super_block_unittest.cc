@@ -449,7 +449,7 @@ TEST_F(super_block_update_statTest, UpdateFail_SinceReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-EBADF, super_block_update_stat(inode, &new_stat));
+	EXPECT_EQ(-EBADF, super_block_update_stat(inode, &new_stat, FALSE));
 }
 
 TEST_F(super_block_update_statTest, UpdateStatSuccess)
@@ -475,7 +475,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 	expected_stat.st_size = 123456;
 
 	/* Run */
-	EXPECT_EQ(0, super_block_update_stat(inode, &expected_stat));
+	EXPECT_EQ(0, super_block_update_stat(inode, &expected_stat, FALSE));
 
 	/* Verify */
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
@@ -485,6 +485,41 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 	EXPECT_EQ(IS_DIRTY, sb_entry.status);
 	EXPECT_EQ(TRUE, sb_entry.mod_after_in_transit);
 	EXPECT_EQ(1, sys_super_block->head.num_dirty);
+}
+
+TEST_F(super_block_update_statTest, UpdateStatSuccessNoSync)
+{
+	struct stat expected_stat;
+	ino_t inode = 8;
+	SUPER_BLOCK_ENTRY sb_entry;
+
+	/* Mock data. Write a entry */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * inode);
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = NO_LL;
+	sb_entry.in_transit = TRUE;
+	sb_entry.mod_after_in_transit = FALSE;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
+
+	expected_stat.st_dev = 1;  /* expected stat */
+	expected_stat.st_ino = inode;
+	expected_stat.st_mode = S_IFDIR;
+	expected_stat.st_nlink = 5;
+	expected_stat.st_size = 123456;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_update_stat(inode, &expected_stat, TRUE));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
+
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, sizeof(struct stat)));
+	EXPECT_EQ(NO_LL, sb_entry.status);
+	EXPECT_EQ(FALSE, sb_entry.mod_after_in_transit);
+	EXPECT_EQ(0, sys_super_block->head.num_dirty);
 }
 
 /*

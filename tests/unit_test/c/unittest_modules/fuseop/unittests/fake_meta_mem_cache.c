@@ -79,6 +79,30 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_s
 	return 0;
 }
 
+int32_t meta_cache_update_file_nosync(ino_t this_inode,
+	const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	if (this_inode == 1)
+		root_updated = TRUE;
+	else
+		before_update_file_data = FALSE;
+	if (inode_stat != NULL) {
+		if (this_inode == 1)
+			memcpy(&updated_root, inode_stat, sizeof(struct stat));
+		else
+			memcpy(&updated_stat, inode_stat, sizeof(struct stat));
+	}
+
+	if (block_page != NULL) {
+		after_update_block_page = TRUE;
+		memcpy(&updated_block_page, block_page,
+				sizeof(BLOCK_ENTRY_PAGE));
+	}
+	return 0;
+}
+
 int32_t meta_cache_update_stat_nosync(ino_t this_inode,
                                        const struct stat *inode_stat,
                                        META_CACHE_ENTRY_STRUCT *body_ptr)
