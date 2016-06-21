@@ -63,7 +63,7 @@ function main()
 	IMAGE_TYPE=$1
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
-	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-6.0.0_r26_MDB08M_20160530"
+	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
 	echo ================================================================================
 	echo $IMAGE_TYPE
 	echo $IMG_DIR
@@ -167,6 +167,11 @@ function build_system() {
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
+	pushd /data/packages/apps/Launcher3 && \
+	git fetch origin master && \
+	git reset --hard master && \
+	git clean -dxf && \
+	popd && \
 	make clean && \
 	make \$PARALLEL_JOBS dist"'
 }
