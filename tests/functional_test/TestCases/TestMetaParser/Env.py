@@ -8,7 +8,8 @@ import pwd
 import grp
 import getpass
 
-import HCFSmgt
+import HCFSMgt
+import SwiftMgt
 import Var
 
 # TODO:path replace with os.path.join to feat all OS
@@ -25,94 +26,19 @@ logging.basicConfig()
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
-class _Swift(object):
-
-	def __init__(self, user, ip, pwd, bucket):
-		self._user = user
-		self._ip = ip
-		self._url = "https://" + ip + ":8080/auth/v1.0"
-		self._pwd = pwd
-		self._bucket = bucket
-		self._useDocker = False
-		_logger.info("[Swift] Initializing.")
-		self.cleanup()
-		self.create_bucket()
-		self.check_bucket()
-
-	@classmethod
-	def fromDocker(cls, docker, user, pwd, bucket):
-		swift = cls(user, docker.getIP(), pwd, bucket)
-		swift._useDocker = True
-		return swift
-
-	def cleanup(self):
-		_logger.info("[Swift] Cleaning up.")
-		if not self._useDocker:
-			self.rm_bucket()
-		
-	def rm_bucket(self):
-		cmd = self._cmd_prefix()
-		cmd.extend(["delete", self._bucket])
-		_logger.info("[Swift] Remove bucket cmd = " + " ".join(cmd))	
-		subprocess.call(" ".join(cmd), shell=True, stdout=PIPE, stderr=PIPE)
-
-	def create_bucket(self):
-		cmd = self._cmd_prefix()
-		cmd.extend(["post", self._bucket])
-		_logger.info("[Swift] Create bucket cmd = " + " ".join(cmd))
-		subprocess.call(" ".join(cmd), shell=True, stdout=PIPE, stderr=PIPE)
-
-	def check_bucket(self):
-		cmd = self._cmd_prefix()
-		cmd.extend(["list", self._bucket])
-		_logger.info("[Swift] Check bucket cmd = " + " ".join(cmd))
-		pipe = subprocess.Popen(" ".join(cmd), stdout=PIPE, stderr=PIPE, shell=True)
-		out, err = pipe.communicate()
-		assert not err, err
-	
-	def _cmd_prefix(self):
-		return ["swift --insecure -A", self._url, "-U", self._user + ":" + self._user, "-K", self._pwd]
-
-# TODO: not yet implemented
-class _Docker(object):
-
-	# name:str
-	# volume:[(str,str,str), (str,str), (str) ...] =>(host src), dest, (options)
-	# image:str
-	def __init__(self, name, volume, image):
-		self._name = name
-		self._volume = [("/etc/localtime", "/etc/localtime", "ro")].extend(volume)
-		self._image = image
-		self._tty = True
-		self._detach = True
-		_logger.info("[Docker] Initializing.")
-		self.cleanup()
-		self.mk_HCFS_dirs()
-
-	def run(self):
-		cmds = ["sudo docker run"]
-
-	def cleanup(self):
-		_logger.info("[Docker] Cleaning up.")
-		self.rm()
-
-	def rm(self):
-		cmd = ["sudo docker rm -f", self._name]
-		_logger.info("[Docker] Stopping docker cmd = " + " ".join(cmd))
-		subprocess.call(" ".join(cmd), shell=True)
-	
-	def getIP(self):
-		cmds = ["", "delete", bucket]
-
 # TODO: return permissioon? In the root
 def prepare_dir_permission():
 	_logger.info("[Env] Ggrant permission 730 to current user <" + getpass.getuser() + "> and change group to <fuse>")
 	_logger.info("[Env] Affect below : /data /data/hcfs.conf.tmp /data/hcfs.conf repo")
+	# /data
 	if not os.path.exists("/data"):	subprocess.call("sudo mkdir /data", shell=True)	
 	subprocess.call("sudo chown " + getpass.getuser() + ":fuse /data", shell=True)
 	subprocess.call("sudo chmod 730 /data", shell=True)
+	# /data/hcfs.conf.tmp
 	if os.path.isfile("/data/hcfs.conf.tmp"):	subprocess.call("sudo rm /data/hcfs.conf.tmp", shell=True)
+	# /data/hcfs.conf
 	if os.path.isfile("/data/hcfs.conf"):	subprocess.call("sudo rm /data/hcfs.conf", shell=True)
+	# repo/tmp/meta repo/tmp/block repo/tmp/mnt
 	subprocess.call("sudo chown " + getpass.getuser() + ":fuse " + _repo, shell=True)
 	subprocess.call("sudo chmod 730 " + _repo, shell=True)
 
@@ -125,23 +51,22 @@ def before():
 
 def cleanup():
 	_logger.info("[Env] Cleaning up")
-	HCFSmgt.compile_hcfs()
-	if HCFSmgt.is_hcfs_running():
-		HCFSmgt.terminate_hcfs()
+	HCFSMgt.compile_hcfs()
+	if HCFSMgt.is_hcfs_running():
+		HCFSMgt.terminate_hcfs()
 		count = 3
-		while HCFSmgt.is_hcfs_running() and count >= 0:
+		while HCFSMgt.is_hcfs_running() and count >= 0:
 			count = count - 1
 			time.sleep(1)
-		assert not HCFSmgt.is_hcfs_running(), "Unable to terminate hcfs daemon"
-	_logger.info("[Env] Clean test data directories.")
-	if os.path.exists(_repo + "/tmp"):	shutil.rmtree(_repo + "/tmp")
+		assert not HCFSMgt.is_hcfs_running(), "Unable to terminate hcfs daemon"
+	HCFSMgt.clean_hcfs()
 	_logger.info("[Env] Clean hcfs config files.")
 	if os.path.isfile("/data/hcfs.conf.tmp"):	os.remove("/data/hcfs.conf.tmp")
 	if os.path.isfile("/data/hcfs.conf"):	os.remove("/data/hcfs.conf")
-	HCFSmgt.clean_hcfs()
+	_logger.info("[Env] Clean test directories <repo/tmp>.")
+	if os.path.exists(_repo + "/tmp"):	subprocess.call("sudo rm -rf " + _repo + "/tmp", shell=True)
 
-# TODO: directory access need to check permission
-def setup():
+def setup_test_dir():
 	_logger.info("[Env] Setup meta and block directories.")
 	os.makedirs(_meta)
 	os.makedirs(_block)	
@@ -155,7 +80,7 @@ def setup_hcfs_conf(swift):
 		with open(_hcfs_conf_tmp, "rt") as fin:
 			for line in fin:
 				fout.write(line.replace("{meta}", _meta).replace("{block}", _block).replace("{user}", swift._user).replace("{pwd}", swift._pwd).replace("{ip}", swift._ip).replace("{bucket}", swift._bucket))
-	HCFSmgt.enc_hcfs_conf()
+	HCFSMgt.enc_hcfs_conf()
 
 def setup_Ted_env():
 	try:
@@ -163,11 +88,11 @@ def setup_Ted_env():
 		prepare_dir_permission()
 		before()
 		cleanup()
-		setup()
-		_swift = _Swift("tedchen", "10.10.99.120", "gkuVn4slZCJB", "tedchentestmeta")
-		HCFSmgt.compile_hcfs()
+		_swift = SwiftMgt.Swift("tedchen", "10.10.99.120", "gkuVn4slZCJB", "tedchentestmeta")
+		HCFSMgt.compile_hcfs()
+		setup_test_dir()
 		setup_hcfs_conf(_swift)
-		HCFSmgt.start_hcfs()
+		HCFSMgt.start_hcfs()
 	except Exception as e:
 		cleanup()
 		return False, e
@@ -175,10 +100,8 @@ def setup_Ted_env():
 
 # TODO: not yet implemented
 def setup_docker_env():
-	assert os.path.isfile("/var/run/docker.sock"), "Need installed docker."
 	before()
 	cleanup()
-	setup()
 	_logger.info("[Env] Create swift data directories.")
 	os.makedirs(_swift_data)
 
