@@ -66,6 +66,7 @@ create:
         char* emu_path = "/storage/emulated/0";
         if (strcmp(path, emu_path) == 0) {
             while(1) {
+                ALOGE("Failed to mkdir(%s): %s", path, strerror(errno));
                 sleep(3);
                 if (TEMP_FAILURE_RETRY(mkdir(path, mode)) == -1) continue;
                 else break;            
