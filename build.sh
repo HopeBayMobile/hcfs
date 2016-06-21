@@ -103,12 +103,15 @@ function lib()
 	exit
 }
 
-function pyhcfs()
+function pyhcfs ()
 {
+	docker pull docker:5000/docker_hcfs_test_slave
 	if [ "$TEST" -eq 1 ]; then
-		python setup.py test
+		docker run -it --rm -v "$repo":/hcfs -w="/hcfs" docker:5000/docker_hcfs_test_slave \
+			bash -c "umask 000; python setup.py test"
 	else
-		python setup.py bdist_egg
+		docker run -it --rm -v "$repo":/hcfs -w="/hcfs" docker:5000/docker_hcfs_test_slave \
+			bash -c "umask 000; python setup.py bdist_egg"
 	fi
 }
 
