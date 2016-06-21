@@ -81,9 +81,18 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	fclose(fsmgr_fptr);
 
 	*num_inodes = num_dir + num_nondir; /* Collect all root inodes */
-	*roots = (ino_t *)malloc(sizeof(ino_t) * (*num_inodes));
-	memcpy(*roots, dir_nodes, sizeof(ino_t) * num_dir);
-	memcpy(*roots + num_dir, nondir_nodes, sizeof(ino_t) * num_nondir);
+	if (*num_inodes > 0) {
+		*roots = (ino_t *)malloc(sizeof(ino_t) * (*num_inodes));
+		if (num_dir > 0)
+			memcpy(*roots, dir_nodes, sizeof(ino_t) * num_dir);
+		if (num_nondir > 0)
+			memcpy(*roots + num_dir, nondir_nodes,
+					sizeof(ino_t) * num_nondir);
+	} else {
+		*roots = NULL;
+		write_log(4, "There are no root inodes\n");
+		return -ENOENT;
+	}
 
 	free(dir_nodes);
 	free(nondir_nodes);
@@ -343,7 +352,17 @@ int32_t init_rebuild_sb(char rebuild_action)
 	return 0;
 }
 
-void destroy_rebuild_sb(void)
+/**
+ * Destroy and reclaim resource of rebuilding superblock. This function
+ * is called when system shutdown or rebuilding process completed. If system
+ * is going to shutdown, do not remove the queue file so that it can keep
+ * rebuilding superblock next time.
+ *
+ * @param destroy_queue_file Flag indicating if queue file can be removed.
+ *
+ * @return none.
+ */
+void destroy_rebuild_sb(BOOL destroy_queue_file)
 {
 	char queue_filepath[400];
 	int32_t idx;
@@ -363,9 +382,17 @@ void destroy_rebuild_sb(void)
 	sem_destroy(&(rebuild_sb_tpool->tpool_access_sem));
 	free(rebuild_sb_jobs);
 	free(rebuild_sb_tpool);
+	rebuild_sb_jobs = NULL;
+	rebuild_sb_tpool = NULL;
 	return;
 }
 
+/**
+ * When backend comes from offline to online, backend monitor need to wake up
+ * these sleeping worker threads if system is restoring mode.
+ *
+ * @return none.
+ */
 void wake_sb_rebuilder(void)
 {
 	/* Lock hcfs_system to avoid race condition */
@@ -387,7 +414,16 @@ void wake_sb_rebuilder(void)
 	return;
 }
 
-/* Need mutex lock */
+/**
+ * Pull an inode job. Job mutex lock should be locked before calling
+ * this function. If inode job in cache queue is empty, then read many
+ * inode from queue file and cache them in the cache queue.
+ *
+ * @param inode_job Job handler to store inode job and its position
+ *                  in queue file.
+ *
+ * @return 0 on success, -ENOENT in case of no inode job.
+ */
 int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job)
 {
 	CACHED_JOBS *cache_job;
@@ -445,7 +481,14 @@ int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job)
 	return 0;
 }
 
-/* Do not need pre-lock job queue */
+/**
+ * Push a bunch of inodes into queue file.
+ *
+ * @param inode_jobs Inode array to be pushed into queue file.
+ * @param num_inodes Number of inodes in inode_jobs.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes)
 {
 	int64_t total_jobs;
@@ -486,7 +529,7 @@ int32_t erase_inode_job(INODE_JOB_HANDLE *inode_job)
 
 	empty_inode = 0;
 	LOCK_QUEUE_FILE();
-	PWRITE(rebuild_sb_jobs->queue_fh, &empty_inode, 1,
+	PWRITE(rebuild_sb_jobs->queue_fh, &empty_inode, sizeof(ino_t),
 		inode_job->queue_file_pos);
 	UNLOCK_QUEUE_FILE();
 	return 0;

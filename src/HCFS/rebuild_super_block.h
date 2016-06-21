@@ -43,9 +43,11 @@ typedef struct REBUILD_INODE_JOBS {
 	CACHED_JOBS cache_jobs;
 	sem_t queue_file_sem; /* Queue file semaphore */
 	int32_t queue_fh;
+
+	/* remaining_jobs + job_count = total jobs in queue file */
 	int64_t remaining_jobs; /* # of remaining jobs */
-	int64_t job_count;
-	BOOL job_finish; 
+	int64_t job_count; /* # of assigned jobs */
+	BOOL job_finish; /* True if all entry had been rebuilded */ 
 	pthread_mutex_t job_mutex; /* job resource lock */
 	pthread_cond_t job_cond; /* job condition */
 } REBUILD_SB_JOBS;

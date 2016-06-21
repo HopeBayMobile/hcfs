@@ -2,6 +2,7 @@
 #include "super_block.h"
 #include "fuseop.h"
 #include "mount_manager.h"
+#include "rebuild_super_block_params.h"
 
 int32_t write_log(int32_t level, char *format, ...)
 {
@@ -78,6 +79,15 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	ino_t **nondir_node_list, int64_t *num_nondir_node,
 	char **nondir_type_list)
 {
+	if (NOW_NO_ROOTS == TRUE) {
+		printf("Now no roots\n");
+		*num_dir_node = 0;
+		*num_nondir_node = 0;
+		*dir_node_list = NULL;
+		*nondir_node_list = NULL;
+		return 0;
+	}
+
 	*dir_node_list = (ino_t *) malloc(sizeof(ino_t) * 3);
 	(*dir_node_list)[0] = 234;
 	(*dir_node_list)[1] = 345;
@@ -121,5 +131,11 @@ int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 
 int32_t update_sb_size()
 {
+	char path[300];
+	struct stat tmpstat;
+
+	sprintf(path, "rebuild_sb_running_folder/superblock");
+	stat(path, &tmpstat);
+	hcfs_system->systemdata.super_block_size = tmpstat.st_size;
 	return 0;
 }

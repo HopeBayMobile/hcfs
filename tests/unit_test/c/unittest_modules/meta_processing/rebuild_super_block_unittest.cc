@@ -12,6 +12,7 @@ extern "C" {
 #include "fuseop.h"
 }
 #include <cstdlib>
+#include "rebuild_super_block_params.h"
 #include "gtest/gtest.h"
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
@@ -44,6 +45,9 @@ class superblockEnvironment : public ::testing::Environment {
 ::testing::Environment* const rebuild_superblock_env =
 	::testing::AddGlobalTestEnvironment(new superblockEnvironment);
 
+/**
+ * Unittest of init_rebuild_sb()
+ */
 class init_rebuild_sbTest: public ::testing::Test {
 protected:
 	char *sb_path, *queuefile_path;
@@ -54,14 +58,16 @@ protected:
 		queuefile_path = (char *)malloc(400);
 		sprintf(sb_path, "%s/superblock", METAPATH);
 		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
-		sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+		NOW_NO_ROOTS = FALSE;
 	}
 	void TearDown()
 	{
 		free(sb_path);
 		free(queuefile_path);
 		free(sys_super_block);
-		system("rm -r ./rebuild_sb_running_folder/*");
+		system("rm -rf ./rebuild_sb_running_folder/*");
 	}
 };
 
@@ -79,7 +85,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	fseek(fptr, 0, SEEK_SET);
 	fread(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, fptr);
 	memset(&exp_sb_head, 0, sizeof(SUPER_BLOCK_HEAD));
-	exp_sb_head.num_total_inodes = 5;
+	exp_sb_head.num_total_inodes = 5; /* Mock number is set in mock function */
 	exp_sb_head.now_rebuild = TRUE;
 
 	EXPECT_EQ(0, memcmp(&exp_sb_head, &sb_head, sizeof(SUPER_BLOCK_HEAD)));
@@ -102,4 +108,550 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 		ASSERT_EQ(0, access(fsstat_path, F_OK));
 		unlink(fsstat_path);
 	}
+
+	/* Verify superblock size */
+	EXPECT_EQ(sizeof(SUPER_BLOCK_HEAD) + 5 * sizeof(SUPER_BLOCK_ENTRY),
+			hcfs_system->systemdata.super_block_size);
+
+	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
 }
+
+TEST_F(init_rebuild_sbTest, NoRoot_DoNeedRebuild)
+{
+	NOW_NO_ROOTS = TRUE;
+
+	EXPECT_EQ(-ENOENT, init_rebuild_sb(START_REBUILD_SB));
+}
+
+TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileExist)
+{
+	FILE *fptr;
+	ino_t inode_in_queue[10] = {0, 0, 45, 0, 67, 78, 0, 90, 12, 5566};
+	ino_t inodes[10];
+
+	fptr = fopen(queuefile_path, "w+");
+	setbuf(fptr, NULL);
+	ftruncate(fileno(fptr), 0);
+	fwrite(&inode_in_queue, sizeof(ino_t), 10, fptr);
+	fclose(fptr);
+
+	EXPECT_EQ(0, init_rebuild_sb(KEEP_REBUILD_SB));
+
+	/* Verify */
+	pread(rebuild_sb_jobs->queue_fh, inodes, sizeof(ino_t) * 10, 0);
+	EXPECT_EQ(0, memcmp(inode_in_queue, inodes, sizeof(ino_t) * 10));
+	EXPECT_EQ(10, rebuild_sb_jobs->remaining_jobs);
+	close(rebuild_sb_jobs->queue_fh);
+	unlink(queuefile_path);
+
+	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+}
+
+TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileNotExist)
+{
+	ino_t exp_roots[5] = {234, 345, 456, 567, 678};
+	ino_t roots[5];
+
+	EXPECT_EQ(0, init_rebuild_sb(KEEP_REBUILD_SB));
+
+	/* Verify */
+	pread(rebuild_sb_jobs->queue_fh, roots, sizeof(ino_t) * 5, 0);
+	EXPECT_EQ(0, memcmp(exp_roots, roots, sizeof(ino_t) * 5));
+	EXPECT_EQ(5, rebuild_sb_jobs->remaining_jobs);
+	close(rebuild_sb_jobs->queue_fh);
+	unlink(queuefile_path);
+
+	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+}
+/**
+ * End unittest of init_rebuild_sb()
+ */
+
+
+/**
+ * Unittest of destroy_rebuild_sb()
+ */
+class destroy_rebuild_sbTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		queuefile_path = (char *)malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+
+		/* Allocate memory for jobs */
+		rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+		memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
+		pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+		pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+		sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
+
+		/* Allocate memory for thread pool */
+		rebuild_sb_tpool = (SB_THREAD_POOL *)
+			calloc(sizeof(SB_THREAD_POOL), 1);
+		memset(rebuild_sb_tpool, 0, sizeof(SB_THREAD_POOL));
+		rebuild_sb_tpool->tmaster = -1;
+		sem_init(&(rebuild_sb_tpool->tpool_access_sem), 0, 1);
+
+		rebuild_sb_jobs->queue_fh = open(queuefile_path,
+				O_CREAT | O_RDWR, 0600);
+	}
+	void TearDown()
+	{
+		free(sb_path);
+		free(queuefile_path);
+		free(sys_super_block);
+		if (rebuild_sb_jobs)
+			free(rebuild_sb_jobs);
+		if (rebuild_sb_tpool)
+			free(rebuild_sb_tpool);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+void mock_worker(void *ptr)
+{
+	return;
+}
+
+TEST_F(destroy_rebuild_sbTest, Destroy_RemoveQueueFile)
+{
+	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
+		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
+			NULL, (void *)&mock_worker, NULL);
+	}
+
+	destroy_rebuild_sb(TRUE);
+	EXPECT_EQ(0, rebuild_sb_jobs);
+	EXPECT_EQ(0, rebuild_sb_tpool);
+	EXPECT_EQ(-1, access(queuefile_path, F_OK));
+}
+
+TEST_F(destroy_rebuild_sbTest, Destroy_PreserveQueueFile)
+{
+	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
+		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
+			NULL, (void *)&mock_worker, NULL);
+	}
+
+	destroy_rebuild_sb(FALSE);
+	EXPECT_EQ(0, rebuild_sb_jobs);
+	EXPECT_EQ(0, rebuild_sb_tpool);
+	EXPECT_EQ(0, access(queuefile_path, F_OK));
+	unlink(queuefile_path);
+}
+/**
+ * End unittest of destroy_rebuild_sb()
+ */
+
+/**
+ * Unittest of wake_sb_rebuilder()
+ */
+class wake_sb_rebuilderTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		queuefile_path = (char *)malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+
+		/* Allocate memory for jobs */
+		rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+		memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
+		pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+		pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+		sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
+
+		/* Allocate memory for thread pool */
+		rebuild_sb_tpool = (SB_THREAD_POOL *)
+			calloc(sizeof(SB_THREAD_POOL), 1);
+		memset(rebuild_sb_tpool, 0, sizeof(SB_THREAD_POOL));
+		rebuild_sb_tpool->tmaster = -1;
+		sem_init(&(rebuild_sb_tpool->tpool_access_sem), 0, 1);
+	}
+	void TearDown()
+	{
+		free(sb_path);
+		free(queuefile_path);
+		free(sys_super_block);
+		if (rebuild_sb_jobs)
+			free(rebuild_sb_jobs);
+		if (rebuild_sb_tpool)
+			free(rebuild_sb_tpool);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+void mock_worker2(void *ptr)
+{
+	int idx = *(int *)ptr;
+
+	pthread_mutex_lock(&(rebuild_sb_jobs->job_mutex));
+	printf("thread is going to wait\n");
+
+	sem_wait(&(rebuild_sb_tpool->tpool_access_sem));
+	rebuild_sb_tpool->num_idle++;
+	sem_post(&(rebuild_sb_tpool->tpool_access_sem));
+
+	pthread_cond_broadcast(&(rebuild_sb_jobs->job_cond));
+	rebuild_sb_tpool->num_idle--;
+	rebuild_sb_tpool->thread[idx].active = FALSE;
+	pthread_mutex_unlock(&(rebuild_sb_jobs->job_mutex));
+	return;
+}
+
+TEST_F(wake_sb_rebuilderTest, WakeUpAllThreads)
+{
+	struct timespec sleep_time;
+
+	sleep_time.tv_sec = 0;
+	sleep_time.tv_nsec = 100000000;
+
+	hcfs_system->system_restoring = TRUE;
+	rebuild_sb_tpool->num_idle = 0;
+	rebuild_sb_jobs->job_finish = FALSE;
+
+	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
+		rebuild_sb_tpool->tidx[idx] = idx;
+		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
+			NULL, (void *)&mock_worker2,
+			&(rebuild_sb_tpool->tidx[idx]));
+		rebuild_sb_tpool->thread[idx].active = TRUE;
+	}
+
+	nanosleep(&sleep_time, NULL);
+	wake_sb_rebuilder();
+	
+	/* Verify */
+	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
+		EXPECT_EQ(FALSE, rebuild_sb_tpool->thread[idx].active);
+		pthread_join(rebuild_sb_tpool->thread[idx].tid, NULL);
+	}
+
+}
+/**
+ * End unittest of wake_sb_rebuilder()
+ */
+
+/**
+ * Unittest of push_inode_job()
+ */
+class push_inode_jobTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		queuefile_path = (char *)malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+
+		/* Allocate memory for jobs */
+		rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+		memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
+		pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+		pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+		sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
+
+		/* Allocate memory for thread pool */
+		rebuild_sb_tpool = (SB_THREAD_POOL *)
+			calloc(sizeof(SB_THREAD_POOL), 1);
+		memset(rebuild_sb_tpool, 0, sizeof(SB_THREAD_POOL));
+		rebuild_sb_tpool->tmaster = -1;
+		sem_init(&(rebuild_sb_tpool->tpool_access_sem), 0, 1);
+
+		rebuild_sb_jobs->queue_fh = open(queuefile_path,
+				O_CREAT | O_RDWR, 0600);
+	}
+	void TearDown()
+	{
+		free(sb_path);
+		free(queuefile_path);
+		free(sys_super_block);
+		if (rebuild_sb_jobs)
+			free(rebuild_sb_jobs);
+		if (rebuild_sb_tpool)
+			free(rebuild_sb_tpool);
+		unlink(queuefile_path);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+TEST_F(push_inode_jobTest, PushInodesInto_EmptyQueue)
+{
+	ino_t inodes[5] = {123,234,345,456,567};
+	ino_t verified_inodes[5] = {0};
+
+	EXPECT_EQ(0, push_inode_job(inodes, 5));
+
+	/* Verify */
+	EXPECT_EQ(5, rebuild_sb_jobs->remaining_jobs);
+	EXPECT_EQ(0, rebuild_sb_jobs->job_count);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.num_cached_inode);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.cache_idx);
+	pread(rebuild_sb_jobs->queue_fh, &verified_inodes,
+			sizeof(ino_t) * 5, 0);
+	EXPECT_EQ(0, memcmp(inodes, verified_inodes, sizeof(ino_t) * 5));
+	
+	close(rebuild_sb_jobs->queue_fh);
+}
+
+TEST_F(push_inode_jobTest, PushInodesInto_NonemptyQueue)
+{
+	struct stat tmpstat;
+	ino_t inodes[5] = {123,234,345,456,567};
+	ino_t verified_inodes[150] = {0};
+	ino_t inodes_in_file[150];
+
+	/* Mock data */
+	for (int i = 0; i < 150; i++)
+		inodes_in_file[i] = i;
+	pwrite(rebuild_sb_jobs->queue_fh, inodes_in_file,
+		sizeof(ino_t) * 150, 0);
+	rebuild_sb_jobs->remaining_jobs = 100;
+	rebuild_sb_jobs->job_count = 50;
+
+	EXPECT_EQ(0, push_inode_job(inodes, 5));
+
+	/* Verify */
+	EXPECT_EQ(105, rebuild_sb_jobs->remaining_jobs);
+	EXPECT_EQ(50, rebuild_sb_jobs->job_count);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.num_cached_inode);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.cache_idx);
+	pread(rebuild_sb_jobs->queue_fh, &verified_inodes,
+			sizeof(ino_t) * 150, 0);
+	EXPECT_EQ(0, memcmp(inodes_in_file, verified_inodes,
+			sizeof(ino_t) * 150));
+	pread(rebuild_sb_jobs->queue_fh, &verified_inodes,
+			sizeof(ino_t) * 5, sizeof(ino_t) * 150);
+	EXPECT_EQ(0, memcmp(inodes, verified_inodes, sizeof(ino_t) * 5));
+
+	fstat(rebuild_sb_jobs->queue_fh, &tmpstat);
+	EXPECT_EQ(sizeof(ino_t) * 155, tmpstat.st_size);
+	close(rebuild_sb_jobs->queue_fh);
+}
+
+/**
+ * End of unittest of push_inode_job()
+ */
+
+/**
+ * Unittest of pull_inode_job()
+ */
+class pull_inode_jobTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		queuefile_path = (char *)malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+
+		/* Allocate memory for jobs */
+		rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+		memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
+		pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+		pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+		sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
+
+		/* Allocate memory for thread pool */
+		rebuild_sb_tpool = (SB_THREAD_POOL *)
+			calloc(sizeof(SB_THREAD_POOL), 1);
+		memset(rebuild_sb_tpool, 0, sizeof(SB_THREAD_POOL));
+		rebuild_sb_tpool->tmaster = -1;
+		sem_init(&(rebuild_sb_tpool->tpool_access_sem), 0, 1);
+
+		rebuild_sb_jobs->queue_fh = open(queuefile_path,
+				O_CREAT | O_RDWR, 0600);
+	}
+	void TearDown()
+	{
+		free(sb_path);
+		free(queuefile_path);
+		free(sys_super_block);
+		if (rebuild_sb_jobs)
+			free(rebuild_sb_jobs);
+		if (rebuild_sb_tpool)
+			free(rebuild_sb_tpool);
+		unlink(queuefile_path);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+TEST_F(pull_inode_jobTest, PullExistJobManyTimes)
+{
+	int num_inodes = 523456;
+	ino_t many_inodes[num_inodes];
+	INODE_JOB_HANDLE job_handle;
+
+	for (int i = 0; i < num_inodes; i++) {
+		many_inodes[i] = i * 3 + 1;
+	}
+	pwrite(rebuild_sb_jobs->queue_fh, many_inodes,
+		sizeof(ino_t) * num_inodes, 0);
+	rebuild_sb_jobs->remaining_jobs = num_inodes;
+
+	/* Run */
+	for (int i = 0; i < num_inodes; i++) {
+		ASSERT_EQ(0, pull_inode_job(&job_handle));
+		ASSERT_EQ(many_inodes[i], job_handle.inode);
+		ASSERT_EQ(i * sizeof(ino_t), job_handle.queue_file_pos);
+		ASSERT_EQ(num_inodes - i - 1, rebuild_sb_jobs->remaining_jobs);
+		ASSERT_EQ(i + 1, rebuild_sb_jobs->job_count);
+		ASSERT_EQ(i % NUM_CACHED_INODES + 1,
+				rebuild_sb_jobs->cache_jobs.cache_idx);
+		if (i / NUM_CACHED_INODES < num_inodes / NUM_CACHED_INODES)
+			ASSERT_EQ(NUM_CACHED_INODES,
+				rebuild_sb_jobs->cache_jobs.num_cached_inode);
+		else
+			ASSERT_EQ(num_inodes % NUM_CACHED_INODES,
+				rebuild_sb_jobs->cache_jobs.num_cached_inode);
+	}
+
+	ASSERT_EQ(-ENOENT, pull_inode_job(&job_handle));
+	close(rebuild_sb_jobs->queue_fh);
+}
+
+TEST_F(pull_inode_jobTest, PullJob_ManyEmptyInode)
+{
+	int num_inodes = 523456;
+	ino_t many_inodes[num_inodes];
+	INODE_JOB_HANDLE job_handle;
+
+	for (int i = 0; i < num_inodes; i++) {
+		if (i % 2)
+			many_inodes[i] = i * 3 + 1;
+		else
+			many_inodes[i] = 0; /* Skip inode 0 */
+	}
+	pwrite(rebuild_sb_jobs->queue_fh, many_inodes,
+		sizeof(ino_t) * num_inodes, 0);
+	rebuild_sb_jobs->remaining_jobs = num_inodes;
+
+	/* Run */
+	for (int i = 0; i < num_inodes; i++) {
+		if (!(i % 2)) /* inode zero will be skipped */
+			continue;
+
+		ASSERT_EQ(0, pull_inode_job(&job_handle));
+		ASSERT_EQ(many_inodes[i], job_handle.inode);
+		ASSERT_EQ(i * sizeof(ino_t), job_handle.queue_file_pos);
+		ASSERT_EQ(num_inodes - i - 1, rebuild_sb_jobs->remaining_jobs);
+		ASSERT_EQ(i + 1, rebuild_sb_jobs->job_count);
+		ASSERT_EQ(i % NUM_CACHED_INODES + 1,
+				rebuild_sb_jobs->cache_jobs.cache_idx);
+		if (i / NUM_CACHED_INODES < num_inodes / NUM_CACHED_INODES)
+			ASSERT_EQ(NUM_CACHED_INODES,
+				rebuild_sb_jobs->cache_jobs.num_cached_inode);
+		else
+			ASSERT_EQ(num_inodes % NUM_CACHED_INODES,
+				rebuild_sb_jobs->cache_jobs.num_cached_inode);
+	}
+
+	ASSERT_EQ(-ENOENT, pull_inode_job(&job_handle));
+	close(rebuild_sb_jobs->queue_fh);
+}
+
+TEST_F(pull_inode_jobTest, QueueFileEmpty_But_RemainingJobNotZero)
+{
+	INODE_JOB_HANDLE job_handle;
+
+	rebuild_sb_jobs->remaining_jobs = 123;
+
+	EXPECT_EQ(-ENOENT, pull_inode_job(&job_handle));
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.cache_idx);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.num_cached_inode);
+	EXPECT_EQ(0, rebuild_sb_jobs->remaining_jobs);
+
+	close(rebuild_sb_jobs->queue_fh);
+}
+/**
+ * End of unittest of pull_inode_job()
+ */
+
+/**
+ * Unittest of erase_inode_job()
+ */
+class erase_inode_jobTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		queuefile_path = (char *)malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+
+		/* Allocate memory for jobs */
+		rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+		memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
+		pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+		pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+		sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
+
+		rebuild_sb_jobs->queue_fh = open(queuefile_path,
+				O_CREAT | O_RDWR, 0600);
+	}
+	void TearDown()
+	{
+		free(sb_path);
+		free(queuefile_path);
+		free(sys_super_block);
+		if (rebuild_sb_jobs)
+			free(rebuild_sb_jobs);
+		unlink(queuefile_path);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+TEST_F(erase_inode_jobTest, EraseInodeSuccess)
+{
+	INODE_JOB_HANDLE job_handle;
+	ino_t inodes[5] = {123,234,345,456,567};
+	ino_t zero_inodes[5] = {0}, verified_inodes[5];
+
+	pwrite(rebuild_sb_jobs->queue_fh, inodes,
+			sizeof(ino_t) * 5, 0);
+
+	/* Run */
+	for (int i = 0; i < 5; i++) {
+		job_handle.inode = inodes[i];
+		job_handle.queue_file_pos = sizeof(ino_t) * i;
+		ASSERT_EQ(0, erase_inode_job(&job_handle));
+	}
+
+	memset(zero_inodes, 0, sizeof(ino_t) * 5);
+	pread(rebuild_sb_jobs->queue_fh, verified_inodes,
+			sizeof(ino_t) * 5, 0);
+	EXPECT_EQ(0, memcmp(zero_inodes, verified_inodes, sizeof(ino_t) * 5));
+
+	close(rebuild_sb_jobs->queue_fh);
+}
+/**
+ * End unittest of erase_inode_job()
+ */
