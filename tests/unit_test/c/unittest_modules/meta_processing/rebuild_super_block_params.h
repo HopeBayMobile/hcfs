@@ -1,0 +1,1 @@
+char NOW_NO_ROOTS;
