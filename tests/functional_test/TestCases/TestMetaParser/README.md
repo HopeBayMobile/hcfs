@@ -1,3 +1,5 @@
+執行需要 root 權限
+
 目前環境是使用 Arkflex U 的 server 以 Ted 的帳號執行 local 端的 hcfs;
 更改測試環境請於 Env.py
 路徑參數於 Var.py
