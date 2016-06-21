@@ -43,6 +43,3 @@ def list_external_volume(fsmgr_path):
     if ret != 0:
         return ret
     return [convert_to_python(ptr_ret_entry[0][x]) for x in range(ret_num[0])]
-
-
-print list_external_volume("testdata/fsmgr")
