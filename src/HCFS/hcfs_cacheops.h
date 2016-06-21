@@ -30,4 +30,7 @@ void *run_cache_loop(void *ptr);
 void run_cache_loop(void);
 #endif
 
+int64_t get_cache_limit(const char pin_type);
+int64_t get_pinned_limit(const char pin_type);
+
 #endif  /* GW20_HCFS_HCFS_CACHEOPS_H_ */

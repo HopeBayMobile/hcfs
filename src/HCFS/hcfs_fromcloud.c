@@ -704,7 +704,7 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 	/* Check pin-status. It may be modified to UNPIN by other processes */
 	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
-	if (filemeta.local_pin == FALSE) {
+	if (P_IS_UNPIN(filemeta.local_pin)) {
 		flock(fileno(fptr), LOCK_UN);
 		write_log(5, "Warning: Inode %"PRIu64" is detected to be "
 			"unpinned in pin-process.\n", (uint64_t)inode);

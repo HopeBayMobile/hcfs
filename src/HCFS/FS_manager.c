@@ -242,7 +242,7 @@ ino_t _create_root_inode()
 #ifdef _ANDROID_ENV_
 	self_mode = S_IFDIR | 0770;
 	if (voltype == ANDROID_INTERNAL) /* Default pin internal storage */
-		ispin = TRUE;
+		ispin = P_PIN;
 	else
 		ispin = DEFAULT_PIN;
 #else

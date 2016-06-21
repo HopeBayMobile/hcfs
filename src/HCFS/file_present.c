@@ -44,6 +44,7 @@
 #include "path_reconstruct.h"
 #include "dir_statistics.h"
 #include "parent_lookup.h"
+#include "hcfs_cacheops.h"
 
 /************************************************************************
 *
@@ -264,8 +265,8 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.local_pin = ispin;
-	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, ispin == TRUE? "PIN" : "UNPIN");
+	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
+		selfname, ispin);
 
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
@@ -433,8 +434,8 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.root_inode = root_ino;
 	this_meta.finished_seq = 0;
 	this_meta.local_pin = ispin;
-	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		selfname, ispin == TRUE? "PIN" : "UNPIN");
+	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
+		selfname, ispin);
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
@@ -455,7 +456,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		meta_cache_unlock_entry(body_ptr);
 		dir_remove_fail_node(parent_inode, self_inode,
 			selfname, this_stat->st_mode);
-		return ret_val;	
+		return ret_val;
 	}
 
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
@@ -847,8 +848,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.finished_seq = 0;
 	symlink_meta.local_pin = ispin;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
-	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
-		name, ispin == TRUE? "PIN" : "UNPIN");
+	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
+		name, ispin);
 
 	/* Update self meta data */
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
@@ -1189,17 +1190,19 @@ error_handle:
  * increase system pinned space.
  */
 int32_t increase_pinned_size(int64_t *reserved_pinned_size,
-		int64_t file_size)
+		int64_t file_size, char pin_type)
 {
 	int32_t ret;
+	int64_t max_pinned_size;
 
 	ret = 0;
 	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
 	if (*reserved_pinned_size <= 0) { /* Need more space than expectation */
 		ret = 0;
+		max_pinned_size = get_pinned_limit(pin_type);
 		sem_wait(&(hcfs_system->access_sem));
-		if (hcfs_system->systemdata.pinned_size -
-			(*reserved_pinned_size) <= MAX_PINNED_LIMIT) {
+		if ((max_pinned_size > 0) && (hcfs_system->systemdata.pinned_size -
+			(*reserved_pinned_size) <= max_pinned_size)) {
 			hcfs_system->systemdata.pinned_size -=
 				(*reserved_pinned_size);
 			*reserved_pinned_size = 0;
@@ -1222,7 +1225,7 @@ int32_t increase_pinned_size(int64_t *reserved_pinned_size,
 /**
  * pin_inode
  *
- * Change local pin flag in meta cache to "TRUE" and set pin_status
+ * Change local pin flag in meta cache to "pin_type" and set pin_status
  * in super block to ST_PINNING in case of regfile, ST_PIN for dir/ symlink.
  * When a regfile is set to ST_PINNING, it will be pushed into pinning queue
  * and all blocks will be fetched from cloud by other thread.
@@ -1233,7 +1236,7 @@ int32_t increase_pinned_size(int64_t *reserved_pinned_size,
  * @return 0 on success, 1 on case that regfile/symlink had been pinned,
  *         otherwise negative error code.
  */
-int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
+int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type)
 {
 	int32_t ret;
 	struct stat tempstat;
@@ -1245,7 +1248,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		return ret;
 
 
-	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
+	ret = change_pin_flag(this_inode, tempstat.st_mode, pin_type);
 	if (ret < 0) {
 		return ret;
 
@@ -1257,12 +1260,12 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.st_mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
-					tempstat.st_size);
+					tempstat.st_size, pin_type);
 			if (ret == -ENOSPC) {
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
 				change_pin_flag(this_inode,
-					tempstat.st_mode, FALSE);
+					tempstat.st_mode, P_UNPIN);
 				return ret;
 			}
 		}
@@ -1294,7 +1297,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		ret = 0;
 		for (count = 0; count < num_nondir_node; count++) {
 			ret = pin_inode(nondir_node_list[count],
-				reserved_pinned_size);
+				reserved_pinned_size, pin_type);
 			if (ret < 0)
 				break;
 		}
@@ -1309,7 +1312,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size)
 		ret = 0;
 		for (count = 0; count < num_dir_node; count++) {
 			ret = pin_inode(dir_node_list[count],
-				reserved_pinned_size);
+				reserved_pinned_size, pin_type);
 			if (ret < 0)
 				break;
 		}
@@ -1381,7 +1384,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		return ret;
 
 
-	ret = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
+	ret = change_pin_flag(this_inode, tempstat.st_mode, P_UNPIN);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to unpin inode %"PRIu64"."
 			" Code %d\n", (uint64_t)-ret);

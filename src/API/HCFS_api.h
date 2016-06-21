@@ -162,6 +162,7 @@ void HCFS_get_sync_status(char **json_res);
 /*Pin file
  * @json_res result string in json format.
  * @pin_path a valid pathname (cloud be a file or a directory).
+ * @pin_type 1 for pin, 2 for high-priority-pin.
  *
  * Pin a file so that it will never be replaced when doing cache replacement.
  * If the given (pin_path) is a directory, HCFS_pin_path() will recursively
@@ -175,28 +176,7 @@ void HCFS_get_sync_status(char **json_res);
  * | False | ENOSPC when pinned space is not available.|
  * | | Other linux errors.|
  */
-void HCFS_pin_path(char **json_res, char *pin_path);
-
-/*Pin app
- * @json_res result string in json format.
- * @app_path /data/data/<package-name>
- * @data_path /data/app/<codePath>
- * @sd0_path /storage/sdcard0/Android/<type>/<package-name>
- * @sd1_path /storage/sdcard1/Android/<type>/<package-name>
- *
- * Pin all binaries and data files created by a app.
- * Input are four possible path where contain files belong to this app.
- *
- * Return code -
- *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | ENOSPC when pinned space is not available.|
- * | | Other linux errors.|
- */
-void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
-		  char *sd0_path, char *sd1_path);
+void HCFS_pin_path(char **json_res, char *pin_path, char pin_type);
 
 /*Unpin file
  * @json_res result string in json format.
@@ -214,26 +194,6 @@ void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
  * | False | Linux errors.|
  */
 void HCFS_unpin_path(char **json_res, char *pin_path);
-
-/*Unpin app
- * @json_res result string in json format.
- * @app_path /data/data/<package-name>
- * @data_path /data/app/<codePath>
- * @sd0_path /storage/sdcard0/Android/<type>/<package-name>
- * @sd1_path /storage/sdcard1/Android/<type>/<package-name>
- *
- * Unpin all binaries and data files created by a app.
- * Input are four possible path where contain files belong to this app.
- *
- * Return code -
- *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
- */
-void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
-		    char *sd0_path, char *sd1_path);
 
 /*Pin status
  * @json_res result string in json format.

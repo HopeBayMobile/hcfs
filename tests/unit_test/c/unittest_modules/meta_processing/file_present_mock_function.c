@@ -10,6 +10,8 @@
 #include "global.h"
 #include "dir_statistics.h"
 
+extern SYSTEM_CONF_STRUCT *system_config;
+
 int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
@@ -336,4 +338,12 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
 {
 	return 0;
+}
+
+int64_t get_pinned_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return PINNED_LIMITS(pin_type);
+	else
+		return -EINVAL;
 }

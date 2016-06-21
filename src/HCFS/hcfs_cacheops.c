@@ -128,7 +128,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		/* Skip if inode is pinned */
-		if (temphead.local_pin == TRUE) {
+		if (P_IS_PIN(temphead.local_pin)) {
 			write_log(10, "Debug: inode %"PRIu64" is pinned. "
 				"Skip to page it out.\n", (uint64_t)this_inode);
 			flock(fileno(metafptr), LOCK_UN);
@@ -289,7 +289,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 				FREAD(&temphead, sizeof(FILE_META_TYPE),
 					1, metafptr);
-				if (temphead.local_pin == TRUE) {
+				if (P_IS_PIN(temphead.local_pin)) {
 					write_log(10, "Debug: inode %"PRIu64" "
 						"is pinned when paging it out. "
 						"Stop\n", (uint64_t)this_inode);
@@ -638,3 +638,36 @@ void notify_sleep_on_cache(int32_t cache_replace_status)
 	}
 }
 
+/************************************************************************
+*
+* Function name: get_cache_limit
+*        Inputs: const char pin_type
+*       Summary: Returns cache threshold for (pin_type)
+*  Return value: Cache space limit if successful. Otherwise returns the
+*  		 negation of linux error code.
+*
+*************************************************************************/
+int64_t get_cache_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return CACHE_LIMITS(pin_type);
+	else
+		return -EINVAL;
+}
+
+/************************************************************************
+*
+* Function name: get_pinned_limit
+*        Inputs: const char pin_type
+*       Summary: Returns pinned threshold for (pin_type)
+*  Return value: Pinned space limit if successful. Otherwise returns the
+*  		 negation of linux error code.
+*
+*************************************************************************/
+int64_t get_pinned_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return PINNED_LIMITS(pin_type);
+	else
+		return -EINVAL;
+}

@@ -20,6 +20,12 @@ class superblockEnvironment : public ::testing::Environment {
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
+			system_config->max_cache_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+
+			system_config->max_pinned_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+
 			hcfs_system = (SYSTEM_DATA_HEAD *)
 					malloc(sizeof(SYSTEM_DATA_HEAD));
 			memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
@@ -908,7 +914,6 @@ protected:
 		expected_stat.st_dev = 5;
 		expected_stat.st_nlink = 6;
 		expected_stat.st_size = 5566;
-		CACHE_HARD_LIMIT = 10000;
 	}
 };
 

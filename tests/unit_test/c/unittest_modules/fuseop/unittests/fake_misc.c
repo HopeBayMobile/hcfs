@@ -17,8 +17,11 @@
 #include "mount_manager.h"
 #include "dir_statistics.h"
 #include "atomic_tocloud.h"
+#include "params.h"
 
 #include "fake_misc.h"
+
+extern SYSTEM_CONF_STRUCT *system_config;
 
 int32_t init_api_interface(void)
 {
@@ -1020,4 +1023,20 @@ int32_t insert_cache_pkg(const char *pkgname, uid_t uid)
 int32_t remove_cache_pkg(const char *pkgname)
 {
 	return 0;
+}
+
+int64_t get_cache_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return CACHE_LIMITS(pin_type);
+	else
+		return -EINVAL;
+}
+
+int64_t get_pinned_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return PINNED_LIMITS(pin_type);
+	else
+		return -EINVAL;
 }

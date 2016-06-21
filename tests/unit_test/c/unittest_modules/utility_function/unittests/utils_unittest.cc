@@ -514,6 +514,7 @@ TEST_F(read_system_configTest, GoodConfig) {
   EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
   EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
   EXPECT_EQ(CACHE_DELTA, 10485760);
+  EXPECT_EQ(RESERVED_CACHE_SPACE, 53687091);
   EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
   EXPECT_EQ(CURRENT_BACKEND, SWIFT);
   EXPECT_STREQ(SWIFT_ACCOUNT,"hopebay");
@@ -846,6 +847,20 @@ TEST_F(validate_system_configTest, MissingS3Config) {
   EXPECT_EQ(-1,validate_system_config(system_config));
   S3_PROTOCOL = tmpptr;
 
+ }
+
+TEST_F(validate_system_configTest, NoReservedCacheSection) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_no_reserved_section.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname, system_config));
+
+  ASSERT_EQ(0,validate_system_config(system_config));
+
+  EXPECT_EQ(RESERVED_CACHE_SPACE, system_config->max_block_size);
  }
 /* End of the test case for the function validate_system_config*/
 
@@ -1267,4 +1282,37 @@ TEST_F(get_quota_from_backupTest, Success)
 }
 
 /* End of unittest of get_quota_from_backup() */
+/*
+        Unittest for init_cache_thresholds()
+ */
+class init_cache_thresholdsTest : public ::testing::Test {
+	protected:
+		virtual void SetUp()
+		{
+			CACHE_HARD_LIMIT = 0;
+			RESERVED_CACHE_SPACE = 0;
+		}
+};
 
+TEST_F(init_cache_thresholdsTest, Successful)
+{
+	int32_t ret;
+
+	CACHE_HARD_LIMIT = 100;
+	RESERVED_CACHE_SPACE = 100;
+	ret = init_cache_thresholds(system_config);
+
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(CACHE_LIMITS(P_UNPIN), CACHE_HARD_LIMIT);
+	EXPECT_EQ(PINNED_LIMITS(P_UNPIN), MAX_PINNED_LIMIT);
+	EXPECT_EQ(CACHE_LIMITS(P_PIN), CACHE_HARD_LIMIT);
+	EXPECT_EQ(PINNED_LIMITS(P_PIN), MAX_PINNED_LIMIT);
+	EXPECT_EQ(CACHE_LIMITS(P_HIGH_PRI_PIN),
+			CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE);
+	EXPECT_EQ(PINNED_LIMITS(P_HIGH_PRI_PIN),
+			MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE);
+}
+
+/*
+        End of unittest of init_cache_thresholds()
+ */

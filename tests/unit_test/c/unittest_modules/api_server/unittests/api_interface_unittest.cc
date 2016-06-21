@@ -181,6 +181,10 @@ class api_moduleTest : public ::testing::Test
 	{
     		system_config = (SYSTEM_CONF_STRUCT *)
 			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->max_cache_limit =
+			(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+		system_config->max_pinned_limit =
+			(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		api_server_monitor_time = 1;
 		hcfs_system =
 		    (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
@@ -769,12 +773,13 @@ TEST_F(api_moduleTest, UnmountAllTest) {
   ASSERT_EQ(TRUE, UNMOUNTEDALL);
  }
 
-TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
+TEST_F(api_moduleTest, pin_inodeTest_InvalidPinType) {
 
   int32_t ret_val, errcode;
   uint32_t code, cmd_len, size_msg;
   char buf[300];
   int64_t reserved_size;
+  char pin_type;
   uint32_t num_inode;
 
   PIN_INODE_ROLLBACK = FALSE;
@@ -787,13 +792,64 @@ TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
   ASSERT_NE(0, fd);
   code = PIN;
   reserved_size = 1000;
+  pin_type = 3; /* This pin type is not supported */
   num_inode = 0;
   cmd_len = sizeof(int64_t) + sizeof(uint32_t);
   memcpy(buf, &reserved_size, sizeof(int64_t));
-  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
-  CACHE_HARD_LIMIT = 300; /* Space not available */
+  memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+  memcpy(buf + sizeof(int64_t) + sizeof(char),
+		  &num_inode, sizeof(uint32_t));
+  /* Space not available */
   hcfs_system->systemdata.pinned_size = 0;
-  
+
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(sizeof(uint32_t), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(uint32_t), 0);
+  ASSERT_EQ(sizeof(uint32_t), ret_val);
+  ASSERT_EQ(-EINVAL, errcode);
+ }
+
+TEST_F(api_moduleTest, pin_inodeTest_NoSpace) {
+
+  int32_t ret_val, errcode;
+  uint32_t code, cmd_len, size_msg;
+  char buf[300];
+  int64_t reserved_size;
+  char pin_type;
+  uint32_t num_inode;
+
+  PIN_INODE_ROLLBACK = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = PIN;
+  reserved_size = 1000;
+  pin_type = 1;
+  num_inode = 0;
+  cmd_len = sizeof(int64_t) + sizeof(uint32_t);
+  memcpy(buf, &reserved_size, sizeof(int64_t));
+  memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+  memcpy(buf + sizeof(int64_t) + sizeof(char),
+		  &num_inode, sizeof(uint32_t));
+  /* Space not available */
+  hcfs_system->systemdata.pinned_size = 0;
+  system_config->max_cache_limit[pin_type] = 300;
+  system_config->max_pinned_limit[pin_type] = 300 * 0.8;
+
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);
@@ -817,6 +873,7 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   uint32_t code, cmd_len, size_msg;
   char buf[300];
   int64_t reserved_size;
+  char pin_type;
   uint32_t num_inode;
   ino_t inode_list[1];
 
@@ -830,16 +887,20 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   ASSERT_NE(0, fd);
   code = PIN;
   reserved_size = 10;
+  pin_type = 1;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(int64_t) + sizeof(uint32_t) + sizeof(ino_t);
+  cmd_len = sizeof(int64_t) + +sizeof(char) +
+	  	sizeof(uint32_t) + sizeof(ino_t);
   memcpy(buf, &reserved_size, sizeof(int64_t));
-  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
-  memcpy(buf + sizeof(int64_t) + sizeof(uint32_t),
+  memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+  memcpy(buf + sizeof(int64_t) + sizeof(char), &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(int64_t) + sizeof(char) + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
-  CACHE_HARD_LIMIT = 500; 
   hcfs_system->systemdata.pinned_size = 0;
-  
+  system_config->max_cache_limit[pin_type] = 500;
+  system_config->max_pinned_limit[pin_type] = 500 * 0.8;
+
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);
@@ -863,6 +924,7 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   uint32_t code, cmd_len, size_msg;
   char buf[300];
   int64_t reserved_size;
+  char pin_type;
   uint32_t num_inode;
   ino_t inode_list[1];
 
@@ -876,16 +938,20 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   ASSERT_NE(0, fd);
   code = PIN;
   reserved_size = 10;
+  pin_type = 1;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(int64_t) + sizeof(uint32_t) + sizeof(ino_t);
+  cmd_len = sizeof(int64_t) + sizeof(char) +
+	 	sizeof(uint32_t) + sizeof(ino_t);
   memcpy(buf, &reserved_size, sizeof(int64_t));
-  memcpy(buf + sizeof(int64_t), &num_inode, sizeof(uint32_t));
-  memcpy(buf + sizeof(int64_t) + sizeof(uint32_t),
+  memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+  memcpy(buf + sizeof(int64_t) + sizeof(char), &num_inode, sizeof(uint32_t));
+  memcpy(buf + sizeof(int64_t) + sizeof(char) + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
-  CACHE_HARD_LIMIT = 500; 
   hcfs_system->systemdata.pinned_size = 0;
-  
+  system_config->max_cache_limit[pin_type] = 500;
+  system_config->max_pinned_limit[pin_type] = 500 * 0.8;
+
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);
@@ -927,9 +993,9 @@ TEST_F(api_moduleTest, unpin_inodeTest_Success) {
   memcpy(buf, &num_inode, sizeof(uint32_t));
   memcpy(buf + sizeof(uint32_t),
   		&inode_list, sizeof(ino_t));
-  CACHE_HARD_LIMIT = 500; 
+  CACHE_HARD_LIMIT = 500;
   hcfs_system->systemdata.pinned_size = 0;
-  
+
   printf("Start sending\n");
   size_msg=send(fd, &code, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);

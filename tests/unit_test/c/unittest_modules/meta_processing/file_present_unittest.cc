@@ -17,6 +17,12 @@ class file_presentEnvironment : public ::testing::Environment {
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
+			system_config->max_cache_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+
+			system_config->max_pinned_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		}
 		void TearDown()
 		{
@@ -726,11 +732,12 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 class pin_inodeTest : public ::testing::Test {
 protected:
 	int64_t mock_reserved_size;
+	char pin_type;
 
 	void SetUp()
 	{
+		pin_type = 1;
 		mock_reserved_size = 0;
-		CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 			malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->systemdata.pinned_size = 0;
@@ -749,44 +756,60 @@ TEST_F(pin_inodeTest, FailIn_fetch_inode_stat)
 {
 	ino_t inode = 0;
 
-	EXPECT_EQ(-ENOENT, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(-ENOENT, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, FailIn_change_pin_flag)
 {
 	ino_t inode = 1; /* this inode # will fail in change_pin_flag() */
 
-	EXPECT_EQ(-ENOMEM, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(-ENOMEM, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, PinRegfile_ENOSPC)
 {
 	ino_t inode = INO_REGFILE;
 
-	CACHE_HARD_LIMIT = 0; /* Let pinned size not available */
-	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size));
+	/* Let pinned size not available */
+	system_config->max_cache_limit[pin_type] = 0;
+	system_config->max_pinned_limit[pin_type] = 0;
+	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size, pin_type));
+}
+
+TEST_F(pin_inodeTest, HighPinRegfile_ENOSPC)
+{
+	ino_t inode = INO_REGFILE;
+	pin_type = 2;
+
+	/* Let pinned size not available */
+	system_config->max_cache_limit[pin_type] = 0;
+	system_config->max_pinned_limit[pin_type] = 0;
+	EXPECT_EQ(-ENOSPC, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, PinRegfileSuccess)
 {
 	ino_t inode = INO_REGFILE;
 
-	CACHE_HARD_LIMIT = NUM_BLOCKS * MOCK_BLOCK_SIZE * 2;
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	system_config->max_cache_limit[pin_type] =
+		NUM_BLOCKS * MOCK_BLOCK_SIZE * 2;
+	system_config->max_pinned_limit[pin_type] =
+		NUM_BLOCKS * MOCK_BLOCK_SIZE * 2;
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, PinFIFOSuccess)
 {
 	ino_t inode = INO_FIFO;
 
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, PinSymlinkSuccess)
 {
 	ino_t inode = INO_LNK;
 
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, PinDirSuccess)
@@ -794,7 +817,16 @@ TEST_F(pin_inodeTest, PinDirSuccess)
 	ino_t inode = INO_DIR;
 
 	collect_dir_children_flag = FALSE;
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, pin_type));
+}
+
+TEST_F(pin_inodeTest, HighPinDirSuccess)
+{
+	ino_t inode = INO_DIR;
+	pin_type = 2;
+
+	collect_dir_children_flag = FALSE;
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 TEST_F(pin_inodeTest, PinDirSuccess_ManyChildren)
@@ -802,7 +834,7 @@ TEST_F(pin_inodeTest, PinDirSuccess_ManyChildren)
 	ino_t inode = INO_DIR;
 
 	collect_dir_children_flag = TRUE;
-	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, pin_inode(inode, &mock_reserved_size, pin_type));
 }
 
 /* End of unittest for pin_inode() */
@@ -891,9 +923,13 @@ TEST_F(unpin_inodeTest, UnpinDirSuccess_ManyChildren)
 /* Unittest for increase_pinned_size() */
 class increase_pinned_sizeTest : public ::testing::Test {
 protected:
+	char pin_type;
+
 	void SetUp()
 	{
-		CACHE_HARD_LIMIT = 0;
+		pin_type = 1;
+		system_config->max_cache_limit[pin_type] = 0;
+		system_config->max_pinned_limit[pin_type] = 0;
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 			malloc(sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
@@ -914,7 +950,7 @@ TEST_F(increase_pinned_sizeTest, QuotaIsSufficient)
 	file_size = 20;
 	hcfs_system->systemdata.pinned_size = 200;
 
-	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size, pin_type));
 	EXPECT_EQ(100 - 20, quota_size);
 	EXPECT_EQ(200, hcfs_system->systemdata.pinned_size);
 }
@@ -926,10 +962,11 @@ TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemSufficient)
 
 	quota_size = 10;
 	file_size = 50;
-	CACHE_HARD_LIMIT = 200; /* pinned space = 0.8 * hard_limit */
 	hcfs_system->systemdata.pinned_size = 0;
+	system_config->max_cache_limit[pin_type] = 200;
+	system_config->max_pinned_limit[pin_type] = 200 * 0.8;
 
-	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(0, increase_pinned_size(&quota_size, file_size, pin_type));
 	EXPECT_EQ(0, quota_size);
 	EXPECT_EQ((50 - 10), hcfs_system->systemdata.pinned_size);
 }
@@ -941,10 +978,11 @@ TEST_F(increase_pinned_sizeTest, QuotaIsInsufficient_SystemInsufficient)
 
 	quota_size = 10;
 	file_size = 50;
-	CACHE_HARD_LIMIT = 20; /* pinned space = 0.8 * hard_limit */
 	hcfs_system->systemdata.pinned_size = 0;
+	system_config->max_cache_limit[pin_type] = 20;
+	system_config->max_pinned_limit[pin_type] = 20 * 0.8;
 
-	EXPECT_EQ(-ENOSPC, increase_pinned_size(&quota_size, file_size));
+	EXPECT_EQ(-ENOSPC, increase_pinned_size(&quota_size, file_size, pin_type));
 	EXPECT_EQ(10, quota_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.pinned_size);
 }

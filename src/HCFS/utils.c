@@ -446,6 +446,17 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			config->cache_update_delta = temp_val;
 			continue;
 		}
+		if (strcasecmp(argname, "cache_reserved") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				write_log(0, "Number conversion error: %s\n", argname);
+				return -1;
+			}
+			config->cache_reserved_space = temp_val;
+			continue;
+		}
 		if (strcasecmp(argname, "max_block_size") == 0) {
 			errno = 0;
 			temp_val = strtoll(argval, &num_check_ptr, 10);
@@ -791,6 +802,12 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 			  "cache_soft_limit + cache_delta\n");
 		return -1;
 	}
+	if (config->cache_reserved_space < config->max_block_size) {
+		write_log(0, "%s%s",
+			"cache_reserved_space must be at least max_block_size,",
+			" force to use default value\n");
+		config->cache_reserved_space = config->max_block_size;
+	}
 
 	/* Validate that the information for the assigned backend
 		is complete. */
@@ -867,6 +884,84 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		"%lld %lld %lld %lld\n", config->cache_soft_limit,
 		config->cache_hard_limit, config->cache_update_delta,
 		config->max_block_size);
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: init_cache_thresholds
+*        Inputs: SYSTEM_CONF_STRUCT *config
+*       Summary: Initialize max_pinned_limit and max_cache_limit for
+*       	 different pin tyeps.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
+{
+	config->max_cache_limit =
+		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+	if (config->max_cache_limit == NULL)
+		return -ENOMEM;
+
+	config->max_pinned_limit =
+		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+	if (config->max_pinned_limit == NULL) {
+		free(config->max_cache_limit);
+		return -ENOMEM;
+	}
+
+	config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
+	config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
+
+	config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT;
+	config->max_pinned_limit[P_PIN] = MAX_PINNED_LIMIT;
+
+	config->max_cache_limit[P_HIGH_PRI_PIN] =
+		CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
+	config->max_pinned_limit[P_HIGH_PRI_PIN] =
+		MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: init_system_config_settings
+*        Inputs: const char *config_path, SYSTEM_CONF_STRUCT *config
+*       Summary: To read config settings from config file, validate
+*       	 values and initialize cache thresholds. These settings
+*       	 will be cached in (config).
+*  Return value: Zero if successful. Otherwise returns
+*                negation of error code.
+*
+*************************************************************************/
+int32_t init_system_config_settings(const char *config_path,
+				    SYSTEM_CONF_STRUCT *config)
+{
+	int32_t ret = 0;
+
+	ret = read_system_config(config_path, config);
+	if (ret < 0) {
+		write_log(0, "Failed to read config file, errcode %d.\n",
+				-ret);
+		return ret;
+	}
+
+	ret = validate_system_config(config);
+	if (ret < 0) {
+		write_log(0, "Detected invalid value of config, errcode %d.\n",
+				-ret);
+		return ret;
+	}
+
+	ret = init_cache_thresholds(config);
+	if (ret < 0) {
+		write_log(0, "Failed to init cache thresholds, errcode %d.\n",
+				-ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -1062,6 +1157,7 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 	return ret;
 }
 
+/* Unused function */
 int32_t change_pin_size(int64_t delta_pin_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
@@ -1701,13 +1797,8 @@ int32_t reload_system_config(const char *config_path)
 	if (new_config == NULL)
 		return -ENOMEM;
 
-	ret = read_system_config(config_path, new_config);
-	if (ret < 0) {
-		free(new_config);
-		return ret;
-	}
-
-	ret = validate_system_config(new_config);
+	/* Read settings from config file */
+	ret = init_system_config_settings(config_path, new_config);
 	if (ret < 0) {
 		free(new_config);
 		return ret;
@@ -1716,6 +1807,8 @@ int32_t reload_system_config(const char *config_path)
 	/* Compare old config and new config*/
 	ret = _check_config(new_config);
 	if (ret < 0) {
+		free(new_config->max_cache_limit);
+		free(new_config->max_pinned_limit);
 		free(new_config);
 		return ret;
 	}
@@ -1728,6 +1821,8 @@ int32_t reload_system_config(const char *config_path)
 
 	temp_config = system_config;
 	system_config = new_config;
+	free(temp_config->max_cache_limit);
+	free(temp_config->max_pinned_limit);
 	free(temp_config);
 
 	/* Init backend related threads */

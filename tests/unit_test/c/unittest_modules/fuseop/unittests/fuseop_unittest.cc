@@ -96,6 +96,10 @@ class fuseopEnvironment : public ::testing::Environment {
 
     system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
     memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+    system_config->max_cache_limit =
+        (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+    system_config->max_pinned_limit =
+        (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     sem_init(&(hcfs_system->access_sem), 0, 1);
     sys_super_block = (SUPER_BLOCK_CONTROL *)
@@ -104,6 +108,10 @@ class fuseopEnvironment : public ::testing::Environment {
     system_config->max_block_size = 2097152;
     system_config->cache_hard_limit = 3200000;
     system_config->cache_soft_limit = 3200000;
+    system_config->max_cache_limit[0] = 3200000; /* cache thresholds */
+    system_config->max_pinned_limit[0] = 3200000 * 0.8;
+    system_config->max_cache_limit[1] = 3200000;
+    system_config->max_pinned_limit[1] = 3200000 * 0.8;
     system_config->current_backend = 1;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;

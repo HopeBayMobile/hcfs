@@ -9,6 +9,8 @@
 #include "meta_mem_cache.h"
 #include "dir_statistics.h"
 
+extern SYSTEM_CONF_STRUCT *system_config;
+
 int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
@@ -169,4 +171,12 @@ int32_t update_quota()
 {
 	hcfs_system->systemdata.system_quota = 5566;
 	return 0;
+}
+
+int64_t get_pinned_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return PINNED_LIMITS(pin_type);
+	else
+		return -EINVAL;
 }

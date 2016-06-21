@@ -35,17 +35,23 @@ int32_t main(int32_t argc, char **argv)
 	uint32_t num_inodes = 0;
 	ino_t inode_list[1000];
 	int32_t i;
+	char pin_type;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
 		exit(-EPERM);
 	}
-	if (strcasecmp(argv[1], "pin") == 0)
+	if (strcasecmp(argv[1], "pin") == 0) {
 		code = PIN;
-	else if (strcasecmp(argv[1], "unpin") == 0)
+		pin_type = 1;
+	} else if (strcasecmp(argv[1], "high-pin") == 0) {
+		code = PIN;
+		pin_type = 2;
+	} else if (strcasecmp(argv[1], "unpin") == 0) {
 		code = UNPIN;
-	else
+	} else {
 		code = -1;
+	}
 	if (code < 0) {
 		printf("Unsupported action\n");
 		exit(-ENOTSUP);
@@ -73,12 +79,13 @@ int32_t main(int32_t argc, char **argv)
 	switch (code) {
 	case PIN:
 
-		cmd_len = sizeof(int64_t) + sizeof(uint32_t) + 
+		cmd_len = sizeof(int64_t) + sizeof(char) + sizeof(uint32_t) +
 			num_inodes * sizeof(ino_t);
 		memcpy(buf, &reserved_size, sizeof(int64_t)); /* Pre-allocating pinned size (be allowed to be 0) */
-		memcpy(buf + sizeof(int64_t), &num_inodes, /* # of inodes */
+		memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+		memcpy(buf + sizeof(int64_t) + sizeof(char), &num_inodes, /* # of inodes */
 			sizeof(uint32_t));
-		memcpy(buf + sizeof(int64_t) + sizeof(uint32_t), /* inode array */
+		memcpy(buf + sizeof(int64_t) + sizeof(char) + sizeof(uint32_t), /* inode array */
 			inode_list, sizeof(ino_t) * num_inodes);
 		send(fd, &code, sizeof(uint32_t), 0);
 		send(fd, &cmd_len, sizeof(uint32_t), 0);

@@ -338,13 +338,8 @@ int32_t main(int32_t argc, char **argv)
 		write_log(0, "Error: Out of mem\n");
 		exit(-1);
 	}
-	ret_val = read_system_config(DEFAULT_CONFIG_PATH, system_config);
-
-	if (ret_val < 0)
-		exit(-1);
-
-	ret_val = validate_system_config(system_config);
-
+	ret_val = init_system_config_settings(DEFAULT_CONFIG_PATH,
+					      system_config);
 	if (ret_val < 0)
 		exit(-1);
 

@@ -1408,14 +1408,14 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				else
 					dirty_delta = 0;
 
-				unpin_dirty_delta = (file_meta.local_pin == TRUE
-					? 0 : dirty_delta);
+				unpin_dirty_delta = (P_IS_UNPIN(file_meta.local_pin)
+					? dirty_delta : 0);
 				change_system_meta(0, 0, -cache_block_size, -1,
 					dirty_delta, unpin_dirty_delta, FALSE);
 			}
 		}
 		sem_wait(&(hcfs_system->access_sem));
-		if (file_meta.local_pin == TRUE) {
+		if (P_IS_PIN(file_meta.local_pin)) {
 			hcfs_system->systemdata.pinned_size -=
 						this_inode_stat.st_size;
 			if (hcfs_system->systemdata.pinned_size < 0)
@@ -1742,7 +1742,7 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin
 
 	/* when from unpin to pin, decrease unpin-dirty size,
 	 * otherwise increase unpin-dirty size */
-	if (ispin == TRUE)
+	if (P_IS_PIN(ispin))
 		change_system_meta(0, 0, 0, 0, 0,
 				-filestats.dirty_data_size, FALSE);
 	else
@@ -1757,8 +1757,8 @@ errcode_handle:
 }
 
 /**
- * Change "local_pin" flag in meta cache. "new_pin_status" is either
- * TRUE or FALSE. local_pin equals TRUE means this inode is pinned at local
+ * Change "local_pin" flag in meta cache. "new_pin_status" might be 1, 2 or 3
+ * local_pin equals 1 or 2 means this inode is pinned at local
  * device but not neccessarily all blocks are local now.
  *
  * @param this_inode Inode of the meta to be changed.
@@ -1775,6 +1775,7 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 	DIR_META_TYPE dir_meta;
 	SYMLINK_META_TYPE symlink_meta;
 	int32_t ret, ret_code;
+	char old_pin_status;
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -1794,6 +1795,7 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 		if (file_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
+			old_pin_status = file_meta.local_pin;
 			file_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_file_data(this_inode, NULL,
 				&file_meta, NULL, 0, meta_cache_entry);
@@ -1801,12 +1803,19 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 				ret_code = ret;
 				goto error_handling;
 			}
-			/* Update unpin-dirty data size */
-			ret = _change_unpin_dirty_size(meta_cache_entry,
-					new_pin_status);
-			if (ret < 0) {
-				ret_code = ret;
-				goto error_handling;
+
+			if (P_IS_PIN(old_pin_status) &&
+				P_IS_PIN(new_pin_status)) {
+				/* Only change pin flag */
+				ret_code = 1;
+			} else {
+				/* Update unpin-dirty data size */
+				ret = _change_unpin_dirty_size(meta_cache_entry,
+						new_pin_status);
+				if (ret < 0) {
+					ret_code = ret;
+					goto error_handling;
+				}
 			}
 		}
 	/* Case dir */
@@ -1821,12 +1830,19 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 		if (dir_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
+			old_pin_status = dir_meta.local_pin;
 			dir_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_dir_data(this_inode, NULL,
 				&dir_meta, NULL, meta_cache_entry);
 			if (ret < 0) {
 				ret_code = ret;
 				goto error_handling;
+			}
+
+			if (P_IS_PIN(old_pin_status) &&
+				P_IS_PIN(new_pin_status)) {
+				/* Only change pin flag */
+				ret_code = 1;
 			}
 		}
 

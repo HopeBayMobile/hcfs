@@ -38,6 +38,12 @@ class metaopsEnvironment : public ::testing::Environment {
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
+			system_config->max_cache_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+
+			system_config->max_pinned_limit =
+				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		}
 		void TearDown()
 		{
@@ -1291,7 +1297,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 		tmp_fp = fopen(thisblockpath, "w");
 		fclose(tmp_fp);
 	}
-	
+
 	// make mock meta file so that delete_inode_meta() will success
 	/* Make mock meta file. Add truncated size */
 	memset(&block_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
@@ -1315,18 +1321,18 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG,
 		mock_root, &mount_t));
-	
+
 	/* Verify if block files are removed correctly */
 	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE,
 		hcfs_system->systemdata.system_size);
-	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS, 
+	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS,
 		hcfs_system->systemdata.cache_size);
-	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS, 
+	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS,
 		hcfs_system->systemdata.unpin_dirty_data_size);
 	EXPECT_EQ(MOCK_CACHE_SIZE, hcfs_system->systemdata.pinned_size);
-	EXPECT_EQ(MOCK_CACHE_BLOCKS - NUM_BLOCKS, 
+	EXPECT_EQ(MOCK_CACHE_BLOCKS - NUM_BLOCKS,
 		hcfs_system->systemdata.cache_blocks);
-	
+
 	block_file_existed = false;
 	for (int32_t i = 0; i < NUM_BLOCKS; i++) {
 		fetch_block_path(thisblockpath, mock_inode, i);
@@ -1338,7 +1344,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 		}
 	}
 	EXPECT_EQ(false, block_file_existed);
-	
+
 	/* Free resource */
 	free(hcfs_system);
 	unlink(thismetapath);
@@ -1616,7 +1622,7 @@ TEST_F(change_pin_flagTest, RegfileHadBeenPinned)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = TRUE; 
+	pin_flag_in_meta = TRUE;
 	EXPECT_EQ(1, change_pin_flag(inode, S_IFREG, TRUE));
 }
 
@@ -1625,7 +1631,7 @@ TEST_F(change_pin_flagTest, PinRegfileSuccess)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = FALSE; 
+	pin_flag_in_meta = FALSE;
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFREG, TRUE));
 }
 
@@ -1634,7 +1640,7 @@ TEST_F(change_pin_flagTest, PinFIFOfileSuccess)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = FALSE; 
+	pin_flag_in_meta = FALSE;
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFIFO, TRUE));
 }
 
@@ -1643,7 +1649,7 @@ TEST_F(change_pin_flagTest, PinSocketfileSuccess)
 	ino_t inode = INO_DIRECT_SUCCESS;
 
 	/* set pin flag in meta when calling meta_cache_lookup_xxx */
-	pin_flag_in_meta = FALSE; 
+	pin_flag_in_meta = FALSE;
 	EXPECT_EQ(0, change_pin_flag(inode, S_IFSOCK, TRUE));
 }
 

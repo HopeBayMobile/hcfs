@@ -170,21 +170,21 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 
-	file_meta_ptr->local_pin = pin_flag_in_meta;	
+	file_meta_ptr->local_pin = pin_flag_in_meta;
 	switch(this_inode) {
        	case INO_DIRECT_SUCCESS:
 		file_meta_ptr->direct = sizeof(FILE_META_TYPE);
-		return 0; 
+		return 0;
 	case INO_SINGLE_INDIRECT_SUCCESS:
 		file_meta_ptr->single_indirect = sizeof(FILE_META_TYPE);
 		return 0;
 
         case INO_DOUBLE_INDIRECT_SUCCESS:
-		file_meta_ptr->double_indirect = sizeof(FILE_META_TYPE); 
+		file_meta_ptr->double_indirect = sizeof(FILE_META_TYPE);
 		return 0;
 
 	case INO_TRIPLE_INDIRECT_SUCCESS:
-		file_meta_ptr->triple_indirect = sizeof(FILE_META_TYPE); 
+		file_meta_ptr->triple_indirect = sizeof(FILE_META_TYPE);
 		return 0;
 
 	case INO_QUADRUPLE_INDIRECT_SUCCESS:

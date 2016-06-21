@@ -26,6 +26,10 @@ typedef struct {
 	int64_t cache_soft_limit;
 	int64_t cache_hard_limit;
 	int64_t cache_update_delta;
+	int64_t cache_reserved_space;
+	/* Cache management thresholds */
+	int64_t *max_cache_limit;
+	int64_t *max_pinned_limit;
 	int64_t max_block_size;
 	int32_t current_backend;
 	char *swift_account;
@@ -106,6 +110,11 @@ typedef struct {
 #define XFER_WINDOW_SIZE 3
 #define XFER_SEC_PER_WINDOW 20
 #define XFER_SLOW_SPEED 32 /* in KB/s */
+
+/* cache limit parameters */
+#define RESERVED_CACHE_SPACE system_config->cache_reserved_space
+#define CACHE_LIMITS(p) (system_config->max_cache_limit[(int32_t)p])
+#define PINNED_LIMITS(p) (system_config->max_pinned_limit[(int32_t)p])
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";

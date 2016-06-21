@@ -86,6 +86,16 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 
 #define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
 
+/* Defines for local pin property */
+#define NUM_PIN_TYPES 3
+#define P_UNPIN 0
+#define P_PIN 1
+#define P_HIGH_PRI_PIN 2
+/* Marcos to check pin property */
+#define P_IS_VALID_PIN(p) (p < NUM_PIN_TYPES) /* To valid pin property */
+#define P_IS_PIN(p) ((p == P_PIN) || (p == P_HIGH_PRI_PIN))
+#define P_IS_UNPIN(p) (p == P_UNPIN)
+
 #ifdef _ANDROID_ENV_
 #define  IS_ANDROID_EXTERNAL(type) (((type) == (ANDROID_EXTERNAL)) || \
 		((type) == (ANDROID_MULTIEXTERNAL)))

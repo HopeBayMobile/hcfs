@@ -42,6 +42,7 @@
 #include "utils.h"
 #include "monitor.h"
 #include "hcfs_fromcloud.h"
+#include "hcfs_cacheops.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -494,7 +495,7 @@ int32_t unmount_all_handle(void)
 }
 
 int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
-		int64_t total_reserved_size)
+		int64_t total_reserved_size, char pin_type)
 {
 	int32_t retcode, count, count2;
 	int64_t zero_size;
@@ -506,7 +507,7 @@ int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
 		write_log(10, "Debug: Prepare to pin inode %"PRIu64
 			", remaining reserved pinned size %" PRId64 "\n",
 			(uint64_t)pinned_list[count], total_reserved_size);
-		retcode = pin_inode(pinned_list[count], &total_reserved_size);
+		retcode = pin_inode(pinned_list[count], &total_reserved_size, pin_type);
 		if (retcode < 0) {
 			unused_reserved_size = total_reserved_size;
 
@@ -700,10 +701,12 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 	meta_cache_close_file(thisptr);
 	meta_cache_unlock_entry(thisptr);
 
-	if (is_local_pin == TRUE)
-		return 1;
-	else
-		return 0;
+	if (P_IS_VALID_PIN(is_local_pin)) {
+		return is_local_pin;
+	} else {
+		retcode = -EIO;
+		goto error_handling;
+	}
 
 error_handling:
 	meta_cache_unlock_entry(thisptr);
@@ -859,10 +862,12 @@ void api_module(void *index)
 	DIR_STATS_TYPE tmpstat;
 
 	int64_t reserved_pinned_size;
+	char pin_type;
 	uint32_t num_inode;
 	ino_t *pinned_list, *unpinned_list;
 	uint32_t sync_switch;
 	int32_t loglevel;
+	int64_t max_pinned_size;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -975,10 +980,22 @@ void api_module(void *index)
 			memcpy(&reserved_pinned_size, largebuf,
 				sizeof(int64_t));
 
+			memcpy(&pin_type, largebuf + sizeof(int64_t),
+				sizeof(char));
+
 			/* Check required size */
+			if (!P_IS_PIN(pin_type)) {
+				retcode = -EINVAL;
+				break;
+			}
 			sem_wait(&(hcfs_system->access_sem));
+			max_pinned_size = get_pinned_limit(pin_type);
+			if (max_pinned_size < 0) {
+				retcode = -EINVAL;
+				break;
+			}
 			if (hcfs_system->systemdata.pinned_size +
-				reserved_pinned_size >= MAX_PINNED_LIMIT) {
+				reserved_pinned_size >= max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				write_log(5, "No pinned space available\n");
 				retcode = -ENOSPC;
@@ -995,7 +1012,7 @@ void api_module(void *index)
 			    hcfs_system->systemdata.pinned_size);
 
 			/* Prepare inode array */
-			memcpy(&num_inode, largebuf + sizeof(int64_t),
+			memcpy(&num_inode, largebuf + sizeof(int64_t) + sizeof(char),
 					sizeof(uint32_t));
 
 			pinned_list = malloc(sizeof(ino_t) * num_inode);
@@ -1003,13 +1020,13 @@ void api_module(void *index)
 				retcode = -ENOMEM;
 				break;
 			}
-			memcpy(pinned_list, largebuf + sizeof(int64_t) +
+			memcpy(pinned_list, largebuf + sizeof(int64_t) + sizeof(char) +
 				sizeof(uint32_t),
 				sizeof(ino_t) * num_inode);
 
 			/* Begin to pin all of them */
 			retcode = pin_inode_handle(pinned_list, num_inode,
-							reserved_pinned_size);
+						reserved_pinned_size, pin_type);
 			free(pinned_list);
 			if (retcode == 0) {
 				ret_len = sizeof(int32_t);
