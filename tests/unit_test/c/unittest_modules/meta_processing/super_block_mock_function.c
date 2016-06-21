@@ -1,8 +1,10 @@
 #include "params.h"
 #include "fuseop.h"
 #include <sys/types.h>
+#include <errno.h>
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
+extern SYSTEM_CONF_STRUCT *system_config;
 
 int32_t write_log(int32_t level, char *format, ...)
 {
@@ -31,4 +33,12 @@ int32_t update_sb_size()
 sleep_on_cache_full(void)
 {
 	return;
+}
+
+int64_t get_pinned_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return PINNED_LIMITS(pin_type);
+	else
+		return -EINVAL;
 }

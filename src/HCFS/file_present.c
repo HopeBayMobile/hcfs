@@ -44,6 +44,7 @@
 #include "path_reconstruct.h"
 #include "dir_statistics.h"
 #include "parent_lookup.h"
+#include "hcfs_cacheops.h"
 
 /************************************************************************
 *
@@ -1192,14 +1193,16 @@ int32_t increase_pinned_size(int64_t *reserved_pinned_size,
 		int64_t file_size, char pin_type)
 {
 	int32_t ret;
+	int64_t max_pinned_size;
 
 	ret = 0;
 	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
 	if (*reserved_pinned_size <= 0) { /* Need more space than expectation */
 		ret = 0;
+		max_pinned_size = get_pinned_limit(pin_type);
 		sem_wait(&(hcfs_system->access_sem));
-		if (hcfs_system->systemdata.pinned_size -
-			(*reserved_pinned_size) <= GET_PINNED_LIMIT(pin_type)) {
+		if ((max_pinned_size > 0) && (hcfs_system->systemdata.pinned_size -
+			(*reserved_pinned_size) <= max_pinned_size)) {
 			hcfs_system->systemdata.pinned_size -=
 				(*reserved_pinned_size);
 			*reserved_pinned_size = 0;

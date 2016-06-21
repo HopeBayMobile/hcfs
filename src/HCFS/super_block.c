@@ -952,8 +952,9 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	struct stat tempstat;
 	ino_t new_first_reclaimed;
 	uint64_t this_generation;
-	int32_t errcode, ret, ret_val;
+	int32_t errcode, ret;
 	BOOL update_size;
+	int64_t max_pinned_size;
 
 	super_block_exclusive_locking();
 
@@ -989,14 +990,12 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		this_generation = tempentry.generation + 1;
 		update_size = FALSE;
 	} else {
-		if (hcfs_system->systemdata.cache_size > GET_CACHE_LIMIT(local_pin)) {
-			ret_val = sleep_on_cache_full();
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return 0;
-			}
+		max_pinned_size = get_pinned_limit(local_pin);
+		if (max_pinned_size < 0) {
+			super_block_exclusive_release();
+			return 0;
 		}
-		if (hcfs_system->systemdata.pinned_size > GET_PINNED_LIMIT(local_pin)) {
+		if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
 			super_block_exclusive_release();
 			return 0;
 		}

@@ -90,6 +90,12 @@ int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
 	return 0;
 }
 
+int32_t init_system_config_settings(const char *config_path,
+                                    SYSTEM_CONF_STRUCT *config)
+{
+	return 0;
+}
+
 int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 {
 	if (hcfs_list_container_success == TRUE)

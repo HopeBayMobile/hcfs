@@ -806,7 +806,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		write_log(0, "%s%s",
 			"cache_reserved_space must be at least max_block_size,",
 			" force to use default value\n");
-		config->cache_reserved_space = DEFAULT_RESERVED_CACHE;
+		config->cache_reserved_space = config->max_block_size;
 	}
 
 	/* Validate that the information for the assigned backend
@@ -900,12 +900,6 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 *************************************************************************/
 int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
 {
-	if (config->cache_hard_limit < 0)
-		return -EINVAL;
-
-	if (config->cache_reserved_space < 0)
-		return -EINVAL;
-
 	config->max_cache_limit =
 		(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 	if (config->max_cache_limit == NULL)
@@ -926,6 +920,46 @@ int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
 		CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
 	config->max_pinned_limit[P_HIGH_PRI_PIN] =
 		MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: init_system_config_settings
+*        Inputs: const char *config_path, SYSTEM_CONF_STRUCT *config
+*       Summary: To read config settings from config file, validate
+*       	 values and initialize cache thresholds. These settings
+*       	 will be cached in (config).
+*  Return value: Zero if successful. Otherwise returns
+*                negation of error code.
+*
+*************************************************************************/
+int32_t init_system_config_settings(const char *config_path,
+				    SYSTEM_CONF_STRUCT *config)
+{
+	int32_t ret = 0;
+
+	ret = read_system_config(config_path, config);
+	if (ret < 0) {
+		write_log(0, "Failed to read config file, errcode %d.\n",
+				-ret);
+		return ret;
+	}
+
+	ret = validate_system_config(config);
+	if (ret < 0) {
+		write_log(0, "Detected invalid value of config, errcode %d.\n",
+				-ret);
+		return ret;
+	}
+
+	ret = init_cache_thresholds(config);
+	if (ret < 0) {
+		write_log(0, "Failed to init cache thresholds, errcode %d.\n",
+				-ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -1761,19 +1795,8 @@ int32_t reload_system_config(const char *config_path)
 	if (new_config == NULL)
 		return -ENOMEM;
 
-	ret = read_system_config(config_path, new_config);
-	if (ret < 0) {
-		free(new_config);
-		return ret;
-	}
-
-	ret = validate_system_config(new_config);
-	if (ret < 0) {
-		free(new_config);
-		return ret;
-	}
-
-	ret = init_cache_thresholds(new_config);
+	/* Read settings from config file */
+	ret = init_system_config_settings(config_path, new_config);
 	if (ret < 0) {
 		free(new_config);
 		return ret;

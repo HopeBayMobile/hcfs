@@ -44,6 +44,8 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode);
 int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config);
 int32_t validate_system_config(SYSTEM_CONF_STRUCT *config);
 int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config);
+int32_t init_system_config_settings(const char *config_path,
+				    SYSTEM_CONF_STRUCT *config);
 
 off_t check_file_size(const char *path);
 

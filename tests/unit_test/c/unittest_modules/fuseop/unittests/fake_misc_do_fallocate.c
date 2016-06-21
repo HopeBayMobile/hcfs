@@ -891,3 +891,18 @@ void* fuse_req_userdata(fuse_req_t req)
         return &tmpmount;
 }
 
+int64_t get_cache_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return CACHE_LIMITS(pin_type);
+	else
+		return -EINVAL;
+}
+
+int64_t get_pinned_limit(const char pin_type)
+{
+	if (pin_type < NUM_PIN_TYPES)
+		return PINNED_LIMITS(pin_type);
+	else
+		return -EINVAL;
+}

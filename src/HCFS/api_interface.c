@@ -42,6 +42,7 @@
 #include "utils.h"
 #include "monitor.h"
 #include "hcfs_fromcloud.h"
+#include "hcfs_cacheops.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -866,6 +867,7 @@ void api_module(void *index)
 	ino_t *pinned_list, *unpinned_list;
 	uint32_t sync_switch;
 	int32_t loglevel;
+	int64_t max_pinned_size;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -987,8 +989,13 @@ void api_module(void *index)
 				break;
 			}
 			sem_wait(&(hcfs_system->access_sem));
+			max_pinned_size = get_pinned_limit(pin_type);
+			if (max_pinned_size < 0) {
+				retcode = -EINVAL;
+				break;
+			}
 			if (hcfs_system->systemdata.pinned_size +
-				reserved_pinned_size >= GET_PINNED_LIMIT(pin_type)) {
+				reserved_pinned_size >= max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				write_log(5, "No pinned space available\n");
 				retcode = -ENOSPC;

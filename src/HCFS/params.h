@@ -112,10 +112,9 @@ typedef struct {
 #define XFER_SLOW_SPEED 32 /* in KB/s */
 
 /* cache limit parameters */
-#define DEFAULT_RESERVED_CACHE 536870912
 #define RESERVED_CACHE_SPACE system_config->cache_reserved_space
-#define GET_CACHE_LIMIT(p) (system_config->max_cache_limit[(int32_t)p])
-#define GET_PINNED_LIMIT(p) (system_config->max_pinned_limit[(int32_t)p])
+#define CACHE_LIMITS(p) (system_config->max_cache_limit[(int32_t)p])
+#define PINNED_LIMITS(p) (system_config->max_pinned_limit[(int32_t)p])
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";

@@ -860,7 +860,7 @@ TEST_F(validate_system_configTest, NoReservedCacheSection) {
 
   ASSERT_EQ(0,validate_system_config(system_config));
 
-  EXPECT_EQ(RESERVED_CACHE_SPACE, DEFAULT_RESERVED_CACHE);
+  EXPECT_EQ(RESERVED_CACHE_SPACE, system_config->max_block_size);
  }
 /* End of the test case for the function validate_system_config*/
 
@@ -1303,35 +1303,16 @@ TEST_F(init_cache_thresholdsTest, Successful)
 	ret = init_cache_thresholds(system_config);
 
 	EXPECT_EQ(ret, 0);
-	EXPECT_EQ(GET_CACHE_LIMIT(P_UNPIN), CACHE_HARD_LIMIT);
-	EXPECT_EQ(GET_PINNED_LIMIT(P_UNPIN), MAX_PINNED_LIMIT);
-	EXPECT_EQ(GET_CACHE_LIMIT(P_PIN), CACHE_HARD_LIMIT);
-	EXPECT_EQ(GET_PINNED_LIMIT(P_PIN), MAX_PINNED_LIMIT);
-	EXPECT_EQ(GET_CACHE_LIMIT(P_HIGH_PRI_PIN),
+	EXPECT_EQ(CACHE_LIMITS(P_UNPIN), CACHE_HARD_LIMIT);
+	EXPECT_EQ(PINNED_LIMITS(P_UNPIN), MAX_PINNED_LIMIT);
+	EXPECT_EQ(CACHE_LIMITS(P_PIN), CACHE_HARD_LIMIT);
+	EXPECT_EQ(PINNED_LIMITS(P_PIN), MAX_PINNED_LIMIT);
+	EXPECT_EQ(CACHE_LIMITS(P_HIGH_PRI_PIN),
 			CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE);
-	EXPECT_EQ(GET_PINNED_LIMIT(P_HIGH_PRI_PIN),
+	EXPECT_EQ(PINNED_LIMITS(P_HIGH_PRI_PIN),
 			MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE);
 }
 
-TEST_F(init_cache_thresholdsTest, ErrCacheHardLimit)
-{
-	int32_t ret;
-
-	CACHE_HARD_LIMIT = -1;
-	RESERVED_CACHE_SPACE = 100;
-	ret = init_cache_thresholds(system_config);
-
-	EXPECT_EQ(ret, -EINVAL);
-}
-
-TEST_F(init_cache_thresholdsTest, ErrReservedCacheSpace)
-{
-	int32_t ret;
-
-	CACHE_HARD_LIMIT = 100;
-	RESERVED_CACHE_SPACE = -1;
-	ret = init_cache_thresholds(system_config);
-}
 /*
         End of unittest of init_cache_thresholds()
  */
