@@ -299,11 +299,14 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			if ((ret == 0) && (semval == 0))
 				sem_post(&(hcfs_system->something_to_replace));
 
+			/* Do not sync block status changes due to download */
+			/*
 			ret = super_block_mark_dirty(ptr->this_inode);
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
 			}
+			*/
 		}
 	}
 	flock(fileno(blockfptr), LOCK_UN);
@@ -479,7 +482,7 @@ static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 		return block_page.block_entries[e_index].status;
 	}
 
-	ret = meta_cache_update_file_data(block_info->this_inode, NULL, NULL,
+	ret = meta_cache_update_file_nosync(block_info->this_inode, NULL, NULL,
 		&block_page, block_info->page_pos, meta_cache_entry);
 	if (ret < 0) {
 		meta_cache_unlock_entry(meta_cache_entry);
@@ -658,9 +661,12 @@ void fetch_backend_block(void *ptr)
 	flock(fileno(block_fptr), LOCK_UN);
 	fclose(block_fptr);
 
+	/* Do not sync block status changes due to download */
+	/*
 	ret = super_block_mark_dirty(block_info->this_inode);
 	if (ret < 0)
 		block_info->dl_error = TRUE;
+	*/
 
 	return;
 

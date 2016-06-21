@@ -571,6 +571,7 @@ processing the new one */
 
 	int32_t ret, errcode;
 	size_t ret_size;
+	ino_t tmpino;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -600,10 +601,16 @@ processing the new one */
 		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
 		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 
-		ret = super_block_mark_dirty((body_ptr->this_stat).st_ino);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
+		/* If not syncing struct stat or meta, need to sync
+		block page */
+		if ((body_ptr->stat_dirty != TRUE) &&
+		    (body_ptr->meta_dirty != TRUE)) {
+			tmpino = (body_ptr->this_stat).st_ino;
+			ret = super_block_mark_dirty(tmpino);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 		}
 	}
 
@@ -614,6 +621,91 @@ processing the new one */
 
 	/* Write changes to meta file if write through is enabled */
 	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = flush_single_entry(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
+	return 0;
+
+/* Exception handling from here */
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: meta_cache_update_file_nosync
+*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+*                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
+*       Summary: Update the cache content for inode "this_inode". Content
+*                entries not updated are passed as "NULL". If write through
+*                cache is enabled (the only option now), will also write
+*                changes to meta file. Do not sync meta to backend.
+*                This function handles regular files only.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int32_t meta_cache_update_file_nosync(ino_t this_inode,
+	const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+/* Always change dirty status to TRUE here as we always update */
+/* For block entry page lookup or update, only allow one lookup/update at a
+time, and will check page_pos input against the two entries in the cache.
+If does not match any of the two, flush the older page entry first before
+processing the new one */
+
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	UNUSED(this_inode);
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (inode_stat != NULL) {
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		body_ptr->stat_dirty = TRUE;
+	}
+
+	if (file_meta_ptr != NULL) {
+		if (body_ptr->file_meta == NULL) {
+			body_ptr->file_meta = malloc(sizeof(FILE_META_TYPE));
+			if (body_ptr->file_meta == NULL)
+				return -ENOMEM;
+		}
+		memcpy((body_ptr->file_meta), file_meta_ptr,
+						sizeof(FILE_META_TYPE));
+		body_ptr->meta_dirty = TRUE;
+	}
+
+	if (block_page != NULL) {
+		ret = _open_file(body_ptr);
+
+		if (ret < 0)
+			return ret;
+
+		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
+		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+	}
+
+	gettimeofday(&(body_ptr->last_access_time), NULL);
+
+	if (body_ptr->something_dirty == FALSE)
+		body_ptr->something_dirty = TRUE;
+
+	/* Write changes to meta file if write through is enabled */
+	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = meta_cache_sync_later(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
 		ret = flush_single_entry(body_ptr);
 		if (ret < 0) {
 			errcode = ret;
@@ -657,14 +749,14 @@ int32_t meta_cache_update_stat_nosync(ino_t this_inode,
 	if (body_ptr->something_dirty == FALSE)
 		body_ptr->something_dirty = TRUE;
 
-	ret = meta_cache_sync_later(body_ptr);
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
-	}
-
 	/* Write changes to meta file if write through is enabled */
 	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = meta_cache_sync_later(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
 		ret = flush_single_entry(body_ptr);
 		if (ret < 0) {
 			errcode = ret;

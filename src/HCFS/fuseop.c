@@ -2580,7 +2580,7 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 				(last_block_entry->status == ST_CtoL)) {
 			if (last_block_entry->status == ST_CLOUD) {
 				last_block_entry->status = ST_CtoL;
-				ret = meta_cache_update_file_data(this_inode,
+				ret = meta_cache_update_file_nosync(this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
 				if (ret < 0) {
@@ -3466,7 +3466,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		ret = 0;
 		if ((tpage->block_entries[eindex]).status == ST_CLOUD) {
 			(tpage->block_entries[eindex]).status = ST_CtoL;
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+			/* Do not sync block status if fetch from backend */
+			ret = meta_cache_update_file_nosync(fh_ptr->thisinode,
 					NULL, NULL, tpage, page_fpos,
 					fh_ptr->meta_cache_ptr);
 		}
@@ -3507,7 +3508,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
 				(tpage->block_entries[eindex]).status =
 								ST_CLOUD;
-				meta_cache_update_file_data(fh_ptr->thisinode,
+				/* Do not sync if fetch failed */
+				meta_cache_update_file_nosync(fh_ptr->thisinode,
 					NULL, NULL, tpage, page_fpos,
 					fh_ptr->meta_cache_ptr);
 				/* Unlink this block */
@@ -3563,7 +3565,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 					}
 					return -EIO;
 				}
-				ret = meta_cache_update_file_data(
+				/* Do not sync if only fetch from backend */
+				ret = meta_cache_update_file_nosync(
 						fh_ptr->thisinode,
 						NULL, NULL, tpage, page_fpos,
 						fh_ptr->meta_cache_ptr);
@@ -3590,9 +3593,13 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 						0, fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
+
+			/* Do not sync block status changes due to download */
+			/*
 			ret = super_block_mark_dirty(fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
+			*/
 		}
 	}
 	fh_ptr->meta_cache_locked = FALSE;
@@ -4139,7 +4146,7 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		((tpage->block_entries[eindex]).status == ST_CtoL)) {
 		if ((tpage->block_entries[eindex]).status == ST_CLOUD) {
 			(tpage->block_entries[eindex]).status = ST_CtoL;
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+			ret = meta_cache_update_file_nosync(fh_ptr->thisinode,
 				NULL, NULL, tpage, page_fpos,
 				fh_ptr->meta_cache_ptr);
 			if (ret < 0) {

@@ -227,11 +227,16 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				}
 
 				sem_post(&(hcfs_system->access_sem));
+
+				/* Do not sync the block status change
+				due to paging out */
+				/*
 				ret = super_block_mark_dirty(this_inode);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
+				*/
 			}
 /*Adding a delta threshold to avoid thrashing at hard limit boundary*/
 			if (hcfs_system->systemdata.cache_size <
