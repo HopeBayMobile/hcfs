@@ -143,7 +143,7 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_s
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int32_t meta_cache_update_fstat_nosync(ino_t this_inode,
+int32_t meta_cache_update_stat_nosync(ino_t this_inode,
                                        const struct stat *inode_stat,
                                        META_CACHE_ENTRY_STRUCT *body_ptr);
 
@@ -165,8 +165,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 int32_t meta_cache_remove(ino_t this_inode);
 int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
-				const DIR_ENTRY_PAGE *temppage);
-
+			const DIR_ENTRY_PAGE *temppage, BOOL is_dirty);
 
 int32_t meta_cache_update_symlink_data(ino_t this_inode,
 				   const struct stat *inode_stat,

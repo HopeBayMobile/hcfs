@@ -235,14 +235,18 @@ int32_t release_meta_cache_headers(void)
 
 /* Helper function for caching a new dir entry page and dropping the last one */
 static int32_t _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
-					const DIR_ENTRY_PAGE *temppage)
+			const DIR_ENTRY_PAGE *temppage, BOOL is_dirty)
 {
 	body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
 	memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0],
 						sizeof(DIR_ENTRY_PAGE));
 	memcpy((body_ptr->dir_entry_cache[0]), temppage,
 						sizeof(DIR_ENTRY_PAGE));
-	body_ptr->dir_entry_cache_dirty[0] = TRUE;
+	if (is_dirty == TRUE)
+		body_ptr->dir_entry_cache_dirty[0] = TRUE;
+	else
+		body_ptr->dir_entry_cache_dirty[0] = FALSE;
+
 	return 0;
 }
 
@@ -250,14 +254,14 @@ static int32_t _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
 *
 * Function name: meta_cache_push_dir_page
 *        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr,
-*                const DIR_ENTRY_PAGE *temppage
+*                const DIR_ENTRY_PAGE *temppage, BOOL is_dirty
 *       Summary: Cache a new dir entry page (temppage) for this meta cache
 *                entry (body_ptr), and drop the last one (with index 1).
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
-				const DIR_ENTRY_PAGE *temppage)
+			const DIR_ENTRY_PAGE *temppage, BOOL is_dirty)
 {
 	int32_t ret;
 
@@ -268,7 +272,10 @@ int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 			return -ENOMEM;
 		memcpy((body_ptr->dir_entry_cache[0]), temppage,
 							sizeof(DIR_ENTRY_PAGE));
-		body_ptr->dir_entry_cache_dirty[0] = TRUE;
+		if (is_dirty == TRUE)
+			body_ptr->dir_entry_cache_dirty[0] = TRUE;
+		else
+			body_ptr->dir_entry_cache_dirty[0] = FALSE;
 	} else {
 		/* If the second page entry is empty,
 			allocate mem space first */
@@ -277,13 +284,15 @@ int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 						malloc(sizeof(DIR_ENTRY_PAGE));
 			if (body_ptr->dir_entry_cache[1] == NULL)
 				return -ENOMEM;
-			ret = _push_page_entry(body_ptr, temppage);
+			ret = _push_page_entry(body_ptr, temppage, is_dirty);
 		} else {
-			/* Need to flush first */
-			ret = meta_cache_flush_dir_cache(body_ptr, 1);
-			if (ret < 0)
-				return ret;
-			ret = _push_page_entry(body_ptr, temppage);
+			/* Need to flush first if content is dirty */
+			if (body_ptr->dir_entry_cache_dirty[1] == TRUE) {
+				ret = meta_cache_flush_dir_cache(body_ptr, 1);
+				if (ret < 0)
+					return ret;
+			}
+			ret = _push_page_entry(body_ptr, temppage, is_dirty);
 		}
 	}
 	return ret;
@@ -421,6 +430,7 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 	/* Update stat info in super inode and push to cloud if needed */
 	if (body_ptr->can_be_synced_cloud_later == TRUE) { /* Skip sync */
+		write_log(10, "Can be synced to cloud later\n");
 		body_ptr->can_be_synced_cloud_later = FALSE;
 		ret = super_block_update_stat(body_ptr->inode_num,
 				&(body_ptr->this_stat), TRUE);
@@ -621,14 +631,14 @@ errcode_handle:
 
 /************************************************************************
 *
-* Function name: meta_cache_update_fstat_nosync
+* Function name: meta_cache_update_stat_nosync
 *        Inputs: ino_t this_inode, struct stat *inode_stat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Write file struct stat to disk but do not sync to backend
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t meta_cache_update_fstat_nosync(ino_t this_inode,
+int32_t meta_cache_update_stat_nosync(ino_t this_inode,
                                        const struct stat *inode_stat,
                                        META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -941,7 +951,8 @@ the new one */
 				bptr->dir_entry_cache_dirty[1] = TRUE;
 			} else {
 				/* Cannot find the requested page in cache */
-				ret = meta_cache_push_dir_page(bptr, dir_page);
+				ret = meta_cache_push_dir_page(bptr, dir_page,
+				                               TRUE);
 				if (ret < 0)
 					return ret;
 			}
@@ -1091,15 +1102,12 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);
 
-	if (body_ptr->something_dirty == FALSE)
-		body_ptr->something_dirty = TRUE;
-
 	if (ret == -ENOENT) { /*Not found*/
 		*result_index = -1;
 		return 0;
 	}
 	/*Found the entry */
-	ret = meta_cache_push_dir_page(body_ptr, &tmp_resultpage);
+	ret = meta_cache_push_dir_page(body_ptr, &tmp_resultpage, FALSE);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
