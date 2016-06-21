@@ -92,15 +92,15 @@ int32_t unlink_upload_file(char *filename)
 		filesize = filestat.st_size;
 		UNLINK(filename);
 		old_cachesize = hcfs_system->systemdata.cache_size;
-		change_system_meta(-filesize, 0, -filesize,
+		change_system_meta(0, 0, -filesize,
 				0, 0, 0, FALSE);
-		if (old_cachesize > CACHE_SOFT_LIMIT) {
+		if (old_cachesize >= CACHE_SOFT_LIMIT) {
 			/* Once temp block is removed, check if cache_size
 			 * drop below hard_limit - delta. */
 			new_cachesize = hcfs_system->systemdata.cache_size;
 			threshold = CACHE_HARD_LIMIT - CACHE_DELTA;
-			if (old_cachesize > threshold &&
-					new_cachesize < threshold) {
+			if (old_cachesize >= threshold &&
+					new_cachesize <= threshold) {
 				/* Some ops may sleep because these
 				 * temp blocks occupied cache space. */
 				notify_sleep_on_cache(0);
@@ -1726,7 +1726,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 		goto errcode_handle;
 
 	UNLINK(thread_ptr->tempfilename);
-	change_system_meta(-filesize, 0, -filesize, 0, 0, 0, FALSE);
+	change_system_meta(0, 0, -filesize, 0, 0, 0, FALSE);
 	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 
@@ -1747,7 +1747,7 @@ errcode_handle:
 	if (thread_ptr->is_block == TRUE) {
 		ret = unlink(thread_ptr->tempfilename);
 		if (ret == 0)
-			change_system_meta(-filesize, 0, -filesize,
+			change_system_meta(0, 0, -filesize,
 					0, 0, 0, FALSE);
 	}
 	upload_ctl.threads_finished[which_index] = TRUE;

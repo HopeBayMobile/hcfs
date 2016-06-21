@@ -3398,7 +3398,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 	char thisblockpath[400];
 	char objname[1000];
 	struct stat tempstat2;
-	int32_t ret, errcode;
+	int32_t ret, errcode, semval;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Check network status */
@@ -3573,6 +3573,15 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			/* Update system meta to reflect correct cache size */
 			change_system_meta(0, 0, tempstat2.st_size,
 					1, 0, 0, TRUE);
+
+			/* Signal cache management that something can be paged
+			out */
+			semval = 0;
+			ret = sem_getvalue(&(hcfs_system->something_to_replace),
+		              	     &semval);
+			if ((ret == 0) && (semval == 0))
+				sem_post(&(hcfs_system->something_to_replace));
+
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
