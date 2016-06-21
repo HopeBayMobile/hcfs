@@ -1,13 +1,19 @@
+CFLAGS=-D_ANDROID_ENV_
+
 all: _pyhcfs.so parser
 
 _pyhcfs.so: parser.c parser.h
 	cd ../../; ./build.sh pyhcfs
 	python pyhcfs_build.py
 
+parser: CFLAGS+=-g -I../HCFS
 parser: parser.c parser.h
-	cc -D_ANDROID_ENV_  -I../HCFS  parser.c parser.h  -g -o parser
+	cc $(CFLAGS) $< -o $@
 
 clean:
-	rm -f _pyhcfs.so pyhcfs
-CFLAGS=-D_ANDROID_ENV_
+	rm -f _pyhcfs.c _pyhcfs.o _pyhcfs.so parser parser.o
+
+check_pkgs:
+	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
+
 .PHONY: _pyhcfs.so parser
