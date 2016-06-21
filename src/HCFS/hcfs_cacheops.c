@@ -627,7 +627,7 @@ void notify_sleep_on_cache(int32_t cache_replace_status)
 *
 * Function name: get_cache_limit
 *        Inputs: const char pin_type
-*       Summary: Routine for waking threads/processes sleeping from using
+*       Summary: Returns cache threshold for (pin_type)
 *  Return value: Cache space limit if successful. Otherwise returns the
 *  		 negation of linux error code.
 *
@@ -644,7 +644,7 @@ int64_t get_cache_limit(const char pin_type)
 *
 * Function name: get_pinned_limit
 *        Inputs: const char pin_type
-*       Summary: Routine for waking threads/processes sleeping from using
+*       Summary: Returns pinned threshold for (pin_type)
 *  Return value: Pinned space limit if successful. Otherwise returns the
 *  		 negation of linux error code.
 *
