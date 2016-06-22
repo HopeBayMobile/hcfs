@@ -1,3 +1,5 @@
+include ../../build/ccache.mk
+
 CFLAGS=-D_ANDROID_ENV_
 
 all: _pyhcfs.so parser
