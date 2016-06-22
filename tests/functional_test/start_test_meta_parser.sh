@@ -10,7 +10,7 @@ if [ ! -e /var/run/docker.sock ]; then
 	exit -1
 fi
 
-if [ ! [ $(docker images | grep $image | grep $ver) ]]; then
+if [[ ! $(docker images | grep $image | grep $ver) ]]; then
 	echo "Build docker image for test environment."
 	cd $repo
 	docker build -f $dockerfile -t $image\:$ver .
