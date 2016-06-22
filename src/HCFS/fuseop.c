@@ -2610,7 +2610,7 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 				(last_block_entry->status == ST_CtoL)) {
 			if (last_block_entry->status == ST_CLOUD) {
 				last_block_entry->status = ST_CtoL;
-				ret = meta_cache_update_file_data(this_inode,
+				ret = meta_cache_update_file_nosync(this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
 				if (ret < 0) {
@@ -3503,7 +3503,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		ret = 0;
 		if ((tpage->block_entries[eindex]).status == ST_CLOUD) {
 			(tpage->block_entries[eindex]).status = ST_CtoL;
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+			/* Do not sync block status if fetch from backend */
+			ret = meta_cache_update_file_nosync(fh_ptr->thisinode,
 					NULL, NULL, tpage, page_fpos,
 					fh_ptr->meta_cache_ptr);
 		}
@@ -3544,7 +3545,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
 				(tpage->block_entries[eindex]).status =
 								ST_CLOUD;
-				meta_cache_update_file_data(fh_ptr->thisinode,
+				/* Do not sync if fetch failed */
+				meta_cache_update_file_nosync(fh_ptr->thisinode,
 					NULL, NULL, tpage, page_fpos,
 					fh_ptr->meta_cache_ptr);
 				/* Unlink this block */
@@ -3600,7 +3602,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 					}
 					return -EIO;
 				}
-				ret = meta_cache_update_file_data(
+				/* Do not sync if only fetch from backend */
+				ret = meta_cache_update_file_nosync(
 						fh_ptr->thisinode,
 						NULL, NULL, tpage, page_fpos,
 						fh_ptr->meta_cache_ptr);
@@ -3627,9 +3630,13 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 						0, fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
+
+			/* Do not sync block status changes due to download */
+			/*
 			ret = super_block_mark_dirty(fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
+			*/
 		}
 	}
 	fh_ptr->meta_cache_locked = FALSE;
@@ -4044,8 +4051,9 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 
 		set_timestamp_now(&temp_stat, ATIME);
 
-		ret = meta_cache_update_file_data(fh_ptr->thisinode,
-			&temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+		/* Write changes to disk but do not sync to backend */
+		ret = meta_cache_update_stat_nosync(fh_ptr->thisinode,
+		                       &temp_stat, fh_ptr->meta_cache_ptr);
 		if (ret < 0) {
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -4180,7 +4188,7 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		((tpage->block_entries[eindex]).status == ST_CtoL)) {
 		if ((tpage->block_entries[eindex]).status == ST_CLOUD) {
 			(tpage->block_entries[eindex]).status = ST_CtoL;
-			ret = meta_cache_update_file_data(fh_ptr->thisinode,
+			ret = meta_cache_update_file_nosync(fh_ptr->thisinode,
 				NULL, NULL, tpage, page_fpos,
 				fh_ptr->meta_cache_ptr);
 			if (ret < 0) {
@@ -5470,9 +5478,10 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	ret = 0;
 	if (buf_pos > 0) {
+		/* Do not sync atime change to backend */
 		set_timestamp_now(&thisstat, ATIME);
-		ret = meta_cache_update_dir_data(this_inode, &thisstat, NULL,
-					NULL, body_ptr);
+		ret = meta_cache_update_stat_nosync(this_inode, &thisstat,
+		                                     body_ptr);
 	}
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
@@ -5521,17 +5530,20 @@ void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
 	thisinode = real_ino(req, ino);
 
 	if (file_info->fh >= MAX_OPEN_FILE_ENTRIES) {
+		write_log(10, "FH too large\n");
 		fuse_reply_err(req, EBADF);
 		return;
 	}
 
 	if (system_fh_table.entry_table_flags[file_info->fh] != IS_DIRH) {
+		write_log(10, "Handle is not a DIRH\n");
 		fuse_reply_err(req, EBADF);
 		return;
 	}
 
-	if (system_fh_table.entry_table[file_info->fh].thisinode
+	if (system_fh_table.direntry_table[file_info->fh].thisinode
 					!= thisinode) {
+		write_log(10, "Handle is not itself\n");
 		fuse_reply_err(req, EBADF);
 		return;
 	}
@@ -5663,7 +5675,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 {
 	int32_t ret_val;
 	ino_t this_inode;
-	char attr_changed;
+	BOOL attr_changed, only_atime_changed;
 	struct timespec timenow;
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -5681,18 +5693,11 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	attr_changed = FALSE;
+	only_atime_changed = TRUE;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
 	if (body_ptr == NULL) {
 		fuse_reply_err(req, ENOMEM);
-		return;
-	}
-
-	ret_val = update_meta_seq(body_ptr);
-	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
@@ -5736,6 +5741,15 @@ continue_check:
 		}
 
 allow_truncate:
+		/* Now will update meta seq only if truncated */
+		ret_val = update_meta_seq(body_ptr);
+		if (ret_val < 0) {
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
 		ret_val = hfuse_ll_truncate(this_inode, &newstat,
 				attr->st_size, &body_ptr, req);
 		if (ret_val < 0) {
@@ -5745,9 +5759,12 @@ allow_truncate:
 			return;
 		}
 		attr_changed = TRUE;
+		only_atime_changed = FALSE;
+		write_log(10, "Truncated\n");
 	}
 
-	if (to_set & FUSE_SET_ATTR_MODE) {
+	if ((to_set & FUSE_SET_ATTR_MODE) &&
+	    (newstat.st_mode != attr->st_mode)) {
 		write_log(10, "Debug setattr context %d, file %d\n",
 			temp_context->uid, newstat.st_uid);
 
@@ -5763,9 +5780,12 @@ allow_truncate:
 
 		newstat.st_mode = attr->st_mode;
 		attr_changed = TRUE;
+		only_atime_changed = FALSE;
+		write_log(10, "Mode changed\n");
 	}
 
-	if (to_set & FUSE_SET_ATTR_UID) {
+	if ((to_set & FUSE_SET_ATTR_UID) &&
+	    (newstat.st_uid != attr->st_uid)) {
 		/* Checks if process has CHOWN capabilities here */
 		if (_check_capability(temp_context->pid,
 			CAP_CHOWN) != TRUE) {
@@ -5778,9 +5798,12 @@ allow_truncate:
 
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
+		only_atime_changed = FALSE;
+		write_log(10, "uid changed\n");
 	}
 
-	if (to_set & FUSE_SET_ATTR_GID) {
+	if ((to_set & FUSE_SET_ATTR_GID) &&
+	    (newstat.st_gid != attr->st_gid)) {
 		/* Checks if process has CHOWN capabilities here */
 		/* Or if is owner or in group */
 		if (_check_capability(temp_context->pid,
@@ -5805,9 +5828,12 @@ allow_truncate:
 
 		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
+		only_atime_changed = FALSE;
+		write_log(10, "gid changed\n");
 	}
 
-	if (to_set & FUSE_SET_ATTR_ATIME) {
+	if ((to_set & FUSE_SET_ATTR_ATIME) &&
+	    (newstat.st_atime != attr->st_atime)) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
@@ -5826,7 +5852,8 @@ allow_truncate:
 		attr_changed = TRUE;
 	}
 
-	if (to_set & FUSE_SET_ATTR_MTIME) {
+	if ((to_set & FUSE_SET_ATTR_MTIME) &&
+	    (newstat.st_mtime != attr->st_mtime)) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
@@ -5842,6 +5869,8 @@ allow_truncate:
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
+		only_atime_changed = FALSE;
+		write_log(10, "mtime changed\n");
 	}
 
 	clock_gettime(CLOCK_REALTIME, &timenow);
@@ -5884,6 +5913,8 @@ allow_truncate:
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
+		only_atime_changed = FALSE;
+		write_log(10, "mtime changed to now\n");
 	}
 
 	if (attr_changed == TRUE) {
@@ -5901,8 +5932,18 @@ allow_truncate:
 		}
 	}
 
-	ret_val = meta_cache_update_file_data(this_inode, &newstat,
-			NULL, NULL, 0, body_ptr);
+	if (only_atime_changed == TRUE)
+		write_log(10, "Only access time changed\n");
+	else
+		write_log(10, "Some other stat changed also\n");
+
+	/* If only access time is changed (other than ctime), do not sync */
+	if (only_atime_changed == TRUE)
+		ret_val = meta_cache_update_stat_nosync(this_inode, &newstat,
+				body_ptr);
+	else
+		ret_val = meta_cache_update_file_data(this_inode, &newstat,
+				NULL, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0) {
@@ -6264,10 +6305,10 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 
-	/* Update access time */
+	/* Update access time but do not sync to backend */
 	set_timestamp_now(&symlink_stat, ATIME);
-	ret_code = meta_cache_update_symlink_data(this_inode, &symlink_stat,
-		NULL, meta_cache_entry);
+	ret_code = meta_cache_update_stat_nosync(this_inode, &symlink_stat,
+		meta_cache_entry);
 	if (ret_code < 0) {
 		write_log(0, "readlink() update symlink meta fail\n");
 		meta_cache_close_file(meta_cache_entry);

@@ -367,13 +367,15 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 /************************************************************************
 *
 * Function name: super_block_update_stat
-*        Inputs: ino_t this_inode, struct stat *newstat
+*        Inputs: ino_t this_inode, struct stat *newstat, BOOL no_sync
 *       Summary: Update the stat in the super block entry for inode number
-*                "this_inode", from input pointed by "newstat".
+*                "this_inode", from input pointed by "newstat". Do not sync
+*                to backend if no_sync is true.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat)
+int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
+                                BOOL no_sync)
 {
 	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -382,7 +384,7 @@ int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat)
 
 	/* Read the old content of super block entry first */
 	ret_val = read_super_block_entry(this_inode, &tempentry);
-	if (ret_val >= 0) {
+	if ((ret_val >= 0) && (no_sync == FALSE)) {
 		if (tempentry.status != IS_DIRTY) {
 			ret_val = ll_dequeue(this_inode, &tempentry);
 			if (ret_val < 0) {
@@ -403,6 +405,12 @@ int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat)
 		if (tempentry.in_transit == TRUE)
 			tempentry.mod_after_in_transit = TRUE;
 
+		memcpy(&(tempentry.inode_stat), newstat, sizeof(struct stat));
+		/* Write the updated content back */
+		ret_val = write_super_block_entry(this_inode, &tempentry);
+	} else if ((ret_val >= 0) && (no_sync == TRUE)) {
+		/* Only update the copy of stat in super block, but do not
+		sync to the backend */
 		memcpy(&(tempentry.inode_stat), newstat, sizeof(struct stat));
 		/* Write the updated content back */
 		ret_val = write_super_block_entry(this_inode, &tempentry);

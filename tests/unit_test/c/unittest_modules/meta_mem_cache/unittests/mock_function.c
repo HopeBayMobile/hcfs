@@ -30,7 +30,8 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 	return 0;
 }
 
-int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat)
+int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
+                                BOOL no_sync)
 {
 	return 0;
 }

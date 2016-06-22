@@ -2413,6 +2413,8 @@ class hfuse_ll_setxattrTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -2503,6 +2505,8 @@ class hfuse_ll_getxattrTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -2601,6 +2605,8 @@ class hfuse_ll_listxattrTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -2660,6 +2666,8 @@ class hfuse_ll_removexattrTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -2740,6 +2748,8 @@ class hfuse_ll_symlinkTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -2847,6 +2857,8 @@ class hfuse_ll_readlinkTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -2891,6 +2903,8 @@ class hfuse_ll_linkTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()
@@ -3008,6 +3022,8 @@ protected:
 
 	void SetUp()
 	{
+		root_updated = FALSE;
+		before_update_file_data = TRUE;
 	}
 
 	void TearDown()

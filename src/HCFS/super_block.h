@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+#include "global.h"
+
 /* pin-status in super block */
 #define ST_DEL 0
 #define ST_UNPIN 1
@@ -100,7 +102,8 @@ int32_t super_block_reclaim(void);
 int32_t super_block_reclaim_fullscan(void);
 ino_t super_block_new_inode(struct stat *in_stat,
 				uint64_t *ret_generation, char local_pin);
-int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat);
+int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
+                                BOOL no_sync);
 
 int32_t ll_rebuild_dirty(ino_t missing_inode);
 int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry);

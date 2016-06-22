@@ -338,7 +338,8 @@ TEST_F(meta_cache_push_dir_pageTest, BothEntryCacheNull)
 	body_ptr->dir_entry_cache[0] = NULL;
 	body_ptr->dir_entry_cache[1] = NULL;
 	/* Test */
-	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page));
+	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page,
+	          TRUE));
 	EXPECT_EQ(0, memcmp(body_ptr->dir_entry_cache[0], test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(NULL, body_ptr->dir_entry_cache[1]);
 }
@@ -350,7 +351,8 @@ TEST_F(meta_cache_push_dir_pageTest, OnlyEntry_0_Null)
 	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 	memcpy(body_ptr->dir_entry_cache[1], reserved_dir_entry_page, sizeof(DIR_ENTRY_PAGE));
 	/* Test */
-	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page));
+	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page,
+	          TRUE));
 	EXPECT_EQ(0, memcmp(test_dir_entry_page, body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, memcmp(reserved_dir_entry_page, body_ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE)));
 
@@ -364,7 +366,8 @@ TEST_F(meta_cache_push_dir_pageTest, OnlyEntry_1_Null)
 	memcpy(body_ptr->dir_entry_cache[0], reserved_dir_entry_page, sizeof(DIR_ENTRY_PAGE));
 	body_ptr->dir_entry_cache[1] = NULL;
 	/* Test */
-	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page));
+	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page,
+	          TRUE));
 	EXPECT_EQ(0, memcmp(test_dir_entry_page, body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, memcmp(reserved_dir_entry_page, body_ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE)));
 
@@ -382,7 +385,8 @@ TEST_F(meta_cache_push_dir_pageTest, BothNonempty)
 	test_dir_entry_page->this_page_pos = 0; // entry_index_1 will write to filepos 0
 
 	/* Test */
-	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page));
+	EXPECT_EQ(0, meta_cache_push_dir_page(body_ptr, test_dir_entry_page,
+	          TRUE));
 	EXPECT_EQ(0, memcmp(test_dir_entry_page, body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, memcmp(reserved_dir_entry_page, body_ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE)));
 
@@ -648,6 +652,144 @@ TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
 
 /*
 	End of unit testing for meta_cache_update_file_data()
+ */
+
+/*
+	Unit testing for meta_cache_update_file_nosync()
+ */
+
+class meta_cache_update_file_nosyncTest : public BaseClassWithMetaCacheEntry {
+protected:
+	const char *mock_file_meta;
+
+	void SetUp()
+	{
+		mock_file_meta = "/tmp/mock_file_meta";
+
+		BaseClassWithMetaCacheEntry::SetUp();
+
+		body_ptr->this_stat.st_mode = S_IFREG;
+		body_ptr->fptr = fopen(mock_file_meta, "w+");
+		body_ptr->meta_opened = TRUE;
+		truncate(mock_file_meta, sizeof(struct stat) +
+			sizeof(FILE_META_TYPE) + sizeof(BLOCK_ENTRY_PAGE));
+	}
+
+	void TearDown()
+	{
+		fclose(body_ptr->fptr);
+		unlink(mock_file_meta);
+
+		BaseClassWithMetaCacheEntry::TearDown();
+	}
+};
+
+TEST_F(meta_cache_update_file_nosyncTest, CacheNotLocked)
+{
+	/* Test for non-locked cache */
+	EXPECT_EQ(-EINVAL, meta_cache_update_file_nosync(0, NULL, NULL, NULL, 0, body_ptr));
+}
+
+TEST_F(meta_cache_update_file_nosyncTest, UpdateSuccess)
+{
+	/* Mock data */
+	struct stat *test_stat = generate_mock_stat(0);
+	FILE_META_TYPE actual_file_meta, test_file_meta;
+	BLOCK_ENTRY_PAGE actual_block_page, test_block_page;
+	struct stat actual_stat;
+
+	memset(&test_block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
+	test_block_page.num_entries = 123;
+
+	memset(&test_file_meta, 0, sizeof(FILE_META_TYPE));
+	test_file_meta = FILE_META_TYPE{5, 6, 7, 8, 9, 112, 113};
+
+	body_ptr->file_meta = NULL; // it will be allocated in function
+
+	/* Test */
+	sem_wait(&(body_ptr->access_sem));
+	EXPECT_EQ(0, meta_cache_update_file_nosync(0, test_stat, &test_file_meta,
+		&test_block_page, sizeof(struct stat) + sizeof(FILE_META_TYPE), body_ptr));
+	sem_post(&(body_ptr->access_sem));
+
+	/* Verify */
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&test_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
+
+	fseek(body_ptr->fptr, 0, SEEK_SET);
+	fread(&actual_stat, sizeof(struct stat), 1 ,body_ptr->fptr);
+	fread(&actual_file_meta, sizeof(FILE_META_TYPE), 1 ,body_ptr->fptr);
+	fread(&actual_block_page, sizeof(BLOCK_ENTRY_PAGE), 1 ,body_ptr->fptr);
+
+	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&test_file_meta, &actual_file_meta, sizeof(FILE_META_TYPE)));
+	EXPECT_EQ(0, memcmp(&test_block_page, &actual_block_page, sizeof(BLOCK_ENTRY_PAGE)));
+}
+
+/*
+	End of unit testing for meta_cache_update_file_nosync()
+ */
+
+/*
+	Unit testing for meta_cache_update_stat_nosync()
+ */
+
+class meta_cache_update_stat_nosyncTest : public BaseClassWithMetaCacheEntry {
+protected:
+	const char *mock_file_meta;
+
+	void SetUp()
+	{
+		mock_file_meta = "/tmp/mock_file_meta";
+
+		BaseClassWithMetaCacheEntry::SetUp();
+
+		body_ptr->this_stat.st_mode = S_IFREG;
+		body_ptr->fptr = fopen(mock_file_meta, "w+");
+		body_ptr->meta_opened = TRUE;
+		truncate(mock_file_meta, sizeof(struct stat) +
+			sizeof(FILE_META_TYPE) + sizeof(BLOCK_ENTRY_PAGE));
+	}
+
+	void TearDown()
+	{
+		fclose(body_ptr->fptr);
+		unlink(mock_file_meta);
+
+		BaseClassWithMetaCacheEntry::TearDown();
+	}
+};
+
+TEST_F(meta_cache_update_stat_nosyncTest, CacheNotLocked)
+{
+	/* Test for non-locked cache */
+	EXPECT_EQ(-EINVAL, meta_cache_update_stat_nosync(0, NULL, body_ptr));
+}
+
+TEST_F(meta_cache_update_stat_nosyncTest, UpdateSuccess)
+{
+	/* Mock data */
+	struct stat *test_stat = generate_mock_stat(0);
+	FILE_META_TYPE actual_file_meta, test_file_meta;
+	BLOCK_ENTRY_PAGE actual_block_page, test_block_page;
+	struct stat actual_stat;
+
+	/* Test */
+	sem_wait(&(body_ptr->access_sem));
+	EXPECT_EQ(0, meta_cache_update_stat_nosync(0, test_stat, body_ptr));
+	sem_post(&(body_ptr->access_sem));
+
+	/* Verify */
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+
+	fseek(body_ptr->fptr, 0, SEEK_SET);
+	fread(&actual_stat, sizeof(struct stat), 1 ,body_ptr->fptr);
+
+	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(struct stat)));
+}
+
+/*
+	End of unit testing for meta_cache_update_stat_nosync()
  */
 
 /*

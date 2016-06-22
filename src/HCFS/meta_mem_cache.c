@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/9 Jiahong added header for this file, and revising coding style.
 * 2015/7/8 Kewei added meta cache processing about symlink.
+* 2016/6/20 Jiahong added the option of not sync to backend on meta change
 *
 **************************************************************************/
 #include "meta_mem_cache.h"
@@ -234,14 +235,18 @@ int32_t release_meta_cache_headers(void)
 
 /* Helper function for caching a new dir entry page and dropping the last one */
 static int32_t _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
-					const DIR_ENTRY_PAGE *temppage)
+			const DIR_ENTRY_PAGE *temppage, BOOL is_dirty)
 {
 	body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
 	memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0],
 						sizeof(DIR_ENTRY_PAGE));
 	memcpy((body_ptr->dir_entry_cache[0]), temppage,
 						sizeof(DIR_ENTRY_PAGE));
-	body_ptr->dir_entry_cache_dirty[0] = TRUE;
+	if (is_dirty == TRUE)
+		body_ptr->dir_entry_cache_dirty[0] = TRUE;
+	else
+		body_ptr->dir_entry_cache_dirty[0] = FALSE;
+
 	return 0;
 }
 
@@ -249,14 +254,14 @@ static int32_t _push_page_entry(META_CACHE_ENTRY_STRUCT *body_ptr,
 *
 * Function name: meta_cache_push_dir_page
 *        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr,
-*                const DIR_ENTRY_PAGE *temppage
+*                const DIR_ENTRY_PAGE *temppage, BOOL is_dirty
 *       Summary: Cache a new dir entry page (temppage) for this meta cache
 *                entry (body_ptr), and drop the last one (with index 1).
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
-				const DIR_ENTRY_PAGE *temppage)
+			const DIR_ENTRY_PAGE *temppage, BOOL is_dirty)
 {
 	int32_t ret;
 
@@ -267,7 +272,10 @@ int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 			return -ENOMEM;
 		memcpy((body_ptr->dir_entry_cache[0]), temppage,
 							sizeof(DIR_ENTRY_PAGE));
-		body_ptr->dir_entry_cache_dirty[0] = TRUE;
+		if (is_dirty == TRUE)
+			body_ptr->dir_entry_cache_dirty[0] = TRUE;
+		else
+			body_ptr->dir_entry_cache_dirty[0] = FALSE;
 	} else {
 		/* If the second page entry is empty,
 			allocate mem space first */
@@ -276,13 +284,15 @@ int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 						malloc(sizeof(DIR_ENTRY_PAGE));
 			if (body_ptr->dir_entry_cache[1] == NULL)
 				return -ENOMEM;
-			ret = _push_page_entry(body_ptr, temppage);
+			ret = _push_page_entry(body_ptr, temppage, is_dirty);
 		} else {
-			/* Need to flush first */
-			ret = meta_cache_flush_dir_cache(body_ptr, 1);
-			if (ret < 0)
-				return ret;
-			ret = _push_page_entry(body_ptr, temppage);
+			/* Need to flush first if content is dirty */
+			if (body_ptr->dir_entry_cache_dirty[1] == TRUE) {
+				ret = meta_cache_flush_dir_cache(body_ptr, 1);
+				if (ret < 0)
+					return ret;
+			}
+			ret = _push_page_entry(body_ptr, temppage, is_dirty);
 		}
 	}
 	return ret;
@@ -418,16 +428,19 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 		}
 	}
 
-	/* Update stat info in super inode no matter what so that meta file
-		get pushed to cloud */
-	/* TODO: May need to simply this so that only dirty status in super
-		inode is updated */
+	/* Update stat info in super inode and push to cloud if needed */
 	if (body_ptr->can_be_synced_cloud_later == TRUE) { /* Skip sync */
+		write_log(10, "Can be synced to cloud later\n");
 		body_ptr->can_be_synced_cloud_later = FALSE;
-
+		ret = super_block_update_stat(body_ptr->inode_num,
+				&(body_ptr->this_stat), TRUE);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	} else {
 		ret = super_block_update_stat(body_ptr->inode_num,
-				&(body_ptr->this_stat));
+				&(body_ptr->this_stat), FALSE);
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -558,6 +571,7 @@ processing the new one */
 
 	int32_t ret, errcode;
 	size_t ret_size;
+	ino_t tmpino;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -587,10 +601,16 @@ processing the new one */
 		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
 		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 
-		ret = super_block_mark_dirty((body_ptr->this_stat).st_ino);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
+		/* If not syncing struct stat or meta, need to sync
+		block page */
+		if ((body_ptr->stat_dirty != TRUE) &&
+		    (body_ptr->meta_dirty != TRUE)) {
+			tmpino = (body_ptr->this_stat).st_ino;
+			ret = super_block_mark_dirty(tmpino);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 		}
 	}
 
@@ -601,6 +621,142 @@ processing the new one */
 
 	/* Write changes to meta file if write through is enabled */
 	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = flush_single_entry(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
+	return 0;
+
+/* Exception handling from here */
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: meta_cache_update_file_nosync
+*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+*                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
+*       Summary: Update the cache content for inode "this_inode". Content
+*                entries not updated are passed as "NULL". If write through
+*                cache is enabled (the only option now), will also write
+*                changes to meta file. Do not sync meta to backend.
+*                This function handles regular files only.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int32_t meta_cache_update_file_nosync(ino_t this_inode,
+	const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+/* Always change dirty status to TRUE here as we always update */
+/* For block entry page lookup or update, only allow one lookup/update at a
+time, and will check page_pos input against the two entries in the cache.
+If does not match any of the two, flush the older page entry first before
+processing the new one */
+
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	UNUSED(this_inode);
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (inode_stat != NULL) {
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		body_ptr->stat_dirty = TRUE;
+	}
+
+	if (file_meta_ptr != NULL) {
+		if (body_ptr->file_meta == NULL) {
+			body_ptr->file_meta = malloc(sizeof(FILE_META_TYPE));
+			if (body_ptr->file_meta == NULL)
+				return -ENOMEM;
+		}
+		memcpy((body_ptr->file_meta), file_meta_ptr,
+						sizeof(FILE_META_TYPE));
+		body_ptr->meta_dirty = TRUE;
+	}
+
+	if (block_page != NULL) {
+		ret = _open_file(body_ptr);
+
+		if (ret < 0)
+			return ret;
+
+		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
+		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+	}
+
+	gettimeofday(&(body_ptr->last_access_time), NULL);
+
+	if (body_ptr->something_dirty == FALSE)
+		body_ptr->something_dirty = TRUE;
+
+	/* Write changes to meta file if write through is enabled */
+	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = meta_cache_sync_later(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
+		ret = flush_single_entry(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
+	return 0;
+
+/* Exception handling from here */
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: meta_cache_update_stat_nosync
+*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*                META_CACHE_ENTRY_STRUCT *body_ptr
+*       Summary: Write file struct stat to disk but do not sync to backend
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int32_t meta_cache_update_stat_nosync(ino_t this_inode,
+                                       const struct stat *inode_stat,
+                                       META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	int32_t ret, errcode;
+
+	UNUSED(this_inode);
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (inode_stat != NULL) {
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		body_ptr->stat_dirty = TRUE;
+	}
+
+	gettimeofday(&(body_ptr->last_access_time), NULL);
+
+	if (body_ptr->something_dirty == FALSE)
+		body_ptr->something_dirty = TRUE;
+
+	/* Write changes to meta file if write through is enabled */
+	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = meta_cache_sync_later(body_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
 		ret = flush_single_entry(body_ptr);
 		if (ret < 0) {
 			errcode = ret;
@@ -887,7 +1043,8 @@ the new one */
 				bptr->dir_entry_cache_dirty[1] = TRUE;
 			} else {
 				/* Cannot find the requested page in cache */
-				ret = meta_cache_push_dir_page(bptr, dir_page);
+				ret = meta_cache_push_dir_page(bptr, dir_page,
+				                               TRUE);
 				if (ret < 0)
 					return ret;
 			}
@@ -1037,15 +1194,12 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);
 
-	if (body_ptr->something_dirty == FALSE)
-		body_ptr->something_dirty = TRUE;
-
 	if (ret == -ENOENT) { /*Not found*/
 		*result_index = -1;
 		return 0;
 	}
 	/*Found the entry */
-	ret = meta_cache_push_dir_page(body_ptr, &tmp_resultpage);
+	ret = meta_cache_push_dir_page(body_ptr, &tmp_resultpage, FALSE);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

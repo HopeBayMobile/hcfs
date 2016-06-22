@@ -139,9 +139,19 @@ int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr,
 int32_t flush_clean_all_meta_cache(void);
 int32_t free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
-int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode,
+	const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+
+int32_t meta_cache_update_file_nosync(ino_t this_inode,
+	const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+
+int32_t meta_cache_update_stat_nosync(ino_t this_inode,
+                                       const struct stat *inode_stat,
+                                       META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
@@ -161,8 +171,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 int32_t meta_cache_remove(ino_t this_inode);
 int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
-				const DIR_ENTRY_PAGE *temppage);
-
+			const DIR_ENTRY_PAGE *temppage, BOOL is_dirty);
 
 int32_t meta_cache_update_symlink_data(ino_t this_inode,
 				   const struct stat *inode_stat,
