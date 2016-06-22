@@ -18,29 +18,29 @@ cd $repo
 
 function usage()
 {
-cat <<EOF
+sed -e "s/\t/    /g" <<EOF
 Usage: ./build.sh [ACTION] [OPTIONS]
 
 ACTION:
-    lib [-d ndk-path]
-        Build Android Libraries. ndk-path is path to Android-ndk directory
-    ci-test
-        Run continuous integration tests.
-    unittest
-        Run unit tests.
-    image 5x|s58a [--userdebug|--user] [--test]
-        5x|s58a
-            Build Android image. 
-        --userdebug|--user
-            buila userdebug or user type with --userdebug and --user
-            respectively. Script will build both type if not specified.
-        --test
-            test image build process.
-    pyhcfs [--test]
-        Build python library "pyhcfs" at dist/
+	lib [-d ndk-path]
+		Build Android Libraries. ndk-path is path to Android-ndk directory
+	ci-test
+		Run continuous integration tests.
+	unittest
+		Run unit tests.
+	image 5x|s58a [--userdebug|--user] [--test]
+		5x|s58a
+			Build Android image.
+		--userdebug|--user
+			buila userdebug or user type with --userdebug and --user
+			respectively. Script will build both type if not specified.
+		--test
+			test image build process.
+	pyhcfs [--test]
+		Build python library "pyhcfs" at dist/
 OPTIONS:
-    -h
-        Show usage
+	-h
+		Show usage
 EOF
 }
 
@@ -53,18 +53,18 @@ function parse_options()
 			TARGET="$1"; shift ;;
 		ci-test)
 			TARGET="$1"; shift ;;
-		unittest) 
+		unittest)
 			TARGET="$1"; shift ;;
 		pyhcfs)
 			TARGET="$1"; shift ;;
-		-d ) 
+		-d )
 			if [ -z "$2" ] ; then echo "Invalid argument for -d"; usage; exit 1; fi
 			export SET_NDK_BUILD="$2"; shift 2 ;;
-		-h ) 
+		-h )
 			usage; exit ;;
 		--test)
 			TEST=1; shift 1;;
-		*) 
+		*)
 			exec 2>&1 ;echo "Invalid option: $@"; usage; exit 1 ;;
 		esac
 	done

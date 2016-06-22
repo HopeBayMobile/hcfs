@@ -7,7 +7,7 @@ Latest source code for command-line utilities under 'src/CLI_utils'.
 
 Developing Flow
 -----------
-1. Fork branch from android-dev and developing in it. 
+1. Fork branch from android-dev and developing in it.
 2. Unit test your code
 3. Check coding style of your code (do it last as coding style breaks during modify)
 
