@@ -169,7 +169,7 @@ function build_system() {
 	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
 	pushd /data/packages/apps/Launcher3 && \
 	git fetch origin master && \
-	git reset --hard master && \
+	git reset --hard origin master && \
 	git clean -dxf && \
 	popd && \
 	make clean && \
