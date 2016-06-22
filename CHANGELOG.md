@@ -1,16 +1,55 @@
 Please view this file on the android-dev branch, on stable branches it's out of date.
 
-Known Issues / Limitations / Features to be Implemented
-=====
-  1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
-  2. If cache is full during recording vedio, user need to wait cache been flush to storage after recording finished.
-  3. Delete an app then reinstall it again (without running some other app with external storage access) might cause wrong permission when reading from external storage for this app.
-  4. For uses in demo kit environment, backend setting via APP does not work (no connection to management cluster). Please push backend settings to phone directly.
-  5. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
-  6. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
-  7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
-  8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
 
+v 2.2.1.962
+=====
+## New Features
+- (!396) System supports new pin type - “high-priority-pin”. (also gateway-2-0/android-management-app!35)
+    - Some reserved space will be used for high-priority-pin files/dirs if there are no cache space can be reused.
+    - Integrate high priority pin to Tera app
+- (!410) Replace default with Tera launcher (pin/unpin from launcher) (also !415)
+- (!413) Do not sync to backend if only atime is changed, or if block status changed due to cache download or paging out
+    - Change the code so that the meta file won't be synced to backend if
+        1. Only atime is changed, or
+        2. If block status changed due to cache download or paging out.
+- (US-941) As a user, I want to do factory reset on the phone but still keep all data on the cloud(and could be restored later).
+- (US-946) As a user, I want to do pin / unpin on launcher icons directly.
+- (US-948) As a user, I want to see TeraFonn related cloud storage information and launch TeraFonn APP from the Setting app.
+- (US-1257) As a user, I want to be notified to release pin space when remaining pin space is not enough
+- (US-713) As a user, I want to change the google account associated with TeraFonn on the phone.
+- (US-935) As a user, I want to activate Tera via invitation (activation) code from within the phone.
+- (US-946) As a user, I want to do pin / unpin on launcher icons directly.
+
+## Fixes
+ - (!414) Change hcfs default config
+ - (!411) Workaround for 5x : unzip images and flash one by one
+    This is a workaround for booting error if install image with `fastboot update  *-img-*.zip`
+ - (!412) Fix: Failed to mkdir /storage/emulated/0
+ - (!406) Hotfix/cache blocked by pin
+    1. Pin file will trigger cache replacement
+    2. Read from cloud will trigger cache replacement 
+    3. Enhance rebuild super block
+    4. CACHE_USAGE_NUM_ENTRIES 65536 -> 128
+ - (Teara App) Fix google silent login at system bootup
+ - (Teara App) Fix google login issue
+ - (Teara App) Fix open multi Tera app
+ - (Teara App) Start sync cloud when user activates Tera
+ - (Teara App) Remove ongoing notification when authentication failed
+ - (Setting App) Fix crash when open “Storage & USB” from settings app
+
+## CI / Refactoring
+ - (!405) Release ota package files with CI. It's for later ota procedure.
+
+## Known Issues / Limitations / Features to be Implemented
+ 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
+ 2. If cache is full during recording vedio, user need to wait cache been flush to storage after recording finished.
+ 3. Delete an app then reinstall it again (without running some other app with external storage access) might cause wrong permission when reading from external storage for this app.
+ 4. For uses in demo kit environment, backend setting via APP does not work (no connection to management cluster). Please push backend settings to phone directly.
+ 5. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
+ 6. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
+ 7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
+ 8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
+ 9. `[New]` First activation after flash ROM may failed in silent. Reboot Android should fix this problem.
 
 v 2.2.1.0908
 =====
