@@ -16,7 +16,6 @@ def relpath(target):
     here = os.path.dirname( __file__ )
     if here == "":
         here = "."
-    print os.path.relpath(here + "/" + target)
     return os.path.relpath(here + "/" + target)
 
 ffi.set_source( '_pyhcfs',
