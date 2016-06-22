@@ -47,7 +47,6 @@ def before():
 	_logger.info("[Env] Execute before script.")
 	subprocess.call(" ".join(["sudo", _repo + "/utils/setup_dev_env.sh", "-m", "functional_test"]), shell=True)	
 	subprocess.call(" ".join(["sudo", _repo + "/utils/setup_dev_env.sh", "-m", "docker_host"]), shell=True)	
-	subprocess.call(["sudo", "/bin/sh", "-c", _repo + "/utils/env_config.sh"])
 
 def cleanup():
 	_logger.info("[Env] Cleaning up")

@@ -6,8 +6,36 @@
 struct hcfs_stat { 
         uint64_t st_dev;    /** ID of device containing file */
         uint64_t st_ino;    /** inode number */
-        uint32_t st_mode;   /** Ubuntu x86_64:   uint32_t, */
+        uint32_t st_mode;   /** Ubuntu x86_64:   uint32_t,
+                              Android aarch64: uint32_t,
+                              Android arm-v8:  uint32_t,
+                              Mac OS X:        uint16_t */
+        uint64_t st_nlink;  /** Ubuntu x86_64:   uint64_t,
+                              Android aarch64: uint32_t,
+                              Android arm-v8:  uint32_t,
+                              Mac OS X:        uint16_t */
+        uint32_t st_uid;    /** user ID of owner */
+        uint32_t st_gid;    /** group ID of owner */
+        uint64_t st_rdev;   /** device ID (if special file)
+                              Ubuntu x86_64:   uint64_t,
+                              Android aarch64: uint64_t,
+                              Android arm-v8:  uint64_t,
+                              Mac OS X:         int32_t */
+        int64_t st_size;    /** total size, in bytes */
+        int64_t st_blksize; /** blocksize for filesystem I/O
+                              Ubuntu x86_64:    int64_t,
+                              Android aarch64:  int32_t,
+                              Android arm-v8:  uint64_t,
+                              Mac OS X:         int32_t */
+        int64_t st_blocks;  /** blocks allocated for file */
+        int64_t st_atime;   /** time of last access. use aarch64's time structure */
+        uint64_t st_atime_nsec;
+        int64_t st_mtime;   /** time of last modification */
+        uint64_t st_mtime_nsec;
+        int64_t st_ctime;   /** time of last status change */
+        uint64_t st_ctime_nsec;
 };
+
 
 typedef struct hcfs_stat hcfs_statObj;
 typedef hcfs_statObj * hcfs_statPtr;
