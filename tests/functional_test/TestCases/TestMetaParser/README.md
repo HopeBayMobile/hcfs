@@ -1,4 +1,4 @@
-![alt tag](https://gitlab.hopebaytech.com/gateway-2-0/hcfs/tree/test-meta-parser/tests/functional_test/TestCases/TestMetaParser/arch.jpg)
+![alt tag](https://gitlab.hopebaytech.com/gateway-2-0/hcfs/raw/test-meta-parser/tests/functional_test/TestCases/TestMetaParser/arch.jpg)
 
 以"start_test_meta_parser.sh"開始執行測試,步驟
 1. 檢查是否安裝 docker 若無則停止執行
