@@ -4,6 +4,8 @@
 #include "mount_manager.h"
 #include "rebuild_super_block_params.h"
 
+extern SYSTEM_CONF_STRUCT *system_config;
+
 int32_t write_log(int32_t level, char *format, ...)
 {
 	return 0;
@@ -26,11 +28,31 @@ int32_t super_block_exclusive_release(void)
 
 int32_t write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	printf("Write entry\n");
+	pwrite(sys_super_block->iofptr, inode_ptr, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + (this_inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY));
+
 	return 0;
 }
 
 int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	if (NOW_TEST_RESTORE_META == TRUE) {
+		inode_ptr->this_index = 0;
+		return 0;
+	} else {
+		inode_ptr->this_index = this_inode;
+		inode_ptr->inode_stat.st_mode =
+			this_inode % 2 ? S_IFDIR : S_IFREG;
+	}
+
+	sem_wait(&record_inode_sem);
+	record_inode[this_inode] = TRUE;
+	max_record_inode = max_record_inode < this_inode ?
+			this_inode : max_record_inode;
+	sem_post(&record_inode_sem);
+
 	return 0;
 }
 
@@ -101,21 +123,54 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	return 0;
 }
 
-int32_t collect_dir_children(DIR_META_TYPE *dir_meta, FILE *fptr,
+int32_t collect_dir_children(ino_t this_inode,
 	ino_t **dir_node_list, int64_t *num_dir_node,
 	ino_t **nondir_node_list, int64_t *num_nondir_node,
 	char **nondir_type_list)
 {
+	if (this_inode > 80000) {
+		*num_dir_node = 0;
+		*num_nondir_node = 0;
+		*dir_node_list = NULL;
+		*nondir_node_list = NULL;
+		*nondir_type_list = NULL;
+		return 0;
+	}
+
+	*dir_node_list = malloc(sizeof(ino_t) * 1);
+	(*dir_node_list)[0] = this_inode + 2;
+	*num_dir_node = 1;
+
+	*nondir_node_list = malloc(sizeof(ino_t) * 2);
+	(*nondir_node_list)[0] = this_inode + 1;
+	(*nondir_node_list)[1] = this_inode + 3;
+	*num_nondir_node = 2;
+
+	*nondir_type_list = malloc(sizeof(ino_t) * 2);
+	(*nondir_type_list)[0] = S_IFREG;
+	(*nondir_type_list)[1] = S_IFREG;
+
 	return 0;
 }
 
 int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
+	sprintf(pathname, "%s/meta_%"PRIu64, METAPATH, (uint64_t)this_inode);
 	return 0;
 }
 
 int32_t restore_meta_file(ino_t this_inode)
 {
+	char path[300];
+	FILE *fptr;
+	
+	fetch_meta_path(path, this_inode);
+	fptr = fopen(path, "w+");
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&exp_stat, sizeof(struct stat), 1, fptr);
+	fwrite(&exp_filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	fclose(fptr);	
+
 	return 0;
 }
 

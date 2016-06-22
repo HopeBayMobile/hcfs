@@ -29,10 +29,12 @@ class superblockEnvironment : public ::testing::Environment {
 					malloc(sizeof(SYSTEM_DATA_HEAD));
 			memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 			sem_init(&(hcfs_system->access_sem), 0, 1);
+			sem_init(&(hcfs_system->fuse_sem), 0, 0);
 			if (!access("rebuild_sb_running_folder", F_OK))
 				system("rm -r ./rebuild_sb_running_folder");
 			mkdir("rebuild_sb_running_folder", 0700);
 			METAPATH = "rebuild_sb_running_folder";
+			NOW_TEST_RESTORE_META = FALSE;
 		}
 		void TearDown()
 		{
@@ -98,6 +100,8 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 
 	EXPECT_EQ(0, memcmp(exp_roots, roots, sizeof(ino_t) * 5));
 	EXPECT_EQ(5, rebuild_sb_jobs->remaining_jobs);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.cache_idx);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.num_cached_inode);
 	unlink(queuefile_path);
 
 	/* Verify FSstat */
@@ -141,6 +145,8 @@ TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileExist)
 	pread(rebuild_sb_jobs->queue_fh, inodes, sizeof(ino_t) * 10, 0);
 	EXPECT_EQ(0, memcmp(inode_in_queue, inodes, sizeof(ino_t) * 10));
 	EXPECT_EQ(10, rebuild_sb_jobs->remaining_jobs);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.cache_idx);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.num_cached_inode);
 	close(rebuild_sb_jobs->queue_fh);
 	unlink(queuefile_path);
 
@@ -158,6 +164,8 @@ TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileNotExist)
 	pread(rebuild_sb_jobs->queue_fh, roots, sizeof(ino_t) * 5, 0);
 	EXPECT_EQ(0, memcmp(exp_roots, roots, sizeof(ino_t) * 5));
 	EXPECT_EQ(5, rebuild_sb_jobs->remaining_jobs);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.cache_idx);
+	EXPECT_EQ(0, rebuild_sb_jobs->cache_jobs.num_cached_inode);
 	close(rebuild_sb_jobs->queue_fh);
 	unlink(queuefile_path);
 
@@ -654,4 +662,198 @@ TEST_F(erase_inode_jobTest, EraseInodeSuccess)
 }
 /**
  * End unittest of erase_inode_job()
+ */
+
+/**
+ * Unittest of create_sb_rebuilder()
+ */
+class create_sb_rebuilderTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		queuefile_path = (char *)malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sprintf(queuefile_path, "%s/rebuild_sb_queue", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+
+		/* Allocate memory for jobs */
+		rebuild_sb_jobs = (REBUILD_SB_JOBS *)
+			calloc(sizeof(REBUILD_SB_JOBS), 1);
+		memset(rebuild_sb_jobs, 0, sizeof(REBUILD_SB_JOBS));
+		pthread_mutex_init(&(rebuild_sb_jobs->job_mutex), NULL);
+		pthread_cond_init(&(rebuild_sb_jobs->job_cond), NULL);
+		sem_init(&(rebuild_sb_jobs->queue_file_sem), 0, 1);
+
+		/* Allocate memory for thread pool */
+		rebuild_sb_tpool = (SB_THREAD_POOL *)
+			calloc(sizeof(SB_THREAD_POOL), 1);
+		memset(rebuild_sb_tpool, 0, sizeof(SB_THREAD_POOL));
+		rebuild_sb_tpool->tmaster = -1;
+		sem_init(&(rebuild_sb_tpool->tpool_access_sem), 0, 1);
+
+		rebuild_sb_jobs->queue_fh = open(queuefile_path,
+				O_CREAT | O_RDWR, 0600);
+
+		memset(record_inode, 0, 100000);
+		sem_init(&record_inode_sem, 0, 1);
+		max_record_inode = 0;
+	}
+	void TearDown()
+	{
+		free(sb_path);
+		free(queuefile_path);
+		free(sys_super_block);
+		if (rebuild_sb_jobs)
+			free(rebuild_sb_jobs);
+		if (rebuild_sb_tpool)
+			free(rebuild_sb_tpool);
+		unlink(queuefile_path);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+TEST_F(create_sb_rebuilderTest, NoBackendInfo)
+{
+	CURRENT_BACKEND = NONE;
+
+	EXPECT_EQ(-EPERM, create_sb_rebuilder());
+	close(rebuild_sb_jobs->queue_fh);
+}
+
+TEST_F(create_sb_rebuilderTest, EmptyQueueFile_RebuildSuccess)
+{
+	CURRENT_BACKEND = SWIFT;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	sys_super_block->head.now_rebuild = TRUE;
+	EXPECT_EQ(0, create_sb_rebuilder());
+
+	/* Wait */
+	sem_wait(&(hcfs_system->fuse_sem));
+	sleep(1);
+
+	/* Verify */
+	EXPECT_EQ(0, rebuild_sb_tpool->num_active);
+	for (int i = 0; i < NUM_THREADS_IN_POOL; i++)
+		EXPECT_EQ(FALSE, rebuild_sb_tpool->thread[i].active);
+	EXPECT_EQ(FALSE, sys_super_block->head.now_rebuild);
+	destroy_rebuild_sb(FALSE);
+}
+
+TEST_F(create_sb_rebuilderTest, RootInQueueFile_BackendFromOfflineToOnline)
+{
+	ino_t roots[3] = {1, 2, 3};
+	struct timespec sleep_time;
+	ino_t cache[4096], zero[4096];
+	size_t ret_size;
+	FILE *fptr;
+
+	sleep_time.tv_sec = 0;
+	sleep_time.tv_nsec = 100000000;
+
+	pwrite(rebuild_sb_jobs->queue_fh, roots, sizeof(ino_t) * 3, 0);
+	rebuild_sb_jobs->remaining_jobs = 3;
+
+	CURRENT_BACKEND = SWIFT;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = FALSE;
+	sys_super_block->head.now_rebuild = TRUE;
+	EXPECT_EQ(0, create_sb_rebuilder());
+
+	nanosleep(&sleep_time, NULL);
+	hcfs_system->backend_is_online = TRUE;
+	wake_sb_rebuilder();
+
+	/* Wait */
+	sem_wait(&(hcfs_system->fuse_sem));
+	sleep(1);
+
+	/* Verify */
+	EXPECT_EQ(0, rebuild_sb_tpool->num_active);
+	for (int i = 0; i < NUM_THREADS_IN_POOL; i++)
+		EXPECT_EQ(FALSE, rebuild_sb_tpool->thread[i].active);
+	EXPECT_EQ(FALSE, sys_super_block->head.now_rebuild);
+	destroy_rebuild_sb(FALSE);
+
+	for (int i = 1; i <= max_record_inode ; i++)
+		ASSERT_EQ(TRUE, record_inode[i]);
+
+	memset(zero, 0, sizeof(ino_t) * 4096);
+	fptr = fopen(queuefile_path, "r");
+	fseek(fptr, 0, SEEK_SET);
+	while (!feof(fptr)) {
+		ret_size = fread(cache, sizeof(ino_t), 4096, fptr);
+		ASSERT_EQ(0, memcmp(zero, cache, sizeof(ino_t) * ret_size));
+	}
+	fclose(fptr);
+}
+/**
+ * End unittest of create_sb_rebuilder()
+ */
+
+/**
+ * Unittest of rebuild_super_block_entry()
+ */
+class restore_meta_super_block_entryTest: public ::testing::Test {
+protected:
+	char *sb_path, *queuefile_path;
+
+	void SetUp()
+	{
+		sb_path = (char *) malloc(400);
+		sprintf(sb_path, "%s/superblock", METAPATH);
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+		sys_super_block->iofptr = open(sb_path, O_CREAT | O_RDWR, 0600);
+		NOW_TEST_RESTORE_META = TRUE;
+	}
+	void TearDown()
+	{
+		NOW_TEST_RESTORE_META = FALSE;
+		close(sys_super_block->iofptr);
+		free(sb_path);
+		free(sys_super_block);
+		unlink(sb_path);
+		system("rm -rf ./rebuild_sb_running_folder/*");
+	}
+};
+
+TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
+{
+	ino_t inode;
+	struct stat tmpstat;
+	SUPER_BLOCK_ENTRY exp_entry, test_entry;
+
+	inode = 10;
+	memset(&exp_stat, 0, sizeof(struct stat));
+	memset(&exp_filemeta, 0, sizeof(FILE_META_TYPE));
+	exp_stat.st_mode = S_IFREG;
+	exp_stat.st_size = 5566;
+	exp_filemeta.local_pin = TRUE;
+
+	EXPECT_EQ(0, restore_meta_super_block_entry(inode, &tmpstat));
+
+	/* Verify */
+	EXPECT_EQ(0, memcmp(&exp_stat, &tmpstat, sizeof(struct stat)));
+
+	memset(&exp_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	memcpy(&(exp_entry.inode_stat), &exp_stat, sizeof(struct stat));
+	exp_entry.this_index = inode;
+	exp_entry.generation = 1;
+	exp_entry.status = NO_LL;
+	exp_entry.pin_status = ST_PINNING;
+	pread(sys_super_block->iofptr, &test_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, memcmp(&exp_entry, &test_entry,
+				sizeof(SUPER_BLOCK_ENTRY)));
+}
+/**
+ * End unittest of rebuild_super_block_entry()
  */

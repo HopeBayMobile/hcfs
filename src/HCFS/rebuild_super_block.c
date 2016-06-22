@@ -495,6 +495,9 @@ int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes)
 	ssize_t ret_ssize;
 	int32_t errcode;
 
+	if (inode_jobs == NULL || num_inodes <= 0)
+		return 0;
+
 	pthread_mutex_lock(&(rebuild_sb_jobs->job_mutex));
 	total_jobs = rebuild_sb_jobs->remaining_jobs +
 			rebuild_sb_jobs->job_count;
@@ -694,6 +697,12 @@ void rebuild_sb_worker(void *t_idx)
 			char *nondir_type_list;
 			int32_t idx;
 
+			dir_list = NULL;
+			nondir_list = NULL;
+			nondir_type_list = NULL;
+			num_dir = 0;
+			num_nondir = 0;
+
 			ret = collect_dir_children(inode_job.inode,
 				&dir_list, &num_dir, &nondir_list, &num_nondir,
 				&nondir_type_list);
@@ -715,7 +724,7 @@ void rebuild_sb_worker(void *t_idx)
 						dir_list[idx],
 						inode_job.inode, D_ISDIR);
 					if (ret < 0)
-						write_log(0, "Error; Fail"
+						write_log(0, "Error: Fail"
 							" to rebuild parent"
 							" stat. Code %d", -ret);
 				}
@@ -735,7 +744,7 @@ void rebuild_sb_worker(void *t_idx)
 						inode_job.inode,
 						nondir_type_list[idx]);
 					if (ret < 0)
-						write_log(0, "Error; Fail"
+						write_log(0, "Error: Fail"
 							" to rebuild parent"
 							" stat. Code %d", -ret);
 				}
