@@ -171,6 +171,8 @@ int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 		      SEEK_SET);
 		FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
 		memset(&tmp_dirstat, 0, sizeof(DIR_STATS_TYPE));
+		write_log(10, "Local blocks: %" PRId64 ", %" PRId64 "\n",
+		          meta_stats.num_blocks, meta_stats.num_cached_blocks);
 		if ((meta_stats.num_blocks == 0) ||
 		    	(meta_stats.num_blocks ==
 		         meta_stats.num_cached_blocks)) {
@@ -187,6 +189,7 @@ int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 		metafptr = NULL;
 	} else {
 		/* Meta file not found, set location to cloud */
+		write_log(10, "No Local Meta\n");
 		memset(&tmp_dirstat, 0, sizeof(DIR_STATS_TYPE));
 		tmp_dirstat.num_cloud = 1;
 	}
