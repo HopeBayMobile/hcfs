@@ -16,24 +16,25 @@
 #include <inttypes.h>
 #include <time.h>
 
-struct hcfs_stat {
-	uint64_t st_dev;
-	uint64_t st_ino;
-	uint32_t st_mode;
-	uint64_t st_nlink; /* unsigned int in android */
-	uint32_t st_uid;
-	uint32_t st_gid;
-	uint64_t st_rdev;
-	int64_t st_size;
-	int64_t st_blksize; /* int in android */
-	int64_t st_blocks;
-	/* use aarch64's time structure */
-	int64_t	st_atime;
-	uint64_t st_atime_nsec;
-	int64_t	st_mtime;
-	uint64_t st_mtime_nsec;
-	int64_t	st_ctime;
-	uint64_t st_ctime_nsec;
+struct hcfs_stat { /* 128 bytes */
+	uint64_t dev;
+	uint64_t ino;
+	uint32_t mode;
+	uint32_t __pad1;
+	uint64_t nlink; /* unsigned int in android */
+	uint32_t uid;
+	uint32_t gid;
+	uint64_t rdev;
+	int64_t size;
+	int64_t blksize; /* int in android */
+	int64_t blocks;
+	int64_t	atime; /* use aarch64 time structure */
+	uint64_t atime_nsec;
+	int64_t	mtime;
+	uint64_t mtime_nsec;
+	int64_t	ctime;
+	uint64_t ctime_nsec;
+	uint32_t __unused4;
+	uint32_t __unused5;
 };
-
 #endif /* SRC_HCFS_HCFS_STAT_H_ */

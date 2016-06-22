@@ -33,9 +33,9 @@ def list_external_volume(fsmgr_path):
             uint64_t inode;
             char name[256];
         } PORTABLE_DIR_ENTRY;
-	int32_t list_external_volume(char *meta_path,
-				     PORTABLE_DIR_ENTRY **ptr_ret_entry,
-				     uint64_t *ret_num);
+        int32_t list_external_volume(char *meta_path,
+                                     PORTABLE_DIR_ENTRY **ptr_ret_entry,
+                                     uint64_t *ret_num);
     """
     ptr_ret_entry = ffi.new("PORTABLE_DIR_ENTRY **")
     ret_num = ffi.new("uint64_t *")
@@ -50,7 +50,23 @@ def list_external_volume(fsmgr_path):
 
     return response
 
-def hcfs_parse_meta(meta_path):
+def parse_meta(meta_path):
+    """
+    Get data from hcfs metafile
+
+    cdef:
+        #define D_ISDIR 0
+        #define D_ISREG 1
+        #define D_ISLNK 2
+        #define D_ISFIFO 3
+        #define D_ISSOCK 4
+
+    @Input  meta_path: A string contains local path of metafile
+    @Output result: 0 on success, negative integer on error.
+    @Output file_type: defined in fuseop.h
+    @Output child_number: number of childs if it is a folder, not used if
+                file_type is not D_ISDIR.
+    """
     resp = {
         'result': 0,
         'file_type': 2,
@@ -77,7 +93,7 @@ def hcfs_parse_meta(meta_path):
 
     return resp
 
-def hcfs_list_dir_inorder(meta_path, offset=(0, 0), limit=20):
+def list_dir_inorder(meta_path, offset=(0, 0), limit=20):
     resp = [
         (1001, u'Android'),
         (1002, u'data'),
