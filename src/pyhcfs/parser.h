@@ -43,7 +43,7 @@ typedef struct {
 	int32_t result;
 	int32_t file_type;
 	uint64_t child_number;
-	HCFS_STAT hcfs_stat;
+	HCFS_STAT stat;
 } RET_META;
 
 int32_t list_external_volume(char *meta_path,

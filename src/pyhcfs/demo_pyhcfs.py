@@ -19,12 +19,15 @@ class MyPrettyPrinter(pprint.PrettyPrinter):
 		self, object, context, maxlevels, level)
 pp = MyPrettyPrinter(indent=4)
 
-print "\nlist_external_volume"
+print "=============================="
+print "list_external_volume"
 pprint.pprint(list_external_volume("testdata/fsmgr"))
 
-print "\nhcfs_parse_meta"
-pprint.pprint(hcfs_parse_meta("testdata/meta123"))
+print "=============================="
+print "parse_meta"
+pprint.pprint(parse_meta("testdata/meta423"))
+#pprint.pprint(parse_meta("testdata/metaXxx"))
 
-print "\nhcfs_list_dir_inorder"
-offset, resp = hcfs_list_dir_inorder("testdata/meta123", limit=2)
-pp.pprint((offset, resp))
+print "=============================="
+print "list_dir_inorder"
+pp.pprint(list_dir_inorder("testdata/meta123", limit=2))

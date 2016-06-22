@@ -38,7 +38,7 @@ int main(void)
 	uint64_t ret_num;
 	int32_t i;
 	RET_META meta_data;
-	HCFS_STAT *stat_data = &meta_data.hcfs_stat;
+	HCFS_STAT *stat_data = &meta_data.stat;
 
 	puts("============================================");
 	puts("list_external_volume(\"testdata/fsmgr\", &ret_entry, &ret_num);");
@@ -186,26 +186,27 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 	return_code = read(meta_fd, &stat_data, sizeof(stat_data));
 	if (return_code == -1) {
 		close(meta_fd);
+		ret->result = -1;
 		return -1;
 	}
 	ret->result = 0;
 
-	ret->hcfs_stat.dev = stat_data.dev;
-	ret->hcfs_stat.ino = stat_data.ino;
-	ret->hcfs_stat.mode = stat_data.mode;
-	ret->hcfs_stat.nlink = stat_data.nlink;
-	ret->hcfs_stat.uid = stat_data.uid;
-	ret->hcfs_stat.gid = stat_data.gid;
-	ret->hcfs_stat.rdev = stat_data.rdev;
-	ret->hcfs_stat.size = stat_data.size;
-	ret->hcfs_stat.blksize = stat_data.blksize;
-	ret->hcfs_stat.blocks = stat_data.blocks;
-	ret->hcfs_stat.atime = stat_data.atime;
-	ret->hcfs_stat.atime_nsec = stat_data.atime_nsec;
-	ret->hcfs_stat.mtime = stat_data.mtime;
-	ret->hcfs_stat.mtime_nsec = stat_data.mtime_nsec;
-	ret->hcfs_stat.ctime = stat_data.ctime;
-	ret->hcfs_stat.ctime_nsec = stat_data.ctime_nsec;
+	ret->stat.dev = stat_data.dev;
+	ret->stat.ino = stat_data.ino;
+	ret->stat.mode = stat_data.mode;
+	ret->stat.nlink = stat_data.nlink;
+	ret->stat.uid = stat_data.uid;
+	ret->stat.gid = stat_data.gid;
+	ret->stat.rdev = stat_data.rdev;
+	ret->stat.size = stat_data.size;
+	ret->stat.blksize = stat_data.blksize;
+	ret->stat.blocks = stat_data.blocks;
+	ret->stat.atime = stat_data.atime;
+	ret->stat.atime_nsec = stat_data.atime_nsec;
+	ret->stat.mtime = stat_data.mtime;
+	ret->stat.mtime_nsec = stat_data.mtime_nsec;
+	ret->stat.ctime = stat_data.ctime;
+	ret->stat.ctime_nsec = stat_data.ctime_nsec;
 
 	if (S_ISDIR(stat_data.mode))
 		ret->file_type = D_ISDIR;
@@ -220,10 +221,14 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 
 	if (ret->file_type == D_ISDIR) {
 		return_code = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
+		if (return_code == -1) {
+			close(meta_fd);
+			return -1;
+		}
 		ret->child_number = dir_meta.total_children;
 	} else {
 		ret->child_number = 0;
 	}
 
-	return return_code;
+	return 0;
 }

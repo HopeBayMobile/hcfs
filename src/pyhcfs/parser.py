@@ -54,12 +54,12 @@ def parse_meta(meta_path):
     """
     Get data from hcfs metafile
 
-    cdef:
-        #define D_ISDIR 0
+    cdef: #define D_ISDIR 0
         #define D_ISREG 1
         #define D_ISLNK 2
         #define D_ISFIFO 3
         #define D_ISSOCK 4
+    int32_t parse_meta(char *meta_path, RET_META *meta);
 
     @Input  meta_path: A string contains local path of metafile
     @Output result: 0 on success, negative integer on error.
@@ -67,31 +67,14 @@ def parse_meta(meta_path):
     @Output child_number: number of childs if it is a folder, not used if
                 file_type is not D_ISDIR.
     """
-    resp = {
-        'result': 0,
-        'file_type': 2,
-        'child_number': 21,
-        'stat': {
-            'st_dev': '',
-            'st_ino': '22',
-            'st_mode': 'uint32_t',
-            'st_nlink': '',
-            'st_uid': '',
-            'st_gid': '',
-            'st_rdev': '',
-            'st_size': 204800,
-            'st_blksize': 4096,
-            'st_blocks': '',
-            'st_atime': 1465788148,
-            'st_atime_nsec': '',
-            'st_mtime': 1465788148,
-            'st_mtime_nsec': '',
-            'st_ctime': 1465788148,
-            'st_ctime_nsec': ''
-        }
-    }
+    meta = ffi.new("RET_META *")
+    ret = lib.parse_meta(meta_path, meta)
+    return (meta[0].result,
+            meta[0].file_type,
+            meta[0].child_number,
+            convert_to_python(meta[0].stat))
+    #return convert_to_python(meta[0])
 
-    return resp
 
 def list_dir_inorder(meta_path, offset=(0, 0), limit=20):
     resp = [
