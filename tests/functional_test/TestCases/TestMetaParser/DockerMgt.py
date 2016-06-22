@@ -50,8 +50,8 @@ def run(docker):
 
 def terminate(docker):
 	assert isinstance(docker, Dockerable), "Input must inherit from Dockerable"
-	_logger.info("[Docker] Stopping docker <" + docker._name + ">")
-	subprocess.call("sudo docker rm -f" + docker._name, shell=True)
+	_logger.info("[Docker] Stopping docker <" + docker.name + ">")
+	subprocess.call("sudo docker rm -f " + docker.name, shell=True)
 
 def cleanup(docker):
 	assert isinstance(docker, Dockerable), "Input must inherit from Dockerable"
