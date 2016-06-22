@@ -15,28 +15,62 @@
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <time.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <string.h>
+#include <errno.h>
 #include "parser.h"
 
-/**
- * @brief Test all functions with test data, if compiled
- *
- * ddd
- * @param param1 Description of the first parameter of the function.
- * @param param2 The second one, which follows @p param1.
- * @return Describe what the function returns.
- */
+/************************************************************************
+*
+* Function name: main
+*       Summary: it will test functions on executing, only used when
+*                compiled without pyhcs.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
 int main(void)
 {
 	PORTABLE_DIR_ENTRY *ret_entry;
 	uint64_t ret_num;
 	int32_t i;
+	RET_META meta_data;
+	HCFS_STAT *stat_data = &meta_data.hcfs_stat;
 
+	puts("============================================");
+	puts("list_external_volume(\"testdata/fsmgr\", &ret_entry, &ret_num);");
 	list_external_volume("testdata/fsmgr", &ret_entry, &ret_num);
 	for (i = 0; i < ret_num; i++)
 		printf("%lu %s\n", ret_entry[i].inode, ret_entry[i].name);
+	
+	puts("============================================");
+	puts("parse_meta(\"testdata/meta423\", &meta_data);");
+	parse_meta("testdata/meta423", &meta_data);
+	printf("%20s: %d\n", "Result", meta_data.result);
+	printf("%20s: %d\n", "Type (0=dir, 1=file)", meta_data.file_type);
+	printf("%20s: %lu\n", "Child number", meta_data.child_number);
+	printf("%20s: %lu\n", "dev", stat_data->dev);
+	printf("%20s: %lu\n", "ino", stat_data->ino);
+	printf("%20s: %d\n", "mode", stat_data->mode);
+	printf("%20s: %lu\n", "nlink", stat_data->nlink);
+	printf("%20s: %d\n", "uid", stat_data->uid);
+	printf("%20s: %d\n", "gid", stat_data->gid);
+	printf("%20s: %ld\n", "rdev", stat_data->rdev);
+	printf("%20s: %lu\n", "size", stat_data->size);
+	printf("%20s: %ld\n", "blksize", stat_data->blksize);
+	printf("%20s: %ld\n", "blocks", stat_data->blocks);
+	printf("%20s: %s", "atime", ctime(&(stat_data->atime)));
+	printf("%20s: %lu\n", "atime_nsec", stat_data->atime_nsec);
+	printf("%20s: %s", "mtime", ctime(&(stat_data->mtime)));
+	printf("%20s: %lu\n", "mtime_nsec", stat_data->mtime_nsec);
+	printf("%20s: %s", "ctime", ctime(&(stat_data->ctime)));
+	printf("%20s: %lu\n", "ctime_nsec", stat_data->ctime_nsec);
+
+	puts("============================================");
+	puts("list_dir_inorder(\"testdata/meta423\")");
 }
 
 /************************************************************************
@@ -59,13 +93,18 @@ int32_t list_external_volume(char *fs_mgr_path,
 	int64_t num_walked;
 	int64_t next_node_pos;
 	int32_t count;
-	int32_t FS_list_fh = open(fs_mgr_path, O_RDWR);
+	int32_t meta_fd = open(fs_mgr_path, O_RDONLY);
 	ssize_t return_code;
 	PORTABLE_DIR_ENTRY *ret_entry;
 
-	return_code = pread(FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (return_code == -1)
+	if (meta_fd == -1)
+		return -1;
+
+	return_code = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	if (return_code == -1) {
+		close(meta_fd);
 		return return_code;
+	}
 
 	/* Initialize B-tree walk by first loading the first node of the
 	 * tree walk.
@@ -73,10 +112,12 @@ int32_t list_external_volume(char *fs_mgr_path,
 	next_node_pos = tmp_head.tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
-		return_code = pread(FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+		return_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (return_code == -1)
+		if (return_code == -1) {
+			close(meta_fd);
 			return return_code;
+		}
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
 	}
@@ -89,14 +130,14 @@ int32_t list_external_volume(char *fs_mgr_path,
 	next_node_pos = tmp_head.tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
-		return_code = pread(FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+		return_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (return_code == -1)
+		if (return_code == -1) {
+			close(meta_fd);
 			return return_code;
+		}
 		for (count = 0; count < tpage.num_entries; count++) {
 			switch (tpage.dir_entries[count].d_type) {
-			case ANDROID_INTERNAL:
-				break;
 			case ANDROID_EXTERNAL:
 			case ANDROID_MULTIEXTERNAL:
 				ret_entry[num_walked].inode =
@@ -107,7 +148,7 @@ int32_t list_external_volume(char *fs_mgr_path,
 				num_walked++;
 				break;
 			default:
-				assert(1);
+				break;
 			}
 		}
 		next_node_pos = tpage.tree_walk_next;
@@ -115,5 +156,74 @@ int32_t list_external_volume(char *fs_mgr_path,
 
 	*ret_num = num_walked;
 
+	close(meta_fd);
 	return 0;
+}
+
+/************************************************************************
+*
+* Function name: parse_meta
+*        Inputs: char *meta_path
+*       Summary: load fsmgr file and return all external volume
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*                ptr_ret_meta will be filled if return code is 0
+*
+*************************************************************************/
+int32_t parse_meta(char *meta_path, RET_META *ret)
+{
+	int32_t meta_fd;
+	struct stat_aarch64 stat_data;
+	int32_t return_code;
+	DIR_META_TYPE dir_meta;
+
+	meta_fd = open(meta_path, O_RDONLY);
+	if (meta_fd == -1) {
+		ret->result = -1;
+		return -1;
+	}
+
+	return_code = read(meta_fd, &stat_data, sizeof(stat_data));
+	if (return_code == -1) {
+		close(meta_fd);
+		return -1;
+	}
+	ret->result = 0;
+
+	ret->hcfs_stat.dev = stat_data.dev;
+	ret->hcfs_stat.ino = stat_data.ino;
+	ret->hcfs_stat.mode = stat_data.mode;
+	ret->hcfs_stat.nlink = stat_data.nlink;
+	ret->hcfs_stat.uid = stat_data.uid;
+	ret->hcfs_stat.gid = stat_data.gid;
+	ret->hcfs_stat.rdev = stat_data.rdev;
+	ret->hcfs_stat.size = stat_data.size;
+	ret->hcfs_stat.blksize = stat_data.blksize;
+	ret->hcfs_stat.blocks = stat_data.blocks;
+	ret->hcfs_stat.atime = stat_data.atime;
+	ret->hcfs_stat.atime_nsec = stat_data.atime_nsec;
+	ret->hcfs_stat.mtime = stat_data.mtime;
+	ret->hcfs_stat.mtime_nsec = stat_data.mtime_nsec;
+	ret->hcfs_stat.ctime = stat_data.ctime;
+	ret->hcfs_stat.ctime_nsec = stat_data.ctime_nsec;
+
+	if (S_ISDIR(stat_data.mode))
+		ret->file_type = D_ISDIR;
+	else if (S_ISREG(stat_data.mode))
+		ret->file_type = D_ISREG;
+	else if (S_ISLNK(stat_data.mode))
+		ret->file_type = D_ISLNK;
+	else if (S_ISFIFO(stat_data.mode))
+		ret->file_type = D_ISFIFO;
+	else if (S_ISSOCK(stat_data.mode))
+		ret->file_type = D_ISSOCK;
+
+	if (ret->file_type == D_ISDIR) {
+		return_code = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
+		ret->child_number = dir_meta.total_children;
+	} else {
+		ret->child_number = 0;
+	}
+
+	return return_code;
 }

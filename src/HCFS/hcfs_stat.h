@@ -16,7 +16,7 @@
 #include <inttypes.h>
 #include <time.h>
 
-struct hcfs_stat { /* 128 bytes */
+typedef struct { /* 128 bytes */
 	uint64_t dev;
 	uint64_t ino;
 	uint32_t mode;
@@ -36,5 +36,5 @@ struct hcfs_stat { /* 128 bytes */
 	uint64_t ctime_nsec;
 	uint32_t __unused4;
 	uint32_t __unused5;
-};
+} HCFS_STAT;
 #endif /* SRC_HCFS_HCFS_STAT_H_ */

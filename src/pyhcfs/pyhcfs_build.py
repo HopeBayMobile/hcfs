@@ -20,8 +20,8 @@ def relpath(target):
 
 ffi.set_source( '_pyhcfs',
     source="""
-    #include <inttypes.h>
     #include "parser.h"
+    #include "hcfs_stat.h"
     """,
     include_dirs=[relpath("."), relpath("../HCFS")],
     sources=[relpath("parser.c")],
@@ -37,11 +37,7 @@ typedef struct {
     char name[256];
 } PORTABLE_DIR_ENTRY;
 
-int32_t list_external_volume(char *meta_path,
-                             PORTABLE_DIR_ENTRY **ptr_ret_entry,
-                             uint64_t *ret_num);
-
-struct hcfs_stat { /* 128 bytes */
+typedef struct { /* 128 bytes */
 	uint64_t dev;
 	uint64_t ino;
 	uint32_t mode;
@@ -61,7 +57,19 @@ struct hcfs_stat { /* 128 bytes */
 	uint64_t ctime_nsec;
 	uint32_t __unused4;
 	uint32_t __unused5;
-};
+} HCFS_STAT;
+typedef struct {
+	int32_t result;
+	int32_t file_type;
+	uint64_t child_number;
+	HCFS_STAT hcfs_stat;
+} RET_META;
+
+int32_t list_external_volume(char *meta_path,
+                             PORTABLE_DIR_ENTRY **ptr_ret_entry,
+                             uint64_t *ret_num);
+
+int32_t parse_meta(char *meta_path, RET_META *meta);
     """)
 
 if __name__ == "__main__":
