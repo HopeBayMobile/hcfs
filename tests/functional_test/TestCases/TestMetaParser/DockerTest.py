@@ -20,8 +20,8 @@ class MyDocker(Dockerable):
 if __name__ == "__main__":
 	_logger1.info("logger 1")
 	_logger2.info("logger 2")
-	docker = MyDocker("yo", "test_img:1.0", "python", "pi_tester.py -d debug -s TestSuites/TestMetaParser.csv")
-	docker.add_volume((_repo, "/home/yo/hcfs", ""))
-	docker.wd = "/home/yo/hcfs/tests/functional_test/"
+	docker = MyDocker("yo", "docker:5000/docker_hcfs_test_slave", "/bin/sh", "-c start_test_in_docker.sh")
+	docker.add_volume((_repo, "/hcfs", ""))
+	docker.wd = "/hcfs/tests/functional_test/TestCases/TestMetaParser"
 	DockerMgt.terminate(docker)
 	DockerMgt.run(docker)
