@@ -32,11 +32,6 @@ ffi.set_source( '_pyhcfs',
 #https: // cffi.readthedocs.org/en/latest/cdef.html#ffi-cdef-declaring-types-and-functions
 ffi.cdef(
     """
-typedef struct {
-    uint64_t inode;
-    char name[256];
-} PORTABLE_DIR_ENTRY;
-
 typedef struct { /* 128 bytes */
 	uint64_t dev;
 	uint64_t ino;
@@ -58,6 +53,13 @@ typedef struct { /* 128 bytes */
 	uint32_t __unused4;
 	uint32_t __unused5;
 } HCFS_STAT;
+
+typedef struct {
+	uint64_t inode;
+	char d_name[256];
+	char d_type;
+} PORTABLE_DIR_ENTRY;
+
 typedef struct {
 	int32_t result;
 	int32_t file_type;
@@ -66,10 +68,15 @@ typedef struct {
 } RET_META;
 
 int32_t list_external_volume(char *meta_path,
-                             PORTABLE_DIR_ENTRY **ptr_ret_entry,
-                             uint64_t *ret_num);
+			     PORTABLE_DIR_ENTRY **ptr_ret_entry,
+			     uint64_t *ret_num);
 
 int32_t parse_meta(char *meta_path, RET_META *meta);
+
+int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
+			 const int32_t start_el, const int32_t limit,
+			 int64_t *end_page_pos, int32_t *end_el_no,
+			 PORTABLE_DIR_ENTRY *file_list);
     """)
 
 if __name__ == "__main__":

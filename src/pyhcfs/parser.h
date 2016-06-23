@@ -8,6 +8,8 @@
 #include "../HCFS/hcfs_stat.h"
 
 /* Private declaration */
+#define LIST_DIR_LIMIT 1000
+
 /* size 128 Bytes */
 struct stat_aarch64 {
 	uint64_t dev;
@@ -32,9 +34,14 @@ struct stat_aarch64 {
 	uint32_t __unused5;
 };
 
-/* Public declaration */
+typedef struct {
+	char is_walk_end;
+	int64_t end_page_pos;
+	int32_t end_el_no;
+	int32_t num_walked;
+} TREE_WALKER;
 
-#define LIST_DIR_LIMIT 1000
+/* Public declaration */
 
 typedef struct {
 	uint64_t inode;
@@ -48,14 +55,6 @@ typedef struct {
 	uint64_t child_number;
 	HCFS_STAT stat;
 } RET_META;
-
-typedef struct {
-	char is_walk_end;
-	int64_t end_page_pos;
-	int32_t end_el_no;
-	int32_t num_walked;
-} TREE_WALKER;
-
 
 int32_t list_external_volume(char *meta_path,
 			     PORTABLE_DIR_ENTRY **ptr_ret_entry,

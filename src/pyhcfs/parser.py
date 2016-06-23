@@ -27,15 +27,6 @@ def convert_to_python(s):
 def list_external_volume(fsmgr_path):
     """
     Return list of hcfs external volumes
-
-    cdef:
-        typedef struct {
-            uint64_t inode;
-            char name[256];
-        } PORTABLE_DIR_ENTRY;
-        int32_t list_external_volume(char *meta_path,
-                                     PORTABLE_DIR_ENTRY **ptr_ret_entry,
-                                     uint64_t *ret_num);
     """
     ptr_ret_entry = ffi.new("PORTABLE_DIR_ENTRY **")
     ret_num = ffi.new("uint64_t *")
@@ -46,7 +37,7 @@ def list_external_volume(fsmgr_path):
     response = []
     for x in range(ret_num[0]):
         entry = ptr_ret_entry[0][x]
-        response += [(entry.inode, ffi.string(entry.name))]
+        response += [(entry.inode, ffi.string(entry.d_name))]
 
     return response
 

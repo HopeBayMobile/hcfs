@@ -75,13 +75,16 @@ int main(void)
 	puts("list_dir_inorder(\"testdata/meta423\")");
 
 	PORTABLE_DIR_ENTRY file_list[400];
-	list_dir_inorder("testdata/meta423", 0, 0, 400, &end_pos, &end_el, &file_list);
-	for (i=0;i<400;i++)
+	PORTABLE_DIR_ENTRY file_list2[30];
+
+	list_dir_inorder("testdata/meta423", 0, 0, 400, &end_pos, &end_el,
+			 &(file_list[0]));
+	for (i = 0; i < 400; i++)
 		printf("%s\n", file_list[i].d_name);
 
-	PORTABLE_DIR_ENTRY file_list2[30];
-	list_dir_inorder("testdata/meta423", end_pos, end_el, 30, &end_pos, &end_el, &file_list2);
-	for (i=0;i<30;i++)
+	list_dir_inorder("testdata/meta423", end_pos, end_el, 30, &end_pos,
+			 &end_el, &(file_list2[0]));
+	for (i = 0; i < 30; i++)
 		printf("%s\n", file_list2[i].d_name);
 }
 
@@ -106,16 +109,16 @@ int32_t list_external_volume(char *fs_mgr_path,
 	int64_t next_node_pos;
 	int32_t count;
 	int32_t meta_fd = open(fs_mgr_path, O_RDONLY);
-	ssize_t return_code;
+	ssize_t ret_code;
 	PORTABLE_DIR_ENTRY *ret_entry;
 
 	if (meta_fd == -1)
 		return -1;
 
-	return_code = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (return_code == -1) {
+	ret_code = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	if (ret_code == -1) {
 		close(meta_fd);
-		return return_code;
+		return ret_code;
 	}
 
 	/* Initialize B-tree walk by first loading the first node of the
@@ -124,11 +127,11 @@ int32_t list_external_volume(char *fs_mgr_path,
 	next_node_pos = tmp_head.tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
-		return_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
+		ret_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (return_code == -1) {
+		if (ret_code == -1) {
 			close(meta_fd);
-			return return_code;
+			return ret_code;
 		}
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
@@ -142,11 +145,11 @@ int32_t list_external_volume(char *fs_mgr_path,
 	next_node_pos = tmp_head.tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
-		return_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
+		ret_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (return_code == -1) {
+		if (ret_code == -1) {
 			close(meta_fd);
-			return return_code;
+			return ret_code;
 		}
 		for (count = 0; count < tpage.num_entries; count++) {
 			switch (tpage.dir_entries[count].d_type) {
@@ -186,8 +189,10 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 {
 	int32_t meta_fd;
 	struct stat_aarch64 stat_data;
-	int32_t return_code;
+	int32_t ret_code;
 	DIR_META_TYPE dir_meta;
+
+	ret->result = 0;
 
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1) {
@@ -195,13 +200,9 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 		return -1;
 	}
 
-	return_code = read(meta_fd, &stat_data, sizeof(stat_data));
-	if (return_code == -1) {
-		close(meta_fd);
-		ret->result = -1;
-		return -1;
-	}
-	ret->result = 0;
+	ret_code = read(meta_fd, &stat_data, sizeof(stat_data));
+	if (ret_code == -1)
+		goto errcode_handle;
 
 	ret->stat.dev = stat_data.dev;
 	ret->stat.ino = stat_data.ino;
@@ -232,26 +233,33 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 		ret->file_type = D_ISSOCK;
 
 	if (ret->file_type == D_ISDIR) {
-		return_code = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
-		if (return_code == -1) {
-			close(meta_fd);
-			return -1;
-		}
+		ret_code = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
+		if (ret_code == -1) 
+			goto errcode_handle;
 		ret->child_number = dir_meta.total_children;
 	} else {
 		ret->child_number = 0;
 	}
 
-	return 0;
+	ret_code = 0;
+	ret->result = 0;
+	goto end;
+
+errcode_handle:
+	ret_code = -errno;
+	ret->result = -1;
+end:
+	close(meta_fd);
+	return ret_code;
 }
 
 /************************************************************************
 *
 * Function name: _traverse_dir_btree
 *        Inputs: const int32_t fd, const int64_t page_pos,
-*        	 const int32_t start_el, const int32_t walk_left,
-*        	 const int32_t walk_up, const int32_t limit,
-*        	 TREE_WALKER *this_walk, PORTABLE_DIR_ENTRY *file_list
+*                const int32_t start_el, const int32_t walk_left,
+*		 const int32_t walk_up, const int32_t limit,
+*		 TREE_WALKER *this_walk, PORTABLE_DIR_ENTRY *file_list
 *       Summary: Helper function to traverse dir_entry btree recursively.
 *
 *  Return value: 0 if successful. Otherwise returns negation of error code.
@@ -260,7 +268,8 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 			    const int32_t start_el, const int32_t walk_left,
 			    const int32_t walk_up, const int32_t limit,
-			    TREE_WALKER *this_walk, PORTABLE_DIR_ENTRY *file_list)
+			    TREE_WALKER *this_walk,
+			    PORTABLE_DIR_ENTRY *file_list)
 {
 	uint32_t idx;
 	int32_t ret_code;
@@ -268,8 +277,7 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 	int32_t parent_start_el = -1;
 	DIR_ENTRY_PAGE temppage;
 
-	ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE),
-			page_pos);
+	ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE), page_pos);
 	if (ret_ssize < 0)
 		return -errno;
 
@@ -280,21 +288,21 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 				if (this_walk->is_walk_end == FALSE) {
 					this_walk->is_walk_end = TRUE;
 					this_walk->end_page_pos =
-						temppage.this_page_pos;
+					    temppage.this_page_pos;
 					this_walk->end_el_no = idx;
 				}
 				return 0;
 			}
 			memcpy(file_list + this_walk->num_walked,
-				&(temppage.dir_entries[idx]),
-				sizeof(PORTABLE_DIR_ENTRY));
+			       &(temppage.dir_entries[idx]),
+			       sizeof(PORTABLE_DIR_ENTRY));
 			this_walk->num_walked += 1;
 		}
 	} else {
 		if (walk_left) {
-			ret_code = _traverse_dir_btree(fd,
-					temppage.child_page_pos[start_el],
-					0, TRUE, FALSE, limit, this_walk, file_list);
+			ret_code = _traverse_dir_btree(
+			    fd, temppage.child_page_pos[start_el], 0, TRUE,
+			    FALSE, limit, this_walk, file_list);
 			if (ret_code < 0)
 				return ret_code;
 		}
@@ -304,18 +312,18 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 				if (this_walk->is_walk_end == FALSE) {
 					this_walk->is_walk_end = TRUE;
 					this_walk->end_page_pos =
-						temppage.child_page_pos[idx + 1];
+					    temppage.child_page_pos[idx + 1];
 					this_walk->end_el_no = 0;
 				}
 				return 0;
 			}
 			memcpy(file_list + this_walk->num_walked,
-				&(temppage.dir_entries[idx]),
-				sizeof(PORTABLE_DIR_ENTRY));
+			       &(temppage.dir_entries[idx]),
+			       sizeof(PORTABLE_DIR_ENTRY));
 			this_walk->num_walked += 1;
-			ret_code = _traverse_dir_btree(fd,
-					temppage.child_page_pos[idx + 1],
-					0, TRUE, FALSE, limit, this_walk, file_list);
+			ret_code = _traverse_dir_btree(
+			    fd, temppage.child_page_pos[idx + 1], 0, TRUE,
+			    FALSE, limit, this_walk, file_list);
 			if (ret_code < 0)
 				return ret_code;
 		}
@@ -324,7 +332,7 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 	/* Need to backward to parent page for deeper traverse */
 	if (walk_up && temppage.parent_page_pos != 0) {
 		ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE),
-			temppage.parent_page_pos);
+				  temppage.parent_page_pos);
 		if (ret_ssize < 0)
 			return -errno;
 
@@ -335,9 +343,9 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 			}
 		}
 		if (parent_start_el >= 0) {
-			ret_code = _traverse_dir_btree(fd,
-					temppage.this_page_pos, parent_start_el,
-					FALSE, TRUE, limit, this_walk, file_list);
+			ret_code = _traverse_dir_btree(
+			    fd, temppage.this_page_pos, parent_start_el, FALSE,
+			    TRUE, limit, this_walk, file_list);
 			if (ret_code < 0)
 				return ret_code;
 		}
@@ -350,9 +358,9 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 *
 * Function name: list_dir_inorder
 *        Inputs: const char *meta_path, const int64_t page_pos,
-*        	 const int32_t start_el, const int32_t limit,
-*        	 int64_t *end_page_pos, int32_t *end_el_no,
-*        	 PORTABLE_DIR_ENTRY* file_list
+*		 const int32_t start_el, const int32_t limit,
+*		 int64_t *end_page_pos, int32_t *end_el_no,
+*		 PORTABLE_DIR_ENTRY* file_list
 *       Summary: Traverse the dir_entry tree in a given dir meta file and
 *                return a list contains files and dirs in this dir in order.
 *                The tree traverse will start from the (start_el) in (page_pos)
@@ -388,7 +396,9 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 	if (meta_fd == -1)
 		return -errno;
 
-	pread(meta_fd, &meta_stat, sizeof(struct stat_aarch64), 0);
+	ret_ssize = pread(meta_fd, &meta_stat, sizeof(struct stat_aarch64), 0);
+	if (ret_ssize < 0)
+		goto errcode_handle;
 	if (!S_ISDIR(meta_stat.mode))
 		return -ENOTDIR;
 
@@ -401,15 +411,17 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 	if (page_pos == 0) {
 		/* Traverse from tree root */
 		ret_ssize = pread(meta_fd, &dirmeta, sizeof(DIR_META_TYPE),
-				sizeof(struct stat_aarch64));
+				  sizeof(struct stat_aarch64));
 		if (ret_ssize < 0)
 			goto errcode_handle;
 
-		ret_code = _traverse_dir_btree(meta_fd, dirmeta.root_entry_page, 0,
-				TRUE, TRUE, limit, &this_walk, file_list);
+		ret_code = _traverse_dir_btree(meta_fd, dirmeta.root_entry_page,
+					       0, TRUE, TRUE, limit, &this_walk,
+					       file_list);
 	} else {
-		ret_code = _traverse_dir_btree(meta_fd, page_pos, start_el,
-				FALSE, TRUE, limit, &this_walk, file_list);
+		ret_code =
+		    _traverse_dir_btree(meta_fd, page_pos, start_el, FALSE,
+					TRUE, limit, &this_walk, file_list);
 	}
 
 	if (ret_code == 0) {
@@ -425,5 +437,3 @@ end:
 	close(meta_fd);
 	return ret_code;
 }
-
-
