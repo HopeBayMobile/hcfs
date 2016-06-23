@@ -34,6 +34,8 @@ struct stat_aarch64 {
 
 /* Public declaration */
 
+#define LIST_DIR_LIMIT 1000
+
 typedef struct {
 	uint64_t inode;
 	char name[256];
@@ -46,8 +48,21 @@ typedef struct {
 	HCFS_STAT stat;
 } RET_META;
 
+typedef struct {
+	char is_walk_end;
+	int64_t end_page_pos;
+	int32_t end_el_no;
+	int32_t num_walked;
+} TREE_WALKER;
+
+
 int32_t list_external_volume(char *meta_path,
 			     PORTABLE_DIR_ENTRY **ptr_ret_entry,
 			     uint64_t *ret_num);
 
 int32_t parse_meta(char *meta_path, RET_META *meta);
+
+int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
+			 const int32_t start_el, const int32_t limit,
+			 int64_t *end_page_pos, int32_t *end_el_no,
+			 DIR_ENTRY* file_list);
