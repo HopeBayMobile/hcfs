@@ -42,3 +42,22 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+                struct stat *ret_stat)
+{
+	return 0;
+}
+
+int32_t init_rebuild_sb(char rebuild_action)
+{
+	return 0;
+}
+int32_t create_sb_rebuilder()
+{
+	return 0;
+}
+int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
+{
+	return 0;
+}
+

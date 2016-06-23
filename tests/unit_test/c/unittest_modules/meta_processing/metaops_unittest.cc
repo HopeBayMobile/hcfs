@@ -1718,7 +1718,8 @@ TEST_F(collect_dir_childrenTest, MetaNotExist)
 
 	inode = 5;
 	EXPECT_EQ(-ENOENT, collect_dir_children(inode, &dir_node_list,
-		&num_dir_node, &nondir_node_list, &num_nondir_node, NULL));
+		&num_dir_node, &nondir_node_list, &num_nondir_node,
+	        &nondir_type_list));
 }
 
 TEST_F(collect_dir_childrenTest, NoChildren)

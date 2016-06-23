@@ -547,9 +547,10 @@ protected:
 		download_thread_ctl.block_info[0].dl_error = FALSE;
 
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&download_curl_control_sem, 0, 1); 
-		sem_init(&pin_download_curl_sem, 0,
-				MAX_DOWNLOAD_CURL_HANDLE / 2);
+		sem_init(&download_curl_control_sem, 0, 1);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		//sem_init(&pin_download_curl_sem, 0,
+		//		MAX_DOWNLOAD_CURL_HANDLE / 2);
 	}
 
 	void TearDown()

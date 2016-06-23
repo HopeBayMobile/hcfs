@@ -224,3 +224,9 @@ int32_t enc_backup_usermeta(char *json_str)
 {
 	return 0;
 }
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+                struct stat *ret_stat)
+{
+	return 0;
+}
+

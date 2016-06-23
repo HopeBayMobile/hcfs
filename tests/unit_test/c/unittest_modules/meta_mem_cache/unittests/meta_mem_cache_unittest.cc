@@ -29,19 +29,23 @@ extern META_CACHE_HEADER_STRUCT *meta_mem_cache;
 extern int64_t current_meta_mem_cache_entries;
 
 class BaseClassWithMetaCacheEntry : public ::testing::Test {
-	protected:
-		virtual void SetUp()
-		{
-			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+ protected:
+  virtual void SetUp() {
+    body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 			memset(body_ptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 			sem_init(&(body_ptr->access_sem), 0, 1);
-		}
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
+  }
 
-		virtual void TearDown()
-		{
-			free(body_ptr);
-		}
-		META_CACHE_ENTRY_STRUCT *body_ptr;
+  virtual void TearDown() {
+    free(hcfs_system);
+    free(body_ptr);
+  }
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 };
 
 /*

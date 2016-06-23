@@ -1072,6 +1072,7 @@ protected:
 
 	void TearDown()
 	{
+		free(sys_super_block);
 		fclose(fptr);
 		unlink("utils_unittest_folder/mock_FSstat");
 		rmdir("utils_unittest_folder");
