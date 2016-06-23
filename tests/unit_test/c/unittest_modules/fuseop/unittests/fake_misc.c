@@ -1026,6 +1026,19 @@ int32_t remove_cache_pkg(const char *pkgname)
 	return 0;
 }
 
+int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
+{
+	num_stat_rebuilt++;
+	return 0;
+}
+void destroy_rebuild_sb(BOOL destroy_queue_file)
+{
+	return;
+}
+void init_backend_related_module()
+{
+	return;
+}
 int64_t get_cache_limit(const char pin_type)
 {
 	if (pin_type < NUM_PIN_TYPES)

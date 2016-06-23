@@ -128,5 +128,6 @@ int32_t restore_meta_super_block_entry(ino_t this_inode,
 }
 int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 {
+	num_stat_rebuilt++;
 	return 0;
 }
