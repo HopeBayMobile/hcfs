@@ -101,9 +101,9 @@ docker_host )
 		packages="$packages wget"
 		install_pkg
 		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
-		wget -qO- https://get.docker.com/ > install_docker
-		sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' install_docker
-		sudo sh ./install_docker
+		wget -qO- https://get.docker.com/ > /tmp/install_docker
+		sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
+		sudo sh /tmp/install_docker
 	fi
 	if ! grep -q docker:5000 /etc/default/docker; then
 		echo "Updating /etc/default/docker"
