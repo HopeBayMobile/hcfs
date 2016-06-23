@@ -1041,3 +1041,15 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
+{
+	return 0;
+}
+void destroy_rebuild_sb(BOOL destroy_queue_file)
+{
+	return;
+}
+void init_backend_related_module()
+{
+	return;
+}
