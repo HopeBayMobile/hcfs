@@ -90,6 +90,8 @@ functional_test )
 docker_host )
 	if ! hash docker; then
 		echo "Install Docker"
+		packages="$packages curl"
+		install_pkg
 		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 		curl https://get.docker.com | sudo sh
 	fi
