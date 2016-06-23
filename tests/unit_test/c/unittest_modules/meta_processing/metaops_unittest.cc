@@ -1696,6 +1696,7 @@ class collect_dir_childrenTest : public ::testing::Test {
 protected:
 	int64_t num_dir_node, num_nondir_node;
 	ino_t *dir_node_list, *nondir_node_list;
+	char *nondir_type_list;
 	
 	void SetUp()
 	{
@@ -1717,7 +1718,7 @@ TEST_F(collect_dir_childrenTest, MetaNotExist)
 
 	inode = 5;
 	EXPECT_EQ(-ENOENT, collect_dir_children(inode, &dir_node_list,
-		&num_dir_node, &nondir_node_list, &num_nondir_node));
+		&num_dir_node, &nondir_node_list, &num_nondir_node, NULL));
 }
 
 TEST_F(collect_dir_childrenTest, NoChildren)
@@ -1738,13 +1739,15 @@ TEST_F(collect_dir_childrenTest, NoChildren)
 	fclose(fptr);
 
 	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
-		&num_dir_node, &nondir_node_list, &num_nondir_node));
+		&num_dir_node, &nondir_node_list, &num_nondir_node,
+		&nondir_type_list));
 
 	/* Verify */
 	EXPECT_EQ(0, num_dir_node);
 	EXPECT_EQ(0, num_nondir_node);
 	EXPECT_EQ(NULL, dir_node_list);
 	EXPECT_EQ(NULL, nondir_node_list);
+	EXPECT_EQ(NULL, nondir_type_list);
 
 	unlink(metapath);
 }
@@ -1796,8 +1799,10 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 
 	fclose(fptr);
 
+	/* Run */
 	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
-		&num_dir_node, &nondir_node_list, &num_nondir_node));
+		&num_dir_node, &nondir_node_list, &num_nondir_node,
+		&nondir_type_list));
 
 	/* Verify */
 	EXPECT_EQ(10, num_dir_node);
@@ -1808,10 +1813,16 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 		EXPECT_EQ(child_inode, dir_node_list[i]);
 
 	child_inode = 2;
-	for (int32_t i = 0; i < num_nondir_node; i++, child_inode += 2)
+	for (int32_t i = 0; i < num_nondir_node; i++, child_inode += 2) {
 		EXPECT_EQ(child_inode, nondir_node_list[i]);
+		EXPECT_EQ(D_ISREG, nondir_type_list[i]);
+	}
 
 	unlink(metapath);
+
+	free(dir_node_list);
+	free(nondir_node_list);
+	free(nondir_type_list);
 }
 
 /* End of unittest for collect_dir_children */

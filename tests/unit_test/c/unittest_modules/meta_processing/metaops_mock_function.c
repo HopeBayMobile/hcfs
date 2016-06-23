@@ -486,3 +486,18 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 {
 	return 0;
 }
+
+int32_t change_pin_size(int64_t delta_pin_size)
+{
+	return 0;
+}
+
+void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+{
+	return;
+}
+
+int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+{
+	return 0;
+}

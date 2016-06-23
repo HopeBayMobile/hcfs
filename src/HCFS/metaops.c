@@ -1962,6 +1962,8 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	*num_nondir_node = 0;
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
+	if (nondir_type_list)
+		*nondir_type_list = NULL;
 
 	total_children = dir_meta->total_children;
 	now_page_pos = dir_meta->tree_walk_list_head;
