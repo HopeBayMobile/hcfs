@@ -12,7 +12,7 @@ fi
 
 if [[ ! $(docker images | grep $image | grep $ver) ]]; then
 	echo "Build docker image for test environment."
-	cd $repo
+	cd $repo/..
 	docker build -f $dockerfile -t $image\:$ver .
 fi
 
