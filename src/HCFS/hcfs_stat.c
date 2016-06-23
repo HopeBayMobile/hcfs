@@ -15,6 +15,6 @@
 *
 **************************************************************************/
 
-#include "common_stat.h"
+#include "hcfs_stat.h"
 #include <stdio.h>
 

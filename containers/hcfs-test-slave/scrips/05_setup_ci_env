@@ -21,7 +21,7 @@ function main() {
 	pushd /ci-tools
 	install_oclint
 	install_pmd
-	install_ccminstall_ccm
+	install_ccm
 	popd
 
 	install_pyhcfs_deps
