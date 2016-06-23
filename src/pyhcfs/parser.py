@@ -69,11 +69,7 @@ def parse_meta(meta_path):
     """
     meta = ffi.new("RET_META *")
     ret = lib.parse_meta(meta_path, meta)
-    return (meta[0].result,
-            meta[0].file_type,
-            meta[0].child_number,
-            convert_to_python(meta[0].stat))
-    #return convert_to_python(meta[0])
+    return convert_to_python(meta[0])
 
 
 def list_dir_inorder(meta_path, offset=(0, 0), limit=20):
