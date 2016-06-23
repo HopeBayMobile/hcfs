@@ -38,7 +38,8 @@ struct stat_aarch64 {
 
 typedef struct {
 	uint64_t inode;
-	char name[256];
+	char d_name[256];
+	char d_type;
 } PORTABLE_DIR_ENTRY;
 
 typedef struct {
@@ -65,4 +66,4 @@ int32_t parse_meta(char *meta_path, RET_META *meta);
 int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 			 const int32_t start_el, const int32_t limit,
 			 int64_t *end_page_pos, int32_t *end_el_no,
-			 DIR_ENTRY* file_list);
+			 PORTABLE_DIR_ENTRY *file_list);
