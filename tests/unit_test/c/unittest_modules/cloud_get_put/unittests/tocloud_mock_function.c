@@ -176,6 +176,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCF
 	fs_cloud_stat.backend_system_size = 7687483;
 	fs_cloud_stat.backend_meta_size = 5566;
 	fs_cloud_stat.backend_num_inodes = 34334;
+	fs_cloud_stat.max_inode = 1;
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
@@ -421,6 +422,7 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.backend_system_size += fs_total_size_delta;
 	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
 	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
+	fs_cloud_stat.max_inode = 1;
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
