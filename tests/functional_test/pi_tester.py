@@ -5,10 +5,14 @@ import sys
 import logging
 import ConfigParser
 from optparse import OptionParser
+import json
+import re
+
 # customize
 import Engine.TestEngine as TestEngine
 import Engine.parser as Parser
 import Engine as engine
+from Engine.config import VariablesPool
 
 
 LOGGING_LEVELS = {'critical': logging.CRITICAL,
@@ -17,44 +21,68 @@ LOGGING_LEVELS = {'critical': logging.CRITICAL,
                   'info': logging.INFO,
                   'debug': logging.DEBUG}
 
+
+def parse_variable(variables):
+    if re.search('^\w+\:\w+,{0,1}', variables):
+        variable_dict = {}
+        variable_list = variables.split(',')
+
+        for vairable in variable_list:
+            vairable_pair = vairable.split(':')
+            variable_dict.update({vairable_pair[0]: vairable_pair[1]})
+            setattr(VariablesPool, vairable_pair[0], vairable_pair[1])
+    else:
+        raise Exception('The format of the string to variable is wrong.')
+
+
 def main():
     parser = OptionParser(usage="usage: %prog [options][arg]")
     parser.add_option('-d', '--debug',
-                      action='store', 
-                      type='string', 
+                      action='store',
+                      type='string',
                       dest='debug_flag',
                       help='Turn on the debug mode [debug|info|warning|error]. Ex: $python threat_tester.py -d debug -c Dummy')
-    parser.add_option('-c', '--caseid', 
-                      action='store', 
-                      type='string', 
-                      dest="caseid_prefix", 
-                      help="Run the specific test case by ID or prefix of test case ID.")
-    parser.add_option('-s', '--csv', 
-                      action='store', 
-                      type='string', 
-                      dest="run_csv_path", 
-                      help="Run all test case in the specific csv file.")
-    parser.add_option('-l', '--csvlist', 
-                      action='store', 
-                      type='string', 
-                      dest="csv_list", 
-                      help="Run all csv files via list in a file. It can exectue the csv by order from top to bottom.")
-    parser.add_option('-a', '--all', 
-                      action='store_true',  
-                      dest="run_all_flag", 
-                      help="Run all the test cases")
-    parser.add_option("-g", "--gen", 
+    parser.add_option('-c', '--caseid',
                       action='store',
-                      type='string', 
+                      type='string',
+                      dest="caseid_prefix",
+                      help="Run the specific test case by ID or prefix of test case ID.")
+    parser.add_option('-s', '--csv',
+                      action='store',
+                      type='string',
+                      dest="run_csv_path",
+                      help="Run all test case in the specific csv file.")
+    parser.add_option('-l', '--csvlist',
+                      action='store',
+                      type='string',
+                      dest="csv_list",
+                      help="Run all csv files via list in a file. It can exectue the csv by order from top to bottom.")
+    parser.add_option('-a', '--all',
+                      action='store_true',
+                      dest="run_all_flag",
+                      help="Run all the test cases")
+    parser.add_option("-g", "--gen",
+                      action='store',
+                      type='string',
                       dest="csv_file_path",
                       help="Generate the template of test scripts. Ex: $python threat_tester.py TestSuites/Dummy.csv")
-    parser.add_option("-t", "--test", 
-                      action='store_true', 
+    parser.add_option("-t", "--test",
+                      action='store_true',
                       dest="test_flag",
-                      default=False, 
+                      default=False,
                       help="For develope use")
+    parser.add_option("-x", "--xml",
+                      action='store',
+                      dest="xml_filename",
+                      help="Output the xml file with junit xml format.")
+    parser.add_option("-v", "--variables",
+                      action='store',
+                      dest="variables",
+                      help="Variables with 'var1:AAA,var2:BBB'")
     (options, args) = parser.parse_args()
-    test_stat = 1
+
+    if options.variables:
+        parse_variable(options.variables)
 
     if options.debug_flag:
         # -d
@@ -63,22 +91,22 @@ def main():
         logging.info("Turn on the debug mode!")
     else:
         logging.basicConfig(format='[%(levelname)-6s][%(name)s]:%(message)s', level=logging.WARN)
-    
+
     if options.caseid_prefix:
         # -c
-        runner = TestEngine.Runner(['all'])
-        test_stat = runner.run(options.caseid_prefix)     
+        runner = TestEngine.Runner(['all'], options.xml_filename)
+        runner.run(options.caseid_prefix)
     elif options.run_csv_path:
         # -s
-        runner = TestEngine.Runner(options.run_csv_path.split(','))   
-        test_stat = runner.run_all()
+        runner = TestEngine.Runner(options.run_csv_path.split(','), options.xml_filename)
+        runner.run_all()
     elif options.csv_list:
         # -l
         with open(options.csv_list, 'rb') as fh:
             for line in fh:
                 csv_path = os.path.join('TestSuites', line.rstrip('\r\n'))
-                runner = TestEngine.Runner([csv_path])   
-                test_stat = runner.run_all()
+                runner = TestEngine.Runner([csv_path])
+                runner.run_all()
 
     elif options.csv_file_path:
         # -g
@@ -93,11 +121,10 @@ def main():
     elif options.run_all_flag:
         # -a
         runner = TestEngine.Runner(['all'])
-        test_stat = runner.run_all()
+        runner.run_all()
     else:
         parser.print_help()
 
-    return test_stat
+
 if __name__ == "__main__":
-    ret = main()
-    exit(ret)
+    main()

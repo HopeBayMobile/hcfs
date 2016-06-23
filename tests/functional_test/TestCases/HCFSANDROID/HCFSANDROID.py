@@ -1210,17 +1210,74 @@ class HCFSANDROID_87001:
     test Backend Monitor offline
     '''
     def __init__(self):
-        #self.cmd = "./TestCases/HCFSANDROID/test_scripts/testtestBackendMonitorOnline 1"
-        self.cmd = "ls -l"
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testBackendMonitorOnline.sh 1"
+        #self.cmd = "ls -l"
 
     def run(self):
-        
+        dt_ori = datetime.now()
+
         retcode = subprocess.call(self.cmd,shell=True)
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+
         if retcode != 0:
             return False, retcode
         else: 
-            return True, retcode
+            return True, 'Spend time: {0}'.format(spend_time)
 
+
+class HCFSANDROID_87002:
+    '''
+    test Backend Monitor from offline to online
+    '''
+    def __init__(self):
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testBackendMonitorOnline.sh 2"
+        #self.cmd = "ls -l"
+
+    def run(self):
+        dt_ori = datetime.now()
+
+        retcode = subprocess.call(self.cmd,shell=True)
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+
+        if retcode != 0:
+            return False, retcode
+        else: 
+            return True, 'Spend time: {0}'.format(spend_time)
+
+
+class HCFSANDROID_87003:
+    '''
+    test Backend Monitor from offline to online
+    '''
+    def __init__(self):
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testBackendMonitorOnline.sh 3"
+        #self.cmd = "ls -l"
+
+    def run(self):
+        dt_ori = datetime.now()
+
+        retcode = subprocess.call(self.cmd,shell=True)
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+
+        if retcode != 0:
+            return False, retcode
+        else: 
+            return True, 'Spend time: {0}'.format(spend_time)
 
 if __name__ == '__main__':
     pass
