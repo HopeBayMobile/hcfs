@@ -32,6 +32,8 @@ ffi.set_source( '_pyhcfs',
 #https: // cffi.readthedocs.org/en/latest/cdef.html#ffi-cdef-declaring-types-and-functions
 ffi.cdef(
     """
+#define LIST_DIR_LIMIT 1000
+
 typedef struct { /* 128 bytes */
 	uint64_t dev;
 	uint64_t ino;
@@ -57,7 +59,7 @@ typedef struct { /* 128 bytes */
 typedef struct {
 	uint64_t inode;
 	char d_name[256];
-	char d_type;
+	uint8_t d_type;
 } PORTABLE_DIR_ENTRY;
 
 typedef struct {

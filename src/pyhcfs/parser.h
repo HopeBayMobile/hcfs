@@ -46,7 +46,7 @@ typedef struct {
 typedef struct {
 	uint64_t inode;
 	char d_name[256];
-	char d_type;
+	uint8_t d_type;
 } PORTABLE_DIR_ENTRY;
 
 typedef struct {

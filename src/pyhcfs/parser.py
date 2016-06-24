@@ -63,34 +63,26 @@ def parse_meta(meta_path):
     return convert_to_python(meta[0])
 
 
-def list_dir_inorder(meta_path, offset=(0, 0), limit=20):
-    resp = [
-        (1001, u'Android'),
-        (1002, u'data'),
-        (1003, u'DCIM'),
-        (1004, u'Download'),
-        (1005, u'LINE_Backup'),
-        (1006, u'我的文件夾'),
-        (1007, u'照片 2016'),
-        (1008, u'企劃書 01.docx'),
-        (1009, u'企劃書 02.docx'),
-        (1010, u'活動投影片01.pptx'),
-        (1011, u'活動投影片02.pptx'),
-        (1012, u'照片 5022.jpg'),
-        (1013, u'照片 5023.jpg'),
-        (1014, u'照片 5024.jpg'),
-        (1015, u'照片 5025.jpg'),
-        (1016, u'照片 5026.jpg'),
-        (1017, u'照片 5022.jpg'),
-        (1018, u'照片 5023.jpg'),
-        (1019, u'照片 5024.jpg'),
-        (1020, u'照片 5025.jpg'),
-        (1021, u'照片 5026.jpg'),
-    ]
+def list_dir_inorder(meta_path, offset=(0, 0), limit=1000):
+    """
+    int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
+                             const int32_t start_el, const int32_t limit,
+                             int64_t *end_page_pos, int32_t *end_el_no,
+                             PORTABLE_DIR_ENTRY *file_list);
+    """
+    end_page_pos = ffi.new("int64_t *")
+    end_el_no = ffi.new("int32_t *")
+    file_list = ffi.new("PORTABLE_DIR_ENTRY []", limit)
+    ret_code = lib.list_dir_inorder(meta_path, offset[0], offset[1], limit, 
+            end_page_pos, end_el_no, file_list)
 
-    offset = (234, 543)
+    ret = {
+            'result': ret_code,
+            'offset': (end_page_pos[0], end_el_no[0]),
+            'child_list': [ convert_to_python(file_list[i]) for i in range(limit) ]
+            }
 
-    return (offset, resp)
+    return ret
 
 def get_external_vol(tmp_meta):
     return list_external_vol(tmp_meta)

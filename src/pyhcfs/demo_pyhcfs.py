@@ -30,4 +30,10 @@ pprint.pprint(parse_meta("testdata/meta423"))
 
 print "=============================="
 print "list_dir_inorder"
-pp.pprint(list_dir_inorder("testdata/meta123", limit=2))
+offset = (0, 0)
+ret = list_dir_inorder("testdata/meta423", offset, limit=50)
+pp.pprint( ret )
+ret = list_dir_inorder("testdata/meta423", ret['offset'], limit=50)
+pp.pprint( ret )
+ret = list_dir_inorder("testdata/meta423", ret['offset'], limit=50)
+pp.pprint( ret )
