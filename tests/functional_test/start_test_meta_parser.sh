@@ -4,6 +4,8 @@ repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..
 
 $repo/utils/setup_dev_env.sh -m docker_host
 
+$repo/build.sh pyhcfs
+
 #dockerfile=$repo/tests/functional_test/TestCases/TestMetaParser/Dockerfile
 #image="test_img"
 #ver="1.0"

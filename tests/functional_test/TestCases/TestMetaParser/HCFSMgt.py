@@ -5,16 +5,16 @@ import re
 import os
 import time
 
-import Var
+import VarMgt
 
 logging.basicConfig()
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
-_repo = Var.get_repo()
-_hcfs = Var.get_hcfs_path()
-_cli = Var.get_cli_path()
-_API = Var.get_API_path()
+_repo = VarMgt.get_repo()
+_hcfs = VarMgt.get_hcfs_path()
+_cli = VarMgt.get_cli_path()
+_API = VarMgt.get_API_path()
 _hcfs_bin = _hcfs + "/hcfs"
 _HCFSvol_bin = _cli + "/HCFSvol"
 _hcfsconf_bin = _API + "/hcfsconf"
@@ -24,9 +24,9 @@ _hcfs_timeout = 40
 
 def clean_hcfs():
 	_logger.info("[HCFS] Make clean hcfs.")
-	subprocess.call("make -s -C " + _hcfs + " clean", shell=True, stdout=PIPE, stderr=PIPE)
-	subprocess.call("make -s -C " + _cli + " clean", shell=True, stdout=PIPE, stderr=PIPE)
-	subprocess.call("make -s -C " + _API + " clean", shell=True, stdout=PIPE, stderr=PIPE)
+	subprocess.call("sudo make -s -C " + _hcfs + " clean", shell=True, stdout=PIPE, stderr=PIPE)
+	subprocess.call("sudo make -s -C " + _cli + " clean", shell=True, stdout=PIPE, stderr=PIPE)
+	subprocess.call("sudo make -s -C " + _API + " clean", shell=True, stdout=PIPE, stderr=PIPE)
 	assert not os.path.isfile(_hcfs_bin), "Error occured when make clean hcfs."
 	assert not os.path.isfile(_HCFSvol_bin), "Error occured when make clean HCFSvol."
 	assert not os.path.isfile(_hcfsconf_bin), "Error occured when make clean hcfsconf."
@@ -34,9 +34,9 @@ def clean_hcfs():
 # TODO: "make" args is not for sure.
 def compile_hcfs():
 	_logger.info("[HCFS] Compile hcfs.")
-	subprocess.call("make -s -C " + _hcfs, shell=True, stdout=PIPE, stderr=PIPE)
-	subprocess.call("make -s -C " + _cli, shell=True, stdout=PIPE, stderr=PIPE)
-	subprocess.call("make -s -C " + _API + " hcfsconf", shell=True, stdout=PIPE, stderr=PIPE)
+	subprocess.call("sudo make -s -C " + _hcfs, shell=True, stdout=PIPE, stderr=PIPE)
+	subprocess.call("sudo make -s -C " + _cli, shell=True, stdout=PIPE, stderr=PIPE)
+	subprocess.call("sudo make -s -C " + _API + " hcfsconf", shell=True, stdout=PIPE, stderr=PIPE)
 	assert os.path.isfile(_hcfs_bin), "Cannot make hcfs executable."
 	assert os.access(_hcfs_bin, os.X_OK), "Cannot execute hcfs executable."
 	assert os.path.isfile(_HCFSvol_bin), "Cannot make HCFSvol executable."

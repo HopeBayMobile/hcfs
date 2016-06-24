@@ -9,10 +9,10 @@ _hcfs = _repo + "/src/HCFS"
 _cli = _repo + "/src/CLI_utils"
 _API = _repo + "/src/API"
 
-_swift_data = _repo + "/tmp/swift_data"
-_meta = _repo + "/tmp/meta"
-_block = _repo + "/tmp/block"
-_mnt = _repo + "/tmp/mnt"
+_swift_data = "/tmp/swift_data"
+_meta = "/tmp/meta"
+_block = "/tmp/block"
+_mnt = "/tmp/mnt"
 
 _hcfs_conf_tmp = _repo + "/tests/functional_test/TestCases/TestMetaParser/hcfs.conf.tmp"
 

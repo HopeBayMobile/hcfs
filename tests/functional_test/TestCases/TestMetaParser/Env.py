@@ -10,17 +10,17 @@ import getpass
 
 import HCFSMgt
 import SwiftMgt
-import Var
+import VarMgt
 
 # TODO:path replace with os.path.join to feat all OS
 
-_repo = Var.get_repo()
-_swift_data = Var.get_swift_data_path()
-_meta = Var.get_meta_path()
-_block = Var.get_block_path()
-_mnt = Var.get_mnt()
+_repo = VarMgt.get_repo()
+_swift_data = VarMgt.get_swift_data_path()
+_meta = VarMgt.get_meta_path()
+_block = VarMgt.get_block_path()
+_mnt = VarMgt.get_mnt()
 
-_hcfs_conf_tmp = Var.get_hcfs_conf_tmp()
+_hcfs_conf_tmp = VarMgt.get_hcfs_conf_tmp()
 
 logging.basicConfig()
 _logger = logging.getLogger(__name__)
@@ -32,15 +32,14 @@ def prepare_dir_permission():
 	_logger.info("[Env] Affect below : /data /data/hcfs.conf.tmp /data/hcfs.conf repo")
 	# /data
 	if not os.path.exists("/data"):	subprocess.call("sudo mkdir /data", shell=True)	
-	subprocess.call("sudo chown " + getpass.getuser() + ":fuse /data", shell=True)
-	subprocess.call("sudo chmod 730 /data", shell=True)
+	#subprocess.call("sudo chown " + getpass.getuser() + ":fuse /data", shell=True)
+	#subprocess.call("sudo chmod 730 /data", shell=True)
 	# /data/hcfs.conf.tmp
 	if os.path.isfile("/data/hcfs.conf.tmp"):	subprocess.call("sudo rm /data/hcfs.conf.tmp", shell=True)
 	# /data/hcfs.conf
 	if os.path.isfile("/data/hcfs.conf"):	subprocess.call("sudo rm /data/hcfs.conf", shell=True)
-	# repo/tmp/meta repo/tmp/block repo/tmp/mnt
-	subprocess.call("sudo chown " + getpass.getuser() + ":fuse " + _repo, shell=True)
-	subprocess.call("sudo chmod 730 " + _repo, shell=True)
+	#subprocess.call("sudo chown " + getpass.getuser() + ":fuse " + _repo, shell=True)
+	#subprocess.call("sudo chmod 730 " + _repo, shell=True)
 
 # TODO:decouple with shell script
 def before():
@@ -92,6 +91,9 @@ def setup_Ted_env():
 		setup_test_dir()
 		setup_hcfs_conf(_swift)
 		HCFSMgt.start_hcfs()
+		HCFSMgt.create_filesystem("test_fs")
+		assert "test_fs" in HCFSMgt.list_filesystems(), "HCFS create file system failure"
+		HCFSMgt.mount("test_fs", _mnt)
 	except Exception as e:
 		cleanup()
 		return False, e
