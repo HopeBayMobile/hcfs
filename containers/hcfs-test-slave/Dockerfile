@@ -21,7 +21,9 @@ RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 
 # CI runs build/test in all roles
 #
-ADD . /build
-RUN ls -l /build
-RUN /build/scrips/05_setup_ci_env
+ADD utils/ /build/utils/
+ADD scrips/05_install_required_packages /build/scrips/05_install_required_packages
+RUN /build/scrips/05_install_required_packages
+ADD scrips/06_setup_ci_env /build/scrips/06_setup_ci_env
+RUN /build/scrips/06_setup_ci_env
 RUN rm -rf /tmp/* /var/tmp/* /etc/service/sshd/down

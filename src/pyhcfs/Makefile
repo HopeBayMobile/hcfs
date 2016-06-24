@@ -5,7 +5,7 @@ CFLAGS=-D_ANDROID_ENV_
 all: _pyhcfs.so parser
 
 _pyhcfs.so: parser.c parser.h
-	python pyhcfs_build.py
+	python3 pyhcfs_build.py
 
 parser: CFLAGS+=-g -I../HCFS
 parser: parser.c parser.h

@@ -106,6 +106,7 @@ function lib()
 function pyhcfs ()
 {
 	$repo/utils/setup_dev_env.sh -m docker_host
+	$repo/utils/setup_dev_env.sh
 	if ! groups $USER | grep  -q "\(docker\|root\)"; then
 		echo To run docker with user, please add your user into docker group and re-login session:
 		echo "sudo usermod -aG docker <user_name>"
@@ -115,10 +116,10 @@ function pyhcfs ()
 	set -x
 	if [ "$TEST" -eq 1 ]; then
 		docker run --rm -v "$repo":/hcfs docker:5000/docker_hcfs_test_slave \
-			bash -c "cd /hcfs; umask 000; python setup.py test"
+			bash -c "cd /hcfs; umask 000; python3 setup.py test"
 	else
 		docker run --rm -v "$repo":/hcfs docker:5000/docker_hcfs_test_slave \
-			bash -c "cd /hcfs; umask 000; python setup.py bdist_egg"
+			bash -c "cd /hcfs; umask 000; python3 setup.py bdist_egg"
 		mkdir -p build/out/
 		rsync -arcv --no-owner --no-group --no-times dist/ build/out/
 	fi
