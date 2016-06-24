@@ -72,20 +72,24 @@ int main(void)
 	printf("%20s: %lu\n", "ctime_nsec", stat_data->ctime_nsec);
 
 	puts("============================================");
-	puts("list_dir_inorder(\"testdata/meta423\")");
 
+	puts("list_dir_inorder(\"testdata/meta423\"), 0, 0, 400, &end_pos, "
+	     "&end_el, &(file_list[0])");
 	PORTABLE_DIR_ENTRY file_list[400];
-	PORTABLE_DIR_ENTRY file_list2[30];
 
 	list_dir_inorder("testdata/meta423", 0, 0, 400, &end_pos, &end_el,
 			 &(file_list[0]));
 	for (i = 0; i < 400; i++)
-		printf("%s\n", file_list[i].d_name);
+		printf("%s ", file_list[i].d_name);
+
+	puts("\nlist_dir_inorder(\"testdata/meta423\", end_pos, end_el, 30, "
+	     "&end_pos, &end_el, &(file_list2[0]))");
+	PORTABLE_DIR_ENTRY file_list2[30];
 
 	list_dir_inorder("testdata/meta423", end_pos, end_el, 30, &end_pos,
 			 &end_el, &(file_list2[0]));
 	for (i = 0; i < 30; i++)
-		printf("%s\n", file_list2[i].d_name);
+		printf("%s ", file_list2[i].d_name);
 }
 
 /************************************************************************
@@ -234,7 +238,7 @@ int32_t parse_meta(char *meta_path, RET_META *ret)
 
 	if (ret->file_type == D_ISDIR) {
 		ret_code = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
-		if (ret_code == -1) 
+		if (ret_code == -1)
 			goto errcode_handle;
 		ret->child_number = dir_meta.total_children;
 	} else {
