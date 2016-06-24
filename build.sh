@@ -114,11 +114,11 @@ function pyhcfs ()
 	docker pull docker:5000/docker_hcfs_test_slave
 	set -x
 	if [ "$TEST" -eq 1 ]; then
-		docker run -it --rm -v "$repo":/hcfs -w="/hcfs" docker:5000/docker_hcfs_test_slave \
-			bash -c "umask 000; python setup.py test"
+		docker run --rm -v "$repo":/hcfs docker:5000/docker_hcfs_test_slave \
+			bash -c "cd /hcfs; umask 000; python setup.py test"
 	else
-		docker run -it --rm -v "$repo":/hcfs -w="/hcfs" docker:5000/docker_hcfs_test_slave \
-			bash -c "umask 000; python setup.py bdist_egg"
+		docker run --rm -v "$repo":/hcfs docker:5000/docker_hcfs_test_slave \
+			bash -c "cd /hcfs; umask 000; python setup.py bdist_egg"
 		mkdir -p build/out/
 		rsync -arcv --no-owner --no-group --no-times dist/ build/out/
 	fi
