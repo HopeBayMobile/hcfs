@@ -2624,7 +2624,7 @@ int32_t restore_meta_structure(FILE *fptr)
 	/* Update statistics */
 	change_system_meta(this_stat.st_size, meta_stat.st_size,
 			0, 0, 0, 0, TRUE);
-	if (file_meta.local_pin == TRUE) {
+	if (P_IS_PIN(file_meta.local_pin)) {
 		ret = change_pin_size(this_stat.st_size);
 		if (ret < 0) {
 			/* If no space, change pin status? */
@@ -2632,7 +2632,7 @@ int32_t restore_meta_structure(FILE *fptr)
 requests surface before meta restoration is completed, should
 limit number / size of the requests, or should consider soft pin?
 */
-			file_meta.local_pin = FALSE;
+			file_meta.local_pin = P_UNPIN;
 			FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 			FWRITE(&file_meta,
 				sizeof(FILE_META_TYPE), 1, fptr);
@@ -2657,7 +2657,7 @@ errcode_handle:
 int32_t restore_meta_file(ino_t this_inode)
 {
 	char metapath[METAPATHLEN];
-	char restored_metapath[300], objname[100];
+	char restored_metapath[400], objname[100];
 	FILE *fptr;
 	int32_t errcode, ret;
 

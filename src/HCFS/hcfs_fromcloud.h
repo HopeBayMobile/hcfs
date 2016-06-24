@@ -27,6 +27,7 @@
 
 #define MAX_PIN_DL_CONCURRENCY ((MAX_DOWNLOAD_CURL_HANDLE) / 2)
 
+/* Download action type */
 #define READ_BLOCK 0 /* Read block. High priority */
 #define PIN_BLOCK 1 /* Pin a block */
 #define FETCH_FILE_META 2 /* Download meta file by sync thread */
