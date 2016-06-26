@@ -36,8 +36,6 @@ int main(void)
 {
 	PORTABLE_DIR_ENTRY *ret_entry;
 	uint64_t ret_num;
-	int64_t end_pos;
-	int32_t end_el;
 	int32_t i;
 	RET_META meta_data;
 	HCFS_STAT *stat_data = &meta_data.stat;
@@ -75,21 +73,30 @@ int main(void)
 
 	puts("list_dir_inorder(\"testdata/meta423\"), 0, 0, 400, &end_pos, "
 	     "&end_el, &(file_list[0])");
+	int32_t num_walked = 0;
+	int32_t num_children = 99;
+	int32_t end_el = 0;
+	int64_t end_pos = 0;
 	PORTABLE_DIR_ENTRY file_list[400];
 
-	list_dir_inorder("testdata/meta423", 0, 0, 400, &end_pos, &end_el,
-			 &(file_list[0]));
-	for (i = 0; i < 400; i++)
-		printf("%s ", file_list[i].d_name);
-
-	puts("\nlist_dir_inorder(\"testdata/meta423\", end_pos, end_el, 30, "
-	     "&end_pos, &end_el, &(file_list2[0]))");
-	PORTABLE_DIR_ENTRY file_list2[30];
-
-	list_dir_inorder("testdata/meta423", end_pos, end_el, 30, &end_pos,
-			 &end_el, &(file_list2[0]));
-	for (i = 0; i < 30; i++)
-		printf("%s ", file_list2[i].d_name);
+	while (TRUE) {
+		num_walked = list_dir_inorder("testdata/meta423",
+				end_pos, end_el, num_children, &end_pos, &end_el,
+				&(file_list[0]));
+		if (num_walked == 0) {
+			printf("No more children can be listed\n");
+			printf("Total %d children traversed\n", num_walked);
+			printf("next page_pos is %lld, next el_no is %d\n", end_pos, end_el);
+			break;
+		} else if (num_walked < 0) {
+			printf("Error %d\n", num_walked);
+			break;
+		}
+		printf("Total %d children traversed\n", num_walked);
+		printf("next page_pos is %lld, next el_no is %d\n", end_pos, end_el);
+		for (i = 0; i < num_walked; i++)
+			printf("%s\n", file_list[i].d_name);
+	}
 }
 
 /************************************************************************
@@ -278,7 +285,6 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 	uint32_t idx;
 	int32_t ret_code;
 	ssize_t ret_ssize;
-	int32_t parent_start_el = -1;
 	DIR_ENTRY_PAGE temppage;
 
 	ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE), page_pos);
@@ -288,19 +294,21 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 	if (temppage.child_page_pos[start_el] == 0) {
 		/* At leaf */
 		for (idx = start_el; idx < temppage.num_entries; idx++) {
-			if (this_walk->num_walked >= limit) {
-				if (this_walk->is_walk_end == FALSE) {
-					this_walk->is_walk_end = TRUE;
-					this_walk->end_page_pos =
-					    temppage.this_page_pos;
-					this_walk->end_el_no = idx;
-				}
+			if (this_walk->is_walk_end)
 				return 0;
-			}
+
 			memcpy(file_list + this_walk->num_walked,
 			       &(temppage.dir_entries[idx]),
-			       sizeof(PORTABLE_DIR_ENTRY));
+				       sizeof(PORTABLE_DIR_ENTRY));
+			this_walk->end_page_pos = temppage.this_page_pos;
+			this_walk->end_el_no = idx;
 			this_walk->num_walked += 1;
+
+			if (this_walk->num_walked >= limit) {
+				this_walk->end_el_no += 1;
+				this_walk->is_walk_end = TRUE;
+				return 0;
+			}
 		}
 	} else {
 		if (walk_left) {
@@ -312,19 +320,25 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 		}
 
 		for (idx = start_el; idx < temppage.num_entries; idx++) {
-			if (this_walk->num_walked >= limit) {
-				if (this_walk->is_walk_end == FALSE) {
-					this_walk->is_walk_end = TRUE;
-					this_walk->end_page_pos =
-					    temppage.child_page_pos[idx + 1];
-					this_walk->end_el_no = 0;
-				}
+			if (this_walk->is_walk_end)
 				return 0;
-			}
+
 			memcpy(file_list + this_walk->num_walked,
 			       &(temppage.dir_entries[idx]),
 			       sizeof(PORTABLE_DIR_ENTRY));
+			this_walk->end_page_pos =
+				temppage.this_page_pos;
+			this_walk->end_el_no = idx;
 			this_walk->num_walked += 1;
+
+			if (this_walk->num_walked >= limit) {
+				this_walk->end_page_pos =
+					temppage.child_page_pos[idx + 1];
+				this_walk->end_el_no = 0;
+				this_walk->is_walk_end = TRUE;
+				return 0;
+			}
+
 			ret_code = _traverse_dir_btree(
 			    fd, temppage.child_page_pos[idx + 1], 0, TRUE,
 			    FALSE, limit, this_walk, file_list);
@@ -334,7 +348,8 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 	}
 
 	/* Need to backward to parent page for deeper traverse */
-	if (walk_up && temppage.parent_page_pos != 0) {
+	if (walk_up && temppage.parent_page_pos != 0 &&
+			this_walk->is_walk_end == FALSE) {
 		ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE),
 				  temppage.parent_page_pos);
 		if (ret_ssize < 0)
@@ -342,16 +357,13 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 
 		for (idx = 0; idx < temppage.num_entries + 1; idx++) {
 			if (page_pos == temppage.child_page_pos[idx]) {
-				parent_start_el = idx;
+				ret_code = _traverse_dir_btree(
+				    fd, temppage.this_page_pos, idx, FALSE,
+				    TRUE, limit, this_walk, file_list);
+				if (ret_code < 0)
+					return ret_code;
 				break;
 			}
-		}
-		if (parent_start_el >= 0) {
-			ret_code = _traverse_dir_btree(
-			    fd, temppage.this_page_pos, parent_start_el, FALSE,
-			    TRUE, limit, this_walk, file_list);
-			if (ret_code < 0)
-				return ret_code;
 		}
 	}
 
@@ -372,7 +384,8 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 *                Arguments (end_page_pos) and (end_el_no) indicate the start
 *                position for next traverse.
 *
-*  Return value: 0 if successful. Otherwise returns negation of error code.
+*  Return value: Number of children returned if successful.
+*  		 Otherwise returns negation of error code.
 *
 *************************************************************************/
 int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
@@ -408,8 +421,8 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 
 	/* Initialize stats about this tree walk */
 	this_walk.is_walk_end = FALSE;
-	this_walk.end_page_pos = 0;
-	this_walk.end_el_no = 0;
+	this_walk.end_page_pos = page_pos;
+	this_walk.end_el_no = start_el;
 	this_walk.num_walked = 0;
 
 	if (page_pos == 0) {
@@ -431,6 +444,10 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 	if (ret_code == 0) {
 		*end_page_pos = this_walk.end_page_pos;
 		*end_el_no = this_walk.end_el_no;
+		if (this_walk.num_walked > 0 &&
+		    this_walk.num_walked < limit)
+			*end_el_no += 1;
+		ret_code = this_walk.num_walked;
 	}
 
 	goto end;
