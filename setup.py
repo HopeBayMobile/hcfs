@@ -11,6 +11,8 @@
 #
 ##########################################################################
 import sys
+import os
+import datetime
 
 from setuptools import setup, find_packages, Extension
 from setuptools.command.test import test as TestCommand
@@ -36,7 +38,7 @@ class PyTest(TestCommand):
 
 setup(
     name='pyhcfs',
-    version='0.1dev',
+    version=os.getenv('VERSION_NUM', datetime.datetime.now().isoformat('T')),
     package_dir={'':'src'},
     packages=find_packages("src"),
     setup_requires=['cffi >= 1.1'],
