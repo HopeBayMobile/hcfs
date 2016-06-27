@@ -272,7 +272,8 @@ public class SettingsActivity extends Activity
             R.id.location_settings,
             R.id.security_settings,
             R.id.language_settings,
-            R.id.user_settings,
+            // Vince
+            //R.id.user_settings,
             R.id.account_settings,
             R.id.system_section,
             R.id.date_time_settings,
@@ -1274,6 +1275,7 @@ public class SettingsActivity extends Activity
                     if (!updateHomeSettingTiles(tile)) {
                         removeTile = true;
                     }
+                /* Vince
                 } else if (id == R.id.user_settings) {
                     boolean hasMultipleUsers =
                             ((UserManager) getSystemService(Context.USER_SERVICE))
@@ -1283,6 +1285,7 @@ public class SettingsActivity extends Activity
                             || Utils.isMonkeyRunning()) {
                         removeTile = true;
                     }
+                */
                 } else if (id == R.id.nfc_payment_settings) {
                     if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_NFC)) {
                         removeTile = true;

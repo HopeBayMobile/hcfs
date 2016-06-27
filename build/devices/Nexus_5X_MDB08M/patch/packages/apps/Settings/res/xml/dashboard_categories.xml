@@ -142,13 +142,15 @@
                 android:icon="@drawable/ic_settings_memory"
                 />
 
-        <!-- Manage users -->
+        <!-- Vince -->
+        <!-- Manage users 
         <dashboard-tile
                 android:id="@+id/user_settings"
                 android:title="@string/user_settings_title"
                 android:fragment="com.android.settings.users.UserSettings"
                 android:icon="@drawable/ic_settings_multiuser"
                 />
+        -->
 
         <!-- Manage NFC payment apps -->
         <dashboard-tile
