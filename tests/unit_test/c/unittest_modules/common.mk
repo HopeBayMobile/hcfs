@@ -88,19 +88,24 @@ $(OBJ_DIR)/gtest_main.a : $(OBJ_DIR)/gtest-all.o $(OBJ_DIR)/gtest_main.o
 $(OBJ_DIR):
 	mkdir -p $@
 
-# pull in dependency info for *existing* .o files
-include $(OBJS:%.o=%.d)
-
 # compile and generate dependency info
 $(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $(@:%.o=%.d)
-	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(@:%.o=%.d)
+
+$(OBJ_DIR)/%.d: %.c | $(OBJ_DIR)
+	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $@
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $@
 
 $(OBJ_DIR)/%.o: %.cc | $(OBJ_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-	@$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< > $(@:%.o=%.d)
-	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(@:%.o=%.d)
 
+$(OBJ_DIR)/%.d: %.cc | $(OBJ_DIR)
+	@$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< > $@
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $@
 
-
+###########################################################################
+# HCFS setup rules
+###########################################################################
+setup:
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+.PHONY: setup
