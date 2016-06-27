@@ -15,33 +15,26 @@ include ../common.mk
 
 # All tests produced by this Makefile.
 
-define ADDTEST
-$(eval T := $(strip $1))
-$(eval OBJS := $(addprefix $(OBJ_DIR)/, $2))
-TESTS += $(T)
-RUN_TESTS += run-$(T)
--include $(OBJS:%.o=%.d) # Load dependency info for *existing* .o files
-
-$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread
-
-run-$(T): $(T)
-	./$$< --gtest_output=xml:test_detail_$$<.xml
-.PHONY: run-$(T)
-endef
 
 # monitor unittest
 $(eval $(call ADDTEST, \
   pyhcfs_unittest, \
   pyhcfs_unittest.o))
 
-test: $(RUN_TESTS)
-ifndef NOGCOVR
+# Load Generated test list
+-include $(OBJ_DIR)/*.tests
+
+test: $(RUN_TESTS) | $(UT_FILES)
+ifndef GEN_TEST # Reload make rule if nothing is loaded
+	make test
+else
+  ifndef NOGCOVR
 	gcovr -p -k -r $(USER_DIR) .
+  endif
 endif
 
 clean:
-	rm -rf $(TESTS) *.gcda *.gcov $(OBJ_DIR) *.xml
+	rm -rf $(UT_FILES) *.gcda *.gcov $(OBJ_DIR) *.xml
 
 # finalizing the default targets
-all: setup $(TESTS)
+all: setup $(UT_FILES)

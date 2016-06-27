@@ -109,3 +109,30 @@ $(OBJ_DIR)/%.d: %.cc | $(OBJ_DIR)
 setup:
 	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 .PHONY: setup
+
+define ADDTEST
+$(eval T := $(strip $1))
+$(eval OBJS := $(addprefix $(OBJ_DIR)/, $2))
+-include $(OBJS:%.o=%.d) # Load dependency info for *existing* .o files
+
+# Prepare Test
+UT_FILES += prepare-$(T)
+
+.PHONY: prepare-$(T)
+prepare-$(T): $(T) $(OBJ_DIR)/$(T).tests
+
+# Build executable test
+$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread
+
+# Generate test list from executable file
+$(OBJ_DIR)/$(T).tests: $(T) | $(OBJ_DIR)
+	./$(T) --gtest_list_tests | \
+	  awk 'NR>1&&/^[^ ]/{prefix=$$$$1}; NR>1&&/^ /{print prefix$$$$1}' | \
+	  xargs -I{} echo -e \
+	  "GEN_TEST:=1\n\
+	  RUN_TESTS+=$(OBJ_DIR)/$(T).{}.pass\n\
+	  $(OBJ_DIR)/$(T).{}.pass: $(T)\n\t\
+	  ./$$< --gtest_filter={} --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T).{}.xml\n\t\
+	  touch $(OBJ_DIR)/$(T).{}.pass" > $(OBJ_DIR)/$(T).tests
+endef
