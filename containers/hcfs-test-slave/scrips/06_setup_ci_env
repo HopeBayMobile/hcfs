@@ -67,7 +67,7 @@ function install_ccm() {
 }
 
 function install_pyhcfs_deps() {
-	pip3 install cffi
+	pip3 install cffi pytest py
 }
 
 function setup_dev_env() {
