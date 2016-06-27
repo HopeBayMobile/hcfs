@@ -7595,8 +7595,8 @@ int32_t hook_fuse(int32_t argc, char **argv)
 		sem_wait(&(hcfs_system->access_sem));
 		if (hcfs_system->system_restoring) {
 			if (rebuild_sb_jobs->job_finish) {
-				destroy_rebuild_sb();
 				hcfs_system->system_restoring = FALSE;
+				destroy_rebuild_sb(TRUE);
 				/* Enable backend related services */
 				init_backend_related_module();
 				write_log(10, "Debug: Finish rebuilding."
