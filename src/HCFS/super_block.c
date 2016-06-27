@@ -865,6 +865,7 @@ int32_t super_block_reclaim_fullscan(void)
 		super_block_exclusive_release();
 		return -errcode;
 	}
+
 	/* Traverse all entries and reclaim. */
 	for (count = 1; count < sys_super_block->head.num_total_inodes;
 								count++) {
@@ -1923,6 +1924,15 @@ error_handling:
 			return -ENOTCONN; \
 	}
 
+/**
+ * Check number of root inodes and super block status and decide
+ * if need to rebuild super block or create a new super block. In case
+ * of super block rebuilding, decide to start from begining or keep
+ * rebuilding.
+ *
+ * @return 0 when keep or start rebuilding super block. 1 when initialize
+ *         and open old super block. Otherwise negative error code.
+ */
 int32_t check_init_super_block()
 {
 	char fsmgr_path[400], objname[300];

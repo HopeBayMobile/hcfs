@@ -516,7 +516,7 @@ int32_t main(int32_t argc, char **argv)
 			write_log(10, "Debug: Open old superblock.\n");
 			init_backend_related_module();
 		} else {
-			write_log(10, "Debug: Rebuild superblock.\n");
+			write_log(4, "Rebuild superblock.\n");
 			/* Rebuild superblock.
 			 * Do NOT init upload/delete/cache mgmt */
 		}
@@ -525,7 +525,7 @@ int32_t main(int32_t argc, char **argv)
 		ret = check_init_super_block();
 		if (ret < 0) {
 			exit(ret);
-		} else if (ret > 0) { /* It just opened old superblock */
+		} else if (ret > 0) { /* Just opened old superblock */
 			init_backend_related_module();
 		} else {
 			write_log(0, "Error: Cannot restore because"

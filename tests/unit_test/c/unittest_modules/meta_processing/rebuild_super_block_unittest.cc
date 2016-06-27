@@ -830,12 +830,12 @@ TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 	struct stat tmpstat;
 	SUPER_BLOCK_ENTRY exp_entry, test_entry;
 
-	inode = 10;
+	inode = 15;
 	memset(&exp_stat, 0, sizeof(struct stat));
 	memset(&exp_filemeta, 0, sizeof(FILE_META_TYPE));
 	exp_stat.st_mode = S_IFREG;
 	exp_stat.st_size = 5566;
-	exp_filemeta.local_pin = TRUE;
+	exp_filemeta.local_pin = P_PIN;
 
 	EXPECT_EQ(0, restore_meta_super_block_entry(inode, &tmpstat));
 

@@ -1,5 +1,6 @@
 #include "params.h"
 #include "fuseop.h"
+#include "super_block_mock_params.h"
 #include <sys/types.h>
 #include <errno.h>
 
@@ -50,14 +51,26 @@ int32_t restore_meta_super_block_entry(ino_t this_inode,
 
 int32_t init_rebuild_sb(char rebuild_action)
 {
+	mknod(SUPERBLOCK, 0600, 0);
+	mknod(UNCLAIMEDFILE, 0600, 0);
 	return 0;
 }
+
 int32_t create_sb_rebuilder()
 {
 	return 0;
 }
+
 int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 {
+	if (!strcmp(objname, "FSmgr_backup")) {
+		DIR_META_TYPE dirmeta;
+		memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
+		dirmeta.total_children = NUM_VOL;
+		pwrite(fileno(fptr), &dirmeta, sizeof(DIR_META_TYPE), 16);
+	}
+	printf("fetch object %s\n", objname);
+
 	return 0;
 }
 

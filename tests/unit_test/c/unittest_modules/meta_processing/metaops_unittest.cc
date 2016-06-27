@@ -1958,7 +1958,7 @@ protected:
 	{
 		strcpy(work_path, "restore_meta_fileTestPath");
 		if (!access(work_path, F_OK))
-			system("rm -rf ./restore_meta_fileTest");
+			system("rm -rf ./restore_meta_fileTestPath");
 		mkdir(work_path, 0700);
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system = (SYSTEM_DATA_HEAD*)
@@ -1971,7 +1971,7 @@ protected:
 	{
 		free(hcfs_system);
 		if (!access(work_path, F_OK))
-			system("rm -rf ./restore_meta_fileTest");
+			system("rm -rf ./restore_meta_fileTestPath");
 	}
 };
 
@@ -2123,7 +2123,7 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 	setbuf(fptr, NULL);
 	memset(&tmpstat, 0, sizeof(struct stat));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
-	memset(&stats, 0, sizeof(FILE_STATS_TYPE));
+	memset(&stats, 1, sizeof(FILE_STATS_TYPE));
 	stats.num_blocks = 7;
 	memset(&cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
 	memset(&block_page, 0, sizeof(BLOCK_ENTRY_PAGE));

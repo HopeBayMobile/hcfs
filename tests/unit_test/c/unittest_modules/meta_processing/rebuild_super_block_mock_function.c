@@ -13,6 +13,8 @@ int32_t write_log(int32_t level, char *format, ...)
 
 int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	if (NOW_TEST_RESTORE_META == TRUE)
+		inode_ptr->this_index = 0;
 	return 0;
 }
 

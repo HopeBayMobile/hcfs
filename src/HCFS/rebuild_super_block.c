@@ -966,7 +966,10 @@ restoring mode is early enough so that read will always be successful here */
 	if (S_ISREG(this_stat.st_mode)) {
 		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 		FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
-		pin_status = this_meta.local_pin == TRUE ? PIN : UNPIN;
+		if (P_IS_PIN(this_meta.local_pin))
+			pin_status = PIN;
+		else
+			pin_status = UNPIN;
 	} else {
 		pin_status = PIN;
 	}
