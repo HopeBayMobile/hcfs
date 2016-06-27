@@ -17,7 +17,7 @@ def test_parse_meta():
     _TEST_META_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'meta'))
     ret = parser.parse_meta(_TEST_META_FILENAME)
     pp.pprint(ret)
-    assert ret == {   
+    assert ret == {
             'child_number': 3001,
             'file_type': 0,
             'result': 0,

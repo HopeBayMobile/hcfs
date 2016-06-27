@@ -73,7 +73,7 @@ def list_dir_inorder(meta_path, offset=(0, 0), limit=1000):
     end_page_pos = ffi.new("int64_t *")
     end_el_no = ffi.new("int32_t *")
     file_list = ffi.new("PORTABLE_DIR_ENTRY []", limit)
-    ret_code = lib.list_dir_inorder(meta_path, offset[0], offset[1], limit, 
+    ret_code = lib.list_dir_inorder(meta_path, offset[0], offset[1], limit,
             end_page_pos, end_el_no, file_list)
 
     ret = {
