@@ -47,10 +47,15 @@ def test_list_dir_inorder():
     _TEST_META_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'meta'))
     _TEST_META_FILELIST_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'meta_filelist'))
     f = open(_TEST_META_FILELIST_FILENAME, 'r')
-    offset = (0, 0)
-    ret = parser.list_dir_inorder(_TEST_META_FILENAME, offset, limit=50)
-    pp.pprint(ret)
-    ret = parser.list_dir_inorder(_TEST_META_FILENAME, ret['offset'], limit=50)
-    pp.pprint(ret)
-    ret = parser.list_dir_inorder(_TEST_META_FILENAME, ret['offset'], limit=50)
-    pp.pprint(ret)
+    ret = { 'offset': (0, 0)}
+    sum=0
+    while True:
+        ret = parser.list_dir_inorder(_TEST_META_FILENAME, ret['offset'], limit=33)
+        files = [ x['d_name'] for x in ret['child_list'] ]
+        if len(files) == 0:
+            break
+        print(files)
+        sum += len(files)
+        for filename in files:
+            assert str.encode(f.readline().strip()) == filename
+    assert sum == 3003

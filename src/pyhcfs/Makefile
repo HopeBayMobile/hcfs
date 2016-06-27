@@ -12,7 +12,7 @@ parser: parser.c parser.h
 	cc $(CFLAGS) $< -o $@
 
 clean:
-	rm -f _pyhcfs.c _pyhcfs.o _pyhcfs.so parser parser.o
+	rm -rf _pyhcfs.c _pyhcfs.o _pyhcfs.so _pyhcfs.*.so parser parser.o __pycache__/
 
 check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh

@@ -79,8 +79,10 @@ def list_dir_inorder(meta_path, offset=(0, 0), limit=1000):
     ret = {
             'result': ret_code,
             'offset': (end_page_pos[0], end_el_no[0]),
-            'child_list': [ convert_to_python(file_list[i]) for i in range(limit) ]
+            'child_list': []
             }
+    if ret_code > 0:
+        ret['child_list'] = [ convert_to_python(file_list[i]) for i in range(ret_code) ]
 
     return ret
 

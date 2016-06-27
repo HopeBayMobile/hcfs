@@ -41,14 +41,14 @@ int main(void)
 	HCFS_STAT *stat_data = &meta_data.stat;
 
 	puts("============================================");
-	puts("list_external_volume(\"testdata/fsmgr\", &ret_entry, &ret_num);");
-	list_external_volume("testdata/fsmgr", &ret_entry, &ret_num);
+	puts("list_external_volume(\"../../tests/unit_test/python/test_nexus_5x/fsmgr\", &ret_entry, &ret_num);");
+	list_external_volume("../../tests/unit_test/python/test_nexus_5x/fsmgr", &ret_entry, &ret_num);
 	for (i = 0; i < ret_num; i++)
 		printf("%lu %s\n", ret_entry[i].inode, ret_entry[i].d_name);
 
 	puts("============================================");
-	puts("parse_meta(\"testdata/meta423\", &meta_data);");
-	parse_meta("testdata/meta423", &meta_data);
+	puts("parse_meta(\"../../tests/unit_test/python/test_nexus_5x/meta\", &meta_data);");
+	parse_meta("../../tests/unit_test/python/test_nexus_5x/meta", &meta_data);
 	printf("%20s: %d\n", "Result", meta_data.result);
 	printf("%20s: %d\n", "Type (0=dir, 1=file)", meta_data.file_type);
 	printf("%20s: %lu\n", "Child number", meta_data.child_number);
@@ -71,7 +71,7 @@ int main(void)
 
 	puts("============================================");
 
-	puts("list_dir_inorder(\"testdata/meta423\"), 0, 0, 400, &end_pos, "
+	puts("list_dir_inorder(\"../../tests/unit_test/python/test_nexus_5x/meta\"), 0, 0, 400, &end_pos, "
 	     "&end_el, &(file_list[0])");
 	int32_t num_walked = 0;
 	int32_t num_children = 99;
@@ -80,20 +80,20 @@ int main(void)
 	PORTABLE_DIR_ENTRY file_list[400];
 
 	while (TRUE) {
-		num_walked = list_dir_inorder("testdata/meta423",
+		num_walked = list_dir_inorder("../../tests/unit_test/python/test_nexus_5x/meta",
 				end_pos, end_el, num_children, &end_pos, &end_el,
 				&(file_list[0]));
 		if (num_walked == 0) {
 			printf("No more children can be listed\n");
 			printf("Total %d children traversed\n", num_walked);
-			printf("next page_pos is %lld, next el_no is %d\n", end_pos, end_el);
+			printf("next page_pos is %ld, next el_no is %d\n", end_pos, end_el);
 			break;
 		} else if (num_walked < 0) {
 			printf("Error %d\n", num_walked);
 			break;
 		}
 		printf("Total %d children traversed\n", num_walked);
-		printf("next page_pos is %lld, next el_no is %d\n", end_pos, end_el);
+		printf("next page_pos is %ld, next el_no is %d\n", end_pos, end_el);
 		for (i = 0; i < num_walked; i++)
 			printf("%s\n", file_list[i].d_name);
 	}
