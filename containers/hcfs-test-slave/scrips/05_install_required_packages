@@ -25,4 +25,4 @@ packages+=" colormake"					# colorful logs
 packages+=" parallel"					# parallel check source code style
 
 install_pkg
-apt-get clean
+apt-get clean || :
