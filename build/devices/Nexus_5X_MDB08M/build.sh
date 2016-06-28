@@ -156,12 +156,8 @@ function patch_system() {
 function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
-	git fetch origin && \
-	git reset --hard origin/master && \
-	git clean -dxf && \
-	git submodule foreach git fetch origin && \
-	git submodule foreach git reset --hard origin/master && \
-	git submodule foreach git clean -dxf"'
+	git pull origin master && \
+	git submodule foreach git pull origin master"'
 }
 function pull_hcfs_binaay() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
@@ -177,7 +173,7 @@ function pull_management_app() {
 function push_system_diff() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
-	git add . && \
+	git add -f * && \
 	git commit -m '${VERSION_NUM}' && \
 	git tag -a -m '${VERSION_NUM}' '${VERSION_NUM}' && \
 	git push origin '${VERSION_NUM}' -f"'
