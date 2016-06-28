@@ -200,7 +200,7 @@ end:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
+static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 			    const int32_t start_el, const int32_t walk_left,
 			    const int32_t walk_up, const int32_t limit,
 			    TREE_WALKER *this_walk,
