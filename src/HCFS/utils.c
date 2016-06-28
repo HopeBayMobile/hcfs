@@ -109,8 +109,21 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 
 void fetch_restored_meta_path(char *pathname, ino_t this_inode)
 {
-	snprintf(pathname, METAPATHLEN, "/tmp/restored_meta_%" PRIu64 "",
-			(uint64_t)this_inode);
+	char restoring_meta_path[200];
+	int32_t errcode, ret;
+
+	sprintf(restoring_meta_path, "%s/restoring_meta", METAPATH);
+	if (access(restoring_meta_path, F_OK) < 0)
+		MKDIR(restoring_meta_path, 0700);
+
+	snprintf(pathname, METAPATHLEN, "%s/restored_meta_%" PRIu64 "",
+			restoring_meta_path, (uint64_t)this_inode);
+	return;
+
+errcode_handle:
+	snprintf(pathname, METAPATHLEN, "%s/restored_meta_%" PRIu64 "",
+			restoring_meta_path, (uint64_t)this_inode);
+	return;
 }
 
 /************************************************************************
