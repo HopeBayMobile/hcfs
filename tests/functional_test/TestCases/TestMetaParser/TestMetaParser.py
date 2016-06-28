@@ -87,7 +87,10 @@ class TestMetaParser_04(object):
 					expected = cur
 					break;
 			assert expected, "Unable to find stat of inode = <" + inode + ">"
-			sub_msg = parse_meta_normal_spec.expect([meta_path], [expected], [parse_meta(meta_path)])
+			result = parse_meta(meta_path)
+			print result
+			expected["stat"]["atime"] = result["stat"]["atime"] # access time change when stat the expected value so disabled it
+			sub_msg = parse_meta_normal_spec.expect([meta_path], [expected], [result])
 			msg.extend([sub_msg])
 		return True, repr(msg)
 

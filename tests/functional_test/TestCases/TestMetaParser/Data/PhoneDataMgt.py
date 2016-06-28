@@ -13,12 +13,11 @@ g_logger = logging.getLogger(__name__)
 g_logger.setLevel(logging.INFO)
 
 class PhoneDataSrc(DataSrc):
-	def __init__(self, phone_id, fsmgr, test_data_dir, sync_dirs):
+	def __init__(self, phone_id, fsmgr, test_data_dir, inodes):
 		self.phone_id = phone_id
 		self.fsmgr = fsmgr
 		self.test_data_dir = test_data_dir
-		self.sync_dirs = sync_dirs
-		self.new_dir = ""
+		self.inodes = inodes
 		self.logger = g_logger.getChild("PhoneDataSrc")
 		self.logger.setLevel(logging.INFO)
 
@@ -38,41 +37,40 @@ class PhoneDataSrc(DataSrc):
 
 	@overrides
 	def fetch(self):
-		try:
-			self.logger.info("Get fsmgr")
-			if os.path.isfile(self.fsmgr):	os.remove(self.fsmgr)
-			subprocess.call("adb pull /data/hcfs/metastorage/fsmgr " + self.fsmgr, shell=True)
+		self.logger.info("Get fsmgr")
+		if os.path.isfile(self.fsmgr):	os.remove(self.fsmgr)
+		subprocess.call("adb pull /data/hcfs/metastorage/fsmgr " + self.fsmgr, shell=True)
 			
-			#TODO: file type, file size
-			self.logger.info("Create test file and push into phone device")
-			test_file = "testFile.hp"
-			test_file_path = os.path.join("/tmp", test_file)
-			with open(test_file_path, "wt") as fout:	fout.write("test file content")
-			subprocess.call("adb push " + test_file_path + " " + self.sync_dirs, shell=True)
-			test_file_path = os.path.join(self.sync_dirs, test_file)
-
+		#TODO: file type, file size
+		#self.logger.info("Create test file and push into phone device")
+		#test_file = "testFile.hp"
+		#test_file_path = os.path.join("/tmp", test_file)
+		#with open(test_file_path, "wt") as fout:	fout.write("test file content")
+		#subprocess.call("adb push " + test_file_path + " " + self.sync_dirs, shell=True)
+		#test_file_path = os.path.join(self.sync_dirs, test_file)
+			
+		result = []
+		for path in self.inodes:
 			self.logger.info("Create directory to store test data")
-			inode = stat_inode(test_file_path)
-			self.new_dir = os.path.join(self.test_data_dir, str(inode))
-			if os.path.exists(self.new_dir):	shutil.rmtree(self.new_dir)
-			os.makedirs(self.new_dir)
-
+			inode = stat_inode(path)
+			new_dir = os.path.join(self.test_data_dir, str(inode))
+			if os.path.exists(new_dir):	continue
+			os.makedirs(new_dir)
+				
 			self.logger.info("Get stat test data")
-			new_prop = os.path.join(self.new_dir, str(inode))
+			new_prop = os.path.join(new_dir, str(inode))
 			with open(new_prop, "wt") as fout:
-				fout.write(repr(get_stat(test_file_path)))
+				fout.write(repr(get_stat(path)))
 			assert os.path.isfile(new_prop), "Stat <" + str(inode) + "> fail"
 			with open(new_prop, "rt") as fin:
-				return ast.literal_eval(fin.read())
-		except Exception as e:
-			if os.path.exists(self.new_dir):	shutil.rmtree(self.new_dir)
-			raise e
+				result.extend([ast.literal_eval(fin.read())])
+		return result
 
 def get_stat(path):
 	result = {}
 	stat = {}
 	result["file_type"] = stat_file_type(path)
-	result["child_number"] = 0L
+	result["child_number"] = stat_child(path) # not sure
 	result["result"] = 0
 	
 	stat["blocks"] = stat_blocks(path)
@@ -90,10 +88,10 @@ def get_stat(path):
 	stat["mtime"] = stat_mtime(path)
 	stat["ctime_nsec"] = 0L
 	stat["gid"] = stat_gid(path)
-	stat["atime"] = stat_atime(path)
+	stat["atime"] = stat_atime(path) # change when access, disabled it
 	stat["ino"] = stat_inode(path)
 	stat["__unused4"] = 0 #???
-	stat["size"] = stat_size(path)
+	stat["size"] = stat_size(path) # byte
 	result["stat"] = stat
 	return result
 
@@ -103,6 +101,13 @@ def stat_file_type(path):
 	elif file_type == "regular file":	return 1
 	#TODO: link, pipe, socket
 	return -1
+
+def stat_child(path):
+	pipe = subprocess.Popen("adb shell find " + path + " -mindepth 1 | wc -l", shell=True, stdout=PIPE, stderr=PIPE)
+	out, err = pipe.communicate()
+	assert not err, "Stat <" + path + "> error = <" + err + ">"
+	assert out.rstrip().isdigit(), "Stat <" + path + "> child number <" + out.rstrip() + "> is not a integer"
+	return long(out.rstrip())
 
 def stat_inode(path):	return long(stat("i", path))
 def stat_blocks(path):	return int(stat("b", path))
@@ -115,7 +120,7 @@ def stat_ctime(path):	return int(stat("Z", path))
 def stat_nlink(path):	return long(stat("h", path))
 def stat_rdev(path):	return long(stat("d", path)[:-1])
 def stat_mode(path):	return int(stat("f", path), 16)
-def stat_size(path):	return int(stat("s", path)) # byte
+def stat_size(path):	return int(stat("s", path)) 
 
 def stat(opt, path):
 	pipe = subprocess.Popen("adb shell stat -c%" + opt + " " + path, shell=True, stdout=PIPE, stderr=PIPE)

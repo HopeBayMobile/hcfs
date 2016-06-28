@@ -18,7 +18,7 @@ _mnt = "/tmp/mnt"
 _test_data_dir = _repo + "/tests/functional_test/TestCases/TestMetaParser/test_data"
 _test_fsmgr = _test_data_dir + "/fsmgr"
 _phone_id = "00f28ec4cb50a4f2"
-_phone_sync_dirs = "/sdcard/DCIM/Camera"
+_phone_sync_inodes = ["/sdcard/DCIM/Camera", "/sdcard/DCIM", "/sdcard/DCIM/Camera/IMG_20160623_143220.jpg"]
 _swift = SwiftMgt.Swift("005FR0018SAL", "61.219.202.83", "WligAP3pSFWS", "Z4O7HP3LFPPRKRJVGV99ZRUIYBDJSWCGQ2TAS80HB1I0PC76VJ1A1CLRAROHIO86TX8UC2QL5ZENAHO0687JT5D2JA924K3BOKY7RM6YRDBBVIKOM5XWP9HJ51QWSI37")
 
 _hcfs_conf_tmp = _repo + "/tests/functional_test/TestCases/TestMetaParser/hcfs.conf.tmp"
@@ -59,8 +59,8 @@ def get_test_fsmgr():
 def get_phone_id():
 	return _phone_id
 
-def get_phone_sync_dirs():
-	return _phone_sync_dirs
+def get_phone_sync_inodes():
+	return _phone_sync_inodes
 
 def get_swift():
 	return _swift
