@@ -102,39 +102,38 @@ int32_t write_log(int32_t level, char *format, ...)
 	char add_newline;
 	char timestr[100];
 
+	if (level > LOG_LEVEL)
+		return 0;
+
 	va_start(alist, format);
 	if (format[strlen(format)-1] != '\n')
 		add_newline = TRUE;
 	else
 		add_newline = FALSE;
 	if ((logptr == NULL) || (logptr->fptr == NULL)) {
-		if (level <= LOG_LEVEL) {
-			gettimeofday(&tmptime, NULL);
-			localtime_r(&(tmptime.tv_sec), &tmptm);
-			strftime(timestr, 90, "%F %T", &tmptm);
+		gettimeofday(&tmptime, NULL);
+		localtime_r(&(tmptime.tv_sec), &tmptm);
+		strftime(timestr, 90, "%F %T", &tmptm);
 
-			printf("%s.%06d\t", timestr,
-				(uint32_t)tmptime.tv_usec);
+		printf("%s.%06d\t", timestr,
+			(uint32_t)tmptime.tv_usec);
 
-			vprintf(format, alist);
-			if (add_newline == TRUE)
-				printf("\n");
-		}
+		vprintf(format, alist);
+		if (add_newline == TRUE)
+			printf("\n");
 	} else {
-		if (level <= LOG_LEVEL) {
-			gettimeofday(&tmptime, NULL);
-			localtime_r(&(tmptime.tv_sec), &tmptm);
-			strftime(timestr, 90, "%F %T", &tmptm);
+		gettimeofday(&tmptime, NULL);
+		localtime_r(&(tmptime.tv_sec), &tmptm);
+		strftime(timestr, 90, "%F %T", &tmptm);
 
-			sem_wait(&(logptr->logsem));
-			fprintf(logptr->fptr, "%s.%06d\t", timestr,
-				(uint32_t)tmptime.tv_usec);
-			vfprintf(logptr->fptr, format, alist);
-			if (add_newline == TRUE)
-				fprintf(logptr->fptr, "\n");
+		sem_wait(&(logptr->logsem));
+		fprintf(logptr->fptr, "%s.%06d\t", timestr,
+			(uint32_t)tmptime.tv_usec);
+		vfprintf(logptr->fptr, format, alist);
+		if (add_newline == TRUE)
+			fprintf(logptr->fptr, "\n");
 
-			sem_post(&(logptr->logsem));
-		}
+		sem_post(&(logptr->logsem));
 	}
 
 	va_end(alist);
