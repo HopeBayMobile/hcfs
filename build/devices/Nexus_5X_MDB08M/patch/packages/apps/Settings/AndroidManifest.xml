@@ -2216,6 +2216,7 @@
                 android:value="true" />
         </activity>
 
+        <!-- Vince
         <activity android:name="Settings$UserSettingsActivity"
                 android:label="@string/user_settings_title"
                 android:taskAffinity="">
@@ -2234,6 +2235,7 @@
             <meta-data android:name="com.android.settings.PRIMARY_PROFILE_CONTROLLED"
                 android:value="true" />
         </activity>
+        -->
 
         <activity android:name="Settings$PaymentSettingsActivity"
                 android:label="@string/nfc_payment_settings_title"
