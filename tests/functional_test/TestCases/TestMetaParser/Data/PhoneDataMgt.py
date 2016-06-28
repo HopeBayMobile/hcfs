@@ -70,16 +70,31 @@ class PhoneDataSrc(DataSrc):
 
 def get_stat(path):
 	result = {}
+	stat = {}
 	result["file_type"] = stat_file_type(path)
-	result["ino"] = stat_inode(path)
-	result["blocks"] = stat_blocks(path)
-	result["blksize"] = stat_blksize(path)
-	result["uid"] = stat_uid(path)
-	result["gid"] = stat_gid(path)
-	result["atime"] = stat_atime(path)
-	result["mtime"] = stat_mtime(path)
-	result["ctime"] = stat_ctime(path)
-	result["nlink"] = stat_nlink(path)
+	result["child_number"] = 0L
+	result["result"] = 0
+	
+	stat["blocks"] = stat_blocks(path)
+	stat["uid"] = stat_uid(path)
+	stat["__unused5"] = 0 #???
+	stat["mtime_nsec"] = 0L
+	stat["rdev"] = stat_rdev(path) 
+	stat["dev"] = 0L #??? 
+	stat["ctime"] = stat_ctime(path)
+	stat["__pad1"] = 0 #??? about irq
+	stat["blksize"] = stat_blksize(path)
+	stat["nlink"] = stat_nlink(path)
+	stat["mode"] = stat_mode(path) # not sure
+	stat["atime_nsec"] = 0L
+	stat["mtime"] = stat_mtime(path)
+	stat["ctime_nsec"] = 0L
+	stat["gid"] = stat_gid(path)
+	stat["atime"] = stat_atime(path)
+	stat["ino"] = stat_inode(path)
+	stat["__unused4"] = 0 #???
+	stat["size"] = stat_size(path)
+	result["stat"] = stat
 	return result
 
 def stat_file_type(path):
@@ -94,10 +109,13 @@ def stat_blocks(path):	return int(stat("b", path))
 def stat_blksize(path):	return int(stat("B", path))
 def stat_uid(path):	return int(stat("u", path))
 def stat_gid(path):	return int(stat("g", path))
-def stat_atime(path):	return long(stat("X", path))
-def stat_mtime(path):	return long(stat("Y", path))
-def stat_ctime(path):	return long(stat("Z", path))
-def stat_nlink(path):	return int(stat("h", path))
+def stat_atime(path):	return int(stat("X", path))
+def stat_mtime(path):	return int(stat("Y", path))
+def stat_ctime(path):	return int(stat("Z", path))
+def stat_nlink(path):	return long(stat("h", path))
+def stat_rdev(path):	return long(stat("d", path)[:-1])
+def stat_mode(path):	return int(stat("f", path), 16)
+def stat_size(path):	return int(stat("s", path)) # byte
 
 def stat(opt, path):
 	pipe = subprocess.Popen("adb shell stat -c%" + opt + " " + path, shell=True, stdout=PIPE, stderr=PIPE)

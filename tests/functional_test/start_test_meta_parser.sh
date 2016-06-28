@@ -16,4 +16,5 @@ $repo/build.sh pyhcfs
 #fi
 
 cd $repo/tests/functional_test/TestCases/TestMetaParser
+python prepare.py
 python DockerTest.py

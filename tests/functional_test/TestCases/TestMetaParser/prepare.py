@@ -18,11 +18,12 @@ if __name__ == "__main__":
 	result, data = data_src.get_data()
 	if result:
 		try:
-			meta_name = "meta_" + str(data["ino"])
-			new_meta = os.path.join(test_data_dir, str(data["ino"]), meta_name)
-			time.sleep(300)
+			inode = data["stat"]["ino"]
+			meta_name = "meta_" + str(inode)
+			new_meta = os.path.join(test_data_dir, str(inode), meta_name)
+			time.sleep(30) # poll and event driven
 			swift.download_file(meta_name, new_meta)
 			assert os.path.isfile(new_meta), "Download <" + meta_name + "> fail"
 		except Exception as e:
-			clean_dir = os.path.join(test_data_dir, str(data["ino"]))
+			clean_dir = os.path.join(test_data_dir, str(inode))
 			shutil.rmtree(clean_dir)

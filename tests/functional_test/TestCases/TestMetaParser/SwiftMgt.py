@@ -15,10 +15,6 @@ class Swift(object):
 		self._pwd = pwd
 		self._bucket = bucket
 		self._useDocker = False
-		_logger.info("[Swift] Initializing.")
-		self.cleanup()
-		self.create_bucket()
-		self.check_bucket()
 
 	@classmethod
 	def fromDocker(cls, docker, user, pwd, bucket):
@@ -47,6 +43,14 @@ class Swift(object):
 		cmd = self._cmd_prefix()
 		cmd.extend(["list", self._bucket])
 		_logger.info("[Swift] Check bucket cmd = " + " ".join(cmd))
+		pipe = subprocess.Popen(" ".join(cmd), stdout=PIPE, stderr=PIPE, shell=True)
+		out, err = pipe.communicate()
+		assert not err, err
+
+	def download_file(self, name, new_path_name):
+		cmd = self._cmd_prefix()
+		cmd.extend(["download", self._bucket, name, "-o", new_path_name])
+		_logger.info("[Swift] Download file cmd = " + " ".join(cmd))
 		pipe = subprocess.Popen(" ".join(cmd), stdout=PIPE, stderr=PIPE, shell=True)
 		out, err = pipe.communicate()
 		assert not err, err

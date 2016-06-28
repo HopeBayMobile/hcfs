@@ -18,10 +18,11 @@ class LocalMetaDataSrc(DataSrc):
 	@overrides
 	def isAvailable(self):
 		for dir_name in os.listdir(self.test_data_dir):
-			self.logger("Dir = <" + dir_name + ">")
+			if dir_name == "fsmgr":	continue
+			self.logger.info("Dir = <" + dir_name + ">")
 			inode = int(dir_name)
 			inode_dir = os.path.join(self.test_data_dir, dir_name)
-			self.logger("Dir = <" + dir_name + ">, check length")
+			self.logger.info("Dir = <" + dir_name + ">, check length")
 			if len(os.listdir(inode_dir)) != 2:	return False
 			if not (dir_name in os.listdir(inode_dir)):	return False
 			if not (("meta_" + dir_name) in os.listdir(inode_dir)):	return False
@@ -31,8 +32,9 @@ class LocalMetaDataSrc(DataSrc):
 	def fetch(self):
 		result = []
 		for dir_name in os.listdir(self.test_data_dir):
+			if dir_name == "fsmgr":	continue
 			inode_dir = os.path.join(self.test_data_dir, dir_name)
-			self.logger("Fetch = <" + inode_dir + ">")
+			self.logger.info("Fetch = <" + inode_dir + ">")
 			for file_name in os.listdir(inode_dir):
 				if not file_name.startswith("meta_"):
 					stat_file = os.path.join(inode_dir, file_name)

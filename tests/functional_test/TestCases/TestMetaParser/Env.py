@@ -32,14 +32,10 @@ def prepare_dir_permission():
 	_logger.info("[Env] Affect below : /data /data/hcfs.conf.tmp /data/hcfs.conf repo")
 	# /data
 	if not os.path.exists("/data"):	subprocess.call("sudo mkdir /data", shell=True)	
-	#subprocess.call("sudo chown " + getpass.getuser() + ":fuse /data", shell=True)
-	#subprocess.call("sudo chmod 730 /data", shell=True)
 	# /data/hcfs.conf.tmp
 	if os.path.isfile("/data/hcfs.conf.tmp"):	subprocess.call("sudo rm /data/hcfs.conf.tmp", shell=True)
 	# /data/hcfs.conf
 	if os.path.isfile("/data/hcfs.conf"):	subprocess.call("sudo rm /data/hcfs.conf", shell=True)
-	#subprocess.call("sudo chown " + getpass.getuser() + ":fuse " + _repo, shell=True)
-	#subprocess.call("sudo chmod 730 " + _repo, shell=True)
 
 # TODO:decouple with shell script
 def before():
@@ -81,6 +77,25 @@ def setup_hcfs_conf(swift):
 	HCFSMgt.enc_hcfs_conf()
 
 def setup_Ted_env():
+	try:
+		global _swift
+		prepare_dir_permission()
+		before()
+		cleanup()
+		_swift = SwiftMgt.Swift("tedchen", "10.10.99.120", "gkuVn4slZCJB", "tedchentestmeta")
+		HCFSMgt.compile_hcfs()
+		setup_test_dir()
+		setup_hcfs_conf(_swift)
+		HCFSMgt.start_hcfs()
+		HCFSMgt.create_filesystem("test_fs")
+		assert "test_fs" in HCFSMgt.list_filesystems(), "HCFS create file system failure"
+		HCFSMgt.mount("test_fs", _mnt)
+	except Exception as e:
+		cleanup()
+		return False, e
+	return True, ""
+
+def create_meta_parser_env():
 	try:
 		global _swift
 		prepare_dir_permission()
