@@ -712,12 +712,6 @@ void rebuild_sb_worker(void *t_idx)
 				continue;
 			}
 			if (num_dir > 0) {
-				ret = push_inode_job(dir_list, num_dir);
-				if (ret < 0) {
-					push_inode_job(&(inode_job.inode), 1);
-					erase_inode_job(&inode_job);
-					continue;
-				}
 				/* Rebuild parent stat */
 				for (idx = 0; idx < num_dir; idx++) {
 					ret = rebuild_parent_stat(
@@ -728,15 +722,18 @@ void rebuild_sb_worker(void *t_idx)
 							" to rebuild parent"
 							" stat. Code %d", -ret);
 				}
-				free(dir_list);
-			}
-			if (num_nondir > 0) {
-				ret = push_inode_job(nondir_list, num_nondir);
+				ret = push_inode_job(dir_list, num_dir);
 				if (ret < 0) {
 					push_inode_job(&(inode_job.inode), 1);
 					erase_inode_job(&inode_job);
+					free(dir_list);
+					free(nondir_list);
+					free(nondir_type_list);
 					continue;
 				}
+				free(dir_list);
+			}
+			if (num_nondir > 0) {
 				/* Rebuild parent stat */
 				for (idx = 0; idx < num_nondir; idx++) {
 					ret = rebuild_parent_stat(
@@ -747,6 +744,14 @@ void rebuild_sb_worker(void *t_idx)
 						write_log(0, "Error: Fail"
 							" to rebuild parent"
 							" stat. Code %d", -ret);
+				}
+				ret = push_inode_job(nondir_list, num_nondir);
+				if (ret < 0) {
+					push_inode_job(&(inode_job.inode), 1);
+					erase_inode_job(&inode_job);
+					free(nondir_list);
+					free(nondir_type_list);
+					continue;
 				}
 				free(nondir_list);
 				free(nondir_type_list);
