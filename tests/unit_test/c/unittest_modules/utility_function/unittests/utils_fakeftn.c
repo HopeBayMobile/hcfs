@@ -89,6 +89,11 @@ void *monitor_loop(void *ptr)
 	return NULL;
 }
 
+void run_cache_loop(void)
+{
+	return;
+}
+
 void init_download_module(void)
 {
 	return;
