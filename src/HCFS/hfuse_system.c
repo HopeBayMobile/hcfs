@@ -526,7 +526,7 @@ int32_t main(int32_t argc, char **argv)
 		if (ret < 0) {
 			exit(ret);
 		} else if (ret > 0) { /* Just opened old superblock */
-			init_backend_related_module();
+			write_log(8, "Open old (or create new) superblock\n");
 		} else {
 			write_log(0, "Error: Cannot restore because"
 				" there is no backend info.\n");
@@ -542,11 +542,14 @@ int32_t main(int32_t argc, char **argv)
 	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
+		/* When system restoring, deletion and uploading services
+		 * are not enabled. They are created after restoration
+		 * completed. */
 		if (hcfs_system->system_restoring == FALSE) {
-			pthread_join(cache_loop_thread, NULL);
 			pthread_join(delete_loop_thread, NULL);
 			pthread_join(upload_loop_thread, NULL);
 		}
+		pthread_join(cache_loop_thread, NULL);
 		destroy_monitor_loop_thread();
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");

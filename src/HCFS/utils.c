@@ -1875,6 +1875,7 @@ int32_t reload_system_config(const char *config_path)
 				" Code %d\n", -ret);
 		}
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		init_download_module();
 		init_backend_related_module();
 	}
