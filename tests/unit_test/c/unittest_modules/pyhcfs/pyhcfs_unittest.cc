@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <semaphore.h>
+#include <fcntl.h>
 extern "C" {
 #include "global.h"
 #include "fuseop.h"
@@ -48,11 +49,27 @@ class list_dir_inorderTest : public ::testing::Test {
 
 TEST_F(list_dir_inorderTest, FromTreeRootSuccessful)
 {
+	int32_t count = 0;
+	int32_t cmp_res;
+	FILE *fp;
+	char fname[100];
 	PORTABLE_DIR_ENTRY file_list[limit];
 
 	num_children = list_dir_inorder("test_nexus_5x/meta",
 				end_page_pos, end_el_no, limit, &end_page_pos,
 				&end_el_no, &(file_list[0]));
+
+	/* Compare filename */
+	fp = fopen("test_nexus_5x/meta_filelist", "r");
+	while (1) {
+		fgets(fname, 100, fp);
+		cmp_res = strncmp(file_list[count].d_name, fname,
+				     strlen(file_list[count].d_name));
+		ASSERT_EQ(0, cmp_res);
+		count += 1;
+		if (count >= limit)
+			break;
+	}
 
 	ASSERT_EQ(num_children, limit);
 }
@@ -77,6 +94,31 @@ TEST_F(list_dir_inorderTest, TraverseAllSuccessful)
 	}
 
 	ASSERT_EQ(num_children, 0);
+}
+
+TEST_F(list_dir_inorderTest, ValidateOffset)
+{
+	limit = 1;
+	PORTABLE_DIR_ENTRY file_list[limit];
+
+	num_children = list_dir_inorder("test_nexus_5x/meta",
+				end_page_pos, end_el_no, limit, &end_page_pos,
+				&end_el_no, &(file_list[0]));
+
+	ASSERT_EQ(num_children, limit);
+	ASSERT_EQ(end_page_pos, 240);
+	ASSERT_EQ(end_el_no, 1);
+}
+
+TEST_F(list_dir_inorderTest, MetaIsReg)
+{
+	PORTABLE_DIR_ENTRY file_list[limit];
+
+	num_children = list_dir_inorder("test_nexus_5x/meta_isreg",
+				end_page_pos, end_el_no, limit, &end_page_pos,
+				&end_el_no, &(file_list[0]));
+
+	ASSERT_EQ(num_children, -ENOTDIR);
 }
 
 TEST_F(list_dir_inorderTest, LimitExceeded)
