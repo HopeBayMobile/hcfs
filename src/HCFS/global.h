@@ -15,6 +15,7 @@
 #define GW20_SRC_GLOBAL_H_
 
 #include <stdint.h>
+#include <limits.h>
 
 #define BOOL uint8_t
 #define TRUE 1

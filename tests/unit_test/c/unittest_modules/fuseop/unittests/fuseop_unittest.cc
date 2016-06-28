@@ -904,6 +904,16 @@ TEST_F(hfuse_truncateTest, IsNotFile) {
   ASSERT_EQ(ret_val, -1);
   EXPECT_EQ(tmp_err, EISDIR);
 }
+TEST_F(hfuse_truncateTest, NegativeSize) {
+  int32_t ret_val;
+  int32_t tmp_err;
+
+  ret_val = truncate("/tmp/test_fuse/testfile2", -1);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EINVAL);
+}
 TEST_F(hfuse_truncateTest, NoSizeChange) {
   int32_t ret_val;
   int32_t tmp_err;

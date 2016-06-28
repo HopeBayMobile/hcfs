@@ -31,6 +31,7 @@
 * 2016/3/22 Jiahong lifted truncate permission check in Android
 *           Let SELinux do the work here.
 * 2016/4/20 Jiahong adding dir handle operations to opendir / closedir
+* 2016/6/27 Jiahong adding file size limitation
 *
 **************************************************************************/
 
@@ -2877,6 +2878,13 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	int64_t now_seq;
 	int64_t max_pinned_size;
 
+	/* Return error -EFBIG if offset is greater than expected */
+	if (offset > (off_t) MAX_FILE_SIZE)
+		return -EFBIG;
+
+	if (offset < 0)
+		return -EINVAL;
+
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	write_log(10, "Debug truncate: offset %ld\n", offset);
@@ -4760,6 +4768,23 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	thisinode = real_ino(req, ino);
+
+	/* If size after writing is greater than max file size,
+	return -EFBIG */
+	if (size > (size_t) MAX_FILE_SIZE) {
+		fuse_reply_err(req, EFBIG);
+		return;
+	}
+
+	if (offset > (off_t) (MAX_FILE_SIZE - size)) {
+		fuse_reply_err(req, EFBIG);
+		return;
+	}
+
+	if (offset < 0) {
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
 
 	if (system_fh_table.entry_table_flags[file_info->fh] != IS_FH) {
 		fuse_reply_err(req, EBADF);
