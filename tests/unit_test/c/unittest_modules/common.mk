@@ -126,7 +126,7 @@ $(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread
 
 # Generate test list from executable file
-$(OBJ_DIR)/$(T).tests: $(T) | $(OBJ_DIR)
+$(OBJ_DIR)/$(T).tests: $(T) $(lastword $(MAKEFILE_LIST)) | $(OBJ_DIR)
 	./$(T) --gtest_list_tests | \
 	  awk 'NR>1&&/^[^ ]/{prefix=$$$$1}; NR>1&&/^ /{print prefix$$$$1}' | \
 	  xargs -I{} echo -e \
