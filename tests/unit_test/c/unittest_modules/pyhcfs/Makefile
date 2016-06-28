@@ -23,7 +23,9 @@ $(eval $(call ADDTEST, pyhcfs_unittest, \
   pyhcfs_unittest.o parser.o))
 
 # Load Generated test list
--include $(OBJ_DIR)/*.tests
+ifneq ($(MAKECMDGOALS),clean)
+  -include $(OBJ_DIR)/*.tests
+endif
 
 test: $(RUN_TESTS) | $(UT_FILES)
 ifndef GEN_TEST # Reload make rule if nothing is loaded

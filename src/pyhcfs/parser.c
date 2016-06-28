@@ -206,7 +206,7 @@ int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 			    TREE_WALKER *this_walk,
 			    PORTABLE_DIR_ENTRY *file_list)
 {
-	uint32_t idx;
+	int32_t idx;
 	int32_t ret_code;
 	ssize_t ret_ssize;
 	DIR_ENTRY_PAGE temppage;
