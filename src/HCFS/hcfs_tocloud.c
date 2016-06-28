@@ -1157,9 +1157,7 @@ store in some other file */
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 
-			/* Check if needs to continue uploading next time */
-			if (sync_ctl.continue_nexttime[ptr->which_index] ==
-					TRUE)
+			if (sync_ctl.threads_error[ptr->which_index] == TRUE)
 				break;
 
 			if (is_revert == TRUE) {
@@ -1600,7 +1598,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		if ((ret_val >= 200) && (ret_val <= 299))
 			ret = 0;
 		else
-			ret = -EIO;
+			ret = -ENOTCONN;
 
 #if (DEDUP_ENABLE)
 		/* Upload finished - Need to update dedup table */
@@ -1660,7 +1658,7 @@ int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	if ((200 <= ret_val) && (ret_val <= 299))
 		ret = 0;
 	else
-		ret = -EIO;
+		ret = -ENOTCONN;
 
 	if (fptr != new_fptr)
 		fclose(new_fptr);
@@ -1732,14 +1730,14 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 errcode_handle:
 	write_log(10, "Recording error in %s\n", __func__);
-	_set_inode_sync_error(thread_ptr->inode);
 
 	/* If upload caused by disconnection, then upload next time */
 	fetch_meta_path(local_metapath, thread_ptr->inode);
 	if (access(local_metapath, F_OK) == 0) {
-		if (hcfs_system->sync_paused == TRUE)
+		if (hcfs_system->sync_paused == TRUE || ret == -ENOTCONN)
 			_set_inode_continue_nexttime(thread_ptr->inode);
 	}
+	_set_inode_sync_error(thread_ptr->inode);
 
 	/* Unlink toupload block if we terminates uploading, but
 	 * do NOT unlink toupload meta because it will be re-upload
