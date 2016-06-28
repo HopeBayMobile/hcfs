@@ -6,7 +6,7 @@ all :
 GTEST_DIR = ../../gtest-1.7.0
 
 # Where to find user code.
-USER_DIR = $(realpath ../../../../../src/HCFS)
+USER_DIR += $(realpath ../../../../../src/HCFS)
 
 # Where to put objects
 OBJ_DIR = obj
@@ -17,7 +17,7 @@ OBJ_DIR = obj
 CPPFLAGS += -isystem $(GTEST_DIR)/include $(EXTRACPPFLAGS)
 
 # Search paths for headers
-CPPFLAGS += -iquote$(USER_DIR)
+CPPFLAGS += $(addprefix -iquote,$(USER_DIR))
 # Search paths for source
 vpath	%.c	$(USER_DIR)
 

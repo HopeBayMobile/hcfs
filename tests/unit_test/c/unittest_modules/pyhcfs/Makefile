@@ -11,12 +11,9 @@
 # Please tweak the following variable definitions as needed by your
 # project, except GTEST_HEADERS, which you can use in your own targets
 # but shouldn't modify.
-include ../common.mk
 
-# Search paths for headers
-CPPFLAGS += -iquote$(realpath ../../../../../src/pyhcfs)
-# Search paths for source
-vpath	%.c	$(realpath ../../../../../src/pyhcfs)
+USER_DIR += $(realpath ../../../../../src/pyhcfs)
+include ../common.mk
 
 # monitor unittest
 $(eval $(call ADDTEST, pyhcfs_unittest, \
