@@ -13,13 +13,14 @@
 # but shouldn't modify.
 include ../common.mk
 
-# All tests produced by this Makefile.
-
+# Search paths for headers
+CPPFLAGS += -iquote$(realpath ../../../../../src/pyhcfs)
+# Search paths for source
+vpath	%.c	$(realpath ../../../../../src/pyhcfs)
 
 # monitor unittest
-$(eval $(call ADDTEST, \
-  pyhcfs_unittest, \
-  pyhcfs_unittest.o))
+$(eval $(call ADDTEST, pyhcfs_unittest, \
+  pyhcfs_unittest.o parser.o))
 
 # Load Generated test list
 -include $(OBJ_DIR)/*.tests

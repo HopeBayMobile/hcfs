@@ -107,7 +107,7 @@ $(OBJ_DIR)/%.d: %.cc | $(OBJ_DIR)
 # HCFS setup rules
 ###########################################################################
 setup:
-	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@../../../../../utils/setup_dev_env.sh -m unit_test
 .PHONY: setup
 
 define ADDTEST
