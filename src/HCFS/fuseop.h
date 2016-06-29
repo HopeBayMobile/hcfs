@@ -56,6 +56,8 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 /* Number of pointers in a pointer page */
 #define POINTERS_PER_PAGE 1024
 
+#define MAX_FILE_SIZE LONG_MAX
+
 /* Defining the names for block status */
 /* Not stored on any media or storage. Value should be zero.*/
 #define ST_NONE 0

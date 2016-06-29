@@ -791,7 +791,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	setbuf(fptr, NULL);
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
-	if (!S_ISREG(tempstat.st_mode)) { /* It is not a regfile? wtf */
+	if (!S_ISREG(tempstat.st_mode)) {
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		return 0;
