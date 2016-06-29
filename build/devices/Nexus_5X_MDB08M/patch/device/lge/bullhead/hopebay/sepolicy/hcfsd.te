@@ -207,3 +207,20 @@ allow file_type hcfs:filesystem associate;
 #============= nfs ============
 allow hcfsd nfc:dir { search };
 allow hcfsd nfc:file { read write open getattr };
+
+ 
+#=========== /data/media ===========
+#===========  HBTUpdater ===========
+allow uncrypt media_rw_data_file:dir { search getattr };
+allow uncrypt media_rw_data_file:file { read open getattr };
+#allow hcfsd sdcardd:dir { search };
+#allow sdcardd fuse:dir { mounton };
+# for init to mkdir /data/media/0/hbtupdater and /storage/emulated/0/hbtupdater
+allow init fuse:dir { create write add_name search setattr };
+# for "mount -o bind /data/media/0/hbtupdater /storage/emulated/0/hbtupdater" in init.bullhead.rc
+# `/system/bin/mount` is a symbolic link to `/system/bin/toolbox`
+allow toolbox toolbox:capability { sys_admin dac_override dac_read_search };
+allow toolbox storage_file:dir { search };
+allow toolbox fuse:dir { search mounton };
+allow toolbox media_rw_data_file:dir { open read search ioctl };
+allow hcfsd zygote:file { getattr };

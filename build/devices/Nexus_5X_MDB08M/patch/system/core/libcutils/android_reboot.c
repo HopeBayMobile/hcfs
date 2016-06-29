@@ -95,6 +95,8 @@ int android_reboot(int cmd, int flags UNUSED, const char *arg)
 {
     int ret;
 
+    //guo
+    system("umount /storage/emulated/0/hbtupdater");
     //Vince
     system("HCFSvol terminate");
 

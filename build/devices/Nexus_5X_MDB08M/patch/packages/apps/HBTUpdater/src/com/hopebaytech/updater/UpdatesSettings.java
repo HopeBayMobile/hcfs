@@ -1,0 +1,1280 @@
+/*
+ * Copyright (C) 2012 The CyanogenMod Project (DvTonder)
+ *
+ * * Licensed under the GNU GPLv2 license
+ *
+ * The text of the license can be found in the LICENSE file
+ * or at https://www.gnu.org/licenses/gpl-2.0.txt
+ */
+
+package com.hopebaytech.updater;
+
+import android.app.ActionBar;
+import android.app.AlertDialog;
+import android.app.DownloadManager;
+import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.res.Resources;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Parcelable;
+import android.preference.ListPreference;
+import android.preference.Preference;
+import android.preference.Preference.OnPreferenceChangeListener;
+import android.preference.PreferenceActivity;
+import android.preference.PreferenceCategory;
+import android.preference.PreferenceManager;
+import android.preference.PreferenceScreen;
+
+import android.preference.CheckBoxPreference;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.text.format.DateFormat;
+import android.text.Html; // Aaron add
+import android.util.Log;
+import android.util.AttributeSet;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.LayoutInflater;
+import android.widget.RelativeLayout;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+import android.widget.Button;
+import android.support.annotation.Nullable;
+
+import com.hopebaytech.updater.misc.Constants;
+import com.hopebaytech.updater.misc.State;
+import com.hopebaytech.updater.misc.UpdateInfo;
+import com.hopebaytech.updater.receiver.DownloadReceiver;
+import com.hopebaytech.updater.service.UpdateCheckService;
+import com.hopebaytech.updater.utils.UpdateFilter;
+import com.hopebaytech.updater.utils.Utils;
+
+import com.hopebaytech.updater.utils.ScreenType;
+import com.hopebaytech.updater.receiver.DownloadNotifier; // Aaron add
+import android.provider.Settings; //guo add
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Locale; // Aaron add
+
+public class UpdatesSettings extends PreferenceActivity implements
+	OnPreferenceChangeListener, 
+	UpdatePreference.OnReadyListener, 
+	UpdatePreference.OnActionListener,
+	ActivityCompat.OnRequestPermissionsResultCallback {
+    private static String TAG = "UpdatesSettings";
+
+    // intent extras
+    public static final String EXTRA_UPDATE_LIST_UPDATED = "update_list_updated";
+    public static final String EXTRA_FINISHED_DOWNLOAD_ID = "download_id";
+    public static final String EXTRA_FINISHED_DOWNLOAD_PATH = "download_path";
+    public static final String EXTRA_FINISHED_DOWNLOAD_INCREMENTAL_FOR = "download_incremental_for";
+
+    public static final String KEY_SYSTEM_INFO = "system_info";
+    private static final String KEY_DELETE_ALL = "delete_all";
+
+	//guo
+    public static final String KEY_OVER_WIFI_ONLY = "pref_over_wifi_only";
+    public static final String KEY_AUTO_DOWNLOAD_SYSTEM_UPDATES = "pref_auto_download_system_updates";
+    public static final String KEY_SYSTEM_VERSION = "pref_system_version";
+	//end guo
+
+    private static final String UPDATES_CATEGORY = "updates_category";
+
+    private static final int MENU_REFRESH = 0;
+    private static final int MENU_DELETE_ALL = 1;
+    private static final int MENU_SYSTEM_INFO = 2;
+
+    private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
+
+    private SharedPreferences mPrefs;
+    private ListPreference mUpdateCheck;
+
+    private PreferenceCategory mUpdatesList;
+    private UpdatePreference mDownloadingPreference;
+
+	//guo add
+    private Preference mSystemVersionPreference;
+	private boolean mCheckBoxPreferenceShouldChecked = true;
+
+    private File mUpdateFolder;
+
+    private boolean mStartUpdateVisible = false;
+    private ProgressDialog mProgressDialog;
+    private AlertDialog mDownloadDialog;
+
+    private DownloadManager mDownloadManager;
+    private boolean mDownloading = false;
+    private long mDownloadId;
+    private String mFileName;
+    private UpdateInfo.Type mUpdateType;
+
+    private Handler mUpdateHandler = new Handler();
+
+    //guo this is registered in onStart() and unregistered in onStop()
+    //guo: this is used to receive ACTION_DOWNLOAD_STARTED from DownloadService's downloadFullZip() and downloadIncremental()
+    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+			//guo: this is from DownloadService downloadFullZip()/downloadIncremental()
+            if (DownloadReceiver.ACTION_DOWNLOAD_STARTED.equals(action)) {
+                mDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                //mUpdateHandler.post(mUpdateProgress);
+                mUpdateHandler.post(mUpdateProgressMessage); // Aaron add
+            } else if (UpdateCheckService.ACTION_CHECK_FINISHED.equals(action)) { 
+				// Aaron: from UpdateCheckService.java's onErrorResponse() and onResponse()
+                if (mProgressDialog != null) {
+					mProgressDialog.dismiss();
+                    mProgressDialog = null;
+
+					/* Aaron: comment
+                    int count = intent.getIntExtra(UpdateCheckService.EXTRA_NEW_UPDATE_COUNT, -1);
+                    if (count == 0) {
+                        Toast.makeText(UpdatesSettings.this, R.string.no_updates_found,
+                                Toast.LENGTH_SHORT).show();
+                    } else if (count < 0) {
+                        Toast.makeText(UpdatesSettings.this, R.string.update_check_failed,
+                                Toast.LENGTH_LONG).show();
+                    }
+					*/
+                }
+                //updateLayout();
+                
+                // Start Aaron
+                int count = intent.getIntExtra(UpdateCheckService.EXTRA_REAL_UPDATE_COUNT, -1);
+                if (count == 0) {
+                    Toast.makeText(UpdatesSettings.this, R.string.no_updates_found,
+                            Toast.LENGTH_SHORT).show();
+                } else if (count < 0) {
+                    Toast.makeText(UpdatesSettings.this, R.string.update_check_failed,
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    int typePos = intent.getIntExtra(UpdateCheckService.EXTRA_UPDATE_TYPE, -1);
+                    mUpdateType = UpdateInfo.Type.values()[typePos];
+                    showSystemUpdateDialog(mUpdateType); 
+                }
+                // End Aaron
+ 
+            }
+        }
+    };
+
+    // Aaron add
+    public void showSystemUpdateDialog(final UpdateInfo.Type updateType) {
+		String subMsg  = "Requires a restart later";
+		String message = String.format(Locale.getDefault(), getString(R.string.download_dialog_message), subMsg);
+
+		mDownloadDialog = new AlertDialog.Builder(UpdatesSettings.this)
+                .setTitle(Html.fromHtml("<font color=" + ContextCompat.getColor(UpdatesSettings.this, R.color.dialog_title) + 
+										">System Update</font>"))
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("Download", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+
+        mDownloadDialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(final DialogInterface dialog) {
+                final Button positiveButton = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_POSITIVE);
+                final Button negativeButton = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_NEGATIVE);
+                positiveButton.setOnClickListener(new View.OnClickListener() {
+					@Override
+                    public void onClick(View v) {
+						// But check permissions first - download will be started in the callback
+						int permissionCheck = ContextCompat.checkSelfPermission(UpdatesSettings.this,
+								android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
+						if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+							// permission already granted, start the download
+							if (positiveButton.getTag() != null) {
+								String fileName = (String) positiveButton.getTag();
+								Log.d(TAG, "fileName=" + fileName);
+								try {
+									Utils.triggerUpdate(UpdatesSettings.this, fileName + ".partial");
+								} catch (IOException e) {
+									Log.e(TAG, "Unable to reboot into recovery mode", e);
+									Toast.makeText(UpdatesSettings.this, R.string.apply_unable_to_reboot_toast,
+										 Toast.LENGTH_SHORT).show();
+								}
+							} else {
+								positiveButton.setVisibility(View.INVISIBLE);
+								negativeButton.setVisibility(View.GONE);
+								startToDownload(updateType);
+							}
+						} else {
+							// permission not granted, request it from the user
+							ActivityCompat.requestPermissions(UpdatesSettings.this,
+									new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
+									PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
+						}		
+					}//end onClick()
+                });
+            }//end show()
+        });
+        mDownloadDialog.show();
+    }// end showSystemUpdateDialog()
+
+    public void startToDownload(UpdateInfo.Type updateType) {
+        Log.d(TAG, "startToDownload");
+		LinkedList<UpdateInfo> availableUpdates = State.loadState(this);
+		UpdateInfo info = availableUpdates.getLast();
+        info.setType(updateType);
+        
+		Intent intent = new Intent(this, DownloadReceiver.class);
+        intent.setAction(DownloadReceiver.ACTION_START_DOWNLOAD);
+        intent.putExtra(DownloadReceiver.EXTRA_UPDATE_INFO, (Parcelable) info);
+        sendBroadcast(intent);                
+
+        // Aaron add: clear old ota file
+        // guo: add try-catch to prevent this Activiy from crashing if the directory is empty
+		try{
+			File directory = Utils.makeUpdateFolder();
+			if (directory.exists()) {
+				for (File file: directory.listFiles()) {
+				file.delete();
+				}
+			}
+		} catch(Exception e) {
+			Log.d(TAG,"got the directory.listFiles() exeption");
+			e.printStackTrace();
+		}
+    }
+
+    private Runnable mUpdateProgressMessage = new Runnable() {
+        @Override
+        public void run() {
+			DownloadManager.Query q = new DownloadManager.Query();
+			q.setFilterById(mDownloadId);
+
+			int downloadStatus;	
+			Cursor cursor = mDownloadManager.query(q);            
+            if (cursor == null || !cursor.moveToFirst()) {
+                // DownloadReceiver has likely already removed the download
+				// from the DB due to failure or MD5 mismatch
+                downloadStatus = DownloadManager.STATUS_FAILED;
+			} else {
+				downloadStatus = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+			}
+
+            switch (downloadStatus) {
+	        case DownloadManager.STATUS_PAUSED:
+                case DownloadManager.STATUS_RUNNING:
+                    Log.d(TAG, "DownloadManager.STATUS_RUNNING");
+                    int downloadedBytes = cursor.getInt(
+                        cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    int totalBytes = cursor.getInt(
+                        cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+	       		
+					if (cursor != null) {
+						cursor.close();
+					}
+
+					int progress;
+					if (totalBytes < 0) {
+							progress = 0;
+					} else {
+							progress = (int) Math.round(((double) downloadedBytes / totalBytes) * 100);
+					}
+
+                    String progressMsg  = String.format(Locale.getDefault(), "Download in progress... %1$d%%", progress);
+                    String message = String.format(Locale.getDefault(), getString(R.string.download_dialog_message),  progressMsg);
+                    mDownloadDialog.setMessage(message);
+                    break;
+                case DownloadManager.STATUS_FAILED:
+                    Log.d(TAG, "DownloadManager.STATUS_FAILED");
+                    resetDownloadState();
+                    break;
+            }//end switch
+
+            if (downloadStatus != DownloadManager.STATUS_FAILED) {
+                mUpdateHandler.postDelayed(this, 1000);
+			}
+        }//end run()
+    };
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+
+        // Load the layouts
+        //if (!Utils.hasLeanback(this)) {
+		addPreferencesFromResource(R.xml.main);
+        //} 
+		//else {
+        //    addPreferencesFromResource(R.xml.main_tv);
+        //}
+
+        // start Aaron
+        setContentView(R.layout.main_activity);
+
+        Button checkUpdateBtn = (Button) findViewById(R.id.check_update);
+        checkUpdateBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+				checkForUpdates();
+            }
+        });
+        // end Aaron
+
+        mUpdatesList = (PreferenceCategory) findPreference(UPDATES_CATEGORY);
+        mUpdateCheck = (ListPreference) findPreference(Constants.UPDATE_CHECK_PREF);//guo mark
+
+		findPreference(KEY_OVER_WIFI_ONLY).setEnabled(false);//guo: temp disable wifi only item
+		findPreference(KEY_AUTO_DOWNLOAD_SYSTEM_UPDATES).setEnabled(false);
+
+        // Aaron add
+        //getPreferenceScreen().removePreference(mUpdatesList);
+        //getPreferenceScreen().removePreference(mUpdateCheck);
+
+		//guo
+		//mSystemVersionPreference = (CheckBoxPreference) findPreference(KEY_SYSTEM_VERSION);
+		mSystemVersionPreference = findPreference(KEY_SYSTEM_VERSION);
+		mSystemVersionPreference.setSummary(android.os.Build.VERSION.INCREMENTAL);
+		//end guo
+
+        // Load the stored preference data
+        mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+		//guo mark
+		/*
+        if (mUpdateCheck != null) {
+            //int check = mPrefs.getInt(Constants.UPDATE_CHECK_PREF, Constants.UPDATE_FREQ_WEEKLY);
+            int check = mPrefs.getInt(Constants.UPDATE_CHECK_PREF, Constants.UPDATE_FREQ_DAILY);//guo modify
+            mUpdateCheck.setValue(String.valueOf(check));
+            mUpdateCheck.setSummary(mapCheckValue(check));
+            mUpdateCheck.setOnPreferenceChangeListener(this);
+        }
+		*/
+
+        // Force a refresh if UPDATE_TYPE_PREF does not match release type
+        int updateType = Utils.getUpdateType();
+        int updateTypePref = mPrefs.getInt(Constants.UPDATE_TYPE_PREF,
+                Constants.UPDATE_TYPE_SNAPSHOT);
+        if (updateTypePref != updateType) {
+            updateUpdatesType(updateType);
+        }
+
+        // Set 'HomeAsUp' feature of the actionbar to fit better into Settings
+        if (!Utils.hasLeanback(this)) {
+            final ActionBar bar = getActionBar();
+            if (bar != null) {
+                bar.setDisplayHomeAsUpEnabled(true);
+            }
+
+            // Turn on the Options Menu
+            invalidateOptionsMenu(); //guo: mark this to disable the Options Menu
+        }
+    }
+
+    @Override
+    public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference preference) {
+        /*if (preference == findPreference(KEY_SYSTEM_INFO)) { //guo: used for the main_tv.xml
+            checkForUpdates();
+        } else if (preference == findPreference(KEY_DELETE_ALL)) {
+            confirmDeleteAll();
+        }  
+		*/
+		if (preference == findPreference(KEY_OVER_WIFI_ONLY)) {//guo add
+			dataFeeWarningDialog(preference);
+			//Log.d(TAG,"guo: mCheckBoxPreferenceShouldChecked =" + Boolean.toString(mCheckBoxPreferenceShouldChecked));
+			//if( !((CheckBoxPreference) preference).isChecked()) dataFeeWarningDialog();
+		
+			//guo: FAIL!! this does not work since the AlertDialog has its own thread.
+			/*
+			if(mCheckBoxPreferenceShouldChecked) {
+				((CheckBoxPreference) preference).setChecked(true);
+			}//end if
+			*/
+        } else if (preference == findPreference(KEY_AUTO_DOWNLOAD_SYSTEM_UPDATES)) {//guo add
+                Toast.makeText(this, R.string.download_not_found, Toast.LENGTH_LONG).show();
+        } //else if (preference == findPreference(KEY_SYSTEM_VERSION)) {//guo add
+				//noNetworkWarnDialog();
+        //}
+        return super.onPreferenceTreeClick(preferenceScreen, preference);
+    }
+
+	//guo mark
+	/*
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        menu.add(0, MENU_REFRESH, 0, R.string.menu_refresh)
+                .setIcon(R.drawable.ic_menu_refresh)
+                .setShowAsActionFlags(MenuItem.SHOW_AS_ACTION_ALWAYS
+                        | MenuItem.SHOW_AS_ACTION_WITH_TEXT);
+
+        menu.add(0, MENU_DELETE_ALL, 0, R.string.menu_delete_all)
+            .setShowAsActionFlags(MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+
+        menu.add(0, MENU_SYSTEM_INFO, 0, R.string.menu_system_info)
+            .setShowAsActionFlags(MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+
+        return true;
+    }
+	*/
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+			//guo mark
+			/*
+            case MENU_REFRESH:
+                checkForUpdates();
+                return true;
+
+            case MENU_DELETE_ALL:
+                confirmDeleteAll();
+                return true;
+
+            case MENU_SYSTEM_INFO:
+                showSysInfo();
+                return true;
+			*/
+
+            case android.R.id.home:
+                onBackPressed();
+                return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+
+        // Check if we need to refresh the screen to show new updates
+        if (intent.getBooleanExtra(EXTRA_UPDATE_LIST_UPDATED, false)) {
+            updateLayout();
+        }
+
+        checkForDownloadCompleted(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // If running on a phone, remove padding around the listview
+        if (!ScreenType.isTablet(this)) {
+            getListView().setPadding(0, 0, 0, 0);
+        }
+    }
+
+	//guo: callback of UpdatePreference.OnReadyListener
+    @Override
+    public void onReady(UpdatePreference pref) {
+        pref.setOnReadyListener(null);
+        mUpdateHandler.post(mUpdateProgress);
+    }
+
+	//guo: this is used for the update scheduler ListPreference: "Check for updates"
+	//guo: we don't need this, since we hardcode that update checking frequency is "everyday"
+    @Override
+    public boolean onPreferenceChange(Preference preference, Object newValue) {
+		/*
+		//guo marked
+        if (preference == mUpdateCheck) {
+            int value = Integer.valueOf((String) newValue);
+            mPrefs.edit().putInt(Constants.UPDATE_CHECK_PREF, value).apply();
+            mUpdateCheck.setSummary(mapCheckValue(value));
+            Utils.scheduleUpdateService(this, value * 1000);
+            return true;
+        }
+		*/
+
+        return false;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        // Determine if there are any in-progress downloads
+        mDownloadId = mPrefs.getLong(Constants.DOWNLOAD_ID, -1);
+        if (mDownloadId >= 0) {
+            Cursor c = mDownloadManager.query(new DownloadManager.Query().setFilterById(mDownloadId));
+            if (c == null || !c.moveToFirst()) {//guo: no any in-progress downloads
+                Toast.makeText(this, R.string.download_not_found, Toast.LENGTH_LONG).show();
+            } else {
+                int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                Uri uri = Uri.parse(c.getString(c.getColumnIndex(DownloadManager.COLUMN_URI)));
+                if (status == DownloadManager.STATUS_PENDING
+                        || status == DownloadManager.STATUS_RUNNING
+                        || status == DownloadManager.STATUS_PAUSED) {
+                    mFileName = uri.getLastPathSegment();
+                    Log.d(TAG, "onStart(): mFileName" + mFileName);
+                }
+            }
+            if (c != null) {
+                c.close();
+            }
+        }
+        if (mDownloadId < 0 || mFileName == null) {
+            resetDownloadState();
+        }
+
+        //updateLayout(); //Aaron mark
+
+        IntentFilter filter = new IntentFilter(UpdateCheckService.ACTION_CHECK_FINISHED);
+        filter.addAction(DownloadReceiver.ACTION_DOWNLOAD_STARTED);
+        registerReceiver(mReceiver, filter);
+
+        //checkForDownloadCompleted(getIntent()); //Aaron mark
+        setIntent(null);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        mUpdateHandler.removeCallbacks(mUpdateProgress);
+        unregisterReceiver(mReceiver);
+        if (mProgressDialog != null) {
+            mProgressDialog.cancel();
+            mProgressDialog = null;
+        }
+    }
+
+
+    //guo: callback for UpdatePreference.OnActionListener
+    @Override
+    public void onStartDownload(UpdatePreference pref) {
+		//Log.d(TAG,"guo: UpdatesSettings.java onStartDownload()");
+        // If there is no internet connection, display a message and return.
+        if (!Utils.isOnline(this)) {
+            Toast.makeText(this, R.string.data_connection_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (mDownloading) {
+            Toast.makeText(this, R.string.download_already_running, Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // We have a match, get ready to trigger the download
+        mDownloadingPreference = pref;
+
+        // But check permissions first - download will be started in the callback
+        int permissionCheck = ContextCompat.checkSelfPermission(pref.getContext(),
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+            // permission already granted, start the download
+            startDownload();
+        } else {
+            // permission not granted, request it from the user
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
+        }
+    }
+
+     private Runnable mUpdateProgress = new Runnable() {
+        public void run() {
+			//Log.d(TAG, "guo: in mUpdateProgress thread, mDownloadId =" + mDownloadId);
+            if (!mDownloading || mDownloadingPreference == null || mDownloadId < 0) {
+                return;
+            }
+
+            ProgressBar progressBar = mDownloadingPreference.getProgressBar();
+            if (progressBar == null) {
+                return;
+            }
+
+            ImageView updatesButton = mDownloadingPreference.getUpdatesButton();
+            if (updatesButton == null) {
+                return;
+            }
+
+            // Enable updates button
+            updatesButton.setEnabled(true);
+
+            DownloadManager.Query q = new DownloadManager.Query();
+            q.setFilterById(mDownloadId);
+
+            Cursor cursor = mDownloadManager.query(q);
+            int status;
+
+            if (cursor == null || !cursor.moveToFirst()) {
+                // DownloadReceiver has likely already removed the download
+                // from the DB due to failure or MD5 mismatch
+                status = DownloadManager.STATUS_FAILED;
+            } else {
+                status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+            }
+
+            switch (status) {
+                case DownloadManager.STATUS_PENDING:
+                    progressBar.setIndeterminate(true);
+                    break;
+                case DownloadManager.STATUS_PAUSED:
+                case DownloadManager.STATUS_RUNNING:
+                     int downloadedBytes = cursor.getInt(
+                        cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                     int totalBytes = cursor.getInt(
+                        cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+
+                     if (totalBytes < 0) {
+                         progressBar.setIndeterminate(true);
+                     } else {
+                         progressBar.setIndeterminate(false);
+                         progressBar.setMax(totalBytes);
+                         progressBar.setProgress(downloadedBytes);
+                     }
+                     break;
+                 case DownloadManager.STATUS_FAILED:
+                     mDownloadingPreference.setStyle(UpdatePreference.STYLE_NEW);
+                     resetDownloadState();
+                     break;
+             }
+
+             if (cursor != null) {
+                 cursor.close();
+             }
+             if (status != DownloadManager.STATUS_FAILED) {
+                 mUpdateHandler.postDelayed(this, 1000);
+             }
+         }
+     };
+
+    @Override
+    public void onStopDownload(final UpdatePreference pref) {
+        Log.d(TAG, "onStopDownload");
+        if (!mDownloading || mFileName == null || mDownloadId < 0) {
+            pref.setStyle(UpdatePreference.STYLE_NEW);
+            resetDownloadState();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.confirm_download_cancelation_dialog_title)
+                .setMessage(R.string.confirm_download_cancelation_dialog_message)
+                .setPositiveButton(R.string.dialog_ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // Set the preference back to new style
+                        pref.setStyle(UpdatePreference.STYLE_NEW);
+
+                        // We are OK to stop download, trigger it
+                        mDownloadManager.remove(mDownloadId);
+                        mUpdateHandler.removeCallbacks(mUpdateProgress);
+                        resetDownloadState();
+
+                        // Clear the stored data from shared preferences
+                        mPrefs.edit()
+                                .remove(Constants.DOWNLOAD_ID)
+                                .remove(Constants.DOWNLOAD_MD5)
+                                .apply();
+
+                        Toast.makeText(UpdatesSettings.this,
+                                R.string.download_cancelled, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+    }
+
+    private void updateUpdatesType(int type) {
+        mPrefs.edit().putInt(Constants.UPDATE_TYPE_PREF, type).apply();
+        checkForUpdates();
+    }
+
+    //guo: this calls ---> onStartUpdates() ---> reboot into recovery mode
+    private void checkForDownloadCompleted(Intent intent) {
+        Log.d(TAG, "checkForDownloadCompleted");
+
+        long downloadId = 0;
+        String fullPathName = null;
+        boolean downloadAndCheckSumSuccessful = true;        
+        if (intent == null) {
+            //return;
+            downloadAndCheckSumSuccessful = false;
+        } else {
+            downloadId = intent.getLongExtra(EXTRA_FINISHED_DOWNLOAD_ID, -1);
+            if (downloadId < 0) {
+                downloadAndCheckSumSuccessful = false;
+            }
+
+	    fullPathName = intent.getStringExtra(EXTRA_FINISHED_DOWNLOAD_PATH);
+            if (fullPathName == null) {
+                downloadAndCheckSumSuccessful = false;
+            } 
+        }
+
+		/* Aaron mark
+        long downloadId = intent.getLongExtra(EXTRA_FINISHED_DOWNLOAD_ID, -1);
+        if (downloadId < 0) {
+            return;
+        }
+
+        String fullPathName = intent.getStringExtra(EXTRA_FINISHED_DOWNLOAD_PATH);
+        if (fullPathName == null) {
+            return;
+        }
+		*/
+
+        if (!downloadAndCheckSumSuccessful) {
+            if (mDownloadDialog != null) {
+                mDownloadDialog.dismiss();
+            }
+
+            new AlertDialog.Builder(this)
+                 .setTitle("Download failed")
+                 .setMessage("Download failed")
+                 .setPositiveButton("OK", null)
+                 .show();
+            return;
+        }
+
+		Intent updateIntent = new Intent(this, UpdatesSettings.class);
+		updateIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		updateIntent.putExtra(UpdatesSettings.EXTRA_FINISHED_DOWNLOAD_ID, downloadId);
+		updateIntent.putExtra(UpdatesSettings.EXTRA_FINISHED_DOWNLOAD_PATH, fullPathName);
+
+        File updateFile = new File(fullPathName);
+        String fileName = updateFile.getName();
+
+		DownloadNotifier.notifyDownloadComplete(this, updateIntent, updateFile);
+        if (mDownloadDialog != null) {
+             String progressMsg  = String.format(Locale.getDefault(), "Download in progress... %1$d%%", 100);
+             String message = String.format(Locale.getDefault(), getString(R.string.download_dialog_message), progressMsg);
+             mDownloadDialog.setMessage(message);
+
+             Button positiveButton = mDownloadDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+             positiveButton.setText("RESTART & INSTALL");
+             positiveButton.setVisibility(View.VISIBLE);
+             positiveButton.setTag(fileName);
+        }
+
+		/* Aaron mark
+        // If this is an incremental, find matching target and mark it as downloaded.
+        String incrementalFor = intent.getStringExtra(EXTRA_FINISHED_DOWNLOAD_INCREMENTAL_FOR);
+        if (incrementalFor != null) {
+            UpdatePreference pref = (UpdatePreference) mUpdatesList.findPreference(incrementalFor);
+            if (pref != null) {
+                pref.setStyle(UpdatePreference.STYLE_DOWNLOADED);
+                pref.getUpdateInfo().setFileName(fileName);
+                onStartUpdate(pref);
+            }
+        } else {
+            // Find the matching preference so we can retrieve the UpdateInfo
+            UpdatePreference pref = (UpdatePreference) mUpdatesList.findPreference(fileName);
+            if (pref != null) {
+                pref.setStyle(UpdatePreference.STYLE_DOWNLOADED);
+                onStartUpdate(pref);
+            }
+        }
+		*/
+        resetDownloadState();
+    }//end checkForDownloadCompleted()
+
+    private void resetDownloadState() {
+        mDownloadId = -1;
+        mFileName = null;
+        mDownloading = false;
+        mDownloadingPreference = null;
+    }
+
+    private String mapCheckValue(Integer value) {
+        Resources resources = getResources();
+        String[] checkNames = resources.getStringArray(R.array.update_check_entries);
+        String[] checkValues = resources.getStringArray(R.array.update_check_values);
+        for (int i = 0; i < checkValues.length; i++) {
+            if (Integer.decode(checkValues[i]).equals(value)) {
+                return checkNames[i];
+            }
+        }
+        return getString(R.string.unknown);
+    }
+
+    private void checkForUpdates() {
+		//Log.d(TAG, "guo: UpdateSettings.java checkForUpdates()");
+        if (mProgressDialog != null) {
+            return;
+        }
+
+        // If there is no internet connection, display a message and return.
+        if (!Utils.isOnline(this)) {
+            Toast.makeText(this, R.string.data_connection_required, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        mProgressDialog = new ProgressDialog(this);
+        mProgressDialog.setTitle(R.string.checking_for_updates);
+        mProgressDialog.setMessage(getString(R.string.checking_for_updates));
+        mProgressDialog.setIndeterminate(true);
+        mProgressDialog.setCancelable(true);
+        mProgressDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                Intent cancelIntent = new Intent(UpdatesSettings.this, UpdateCheckService.class);
+                cancelIntent.setAction(UpdateCheckService.ACTION_CANCEL_CHECK);
+                startService(cancelIntent);
+                mProgressDialog = null;
+            }
+        });
+
+        Intent checkIntent = new Intent(UpdatesSettings.this, UpdateCheckService.class);
+        checkIntent.setAction(UpdateCheckService.ACTION_CHECK);
+        startService(checkIntent);
+
+        mProgressDialog.show();
+    }
+
+    private void updateLayout() {
+        // Read existing Updates
+        LinkedList<String> existingFiles = new LinkedList<String>();
+
+        mUpdateFolder = Utils.makeUpdateFolder();
+
+		//guo: /storage/emulated/0/hbtupdater/*.zip ---> downloaded files before
+        File[] files = mUpdateFolder.listFiles(new UpdateFilter(".zip"));
+
+        if (mUpdateFolder.exists() && mUpdateFolder.isDirectory() && files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    existingFiles.add(file.getName());
+                }
+            }
+        }
+
+        // Clear the notification if one exists
+        Utils.cancelNotification(this);
+
+        // Build list of updates
+        LinkedList<UpdateInfo> availableUpdates = State.loadState(this);
+        final LinkedList<UpdateInfo> updates = new LinkedList<UpdateInfo>();
+
+        for (String fileName : existingFiles) {
+            updates.add(new UpdateInfo.Builder().setFileName(fileName).build());
+        }
+        for (UpdateInfo update : availableUpdates) {
+            // Only add updates to the list that are not already downloaded
+            if (existingFiles.contains(update.getFileName())) {
+                continue;
+            }
+            updates.add(update);
+        }
+
+        Collections.sort(updates, new Comparator<UpdateInfo>() {
+            @Override
+            public int compare(UpdateInfo lhs, UpdateInfo rhs) {
+                // sort in descending 'UI name' order (newest first)
+                return -lhs.getName().compareTo(rhs.getName());
+            }
+        });
+
+        // Update the preference list
+        refreshPreferences(updates);
+
+		/*
+		//guo: we don't need this
+        // Prune obsolete change log files
+        new Thread() {
+            @Override
+            public void run() {
+                File[] files = getCacheDir().listFiles(new UpdateFilter(UpdateInfo.CHANGELOG_EXTENSION));
+                if (files == null) {
+                    return;
+                }
+
+                for (File file : files) {
+                    boolean updateExists = false;
+                    for (UpdateInfo info : updates) {
+                        if (file.getName().startsWith(info.getFileName())) {
+                            updateExists = true;
+                            break;
+                        }
+                    }
+                    if (!updateExists) {
+                        file.delete();
+                    }
+                }
+            }
+        }.start();
+		//guo: end we don't need this
+		*/
+    }
+
+	//guo: this is called by updateLayout()
+    private void refreshPreferences(LinkedList<UpdateInfo> updates) {
+        if (mUpdatesList == null) {
+            return;
+        }
+
+        // Clear the list
+        mUpdatesList.removeAll();
+
+        // Convert the installed version name to the associated filename
+        String installedZip = "cm-" + Utils.getInstalledVersion() + ".zip";
+
+        // Determine installed incremental
+        String installedIncremental = Utils.getIncremental();
+
+        // Convert LinkedList to HashMap, keyed on filename.
+        HashMap<String, UpdateInfo> updatesMap = new HashMap<String, UpdateInfo>();
+        for (UpdateInfo ui : updates) {
+            updatesMap.put(ui.getFileName(), ui);
+        }
+
+        // Add the updates
+        for (UpdateInfo ui : updates) {
+            // Skip if this is an incremental
+            if (ui.isIncremental()) {
+                continue;
+            }
+
+            // Check to see if there is an incremental
+            boolean haveIncremental = false;
+            String incrementalFile = "incremental-" + installedIncremental + "-"
+                    + ui.getIncremental() + ".zip";
+            if (updatesMap.containsKey(incrementalFile)) {
+                haveIncremental = true;
+                ui.setFileName(incrementalFile);
+            }
+
+            // Determine the preference style and create the preference
+            boolean isDownloading = ui.getFileName().equals(mFileName);
+            int style;
+
+            if (isDownloading) {
+                // In progress download
+                style = UpdatePreference.STYLE_DOWNLOADING;
+            } else if (haveIncremental) {
+                style = UpdatePreference.STYLE_DOWNLOADED;
+            } else if (ui.getFileName().equals(installedZip)) {
+                // This is the currently installed version
+                style = UpdatePreference.STYLE_INSTALLED;
+            } else if (ui.getDownloadUrl() != null) {
+                style = UpdatePreference.STYLE_NEW;
+            } else {
+                style = UpdatePreference.STYLE_DOWNLOADED;
+            }
+
+            UpdatePreference up = new UpdatePreference(this, ui, style);
+            up.setOnActionListener(this);
+            up.setKey(ui.getFileName());
+
+            // If we have an in progress download, link the preference
+            if (isDownloading) {
+                mDownloadingPreference = up;
+                up.setOnReadyListener(this);
+                mDownloading = true;
+            }
+
+            // Add to the list
+            mUpdatesList.addPreference(up);
+        }
+
+        // If no updates are in the list, show the default message
+        if (mUpdatesList.getPreferenceCount() == 0) {
+            Preference pref = new Preference(this);
+            pref.setLayoutResource(R.layout.preference_empty_list);
+            //if (!Utils.hasLeanback(this)) {//guo mark
+			pref.setTitle(R.string.no_available_updates_intro);
+            //}
+            pref.setEnabled(false);//guo: this line hide the UpdatePreference.java
+            mUpdatesList.addPreference(pref);
+        }
+    }
+
+    //guo: callback for UpdatePreference.OnActionListener 
+    @Override
+    public void onDeleteUpdate(UpdatePreference pref) {
+        final String fileName = pref.getKey();
+
+        if (mUpdateFolder.exists() && mUpdateFolder.isDirectory()) {
+            File zipFileToDelete = new File(mUpdateFolder, fileName);
+
+            if (zipFileToDelete.exists()) {
+                zipFileToDelete.delete();
+            } else {
+                Log.d(TAG, "Update to delete not found");
+                return;
+            }
+
+            String message = getString(R.string.delete_single_update_success_message, fileName);
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        } else if (!mUpdateFolder.exists()) {
+            Toast.makeText(this, R.string.delete_updates_noFolder_message, Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, R.string.delete_updates_failure_message, Toast.LENGTH_SHORT).show();
+        }
+
+        // Update the list
+        updateLayout();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[],
+                                           int[] grantResults) {
+		//Log.d(TAG,"guo: UpdatesSettings.java onRequestPermissionsResult()");
+        switch (requestCode) {
+            case PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE: {
+                // if request is cancelled, the result arrays are empty
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted, yay!
+                    Button positiveButton = mDownloadDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                    Button negativeButton = mDownloadDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+					positiveButton.setVisibility(View.INVISIBLE);
+                    negativeButton.setVisibility(View.GONE);
+                    startToDownload(mUpdateType);
+                } else {
+                    // permission was not granted, cannot download
+                    mDownloadingPreference = null;
+                    new AlertDialog.Builder(this)
+                            .setTitle(R.string.permission_not_granted_dialog_title)
+                            .setMessage(R.string.permission_not_granted_dialog_message)
+                            .setPositiveButton(R.string.dialog_ok, null)
+                            .show();
+                    return;
+                }
+                break;
+            }
+        }
+    }
+
+    private void startDownload() {
+		//Log.d(TAG, "guo: UpdateSettings.java startDownload()");
+        UpdateInfo ui = mDownloadingPreference.getUpdateInfo();
+        if (ui == null) {
+            return;
+        }
+
+        mDownloadingPreference.setStyle(UpdatePreference.STYLE_DOWNLOADING);
+
+        // Set progress bar to indeterminate while incremental check runs
+        ProgressBar progressBar = mDownloadingPreference.getProgressBar();
+        progressBar.setIndeterminate(true);
+
+        // Disable cancel button while incremental check runs
+        ImageView updatesButton = mDownloadingPreference.getUpdatesButton();
+        updatesButton.setEnabled(false);
+
+        mFileName = ui.getFileName();
+        mDownloading = true;
+
+        // Start the download
+        Intent intent = new Intent(this, DownloadReceiver.class);
+        intent.setAction(DownloadReceiver.ACTION_START_DOWNLOAD);
+        intent.putExtra(DownloadReceiver.EXTRA_UPDATE_INFO, (Parcelable) ui);//guo: ui is the UpdateInfo instance
+        sendBroadcast(intent);
+
+        mUpdateHandler.post(mUpdateProgress);
+    }
+
+    private void confirmDeleteAll() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.confirm_delete_dialog_title)
+                .setMessage(R.string.confirm_delete_all_dialog_message)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        // We are OK to delete, trigger it
+                        deleteOldUpdates();
+                        updateLayout();
+                    }
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+    }
+
+    private boolean deleteOldUpdates() {
+        boolean success;
+        //mUpdateFolder: Foldername with fullpath of SDCARD
+        if (mUpdateFolder.exists() && mUpdateFolder.isDirectory()) {
+            deleteDir(mUpdateFolder);
+            mUpdateFolder.mkdir();
+            success = true;
+            Toast.makeText(this, R.string.delete_updates_success_message, Toast.LENGTH_SHORT).show();
+        } else if (!mUpdateFolder.exists()) {
+            success = false;
+            Toast.makeText(this, R.string.delete_updates_noFolder_message, Toast.LENGTH_SHORT).show();
+        } else {
+            success = false;
+            Toast.makeText(this, R.string.delete_updates_failure_message, Toast.LENGTH_SHORT).show();
+        }
+        return success;
+    }
+
+    private static boolean deleteDir(File dir) {
+        if (dir.isDirectory()) {
+            String[] children = dir.list();
+            for (String aChildren : children) {
+                boolean success = deleteDir(new File(dir, aChildren));
+                if (!success) {
+                    return false;
+                }
+            }
+        }
+        // The directory is now empty so delete it
+        return dir.delete();
+    }
+
+	/*
+	//guo: we don't need this method
+	int count = 0;
+    private void showSysInfo() {
+		count++;//guo
+        // Build the message
+        Date lastCheck = new Date(mPrefs.getLong(Constants.LAST_UPDATE_CHECK_PREF, 0));
+        String date = DateFormat.getLongDateFormat(this).format(lastCheck);
+        String time = DateFormat.getTimeFormat(this).format(lastCheck);
+
+        String cmReleaseType = Constants.CM_RELEASETYPE_NIGHTLY;
+        int updateType = Utils.getUpdateType();
+        if (updateType == Constants.UPDATE_TYPE_SNAPSHOT) {
+            cmReleaseType = Constants.CM_RELEASETYPE_SNAPSHOT;
+        }
+
+        String message = getString(R.string.sysinfo_device) + " " + Utils.getDeviceType() + "\n\n"
+                + getString(R.string.sysinfo_running) + " " + Utils.getInstalledVersion() + "\n\n"
+                + getString(R.string.sysinfo_update_channel) + " " + cmReleaseType + "\n\n"
+                + getString(R.string.sysinfo_last_check) + " " + date + " " + time
+				+ "\n\n count = " + count;//guo added
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_system_info)
+                .setMessage(message)
+                //.setPositiveButton(R.string.dialog_ok, null);//guo mark
+                .setPositiveButton(R.string.dialog_ok, null)
+                .setNegativeButton(R.string.dialog_settings, new DialogInterface.OnClickListener(){//guo: added
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+						showSysInfo();
+						//this.setMessage(message + count++);
+					}//end onClick()
+				});
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+			try{
+				Thread.sleep(1000);
+			} catch(Exception e){}
+
+        TextView messageView = (TextView) dialog.findViewById(android.R.id.message);
+        messageView.setTextAppearance(this, android.R.style.TextAppearance_DeviceDefault_Small);
+			messageView.setText("count = " + count);	
+    }
+	*/
+
+	//guo: callback for UpdatePreference.OnActionListener 
+	//guo: reboot into recovery mode here
+    @Override
+    public void onStartUpdate(UpdatePreference pref) {
+        final UpdateInfo updateInfo = pref.getUpdateInfo();
+
+        // Prevent the dialog from being triggered more than once
+        if (mStartUpdateVisible) {
+            return;
+        }
+
+        mStartUpdateVisible = true;
+
+        // Get the message body right
+        String dialogBody = getString(R.string.apply_update_dialog_text, updateInfo.getName());
+
+        // Display the dialog
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.apply_update_dialog_title)
+                .setMessage(dialogBody)
+                .setPositiveButton(R.string.dialog_update, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        try {
+                            Utils.triggerUpdate(UpdatesSettings.this, updateInfo.getFileName());//guo: reboot into recovery mode
+                        } catch (IOException e) {
+                            Log.e(TAG, "Unable to reboot into recovery mode", e);
+                            Toast.makeText(UpdatesSettings.this, R.string.apply_unable_to_reboot_toast,
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton(R.string.dialog_cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mStartUpdateVisible = false;
+                    }
+                })
+                .show();
+    }
+
+	//guo add
+	//TODO: deal with disconnecting the mobile network???
+	//TODO: how to implement update over wifi only????
+    //private void dataFeeWarningDialog() {
+    private void dataFeeWarningDialog(Preference preference) {
+		if(((CheckBoxPreference) preference).isChecked()) {
+			//mCheckBoxPreferenceShouldChecked = false;
+			Utils.setWifiOnly(true);
+		}
+		else{
+		// the checkbox is unchecked
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.data_fee_warning_dialog_title)
+                .setMessage(R.string.data_fee_warning_dialog_msg)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+						//mCheckBoxPreferenceShouldChecked = false;
+						Utils.setWifiOnly(false);
+					}//end onClick()
+				})
+                .setNegativeButton(R.string.dialog_cancel, new DialogInterface.OnClickListener(){
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+						//mCheckBoxPreferenceShouldChecked = true;
+					}//end onClick()
+				})
+                .show();
+			}//end else
+
+			/*
+			if(mCheckBoxPreferenceShouldChecked) {
+				((CheckBoxPreference) preference).setChecked(true);
+			}
+			*/
+		//	Log.d(TAG,"guo: mCheckBoxPreferenceShouldChecked =" + Boolean.toString(mCheckBoxPreferenceShouldChecked));
+    }//end dataFeeWarningDialog()
+
+	/*
+	//guo add
+	private void setPreferenceCheckBoxValue(Preference preference, boolean value){
+		((CheckBoxPreference) preference).setChecked(true);
+	}
+	*/
+
+    private void noNetworkWarnDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.unable_to_connect_dialog_title)
+                .setMessage(R.string.unable_to_connect_dialog_msg)
+                .setPositiveButton(R.string.dialog_settings, new DialogInterface.OnClickListener(){
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+						startActivity(new Intent(Settings.ACTION_SETTINGS));
+					}//end onClick()
+				})
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+    }//end dataFeeWarningDialog()
+}
