@@ -454,7 +454,8 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	}
 
 	ret_val = parse_swift_auth_header(fptr);
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	/*TODO: add retry routines somewhere for failed attempts*/
@@ -775,7 +776,8 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	}
 
 	ret_val = parse_swift_list_header(swift_header_fptr);
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	if ((ret_val >= 200) && (ret_val < 300))
@@ -909,7 +911,8 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		return -1;
 	}
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	fclose(swift_header_fptr);
@@ -1036,7 +1039,8 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		return -1;
 	}
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	/* get object meta data */
@@ -1157,7 +1161,8 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 		return -1;
 	}
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	fclose(swift_header_fptr);
@@ -1383,7 +1388,8 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 		dump_S3_list_body(S3_list_body_fptr);
 	/*TODO: add retry routines somewhere for failed attempts*/
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	write_log(10, "return val is: %d\n", ret_val);
@@ -2036,7 +2042,8 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		return -1;
 	}
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	fclose(S3_header_fptr);
@@ -2169,7 +2176,8 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		return -1;
 	}
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	/* get object meta data */
@@ -2306,7 +2314,8 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 		return -1;
 	}
 
-	if (ret_val >= 500 && ret_val <= 505)
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
 	fclose(S3_header_fptr);
