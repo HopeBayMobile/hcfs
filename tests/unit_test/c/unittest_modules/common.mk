@@ -28,8 +28,7 @@ CXX	=	g++
 ###########################################################################
 # CCache
 ###########################################################################
-export PATH := /usr/lib/ccache:$(PATH)
-export USE_CCACHE := 1
+include $(dir $(lastword $(MAKEFILE_LIST)))/../../../../build/ccache.mk
 
 ###########################################################################
 # Compiling flags
@@ -50,7 +49,7 @@ CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
 # Support  gcc4.9 color output
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
-	CPPFLAGS += -fdiagnostics-color
+	CPPFLAGS += -fdiagnostics-color=auto
 endif
 
 ###########################################################################
