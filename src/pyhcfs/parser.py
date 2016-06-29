@@ -63,24 +63,30 @@ def parse_meta(meta_path):
     return convert_to_python(meta[0])
 
 
-def list_dir_inorder(meta_path, offset=(0, 0), limit=1000):
+def list_dir_inorder(meta_path="", offset=(0, 0), limit=1000):
     """
     int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
                              const int32_t start_el, const int32_t limit,
                              int64_t *end_page_pos, int32_t *end_el_no,
                              PORTABLE_DIR_ENTRY *file_list);
     """
+    ret = {
+            'result': -1,
+            'offset': (0,0),
+            'child_list': []
+            }
+    if limit <= 0 or offset[0] < 0 or offset[1] < 0:
+        return ret
+
     end_page_pos = ffi.new("int64_t *")
     end_el_no = ffi.new("int32_t *")
     file_list = ffi.new("PORTABLE_DIR_ENTRY []", limit)
+
     ret_code = lib.list_dir_inorder(meta_path, offset[0], offset[1], limit,
             end_page_pos, end_el_no, file_list)
 
-    ret = {
-            'result': ret_code,
-            'offset': (end_page_pos[0], end_el_no[0]),
-            'child_list': []
-            }
+    ret['result'] = ret_code
+    ret['offset'] = (end_page_pos[0], end_el_no[0])
     if ret_code > 0:
         ret['child_list'] = [ convert_to_python(file_list[i]) for i in range(ret_code) ]
 
