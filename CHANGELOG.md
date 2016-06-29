@@ -1,7 +1,47 @@
 Please view this file on the android-dev branch, on stable branches it's out of date.
 
+v 2.2.1.1025
+=====
 
-v 2.2.1.962
+## New Features
+ - [Android] remove user settings (!424)
+ - [Tera-App] Add a feedback button onto settings page ([!45](gateway-2-0/android-management-app!45))
+ - [Tera-App] Add required information for ui automation ([@63f5b04a](gateway-2-0/android-management-app@63f5b04a))
+ - [Android] Feature/HBTUpdater (!426)
+	1. Integrate OTA Updater APP (/system/priv-app/HBTUpdater.apk) into nexus-5X source code. User can upgrade system from OTA now.
+	2. Download the oldest OTA update only (User may need to upgrade system multiple times)
+	3. Temporarily disable wifi download only (update through Wi-Fi+Cellular )
+	4. Temporarily disable auto download OTA update
+
+## Fixes
+ - [HCFS] Fix #11476 Device should not show "Transmission slow" for return code 401. (!427)
+ - [HCFS] hotfix/break_upload_block_loop_on_error (!421)
+ - [HCFS] Adding lower limit to truncate and write offset, and unittest (!425)
+ - [Android] Move tera api library to android prebuilt (!418)
+ - [Tera-App] #11598 Tera exception happened after pressing "Start switching" button to switch account ([!46](gateway-2-0/android-management-app!46))
+ - [Tera-App] #11100 List view 點擊 Pin/Unpin App 時會出現 pin status 切回點擊前狀態 ([!47](gateway-2-0/android-management-app!47))
+ - [Tera-App] #11636 There is no Tera version information and IMEI 2 should not list in About page. ([!48](gateway-2-0/android-management-app!48))
+ - [Tera-App] #11632 APP/FILE 畫面下, 切換到Display by file時資料夾名稱下半部被裁切掉了  ([@7d50f700](gateway-2-0/android-management-app@7d50f700))
+ - [Tera-App] Fix login permission request dialog issue ([!39](gateway-2-0/android-management-app!39))
+ - [Tera-App] Fix inconsistent state when mgmt app (launcher) pin or unpin ([!40](gateway-2-0/android-management-app!40))
+ - [Tera-App] Show message on login page when auto auth failed ([@e79552cf](gateway-2-0/android-management-app@e79552cf))
+ - [Tera-App] Unpin/pin related files/apps when pin/unpin failed ([@2aa28b4d](gateway-2-0/android-management-app@2aa28b4d))
+
+## CI / Refactoring
+  - No changes
+
+## Known Issues / Limitations / Features to be Implemented
+ 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
+ 2. If cache is full during recording video, user need to wait cache been flush to storage after recording finished.
+ 3. Delete an app then reinstall it again (without running some other app with external storage access) might cause wrong permission when reading from external storage for this app.
+ 4. For uses in demo kit environment, backend setting via APP does not work (no connection to management cluster). Please push backend settings to phone directly.
+ 5. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
+ 6. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
+ 7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
+ 8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
+ 9. First activation after flash ROM may failed in silent. Reboot Android should fix this problem.
+
+v 2.2.1.0962
 =====
 ## New Features
 - (!396) System supports new pin type - “high-priority-pin”. (also gateway-2-0/android-management-app!35)
