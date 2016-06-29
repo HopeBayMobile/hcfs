@@ -2,6 +2,18 @@
 
 ###notation
 ##TAG
+deconf() {
+adb push hcfsconf /data/
+adb shell chmod 777 /data/hcfsconf
+adb shell /data/hcfsconf dec /data/hcfs.conf /tmp/hcfs.conf.dec
+adb pull /tmp/hcfs.conf.dec /tmp/hcfs.conf/dec
+}
+
+disableAccount() {
+###need mock?
+adb shell iptables -I INPUT -p all -s 61.219.202.83 -d 0.0.0.0/0 -j DROP
+adb shell iptables -I OUTPUT -p all -s 0.0.0.0/0 -d 61.219.202.83 -j DROP
+}
 
 checkBackendStat() {
 adb shell HCFSvol cloudstat
@@ -139,16 +151,44 @@ else
 fi
 }
 
-#testBackendMonitorOffline2() {
-###backend offline long time
-##HCFS_ANDROID_870_04
-#}
+testBackendMonitorOfflineLongTime() {
+echo "###backend monitor -- backend offline long time"
+echo "##HCFS_ANDROID_870_04"
+setup
+backendOfflineStart
+start_line=$?
+echo $start_line
+sleep 3600
+online
+sleep 512
+pullLog
+#wait_count=$(sed -n "$start_line,$"p /tmp/log.tmp | grep 'Monitor' |grep 'online')
+teardown
+if [ $(adb shell 'HCFSvol cloudstat | grep ONLINE > /dev/null; echo $?') != 0 ];then
+    echo "[O]"
+    return 0
+else
+    echo "[X]"
+    return 1
+fi
+}
 
 
-#testBackendMonitorAccountDisable() {
+testBackendMonitorAccountDisable() {
 ###backend account disable
 ##HCFS_ANDROID_870_05
-#}
+deconf
+
+sleep 60
+if [ $(adb shell 'HCFSvol cloudstat | grep OFFLINE > /dev/null; echo $?') != 0 ];then
+    echo "[O]"
+    return 0
+else
+    echo "[X]"
+    return 1
+fi
+
+}
 
 ####Main####
 
@@ -162,6 +202,9 @@ fi
             ;;
         3)         
             testBackendMonitorDataAccess
+            ;;
+        4)         
+            testBackendMonitorOfflineLongTime
             ;;
         *)
             ;;

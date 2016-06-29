@@ -41,5 +41,5 @@ AttributeError: 'module' object has no attribute 'HCFSANDROID_99'
 US-870,HCFSANDROID_87001,backend monitor -- backend offline ,,1,Pass,0,0
 US-870,HCFSANDROID_87002,backend monitor -- backend from offline to online,,1,,,
 US-870,HCFSANDROID_87003,backend monitor -- data access,,1,,,
-US-870,HCFSANDROID_87004,backend monitor -- backend offline long time,,0,,,
+US-870,HCFSANDROID_87004,backend monitor -- backend offline long time,,1,,,
 US-870,HCFSANDROID_87005,backend monitor -- backend account disable,,0,,,

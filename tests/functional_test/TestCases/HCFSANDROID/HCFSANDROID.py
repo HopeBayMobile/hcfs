@@ -1257,7 +1257,7 @@ class HCFSANDROID_87002:
 
 class HCFSANDROID_87003:
     '''
-    test Backend Monitor from offline to online
+    test Backend Monitor data access
     '''
     def __init__(self):
         self.cmd = "./TestCases/HCFSANDROID/test_scripts/testBackendMonitorOnline.sh 3"
@@ -1266,6 +1266,54 @@ class HCFSANDROID_87003:
     def run(self):
         dt_ori = datetime.now()
 
+        retcode = subprocess.call(self.cmd,shell=True)
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+
+        if retcode != 0:
+            return False, retcode
+        else: 
+            return True, 'Spend time: {0}'.format(spend_time)
+
+class HCFSANDROID_87004:
+    '''
+    test Backend Monitor from offline 1hour to online
+    '''
+    def __init__(self):
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testBackendMonitorOnline.sh 4"
+        #self.cmd = "ls -l"
+
+    def run(self):
+        dt_ori = datetime.now()
+
+        retcode = subprocess.call(self.cmd,shell=True)
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+
+        if retcode != 0:
+            return False, retcode
+        else: 
+            return True, 'Spend time: {0}'.format(spend_time)
+
+class HCFSANDROID_87005:
+    '''
+    backend monitor -- backend account disable
+    '''
+    def __init__(self):
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testBackendMonitorOnline.sh 5"
+        #self.cmd = "ls -l"
+
+    def run(self):
+        dt_ori = datetime.now()
+        
         retcode = subprocess.call(self.cmd,shell=True)
 
         dt_new = datetime.now()
