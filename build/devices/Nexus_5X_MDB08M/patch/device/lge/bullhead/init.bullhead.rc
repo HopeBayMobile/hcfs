@@ -57,6 +57,12 @@ on property:sys.boot_completed=1
     # allow CPUs to go in deeper idle state than C0
     write /sys/module/lpm_levels/parameters/sleep_disabled 0
 
+# guo add
+on property:dev.bootcomplete=1
+    mkdir /storage/emulated/0/hbtupdater 0771 root sdcard_rw
+    mkdir /data/media/0/hbtupdater 0770 media_rw media_rw
+    start binddatamedia
+
 on init
     # Load persistent dm-verity state
     verity_load_state
@@ -511,3 +517,8 @@ service hcfs_api /system/bin/hcfsapid
     //group root system shell
     //oneshot
     disabled
+
+#guo: for HBTUpdater
+service binddatamedia /system/bin/mount -o bind /data/media/0/hbtupdater /storage/emulated/0/hbtupdater
+    disabled
+    oneshot

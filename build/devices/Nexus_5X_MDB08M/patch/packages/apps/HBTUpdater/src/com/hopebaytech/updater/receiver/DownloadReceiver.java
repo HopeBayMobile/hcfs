@@ -31,12 +31,12 @@ import java.io.IOException;
 public class DownloadReceiver extends BroadcastReceiver{
     private static final String TAG = "DownloadReceiver";
 
-    public static final String ACTION_START_DOWNLOAD = "com.cyanogenmod.cmupdater.action.START_DOWNLOAD";
+    public static final String ACTION_START_DOWNLOAD = "com.hopebaytech.hbtupdater.action.START_DOWNLOAD";
     public static final String EXTRA_UPDATE_INFO = "update_info";
 
-    public static final String ACTION_DOWNLOAD_STARTED = "com.cyanogenmod.cmupdater.action.DOWNLOAD_STARTED";
+    public static final String ACTION_DOWNLOAD_STARTED = "com.hopebaytech.hbtupdater.action.DOWNLOAD_STARTED";
 
-    static final String ACTION_INSTALL_UPDATE = "com.cyanogenmod.cmupdater.action.INSTALL_UPDATE";
+    static final String ACTION_INSTALL_UPDATE = "com.hopebaytech.hbtupdater.action.INSTALL_UPDATE";
     static final String EXTRA_FILENAME = "filename";
 
     @Override
@@ -45,7 +45,7 @@ public class DownloadReceiver extends BroadcastReceiver{
 
         if (ACTION_START_DOWNLOAD.equals(action)) {//guo: from UpdateCheckService.java or AndroidManifest.xml
 			//guo: UpdatesSettings.java (startDownload()) 
-			Log.e(TAG, "guo: DownloadReceiver is started by ACTION_START_DOWNLOAD");//guo add
+			//Log.e(TAG, "started by ACTION_START_DOWNLOAD");
             UpdateInfo ui = (UpdateInfo) intent.getParcelableExtra(EXTRA_UPDATE_INFO);
             handleStartDownload(context, ui);
         } else if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(action)) {//guo:AndroidManifest.xml, get from the DownloadManager
@@ -67,19 +67,22 @@ public class DownloadReceiver extends BroadcastReceiver{
     }
 
     private void handleStartDownload(Context context, UpdateInfo ui) {
-		Log.e(TAG, "guo: DownloadReceiver starts DownloadService");//guo add
+		//Log.e(TAG, "starts DownloadService");
         DownloadService.start(context, ui);
     }
 
     private void handleDownloadComplete(Context context, long id) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         long enqueued = prefs.getLong(Constants.DOWNLOAD_ID, -1);
+
         if (enqueued < 0 || id < 0 || id != enqueued) {
             return;
         }
 
         String downloadedMD5 = prefs.getString(Constants.DOWNLOAD_MD5, "");
         String incrementalFor = prefs.getString(Constants.DOWNLOAD_INCREMENTAL_FOR, null);
+
+        Log.d(TAG, "downloadedMD5=" + downloadedMD5 + ", incrementalFor=" + incrementalFor);
 
         // Send off to DownloadCompleteIntentService
         Intent intent = new Intent(context, DownloadCompleteIntentService.class);

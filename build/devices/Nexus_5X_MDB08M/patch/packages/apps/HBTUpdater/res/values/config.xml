@@ -8,5 +8,5 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- HBTUpdate Config Strings -->
-    <string name="conf_update_server_url_def" translatable="false">http://192.168.1.215:8000/upload/list</string>
+    <string name="conf_update_server_url_def" translatable="false">http://ota.terafonn.com/upload/list</string>
 </resources>

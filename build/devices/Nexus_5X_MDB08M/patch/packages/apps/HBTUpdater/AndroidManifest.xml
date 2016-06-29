@@ -1,8 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.hopebaytech.updater"
     android:versionCode="4"
-    android:versionName="2.3" 
-	android:sharedUserId="com.google.uid.shared">
+    android:versionName="2.3" >
+<!--	android:sharedUserId="com.google.uid.shared" -->
 <!--    android:sharedUserId="android.uid.system" --> <!-- Settings.apk use this --> <!-- this does not work! -->
 
     <uses-sdk
@@ -29,11 +29,10 @@
 
         <activity
             android:name=".UpdatesSettings"
-            android:launchMode="singleTop"
+            android:launchMode="singleInstance"
             android:hardwareAccelerated="true"
             android:label="@string/display_name"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:excludeFromRecents="true" >
+            android:configChanges="orientation|keyboardHidden|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 <!--                <category android:name="android.intent.category.DEFAULT" />  -->
@@ -55,7 +54,7 @@
         <receiver android:name="com.hopebaytech.updater.receiver.DownloadReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE"/>
-                <action android:name="com.cyanogenmod.cmupdater.action.START_DOWNLOAD"/>
+                <action android:name="com.hopebaytech.hbtupdater.action.START_DOWNLOAD"/>
             </intent-filter>
         </receiver>
 

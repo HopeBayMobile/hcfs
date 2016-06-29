@@ -41,6 +41,7 @@ public class DownloadNotifier {
                 .setContentText(updateUiName)
                 .setTicker(context.getString(R.string.not_download_success))
                 .setStyle(style)
+                .setOngoing(true)
                 .addAction(R.drawable.ic_tab_install,
                         context.getString(R.string.not_action_install_update),
                         createInstallPendingIntent(context, updateFile));

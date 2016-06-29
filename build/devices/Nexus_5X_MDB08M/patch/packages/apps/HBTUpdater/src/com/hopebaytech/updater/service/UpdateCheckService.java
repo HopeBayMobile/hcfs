@@ -48,7 +48,7 @@ import java.util.Date;
 import java.util.LinkedList;
 
 public class UpdateCheckService extends IntentService
-        implements Response.ErrorListener, Response.Listener<JSONObject> {
+	implements Response.ErrorListener, Response.Listener<JSONObject> {
 
     private static final String TAG = "UpdateCheckService";
 
@@ -57,17 +57,19 @@ public class UpdateCheckService extends IntentService
     private static final boolean TESTING_DOWNLOAD = false;
 
     // request actions
-    public static final String ACTION_CHECK = "com.cyanogenmod.cmupdater.action.CHECK";
-    public static final String ACTION_CANCEL_CHECK = "com.cyanogenmod.cmupdater.action.CANCEL_CHECK";
+    public static final String ACTION_CHECK = "com.hopebaytech.hbtupdater.action.CHECK";
+    public static final String ACTION_CANCEL_CHECK = "com.hopebaytech.hbtupdater.action.CANCEL_CHECK";
 
     // broadcast actions
-    public static final String ACTION_CHECK_FINISHED = "com.cyanogenmod.cmupdater.action.UPDATE_CHECK_FINISHED";
+    public static final String ACTION_CHECK_FINISHED = "com.hopebaytech.hbtupdater.action.UPDATE_CHECK_FINISHED";
     // extra for ACTION_CHECK_FINISHED: total amount of found updates
     public static final String EXTRA_UPDATE_COUNT = "update_count";
     // extra for ACTION_CHECK_FINISHED: amount of updates that are newer than what is installed
     public static final String EXTRA_REAL_UPDATE_COUNT = "real_update_count";
     // extra for ACTION_CHECK_FINISHED: amount of updates that were found for the first time
     public static final String EXTRA_NEW_UPDATE_COUNT = "new_update_count";
+    // Aaron: extra for ACTION_CHECK_FINISHED: the update type (INCREMENTAL or FULL)
+    public static final String EXTRA_UPDATE_TYPE = "update_type";
 
     // max. number of updates listed in the expanded notification
     private static final int EXPANDED_NOTIF_UPDATE_COUNT = 4;
@@ -90,7 +92,6 @@ public class UpdateCheckService extends IntentService
         return super.onStartCommand(intent, flags, startId);
     }
 
-	//guo: This method is called when somebody start this service???
 	//guo: this is called by:
 	//	(1) Utils.java's scheduleUpdateService()
 	//	(2) UpdatesSettings.java
@@ -102,7 +103,7 @@ public class UpdateCheckService extends IntentService
             Log.i(TAG, "Could not check for updates. Not connected to the network.");
             return;
         }
-		Log.i(TAG, "guo:get into the UpdateCheckService.java: onHandleIntent()");//guo
+		//Log.i(TAG, "onHandleIntent");
         getAvailableUpdates();//guo: this one connects to the OTA server
     }
 
@@ -110,7 +111,7 @@ public class UpdateCheckService extends IntentService
             Intent finishedIntent) {
 
         if (availableUpdates == null) {
-            sendBroadcast(finishedIntent); //guo: who get this intent??? CAN'T FIND WHO???
+            sendBroadcast(finishedIntent); // Aaron: UpdatesSttings.java's BroadcastReceiver get this intent.
             return;
         }
 
@@ -172,6 +173,7 @@ public class UpdateCheckService extends IntentService
                 }
             });
 
+			/* Aaron: comment
             NotificationCompat.InboxStyle inbox = new NotificationCompat.InboxStyle(builder)
                     .setBigContentTitle(text);
             int added = 0, count = realUpdates.size();
@@ -188,20 +190,22 @@ public class UpdateCheckService extends IntentService
             }
             builder.setStyle(inbox);
             builder.setNumber(availableUpdates.size());
+			*/
 
-            if (count == 1) {
-				//guo: way-1: UpdatesSetting(checkForUpdates()) ---> UpdateCheckService ---> DownloadReceiver ---> DownloadService
-				//guo: way-2: UpdatesSetting(startDownload())                           ---> DownloadReceiver ---> DownloadService
-				//guo: way-3: UpdateCheckReceiver               ---> UpdateCheckService ---> DownloadReceiver ---> DownloadService
-                i = new Intent(this, DownloadReceiver.class); //guo: start DownloadReceiver.java
-                i.setAction(DownloadReceiver.ACTION_START_DOWNLOAD);
-                i.putExtra(DownloadReceiver.EXTRA_UPDATE_INFO, (Parcelable) realUpdates.getFirst());
-                PendingIntent downloadIntent = PendingIntent.getBroadcast(this, 0, i,
-                        PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_UPDATE_CURRENT);
+            //  if (count == 1) { //Aaron: comment
 
-                builder.addAction(R.drawable.ic_tab_download,
-                        res.getString(R.string.not_action_download), downloadIntent);
-            }
+			//guo: way-1: UpdatesSetting(checkForUpdates()) ---> UpdateCheckService ---> DownloadReceiver ---> DownloadService
+			//guo: way-2: UpdatesSetting(startDownload())                           ---> DownloadReceiver ---> DownloadService
+			//guo: way-3: UpdateCheckReceiver               ---> UpdateCheckService ---> DownloadReceiver ---> DownloadService
+			i = new Intent(this, DownloadReceiver.class); //guo: start DownloadReceiver.java
+			i.setAction(DownloadReceiver.ACTION_START_DOWNLOAD);
+			i.putExtra(DownloadReceiver.EXTRA_UPDATE_INFO, (Parcelable) realUpdates.getFirst());
+			PendingIntent downloadIntent = PendingIntent.getBroadcast(this, 0, i,
+					PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_UPDATE_CURRENT);
+
+			builder.addAction(R.drawable.ic_tab_download,
+					res.getString(R.string.not_action_download), downloadIntent);
+            // } //Aaron: comment
 
             // Trigger the notification
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -211,27 +215,24 @@ public class UpdateCheckService extends IntentService
         sendBroadcast(finishedIntent);
     }
 
-	//guo: bingo, the OTA server URL is here!!!
+    //guo: the OTA server URL is here!!!
     private URI getServerURI() {
-        //String propertyUpdateUri = SystemProperties.get("cm.updater.uri");
-        
 		//guo: this could be used for dynamically set the ota server ip
-		//guo: sample: `setprop hb.updater.url http://192.168.0.7:8000/upload/list`
+		//guo: `setprop hb.updater.url http://192.168.0.7:8000/upload/list`
         String propertyUpdateUri = SystemProperties.get("hb.updater.url");
         if (!TextUtils.isEmpty(propertyUpdateUri)) {
-			Log.d(TAG, "guo:check " + propertyUpdateUri);
             return URI.create(propertyUpdateUri);
         }
 
-		//guo: this is the default url
+		//default url
         String configUpdateUri = getString(R.string.conf_update_server_url_def); 
-		Log.d(TAG, "guo:check " + configUpdateUri);
+		//Log.d(TAG, "connect to url:" + configUpdateUri);
         return URI.create(configUpdateUri);
     }
 
-	//guo: this one connects to the OTA server
+	//connects to the OTA server
     private void getAvailableUpdates() {
-		Log.d(TAG, "guo:check getAvailableUpdates()");
+		//Log.d(TAG, "getAvailableUpdates()");
         // Get the type of update we should check for
         int updateType = Utils.getUpdateType();
 
@@ -242,7 +243,6 @@ public class UpdateCheckService extends IntentService
             request = new UpdatesJsonObjectRequest(updateServerUri.toASCIIString(),
                     Utils.getUserAgentString(this), buildUpdateRequest(updateType), this, this);
             // Improve request error tolerance
-		Log.d(TAG, "guo:check getAvailableUpdates()---> request.setRetryPolicy()");
             request.setRetryPolicy(new DefaultRetryPolicy(UPDATE_REQUEST_TIMEOUT,
                         UPDATE_REQUEST_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
             // Set the tag for the request, reuse logging tag
@@ -252,7 +252,6 @@ public class UpdateCheckService extends IntentService
             return;
         }
 
-		Log.d(TAG, "guo:check getAvailableUpdates()---> add(request)");
         ((UpdateApplication) getApplicationContext()).getQueue().add(request);
     }
 
@@ -283,8 +282,7 @@ public class UpdateCheckService extends IntentService
         return request;
     }
 
-    private LinkedList<UpdateInfo> parseJSON(String jsonString, int updateType) {
-		Log.d(TAG, "guo:parseJSON()");//guo
+    private LinkedList<UpdateInfo> parseJSON(String jsonString/*, int updateType*/) {
         LinkedList<UpdateInfo> updates = new LinkedList<UpdateInfo>();
         try {
             JSONObject result = new JSONObject(jsonString);
@@ -298,7 +296,7 @@ public class UpdateCheckService extends IntentService
                     continue;
                 }
                 JSONObject item = updateList.getJSONObject(i);
-                UpdateInfo info = parseUpdateJSONObject(item, updateType);
+                UpdateInfo info = parseUpdateJSONObject(item/*, updateType*/);
 				//Log.d(TAG, "guo:" + info.toString());//guo
                 if (info != null) {
                     updates.add(info);
@@ -310,9 +308,8 @@ public class UpdateCheckService extends IntentService
         return updates;
     }
 
-	//guo: .json is actually parsed here
-    private UpdateInfo parseUpdateJSONObject(JSONObject obj, int updateType) throws JSONException {
-		Log.d(TAG, "guo:parseUpdateJSONObject()");//guo
+	//json is actually parsed here
+    private UpdateInfo parseUpdateJSONObject(JSONObject obj/*, int updateType*/) throws JSONException {
         UpdateInfo ui = new UpdateInfo.Builder()
                 .setFileName(obj.getString("filename"))
                 .setDownloadUrl(obj.getString("url"))
@@ -332,7 +329,7 @@ public class UpdateCheckService extends IntentService
         return ui;
     }
 
-	//guo: Response.ErrorListener
+	//Response.ErrorListener
     @Override
     public void onErrorResponse(VolleyError volleyError) {
         VolleyLog.e("Error: ", volleyError.getMessage());
@@ -341,14 +338,13 @@ public class UpdateCheckService extends IntentService
         sendBroadcast(intent);
     }
 
-	//guo: Response.Listener<T>
+	//Response.Listener<T>
     @Override
     public void onResponse(JSONObject jsonObject) {
-		Log.d(TAG, "guo:onResponse()");//guo
-        int updateType = Utils.getUpdateType();
+        //int updateType = Utils.getUpdateType();
 
         LinkedList<UpdateInfo> lastUpdates = State.loadState(this);
-        LinkedList<UpdateInfo> updates = parseJSON(jsonObject.toString(), updateType);
+        LinkedList<UpdateInfo> updates = parseJSON(jsonObject.toString()/*, updateType*/);
 
         int newUpdates = 0, realUpdates = 0;
         for (UpdateInfo ui : updates) {
@@ -360,11 +356,21 @@ public class UpdateCheckService extends IntentService
             }
         }
 
+        // Aaron: determine the udpate type 
+        int COUNT_FOR_FULL_UPDATE = 3;
+        UpdateInfo.Type updateType;
+        if (realUpdates > COUNT_FOR_FULL_UPDATE) {
+            updateType = UpdateInfo.Type.FULL;
+        } else {
+            updateType = UpdateInfo.Type.INCREMENTAL;
+        }
+
 		//guo: this is the finished Intent
-        Intent intent = new Intent(ACTION_CHECK_FINISHED); //guo: who get this intent???
+        Intent intent = new Intent(ACTION_CHECK_FINISHED); //guo: UpdatesSettings.java' internal receiver get this
         intent.putExtra(EXTRA_UPDATE_COUNT, updates.size());
         intent.putExtra(EXTRA_REAL_UPDATE_COUNT, realUpdates);
         intent.putExtra(EXTRA_NEW_UPDATE_COUNT, newUpdates);
+        intent.putExtra(EXTRA_UPDATE_TYPE, updateType.ordinal()); // Aaron: pass the update type 
 
         recordAvailableUpdates(updates, intent);
         State.saveState(this, updates);

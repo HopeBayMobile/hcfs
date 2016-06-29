@@ -57,12 +57,14 @@ public class Utils {
 	//end guo add
 
     public static File makeUpdateFolder() {
-		//guo: /storage/emulated/0/cmupdater/
+		// /storage/emulated/0/hbtupdater/
+		// in HCFS system, we do `mount -o bind /data/media/0/hbtupdater /storage/emulated/0/hbtupdater`
+		// to redirect every thing to /data/media/0/hbtupdater
         return new File(Environment.getExternalStorageDirectory(),
                 Constants.UPDATES_FOLDER);
     }
 
-	//guo: cancel Notification in the notification bar
+    //guo: cancel Notification in the notification bar
     public static void cancelNotification(Context context) {
         final NotificationManager nm =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -155,20 +157,19 @@ public class Utils {
         updatePackagePath = updatePackagePath.replace("storage/emulated", "data/media");
 
         // Reboot into recovery and trigger the update
-        android.os.RecoverySystem.installPackage(context, new File(updatePackagePath)); //guo: this line reboot into the recovery mode
+        // guo: this line reboot into the recovery mode
+        android.os.RecoverySystem.installPackage(context, new File(updatePackagePath));
     }
 
     public static int getUpdateType() {
         int updateType = Constants.UPDATE_TYPE_NIGHTLY;
         try {
-            String cmReleaseType = SystemProperties.get(
-                    Constants.PROPERTY_CM_RELEASETYPE);
+            String cmReleaseType = SystemProperties.get( Constants.PROPERTY_CM_RELEASETYPE);
 
             // Treat anything that is not SNAPSHOT as NIGHTLY
             if (!cmReleaseType.isEmpty()) {
-                if (TextUtils.equals(cmReleaseType,
-                        Constants.CM_RELEASETYPE_SNAPSHOT)) {
-                    updateType = Constants.UPDATE_TYPE_SNAPSHOT;
+                if (TextUtils.equals(cmReleaseType, Constants.CM_RELEASETYPE_SNAPSHOT)) {
+					updateType = Constants.UPDATE_TYPE_SNAPSHOT;
                 }
             }
         } catch (RuntimeException ignored) {

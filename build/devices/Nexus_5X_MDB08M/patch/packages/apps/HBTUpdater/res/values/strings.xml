@@ -9,7 +9,6 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- General strings -->
-<!--    <string name="app_name">CM Updater</string> guo mark-->
     <string name="app_name">HopeBayTech Updater</string>
     <string name="display_name">System updates</string>
     <string name="unknown">Unknown</string>
@@ -66,6 +65,7 @@
     <string name="not_download_failure">Update download was unsuccessful</string>
     <string name="not_action_install_update">Reboot and install</string>
     <string name="not_download_install_notice">The update <xliff:g id="filename">%s</xliff:g> was successfully downloaded. When touching \'Reboot and install\', the device will restart itself to install the update.\n\nNote: A compatible Recovery is required for the installation to work automatically.</string>
+    <string name="download_dialog_message">Download updates over a mobile network or while roaming may cause additional charges.\n\n<b>Please do not turn off your phone until the update finishes.\n\n%1$s</b></string>
 
     <!-- MD5 related strings -->
     <string name="md5_verification_failed">MD5 verification failed</string>

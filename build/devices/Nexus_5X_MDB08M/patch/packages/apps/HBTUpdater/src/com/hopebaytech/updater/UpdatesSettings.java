@@ -34,12 +34,11 @@ import android.preference.PreferenceCategory;
 import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
 
-//guo
 import android.preference.CheckBoxPreference;
-//end guo
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.text.format.DateFormat;
+import android.text.Html; // Aaron add
 import android.util.Log;
 import android.util.AttributeSet;
 import android.view.View;
@@ -63,12 +62,9 @@ import com.hopebaytech.updater.service.UpdateCheckService;
 import com.hopebaytech.updater.utils.UpdateFilter;
 import com.hopebaytech.updater.utils.Utils;
 
-//guo mark
-//import org.hopebaytech.internal.util.ScreenType;
 import com.hopebaytech.updater.utils.ScreenType;
-
-//guo add
-import android.provider.Settings;
+import com.hopebaytech.updater.receiver.DownloadNotifier; // Aaron add
+import android.provider.Settings; //guo add
 
 import java.io.File;
 import java.io.IOException;
@@ -77,10 +73,13 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Locale; // Aaron add
 
 public class UpdatesSettings extends PreferenceActivity implements
-        OnPreferenceChangeListener, UpdatePreference.OnReadyListener, UpdatePreference.OnActionListener,
-        ActivityCompat.OnRequestPermissionsResultCallback {
+	OnPreferenceChangeListener, 
+	UpdatePreference.OnReadyListener, 
+	UpdatePreference.OnActionListener,
+	ActivityCompat.OnRequestPermissionsResultCallback {
     private static String TAG = "UpdatesSettings";
 
     // intent extras
@@ -92,11 +91,11 @@ public class UpdatesSettings extends PreferenceActivity implements
     public static final String KEY_SYSTEM_INFO = "system_info";
     private static final String KEY_DELETE_ALL = "delete_all";
 
-//guo
+	//guo
     public static final String KEY_OVER_WIFI_ONLY = "pref_over_wifi_only";
     public static final String KEY_AUTO_DOWNLOAD_SYSTEM_UPDATES = "pref_auto_download_system_updates";
     public static final String KEY_SYSTEM_VERSION = "pref_system_version";
-//end guo
+	//end guo
 
     private static final String UPDATES_CATEGORY = "updates_category";
 
@@ -107,7 +106,7 @@ public class UpdatesSettings extends PreferenceActivity implements
     private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
 
     private SharedPreferences mPrefs;
-//    private ListPreference mUpdateCheck;//guo mark
+    private ListPreference mUpdateCheck;
 
     private PreferenceCategory mUpdatesList;
     private UpdatePreference mDownloadingPreference;
@@ -120,29 +119,35 @@ public class UpdatesSettings extends PreferenceActivity implements
 
     private boolean mStartUpdateVisible = false;
     private ProgressDialog mProgressDialog;
+    private AlertDialog mDownloadDialog;
 
     private DownloadManager mDownloadManager;
     private boolean mDownloading = false;
     private long mDownloadId;
     private String mFileName;
+    private UpdateInfo.Type mUpdateType;
 
     private Handler mUpdateHandler = new Handler();
 
-	//guo this is registered in onStart() and unregistered in onStop()
-	//guo: this is used to receive ACTION_DOWNLOAD_STARTED from DownloadService's downloadFullZip() and downloadIncremental()
+    //guo this is registered in onStart() and unregistered in onStop()
+    //guo: this is used to receive ACTION_DOWNLOAD_STARTED from DownloadService's downloadFullZip() and downloadIncremental()
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            if (DownloadReceiver.ACTION_DOWNLOAD_STARTED.equals(action)) {//guo: this is from DownloadService downloadFullZip()/downloadIncremental()
+			//guo: this is from DownloadService downloadFullZip()/downloadIncremental()
+            if (DownloadReceiver.ACTION_DOWNLOAD_STARTED.equals(action)) {
                 mDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                mUpdateHandler.post(mUpdateProgress);
-            } else if (UpdateCheckService.ACTION_CHECK_FINISHED.equals(action)) {
+                //mUpdateHandler.post(mUpdateProgress);
+                mUpdateHandler.post(mUpdateProgressMessage); // Aaron add
+            } else if (UpdateCheckService.ACTION_CHECK_FINISHED.equals(action)) { 
+				// Aaron: from UpdateCheckService.java's onErrorResponse() and onResponse()
                 if (mProgressDialog != null) {
-                    mProgressDialog.dismiss();
+					mProgressDialog.dismiss();
                     mProgressDialog = null;
 
+					/* Aaron: comment
                     int count = intent.getIntExtra(UpdateCheckService.EXTRA_NEW_UPDATE_COUNT, -1);
                     if (count == 0) {
                         Toast.makeText(UpdatesSettings.this, R.string.no_updates_found,
@@ -151,10 +156,160 @@ public class UpdatesSettings extends PreferenceActivity implements
                         Toast.makeText(UpdatesSettings.this, R.string.update_check_failed,
                                 Toast.LENGTH_LONG).show();
                     }
+					*/
                 }
-                updateLayout();
+                //updateLayout();
+                
+                // Start Aaron
+                int count = intent.getIntExtra(UpdateCheckService.EXTRA_REAL_UPDATE_COUNT, -1);
+                if (count == 0) {
+                    Toast.makeText(UpdatesSettings.this, R.string.no_updates_found,
+                            Toast.LENGTH_SHORT).show();
+                } else if (count < 0) {
+                    Toast.makeText(UpdatesSettings.this, R.string.update_check_failed,
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    int typePos = intent.getIntExtra(UpdateCheckService.EXTRA_UPDATE_TYPE, -1);
+                    mUpdateType = UpdateInfo.Type.values()[typePos];
+                    showSystemUpdateDialog(mUpdateType); 
+                }
+                // End Aaron
+ 
             }
         }
+    };
+
+    // Aaron add
+    public void showSystemUpdateDialog(final UpdateInfo.Type updateType) {
+		String subMsg  = "Requires a restart later";
+		String message = String.format(Locale.getDefault(), getString(R.string.download_dialog_message), subMsg);
+
+		mDownloadDialog = new AlertDialog.Builder(UpdatesSettings.this)
+                .setTitle(Html.fromHtml("<font color=" + ContextCompat.getColor(UpdatesSettings.this, R.color.dialog_title) + 
+										">System Update</font>"))
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("Download", null)
+                .setNegativeButton("Cancel", null)
+                .create();
+
+        mDownloadDialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(final DialogInterface dialog) {
+                final Button positiveButton = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_POSITIVE);
+                final Button negativeButton = ((AlertDialog) dialog).getButton(AlertDialog.BUTTON_NEGATIVE);
+                positiveButton.setOnClickListener(new View.OnClickListener() {
+					@Override
+                    public void onClick(View v) {
+						// But check permissions first - download will be started in the callback
+						int permissionCheck = ContextCompat.checkSelfPermission(UpdatesSettings.this,
+								android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
+						if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
+							// permission already granted, start the download
+							if (positiveButton.getTag() != null) {
+								String fileName = (String) positiveButton.getTag();
+								Log.d(TAG, "fileName=" + fileName);
+								try {
+									Utils.triggerUpdate(UpdatesSettings.this, fileName + ".partial");
+								} catch (IOException e) {
+									Log.e(TAG, "Unable to reboot into recovery mode", e);
+									Toast.makeText(UpdatesSettings.this, R.string.apply_unable_to_reboot_toast,
+										 Toast.LENGTH_SHORT).show();
+								}
+							} else {
+								positiveButton.setVisibility(View.INVISIBLE);
+								negativeButton.setVisibility(View.GONE);
+								startToDownload(updateType);
+							}
+						} else {
+							// permission not granted, request it from the user
+							ActivityCompat.requestPermissions(UpdatesSettings.this,
+									new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
+									PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
+						}		
+					}//end onClick()
+                });
+            }//end show()
+        });
+        mDownloadDialog.show();
+    }// end showSystemUpdateDialog()
+
+    public void startToDownload(UpdateInfo.Type updateType) {
+        Log.d(TAG, "startToDownload");
+		LinkedList<UpdateInfo> availableUpdates = State.loadState(this);
+		UpdateInfo info = availableUpdates.getLast();
+        info.setType(updateType);
+        
+		Intent intent = new Intent(this, DownloadReceiver.class);
+        intent.setAction(DownloadReceiver.ACTION_START_DOWNLOAD);
+        intent.putExtra(DownloadReceiver.EXTRA_UPDATE_INFO, (Parcelable) info);
+        sendBroadcast(intent);                
+
+        // Aaron add: clear old ota file
+        // guo: add try-catch to prevent this Activiy from crashing if the directory is empty
+		try{
+			File directory = Utils.makeUpdateFolder();
+			if (directory.exists()) {
+				for (File file: directory.listFiles()) {
+				file.delete();
+				}
+			}
+		} catch(Exception e) {
+			Log.d(TAG,"got the directory.listFiles() exeption");
+			e.printStackTrace();
+		}
+    }
+
+    private Runnable mUpdateProgressMessage = new Runnable() {
+        @Override
+        public void run() {
+			DownloadManager.Query q = new DownloadManager.Query();
+			q.setFilterById(mDownloadId);
+
+			int downloadStatus;	
+			Cursor cursor = mDownloadManager.query(q);            
+            if (cursor == null || !cursor.moveToFirst()) {
+                // DownloadReceiver has likely already removed the download
+				// from the DB due to failure or MD5 mismatch
+                downloadStatus = DownloadManager.STATUS_FAILED;
+			} else {
+				downloadStatus = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+			}
+
+            switch (downloadStatus) {
+	        case DownloadManager.STATUS_PAUSED:
+                case DownloadManager.STATUS_RUNNING:
+                    Log.d(TAG, "DownloadManager.STATUS_RUNNING");
+                    int downloadedBytes = cursor.getInt(
+                        cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                    int totalBytes = cursor.getInt(
+                        cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+	       		
+					if (cursor != null) {
+						cursor.close();
+					}
+
+					int progress;
+					if (totalBytes < 0) {
+							progress = 0;
+					} else {
+							progress = (int) Math.round(((double) downloadedBytes / totalBytes) * 100);
+					}
+
+                    String progressMsg  = String.format(Locale.getDefault(), "Download in progress... %1$d%%", progress);
+                    String message = String.format(Locale.getDefault(), getString(R.string.download_dialog_message),  progressMsg);
+                    mDownloadDialog.setMessage(message);
+                    break;
+                case DownloadManager.STATUS_FAILED:
+                    Log.d(TAG, "DownloadManager.STATUS_FAILED");
+                    resetDownloadState();
+                    break;
+            }//end switch
+
+            if (downloadStatus != DownloadManager.STATUS_FAILED) {
+                mUpdateHandler.postDelayed(this, 1000);
+			}
+        }//end run()
     };
 
     @Override
@@ -165,7 +320,7 @@ public class UpdatesSettings extends PreferenceActivity implements
 
         // Load the layouts
         //if (!Utils.hasLeanback(this)) {
-            addPreferencesFromResource(R.xml.main);
+		addPreferencesFromResource(R.xml.main);
         //} 
 		//else {
         //    addPreferencesFromResource(R.xml.main_tv);
@@ -178,14 +333,20 @@ public class UpdatesSettings extends PreferenceActivity implements
         checkUpdateBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-	        Toast.makeText(UpdatesSettings.this, R.string.check_for_update, Toast.LENGTH_LONG).show();
-	        checkForUpdates();
+				checkForUpdates();
             }
         });
         // end Aaron
 
         mUpdatesList = (PreferenceCategory) findPreference(UPDATES_CATEGORY);
-//        mUpdateCheck = (ListPreference) findPreference(Constants.UPDATE_CHECK_PREF);//guo mark
+        mUpdateCheck = (ListPreference) findPreference(Constants.UPDATE_CHECK_PREF);//guo mark
+
+		findPreference(KEY_OVER_WIFI_ONLY).setEnabled(false);//guo: temp disable wifi only item
+		findPreference(KEY_AUTO_DOWNLOAD_SYSTEM_UPDATES).setEnabled(false);
+
+        // Aaron add
+        //getPreferenceScreen().removePreference(mUpdatesList);
+        //getPreferenceScreen().removePreference(mUpdateCheck);
 
 		//guo
 		//mSystemVersionPreference = (CheckBoxPreference) findPreference(KEY_SYSTEM_VERSION);
@@ -195,8 +356,9 @@ public class UpdatesSettings extends PreferenceActivity implements
 
         // Load the stored preference data
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-//guo mark
-/*
+
+		//guo mark
+		/*
         if (mUpdateCheck != null) {
             //int check = mPrefs.getInt(Constants.UPDATE_CHECK_PREF, Constants.UPDATE_FREQ_WEEKLY);
             int check = mPrefs.getInt(Constants.UPDATE_CHECK_PREF, Constants.UPDATE_FREQ_DAILY);//guo modify
@@ -204,7 +366,7 @@ public class UpdatesSettings extends PreferenceActivity implements
             mUpdateCheck.setSummary(mapCheckValue(check));
             mUpdateCheck.setOnPreferenceChangeListener(this);
         }
-*/
+		*/
 
         // Force a refresh if UPDATE_TYPE_PREF does not match release type
         int updateType = Utils.getUpdateType();
@@ -228,23 +390,23 @@ public class UpdatesSettings extends PreferenceActivity implements
 
     @Override
     public boolean onPreferenceTreeClick(PreferenceScreen preferenceScreen, Preference preference) {
-/*        if (preference == findPreference(KEY_SYSTEM_INFO)) { //guo: used for the main_tv.xml
+        /*if (preference == findPreference(KEY_SYSTEM_INFO)) { //guo: used for the main_tv.xml
             checkForUpdates();
         } else if (preference == findPreference(KEY_DELETE_ALL)) {
             confirmDeleteAll();
         }  
-*/
+		*/
 		if (preference == findPreference(KEY_OVER_WIFI_ONLY)) {//guo add
 			dataFeeWarningDialog(preference);
-			Log.d(TAG,"guo: mCheckBoxPreferenceShouldChecked =" + Boolean.toString(mCheckBoxPreferenceShouldChecked));
+			//Log.d(TAG,"guo: mCheckBoxPreferenceShouldChecked =" + Boolean.toString(mCheckBoxPreferenceShouldChecked));
 			//if( !((CheckBoxPreference) preference).isChecked()) dataFeeWarningDialog();
 		
 			//guo: FAIL!! this does not work since the AlertDialog has its own thread.
-		/*
+			/*
 			if(mCheckBoxPreferenceShouldChecked) {
 				((CheckBoxPreference) preference).setChecked(true);
 			}//end if
-		*/
+			*/
         } else if (preference == findPreference(KEY_AUTO_DOWNLOAD_SYSTEM_UPDATES)) {//guo add
                 Toast.makeText(this, R.string.download_not_found, Toast.LENGTH_LONG).show();
         } //else if (preference == findPreference(KEY_SYSTEM_VERSION)) {//guo add
@@ -253,8 +415,8 @@ public class UpdatesSettings extends PreferenceActivity implements
         return super.onPreferenceTreeClick(preferenceScreen, preference);
     }
 
-//guo mark
-/*
+	//guo mark
+	/*
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         menu.add(0, MENU_REFRESH, 0, R.string.menu_refresh)
@@ -270,13 +432,14 @@ public class UpdatesSettings extends PreferenceActivity implements
 
         return true;
     }
-*/
+	*/
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-//guo mark
-/*            case MENU_REFRESH:
+			//guo mark
+			/*
+            case MENU_REFRESH:
                 checkForUpdates();
                 return true;
 
@@ -287,7 +450,7 @@ public class UpdatesSettings extends PreferenceActivity implements
             case MENU_SYSTEM_INFO:
                 showSysInfo();
                 return true;
-*/
+			*/
 
             case android.R.id.home:
                 onBackPressed();
@@ -329,8 +492,8 @@ public class UpdatesSettings extends PreferenceActivity implements
 	//guo: we don't need this, since we hardcode that update checking frequency is "everyday"
     @Override
     public boolean onPreferenceChange(Preference preference, Object newValue) {
-	/*
-	//guo marked
+		/*
+		//guo marked
         if (preference == mUpdateCheck) {
             int value = Integer.valueOf((String) newValue);
             mPrefs.edit().putInt(Constants.UPDATE_CHECK_PREF, value).apply();
@@ -338,7 +501,7 @@ public class UpdatesSettings extends PreferenceActivity implements
             Utils.scheduleUpdateService(this, value * 1000);
             return true;
         }
-	*/
+		*/
 
         return false;
     }
@@ -360,6 +523,7 @@ public class UpdatesSettings extends PreferenceActivity implements
                         || status == DownloadManager.STATUS_RUNNING
                         || status == DownloadManager.STATUS_PAUSED) {
                     mFileName = uri.getLastPathSegment();
+                    Log.d(TAG, "onStart(): mFileName" + mFileName);
                 }
             }
             if (c != null) {
@@ -370,13 +534,13 @@ public class UpdatesSettings extends PreferenceActivity implements
             resetDownloadState();
         }
 
-        updateLayout();
+        //updateLayout(); //Aaron mark
 
         IntentFilter filter = new IntentFilter(UpdateCheckService.ACTION_CHECK_FINISHED);
         filter.addAction(DownloadReceiver.ACTION_DOWNLOAD_STARTED);
         registerReceiver(mReceiver, filter);
 
-        checkForDownloadCompleted(getIntent());
+        //checkForDownloadCompleted(getIntent()); //Aaron mark
         setIntent(null);
     }
 
@@ -391,10 +555,11 @@ public class UpdatesSettings extends PreferenceActivity implements
         }
     }
 
-	//guo: callback for UpdatePreference.OnActionListener 
+
+    //guo: callback for UpdatePreference.OnActionListener
     @Override
     public void onStartDownload(UpdatePreference pref) {
-		Log.d(TAG,"guo: UpdatesSettings.java onStartDownload()");
+		//Log.d(TAG,"guo: UpdatesSettings.java onStartDownload()");
         // If there is no internet connection, display a message and return.
         if (!Utils.isOnline(this)) {
             Toast.makeText(this, R.string.data_connection_required, Toast.LENGTH_SHORT).show();
@@ -421,12 +586,11 @@ public class UpdatesSettings extends PreferenceActivity implements
                     new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
                     PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE);
         }
-
     }
 
-    private Runnable mUpdateProgress = new Runnable() {
+     private Runnable mUpdateProgress = new Runnable() {
         public void run() {
-			Log.d(TAG, "guo: in mUpdateProgress thread, mDownloadId =" + mDownloadId);
+			//Log.d(TAG, "guo: in mUpdateProgress thread, mDownloadId =" + mDownloadId);
             if (!mDownloading || mDownloadingPreference == null || mDownloadId < 0) {
                 return;
             }
@@ -464,37 +628,37 @@ public class UpdatesSettings extends PreferenceActivity implements
                     break;
                 case DownloadManager.STATUS_PAUSED:
                 case DownloadManager.STATUS_RUNNING:
-                    int downloadedBytes = cursor.getInt(
+                     int downloadedBytes = cursor.getInt(
                         cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
-                    int totalBytes = cursor.getInt(
+                     int totalBytes = cursor.getInt(
                         cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
 
-                    if (totalBytes < 0) {
-                        progressBar.setIndeterminate(true);
-                    } else {
-                        progressBar.setIndeterminate(false);
-                        progressBar.setMax(totalBytes);
-                        progressBar.setProgress(downloadedBytes);
-                    }
-                    break;
-                case DownloadManager.STATUS_FAILED:
-                    mDownloadingPreference.setStyle(UpdatePreference.STYLE_NEW);
-                    resetDownloadState();
-                    break;
-            }
+                     if (totalBytes < 0) {
+                         progressBar.setIndeterminate(true);
+                     } else {
+                         progressBar.setIndeterminate(false);
+                         progressBar.setMax(totalBytes);
+                         progressBar.setProgress(downloadedBytes);
+                     }
+                     break;
+                 case DownloadManager.STATUS_FAILED:
+                     mDownloadingPreference.setStyle(UpdatePreference.STYLE_NEW);
+                     resetDownloadState();
+                     break;
+             }
 
-            if (cursor != null) {
-                cursor.close();
-            }
-            if (status != DownloadManager.STATUS_FAILED) {
-                mUpdateHandler.postDelayed(this, 1000);
-            }
-        }
-    };
+             if (cursor != null) {
+                 cursor.close();
+             }
+             if (status != DownloadManager.STATUS_FAILED) {
+                 mUpdateHandler.postDelayed(this, 1000);
+             }
+         }
+     };
 
-	//guo: callback for UpdatePreference.OnActionListener 
     @Override
     public void onStopDownload(final UpdatePreference pref) {
+        Log.d(TAG, "onStopDownload");
         if (!mDownloading || mFileName == null || mDownloadId < 0) {
             pref.setStyle(UpdatePreference.STYLE_NEW);
             resetDownloadState();
@@ -534,12 +698,29 @@ public class UpdatesSettings extends PreferenceActivity implements
         checkForUpdates();
     }
 
-	//guo: this calls ---> onStartUpdates() ---> reboot into recovery mode
+    //guo: this calls ---> onStartUpdates() ---> reboot into recovery mode
     private void checkForDownloadCompleted(Intent intent) {
+        Log.d(TAG, "checkForDownloadCompleted");
+
+        long downloadId = 0;
+        String fullPathName = null;
+        boolean downloadAndCheckSumSuccessful = true;        
         if (intent == null) {
-            return;
+            //return;
+            downloadAndCheckSumSuccessful = false;
+        } else {
+            downloadId = intent.getLongExtra(EXTRA_FINISHED_DOWNLOAD_ID, -1);
+            if (downloadId < 0) {
+                downloadAndCheckSumSuccessful = false;
+            }
+
+	    fullPathName = intent.getStringExtra(EXTRA_FINISHED_DOWNLOAD_PATH);
+            if (fullPathName == null) {
+                downloadAndCheckSumSuccessful = false;
+            } 
         }
 
+		/* Aaron mark
         long downloadId = intent.getLongExtra(EXTRA_FINISHED_DOWNLOAD_ID, -1);
         if (downloadId < 0) {
             return;
@@ -549,9 +730,42 @@ public class UpdatesSettings extends PreferenceActivity implements
         if (fullPathName == null) {
             return;
         }
+		*/
 
-        String fileName = new File(fullPathName).getName();
+        if (!downloadAndCheckSumSuccessful) {
+            if (mDownloadDialog != null) {
+                mDownloadDialog.dismiss();
+            }
 
+            new AlertDialog.Builder(this)
+                 .setTitle("Download failed")
+                 .setMessage("Download failed")
+                 .setPositiveButton("OK", null)
+                 .show();
+            return;
+        }
+
+		Intent updateIntent = new Intent(this, UpdatesSettings.class);
+		updateIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		updateIntent.putExtra(UpdatesSettings.EXTRA_FINISHED_DOWNLOAD_ID, downloadId);
+		updateIntent.putExtra(UpdatesSettings.EXTRA_FINISHED_DOWNLOAD_PATH, fullPathName);
+
+        File updateFile = new File(fullPathName);
+        String fileName = updateFile.getName();
+
+		DownloadNotifier.notifyDownloadComplete(this, updateIntent, updateFile);
+        if (mDownloadDialog != null) {
+             String progressMsg  = String.format(Locale.getDefault(), "Download in progress... %1$d%%", 100);
+             String message = String.format(Locale.getDefault(), getString(R.string.download_dialog_message), progressMsg);
+             mDownloadDialog.setMessage(message);
+
+             Button positiveButton = mDownloadDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+             positiveButton.setText("RESTART & INSTALL");
+             positiveButton.setVisibility(View.VISIBLE);
+             positiveButton.setTag(fileName);
+        }
+
+		/* Aaron mark
         // If this is an incremental, find matching target and mark it as downloaded.
         String incrementalFor = intent.getStringExtra(EXTRA_FINISHED_DOWNLOAD_INCREMENTAL_FOR);
         if (incrementalFor != null) {
@@ -569,9 +783,9 @@ public class UpdatesSettings extends PreferenceActivity implements
                 onStartUpdate(pref);
             }
         }
-
+		*/
         resetDownloadState();
-    }
+    }//end checkForDownloadCompleted()
 
     private void resetDownloadState() {
         mDownloadId = -1;
@@ -593,6 +807,7 @@ public class UpdatesSettings extends PreferenceActivity implements
     }
 
     private void checkForUpdates() {
+		//Log.d(TAG, "guo: UpdateSettings.java checkForUpdates()");
         if (mProgressDialog != null) {
             return;
         }
@@ -618,8 +833,6 @@ public class UpdatesSettings extends PreferenceActivity implements
             }
         });
 
-		
-	Log.d(TAG, "guo: UpdateSettings.java checkForUpdates()");
         Intent checkIntent = new Intent(UpdatesSettings.this, UpdateCheckService.class);
         checkIntent.setAction(UpdateCheckService.ACTION_CHECK);
         startService(checkIntent);
@@ -631,8 +844,10 @@ public class UpdatesSettings extends PreferenceActivity implements
         // Read existing Updates
         LinkedList<String> existingFiles = new LinkedList<String>();
 
-        mUpdateFolder = Utils.makeUpdateFolder(); //guo: /sdcard/cmupater/
-        File[] files = mUpdateFolder.listFiles(new UpdateFilter(".zip")); //guo: /sdcard/cmupdater/*.zip ---> downloaded before
+        mUpdateFolder = Utils.makeUpdateFolder();
+
+		//guo: /storage/emulated/0/hbtupdater/*.zip ---> downloaded files before
+        File[] files = mUpdateFolder.listFiles(new UpdateFilter(".zip"));
 
         if (mUpdateFolder.exists() && mUpdateFolder.isDirectory() && files != null) {
             for (File file : files) {
@@ -671,8 +886,8 @@ public class UpdatesSettings extends PreferenceActivity implements
         // Update the preference list
         refreshPreferences(updates);
 
-/*
-//guo: we don't need this
+		/*
+		//guo: we don't need this
         // Prune obsolete change log files
         new Thread() {
             @Override
@@ -696,8 +911,8 @@ public class UpdatesSettings extends PreferenceActivity implements
                 }
             }
         }.start();
-//guo: end we don't need this
-*/
+		//guo: end we don't need this
+		*/
     }
 
 	//guo: this is called by updateLayout()
@@ -775,14 +990,14 @@ public class UpdatesSettings extends PreferenceActivity implements
             Preference pref = new Preference(this);
             pref.setLayoutResource(R.layout.preference_empty_list);
             //if (!Utils.hasLeanback(this)) {//guo mark
-                pref.setTitle(R.string.no_available_updates_intro);
+			pref.setTitle(R.string.no_available_updates_intro);
             //}
             pref.setEnabled(false);//guo: this line hide the UpdatePreference.java
             mUpdatesList.addPreference(pref);
         }
     }
 
-	//guo: callback for UpdatePreference.OnActionListener 
+    //guo: callback for UpdatePreference.OnActionListener 
     @Override
     public void onDeleteUpdate(UpdatePreference pref) {
         final String fileName = pref.getKey();
@@ -812,14 +1027,18 @@ public class UpdatesSettings extends PreferenceActivity implements
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[],
                                            int[] grantResults) {
-		Log.d(TAG,"guo: UpdatesSettings.java onRequestPermissionsResult()");
+		//Log.d(TAG,"guo: UpdatesSettings.java onRequestPermissionsResult()");
         switch (requestCode) {
             case PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE: {
                 // if request is cancelled, the result arrays are empty
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // permission was granted, yay!
-                    startDownload();
+                    Button positiveButton = mDownloadDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                    Button negativeButton = mDownloadDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+					positiveButton.setVisibility(View.INVISIBLE);
+                    negativeButton.setVisibility(View.GONE);
+                    startToDownload(mUpdateType);
                 } else {
                     // permission was not granted, cannot download
                     mDownloadingPreference = null;
@@ -836,7 +1055,7 @@ public class UpdatesSettings extends PreferenceActivity implements
     }
 
     private void startDownload() {
-		Log.d(TAG, "guo: UpdateSettings.java startDownload()");
+		//Log.d(TAG, "guo: UpdateSettings.java startDownload()");
         UpdateInfo ui = mDownloadingPreference.getUpdateInfo();
         if (ui == null) {
             return;
@@ -912,8 +1131,8 @@ public class UpdatesSettings extends PreferenceActivity implements
         return dir.delete();
     }
 
-/*
-	//guo:modify
+	/*
+	//guo: we don't need this method
 	int count = 0;
     private void showSysInfo() {
 		count++;//guo
@@ -957,7 +1176,7 @@ public class UpdatesSettings extends PreferenceActivity implements
         messageView.setTextAppearance(this, android.R.style.TextAppearance_DeviceDefault_Small);
 			messageView.setText("count = " + count);	
     }
-*/
+	*/
 
 	//guo: callback for UpdatePreference.OnActionListener 
 	//guo: reboot into recovery mode here
@@ -1000,9 +1219,9 @@ public class UpdatesSettings extends PreferenceActivity implements
                 .show();
     }
 
-//guo add
-//TODO: deal with disconnecting the mobile network???
-//TODO: how to implement update over wifi only????
+	//guo add
+	//TODO: deal with disconnecting the mobile network???
+	//TODO: how to implement update over wifi only????
     //private void dataFeeWarningDialog() {
     private void dataFeeWarningDialog(Preference preference) {
 		if(((CheckBoxPreference) preference).isChecked()) {
@@ -1017,32 +1236,33 @@ public class UpdatesSettings extends PreferenceActivity implements
                 .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener(){
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-		//				mCheckBoxPreferenceShouldChecked = false;
+						//mCheckBoxPreferenceShouldChecked = false;
 						Utils.setWifiOnly(false);
 					}//end onClick()
 				})
                 .setNegativeButton(R.string.dialog_cancel, new DialogInterface.OnClickListener(){
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-		//				mCheckBoxPreferenceShouldChecked = true;
+						//mCheckBoxPreferenceShouldChecked = true;
 					}//end onClick()
 				})
                 .show();
 			}//end else
-/*
+
+			/*
 			if(mCheckBoxPreferenceShouldChecked) {
 				((CheckBoxPreference) preference).setChecked(true);
 			}
-*/
+			*/
 		//	Log.d(TAG,"guo: mCheckBoxPreferenceShouldChecked =" + Boolean.toString(mCheckBoxPreferenceShouldChecked));
     }//end dataFeeWarningDialog()
 
-/*
+	/*
 	//guo add
 	private void setPreferenceCheckBoxValue(Preference preference, boolean value){
 		((CheckBoxPreference) preference).setChecked(true);
 	}
-*/
+	*/
 
     private void noNetworkWarnDialog() {
         new AlertDialog.Builder(this)

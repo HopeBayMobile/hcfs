@@ -24,7 +24,6 @@ import android.util.Log;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.VolleyLog;
-//guo add
 import com.android.volley.DefaultRetryPolicy;
 
 import com.hopebaytech.updater.R;
@@ -64,6 +63,8 @@ public class DownloadService extends IntentService
 
     @Override
     protected void onHandleIntent(Intent intent) {
+        Log.d(TAG, "onHandleIntent");
+
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         mInfo = intent.getParcelableExtra(EXTRA_UPDATE_INFO);
 
@@ -72,11 +73,24 @@ public class DownloadService extends IntentService
             return;
         }
 
+        // Aaron
+        UpdateInfo.Type mType = mInfo.getType();
+        switch (mType) {
+            case INCREMENTAL:
+				downloadIncremental(mInfo);
+                break;
+            case FULL:
+            	downloadFullZip();
+	    	break;
+        }
+        Log.d(TAG, "mType=" + mType);
+		/* Aaron: comment
         try {
             getIncremental();//guo: download is starting from here!!!
         } catch (IOException e) {
             downloadFullZip();
         }
+		*/
     }
 
     private void getIncremental() throws IOException {
@@ -85,15 +99,12 @@ public class DownloadService extends IntentService
                 + mInfo.getIncremental());
 
         UpdatesJsonObjectRequest request = buildRequest(sourceIncremental);
-		//guo: add
-		request.setTag(TAG);
-		//end guo add
+		request.setTag(TAG);//guo: add
         ((UpdateApplication) getApplicationContext()).getQueue().add(request);
     }
 
 	//guo: similar to UPdateCheckService.java's getServerURI()
     private String getServerUri() {
-        //String propertyUri = SystemProperties.get("cm.updater.uri");
         String propertyUri = SystemProperties.get("hb.updater.url");//guo add
         if (!TextUtils.isEmpty(propertyUri)) {
             return propertyUri;
@@ -103,7 +114,6 @@ public class DownloadService extends IntentService
     }
 
     private UpdatesJsonObjectRequest buildRequest(String sourceIncremental) {
-        //URI requestUri = URI.create(getServerUri() + "/v1/build/get_delta");
         URI requestUri = URI.create(getServerUri());//guo add
         UpdatesJsonObjectRequest request;
 
@@ -126,8 +136,7 @@ public class DownloadService extends IntentService
 
 	//guo: we don't need this method
     private JSONObject buildRequestBody(String sourceIncremental) throws JSONException {
-		//guo add
-		if(true) return null;
+		if(true) return null; //guo add
         JSONObject body = new JSONObject();
         body.put("source_incremental", sourceIncremental);
         body.put("target_incremental", mInfo.getIncremental());
@@ -161,15 +170,15 @@ public class DownloadService extends IntentService
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
         String userAgent = Utils.getUserAgentString(this);
         if (userAgent != null) {
-            request.addRequestHeader("User-Agent", userAgent);//guo: ASK: WHAT IS REQUEST HEADER, SHOULD OTA SERVER NEEDS THIS(ask Sherry)???
+            request.addRequestHeader("User-Agent", userAgent);//guo: ???
         }
         request.setTitle(getString(R.string.app_name));
         request.setDestinationUri(Uri.parse(localFilePath));
 
 		//guo add
-		Log.d(TAG,"guo: wifionly =" + Boolean.toString(Utils.getWifiOnly()));
+		//Log.d(TAG,"guo: wifionly =" + Boolean.toString(Utils.getWifiOnly()));
 		if(Utils.getWifiOnly()){
-			Log.d(TAG,"guo: setAllowedOverRoaming = false");
+			//Log.d(TAG,"guo: setAllowedOverRoaming = false");
 			request.setAllowedOverRoaming(false);//guo: this restricts to Update over Wi-Fi only
 		}
         request.setVisibleInDownloadsUi(false);
@@ -182,26 +191,28 @@ public class DownloadService extends IntentService
     }
 
     private void downloadIncremental(UpdateInfo incrementalUpdateInfo) {
-        Log.v(TAG, "Downloading incremental zip: " + incrementalUpdateInfo.getDownloadUrl());
+        //Log.v(TAG, "Downloading incremental zip: " + incrementalUpdateInfo.getDownloadUrl());
         // Build the name of the file to download, adding .partial at the end.  It will get
         // stripped off when the download completes
         String sourceIncremental = Utils.getIncremental();
-        String targetIncremental = mInfo.getIncremental();
-        String fileName = "incremental-" + sourceIncremental + "-" + targetIncremental + ".zip";
+        //String targetIncremental = mInfo.getIncremental(); //Aaron mark
+        //String fileName = "incremental-" + sourceIncremental + "-" + targetIncremental + ".zip"; //Aaron mark
+        String fileName = mInfo.getFileName();
         String incrementalFilePath = "file://" + getUpdateDirectory().getAbsolutePath() + "/" + fileName + ".partial";
 
         long downloadId = enqueueDownload(incrementalUpdateInfo.getDownloadUrl(), incrementalFilePath);
 
         // Store in shared preferences
         mPrefs.edit()
-                .putLong(Constants.DOWNLOAD_ID, downloadId)
+				.putLong(Constants.DOWNLOAD_ID, downloadId)
                 .putString(Constants.DOWNLOAD_MD5, incrementalUpdateInfo.getMD5Sum())
                 .putString(Constants.DOWNLOAD_INCREMENTAL_FOR, mInfo.getFileName())
                 .apply();
 
         Utils.cancelNotification(this);
 
-        Intent intent = new Intent(DownloadReceiver.ACTION_DOWNLOAD_STARTED);//guo: this is send to UpdatesSettings.java internal receiver
+		//guo: this is send to UpdatesSettings.java internal receiver
+        Intent intent = new Intent(DownloadReceiver.ACTION_DOWNLOAD_STARTED);
         intent.putExtra(DownloadManager.EXTRA_DOWNLOAD_ID, downloadId);
         sendBroadcast(intent);
     }
@@ -244,14 +255,11 @@ public class DownloadService extends IntentService
     @Override
     public void onErrorResponse(VolleyError error) {
         VolleyLog.e("Error: ", error.getMessage());
-	    VolleyLog.e("Error type: " + error.toString()); //guo: add
     }
 
-	//guo: this is for getIncremental()
     @Override
     public void onResponse(JSONObject response) {
-        //VolleyLog.v("Response:%n %s", response);
-        VolleyLog.e("Response:%n %s", response);//guo
+        VolleyLog.v("Response:%n %s", response);
 
         UpdateInfo incrementalUpdateInfo = jsonToInfo(response);
         if (incrementalUpdateInfo == null) {

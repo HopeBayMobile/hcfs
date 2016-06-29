@@ -17,7 +17,7 @@ import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
 
 public class UpdateApplication extends Application implements
-        Application.ActivityLifecycleCallbacks {
+	Application.ActivityLifecycleCallbacks {
 
     private boolean mMainActivityActive;
     private RequestQueue mRequestQueue;

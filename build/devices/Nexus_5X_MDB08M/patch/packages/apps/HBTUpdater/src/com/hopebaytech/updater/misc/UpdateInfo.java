@@ -13,6 +13,7 @@ import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.hopebaytech.updater.utils.Utils;
 
@@ -22,6 +23,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class UpdateInfo implements Parcelable, Serializable {
+
+    private final String TAG = UpdateInfo.class.getSimpleName();
     private static final long serialVersionUID = 5499890003569313403L;
     private static final Pattern sIncrementalPattern =
             Pattern.compile("^incremental-(.*)-(.*).zip$");
@@ -34,7 +37,8 @@ public class UpdateInfo implements Parcelable, Serializable {
         RC,
         SNAPSHOT,
         NIGHTLY,
-        INCREMENTAL
+        INCREMENTAL,
+        FULL
     };
     private String mUiName;
     private String mFileName;
@@ -56,12 +60,12 @@ public class UpdateInfo implements Parcelable, Serializable {
         readFromParcel(in);
     }
 
-/*
+	/*
  	//guo: we don't need this
     public File getChangeLogFile(Context context) {
         return new File(context.getCacheDir(), mFileName + CHANGELOG_EXTENSION);
     }
-*/
+	*/
 
     /**
      * Get API level
@@ -91,6 +95,13 @@ public class UpdateInfo implements Parcelable, Serializable {
      */
     public void setFileName(String fileName) {
         mFileName = fileName;
+    }
+
+    /**
+     * Set update type
+     */
+    public void setType(Type updateType) {
+        mType = updateType;
     }
 
     /**
@@ -154,17 +165,19 @@ public class UpdateInfo implements Parcelable, Serializable {
         }
     }
 
-	//guo: compare the apiLevel or the buildDate
+    //guo: compare the apiLevel or the buildDate
     public boolean isNewerThanInstalled() {
         if (mIsNewerThanInstalled != null) {
             return mIsNewerThanInstalled;
         }
 
         int installedApiLevel = Utils.getInstalledApiLevel();
+        // Log.d(TAG, "installedApiLevel=" + installedApiLevel + ", mApiLevel=" + mApiLevel);
         if (installedApiLevel != mApiLevel && mApiLevel > 0) {
             mIsNewerThanInstalled = mApiLevel > installedApiLevel;
         } else {
             // API levels match, so compare build dates.
+            // Log.d(TAG, "mBuildDate=" + mBuildDate + ", Utils.getInstalledBuildDate()=" + Utils.getInstalledBuildDate());
             mIsNewerThanInstalled = mBuildDate > Utils.getInstalledBuildDate();
         }
 
@@ -248,7 +261,7 @@ public class UpdateInfo implements Parcelable, Serializable {
         mIncremental = in.readString();
     }
 	
-	//guo: utility class for shallow clone UpdateInfo instance data from the saved state file: /cache/cmupdater.state
+	//guo: utility class for shallow clone UpdateInfo instance data from the saved state file: /cache/hbtupdater.state
     public static class Builder {
         private String mUiName;
         private String mFileName;

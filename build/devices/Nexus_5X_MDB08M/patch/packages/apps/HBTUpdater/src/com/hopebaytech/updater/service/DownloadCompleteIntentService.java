@@ -23,13 +23,11 @@ import com.hopebaytech.updater.receiver.DownloadNotifier;
 import com.hopebaytech.updater.utils.MD5;
 
 import java.io.File;
-
-//guo
 import android.util.Log;
 
 public class DownloadCompleteIntentService extends IntentService {
     private DownloadManager mDm;
-	private String TAG="DownloadCompleteIntetService";//guo
+    private String TAG="DownloadCompleteIntetService";
 
     @Override
     public void onCreate() {
@@ -43,7 +41,7 @@ public class DownloadCompleteIntentService extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent intent) {
-	Log.d(TAG, "guo: onHandleIntent()");
+		//Log.d(TAG, "onHandleIntent()");
         if (!intent.hasExtra(Constants.DOWNLOAD_ID) ||
                 !intent.hasExtra(Constants.DOWNLOAD_MD5)) {
             return;
@@ -54,11 +52,14 @@ public class DownloadCompleteIntentService extends IntentService {
         String incrementalFor = intent.getStringExtra(Constants.DOWNLOAD_INCREMENTAL_FOR);
 
         Intent updateIntent = new Intent(this, UpdatesSettings.class);
-        updateIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
-                Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        updateIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		// Aaron mark
+        //updateIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
+        //        Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
 
         int status = fetchDownloadStatus(id);
         if (status == DownloadManager.STATUS_SUCCESSFUL) {
+            Log.d(TAG, "DownloadManager.STATUS_SUCCESSFUL");
             // Get the full path name of the downloaded file and the MD5
 
             // Strip off the .partial at the end to get the completed file
@@ -75,7 +76,8 @@ public class DownloadCompleteIntentService extends IntentService {
             partialFile.renameTo(updateFile);
 
             // Start the MD5 check of the downloaded file
-            if (MD5.checkMD5(downloadedMD5, updateFile)) {//guo: in MD5.java, this is disabled by guo to be always true
+            if (MD5.checkMD5(downloadedMD5, updateFile)) {//guo: in MD5.java, this is tempararily disabled to be always true
+                Log.d(TAG, "Aaron: checkMD5 successfull");
                 // We passed. Bring the main app to the foreground and trigger download completed
                 updateIntent.putExtra(UpdatesSettings.EXTRA_FINISHED_DOWNLOAD_ID, id);
                 updateIntent.putExtra(UpdatesSettings.EXTRA_FINISHED_DOWNLOAD_PATH,
@@ -84,6 +86,7 @@ public class DownloadCompleteIntentService extends IntentService {
                         incrementalFor);
                 displaySuccessResult(updateIntent, updateFile);
             } else {
+                Log.d(TAG, "Aaron: checkMD5 failed");
                 // We failed. Clear the file and reset everything
                 mDm.remove(id);
 
@@ -132,6 +135,7 @@ public class DownloadCompleteIntentService extends IntentService {
     }
 
     private void displaySuccessResult(Intent updateIntent, File updateFile) {
+        Log.d(TAG, "displaySuccessResult");
         final UpdateApplication app = (UpdateApplication) getApplicationContext();
         if (app.isMainActivityActive()) {
             startActivity(updateIntent);

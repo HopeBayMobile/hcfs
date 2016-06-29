@@ -103,7 +103,7 @@ public class UpdatePreference extends Preference implements OnLongClickListener 
         mProgressBar = (ProgressBar)view.findViewById(R.id.download_progress_bar);
 
         mUpdatesPref = view.findViewById(R.id.updates_pref);
- //       mUpdatesPref.setOnClickListener(this);
+        //mUpdatesPref.setOnClickListener(this);
         mUpdatesPref.setOnLongClickListener(this);
 
         // Update the views
@@ -132,13 +132,13 @@ public class UpdatePreference extends Preference implements OnLongClickListener 
     }
 
 
-/*
+	/*
+	//guo: we don't need this one
     @Override
     public void onClick(View v) {
         final Context context = getContext();
-															 //guo: we don't need this one
     }
-*/
+	*/
 
     private void confirmDelete() {
         new AlertDialog.Builder(getContext())
@@ -156,7 +156,6 @@ public class UpdatePreference extends Preference implements OnLongClickListener 
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .show();
     }
-
 
     @Override
     public String toString() {
@@ -232,7 +231,7 @@ public class UpdatePreference extends Preference implements OnLongClickListener 
             mUpdatesPref.setLongClickable(true);
 
             final boolean enabled = isEnabled();
-//            mUpdatesPref.setOnClickListener(enabled ? this : null);
+            //mUpdatesPref.setOnClickListener(enabled ? this : null);
             if (!enabled) {
                 mUpdatesPref.setBackgroundColor(0);
             }
