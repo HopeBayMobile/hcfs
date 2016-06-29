@@ -21,7 +21,7 @@ pwd
 whoami
 ls -la
 
-srcdir=$repo/src/HCFS
+srcdir="$repo/src/HCFS $repo/src/pyhcfs"
 testdir=$repo/tests
 
 # Install dependencies
@@ -34,35 +34,39 @@ set -x
 # OCLint with Bear
 function oclint_report()
 {
-	/usr/local/bin/bear make -j4 -C $srcdir
-	/ci-tools/oclint-0.8.1/bin/oclint-json-compilation-database . \
-		-- -report-type pmd -o $repo/oclint-report.xml || :
-	sed -i "s@file name=\"@&src/HCFS/@g" $repo/oclint-report.xml
+	PATH=$PATH:/ci-tools/oclint-0.8.1/bin:/usr/local/bin
+	for dir in $srcdir; do
+		bear make -j4 -C $dir
+		oclint-json-compilation-database . -- -report-type pmd -o $dir/oclint-report.xml || :
+		sed -i "s@$repo/@@g" $dir/oclint-report.xml
+	done
 }
 
 # PMD's Copy/Paste Detector (CPD)
 function cpd_result()
 {
-	LIB_DIR="" /ci-tools/pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir --format xml --language cpp \
-		> $repo/cpd-result.xml || return_code=$?
-	if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
-		echo pmd returns unknown error code $return_code
-		false
-	fi
-	sed -i "s@$repo/@@g" $repo/cpd-result.xml
+	for dir in $srcdir; do
+		LIB_DIR="" /ci-tools/pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $dir --format xml --language cpp \
+			> $dir/cpd-result.xml || return_code=$?
+		if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
+			echo pmd returns unknown error code $return_code
+			false
+		fi
+		sed -i "s@$repo/@@g" $repo/cpd-result.xml
+	done
 }
 
 # Publish SLOCCount analysis results
 function cloc_result()
 {
-	cloc --by-file --xml --out=$repo/cloc-result.xml $srcdir
+	cloc --by-file --xml --out=$repo/cloc-result.xml $repo/src
 	sed -i "s@$repo/@@g" $repo/cloc-result.xml
 }
 
 # Publish CCM analysis results (Cyclomatic Complexity)
 function ccm_result()
 {
-	mono /ci-tools/CCM.exe $srcdir /xml > $repo/ccm-result.xml
+	mono /ci-tools/CCM.exe $repo/src /xml > $repo/ccm-result.xml
 	sed -i "s@<file>/@<file>src/HCFS/@g" $repo/ccm-result.xml
 }
 
@@ -83,10 +87,12 @@ function checkpatch()
 # Clang Scan-Build Results
 function clang_scan_build()
 {
-	rm -rf ${repo}/clangScanBuildReports
-	cd $srcdir
-	make clean
-	scan-build-3.5 -o ${repo}/clangScanBuildReports make -j4
+	for dir in $srcdir; do
+		rm -rf $repo/clangScanBuildReports
+		cd $dir
+		make clean
+		scan-build-3.5 -o $repo/clangScanBuildReports make -j4
+	done
 }
 
 # Run unit test
@@ -97,7 +103,7 @@ function unittest()
 }
 function unittest_report()
 {
-	sed -i "s@$repo/@@g" $repo/tests/unit_test/c/unittest_modules/*/test_detail_*.xml;
+	find $repo/tests/unit_test/c/unittest_modules -name "test_detail_*.xml" | parallel sed -i "s@$repo/@@g" {}
 }
 
 set +x
@@ -118,6 +124,5 @@ unittest
 # coverage.xml
 #         Unit test coverage report
 cd $testdir/unit_test
-gcovr -x -r $srcdir . > $repo/coverage.xml
-sed -i "s@$repo/@@g" $repo/coverage.xml
-gcovr -r $srcdir .
+gcovr -x -r $repo/src . > $repo/coverage.xml && sed -i "s@$repo/@@g" $repo/coverage.xml
+gcovr -r $repo/src .
