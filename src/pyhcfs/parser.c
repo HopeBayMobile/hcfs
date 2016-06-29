@@ -34,7 +34,7 @@
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t list_external_volume(char *fs_mgr_path,
+int32_t list_external_volume(const char *fs_mgr_path,
 			     PORTABLE_DIR_ENTRY **entry_array_ptr,
 			     uint64_t *ret_num)
 {

@@ -11,24 +11,60 @@ extern "C" {
 #include "parser.h"
 }
 
-class pyhcfsTest : public ::testing::Test {
-	protected:
+ssize_t real (int fd, void *buf, size_t count, off_t offset) asm("pread");
+
+#include "../../fff.h"
+DEFINE_FFF_GLOBALS;
+FAKE_VALUE_FUNC(ssize_t, pread, int , void *, size_t , off_t );
+
+/* Unittest for list_external_volume */
+class list_external_volumeTest : public ::testing::Test {
+	public:
 	void SetUp() {
+	RESET_FAKE(pread);
+	FFF_RESET_HISTORY();
+	pread_fake.custom_fake = &f;
 	}
 
 	void TearDown() {
 	}
 };
 
-TEST_F(pyhcfsTest, Traverse_Dir_Btree) {
- /* ASSERT_EQ(TRUE, hcfs_system->backend_is_online); */
+TEST_F(list_external_volumeTest, ListExternalVolume) {
+	int32_t ret;
+	uint64_t i, number;
+	PORTABLE_DIR_ENTRY *list;
+
+	ret = list_external_volume("test_nexus_5x/fsmgr", &list, &number);
+	ASSERT_EQ(ret, 0);
+	ASSERT_EQ(number, 1);
+	for (i = 0; i < number; i++) {
+		puts(list[i].d_name);
+	}
 }
-TEST_F(pyhcfsTest, List_External_Volume) {
- /* ASSERT_EQ(TRUE, hcfs_system->backend_is_online); */
+TEST_F(list_external_volumeTest, ListExternalVolumeNoFile) {
+	int32_t ret;
+	uint64_t number;
+	PORTABLE_DIR_ENTRY *list;
+
+	ret = list_external_volume("test_nexus_5x/....", &list, &number);
+	ASSERT_EQ(ret, -1);
 }
-TEST_F(pyhcfsTest, Parse_Meta) {
- /* ASSERT_EQ(TRUE, hcfs_system->backend_is_online); */
+
+TEST_F(list_external_volumeTest, ListExternalVolumeEIO) {
+	int32_t ret;
+	uint64_t number;
+	PORTABLE_DIR_ENTRY *list;
+
+	//ssize_t myReturnVals[3] = { 0, 0  };
+	//ssize_t (*real_pread) (int, void *, size_t, off_t) = &pread;
+
+	//pread_fake.custom_fake = real_pread;
+	ret = list_external_volume("/proc/self/mem", &list, &number);
+	ASSERT_EQ(ret, -1);
 }
+
+/* End unittest for list_external_volume */
 
 /* Unittest for List_Dir_Inorder */
 class list_dir_inorderTest : public ::testing::Test {
@@ -47,8 +83,7 @@ class list_dir_inorderTest : public ::testing::Test {
 	}
 };
 
-TEST_F(list_dir_inorderTest, FromTreeRootSuccessful)
-{
+TEST_F(list_dir_inorderTest, FromTreeRootSuccessful) {
 	int32_t count = 0;
 	int32_t cmp_res;
 	FILE *fp;
@@ -74,9 +109,7 @@ TEST_F(list_dir_inorderTest, FromTreeRootSuccessful)
 	ASSERT_EQ(num_children, limit);
 }
 
-TEST_F(list_dir_inorderTest, TraverseAllSuccessful)
-{
-	int32_t idx = 0;
+TEST_F(list_dir_inorderTest, TraverseAllSuccessful) {
 	PORTABLE_DIR_ENTRY file_list[limit];
 
 	while (1) {
@@ -96,8 +129,7 @@ TEST_F(list_dir_inorderTest, TraverseAllSuccessful)
 	ASSERT_EQ(num_children, 0);
 }
 
-TEST_F(list_dir_inorderTest, ValidateOffset)
-{
+TEST_F(list_dir_inorderTest, ValidateOffset) {
 	limit = 1;
 	PORTABLE_DIR_ENTRY file_list[limit];
 
@@ -110,8 +142,7 @@ TEST_F(list_dir_inorderTest, ValidateOffset)
 	ASSERT_EQ(end_el_no, 1);
 }
 
-TEST_F(list_dir_inorderTest, MetaIsReg)
-{
+TEST_F(list_dir_inorderTest, MetaIsReg) {
 	PORTABLE_DIR_ENTRY file_list[limit];
 
 	num_children = list_dir_inorder("test_nexus_5x/meta_isreg",
@@ -121,8 +152,7 @@ TEST_F(list_dir_inorderTest, MetaIsReg)
 	ASSERT_EQ(num_children, -ENOTDIR);
 }
 
-TEST_F(list_dir_inorderTest, LimitExceeded)
-{
+TEST_F(list_dir_inorderTest, LimitExceeded) {
 	limit = LIST_DIR_LIMIT + 1;
 	PORTABLE_DIR_ENTRY file_list[limit];
 
@@ -133,8 +163,7 @@ TEST_F(list_dir_inorderTest, LimitExceeded)
 	ASSERT_EQ(num_children, -EINVAL);
 }
 
-TEST_F(list_dir_inorderTest, StartELExceeded)
-{
+TEST_F(list_dir_inorderTest, StartELExceeded) {
 	end_el_no = MAX_DIR_ENTRIES_PER_PAGE + 1;
 	PORTABLE_DIR_ENTRY file_list[limit];
 
@@ -145,8 +174,7 @@ TEST_F(list_dir_inorderTest, StartELExceeded)
 	ASSERT_EQ(num_children, -EINVAL);
 }
 
-TEST_F(list_dir_inorderTest, MetaPathNotExisted)
-{
+TEST_F(list_dir_inorderTest, MetaPathNotExisted) {
 	PORTABLE_DIR_ENTRY file_list[limit];
 
 	num_children = list_dir_inorder("test_nexus_5x/file_no_existed",
