@@ -249,6 +249,28 @@ TEST_F(list_dir_inorderTest, TraverseAllSuccessful)
 	ASSERT_EQ(num_children, 0);
 }
 
+TEST_F(list_dir_inorderTest, TraverseAllSuccessful2)
+{
+	PORTABLE_DIR_ENTRY file_list[limit];
+	limit = 1;
+
+	while (1) {
+		num_children = list_dir_inorder(
+		    "test_nexus_5x/meta", end_page_pos, end_el_no, limit,
+		    &end_page_pos, &end_el_no, &(file_list[0]));
+
+		if (num_children > 0 && num_children < limit) {
+			ASSERT_EQ(num_children, total_children % limit);
+		} else if (num_children > 0) {
+			ASSERT_EQ(num_children, limit);
+		} else {
+			break;
+		}
+	}
+
+	ASSERT_EQ(num_children, 0);
+}
+
 TEST_F(list_dir_inorderTest, ValidateOffset)
 {
 	limit = 1;
