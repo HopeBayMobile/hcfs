@@ -1,5 +1,12 @@
 Please view this file on the android-dev branch, on stable branches it's out of date.
 
+## Known Issues / Limitations / Features to be Implemented
+ 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
+ 2. If cache is full during recording video, user need to wait cache been flush to storage after recording finished.
+ 3. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
+ 4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
+ 5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
+
 v 2.2.1.1025
 =====
 
