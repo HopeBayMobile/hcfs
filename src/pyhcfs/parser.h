@@ -60,7 +60,7 @@ int32_t list_external_volume(const char *meta_path,
 			     PORTABLE_DIR_ENTRY **ptr_ret_entry,
 			     uint64_t *ret_num);
 
-int32_t parse_meta(char *meta_path, RET_META *meta);
+int32_t parse_meta(const char *meta_path, RET_META *meta);
 
 int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 			 const int32_t start_el, const int32_t limit,

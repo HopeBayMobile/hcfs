@@ -53,7 +53,7 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	ret_code = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
 	if (ret_code == -1) {
 		close(meta_fd);
-		return ret_code;
+		return -1;
 	}
 
 	/* Initialize B-tree walk by first loading the first node of the
@@ -66,7 +66,7 @@ int32_t list_external_volume(const char *fs_mgr_path,
 				    next_node_pos);
 		if (ret_code == -1) {
 			close(meta_fd);
-			return ret_code;
+			return -1;
 		}
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
@@ -120,7 +120,7 @@ int32_t list_external_volume(const char *fs_mgr_path,
 *                ptr_ret_meta will be filled if return code is 0
 *
 *************************************************************************/
-int32_t parse_meta(char *meta_path, RET_META *ret)
+int32_t parse_meta(const char *meta_path, RET_META *ret)
 {
 	int32_t meta_fd;
 	struct stat_aarch64 stat_data;
