@@ -79,7 +79,6 @@ function main()
 	update_system_source
 	pull_hcfs_binaay
 	pull_management_app
-	patch_system
 
 	push_system_diff
 	build_system
@@ -156,7 +155,7 @@ function patch_system() {
 function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
-	git pull origin master && \
+	git pull nexus-5x with-patch && \
 	git submodule foreach git pull origin master"'
 }
 function pull_hcfs_binaay() {
