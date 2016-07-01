@@ -2,7 +2,7 @@
 
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
 
-easy_install $repo/dist/pyhcfs-0.1.dev0-py2.7-linux-x86_64.egg
+python3 -m easy_install $repo/dist/*
 
 cd $repo/tests/functional_test
 pip install overrides
