@@ -148,10 +148,6 @@ function setup_ssh_key() {
 }
 
 RSYNC_SETTING="-arcv --no-owner --no-group --no-times"
-function patch_system() {
-	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
-	rsync $RSYNC_SETTING $here/patch/ root@$DOCKER_IP:/data/
-}
 function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
