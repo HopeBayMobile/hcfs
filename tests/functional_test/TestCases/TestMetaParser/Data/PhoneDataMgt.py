@@ -74,22 +74,22 @@ def get_stat(path):
 	result["result"] = 0
 	
 	stat["blocks"] = stat_blocks(path)
-	stat["uid"] = stat_uid(path)
-	stat["__unused5"] = 0 #???
-	stat["mtime_nsec"] = 0L
-	stat["rdev"] = stat_rdev(path) 
-	stat["dev"] = 0L #??? 
 	stat["ctime"] = stat_ctime(path)
-	stat["__pad1"] = 0 #??? about irq
-	stat["blksize"] = stat_blksize(path)
-	stat["nlink"] = stat_nlink(path)
+	stat["mtime_nsec"] = 0 # TODO: why this one is not type of long???
+	stat["rdev"] = stat_rdev(path) # TODO: why this one is not type of long???
+	stat["dev"] = 0 #??? TODO: why this one is not type of long??
 	stat["mode"] = stat_mode(path) # not sure
-	stat["atime_nsec"] = 0L
-	stat["mtime"] = stat_mtime(path)
-	stat["ctime_nsec"] = 0L
+	stat["__pad1"] = 0 #??? about irq
+	stat["ctime_nsec"] = 0 # TODO: why this one is not type of long???
+	stat["nlink"] = stat_nlink(path) # TODO: why this one is not type of long???
 	stat["gid"] = stat_gid(path)
+	stat["ino"] = stat_inode(path) # TODO: why this one is not type of long???
+	stat["blksize"] = stat_blksize(path)
+	stat["atime_nsec"] = 0 # TODO: why this one is not type of long???
+	stat["mtime"] = stat_mtime(path)
+	stat["uid"] = stat_uid(path)
 	stat["atime"] = stat_atime(path) # change when access, disabled it
-	stat["ino"] = stat_inode(path)
+	stat["__unused5"] = 0 #???
 	stat["__unused4"] = 0 #???
 	stat["size"] = stat_size(path) # byte
 	result["stat"] = stat
@@ -103,13 +103,13 @@ def stat_file_type(path):
 	return -1
 
 def stat_child(path):
-	pipe = subprocess.Popen("adb shell find " + path + " -mindepth 1 | wc -l", shell=True, stdout=PIPE, stderr=PIPE)
+	pipe = subprocess.Popen("adb shell find " + path + " -mindepth 1 -maxdepth 1 | wc -l", shell=True, stdout=PIPE, stderr=PIPE)
 	out, err = pipe.communicate()
 	assert not err, "Stat <" + path + "> error = <" + err + ">"
 	assert out.rstrip().isdigit(), "Stat <" + path + "> child number <" + out.rstrip() + "> is not a integer"
-	return long(out.rstrip())
+	return int(out.rstrip())
 
-def stat_inode(path):	return long(stat("i", path))
+def stat_inode(path):	return int(stat("i", path))
 def stat_blocks(path):	return int(stat("b", path))
 def stat_blksize(path):	return int(stat("B", path))
 def stat_uid(path):	return int(stat("u", path))
@@ -117,8 +117,8 @@ def stat_gid(path):	return int(stat("g", path))
 def stat_atime(path):	return int(stat("X", path))
 def stat_mtime(path):	return int(stat("Y", path))
 def stat_ctime(path):	return int(stat("Z", path))
-def stat_nlink(path):	return long(stat("h", path))
-def stat_rdev(path):	return long(stat("d", path)[:-1])
+def stat_nlink(path):	return int(stat("h", path))
+def stat_rdev(path):	return int(stat("d", path)[:-1])
 def stat_mode(path):	return int(stat("f", path), 16)
 def stat_size(path):	return int(stat("s", path)) 
 
