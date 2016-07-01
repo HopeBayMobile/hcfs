@@ -5,6 +5,17 @@ Latest source code under 'src/HCFS'.
 Latest unittest code under 'tests/unit_test' (run the script run_unittests for all unittests).
 Latest source code for command-line utilities under 'src/CLI_utils'.
 
+Developing Flow
+-----------
+1. Fork branch from android-dev and developing in it.
+2. Unit test your code
+3. Check coding style of your code (do it last as coding style breaks during modify)
+
+    `./tests/code_checking/hb_clint.py $(git diff android-dev  --name-only | grep '.*\.c$\|.*\.h$\|.*\.cc$')`
+4. Create Merge Request on gitlab
+5. Ask team member to peer review your Merge Request, collect at least 2 upvotes.
+6. Reassign MR to team member whom can accept it.
+
 Config file
 -----------
 

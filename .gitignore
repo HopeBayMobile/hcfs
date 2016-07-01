@@ -1,3 +1,4 @@
+# Byte-compiled / optimized / DLL files
 *.py[cod]
 *.swp
 *~
@@ -8,10 +9,13 @@
 *.o
 *.d
 
-# Packages
+# Distribution / packaging
 /*.egg
+/*.eggs
 /*.egg-info
 /dist
+/build/lib.*/
+/build/temp.*/
 /eggs
 /parts
 /bin
@@ -19,6 +23,7 @@
 /sdist
 /lib
 /lib64
+*.egg-info/
 
 # Installer logs
 pip-log.txt
@@ -26,6 +31,7 @@ pip-log.txt
 # Unit test / coverage reports
 .coverage
 .tox
+.cache
 /ccm-result.xml
 /cloc-result.xml
 /compile_commands.json

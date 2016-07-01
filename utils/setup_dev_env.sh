@@ -89,9 +89,21 @@ functional_test )
 	;;
 docker_host )
 	if ! hash docker; then
+		install_docker=1
+	else
+		docker_ver=$(docker version | grep ersion | grep -v API | head -1 | sed s/[^.0-9]//g)
+		if dpkg --compare-versions 1.11.2 gt $docker_ver; then
+			install_docker=1
+		fi
+	fi
+	if [ ${install_docker:-0} -eq 1 ]; then
 		echo "Install Docker"
+		packages="$packages wget"
+		install_pkg
 		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
-		curl https://get.docker.com | sudo sh
+		wget -qO- https://get.docker.com/ > /tmp/install_docker
+		sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
+		sudo sh /tmp/install_docker
 	fi
 	if ! grep -q docker:5000 /etc/default/docker; then
 		echo "Updating /etc/default/docker"

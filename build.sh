@@ -18,64 +18,131 @@ cd $repo
 
 function usage()
 {
-	echo "Usage: ./build.sh [OPTIONS] TARGET"
-	echo "Available Targets:"
-	echo "  lib   Build Android Libraries."
-	echo "  ci-test       Run continuous integration tests."
-	echo "  unittest      Run unit tests."
-	echo
-	echo "Options:"
-	echo "  -d DIR   Path to Android-ndk directory"
-	echo "  -h       Show usage"
+sed -e "s/\t/    /g" <<EOF
+Usage: ./build.sh [ACTION] [OPTIONS]
+
+ACTION:
+	lib [-d ndk-path]
+		Build Android Libraries. ndk-path is path to Android-ndk directory
+	ci-test
+		Run continuous integration tests.
+	unittest
+		Run unit tests.
+	image 5x|s58a [--userdebug|--user] [--test]
+		5x|s58a
+			Build Android image.
+		--userdebug|--user
+			buila userdebug or user type with --userdebug and --user
+			respectively. Script will build both type if not specified.
+		--test
+			test image build process.
+	pyhcfs [--test]
+		Build python library "pyhcfs" at dist/
+OPTIONS:
+	-h
+		Show usage
+EOF
 }
 
 function parse_options()
 {
+	TEST=0
 	while [[ $# -gt 0 ]]; do
-		opt="$1";
-		shift; #expose next argument
-		case $opt in
-		lib|ci-test|unittest)
-			TARGET="$opt";;
-		"-d")
-			export SET_NDK_BUILD="$1";
-			shift;;
-		"-h")
-			usage
-			exit;;
+		case $1 in
+		lib)
+			TARGET="$1"; shift ;;
+		ci-test)
+			TARGET="$1"; shift ;;
+		unittest)
+			TARGET="$1"; shift ;;
+		pyhcfs)
+			TARGET="$1"; shift ;;
+		-d )
+			if [ -z "$2" ] ; then echo "Invalid argument for -d"; usage; exit 1; fi
+			export SET_NDK_BUILD="$2"; shift 2 ;;
+		-h )
+			usage; exit ;;
+		--test)
+			TEST=1; shift 1;;
 		*)
-			echo >&2 "Invalid option: $@";
-			exit 1;;
+			exec 2>&1 ;echo "Invalid option: $@"; usage; exit 1 ;;
 		esac
 	done
-
 }
 
-parse_options "$@" && :
+function set_PARALLEL_JOBS()
+{
+	_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
+	PARALLEL_JOBS=-j`expr $_nr_cpu + $_nr_cpu`
+}
 
-case "$TARGET" in
-unittest)
+function unittest()
+{
 	$repo/tests/unit_test/run_unittests
-	;;
-ci-test)
+}
+function ci-test()
+{
 	export CI_VERBOSE=true
 	export UNITTEST_MAKE_FLAG=-k
 	$repo/containers/hcfs-test-slave/ci-test.sh
-	;;
-lib)
-	# load NDK_BUILD
-	packages+=" zip"		# compress with password protection
-	packages+=" ccache"		# compress with password protection
-	install_pkg
+}
 
-	cd $repo"/build/"
-	_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
-	PARALLEL_JOBS=-j`expr $_nr_cpu + $_nr_cpu`
+function lib()
+{
+	# load NDK_BUILD
+	# compress with password protection
+	packages+=" zip"
+
+	# speed up compiling
+	packages+=" ccache"
+
+	install_pkg
+	cd build
 	set -x
 	make $PARALLEL_JOBS
 	exit
-	;;
-*)
+}
+
+function pyhcfs ()
+{
+	$repo/utils/setup_dev_env.sh -m docker_host
+	$repo/utils/setup_dev_env.sh
+	if ! groups $USER | grep  -q "\(docker\|root\)"; then
+		echo To run docker with user, please add your user into docker group and re-login session:
+		echo "sudo usermod -aG docker <user_name>"
+		exit 1
+	fi
+	docker pull docker:5000/docker_hcfs_test_slave
+	set -x
+
+	if [ "$TEST" -eq 1 ]; then
+		PYHCFS_TARGET=test
+	else
+		PYHCFS_TARGET=bdist_egg
+	fi
+
+	if [ -e /.docker* ]; then
+		umask 000
+		python3 setup.py $PYHCFS_TARGET
+	else
+		docker run --rm -v "$repo":/hcfs docker:5000/docker_hcfs_test_slave \
+			bash -c "cd /hcfs; umask 000; python3 setup.py $PYHCFS_TARGET"
+	fi
+
+	if [ -d dist/ ]; then
+		mkdir -p build/out/
+		rsync -arcv --no-owner --no-group --no-times dist/ build/out/
+	fi
+}
+
+parse_options "$@"
+
+# setup -jN for make
+set_PARALLEL_JOBS
+
+# Running target
+if [ -n "$TARGET" ]; then
+	eval $TARGET
+else
 	usage
-	exit;;
-esac
+fi

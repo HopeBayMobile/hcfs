@@ -6,7 +6,7 @@ all :
 GTEST_DIR = ../../gtest-1.7.0
 
 # Where to find user code.
-USER_DIR = $(realpath ../../../../../src/HCFS)
+USER_DIR += $(realpath ../../../../../src/HCFS)
 
 # Where to put objects
 OBJ_DIR = obj
@@ -17,7 +17,7 @@ OBJ_DIR = obj
 CPPFLAGS += -isystem $(GTEST_DIR)/include $(EXTRACPPFLAGS)
 
 # Search paths for headers
-CPPFLAGS += -iquote$(USER_DIR)
+CPPFLAGS += $(addprefix -iquote,$(USER_DIR))
 # Search paths for source
 vpath	%.c	$(USER_DIR)
 
@@ -28,8 +28,7 @@ CXX	=	g++
 ###########################################################################
 # CCache
 ###########################################################################
-export PATH := /usr/lib/ccache:$(PATH)
-export USE_CCACHE := 1
+include $(dir $(lastword $(MAKEFILE_LIST)))/../../../../build/ccache.mk
 
 ###########################################################################
 # Compiling flags
@@ -50,7 +49,7 @@ CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
 # Support  gcc4.9 color output
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
-	CPPFLAGS += -fdiagnostics-color
+	CPPFLAGS += -fdiagnostics-color=auto
 endif
 
 ###########################################################################
@@ -88,19 +87,51 @@ $(OBJ_DIR)/gtest_main.a : $(OBJ_DIR)/gtest-all.o $(OBJ_DIR)/gtest_main.o
 $(OBJ_DIR):
 	mkdir -p $@
 
-# pull in dependency info for *existing* .o files
-include $(OBJS:%.o=%.d)
-
 # compile and generate dependency info
 $(OBJ_DIR)/%.o: %.c | $(OBJ_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $(@:%.o=%.d)
-	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(@:%.o=%.d)
+
+$(OBJ_DIR)/%.d: %.c | $(OBJ_DIR)
+	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $< > $@
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $@
 
 $(OBJ_DIR)/%.o: %.cc | $(OBJ_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-	@$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< > $(@:%.o=%.d)
-	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $(@:%.o=%.d)
 
+$(OBJ_DIR)/%.d: %.cc | $(OBJ_DIR)
+	@$(CXX) -MM $(CPPFLAGS) $(CXXFLAGS) $< > $@
+	@sed -i"" -r -e ':a;$$!N;$$!ba;s# \\\n##g;s#.*:#$(OBJ_DIR)/&#' -e 'p;s/\\ //g' -e 's/.*: //' -e '$$s/ |$$/:\n/g' $@
 
+###########################################################################
+# HCFS setup rules
+###########################################################################
+setup:
+	@../../../../../utils/setup_dev_env.sh -m unit_test
+.PHONY: setup
 
+define ADDTEST
+$(eval T := $(strip $1))
+$(eval OBJS := $(addprefix $(OBJ_DIR)/, $2))
+-include $(OBJS:%.o=%.d) # Load dependency info for *existing* .o files
+
+# Prepare Test
+UT_FILES += prepare-$(T)
+
+.PHONY: prepare-$(T)
+prepare-$(T): $(T) $(OBJ_DIR)/$(T).tests
+
+# Build executable test
+$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread
+
+# Generate test list from executable file
+$(OBJ_DIR)/$(T).tests: $(T) $(lastword $(MAKEFILE_LIST)) | $(OBJ_DIR)
+	./$(T) --gtest_list_tests | \
+	  awk 'NR>1&&/^[^ ]/{prefix=$$$$1}; NR>1&&/^ /{print prefix$$$$1}' | \
+	  xargs -I{} echo -e \
+	  "GEN_TEST:=1\n\
+	  RUN_TESTS+=$(OBJ_DIR)/$(T).{}.pass\n\
+	  $(OBJ_DIR)/$(T).{}.pass: $(T)\n\t\
+	  ./$$< --gtest_filter={} --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T).{}.xml\n\t\
+	  touch $(OBJ_DIR)/$(T).{}.pass" > $(OBJ_DIR)/$(T).tests
+endef
