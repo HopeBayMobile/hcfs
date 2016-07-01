@@ -171,12 +171,13 @@ TEST_F(parse_metaTest, OpenError)
 	ASSERT_TRUE(ret_code < 0);
 	ASSERT_EQ(meta.result, -1);
 }
-TEST_F(list_external_volumeTest, ParseMetaEIO)
+TEST_F(parse_metaTest, ParseMetaEIO)
 {
 	RET_META meta;
 	int32_t ret_code;
 
 	ret_code = parse_meta("/proc/self/mem", &meta);
+	printf("parse_meta ret_code %d", ret_code);
 	ASSERT_TRUE(ret_code < 0);
 	ASSERT_EQ(meta.result, -1);
 }
