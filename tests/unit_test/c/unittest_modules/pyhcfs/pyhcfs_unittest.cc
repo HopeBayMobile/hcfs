@@ -61,49 +61,51 @@ TEST_F(list_external_volumeTest, ListExternalVolume)
 }
 TEST_F(list_external_volumeTest, ListExternalVolumeNoFile)
 {
-	int32_t ret;
+	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
 	pread_fake.custom_fake = &real_pread;
-	ret = list_external_volume("test_nexus_5x/....", &list, &number);
-	ASSERT_EQ(ret, -1);
+	ret_code = list_external_volume("test_nexus_5x/....", &list, &number);
+	ASSERT_TRUE(ret_code < 0);
 }
 
 TEST_F(list_external_volumeTest, ListExternalVolumeEIO)
 {
-	int32_t ret;
+	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
 	pread_fake.custom_fake = &real_pread;
-	ret = list_external_volume("/proc/self/mem", &list, &number);
-	ASSERT_EQ(ret, -1);
+	ret_code = list_external_volume("/proc/self/mem", &list, &number);
+	ASSERT_TRUE(ret_code < 0);
 }
 
 TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
 {
-	int32_t ret;
+	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
 	pread_fake.custom_fake = &pread_cnt;
 	pread_cnt_error_on_call_count = 2;
 
-	ret = list_external_volume("test_nexus_5x/fsmgr", &list, &number);
-	ASSERT_EQ(ret, -1);
+	ret_code = list_external_volume("test_nexus_5x/fsmgr", &list, &number);
+	printf("%d\n", ret_code);
+	printf("number %d\n", number);
+	ASSERT_TRUE(ret_code < 0);
 }
 TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
 {
-	int32_t ret;
+	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
 	pread_fake.custom_fake = &pread_cnt;
 	pread_cnt_error_on_call_count = 3;
 
-	ret = list_external_volume("test_nexus_5x/fsmgr", &list, &number);
-	ASSERT_EQ(ret, -1);
+	ret_code = list_external_volume("test_nexus_5x/fsmgr", &list, &number);
+	ASSERT_TRUE(ret_code < 0);
 }
 /* End unittest for list_external_volume */
 

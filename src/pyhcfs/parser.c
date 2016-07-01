@@ -48,12 +48,12 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	PORTABLE_DIR_ENTRY *ret_entry;
 
 	if (meta_fd == -1)
-		return -1;
+		return errno ? -errno: -1;
 
 	ret_code = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
 	if (ret_code == -1) {
 		close(meta_fd);
-		return -1;
+		return errno ? -errno: -1;
 	}
 
 	/* Initialize B-tree walk by first loading the first node of the
@@ -64,9 +64,10 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	while (next_node_pos != 0) {
 		ret_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (ret_code == -1) {
+		printf("ret_code %d\n", ret_code);
+		if (ret_code == -1 ) {
 			close(meta_fd);
-			return -1;
+			return errno ? -errno : -1;
 		}
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
@@ -84,7 +85,7 @@ int32_t list_external_volume(const char *fs_mgr_path,
 				    next_node_pos);
 		if (ret_code == -1) {
 			close(meta_fd);
-			return ret_code;
+			return errno ? -errno : -1;
 		}
 		for (count = 0; count < tpage.num_entries; count++) {
 			switch (tpage.dir_entries[count].d_type) {
@@ -132,7 +133,7 @@ int32_t parse_meta(const char *meta_path, RET_META *ret)
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1) {
 		ret->result = -1;
-		return -1;
+		return errno ? -errno : -1;
 	}
 
 	ret_code = read(meta_fd, &stat_data, sizeof(stat_data));
@@ -213,7 +214,7 @@ static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 
 	ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE), page_pos);
 	if (ret_ssize < 0)
-		return -errno;
+		return errno ? -errno : -1;
 
 	if (temppage.child_page_pos[start_el] == 0) {
 		/* At leaf */
@@ -277,7 +278,7 @@ static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 		ret_ssize = pread(fd, &temppage, sizeof(DIR_ENTRY_PAGE),
 				  temppage.parent_page_pos);
 		if (ret_ssize < 0)
-			return -errno;
+			return errno ? -errno : -1;
 
 		for (idx = 0; idx < temppage.num_entries + 1; idx++) {
 			if (page_pos == temppage.child_page_pos[idx]) {
@@ -331,11 +332,11 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 		return -EINVAL;
 
 	if (access(meta_path, R_OK) == -1)
-		return -errno;
+		return errno ? -errno : -1;
 
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1)
-		return -errno;
+		return errno ? -errno : -1;
 
 	ret_ssize = pread(meta_fd, &meta_stat, sizeof(struct stat_aarch64), 0);
 	if (ret_ssize < 0)
