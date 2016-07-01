@@ -63,7 +63,8 @@ function main()
 	IMAGE_TYPE=$1
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
-	DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
+	#DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
+	DOCKER_IMAGE="docker:5000/${BOXNAME}:source-only-6.0.0_r26_MDB08M_20160623"
 	echo ================================================================================
 	echo $IMAGE_TYPE
 	echo $IMG_DIR
@@ -75,9 +76,11 @@ function main()
 	start_builder
 	trap cleanup INT TERM ERR
 	setup_ssh_key
+	update_system_source
 	pull_hcfs_binaay
 	pull_management_app
-	patch_system
+
+	push_system_diff
 	build_system
 	publish_image
 	stop_builder
@@ -149,6 +152,12 @@ function patch_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	rsync $RSYNC_SETTING $here/patch/ root@$DOCKER_IP:/data/
 }
+function update_system_source() {
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
+	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
+	git pull origin master && \
+	git submodule foreach git pull origin master"'
+}
 function pull_hcfs_binaay() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	rsync $RSYNC_SETTING $LIB_DIR/$BINARY_TARGET/system/ root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/
@@ -160,19 +169,22 @@ function pull_management_app() {
 	rsync $RSYNC_SETTING $APP_DIR/arm64-v8a/ root@$DOCKER_IP:/data/$HCFS_COMPOMENT_BASE/hopebay/lib64/
 }
 
+function push_system_diff() {
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
+	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
+	git add -f * && \
+	git commit -m '${VERSION_NUM}' && \
+	git tag -a -m '${VERSION_NUM}' '${VERSION_NUM}' && \
+	git push origin '${VERSION_NUM}' -f"'
+}
+
 function build_system() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh root@$DOCKER_IP ccache --max-size=30G
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
+	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
 	echo BUILD_NUMBER := '${BUILD_NUMBER:-}' >> build/core/build_id.mk && \
 	echo DISPLAY_BUILD_NUMBER := true >> build/core/build_id.mk && \
-	lunch aosp_bullhead-'${IMAGE_TYPE}' && \
-	pushd /data/packages/apps/Launcher3 && \
-	git fetch origin master && \
-	git reset --hard origin/master && \
-	git clean -dxf && \
-	popd && \
-	make clean && \
 	make \$PARALLEL_JOBS dist"'
 }
 
