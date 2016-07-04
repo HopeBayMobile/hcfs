@@ -6174,6 +6174,16 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 
+#ifdef _ANDROID_ENV_
+	/* Android will create a symlink "/data/data/<pkg>/lib" linked
+	 * to /data/app/lib when system rebooted. This should be marked
+	 * as high-priority-pin.
+	 */
+	if (strcmp(tmpptr->f_name, DATA_VOL_NAME) == 0 &&
+	    strcmp(name, "lib") == 0)
+		local_pin = P_HIGH_PRI_PIN;
+#endif
+
 	/* Reject if no more pinned size */
 	max_pinned_size = get_pinned_limit(local_pin);
 	if (max_pinned_size < 0) {

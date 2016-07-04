@@ -27,8 +27,9 @@ or external */
 #define ANDROID_INTERNAL 1
 #define ANDROID_EXTERNAL 2
 #define ANDROID_MULTIEXTERNAL 3
-/* /data/app volume should be marked as high-pri-pin when created */
-#define APP_FS_NAME "hcfs_app"
+/* Android internal volumes */
+#define APP_VOL_NAME "hcfs_app"
+#define DATA_VOL_NAME "hcfs_data"
 #endif
 
 typedef struct {
