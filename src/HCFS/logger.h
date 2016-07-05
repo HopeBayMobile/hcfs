@@ -16,9 +16,14 @@
 #include <semaphore.h>
 #include <stdio.h>
 
+#define MAX_LOG_SIZE 1048576
+#define NUM_LOG_FILE 5
+
 typedef struct {
 	sem_t logsem;
 	FILE *fptr;
+	int32_t now_log_size;
+	char *log_filename;
 
 } LOG_STRUCT;
 
