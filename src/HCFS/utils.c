@@ -1737,14 +1737,14 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 
 	switch (new_config->current_backend) {
 	case SWIFT:
-		if (strcmp(SWIFT_ACCOUNT, new_config->swift_account))
+		/*if (strcmp(SWIFT_ACCOUNT, new_config->swift_account))
 			return -EINVAL;
 		if (strcmp(SWIFT_USER, new_config->swift_user))
 			return -EINVAL;
 		if (strcmp(SWIFT_PASS, new_config->swift_pass))
 			return -EINVAL;
 		if (strcmp(SWIFT_URL, new_config->swift_url))
-			return -EINVAL;
+			return -EINVAL;*/
 		if (strcmp(SWIFT_CONTAINER, new_config->swift_container))
 			return -EINVAL;
 		if (strcmp(SWIFT_PROTOCOL, new_config->swift_protocol))
