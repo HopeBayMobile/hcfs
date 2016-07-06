@@ -18,13 +18,17 @@
 
 #define MAX_LOG_SIZE 1048576
 #define NUM_LOG_FILE 5
+#define LOG_MSG_SIZE 150
 
 typedef struct {
 	sem_t logsem;
 	FILE *fptr;
 	int32_t now_log_size;
 	char *log_filename;
-
+	char *latest_log_msg;
+	char *now_log_msg;
+	int32_t repeated_times;
+	time_t latest_log_sec;
 } LOG_STRUCT;
 
 LOG_STRUCT *logptr;   /* Pointer to log structure */

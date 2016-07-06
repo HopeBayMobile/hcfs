@@ -29,6 +29,10 @@
 #include "global.h"
 #include "utils.h"
 
+/**
+ * Open/create the log file named "log_filename" and initialize some
+ * log file info, such as "now_log_size", file mode.
+ */
 int32_t _open_log_file()
 {
 	int32_t ret, errcode;
@@ -85,6 +89,8 @@ int32_t open_log(char *filename)
 		write_log(0, "Opening log failed (out of memory).\n");
 		return -ENOMEM;
 	}
+	memset(logptr, 0, sizeof(LOG_STRUCT));
+
 	ret = sem_init(&(logptr->logsem), 0, 1);
 	if (ret < 0) {
 		errcode = errno;
@@ -98,10 +104,15 @@ int32_t open_log(char *filename)
 	logptr->log_filename = (char *) malloc(strlen(filename) + 2);
 	strcpy(logptr->log_filename, filename);
 
+	logptr->latest_log_msg = (char *) malloc(LOG_MSG_SIZE);
+	logptr->now_log_msg = (char *) malloc(LOG_MSG_SIZE);
+
 	ret = _open_log_file();
 	if (ret < 0) {
 		errcode = errno;
 		free(logptr->log_filename);
+		free(logptr->now_log_msg);
+		free(logptr->latest_log_msg);
 		free(logptr);
 		logptr = NULL;
 		return -errcode;
@@ -149,6 +160,32 @@ void _rename_logfile()
 	}
 }
 
+static inline void _write_repeated_log(char *timestr, uint32_t usec)
+{
+	int32_t log_size;
+
+	/* Remove newline character if it is last character in string */
+//	fprintf(logptr->fptr, "Debug: 3. %d\n", logptr->repeated_times);
+	log_size = strlen(logptr->latest_log_msg);
+	if (logptr->latest_log_msg[log_size - 1] == '\n')
+		logptr->latest_log_msg[log_size - 1] = '\0';
+//	fprintf(logptr->fptr, "Debug: 4. %d\n", logptr->repeated_times);
+
+	/* Write log */
+	log_size = fprintf(logptr->fptr, "%s.%06d\t"
+			"%s [repeat %d times]\n", timestr, usec,
+			logptr->latest_log_msg,
+			logptr->repeated_times);
+	if (log_size > 0)
+		logptr->now_log_size += log_size;
+
+	logptr->latest_log_sec = 0;
+	logptr->repeated_times = 0;
+	logptr->latest_log_msg[0] = '\0';
+
+	return;
+}
+
 int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
@@ -157,6 +194,19 @@ int32_t write_log(int32_t level, char *format, ...)
 	char add_newline;
 	char timestr[100];
 	int32_t this_logsize, ret;
+	char *temp_ptr;
+
+	if (logptr && (logptr->repeated_times > 0)) {
+		gettimeofday(&tmptime, NULL);
+		/* Flush repeated log msg every 3 secs */
+	//fprintf(logptr->fptr, "Debug: 1. %d\n", logptr->repeated_times);
+		if (tmptime.tv_sec - logptr->latest_log_sec >= 3) {
+			localtime_r(&(tmptime.tv_sec), &tmptm);
+			strftime(timestr, 90, "%F %T", &tmptm);
+//	fprintf(logptr->fptr, "Debug: 2. %d\n", logptr->repeated_times);
+			_write_repeated_log(timestr, (uint32_t)tmptime.tv_usec);
+		}
+	}
 
 	if (level > LOG_LEVEL)
 		return 0;
@@ -183,19 +233,34 @@ int32_t write_log(int32_t level, char *format, ...)
 		strftime(timestr, 90, "%F %T", &tmptm);
 
 		sem_wait(&(logptr->logsem));
-		/* Time */
-		this_logsize = fprintf(logptr->fptr, "%s.%06d\t", timestr,
-			(uint32_t)tmptime.tv_usec);
-		if (this_logsize > 0)
-			logptr->now_log_size += this_logsize;
-		/* Log message */
-		this_logsize = vfprintf(logptr->fptr, format, alist);
+		vsnprintf(logptr->now_log_msg, LOG_MSG_SIZE, format, alist);
+		if (!strcmp(logptr->now_log_msg, logptr->latest_log_msg)) {
+			logptr->repeated_times++;
+			sem_post(&(logptr->logsem));
+			va_end(alist);
+			return 0;
+		}
+
+		/* Check if the repeated log msg should be printed */
+		if (logptr->repeated_times > 0)
+			_write_repeated_log(timestr, (uint32_t)tmptime.tv_usec);
+
+		/* Time and log msg */
+		this_logsize = fprintf(logptr->fptr, "%s.%06d\t%s",
+			timestr, (uint32_t)tmptime.tv_usec,
+			logptr->now_log_msg);
 		if (this_logsize > 0)
 			logptr->now_log_size += this_logsize;
 		if (add_newline == TRUE) {
 			fprintf(logptr->fptr, "\n");
 			logptr->now_log_size += 1;
 		}
+
+		/* Let now log be latest log */
+		temp_ptr = logptr->now_log_msg;
+		logptr->now_log_msg = logptr->latest_log_msg;
+		logptr->latest_log_msg = temp_ptr;
+		logptr->latest_log_sec = tmptime.tv_sec;
 
 		/* Create new log file */
 		if (logptr->now_log_size >= MAX_LOG_SIZE) {
@@ -207,6 +272,8 @@ int32_t write_log(int32_t level, char *format, ...)
 			ret = _open_log_file();
 			if (ret < 0) {
 				free(logptr->log_filename);
+				free(logptr->now_log_msg);
+				free(logptr->latest_log_msg);
 				free(logptr);
 				logptr = NULL;
 			}
@@ -230,6 +297,9 @@ int32_t close_log(void)
 		logptr->fptr = NULL;
 	}
 	sem_destroy(&(logptr->logsem));
+	free(logptr->log_filename);
+	free(logptr->now_log_msg);
+	free(logptr->latest_log_msg);
 	free(logptr);
 	logptr = NULL;
 	return 0;
