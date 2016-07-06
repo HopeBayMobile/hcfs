@@ -7,6 +7,26 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.1.1053
+=====
+
+## New Features
+ - [HCFS] Add meta parser python library (AKA pyhcfs) for Tera Client (!419)
+    - The pyhcfs is a python library for Tera Client(web interface) to read user file tree from raw meta files in backend, which does not affect user device.
+
+## Fixes
+ - [HCFS] Handle /data/data/\<pkg\>/lib -> /data/app/lib symlink (!431)
+ - [HCFS] bugfix/enable_change_config (!432)
+ - [Android-OTA] bugfix/ generate files for normal boot to upgrade recovery.img ([!4](gateway-2-0/nexus-5x!4))
+ - [Android-OTA] modify ota server URL to `ota.tera.mobi:50000` ([!5](gateway-2-0/nexus-5x!5))
+ - [Tera-App] #11821 當進入 Device storage/DCIM/Camera/ 後, 縮圖圖示會閃爍. ([!50](gateway-2-0/android-management-app!50))
+ - [Tera-App] #11833 Pin fail 後, pin/unpin file 進度會一直轉圈圈 ([!51](gateway-2-0/android-management-app!51))
+ - [Tera-App] #11864 Switch account後, Tera連線失敗 ([!52](gateway-2-0/android-management-app!52))
+ - [Launcher] #11741 Launcher pin/unpin buttons disappear while executing Tera mgmt app via adb command([!5](gateway-2-0/tera-launcher!5))
+
+## CI / Refactoring
+ - [HCFS] Migrate 5x device patches into new repo "nexus-5x" to simplify system integration process(!420)(!429)
+
 v 2.2.1.1025
 =====
 
@@ -36,17 +56,6 @@ v 2.2.1.1025
 
 ## CI / Refactoring
   - No changes
-
-## Known Issues / Limitations / Features to be Implemented
- 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
- 2. If cache is full during recording video, user need to wait cache been flush to storage after recording finished.
- 3. Delete an app then reinstall it again (without running some other app with external storage access) might cause wrong permission when reading from external storage for this app.
- 4. For uses in demo kit environment, backend setting via APP does not work (no connection to management cluster). Please push backend settings to phone directly.
- 5. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
- 6. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
- 7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
- 8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
- 9. First activation after flash ROM may failed in silent. Reboot Android should fix this problem.
 
 v 2.2.1.0962
 =====
@@ -86,17 +95,6 @@ v 2.2.1.0962
 
 ## CI / Refactoring
  - (!405) Release ota package files with CI. It's for later ota procedure.
-
-## Known Issues / Limitations / Features to be Implemented
- 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
- 2. If cache is full during recording vedio, user need to wait cache been flush to storage after recording finished.
- 3. Delete an app then reinstall it again (without running some other app with external storage access) might cause wrong permission when reading from external storage for this app.
- 4. For uses in demo kit environment, backend setting via APP does not work (no connection to management cluster). Please push backend settings to phone directly.
- 5. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
- 6. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
- 7. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
- 8. If backend (ArkFlexU) is not operating normally, there is a small chance of meta corruption. This issue is still under investigation.
- 9. `[New]` First activation after flash ROM may failed in silent. Reboot Android should fix this problem.
 
 v 2.2.1.0908
 =====
