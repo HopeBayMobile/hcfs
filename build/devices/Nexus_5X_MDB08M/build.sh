@@ -195,7 +195,7 @@ function publish_image() {
 	if [ -e "$record_tmp" ]; then
 		last_version_path=`cat ${record_tmp}`
 	else
-		last_version_path=`ls ${CI_PATH} | grep android-dev | tail -1`
+		last_version_path=`ls ${CI_PATH} | grep android-dev | tail -2 | head -1`
 	fi
 
 	last_version=`echo $last_version_path | awk -F- {'print $1'}`
