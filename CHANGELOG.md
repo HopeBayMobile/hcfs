@@ -17,8 +17,9 @@ v 2.2.1.1053
 ## Fixes
  - [HCFS] #11394 Handle /data/data/\<pkg\>/lib -> /data/app/lib symlink (!431)
  - [HCFS] bugfix/enable_change_config (!432)
- - [Android-OTA] bugfix/ generate files for normal boot to upgrade recovery.img ([!4](gateway-2-0/nexus-5x!4))
- - [Android-OTA] modify ota server URL to `ota.tera.mobi:50000` ([!5](gateway-2-0/nexus-5x!5))
+ - [Nexus-5x] generate files for normal boot to upgrade recovery.img ([!4](gateway-2-0/nexus-5x!4))
+ - [Nexus-5x] modify ota server URL to `ota.tera.mobi:50000` ([!5](gateway-2-0/nexus-5x!5))
+ - [Nexus-5x] fix/user_build_adb_failed ([!7](gateway-2-0/nexus-5x!7))
  - [Tera-App] #11821 當進入 Device storage/DCIM/Camera/ 後, 縮圖圖示會閃爍. ([!50](gateway-2-0/android-management-app!50))
  - [Tera-App] #11833 Pin fail 後, pin/unpin file 進度會一直轉圈圈 ([!51](gateway-2-0/android-management-app!51))
  - [Tera-App] #11864 Switch account後, Tera連線失敗 ([!52](gateway-2-0/android-management-app!52))
