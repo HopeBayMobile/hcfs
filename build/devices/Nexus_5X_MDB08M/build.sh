@@ -171,7 +171,7 @@ function push_system_diff() {
 	git add -f * && \
 	git commit -m '${VERSION_NUM}' && \
 	git tag -a -m '${VERSION_NUM}' '${VERSION_NUM}' && \
-	git push origin '${VERSION_NUM}' -f"'
+	{ git push origin '${VERSION_NUM}' -f || :; }"'
 }
 
 function build_system() {
