@@ -15,7 +15,7 @@ v 2.2.1.1053
     - The pyhcfs is a python library for Tera Client(web interface) to read user file tree from raw meta files in backend, which does not affect user device.
 
 ## Fixes
- - [HCFS] Handle /data/data/\<pkg\>/lib -> /data/app/lib symlink (!431)
+ - [HCFS] #11394 Handle /data/data/\<pkg\>/lib -> /data/app/lib symlink (!431)
  - [HCFS] bugfix/enable_change_config (!432)
  - [Android-OTA] bugfix/ generate files for normal boot to upgrade recovery.img ([!4](gateway-2-0/nexus-5x!4))
  - [Android-OTA] modify ota server URL to `ota.tera.mobi:50000` ([!5](gateway-2-0/nexus-5x!5))
