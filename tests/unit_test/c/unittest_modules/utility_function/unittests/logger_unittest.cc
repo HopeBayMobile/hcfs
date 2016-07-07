@@ -372,8 +372,11 @@ TEST_F(write_logTest, LogCompress_FlushOK2) {
 	ASSERT_EQ(EOF, ret);
 	fclose(fptr);
 }
-#endif
 
+TEST_F(write_logTest, LogCompress_OverDifferentLogFile) {
+
+}
+#endif
 
 /* End of the test case for the function write_log */
 
