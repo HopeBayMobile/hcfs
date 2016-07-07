@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# THIS SCRIPT RUN CHECK ON `HCFS_ANDROID_000_03`
+#
+# **NOTE**
+# MODIFY THE SERVER, USER, KEY, BUCKET FOR SCRIP TO WORK
+
+./deconf.sh
+CURRENT_BACKEND=$(grep 'CURRENT_BACKEND' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+SWIFT_ACCOUNT=$(grep 'SWIFT_ACCOUNT' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+SWIFT_USER=$(grep 'SWIFT_USER' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+SWIFT_PASS=$(grep 'SWIFT_PASS' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+SWIFT_URL=$(grep 'SWIFT_URL' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+SWIFT_CONTAINER=$(grep 'SWIFT_CONTAINER' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+SWIFT_PROTOCOL=$(grep 'SWIFT_PROTOCOL' /tmp/hcfs.conf.dec |awk -F ' = ' '{print $2}')
+
+SERVER=$SWIFT_PROTOCOL'://'$SWIFT_URL'/auth/v1.0'
+USER=$SWIFT_ACCOUNT':'$SWIFT_USER
+KEY=$SWIFT_PASS
+BUCKET=$SWIFT_CONTAINER
+
+echo $SERVER
+echo $USER
+echo $KEY
+echo $BUCKET
+
+adb root
+adb pull /sdcard/datablock.backup
+inode=$(adb shell ls -i /sdcard/datablock | awk '{print $1}')
+nameOnCloud=$(swift --insecure -A ${SERVER} -U ${USER} -K ${KEY} list ${BUCKET} --prefix data_${inode})
+echo Downloding inode $inode \(${nameOnCloud}\)...
+swift --insecure -A ${SERVER} -U ${USER} -K ${KEY} download ${BUCKET} ${nameOnCloud} -o datablock.cloud
+diff datablock.cloud datablock.backup
