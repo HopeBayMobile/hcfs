@@ -1327,5 +1327,60 @@ class HCFSANDROID_87005:
         else: 
             return True, 'Spend time: {0}'.format(spend_time)
 
+
+class HCFSANDROID_00002:
+    '''
+    open file and write the same block – sync with create system call
+    '''
+    def __init__(self):
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testOpenFileWriteSameBlock.sh 2"
+        #self.cmd = "ls -l"
+
+    def run(self):
+        dt_ori = datetime.now()
+        retcode = 0
+        for i in range(0, 10, 1):
+            ret = subprocess.call(self.cmd,shell=True)
+            retcode = retcode + ret 
+            print i
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+        print retcode
+        if retcode != 0:
+            return False, retcode
+        else: 
+            return True, 'Spend time: {0}'.format(spend_time)
+
+class HCFSANDROID_00004:
+    '''
+    open file and write the same block – sync with open system call
+    '''
+    def __init__(self):
+        self.cmd = "./TestCases/HCFSANDROID/test_scripts/testOpenFileWriteSameBlock.sh 4"
+        #self.cmd = "ls -l"
+
+    def run(self):
+        dt_ori = datetime.now()
+        retcode = 0
+        for i in range(0, 10, 1):
+            ret = subprocess.call(self.cmd,shell=True)
+            retcode = retcode + ret 
+            print i
+
+        dt_new = datetime.now()
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+        print retcode
+        if retcode != 0:
+            return False, retcode
+        else: 
+            return True, 'Spend time: {0}'.format(spend_time)
+
 if __name__ == '__main__':
     pass
