@@ -7,6 +7,17 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.1.1060
+=====
+
+## Fixes
+ - [Nexus-5x] fix/user_build_adb_failed ([!7](gateway-2-0/nexus-5x!7))
+ - [Nexus-5x] Let OTA updater can successfully trigger upgrade from notification bar and can launch OTA updater from notification bar when downloading ([!8](gateway-2-0/nexus-5x!8))
+
+## CI / Refactoring
+ - [Nexus-5x] Fix CI error on build ota update package (!434)
+ - [Nexus-5x] Fix CI error when two image jobs try to push tags with same name (!435)
+
 v 2.2.1.1053
 =====
 
@@ -19,7 +30,6 @@ v 2.2.1.1053
  - [HCFS] bugfix/enable_change_config (!432)
  - [Nexus-5x] generate files for normal boot to upgrade recovery.img ([!4](gateway-2-0/nexus-5x!4))
  - [Nexus-5x] modify ota server URL to `ota.tera.mobi:50000` ([!5](gateway-2-0/nexus-5x!5))
- - [Nexus-5x] fix/user_build_adb_failed ([!7](gateway-2-0/nexus-5x!7))
  - [Tera-App] #11821 當進入 Device storage/DCIM/Camera/ 後, 縮圖圖示會閃爍. ([!50](gateway-2-0/android-management-app!50))
  - [Tera-App] #11833 Pin fail 後, pin/unpin file 進度會一直轉圈圈 ([!51](gateway-2-0/android-management-app!51))
  - [Tera-App] #11864 Switch account後, Tera連線失敗 ([!52](gateway-2-0/android-management-app!52))
