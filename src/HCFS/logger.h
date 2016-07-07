@@ -19,6 +19,7 @@
 #define MAX_LOG_SIZE 1048576
 #define NUM_LOG_FILE 5
 #define LOG_MSG_SIZE 150
+#define FLUSH_TIME_INTERVAL 3
 
 typedef struct {
 	sem_t logsem;

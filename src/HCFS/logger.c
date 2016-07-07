@@ -184,6 +184,33 @@ static inline void _write_repeated_log(char *timestr, uint32_t usec)
 	return;
 }
 
+static inline void _check_log_file_size()
+{
+	if (logptr->now_log_size >= MAX_LOG_SIZE) {
+		fclose(logptr->fptr);
+		logptr->fptr = NULL;
+		_rename_logfile();
+		if (_open_log_file() < 0) {
+			free(logptr->log_filename);
+			free(logptr->now_log_msg);
+			free(logptr->latest_log_msg);
+			free(logptr);
+			logptr = NULL;
+		}
+	}
+}
+
+/**
+ * Write log message. If LOG_COMPRESS is enable, the log msg will be deffered
+ * to write until 3 secs since the first repeated log msg appearance time. That
+ * is, the repeated log msg will be flushed every 3 secs. Beside, the latest
+ * log file is <log file name>, on the other hand the oldest one is
+ * <log file name>.<NUM_LOG_FILE>. E.g.: hcfs_android_log, hcfs_android_log.1,
+ * hcfs_android_log.2...hcfs_android_log.5. Oldest log file will be removed
+ * while number of log file is more than NUM_LOG_FILE.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t write_log(int32_t level, char *format, ...)
 {
 	va_list alist;
@@ -191,13 +218,14 @@ int32_t write_log(int32_t level, char *format, ...)
 	struct tm tmptm;
 	char add_newline;
 	char timestr[100];
-	int32_t this_logsize, ret, ret_size;
+	int32_t this_logsize, ret_size;
 	char *temp_ptr;
 
 	if (logptr && (logptr->latest_log_sec > 0)) {
 		gettimeofday(&tmptime, NULL);
-		/* Flush repeated log msg every 3 secs */
-		if (tmptime.tv_sec - logptr->latest_log_sec >= 3) {
+		/* Flush repeated log msg every FLUSH_TIME_INTERVAL secs */
+		if (tmptime.tv_sec - logptr->latest_log_sec >=
+				FLUSH_TIME_INTERVAL) {
 			if (logptr->repeated_times > 0) {
 				localtime_r(&(tmptime.tv_sec), &tmptm);
 				strftime(timestr, 90, "%F %T", &tmptm);
@@ -241,10 +269,28 @@ int32_t write_log(int32_t level, char *format, ...)
 	strftime(timestr, 90, "%F %T", &tmptm);
 
 	sem_wait(&(logptr->logsem));
+	if (LOG_COMPRESS == FALSE) {
+		this_logsize = fprintf(logptr->fptr, "%s.%06d\t",
+				timestr, (uint32_t)tmptime.tv_usec);
+		logptr->now_log_size += this_logsize;
+		this_logsize = vfprintf(logptr->fptr, format, alist);
+		logptr->now_log_size += this_logsize;
+		if (add_newline == TRUE) {
+			fprintf(logptr->fptr, "\n");
+			logptr->now_log_size += 1;
+		}
+
+		_check_log_file_size();
+		sem_post(&(logptr->logsem));
+		va_end(alist);
+		return 0;
+	}
+
 	ret_size = vsnprintf(logptr->now_log_msg,
 			LOG_MSG_SIZE, format, alist);
 	/* Derectly write to file when msg is too long */
 	if (ret_size >= LOG_MSG_SIZE) {
+		va_start(alist, format);
 		this_logsize = fprintf(logptr->fptr, "%s.%06d\t",
 			timestr, (uint32_t)tmptime.tv_usec);
 		logptr->now_log_size += this_logsize;
@@ -290,22 +336,8 @@ int32_t write_log(int32_t level, char *format, ...)
 	logptr->latest_log_msg = temp_ptr;
 	logptr->latest_log_sec = tmptime.tv_sec;
 
-	/* Create new log file */
-	if (logptr->now_log_size >= MAX_LOG_SIZE) {
-		fprintf(logptr->fptr, "This log size: %d\n",
-				logptr->now_log_size);
-		fclose(logptr->fptr);
-		logptr->fptr = NULL;
-		_rename_logfile();
-		ret = _open_log_file();
-		if (ret < 0) {
-			free(logptr->log_filename);
-			free(logptr->now_log_msg);
-			free(logptr->latest_log_msg);
-			free(logptr);
-			logptr = NULL;
-		}
-	}
+	/* Check log file size */
+	_check_log_file_size();
 	sem_post(&(logptr->logsem));
 	va_end(alist);
 	return 0;
