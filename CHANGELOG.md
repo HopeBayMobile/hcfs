@@ -13,6 +13,8 @@ v 2.2.1.1060
 ## Fixes
  - [Nexus-5x] fix/user_build_adb_failed ([!7](gateway-2-0/nexus-5x!7))
  - [Nexus-5x] Let OTA updater can successfully trigger upgrade from notification bar and can launch OTA updater from notification bar when downloading ([!8](gateway-2-0/nexus-5x!8))
+    - #11987 OTA will fail if user trigger OTA from notification bar
+    - #11924 在系統更新頁面時, 拉下狀態訊息列, 再點選狀態訊息, 此時會出現錯誤訊息 "HopeBayTech Updater" exception happened
 
 ## CI / Refactoring
  - [Nexus-5x] Fix CI error on build ota update package (!434)
