@@ -2999,18 +2999,10 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 					goto errcode_handle;
 				}
 
-				/* Update block seq number and reload meta */
+				/* Update block seq number */
 				ret = update_block_seq(*body_ptr, filepos,
 						last_index, last_block,
-						now_seq);
-				if (ret < 0) {
-					errcode = ret;
-					goto errcode_handle;
-				}
-
-				ret = meta_cache_lookup_file_data(this_inode,
-						NULL, NULL, &temppage, filepos,
-						*body_ptr);
+						now_seq, &temppage);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
@@ -4716,7 +4708,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	/* Update block seq num */
 	ret = update_block_seq(fh_ptr->meta_cache_ptr, this_page_fpos,
-			entry_index, bindex, now_seq);
+			entry_index, bindex, now_seq, &temppage);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

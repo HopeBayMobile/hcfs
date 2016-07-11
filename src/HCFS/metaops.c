@@ -2104,6 +2104,11 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 	DIR_META_TYPE dirmeta;
 	SYMLINK_META_TYPE symmeta;
 
+	if (bptr->need_inc_seq == FALSE) {
+		write_log(10, "Skipping meta seq update\n");
+		return 0;
+	}
+
 	this_inode = bptr->inode_num;
 
 	if (S_ISFILE(bptr->this_stat.st_mode)) {
@@ -2118,7 +2123,6 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 			goto error_handling;
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, filemeta.finished_seq);
-
 	} else if (S_ISDIR(bptr->this_stat.st_mode)) {
 		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
 				NULL, bptr);
@@ -2150,6 +2154,8 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 		goto error_handling;
 	}
 
+	bptr->need_inc_seq = FALSE;
+
 	return 0;
 
 error_handling:
@@ -2164,24 +2170,23 @@ error_handling:
  * @return 0 on success, otherwise negative error code.
  */
 int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
-		int64_t eindex, int64_t bindex, int64_t now_seq)
+		int64_t eindex, int64_t bindex, int64_t now_seq,
+		BLOCK_ENTRY_PAGE *bpage_ptr)
 {
-	BLOCK_ENTRY_PAGE bentry_page;
 	int32_t ret;
 
 	if (!S_ISREG(bptr->this_stat.st_mode))
 		return -EINVAL;
 
-	ret = meta_cache_lookup_file_data(bptr->inode_num, NULL, NULL,
-			&bentry_page, page_fpos, bptr);
-	if (ret < 0)
-		return ret;
+	/* Do nothing if seq number is already the same */
+	if (bpage_ptr->block_entries[eindex].seqnum == now_seq)
+		return 0;
 
 	/* Update seqnum */
-	bentry_page.block_entries[eindex].seqnum = now_seq;
+	bpage_ptr->block_entries[eindex].seqnum = now_seq;
 
 	ret = meta_cache_update_file_data(bptr->inode_num, NULL, NULL,
-			&bentry_page, page_fpos, bptr);
+			bpage_ptr, page_fpos, bptr);
 	if (ret < 0)
 		return ret;
 
