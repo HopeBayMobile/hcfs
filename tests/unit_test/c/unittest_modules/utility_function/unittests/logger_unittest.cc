@@ -79,38 +79,39 @@ TEST_F(open_logTest, LogFileOpenError) {
 /* Begin of the test case for the function write_log */
 
 class write_logTest : public ::testing::Test {
- protected:
-  char tmpfilename[25];
-  int32_t outfileno, errfileno;
-  virtual void SetUp() {
-    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
-    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
-    snprintf(tmpfilename, 25, "/tmp/testlog");
-    logptr = NULL;
-    outfileno = dup(fileno(stdout));
-    errfileno = dup(fileno(stderr));
-   }
+protected:
+	char tmpfilename[25];
+	int32_t outfileno, errfileno;
+	virtual void SetUp() {
+		system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+		snprintf(tmpfilename, 25, "/tmp/testlog");
+		logptr = NULL;
+		outfileno = dup(fileno(stdout));
+		errfileno = dup(fileno(stderr));
+	}
 
-  virtual void TearDown() {
-    if (logptr != NULL) {
-      if (logptr->fptr != NULL) {
-        fclose(logptr->fptr);
-       }
-      sem_destroy(&(logptr->logsem));
-      free(logptr);
-     }
+	virtual void TearDown() {
+		if (logptr != NULL) {
+			if (logptr->fptr != NULL) {
+				fclose(logptr->fptr);
+			}
+			sem_destroy(&(logptr->logsem));
+			free(logptr);
+		}
 
-     for (int i = 1; i <= NUM_LOG_FILE; i++) {
-     	char filename[100];
-	sprintf(filename, "%s.%d", tmpfilename, i);
-	if (!access(filename, F_OK))
-		unlink(filename);
-     }
-    unlink(tmpfilename);
-    free(system_config);
-   }
+		for (int i = 1; i <= NUM_LOG_FILE; i++) {
+			char filename[100];
+			sprintf(filename, "%s.%d", tmpfilename, i);
+			if (!access(filename, F_OK))
+				unlink(filename);
+		}
+		unlink(tmpfilename);
+		free(system_config);
+	}
 
- };
+};
 
 TEST_F(write_logTest, LogWriteOK) {
   int32_t ret;
@@ -202,7 +203,7 @@ TEST_F(write_logTest, LogShift_OK) {
 	char log_file2[100];
 
 	fptr = fopen(tmpfilename, "w+");
-	ftruncate(fileno(fptr), MAX_LOG_SIZE);
+	ftruncate(fileno(fptr), MAX_LOG_FILE_SIZE);
 	fclose(fptr);
 	ret = open_log(tmpfilename);
 	ASSERT_EQ(0, ret);
@@ -228,7 +229,7 @@ TEST_F(write_logTest, LogShift_OK) {
 	sprintf(log_file2, "%s.1", tmpfilename);
 	fptr = fopen(log_file2, "r");
 	ASSERT_TRUE(fptr != NULL);
-	fseek(fptr, MAX_LOG_SIZE, SEEK_SET);
+	fseek(fptr, MAX_LOG_FILE_SIZE, SEEK_SET);
 	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
 	ASSERT_EQ(3, ret);
 	EXPECT_STREQ("Thisisatest", tmpstr2);
@@ -247,7 +248,7 @@ TEST_F(write_logTest, ManyLogFile_Shift_OK) {
 
 	/* Mock log file */
 	fptr = fopen(tmpfilename, "w+");
-	ftruncate(fileno(fptr), MAX_LOG_SIZE);
+	ftruncate(fileno(fptr), MAX_LOG_FILE_SIZE);
 	fclose(fptr);
 	for (int i = 1; i <= NUM_LOG_FILE; i++) {
 		sprintf(log_file2, "%s.%d", tmpfilename, i);
@@ -280,7 +281,7 @@ TEST_F(write_logTest, ManyLogFile_Shift_OK) {
 	sprintf(log_file2, "%s.1", tmpfilename);
 	fptr = fopen(log_file2, "r");
 	ASSERT_TRUE(fptr != NULL);
-	fseek(fptr, MAX_LOG_SIZE, SEEK_SET);
+	fseek(fptr, MAX_LOG_FILE_SIZE, SEEK_SET);
 	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
 	ASSERT_EQ(3, ret);
 	EXPECT_STREQ("Thisisatest", tmpstr2);
@@ -302,6 +303,49 @@ TEST_F(write_logTest, ManyLogFile_Shift_OK) {
 		unlink(log_file2);
 	}
 }
+
+TEST_F(write_logTest, LogMsgIsTooLong) {
+	int32_t ret;
+	FILE *fptr;
+	char tmpstr[100], tmpstr1[100], tmpstr2[256];
+	char longstr[256];
+
+	strcpy(longstr, "ThisisatestThisisatestThisisatestThisisatest"
+		"ThisisatestThisisatestThisisatestThisisatestThisisatest"
+		"ThisisatestThisisatestThisisatestThisisatestThisisatest"
+		"ThisisatestThisisatestThisisatestThisisatestThisisatest");
+	ret = open_log(tmpfilename);
+	ASSERT_EQ(0, ret);
+	LOG_LEVEL = 10;
+	write_log(10, "Thisisatest");
+	write_log(10, "%s\n", longstr);
+	write_log(10, "%s\n", longstr);
+	write_log(10, "Thisisatest2");
+
+	close_log();
+
+	dup2(outfileno, fileno(stdout));
+	dup2(errfileno, fileno(stderr));
+
+	/* Check logs */
+	fptr = fopen(tmpfilename, "r");
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	EXPECT_STREQ("Thisisatest", tmpstr2);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	EXPECT_STREQ(longstr, tmpstr2);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	EXPECT_STREQ(longstr, tmpstr2);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	EXPECT_STREQ("Thisisatest2", tmpstr2);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(EOF, ret);
+	fclose(fptr);
+}
+
 
 #ifdef LOG_COMPRESS TRUE
 TEST_F(write_logTest, LogCompress_FlushOK) {
@@ -374,9 +418,52 @@ TEST_F(write_logTest, LogCompress_FlushOK2) {
 }
 
 TEST_F(write_logTest, LogCompress_OverDifferentLogFile) {
+	int32_t ret;
+	FILE *fptr;
+	char tmpstr[100], tmpstr1[100], tmpstr2[100];
+	char log_file2[100];
 
+	fptr = fopen(tmpfilename, "w+");
+	ftruncate(fileno(fptr), MAX_LOG_FILE_SIZE);
+	fclose(fptr);
+	ret = open_log(tmpfilename);
+	ASSERT_EQ(0, ret);
+	LOG_LEVEL = 10;
+	write_log(10, "Thisisatest");
+	write_log(10, "Thisisatest");
+	write_log(10, "Thisisatest");
+	write_log(10, "Thisisatest2");
+
+	close_log();
+
+	dup2(outfileno, fileno(stdout));
+	dup2(errfileno, fileno(stderr));
+
+	/* Newer log file */
+	fptr = fopen(tmpfilename, "r");
+	ret = fscanf(fptr, "%s %s\t%s [repeat 2 times]\n", tmpstr,
+			tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	EXPECT_STREQ("Thisisatest2", tmpstr2);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(EOF, ret);
+	fclose(fptr);
+
+	/* Older log file */
+	sprintf(log_file2, "%s.1", tmpfilename);
+	fptr = fopen(log_file2, "r");
+	ASSERT_TRUE(fptr != NULL);
+	fseek(fptr, MAX_LOG_FILE_SIZE, SEEK_SET);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(3, ret);
+	EXPECT_STREQ("Thisisatest", tmpstr2);
+	ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+	ASSERT_EQ(EOF, ret);
+	fclose(fptr);
+	unlink(log_file2);
 }
 #endif
 
 /* End of the test case for the function write_log */
-

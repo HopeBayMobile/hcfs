@@ -186,7 +186,7 @@ static inline void _write_repeated_log(char *timestr, uint32_t usec)
 
 static inline void _check_log_file_size()
 {
-	if (logptr->now_log_size >= MAX_LOG_SIZE) {
+	if (logptr->now_log_size >= MAX_LOG_FILE_SIZE) {
 		fclose(logptr->fptr);
 		logptr->fptr = NULL;
 		_rename_logfile();
@@ -199,6 +199,8 @@ static inline void _check_log_file_size()
 		}
 	}
 }
+
+#define REPEATED_LOG_IS_CACHED() (logptr->latest_log_sec > 0)
 
 /**
  * Write log message. If LOG_COMPRESS is enable, the log msg will be deffered
@@ -221,7 +223,7 @@ int32_t write_log(int32_t level, char *format, ...)
 	int32_t this_logsize, ret_size;
 	char *temp_ptr;
 
-	if (logptr && (logptr->latest_log_sec > 0)) {
+	if (logptr && REPEATED_LOG_IS_CACHED()) {
 		gettimeofday(&tmptime, NULL);
 		/* Flush repeated log msg every FLUSH_TIME_INTERVAL secs */
 		if (tmptime.tv_sec - logptr->latest_log_sec >=
@@ -269,7 +271,7 @@ int32_t write_log(int32_t level, char *format, ...)
 	strftime(timestr, 90, "%F %T", &tmptm);
 
 	sem_wait(&(logptr->logsem));
-	if (LOG_COMPRESS == FALSE) {
+	if (LOG_COMPRESS == FALSE) { /* Write when log compression is closed */
 		this_logsize = fprintf(logptr->fptr, "%s.%06d\t",
 				timestr, (uint32_t)tmptime.tv_usec);
 		logptr->now_log_size += this_logsize;
@@ -290,6 +292,16 @@ int32_t write_log(int32_t level, char *format, ...)
 			LOG_MSG_SIZE, format, alist);
 	/* Derectly write to file when msg is too long */
 	if (ret_size >= LOG_MSG_SIZE) {
+		if (REPEATED_LOG_IS_CACHED()) {
+			if (logptr->repeated_times > 0) {
+				_write_repeated_log(timestr,
+						(uint32_t)tmptime.tv_usec);
+			} else {
+				logptr->latest_log_sec = 0;
+				logptr->repeated_times = 0;
+				logptr->latest_log_msg[0] = '\0';
+			}
+		}
 		va_start(alist, format);
 		this_logsize = fprintf(logptr->fptr, "%s.%06d\t",
 			timestr, (uint32_t)tmptime.tv_usec);
@@ -300,9 +312,8 @@ int32_t write_log(int32_t level, char *format, ...)
 			fprintf(logptr->fptr, "\n");
 			logptr->now_log_size += 1;
 		}
-		logptr->latest_log_sec = 0;
-		logptr->repeated_times = 0;
-		logptr->latest_log_msg[0] = '\0';
+
+		_check_log_file_size();
 		sem_post(&(logptr->logsem));
 		va_end(alist);
 		return 0;
@@ -330,11 +341,12 @@ int32_t write_log(int32_t level, char *format, ...)
 		logptr->now_log_size += 1;
 	}
 
-	/* Let now log be latest log */
+	/* Let now log be the latest log */
 	temp_ptr = logptr->now_log_msg;
 	logptr->now_log_msg = logptr->latest_log_msg;
 	logptr->latest_log_msg = temp_ptr;
 	logptr->latest_log_sec = tmptime.tv_sec;
+	logptr->repeated_times = 0;
 
 	/* Check log file size */
 	_check_log_file_size();

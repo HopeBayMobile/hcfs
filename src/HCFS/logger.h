@@ -16,9 +16,9 @@
 #include <semaphore.h>
 #include <stdio.h>
 
-#define MAX_LOG_SIZE 1048576
+#define MAX_LOG_FILE_SIZE 20971520 /* 20MB */
 #define NUM_LOG_FILE 5
-#define LOG_MSG_SIZE 150
+#define LOG_MSG_SIZE 128
 #define FLUSH_TIME_INTERVAL 3
 
 typedef struct {
