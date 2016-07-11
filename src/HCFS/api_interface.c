@@ -43,6 +43,7 @@
 #include "monitor.h"
 #include "hcfs_fromcloud.h"
 #include "hcfs_cacheops.h"
+#include "hfuse_system.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -1092,6 +1093,7 @@ void api_module(void *index)
 		case TERMINATE:
 			/* Terminate the system */
 			unmount_all();
+			sync_hcfs_system_data(TRUE);
 			hcfs_system->system_going_down = TRUE;
 			/* Wake up potential sleeping threads */
 			sem_post(&(hcfs_system->something_to_replace));

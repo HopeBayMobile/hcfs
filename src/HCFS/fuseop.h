@@ -250,6 +250,7 @@ typedef struct {
 	BOOL sync_manual_switch;
 	BOOL sync_paused;
 	BOOL xfer_upload_in_progress;
+	BOOL writing_sys_data;
 
 	/* Lots of functions will invoke download directly */
 	sem_t xfer_download_in_progress_sem;
