@@ -827,6 +827,47 @@ int32_t get_xfer_status(void)
 	return 0;
 }
 
+int32_t set_syncpoint_handle()
+{
+	SYNC_POINT_DATA *tmp_syncpoint_data;
+
+	super_block_exclusive_locking();
+	if (sys_super_block->head.last_dirty_inode == 0 &&
+		sys_super_block->head.last_to_delete_inode == 0) {
+		super_block_exclusive_release();
+		return 1;
+	}
+
+	/* Init memory if sync point is not set */
+	if (sys_super_block->sync_point_is_set == FALSE) {
+		sys_super_block->sync_point_is_set = TRUE;
+		sys_super_block->sync_point_info = (SYNC_POINT_INFO *)
+			malloc(sizeof(SYNC_POINT_INFO));
+		if (!(sys_super_block->sync_point_info))
+			return -ENOMEM;
+		memset(sys_super_block->sync_point_info, 0,
+				sizeof(SYNC_POINT_INFO));
+	}
+
+	tmp_syncpoint_data = &(sys_super_block->sync_point_info->data);
+	/* Set sync point */
+	if (sys_super_block->head.last_dirty_inode) {
+		tmp_syncpoint_data->upload_sync_point =
+				sys_super_block->head.last_dirty_inode;
+	} else {
+		tmp_syncpoint_data->upload_sync_complete = TRUE;
+	}
+
+	if (sys_super_block->head.last_to_delete_inode) {
+		tmp_syncpoint_data->delete_sync_point =
+				sys_super_block->head.last_to_delete_inode;
+	} else {
+		tmp_syncpoint_data->delete_sync_complete = TRUE;
+	}
+
+	super_block_exclusive_release();
+	return 0;
+}
 
 /************************************************************************
 *
@@ -1412,6 +1453,16 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
 			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
 			uint32_ret = 0;
+			break;
+		case SETSYNCPOINT:
+			retcode = set_syncpoint_handle();
+			if (retcode == 0) {
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
+			}
 			break;
 		default:
 			retcode = ENOTSUP;

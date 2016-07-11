@@ -79,6 +79,19 @@ typedef struct {
 	int64_t num_active_inodes;
 } SUPER_BLOCK_HEAD;
 
+/* Infomation and data of sync point */
+typedef struct {
+	ino_t upload_sync_point;
+	ino_t delete_sync_point;
+	BOOL upload_sync_complete;
+	BOOL delete_sync_complete;
+} SYNC_POINT_DATA;
+
+typedef struct {
+	FILE *fptr;
+	SYNC_POINT_DATA data;
+} SYNC_POINT_INFO;
+
 /* SUPER_BLOCK_CONTROL defines the structure for controling super block */
 typedef struct {
 	SUPER_BLOCK_HEAD head;
@@ -88,6 +101,8 @@ typedef struct {
 	sem_t share_lock_sem;
 	sem_t share_CR_lock_sem;
 	int32_t share_counter;
+	BOOL sync_point_is_set; /* Indicate if need to sync all data */
+	SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
 } SUPER_BLOCK_CONTROL;
 
 SUPER_BLOCK_CONTROL *sys_super_block;
