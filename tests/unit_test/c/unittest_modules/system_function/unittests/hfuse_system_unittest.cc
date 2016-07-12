@@ -123,6 +123,8 @@ TEST_F(sync_hcfs_system_dataTest, NotNeedLock_SyncSuccess)
 	init_mock_data();
 	/* Run function */
 	ASSERT_EQ(0, sync_hcfs_system_data(FALSE));
+	/* Wait for the update thread to actually write */
+	sleep(3);
 	/* Check answer */
 	fseek(hcfs_system->system_val_fptr, 0, SEEK_SET);
 	fread(&test_answer, sizeof(SYSTEM_DATA_TYPE), 1, hcfs_system->system_val_fptr);

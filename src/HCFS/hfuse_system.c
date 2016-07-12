@@ -166,11 +166,12 @@ errcode_handle:
 	return errcode;
 }
 
-void _write_sys(void)
+void* _write_sys(void *fakeptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
 
+	UNUSED(fakeptr);
 	sleep(2);
 	sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
@@ -181,7 +182,7 @@ void _write_sys(void)
 	sem_post(&(hcfs_system->access_sem));
 
 errcode_handle:
-	return;
+	return NULL;
 }
 
 /************************************************************************
@@ -210,7 +211,7 @@ int32_t sync_hcfs_system_data(char need_lock)
 		if (hcfs_system->writing_sys_data == FALSE) {
 			hcfs_system->writing_sys_data = TRUE;
 			pthread_create(&(write_sys_thread),
-				&prefetch_thread_attr, (void *)&_write_sys,
+				&prefetch_thread_attr, &_write_sys,
 				NULL);
 		}
 	}
