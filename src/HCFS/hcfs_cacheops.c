@@ -251,7 +251,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 						CACHE_SOFT_LIMIT) {
 				flock(fileno(metafptr), LOCK_UN);
 
-				semptr = &(hcfs_system->check_cache_sem);
+				semptr = &(hcfs_system->num_cache_sleep_sem);
 				while (hcfs_system->systemdata.cache_size <
 							CACHE_SOFT_LIMIT) {
 					gettimeofday(&currenttime, NULL);
@@ -568,7 +568,7 @@ void run_cache_loop(void)
 				break;
 
 			/* Check if some thread is still sleeping */
-			ret = sem_getvalue(&(hcfs_system->check_cache_sem),
+			ret = sem_getvalue(&(hcfs_system->num_cache_sleep_sem),
 			                   &semval);
 			if ((ret == 0) && (semval > 0))
 				notify_sleep_on_cache(0);
