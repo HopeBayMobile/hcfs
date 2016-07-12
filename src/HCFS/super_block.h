@@ -2,7 +2,7 @@
 
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: super_block.c
+* File Name: super_block.h
 * Abstract: The c header file for meta processing involving super
 *           block in HCFS. Super block is used for fast inode accessing
 *           and also tracking of status of filesystem objects (data sync
@@ -24,6 +24,7 @@
 #include <inttypes.h>
 
 #include "global.h"
+#include "syncpoint_control.h"
 
 /* pin-status in super block */
 #define ST_DEL 0
@@ -32,7 +33,7 @@
 #define ST_PIN 3
 
 /* SUPER_BLOCK_ENTRY defines the structure for an entry in super block */
-typedef struct {
+typedef struct SUPER_BLOCK_ENTRY {
 	struct stat inode_stat;
 	ino_t util_ll_next;
 	ino_t util_ll_prev;
@@ -79,19 +80,6 @@ typedef struct {
 	int64_t num_active_inodes;
 } SUPER_BLOCK_HEAD;
 
-/* Infomation and data of sync point */
-typedef struct {
-	ino_t upload_sync_point;
-	ino_t delete_sync_point;
-	BOOL upload_sync_complete;
-	BOOL delete_sync_complete;
-} SYNC_POINT_DATA;
-
-typedef struct {
-	FILE *fptr;
-	SYNC_POINT_DATA data;
-} SYNC_POINT_INFO;
-
 /* SUPER_BLOCK_CONTROL defines the structure for controling super block */
 typedef struct {
 	SUPER_BLOCK_HEAD head;
@@ -102,7 +90,7 @@ typedef struct {
 	sem_t share_CR_lock_sem;
 	int32_t share_counter;
 	BOOL sync_point_is_set; /* Indicate if need to sync all data */
-	SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
+	struct SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
 } SUPER_BLOCK_CONTROL;
 
 SUPER_BLOCK_CONTROL *sys_super_block;

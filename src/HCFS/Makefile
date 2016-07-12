@@ -33,7 +33,6 @@ OBJS_F := objmeta.o \
 	file_present.o \
 	hfuse_system.o \
 	utils.o \
-	super_block.o \
 	fuseop.o \
 	metaops.o \
 	filetables.o \
@@ -49,6 +48,8 @@ OBJS_F := objmeta.o \
 	xattr_ops.o \
 	enc.o \
 	compress.o \
+	syncpoint_control.o \
+	super_block.o \
 	dedup_table.o \
 	path_reconstruct.o \
 	pin_scheduling.o \

@@ -54,6 +54,7 @@
 #include "hcfs_fromcloud.h"
 #include "pkg_cache.h"
 #include "api_interface.h"
+#include "syncpoint_control.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -297,7 +298,17 @@ int32_t _init_download_curl(int32_t count)
  */
 void init_backend_related_module(void)
 {
-	int32_t count;
+	int32_t ret, count;
+	char syncpoint_path[400];
+
+	fetch_syncpoint_data_path(syncpoint_path);
+	if (!access(syncpoint_path, F_OK)) {
+		ret = init_syncpoint_resource();
+		if (ret < 0) {
+			write_log(0, "Error: Fail to init sync point data\n");
+			exit(-1);
+		}
+	}
 
 	if (CURRENT_BACKEND != NONE) {
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);

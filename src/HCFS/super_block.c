@@ -42,6 +42,7 @@
 #include "utils.h"
 #include "macro.h"
 #include "hcfs_cacheops.h"
+#include "syncpoint_control.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -1409,7 +1410,7 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		return 0;
 
 	if (old_which_ll == IS_DIRTY) {
-		/* Need to check if the dirty linked list in superblock was currupted */
+		/* Need to check if the dirty linked list in superblock was corrupted */
 		if (this_entry->util_ll_next == 0) {
 			if (sys_super_block->head.last_dirty_inode != thisinode)
 				need_rebuild = TRUE;
@@ -1444,6 +1445,11 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		}
 	}
 
+	/* After trying to rebuild, check if sync point is set. */
+	if (sys_super_block->sync_point_is_set == TRUE)
+		move_sync_point(old_which_ll, thisinode, this_entry);
+
+	/* Begin to dequeue */
 	if (this_entry->util_ll_next == 0) {
 		switch (old_which_ll) {
 		case IS_DIRTY:

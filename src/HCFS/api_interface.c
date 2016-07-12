@@ -44,6 +44,7 @@
 #include "hcfs_fromcloud.h"
 #include "hcfs_cacheops.h"
 #include "hfuse_system.h"
+#include "syncpoint_control.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -830,6 +831,7 @@ int32_t get_xfer_status(void)
 int32_t set_syncpoint_handle()
 {
 	SYNC_POINT_DATA *tmp_syncpoint_data;
+	int32_t ret;
 
 	super_block_exclusive_locking();
 	if (sys_super_block->head.last_dirty_inode == 0 &&
@@ -840,17 +842,19 @@ int32_t set_syncpoint_handle()
 
 	/* Init memory if sync point is not set */
 	if (sys_super_block->sync_point_is_set == FALSE) {
-		sys_super_block->sync_point_is_set = TRUE;
-		sys_super_block->sync_point_info = (SYNC_POINT_INFO *)
-			malloc(sizeof(SYNC_POINT_INFO));
-		if (!(sys_super_block->sync_point_info))
-			return -ENOMEM;
-		memset(sys_super_block->sync_point_info, 0,
-				sizeof(SYNC_POINT_INFO));
+		write_log(10, "Debug: Allocate sync point resource\n");
+		ret = init_syncpoint_resource();
+		if (ret < 0) {
+			super_block_exclusive_release();
+			return ret;
+		}
+	} else {
+		write_log(10, "Debug: Sync point had been set."
+				" Cover old info.\n");
 	}
 
-	tmp_syncpoint_data = &(sys_super_block->sync_point_info->data);
 	/* Set sync point */
+	tmp_syncpoint_data = &(sys_super_block->sync_point_info->data);
 	if (sys_super_block->head.last_dirty_inode) {
 		tmp_syncpoint_data->upload_sync_point =
 				sys_super_block->head.last_dirty_inode;
@@ -865,6 +869,28 @@ int32_t set_syncpoint_handle()
 		tmp_syncpoint_data->delete_sync_complete = TRUE;
 	}
 
+	/* Write to disk */
+	ret = write_syncpoint_data();
+	if (ret < 0) {
+		free_syncpoint_resource(TRUE);
+		super_block_exclusive_release();
+		return ret;
+	}
+
+	super_block_exclusive_release();
+	return 0;
+}
+
+
+int32_t cancel_syncpoint_handle()
+{
+	super_block_exclusive_locking();
+	if (sys_super_block->sync_point_is_set == FALSE) {
+		super_block_exclusive_release();
+		return 1;
+	}
+
+	free_syncpoint_resource(TRUE);
 	super_block_exclusive_release();
 	return 0;
 }
@@ -1455,7 +1481,11 @@ void api_module(void *index)
 			uint32_ret = 0;
 			break;
 		case SETSYNCPOINT:
-			retcode = set_syncpoint_handle();
+		case CANCELSYNCPOINT:
+			if (api_code == SETSYNCPOINT)
+				retcode = set_syncpoint_handle();
+			else
+				retcode = cancel_syncpoint_handle();
 			if (retcode == 0) {
 				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(ret_len),
