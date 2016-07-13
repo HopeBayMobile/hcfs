@@ -5,12 +5,15 @@
 # Author: William W.-Y. Liang, Hope Bay Tech, Copyright (C) 2016-
 # Contact: william.liang@hopebaytech.com
 #
-# Date: $Date: 2016/06/23 11:27:29 $
-# Version: $Revision: 1.10 $
+# Date: $Date: 2016/07/11 12:11:00 $
+# Version: $Revision: 1.11 $
 #
 # History: 
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.11  2016/07/11 12:11:00  wyliang
+# Add the '-boot4perm' option to support permission grant by a userdebug boot.img; Partial code refactoring
+#
 # Revision 1.10  2016/06/23 11:27:29  wyliang
 # Support '-gp' to grant permissions (only); Refine message and sideload check time
 #
@@ -50,29 +53,32 @@ SDK_PATH=$HOME/android-sdk-linux
 
 RECOVERY_URL=https://dl.twrp.me/bullhead/twrp-3.0.2-0-bullhead.img
 RECOVERY_FILE=$(basename $RECOVERY_URL)
-GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20160529/open_gapps-arm64-6.0-pico-20160529.zip
+GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20160710/open_gapps-arm64-6.0-pico-20160710.zip
 GAPPS_FILE=$(basename $GAPPS_URL)
 FACTORY_URL=https://dl.google.com/dl/android/aosp/bullhead-mtc19v-factory-f3a6bee5.tgz
 FACTORY_FILE=$(basename $FACTORY_URL)
 FACTORY_DIR=$(echo $FACTORY_FILE | awk -F- '{ print $1"-"$2 }')
 ROM_DIR=tera
 ROM_ZIP=
+BOOT4PERM_IMG=
 
 # Usage Info
 
 Usage() {
   local _prog=$(basename $0)
-  echo "Usage: $_prog -ff -fr -ask -rom <rom_dir> -recovery <recovery_image> -gapps <gapps_zip> -factory <factory_image_dir> -h"
+  echo "Usage: $_prog [option]..."
+  echo "option:"
   echo "  -fr: flash ROM, from the source specified by either '-rom-zip' or '-rom', where '-rom-zip' is used first."
   echo "  -ff: flash factory image ONLY"
   echo "  -rom <rom dir>: specify the directory containing ROM images (Default <rom dir>: $ROM_DIR). The '-fr' option is implied."
   echo "  -rom-zip <rom zip>: specify the ROM's zip image file (Default <rom zip>: N/A). The '-fr' option is implied."
   echo "  -factory <factory image>: specify the factory image tar ball (e.g. <factory image>: $FACTORY_FILE). The '-ff' option is implied."
   echo "  -factory-url <factory URL>: specify the factory image URL (Default <factory URL>: $FACTORY_URL). The '-ff' option is implied."
-  echo "  -gapps <gapps_zip>: specify the gapps zip file name (e.g. <gapps zip>: $GAPPS_FILE)"
+  echo "  -gapps <gapps zip>: specify the gapps zip file name (e.g. <gapps zip>: $GAPPS_FILE)"
   echo "  -gapps-url <gapps URL>: specify the gapps URL (Default <gapps URL>: $GAPPS_URL)"
   echo "  -recovery <recovery image>: specify the recovery image file name (e.g. <recovery image>: $RECOVERY_FILE)"
   echo "  -recovery-url <recovery URL>: specify the recovery URL (Default <recovery URL>: $RECOVERY_URL)"
+  echo "  -boot4perm <boot image>: specify the temporary boot image for granting permissions"
   echo "  -sdk <sdk path>: set the SDK path (Default: $SDK_PATH)"
   echo "  -ask: ask the user to confirm every major step (Default: do no ask)"
   echo "  -fd: force to download again (for recovery and gapps)"
@@ -82,12 +88,14 @@ Usage() {
   echo "Examples:"
   echo "  Install Open Gapps only: "
   echo "    $ $_prog"
+  echo "  Flash ROM images in a directory named 'tera-1060-userdebug/' and then install Open Gapps:"
+  echo "    $ $_prog -rom tera-1060-userdebug"
+  echo "  Flash ROM images under 'tera-1060-user/', with a temporary boot image 'userdebug/boot.img' to grant permissions, and then install Open Gapps:"
+  echo "    $ $_prog -rom tera-1060-user -boot4perm userdebug/boot.img"
   echo "  Flash ROM images under the default directory '$ROM_DIR/' and then install Open Gapps:"
   echo "    $ $_prog -fr"
   echo "  Flash a full ROM images specified by a zip file and then install Open Gapps:"
   echo "    $ $_prog -rom-zip aosp_bullhead-img-874.zip"
-  echo "  Flash ROM images in another directory namely 'mydroid/' and then install Open Gapps:"
-  echo "    $ $_prog -fr -rom mydroid"
   echo "  Restore the Nexus factory images:"
   echo "    $ $_prog -ff"
   echo "  Restore the Nexus factory images using a pre-downloaded file 'bullhead-mxy12z.tgz':"
@@ -104,6 +112,7 @@ FLASH_ROM=0
 NEED_CONFIRM=0
 FORCE_DOWNLOAD=0
 FORCE_GRANT_PERM=0
+DO_BOOT4PERM=0
 
 ERROR_HDR="** Error:"
 
@@ -111,88 +120,12 @@ ERROR_HDR="** Error:"
 # Functions
 # ---------
 
-CheckParams() {
-  while [ "$1" != "" ]; do
-      case $1 in
-      -h) 
-          Usage 0
-          ;;
-      -v) 
-          grep "\$Revision" $0 | head -1 | awk '{ print "version", $4 }'
-          exit 0
-          ;;
-      -ff) 
-          FLASH_FACTORY=1
-          ;;
-      -fr) 
-          FLASH_ROM=1
-          ;;
-      -ask) 
-          NEED_CONFIRM=1
-          ;;
-      -sdk)
-          SDK_PATH=$2
-          shift
-          ;;
-      -fd) 
-          FORCE_DOWNLOAD=1
-          ;;
-      -gp) 
-          FORCE_GRANT_PERM=1
-          GrantPermissions
-          exit 0
-          ;;
-      -rom)
-          ROM_DIR=$2
-          FLASH_ROM=1	# implied option: -fr
-          shift
-          ;;
-      -rom-zip)
-          ROM_ZIP=$2
-          FLASH_ROM=1	# implied option: -fr
-          shift
-          ;;
-      -recovery)
-          RECOVERY_FILE=$2
-          shift
-          ;;
-      -recovery-url)
-          RECOVERY_URL=$2
-          shift
-          ;;
-      -gapps)
-          GAPPS_FILE=$2
-          shift
-          ;;
-      -gapps-url)
-          GAPPS_URL=$2
-          shift
-          ;;
-      -factory)
-          FACTORY_FILE=$2
-          FLASH_FACTORY=1	# implied option: -ff
-          shift
-          ;;
-      -factory-url)
-          FACTORY_URL=$2
-          FLASH_FACTORY=1	# implied option: -ff
-          shift
-          ;;
-      *)
-          Usage 1
-      esac
-      shift
-  done
-
-  # set PATH
-  export PATH=$PATH:$SDK_PATH/platform-tools
-}
-
 # Primary Functions
 
 Error() {
   [ "$1" = "newline" ] && { echo; shift; }
-  printf "$ERROR_HDR $*"
+  echo "$ERROR_HDR $*"
+  echo "Hint: type '$(basename $0) -h' to check the usage of the command."
   exit 1
 }
 
@@ -340,15 +273,116 @@ WaitAdbMode () {
 
 Wait4App2Appear() {
   local _app=$1
+  local _timeout="$2"
+  local _i
 
   printf ">> Wait for the App '$_app' to get ready"
-  while ! adb shell pm list packages 2> /dev/null | grep $_app > /dev/null > /dev/null 2>&1; do 
-    Sleep 1
+
+  for ((_i=0; _i<$_timeout; _i++)); do
+    adb shell pm list packages 2> /dev/null | grep $_app > /dev/null > /dev/null 2>&1 && break || Sleep 1
   done
-  echo "done"
+  Sleep 2
+
+  [ "$_i" -lt "$_timeout" ] && { echo "done"; return 0; } || { echo "stop waiting"; return 1; }
 }
 
 # Major Functions
+
+CheckParams() {
+  while [ "$1" != "" ]; do
+      case $1 in
+      -h) 
+          Usage 0
+          ;;
+      -v) 
+          grep "\$Revision" $0 | head -1 | awk '{ print "version", $4 }'
+          exit 0
+          ;;
+      -ff) 
+          FLASH_FACTORY=1
+          ;;
+      -fr) 
+          FLASH_ROM=1
+          ;;
+      -ask) 
+          NEED_CONFIRM=1
+          ;;
+      -sdk)
+          SDK_PATH=$2
+          shift
+          ;;
+      -fd) 
+          FORCE_DOWNLOAD=1
+          ;;
+      -gp) 
+          # FORCE_GRANT_PERM=1
+          GrantPermissions
+          exit 0
+          ;;
+      -rom)
+          CheckDir "$2"
+          ROM_DIR=$2
+          FLASH_ROM=1	# implied option: -fr
+          shift
+          ;;
+      -rom-zip)
+          CheckFile "$2"
+          ROM_ZIP=$2
+          FLASH_ROM=1	# implied option: -fr
+          shift
+          ;;
+      -recovery)
+          CheckFile "$2"
+          RECOVERY_FILE=$2
+          shift
+          ;;
+      -recovery-url)
+          RECOVERY_URL=$2
+          shift
+          ;;
+      -gapps)
+          CheckFile "$2"
+          GAPPS_FILE=$2
+          shift
+          ;;
+      -gapps-url)
+          GAPPS_URL=$2
+          shift
+          ;;
+      -factory)
+          CheckFile "$2"
+          FACTORY_FILE=$2
+          FLASH_FACTORY=1	# implied option: -ff
+          shift
+          ;;
+      -factory-url)
+          FACTORY_URL=$2
+          FLASH_FACTORY=1	# implied option: -ff
+          shift
+          ;;
+      -boot4perm)
+          CheckFile "$2"
+          BOOT4PERM_IMG=$2
+          shift
+          ;;
+      *)
+          Usage 1
+      esac
+      shift
+  done
+
+  # set PATH
+  export PATH=$PATH:$SDK_PATH/platform-tools
+
+  # cross-arguments checks
+  if [ -n "$BOOT4PERM_IMG" ]; then 
+    if [ "$FLASH_ROM" -eq 1 ] && CheckFile "$ROM_DIR/boot.img"; then
+      DO_BOOT4PERM=1
+    else 
+      Error "the '-boot4perm' option requires either the '-rom' or '-fr' option is also specified and the file boot.img exists in the rom directory"
+    fi
+  fi
+}
 
 Boot2Fastboot() {
   echo ">> Please make sure that the device has been unlocked and boot into the fastboot mode."
@@ -394,7 +428,7 @@ FlashFactoryImage() {
   echo "done"
  
   echo ">> The device has been recovered with the factory image '$FACTORY_DIR'"
-  # echo ">> If you want to install OpenGapps, please run $(basename $0) again with -f"
+  # echo ">> If you want to install Open Gapps, please run $(basename $0) again with -f"
   exit 0
 }
 
@@ -453,6 +487,7 @@ SideloadOpenGapps() {
     CheckAdbMode sideload && break
     if CheckAdbMode recovery; then
       echo ">> Now wipe and change the device to the sideload mode"
+      sleep 3
       adb shell twrp wipe cache
       sleep 3
       adb shell twrp sideload 
@@ -467,53 +502,64 @@ SideloadOpenGapps() {
     ToConfirm force && sleep 1
   done
 
-  echo ">> Sideload Gapps '$GAPPS_FILE'" 
+  echo ">> Sideload Open Gapps '$GAPPS_FILE'" 
   adb sideload "$GAPPS_FILE"
   echo "done"
 
-  # reboot to android
-  echo "Get ready to reboot into Android"
-  WaitAdbMode "recovery" 10
-  if ! adb shell reboot; then
-    Error newline "problem occurred while sideload '$GAPPS_FILE', probably because the device wasn't set to ADB sideload mode."\
-                  "   You may need to reboot the device into the fastboot mode and restart the whole process."
-  fi
+  WaitAdbMode "recovery" 10 || Error "problem occurred while doing sideload, you may need to reboot the device and restart the whole process."
 }
 
 GrantPermissions() {
-  echo ">> Grant permissions to GApps " && ToConfirm 
+  local _failed=0
 
-  # wait for the GMS process to appear in the device
-  [ "$FORCE_GRANT_PERM" -eq 0 ] && Wait4App2Appear gms
+  echo ">> Prepare to grant permissions to GApps " && ToConfirm 
 
-  adb shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
-  adb shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
-  adb shell pm grant com.google.android.gms android.permission.ACCESS_COARSE_LOCATION
-  adb shell pm grant com.google.android.gms android.permission.INTERACT_ACROSS_USERS
+  if [ "$DO_BOOT4PERM" -eq 1 ]; then
+    echo ">> Replace the boot image with the specified '$BOOT4PERM_IMG'"
+    adb reboot bootloader
+    fastboot flash boot "$BOOT4PERM_IMG"
+    fastboot reboot
+  else
+    echo ">> Reboot into Android"
+    adb reboot
+  fi
 
-  adb shell pm grant com.google.android.gms android.permission.BODY_SENSORS
-  adb shell pm grant com.google.android.gms android.permission.READ_SMS
-  adb shell pm grant com.google.android.gms android.permission.RECEIVE_MMS
-  adb shell pm grant com.google.android.gms android.permission.READ_EXTERNAL_STORAGE
-  adb shell pm grant com.google.android.gms android.permission.WRITE_EXTERNAL_STORAGE
-  adb shell pm grant com.google.android.gms android.permission.READ_CALENDAR
-  adb shell pm grant com.google.android.gms android.permission.CAMERA
-  adb shell pm grant com.google.android.gms android.permission.READ_CONTACTS
-  adb shell pm grant com.google.android.gms android.permission.WRITE_CONTACTS
-  adb shell pm grant com.google.android.gms android.permission.GET_ACCOUNTS
-  adb shell pm grant com.google.android.gms android.permission.RECORD_AUDIO
-  adb shell pm grant com.google.android.gms android.permission.READ_PHONE_STATE
-  adb shell pm grant com.google.android.gms android.permission.CALL_PHONE
-  adb shell pm grant com.google.android.gms android.permission.READ_CALL_LOG
-  adb shell pm grant com.google.android.gms android.permission.PROCESS_OUTGOING_CALLS
-  adb shell pm grant com.google.android.gms android.permission.SEND_SMS
-  adb shell pm grant com.google.android.gms android.permission.RECEIVE_SMS
+  if Wait4App2Appear gms 60; then
+    echo ">> Start to grant permissions"
+    adb shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
+    adb shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
+    adb shell pm grant com.google.android.gms android.permission.ACCESS_COARSE_LOCATION
+    adb shell pm grant com.google.android.gms android.permission.INTERACT_ACROSS_USERS
+    adb shell pm grant com.google.android.gms android.permission.BODY_SENSORS
+    adb shell pm grant com.google.android.gms android.permission.READ_SMS
+    adb shell pm grant com.google.android.gms android.permission.RECEIVE_MMS
+    adb shell pm grant com.google.android.gms android.permission.READ_EXTERNAL_STORAGE
+    adb shell pm grant com.google.android.gms android.permission.WRITE_EXTERNAL_STORAGE
+    adb shell pm grant com.google.android.gms android.permission.READ_CALENDAR
+    adb shell pm grant com.google.android.gms android.permission.CAMERA
+    adb shell pm grant com.google.android.gms android.permission.READ_CONTACTS
+    adb shell pm grant com.google.android.gms android.permission.WRITE_CONTACTS
+    adb shell pm grant com.google.android.gms android.permission.GET_ACCOUNTS
+    adb shell pm grant com.google.android.gms android.permission.RECORD_AUDIO
+    adb shell pm grant com.google.android.gms android.permission.READ_PHONE_STATE
+    adb shell pm grant com.google.android.gms android.permission.CALL_PHONE
+    adb shell pm grant com.google.android.gms android.permission.READ_CALL_LOG
+    adb shell pm grant com.google.android.gms android.permission.PROCESS_OUTGOING_CALLS
+    adb shell pm grant com.google.android.gms android.permission.SEND_SMS
+    adb shell pm grant com.google.android.gms android.permission.RECEIVE_SMS
+    echo "done"
+  else 
+    _failed=1
+  fi
 
-  echo "done"
+  if [ "$DO_BOOT4PERM" -eq 1 ]; then
+    echo ">> Restore the original flashed boot image"
+    adb reboot bootloader
+    fastboot flash boot "$ROM_DIR/boot.img"
+    fastboot reboot
+  fi
 
-  # adb reboot reboot again
-
-  echo ">> Note: Please remember to turn on (all) other permissions for Google Play services manually."
+  [ "$_failed" -eq 1 ] && Error "failed to grant permissions for Open Gapps, please do that manually (for Google Play Service, specifically)"
 }
 
 # ----------------------
