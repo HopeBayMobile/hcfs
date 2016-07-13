@@ -1,18 +1,21 @@
 #!/bin/bash
 #
-# Description: # This is to apply opengapps into Nexus devices with AOSP ROM 
+# Description: # This is to apply opengapps into Nexus devices with AOSP ROM
 #
 # Authors: William W.-Y. Liang, Can Yu, etc
 #          from Hope Bay Tech, Copyright (C) 2016-
 # Contact: william.liang@hopebaytech.com
 #          can.yu@hopebaytech.com
 #
-# Date: $Date: 2016/07/13 07:24:15 $
-# Version: $Revision: 1.12 $
+# Date: $Date: 2016/07/13 17:17:00 $
+# Version: $Revision: 1.13 $
 #
-# History: 
+# History:
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.13  2016/07/13 17:17:00  jethro
+# Support Ubuntu VM in virtualbox, use local cache fro gapps
+#
 # Revision 1.12  2016/07/13 07:24:15  wyliang
 # Support Apple MacOS
 #
@@ -50,6 +53,16 @@
 # Create the nexus gapps installation script
 #
 
+platform='unknown'
+unamestr=`uname`
+if [[ "$unamestr" == 'Linux' ]]; then
+  platform='linux'
+elif [[ "$unamestr" == 'FreeBSD' ]]; then
+  platform='freebsd'
+elif [[ "$unamestr" == 'Darwin' ]]; then
+  platform='mac'
+fi
+
 # Android SDK path
 
 SDK_PATH=$HOME/android-sdk-linux
@@ -59,6 +72,7 @@ SDK_PATH=$HOME/android-sdk-linux
 RECOVERY_URL=https://dl.twrp.me/bullhead/twrp-3.0.2-0-bullhead.img
 RECOVERY_FILE=$(basename $RECOVERY_URL)
 GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20160710/open_gapps-arm64-6.0-pico-20160710.zip
+GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20160710.zip
 GAPPS_FILE=$(basename $GAPPS_URL)
 FACTORY_URL=https://dl.google.com/dl/android/aosp/bullhead-mtc19v-factory-f3a6bee5.tgz
 FACTORY_FILE=$(basename $FACTORY_URL)
@@ -66,6 +80,7 @@ FACTORY_DIR=$(echo $FACTORY_FILE | awk -F- '{ print $1"-"$2 }')
 ROM_DIR=tera
 ROM_ZIP=
 BOOT4PERM_IMG=
+HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Usage Info
 
@@ -131,6 +146,32 @@ TOOL_MD5=md5.sum
 
 # Primary Functions
 
+ErrorReport() {
+  local script="$1"
+  local parent_lineno="$2"
+  local message="$3"
+  local code="${4:-1}"
+  echo "Error near ${script} line ${parent_lineno}; exiting with status ${code}"
+  if [[ -n "$message" ]] ; then
+    echo -e "Messageecho ${message}"
+  fi
+  exit "${code}"
+}
+
+# Enable error trace
+trap 'ErrorReport "${BASH_SOURCE[0]}" ${LINENO}' ERR
+set -e -o errtrace
+
+ReloadUSB() {
+  case $platform in
+  linux)
+    # setup udev rules
+    sudo cp -u "$HERE/utils/51-android.rules" /etc/udev/rules.d/51-android.rules
+    sudo sh -c "(udevadm control --reload-rules && udevadm trigger --action=change)"
+    ;;
+  esac
+}
+
 Error() {
   [ "$1" = "newline" ] && { echo; shift; }
   echo "$ERROR_HDR $*"
@@ -138,7 +179,7 @@ Error() {
   exit 1
 }
 
-CheckProgram() { 
+CheckProgram() {
   local _tool=$1
   which "$_tool" > /dev/null 2>&1 || echo "$ERROR_HDR $_tool is not found. Please install it or add its path in \$PATH."
 }
@@ -148,7 +189,7 @@ CheckTools() {
   if ! CheckProgram adb; then
     echo "   Or, install adb by 'apt-get install android-tools-adb'"
     _ret=1
-  fi 
+  fi
   if ! CheckProgram fastboot; then
     echo "   Or, install fastboot by 'apt-get install android-tools-fastboot'"
     _ret=1
@@ -168,7 +209,7 @@ CheckDir () {
   local _file=$1
   local _show=$2
 
-  if [ -d "$_file" ]; then 
+  if [ -d "$_file" ]; then
     return 0
   else
     # show message only when $_show == 0
@@ -181,7 +222,7 @@ CheckFile () {
   local _file=$1
   local _show=$2
 
-  if [ -f "$_file" ]; then 
+  if [ -f "$_file" ]; then
     return 0
   else
     # show message only when $_show == 0
@@ -193,13 +234,15 @@ CheckFile () {
 ToConfirm() {
   local _force=$1
 
-  [ "$_force" = "force" -o "$NEED_CONFIRM" -eq 1 ] && { printf "Press enter when ready..." && read; } # || echo
+  if [ "$_force" = "force" -o "$NEED_CONFIRM" -eq 1 ]; then
+    { printf "Press enter when ready..." && read; }
+  fi
 }
 
 Sleep() {
   local _secs=$1
 
-  for ((i=0; i<$_secs; i++)); do 
+  for ((i=0; i<$_secs; i++)); do
     printf "." && sleep 1
   done
 }
@@ -211,14 +254,14 @@ Remove2Bak() {
 
 CheckMD5() {
   local _file=$1
-  local _md5a="$($TOOL_MD5 $_file | awk '{ print $1 }')" 
+  local _md5a="$($TOOL_MD5 $_file | awk '{ print $1 }')"
   local _md5b="$(awk '{ print $1 }' $_file.md5)"
 
   printf ">> Check the MD5 checksum of '$_file'..."
 
   # if ! md5sum -c "$_file.md5"; then # this is not used because some .md5 file doesn't match the format
   if [ "$_md5a" != "$_md5b" ]; then
-    echo "$ERROR_HDR MD5 check failed for '$_file'! Remove '$_file' and the md5 to .bak file.\n" 
+    echo "$ERROR_HDR MD5 check failed for '$_file'! Remove '$_file' and the md5 to .bak file.\n"
     Remove2Bak "$_file"
     Remove2Bak "$_file.md5"
     exit 1
@@ -248,12 +291,12 @@ GetFile () {
   local _url=$1
   local _file=$2
 
-  # if force to download, rename existing file to .bak file 
+  # if force to download, rename existing file to .bak file
   [ "$FORCE_DOWNLOAD" -eq 1 ] && { Remove2Bak "$_file"; Remove2Bak "$_file.md5"; }
- 
+
   # download if not exist
   if [ ! -f "$_file" ]; then
-    echo ">> Download $_url." 
+    echo ">> Download $_url."
     if Download "$_url" "$_file"; then
       echo "done"
     else
@@ -265,23 +308,33 @@ GetFile () {
   if [ -f "$_file.md5" ] || wget "$_url.md5"; then
     CheckMD5 "$_file" "$_file.md5"
   fi
-  
+
   return 0
 }
 
-CheckAdbMode() {
-  local _mode=$1
-  
-  adb devices 2>&1 | egrep "$_mode" > /dev/null 2>&1
+GetMode() {
+  local mode=$({ adb devices; fastboot devices; } | tr -d "\n"| sed -r -n "s/.*\<(fastboot|device|recovery|sideload)\>.*/\1/p")
+  printf ${mode:-unknown}
 }
 
-WaitAdbMode () {
+CheckMode() {
+  local _mode=$1
+
+  { adb devices; fastboot devices; } 2>&1 | egrep "$_mode" > /dev/null 2>&1
+}
+
+WaitMode () {
   local _mode="$1"
   local _timeout="$2"
   local _i
 
   for ((_i=0; _i<$_timeout; _i++)); do
-    CheckAdbMode "$_mode" && break || Sleep 1
+    if CheckMode "$_mode"; then
+      break
+    else
+      ReloadUSB
+      Sleep 1
+    fi
   done
   Sleep 2
 
@@ -307,95 +360,95 @@ Wait4App2Appear() {
 
 CheckParams() {
   while [ "$1" != "" ]; do
-      case $1 in
-      -h) 
-          Usage 0
-          ;;
-      -v) 
-          grep "\$Revision" $0 | head -1 | awk '{ print "version", $4 }'
-          exit 0
-          ;;
-      -ff) 
-          FLASH_FACTORY=1
-          ;;
-      -fr) 
-          FLASH_ROM=1
-          ;;
-      -ask) 
-          NEED_CONFIRM=1
-          ;;
-      -sdk)
-          SDK_PATH=$2
-          shift
-          ;;
-      -fd) 
-          FORCE_DOWNLOAD=1
-          ;;
-      -gp) 
-          # FORCE_GRANT_PERM=1
-          GrantPermissions
-          exit 0
-          ;;
-      -rom)
-          CheckDir "$2"
-          ROM_DIR=$2
-          FLASH_ROM=1	# implied option: -fr
-          shift
-          ;;
-      -rom-zip)
-          CheckFile "$2"
-          ROM_ZIP=$2
-          FLASH_ROM=1	# implied option: -fr
-          shift
-          ;;
-      -recovery)
-          CheckFile "$2"
-          RECOVERY_FILE=$2
-          shift
-          ;;
-      -recovery-url)
-          RECOVERY_URL=$2
-          shift
-          ;;
-      -gapps)
-          CheckFile "$2"
-          GAPPS_FILE=$2
-          shift
-          ;;
-      -gapps-url)
-          GAPPS_URL=$2
-          shift
-          ;;
-      -factory)
-          CheckFile "$2"
-          FACTORY_FILE=$2
-          FLASH_FACTORY=1	# implied option: -ff
-          shift
-          ;;
-      -factory-url)
-          FACTORY_URL=$2
-          FLASH_FACTORY=1	# implied option: -ff
-          shift
-          ;;
-      -boot4perm)
-          CheckFile "$2"
-          BOOT4PERM_IMG=$2
-          shift
-          ;;
-      *)
-          Usage 1
-      esac
+    case $1 in
+    -h)
+      Usage 0
+      ;;
+    -v)
+      grep "\$Revision" $0 | head -1 | awk '{ print "version", $4 }'
+      exit 0
+      ;;
+    -ff)
+      FLASH_FACTORY=1
+      ;;
+    -fr)
+      FLASH_ROM=1
+      ;;
+    -ask)
+      NEED_CONFIRM=1
+      ;;
+    -sdk)
+      SDK_PATH=$2
       shift
+      ;;
+    -fd)
+      FORCE_DOWNLOAD=1
+      ;;
+    -gp)
+      # FORCE_GRANT_PERM=1
+      GrantPermissions
+      exit 0
+      ;;
+    -rom)
+      CheckDir "$2"
+      ROM_DIR=$2
+      FLASH_ROM=1	# implied option: -fr
+      shift
+      ;;
+    -rom-zip)
+      CheckFile "$2"
+      ROM_ZIP=$2
+      FLASH_ROM=1	# implied option: -fr
+      shift
+      ;;
+    -recovery)
+      CheckFile "$2"
+      RECOVERY_FILE=$2
+      shift
+      ;;
+    -recovery-url)
+      RECOVERY_URL=$2
+      shift
+      ;;
+    -gapps)
+      CheckFile "$2"
+      GAPPS_FILE=$2
+      shift
+      ;;
+    -gapps-url)
+      GAPPS_URL=$2
+      shift
+      ;;
+    -factory)
+      CheckFile "$2"
+      FACTORY_FILE=$2
+      FLASH_FACTORY=1	# implied option: -ff
+      shift
+      ;;
+    -factory-url)
+      FACTORY_URL=$2
+      FLASH_FACTORY=1	# implied option: -ff
+      shift
+      ;;
+    -boot4perm)
+      CheckFile "$2"
+      BOOT4PERM_IMG=$2
+      shift
+      ;;
+    *)
+      Usage 1
+    esac
+    shift
   done
 
   # set PATH
   export PATH=$PATH:$SDK_PATH/platform-tools
 
   # cross-arguments checks
-  if [ -n "$BOOT4PERM_IMG" ]; then 
+  if [ -n "$BOOT4PERM_IMG" ]; then
     if [ "$FLASH_ROM" -eq 1 ] && CheckFile "$ROM_DIR/boot.img"; then
       DO_BOOT4PERM=1
-    else 
+    else
       Error "the '-boot4perm' option requires either the '-rom' or '-fr' option is also specified and the file boot.img exists in the rom directory"
     fi
   fi
@@ -412,11 +465,31 @@ Boot2Fastboot() {
 
   printf ">> Try to boot the device into the fastboot mode and unlock if it's not done..."
 
-  adb reboot bootloader > /dev/null 2>&1
-  # Sleep 5
-  fastboot oem unlock > /dev/null 2>&1
+  while true; do
+    local mode=`GetMode`
+    printf "[$mode]"
+    case $mode in
+    fastboot)
+      break
+      ;;
+    device|recovery)
+      adb reboot bootloader
+      WaitMode "fastboot" 30
+      ;;
+    sideload)
+      adb sideload "$HERE/utils/dummy_update.zip"
+      WaitMode "recovery" 30
+      ;;
+    *)
+      ReloadUSB
+      sleep 1
+      #false
+      ;;
+    esac
+  done
+  fastboot oem unlock > /dev/null 2>&1 || :
 
-  echo "done"
+  echo " done"
 }
 
 FlashFactoryImage() {
@@ -437,13 +510,13 @@ FlashFactoryImage() {
 
   echo ">> Start to flash the factory image from '$FACTORY_DIR'"
 
-  # flash factory image 
+  # flash factory image
   pushd $FACTORY_DIR > /dev/null
   ./flash-all.sh
   popd > /dev/null
 
   echo "done"
- 
+
   echo ">> The device has been recovered with the factory image '$FACTORY_DIR'"
   # echo ">> If you want to install Open Gapps, please run $(basename $0) again with -f"
   exit 0
@@ -455,7 +528,7 @@ FlashImages() {
     fastboot -w update "$ROM_ZIP"
 
     echo ">> Get ready to reboot the device"
-    if WaitAdbMode "device$" 30; then
+    if WaitMode "device$" 30; then
       adb reboot bootloader
     else
       Error newline "unable to reboot the device into the fastboot mode, perhapse the USB debug mode is disabled in the flashed image."
@@ -486,50 +559,67 @@ Boot2Recovery() {
   echo ">> Boot into the recovery mode with '$RECOVERY_FILE' " && ToConfirm
 
   # use fastboot to boo into the recovery mode
-  fastboot boot $RECOVERY_FILE
-
+  while true;
+  do
+    case `GetMode` in
+    fastboot)
+      fastboot boot $RECOVERY_FILE
+      WaitMode "recovery" 30
+      break
+      ;;
+    device|recovery)
+      adb reboot bootloader
+      WaitMode "fastboot" 30
+      ;;
+    esac
+  done
   echo "done"
 }
 
-SideloadOpenGapps() {
+InstallOpenGapps() {
   # download the open gapps file
   GetFile "$GAPPS_URL" "$GAPPS_FILE"
 
   # wait for the sideload mode until timeout
-  printf ">> Wait for ADB on the device to get ready" 
-  WaitAdbMode "sideload|recovery" 30
+  printf ">> Wait for ADB on the device to get ready"
 
   # Check to see if the device is able to enter the sideload mode
   while true; do
-    CheckAdbMode sideload && break
-    if CheckAdbMode recovery; then
-      echo ">> Now wipe and change the device to the sideload mode"
-      sleep 3
+    case `GetMode` in
+    recovery)
+      echo ">> Now wipe the device"
       adb shell twrp wipe cache
-      sleep 3
-      adb shell twrp sideload 
-      sleep 3
-      break
-    fi
-    echo "** Warning: unable to make the device to enter the sideload mode. Two solutions: "
-    echo "   Solution 1: unplug and then plug the USB port. " 
-    echo "   Solution 2: you can manually enter the sideload mode on the device touch UI:"
-    echo "               Choose Readonly -> Choose Advanced -> Choose ADB Sideload"
-    echo "               -> Check to wipe the device -> Swipe to start slideload" 
-    ToConfirm force && sleep 1
+      WaitMode "recovery" 30
+      sleep 2
+      echo ">> Upload Gapps into the device"
+      adb push "$GAPPS_FILE" "/cache/$GAPPS_FILE"
+      echo ">> Install Gapps"
+      adb shell twrp install "/cache/$GAPPS_FILE"
+      # wipe cache again
+      WaitMode "recovery" 30
+      sleep 2
+      adb shell twrp wipe cache
+      WaitMode "recovery" 30
+      sleep 2
+      echo "done"
+      break;
+      ;;
+    fastboot)
+      echo fastboot; sleep 1
+      ;;
+    device)
+      echo 'device'; sleep 1
+      ;;
+    esac
   done
 
-  echo ">> Sideload Open Gapps '$GAPPS_FILE'" 
-  adb sideload "$GAPPS_FILE"
-  echo "done"
-
-  WaitAdbMode "recovery" 10 || Error "problem occurred while doing sideload, you may need to reboot the device and restart the whole process."
+  WaitMode "recovery" 10 || Error "problem occurred while doing sideload, you may need to reboot the device and restart the whole process."
 }
 
 GrantPermissions() {
   local _failed=0
 
-  echo ">> Prepare to grant permissions to GApps " && ToConfirm 
+  echo ">> Prepare to grant permissions to GApps " && ToConfirm
 
   if [ "$DO_BOOT4PERM" -eq 1 ]; then
     echo ">> Replace the boot image with the specified '$BOOT4PERM_IMG'"
@@ -565,7 +655,7 @@ GrantPermissions() {
     adb shell pm grant com.google.android.gms android.permission.SEND_SMS
     adb shell pm grant com.google.android.gms android.permission.RECEIVE_SMS
     echo "done"
-  else 
+  else
     _failed=1
   fi
 
@@ -576,7 +666,9 @@ GrantPermissions() {
     fastboot reboot
   fi
 
-  [ "$_failed" -eq 1 ] && Error "failed to grant permissions for Open Gapps, please do that manually (for Google Play Service, specifically)"
+  if [ "$_failed" -eq 1 ]; then
+    Error "failed to grant permissions for Open Gapps, please do that manually (for Google Play Service, specifically)"
+  fi
 }
 
 # ----------------------
@@ -596,13 +688,13 @@ Boot2Fastboot
 [ "$FLASH_FACTORY" -eq 1 ] && FlashFactoryImage
 
 # flash aosp image
-[ "$FLASH_ROM" -eq 1 ] && FlashImages 
+[ "$FLASH_ROM" -eq 1 ] && FlashImages
 
 # boot in to recovery mode
 Boot2Recovery
 
 # sideload gapp ota
-SideloadOpenGapps
+InstallOpenGapps
 
 # grant permissions to setup wizard and gms
 GrantPermissions
