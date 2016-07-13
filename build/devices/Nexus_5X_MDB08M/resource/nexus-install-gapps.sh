@@ -2,15 +2,20 @@
 #
 # Description: # This is to apply opengapps into Nexus devices with AOSP ROM 
 #
-# Author: William W.-Y. Liang, Hope Bay Tech, Copyright (C) 2016-
+# Authors: William W.-Y. Liang, Can Yu, etc
+#          from Hope Bay Tech, Copyright (C) 2016-
 # Contact: william.liang@hopebaytech.com
+#          can.yu@hopebaytech.com
 #
-# Date: $Date: 2016/07/11 12:11:00 $
-# Version: $Revision: 1.11 $
+# Date: $Date: 2016/07/13 07:24:15 $
+# Version: $Revision: 1.12 $
 #
 # History: 
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.12  2016/07/13 07:24:15  wyliang
+# Support Apple MacOS
+#
 # Revision 1.11  2016/07/11 12:11:00  wyliang
 # Add the '-boot4perm' option to support permission grant by a userdebug boot.img; Partial code refactoring
 #
@@ -116,6 +121,10 @@ DO_BOOT4PERM=0
 
 ERROR_HDR="** Error:"
 
+# Tools for different host environment
+HOST_OS="$(uname -s)"
+TOOL_MD5=md5.sum
+
 # ---------
 # Functions
 # ---------
@@ -144,6 +153,14 @@ CheckTools() {
     echo "   Or, install fastboot by 'apt-get install android-tools-fastboot'"
     _ret=1
   fi
+
+  # Apple consideration
+  if [ "$HOST_OS" = "Darwin" ]; then
+    TOOL_MD5="md5 -q"
+  else
+    TOOL_MD5=md5sum
+  fi
+
   return $_ret
 }
 
@@ -194,7 +211,7 @@ Remove2Bak() {
 
 CheckMD5() {
   local _file=$1
-  local _md5a="$(md5sum $_file | awk '{ print $1 }')" 
+  local _md5a="$($TOOL_MD5 $_file | awk '{ print $1 }')" 
   local _md5b="$(awk '{ print $1 }' $_file.md5)"
 
   printf ">> Check the MD5 checksum of '$_file'..."
