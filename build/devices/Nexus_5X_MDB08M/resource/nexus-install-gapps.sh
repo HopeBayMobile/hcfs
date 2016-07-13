@@ -138,7 +138,7 @@ ERROR_HDR="** Error:"
 
 # Tools for different host environment
 HOST_OS="$(uname -s)"
-TOOL_MD5=md5.sum
+TOOL_MD5=md5sum
 
 # ---------
 # Functions
@@ -312,8 +312,14 @@ GetFile () {
   return 0
 }
 
+if [ "$HOST_OS" = "Darwin" ]; then
+  SED_OPT="-E"
+else
+  SED_OPT="-r"
+fi
+
 GetMode() {
-  local mode=$({ adb devices; fastboot devices; } | tr -d "\n"| sed -r -n "s/.*\<(fastboot|device|recovery|sideload)\>.*/\1/p")
+  local mode=$({ adb devices; fastboot devices; } | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
   printf ${mode:-unknown}
 }
 
@@ -698,4 +704,3 @@ InstallOpenGapps
 
 # grant permissions to setup wizard and gms
 GrantPermissions
-
