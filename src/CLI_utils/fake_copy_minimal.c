@@ -220,16 +220,42 @@ void _copy_pinned(ino_t thisinode)
 	fclose(fptr);
 }
 
-void _expand_and_copy(ino_t thisinode, char force_expand)
+int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
+{
+	if (strcmp(nowpath, "/data/app") == 0)
+		return 1;
+
+	if (strcmp(nowpath, "/data/data") == 0)
+		return 1;
+
+	/* Expand only /sdcard/Android */
+	if (strcmp(nowpath, "/sdcard") == 0)
+		return 2;
+
+	/* If not high-priority pin, in /data/data only keep the lib symlinks */
+	if ((strncmp(nowpath, "/data/data", strlen("/data/data")) == 0) &&
+	    (depth == 1))
+		return 3;
+
+	if ((strncmp(nowpath, "/sdcard", strlen("/sdcard")) == 0) &&
+	    ((depth == 1) || (depth == 2)))
+		return 1;
+
+	return 0;
+}
+void _expand_and_copy(ino_t thisinode, char *nowpath, int32_t depth)
 {
 	FILE *fptr1;
 	char copiedmeta[METAPATHLEN];
+	char tmppath[METAPATHLEN];
 	DIR_META_TYPE dirmeta;
 	DIR_ENTRY_PAGE tmppage;
 	int64_t filepos;
 	int32_t count;
 	ino_t tmpino;
 	DIR_ENTRY *tmpptr;
+	int32_t expand_val;
+	BOOL skip_this;
 
 	fetch_restore_meta_path(copiedmeta, thisinode);
 	fptr1 = fopen(copiedmeta, "r");
@@ -238,8 +264,12 @@ void _expand_and_copy(ino_t thisinode, char force_expand)
 	fread(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr1);
 
 	/* Do not expand if not high priority pin and not needed */
-	if ((dirmeta.local_pin != P_HIGH_PRI_PIN) && (force_expand == FALSE))
-		return;
+	expand_val = 1;  /* The default */
+	if (dirmeta.local_pin != P_HIGH_PRI_PIN) {
+		expand_val = _check_expand(thisinode, nowpath, depth);
+		if (expand_val == 0)
+			return;
+	}
 
 	/* Fetch first page */
 	filepos = dirmeta.tree_walk_list_head;
@@ -247,6 +277,8 @@ void _expand_and_copy(ino_t thisinode, char force_expand)
 	while (filepos != 0) {
 		fseek(fptr1, filepos, SEEK_SET);
 		fread(&tmppage, sizeof(DIR_ENTRY_PAGE), 1, fptr1);
+		printf("Filepos %lld, entries %d\n", filepos,
+		       tmppage.num_entries);
 		for (count = 0; count < tmppage.num_entries; count++) {
 			tmpptr = &(tmppage.dir_entries[count]);
 			
@@ -258,6 +290,24 @@ void _expand_and_copy(ino_t thisinode, char force_expand)
 			if (strcmp(tmpptr->d_name, "..") == 0)
 				continue;
 
+			skip_this = FALSE;
+			switch (expand_val) {
+			case 2:
+				if (strcmp(tmpptr->d_name, "Android") != 0)
+					skip_this = TRUE;
+				break;
+			case 3:
+				if (strcmp(tmpptr->d_name, "lib") != 0)
+					skip_this = TRUE;
+				break;
+			default:
+				break;
+			}
+
+			if (skip_this == TRUE)
+				continue;
+
+			printf("Processing %s/%s\n", nowpath, tmpptr->d_name);
 			/* First copy the meta */
 			tmpino = tmpptr->d_ino;
 			_copy_meta(tmpino);
@@ -273,9 +323,9 @@ void _expand_and_copy(ino_t thisinode, char force_expand)
 				break;
 			case D_ISDIR:
 				/* Need to expand */
-				/* TODO: for some specific path, may need
-				to force expansion */
-				_expand_and_copy(tmpino, FALSE);
+				snprintf(tmppath, METAPATHLEN, "%s/%s",
+				         nowpath, tmpptr->d_name);
+				_expand_and_copy(tmpino, tmppath, depth + 1);
 				break;
 			default:
 				break;
@@ -300,7 +350,23 @@ int32_t main(void)
 
 	_copy_meta(rootino);
 
-	_expand_and_copy(rootino, TRUE);
+	_expand_and_copy(rootino, "/data/app", 0);
+
+	/* Next check /data/data */
+
+	stat("/data/data", &tmpstat);
+	rootino = tmpstat.st_ino;
+
+	_copy_meta(rootino);
+
+	_expand_and_copy(rootino, "/data/data", 0);
+
+	stat("/sdcard", &tmpstat);
+	rootino = tmpstat.st_ino;
+
+	_copy_meta(rootino);
+
+	_expand_and_copy(rootino, "/sdcard", 0);
 
 	return 0;
 }
