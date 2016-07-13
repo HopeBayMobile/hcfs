@@ -507,22 +507,48 @@ int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 	if (ret_val >= 0) {
-		if (((is_start_transit == FALSE) &&
+		if (((is_start_transit == FALSE) && /* End of transit */
 				(tempentry.status == IS_DIRTY)) &&
-				((transit_incomplete != TRUE) &&
-				(tempentry.mod_after_in_transit == FALSE))) {
+				((transit_incomplete != TRUE))) { /* Complete */
+			if (tempentry.mod_after_in_transit == TRUE) {
+				/* If sync point is set, relocate this inode
+				 * so that it is going to be last one. */
+				if (sys_super_block->sync_point_is_set
+						== TRUE) {
+					write_log(10, "Debug: Re-queue inode %"
+						PRIu64, (uint64_t)this_inode);
+					ret_val = ll_dequeue(this_inode,
+						&tempentry);
+					if (ret_val < 0) {
+						super_block_exclusive_release();
+						return ret_val;
+					}
+					ret_val = ll_enqueue(this_inode,
+						IS_DIRTY, &tempentry);
+					if (ret_val < 0) {
+						super_block_exclusive_release();
+						return ret_val;
+					}
+					ret_val = write_super_block_head();
+					if (ret_val < 0) {
+						super_block_exclusive_release();
+						return ret_val;
+					}
+				}
+			} else {
 			/* If finished syncing and no more mod is done after
 			*  queueing the inode for syncing */
 			/* Remove from is_dirty list */
-			ret_val = ll_dequeue(this_inode, &tempentry);
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
-			}
-			ret_val = write_super_block_head();
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
+				ret_val = ll_dequeue(this_inode, &tempentry);
+				if (ret_val < 0) {
+					super_block_exclusive_release();
+					return ret_val;
+				}
+				ret_val = write_super_block_head();
+				if (ret_val < 0) {
+					super_block_exclusive_release();
+					return ret_val;
+				}
 			}
 		}
 		tempentry.in_transit = is_start_transit;
