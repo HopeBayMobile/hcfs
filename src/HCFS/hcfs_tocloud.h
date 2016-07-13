@@ -59,6 +59,11 @@ typedef struct {
 	int32_t which_index;
 } SYNC_THREAD_TYPE;
 
+typedef struct IMMEDIATELY_RETRY_INODE {
+	int32_t num_retry;
+	ino_t retry_inode[MAX_SYNC_CONCURRENCY];
+} IMMEDIATELY_RETRY_LIST; 
+
 typedef struct {
 	/*Initialize this to MAX_UPLOAD_CONCURRENCY. Decrease when
 	created a thread for upload, and increase when a thread
@@ -78,6 +83,7 @@ typedef struct {
 typedef struct {
 	sem_t sync_op_sem;
 	sem_t sync_queue_sem; /*similar to upload_queue_sem*/
+	IMMEDIATELY_RETRY_LIST retry_list;
 	pthread_t sync_handler_thread;
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
 

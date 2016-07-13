@@ -27,3 +27,5 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 void busy_wait_all_specified_upload_threads(ino_t inode);
 
+ino_t pull_retry_inode();
+void push_retry_inode(ino_t inode);

@@ -305,7 +305,7 @@ static inline void _sync_terminate_thread(int32_t index)
 			 * progress file. Otherwise delete it. */
 			if (sync_ctl.continue_nexttime[index] == TRUE) {
 				close(sync_ctl.progress_fd[index]);
-
+				push_retry_inode(inode); /* Retry immediately */
 			} else {
 				del_progress_file(sync_ctl.progress_fd[index],
 						inode);
@@ -1991,7 +1991,7 @@ void *upload_loop(void *ptr)
 void upload_loop(void)
 #endif
 {
-	ino_t ino_sync, ino_check;
+	ino_t ino_sync, ino_check, retry_inode;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 	SUPER_BLOCK_ENTRY tempentry;
 	int32_t count, sleep_count;
@@ -2064,12 +2064,23 @@ void upload_loop(void)
 			break;
 		}
 
+		/* Check if any inode should be retried right now. */
+		sem_wait(&(sync_ctl.sync_op_sem));
+		retry_inode = pull_retry_inode();
+		sem_post(&(sync_ctl.sync_op_sem));
+
 		super_block_exclusive_locking();
-		if (ino_check == 0) {
-			ino_check = sys_super_block->head.first_dirty_inode;
-			write_log(10, "Debug: first dirty inode is inode %lld\n"
-				, ino_check);
+		if (retry_inode > 0) { /* Retried inode has higher priority */
+			ino_check = retry_inode;
+		} else {
+			if (ino_check == 0) {
+				ino_check =
+					sys_super_block->head.first_dirty_inode;
+				write_log(10, "Debug: first dirty inode"
+					" is inode %lld\n", ino_check);
+			}
 		}
+
 		ino_sync = 0;
 		if (ino_check != 0) {
 			ino_sync = ino_check;
