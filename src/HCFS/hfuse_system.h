@@ -18,8 +18,10 @@
 #include "pthread.h"
 #include "inttypes.h"
 
-int32_t init_hfuse(void);
-int32_t init_hcfs_system_data(void);
+#include "global.h"
+
+int32_t init_hfuse(BOOL is_restoring);
+int32_t init_hcfs_system_data(BOOL is_restoring);
 int32_t sync_hcfs_system_data(char need_lock);
 void init_backend_related_module();
 int32_t init_event_notify_module(void);
