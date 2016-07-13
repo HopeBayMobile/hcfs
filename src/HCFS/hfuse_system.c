@@ -393,6 +393,42 @@ int32_t _is_battery_low()
 	return FALSE;
 }
 
+int32_t _check_partial_storage(void)
+{
+	char restore_metapath[METAPATHLEN];
+	char restore_blockpath[BLOCKPATHLEN];
+	char todelete_metapath[METAPATHLEN];
+	char todelete_blockpath[BLOCKPATHLEN];
+
+	snprintf(restore_metapath, METAPATHLEN, "%s_restore",
+	         METAPATH);
+	snprintf(restore_blockpath, BLOCKPATHLEN, "%s_restore",
+	         BLOCKPATH);
+	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete",
+	         METAPATH);
+	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete",
+	         BLOCKPATH);
+
+/* FEATURE TODO: error handling? */
+	if (access(restore_metapath, F_OK) == 0) {
+		/* Need to rename the path to the current one */
+		/* First check if need to rename old path to todelete */
+		if (access(METAPATH, F_OK) == 0)
+			rename(METAPATH, todelete_metapath);
+		rename(restore_metapath, METAPATH);
+	}
+
+	if (access(restore_blockpath, F_OK) == 0) {
+		/* Need to rename the path to the current one */
+		/* First check if need to rename old path to todelete */
+		if (access(BLOCKPATH, F_OK) == 0)
+			rename(BLOCKPATH, todelete_blockpath);
+		rename(restore_blockpath, BLOCKPATH);
+	}
+
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: main
@@ -466,6 +502,19 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	UNUSED(curl_handle);
+
+	/* Check if the system is being restored (and in stage 2) */
+	ret_val = _check_restore_stat();
+	if (ret_val == 1) {
+		/* If the system is in stage 2, make sure that
+		meta and block storage are pointed to the partially
+		restored one */
+		_check_partial_storage();
+	}
+
+	/* FEATURE TODO: If the old meta/block storage
+	exists here, delete them */
+
 	ret_val = init_hfuse();
 	if (ret_val < 0)
 		exit(-1);
