@@ -23,6 +23,8 @@
 #include "params.h"
 #include "super_block.h"
 
+#define SYNC_RETRY_TIMES 2
+
 extern SYSTEM_CONF_STRUCT *system_config;
 struct SUPER_BLOCK_ENTRY;
 
@@ -36,6 +38,7 @@ typedef struct {
 
 typedef struct SYNC_POINT_INFO {
 	FILE *fptr;
+	int32_t sync_retry_times;
 	SYNC_POINT_DATA data;
 	sem_t ctl_sem;
 } SYNC_POINT_INFO;

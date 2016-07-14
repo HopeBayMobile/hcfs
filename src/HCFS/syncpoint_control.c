@@ -25,11 +25,21 @@
 #include "macro.h"
 #include "super_block.h"
 
+/**
+ * Fetch path of sync point data.
+ */
 void fetch_syncpoint_data_path(char *path)
 {
 	sprintf(path, "%s/sync_point_data", METAPATH);
 }
 
+/**
+ * Allocate the necessary memory and file when proccessing to sync all data.
+ * If sync point data file exists, just open it and load data to memory.
+ * Otherwise create a file and init all data to be zero.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t init_syncpoint_resource()
 {
 	char path[METAPATHLEN];
@@ -60,9 +70,8 @@ int32_t init_syncpoint_resource()
 		FREE(sys_super_block->sync_point_info);	
 		return -ENOMEM;
 	}
-	memset(sys_super_block->sync_point_info, 0,
-			sizeof(SYNC_POINT_INFO));
-
+	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
+	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;
 	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
 	fetch_syncpoint_data_path(path);
 	
@@ -73,7 +82,8 @@ int32_t init_syncpoint_resource()
 			return -errno;
 		}
 		sys_super_block->sync_point_info->fptr = temp_fptr;
-		PREAD(fileno(temp_fptr), &(sys_super_block->sync_point_info->data),
+		PREAD(fileno(temp_fptr),
+				&(sys_super_block->sync_point_info->data),
 				sizeof(SYNC_POINT_DATA), 0);
 		return 0;
 	}
@@ -95,6 +105,14 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Release all memory resource and remove sync point data file. Also
+ * reset the flag "sync_point_is_set".
+ *
+ * @param remove_file Flag indicates whether data file should be removed.
+ *
+ * @return none.
+ */
 void free_syncpoint_resource(BOOL remove_file)
 {
 	char path[METAPATHLEN];
@@ -117,6 +135,11 @@ void free_syncpoint_resource(BOOL remove_file)
 	return;
 }
 
+/**
+ * Flush sync point data to file.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t write_syncpoint_data()
 {
 	int32_t errcode;
@@ -132,19 +155,69 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Check if both upload and delete thread all complete. If both of them complete
+ * to sync all data, then check whether there are dirty data in queue. If it is
+ * still dirty, then reset sync point and sync again.
+ *
+ * @return none.
+ */
 void check_sync_complete()
 {
 	SYNC_POINT_DATA *data;
+	BOOL sync_complete;
 
 	data = &(sys_super_block->sync_point_info->data);
 	if (data->upload_sync_complete && data->delete_sync_complete) {
-		write_log(10, "Debug: Sync all data completed.\n");
-		free_syncpoint_resource(TRUE);
+		sync_complete = TRUE;
+
+		/* Retry some times */
+		if (sys_super_block->sync_point_info->sync_retry_times > 0) {
+			/* If queue is not empty or more than 2 element in
+			 * queue, reset the sync point */
+			if (sys_super_block->head.last_dirty_inode !=
+			    sys_super_block->head.first_dirty_inode) {
+				data->upload_sync_point =
+					sys_super_block->head.last_dirty_inode;
+				data->upload_sync_complete = FALSE;
+				sync_complete = FALSE;
+			}
+
+			if (sys_super_block->head.last_to_delete_inode !=
+			    sys_super_block->head.first_to_delete_inode) {
+				data->delete_sync_point =
+					sys_super_block->head.last_to_delete_inode;
+				data->delete_sync_complete = FALSE;
+				sync_complete = FALSE;
+			}
+			sys_super_block->sync_point_info->sync_retry_times -= 1;
+			if (sync_complete == FALSE) {
+				write_syncpoint_data();
+				write_log(6, "Info: System is still dirty,"
+					" sync again\n");
+			}
+		}
+
+		/* Check if task complete or not */
+		if (sync_complete) {
+			write_log(10, "Debug: Sync all data completed.\n");
+			free_syncpoint_resource(TRUE);
+		}
 	}
 
 	return;
 }
 
+/**
+ * Move sync point when sync point is going to be dequeued from dirty queue
+ * or delete queue. After moving sync point, check if sync completes.
+ *
+ * @param which_ll Original status of "this_inode"
+ * @param this_inode Inode to be dequeued
+ * @param this_entry Super block entry to be dequeued
+ *
+ * @return none
+ */
 void move_sync_point(char which_ll, ino_t this_inode,
 			SUPER_BLOCK_ENTRY *this_entry)
 {
@@ -156,7 +229,7 @@ void move_sync_point(char which_ll, ino_t this_inode,
 	syncpoint_data = &(sys_super_block->sync_point_info->data);
 	switch (which_ll) {
 	case IS_DIRTY:
-			/* Check when upload thread does not complete. */
+		/* Check when upload thread does not complete. */
 		if (syncpoint_data->upload_sync_complete == FALSE) {
 			if (syncpoint_data->upload_sync_point == this_inode)
 				syncpoint_data->upload_sync_point =

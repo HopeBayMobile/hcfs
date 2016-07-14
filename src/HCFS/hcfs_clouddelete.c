@@ -69,20 +69,31 @@ dsync_single_inode. */
 static inline void _dsync_terminate_thread(int32_t index)
 {
 	int32_t ret;
+	int32_t retry_inode;
 
 	if ((dsync_ctl.threads_in_use[index] != 0) &&
 			((dsync_ctl.threads_finished[index] == TRUE) &&
 			(dsync_ctl.threads_created[index] == TRUE))) {
 		ret = pthread_join(dsync_ctl.inode_dsync_thread[index],
 					NULL);
-		if (ret == 0) {
-			dsync_ctl.threads_in_use[index] = 0;
-			dsync_ctl.threads_created[index] = FALSE;
-			dsync_ctl.threads_finished[index] = FALSE;
-			dsync_ctl.threads_error[index] = FALSE;
-			dsync_ctl.total_active_dsync_threads--;
-			sem_post(&(dsync_ctl.dsync_queue_sem));
-		 }
+		if (ret < 0)
+			return;
+
+		if (dsync_ctl.retry_right_now[index] == TRUE)
+			retry_inode = dsync_ctl.threads_in_use[index];
+		else
+			retry_inode = 0;
+
+		dsync_ctl.threads_in_use[index] = 0;
+		dsync_ctl.threads_created[index] = FALSE;
+		dsync_ctl.threads_finished[index] = FALSE;
+		dsync_ctl.retry_right_now[index] = FALSE;
+		dsync_ctl.threads_error[index] = FALSE;
+		dsync_ctl.total_active_dsync_threads--;
+		sem_post(&(dsync_ctl.dsync_queue_sem));
+
+		if (retry_inode > 0)
+			push_retry_inode(&(dsync_ctl.retry_list), retry_inode);
 	}
 }
 
@@ -211,6 +222,10 @@ void init_dsync_control(void)
 	memset(&(dsync_ctl.threads_finished), 0,
 					sizeof(char) * MAX_DSYNC_CONCURRENCY);
 	dsync_ctl.total_active_dsync_threads = 0;
+	dsync_ctl.retry_list.list_size = MAX_DSYNC_CONCURRENCY;
+	dsync_ctl.retry_list.num_retry = 0;
+	dsync_ctl.retry_list.retry_inode = calloc(sizeof(ino_t) *
+			MAX_DSYNC_CONCURRENCY, 1);
 
 	pthread_create(&(dsync_ctl.dsync_handler_thread), NULL,
 				(void *)&collect_finished_dsync_threads, NULL);
@@ -839,10 +854,12 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
 	int32_t which_curl;
 	int32_t which_index;
+	int32_t dsync_index;
 	int32_t ret;
 
 	which_curl = delete_thread_ptr->which_curl;
 	which_index = delete_thread_ptr->which_index;
+	dsync_index = delete_thread_ptr->dsync_index;
 
 	if (delete_thread_ptr->is_block == TRUE)
 		ret = do_block_delete(delete_thread_ptr->inode,
@@ -855,10 +872,12 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 		ret = do_meta_delete(delete_thread_ptr->inode,
 			&(delete_curl_handles[which_curl]));
 
-	if (ret < 0 && ret != -ENOENT) /* do not care 404 not found */
+	if (ret < 0 && ret != -ENOENT) { /* do not care 404 not found */
 		delete_ctl.threads_error[which_index] = TRUE;
-	else
+		dsync_ctl.retry_right_now[dsync_index] = TRUE;
+	} else {
 		delete_ctl.threads_error[which_index] = FALSE;
+	}
 
 	delete_ctl.threads_finished[which_index] = TRUE;
 }
@@ -907,7 +926,7 @@ void *delete_loop(void *ptr)
 void delete_loop(void)
 #endif
 {
-	ino_t inode_to_dsync, inode_to_check;
+	ino_t inode_to_dsync, inode_to_check, retry_inode;
 	SUPER_BLOCK_ENTRY tempentry;
 	int32_t count;
 	char in_dsync;
@@ -941,11 +960,18 @@ void delete_loop(void)
 			break;
 		}
 
-		super_block_share_locking();
-		if (inode_to_check == 0)
-			inode_to_check =
-				sys_super_block->head.first_to_delete_inode;
+		sem_wait(&(dsync_ctl.dsync_op_sem));
+		retry_inode = pull_retry_inode(&(dsync_ctl.retry_list));
+		sem_post(&(dsync_ctl.dsync_op_sem));
 
+		super_block_share_locking();
+		if (retry_inode > 0) { /* Jump to retried inode */
+			inode_to_check = retry_inode;
+		} else {
+			if (inode_to_check == 0)
+				inode_to_check =
+				sys_super_block->head.first_to_delete_inode;
+		}
 		/* Find next to-delete inode if inode_to_check is not the
 			last one. */
 		inode_to_dsync = 0;

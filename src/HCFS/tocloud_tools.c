@@ -511,25 +511,25 @@ errcode_handle:
  *
  * @return an inode number if retry_list is not empty. Otherwise return 0.
  */
-ino_t pull_retry_inode()
+ino_t pull_retry_inode(IMMEDIATELY_RETRY_LIST *list)
 {
 	int32_t idx;
 	ino_t ret_inode;
 
-	if (sync_ctl.retry_list.num_retry == 0)
+	if (list->num_retry == 0)
 		return 0;
 
-	for (idx = 0; idx < MAX_SYNC_CONCURRENCY; idx++)
-		if (sync_ctl.retry_list.retry_inode[idx] > 0)
+	for (idx = 0; idx < list->list_size; idx++)
+		if (list->retry_inode[idx] > 0)
 			break;
 
-	if (idx < MAX_SYNC_CONCURRENCY) {
-		ret_inode = sync_ctl.retry_list.retry_inode[idx];
-		sync_ctl.retry_list.retry_inode[idx] = 0;
-		sync_ctl.retry_list.num_retry--;
+	if (idx < list->list_size) {
+		ret_inode = list->retry_inode[idx];
+		list->retry_inode[idx] = 0;
+		list->num_retry--;
 		return ret_inode;
 	} else {
-		sync_ctl.retry_list.num_retry = 0;
+		list->num_retry = 0;
 	}
 
 	return 0;
@@ -542,19 +542,19 @@ ino_t pull_retry_inode()
  *
  * @return none.
  */
-void push_retry_inode(ino_t inode)
+void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
 {
 	int32_t idx;
 
-	for (idx = 0; idx < MAX_SYNC_CONCURRENCY; idx++)
-		if (sync_ctl.retry_list.retry_inode[idx] == 0)
+	for (idx = 0; idx < list->list_size; idx++)
+		if (list->retry_inode[idx] == 0)
 			break;
 
-	if (idx < MAX_SYNC_CONCURRENCY) {
-		sync_ctl.retry_list.retry_inode[idx] = inode;
-		sync_ctl.retry_list.num_retry++;
+	if (idx < list->list_size) {
+		list->retry_inode[idx] = inode;
+		list->num_retry++;
 	} else {
-		write_log(4, "Warn: Retry sync list overflow?");
+		write_log(4, "Warn: Retry list overflow?");
 	}
 
 	return;

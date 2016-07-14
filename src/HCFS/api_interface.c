@@ -854,10 +854,13 @@ int32_t set_syncpoint_handle()
 	}
 
 	/* Set sync point */
+	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;
+
 	tmp_syncpoint_data = &(sys_super_block->sync_point_info->data);
 	if (sys_super_block->head.last_dirty_inode) {
 		tmp_syncpoint_data->upload_sync_point =
 				sys_super_block->head.last_dirty_inode;
+		tmp_syncpoint_data->upload_sync_complete = FALSE;
 	} else {
 		tmp_syncpoint_data->upload_sync_complete = TRUE;
 	}
@@ -865,6 +868,7 @@ int32_t set_syncpoint_handle()
 	if (sys_super_block->head.last_to_delete_inode) {
 		tmp_syncpoint_data->delete_sync_point =
 				sys_super_block->head.last_to_delete_inode;
+		tmp_syncpoint_data->delete_sync_complete = FALSE;
 	} else {
 		tmp_syncpoint_data->delete_sync_complete = TRUE;
 	}

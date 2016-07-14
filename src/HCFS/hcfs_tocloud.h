@@ -26,6 +26,7 @@
 #include "objmeta.h"
 #include "fuseop.h"
 #include "dedup_table.h"
+#include "tocloud_tools.h"
 
 #define MAX_UPLOAD_CONCURRENCY 4
 #define MAX_SYNC_CONCURRENCY 2
@@ -58,11 +59,6 @@ typedef struct {
 	char is_revert;
 	int32_t which_index;
 } SYNC_THREAD_TYPE;
-
-typedef struct IMMEDIATELY_RETRY_INODE {
-	int32_t num_retry;
-	ino_t retry_inode[MAX_SYNC_CONCURRENCY];
-} IMMEDIATELY_RETRY_LIST; 
 
 typedef struct {
 	/*Initialize this to MAX_UPLOAD_CONCURRENCY. Decrease when

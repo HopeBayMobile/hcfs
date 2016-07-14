@@ -182,14 +182,15 @@ static inline int32_t _set_inode_continue_nexttime(ino_t inode)
 }
 
 
-/*
+/**
  * _del_toupload_blocks()
  *
  * When sync error, perhaps there are many copied blocks prepared to be
  * uploaded, so remove all of them because uploading this time is cancelled.
  *
- * */
-static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
+ */
+static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
+	ino_t inode, mode_t *this_mode)
 {
 	FILE *fptr;
 	int64_t num_blocks, bcount;
@@ -200,6 +201,7 @@ static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 	FILE_META_TYPE tmpmeta;
 	int64_t current_page, which_page, page_pos;
 
+	*this_mode = 0;
 	fptr = fopen(toupload_metapath, "r");
 	if (fptr != NULL) {
 		flock(fileno(fptr), LOCK_EX);
@@ -207,7 +209,9 @@ static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
 				sizeof(struct stat));
 
+		*this_mode = tmpstat.st_mode;
 		if (!S_ISREG(tmpstat.st_mode)) { /* Return when not regfile */
+			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
 			return 0;
 		}
@@ -232,8 +236,8 @@ static inline int32_t _del_toupload_blocks(char *toupload_metapath, ino_t inode)
 			if (access(block_path, F_OK) == 0)
 				unlink_upload_file(block_path);
 		}
-		fclose(fptr);
 		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
 	}
 
 	return 0;
@@ -252,6 +256,7 @@ static inline void _sync_terminate_thread(int32_t index)
 	ino_t inode;
 	char toupload_metapath[300], local_metapath[400];
 	char finish_sync;
+	mode_t this_mode;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
@@ -259,6 +264,7 @@ static inline void _sync_terminate_thread(int32_t index)
 		ret = pthread_join(sync_ctl.inode_sync_thread[index], NULL);
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
+			this_mode = 0;
 			finish_sync = sync_ctl.threads_error[index] == TRUE ?
 					FALSE : TRUE;
 			fetch_toupload_meta_path(toupload_metapath, inode);
@@ -294,7 +300,7 @@ static inline void _sync_terminate_thread(int32_t index)
 			 * blocks. */
 			if (sync_ctl.threads_error[index] == TRUE) {
 				ret = _del_toupload_blocks(toupload_metapath,
-						inode);
+						inode, &this_mode);
 				if (ret < 0)
 					write_log(0, "Error: Fail to remove"
 						"toupload block. Code %d\n",
@@ -304,9 +310,21 @@ static inline void _sync_terminate_thread(int32_t index)
 			/* If need to continue nexttime, then just close
 			 * progress file. Otherwise delete it. */
 			if (sync_ctl.continue_nexttime[index] == TRUE) {
-				close(sync_ctl.progress_fd[index]);
-				push_retry_inode(inode); /* Retry immediately */
-			} else {
+				if (this_mode && S_ISREG(this_mode)) {
+					close(sync_ctl.progress_fd[index]);
+				} else {
+					write_log(4, "Warn: No file mode in %s",
+							__func__);
+					del_progress_file(
+						sync_ctl.progress_fd[index],
+						inode);
+					unlink_upload_file(toupload_metapath);
+				}
+
+				/* Retry immediately */
+				push_retry_inode(&(sync_ctl.retry_list), inode);
+
+			} else { /* Successfully sync, remove progress file */
 				del_progress_file(sync_ctl.progress_fd[index],
 						inode);
 				if (access(toupload_metapath, F_OK) == 0)
@@ -610,6 +628,10 @@ void init_sync_control(void)
 	memset(&(sync_ctl.threads_finished), 0,
 	       sizeof(char) * MAX_SYNC_CONCURRENCY);
 	sync_ctl.total_active_sync_threads = 0;
+	sync_ctl.retry_list.num_retry = 0;
+	sync_ctl.retry_list.list_size = MAX_SYNC_CONCURRENCY;
+	sync_ctl.retry_list.retry_inode = calloc(sizeof(ino_t) *
+			MAX_SYNC_CONCURRENCY, 1);
 
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
 		       (void *)&collect_finished_sync_threads, NULL);
@@ -1416,10 +1438,7 @@ store in some other file */
 				delete_backend_blocks(progress_fd, total_blocks,
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 			}
-		} else { /* Just re-upload for dir/slnk/fifo/socket */
-			sync_ctl.continue_nexttime[ptr->which_index] = FALSE;
 		}
-
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -2066,18 +2085,21 @@ void upload_loop(void)
 
 		/* Check if any inode should be retried right now. */
 		sem_wait(&(sync_ctl.sync_op_sem));
-		retry_inode = pull_retry_inode();
+		retry_inode = pull_retry_inode(&(sync_ctl.retry_list));
 		sem_post(&(sync_ctl.sync_op_sem));
 
 		super_block_exclusive_locking();
 		if (retry_inode > 0) { /* Retried inode has higher priority */
 			ino_check = retry_inode;
+			write_log(6, "Info: Retry to sync inode %"PRIu64,
+					(uint64_t)ino_check);
 		} else {
 			if (ino_check == 0) {
 				ino_check =
 					sys_super_block->head.first_dirty_inode;
 				write_log(10, "Debug: first dirty inode"
-					" is inode %lld\n", ino_check);
+					" is inode %"PRIu64,
+					(uint64_t)ino_check);
 			}
 		}
 
