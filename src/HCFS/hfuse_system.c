@@ -411,6 +411,11 @@ int32_t _check_partial_storage(void)
 	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete",
 	         BLOCKPATH);
 
+/* TODO: It's possible that restore_metapath exists but restore_blockpath
+does not (i.e. no block to be restored in stage 1). Will need to first
+check this situation to decide if need to rename blockpath to todelete
+and then create a new blockpath */
+
 /* FEATURE TODO: error handling? */
 	if (access(restore_metapath, F_OK) == 0) {
 		/* Need to rename the path to the current one */
@@ -506,7 +511,13 @@ int32_t main(int32_t argc, char **argv)
 
 	UNUSED(curl_handle);
 
+	open_log("hcfs_android_log");
+
 	/* Check if the system is being restored (and in stage 2) */
+	/* TODO: Check if the backend setting is correct before
+	switching metastorage / blockstorage */
+	/* TODO: Need to check if can correctly unmount when stage 2
+	is in progress */
 	is_restoring = FALSE;
 	ret_val = _check_restore_stat();
 	if (ret_val == 1) {
@@ -514,6 +525,7 @@ int32_t main(int32_t argc, char **argv)
 		meta and block storage are pointed to the partially
 		restored one */
 		is_restoring = TRUE;
+		write_log(10, "Checking if need to switch storage paths\n");
 		_check_partial_storage();
 	}
 
