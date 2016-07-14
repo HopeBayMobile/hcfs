@@ -436,6 +436,7 @@ protected:
 	void SetUp()
 	{
 		mkdir("/tmp/testHCFS", 0700);
+		mkdir("mock_meta_folder", 0700);
 		num_inode = 100;
 		memset(empty_ino_array, 0, sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
 		memset(empty_created_array, 0, sizeof(char) * MAX_SYNC_CONCURRENCY);
@@ -463,6 +464,7 @@ protected:
 		if (!access(metapath, F_OK))
 			unlink(metapath);
 		rmdir("/tmp/testHCFS");
+		rmdir("mock_meta_folder");
 	}
 };
 
@@ -586,17 +588,27 @@ TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
 
 TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 {
+	FILE *fptr;
 	int fd;
 	void *res;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
+	struct stat tmpstat;
+	char local_path[200];
 
 	/* Run tested function */
 	init_sync_control();
 
 	/* The same as fetch_meta_path */
-	sprintf(metapath, "/tmp/testHCFS/mock_file_meta");
+	fetch_toupload_meta_path(metapath, 2);
+	strcpy(local_path, MOCK_META_PATH);
+	mknod(local_path, 0700, 0);
 	mknod(metapath, 0700, 0);
-	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+	tmpstat.st_mode = S_IFREG;
+	fptr = fopen(metapath, "r+");
+	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fclose(fptr);
+
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR, 0600);
 
 	sem_wait(&sync_ctl.sync_queue_sem);
 	sem_wait(&sync_ctl.sync_op_sem);
@@ -629,6 +641,7 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 
 	unlink("/tmp/mock_progress_file");
 	unlink(metapath);
+	unlink(local_path);
 }
 
 TEST_F(init_sync_controlTest, SyncSuccess)

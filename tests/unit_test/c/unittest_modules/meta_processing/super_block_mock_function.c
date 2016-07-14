@@ -42,3 +42,9 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+
+void move_sync_point(char which_ll, ino_t this_inode,
+		struct SUPER_BLOCK_ENTRY *this_entry)
+{
+	return 0;
+}

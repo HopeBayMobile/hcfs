@@ -454,3 +454,13 @@ void notify_sleep_on_cache(int32_t cache_replace_status)
 {
 	return;
 }
+
+ino_t pull_retry_inode(IMMEDIATELY_RETRY_LIST *list)
+{
+	return 0;
+}
+
+void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
+{
+	return;
+}

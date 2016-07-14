@@ -206,15 +206,15 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 	if (fptr != NULL) {
 		flock(fileno(fptr), LOCK_EX);
 		PREAD(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
-		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
-				sizeof(struct stat));
-
 		*this_mode = tmpstat.st_mode;
 		if (!S_ISREG(tmpstat.st_mode)) { /* Return when not regfile */
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
 			return 0;
 		}
+
+		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
+				sizeof(struct stat));
 
 		num_blocks = ((tmpstat.st_size == 0) ? 0
 				: (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1);
@@ -313,8 +313,9 @@ static inline void _sync_terminate_thread(int32_t index)
 				if (this_mode && S_ISREG(this_mode)) {
 					close(sync_ctl.progress_fd[index]);
 				} else {
-					write_log(4, "Warn: No file mode in %s",
-							__func__);
+					if (this_mode == 0)
+						write_log(4, "Warn: No file "
+							"mode in %s", __func__);
 					del_progress_file(
 						sync_ctl.progress_fd[index],
 						inode);
