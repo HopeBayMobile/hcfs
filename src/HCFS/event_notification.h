@@ -41,7 +41,12 @@ extern EVENT_QUEUE *event_queue;
 int32_t init_event_queue();
 int32_t set_event_notify_server(char *path);
 
-void run_event_queue_worker();
+#ifdef _ANDROID_ENV_
+void *event_worker_loop(void *ptr);
+#else
+void *event_worker_loop(void);
+#endif
+void destroy_event_worker_loop_thread();
 
 int32_t event_enqueue(int32_t event_id);
 int32_t event_dequeue(int32_t num_events);

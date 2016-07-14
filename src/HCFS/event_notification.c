@@ -23,41 +23,11 @@
 
 #include "fuseop.h"
 #include "event_filter.h"
+#include "macro.h"
 
 char *notify_server_path = NULL;
 EVENT_QUEUE *event_queue;
 
-/* TEMP for test, will removed after integrated with hcfs code */
-int32_t write_log(int32_t level, char *format, ...)
-{
-	return 0;
-        va_list alist;
-        struct timeval tmptime;
-        struct tm tmptm;
-        char add_newline;
-        char timestr[100];
-
-        va_start(alist, format);
-        if (format[strlen(format)-1] != '\n')
-                add_newline = 1;
-        else
-                add_newline = 0;
-
-        gettimeofday(&tmptime, NULL);
-        localtime_r(&(tmptime.tv_sec), &tmptm);
-        strftime(timestr, 90, "%F %T", &tmptm);
-
-        printf("%s.%06d\t", timestr,
-                (uint32_t)tmptime.tv_usec);
-
-        vprintf(format, alist);
-        if (add_newline == 1)
-                printf("\n");
-
-        va_end(alist);
-        return 0;
-
-}
 
 /************************************************************************
  *
@@ -112,7 +82,7 @@ int32_t init_event_queue()
  *                appropriate error code.
  *
  ***********************************************************************/
-static int32_t _get_server_conn()
+static int32_t _get_server_conn(char *path)
 {
 	int32_t fd, status;
 	struct sockaddr_un addr;
@@ -120,11 +90,11 @@ static int32_t _get_server_conn()
 	memset(&addr, 0, sizeof(struct sockaddr_un));
 	addr.sun_family = AF_UNIX;
 	addr.sun_path[0] = 0;
-	strcpy(&(addr.sun_path[1]), notify_server_path);
+	strcpy(&(addr.sun_path[1]), path);
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -errno;
-	status = connect(fd, &addr, sizeof(struct sockaddr_un));
+	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
 	if (status < 0) {
 		close(fd);
 		return -errno;
@@ -146,19 +116,17 @@ static int32_t _get_server_conn()
 int32_t set_event_notify_server(char *server_path)
 {
 	int32_t ret_code, server_fd;
-	char *old_server_path;
+	char *new_server_path, *temp_server_path;
 	char *msg_to_send = NULL;
 	json_t *test_event = NULL;
 
-	old_server_path = notify_server_path;
-
-	notify_server_path = malloc(strlen(server_path) + 1);
-	if (notify_server_path == NULL) {
+	new_server_path = malloc(strlen(server_path) + 1);
+	if (new_server_path == NULL) {
 		write_log(4, "Failed to set notify server, errno - %d\n", errno);
 		ret_code = -errno;
 		goto error_handle;
 	}
-	strcpy(notify_server_path, server_path);
+	strcpy(new_server_path, server_path);
 
 	/* Construct test event */
 	test_event = json_pack("[{s:i}]", "event_id", TESTSERVER);
@@ -176,7 +144,7 @@ int32_t set_event_notify_server(char *server_path)
 	}
 
 	/* Send test event */
-	server_fd = _get_server_conn();
+	server_fd = _get_server_conn(new_server_path);
 	if (server_fd < 0) {
 		write_log(4,
 			"Failed to connect notify server, errno - %d\n", -server_fd);
@@ -192,13 +160,15 @@ int32_t set_event_notify_server(char *server_path)
 		goto error_handle;
 	}
 
-	free(old_server_path);
+	temp_server_path = notify_server_path;
+	notify_server_path = new_server_path;
+	free(temp_server_path);
+
 	ret_code = 0;
 	goto done;
 
 error_handle:
-	free(notify_server_path);
-	notify_server_path = old_server_path;
+	free(new_server_path);
 
 done:
 	if (test_event != NULL)
@@ -275,7 +245,9 @@ int32_t event_enqueue(int32_t event_id)
  ***********************************************************************/
 int32_t event_dequeue(int32_t num_events)
 {
-	int32_t idx;
+	int32_t event_id, idx;
+	int64_t timestamp;
+	json_t *tmp_obj;
 
 	if (num_events <= 0 || num_events > EVENT_QUEUE_SIZE)
 		return -EINVAL;
@@ -291,9 +263,20 @@ int32_t event_dequeue(int32_t num_events)
 	/* Wait lock */
 	sem_wait(&(event_queue->queue_access_sem));
 
+	timestamp = (int64_t)time(NULL);
+
 	for (idx = num_events; idx > 0; idx--) {
+		/* Update send timestamp */
+		tmp_obj = json_object_get(event_queue->events[event_queue->head],
+					  "event_id");
+		if (tmp_obj != NULL) {
+			event_id = (int32_t)json_integer_value(tmp_obj);
+			event_filters[event_id].last_send_timestamp =
+				timestamp;
+		}
+
 		json_decref(event_queue->events[event_queue->head]);
-		event_queue->num_events -= 1;
+		event_queue->num_events--;
 		if (event_queue->num_events == 0) {
 			event_queue->head = -1;
 			event_queue->rear = -1;
@@ -344,7 +327,7 @@ int32_t send_event_to_server(int32_t fd, char *events_in_json)
 
 /************************************************************************
  *
- * Function name: run_event_queue_worker
+ * Function name: event_worker_loop
  *        Inputs: NONE
  *        Output: Integer
  *       Summary: Loop to process events in queue. Worker will collect
@@ -353,27 +336,30 @@ int32_t send_event_to_server(int32_t fd, char *events_in_json)
  *  Return value: NONE
  *
  ***********************************************************************/
-void run_event_queue_worker()
+#ifdef _ANDROID_ENV_
+void *event_worker_loop(void *ptr)
+#else
+void *event_worker_loop(void)
+#endif
 {
 	int32_t ret_code, count, server_fd;
 	int32_t queue_head, num_events_to_send;
 	char *msg_to_send;
 	json_t *events_to_send;
 
+	UNUSED(ptr);
+
 	/* Loop for sending event notify */
-	//while (!hcfs_system->system_going_down)
-	while (1)
+	while (hcfs_system->system_going_down == FALSE)
 	{
-		printf("Start to wait\n");
 		/* Wait for active */
 		pthread_mutex_lock(&(event_queue->worker_active_lock));
 		pthread_cond_wait(&(event_queue->worker_active_cond),
 				    &(event_queue->worker_active_lock));
 		pthread_mutex_unlock(&(event_queue->worker_active_lock));
-		printf("End wait\n");
 
 		while (event_queue->num_events > 0) {
-			server_fd = _get_server_conn();
+			server_fd = _get_server_conn(notify_server_path);
 			if (server_fd < 0) {
 				/* TODO - go next round or errno handler? */
 				write_log(4,
@@ -432,6 +418,29 @@ void run_event_queue_worker()
 		write_log(8,
 			"Event queue is empty, worker will go to sleep.\n");
 	}
+#ifdef _ANDROID_ENV_
+	return NULL;
+#else
+	return;
+#endif
+}
+
+
+/************************************************************************
+ *
+ * Function name: destroy_event_worker_loop_thread
+ *        Inputs: NONE
+ *        Output: Integer
+ *       Summary: Destroy event_worker_loop thread.
+ *  Return value: NONE
+ *
+ ***********************************************************************/
+void destroy_event_worker_loop_thread()
+{
+	/* Wake up event worker */
+	pthread_mutex_lock(&(event_queue->worker_active_lock));
+	pthread_cond_signal(&(event_queue->worker_active_cond));
+	pthread_mutex_unlock(&(event_queue->worker_active_lock));
 }
 
 /************************************************************************
@@ -485,20 +494,3 @@ int32_t add_notify_event(int32_t event_id)
 	return 0;
 }
 
-void main()
-{
-	int32_t event_id;
-	pthread_t t1;
-
-	init_event_queue();
-	printf("Set server result %d\n",
-			set_event_notify_server("event.notify.mock.server"));
-
-	pthread_create(&t1, NULL, &run_event_queue_worker, NULL);
-
-	printf("Enter event ID\n");
-	while (1) {
-		scanf("%d", &event_id);
-		printf("Add event - result %d\n", add_notify_event(event_id));
-	}
-}
