@@ -228,8 +228,8 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	if (strcmp(nowpath, "/data/data") == 0)
 		return 1;
 
-	/* Expand only /sdcard/Android */
-	if (strcmp(nowpath, "/sdcard") == 0)
+	/* Expand only /storage/emulated/Android */
+	if (strcmp(nowpath, "/storage/emulated") == 0)
 		return 2;
 
 	/* If not high-priority pin, in /data/data only keep the lib symlinks */
@@ -237,7 +237,7 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	    (depth == 1))
 		return 3;
 
-	if ((strncmp(nowpath, "/sdcard", strlen("/sdcard")) == 0) &&
+	if ((strncmp(nowpath, "/storage/emulated", strlen("/storage/emulated")) == 0) &&
 	    ((depth == 1) || (depth == 2)))
 		return 1;
 
@@ -361,12 +361,12 @@ int32_t main(void)
 
 	_expand_and_copy(rootino, "/data/data", 0);
 
-	stat("/sdcard", &tmpstat);
+	stat("/storage/emulated", &tmpstat);
 	rootino = tmpstat.st_ino;
 
 	_copy_meta(rootino);
 
-	_expand_and_copy(rootino, "/sdcard", 0);
+	_expand_and_copy(rootino, "/storage/emulated", 0);
 
 	return 0;
 }
