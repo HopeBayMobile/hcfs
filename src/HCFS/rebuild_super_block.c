@@ -199,6 +199,11 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		if (max_inode < fs_cloud_stat.max_inode)
 			max_inode = fs_cloud_stat.max_inode;
 
+		write_log(10, "Max inode is now %" PRIu64
+		          ", per vol max is %" PRIu64 "\n",
+		          (uint64_t) max_inode,
+		          (uint64_t) fs_cloud_stat.max_inode);
+
 		/* Check if FS local stat exist and init it. */
 		fetch_stat_path(fstatpath, root_inode);
 		if (access(fstatpath, F_OK) < 0) {
@@ -265,6 +270,7 @@ int32_t init_rebuild_sb(char rebuild_action)
 	int64_t num_roots;
 	int64_t ret_pos;
 
+	write_log(10, "Initing sb rebuilding\n");
 	/* Allocate memory for jobs */
 	rebuild_sb_jobs = (REBUILD_SB_JOBS *)
 			calloc(sizeof(REBUILD_SB_JOBS), 1);

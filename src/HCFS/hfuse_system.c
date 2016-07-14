@@ -411,10 +411,14 @@ int32_t _check_partial_storage(void)
 	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete",
 	         BLOCKPATH);
 
-/* TODO: It's possible that restore_metapath exists but restore_blockpath
+/* FEATURE TODO: It's possible that restore_metapath exists but restore_blockpath
 does not (i.e. no block to be restored in stage 1). Will need to first
 check this situation to decide if need to rename blockpath to todelete
 and then create a new blockpath */
+
+/* FEATURE TODO: Need an upgrade mechanism to add max_inode from super block to
+FSstats (now used for tracking max inode in the backend). An OTA is needed for
+allowing current devices to restore */
 
 /* FEATURE TODO: error handling? */
 	if (access(restore_metapath, F_OK) == 0) {
@@ -514,9 +518,9 @@ int32_t main(int32_t argc, char **argv)
 	open_log("hcfs_android_log");
 
 	/* Check if the system is being restored (and in stage 2) */
-	/* TODO: Check if the backend setting is correct before
+	/* FEATURE TODO: Check if the backend setting is correct before
 	switching metastorage / blockstorage */
-	/* TODO: Need to check if can correctly unmount when stage 2
+	/* FEATURE TODO: Need to check if can correctly unmount when stage 2
 	is in progress */
 	is_restoring = FALSE;
 	ret_val = _check_restore_stat();
