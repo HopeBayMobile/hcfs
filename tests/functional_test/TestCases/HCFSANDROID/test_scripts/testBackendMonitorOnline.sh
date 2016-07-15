@@ -194,11 +194,11 @@ access
 teardown
 if [ $(adb shell 'HCFSvol cloudstat | grep OFFLINE > /dev/null; echo $?') != 0 ];then
     echo "[O]"
-    online $SWIFT_ACCOUNT
+    enableAccount $SWIFT_ACCOUNT
     return 0
 else
     echo "[X]"
-    online $SWIFT_ACCOUNT
+    enableAccount $SWIFT_ACCOUNT
     return 1
 fi
 
