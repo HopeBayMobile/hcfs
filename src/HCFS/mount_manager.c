@@ -28,6 +28,7 @@
 #include "lookup_count.h"
 #include "logger.h"
 #include "macro.h"
+#include "hcfs_fromcloud.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #endif
@@ -542,6 +543,9 @@ errcode_handle:
 /* Helper for unmounting */
 int32_t do_unmount_FS(MOUNT_T *mount_info)
 {
+	sem_wait((mount_info->stat_lock));
+	update_FS_statistics(mount_info);
+	sem_post((mount_info->stat_lock));
 	pthread_join(mount_info->mt_thread, NULL);
 	fuse_remove_signal_handlers(mount_info->session_ptr);
 	fuse_session_remove_chan(mount_info->chan_ptr);
@@ -1020,6 +1024,20 @@ int32_t unmount_all(void)
 	return 0;
 }
 
+void _write_volstat(void *mptr1)
+{
+	MOUNT_T *mptr;
+
+	mptr = (MOUNT_T *) mptr1;
+
+	sleep(2);
+	sem_wait((mptr->stat_lock));
+	update_FS_statistics(mptr);
+	mptr->writing_stat = FALSE;
+	write_log(10, "Writing vol statistics\n");
+	sem_post((mptr->stat_lock));
+	return;
+}
 /************************************************************************
 *
 * Function name: change_mount_stat
@@ -1034,7 +1052,8 @@ int32_t unmount_all(void)
 int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
-	int32_t ret;
+	//int32_t ret;
+	pthread_t write_volstat_thread;
 
 	sem_wait((mptr->stat_lock));
 	(mptr->FS_stat)->system_size += (system_size_delta + meta_size_delta);
@@ -1048,10 +1067,17 @@ int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 	(mptr->FS_stat)->num_inodes += num_inodes_delta;
 	if ((mptr->FS_stat)->num_inodes < 0)
 		(mptr->FS_stat)->num_inodes = 0;
-	ret = update_FS_statistics(mptr);
+	if (mptr->writing_stat == FALSE) {
+		mptr->writing_stat = TRUE;
+		pthread_create(&(write_volstat_thread),
+			&prefetch_thread_attr, (void *)&_write_volstat,
+			(void *)mptr);
+	}
+
+	//ret = update_FS_statistics(mptr);
 	sem_post((mptr->stat_lock));
 
-	return ret;
+	return 0;
 }
 
 /************************************************************************

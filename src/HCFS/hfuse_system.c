@@ -103,6 +103,7 @@ int32_t init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->monitor_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->writing_sys_data = FALSE;
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
 
@@ -165,6 +166,25 @@ errcode_handle:
 	return errcode;
 }
 
+void* _write_sys(void *fakeptr)
+{
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	UNUSED(fakeptr);
+	sleep(2);
+	sem_wait(&(hcfs_system->access_sem));
+	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
+	FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
+	       hcfs_system->system_val_fptr);
+	hcfs_system->writing_sys_data = FALSE;
+	write_log(10, "Syncing system data\n");
+	sem_post(&(hcfs_system->access_sem));
+
+errcode_handle:
+	return NULL;
+}
+
 /************************************************************************
 *
 * Function name: sync_hcfs_system_data
@@ -179,15 +199,22 @@ int32_t sync_hcfs_system_data(char need_lock)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
+	pthread_t write_sys_thread;
 
-	if (need_lock == TRUE)
+	if (need_lock == TRUE) {
 		sem_wait(&(hcfs_system->access_sem));
-	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
-	FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
-	       hcfs_system->system_val_fptr);
-	if (need_lock == TRUE)
+		FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
+		FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
+		       hcfs_system->system_val_fptr);
 		sem_post(&(hcfs_system->access_sem));
-
+	} else {
+		if (hcfs_system->writing_sys_data == FALSE) {
+			hcfs_system->writing_sys_data = TRUE;
+			pthread_create(&(write_sys_thread),
+				&prefetch_thread_attr, &_write_sys,
+				NULL);
+		}
+	}
 	return 0;
 
 errcode_handle:
@@ -419,6 +446,7 @@ int32_t main(int32_t argc, char **argv)
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
 	}
+	sync_hcfs_system_data(TRUE);
 	close_log();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();

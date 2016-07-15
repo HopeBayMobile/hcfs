@@ -112,6 +112,7 @@ typedef struct {
 					   and flush_single_entry(). It will be
 					   set to false in flush_single_entry().
 					   */
+	BOOL need_inc_seq;
 } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {

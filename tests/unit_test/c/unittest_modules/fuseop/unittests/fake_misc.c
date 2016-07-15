@@ -929,7 +929,8 @@ int update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 }
 
 int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
-		off_t page_fpos, long long eindex, long long bindex)
+		off_t page_fpos, long long eindex, long long bindex,
+		BLOCK_ENTRY_PAGE *bpage_ptr)
 {
 	return 0;
 }

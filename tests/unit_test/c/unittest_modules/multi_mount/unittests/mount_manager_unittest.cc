@@ -634,6 +634,7 @@ TEST_F(unmount_FSTest, UnmountMountedFS) {
   struct timespec waittime;
   struct timeval curtime;
   struct sigaction newact, oldact;
+  FILE *fptr;
 
   build_tree(1);
 
@@ -652,6 +653,9 @@ TEST_F(unmount_FSTest, UnmountMountedFS) {
   ret_val = sigismember(&sigset, SIGHUP);
   ASSERT_EQ(1, ret_val);
 
+  mount_mgr.root->mt_entry->stat_lock = (sem_t *) malloc(sizeof(sem_t));
+  mount_mgr.root->mt_entry->stat_fptr = fopen("/tmp/tmpstatfptr", "w+");
+  sem_init((mount_mgr.root->mt_entry->stat_lock), 0, 1);
   mount_mgr.root->mt_entry->f_mp = (char *) malloc(100);
   snprintf(mount_mgr.root->mt_entry->f_mp, 100, "/tmp/testmount");
   pthread_create(&(mount_mgr.root->mt_entry->mt_thread),
@@ -659,6 +663,8 @@ TEST_F(unmount_FSTest, UnmountMountedFS) {
 
   ret = unmount_FS(fsname, mount_mgr.root->mt_entry->f_mp);
   EXPECT_EQ(0, ret);
+
+  unlink("/tmp/tmpstatfptr");
 
   pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
   sigaction(SIGHUP, &oldact, NULL);
@@ -693,6 +699,7 @@ TEST_F(unmount_eventTest, UnmountMountedFS) {
   char fsname[10];
   sigset_t sigset, testset;
   struct sigaction newact, oldact;
+  FILE *fptr;
 
   build_tree(1);
   mount_mgr.num_mt_FS = 1;
@@ -712,6 +719,9 @@ TEST_F(unmount_eventTest, UnmountMountedFS) {
   ret_val = sigismember(&sigset, SIGHUP);
   ASSERT_EQ(1, ret_val);
 
+  mount_mgr.root->mt_entry->stat_lock = (sem_t *) malloc(sizeof(sem_t));
+  mount_mgr.root->mt_entry->stat_fptr = fopen("/tmp/tmpstatfptr", "w+");
+  sem_init((mount_mgr.root->mt_entry->stat_lock), 0, 1);
   mount_mgr.root->mt_entry->f_mp = (char *) malloc(100);
   snprintf(mount_mgr.root->mt_entry->f_mp, 100, "/tmp/testmount");
   pthread_create(&(mount_mgr.root->mt_entry->mt_thread),

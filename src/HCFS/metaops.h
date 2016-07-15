@@ -72,7 +72,8 @@ int32_t collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr);
 
 int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
-		int64_t eindex, int64_t bindex, int64_t now_seq);
+		int64_t eindex, int64_t bindex, int64_t now_seq,
+		BLOCK_ENTRY_PAGE *bpage_ptr);
 int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr);
 

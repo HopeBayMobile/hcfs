@@ -1534,6 +1534,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 
 		(current_ptr->body).inode_num = this_inode;
 		(current_ptr->body).meta_opened = FALSE;
+		(current_ptr->body).need_inc_seq = TRUE;
 		memcpy(&((current_ptr->body).this_stat),
 				&(tempentry.inode_stat), sizeof(struct stat));
 		/* need_new = FALSE; */
@@ -1784,6 +1785,8 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	body_ptr->uploading_info.is_uploading = is_now_uploading;
 	body_ptr->uploading_info.progress_list_fd = new_fd;
 	body_ptr->uploading_info.toupload_blocks = toupload_blocks;
+	if (is_now_uploading == TRUE)
+		body_ptr->need_inc_seq = TRUE;
 
 	return 0;
 }

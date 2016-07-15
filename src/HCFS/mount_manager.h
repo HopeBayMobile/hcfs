@@ -75,6 +75,7 @@ typedef struct {
 	FS_STAT_T *FS_stat; /* shared */
 	FILE *stat_fptr;  /* For keeping track of FS stat. shared */
 	sem_t *stat_lock; /* shared */
+	BOOL writing_stat;
 	struct fuse_args mount_args;
 } MOUNT_T;
 
