@@ -591,6 +591,7 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	FILE *fptr;
 	int fd;
 	void *res;
+	FILE_META_TYPE filemeta;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 	struct stat tmpstat;
 	char local_path[200];
@@ -604,8 +605,10 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	mknod(local_path, 0700, 0);
 	mknod(metapath, 0700, 0);
 	tmpstat.st_mode = S_IFREG;
+	tmpstat.st_size = 0;
 	fptr = fopen(metapath, "r+");
 	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fclose(fptr);
 
 	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR, 0600);
