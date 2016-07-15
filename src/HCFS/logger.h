@@ -16,6 +16,9 @@
 #include <semaphore.h>
 #include <stdio.h>
 
+#include "global.h"
+#include "pthread.h"
+
 #define MAX_LOG_FILE_SIZE 20971520 /* 20MB */
 #define NUM_LOG_FILE 5
 #define LOG_MSG_SIZE 128
@@ -29,7 +32,10 @@ typedef struct {
 	char *latest_log_msg;
 	char *now_log_msg;
 	int32_t repeated_times;
-	time_t latest_log_sec;
+	struct timeval latest_log_time;
+	pthread_t tid;
+	pthread_attr_t flusher_attr;
+	BOOL flusher_is_created;
 } LOG_STRUCT;
 
 LOG_STRUCT *logptr;   /* Pointer to log structure */

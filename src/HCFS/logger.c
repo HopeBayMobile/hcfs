@@ -107,6 +107,10 @@ int32_t open_log(char *filename)
 	logptr->latest_log_msg = (char *) malloc(LOG_MSG_SIZE);
 	logptr->now_log_msg = (char *) malloc(LOG_MSG_SIZE);
 
+	pthread_attr_init(&(logptr->flusher_attr));
+	pthread_attr_setdetachstate(&(logptr->flusher_attr),
+			PTHREAD_CREATE_DETACHED);
+
 	ret = _open_log_file();
 	if (ret < 0) {
 		errcode = errno;
@@ -160,24 +164,37 @@ void _rename_logfile()
 	}
 }
 
-static inline void _write_repeated_log(char *timestr, uint32_t usec)
+static inline void _write_repeated_log()
 {
 	int32_t log_size;
+	struct tm tmptm;
+	char timestr[100];
+	uint32_t usec;
 
+	localtime_r(&(logptr->latest_log_time.tv_sec), &tmptm);
+	strftime(timestr, 90, "%F %T", &tmptm);
 	/* Remove newline character if it is last character in string */
 	log_size = strlen(logptr->latest_log_msg);
 	if (logptr->latest_log_msg[log_size - 1] == '\n')
 		logptr->latest_log_msg[log_size - 1] = '\0';
 
 	/* Write log */
-	log_size = fprintf(logptr->fptr, "%s.%06d\t"
+	usec = logptr->latest_log_time.tv_usec;
+	if (logptr->repeated_times > 1)
+		log_size = fprintf(logptr->fptr, "%s.%06d\t"
 			"%s [repeat %d times]\n", timestr, usec,
 			logptr->latest_log_msg,
 			logptr->repeated_times);
+	else
+		log_size = fprintf(logptr->fptr, "%s.%06d\t"
+			"%s\n", timestr, usec,
+			logptr->latest_log_msg);
+
 	if (log_size > 0)
 		logptr->now_log_size += log_size;
 
-	logptr->latest_log_sec = 0;
+	logptr->latest_log_time.tv_sec = 0;
+	logptr->latest_log_time.tv_usec = 0;
 	logptr->repeated_times = 0;
 	logptr->latest_log_msg[0] = '\0';
 
@@ -200,7 +217,48 @@ static inline void _check_log_file_size()
 	}
 }
 
-#define REPEATED_LOG_IS_CACHED() (logptr->latest_log_sec > 0)
+#define REPEATED_LOG_IS_CACHED() (logptr->latest_log_time.tv_sec > 0)
+
+void log_sweeper(void)
+{
+	int32_t sleep_sec, timediff;
+	struct timeval tmptime;
+
+	sleep_sec = FLUSH_TIME_INTERVAL;
+
+	while (1) {
+		sleep(sleep_sec);
+
+		gettimeofday(&tmptime, NULL);
+		sem_wait(&(logptr->logsem));
+		if (REPEATED_LOG_IS_CACHED()) {
+			timediff = tmptime.tv_sec -
+					logptr->latest_log_time.tv_sec;
+			if (timediff < FLUSH_TIME_INTERVAL) {
+				sleep_sec = FLUSH_TIME_INTERVAL - timediff;
+				sem_post(&(logptr->logsem));
+				continue;
+			}
+
+			/* When timediff >= FLUSH_TIME_INTERVAL, flush
+			 * the log and leave loop */
+			if (logptr->repeated_times > 0) {
+				_write_repeated_log();
+			} else {
+				logptr->latest_log_time.tv_sec = 0;
+				logptr->latest_log_time.tv_usec = 0;
+				logptr->repeated_times = 0;
+				logptr->latest_log_msg[0] = '\0';
+			}
+
+		}
+
+		break;
+	}
+	logptr->flusher_is_created = FALSE;
+	sem_post(&(logptr->logsem));
+	return;
+}
 
 /**
  * Write log message. If LOG_COMPRESS is enable, the log msg will be deffered
@@ -222,24 +280,6 @@ int32_t write_log(int32_t level, char *format, ...)
 	char timestr[100];
 	int32_t this_logsize, ret_size;
 	char *temp_ptr;
-
-	if (logptr && REPEATED_LOG_IS_CACHED()) {
-		gettimeofday(&tmptime, NULL);
-		/* Flush repeated log msg every FLUSH_TIME_INTERVAL secs */
-		if (tmptime.tv_sec - logptr->latest_log_sec >=
-				FLUSH_TIME_INTERVAL) {
-			if (logptr->repeated_times > 0) {
-				localtime_r(&(tmptime.tv_sec), &tmptm);
-				strftime(timestr, 90, "%F %T", &tmptm);
-				_write_repeated_log(timestr,
-					(uint32_t)tmptime.tv_usec);
-			} else {
-				logptr->latest_log_sec = 0;
-				logptr->repeated_times = 0;
-				logptr->latest_log_msg[0] = '\0';
-			}
-		}
-	}
 
 	if (level > LOG_LEVEL)
 		return 0;
@@ -294,10 +334,10 @@ int32_t write_log(int32_t level, char *format, ...)
 	if (ret_size >= LOG_MSG_SIZE) {
 		if (REPEATED_LOG_IS_CACHED()) {
 			if (logptr->repeated_times > 0) {
-				_write_repeated_log(timestr,
-						(uint32_t)tmptime.tv_usec);
+				_write_repeated_log();
 			} else {
-				logptr->latest_log_sec = 0;
+				logptr->latest_log_time.tv_sec = 0;
+				logptr->latest_log_time.tv_usec = 0;
 				logptr->repeated_times = 0;
 				logptr->latest_log_msg[0] = '\0';
 			}
@@ -319,8 +359,15 @@ int32_t write_log(int32_t level, char *format, ...)
 		return 0;
 	}
 
+	/* Compare between new log and latest log */
 	if (!strcmp(logptr->now_log_msg, logptr->latest_log_msg)) {
+		logptr->latest_log_time = tmptime;
 		logptr->repeated_times++;
+		if (logptr->flusher_is_created == FALSE) {
+			pthread_create(&(logptr->tid), &(logptr->flusher_attr),
+				(void *)log_sweeper, NULL);
+			logptr->flusher_is_created = TRUE;
+		}
 		sem_post(&(logptr->logsem));
 		va_end(alist);
 		return 0;
@@ -328,7 +375,7 @@ int32_t write_log(int32_t level, char *format, ...)
 
 	/* Check if the repeated log msg should be printed */
 	if (logptr->repeated_times > 0)
-		_write_repeated_log(timestr, (uint32_t)tmptime.tv_usec);
+		_write_repeated_log();
 
 	/* Time and log msg */
 	this_logsize = fprintf(logptr->fptr, "%s.%06d\t%s",
@@ -345,7 +392,7 @@ int32_t write_log(int32_t level, char *format, ...)
 	temp_ptr = logptr->now_log_msg;
 	logptr->now_log_msg = logptr->latest_log_msg;
 	logptr->latest_log_msg = temp_ptr;
-	logptr->latest_log_sec = tmptime.tv_sec;
+	logptr->latest_log_time = tmptime;
 	logptr->repeated_times = 0;
 
 	/* Check log file size */

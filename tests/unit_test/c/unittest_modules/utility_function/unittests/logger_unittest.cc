@@ -360,7 +360,7 @@ TEST_F(write_logTest, LogCompress_FlushOK) {
 		write_log(5, "Thisisatest");
 
 	sleep(FLUSH_TIME_INTERVAL + 1);
-	write_log(10, "Dummy log msg"); /* This log will not be recorded */
+	//write_log(10, "Dummy log msg"); /* This log will not be recorded */
 
 	close_log();
 
