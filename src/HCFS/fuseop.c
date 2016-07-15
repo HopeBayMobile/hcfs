@@ -7547,6 +7547,14 @@ void *mount_single_thread(void *ptr)
 	return 0;
 }
 
+void _unlink_restore_stat(void)
+{
+	char restore_stat_path[METAPATHLEN];
+
+	fetch_restore_stat_path(restore_stat_path);
+	unlink(restore_stat_path);
+}
+
 int32_t hook_fuse(int32_t argc, char **argv)
 {
 	int32_t dl_count;
@@ -7597,6 +7605,8 @@ int32_t hook_fuse(int32_t argc, char **argv)
 			if (rebuild_sb_jobs->job_finish) {
 				hcfs_system->system_restoring = FALSE;
 				destroy_rebuild_sb(TRUE);
+				/* Remove tag for rebuilding */
+				_unlink_restore_stat();
 				/* Enable backend related services */
 				init_backend_related_module();
 				write_log(10, "Debug: Finish rebuilding."
