@@ -33,6 +33,7 @@ typedef struct {
 	char *now_log_msg;
 	int32_t repeated_times;
 	struct timeval latest_log_time;
+	time_t latest_log_start_time;
 	pthread_t tid;
 	pthread_attr_t flusher_attr;
 	BOOL flusher_is_created;

@@ -195,6 +195,7 @@ static inline void _write_repeated_log()
 
 	logptr->latest_log_time.tv_sec = 0;
 	logptr->latest_log_time.tv_usec = 0;
+	logptr->latest_log_start_time = 0;
 	logptr->repeated_times = 0;
 	logptr->latest_log_msg[0] = '\0';
 
@@ -217,7 +218,7 @@ static inline void _check_log_file_size()
 	}
 }
 
-#define REPEATED_LOG_IS_CACHED() (logptr->latest_log_time.tv_sec > 0)
+#define REPEATED_LOG_IS_CACHED() (logptr->latest_log_start_time > 0)
 
 void log_sweeper(void)
 {
@@ -233,7 +234,7 @@ void log_sweeper(void)
 		sem_wait(&(logptr->logsem));
 		if (REPEATED_LOG_IS_CACHED()) {
 			timediff = tmptime.tv_sec -
-					logptr->latest_log_time.tv_sec;
+					logptr->latest_log_start_time;
 			if (timediff < FLUSH_TIME_INTERVAL) {
 				sleep_sec = FLUSH_TIME_INTERVAL - timediff;
 				sem_post(&(logptr->logsem));
@@ -247,6 +248,7 @@ void log_sweeper(void)
 			} else {
 				logptr->latest_log_time.tv_sec = 0;
 				logptr->latest_log_time.tv_usec = 0;
+				logptr->latest_log_start_time = 0;
 				logptr->repeated_times = 0;
 				logptr->latest_log_msg[0] = '\0';
 			}
@@ -338,6 +340,7 @@ int32_t write_log(int32_t level, char *format, ...)
 			} else {
 				logptr->latest_log_time.tv_sec = 0;
 				logptr->latest_log_time.tv_usec = 0;
+				logptr->latest_log_start_time = 0;
 				logptr->repeated_times = 0;
 				logptr->latest_log_msg[0] = '\0';
 			}
@@ -393,6 +396,7 @@ int32_t write_log(int32_t level, char *format, ...)
 	logptr->now_log_msg = logptr->latest_log_msg;
 	logptr->latest_log_msg = temp_ptr;
 	logptr->latest_log_time = tmptime;
+	logptr->latest_log_start_time = tmptime.tv_sec;
 	logptr->repeated_times = 0;
 
 	/* Check log file size */
