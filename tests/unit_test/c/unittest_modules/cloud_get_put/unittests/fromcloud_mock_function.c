@@ -101,9 +101,12 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 	return 0;
 }
 
+
 int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 		int64_t num_cached_blocks_delta,
-		int64_t cached_size_delta)
+		int64_t cached_size_delta,
+		int64_t dirty_data_size_delta,
+		ino_t thisinode)
 {
 	return 0;
 }
@@ -158,8 +161,10 @@ int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 	return 0;
 }
 
-int32_t change_system_meta(int64_t system_size_delta,
-		int64_t cache_size_delta, int64_t cache_blocks_delta)
+int32_t change_system_meta(int64_t system_data_size_delta,
+	int64_t meta_size_delta, int64_t cache_data_size_delta,
+	int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+	int64_t unpin_dirty_data_size, BOOL need_sync)
 {
 	return 0;
 }

@@ -359,8 +359,8 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 	return 0;
 }
 
-int change_block_status_to_BOTH(ino_t inode, long long blockno,
-		long long page_pos, long long toupload_seq)
+int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
+		int64_t page_pos, int64_t toupload_seq)
 {
 	FILE *fptr;
 	BLOCK_ENTRY_PAGE tmppage;
