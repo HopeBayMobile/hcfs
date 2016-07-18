@@ -111,7 +111,8 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 # unittest for api_interface.c
 
-api_interface.o : $(USER_DIR)/api_interface.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
+api_interface.o : $(USER_DIR)/api_interface.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h \
+		$(USER_DIR)/event_notification.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/api_interface.c
 
 api_interface_fakeftn.o : $(UNITTEST_DIR)/api_interface_fakeftn.c

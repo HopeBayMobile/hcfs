@@ -20,7 +20,7 @@
 
 #define SERVERREPLYOK 1 /* Server should reply after event msg received */
 #define MAX_NOTIFY_SERVER_LENGTH 256
-#define EVENT_QUEUE_SIZE 5
+#define EVENT_QUEUE_SIZE 64
 #define MAX_NUM_EVENT_SEND 3
 
 typedef struct {
@@ -48,11 +48,11 @@ void *event_worker_loop(void);
 #endif
 void destroy_event_worker_loop_thread();
 
-int32_t event_enqueue(int32_t event_id);
+int32_t event_enqueue(int32_t event_id, char *event_info_json_str);
 int32_t event_dequeue(int32_t num_events);
 
 int32_t send_event_to_server(int32_t fd, char *events_in_json);
 
-int32_t add_notify_event(int32_t event_id);
+int32_t add_notify_event(int32_t event_id, char *event_info_json_str);
 
 #endif /* GW20_SRC_EVENT_NOTIFY */

@@ -21,10 +21,11 @@
 #define TESTSERVER 0
 #define TOKENEXPIRED 1
 
+
 typedef struct {
 	int32_t name;
 	int64_t last_send_timestamp;
-	int64_t send_interval; /* in seconds */
+	int64_t send_interval; /* Send event once in an interval (in seconds) */
 } EVENT_FILTER;
 
 extern EVENT_FILTER event_filters[];
