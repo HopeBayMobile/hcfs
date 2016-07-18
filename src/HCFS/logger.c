@@ -104,8 +104,8 @@ int32_t open_log(char *filename)
 	logptr->log_filename = (char *) malloc(strlen(filename) + 2);
 	strcpy(logptr->log_filename, filename);
 
-	logptr->latest_log_msg = (char *) malloc(LOG_MSG_SIZE);
-	logptr->now_log_msg = (char *) malloc(LOG_MSG_SIZE);
+	logptr->latest_log_msg = (char *) calloc(LOG_MSG_SIZE, 1);
+	logptr->now_log_msg = (char *) calloc(LOG_MSG_SIZE, 1);
 
 	pthread_attr_init(&(logptr->flusher_attr));
 	pthread_attr_setdetachstate(&(logptr->flusher_attr),
