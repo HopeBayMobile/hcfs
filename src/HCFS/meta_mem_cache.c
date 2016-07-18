@@ -1401,7 +1401,8 @@ int32_t expire_meta_mem_cache_entry(void)
 			atime_ptr = &((lptr->body).last_access_time);
 			float_access_time = (atime_ptr->tv_sec * 1.0) +
 					(atime_ptr->tv_usec * 0.000001);
-			if (float_current_time - float_access_time > 0.5) {
+			if ((float_current_time - float_access_time > 0.5) &&
+			    (lptr->body.uploading_info.is_uploading == FALSE)) {
 				/* Expire the entry */
 				ret = _expire_entry(lptr, cindex);
 				return ret;
