@@ -346,7 +346,7 @@ static inline void _check_del_progress_file(ino_t inode)
 		fetch_backend_meta_path(backend_metapath, inode);
 		fetch_progress_file_path(progress_path, inode);
 		if (!access(toupload_metapath, F_OK))
-			ret[0] = unlink(toupload_metapath);
+			ret[0] = unlink_upload_file(toupload_metapath);
 		if (!access(backend_metapath, F_OK))
 			ret[1] = unlink(backend_metapath);
 		if (!access(progress_path, F_OK))

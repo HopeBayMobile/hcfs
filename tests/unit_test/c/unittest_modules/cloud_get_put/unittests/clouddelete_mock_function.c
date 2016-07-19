@@ -183,3 +183,8 @@ void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
 {
 	return;
 }
+
+int32_t unlink_upload_file(char *filename)
+{
+	return 0;
+}

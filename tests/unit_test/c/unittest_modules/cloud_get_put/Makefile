@@ -49,7 +49,8 @@ endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest atomic_tocloud_unittest
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest \
+	atomic_tocloud_unittest tocloud_tools_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
