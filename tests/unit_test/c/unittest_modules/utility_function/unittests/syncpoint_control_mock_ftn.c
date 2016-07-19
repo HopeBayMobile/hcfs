@@ -1,0 +1,9 @@
+#include <inttypes.h>
+#include "utils.h"
+
+SYSTEM_CONF_STRUCT *system_config;
+
+int32_t write_log(int32_t level, char *format, ...)
+{
+	return 0;
+}
