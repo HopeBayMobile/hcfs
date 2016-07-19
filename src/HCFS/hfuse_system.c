@@ -447,6 +447,7 @@ int32_t main(int32_t argc, char **argv)
 		write_log(10, "Debug: All threads terminated\n");
 	}
 	sync_hcfs_system_data(TRUE);
+	write_log(4, "HCFS shutting down normally\n");
 	close_log();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
@@ -499,6 +500,7 @@ int32_t main(int32_t argc, char **argv)
 			for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
 				waitpid(child_pids[proc_idx], NULL, 0);
 		}
+		write_log(4, "HCFS (fuse) shutting down normally\n");
 		close_log();
 		destroy_dirstat_lookup();
 		destroy_pathlookup();
@@ -509,6 +511,7 @@ int32_t main(int32_t argc, char **argv)
 		open_log("cache_maintain.log");
 		write_log(2, "\nStart logging cache cleanup\n");
 		run_cache_loop();
+		write_log(4, "HCFS (cache) shutting down normally\n");
 		close_log();
 		break;
 	case 2:
@@ -528,6 +531,7 @@ int32_t main(int32_t argc, char **argv)
 		upload_loop();
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(monitor_loop_thread, NULL);
+		write_log(4, "HCFS (sync) shutting down normally\n");
 		close_log();
 		break;
 	}
