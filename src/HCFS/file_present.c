@@ -1049,7 +1049,7 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			write_log(10, "Debug: A new xattr page in symlink"
 				" meta\n");
 		}
-	} else { /* xattr has been existed. Just read it. */
+	} else { /* xattr existed. Just read it. */
 		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
 		FREAD(xattr_page, sizeof(XATTR_PAGE), 1,
 			meta_cache_entry->fptr);

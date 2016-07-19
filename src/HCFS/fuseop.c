@@ -6667,7 +6667,7 @@ fetch_xattr:
 		&xattr_filepos, FALSE);
 	if (retcode < 0) {
 		if (retcode == -ENOENT) {
-			write_log(10, "Debug: xattr page did not be created\n");
+			write_log(10, "Debug: xattr page was not created\n");
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);

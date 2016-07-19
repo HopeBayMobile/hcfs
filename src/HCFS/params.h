@@ -111,6 +111,8 @@ typedef struct {
 #define XFER_SEC_PER_WINDOW 20
 #define XFER_SLOW_SPEED 32 /* in KB/s */
 
+#define LOG_COMPRESS TRUE
+
 /* cache limit parameters */
 #define RESERVED_CACHE_SPACE system_config->cache_reserved_space
 #define CACHE_LIMITS(p) (system_config->max_cache_limit[(int32_t)p])

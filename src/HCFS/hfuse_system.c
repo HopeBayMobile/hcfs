@@ -414,6 +414,7 @@ int32_t main(int32_t argc, char **argv)
 	init_sync_stat_control();
 
 #ifdef _ANDROID_ENV_
+	open_log("hcfs_android_log");
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
 		exit(ret_val);
@@ -424,7 +425,6 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(ret_val);
 
-	open_log("hcfs_android_log");
 #ifdef VERSION_NUM
 	write_log(2, "\nVersion: %s\nStart logging\n", VERSION_NUM);
 #endif
