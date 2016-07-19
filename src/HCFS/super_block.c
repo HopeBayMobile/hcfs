@@ -849,6 +849,11 @@ int32_t super_block_reclaim_fullscan(void)
 	ino_t last_reclaimed, first_reclaimed, old_last_reclaimed;
 	ino_t this_inode;
 	ssize_t retsize;
+/* FEATURE TODO: Be able to release the exclusive lock after a number
+of inodes are scanned, and then reclaim the lock. Should be able to
+integrate this process with other super block ops (perhaps should let
+super_block_reclaim return immediately if fullscan is in progress, but
+also add the list of to_reclaim to the reclaimed list here) */
 
 	last_reclaimed = 0;
 	first_reclaimed = 0;
