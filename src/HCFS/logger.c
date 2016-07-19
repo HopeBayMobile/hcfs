@@ -230,6 +230,8 @@ void log_sweeper(void)
 
 	while (1) {
 		sleep(sleep_sec);
+		if (!logptr)
+			return;
 
 		gettimeofday(&tmptime, NULL);
 		sem_wait(&(logptr->logsem));
@@ -419,8 +421,16 @@ int32_t write_log(int32_t level, char *format, ...)
 
 int32_t close_log(void)
 {
+	struct timespec time_to_sleep;
+
+	time_to_sleep.tv_sec = 0;
+	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
+
 	if (logptr == NULL)
 		return 0;
+
+	while (logptr->flusher_is_created)
+		nanosleep(&time_to_sleep, NULL);
 
 	if (logptr->fptr != NULL) {
 		fclose(logptr->fptr);
