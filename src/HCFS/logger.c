@@ -28,6 +28,7 @@
 #include "params.h"
 #include "global.h"
 #include "utils.h"
+#include "fuseop.h"
 
 /**
  * Open/create the log file named "log_filename" and initialize some
@@ -225,34 +226,44 @@ void log_sweeper(void)
 	int32_t sleep_sec, timediff;
 	struct timeval tmptime;
 
-	sleep_sec = FLUSH_TIME_INTERVAL;
+	sleep_sec = 0;
 
 	while (1) {
 		sleep(sleep_sec);
 
 		gettimeofday(&tmptime, NULL);
 		sem_wait(&(logptr->logsem));
-		if (REPEATED_LOG_IS_CACHED()) {
-			timediff = tmptime.tv_sec -
-					logptr->latest_log_start_time;
-			if (timediff < FLUSH_TIME_INTERVAL) {
-				sleep_sec = FLUSH_TIME_INTERVAL - timediff;
-				sem_post(&(logptr->logsem));
-				continue;
+		/* Leave if no log was cached */
+		if (!REPEATED_LOG_IS_CACHED())
+			break;
+
+		timediff = tmptime.tv_sec -
+			logptr->latest_log_start_time;
+		if (logptr->repeated_times > 0) {
+			/* Flush immediately if system is going to shutdown */
+			if (hcfs_system->system_going_down == FALSE) {
+				if (timediff < FLUSH_TIME_INTERVAL) {
+					sleep_sec = FLUSH_TIME_INTERVAL -
+							timediff;
+					sem_post(&(logptr->logsem));
+					continue;
+				}
 			}
 
 			/* When timediff >= FLUSH_TIME_INTERVAL, flush
 			 * the log and leave loop */
-			if (logptr->repeated_times > 0) {
-				_write_repeated_log();
-			} else {
+			_write_repeated_log();
+
+		} else {
+			/* If repeate times == 0, check timediff and
+			 * reset cached log. */
+			if (timediff >= FLUSH_TIME_INTERVAL) {
 				logptr->latest_log_time.tv_sec = 0;
 				logptr->latest_log_time.tv_usec = 0;
 				logptr->latest_log_start_time = 0;
 				logptr->repeated_times = 0;
 				logptr->latest_log_msg[0] = '\0';
 			}
-
 		}
 
 		break;

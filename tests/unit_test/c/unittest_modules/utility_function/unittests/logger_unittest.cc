@@ -13,6 +13,7 @@ extern "C" {
 #include "logger.h"
 #include "global.h"
 #include "params.h"
+#include "fuseop.h"
 }
 #include "gtest/gtest.h"
 
@@ -85,6 +86,9 @@ protected:
 	virtual void SetUp() {
 		system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+				malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0 ,sizeof(SYSTEM_DATA_HEAD));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		snprintf(tmpfilename, 25, "/tmp/testlog");
 		logptr = NULL;
@@ -109,6 +113,7 @@ protected:
 		}
 		unlink(tmpfilename);
 		free(system_config);
+		free(hcfs_system);
 	}
 
 };
