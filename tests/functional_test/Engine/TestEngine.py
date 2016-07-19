@@ -6,7 +6,7 @@ Created on 2012/6/24
 import os
 import re
 import logging
-logger = logging.getLogger('TestEngine')
+
 import csv
 import sys
 import pprint
@@ -18,21 +18,28 @@ from parser import TestCaseParser
 from reporter import Reporter
 from feedback import Feedback
 
+logger = logging.getLogger('TestEngine')
+
+
 class Runner:
-    def __init__(self, source_csv):
+    def __init__(self, args, task_id=None, xml_filename=None):
         parser = TestCaseParser()
-        self.test_case_suites = parser.parse_from_csv(source_csv)
+        self.test_case_suites = parser.parse_from_csv(args)
         self.reporter = Reporter()
-        self.feedback = Feedback()
+        self.feedback = Feedback(task_id)
         self.test_result = {}
         self.test_summary = {}
 
-    def _save_csv_path(self, case_classify, csv_file_path):
-        if self.test_result.has_key(case_classify):
+    def _store_csv_path(self, case_classify, csv_file_path):
+        """Store the csv path into test_result dict.
+        """
+        if case_classify in self.test_result.keys():
             self.test_result[case_classify]['csv_file_path'] = csv_file_path
 
-    def _save_result(self, case_classify, case_id, run_result, log_message, passed_num, failed_num, run_time):
-        if run_result == True:
+    def _store_result(self, case_classify, case_id, run_result, log_message, passed_num, failed_num, run_time):
+        """Store result related information into test_result dict.
+        """
+        if run_result is True:
             run_result = 'Pass'
             passed_num += 1
         elif run_result == 'Error':
@@ -42,25 +49,32 @@ class Runner:
             run_result = 'Fail'
             failed_num += 1
 
-        if not self.test_result.has_key(case_classify):
+        if case_classify not in self.test_result.keys():
             self.test_result[case_classify] = {}
-        if not self.test_result[case_classify].has_key('result'):
+
+        if 'result' not in self.test_result[case_classify].keys():
             self.test_result[case_classify]['result'] = {}
 
-        self.test_result[case_classify]['result'].update({ case_id: [str(run_result), log_message, str(run_time)] })
-        logger.debug('{0} Test Result: {1}'.format(case_id, str(run_result)) )
+        self.test_result[case_classify]['result'].update({case_id: [str(run_result), log_message, str(run_time)]})
+        logger.debug('Test Result: {0}'.format(str(run_result)))
 
         return passed_num, failed_num
 
-    def _save_summary(self, case_classify, ran_cases, passed_cases, failed_cases, total_run_time):
+    def _store_summary(self, case_classify, ran_cases, passed_cases, failed_cases, total_run_time):
         if case_classify in self.test_result.keys():
-            self.test_result[case_classify]['summary'] =  {
+            self.test_result[case_classify]['summary'] = {
                                                             'ran_cases': ran_cases,
                                                             'passed_cases': passed_cases,
                                                             'failed_cases': failed_cases,
                                                             'total_run_time': total_run_time
-                                                           }
+                                                        }
         return True
+
+    def _replace_attribue_with_vaiablespool(self, obj):
+        from Engine.config import VariablesPool
+        for key in VariablesPool.__dict__.keys():
+            if not re.match(r'_{2}', key):
+                setattr(obj, key, getattr(VariablesPool, key))
 
     def _invoke_test_case(self, case_id):
         '''
@@ -73,8 +87,9 @@ class Runner:
             mod = __import__('TestCases.{0}.{0}'.format(case_classify), fromlist=[case_id])
             mod_class = getattr(mod, case_id)
             mod_class_inst = mod_class()
-            logger.debug('Run test case: {0}.{1}'.format(case_classify, case_id))
+            self._replace_attribue_with_vaiablespool(mod_class_inst)
             run_result, log_message = getattr(mod_class_inst, 'run')()
+            logger.debug('Run test case: {0}.{1}'.format(case_classify, case_id))
             end_time = time.time()
             run_time = end_time - start_time
             result = (run_result, log_message, int(run_time))
@@ -96,9 +111,8 @@ class Runner:
         run_count = 0
         passed_num = 0
         failed_num = 0
-        fail_tag = 0    # indicate pass or fail for whole tests.
         spec_case_id = '\w' if spec_case_id == '' else spec_case_id
-        self.feedback.feedback_to_server(self.test_result)
+        self.feedback.feedback_to_server(self.test_result)  # this can initial feedback server.
 
         if self.test_case_suites is False:
             return
@@ -113,9 +127,9 @@ class Runner:
                 # CaseID can support REGEX
                 pattern = re.compile(spec_case_id)
                 re_result = pattern.search(case_id)
-                if re_result == None:           # skip test case
+                if re_result is None:           # skip test case
                     continue
-                logger.debug('Pattern: {0}, Next matched case: {1}'.format(spec_case_id, case_id))
+                logger.debug('Pattern: {0}, Match case: {1}'.format(spec_case_id, case_id))
 
                 # TestCaseSuites can control which case could be run
                 if case_run == '1':     # filter run = 0
@@ -126,18 +140,17 @@ class Runner:
                         logger.error(traceback.format_exc())
                         continue
 
-                    passed_num, failed_num = self._save_result(case_classify,
-                                                               case_id,
-                                                               run_result,
-                                                               log_message,
-                                                               passed_num, failed_num,
-                                                               run_time)
+                    passed_num, failed_num = self._store_result(case_classify,
+                                                                case_id,
+                                                                run_result,
+                                                                log_message,
+                                                                passed_num, failed_num,
+                                                                run_time)
                     total_run_time = total_run_time + run_time
             else:
                 csv_file_path = self.test_case_suites[case_classify]['csv_file_path']
-                fail_tag = 1 if failed_num > 0 else 0
-                self._save_csv_path(case_classify, csv_file_path)  # save csv_file_path in test_result
-                self._save_summary(case_classify, run_count, passed_num, failed_num, total_run_time)
+                self._store_csv_path(case_classify, csv_file_path)  # save csv_file_path in test_result
+                self._store_summary(case_classify, run_count, passed_num, failed_num, total_run_time)
                 run_count = passed_num = failed_num = 0
 
         logger.debug('Test Result: %s' % str(self.test_result))
@@ -149,8 +162,6 @@ class Runner:
             logger.error('Please check the server configuration!')
 
         self.reporter.output_report(self.test_result)
-
-        return fail_tag
 
 
 def _write_template(script_filename_path, cases):
@@ -172,6 +183,7 @@ class {0}:
     '''.format(value)
             fh.write(temp)
         fh.close()
+
 
 def GenerateTestCase(test_case_suites):
     working_folder = os.getcwd()
@@ -209,4 +221,3 @@ def GenerateTestCase(test_case_suites):
         else:
             logging.warning('[GenerateTestCase] -The file is exist, it will not write template:')
             logging.warning('[GenerateTestCase] -{0}'.format(script_filename_path))
-
