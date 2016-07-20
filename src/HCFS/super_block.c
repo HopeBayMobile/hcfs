@@ -1629,7 +1629,7 @@ int32_t super_block_finish_pinning(ino_t this_inode)
 				(uint64_t)this_inode, __func__);
 		break;
 	case ST_PIN: /* What happened? */
-		write_log(5, "inode %"PRIu64 " is ST_PIN in %s",
+		write_log(4, "inode %"PRIu64 " is ST_PIN in %s",
 				(uint64_t)this_inode, __func__);
 		break;
 	case ST_DEL: /* It may be deleted by others */

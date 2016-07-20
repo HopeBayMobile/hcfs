@@ -271,16 +271,30 @@ void pinning_loop()
 				}
 			}
 			sem_post(&(pinning_scheduler.ctl_op_sem));
-			if (found == TRUE) { /* Pin next file */
-				ret = super_block_read(now_inode, &sb_entry);
-				if (ret < 0) {
-					write_log(0, "Error: Fail to read sb "
+			super_block_share_locking();
+			ret = super_block_read(now_inode, &sb_entry);
+			super_block_share_release();
+			if (ret < 0) {
+				write_log(0, "Error: Fail to read sb "
 						"entry. Code %d\n", -ret);
-					now_inode = 0;
-					break;
-				}
+				now_inode = 0;
+				break;
+			}
+
+			if (found == TRUE) { /* Pin next file */
 				now_inode = sb_entry.pin_ll_next;
 			} else {
+				if (sb_entry.pin_status == ST_PIN) {
+					write_log(4, "Warn: inode %"PRIu64
+						" in pin queue with status"
+						" STPIN\n", (uint64_t)now_inode);
+					now_inode = sb_entry.pin_ll_next;
+					continue;
+				}
+				/* This file may be removed, so just
+				 * start from head of queue */
+				if (sb_entry.pin_status != ST_PINNING)
+					now_inode = 0;
 				break;
 			}
 		}
@@ -313,7 +327,9 @@ void pinning_loop()
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 
 		/* Find next inode to be pinned */
+		super_block_share_locking();
 		ret = super_block_read(now_inode, &sb_entry);
+		super_block_share_release();
 		if (ret < 0) {
 			write_log(0, "Error: Fail to read sb "
 					"entry. Code %d\n", -ret);
