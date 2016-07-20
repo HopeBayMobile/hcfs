@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+# vim:set tabstop=2 shiftwidth=2 softtabstop=0 expandtab:
 # Description: # This is to apply opengapps into Nexus devices with AOSP ROM
 #
 # Authors: William W.-Y. Liang, Can Yu, etc
@@ -52,16 +52,6 @@
 # Revision 1.1  2016/06/07 06:04:50  wyliang
 # Create the nexus gapps installation script
 #
-
-platform='unknown'
-unamestr=`uname`
-if [[ "$unamestr" == 'Linux' ]]; then
-  platform='linux'
-elif [[ "$unamestr" == 'FreeBSD' ]]; then
-  platform='freebsd'
-elif [[ "$unamestr" == 'Darwin' ]]; then
-  platform='mac'
-fi
 
 # Android SDK path
 
@@ -138,7 +128,6 @@ ERROR_HDR="** Error:"
 
 # Tools for different host environment
 HOST_OS="$(uname -s)"
-TOOL_MD5=md5sum
 
 # ---------
 # Functions
@@ -163,8 +152,8 @@ trap 'ErrorReport "${BASH_SOURCE[0]}" ${LINENO}' ERR
 set -e -o errtrace
 
 ReloadUSB() {
-  case $platform in
-  linux)
+  case $HOST_OS in
+  Linux)
     # setup udev rules
     sudo cp -u "$HERE/utils/51-android.rules" /etc/udev/rules.d/51-android.rules
     sudo sh -c "(udevadm control --reload-rules && udevadm trigger --action=change)"
@@ -198,8 +187,10 @@ CheckTools() {
   # Apple consideration
   if [ "$HOST_OS" = "Darwin" ]; then
     TOOL_MD5="md5 -q"
+    SED_OPT="-E"
   else
     TOOL_MD5=md5sum
+    SED_OPT="-r"
   fi
 
   return $_ret
@@ -311,12 +302,6 @@ GetFile () {
 
   return 0
 }
-
-if [ "$HOST_OS" = "Darwin" ]; then
-  SED_OPT="-E"
-else
-  SED_OPT="-r"
-fi
 
 GetMode() {
   local mode=$({ adb devices; fastboot devices; } | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
