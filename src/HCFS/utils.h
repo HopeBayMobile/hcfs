@@ -23,6 +23,9 @@ extern SYSTEM_CONF_STRUCT *system_config;
 #include "dir_statistics.h"
 #include "global.h"
 
+int32_t check_and_create_metapaths(void);
+int32_t check_and_create_blockpaths(void);
+
 /*BEGIN string utility definition*/
 
 /*Will copy the filename of the meta file to pathname*/
