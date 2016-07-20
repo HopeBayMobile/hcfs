@@ -198,6 +198,8 @@ class mainTest : public ::testing::Test {
 			strcpy(tmp_argv[0], "none");
 			HCFSSYSTEM = (char *)malloc(sizeof(char) * 100);
 			strcpy(HCFSSYSTEM, "/tmp/test_system_file");
+			api_server = (API_SERVER_TYPE *) malloc(sizeof(API_SERVER_TYPE));
+			sem_init(&(api_server->shutdown_sem), 0, 0);
 		}
 		virtual void TearDown()
 		{

@@ -213,4 +213,8 @@ int32_t destroy_pkg_cache()
 {
 	return 0;
 }
+int32_t destroy_api_interface(void)
+{
+	return 0;
+}
 void destroy_monitor_loop_thread() {}
