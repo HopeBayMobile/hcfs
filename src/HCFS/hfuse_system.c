@@ -351,6 +351,21 @@ int32_t _is_battery_low()
 		return FALSE;
 	}
 
+	/* Hack for Android: If powerlevel = 50, should check again
+	as the value might be a fake from system */
+	if (powerlevel == 50) {
+		write_log(4, "Re-reading battery level in 10 seconds\n");
+		sleep(10);
+		fseek(fptr, 0, SEEK_SET);
+		powerlevel = 0;
+		retval = fscanf(fptr, "%d\n", &powerlevel);
+		if (retval < 1) {
+			write_log(4, "Unable to read battery level\n");
+			fclose(fptr);
+			return FALSE;
+		}
+	}
+
 	fclose(fptr);
 
 	if (powerlevel <= BATTERY_LOW_LEVEL) {
