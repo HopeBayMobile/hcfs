@@ -60,6 +60,7 @@ typedef struct {
 	float job_totaltime[PROCESS_WINDOW];
 	time_t last_update;
 	sem_t job_lock;
+	sem_t shutdown_sem;
 } API_SERVER_TYPE;
 
 API_SERVER_TYPE *api_server;

@@ -53,6 +53,7 @@
 #include "path_reconstruct.h"
 #include "hcfs_fromcloud.h"
 #include "pkg_cache.h"
+#include "api_interface.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -536,5 +537,7 @@ int32_t main(int32_t argc, char **argv)
 		break;
 	}
 #endif /* _ANDROID_ENV_ */
+	sem_post(&(api_server->shutdown_sem));
+	destroy_api_interface();
 	return 0;
 }
