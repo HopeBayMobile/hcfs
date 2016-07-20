@@ -1,5 +1,6 @@
 #!/bin/bash
 # vim:set tabstop=2 shiftwidth=2 softtabstop=0 expandtab:
+#
 # Description: # This is to apply opengapps into Nexus devices with AOSP ROM
 #
 # Authors: William W.-Y. Liang, Can Yu, etc
@@ -155,7 +156,9 @@ ReloadUSB() {
   case $HOST_OS in
   Linux)
     # setup udev rules
-    sudo cp -u "$HERE/utils/51-android.rules" /etc/udev/rules.d/51-android.rules
+    if [ -f "$HERE/utils/51-android.rules" ]; then
+      sudo cp -u "$HERE/utils/51-android.rules" /etc/udev/rules.d/51-android.rules
+    fi
     sudo sh -c "(udevadm control --reload-rules && udevadm trigger --action=change)"
     ;;
   esac
@@ -467,10 +470,6 @@ Boot2Fastboot() {
       adb reboot bootloader
       WaitMode "fastboot" 30
       ;;
-    sideload)
-      adb sideload "$HERE/utils/dummy_update.zip"
-      WaitMode "recovery" 30
-      ;;
     *)
       ReloadUSB
       sleep 1
@@ -478,7 +477,7 @@ Boot2Fastboot() {
       ;;
     esac
   done
-  fastboot oem unlock > /dev/null 2>&1 || :
+  fastboot oem unlock > /dev/null 2>&1 || : # continue script on failure
 
   echo " done"
 }
