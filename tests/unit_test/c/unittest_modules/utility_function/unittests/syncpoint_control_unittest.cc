@@ -178,9 +178,104 @@ protected:
 
 TEST_F(free_syncpoint_resourceTest, FreeDataSucceess)
 {
+	char path[300];
+
+	fetch_syncpoint_data_path(path);
 	EXPECT_EQ(0, init_syncpoint_resource());
+	EXPECT_EQ(0, access(path, F_OK));
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+
+	/* Run */
+	free_syncpoint_resource(TRUE);
+
+	/* Verify */
+	EXPECT_EQ(-1, access(path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+	EXPECT_TRUE(NULL == sys_super_block->sync_point_info);
+}
+
+TEST_F(free_syncpoint_resourceTest, FreeDataSucceess_DoNOTRemoveFile)
+{
+	char path[300];
+
+	fetch_syncpoint_data_path(path);
+	EXPECT_EQ(0, init_syncpoint_resource());
+	EXPECT_EQ(0, access(path, F_OK));
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+
+	/* Run */
+	free_syncpoint_resource(FALSE);
+
+	/* Verify */
+	EXPECT_EQ(0, access(path, F_OK));
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+	EXPECT_TRUE(NULL == sys_super_block->sync_point_info);
+}
+/**
+ * End of Unittest of free_syncpoint_resource()
+ */
+
+/**
+ * Unittest of check_sync_complete()
+ */
+class check_sync_completeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				calloc(sizeof(SUPER_BLOCK_CONTROL), 1);
+		if (!access(METAPATH, F_OK))
+			system("rm -rf syncpoint_control_folder");
+		mkdir(METAPATH, 0700);
+
+		init_syncpoint_resource();
+	}
+
+	void TearDown()
+	{
+		free_syncpoint_resource(TRUE);
+		if (sys_super_block)
+			free(sys_super_block);
+		if (!access(METAPATH, F_OK))
+			system("rm -rf syncpoint_control_folder");
+	}
+};
+
+TEST_F(check_sync_completeTest, RetrySuccess)
+{
+	SYNC_POINT_DATA *data;
+	SYNC_POINT_DATA exp_data, verified_data;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = TRUE;
+	data->delete_sync_complete = TRUE;
+	sys_super_block->head.first_dirty_inode = 12;
+	sys_super_block->head.last_dirty_inode = 345;
+	sys_super_block->head.first_to_delete_inode = 78;
+	sys_super_block->head.last_to_delete_inode = 910;
+
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 345;
+	exp_data.delete_sync_point = 910;
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = FALSE;
+
+	/* Run */
+	check_sync_complete();
+
+	/* Verify */
+	data = &(sys_super_block->sync_point_info->data);
+	EXPECT_EQ(SYNC_RETRY_TIMES - 1,
+		sys_super_block->sync_point_info->sync_retry_times);
+	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(sizeof(SYNC_POINT_DATA),
+		pread(fileno(sys_super_block->sync_point_info->fptr),
+		&verified_data, sizeof(SYNC_POINT_DATA), 0));
+	EXPECT_EQ(0, memcmp(&exp_data, &verified_data,
+		sizeof(SYNC_POINT_DATA)));
 }
 
 /**
- * End of Unittest of free_syncpoint_resource()
+ * End of unittest of check_sync_complete()
  */
