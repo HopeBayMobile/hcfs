@@ -48,6 +48,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 
 int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	inode_ptr->pin_status = ST_PINNING;
 	if (mock_inodes_counter == TOTAL_MOCK_INODES) {
 		inode_ptr->pin_ll_next = 0;
 		sys_super_block->head.first_pin_inode = 0;

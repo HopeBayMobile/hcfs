@@ -58,6 +58,7 @@ TEST_F(pinning_loopTest, WorkNormally)
 	for (int32_t i = 0; i < TOTAL_MOCK_INODES; i++) {
 		mock_inodes[i] = (i + 1) * 15;
 	}
+	pinning_scheduler.deep_sleep = FALSE;
 	sys_super_block->head.num_pinning_inodes = TOTAL_MOCK_INODES;
 	sys_super_block->head.first_pin_inode = mock_inodes[0];
 	mock_inodes_counter = 1;

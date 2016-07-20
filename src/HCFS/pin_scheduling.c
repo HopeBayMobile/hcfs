@@ -205,7 +205,7 @@ void pinning_worker(void *ptr)
  */
 void pinning_loop()
 {
-	ino_t now_inode;
+	ino_t now_inode, next_inode;
 	uint32_t rest_times;
 	int32_t ret, i, t_idx;
 	char found, start_from_head;
@@ -260,6 +260,7 @@ void pinning_loop()
 			break;
 		}
 		/* Check whether this inode is now being handled */
+		next_inode = 0;
 		while (now_inode) {
 			found = FALSE;
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
@@ -281,7 +282,7 @@ void pinning_loop()
 				break;
 			}
 
-			if (found == TRUE) { /* Pin next file */
+			if (found == TRUE) { /* Go to next file */
 				now_inode = sb_entry.pin_ll_next;
 			} else {
 				if (sb_entry.pin_status == ST_PIN) {
@@ -291,9 +292,13 @@ void pinning_loop()
 					now_inode = sb_entry.pin_ll_next;
 					continue;
 				}
-				/* This file may be removed, so just
-				 * start from head of queue */
-				if (sb_entry.pin_status != ST_PINNING)
+
+				if (sb_entry.pin_status == ST_PINNING)
+					/* Remember next inode */
+					next_inode = sb_entry.pin_ll_next;
+				else
+					/* This file may be removed, so just
+					 * start from head of queue */
 					now_inode = 0;
 				break;
 			}
@@ -327,16 +332,7 @@ void pinning_loop()
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 
 		/* Find next inode to be pinned */
-		super_block_share_locking();
-		ret = super_block_read(now_inode, &sb_entry);
-		super_block_share_release();
-		if (ret < 0) {
-			write_log(0, "Error: Fail to read sb "
-					"entry. Code %d\n", -ret);
-			now_inode = 0;
-		} else {
-			now_inode = sb_entry.pin_ll_next;
-		}
+		now_inode = next_inode;
 	}
 	/**** End of while loop ****/
 
