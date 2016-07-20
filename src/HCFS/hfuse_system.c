@@ -322,6 +322,49 @@ void init_backend_related_module(void)
 }
 
 /************************************************************************
+Helper function for checking if the battery is below a threshold
+******/
+int32_t _is_battery_low()
+{
+	FILE *fptr;
+	int32_t retval, powerlevel;
+
+	if (access("/sys/class/power_supply/battery/capacity", F_OK) == 0)
+		fptr = fopen("/sys/class/power_supply/battery/capacity", "r");
+	else if (access("/sys/class/power_supply/BAT0/capacity", F_OK) == 0)
+		fptr = fopen("/sys/class/power_supply/BAT0/capacity", "r");
+	else
+		fptr = NULL;
+
+	if (fptr == NULL) {
+		write_log(4, "Unable to access battery level\n");
+		return FALSE;
+	}
+
+	powerlevel = 0;
+
+	retval = fscanf(fptr, "%d\n", &powerlevel);
+
+	if (retval < 1) {
+		write_log(4, "Unable to read battery level\n");
+		fclose(fptr);
+		return FALSE;
+	}
+
+	fclose(fptr);
+
+	if (powerlevel <= BATTERY_LOW_LEVEL) {
+		write_log(4, "Battery low, shutting down. (level is %d)\n",
+		          powerlevel);
+		return TRUE;
+	}
+
+	write_log(4, "Battery level is %d. Continue with bootup\n",
+	          powerlevel);
+	return FALSE;
+}
+
+/************************************************************************
 *
 * Function name: main
 *        Inputs: int32_t argc, char **argv
@@ -370,6 +413,20 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(-1);
 
+	/* Move log opening earlier for android to log low battery events */
+#ifdef _ANDROID_ENV_
+	open_log("hcfs_android_log");
+#endif
+
+	/* Check if battery level is low. If so, shutdown */
+	ret_val = _is_battery_low();
+	if (ret_val == TRUE) {
+		close_log();
+		ret_val = execlp("setprop", "setprop", "sys.powerctl",
+		                 "shutdown", NULL);
+		exit(-1);
+	}
+
 	nofile_limit.rlim_cur = 150000;
 	nofile_limit.rlim_max = 150001;
 
@@ -380,32 +437,6 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	UNUSED(curl_handle);
-	/* Only init backend when actual transfer is needed */
-	/*
-		if (CURRENT_BACKEND != NONE) {
-			sprintf(curl_handle.id, "main");
-			ret_val = hcfs_init_backend(&curl_handle);
-			if ((ret_val < 200) || (ret_val > 299)) {
-				write_log(0,
-					"Error in connecting to backend. Code
-	   %d\n",
-					ret_val);
-				write_log(0, "Backend %d\n", CURRENT_BACKEND);
-				exit(-1);
-			}
-
-			ret_val = hcfs_list_container(&curl_handle);
-			if (((ret_val < 200) || (ret_val > 299)) && (ret_val !=
-	   404)) {
-				write_log(0, "Error in connecting to
-	   backend\n");
-				exit(-1);
-			}
-			write_log(10, "ret code %d\n", ret_val);
-
-			hcfs_destroy_backend(curl_handle.curl);
-		}
-	*/
 	ret_val = init_hfuse();
 	if (ret_val < 0)
 		exit(-1);
@@ -414,7 +445,6 @@ int32_t main(int32_t argc, char **argv)
 	init_sync_stat_control();
 
 #ifdef _ANDROID_ENV_
-	open_log("hcfs_android_log");
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
 		exit(ret_val);

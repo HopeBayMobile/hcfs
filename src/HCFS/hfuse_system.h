@@ -35,5 +35,6 @@ int32_t proc_idx;
 #endif /* _ANDROID_ENV_ */
 
 #define CHILD_NUM 2
+#define BATTERY_LOW_LEVEL 3
 
 #endif  /* GW20_SRC_HFUSE_SYSTEM_H_ */
