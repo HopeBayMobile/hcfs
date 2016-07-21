@@ -217,4 +217,17 @@ int32_t destroy_api_interface(void)
 {
 	return 0;
 }
-void destroy_monitor_loop_thread() {}
+void destroy_monitor_loop_thread()
+{
+	return;
+}
+
+void fetch_syncpoint_data_path(char *path)
+{
+	strcpy(path, "mock_syncpoint_data");
+}
+
+int32_t init_syncpoint_resource()
+{
+	return 0;
+}
