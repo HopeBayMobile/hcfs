@@ -54,6 +54,9 @@ void move_sync_point(char which_ll, ino_t this_inode,
 
 int32_t init_syncpoint_resource()
 {
+	sys_super_block->sync_point_is_set = TRUE;
+	sys_super_block->sync_point_info = (SYNC_POINT_INFO *)
+		malloc(sizeof(SYNC_POINT_INFO));
 	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
 	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
 }

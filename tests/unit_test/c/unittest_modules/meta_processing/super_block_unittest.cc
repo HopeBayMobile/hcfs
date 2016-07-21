@@ -2603,7 +2603,86 @@ TEST_F(super_block_set_syncpointTest, AllClean_DoNotNeedSet)
 	sys_super_block->head.last_to_delete_inode = 0;
 
 	EXPECT_EQ(1, super_block_set_syncpoint());
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+}
+
+TEST_F(super_block_set_syncpointTest, InitSyncPointSuccess)
+{
+	SYNC_POINT_DATA exp_data;
+
+	sys_super_block->head.last_dirty_inode = 123;
+	sys_super_block->head.last_to_delete_inode = 456;
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 123;
+	exp_data.delete_sync_point = 456;
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = FALSE;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_set_syncpoint());
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data,
+			&(sys_super_block->sync_point_info->data),
+			sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(SYNC_RETRY_TIMES,
+		sys_super_block->sync_point_info->sync_retry_times);
+}
+
+TEST_F(super_block_set_syncpointTest, ResetSyncPointSuccess)
+{
+	SYNC_POINT_DATA exp_data;
+
+	sys_super_block->sync_point_is_set = TRUE;
+	sys_super_block->sync_point_info = (SYNC_POINT_INFO *)
+		malloc(sizeof(SYNC_POINT_INFO));
+	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
+	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
+
+	sys_super_block->head.last_dirty_inode = 123;
+	sys_super_block->head.last_to_delete_inode = 456;
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 123;
+	exp_data.delete_sync_point = 456;
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = FALSE;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_set_syncpoint());
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data,
+			&(sys_super_block->sync_point_info->data),
+			sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(SYNC_RETRY_TIMES,
+		sys_super_block->sync_point_info->sync_retry_times);
 }
 /**
  * End of unittest of super_block_set_syncpoint()
+ */
+
+/**
+ * Unittest of super_block_cancel_syncpoint()
+ */
+class super_block_cancel_syncpointTest : public InitSuperBlockBaseClass {
+
+};
+
+TEST_F(super_block_cancel_syncpointTest, NoSyncPointIsSet)
+{
+	sys_super_block->sync_point_is_set = FALSE;
+
+	EXPECT_EQ(1, super_block_cancel_syncpoint());
+}
+
+TEST_F(super_block_cancel_syncpointTest, CancelSuccess)
+{
+	sys_super_block->sync_point_is_set = TRUE;
+
+	EXPECT_EQ(0, super_block_cancel_syncpoint());
+}
+/**
+ * End of unittest of super_block_cancel_syncpoint()
  */

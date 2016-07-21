@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: super_block.c
 * Abstract: The c source code file for meta processing involving super
@@ -1894,12 +1894,20 @@ error_handling:
 	return ret;
 }
 
+/**
+ * Set sync point. If the sync point had been set, then just overwrite
+ * old sync point information. Otherwise allocate new resource it needs.
+ *
+ * @return 0 on success, and 1 when all data is clean now. Otherwise return
+ *         negative error code.
+ */
 int32_t super_block_set_syncpoint()
 {
 	SYNC_POINT_DATA *tmp_syncpoint_data;
 	int32_t ret;
 
 	super_block_exclusive_locking();
+	/* Do nothing when data is clean */
 	if (sys_super_block->head.last_dirty_inode == 0 &&
 		sys_super_block->head.last_to_delete_inode == 0) {
 		super_block_exclusive_release();
@@ -1951,6 +1959,11 @@ int32_t super_block_set_syncpoint()
 	return 0;
 }
 
+/**
+ * Cancel the setting of sync point and free all resource about it.
+ *
+ * @return 0 on success, and 1 when no sync point is set.
+ */
 int32_t super_block_cancel_syncpoint()
 {
 	super_block_exclusive_locking();

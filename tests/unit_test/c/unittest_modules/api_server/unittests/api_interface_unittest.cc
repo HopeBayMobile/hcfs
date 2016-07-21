@@ -1659,7 +1659,7 @@ TEST_F(api_moduleTest, XferStatusSlowTransit) {
 	ASSERT_EQ(2, status);
 }
 
-TEST_F(api_moduleTest, AllClean_SetSyncPoint_Cancel) {
+TEST_F(api_moduleTest, SetSyncPointReturnSuccess) {
 
 	int32_t ret_val, status;
 	uint32_t code, cmd_len, size_msg;
@@ -1673,9 +1673,7 @@ TEST_F(api_moduleTest, AllClean_SetSyncPoint_Cancel) {
 	ASSERT_EQ(0, ret_val);
 	ASSERT_NE(0, fd);
 
-	sys_super_block = ()
-
-	code = GETXFERSTATUS;
+	code = SETSYNCPOINT;
 	cmd_len = 0;
 	memset(buf, 0, 300);
 
@@ -1693,7 +1691,42 @@ TEST_F(api_moduleTest, AllClean_SetSyncPoint_Cancel) {
 	ASSERT_EQ(sizeof(int32_t), size_msg);
 	ret_val = recv(fd, &status, sizeof(int32_t), 0);
 	ASSERT_EQ(sizeof(int32_t), ret_val);
-	ASSERT_EQ(1, status);
+	ASSERT_EQ(0, status);
+}
+
+TEST_F(api_moduleTest, CancelSyncPointSuccess) {
+
+	int32_t ret_val, status;
+	uint32_t code, cmd_len, size_msg;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	code = SETSYNCPOINT;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int32_t), size_msg);
+	ret_val = recv(fd, &status, sizeof(int32_t), 0);
+	ASSERT_EQ(sizeof(int32_t), ret_val);
+	ASSERT_EQ(0, status);
 }
 
 /* End of the test case for the function api_module */
