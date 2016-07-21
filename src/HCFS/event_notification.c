@@ -19,11 +19,14 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <stddef.h>
 #include <jansson.h>
 
+#include "global.h"
 #include "fuseop.h"
 #include "event_filter.h"
 #include "macro.h"
+#include "logger.h"
 
 char *notify_server_path = NULL;
 EVENT_QUEUE *event_queue;
@@ -84,7 +87,7 @@ int32_t init_event_queue()
  ***********************************************************************/
 static int32_t _get_server_conn(char *path)
 {
-	int32_t fd, status;
+	int32_t fd, status, sock_len;
 	struct sockaddr_un addr;
 
 	memset(&addr, 0, sizeof(struct sockaddr_un));
@@ -94,7 +97,8 @@ static int32_t _get_server_conn(char *path)
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -errno;
-	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
+	sock_len = 1 + strlen(path) + offsetof(struct sockaddr_un, sun_path);
+	status = connect(fd, (const struct sockaddr *) &addr, sock_len);
 	if (status < 0) {
 		close(fd);
 		return -errno;
@@ -117,7 +121,7 @@ int32_t set_event_notify_server(char *server_path)
 {
 	int32_t ret_code, server_fd;
 	char *new_server_path, *temp_server_path;
-	char *msg_to_send = NULL;
+	char msg_to_send[32];
 	json_t *test_event = NULL;
 
 	new_server_path = malloc(strlen(server_path) + 1);
@@ -129,19 +133,7 @@ int32_t set_event_notify_server(char *server_path)
 	strcpy(new_server_path, server_path);
 
 	/* Construct test event */
-	test_event = json_pack("[{s:i}]", "event_id", TESTSERVER);
-	if (test_event == NULL) {
-		write_log(4, "Failed to construct test event for server setup\n");
-		ret_code = -errno;
-		goto error_handle;
-	}
-
-	msg_to_send = json_dumps(test_event, JSON_COMPACT);
-	if (msg_to_send == NULL) {
-		write_log(4, "Failed to construct event msg for server setup\n");
-		ret_code = -errno;
-		goto error_handle;
-	}
+	sprintf(msg_to_send, "[{\"event_id\":%d}]", TESTSERVER);
 
 	/* Send test event */
 	server_fd = _get_server_conn(new_server_path);
@@ -172,8 +164,6 @@ error_handle:
 done:
 	if (test_event != NULL)
 		json_decref(test_event);
-	if (msg_to_send != NULL)
-		free(msg_to_send);
 
 	return ret_code;
 }
@@ -214,7 +204,7 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str)
 					"Failed to parse event info", json_err.text);
 			return -EINVAL;
 		} else if (!json_is_object(event)) {
-			write_log(4, "Event info must be a json object\n");
+			write_log(4, "Event info must be a json object.\n");
 			return -EINVAL;
 		}
 	}
@@ -258,8 +248,8 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str)
  *        Output: Integer
  *       Summary: Remove (num_events) events from event queue. The range
  *                of (num_events) should be 0 < num_events <= EVENT_QUEUE_SIZE.
- *  Return value: 0 if successful. Otherwise returns the negation of the
- *                appropriate error code.
+ *  Return value: Return total number of events dequeued if successful.
+ *                Otherwise returns the negation of the appropriate error code.
  *
  ***********************************************************************/
 int32_t event_dequeue(int32_t num_events)
@@ -298,7 +288,7 @@ int32_t event_dequeue(int32_t num_events)
 	write_log(8, "Event dequeue was successful. Total %d events removed.",
 			num_events);
 
-	return 0;
+	return num_events;
 }
 
 /************************************************************************
@@ -316,12 +306,19 @@ int32_t event_dequeue(int32_t num_events)
  ***********************************************************************/
 int32_t send_event_to_server(int32_t fd, char *events_in_json)
 {
-	int32_t r_size;
-	int32_t ret_val;
+	int32_t r_size, ret_val;
+	char event_msg[strlen(events_in_json) + 2];
 
-	r_size = send(fd, events_in_json,
-			strlen(events_in_json) + 1, MSG_NOSIGNAL);
-	if (r_size < 0)
+	/*
+	 * Android API BufferedReader.readline() hangs until
+	 * end-of-line is reached. So we put '\n' at the end
+	 * of events_in_json string.
+	 */
+	sprintf(event_msg, "%s\n", events_in_json);
+
+	r_size = send(fd, event_msg,
+			strlen(event_msg), MSG_NOSIGNAL);
+	if (r_size <= 0)
 		return -errno;
 
 	r_size = recv(fd, &ret_val, sizeof(int32_t), MSG_NOSIGNAL);
@@ -349,7 +346,7 @@ void *event_worker_loop(void)
 #endif
 {
 	int32_t ret_code, count, server_fd;
-	int32_t queue_head, num_events_to_send;
+	int32_t queue_head, num_events_to_send, num_events_dequeue;
 	char *msg_to_send;
 	json_t *events_to_send;
 
@@ -365,14 +362,6 @@ void *event_worker_loop(void)
 		pthread_mutex_unlock(&(event_queue->worker_active_lock));
 
 		while (event_queue->num_events > 0) {
-			server_fd = _get_server_conn(notify_server_path);
-			if (server_fd < 0) {
-				/* TODO - go next round or errno handler? */
-				write_log(4,
-					"Failed to connect notify server, errno - %d\n", -server_fd);
-				continue;
-			}
-
 			if (event_queue->num_events < MAX_NUM_EVENT_SEND)
 				num_events_to_send = event_queue->num_events;
 			else
@@ -406,6 +395,13 @@ void *event_worker_loop(void)
 				continue;
 			}
 
+			server_fd = _get_server_conn(notify_server_path);
+			if (server_fd < 0) {
+				write_log(4,
+					"Failed to connect notify server, errno - %d\n", -server_fd);
+				continue;
+			}
+
 			ret_code = send_event_to_server(server_fd, msg_to_send);
 			if (ret_code < 0) {
 				write_log(4,
@@ -416,7 +412,10 @@ void *event_worker_loop(void)
 			}
 
 			/* These events are send, remove from queue */
-			event_dequeue(num_events_to_send);
+			num_events_dequeue = event_dequeue(num_events_to_send);
+			if (num_events_dequeue < 0)
+				write_log(4, "Failed to remove sent events from queue\n ");
+
 
 			free(msg_to_send);
 			json_decref(events_to_send);
@@ -494,18 +493,21 @@ int32_t add_notify_event(int32_t event_id, char *event_info_json_str)
 
 	ret_code = event_enqueue(event_id, event_info_json_str);
 	if (ret_code == -ENOSPC) {
-		/* Queue is full */
+		/* Event queue is full */
 		write_log(4, "Event is dropped due to queue full error.");
-		return 2;
+		ret_code = 2;
+		goto done;
 	} else if (ret_code < 0) {
 		return ret_code;
 	}
 
+	ret_code = 0;
+done:
 	/* Wake up queue worker */
 	pthread_mutex_lock(&(event_queue->worker_active_lock));
 	pthread_cond_signal(&(event_queue->worker_active_cond));
 	pthread_mutex_unlock(&(event_queue->worker_active_lock));
 
-	return 0;
+	return ret_code;
 }
 

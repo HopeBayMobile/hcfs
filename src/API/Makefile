@@ -32,7 +32,7 @@ publish: doc
 	sudo cp -r doc /mnt/nas/CloudDataSolution/Gateway_2.0/
 
 doc: HCFS_api.c HCFS_api.h
-	cldoc generate -c -- --basedir . --type html --merge docs --output doc HCFS_api.h
+	cldoc generate -c -- --static --basedir . --type html --merge docs --output doc HCFS_api.h
 
 clean:
 	rm -rf $(OBJS_DIR) $(OBJS_DIR) hcfsapid test hcfsconf

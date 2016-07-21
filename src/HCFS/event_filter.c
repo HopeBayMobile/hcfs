@@ -28,8 +28,8 @@ EVENT_FILTER event_filters[] = {
  *         Inputs: int32_t event_id
  *         Output: Integer
  *        Summary: Entry point to check all items in event filter.
- *   Return value: 0 if successful. Otherwise returns the negation of the
- *                 appropriate error code.
+ *   Return value: 0 if event is allowed to send.
+ *                -1 if not allowed.
  *
  ***********************************************************************/
 int32_t check_event_filter(int32_t event_id)
