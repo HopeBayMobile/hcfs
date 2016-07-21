@@ -272,9 +272,7 @@ void pinning_loop()
 				}
 			}
 			sem_post(&(pinning_scheduler.ctl_op_sem));
-			super_block_share_locking();
 			ret = super_block_read(now_inode, &sb_entry);
-			super_block_share_release();
 			if (ret < 0) {
 				write_log(0, "Error: Fail to read sb "
 						"entry. Code %d\n", -ret);
