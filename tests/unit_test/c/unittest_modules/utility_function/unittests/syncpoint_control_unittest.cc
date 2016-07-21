@@ -242,7 +242,7 @@ protected:
 	}
 };
 
-TEST_F(check_sync_completeTest, RetrySuccess)
+TEST_F(check_sync_completeTest, RetrySuccess_StillNeedToSync)
 {
 	SYNC_POINT_DATA *data;
 	SYNC_POINT_DATA exp_data, verified_data;
@@ -265,7 +265,7 @@ TEST_F(check_sync_completeTest, RetrySuccess)
 	check_sync_complete();
 
 	/* Verify */
-	data = &(sys_super_block->sync_point_info->data);
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
 	EXPECT_EQ(SYNC_RETRY_TIMES - 1,
 		sys_super_block->sync_point_info->sync_retry_times);
 	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
@@ -276,6 +276,145 @@ TEST_F(check_sync_completeTest, RetrySuccess)
 		sizeof(SYNC_POINT_DATA)));
 }
 
+TEST_F(check_sync_completeTest, SyncComplete)
+{
+	char path[300];
+	SYNC_POINT_DATA *data;
+
+	fetch_syncpoint_data_path(path);
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = TRUE;
+	data->delete_sync_complete = TRUE;
+	sys_super_block->sync_point_info->sync_retry_times = 0;
+
+	/* Run */
+	check_sync_complete();
+
+	/* Verify */
+	data = &(sys_super_block->sync_point_info->data);
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+	EXPECT_TRUE(NULL == sys_super_block->sync_point_info);
+	EXPECT_EQ(-1, access(path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
+}
 /**
  * End of unittest of check_sync_complete()
+ */
+
+/**
+ * Unittest of move_sync_point()
+ */
+class move_sync_pointTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		sys_super_block = (SUPER_BLOCK_CONTROL *)
+				calloc(sizeof(SUPER_BLOCK_CONTROL), 1);
+		if (!access(METAPATH, F_OK))
+			system("rm -rf syncpoint_control_folder");
+		mkdir(METAPATH, 0700);
+
+		init_syncpoint_resource();
+	}
+
+	void TearDown()
+	{
+		free_syncpoint_resource(TRUE);
+		if (sys_super_block)
+			free(sys_super_block);
+		if (!access(METAPATH, F_OK))
+			system("rm -rf syncpoint_control_folder");
+	}
+};
+
+TEST_F(move_sync_pointTest, MoveDirtySyncPoint_Success)
+{
+	SYNC_POINT_DATA *data, exp_data, verified_data;
+	SUPER_BLOCK_ENTRY sbentry;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = FALSE;
+	data->delete_sync_complete = FALSE;
+	data->upload_sync_point = 5566;
+	data->delete_sync_point = 123;
+
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_complete = TRUE;
+	exp_data.delete_sync_complete = FALSE;
+	exp_data.upload_sync_point = 0;
+	exp_data.delete_sync_point = 123;
+	memset(&sbentry, 0, sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	move_sync_point(IS_DIRTY, 5566, &sbentry);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(sizeof(SYNC_POINT_DATA),
+		pread(fileno(sys_super_block->sync_point_info->fptr),
+		&verified_data, sizeof(SYNC_POINT_DATA), 0));
+	EXPECT_EQ(0, memcmp(&exp_data, &verified_data,
+		sizeof(SYNC_POINT_DATA)));
+}
+
+TEST_F(move_sync_pointTest, MoveDeleteSyncPoint_Success)
+{
+	SYNC_POINT_DATA *data, exp_data, verified_data;
+	SUPER_BLOCK_ENTRY sbentry;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = FALSE;
+	data->delete_sync_complete = FALSE;
+	data->upload_sync_point = 5566;
+	data->delete_sync_point = 123;
+
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = TRUE;
+	exp_data.upload_sync_point = 5566;
+	exp_data.delete_sync_point = 0;
+	memset(&sbentry, 0, sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	move_sync_point(TO_BE_DELETED, 123, &sbentry);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(sizeof(SYNC_POINT_DATA),
+		pread(fileno(sys_super_block->sync_point_info->fptr),
+		&verified_data, sizeof(SYNC_POINT_DATA), 0));
+	EXPECT_EQ(0, memcmp(&exp_data, &verified_data,
+		sizeof(SYNC_POINT_DATA)));
+}
+
+TEST_F(move_sync_pointTest, StatusNotMatch_ChangeNothing)
+{
+	SYNC_POINT_DATA *data, exp_data, verified_data;
+	SUPER_BLOCK_ENTRY sbentry;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = FALSE;
+	data->delete_sync_complete = FALSE;
+	data->upload_sync_point = 5566;
+	data->delete_sync_point = 123;
+
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = FALSE;
+	exp_data.upload_sync_point = 5566;
+	exp_data.delete_sync_point = 123;
+	memset(&sbentry, 0, sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	move_sync_point(NO_LL, 456, &sbentry);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
+}
+
+/**
+ * End of unittest of move_sync_point()
  */

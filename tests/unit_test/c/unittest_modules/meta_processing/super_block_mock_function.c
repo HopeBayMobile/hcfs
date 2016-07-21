@@ -1,7 +1,9 @@
-#include "params.h"
-#include "fuseop.h"
 #include <sys/types.h>
 #include <errno.h>
+#include "params.h"
+#include "fuseop.h"
+#include "super_block.h"
+#include "syncpoint_control.h"
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -17,9 +19,10 @@ int32_t get_meta_size(ino_t inode, int64_t *metasize)
 	return 0;
 }
 
-int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
-		int64_t cache_size_delta, int64_t cache_blocks_delta,
-		int64_t dirty_cache_delta)
+int32_t change_system_meta(int64_t system_data_size_delta,
+		int64_t meta_size_delta, int64_t cache_data_size_delta,
+		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+		int64_t unpin_dirty_data_size, BOOL need_sync)
 {
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	return 0;
@@ -45,6 +48,22 @@ int64_t get_pinned_limit(const char pin_type)
 
 void move_sync_point(char which_ll, ino_t this_inode,
 		struct SUPER_BLOCK_ENTRY *this_entry)
+{
+	return 0;
+}
+
+int32_t init_syncpoint_resource()
+{
+	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
+	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
+}
+
+void free_syncpoint_resource(BOOL remove_file)
+{
+	return;
+}
+
+int32_t write_syncpoint_data()
 {
 	return 0;
 }

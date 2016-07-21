@@ -828,77 +828,6 @@ int32_t get_xfer_status(void)
 	return 0;
 }
 
-int32_t set_syncpoint_handle()
-{
-	SYNC_POINT_DATA *tmp_syncpoint_data;
-	int32_t ret;
-
-	super_block_exclusive_locking();
-	if (sys_super_block->head.last_dirty_inode == 0 &&
-		sys_super_block->head.last_to_delete_inode == 0) {
-		super_block_exclusive_release();
-		return 1;
-	}
-
-	/* Init memory if sync point is not set */
-	if (sys_super_block->sync_point_is_set == FALSE) {
-		write_log(10, "Debug: Allocate sync point resource\n");
-		ret = init_syncpoint_resource();
-		if (ret < 0) {
-			super_block_exclusive_release();
-			return ret;
-		}
-	} else {
-		write_log(10, "Debug: Sync point had been set."
-				" Cover old info.\n");
-	}
-
-	/* Set sync point */
-	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;
-
-	tmp_syncpoint_data = &(sys_super_block->sync_point_info->data);
-	if (sys_super_block->head.last_dirty_inode) {
-		tmp_syncpoint_data->upload_sync_point =
-				sys_super_block->head.last_dirty_inode;
-		tmp_syncpoint_data->upload_sync_complete = FALSE;
-	} else {
-		tmp_syncpoint_data->upload_sync_complete = TRUE;
-	}
-
-	if (sys_super_block->head.last_to_delete_inode) {
-		tmp_syncpoint_data->delete_sync_point =
-				sys_super_block->head.last_to_delete_inode;
-		tmp_syncpoint_data->delete_sync_complete = FALSE;
-	} else {
-		tmp_syncpoint_data->delete_sync_complete = TRUE;
-	}
-
-	/* Write to disk */
-	ret = write_syncpoint_data();
-	if (ret < 0) {
-		free_syncpoint_resource(TRUE);
-		super_block_exclusive_release();
-		return ret;
-	}
-
-	super_block_exclusive_release();
-	return 0;
-}
-
-
-int32_t cancel_syncpoint_handle()
-{
-	super_block_exclusive_locking();
-	if (sys_super_block->sync_point_is_set == FALSE) {
-		super_block_exclusive_release();
-		return 1;
-	}
-
-	free_syncpoint_resource(TRUE);
-	super_block_exclusive_release();
-	return 0;
-}
-
 /************************************************************************
 *
 * Function name: api_module
@@ -1487,9 +1416,9 @@ void api_module(void *index)
 		case SETSYNCPOINT:
 		case CANCELSYNCPOINT:
 			if (api_code == SETSYNCPOINT)
-				retcode = set_syncpoint_handle();
+				retcode = super_block_set_syncpoint();
 			else
-				retcode = cancel_syncpoint_handle();
+				retcode = super_block_cancel_syncpoint();
 			if (retcode == 0) {
 				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(ret_len),

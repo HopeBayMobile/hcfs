@@ -130,4 +130,7 @@ int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode);
 int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 int32_t pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 
+int32_t super_block_set_syncpoint();
+int32_t super_block_cancel_syncpoint();
+
 #endif  /* GW20_HCFS_SUPER_BLOCK_H_ */

@@ -2589,3 +2589,21 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_mix_enqueueERR_dequeueERR_listSUCCESS)
 	unlink(mocksb_path);
 }
 /* End for ll_rebuild_dirty */
+
+/**
+ * Unittest of super_block_set_syncpoint()
+ */
+class super_block_set_syncpointTest : public InitSuperBlockBaseClass {
+
+};
+
+TEST_F(super_block_set_syncpointTest, AllClean_DoNotNeedSet)
+{
+	sys_super_block->head.last_dirty_inode = 0;
+	sys_super_block->head.last_to_delete_inode = 0;
+
+	EXPECT_EQ(1, super_block_set_syncpoint());
+}
+/**
+ * End of unittest of super_block_set_syncpoint()
+ */

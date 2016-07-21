@@ -74,7 +74,7 @@ int32_t init_syncpoint_resource()
 	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;
 	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
 	fetch_syncpoint_data_path(path);
-	
+
 	if (!access(path, F_OK)) {
 		temp_fptr = fopen(path, "r+");
 		if (!temp_fptr) {

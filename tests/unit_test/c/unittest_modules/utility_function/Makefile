@@ -49,7 +49,8 @@ endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest dir_entry_btree_unittest logger_unittest pkg_cache_unittest syncpoint_control
+TESTS = utils_unittest dir_entry_btree_unittest logger_unittest \
+	pkg_cache_unittest syncpoint_control_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
