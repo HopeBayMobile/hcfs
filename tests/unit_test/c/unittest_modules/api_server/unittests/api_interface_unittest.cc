@@ -428,6 +428,8 @@ TEST_F(api_moduleTest, TerminateTest) {
   ASSERT_EQ(sizeof(uint32_t), size_msg);
   size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), size_msg);
+
+  sem_post(&(api_server->shutdown_sem));
   printf("Start recv\n");
   ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
   ASSERT_EQ(sizeof(uint32_t), ret_val);

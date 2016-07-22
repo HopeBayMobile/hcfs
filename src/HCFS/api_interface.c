@@ -78,6 +78,7 @@ int32_t init_api_interface(void)
 	}
 
 	sem_init(&(api_server->job_lock), 0, 1);
+	sem_init(&(api_server->shutdown_sem), 0, 0);
 	api_server->num_threads = INIT_API_THREADS;
 	api_server->last_update = 0;
 	memset(api_server->job_count, 0, sizeof(int32_t) * PROCESS_WINDOW);
@@ -1098,6 +1099,8 @@ void api_module(void *index)
 			/* Wake up potential sleeping threads */
 			sem_post(&(hcfs_system->something_to_replace));
 			sem_post(&(hcfs_system->fuse_sem));
+			/* First wait for system shutdown to finish */
+			sem_wait(&(api_server->shutdown_sem));
 			retcode = 0;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
