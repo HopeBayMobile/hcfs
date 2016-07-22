@@ -472,6 +472,7 @@ int32_t list_FS_handle(DIR_ENTRY **entryarray, uint64_t *ret_entries)
 	uint64_t num_entries, temp;
 	int32_t ret;
 
+	temp = 0;
 	ret = list_filesystem(0, NULL, &num_entries);
 
 	write_log(10, "Debug list volume num volumes %ld\n", num_entries);
@@ -479,6 +480,7 @@ int32_t list_FS_handle(DIR_ENTRY **entryarray, uint64_t *ret_entries)
 		return ret;
 	if (num_entries > 0) {
 		*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
+		memset(*entryarray, 0, sizeof(DIR_ENTRY) * num_entries);
 		ret = list_filesystem(num_entries, *entryarray, &temp);
 	}
 	write_log(10, "Debug list volume %d, %ld\n", ret, temp);
@@ -976,6 +978,7 @@ void api_module(void *index)
 			goto return_message;
 		}
 
+		retcode = 0;
 		switch (api_code) {
 		case PIN:
 			memcpy(&reserved_pinned_size, largebuf,
@@ -1280,6 +1283,7 @@ void api_module(void *index)
 			break;
 		case LISTVOL:
 			/*Echos the arguments back to the caller*/
+			entryarray = NULL;
 			retcode = list_FS_handle(&entryarray, &num_entries);
 			tmpptr = (char *) entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;

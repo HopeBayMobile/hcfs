@@ -1343,7 +1343,6 @@ TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 
 	int32_t ret_val, errcode;
 	uint32_t code, cmd_len, size_msg;
-	char buf[300];
 
 	ret_val = init_api_interface();
 	ASSERT_EQ(0, ret_val);
@@ -1355,7 +1354,6 @@ TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 
 	code = TRIGGERUPDATEQUOTA;
 	cmd_len = 0;
-	memset(buf, 0, 300);
 	hcfs_system->systemdata.system_quota = 0; /* It will be modified */
 
 	printf("Start sending\n");
@@ -1363,8 +1361,6 @@ TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 	ASSERT_EQ(sizeof(uint32_t), size_msg);
 	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
 	ASSERT_EQ(sizeof(uint32_t), size_msg);
-	size_msg=send(fd, &buf, cmd_len, 0);
-	ASSERT_EQ(cmd_len, size_msg);
 
 	printf("Start recv\n");
 	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
