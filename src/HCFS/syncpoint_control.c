@@ -200,6 +200,7 @@ void check_sync_complete()
 
 		/* Check if task complete or not */
 		if (sync_complete) {
+			/* TODO: Send event to UI to tell that sync completed */
 			write_log(10, "Debug: Sync all data completed.\n");
 			free_syncpoint_resource(TRUE);
 		}
