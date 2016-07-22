@@ -553,6 +553,10 @@ void fetch_backend_block(void *ptr)
 		return;
 	}
 
+	/* Fetch block from cloud */
+	fetch_backend_block_objname(objname, block_info->this_inode,
+			block_info->block_no, block_info->seqnum);
+
 	/* Lock block ptr so that status ST_CtoL cannot be met */
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
@@ -571,14 +575,16 @@ void fetch_backend_block(void *ptr)
 	} else if (ret > 0) {
 		/* Status does not match ST_CLOUD, it may be
 		modified by another one */
-		flock(fileno(block_fptr), LOCK_UN);
-		fclose(block_fptr);
-		return;
+		if (ret == ST_CtoL) { /* Keep pinning */
+			write_log(10, "Debug: Status of %s is ST_CtoL"
+				" when pinning\n", objname);
+		} else {
+			flock(fileno(block_fptr), LOCK_UN);
+			fclose(block_fptr);
+			return;
+		}
 	}
 
-	/* Fetch block from cloud */
-	fetch_backend_block_objname(objname, block_info->this_inode,
-			block_info->block_no, block_info->seqnum);
 	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
@@ -653,9 +659,16 @@ void fetch_backend_block(void *ptr)
 		goto thread_error;
 	} else if (ret > 0) {
 		/* Status does not match ST_CtoL. It may be truncated */
-		flock(fileno(block_fptr), LOCK_UN);
-		fclose(block_fptr);
-		return;
+		if (ret == ST_CLOUD) {
+			write_log(4, "Warn: Status of %s is ST_CLOUD when"
+				" change it from ST_CtoL to ST_BOTH\n",
+				objname);
+			goto thread_error;
+		} else {
+			flock(fileno(block_fptr), LOCK_UN);
+			fclose(block_fptr);
+			return;
+		}
 	}
 
 	flock(fileno(block_fptr), LOCK_UN);
@@ -723,7 +736,8 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 	flock(fileno(fptr), LOCK_UN);
 
 	temp_entry = &(entry_page.block_entries[e_index]);
-	if (temp_entry->status == ST_CLOUD) {
+	if (temp_entry->status == ST_CLOUD ||
+			temp_entry->status == ST_CtoL) {
 		/* Create thread to download */
 		sem_wait(&(download_thread_ctl.dl_th_sem));
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
@@ -741,7 +755,6 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
-	/* TODO: How about ST_CtoL? */
 
 	return 0;
 
