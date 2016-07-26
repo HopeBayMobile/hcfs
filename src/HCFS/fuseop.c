@@ -108,6 +108,7 @@
 #include "rebuild_parent_dirstat.h"
 #include "rebuild_super_block.h"
 #include "hfuse_system.h"
+#include "do_restoration.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
 	1. in lookup_count, add a field "to_delete". rmdir, unlink
@@ -7551,8 +7552,10 @@ void _unlink_restore_stat(void)
 {
 	char restore_stat_path[METAPATHLEN];
 
+	sem_wait(&(restore_sem));
 	fetch_restore_stat_path(restore_stat_path);
 	unlink(restore_stat_path);
+	sem_post(&(restore_sem));
 }
 
 int32_t hook_fuse(int32_t argc, char **argv)

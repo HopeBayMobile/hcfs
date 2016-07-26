@@ -45,6 +45,7 @@
 #include "hcfs_cacheops.h"
 #include "hfuse_system.h"
 #include "event_notification.h"
+#include "do_restoration.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -1438,6 +1439,13 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 		case INITIATE_RESTORATION:
 			uint32_ret = initiate_restoration();
+			ret_len = sizeof(uint32_ret);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
+			break;
+		case CHECK_RESTORATION_STATUS:
+			uint32_ret = check_restoration_status();
 			ret_len = sizeof(uint32_ret);
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
 			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);

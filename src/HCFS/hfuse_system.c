@@ -519,8 +519,10 @@ int32_t main(int32_t argc, char **argv)
 	is in progress */
 	is_restoring = FALSE;
 	init_restore_path();
-	ret_val = _check_restore_stat();
-	if (ret_val == 1) {
+	ret_val = check_restoration_status();
+	/* FEATURE TODO: handling for stage 1 and 2 if reboot when stage
+	unfinished */
+	if (ret_val == 2) {
 		/* If the system is in stage 2, make sure that
 		meta and block storage are pointed to the partially
 		restored one */
