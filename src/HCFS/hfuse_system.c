@@ -55,6 +55,7 @@
 #include "pkg_cache.h"
 #include "api_interface.h"
 #include "event_notification.h"
+#include "do_restoration.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -397,15 +398,9 @@ int32_t _is_battery_low()
 
 int32_t _check_partial_storage(void)
 {
-	char restore_metapath[METAPATHLEN];
-	char restore_blockpath[BLOCKPATHLEN];
 	char todelete_metapath[METAPATHLEN];
 	char todelete_blockpath[BLOCKPATHLEN];
 
-	snprintf(restore_metapath, METAPATHLEN, "%s_restore",
-	         METAPATH);
-	snprintf(restore_blockpath, BLOCKPATHLEN, "%s_restore",
-	         BLOCKPATH);
 	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete",
 	         METAPATH);
 	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete",
@@ -421,20 +416,20 @@ FSstats (now used for tracking max inode in the backend). An OTA is needed for
 allowing current devices to restore */
 
 /* FEATURE TODO: error handling? */
-	if (access(restore_metapath, F_OK) == 0) {
+	if (access(RESTORE_METAPATH, F_OK) == 0) {
 		/* Need to rename the path to the current one */
 		/* First check if need to rename old path to todelete */
 		if (access(METAPATH, F_OK) == 0)
 			rename(METAPATH, todelete_metapath);
-		rename(restore_metapath, METAPATH);
+		rename(RESTORE_METAPATH, METAPATH);
 	}
 
-	if (access(restore_blockpath, F_OK) == 0) {
+	if (access(RESTORE_BLOCKPATH, F_OK) == 0) {
 		/* Need to rename the path to the current one */
 		/* First check if need to rename old path to todelete */
 		if (access(BLOCKPATH, F_OK) == 0)
 			rename(BLOCKPATH, todelete_blockpath);
-		rename(restore_blockpath, BLOCKPATH);
+		rename(RESTORE_BLOCKPATH, BLOCKPATH);
 	}
 
 	return 0;
@@ -523,6 +518,7 @@ int32_t main(int32_t argc, char **argv)
 	/* FEATURE TODO: Need to check if can correctly unmount when stage 2
 	is in progress */
 	is_restoring = FALSE;
+	init_restore_path();
 	ret_val = _check_restore_stat();
 	if (ret_val == 1) {
 		/* If the system is in stage 2, make sure that
