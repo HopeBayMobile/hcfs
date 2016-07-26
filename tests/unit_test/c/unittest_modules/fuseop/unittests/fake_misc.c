@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <stdarg.h>
 #include <fuse/fuse_lowlevel.h>
+#include <attr/xattr.h>
 
 #include "meta_mem_cache.h"
 #include "filetables.h"
@@ -220,7 +221,7 @@ int32_t lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 
 off_t check_file_size(const char *path)
 {
-	struct stat tempstat;
+	struct stat tempstat; /* file ops */
 
 	stat(path, &tempstat);
 	return tempstat.st_size;
@@ -371,7 +372,7 @@ int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page,
 {
 	switch (target_page) {
 	case 0:
-		return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+		return sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 	default:
 		return 0;
 	}
@@ -382,7 +383,7 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 {
 	switch (target_page) {
 	case 0:
-		return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+		return sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 	default:
 		return 0;
 	}
@@ -391,7 +392,6 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
-	return 0;
 }
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
@@ -449,115 +449,120 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	return 0;
 }
 
-int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, uint64_t *gen)
+int32_t fetch_inode_stat(ino_t this_inode,
+			 HCFS_STAT *inode_stat,
+			 uint64_t *gen,
+			 char *ret_pin_status)
 {
+	if (ret_pin_status)
+		*ret_pin_status = P_UNPIN;
 	switch (this_inode) {
 	case 1:
-		inode_stat->st_ino = 1;
-		inode_stat->st_mode = S_IFDIR | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 1;
+		inode_stat->mode = S_IFDIR | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 2:
-		inode_stat->st_ino = 2;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 2;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 4:
-		inode_stat->st_ino = 4;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 4;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 6:
-		inode_stat->st_ino = 6;
-		inode_stat->st_mode = S_IFDIR | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 6;
+		inode_stat->mode = S_IFDIR | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 10:
-		inode_stat->st_ino = 10;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 10;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 11:
-		inode_stat->st_ino = 11;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
-		inode_stat->st_size = 1024;
+		inode_stat->ino = 11;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
+		inode_stat->size = 1024;
 		break;
 	case 12:
-		inode_stat->st_ino = 12;
-		inode_stat->st_mode = S_IFDIR | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 12;
+		inode_stat->mode = S_IFDIR | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 13:
-		inode_stat->st_ino = 13;
-		inode_stat->st_mode = S_IFDIR | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 13;
+		inode_stat->mode = S_IFDIR | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 14:
-		inode_stat->st_ino = 14;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
-		inode_stat->st_size = 102400;
+		inode_stat->ino = 14;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
+		inode_stat->size = 102400;
 		break;
 	case 15:
-		inode_stat->st_ino = 15;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
-		inode_stat->st_size = 204800;
+		inode_stat->ino = 15;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
+		inode_stat->size = 204800;
 		break;
 	case 16:
-		inode_stat->st_ino = 16;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
-		inode_stat->st_size = 204800;
+		inode_stat->ino = 16;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
+		inode_stat->size = 204800;
 		break;
 	case 17:
-		inode_stat->st_ino = 17;
-		inode_stat->st_mode = S_IFDIR | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 17;
+		inode_stat->mode = S_IFDIR | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 18:
-		inode_stat->st_ino = 18;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 18;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 19:
-		inode_stat->st_ino = 19;
-		inode_stat->st_mode = S_IFREG | 0500;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 19;
+		inode_stat->mode = S_IFREG | 0500;
+		inode_stat->atime = 100000;
 		break;
 	case 20:
-		inode_stat->st_ino = 20;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 20;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 21:
-		inode_stat->st_ino = 21;
-		inode_stat->st_mode = S_IFLNK | 0700;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 21;
+		inode_stat->mode = S_IFLNK | 0700;
+		inode_stat->atime = 100000;
 		break;
 	case 22:
-		inode_stat->st_ino = 22;
-		inode_stat->st_mode = S_IFREG | 0700;
-		inode_stat->st_atime = 100000;
-		inode_stat->st_nlink = 1;
+		inode_stat->ino = 22;
+		inode_stat->mode = S_IFREG | 0700;
+		inode_stat->atime = 100000;
+		inode_stat->nlink = 1;
 		break;
 	case 23:
-		inode_stat->st_ino = 23;
-		inode_stat->st_mode = S_IFDIR | 0600;
-		inode_stat->st_atime = 100000;
+		inode_stat->ino = 23;
+		inode_stat->mode = S_IFDIR | 0600;
+		inode_stat->atime = 100000;
 		break;
 	default:
 		break;
 	}
 
-	inode_stat->st_uid = geteuid();
-	inode_stat->st_gid = getegid();
+	inode_stat->uid = geteuid();
+	inode_stat->gid = getegid();
 
 	if (this_inode == 1 && root_updated == TRUE)
-		memcpy(inode_stat, &updated_root, sizeof(struct stat));
+		memcpy(inode_stat, &updated_root, sizeof(HCFS_STAT));
 	if (this_inode != 1 && before_update_file_data == FALSE)
-		memcpy(inode_stat, &updated_stat, sizeof(struct stat));
+		memcpy(inode_stat, &updated_stat, sizeof(HCFS_STAT));
 
 	if (gen)
 		*gen = 10;
@@ -567,7 +572,7 @@ int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, uint64_t *ge
 
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, uint64_t this_gen,
+			HCFS_STAT *this_stat, uint64_t this_gen,
 			ino_t root_ino, int64_t *delta_metasize, char ispin)
 {
 	if (fail_mknod_update_meta == TRUE)
@@ -578,7 +583,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, uint64_t this_gen,
+			HCFS_STAT *this_stat, uint64_t this_gen,
 			ino_t root_ino, int64_t *delta_metasize, char ispin)
 {
 	if (fail_mkdir_update_meta == TRUE)
@@ -608,7 +613,7 @@ int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	return 0;
 }
 
-ino_t super_block_new_inode(struct stat *in_stat)
+ino_t super_block_new_inode(HCFS_STAT *in_stat)
 {
 	if (fail_super_block_new_inode == TRUE)
 		return 0;
@@ -648,7 +653,7 @@ int32_t delete_inode_meta(ino_t this_inode)
 	return 0;
 }
 
-int32_t lookup_init()
+int32_t lookup_init(void)
 {
 	return 0;
 }
@@ -687,11 +692,11 @@ int32_t disk_checkdelete(ino_t this_inode)
 {
 	return 0;
 }
-int32_t startup_finish_delete()
+int32_t startup_finish_delete(void)
 {
 	return 0;
 }
-int32_t lookup_destroy()
+int32_t lookup_destroy(void)
 {
 	return 0;
 }
@@ -796,11 +801,10 @@ int32_t destroy_mount_mgr(void)
 
 void destroy_fs_manager(void)
 {
-	return 0;
 }
 
 int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
-	const struct stat *this_stat, const char *link, 
+	const HCFS_STAT *this_stat, const char *link, 
 	const uint64_t generation, const char *name,
 	int64_t *delta_metasize, char ispin)
 {
@@ -817,13 +821,13 @@ int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 }
 
 int32_t link_update_meta(ino_t link_inode, const char *newname,
-	struct stat *link_stat, uint64_t *generation, 
+	HCFS_STAT *link_stat, uint64_t *generation, 
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {
-	memset(link_stat, 0, sizeof(struct stat));
+	memset(link_stat, 0, sizeof(HCFS_STAT));
 	*generation = 5;
-	link_stat->st_ino = link_inode;
-	link_stat->st_mode = S_IFREG;
+	link_stat->ino = link_inode;
+	link_stat->mode = S_IFREG;
 
 	if (!strcmp(newname, "new_link_update_meta_fail"))
 		return -123;
@@ -880,19 +884,19 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 {
 	return 0;
 }
-int32_t init_pin_scheduler()
+int32_t init_pin_scheduler(void)
 {
 	return 0;
 }
-int32_t destroy_pin_scheduler()
+int32_t destroy_pin_scheduler(void)
 {
 	return 0;
 }
-int32_t init_download_control()
+int32_t init_download_control(void)
 {
 	return 0;
 }
-int32_t destroy_download_control()
+int32_t destroy_download_control(void)
 {
 	return 0;
 }
@@ -982,7 +986,7 @@ int fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 	return 0;
 }
 
-int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,
+int32_t do_fallocate(ino_t this_inode, HCFS_STAT *newstat, int32_t mode,
 		off_t offset, off_t length,
 		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
 {
@@ -992,11 +996,11 @@ int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,
 	if (mode != 0)
 		return -ENOTSUP;
 	newlen = offset + length;
-	if (newlen <= newstat->st_size)
+	if (newlen <= newstat->size)
 		return 0;
-	oldsize = newstat->st_size;
+	oldsize = newstat->size;
 
-	newstat->st_size = newlen;
+	newstat->size = newlen;
 	hcfs_system->systemdata.system_size += (newlen - oldsize);
 	return 0;
 }

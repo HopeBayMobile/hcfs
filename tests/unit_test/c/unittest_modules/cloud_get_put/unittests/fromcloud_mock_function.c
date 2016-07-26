@@ -4,6 +4,8 @@
 #include <semaphore.h>
 #include <inttypes.h>
 #include <jansson.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include "enc.h"
@@ -120,8 +122,6 @@ void get_system_size(int64_t *cache_size, int64_t *pinned_size)
 		if (cache_size)
 			*cache_size = CACHE_HARD_LIMIT - 1;
 	}
-
-	return 0;
 }
 
 int32_t fetch_error_download_path(char *path, ino_t inode)
@@ -135,9 +135,12 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 	return 0;
 }
 
-int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
-		FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_file_data(ino_t this_inode,
+				    HCFS_STAT *inode_stat,
+				    FILE_META_TYPE *file_meta_ptr,
+				    BLOCK_ENTRY_PAGE *block_page,
+				    int64_t page_pos,
+				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (block_page) {
 		block_page->block_entries[0].status = NOW_STATUS;
@@ -149,9 +152,12 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
-int32_t meta_cache_update_file_nosync(ino_t this_inode, const struct stat *inode_stat,
-	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_update_file_nosync(ino_t this_inode,
+				      const HCFS_STAT *inode_stat,
+				      const FILE_META_TYPE *file_meta_ptr,
+				      const BLOCK_ENTRY_PAGE *block_page,
+				      const int64_t page_pos,
+				      META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -172,7 +178,7 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		int64_t target_page, int64_t hint_page)
 {
-	return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	return sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 }
 
 void fetch_backend_block_objname(char *objname, ino_t inode,
@@ -219,7 +225,7 @@ char *json_dumps(const json_t *root, size_t flags)
 	return (char *)malloc(1);
 }
 
-void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void))
 {
 	sleep(1);
 	return;

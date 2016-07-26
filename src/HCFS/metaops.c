@@ -46,6 +46,7 @@
 #include "lookup_count.h"
 #include "super_block.h"
 #include "filetables.h"
+#include "xattr_ops.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #include "FS_manager.h"
@@ -103,7 +104,7 @@ int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	struct stat parent_stat;
+	HCFS_STAT parent_stat;
 	DIR_META_TYPE parent_meta;
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
@@ -307,7 +308,7 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 
 		/* Complete the splitting by updating the meta of the
 		*  directory. */
-		FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 		FWRITE(&parent_meta, sizeof(DIR_META_TYPE), 1,
 					body_ptr->fptr);
 	}
@@ -315,7 +316,7 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 	/*If the new entry is a subdir, increase the hard link of the parent*/
 
 	if (S_ISDIR(child_mode))
-		parent_stat.st_nlink++;
+		parent_stat.nlink++;
 
 	parent_meta.total_children++;
 	write_log(10,
@@ -351,7 +352,7 @@ int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 			const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	struct stat parent_stat;
+	HCFS_STAT parent_stat;
 	DIR_META_TYPE parent_meta;
 	DIR_ENTRY_PAGE tpage;
 	int32_t sem_val;
@@ -432,7 +433,7 @@ int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 		*  the parent*/
 
 		if (S_ISDIR(child_mode))
-			parent_stat.st_nlink--;
+			parent_stat.nlink--;
 
 		parent_meta.total_children--;
 		write_log(10, "TOTAL CHILDREN is now %lld\n",
@@ -471,7 +472,7 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	DIR_ENTRY_PAGE tpage;
 	int32_t count;
 	int32_t ret_val;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 
 	/* TODO: remove unused parameter ‘parent_inode1’ */
 	UNUSED(parent_inode1);
@@ -502,7 +503,7 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *
 * Function name: change_dir_entry_inode
 *        Inputs: ino_t self_inode, const char *targetname,
-*                ino_t new_inode, struct stat *thisstat,
+*                ino_t new_inode,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: For a directory "self_inode", change the inode and mode
 *                of entry "targetname" to "new_inode" and "new_mode".
@@ -510,14 +511,16 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t change_dir_entry_inode(ino_t self_inode, const char *targetname,
-		ino_t new_inode, mode_t new_mode,
-		META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t change_dir_entry_inode(ino_t self_inode,
+			       const char *targetname,
+			       ino_t new_inode,
+			       mode_t new_mode,
+			       META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
 	int32_t count;
 	int32_t ret_val;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
 						targetname, body_ptr);
@@ -664,7 +667,7 @@ errcode_handle:
 *************************************************************************/
 int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 {
-	struct stat this_inode_stat;
+	HCFS_STAT this_inode_stat;
 	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
@@ -681,7 +684,7 @@ int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 		return ret_val;
 	}
 
-	if (this_inode_stat.st_nlink <= 1) {
+	if (this_inode_stat.nlink <= 1) {
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
 
@@ -689,7 +692,7 @@ int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 
 	} else {
 		/* If it is still referenced, update the meta file. */
-		this_inode_stat.st_nlink--;
+		this_inode_stat.nlink--;
 		set_timestamp_now(&this_inode_stat, CTIME);
 		ret_val = meta_cache_update_dir_data(this_inode,
 					&this_inode_stat, NULL, NULL, body_ptr);
@@ -821,8 +824,9 @@ errcode_handle:
 *                If file pos is 0, the page is not found.
 *
 *************************************************************************/
-int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page,
-			int64_t hint_page)
+int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr,
+		  int64_t target_page,
+		  int64_t hint_page)
 {
 	off_t filepos;
 	int32_t sem_val;
@@ -1166,8 +1170,10 @@ errcode_handle:
 *                If file pos is 0, the page is not found.
 *
 *************************************************************************/
-int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
-		int64_t target_page, int64_t hint_page)
+int64_t seek_page2(FILE_META_TYPE *temp_meta,
+		   FILE *fptr,
+		   int64_t target_page,
+		   int64_t hint_page)
 {
 	off_t filepos;
 	int32_t which_indirect;
@@ -1245,7 +1251,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	int64_t current_page;
 	int64_t page_pos;
 	off_t cache_block_size;
-	struct stat this_inode_stat;
+	HCFS_STAT this_inode_stat;
         FILE_META_TYPE file_meta;
         BLOCK_ENTRY_PAGE tmppage;
         FILE *metafptr;
@@ -1350,9 +1356,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
-		memset(&this_inode_stat, 0, sizeof(struct stat));
-		memset(&file_meta, 0, sizeof(FILE_META_TYPE));
-		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
+		memset(&this_inode_stat, 0, sizeof(this_inode_stat));
+		memset(&file_meta, 0, sizeof(file_meta));
+		FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
 		if (ret_size < 1) {
 			write_log(2, "Skipping block deletion (meta gone)\n");
 			fclose(metafptr);
@@ -1369,10 +1375,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
 		*  deletion loop as well*/
-		if (this_inode_stat.st_size == 0)
+		if (this_inode_stat.size == 0)
 			total_blocks = 0;
 		else
-			total_blocks = ((this_inode_stat.st_size - 1) /
+			total_blocks = ((this_inode_stat.size - 1) /
 				MAX_BLOCK_SIZE) + 1;
 
 		current_page = -1;
@@ -1429,23 +1435,23 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		sem_wait(&(hcfs_system->access_sem));
 		if (P_IS_PIN(file_meta.local_pin)) {
 			hcfs_system->systemdata.pinned_size -=
-						this_inode_stat.st_size;
+						this_inode_stat.size;
 			if (hcfs_system->systemdata.pinned_size < 0)
 				hcfs_system->systemdata.pinned_size = 0;
 		}
 
-		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
+		hcfs_system->systemdata.system_size -= this_inode_stat.size;
 		if (hcfs_system->systemdata.system_size < 0)
 			hcfs_system->systemdata.system_size = 0;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 		if (mptr != NULL) {
-			change_mount_stat(mptr, -this_inode_stat.st_size,
+			change_mount_stat(mptr, -this_inode_stat.size,
 					-metasize, -1);
 		} else {
 			tmpstat.num_inodes--;
 			tmpstat.system_size -=
-				(this_inode_stat.st_size + metasize);
+				(this_inode_stat.size + metasize);
 			tmpstat.meta_size -= metasize;
 			tmpstat.num_inodes -= 1;
 
@@ -1626,7 +1632,7 @@ int32_t startup_finish_delete(void)
 {
 	DIR *dirp;
 	struct dirent tmpent, *tmpptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	char pathname[200];
 	int32_t ret_val;
 	ino_t tmp_ino, root_inode;
@@ -1667,13 +1673,13 @@ int32_t startup_finish_delete(void)
 				closedir(dirp);
 				return ret;
 			}
-			if (S_ISFILE(tmpstat.st_mode))
+			if (S_ISFILE(tmpstat.mode))
 				ret = actual_delete_inode(tmp_ino, D_ISREG,
 						root_inode, NULL);
-			if (S_ISDIR(tmpstat.st_mode))
+			if (S_ISDIR(tmpstat.mode))
 				ret = actual_delete_inode(tmp_ino, D_ISDIR,
 						root_inode, NULL);
-			if (S_ISLNK(tmpstat.st_mode))
+			if (S_ISLNK(tmpstat.mode))
 				ret = actual_delete_inode(tmp_ino, D_ISLNK,
 						root_inode, NULL);
 
@@ -1748,7 +1754,7 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin
 		goto errcode_handle;
 	}
 
-	FSEEK(ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	FSEEK(ptr->fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
 		SEEK_SET);
 	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
 
@@ -2003,7 +2009,7 @@ int32_t collect_dir_children(ino_t this_inode,
 		return -ENOENT;
 	}
 
-	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	total_children = dir_meta.total_children;
 	now_page_pos = dir_meta.tree_walk_list_head;
@@ -2123,7 +2129,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 
 	this_inode = bptr->inode_num;
 
-	if (S_ISFILE(bptr->this_stat.st_mode)) {
+	if (S_ISFILE(bptr->this_stat.mode)) {
 		ret = meta_cache_lookup_file_data(this_inode, NULL, &filemeta,
 				NULL, 0, bptr);
 		if (ret < 0)
@@ -2135,7 +2141,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 			goto error_handling;
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, filemeta.finished_seq);
-	} else if (S_ISDIR(bptr->this_stat.st_mode)) {
+	} else if (S_ISDIR(bptr->this_stat.mode)) {
 		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
 				NULL, bptr);
 		if (ret < 0)
@@ -2148,7 +2154,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, dirmeta.finished_seq);
 	
-	} else if (S_ISLNK(bptr->this_stat.st_mode)) {
+	} else if (S_ISLNK(bptr->this_stat.mode)) {
 		ret = meta_cache_lookup_symlink_data(this_inode, NULL, &symmeta,
 				bptr);
 		if (ret < 0)
@@ -2187,7 +2193,7 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 {
 	int32_t ret;
 
-	if (!S_ISREG(bptr->this_stat.st_mode))
+	if (!S_ISREG(bptr->this_stat.mode))
 		return -EINVAL;
 
 	/* Do nothing if seq number is already the same */

@@ -213,7 +213,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 	BLOCK_ENTRY_PAGE tmp_entry_page;
 	FILE *file_metafptr;
 	int num_pages;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 
 	/* Prepare mock metadata that all blocks are TODELETE and NONE */
 	fd = open(mock_progress_path, O_CREAT | O_RDWR);
@@ -227,11 +227,11 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 			(i % 2 ? ST_TODELETE : ST_NONE);
 	}
 	num_pages = 1000;
-	memset(&tmp_stat, 0, sizeof(struct stat));
+	memset(&tmp_stat, 0, sizeof(HCFS_STAT));
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
 
 	fseek(file_metafptr, 0, SEEK_SET);
-	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
+	fwrite(&tmp_stat, 1, sizeof(HCFS_STAT), file_metafptr);
 	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
 	for (int i = 0; i < num_pages ; i++) { // Linearly mock metadata
 		fwrite(&tmp_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1,
@@ -269,7 +269,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 	BLOCK_ENTRY_PAGE tmp_entry_page;
 	FILE *file_metafptr;
 	int num_pages;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 
 	/* Prepare mock metadata that all blocks are TODELETE and NONE */
 	fd = open(mock_progress_path, O_CREAT | O_RDWR);
@@ -286,11 +286,11 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 			(i % 2 ? ST_CLOUD : ST_LDISK);
 	}
 	num_pages = 1 + POINTERS_PER_PAGE + POINTERS_PER_PAGE / 5;
-	memset(&tmp_stat, 0, sizeof(struct stat));
+	memset(&tmp_stat, 0, sizeof(HCFS_STAT));
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
 
 	fseek(file_metafptr, 0, SEEK_SET);
-	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
+	fwrite(&tmp_stat, 1, sizeof(HCFS_STAT), file_metafptr);
 	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
 	for (int i = 0; i < num_pages ; i++) { // Linearly mock metadata
 		fwrite(&tmp_entry_page, 1, sizeof(BLOCK_ENTRY_PAGE),
@@ -341,7 +341,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 	BLOCK_ENTRY_PAGE tmp_entry_page;
 	FILE *file_metafptr;
 	int num_pages;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 
 	/* Prepare mock metadata that all blocks are TODELETE and NONE */
 	fd = open(mock_progress_path, O_CREAT | O_RDWR);
@@ -356,11 +356,11 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 	tmp_entry_page.block_entries[MAX_BLOCK_ENTRIES_PER_PAGE - 1].status =
 		ST_LDISK; // Last element is LDISK
 	num_pages = 1 + POINTERS_PER_PAGE + POINTERS_PER_PAGE / 5;
-	memset(&tmp_stat, 0, sizeof(struct stat));
+	memset(&tmp_stat, 0, sizeof(HCFS_STAT));
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
 
 	fseek(file_metafptr, 0, SEEK_SET);
-	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
+	fwrite(&tmp_stat, 1, sizeof(HCFS_STAT), file_metafptr);
 	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
 	for (int i = 0; i < num_pages ; i++) { // Linearly mock metadata
 		fwrite(&tmp_entry_page, 1, sizeof(BLOCK_ENTRY_PAGE),

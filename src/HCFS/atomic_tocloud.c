@@ -595,7 +595,7 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 	}
 
 	PREAD(fileno(backend_metafptr), &tempfilemeta, sizeof(FILE_META_TYPE),
-							sizeof(struct stat));
+							sizeof(HCFS_STAT));
 
 	write_log(10, "Debug: backend blocks = %lld\n", backend_blocks);
 
@@ -1001,7 +1001,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 	FILE *backend_metafptr;
 	char backend_metapath[400];
 	char objname[400];
-	struct stat tempfilestat;
+	HCFS_STAT tempfilestat;
 	int32_t errcode, ret;
 	ssize_t ret_ssize;
 	BOOL first_upload;
@@ -1077,8 +1077,8 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 
 		} else {
 			PREAD(fileno(backend_metafptr), &tempfilestat,
-					sizeof(struct stat), 0);
-			*backend_size = tempfilestat.st_size;
+					sizeof(HCFS_STAT), 0);
+			*backend_size = tempfilestat.size;
 			*total_backend_blocks = (*backend_size == 0) ? 
 				0 : (*backend_size - 1) / MAX_BLOCK_SIZE + 1;
 			ret = init_progress_info(ptr->progress_fd,

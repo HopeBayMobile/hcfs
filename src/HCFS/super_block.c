@@ -43,6 +43,7 @@
 #include "macro.h"
 #include "hcfs_cacheops.h"
 #include "syncpoint_control.h"
+#include "meta.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -368,15 +369,16 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 /************************************************************************
 *
 * Function name: super_block_update_stat
-*        Inputs: ino_t this_inode, struct stat *newstat, BOOL no_sync
+*        Inputs: ino_t this_inode, HCFS_STAT *newstat, BOOL no_sync
 *       Summary: Update the stat in the super block entry for inode number
 *                "this_inode", from input pointed by "newstat". Do not sync
 *                to backend if no_sync is true.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
-                                BOOL no_sync)
+int32_t super_block_update_stat(ino_t this_inode,
+				HCFS_STAT *newstat,
+				BOOL no_sync)
 {
 	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -406,13 +408,13 @@ int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
 		if (tempentry.in_transit == TRUE)
 			tempentry.mod_after_in_transit = TRUE;
 
-		memcpy(&(tempentry.inode_stat), newstat, sizeof(struct stat));
+		memcpy(&(tempentry.inode_stat), newstat, sizeof(HCFS_STAT));
 		/* Write the updated content back */
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 	} else if ((ret_val >= 0) && (no_sync == TRUE)) {
 		/* Only update the copy of stat in super block, but do not
 		sync to the backend */
-		memcpy(&(tempentry.inode_stat), newstat, sizeof(struct stat));
+		memcpy(&(tempentry.inode_stat), newstat, sizeof(HCFS_STAT));
 		/* Write the updated content back */
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 	}
@@ -602,9 +604,9 @@ int32_t super_block_to_delete(ino_t this_inode)
 
 		if (ret_val >= 0) {
 			tempentry.in_transit = FALSE;
-			tempmode = tempentry.inode_stat.st_mode;
-			memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
-			tempentry.inode_stat.st_mode = tempmode;
+			tempmode = tempentry.inode_stat.mode;
+			init_hcfs_stat(&(tempentry.inode_stat));
+			tempentry.inode_stat.mode = tempmode;
 			tempentry.pin_status = ST_DEL;
 			ret_val = write_super_block_entry(this_inode, &tempentry);
 		}
@@ -645,7 +647,7 @@ int32_t super_block_delete(ino_t this_inode)
 			tempentry.status = TO_BE_RECLAIMED;
 		}
 		tempentry.in_transit = FALSE;
-		memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
+		init_hcfs_stat(&(tempentry.inode_stat));
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 		if (ret_val < 0) {
 			super_block_exclusive_release();
@@ -895,7 +897,7 @@ int32_t super_block_reclaim_fullscan(void)
 			break;
 
 		if ((tempentry.status == TO_BE_RECLAIMED) ||
-				((tempentry.inode_stat.st_ino == 0) &&
+				((tempentry.inode_stat.ino == 0) &&
 					(tempentry.status != TO_BE_DELETED))) {
 
 			/* Modify status and reclaim the entry. */
@@ -984,19 +986,20 @@ int32_t super_block_reclaim_fullscan(void)
 /************************************************************************
 *
 * Function name: super_block_new_inode
-*        Inputs: struct stat *in_stat
+*        Inputs: HCFS_STAT *in_stat
 *       Summary: Allocate a new inode (first by checking reclaimed inodes)
 *                and initialize the entry in super block using "in_stat".
 *  Return value: New inode number if successful. Otherwise returns 0.
 *
 *************************************************************************/
-ino_t super_block_new_inode(struct stat *in_stat,
-				uint64_t *ret_generation, char local_pin)
+ino_t super_block_new_inode(HCFS_STAT *in_stat,
+			    uint64_t *ret_generation,
+			    char local_pin)
 {
 	ssize_t retsize;
 	ino_t this_inode;
 	SUPER_BLOCK_ENTRY tempentry;
-	struct stat tempstat;
+	HCFS_STAT tempstat;
 	ino_t new_first_reclaimed;
 	uint64_t this_generation;
 	int32_t errcode, ret;
@@ -1059,9 +1062,9 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	if (ret_generation != NULL)
 		*ret_generation = this_generation;
 
-	memcpy(&tempstat, in_stat, sizeof(struct stat));
-	tempstat.st_ino = this_inode;
-	memcpy(&(tempentry.inode_stat), &tempstat, sizeof(struct stat));
+	memcpy(&tempstat, in_stat, sizeof(HCFS_STAT));
+	tempstat.ino = this_inode;
+	memcpy(&(tempentry.inode_stat), &tempstat, sizeof(HCFS_STAT));
 	retsize = pwrite(sys_super_block->iofptr, &tempentry, SB_ENTRY_SIZE,
 				SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (retsize < 0) {

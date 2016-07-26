@@ -43,18 +43,19 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	int64_t num_walked;
 	int64_t next_node_pos;
 	int32_t count;
-	int32_t meta_fd = open(fs_mgr_path, O_RDONLY);
-	ssize_t ret_code;
+	int32_t meta_fd;
+	ssize_t ret_size;
+	int32_t ret_val, tmp_errno = 0;
 	PORTABLE_DIR_ENTRY *ret_entry;
 
+	ret_val = 0;
+	meta_fd = open(fs_mgr_path, O_RDONLY);
 	if (meta_fd == -1)
-		return errno ? -errno: -1;
+		return ERROR_SYSCALL;
 
-	ret_code = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (ret_code == -1) {
-		close(meta_fd);
-		return errno ? -errno: -1;
-	}
+	ret_size = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	if (ret_size == -1)
+		goto errcode_handle;
 
 	/* Initialize B-tree walk by first loading the first node of the
 	 * tree walk.
@@ -62,13 +63,11 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	next_node_pos = tmp_head.tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
-		ret_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
+		ret_size = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		printf("ret_code %d\n", ret_code);
-		if (ret_code == -1 ) {
-			close(meta_fd);
-			return errno ? -errno : -1;
-		}
+		/*printf("ret_val %zu\n", ret_size);*/
+		if (ret_size == -1)
+			goto errcode_handle;
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
 	}
@@ -81,12 +80,10 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	next_node_pos = tmp_head.tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
-		ret_code = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
+		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (ret_code == -1) {
-			close(meta_fd);
-			return errno ? -errno : -1;
-		}
+		if (ret_val == -1)
+			goto errcode_handle;
 		for (count = 0; count < tpage.num_entries; count++) {
 			switch (tpage.dir_entries[count].d_type) {
 			case ANDROID_EXTERNAL:
@@ -106,9 +103,14 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	}
 
 	*ret_num = num_walked;
+	goto end;
 
+errcode_handle:
+	tmp_errno = errno;
+end:
 	close(meta_fd);
-	return 0;
+	errno = tmp_errno;
+	return (ret_val >= 0) ? 0 : ERROR_SYSCALL;
 }
 
 /************************************************************************
@@ -121,72 +123,79 @@ int32_t list_external_volume(const char *fs_mgr_path,
 *                ptr_ret_meta will be filled if return code is 0
 *
 *************************************************************************/
-int32_t parse_meta(const char *meta_path, RET_META *ret)
+void parse_meta(const char *meta_path, RET_META *ret)
 {
-	int32_t meta_fd;
-	struct stat_aarch64 stat_data;
-	int32_t ret_code;
+	int32_t meta_fd, tmp_errno = 0;
+	HCFS_STAT_v1 meta_stat;
 	DIR_META_TYPE dir_meta;
 
 	ret->result = 0;
+	ret->child_number = 0;
 
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1) {
-		ret->result = -1;
-		return errno ? -errno : -1;
+		ret->result = ERROR_SYSCALL;
+		return;
 	}
 
-	ret_code = read(meta_fd, &stat_data, sizeof(stat_data));
-	if (ret_code == -1)
+	ret->result = read(meta_fd, &meta_stat, sizeof(meta_stat));
+	if (ret->result == -1)
 		goto errcode_handle;
 
-	ret->stat.dev = stat_data.dev;
-	ret->stat.ino = stat_data.ino;
-	ret->stat.mode = stat_data.mode;
-	ret->stat.nlink = stat_data.nlink;
-	ret->stat.uid = stat_data.uid;
-	ret->stat.gid = stat_data.gid;
-	ret->stat.rdev = stat_data.rdev;
-	ret->stat.size = stat_data.size;
-	ret->stat.blksize = stat_data.blksize;
-	ret->stat.blocks = stat_data.blocks;
-	ret->stat.atime = stat_data.atime;
-	ret->stat.atime_nsec = stat_data.atime_nsec;
-	ret->stat.mtime = stat_data.mtime;
-	ret->stat.mtime_nsec = stat_data.mtime_nsec;
-	ret->stat.ctime = stat_data.ctime;
-	ret->stat.ctime_nsec = stat_data.ctime_nsec;
+	ret->result =
+	    memcmp(&meta_stat.magic, &META_MAGIC[0], sizeof(meta_stat.magic));
+	if (ret->result != 0 || meta_stat.metaver > CURRENT_META_VER ||
+	    meta_stat.metaver < BACKWARD_COMPATIBILITY) {
+		ret->result = ERROR_UNSUPPORT_VER;
+		goto errcode_handle;
+	}
 
-	if (S_ISDIR(stat_data.mode))
+	memcpy(&ret->stat.magic, &meta_stat.magic, sizeof(ret->stat.magic));
+	ret->stat.metaver = meta_stat.metaver;
+	ret->stat.dev = meta_stat.dev;
+	ret->stat.ino = meta_stat.ino;
+	ret->stat.mode = meta_stat.mode;
+	ret->stat.nlink = meta_stat.nlink;
+	ret->stat.uid = meta_stat.uid;
+	ret->stat.gid = meta_stat.gid;
+	ret->stat.rdev = meta_stat.rdev;
+	ret->stat.size = meta_stat.size;
+	ret->stat.blksize = meta_stat.blksize;
+	ret->stat.blocks = meta_stat.blocks;
+	ret->stat.atime = meta_stat.atime;
+	ret->stat.atime_nsec = meta_stat.atime_nsec;
+	ret->stat.mtime = meta_stat.mtime;
+	ret->stat.mtime_nsec = meta_stat.mtime_nsec;
+	ret->stat.ctime = meta_stat.ctime;
+	ret->stat.ctime_nsec = meta_stat.ctime_nsec;
+
+	if (S_ISDIR(meta_stat.mode))
 		ret->file_type = D_ISDIR;
-	else if (S_ISREG(stat_data.mode))
+	else if (S_ISREG(meta_stat.mode))
 		ret->file_type = D_ISREG;
-	else if (S_ISLNK(stat_data.mode))
+	else if (S_ISLNK(meta_stat.mode))
 		ret->file_type = D_ISLNK;
-	else if (S_ISFIFO(stat_data.mode))
+	else if (S_ISFIFO(meta_stat.mode))
 		ret->file_type = D_ISFIFO;
-	else if (S_ISSOCK(stat_data.mode))
+	else if (S_ISSOCK(meta_stat.mode))
 		ret->file_type = D_ISSOCK;
 
 	if (ret->file_type == D_ISDIR) {
-		ret_code = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
-		if (ret_code == -1)
+		ret->result = read(meta_fd, &dir_meta, sizeof(DIR_META_TYPE));
+		if (ret->result == -1)
 			goto errcode_handle;
 		ret->child_number = dir_meta.total_children;
-	} else {
-		ret->child_number = 0;
 	}
 
-	ret_code = 0;
 	ret->result = 0;
 	goto end;
 
 errcode_handle:
-	ret_code = -errno;
-	ret->result = -1;
+	tmp_errno = errno;
 end:
 	close(meta_fd);
-	return ret_code;
+	errno = tmp_errno;
+	return;
 }
 
 /************************************************************************
@@ -208,7 +217,7 @@ static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 			    PORTABLE_DIR_ENTRY *file_list)
 {
 	int32_t idx;
-	int32_t ret_code;
+	int32_t ret_val;
 	ssize_t ret_ssize;
 	DIR_ENTRY_PAGE temppage;
 
@@ -237,11 +246,11 @@ static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 		}
 	} else {
 		if (walk_left) {
-			ret_code = _traverse_dir_btree(
+			ret_val = _traverse_dir_btree(
 			    fd, temppage.child_page_pos[start_el], 0, TRUE,
 			    FALSE, limit, this_walk, file_list);
-			if (ret_code < 0)
-				return ret_code;
+			if (ret_val < 0)
+				return ret_val;
 		}
 
 		for (idx = start_el; idx < temppage.num_entries; idx++) {
@@ -264,11 +273,11 @@ static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 				return 0;
 			}
 
-			ret_code = _traverse_dir_btree(
+			ret_val = _traverse_dir_btree(
 			    fd, temppage.child_page_pos[idx + 1], 0, TRUE,
 			    FALSE, limit, this_walk, file_list);
-			if (ret_code < 0)
-				return ret_code;
+			if (ret_val < 0)
+				return ret_val;
 		}
 	}
 
@@ -282,11 +291,11 @@ static int64_t _traverse_dir_btree(const int32_t fd, const int64_t page_pos,
 
 		for (idx = 0; idx < temppage.num_entries + 1; idx++) {
 			if (page_pos == temppage.child_page_pos[idx]) {
-				ret_code = _traverse_dir_btree(
+				ret_val = _traverse_dir_btree(
 				    fd, temppage.this_page_pos, idx, FALSE,
 				    TRUE, limit, this_walk, file_list);
-				if (ret_code < 0)
-					return ret_code;
+				if (ret_val < 0)
+					return ret_val;
 				break;
 			}
 		}
@@ -318,31 +327,42 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 			 int64_t *end_page_pos, int32_t *end_el_no,
 			 PORTABLE_DIR_ENTRY *file_list)
 {
-	int32_t ret_code;
+	int32_t ret_val = 0, tmp_errno = 0;
 	int32_t meta_fd;
 	ssize_t ret_ssize;
-	struct stat_aarch64 meta_stat;
+	HCFS_STAT_v1 meta_stat;
 	DIR_META_TYPE dirmeta;
 	TREE_WALKER this_walk;
 
-	if (start_el > MAX_DIR_ENTRIES_PER_PAGE)
-		return -EINVAL;
-
-	if (limit <= 0 || limit > LIST_DIR_LIMIT)
-		return -EINVAL;
+	if (start_el > MAX_DIR_ENTRIES_PER_PAGE || limit <= 0 ||
+	    limit > LIST_DIR_LIMIT) {
+		errno = EINVAL;
+		return ERROR_SYSCALL; 
+	}
 
 	if (access(meta_path, R_OK) == -1)
-		return errno ? -errno : -1;
+		return ERROR_SYSCALL;
 
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1)
-		return errno ? -errno : -1;
+		 return ERROR_SYSCALL;
 
-	ret_ssize = pread(meta_fd, &meta_stat, sizeof(struct stat_aarch64), 0);
-	if (ret_ssize < 0)
+	ret_ssize = pread(meta_fd, &meta_stat, sizeof(HCFS_STAT_v1), 0);
+	if (ret_ssize < 0) {
+		ret_val = ERROR_SYSCALL;
 		goto errcode_handle;
-	if (!S_ISDIR(meta_stat.mode))
-		return -ENOTDIR;
+	}
+	ret_val = memcmp(&meta_stat.magic, META_MAGIC, sizeof(meta_stat.magic));
+	if (ret_val != 0 || meta_stat.metaver > CURRENT_META_VER ||
+	    meta_stat.metaver < BACKWARD_COMPATIBILITY) {
+		ret_val = ERROR_UNSUPPORT_VER;
+		goto errcode_handle;
+	}
+	if (!S_ISDIR(meta_stat.mode)) {
+		ret_val = ERROR_SYSCALL;
+		errno = ENOTDIR;
+		goto errcode_handle;
+	}
 
 	/* Initialize stats about this tree walk */
 	this_walk.is_walk_end = FALSE;
@@ -353,33 +373,36 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 	if (page_pos == 0) {
 		/* Traverse from tree root */
 		ret_ssize = pread(meta_fd, &dirmeta, sizeof(DIR_META_TYPE),
-				  sizeof(struct stat_aarch64));
-		if (ret_ssize < 0)
+				  sizeof(HCFS_STAT_v1));
+		if (ret_ssize < 0) {
+			ret_val = ERROR_SYSCALL;
 			goto errcode_handle;
+		}
 
-		ret_code = _traverse_dir_btree(meta_fd, dirmeta.root_entry_page,
+		ret_val = _traverse_dir_btree(meta_fd, dirmeta.root_entry_page,
 					       0, TRUE, TRUE, limit, &this_walk,
 					       file_list);
 	} else {
-		ret_code =
+		ret_val =
 		    _traverse_dir_btree(meta_fd, page_pos, start_el, FALSE,
 					TRUE, limit, &this_walk, file_list);
 	}
 
-	if (ret_code == 0) {
+	if (ret_val == 0) {
 		*end_page_pos = this_walk.end_page_pos;
 		*end_el_no = this_walk.end_el_no;
 		if (this_walk.num_walked > 0 &&
 		    this_walk.num_walked < limit)
 			*end_el_no += 1;
-		ret_code = this_walk.num_walked;
+		ret_val = this_walk.num_walked;
 	}
 
 	goto end;
 
 errcode_handle:
-	ret_code = -errno;
+	tmp_errno = errno;
 end:
 	close(meta_fd);
-	return ret_code;
+	errno = tmp_errno;
+	return (ret_val >= 0) ? 0 : ret_val;
 }

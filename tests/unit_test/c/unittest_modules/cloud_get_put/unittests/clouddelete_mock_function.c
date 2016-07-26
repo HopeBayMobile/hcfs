@@ -12,17 +12,20 @@
 
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return HTTP_OK;
 }
 
 
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return;
 }
 
 int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
 		strcpy(pathname, TODELETE_PATH);
 		return 0;
@@ -44,16 +47,19 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 
 int32_t super_block_delete(ino_t this_inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 int32_t super_block_reclaim(void)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
@@ -64,11 +70,13 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 int32_t super_block_share_locking(void)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	if (this_inode == 0)
 		return -1;
 	if (test_data.tohandle_counter == test_data.num_inode) {
@@ -85,6 +93,7 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 int32_t super_block_share_release(void)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
@@ -92,9 +101,10 @@ int32_t super_block_share_release(void)
 int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	int64_t target_page, int64_t hint_page) 
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	if (target_page >= 3)
 		return 0;
-	long long ret_page_pos = sizeof(struct stat) + 
+	long long ret_page_pos = sizeof(HCFS_STAT) + 
 		sizeof(FILE_META_TYPE) + sizeof(CLOUD_RELATED_DATA) +
 		target_page * sizeof(BLOCK_ENTRY_PAGE);
 	return ret_page_pos;
@@ -102,56 +112,66 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 
 int32_t write_log(int32_t level, char *format, ...)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 			int64_t num_inodes_delta)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
 
-void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void))
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	sleep(secs);
 	return;
 }
 
 int fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 void fetch_backend_meta_objname(char *objname, ino_t inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return;
 }
 
 void fetch_backend_block_objname(char *objname,
 	ino_t inode, long long block_no, long long seqnum)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
 	return;
 }
 
 int fetch_backend_meta_path(char *pathname, ino_t inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
 }
 
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	FILE *src;
 	char buf[4100];
 	size_t size;
@@ -171,6 +191,7 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 void fetch_del_backend_meta_path(char *backend_metapath, ino_t this_inode)
 {
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	sprintf(backend_metapath, "/tmp/mock_backend_meta");
 }
 

@@ -33,7 +33,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page)
 {
-	return (sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	return (sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 		target_page * sizeof(BLOCK_ENTRY_PAGE));
 }
 
@@ -75,17 +75,17 @@ void fetch_backend_meta_objname(char *objname, ino_t inode)
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
 	FILE_META_TYPE filemeta;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 
 	if (fetch_from_cloud_fail == TRUE)
 		return -EIO;
 	if (is_first_upload == TRUE)
 		return -ENOENT;
 
-	tmpstat.st_size = 10485760;
-	pwrite(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
+	tmpstat.size = 10485760;
+	pwrite(fileno(fptr), &tmpstat, sizeof(HCFS_STAT), 0);
 	pwrite(fileno(fptr), &filemeta, sizeof(FILE_META_TYPE),
-			sizeof(struct stat));
+			sizeof(HCFS_STAT));
 
 	return 0;
 }

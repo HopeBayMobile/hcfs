@@ -24,7 +24,7 @@ int32_t prepare_FS_database_backup(void)
 	return 0;
 }
 
-void init_backend_related_module()
+void init_backend_related_module(void)
 {
 	return;
 }

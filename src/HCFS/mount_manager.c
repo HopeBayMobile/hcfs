@@ -29,6 +29,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "hcfs_fromcloud.h"
+#include "meta.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #endif

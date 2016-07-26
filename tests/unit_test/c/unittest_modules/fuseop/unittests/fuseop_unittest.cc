@@ -112,6 +112,8 @@ class fuseopEnvironment : public ::testing::Environment {
     system_config->max_pinned_limit[0] = 3200000 * 0.8;
     system_config->max_cache_limit[1] = 3200000;
     system_config->max_pinned_limit[1] = 3200000 * 0.8;
+    system_config->max_cache_limit[2] = 3200000;
+    system_config->max_pinned_limit[2] = 3200000 * 0.8;
     system_config->current_backend = 1;
     system_config->meta_space_limit = 1000000;
     hcfs_system->systemdata.system_size = 12800000;
@@ -137,7 +139,7 @@ class fuseopEnvironment : public ::testing::Environment {
   }
 
   virtual void TearDown() {
-    int32_t ret_val, tmp_err;
+    int32_t ret_val;
 
     sleep(3);
     if (fork() == 0)
@@ -153,7 +155,6 @@ class fuseopEnvironment : public ::testing::Environment {
     fuse_opt_free_args(&(unittest_mount.mount_args));
 
     ret_val = rmdir("/tmp/test_fuse");
-    tmp_err = errno;
     printf("delete return %d\n",ret_val);
     free(system_fh_table.entry_table_flags);
     free(system_fh_table.entry_table);
@@ -204,11 +205,9 @@ TEST_F(hfuse_getattrTest, FileNotExist) {
 }
 TEST_F(hfuse_getattrTest, TestRoot) {
   int32_t ret_val;
-  int32_t tmp_err;
-  struct stat tempstat;
+  struct stat tempstat; /* raw file ops */
 
   ret_val = stat("/tmp/test_fuse", &tempstat);
-  tmp_err = errno;
   ASSERT_EQ(ret_val, 0);
   EXPECT_EQ(tempstat.st_atime, 100000);
 }
@@ -281,10 +280,8 @@ TEST_F(hfuse_mknodTest, MknodUpdateError) {
 }
 TEST_F(hfuse_mknodTest, MknodOK) {
   int32_t ret_val;
-  int32_t tmp_err;
 
   ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
-  tmp_err = errno;
 
   EXPECT_EQ(ret_val, 0);
 }
@@ -371,10 +368,8 @@ TEST_F(hfuse_mkdirTest, MkdirUpdateError) {
 }
 TEST_F(hfuse_mkdirTest, MkdirOK) {
   int32_t ret_val;
-  int32_t tmp_err;
 
   ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
-  tmp_err = errno;
 
   EXPECT_EQ(ret_val, 0);
 }
@@ -634,11 +629,9 @@ TEST_F(hfuse_renameTest, Parent2NotExist) {
 }
 TEST_F(hfuse_renameTest, SameFile) {
   int32_t ret_val;
-  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testfile",
 			"/tmp/test_fuse/testsamefile");
-  tmp_err = errno;
 
   EXPECT_EQ(ret_val, 0);
 }
@@ -677,12 +670,9 @@ TEST_F(hfuse_renameTest, TargetDirNotEmpty) {
 }
 TEST_F(hfuse_renameTest, RenameFile) {
   int32_t ret_val;
-  int32_t tmp_err;
 
   ret_val = rename("/tmp/test_fuse/testfile1",
 			"/tmp/test_fuse/testfile2");
-  tmp_err = errno;
-
   EXPECT_EQ(ret_val, 0);
 }
 
@@ -712,11 +702,9 @@ TEST_F(hfuse_chmodTest, FileNotExist) {
 
 TEST_F(hfuse_chmodTest, ChmodFile) {
   int32_t ret_val;
-  int32_t tmp_err;
-  struct stat tempstat;
+  struct stat tempstat; /* raw ops*/
 
   ret_val = chmod("/tmp/test_fuse/testfile1", 0444);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testfile1", &tempstat);
@@ -724,11 +712,9 @@ TEST_F(hfuse_chmodTest, ChmodFile) {
 }
 TEST_F(hfuse_chmodTest, ChmodDir) {
   int32_t ret_val;
-  int32_t tmp_err;
-  struct stat tempstat;
+  struct stat tempstat; /* raw ops */
 
   ret_val = chmod("/tmp/test_fuse/testdir1", 0550);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testdir1", &tempstat);
@@ -762,7 +748,6 @@ TEST_F(hfuse_chownTest, FileNotExist) {
 TEST_F(hfuse_chownTest, ChownNotRoot) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
 
   ret_val = chown("/tmp/test_fuse/testfile1", 1, 1);
   tmp_err = errno;
@@ -775,7 +760,7 @@ TEST_F(hfuse_chownTest, ChownNotRoot) {
 TEST_F(hfuse_chownTest, ChownDir) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
 
   ret_val = chown("/tmp/test_fuse/testdir1", 1, 1);
   tmp_err = errno;
@@ -813,14 +798,12 @@ TEST_F(hfuse_utimensTest, FileNotExist) {
 
 TEST_F(hfuse_utimensTest, UtimeTest) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct utimbuf target_time;
   struct stat tempstat;
 
   target_time.actime = 123456;
   target_time.modtime = 456789;
   ret_val = utime("/tmp/test_fuse/testfile1", &target_time);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testfile1", &tempstat);
@@ -835,7 +818,6 @@ TEST_F(hfuse_utimensTest, UtimeTest) {
 }
 TEST_F(hfuse_utimensTest, UtimensatTest) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct timespec target_time[2];
   struct stat tempstat;
 
@@ -844,7 +826,6 @@ TEST_F(hfuse_utimensTest, UtimensatTest) {
   target_time[0].tv_nsec = 2222;
   target_time[1].tv_nsec = 12345678;
   ret_val = utimensat(1, "/tmp/test_fuse/testfile1", target_time, 0);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testfile1", &tempstat);
@@ -859,7 +840,6 @@ TEST_F(hfuse_utimensTest, UtimensatTest) {
 }
 TEST_F(hfuse_utimensTest, FutimensTest) {
   int32_t ret_val;
-  int32_t tmp_err;
   int32_t fd;
   struct timespec target_time[2];
   struct stat tempstat;
@@ -871,7 +851,6 @@ TEST_F(hfuse_utimensTest, FutimensTest) {
 
   fd = open("/tmp/test_fuse/testfile1", O_RDWR);
   ret_val = futimens(fd, target_time);
-  tmp_err = errno;
 
   close(fd);
 
@@ -947,11 +926,9 @@ TEST_F(hfuse_truncateTest, NegativeSize) {
 }
 TEST_F(hfuse_truncateTest, NoSizeChange) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = truncate("/tmp/test_fuse/testfile2", 1024);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testfile2", &tempstat);
@@ -960,11 +937,9 @@ TEST_F(hfuse_truncateTest, NoSizeChange) {
 }
 TEST_F(hfuse_truncateTest, ExtendSize) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
 
   ret_val = truncate("/tmp/test_fuse/testfile2", 102400);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testfile2", &tempstat);
@@ -987,12 +962,10 @@ TEST_F(hfuse_truncateTest, ExtendExceedQuota) {
 }
 TEST_F(hfuse_truncateTest, TruncateZeroNoBlock) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
 
   fake_block_status = ST_NONE;
   ret_val = truncate("/tmp/test_fuse/testtruncate", 0);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testtruncate", &tempstat);
@@ -1001,12 +974,10 @@ TEST_F(hfuse_truncateTest, TruncateZeroNoBlock) {
 }
 TEST_F(hfuse_truncateTest, TruncateZeroBlockTodelete) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
 
   fake_block_status = ST_TODELETE;
   ret_val = truncate("/tmp/test_fuse/testtruncate", 0);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testtruncate", &tempstat);
@@ -1015,7 +986,6 @@ TEST_F(hfuse_truncateTest, TruncateZeroBlockTodelete) {
 }
 TEST_F(hfuse_truncateTest, TruncateZeroBlockLdisk) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
 
@@ -1024,7 +994,6 @@ TEST_F(hfuse_truncateTest, TruncateZeroBlockLdisk) {
   ASSERT_EQ(access(temppath, F_OK), 0);
   fake_block_status = ST_LDISK;
   ret_val = truncate("/tmp/test_fuse/testtruncate", 0);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   stat("/tmp/test_fuse/testtruncate", &tempstat);
@@ -1035,10 +1004,9 @@ TEST_F(hfuse_truncateTest, TruncateZeroBlockLdisk) {
 
 TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
   int32_t ret_val;
-  int32_t tmp_err;
-  struct stat tempstat;
   char temppath[1024];
   int32_t fd;
+  struct stat tempstat;
 
   fetch_block_path(temppath, 14, 0);
   fd = creat(temppath, 0700);
@@ -1049,7 +1017,6 @@ TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
   ASSERT_EQ(access(temppath, F_OK), 0);
   fake_block_status = ST_LDISK;
   ret_val = truncate("/tmp/test_fuse/testtruncate", 51200);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   ASSERT_EQ(access(temppath, F_OK), 0);
@@ -1063,7 +1030,6 @@ TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
 }
 TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   int32_t fd;
@@ -1073,19 +1039,16 @@ TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
     unlink(temppath);
   fake_block_status = ST_NONE;
   ret_val = truncate("/tmp/test_fuse/testtruncate", 51200);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   EXPECT_NE(access(temppath, F_OK), 0);
   stat("/tmp/test_fuse/testtruncate", &tempstat);
-  EXPECT_EQ(tempstat.st_size, 51200);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 51200);
   EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000);
   EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
 }
 TEST_F(hfuse_truncateTest, TruncateHalfCloud) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
   char temppath[1024];
   int32_t fd;
@@ -1094,7 +1057,6 @@ TEST_F(hfuse_truncateTest, TruncateHalfCloud) {
 
   fake_block_status = ST_CLOUD;
   ret_val = truncate("/tmp/test_fuse/testtruncate", 51200);
-  tmp_err = errno;
 
   ASSERT_EQ(ret_val, 0);
   ASSERT_EQ(access(temppath, F_OK), 0);
@@ -1206,7 +1168,7 @@ class hfuse_readTest : public ::testing::Test {
 TEST_F(hfuse_readTest, ReadZeroByte) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   int32_t fd;
@@ -1226,7 +1188,7 @@ TEST_F(hfuse_readTest, ReadZeroByte) {
 TEST_F(hfuse_readTest, ReadPastEnd) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   int32_t fd;
@@ -1247,7 +1209,7 @@ TEST_F(hfuse_readTest, ReadPastEnd) {
 TEST_F(hfuse_readTest, ReadEmptyContent) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1276,7 +1238,7 @@ TEST_F(hfuse_readTest, ReadEmptyContent) {
 TEST_F(hfuse_readTest, ReadLocalContent) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1304,7 +1266,7 @@ TEST_F(hfuse_readTest, ReadLocalContent) {
 TEST_F(hfuse_readTest, ReadCloudContent) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1331,12 +1293,12 @@ TEST_F(hfuse_readTest, ReadPagedOutRead) {
   int ret_val;
   int tmp_err;
   struct stat tempstat;
+  struct stat tmpstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
   int count;
   int tmp_len;
-  struct stat tmpstat;
   ino_t tmpino;
   FILE *tmpfptr;
   int fd;
@@ -1463,7 +1425,7 @@ TEST_F(hfuse_readTest, ReadPagedOutReRead) {
 TEST_F(hfuse_readTest, ReadCloudWaitCache) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1523,7 +1485,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
 TEST_F(hfuse_ll_writeTest, WriteZeroByte) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   int32_t fd;
@@ -1543,7 +1505,7 @@ TEST_F(hfuse_ll_writeTest, WriteZeroByte) {
 TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
   int32_t ret_val;
   int32_t tmp_err, tmp_len;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   int32_t fd;
@@ -1570,7 +1532,7 @@ TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
 TEST_F(hfuse_ll_writeTest, WritePastEnd) {
   int32_t ret_val;
   int32_t tmp_err, tmp_len;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   int32_t fd;
@@ -1600,7 +1562,7 @@ TEST_F(hfuse_ll_writeTest, WritePastEnd) {
 TEST_F(hfuse_ll_writeTest, ReWriteLocalContent) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1635,7 +1597,7 @@ TEST_F(hfuse_ll_writeTest, ReWriteLocalContent) {
 TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1668,7 +1630,7 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
 TEST_F(hfuse_ll_writeTest, ReWritePagedOutLocal) {
   int ret_val;
   int tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -1812,7 +1774,6 @@ TEST_F(hfuse_ll_writeTest, ReWriteSynced) {
   int count;
   int tmp_len;
   ino_t tmpino;
-  FILE *tmpfptr;
   int fd;
   struct stat tmpstat;
 
@@ -1836,7 +1797,6 @@ TEST_F(hfuse_ll_writeTest, ReWriteSynced) {
   EXPECT_EQ(ret_items, 1);
 
   tmpino = (int64_t) tmpstat.st_ino;
-  tmpfptr = system_fh_table.entry_table[tmpino].blockfptr;
   EXPECT_EQ(0, system_fh_table.entry_table[tmpino].opened_block);
   EXPECT_EQ(ST_LDISK, updated_block_page.block_entries[0].status);
 
@@ -1864,7 +1824,7 @@ TEST_F(hfuse_ll_writeTest, ReWriteSynced) {
 TEST_F(hfuse_ll_writeTest, ReWriteCloudWaitCache) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char temppath[1024];
   char tempbuf[1024];
   size_t ret_items;
@@ -2083,19 +2043,19 @@ TEST_F(hfuse_ll_readdirTest, NoEntry) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int32_t ret_val;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
 
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = 0;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = 2;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2129,19 +2089,19 @@ TEST_F(hfuse_ll_readdirTest, SingleEntry) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int32_t ret_val;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
 
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = 1;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = 3;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2186,20 +2146,20 @@ TEST_F(hfuse_ll_readdirTest, OneMaxPageEntries) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int32_t ret_val, count;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char filename[100];
 
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = MAX_DIR_ENTRIES_PER_PAGE - 2;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2249,20 +2209,20 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int32_t ret_val, count;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char filename[100];
 
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = (2 * MAX_DIR_ENTRIES_PER_PAGE) - 2;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2330,7 +2290,7 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntriesWithSnapshot) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int ret_val, count;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char filename[100];
   DIRH_ENTRY *dirh_ptr;
   char readdirsnap_metapath[100];
@@ -2338,15 +2298,15 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntriesWithSnapshot) {
   /* Create the mock dir meta that is modified */
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = 1;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = 3;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2368,15 +2328,15 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntriesWithSnapshot) {
   snprintf(readdirsnap_metapath, 100, "%s_snap", readdir_metapath);
   fptr = fopen(readdirsnap_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = (2 * MAX_DIR_ENTRIES_PER_PAGE) - 2;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -3267,7 +3227,6 @@ TEST_F(hfuse_ll_fallocateTest, ExtendSize2) {
 TEST_F(hfuse_ll_fallocateTest, ModeNotSupported) {
   int32_t ret_val;
   int32_t tmp_err;
-  struct stat tempstat;
   FILE *fptr;
 
   fptr = fopen("/tmp/test_fuse/testfile2", "r+");

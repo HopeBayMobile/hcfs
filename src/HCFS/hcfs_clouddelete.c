@@ -384,9 +384,9 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	if (S_ISFILE(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 				sizeof(FILE_STATS_TYPE), SEEK_SET);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 				metafptr);
@@ -395,7 +395,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	} else if (S_ISDIR(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 				metafptr);
@@ -404,7 +404,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	} else if (S_ISLNK(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 				metafptr);
@@ -445,7 +445,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char objname[500];
 	ino_t this_inode;
 	FILE *backend_metafptr;
-	struct stat tempfilestat;
+	HCFS_STAT tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t curl_id, which_dsync_index;
@@ -548,10 +548,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		flock(fileno(backend_metafptr), LOCK_EX);
 		backend_mlock = TRUE;
 		FSEEK(backend_metafptr, 0, SEEK_SET);
-		FREAD(&tempfilestat, sizeof(struct stat), 1, backend_metafptr);
+		FREAD(&tempfilestat, sizeof(HCFS_STAT), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 							backend_metafptr);
-		tmp_size = tempfilestat.st_size;
+		tmp_size = tempfilestat.size;
 
 		/* Check if need to sync past the current size */
 
@@ -914,7 +914,7 @@ int32_t _dsync_use_thread(int32_t index, ino_t this_inode, mode_t this_mode)
 *
 *************************************************************************/
 
-static BOOL _sleep_wakeup()
+static BOOL _sleep_wakeup(void)
 {
 	if ((hcfs_system->sync_paused == TRUE) ||
 		(hcfs_system->system_going_down == TRUE))
@@ -1019,7 +1019,7 @@ void delete_loop(void)
 								count++) {
 					ret_val = _dsync_use_thread(count,
 							inode_to_dsync,
-						tempentry.inode_stat.st_mode);
+						tempentry.inode_stat.mode);
 					if (ret_val == 0)
 						break;
 				}

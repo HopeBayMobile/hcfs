@@ -18,8 +18,12 @@
 
 #include "meta_mem_cache.h"
 
-int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,
-		off_t offset, off_t length,
-		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req);
+int32_t do_fallocate(ino_t this_inode,
+		     HCFS_STAT *newstat,
+		     int32_t mode,
+		     off_t offset,
+		     off_t length,
+		     META_CACHE_ENTRY_STRUCT **body_ptr,
+		     fuse_req_t req);
 
 #endif  /* GW20_HCFS_DO_FALLOCATE_H_ */

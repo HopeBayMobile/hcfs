@@ -58,7 +58,7 @@ TEST(meta_forget_inodeTest, RemoveMetaSucces)
 
 TEST(fetch_inode_statTest, FetchRootStatFail)
 {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	ino_t inode = 0;
 
 	EXPECT_EQ(-ENOENT, fetch_inode_stat(inode, &inode_stat, NULL, NULL));
@@ -66,20 +66,20 @@ TEST(fetch_inode_statTest, FetchRootStatFail)
 
 TEST(fetch_inode_statTest, FetchInodeStatSuccess)
 {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	ino_t inode = INO_REGFILE;
 
 	/* Run */
 	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, NULL, NULL));
 
 	/* Verify */
-	EXPECT_EQ(inode, inode_stat.st_ino);
-	EXPECT_EQ(NUM_BLOCKS*MOCK_BLOCK_SIZE, inode_stat.st_size);
+	EXPECT_EQ(inode, inode_stat.ino);
+	EXPECT_EQ(NUM_BLOCKS*MOCK_BLOCK_SIZE, inode_stat.size);
 }
 
 TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	uint64_t gen;
 	ino_t inode = INO_REGFILE;
 
@@ -94,7 +94,7 @@ TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 
 TEST(fetch_inode_statTest, FetchFIFOFileGenerationSuccess)
 {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	uint64_t gen;
 	ino_t inode = INO_FIFO;
 
@@ -109,7 +109,7 @@ TEST(fetch_inode_statTest, FetchFIFOFileGenerationSuccess)
 
 TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	uint64_t gen;
 	ino_t inode = INO_DIR;
 
@@ -124,7 +124,7 @@ TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 
 TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	uint64_t gen;
 	ino_t inode = INO_LNK;
 
@@ -163,10 +163,10 @@ TEST_F(mknod_update_metaTest, FailTo_dir_add_entry)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
-	tmp_stat.st_mode = S_IFREG;
+	tmp_stat.mode = S_IFREG;
 
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
@@ -176,10 +176,10 @@ TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 	ino_t parent_inode = 1;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
-	tmp_stat.st_mode = S_IFREG;
+	tmp_stat.mode = S_IFREG;
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
 }
@@ -188,11 +188,11 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 	int32_t ret;
 
-	tmp_stat.st_mode = S_IFREG;
+	tmp_stat.mode = S_IFREG;
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
 		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE));
@@ -209,10 +209,10 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
-	tmp_stat.st_mode = S_IFDIR;
+	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
@@ -223,10 +223,10 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
 	ino_t parent_inode = 1;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
-	tmp_stat.st_mode = S_IFDIR;
+	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
@@ -236,10 +236,10 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
-	tmp_stat.st_mode = S_IFDIR;
+	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
@@ -597,10 +597,10 @@ protected:
 
 TEST_F(symlink_update_metaTest, AddDirEntryFail)
 {
-	struct stat mock_stat;
+	HCFS_STAT mock_stat;
 	int64_t delta_metasize;
 
-	mock_stat.st_ino = 123;
+	mock_stat.ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
@@ -610,10 +610,10 @@ TEST_F(symlink_update_metaTest, AddDirEntryFail)
 
 TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 {
-	struct stat mock_stat;
+	HCFS_STAT mock_stat;
 	int64_t delta_metasize;
 
-	mock_stat.st_ino = 123;
+	mock_stat.ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
@@ -623,10 +623,10 @@ TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 
 TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 {
-	struct stat mock_stat;
+	HCFS_STAT mock_stat;
 	int64_t delta_metasize;
 
-	mock_stat.st_ino = 123;
+	mock_stat.ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
@@ -663,7 +663,7 @@ protected:
 TEST_F(link_update_metaTest, HardlinkToDirFail)
 {
 	ino_t link_inode;
-	struct stat link_stat;
+	HCFS_STAT link_stat;
 	uint64_t gen;
 
 	link_inode = INO_DIR;
@@ -675,7 +675,7 @@ TEST_F(link_update_metaTest, HardlinkToDirFail)
 TEST_F(link_update_metaTest, TooManyLinks)
 {
 	ino_t link_inode;
-	struct stat link_stat;
+	HCFS_STAT link_stat;
 	uint64_t gen;
 
 	link_inode = INO_TOO_MANY_LINKS;
@@ -687,7 +687,7 @@ TEST_F(link_update_metaTest, TooManyLinks)
 TEST_F(link_update_metaTest, UpdateMetaFail)
 {
 	ino_t link_inode;
-	struct stat link_stat;
+	HCFS_STAT link_stat;
 	uint64_t gen;
 
 	link_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
@@ -699,7 +699,7 @@ TEST_F(link_update_metaTest, UpdateMetaFail)
 TEST_F(link_update_metaTest, AddEntryToParentDirFail)
 {
 	ino_t link_inode;
-	struct stat link_stat;
+	HCFS_STAT link_stat;
 	uint64_t gen;
 
 	link_inode = INO_REGFILE;
@@ -709,13 +709,13 @@ TEST_F(link_update_metaTest, AddEntryToParentDirFail)
 		&link_stat, &gen, mock_parent_entry));
 
 	/* Verify */
-	EXPECT_EQ(1, link_stat.st_nlink); // Set to 1 in fetch_inode_stat()
+	EXPECT_EQ(1, link_stat.nlink); // Set to 1 in fetch_inode_stat()
 }
 
 TEST_F(link_update_metaTest, UpdateMetaSuccess)
 {
 	ino_t link_inode;
-	struct stat link_stat;
+	HCFS_STAT link_stat;
 	uint64_t gen;
 
 	link_inode = INO_REGFILE;
@@ -726,7 +726,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 
 	/* Verify */
 	EXPECT_EQ(GENERATION_NUM, gen);
-	EXPECT_EQ(2, link_stat.st_nlink); // Set to 1 in fetch_inode_stat()
+	EXPECT_EQ(2, link_stat.nlink); // Set to 1 in fetch_inode_stat()
 }
 /*
 	End of unittest of link_update_meta()

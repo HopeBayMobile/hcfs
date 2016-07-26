@@ -23,6 +23,7 @@
 #include "errno.h"
 #include "logger.h"
 #include "utils.h"
+#include "fuseop.h"
 
 int32_t init_pin_scheduler()
 {
@@ -51,7 +52,7 @@ int32_t destroy_pin_scheduler()
 	return 0;
 }
 
-static BOOL _pinning_wakeup_fn()
+static BOOL _pinning_wakeup_fn(void)
 {
 	return hcfs_system->system_going_down;
 }
@@ -82,7 +83,7 @@ void _sleep_a_while(uint32_t *rest_times)
  *
  * @return None
  */
-void pinning_collect()
+void* pinning_collect(void *arg)
 {
 	int32_t idx;
 	struct timespec time_to_sleep;
@@ -129,6 +130,7 @@ void pinning_collect()
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 		nanosleep(&time_to_sleep, NULL);
 	}
+	return NULL;
 }
 
 /**

@@ -24,7 +24,8 @@ endif
 # http://scottmcpeak.com/autodepend/autodepend.html
 
 OBJS_DIR = obj
-OBJS_F := objmeta.o \
+OBJS_F := \
+	objmeta.o \
 	mount_manager.o \
 	FS_manager.o \
 	api_interface.o \
@@ -62,6 +63,7 @@ OBJS_F := objmeta.o \
 	fuseproc_comm.o \
 	event_notification.o \
 	event_filter.o \
+	meta.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

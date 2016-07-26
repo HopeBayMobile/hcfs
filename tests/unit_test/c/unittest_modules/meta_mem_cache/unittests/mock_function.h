@@ -11,7 +11,7 @@ enum { INO__FETCH_META_PATH_FAIL,
 	INO__FETCH_META_PATH_SUCCESS, 
 	INO__FETCH_META_PATH_ERR };
 
-struct stat *generate_mock_stat(ino_t inode_num);
+HCFS_STAT *generate_mock_stat(ino_t inode_num);
 
 char MOCK_FINISH_UPLOADING;
 char MOCK_RETURN_VAL;

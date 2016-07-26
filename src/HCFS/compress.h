@@ -17,8 +17,6 @@
 #include <lz4.h>
 #endif
 
-#include "params.h"
-
 typedef int32_t (*compress_func)(const char *source, char *dest, int32_t inputSize);
 
 typedef int32_t (*decompress_func)(const char *source, char *dest, int32_t inputSize,

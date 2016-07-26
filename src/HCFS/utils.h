@@ -86,7 +86,7 @@ int32_t fetch_error_download_path(char *path, ino_t inode);
 
 void get_system_size(int64_t *cache_size, int64_t *pinned_size);
 
-int32_t update_sb_size();
+int32_t update_sb_size(void);
 
 int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 			int64_t num_cached_blocks_delta,
@@ -98,7 +98,7 @@ int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
 int32_t reload_system_config(const char *config_path);
 
-void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)());
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void));
 
 int32_t ignore_sigpipe(void);
 

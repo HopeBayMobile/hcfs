@@ -1,10 +1,10 @@
+#include <string.h>
+#include <gtest/gtest.h>
+#include "mock_function.h"
 extern "C" {
 #include "hcfscurl.h"
 #include "fuseop.h"
 }
-#include <string.h>
-#include <gtest/gtest.h>
-#include "mock_params.h"
 
 #include "../../fff.h"
 DEFINE_FFF_GLOBALS;
@@ -12,10 +12,28 @@ DEFINE_FFF_GLOBALS;
 /* Fake functions for hcfs */
 FAKE_VALUE_FUNC(int32_t, add_notify_event, int32_t, char *, char);
 
+void *set_swift_token(void *)
+{
+	int sleep_time = 5;
+	printf("Set up swift token after %d seconds later\n", sleep_time);
+	sleep(sleep_time);
+	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
+	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+}
+
 class hcfscurlEnvironment : public ::testing::Environment {
 	public:
 		void SetUp()
 		{
+			hcfs_system = (SYSTEM_DATA_HEAD *)malloc(
+			    sizeof(SYSTEM_DATA_HEAD));
+			hcfs_system->system_going_down = FALSE;
+			hcfs_system->backend_is_online = TRUE;
+			hcfs_system->sync_manual_switch = ON;
+			hcfs_system->sync_paused = OFF;
+			sem_init(&(hcfs_system->access_sem), 0, 1);
+
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
@@ -23,6 +41,7 @@ class hcfscurlEnvironment : public ::testing::Environment {
 		void TearDown()
 		{
 			free(system_config);
+			free(hcfs_system);
 		}
 };
 
@@ -150,6 +169,7 @@ TEST_F(hcfs_init_swift_backendTest, InitBackendGetAuthFail)
 
 TEST_F(hcfs_init_swift_backendTest, InitSwiftTokenBackendOK)
 {
+	pthread_t tmpthread;
 	CURL_HANDLE curl_handle;
 
 	CURRENT_BACKEND = SWIFTTOKEN;
@@ -157,6 +177,7 @@ TEST_F(hcfs_init_swift_backendTest, InitSwiftTokenBackendOK)
 
 	add_notify_event_fake.return_val = 0;
 
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
 	EXPECT_EQ(200, hcfs_init_swift_backend(&curl_handle));
 }
 
@@ -198,19 +219,12 @@ protected:
 		http_perform_retry_fail = FALSE;
 		write_list_header_flag = FALSE;
 		let_retry = FALSE;
-		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
-		hcfs_system->sync_manual_switch = ON;
-		hcfs_system->sync_paused = OFF;
-		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
 	void TearDown()
 	{
 		if (curl_handle)
 			free(curl_handle);
-		free(hcfs_system);
 	}
 
 };
@@ -363,11 +377,6 @@ protected:
 		if (!access(objpath, F_OK));
 			unlink(objpath);
 		fptr = fopen(objpath, "w+");
-		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
-		hcfs_system->sync_manual_switch = ON;
-		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->access_sem), 1, 1);
 	}
 
@@ -379,7 +388,6 @@ protected:
 		fclose(fptr);
 		if (!access(objpath, F_OK));
 			unlink(objpath);
-		free(hcfs_system);
 	}
 
 };
@@ -516,11 +524,6 @@ protected:
 		if (!access(objpath, F_OK));
 			unlink(objpath);
 		fptr = fopen(objpath, "w+");
-		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
-		hcfs_system->sync_manual_switch = ON;
-		hcfs_system->sync_paused = OFF;
 		curl_handle->curl_backend = SWIFT;
 		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
@@ -533,7 +536,6 @@ protected:
 		fclose(fptr);
 		if (!access(objpath, F_OK));
 			unlink(objpath);
-		free(hcfs_system);
 	}
 };
 
@@ -664,18 +666,12 @@ protected:
 
 		objname = "here_is_obj";
 		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
-		hcfs_system->sync_manual_switch = ON;
-		hcfs_system->sync_paused = OFF;
-		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
 	void TearDown()
 	{
 		if (curl_handle)
 			free(curl_handle);
-		free(hcfs_system);
 	}
 };
 
@@ -886,16 +882,6 @@ TEST_F(hcfs_destroy_backendTest, DestroyS3)
 /*
 	Unittest of hcfs_swift_reauth()
  */
-void *set_swift_token(void *)
-{
-	int sleep_time = 5;
-	printf("Set up swift token after %d seconds later\n", sleep_time);
-	sleep(sleep_time);
-	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
-	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
-	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
-}
-
 class hcfs_swift_reauthTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -930,6 +916,8 @@ TEST_F(hcfs_swift_reauthTest, SwiftTokenBackendAuthOK)
 	CURRENT_BACKEND = SWIFTTOKEN;
 	curl_handle.curl_backend = SWIFTTOKEN;
 
+	SWIFT_ACCOUNT = "kewei_account";
+	SWIFT_USER = "kewei";
 	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
 
 	add_notify_event_fake.return_val = 0;

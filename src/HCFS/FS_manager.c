@@ -35,6 +35,7 @@
 #include "metaops.h"
 #include "dir_entry_btree.h"
 #include "utils.h"
+#include "meta.h"
 
 /************************************************************************
 *
@@ -218,7 +219,7 @@ ino_t _create_root_inode()
 #endif
 {
 	ino_t root_inode;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	mode_t self_mode;
@@ -235,7 +236,7 @@ ino_t _create_root_inode()
 
 	statfptr = NULL;
 
-	memset(&this_stat, 0, sizeof(struct stat));
+	init_hcfs_stat(&this_stat);
 	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
@@ -249,12 +250,12 @@ ino_t _create_root_inode()
 	self_mode = S_IFDIR | 0775;
 	ispin = DEFAULT_PIN;
 #endif
-	this_stat.st_mode = self_mode;
+	this_stat.mode = self_mode;
 
 	/*One pointed by the parent, another by self*/
-	this_stat.st_nlink = 2;
-	this_stat.st_uid = getuid();
-	this_stat.st_gid = getgid();
+	this_stat.nlink = 2;
+	this_stat.uid = getuid();
+	this_stat.gid = getgid();
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
@@ -271,7 +272,7 @@ ino_t _create_root_inode()
 		goto errcode_handle;
 	}
 
-	this_stat.st_ino = root_inode;
+	this_stat.ino = root_inode;
 
 	metafptr = fopen(metapath, "w");
 	if (metafptr == NULL) {
@@ -281,7 +282,7 @@ ino_t _create_root_inode()
 	}
 
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
+	FWRITE(&this_stat, sizeof(HCFS_STAT), 1, metafptr);
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 
@@ -291,8 +292,7 @@ ino_t _create_root_inode()
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
 	this_meta.local_pin = ispin;
-	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-	this_meta.metaver = CURRENT_META_VER;
+	FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 
 	/* Init parent lookup. Root inode does not have a parent */
 	ret = pathlookup_write_parent(root_inode, 0);
@@ -706,7 +706,7 @@ int32_t delete_filesystem(char *fsname)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+	FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&roothead, sizeof(DIR_META_TYPE), 1, metafptr);
 	fclose(metafptr);
 	metafptr = NULL;

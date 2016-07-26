@@ -92,7 +92,7 @@ int32_t open_log(char *filename)
 	return 0;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 	struct timeval tmptime;

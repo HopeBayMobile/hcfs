@@ -42,7 +42,7 @@ int32_t get_hcfs_socket_conn()
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, SOCK_PATH);
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	status = connect(fd, (struct sockaddr *) &addr, sizeof(addr));
+	status = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
 	if (status < 0)
 		return -errno;
 

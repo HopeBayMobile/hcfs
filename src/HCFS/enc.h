@@ -15,13 +15,10 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+#include <inttypes.h>
 #ifdef OPENSSL_IS_BORINGSSL
 #include <openssl/mem.h>
 #endif
-#include "params.h"
-#include "b64encode.h"
-#include "logger.h"
-#include "compress.h"
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32

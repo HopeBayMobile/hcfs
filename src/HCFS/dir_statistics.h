@@ -26,8 +26,8 @@ typedef struct {
 /* Share with path lookup the same resource lock */
 FILE *dirstat_lookup_data_fptr;
 
-int32_t init_dirstat_lookup();
-void destroy_dirstat_lookup();
+int32_t init_dirstat_lookup(void);
+void destroy_dirstat_lookup(void);
 
 int32_t reset_dirstat_lookup(ino_t thisinode);
 int32_t update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat);

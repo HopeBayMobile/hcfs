@@ -10,7 +10,7 @@
 *
 **************************************************************************/
 #include "hcfscurl.h"
-#include "mock_params.h"
+#include "mock_function.h"
 #include <openssl/hmac.h>
 
 #undef curl_easy_setopt
@@ -137,8 +137,10 @@ const EVP_MD *EVP_sha1(void)
 {
 }
 
-int32_t b64encode_str(uint8_t *inputstr, char *outputstr,
-	int32_t *outlen, int32_t inputlen)
+int32_t b64encode_str(uint8_t *inputstr,
+		      char *outputstr,
+		      int32_t *outlen,
+		      int32_t inputlen)
 {
 	strcpy(outputstr, "test_b64encode");
 }

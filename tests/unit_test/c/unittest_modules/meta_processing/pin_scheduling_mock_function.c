@@ -61,7 +61,7 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 struct timespec UT_sleep;
 
-void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void))
 {
 	UT_sleep.tv_sec = 0;
 	UT_sleep.tv_nsec = 99999999 ;

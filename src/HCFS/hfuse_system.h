@@ -21,7 +21,7 @@
 int32_t init_hfuse(void);
 int32_t init_hcfs_system_data(void);
 int32_t sync_hcfs_system_data(char need_lock);
-void init_backend_related_module();
+void init_backend_related_module(void);
 int32_t init_event_notify_module(void);
 
 pthread_t delete_loop_thread;

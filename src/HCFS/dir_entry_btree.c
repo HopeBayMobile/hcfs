@@ -288,7 +288,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 
 		this_meta->tree_walk_list_head = newpage.this_page_pos;
 		PWRITE(fh, this_meta, sizeof(DIR_META_TYPE),
-							sizeof(struct stat));
+							sizeof(HCFS_STAT));
 
 		/* Parent of new node is the same as the parent of the old
 			node */
@@ -430,7 +430,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	PWRITE(fh, tnode, sizeof(DIR_ENTRY_PAGE), tnode->this_page_pos);
 
 	this_meta->tree_walk_list_head = newpage.this_page_pos;
-	PWRITE(fh, this_meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	PWRITE(fh, this_meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 
 	/* Parent of new node is the same as the parent of the old node*/
 	newpage.parent_page_pos = tnode->parent_page_pos;
@@ -860,7 +860,7 @@ elements into two, using the median as the new parent item. */
 
 		/* Write changes to left node and meta to disk and return */
 		PWRITE(fh, this_meta, sizeof(DIR_META_TYPE),
-							sizeof(struct stat));
+							sizeof(HCFS_STAT));
 
 		PWRITE(fh, &left_page, sizeof(DIR_ENTRY_PAGE),
 						left_page.this_page_pos);

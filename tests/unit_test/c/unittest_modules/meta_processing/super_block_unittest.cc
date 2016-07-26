@@ -112,14 +112,14 @@ TEST_F(read_super_block_entryTest, ReadEntrySuccess)
 {
 	SUPER_BLOCK_ENTRY sb_entry, expected_sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
-	ino_t inode = 2;
+	ino_t inode = 2, i;
 	FILE *ptr;
 
 	/* Write mock sb head & sb entry */
 	ptr = fopen(sb_path, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	for (int32_t i = 0 ; i < inode - 1 ; i++)
+	for (i = 0 ; i < inode - 1 ; i++)
 		fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	expected_sb_entry.util_ll_next = 123;
 	expected_sb_entry.util_ll_prev = 456;
@@ -170,14 +170,14 @@ TEST_F(write_super_block_entryTest, WriteEntrySuccess)
 {
 	SUPER_BLOCK_ENTRY sb_entry, expected_sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
-	ino_t inode = 7;
+	ino_t inode = 7, i;
 	FILE *ptr;
 
 	/* Write mock sb head & sb entry */
 	ptr = fopen(sb_path, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	for (int32_t i = 0 ; i < inode ; i++)
+	for (i = 0 ; i < inode ; i++)
 		fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	fclose(ptr);
 
@@ -339,7 +339,7 @@ TEST_F(super_block_readTest, ReadEntrySuccess)
 {
 	SUPER_BLOCK_ENTRY sb_entry, expected_sb_entry;
 	SUPER_BLOCK_HEAD sb_head;
-	ino_t inode = 2;
+	ino_t inode = 2, i;
 	FILE *ptr;
 
 	/* Write mock sb head & sb entry */
@@ -348,7 +348,7 @@ TEST_F(super_block_readTest, ReadEntrySuccess)
 	ptr = fopen(SUPERBLOCK, "w+");
 	fwrite(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, ptr);
 	memset(&expected_sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	for (int32_t i = 0 ; i < inode - 1 ; i++)
+	for (i = 0 ; i < inode - 1 ; i++)
 		fwrite(&expected_sb_entry, sizeof(SUPER_BLOCK_ENTRY), 1, ptr);
 	expected_sb_entry.util_ll_next = 123;
 	expected_sb_entry.util_ll_prev = 456;
@@ -447,7 +447,7 @@ class super_block_update_statTest : public InitSuperBlockBaseClass {
 
 TEST_F(super_block_update_statTest, UpdateFail_SinceReadEntryFail)
 {
-	struct stat new_stat;
+	HCFS_STAT new_stat;
 	ino_t inode = 8;
 
 	/* Mock data. open a nonexisted file */
@@ -460,7 +460,7 @@ TEST_F(super_block_update_statTest, UpdateFail_SinceReadEntryFail)
 
 TEST_F(super_block_update_statTest, UpdateStatSuccess)
 {
-	struct stat expected_stat;
+	HCFS_STAT expected_stat;
 	ino_t inode = 8;
 	SUPER_BLOCK_ENTRY sb_entry;
 
@@ -474,11 +474,11 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
-	expected_stat.st_dev = 1;  /* expected stat */
-	expected_stat.st_ino = inode;
-	expected_stat.st_mode = S_IFDIR;
-	expected_stat.st_nlink = 5;
-	expected_stat.st_size = 123456;
+	expected_stat.dev = 1;  /* expected stat */
+	expected_stat.ino = inode;
+	expected_stat.mode = S_IFDIR;
+	expected_stat.nlink = 5;
+	expected_stat.size = 123456;
 
 	/* Run */
 	EXPECT_EQ(0, super_block_update_stat(inode, &expected_stat, FALSE));
@@ -487,7 +487,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
-	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, sizeof(HCFS_STAT)));
 	EXPECT_EQ(IS_DIRTY, sb_entry.status);
 	EXPECT_EQ(TRUE, sb_entry.mod_after_in_transit);
 	EXPECT_EQ(1, sys_super_block->head.num_dirty);
@@ -495,7 +495,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 
 TEST_F(super_block_update_statTest, UpdateStatSuccessNoSync)
 {
-	struct stat expected_stat;
+	HCFS_STAT expected_stat;
 	ino_t inode = 8;
 	SUPER_BLOCK_ENTRY sb_entry;
 
@@ -509,11 +509,11 @@ TEST_F(super_block_update_statTest, UpdateStatSuccessNoSync)
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
-	expected_stat.st_dev = 1;  /* expected stat */
-	expected_stat.st_ino = inode;
-	expected_stat.st_mode = S_IFDIR;
-	expected_stat.st_nlink = 5;
-	expected_stat.st_size = 123456;
+	expected_stat.dev = 1;  /* expected stat */
+	expected_stat.ino = inode;
+	expected_stat.mode = S_IFDIR;
+	expected_stat.nlink = 5;
+	expected_stat.size = 123456;
 
 	/* Run */
 	EXPECT_EQ(0, super_block_update_stat(inode, &expected_stat, TRUE));
@@ -522,7 +522,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccessNoSync)
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
-	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, sizeof(HCFS_STAT)));
 	EXPECT_EQ(NO_LL, sb_entry.status);
 	EXPECT_EQ(FALSE, sb_entry.mod_after_in_transit);
 	EXPECT_EQ(0, sys_super_block->head.num_dirty);
@@ -1091,16 +1091,16 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 
 class super_block_new_inodeTest : public InitSuperBlockBaseClass {
 protected:
-	struct stat expected_stat;
+	HCFS_STAT expected_stat;
 
 	void SetUp()
 	{
 		InitSuperBlockBaseClass::SetUp();
-		expected_stat.st_ino = 2;
-		expected_stat.st_mode = S_IFDIR;
-		expected_stat.st_dev = 5;
-		expected_stat.st_nlink = 6;
-		expected_stat.st_size = 5566;
+		expected_stat.ino = 2;
+		expected_stat.mode = S_IFDIR;
+		expected_stat.dev = 5;
+		expected_stat.nlink = 6;
+		expected_stat.size = 5566;
 	}
 };
 
@@ -1132,7 +1132,7 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(1, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat,
-		sizeof(struct stat)));
+		sizeof(HCFS_STAT)));
 }
 
 TEST_F(super_block_new_inodeTest, NoReclaimedNodes_NoMoreMetaSpace)
@@ -1202,7 +1202,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(2, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat,
-		sizeof(struct stat)));
+		sizeof(HCFS_STAT)));
 }
 
 TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNode)
@@ -1248,7 +1248,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	EXPECT_EQ(ST_PIN, sb_entry.pin_status);
 	EXPECT_EQ(2, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat,
-		sizeof(struct stat)));
+		sizeof(HCFS_STAT)));
 }
 /*
 	End of unittest of super_block_new_inode()

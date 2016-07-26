@@ -36,7 +36,7 @@ class uploadEnvironment : public ::testing::Environment {
 	    return;
     }
   */
-    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system = (SYSTEM_DATA_HEAD *) calloc(1, sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
@@ -56,10 +56,10 @@ class uploadEnvironment : public ::testing::Environment {
 	    symlink(tmppath, "/tmp/testHCFS");
     }
     system_config = (SYSTEM_CONF_STRUCT *)
-	    malloc(sizeof(SYSTEM_CONF_STRUCT));
+	    calloc(1, sizeof(SYSTEM_CONF_STRUCT));
+    system_config->max_block_size = 1000;
     if (!system_config)
 	printf("Fail to allocate memory\n");
-    memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 
     METAPATH = (char *) malloc(METAPATHLEN);
     snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
@@ -90,11 +90,19 @@ class init_sync_stat_controlTest : public ::testing::Test {
  protected:
   int32_t count;
   char tmpmgrpath[100];
-  virtual void SetUp() {
-    no_backend_stat = TRUE;
+  char tmppath[200];
+  virtual void SetUp()
+  {
+	  no_backend_stat = TRUE;
+	  snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+	  rmdir(tmppath);
    }
 
-  virtual void TearDown() {
+   virtual void TearDown()
+   {
+	   char tmppath[200];
+	   snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+	   rmdir(tmppath);
    }
 
  };
@@ -282,6 +290,8 @@ protected:
 	{
 		no_backend_stat = TRUE;
 		init_sync_stat_control();
+		sem_init(&upload_ctl.upload_queue_sem, 0, 1);
+		sem_init(&upload_ctl.upload_op_sem, 0, 1);
 	}
 
 	void TearDown()
@@ -369,7 +379,7 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	unlink(MOCK_META_PATH);
 }
 
-TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
+TEST_F(init_upload_controlTest, DISABLED_MetaIsDeleted_and_TerminateThreadSuccess)
 {
 	void *res;
 	int32_t num_block_entry = 80;
@@ -384,6 +394,7 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 		ino_t inode = 1;
 		int32_t index;
 		//usleep(100000);
+		printf("Generate mock threads %d\n", i);
 		sem_wait(&(upload_ctl.upload_queue_sem));
 		sem_wait(&(upload_ctl.upload_op_sem));
 		index = InitUploadControlTool::Tool()->get_thread_index();
@@ -442,10 +453,11 @@ protected:
 		memset(empty_created_array, 0, sizeof(char) * MAX_SYNC_CONCURRENCY);
 		empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
 
-		shm_verified_data = malloc(sizeof(LoopToVerifiedData));
+		shm_verified_data =
+		    (LoopToVerifiedData *)malloc(sizeof(LoopToVerifiedData));
 		sem_init(&shm_verified_data->record_inode_sem, 0, 1);
 		shm_verified_data->record_handle_inode =
-			malloc(sizeof(ino_t) * 1000);
+		    (int32_t *)malloc(sizeof(int32_t) * 1000);
 		shm_verified_data->record_inode_counter = 0;
 		
 		sys_super_block = (SUPER_BLOCK_CONTROL *)
@@ -765,7 +777,7 @@ protected:
 	}
 	void write_mock_meta_file(char *metapath, int32_t total_page, uint8_t block_status, BOOL topin)
 	{
-		struct stat mock_stat;
+		HCFS_STAT mock_stat;
 		FILE_META_TYPE mock_file_meta;
 		BLOCK_ENTRY_PAGE mock_block_page;
 		BLOCK_UPLOADING_PAGE block_uploading_page;
@@ -778,12 +790,12 @@ protected:
 		memset(&block_uploading_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
-		mock_stat.st_size = total_page * MAX_BLOCK_ENTRIES_PER_PAGE *
+		mock_stat.size = total_page * MAX_BLOCK_ENTRIES_PER_PAGE *
 			MAX_BLOCK_SIZE; /* Let total_blocks = 1000000/1000 = 1000 */
-		mock_stat.st_mode = S_IFREG;
+		mock_stat.mode = S_IFREG;
 		mock_file_meta.root_inode = 10;
 		mock_file_meta.local_pin = topin;
-		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
+		fwrite(&mock_stat, sizeof(HCFS_STAT), 1, mock_metaptr); // Write stat
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
 		fwrite(&mock_statistics, sizeof(FILE_STATS_TYPE), 1, mock_metaptr);
 		fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_metaptr);
@@ -849,7 +861,7 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 	sync_single_inode(&mock_thread_type);
 }
 
-TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
+TEST_F(sync_single_inodeTest, DISABLED_SyncBlockFileSuccessNoPin)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
 	char metapath[] = MOCK_META_PATH;
@@ -899,9 +911,9 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
 	}
 	printf("Begin to check block status\n");
 	metaptr = fopen(metapath, "r+");
-	fseek(metaptr, sizeof(struct stat), SEEK_SET);
+	fseek(metaptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
-	fseek(metaptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	fseek(metaptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA),
 			SEEK_SET);
 	while (!feof(metaptr)) {
@@ -914,7 +926,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
 	unlink(metapath);
 }
 
-TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
+TEST_F(sync_single_inodeTest, DISABLED_SyncBlockFileSuccessPin)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
 	char metapath[] = MOCK_META_PATH;
@@ -971,9 +983,9 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
 
 	printf("Begin to check block status\n");
 	metaptr = fopen(metapath, "r+");
-	fseek(metaptr, sizeof(struct stat), SEEK_SET);
+	fseek(metaptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
-	fseek(metaptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	fseek(metaptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA),
 			SEEK_SET);
 	while (!feof(metaptr)) {
@@ -1018,9 +1030,9 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	/* Check status */
 	printf("Begin to check block status\n");
 	metaptr = fopen(metapath, "r+");
-	fseek(metaptr, sizeof(struct stat), SEEK_SET);
+	fseek(metaptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
-	fseek(metaptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	fseek(metaptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA),
 			SEEK_SET);
 	while (!feof(metaptr)) {
@@ -1079,7 +1091,7 @@ protected:
 		max_objname_num = 40;
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
 		for (int32_t i = 0 ; i < max_objname_num ; i++) {
-			struct stat empty_stat;
+			HCFS_STAT empty_stat;
 			DIR_META_TYPE empty_meta;
 			CLOUD_RELATED_DATA mock_cloud_data;
 			FILE *fptr;
@@ -1089,12 +1101,12 @@ protected:
 			fetch_toupload_meta_path(toupload_meta, (i + 1) * 5);
 			fptr = fopen(toupload_meta, "w+");
 			setbuf(fptr, NULL);
-			memset(&empty_stat, 0, sizeof(struct stat));
+			memset(&empty_stat, 0, sizeof(HCFS_STAT));
 			memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
 			memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
 			empty_meta.root_inode = 10;
 			fseek(fptr, 0, SEEK_SET);
-			fwrite(&empty_stat, sizeof(struct stat), 1, fptr);
+			fwrite(&empty_stat, sizeof(HCFS_STAT), 1, fptr);
 			fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, fptr);
 			fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA),
 					1, fptr);
@@ -1158,7 +1170,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 {
 	pthread_t thread_id;
 	int32_t shm_key, shm_key2;
-	struct stat empty_stat;
+	HCFS_STAT empty_stat;
 	DIR_META_TYPE empty_meta;
 	BLOCK_ENTRY_PAGE mock_block_page;
 	CLOUD_RELATED_DATA mock_cloud_data;
@@ -1171,13 +1183,13 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	/* Write something into meta, int32_t the unittest, only test
 	   the case that upload dir meta because regfile case has
 	   been tested in sync_single_inodeTest(). */
-	memset(&empty_stat, 0, sizeof(struct stat));
+	memset(&empty_stat, 0, sizeof(HCFS_STAT));
 	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
 	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
-	empty_stat.st_mode = S_IFDIR;
+	empty_stat.mode = S_IFDIR;
 	empty_meta.root_inode = 10;
 	fseek(mock_file_meta, 0, SEEK_SET);
-	fwrite(&empty_stat, sizeof(struct stat), 1, mock_file_meta);
+	fwrite(&empty_stat, sizeof(HCFS_STAT), 1, mock_file_meta);
 	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
 	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
 	fclose(mock_file_meta);

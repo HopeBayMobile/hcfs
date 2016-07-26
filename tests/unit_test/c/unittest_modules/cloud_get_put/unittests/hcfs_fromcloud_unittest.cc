@@ -68,6 +68,7 @@ protected:
 	{
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
+		sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 		for (int32_t i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
 
@@ -92,17 +93,17 @@ protected:
 		free(objname_list);
 	}
 	/* Static thread function, which is used to run function fetch_from_cloud() */
-	static void *fetch_from_cloud_for_thread(void *block_no)
+	static void *fetch_from_cloud_for_thread(void *arg)
 	{
+		int64_t block_no = (intptr_t)arg;
 		char tmp_filename[50];
 		char objname[100];
 		FILE *fptr;
-		int32_t ret;
 
-		sprintf(objname, "data_1_%ld", *(int32_t *)block_no);
-		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int32_t *)block_no);
+		sprintf(objname, "data_1_%ld", block_no);
+		sprintf(tmp_filename, "/tmp/testHCFS/local_space%ld", block_no);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, READ_BLOCK, objname);
+		fetch_from_cloud(fptr, READ_BLOCK, objname);
 		fclose(fptr);
 		unlink(tmp_filename);
 		return NULL;
@@ -141,7 +142,7 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 		char tmp_filename[20];
 		block_no[i] = (i + 1)*5;
 		EXPECT_EQ(0, pthread_create(&tid[i], NULL,
-			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
+			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)block_no[i]));
 
 		sprintf(tmp_filename, "data_%d_%d", 1, block_no[i]); // Expected value
 		expected_objname[expected_obj_counter++] = std::string(tmp_filename);
@@ -288,7 +289,7 @@ protected:
 	}
 };
 
-void mock_thread_fn()
+void* mock_thread_fn(void *arg)
 {
 	return NULL;
 }
@@ -302,7 +303,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 
 	/* Create download_block_manager */
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
-			(void *)&download_block_manager, NULL);
+			&download_block_manager, NULL);
 
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
 		download_thread_ctl.block_info[i].dl_error = FALSE;
@@ -336,7 +337,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 
 	/* Create download_block_manager */
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
-			(void *)&download_block_manager, NULL);
+			&download_block_manager, NULL);
 
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].active = TRUE;
@@ -344,7 +345,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 		download_thread_ctl.block_info[i].this_inode = i;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 		pthread_create(&(download_thread_ctl.download_thread[i]),
-				NULL, mock_thread_fn, NULL);
+				NULL, &mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
@@ -421,14 +422,14 @@ TEST_F(fetch_pinned_blocksTest, NotRegfile_DirectlyReturn)
 {
 	ino_t inode;
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 
 	inode = 5;
 	fetch_meta_path(metapath, inode);
-	memset(&tmpstat, 0 , sizeof(struct stat));
-	tmpstat.st_mode = S_IFDIR;
+	memset(&tmpstat, 0 , sizeof(HCFS_STAT));
+	tmpstat.mode = S_IFDIR;
 	fptr = fopen(metapath, "w+");
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fclose(fptr);
 
 	/* Test */
@@ -442,17 +443,17 @@ TEST_F(fetch_pinned_blocksTest, SystemGoingDown)
 {
 	ino_t inode;
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE_META_TYPE filemeta;
 
 	inode = 5;
 	fetch_meta_path(metapath, inode);
-	memset(&tmpstat, 0 , sizeof(struct stat));
+	memset(&tmpstat, 0 , sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
-	tmpstat.st_mode = S_IFREG;
-	tmpstat.st_size = 5;
+	tmpstat.mode = S_IFREG;
+	tmpstat.size = 5;
 	fptr = fopen(metapath, "w+");
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fclose(fptr);
 
@@ -469,22 +470,22 @@ TEST_F(fetch_pinned_blocksTest, InodeBeUnpinned)
 {
 	ino_t inode;
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE tmppage;
 
 	inode = 5;
 	fetch_meta_path(metapath, inode);
-	memset(&tmpstat, 0 , sizeof(struct stat));
+	memset(&tmpstat, 0 , sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
-	tmpstat.st_mode = S_IFREG;
-	tmpstat.st_size = 5;
+	tmpstat.mode = S_IFREG;
+	tmpstat.size = 5;
 	tmppage.block_entries[0].status = ST_LDISK;
 	filemeta.local_pin = FALSE;
 
 	fptr = fopen(metapath, "w+");
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fwrite(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
 	fclose(fptr);
@@ -500,22 +501,22 @@ TEST_F(fetch_pinned_blocksTest, BlockStatusIsLocal)
 {
 	ino_t inode;
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE tmppage;
 
 	inode = 5;
 	fetch_meta_path(metapath, inode);
-	memset(&tmpstat, 0 , sizeof(struct stat));
+	memset(&tmpstat, 0 , sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
-	tmpstat.st_mode = S_IFREG;
-	tmpstat.st_size = 5;
+	tmpstat.mode = S_IFREG;
+	tmpstat.size = 5;
 	tmppage.block_entries[0].status = ST_LDISK;
 	filemeta.local_pin = TRUE;
 
 	fptr = fopen(metapath, "w+");
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fwrite(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
 	fclose(fptr);
@@ -600,7 +601,7 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 	OPEN_META_PATH_FAIL = FALSE;
 
 	/* Test */
-	pthread_create(&tid, NULL, fetch_backend_block,
+	pthread_create(&tid, NULL, &fetch_backend_block,
 		&(download_thread_ctl.block_info[0]));
 	pthread_join(tid, NULL);
 
@@ -627,6 +628,7 @@ protected:
 		mkdir(METAPATH, 0700);
 		hcfs_system->system_going_down = FALSE;
 		hcfs_system->backend_is_online = TRUE;
+		sem_init(&(hcfs_system->access_sem), 0, 1);
 
 		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);

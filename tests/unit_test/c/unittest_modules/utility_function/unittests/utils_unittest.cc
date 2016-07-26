@@ -1340,9 +1340,15 @@ class init_cache_thresholdsTest : public ::testing::Test {
 	protected:
 		virtual void SetUp()
 		{
+			system_config = (SYSTEM_CONF_STRUCT *)calloc(
+			    1, sizeof(SYSTEM_CONF_STRUCT));
 			CACHE_HARD_LIMIT = 0;
 			RESERVED_CACHE_SPACE = 0;
 		}
+		void TearDown()
+		{
+			free(system_config);
+	}
 };
 
 TEST_F(init_cache_thresholdsTest, Successful)

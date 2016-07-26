@@ -18,7 +18,7 @@ char readdir_metapath[100];
 int32_t fail_open_files;
 
 BLOCK_ENTRY_PAGE updated_block_page;
-struct stat updated_stat, updated_root;
+HCFS_STAT updated_stat, updated_root;
 mode_t updated_mode;
 uid_t updated_uid;
 gid_t updated_gid;

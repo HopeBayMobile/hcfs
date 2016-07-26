@@ -109,7 +109,7 @@ class dir_add_entryTest : public ::testing::Test {
 			body_ptr->fptr = fopen(mock_metaname, "w+");
 			/* Init meta & stat to be verified */
 			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
-			memset(&to_verified_stat, 0, sizeof(struct stat));
+			memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
                 }
 
                 virtual void TearDown() 
@@ -147,7 +147,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
 	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
 	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
-	to_verified_stat.st_nlink = LINK_NUM;
+	to_verified_stat.nlink = LINK_NUM;
 	sem_wait(&body_ptr->access_sem);
 	
 	/* Run */
@@ -155,7 +155,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
 		self_name, S_IFREG, body_ptr));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 }
 
 TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
@@ -165,7 +165,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
 	memset(&tmp_dir_page, 0, sizeof(DIR_ENTRY_PAGE));
 	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
-	to_verified_stat.st_nlink = LINK_NUM;
+	to_verified_stat.nlink = LINK_NUM;
 	sem_wait(&body_ptr->access_sem);
 	
 	/* Run */
@@ -173,7 +173,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
 		self_name, S_IFDIR, body_ptr));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.nlink);
 }
 
 TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
@@ -186,7 +186,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
 		fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
-	to_verified_stat.st_nlink = LINK_NUM;
+	to_verified_stat.nlink = LINK_NUM;
 	sem_wait(&body_ptr->access_sem);
 	
 	/* Run */
@@ -194,7 +194,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
 		self_name, S_IFREG, body_ptr));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 }
 
 TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
@@ -207,7 +207,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
 		fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	
 	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
-	to_verified_stat.st_nlink = LINK_NUM;
+	to_verified_stat.nlink = LINK_NUM;
 	sem_wait(&body_ptr->access_sem);
 	
 	/* Run */
@@ -215,7 +215,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
 		self_name, S_IFDIR, body_ptr));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.nlink);
 }
 
 /*
@@ -254,9 +254,9 @@ class dir_remove_entryTest : public ::testing::Test {
 			/* to_verified_meta & to_verified_stat will be modify in dir_remove_entry().
 			   Use the global vars to verify result. */
 			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
-			memset(&to_verified_stat, 0, sizeof(struct stat));
+			memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
 			to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
-			to_verified_stat.st_nlink = LINK_NUM;
+			to_verified_stat.nlink = LINK_NUM;
                 }
 
                 virtual void TearDown() {
@@ -283,7 +283,7 @@ TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail)
 		
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 
@@ -298,7 +298,7 @@ TEST_F(dir_remove_entryTest, RemoveDirSuccess)
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM - 1, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM - 1, to_verified_stat.nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 
@@ -313,7 +313,7 @@ TEST_F(dir_remove_entryTest, RemoveRegFileSuccess)
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 
@@ -328,7 +328,7 @@ TEST_F(dir_remove_entryTest, RemoveSymlinkSuccess)
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
-	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 /*
@@ -387,7 +387,7 @@ protected:
 		body_ptr = (META_CACHE_ENTRY_STRUCT*)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
-		memset(&to_verified_stat, 0, sizeof(struct stat));
+		memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
 	}
 	virtual void TearDown() {
 		free(body_ptr);
@@ -1152,6 +1152,11 @@ protected:
 
 		fclose(statfptr);
 	
+		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
+		hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
 	}
 
 	void TearDown()
@@ -1183,6 +1188,7 @@ protected:
 		fetch_meta_path(thismetapath, INO_DELETE_LNK);
 		if (!access(thismetapath, F_OK))
 			unlink(thismetapath);
+		free(hcfs_system);
 	}
 };
 
@@ -1298,7 +1304,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	char thismetapath[100];
 	bool block_file_existed;
 	BLOCK_ENTRY_PAGE block_entry_page;
-	struct stat mock_stat;
+	HCFS_STAT mock_stat;
 	FILE_META_TYPE mock_meta;
 	FILE *tmp_fp;
 	ino_t mock_inode = INO_DELETE_FILE_BLOCK;
@@ -1308,7 +1314,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	mock_root = 556677;
 	/* Mock system init data & block data */
 	MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
-	hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 0, 1);
 	hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
@@ -1326,19 +1331,19 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	// make mock meta file so that delete_inode_meta() will success
 	/* Make mock meta file. Add truncated size */
 	memset(&block_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
-	memset(&mock_stat, 0, sizeof(struct stat));
+	memset(&mock_stat, 0, sizeof(HCFS_STAT));
 	memset(&mock_meta, 0, sizeof(FILE_META_TYPE));
 	for (int32_t i = 0; i < NUM_BLOCKS; i++)
 		block_entry_page.block_entries[i].status = ST_LDISK;
-	mock_stat.st_size = NUM_BLOCKS * MAX_BLOCK_SIZE + TRUNC_SIZE;
-	mock_stat.st_ino = mock_inode;
+	mock_stat.size = NUM_BLOCKS * MAX_BLOCK_SIZE + TRUNC_SIZE;
+	mock_stat.ino = mock_inode;
 	mock_meta.local_pin = FALSE;
-	mock_meta.direct = sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	mock_meta.direct = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 
 	fetch_meta_path(thismetapath, INO_DELETE_FILE_BLOCK);
 	meta_fp = fopen(thismetapath, "w+");
 	fseek(meta_fp, 0, SEEK_SET);
-	fwrite(&mock_stat, sizeof(struct stat), 1, meta_fp);
+	fwrite(&mock_stat, sizeof(HCFS_STAT), 1, meta_fp);
 	fwrite(&mock_meta, sizeof(FILE_META_TYPE), 1, meta_fp);
 	fwrite(&block_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta_fp);
 	fclose(meta_fp);
@@ -1371,7 +1376,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	EXPECT_EQ(false, block_file_existed);
 
 	/* Free resource */
-	free(hcfs_system);
 	unlink(thismetapath);
 }
 
@@ -1616,22 +1620,29 @@ protected:
 	void SetUp()
 	{
 		FILE *fptr;
-		struct stat tmpstat;
+		HCFS_STAT tmpstat;
 		FILE_META_TYPE tmpmeta;
 		FILE_STATS_TYPE tmpstats;
 
-		fptr = fopen("test_meta_file", "w+");
-		fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+		fptr = fopen("test_meta_file", "wb+");
+		fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 		fwrite(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
 		fwrite(&tmpstats, sizeof(FILE_STATS_TYPE), 1, fptr);
-		fclose(fptr);
+		if(fptr)
+			fclose(fptr);
 		test_change_pin_flag = TRUE;
+		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
+		hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
 	}
 
 	void TearDown()
 	{
 		unlink("test_meta_file");
 		test_change_pin_flag = FALSE;
+		free(hcfs_system);
 	}
 };
 
@@ -1750,15 +1761,15 @@ TEST_F(collect_dir_childrenTest, NoChildren)
 	ino_t inode;
 	char metapath[300];
 	FILE *fptr;
-	struct stat tempstat;
+	HCFS_STAT tempstat;
 	DIR_META_TYPE dirmeta;
 
 	inode = 5;
 	fetch_meta_path(metapath, inode);
 	fptr = fopen(metapath, "w+");
-	memset(&tempstat, 0, sizeof(struct stat));
+	memset(&tempstat, 0, sizeof(HCFS_STAT));
 	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
-	fwrite(&tempstat, 1, sizeof(struct stat), fptr);
+	fwrite(&tempstat, 1, sizeof(HCFS_STAT), fptr);
 	fwrite(&dirmeta, 1, sizeof(DIR_META_TYPE), fptr);
 	fclose(fptr);
 
@@ -1779,7 +1790,7 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	ino_t inode, child_inode;
 	char metapath[300];
 	FILE *fptr;
-	struct stat tempstat;
+	HCFS_STAT tempstat;
 	DIR_META_TYPE dirmeta;
 	DIR_ENTRY_PAGE temppage;
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
@@ -1787,12 +1798,12 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	inode = 5;
 	fetch_meta_path(metapath, inode);
 	fptr = fopen(metapath, "w+");
-	memset(&tempstat, 0, sizeof(struct stat));
+	memset(&tempstat, 0, sizeof(HCFS_STAT));
 	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
 	dirmeta.total_children = 2;
-	dirmeta.tree_walk_list_head = sizeof(struct stat) +
+	dirmeta.tree_walk_list_head = sizeof(HCFS_STAT) +
 				sizeof(DIR_META_TYPE);
-	fwrite(&tempstat, 1, sizeof(struct stat), fptr);
+	fwrite(&tempstat, 1, sizeof(HCFS_STAT), fptr);
 	fwrite(&dirmeta, 1, sizeof(DIR_META_TYPE), fptr);
 
 	/* First page */
@@ -1804,7 +1815,7 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 		temppage.dir_entries[i].d_type = child_inode % 2 ?
 						D_ISDIR : D_ISREG;
 	}
-	temppage.tree_walk_next = sizeof(struct stat) +
+	temppage.tree_walk_next = sizeof(HCFS_STAT) +
 		sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
 	fwrite(&temppage, 1, sizeof(DIR_ENTRY_PAGE), fptr);
 

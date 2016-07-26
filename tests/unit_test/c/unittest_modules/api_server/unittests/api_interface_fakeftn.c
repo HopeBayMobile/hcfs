@@ -1,6 +1,7 @@
 #include "api_interface_unittest.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 #include <errno.h>
 #include "fuseop.h"
@@ -103,7 +104,7 @@ int32_t read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	return -EIO;
 }
-int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
+int32_t fetch_inode_stat(ino_t this_inode, HCFS_STAT *inode_stat,
 		uint64_t *ret_gen, char *ret_pin_status)
 {
 	return -EIO;
@@ -122,20 +123,27 @@ int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 	return -EIO;
 }
 
-int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
-	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode,
+				       HCFS_STAT *inode_stat,
+				       SYMLINK_META_TYPE *symlink_meta_ptr,
+				       META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return -EIO;
 }
-int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
-	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
-	META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_dir_data(ino_t this_inode,
+				   HCFS_STAT *inode_stat,
+				   DIR_META_TYPE *dir_meta_ptr,
+				   DIR_ENTRY_PAGE *dir_page,
+				   META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return -EIO;
 }
-int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_file_data(ino_t this_inode,
+				    HCFS_STAT *inode_stat,
+				    FILE_META_TYPE *file_meta_ptr,
+				    BLOCK_ENTRY_PAGE *block_page,
+				    int64_t page_pos,
+				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return -EIO;
 }
@@ -167,7 +175,7 @@ int32_t reload_system_config(const char *config_path)
 	return 0;
 }
 
-int32_t update_quota()
+int32_t update_quota(void)
 {
 	hcfs_system->systemdata.system_quota = 5566;
 	return 0;

@@ -12,12 +12,12 @@
 * 2015/6/1 Jiahong adding structure for logger.
 * 2015/6/30 Jiahong moved dir and file meta defs to other files
 * 2016/5/23 Jiahong adding semaphore for cache management
+* 2016/7/12 Jethro moved meta structs to meta.h
 *
 **************************************************************************/
 
 #ifndef GW20_HCFS_FUSEOP_H_
 #define GW20_HCFS_FUSEOP_H_
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,32 +30,12 @@
 #include <fuse/fuse_opt.h>
 
 #include "global.h"
-#include "params.h"
-#include "dedup_table.h"
+#include "meta.h"
 
 extern struct fuse_lowlevel_ops hfuse_ops;
 
-/*BEGIN META definition*/
-
-/* Defining parameters for B-tree operations (dir entries). */
-/* Max number of children per node is 100, min is 50, so at least 49 elements
-*  in each node (except the root) */
-#define MAX_DIR_ENTRIES_PER_PAGE 99
-#define MAX_BLOCK_ENTRIES_PER_PAGE 100
-/* Minimum number of entries before an underflow */
-#define MIN_DIR_ENTRIES_PER_PAGE 30
-/* WARNING: MIN_DIR_ENTRIES_PER_PAGE must be smaller than
-*  MAX_DIR_ENTRIES_PER_PAGE/2 */
-
-/* Max length of link path pointed by symbolic link */
-#define MAX_LINK_PATH 4096
-
 /* Hard link limit */
 #define MAX_HARD_LINK 65000
-
-/* Number of pointers in a pointer page */
-#define POINTERS_PER_PAGE 1024
-
 #define MAX_FILE_SIZE LONG_MAX
 
 /* Defining the names for block status */
@@ -106,112 +86,6 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define  IS_ANDROID_EXTERNAL(type) (((type) == (ANDROID_EXTERNAL)) || \
 		((type) == (ANDROID_MULTIEXTERNAL)))
 #endif
-
-/* Structures for directories */
-/* Defining directory entry in meta files*/
-typedef struct {
-	ino_t d_ino;
-	char d_name[MAX_FILENAME_LEN+1];
-	char d_type;
-} DIR_ENTRY;
-
-/* Defining the structure of directory object meta */
-typedef struct {
-	int64_t total_children;  /*Total children not including "." and "..*/
-	int64_t root_entry_page;
-	int64_t next_xattr_page;
-	int64_t entry_page_gc_list;
-	int64_t tree_walk_list_head;
-	uint64_t generation;
-	uint8_t source_arch;
-	uint64_t metaver;
-	ino_t root_inode;
-	int64_t finished_seq;
-	char local_pin;
-} DIR_META_TYPE;
-
-/* Defining the structure for a page of directory entries */
-typedef struct {
-	int32_t num_entries;
-	DIR_ENTRY dir_entries[MAX_DIR_ENTRIES_PER_PAGE];
-	int64_t this_page_pos; /*File pos of the current node*/
-	/* File pos of child pages for this node, b-tree style */
-	int64_t child_page_pos[MAX_DIR_ENTRIES_PER_PAGE+1];
-	/*File pos of parent. If this is the root, the value is 0 */
-	int64_t parent_page_pos;
-	/*File pos of the next gc entry if on gc list*/
-	int64_t gc_list_next;
-	int64_t tree_walk_next;
-	int64_t tree_walk_prev;
-} DIR_ENTRY_PAGE;
-
-/* Structures for regular files */
-/* Defining one block status entry in meta files */
-typedef struct {
-	uint8_t status;
-	uint8_t uploaded;
-#if (DEDUP_ENABLE)
-	uint8_t obj_id[OBJID_LENGTH];
-#endif
-	uint32_t paged_out_count;
-	int64_t seqnum;
-} BLOCK_ENTRY;
-
-/* Defining the structure of one page of block status page */
-typedef struct {
-	int32_t num_entries;
-	BLOCK_ENTRY block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
-} BLOCK_ENTRY_PAGE;
-
-/* Defining the structure of pointer page (pointers to other pages) */
-typedef struct {
-	int64_t ptr[POINTERS_PER_PAGE];
-} PTR_ENTRY_PAGE;
-
-/* Defining the structure of file meta */
-typedef struct {
-	int64_t next_xattr_page;
-	int64_t direct;
-	int64_t single_indirect;
-	int64_t double_indirect;
-	int64_t triple_indirect;
-	int64_t quadruple_indirect;
-	uint64_t generation;
-        uint8_t source_arch;
-	uint64_t metaver;
-	ino_t root_inode;
-	int64_t finished_seq;
-	char local_pin;
-} FILE_META_TYPE;
-
-/* The structure for keeping statistics for a file */
-typedef struct {
-	int64_t num_blocks;
-	int64_t num_cached_blocks;
-	int64_t cached_size;
-	int64_t dirty_data_size;
-} FILE_STATS_TYPE;
-
-/* Defining the structure of symbolic link meta */
-typedef struct {
-	int64_t next_xattr_page;
-	uint32_t link_len;
-	uint64_t generation;
-	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
-        uint8_t source_arch;
-	uint64_t metaver;
-	ino_t root_inode;
-	int64_t finished_seq;
-	char local_pin;
-} SYMLINK_META_TYPE;
-
-typedef struct {
-	int64_t size_last_upload; /* Record data + meta */
-	int64_t meta_last_upload; /* Record meta only */
-	int64_t upload_seq;
-} CLOUD_RELATED_DATA;
-
-/*END META definition*/
 
 /* Defining the system meta resources */
 typedef struct {
@@ -280,5 +154,5 @@ int32_t hook_fuse(int32_t argc, char **argv);
 
 ino_t data_data_root;
 
-void set_timestamp_now(struct stat *thisstat, char mode);
+void set_timestamp_now(HCFS_STAT *thisstat, char mode);
 #endif  /* GW20_HCFS_FUSEOP_H_ */

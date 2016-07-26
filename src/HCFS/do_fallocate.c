@@ -29,9 +29,11 @@
 	If mode 0 or 1, don't need to zero regions already containing data
 	If mode = 3, need to zero regions.
 */
-static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
-		off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr,
-		fuse_req_t req)
+static int32_t do_fallocate_extend(ino_t this_inode,
+				   HCFS_STAT *filestat,
+				   off_t offset,
+				   META_CACHE_ENTRY_STRUCT **body_ptr,
+				   fuse_req_t req)
 {
 	FILE_META_TYPE tempfilemeta;
 	int32_t ret;
@@ -43,8 +45,8 @@ static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 
 	write_log(10, "Debug fallocate mode 0: offset %ld\n", offset);
 	/* If the filesystem object is not a regular file, return error */
-	if (S_ISREG(filestat->st_mode) == FALSE) {
-		if (S_ISDIR(filestat->st_mode))
+	if (S_ISREG(filestat->mode) == FALSE) {
+		if (S_ISDIR(filestat->mode))
 			return -EISDIR;
 		else
 			return -EPERM;
@@ -56,15 +58,15 @@ static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	if (ret < 0)
 		return ret;
 
-	if (filestat->st_size >= offset) {
+	if (filestat->size >= offset) {
 		/*Do nothing if no change needed */
 		write_log(10,
 			"Debug fallocate mode 0: Nothing changed.\n");
 		return 0;
 	}
 
-	if (filestat->st_size < offset) {
-		sizediff = (int64_t) offset - filestat->st_size;
+	if (filestat->size < offset) {
+		sizediff = (int64_t) offset - filestat->size;
 		sem_wait(&(hcfs_system->access_sem));
 		/* Check system size and reject if exceeding quota */
 		if (hcfs_system->systemdata.system_size + sizediff >
@@ -95,24 +97,28 @@ static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((int64_t)(offset - filestat->st_size),
+	change_system_meta((int64_t)(offset - filestat->size),
 			0, 0, 0, 0, 0, TRUE);
 
 	ret = change_mount_stat(tmpptr,
-			(int64_t) (offset - filestat->st_size), 0, 0);
+			(int64_t) (offset - filestat->size), 0, 0);
 	if (ret < 0)
 		return ret;
 
-	filestat->st_size = offset;
-	filestat->st_blocks = (filestat->st_size + 511) / 512;
-	filestat->st_mtime = time(NULL);
+	filestat->size = offset;
+	filestat->blocks = (filestat->st_size + 511) / 512;
+	filestat->mtime = time(NULL);
 
 	return 0;
 }
 
-int32_t do_fallocate(ino_t this_inode, struct stat *newstat, int32_t mode,
-		off_t offset, off_t length,
-		META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
+int32_t do_fallocate(ino_t this_inode,
+		     HCFS_STAT *newstat,
+		     int32_t mode,
+		     off_t offset,
+		     off_t length,
+		     META_CACHE_ENTRY_STRUCT **body_ptr,
+		     fuse_req_t req)
 {
 	int32_t ret_val;
 

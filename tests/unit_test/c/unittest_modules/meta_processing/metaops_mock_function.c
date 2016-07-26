@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fuse/fuse_lowlevel.h>
 #include <inttypes.h>
+#include <string.h>
 
 #include "mock_param.h"
 
@@ -18,7 +19,7 @@
 int32_t DELETE_DIR_ENTRY_BTREE_RESULT = 1;
 
 /* mock functions - meta_mem_cache*/
-int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_dir_data(ino_t this_inode, HCFS_STAT *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -28,20 +29,20 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	switch(this_inode) {
 	case INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2:
 		if (inode_stat != NULL) {
-			inode_stat->st_nlink = this_inode + 1;
-			inode_stat->st_size = 0;
+			inode_stat->nlink = this_inode + 1;
+			inode_stat->size = 0;
 		}
 		return 0;
 	case INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel:
 		if (inode_stat != NULL) {
-			inode_stat->st_nlink = 1;
-			inode_stat->st_size = MOCK_BLOCK_SIZE * NUM_BLOCKS;
+			inode_stat->nlink = 1;
+			inode_stat->size = MOCK_BLOCK_SIZE * NUM_BLOCKS;
 		}
 		return 0;
 	case INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel:
 		if (inode_stat != NULL) {
-			inode_stat->st_nlink = 1;
-			inode_stat->st_size = 0;
+			inode_stat->nlink = 1;
+			inode_stat->size = 0;
 		}
 		return 0;
 	case INO_NO_XATTR_PAGE:
@@ -62,12 +63,12 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		dir_meta_ptr->tree_walk_list_head = sizeof(DIR_ENTRY_PAGE);
 		dir_meta_ptr->total_children = to_verified_meta.total_children;
 		if (inode_stat)
-			inode_stat->st_nlink = to_verified_stat.st_nlink;
+			inode_stat->nlink = to_verified_stat.nlink;
 		return 0;
 	}
 }
 
-int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_dir_data(ino_t this_inode, const HCFS_STAT *inode_stat,
     const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
     META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -165,7 +166,7 @@ int32_t meta_cache_remove(ino_t this_inode)
 }
 
 
-int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, HCFS_STAT *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -198,7 +199,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	}
 }
 
-int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode, const HCFS_STAT *inode_stat,
     const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
     const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -291,7 +292,7 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 		strcpy(pathname, "\0");
 		/*FILE *fptr = fopen(pathname, "w");
 		fclose(fptr);
-		struct stat filestat;
+		HCFS_STAT filestat;
 		stat(pathname, &filestat);
 		mode_t mode = filestat.st_mode | S_ISVTX;
 		chmod(pathname, mode);*/
@@ -315,14 +316,14 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 	return 0;
 }
 
-int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, 
+int32_t fetch_inode_stat(ino_t this_inode, HCFS_STAT *inode_stat, 
 	uint64_t *ret_gen)
 {
 	if (this_inode == INO_DELETE_FILE_BLOCK) {
-		inode_stat->st_size = NUM_BLOCKS * MAX_BLOCK_SIZE;
+		inode_stat->size = NUM_BLOCKS * MAX_BLOCK_SIZE;
 	} else {
-		inode_stat->st_size = 0;
-		inode_stat->st_mode = (this_inode % 2 ? S_IFLNK : S_IFDIR);
+		inode_stat->size = 0;
+		inode_stat->mode = (this_inode % 2 ? S_IFLNK : S_IFDIR);
 	}
 	return 0;
 }
@@ -332,7 +333,7 @@ int32_t lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 	return 0;
 }
 
-void set_timestamp_now(struct stat *thisstat, char mode)
+void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 {
 	return;
 }
@@ -386,13 +387,13 @@ int32_t delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 		return -EINVAL;
 }
 
-int32_t meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_symlink_data(ino_t this_inode, const HCFS_STAT *inode_stat,
         const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
 {
 	return 0;
 }
 
-int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode, HCFS_STAT *inode_stat,
         SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (symlink_meta_ptr)

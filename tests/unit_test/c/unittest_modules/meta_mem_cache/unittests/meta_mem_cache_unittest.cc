@@ -17,7 +17,7 @@ extern "C" {
 #include "dir_entry_btree.h"
 #include "super_block.h"
 #include "meta_mem_cache.h"
-#include "mock_tool.h"
+#include "mock_function.h"
 }
 #include "gtest/gtest.h"
 
@@ -417,7 +417,7 @@ protected:
 TEST_F(meta_cache_lock_entryTest, InsertAndLockSuccess)
 {
 	META_CACHE_ENTRY_STRUCT *tmp_meta_entry;
-	struct stat *expected_stat;
+	HCFS_STAT *expected_stat;
 
 	/* Test for those inode that is not in cache */
 	for (int32_t i = 0; i < NUM_META_MEM_CACHE_HEADERS ; i++) {
@@ -429,7 +429,7 @@ TEST_F(meta_cache_lock_entryTest, InsertAndLockSuccess)
 		/* Check lock, number of current cache entries, and stat content */
 		ASSERT_EQ(0, sem_val);
 		ASSERT_EQ(i+1, current_meta_mem_cache_entries);
-		ASSERT_EQ(0, memcmp(&(tmp_meta_entry->this_stat), expected_stat, sizeof(struct stat)));
+		ASSERT_EQ(0, memcmp(&(tmp_meta_entry->this_stat), expected_stat, sizeof(HCFS_STAT)));
 	}
 
 	/* Check the linked list of meta_mem_cache[5k] */
@@ -592,10 +592,10 @@ protected:
 
 		BaseClassWithMetaCacheEntry::SetUp();
 
-		body_ptr->this_stat.st_mode = S_IFREG;
+		body_ptr->this_stat.mode = S_IFREG;
 		body_ptr->fptr = fopen(mock_file_meta, "w+");
 		body_ptr->meta_opened = TRUE;
-		truncate(mock_file_meta, sizeof(struct stat) +
+		truncate(mock_file_meta, sizeof(HCFS_STAT) +
 			sizeof(FILE_META_TYPE) + sizeof(BLOCK_ENTRY_PAGE));
 	}
 
@@ -617,10 +617,10 @@ TEST_F(meta_cache_update_file_dataTest, CacheNotLocked)
 TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
 {
 	/* Mock data */
-	struct stat *test_stat = generate_mock_stat(0);
+	HCFS_STAT *test_stat = generate_mock_stat(0);
 	FILE_META_TYPE actual_file_meta, test_file_meta;
 	BLOCK_ENTRY_PAGE actual_block_page, test_block_page;
-	struct stat actual_stat;
+	HCFS_STAT actual_stat;
 
 	memset(&test_block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 	test_block_page.num_entries = 123;
@@ -633,19 +633,19 @@ TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
 	EXPECT_EQ(0, meta_cache_update_file_data(0, test_stat, &test_file_meta,
-		&test_block_page, sizeof(struct stat) + sizeof(FILE_META_TYPE), body_ptr));
+		&test_block_page, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), body_ptr));
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify */
-	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&test_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
 
 	fseek(body_ptr->fptr, 0, SEEK_SET);
-	fread(&actual_stat, sizeof(struct stat), 1 ,body_ptr->fptr);
+	fread(&actual_stat, sizeof(HCFS_STAT), 1 ,body_ptr->fptr);
 	fread(&actual_file_meta, sizeof(FILE_META_TYPE), 1 ,body_ptr->fptr);
 	fread(&actual_block_page, sizeof(BLOCK_ENTRY_PAGE), 1 ,body_ptr->fptr);
 
-	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&test_file_meta, &actual_file_meta, sizeof(FILE_META_TYPE)));
 	EXPECT_EQ(0, memcmp(&test_block_page, &actual_block_page, sizeof(BLOCK_ENTRY_PAGE)));
 }
@@ -668,10 +668,10 @@ protected:
 
 		BaseClassWithMetaCacheEntry::SetUp();
 
-		body_ptr->this_stat.st_mode = S_IFREG;
+		body_ptr->this_stat.mode = S_IFREG;
 		body_ptr->fptr = fopen(mock_file_meta, "w+");
 		body_ptr->meta_opened = TRUE;
-		truncate(mock_file_meta, sizeof(struct stat) +
+		truncate(mock_file_meta, sizeof(HCFS_STAT) +
 			sizeof(FILE_META_TYPE) + sizeof(BLOCK_ENTRY_PAGE));
 	}
 
@@ -693,10 +693,10 @@ TEST_F(meta_cache_update_file_nosyncTest, CacheNotLocked)
 TEST_F(meta_cache_update_file_nosyncTest, UpdateSuccess)
 {
 	/* Mock data */
-	struct stat *test_stat = generate_mock_stat(0);
+	HCFS_STAT *test_stat = generate_mock_stat(0);
 	FILE_META_TYPE actual_file_meta, test_file_meta;
 	BLOCK_ENTRY_PAGE actual_block_page, test_block_page;
-	struct stat actual_stat;
+	HCFS_STAT actual_stat;
 
 	memset(&test_block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 	test_block_page.num_entries = 123;
@@ -709,19 +709,19 @@ TEST_F(meta_cache_update_file_nosyncTest, UpdateSuccess)
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
 	EXPECT_EQ(0, meta_cache_update_file_nosync(0, test_stat, &test_file_meta,
-		&test_block_page, sizeof(struct stat) + sizeof(FILE_META_TYPE), body_ptr));
+		&test_block_page, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), body_ptr));
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify */
-	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&test_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
 
 	fseek(body_ptr->fptr, 0, SEEK_SET);
-	fread(&actual_stat, sizeof(struct stat), 1 ,body_ptr->fptr);
+	fread(&actual_stat, sizeof(HCFS_STAT), 1 ,body_ptr->fptr);
 	fread(&actual_file_meta, sizeof(FILE_META_TYPE), 1 ,body_ptr->fptr);
 	fread(&actual_block_page, sizeof(BLOCK_ENTRY_PAGE), 1 ,body_ptr->fptr);
 
-	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&test_file_meta, &actual_file_meta, sizeof(FILE_META_TYPE)));
 	EXPECT_EQ(0, memcmp(&test_block_page, &actual_block_page, sizeof(BLOCK_ENTRY_PAGE)));
 }
@@ -744,10 +744,10 @@ protected:
 
 		BaseClassWithMetaCacheEntry::SetUp();
 
-		body_ptr->this_stat.st_mode = S_IFREG;
+		body_ptr->this_stat.mode = S_IFREG;
 		body_ptr->fptr = fopen(mock_file_meta, "w+");
 		body_ptr->meta_opened = TRUE;
-		truncate(mock_file_meta, sizeof(struct stat) +
+		truncate(mock_file_meta, sizeof(HCFS_STAT) +
 			sizeof(FILE_META_TYPE) + sizeof(BLOCK_ENTRY_PAGE));
 	}
 
@@ -769,10 +769,10 @@ TEST_F(meta_cache_update_stat_nosyncTest, CacheNotLocked)
 TEST_F(meta_cache_update_stat_nosyncTest, UpdateSuccess)
 {
 	/* Mock data */
-	struct stat *test_stat = generate_mock_stat(0);
+	HCFS_STAT *test_stat = generate_mock_stat(0);
 	FILE_META_TYPE actual_file_meta, test_file_meta;
 	BLOCK_ENTRY_PAGE actual_block_page, test_block_page;
-	struct stat actual_stat;
+	HCFS_STAT actual_stat;
 
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
@@ -780,12 +780,12 @@ TEST_F(meta_cache_update_stat_nosyncTest, UpdateSuccess)
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify */
-	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 
 	fseek(body_ptr->fptr, 0, SEEK_SET);
-	fread(&actual_stat, sizeof(struct stat), 1 ,body_ptr->fptr);
+	fread(&actual_stat, sizeof(HCFS_STAT), 1 ,body_ptr->fptr);
 
-	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &actual_stat, sizeof(HCFS_STAT)));
 }
 
 /*
@@ -809,19 +809,19 @@ TEST_F(meta_cache_lookup_file_dataTest, CacheNotLocked)
 
 TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
 {
-	struct stat *test_stat = generate_mock_stat(0);
+	HCFS_STAT *test_stat = generate_mock_stat(0);
 	FILE_META_TYPE test_file_meta;
-	struct stat *empty_stat = (struct stat *)malloc(sizeof(struct stat));
+	HCFS_STAT *empty_stat = (HCFS_STAT *)malloc(sizeof(HCFS_STAT));
 	FILE_META_TYPE *empty_file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
 
 	/* Mock data */
 	test_file_meta = FILE_META_TYPE{5, 6, 7, 8, 9, 112, 113};
 
 	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
-	memcpy(&(body_ptr->this_stat), test_stat, sizeof(struct stat));
+	memcpy(&(body_ptr->this_stat), test_stat, sizeof(HCFS_STAT));
 	memcpy(body_ptr->file_meta, &test_file_meta, sizeof(FILE_META_TYPE));
 
-	memset(empty_stat, 0, sizeof(struct stat));
+	memset(empty_stat, 0, sizeof(HCFS_STAT));
 	memset(empty_file_meta, 0, sizeof(FILE_META_TYPE));
 
 	/* Test */
@@ -830,7 +830,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify */
-	EXPECT_EQ(0, memcmp(empty_stat, test_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(empty_stat, test_stat, sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(empty_file_meta, &test_file_meta, sizeof(FILE_META_TYPE)));
 
 	free(empty_stat);
@@ -848,9 +848,9 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupFileMeta_ReadSuccess)
 	body_ptr->fptr = fopen(file_meta_path, "wr+");
 	setbuf(body_ptr->fptr, NULL);
 	body_ptr->meta_opened = TRUE;
-	truncate(file_meta_path, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	truncate(file_meta_path, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 		 sizeof(BLOCK_ENTRY_PAGE));
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fwrite(&expected_meta, sizeof(FILE_META_TYPE), 1, body_ptr->fptr);
 
 	/* Run */
@@ -878,10 +878,10 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupBlockPage_ReadSuccess)
 	body_ptr->fptr = fopen(file_meta_path, "wr+");
 	setbuf(body_ptr->fptr, NULL);
 	body_ptr->meta_opened = TRUE;
-	truncate(file_meta_path, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	truncate(file_meta_path, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 		 sizeof(BLOCK_ENTRY_PAGE));
 
-	page_pos = sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	page_pos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 	fseek(body_ptr->fptr, page_pos, SEEK_SET);
 	fwrite(&expected_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 
@@ -914,10 +914,10 @@ protected:
 		BaseClassWithMetaCacheEntry::SetUp();
 
 		mock_dir_meta = "/tmp/mock_dir_meta";
-		body_ptr->this_stat.st_mode = S_IFDIR;
+		body_ptr->this_stat.mode = S_IFDIR;
 		body_ptr->fptr = fopen(mock_dir_meta, "w+");
 		body_ptr->meta_opened = TRUE;
-		truncate(mock_dir_meta, sizeof(struct stat) +
+		truncate(mock_dir_meta, sizeof(HCFS_STAT) +
 			sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE));
 
 		/* Init dir_entry_page to be tested */
@@ -948,12 +948,12 @@ TEST_F(meta_cache_update_dir_dataTest, CacheNotLocked)
 TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
 {
 	/* Mock data */
-	struct stat *test_stat = generate_mock_stat(0);
+	HCFS_STAT *test_stat = generate_mock_stat(0);
 	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41, 9};
 
 	body_ptr->dir_meta = NULL;
 
-	test_stat->st_mode = S_IFDIR; // Set mode as S_IFDIR, and then it will update
+	test_stat->mode = S_IFDIR; // Set mode as S_IFDIR, and then it will update
 
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
@@ -961,7 +961,7 @@ TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify */
-	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&test_dir_meta, body_ptr->dir_meta, sizeof(DIR_META_TYPE)));
 }
 
@@ -1053,13 +1053,13 @@ TEST_F(meta_cache_lookup_dir_dataTest, CacheNotLocked)
 TEST_F(meta_cache_lookup_dir_dataTest, Lookup_Stat_and_Meta_Success)
 {
 	/* Mock data */
-	struct stat *test_stat = generate_mock_stat(0);
+	HCFS_STAT *test_stat = generate_mock_stat(0);
 	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41, 6};
-	struct stat empty_stat;
+	HCFS_STAT empty_stat;
 	DIR_META_TYPE empty_dir_meta;
 
 	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
-	memcpy(&(body_ptr->this_stat), test_stat, sizeof(struct stat));
+	memcpy(&(body_ptr->this_stat), test_stat, sizeof(HCFS_STAT));
 	memcpy(body_ptr->dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE));
 
 	/* Test */
@@ -1068,7 +1068,7 @@ TEST_F(meta_cache_lookup_dir_dataTest, Lookup_Stat_and_Meta_Success)
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify */
-	EXPECT_EQ(0, memcmp(&empty_stat, test_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&empty_stat, test_stat, sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&empty_dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE)));
 
 	free(test_stat);
@@ -1084,8 +1084,8 @@ TEST_F(meta_cache_lookup_dir_dataTest, LookupMeta_ReadMetaSuccess)
 	body_ptr->fptr= fopen(mock_dir_meta_path, "wr+");
 	body_ptr->meta_opened = TRUE;
 
-	truncate(mock_dir_meta_path, sizeof(struct stat) + sizeof(DIR_META_TYPE));
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	truncate(mock_dir_meta_path, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fwrite(&test_dir_meta, sizeof(DIR_META_TYPE), 1, body_ptr->fptr);
 
 	/* Test */
@@ -1321,8 +1321,8 @@ class flush_single_entryTest : public ::testing::Test {
 		DIR_META_TYPE test_dir_meta;
 		FILE_META_TYPE test_file_meta;
 		DIR_ENTRY_PAGE test_dir_entry[2];
-		struct stat *test_file_stat;
-		struct stat *test_dir_stat;
+		HCFS_STAT *test_file_stat;
+		HCFS_STAT *test_dir_stat;
 	private:
 		void initialize_mock_meta()
 		{
@@ -1333,8 +1333,8 @@ class flush_single_entryTest : public ::testing::Test {
 
 			test_file_stat = generate_mock_stat(3);
 			test_dir_stat = generate_mock_stat(7);
-			test_file_stat->st_mode = S_IFREG;
-			test_dir_stat->st_mode = S_IFDIR;
+			test_file_stat->mode = S_IFREG;
+			test_dir_stat->mode = S_IFDIR;
 
 			test_file_meta = file_meta;
 			test_dir_meta = dir_meta;
@@ -1354,7 +1354,7 @@ TEST_F(flush_single_entryTest, CacheNotLock)
 
 TEST_F(flush_single_entryTest, FlushFileMeta)
 {
-	struct stat verified_stat;
+	HCFS_STAT verified_stat;
 	FILE_META_TYPE verified_file_meta;
 
 	/* Mock data */
@@ -1362,7 +1362,7 @@ TEST_F(flush_single_entryTest, FlushFileMeta)
 	body_ptr->meta_dirty = TRUE;
 	body_ptr->something_dirty = TRUE;
 	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
-	memcpy(&(body_ptr->this_stat), test_file_stat, sizeof(struct stat));
+	memcpy(&(body_ptr->this_stat), test_file_stat, sizeof(HCFS_STAT));
 	memcpy(body_ptr->file_meta, &test_file_meta, sizeof(FILE_META_TYPE));
 
 	/* Run function and read file */
@@ -1372,11 +1372,11 @@ TEST_F(flush_single_entryTest, FlushFileMeta)
 
 	/* Test */
 	fseek(body_ptr->fptr, 0, SEEK_SET);
-	fread(&verified_stat, sizeof(struct stat), 1, body_ptr->fptr);
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fread(&verified_stat, sizeof(HCFS_STAT), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&verified_file_meta, sizeof(FILE_META_TYPE), 1, body_ptr->fptr);
 
-	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&verified_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
 	EXPECT_EQ(FALSE, body_ptr->stat_dirty);
 	EXPECT_EQ(FALSE, body_ptr->meta_dirty);
@@ -1389,7 +1389,7 @@ TEST_F(flush_single_entryTest, FlushFileMeta)
 
 TEST_F(flush_single_entryTest, FlushSymlinkMeta)
 {
-	struct stat verified_stat;
+	HCFS_STAT verified_stat;
 	SYMLINK_META_TYPE verified_symlink_meta;
 	SYMLINK_META_TYPE expected_symlink_meta = {0, 17, 12, "hello! I am kewei"};
 
@@ -1398,8 +1398,8 @@ TEST_F(flush_single_entryTest, FlushSymlinkMeta)
 	body_ptr->meta_dirty = TRUE;
 	body_ptr->something_dirty = TRUE;
 	body_ptr->symlink_meta = (SYMLINK_META_TYPE *)malloc(sizeof(SYMLINK_META_TYPE));
-	test_file_stat->st_mode = S_IFLNK;
-	memcpy(&(body_ptr->this_stat), test_file_stat, sizeof(struct stat));
+	test_file_stat->mode = S_IFLNK;
+	memcpy(&(body_ptr->this_stat), test_file_stat, sizeof(HCFS_STAT));
 	memcpy(body_ptr->symlink_meta, &expected_symlink_meta, sizeof(SYMLINK_META_TYPE));
 
 	/* Run */
@@ -1409,11 +1409,11 @@ TEST_F(flush_single_entryTest, FlushSymlinkMeta)
 
 	/* Verify */
 	fseek(body_ptr->fptr, 0, SEEK_SET);
-	fread(&verified_stat, sizeof(struct stat), 1, body_ptr->fptr);
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fread(&verified_stat, sizeof(HCFS_STAT), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&verified_symlink_meta, sizeof(SYMLINK_META_TYPE), 1, body_ptr->fptr);
 
-	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&verified_symlink_meta, body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE)));
 	EXPECT_EQ(FALSE, body_ptr->stat_dirty);
 	EXPECT_EQ(FALSE, body_ptr->meta_dirty);
@@ -1426,7 +1426,7 @@ TEST_F(flush_single_entryTest, FlushSymlinkMeta)
 
 TEST_F(flush_single_entryTest, FlushDirMeta)
 {
-	struct stat verified_stat;
+	HCFS_STAT verified_stat;
 	DIR_META_TYPE verified_dir_meta;
 	DIR_ENTRY_PAGE verified_dir_entry[2];
 
@@ -1439,7 +1439,7 @@ TEST_F(flush_single_entryTest, FlushDirMeta)
 	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
 	body_ptr->dir_entry_cache[0] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-	memcpy(&(body_ptr->this_stat), test_dir_stat, sizeof(struct stat));
+	memcpy(&(body_ptr->this_stat), test_dir_stat, sizeof(HCFS_STAT));
 	memcpy(body_ptr->dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE));
 	memcpy(body_ptr->dir_entry_cache[0], &test_dir_entry[0], sizeof(DIR_ENTRY_PAGE));
 	memcpy(body_ptr->dir_entry_cache[1], &test_dir_entry[1], sizeof(DIR_ENTRY_PAGE));
@@ -1451,15 +1451,15 @@ TEST_F(flush_single_entryTest, FlushDirMeta)
 
 	/* Test */
 	fseek(body_ptr->fptr, 0, SEEK_SET);
-	fread(&verified_stat, sizeof(struct stat), 1, body_ptr->fptr);
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fread(&verified_stat, sizeof(HCFS_STAT), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&verified_dir_meta, sizeof(DIR_META_TYPE), 1, body_ptr->fptr);
 	fseek(body_ptr->fptr, body_ptr->dir_entry_cache[1]->this_page_pos, SEEK_SET);
 	fread(&verified_dir_entry[1], 1, sizeof(DIR_ENTRY_PAGE), body_ptr->fptr);
 	fseek(body_ptr->fptr, body_ptr->dir_entry_cache[0]->this_page_pos, SEEK_SET);
 	fread(&verified_dir_entry[0], 1, sizeof(DIR_ENTRY_PAGE), body_ptr->fptr);
 
-	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT)));
 	EXPECT_EQ(0, memcmp(&verified_dir_meta, body_ptr->dir_meta, sizeof(DIR_META_TYPE)));
 	EXPECT_EQ(0, memcmp(&verified_dir_entry[0], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, memcmp(&verified_dir_entry[1], body_ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE)));
@@ -1667,7 +1667,7 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
 	DIR_META_TYPE dir_meta;
 	int32_t verified_index;
 	int32_t root_entry_pos;
-	root_entry_pos = sizeof(struct stat) + sizeof(DIR_META_TYPE) + 1234;
+	root_entry_pos = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE) + 1234;
 	ino_t inode = INO__FETCH_META_PATH_SUCCESS;
 
 	mkdir(TMP_META_DIR, 0700);
@@ -1679,7 +1679,7 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
 	fwrite(test_dir_entry_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	/* Write meta data */
 	dir_meta.root_entry_page = root_entry_pos;
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fwrite(&dir_meta, sizeof(DIR_META_TYPE), 1, body_ptr->fptr);
 	body_ptr->dir_meta = NULL;
 	/* Let cache fail */
@@ -1800,7 +1800,7 @@ protected:
 
 		body_ptr->fptr = fopen(mock_file_meta, "w+");
 		body_ptr->meta_opened = TRUE;
-		truncate(mock_file_meta, sizeof(struct stat) +
+		truncate(mock_file_meta, sizeof(HCFS_STAT) +
 			sizeof(SYMLINK_META_TYPE));
 	}
 
@@ -1815,9 +1815,9 @@ protected:
 
 TEST_F(meta_cache_update_symlink_dataTest, UpdateStatSuccess)
 {
-	struct stat expected_stat;
+	HCFS_STAT expected_stat;
 
-	expected_stat.st_mode = S_IFLNK;
+	expected_stat.mode = S_IFLNK;
 
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
@@ -1827,7 +1827,7 @@ TEST_F(meta_cache_update_symlink_dataTest, UpdateStatSuccess)
 
 	/* Verify */
 	EXPECT_EQ(0, memcmp(&expected_stat, &body_ptr->this_stat,
-		sizeof(struct stat)));
+		sizeof(HCFS_STAT)));
 }
 
 TEST_F(meta_cache_update_symlink_dataTest, UpdateSymlinkMetaSuccess)
@@ -1854,22 +1854,22 @@ TEST_F(meta_cache_update_symlink_dataTest, UpdateSymlinkMetaSuccess)
 class meta_cache_lookup_symlink_dataTest : public BaseClassWithMetaCacheEntry {
 protected:
 	const char *mock_file_meta;
-	struct stat expected_stat;
+	HCFS_STAT expected_stat;
 	SYMLINK_META_TYPE expected_meta;
 
 	void SetUp()
 	{
 		mock_file_meta = "/tmp/mock_symlink_meta";
-		memset(&expected_stat, 0, sizeof(struct stat));
+		memset(&expected_stat, 0, sizeof(HCFS_STAT));
 		memset(&expected_meta, 0, sizeof(SYMLINK_META_TYPE));
-		expected_stat.st_mode = S_IFLNK;
+		expected_stat.mode = S_IFLNK;
 		expected_meta = SYMLINK_META_TYPE{1, 6, 4, "hello!"};
 
 		BaseClassWithMetaCacheEntry::SetUp();
 
 		body_ptr->fptr = fopen(mock_file_meta, "w+");
 		body_ptr->meta_opened = TRUE;
-		truncate(mock_file_meta, sizeof(struct stat) +
+		truncate(mock_file_meta, sizeof(HCFS_STAT) +
 			sizeof(SYMLINK_META_TYPE));
 
 	}
@@ -1885,9 +1885,9 @@ protected:
 
 TEST_F(meta_cache_lookup_symlink_dataTest, LookupStatSuccess)
 {
-	struct stat verified_stat;
+	HCFS_STAT verified_stat;
 
-	memcpy(&body_ptr->this_stat, &expected_stat, sizeof(struct stat));
+	memcpy(&body_ptr->this_stat, &expected_stat, sizeof(HCFS_STAT));
 
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
@@ -1897,14 +1897,14 @@ TEST_F(meta_cache_lookup_symlink_dataTest, LookupStatSuccess)
 
 	/* Verify */
 	EXPECT_EQ(0, memcmp(&expected_stat, &verified_stat,
-		sizeof(struct stat)));
+		sizeof(HCFS_STAT)));
 }
 
 TEST_F(meta_cache_lookup_symlink_dataTest, LookupSymlinkMetaSuccess)
 {
 	SYMLINK_META_TYPE verified_meta;
 
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fwrite(&expected_meta, 1, sizeof(SYMLINK_META_TYPE), body_ptr->fptr);
 
 	/* Run */

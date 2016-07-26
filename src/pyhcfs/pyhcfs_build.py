@@ -25,16 +25,18 @@ ffi.set_source( '_pyhcfs',
     """,
     include_dirs=[relpath("."), relpath("../HCFS")],
     sources=[relpath("parser.c")],
-    extra_compile_args=['-D_ANDROID_ENV_'])
+    extra_compile_args=['-D_ANDROID_ENV_','-fdiagnostics-color=auto'])
 
 # declare the functions, variables, etc. from the stuff in set_source
 # that you want to access from your C extension:
-#https: // cffi.readthedocs.org/en/latest/cdef.html#ffi-cdef-declaring-types-and-functions
+# https://cffi.readthedocs.org/en/latest/cdef.html#ffi-cdef-declaring-types-and-functions
 ffi.cdef(
     """
 #define LIST_DIR_LIMIT 1000
 
 typedef struct { /* 128 bytes */
+	uint8_t magic[4];
+	uint32_t metaver;
 	uint64_t dev;
 	uint64_t ino;
 	uint32_t mode;
@@ -46,15 +48,13 @@ typedef struct { /* 128 bytes */
 	int64_t size;
 	int64_t blksize; /* int in android */
 	int64_t blocks;
-	int64_t	atime; /* use aarch64 time structure */
+	int64_t atime; /* use aarch64 time structure */
 	uint64_t atime_nsec;
-	int64_t	mtime;
+	int64_t mtime;
 	uint64_t mtime_nsec;
-	int64_t	ctime;
+	int64_t ctime;
 	uint64_t ctime_nsec;
-	uint32_t __unused4;
-	uint32_t __unused5;
-} HCFS_STAT;
+} HCFS_STAT, HCFS_STAT_v1;
 
 typedef struct {
 	uint64_t inode;
@@ -66,14 +66,14 @@ typedef struct {
 	int32_t result;
 	int32_t file_type;
 	uint64_t child_number;
-	HCFS_STAT stat;
+	HCFS_STAT_v1 stat;
 } RET_META;
 
 int32_t list_external_volume(char *meta_path,
 			     PORTABLE_DIR_ENTRY **ptr_ret_entry,
 			     uint64_t *ret_num);
 
-int32_t parse_meta(char *meta_path, RET_META *meta);
+void parse_meta(char *meta_path, RET_META *meta);
 
 int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 			 const int32_t start_el, const int32_t limit,

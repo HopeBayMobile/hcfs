@@ -53,7 +53,7 @@ sync in upload process */
  *
  * @param this_inode The inode to be removed
  * @param builttime Builttime of last cache usage.
- * @param seconds_slept Total sleeping time accumulating up to now. 
+ * @param seconds_slept Total sleeping time accumulating up to now.
  *
  * @return 0 on succeeding in removing the inode, 1 on skipping the inode,
  *         otherwise negative error code.
@@ -66,8 +66,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	FILE *metafptr;
 	int64_t current_block;
 	int64_t total_blocks;
-	struct stat temphead_stat;
-	struct stat tempstat;
+	HCFS_STAT temphead_stat;
+	struct stat block_stat; /* block ops */
 	FILE_META_TYPE temphead;
 	int64_t pagepos;
 	char thisblockpath[400];
@@ -94,8 +94,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	/*TODO: if hard limit not reached, perhaps should not
 	throw out blocks so aggressively and can sleep for a
 	while*/
-	if ((tempentry.inode_stat.st_ino > 0) &&
-			(S_ISREG(tempentry.inode_stat.st_mode))) {
+	if ((tempentry.inode_stat.ino > 0) &&
+			(S_ISREG(tempentry.inode_stat.mode))) {
 		ret = fetch_meta_path(thismetapath, this_inode);
 		if (ret < 0)
 			return ret;
@@ -124,7 +124,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 
 		current_block = 0;
 
-		FREAD(&temphead_stat, sizeof(struct stat), 1, metafptr);
+		FREAD(&temphead_stat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		/* Skip if inode is pinned */
@@ -136,7 +136,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 			return 1;
 		}
 
-		total_blocks = (temphead_stat.st_size +
+		total_blocks = (temphead_stat.size +
 					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
 
 		page_index = MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -192,7 +192,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					errcode = ret;
 					goto errcode_handle;
 				}
-				ret = stat(thisblockpath, &tempstat);
+				ret = stat(thisblockpath, &block_stat);
 				if (ret < 0) {
 					errcode = errno;
 					write_log(0,
@@ -204,7 +204,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				}
 				sem_wait(&(hcfs_system->access_sem));
 				hcfs_system->systemdata.cache_size -=
-							tempstat.st_size;
+							block_stat.st_size;
 				hcfs_system->systemdata.cache_blocks--;
 				ret = unlink(thisblockpath);
 				if (ret < 0) {
@@ -219,7 +219,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				}
 				sync_hcfs_system_data(FALSE);
 				ret = update_file_stats(metafptr, 0, -1,
-							-(tempstat.st_size),
+							-(block_stat.st_size),
 							0, this_inode);
 				if (ret < 0) {
 					errcode = ret;
@@ -291,7 +291,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				flock(fileno(metafptr), LOCK_EX);
 
 				/* Check pin status before paging blocks out */
-				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+				FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 				FREAD(&temphead, sizeof(FILE_META_TYPE),
 					1, metafptr);
 				if (P_IS_PIN(temphead.local_pin)) {
