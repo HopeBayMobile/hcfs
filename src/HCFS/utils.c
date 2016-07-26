@@ -48,6 +48,7 @@
 #include "FS_manager.h"
 #include "mount_manager.h"
 #include "enc.h"
+#include "super_block.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
@@ -1283,6 +1284,8 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
 	if (fs_cloud_stat.backend_num_inodes < 0)
 		fs_cloud_stat.backend_num_inodes = 0;
+
+	fs_cloud_stat.max_inode = sys_super_block->head.num_total_inodes + 1;
 
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
