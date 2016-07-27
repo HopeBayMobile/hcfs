@@ -14,6 +14,7 @@ extern "C" {
 #include "params.h"
 #include "fuseop.h"
 #include "mount_manager.h"
+#include "super_block.h"
 }
 #include "gtest/gtest.h"
 #include "mock_params.h"
@@ -1019,6 +1020,8 @@ protected:
 	{
 		mkdir("utils_unittest_folder", 0700);
 		fptr = fopen("utils_unittest_folder/mock_FSstat", "w+");
+		sys_super_block = (SUPER_BLOCK_CONTROL *) malloc(sizeof(SUPER_BLOCK_CONTROL));
+		sys_super_block->head.num_total_inodes = 10;
 	}
 
 	void TearDown()
@@ -1026,6 +1029,7 @@ protected:
 		fclose(fptr);
 		unlink("utils_unittest_folder/mock_FSstat");
 		rmdir("utils_unittest_folder");
+		free(sys_super_block);
 	}
 };
 
