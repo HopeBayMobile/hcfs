@@ -214,3 +214,13 @@ int32_t destroy_pkg_cache()
 	return 0;
 }
 void destroy_monitor_loop_thread() {}
+
+int32_t check_and_create_metapaths(void)
+{
+	return 0;
+}
+int32_t check_and_create_blockpaths(void)
+{
+	return 0;
+}
+
