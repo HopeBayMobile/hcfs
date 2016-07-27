@@ -18,9 +18,9 @@
 #include "meta_mem_cache.h"
 
 #define MAX_KEY_SIZE 256 /* Max key length */
-#define MAX_VALUE_BLOCK_SIZE 256 /* Max value size per block (8KB) */
-#define MAX_KEY_ENTRY_PER_LIST 4 /* Max key entry of the sorted array (55) */
-#define MAX_KEY_HASH_ENTRY 8 /* Max hash table entries (64) */
+#define MAX_VALUE_BLOCK_SIZE 256 /* Max value size per block (256) */
+#define MAX_KEY_ENTRY_PER_LIST 4 /* Max key entry of the sorted array (4) */
+#define MAX_KEY_HASH_ENTRY 8 /* Max hash table entries (8) */
 
 /* Define namespace of xattr */
 #define USER 0
