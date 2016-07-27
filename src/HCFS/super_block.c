@@ -687,6 +687,7 @@ int32_t super_block_reclaim(void)
 	size_t num_unclaimed;
 	size_t ret_items;
 	int64_t total_bytes;
+	ino_t now_ino;
 
 	if (sys_super_block->head.num_to_be_reclaimed < RECLAIM_TRIGGER)
 		return 0;
@@ -755,7 +756,17 @@ int32_t super_block_reclaim(void)
 	*  and insert it to the head of the reclaimed list. The inodes on the
 	*  relaimed lists for this batch will be sorted according to inode
 	*  number when this is done (for performance reason). */
-	for (count = num_unclaimed-1; count >= 0; count--) {
+	for (count = num_unclaimed - 1; count >= 0; count--) {
+		now_ino = unclaimed_list[count];
+
+		/* Skip if inode number is illegel. */
+		if ((now_ino <= 0) ||
+		    (now_ino > sys_super_block->head.num_total_inodes + 1)) {
+			write_log(0, "Error: unclaimed inode number is %"PRIu64
+				". Skip it.", (uint64_t)unclaimed_list[count]);
+			continue;
+		}
+
 		ret_val = read_super_block_entry(unclaimed_list[count],
 								&tempentry);
 		if (ret_val < 0) {
