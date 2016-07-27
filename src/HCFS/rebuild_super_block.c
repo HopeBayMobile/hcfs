@@ -127,6 +127,8 @@ int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots)
 	rebuild_sb_jobs->remaining_jobs = num_roots;
 	rebuild_sb_jobs->job_count = 0;
 
+	rebuild_sb_jobs->cache_jobs.num_cached_inode = 0;
+	rebuild_sb_jobs->cache_jobs.cache_idx = 0;
 	return 0;
 
 errcode_handle:
@@ -377,9 +379,12 @@ void destroy_rebuild_sb(BOOL destroy_queue_file)
 		pthread_join(rebuild_sb_tpool->thread[idx].tid, NULL);
 
 	close(rebuild_sb_jobs->queue_fh);
-	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
-	if (!access(queue_filepath, F_OK))
-		unlink(queue_filepath);
+
+	if (destroy_queue_file == TRUE) {
+		sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
+		if (!access(queue_filepath, F_OK))
+			unlink(queue_filepath);
+	}
 
 	/* Free resource */
 	pthread_mutex_destroy(&(rebuild_sb_jobs->job_mutex));
@@ -465,6 +470,8 @@ int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job)
 				write_log(0, "Error: Queue file "
 					"is corrupted?\n");
 				rebuild_sb_jobs->remaining_jobs = 0;
+				cache_job->num_cached_inode = 0;
+				cache_job->cache_idx = 0;
 				return -ENOENT;
 			}
 		}
@@ -715,6 +722,9 @@ void rebuild_sb_worker(void *t_idx)
 			if (ret < 0) {
 				push_inode_job(&(inode_job.inode), 1);
 				erase_inode_job(&inode_job);
+				free(dir_list);
+				free(nondir_list);
+				free(nondir_type_list);
 				continue;
 			}
 			if (num_dir > 0) {

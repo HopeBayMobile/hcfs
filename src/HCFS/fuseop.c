@@ -7619,6 +7619,10 @@ int32_t hook_fuse(int32_t argc, char **argv)
 		sem_post(&(hcfs_system->access_sem));
 	}
 
+	/* Join thread if still restoring */
+	if (hcfs_system->system_restoring)
+		destroy_rebuild_sb();
+
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();
@@ -7630,10 +7634,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));
-
-	/* Join thread if still restoring */
-	if (hcfs_system->system_restoring)
-		destroy_rebuild_sb();
 
 	return 0;
 }

@@ -2222,13 +2222,6 @@ int32_t collect_dir_children(ino_t this_inode,
 	if (ret < 0)
 		return ret;
 
-	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
-		ret = restore_meta_super_block_entry(this_inode, NULL);
-		if (ret < 0)
-			return ret;
-	}
-
 	fptr = fopen(metapath, "r");
 	if (fptr == NULL) {
 		ret = errno;
