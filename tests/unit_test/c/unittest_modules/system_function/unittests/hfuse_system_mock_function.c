@@ -218,3 +218,12 @@ int32_t destroy_api_interface(void)
 	return 0;
 }
 void destroy_monitor_loop_thread() {}
+
+int32_t init_event_queue() {}
+#ifdef _ANDROID_ENV_
+void *event_worker_loop(void *ptr) {}
+#else
+void *event_worker_loop(void) {}
+#endif
+void destroy_event_worker_loop_thread() {}
+

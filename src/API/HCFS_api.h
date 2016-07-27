@@ -267,4 +267,18 @@ void HCFS_file_status(char **json_res, char *pathname);
  */
 void HCFS_reset_xfer(char **json_res);
 
+/*Set Notify Server
+ * @json_res result string in json format.
+ * @path location of notify server
+ *
+ * To set the location of event notify server.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
+ */
+void HCFS_set_notify_server(char **json_res, char *path);
 #endif  /* GW20_HCFS_API_H_ */

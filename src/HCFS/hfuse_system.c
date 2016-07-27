@@ -54,6 +54,7 @@
 #include "hcfs_fromcloud.h"
 #include "pkg_cache.h"
 #include "api_interface.h"
+#include "event_notification.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -322,6 +323,12 @@ void init_backend_related_module(void)
 	}
 }
 
+int32_t init_event_notify_module(void)
+{
+	pthread_create(&event_loop_thread, NULL, &event_worker_loop, NULL);
+	return init_event_queue();
+}
+
 /************************************************************************
 Helper function for checking if the battery is below a threshold
 ******/
@@ -475,6 +482,11 @@ int32_t main(int32_t argc, char **argv)
 	write_log(2, "\nVersion: %s\nStart logging\n", VERSION_NUM);
 #endif
 
+	/* Init event notify service */
+	ret_val = init_event_notify_module();
+	if (ret_val < 0)
+		exit(ret_val);
+
 	/* Init backend related services */
 	if (CURRENT_BACKEND != NONE) {
 		init_backend_related_module();
@@ -483,6 +495,9 @@ int32_t main(int32_t argc, char **argv)
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
+
+	destroy_event_worker_loop_thread();
+	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
 		pthread_join(cache_loop_thread, NULL);
@@ -563,7 +578,7 @@ int32_t main(int32_t argc, char **argv)
 	case 2:
 		open_log("backend_upload.log");
 		write_log(2, "\nStart logging backend upload\n");
-		
+
 		/* Init curl handle */
 		sem_init(&download_curl_sem, 0,
 				MAX_DOWNLOAD_CURL_HANDLE);

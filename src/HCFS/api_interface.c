@@ -44,6 +44,7 @@
 #include "hcfs_fromcloud.h"
 #include "hcfs_cacheops.h"
 #include "hfuse_system.h"
+#include "event_notification.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -829,6 +830,18 @@ int32_t get_xfer_status(void)
 	return 0;
 }
 
+int32_t set_notify_server_loc(int32_t arg_len, char *largebuf)
+{
+	char *path;
+	int32_t ret;
+
+	path = malloc(arg_len + 10);
+	memcpy(path, largebuf, arg_len);
+	ret = set_event_notify_server(path);
+
+	free(path);
+	return ret;
+}
 
 /************************************************************************
 *
@@ -1416,6 +1429,12 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
 			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
 			uint32_ret = 0;
+			break;
+		case SETNOTIFYSERVER:
+			retcode = set_notify_server_loc(arg_len, largebuf);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		default:
 			retcode = ENOTSUP;

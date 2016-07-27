@@ -20,6 +20,7 @@ CPPFLAGS += -isystem $(GTEST_DIR)/include $(EXTRACPPFLAGS)
 CPPFLAGS += $(addprefix -iquote,$(USER_DIR))
 # Search paths for source
 vpath	%.c	$(USER_DIR)
+vpath	%.cc	$(USER_DIR)
 
 # gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CC	=	gcc
@@ -122,7 +123,7 @@ prepare-$(T): $(T) $(OBJ_DIR)/$(T).tests
 
 # Build executable test
 $(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ -lstdc++ -lpthread -ldl -ljansson
 
 # Generate test list from executable file
 $(OBJ_DIR)/$(T).tests: $(T) $(lastword $(MAKEFILE_LIST)) | $(OBJ_DIR)

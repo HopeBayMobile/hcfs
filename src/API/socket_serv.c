@@ -288,6 +288,22 @@ int32_t do_reload_hcfs_config(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_set_notify_server(char *largebuf, int32_t arg_len,
+			     char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	write_log(8, "Start set event notify server\n");
+	ret_code = set_notify_server(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End set event notify server\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -375,6 +391,7 @@ int32_t process_request(int32_t thread_idx)
 		{GETSYNCSWITCH,	do_get_sync_status},
 		{RELOADCONFIG,	do_reload_hcfs_config},
 		{OCCUPIEDSIZE,	do_get_occupied_size},
+		{SETNOTIFYSERVER,	do_set_notify_server},
 	};
 
 	uint32_t n;

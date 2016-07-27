@@ -180,7 +180,16 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+
 int32_t sync_hcfs_system_data(char need_lock)
 {
 	return 0;
+}
+
+int32_t set_event_notify_server(char *path)
+{
+	if (strcmp(path, "setok") == 0)
+		return 0;
+	else
+		return -1;
 }

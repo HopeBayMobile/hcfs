@@ -513,3 +513,38 @@ int32_t reset_xfer_usage()
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: set_notify_server
+ * *        Inputs: char *arg_buf, uint32_t arg_len
+ * *       Summary: To set the location of event notify server.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
+int32_t set_notify_server(char *arg_buf, uint32_t arg_len)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	char path[arg_len + 10];
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = SETNOTIFYSERVER;
+	cmd_len = arg_len;
+
+	memcpy(path, arg_buf, arg_len);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, path, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
