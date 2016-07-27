@@ -14,6 +14,7 @@
 #define GW20_DO_RESTORATION_H_
 
 #include <inttypes.h>
+#include <semaphore.h>
 
 #include "global.h"
 #include "params.h"

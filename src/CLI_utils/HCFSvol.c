@@ -115,6 +115,10 @@ int32_t main(int32_t argc, char **argv)
 		code = GETXFERSTATUS;
 	else if (strcasecmp(argv[1], "setnotifyserver") == 0)
 		code = SETNOTIFYSERVER;
+	else if (strcasecmp(argv[1], "initiate_restoration") == 0)
+		code = INITIATE_RESTORATION;
+	else if (strcasecmp(argv[1], "check_restoration_status") == 0)
+		code = CHECK_RESTORATION_STATUS;
 	else
 		code = -1;
 	if (code < 0) {
@@ -133,6 +137,7 @@ int32_t main(int32_t argc, char **argv)
 	case RESETXFERSTAT:
 	case RELOADCONFIG:
 	case TRIGGERUPDATEQUOTA:
+	case INITIATE_RESTORATION:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -171,6 +176,7 @@ int32_t main(int32_t argc, char **argv)
 	case GETSYNCSWITCH:
 	case GETSYNCSTAT:
 	case GETXFERSTATUS:
+	case CHECK_RESTORATION_STATUS:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -187,6 +193,8 @@ int32_t main(int32_t argc, char **argv)
 			       uint32_ret ? "RUNNING(1)" : "PAUSED(0)");
 		else if (code == GETXFERSTATUS)
 			printf("Xfer status is %d\n", uint32_ret);
+		else if (code == CHECK_RESTORATION_STATUS)
+			printf("Restoration status is %d\n", uint32_ret);
 		break;
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_
