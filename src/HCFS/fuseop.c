@@ -7621,7 +7621,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 
 	/* Join thread if still restoring */
 	if (hcfs_system->system_restoring)
-		destroy_rebuild_sb();
+		destroy_rebuild_sb(FALSE);
 
 	destroy_mount_mgr();
 	destroy_fs_manager();

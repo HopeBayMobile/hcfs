@@ -62,7 +62,7 @@ OBJS_F := objmeta.o \
 	event_notification.o \
 	event_filter.o \
 	rebuild_super_block.o \
-	rebuild_parent_dirstat \
+	rebuild_parent_dirstat.o \
 	do_restoration.o
 
 # obj file used in android env
@@ -72,7 +72,7 @@ endif
 
 OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_F))
 
-all: check_pkgs hcfs
+all: hcfs
 
 check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
