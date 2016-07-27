@@ -137,7 +137,7 @@ TEST_F(event_enqueueTest, EnqueueOneEl)
 
 	time_fake.return_val = 999;
 
-	ret_code = event_enqueue(event_id, NULL);
+	ret_code = event_enqueue(event_id, NULL, FALSE);
 	EXPECT_EQ(ret_code, 0);
 	EXPECT_EQ(event_queue->num_events, 1);
 	EXPECT_EQ(event_queue->head, 0);
@@ -155,7 +155,7 @@ TEST_F(event_enqueueTest, EnqueueWithEventInfo)
 	char *event_info_json_str = "{\"info\":999}";
 	json_t *tmp_obj;
 
-	ret_code = event_enqueue(1, event_info_json_str);
+	ret_code = event_enqueue(1, event_info_json_str, FALSE);
 	EXPECT_EQ(ret_code, 0);
 	EXPECT_EQ(event_queue->num_events, 1);
 	EXPECT_EQ(event_queue->head, 0);
@@ -174,7 +174,7 @@ TEST_F(event_enqueueTest, EnqueueWithErrorEventInfo)
 	char *event_info_json_str = "xxxxxx";
 	json_t *tmp_obj;
 
-	ret_code = event_enqueue(1, event_info_json_str);
+	ret_code = event_enqueue(1, event_info_json_str, FALSE);
 	EXPECT_EQ(ret_code, -EINVAL);
 }
 
@@ -184,7 +184,7 @@ TEST_F(event_enqueueTest, EnqueueWithErrorEventInfo2)
 	char *event_info_json_str = "[{}]";
 	json_t *tmp_obj;
 
-	ret_code = event_enqueue(1, event_info_json_str);
+	ret_code = event_enqueue(1, event_info_json_str, FALSE);
 	EXPECT_EQ(ret_code, -EINVAL);
 }
 
@@ -197,17 +197,17 @@ TEST_F(event_enqueueTest, EnqueueUtilFull)
 	for (count = 0; count < EVENT_QUEUE_SIZE; count++) {
 		rear = event_queue->rear;
 		rear2 = (rear + 1) % EVENT_QUEUE_SIZE;
-		ret_code = event_enqueue(1, NULL);
+		ret_code = event_enqueue(1, NULL, FALSE);
 		EXPECT_EQ(ret_code, 0);
 		EXPECT_EQ(event_queue->rear, rear2);
 		EXPECT_EQ(event_queue->num_events, count + 1);
 	}
 
-	ret_code = event_enqueue(1, NULL);
+	ret_code = event_enqueue(1, NULL, FALSE);
 	EXPECT_EQ(ret_code, -ENOSPC);
 	EXPECT_EQ(event_queue->num_events, EVENT_QUEUE_SIZE);
 
-	ret_code = event_enqueue(1, NULL);
+	ret_code = event_enqueue(1, NULL, FALSE);
 	EXPECT_EQ(ret_code, -ENOSPC);
 	EXPECT_EQ(event_queue->num_events, EVENT_QUEUE_SIZE);
 }
@@ -259,7 +259,7 @@ TEST_F(event_dequeueTest, QueueEmpty)
 TEST_F(event_dequeueTest, DequeueOneEl)
 {
 	/* enqueue first */
-	ASSERT_EQ(event_enqueue(1, NULL), 0);
+	ASSERT_EQ(event_enqueue(1, NULL, FALSE), 0);
 
 	EXPECT_EQ(event_dequeue(1), 1);
 	EXPECT_EQ(event_queue->head, -1);
@@ -276,7 +276,7 @@ TEST_F(event_dequeueTest, DequeueUntilEmpty)
 
 	/* enqueue first */
 	for (idx = 0; idx < total_events; idx++) {
-		ASSERT_EQ(event_enqueue(1, NULL), 0);
+		ASSERT_EQ(event_enqueue(1, NULL, FALSE), 0);
 	}
 
 	for (;;) {
@@ -416,7 +416,7 @@ TEST_F(add_notify_eventTest, AddOK)
 	notify_server_path = "fake.server";
 
 	for (idx = 0; idx < NUM_EVENTS; idx++) {
-		ret_code = add_notify_event(idx, NULL);
+		ret_code = add_notify_event(idx, NULL, FALSE);
 		EXPECT_EQ(ret_code, 0);
 	}
 }
@@ -427,7 +427,7 @@ TEST_F(add_notify_eventTest, NotifyServerNotSet)
 
 	notify_server_path = NULL;
 
-	ret_code = add_notify_event(1, NULL);
+	ret_code = add_notify_event(1, NULL, FALSE);
 	EXPECT_EQ(ret_code, 1);
 }
 
@@ -437,7 +437,7 @@ TEST_F(add_notify_eventTest, InvalidEventID)
 
 	notify_server_path = "fake.server";
 
-	ret_code = add_notify_event(9999, NULL);
+	ret_code = add_notify_event(9999, NULL, FALSE);
 	EXPECT_EQ(ret_code, -EINVAL);
 }
 
@@ -448,7 +448,7 @@ TEST_F(add_notify_eventTest, EventQueueFull)
 	notify_server_path = "fake.server";
 	event_queue->num_events = EVENT_QUEUE_SIZE;
 
-	ret_code = add_notify_event(1, NULL);
+	ret_code = add_notify_event(1, NULL, FALSE);
 	EXPECT_EQ(ret_code, 2);
 }
 
@@ -459,7 +459,7 @@ TEST_F(add_notify_eventTest, BlockedByEventFilter)
 	notify_server_path = "fake.server";
 	check_event_filter_fake.return_val = -1;
 
-	ret_code = add_notify_event(1, NULL);
+	ret_code = add_notify_event(1, NULL, FALSE);
 	EXPECT_EQ(ret_code, 3);
 }
 /* End unittest for add_notify_eventTest */

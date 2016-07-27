@@ -29,6 +29,8 @@ typedef struct {
 	pthread_cond_t worker_active_cond;
 	/* Lock for queue operations */
 	sem_t queue_access_sem;
+	/* Wait when queue is full */
+	sem_t queue_full_sem;
 	int32_t num_events;
 	int32_t head;
 	int32_t rear;
@@ -48,11 +50,13 @@ void *event_worker_loop(void);
 #endif
 void destroy_event_worker_loop_thread();
 
-int32_t event_enqueue(int32_t event_id, char *event_info_json_str);
+int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
+		      char blocking);
 int32_t event_dequeue(int32_t num_events);
 
 int32_t send_event_to_server(int32_t fd, char *events_in_json);
 
-int32_t add_notify_event(int32_t event_id, char *event_info_json_str);
+int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
+			 char blocking);
 
 #endif /* GW20_SRC_EVENT_NOTIFY */

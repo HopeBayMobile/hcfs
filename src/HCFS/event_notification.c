@@ -60,6 +60,12 @@ int32_t init_event_queue()
 		return -errno;
 	}
 
+	ret_code = sem_init(&(event_queue->queue_full_sem), 0, EVENT_QUEUE_SIZE);
+	if (ret_code < 0) {
+		free(event_queue);
+		return -errno;
+	}
+
 	ret_code = pthread_mutex_init(&(event_queue->worker_active_lock), NULL);
 	if (ret_code != 0) {
 		free(event_queue);
@@ -119,7 +125,8 @@ static int32_t _get_server_conn(char *path)
  ***********************************************************************/
 int32_t set_event_notify_server(char *server_path)
 {
-	int32_t ret_code, server_fd;
+	int32_t ret_code;
+	int32_t server_fd = 0;
 	char *new_server_path, *temp_server_path;
 	char msg_to_send[32];
 	json_t *test_event = NULL;
@@ -162,6 +169,9 @@ error_handle:
 	free(new_server_path);
 
 done:
+	if (server_fd > 0)
+		close(server_fd);
+
 	if (test_event != NULL)
 		json_decref(test_event);
 
@@ -172,23 +182,20 @@ done:
  *
  * Function name: event_enqueue
  *        Inputs: int32_t event_id, char *event_info_json_str
+ *                char blocking
  *        Output: Integer
  *       Summary: Add an (event_id) event with (event_info_json_str) info
- *                to event queue. The rule of (event_info_json_str) is
- *                described in add_notify_event function.
+ *                to event queue. The rule of (event_info_json_str) and
+ *                (blocking) are described in add_notify_event function.
  *  Return value: 0 if successful. Otherwise returns the negation of the
  *                appropriate error code.
  ***********************************************************************/
-int32_t event_enqueue(int32_t event_id, char *event_info_json_str)
+int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
+		      char blocking)
 {
 	int32_t ret_code;
 	json_t *event = NULL;
 	json_error_t json_err;
-
-	if (event_queue->num_events >= EVENT_QUEUE_SIZE) {
-		write_log(4, "Failed to add to event queue - Event queue full.");
-		return -ENOSPC;
-	}
 
 	if (event_info_json_str == NULL) {
 		event = json_object();
@@ -216,6 +223,16 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str)
 		return -errno;
 	}
 
+	if (blocking == FALSE &&
+			event_queue->num_events >= EVENT_QUEUE_SIZE) {
+		write_log(4, "%s - %s",
+				"Failed to add to event queue",
+				"Event queue full.");
+		return -ENOSPC;
+	}
+
+	/* Reserve one space of queue */
+	sem_wait(&(event_queue->queue_full_sem));
 	/* Wait lock */
 	sem_wait(&(event_queue->queue_access_sem));
 
@@ -223,7 +240,8 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str)
 		event_queue->head = 0;
 		event_queue->rear = 0;
 	} else {
-		event_queue->rear = (event_queue->rear + 1) % EVENT_QUEUE_SIZE;
+		event_queue->rear =
+			(event_queue->rear + 1) % EVENT_QUEUE_SIZE;
 	}
 
 	event_queue->events[event_queue->rear] = event;
@@ -280,6 +298,8 @@ int32_t event_dequeue(int32_t num_events)
 			event_queue->head =
 				(event_queue->head + 1) % EVENT_QUEUE_SIZE;
 		}
+		/* Release one space of queue */
+		sem_post(&(event_queue->queue_full_sem));
 	}
 
 	/* Unlock */
@@ -306,7 +326,8 @@ int32_t event_dequeue(int32_t num_events)
  ***********************************************************************/
 int32_t send_event_to_server(int32_t fd, char *events_in_json)
 {
-	int32_t r_size, ret_val;
+	int32_t r_size;
+	int32_t ret_val = 0;
 	char event_msg[strlen(events_in_json) + 2];
 
 	/*
@@ -445,16 +466,26 @@ void *event_worker_loop(void)
  ***********************************************************************/
 void destroy_event_worker_loop_thread()
 {
+	int32_t queue_full_sem_val;
+
 	/* Wake up event worker */
 	pthread_mutex_lock(&(event_queue->worker_active_lock));
 	pthread_cond_signal(&(event_queue->worker_active_cond));
 	pthread_mutex_unlock(&(event_queue->worker_active_lock));
+
+	/* Avoid some thread blocked in enqueue function */
+	do {
+		sem_getvalue(&(event_queue->queue_full_sem),
+				&queue_full_sem_val);
+		sem_post(&(event_queue->queue_full_sem));
+	} while (queue_full_sem_val == 0);
 }
 
 /************************************************************************
  *
  * Function name: add_notify_event
  *        Inputs: int32_t event_id, char *event_info_json_str
+ *        	  char blocking
  *        Output: Integer
  *       Summary: Add a notify event. If there is only event_id required
  *                to passed to notify server, then set (event_info_json_str)
@@ -463,6 +494,8 @@ void destroy_event_worker_loop_thread()
  *                should contain these information. The format must be a
  *                string followed the json specification.
  *                E.g. "{\"key1\":\"val1\", \"key2\":\"val2\"}"
+ *                Passing TRUE|FALSE to arg (blocking) to control whether
+ *                this function should be blocked when queue is full or not.
  *  Return value: 0 - Operation was successful.
  *                1 - Event is dropped because notify server not set.
  *                2 - Event is dropped due to queue full error.
@@ -470,7 +503,8 @@ void destroy_event_worker_loop_thread()
  *        Otherwise - The negation of the appropriate error code.
  *
  ***********************************************************************/
-int32_t add_notify_event(int32_t event_id, char *event_info_json_str)
+int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
+			 char blocking)
 {
 	int32_t ret_code;
 
@@ -491,7 +525,7 @@ int32_t add_notify_event(int32_t event_id, char *event_info_json_str)
 		return 3;
 	}
 
-	ret_code = event_enqueue(event_id, event_info_json_str);
+	ret_code = event_enqueue(event_id, event_info_json_str, blocking);
 	if (ret_code == -ENOSPC) {
 		/* Event queue is full */
 		write_log(4, "Event is dropped due to queue full error.");
