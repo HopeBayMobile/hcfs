@@ -3665,11 +3665,12 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
 	off_t this_page_fpos;
-	size_t this_bytes_read, ret_size;
+	size_t this_bytes_read;
 	int64_t entry_index;
 	char fill_zeros;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 	int32_t ret, errnum, errcode;
+	ssize_t ret_ssize;
 
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
@@ -3854,11 +3855,13 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 			*reterr = -EIO;
 			return 0;
 		}
-		FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
+		PREAD(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size,
+		      offset);
+		//FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
 
-		FREAD(buf, sizeof(char), size, fh_ptr->blockfptr);
+		//FREAD(buf, sizeof(char), size, fh_ptr->blockfptr);
 
-		this_bytes_read = ret_size;
+		this_bytes_read = (size_t) ret_ssize;
 		if (this_bytes_read < size) {
 			/*Need to pad zeros*/
 			write_log(5, "Short reading? %ld %ld\n",
@@ -4329,13 +4332,14 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	BLOCK_ENTRY_PAGE temppage;
 	off_t this_page_fpos;
 	off_t old_cache_size, new_cache_size;
-	size_t this_bytes_written, ret_size;
+	size_t this_bytes_written;
 	int64_t entry_index;
 	int32_t ret, errnum, errcode;
 	int64_t tmpcachesize, tmpdiff;
 	int64_t unpin_dirty_size;
 	int64_t max_cache_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
+	ssize_t ret_ssize;
 
 	/* Check system size before writing */
 	if (hcfs_system->systemdata.system_size >
@@ -4675,11 +4679,12 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		ftruncate(fileno(fh_ptr->blockfptr), offset);
 	}
 
-	FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
+	PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
+	//FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
 
-	FWRITE(buf, sizeof(char), size, fh_ptr->blockfptr);
+	//FWRITE(buf, sizeof(char), size, fh_ptr->blockfptr);
 
-	this_bytes_written = ret_size;
+	this_bytes_written = (size_t) ret_ssize;
 
 	new_cache_size = check_file_size(thisblockpath);
 

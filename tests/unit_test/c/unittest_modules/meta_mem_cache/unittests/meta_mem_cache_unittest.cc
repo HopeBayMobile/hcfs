@@ -846,6 +846,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupFileMeta_ReadSuccess)
 	expected_meta = FILE_META_TYPE{4, 5, 6, 7, 8, 9, 1};
 
 	body_ptr->fptr = fopen(file_meta_path, "wr+");
+	setbuf(body_ptr->fptr, NULL);
 	body_ptr->meta_opened = TRUE;
 	truncate(file_meta_path, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
 		 sizeof(BLOCK_ENTRY_PAGE));
@@ -875,6 +876,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupBlockPage_ReadSuccess)
 	expected_block_page.num_entries = 123;
 
 	body_ptr->fptr = fopen(file_meta_path, "wr+");
+	setbuf(body_ptr->fptr, NULL);
 	body_ptr->meta_opened = TRUE;
 	truncate(file_meta_path, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
 		 sizeof(BLOCK_ENTRY_PAGE));

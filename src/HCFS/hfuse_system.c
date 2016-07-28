@@ -467,6 +467,14 @@ int32_t main(int32_t argc, char **argv)
 	/* TODO: error handling for log files */
 	init_sync_stat_control();
 
+	ret_val = check_and_create_metapaths();
+	if (ret_val < 0)
+		exit(ret_val);
+
+	ret_val = check_and_create_blockpaths();
+	if (ret_val < 0)
+		exit(ret_val);
+
 #ifdef _ANDROID_ENV_
 	ret_val = init_pathlookup();
 	if (ret_val < 0)

@@ -227,3 +227,12 @@ void *event_worker_loop(void) {}
 #endif
 void destroy_event_worker_loop_thread() {}
 
+int32_t check_and_create_metapaths(void)
+{
+	return 0;
+}
+int32_t check_and_create_blockpaths(void)
+{
+	return 0;
+}
+
