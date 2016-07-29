@@ -487,6 +487,17 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			config->cache_reserved_space = temp_val;
 			continue;
 		}
+		if (strcasecmp(argname, "meta_space_limit") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				write_log(0, "Number conversion error: %s\n", argname);
+				return -1;
+			}
+			config->meta_space_limit = temp_val;
+			continue;
+		}
 		if (strcasecmp(argname, "max_block_size") == 0) {
 			errno = 0;
 			temp_val = strtoll(argval, &num_check_ptr, 10);
@@ -1060,8 +1071,7 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 		hcfs_system->systemdata.system_meta_size = 0;
 
 	/* Cached size includes meta size */
-	hcfs_system->systemdata.cache_size +=
-		(cache_data_size_delta + meta_size_delta);
+	hcfs_system->systemdata.cache_size += cache_data_size_delta;
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;
 
@@ -1077,11 +1087,6 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_delta;
 	if (hcfs_system->systemdata.unpin_dirty_data_size < 0)
 		hcfs_system->systemdata.unpin_dirty_data_size = 0;
-
-	/* Pinned size includes meta size because meta is never paged out. */
-	hcfs_system->systemdata.pinned_size += meta_size_delta;
-	if (hcfs_system->systemdata.pinned_size < 0)
-		hcfs_system->systemdata.pinned_size = 0;
 
 	ret = 0;
 	if (need_sync) {
@@ -1237,17 +1242,16 @@ int32_t update_sb_size()
 		return 0;
 	}
 
+	/* Now both the pinned space and cache space do not include
+	 * meta and sb size */
+
 	hcfs_system->systemdata.system_size += (new_size - old_size);
+	if (hcfs_system->systemdata.system_size < 0)
+		hcfs_system->systemdata.system_size = 0;
+
+	hcfs_system->systemdata.system_meta_size += (new_size - old_size);
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
-
-	hcfs_system->systemdata.cache_size += (new_size - old_size);
-	if (hcfs_system->systemdata.cache_size < 0)
-		hcfs_system->systemdata.cache_size = 0;
-
-	hcfs_system->systemdata.pinned_size += (new_size - old_size);
-	if (hcfs_system->systemdata.pinned_size < 0)
-		hcfs_system->systemdata.pinned_size = 0;
 
 	hcfs_system->systemdata.super_block_size = new_size;
 	sem_post(&(hcfs_system->access_sem));

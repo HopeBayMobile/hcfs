@@ -212,7 +212,7 @@ typedef struct {
 /* Defining the system meta resources */
 typedef struct {
 	int64_t system_size; /* data + meta + sb */
-	int64_t system_meta_size; /* meta */
+	int64_t system_meta_size; /* meta + sb */
 	int64_t super_block_size; /* sb */
 	int64_t cache_size; /* data(local) + meta + sb */
 	int64_t cache_blocks;
