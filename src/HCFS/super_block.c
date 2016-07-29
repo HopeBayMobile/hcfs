@@ -759,9 +759,10 @@ int32_t super_block_reclaim(void)
 	for (count = num_unclaimed - 1; count >= 0; count--) {
 		now_ino = unclaimed_list[count];
 
-		/* Skip if inode number is illegel. */
+		/* Skip if inode number is illegal. */
 		if ((now_ino <= 0) ||
-		    (now_ino > sys_super_block->head.num_total_inodes + 1)) {
+		    (now_ino >
+		     (ino_t) (sys_super_block->head.num_total_inodes + 1))) {
 			write_log(0, "Error: unclaimed inode number is %"PRIu64
 				". Skip it.", (uint64_t)unclaimed_list[count]);
 			continue;
