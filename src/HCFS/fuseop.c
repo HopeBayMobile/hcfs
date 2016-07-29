@@ -1138,7 +1138,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	if (NO_META_SPACE()) {
 		fuse_reply_err(req, ENOSPC);
@@ -6057,7 +6056,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6371,7 +6369,6 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 	int64_t old_metasize, new_metasize, delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 	FILE_META_TYPE this_filemeta;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -6922,7 +6919,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
 	int64_t old_metasize, new_metasize, delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 	char local_pin;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -7084,7 +7080,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	parent_inode = real_ino(req, parent);
 

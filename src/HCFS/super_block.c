@@ -1001,7 +1001,6 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	uint64_t this_generation;
 	int32_t errcode, ret;
 	BOOL update_size;
-	int64_t max_pinned_size;
 
 	super_block_exclusive_locking();
 
