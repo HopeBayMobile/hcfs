@@ -72,7 +72,7 @@ endif
 
 OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_F))
 
-all: hcfs
+all: check_pkgs hcfs
 
 check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
