@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
 #include <jansson.h>
@@ -68,7 +69,7 @@ int32_t _api_socket_conn()
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -errno;
-	status = connect(fd, &addr, sizeof(addr));
+	status = connect(fd, (struct sockaddr *) &addr, sizeof(addr));
 	if (status < 0)
 		return -errno;
 
@@ -77,7 +78,7 @@ int32_t _api_socket_conn()
 
 void HCFS_set_config(char **json_res, char *key, char *value)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[1000];
@@ -111,7 +112,7 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 
 void HCFS_get_config(char **json_res, char *key)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[1000];
@@ -170,8 +171,8 @@ end:
 
 void HCFS_stat(char **json_res)
 {
-	int32_t fd, status, ret_code;
-	uint32_t code, reply_len, cmd_len, buf_idx;
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
 	HCFS_STAT_TYPE hcfs_stats;
 	json_t *data;
 
@@ -226,7 +227,7 @@ end:
 
 void HCFS_get_occupied_size(char **json_res)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len, buf_idx;
 	int64_t occupied;
 	char buf[512];
@@ -276,7 +277,6 @@ void HCFS_reload_config(char **json_res)
 {
 	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
-	ssize_t str_len;
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -305,7 +305,6 @@ void HCFS_toggle_sync(char **json_res, int32_t enabled)
 {
 	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
-	ssize_t str_len;
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -335,7 +334,6 @@ void HCFS_get_sync_status(char **json_res)
 {
 	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
-	ssize_t str_len;
 	json_t *data;
 
 	fd = _api_socket_conn();
@@ -448,7 +446,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path)
 
 void HCFS_pin_status(char **json_res, char *pathname)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
@@ -477,7 +475,7 @@ void HCFS_pin_status(char **json_res, char *pathname)
 
 void HCFS_dir_status(char **json_res, char *pathname)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len, buf_idx;
 	int64_t num_local, num_cloud, num_hybrid;
 	char buf[3*sizeof(int64_t)];
@@ -530,7 +528,7 @@ end:
 
 void HCFS_file_status(char **json_res, char *pathname)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
@@ -559,7 +557,7 @@ void HCFS_file_status(char **json_res, char *pathname)
 
 void HCFS_reset_xfer(char **json_res)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
@@ -585,9 +583,9 @@ void HCFS_reset_xfer(char **json_res)
 	close(fd);
 }
 
-HCFS_set_notify_server(char **json_res, char *path)
+void HCFS_set_notify_server(char **json_res, char *path)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
 	fd = _api_socket_conn();
@@ -614,9 +612,9 @@ HCFS_set_notify_server(char **json_res, char *path)
 	close(fd);
 }
 
-HCFS_set_swift_token(char **json_res, char *url, char *token)
+void HCFS_set_swift_token(char **json_res, char *url, char *token)
 {
-	int32_t fd, status, ret_code;
+	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 	ssize_t str_len;
 	char buf[4096];

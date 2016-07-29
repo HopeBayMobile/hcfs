@@ -181,6 +181,9 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 	HCFS_STAT_TYPE stats;
 
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
 	write_log(8, "Start get statistics\n");
 	ret_code = get_hcfs_stat(&stats);
 
@@ -205,6 +208,9 @@ int32_t do_get_occupied_size(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 	int64_t occupied;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
 
 	write_log(8, "Start get occupied size\n");
 	ret_code = get_occupied_size(&occupied);
@@ -353,13 +359,15 @@ int32_t _get_unused_thread()
  * *  Return value: 0 if successful. Otherwise returns negation of error code.
  * *
  * *************************************************************************/
-int32_t process_request(int32_t thread_idx)
+int32_t process_request(void *arg)
 {
-	int32_t fd, ret_code, res_size;
+	int32_t thread_idx, fd, ret_code, res_size;
 	uint32_t api_code, arg_len;
 	char buf_reused;
 	char buf[512], resbuf[512];
 	char *largebuf;
+
+	thread_idx = *((int *)arg);
 
 	fd = thread_pool[thread_idx].fd;
 	write_log(8, "Process a new request with socket fd %d\n", fd);
@@ -540,7 +548,7 @@ int32_t init_server()
 					    PTHREAD_CREATE_DETACHED);
 		pthread_create(&(thread_pool[thread_idx].thread),
 			       &(thread_pool[thread_idx].attr),
-			       (void *)process_request, (void *)thread_idx);
+			       (void *)process_request, (void *)&thread_idx);
 	}
 
 	close(sock_fd);

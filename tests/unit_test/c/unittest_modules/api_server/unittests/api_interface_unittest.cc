@@ -27,6 +27,9 @@ extern "C" {
 extern int32_t api_server_monitor_time;
 SYSTEM_CONF_STRUCT *system_config;
 
+char swift_auth_string[1024] = {0};
+char swift_url_string[1024] = {0};
+
 /* Begin of the test case for the function init_api_interface */
 
 class init_api_interfaceTest : public ::testing::Test {

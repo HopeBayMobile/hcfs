@@ -28,79 +28,78 @@
 
 int32_t main()
 {
-
 	char pin_path[100] = "/home/yuxun/mp/test1";
 	char pin_path2[100] = "/home/yuxun/mp/test2";
 	char pin_path3[100] = "/home/yuxun/mp/haha2";
 	char pin_path4[100] = "/home/yuxun/mp/haha3";
 	char pin_path5[100] = "/home/yuxun/mp/haha4";
 
-	//char *res1;
-	//HCFS_pin_path(&res1, pin_path, 1);
-	//printf("pin path - %s\n", res1);
-	//free(res1);
+	char *res1;
+	HCFS_pin_path(&res1, pin_path, 1);
+	printf("pin path - %s\n", res1);
+	free(res1);
 
-	//char *res2;
-	//HCFS_pin_path(&res2, pin_path2, 2);
-	//printf("high-pri-pin path - %s\n", res2);
-	//free(res2);
+	char *res2;
+	HCFS_pin_path(&res2, pin_path2, 2);
+	printf("high-pri-pin path - %s\n", res2);
+	free(res2);
 
-	//char *res3;
-	//HCFS_unpin_path(&res3, pin_path2);
-	//printf("unpin path - %s\n", res3);
-	//free(res3);
+	char *res3;
+	HCFS_unpin_path(&res3, pin_path2);
+	printf("unpin path - %s\n", res3);
+	free(res3);
 
-	//char *res4;
-	//HCFS_pin_status(&res4, pin_path2);
-	//printf("pin status - %s\n", res4);
-	//free(res4);
+	char *res4;
+	HCFS_pin_status(&res4, pin_path2);
+	printf("pin status - %s\n", res4);
+	free(res4);
 
-	//char *res5;
-	//HCFS_file_status(&res5, pin_path);
-	//printf("file status - %s\n", res5);
-	//free(res5);
+	char *res5;
+	HCFS_file_status(&res5, pin_path);
+	printf("file status - %s\n", res5);
+	free(res5);
 
-	//char *res6;
-	//HCFS_stat(&res6);
-	//printf("stat - %s\n", res6);
-	//free(res6);
+	char *res6;
+	HCFS_stat(&res6);
+	printf("stat - %s\n", res6);
+	free(res6);
 
-	//char *res7;
-	//HCFS_dir_status(&res7, pin_path2);
-	//printf("dir stat - %s\n", res7);
-	//free(res7);
+	char *res7;
+	HCFS_dir_status(&res7, pin_path2);
+	printf("dir stat - %s\n", res7);
+	free(res7);
 
-	//char *res8;
-	//char key[500] = "swift_url";
-	//char value[500] = "10.10.10.10:8080";
-	//HCFS_set_config(&res8, key, value);
-	//printf("set config - %s\n", res8);
-	//free(res8);
+	char *res8;
+	char key[500] = "swift_url";
+	char value[500] = "hopebay.arkflex.test:12345";
+	HCFS_set_config(&res8, key, value);
+	printf("set config - %s\n", res8);
+	free(res8);
 
-	//char *res9;
-	//HCFS_get_config(&res9, "swift_url");
-	//printf("get config - %s\n", res9);
-	//free(res9);
+	char *res9;
+	HCFS_get_config(&res9, "swift_url");
+	printf("get config - %s\n", res9);
+	free(res9);
 
-	//char *res10;
-	//HCFS_reset_xfer(&res10);
-	//printf("reset xfer - %s\n", res10);
-	//free(res10);
+	char *res10;
+	HCFS_reset_xfer(&res10);
+	printf("reset xfer - %s\n", res10);
+	free(res10);
 
-	//char *res11;
-	//HCFS_toggle_sync(&res11, 1);
-	//printf("toggle sync - %s\n", res11);
-	//free(res11);
+	char *res11;
+	HCFS_toggle_sync(&res11, 1);
+	printf("toggle sync - %s\n", res11);
+	free(res11);
 
-	//char *res12;
-	//HCFS_get_sync_status(&res12);
-	//printf("sync status - %s\n", res12);
-	//free(res12);
+	char *res12;
+	HCFS_get_sync_status(&res12);
+	printf("sync status - %s\n", res12);
+	free(res12);
 
-	//char *res13;
-	//HCFS_get_occupied_size(&res13);
-	//printf("occupied size - %s\n", res13);
-	//free(res13);
+	char *res13;
+	HCFS_get_occupied_size(&res13);
+	printf("occupied size - %s\n", res13);
+	free(res13);
 
 	char *res14;
 	HCFS_set_notify_server(&res14, "event.notify.mock.server");
@@ -110,9 +109,8 @@ int32_t main()
 	char *res15;
 	HCFS_set_swift_token(&res15,
 			"http://127.0.0.1:12345/v1/AUTH_test",
-			"AUTH_tk883a4aeb1b1a4b0e87f45ccf1993f7fe");
+			"AUTH_tkd83318209e9e486fb190090445fd349d");
 	printf("set swift token - %s\n", res15);
 	free(res15);
 }
-
 
