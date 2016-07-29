@@ -31,4 +31,6 @@ int32_t reset_xfer_usage();
 
 int32_t set_notify_server(char *arg_buf, uint32_t arg_len);
 
+int32_t set_swift_access_token(char *arg_buf, uint32_t arg_len);
+
 #endif  /* GW20_HCFSAPI_SYS_H_ */

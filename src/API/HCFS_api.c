@@ -587,7 +587,6 @@ void HCFS_reset_xfer(char **json_res)
 
 HCFS_set_notify_server(char **json_res, char *path)
 {
-
 	int32_t fd, status, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
@@ -603,6 +602,40 @@ HCFS_set_notify_server(char **json_res, char *path)
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
 	send(fd, path, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+HCFS_set_swift_token(char **json_res, char *url, char *token)
+{
+	int32_t fd, status, ret_code;
+	uint32_t code, reply_len, cmd_len;
+	ssize_t str_len;
+	char buf[4096];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = SETSWIFTTOKEN;
+	cmd_len = 0;
+
+	CONCAT_ARGS(url);
+	CONCAT_ARGS(token);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);

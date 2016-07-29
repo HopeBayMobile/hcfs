@@ -103,10 +103,16 @@ int32_t main()
 	//free(res13);
 
 	char *res14;
-	HCFS_set_notify_server(&res14, "mgmt.api.sock");
+	HCFS_set_notify_server(&res14, "event.notify.mock.server");
 	printf("set notify server - %s\n", res14);
 	free(res14);
 
+	char *res15;
+	HCFS_set_swift_token(&res15,
+			"http://127.0.0.1:12345/v1/AUTH_test",
+			"AUTH_tk883a4aeb1b1a4b0e87f45ccf1993f7fe");
+	printf("set swift token - %s\n", res15);
+	free(res15);
 }
 
 

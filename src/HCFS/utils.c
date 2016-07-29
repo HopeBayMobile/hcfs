@@ -502,6 +502,8 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			config->current_backend = -1;
 			if (strcasecmp(argval, "SWIFT") == 0)
 				config->current_backend = SWIFT;
+			if (strcasecmp(argval, "SWIFTTOKEN") == 0)
+				config->current_backend = SWIFTTOKEN;
 			if (strcasecmp(argval, "S3") == 0)
 				config->current_backend = S3;
 			if (strcasecmp(argval, "NONE") == 0)
@@ -873,6 +875,14 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		if (config->swift_protocol == NULL) {
 			write_log(0,
 				"Swift protocol missing from configuration\n");
+			return -1;
+		}
+	}
+
+	if (config->current_backend == SWIFTTOKEN) {
+		if (config->swift_container == NULL) {
+			write_log(0,
+				"Swift container missing from configuration\n");
 			return -1;
 		}
 	}
@@ -1773,6 +1783,7 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 
 	switch (new_config->current_backend) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		/*if (strcmp(SWIFT_ACCOUNT, new_config->swift_account))
 			return -EINVAL;
 		if (strcmp(SWIFT_USER, new_config->swift_user))
@@ -1803,6 +1814,8 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 	case NONE:
 		return -EINVAL;
 		break;
+	default:
+		return -EINVAL;
 	}
 
 	/* Check block size */

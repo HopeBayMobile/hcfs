@@ -304,6 +304,21 @@ int32_t do_set_notify_server(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_set_swift_token(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	write_log(8, "Start set swift access token\n");
+	ret_code = set_swift_access_token(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End set swift access token\n");
+	return ret_code;
+}
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -392,6 +407,7 @@ int32_t process_request(int32_t thread_idx)
 		{RELOADCONFIG,	do_reload_hcfs_config},
 		{OCCUPIEDSIZE,	do_get_occupied_size},
 		{SETNOTIFYSERVER,	do_set_notify_server},
+		{SETSWIFTTOKEN,	do_set_swift_token},
 	};
 
 	uint32_t n;
@@ -405,6 +421,12 @@ int32_t process_request(int32_t thread_idx)
 	}
 	write_log(0, "API code not found (API code %d)\n",
 			api_code);
+
+	ret_code = -EINVAL;
+	res_size = 0;
+	sends(fd, &res_size, sizeof(int32_t));
+	sends(fd, &ret_code, sizeof(int32_t));
+	goto done;
 
 error:
 	ret_code = -1;

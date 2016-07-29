@@ -98,6 +98,7 @@ void curl_easy_cleanup(CURL *handle)
 {
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		swift_destroy = FALSE;
 		break;
 	case S3:

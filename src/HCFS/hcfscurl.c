@@ -36,8 +36,13 @@
 #include "fuseop.h"
 #include "monitor.h"
 #include "utils.h"
+#include "event_notification.h"
+#include "event_filter.h"
 
 #define MAX_RETRIES 5
+
+char swift_auth_string[1024] = {0};
+char swift_url_string[1024] = {0};
 
 /* Marco to compute data transfer throughput.
  * If object size < 32KB, for this computation the size is rounded up to 32KB.
@@ -481,6 +486,29 @@ errcode_handle:
 
 /************************************************************************
 *
+* Function name: hcfs_get_auth_swifttoken
+*        Inputs:
+*       Summary: Send TOKENEXPIRED event to notify server to ask for new
+*                token.
+*  Return value: Return 200 if event is sent, or -1 if error.
+*
+*************************************************************************/
+int32_t hcfs_get_auth_swifttoken()
+{
+
+	int32_t ret_code;
+
+	ret_code = add_notify_event(TOKENEXPIRED, NULL, FALSE);
+
+	if (ret_code == 0 || ret_code == 3)
+		/* add event was successful or event already sent */
+		return 200;
+	else
+		return -1;
+}
+
+/************************************************************************
+*
 * Function name: hcfs_init_swift_backend
 *        Inputs: CURL_HANDLE *curl_handle
 *       Summary: Initialize Swift backend for the curl handle "curl_handel".
@@ -492,18 +520,35 @@ int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 	char account_user_string[1000];
 	int32_t ret_code;
 
-	curl_handle->curl = curl_easy_init();
+	switch (CURRENT_BACKEND) {
+	case SWIFT:
+		curl_handle->curl = curl_easy_init();
 
-	if (curl_handle->curl) {
-		sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
-			SWIFT_USER);
+		if (curl_handle->curl) {
+			sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
+				SWIFT_USER);
 
-		ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
-					       SWIFT_URL, curl_handle);
+			ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
+						       SWIFT_URL, curl_handle);
 
-		return ret_code;
+			return ret_code;
+		}
+		return -1;
+	case SWIFTTOKEN:
+		curl_handle->curl = curl_easy_init();
+
+		if (curl_handle->curl) {
+			ret_code = hcfs_get_auth_swifttoken();
+			if (ret_code == 200 || swift_auth_string[0] != 0)
+				return 200;
+			else
+				return ret_code;
+		}
+		return -1;
+	default:
+		return -1;
 	}
-	return -1;
+
 }
 
 /************************************************************************
@@ -537,26 +582,41 @@ int32_t hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 	char account_user_string[1000];
 	int32_t ret_code;
 
-	if (curl_handle->curl != NULL)
-		hcfs_destroy_swift_backend(curl_handle->curl);
+	switch (CURRENT_BACKEND) {
+	case SWIFT:
+		if (curl_handle->curl != NULL)
+			hcfs_destroy_swift_backend(curl_handle->curl);
 
-	curl_handle->curl = curl_easy_init();
+		curl_handle->curl = curl_easy_init();
 
-	if (curl_handle->curl) {
-		sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
-			SWIFT_USER);
+		if (curl_handle->curl) {
+			sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
+				SWIFT_USER);
 
-		ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
-					       SWIFT_URL, curl_handle);
+			ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
+						       SWIFT_URL, curl_handle);
 
-		return ret_code;
+			return ret_code;
+		}
+		return -1;
+	case SWIFTTOKEN:
+		if (curl_handle->curl != NULL)
+			hcfs_destroy_swift_backend(curl_handle->curl);
+
+		curl_handle->curl = curl_easy_init();
+
+		if (curl_handle->curl) {
+			return hcfs_get_auth_swifttoken();
+		}
+		return -1;
+	default:
+		return -1;
 	}
-	return -1;
 }
 
 /************************************************************************
 *
-* Function name: hcfs_swift_reauth
+* Function name: hcfs_S3_reauth
 *        Inputs: CURL_HANDLE *curl_handle
 *       Summary: Reset curl handle and init again for S3 backend.
 *  Return value: Return code from request (HTTP return code), or -1 if error.
@@ -650,6 +710,10 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	char header_filename[100];
 	int32_t ret_val, errcode;
 
+	/* For SWIFTTOKEN backend - token not set situation */
+	if (swift_auth_string[0] == 0)
+		return 401;
+
 	snprintf(header_filename, sizeof(header_filename),
 		 "/dev/shm/swiftaccounthead%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
@@ -717,6 +781,10 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	CURL *curl;
 	char header_filename[100], body_filename[100];
 	int32_t ret_val, num_retries, errcode;
+
+	/* For SWIFTTOKEN backend - token not set situation */
+	if (swift_auth_string[0] == 0)
+		return 401;
 
 	sprintf(header_filename, "/dev/shm/swiftlisthead%s.tmp",
 		curl_handle->id);
@@ -823,6 +891,9 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	double time_spent;
 	int64_t xfer_thpt;
 
+	/* For SWIFTTOKEN backend - token not set situation */
+	if (swift_auth_string[0] == 0)
+		return 401;
 
 	sprintf(header_filename, "/dev/shm/swiftputhead%s.tmp",
 		curl_handle->id);
@@ -971,6 +1042,10 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	double time_spent;
 	int64_t xfer_thpt;
 
+	/* For SWIFTTOKEN backend - token not set situation */
+	if (swift_auth_string[0] == 0)
+		return 401;
+
 	sprintf(header_filename, "/dev/shm/swiftgethead%s.tmp",
 		curl_handle->id);
 	curl = curl_handle->curl;
@@ -1105,6 +1180,10 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	char header_filename[100];
 	int32_t ret_val, errcode, ret;
 	int32_t num_retries;
+
+	/* For SWIFTTOKEN backend - token not set situation */
+	if (swift_auth_string[0] == 0)
+		return 401;
 
 	sprintf(header_filename, "/dev/shm/swiftdeletehead%s.tmp",
 		curl_handle->id);
@@ -1486,6 +1565,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	backend setting. Otherwise, it is set to NONE. */
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		write_log(2, "Connecting to Swift backend\n");
 		num_retries = 0;
 		ret_val = hcfs_init_swift_backend(curl_handle);
@@ -1501,7 +1581,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 			ret_val = hcfs_init_swift_backend(curl_handle);
 		}
 		if (_http_is_success(ret_val) == TRUE) {
-			curl_handle->curl_backend = SWIFT;
+			curl_handle->curl_backend = CURRENT_BACKEND;
 		} else {
 			if (curl_handle->curl != NULL)
 				hcfs_destroy_swift_backend(curl_handle->curl);
@@ -1543,6 +1623,7 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 		return;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		hcfs_destroy_swift_backend(curl_handle->curl);
 		break;
 	case S3:
@@ -1586,6 +1667,7 @@ int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		ret_val = hcfs_swift_test_backend(curl_handle);
 		if (ret_val == 401) {
 			write_log(2, "Retrying backend login");
@@ -1642,6 +1724,7 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 	write_log(10, "Debug start listing container\n");
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		ret_val = hcfs_swift_list_container(curl_handle);
 
 		while ((!_http_is_success(ret_val)) &&
@@ -1712,6 +1795,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		ret_val = hcfs_swift_put_object(fptr, objname, curl_handle,
 						object_meta);
 		while ((!_http_is_success(ret_val)) &&
@@ -1789,6 +1873,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		ret_val = hcfs_swift_get_object(fptr, objname, curl_handle,
 						object_meta);
 		while ((!_http_is_success(ret_val)) &&
@@ -1873,6 +1958,7 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		ret_val = hcfs_swift_delete_object(objname, curl_handle);
 
 		while ((!_http_is_success(ret_val)) &&

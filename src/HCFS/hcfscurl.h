@@ -36,8 +36,8 @@ typedef struct {
 	int32_t curl_backend;
 } CURL_HANDLE;
 
-char swift_auth_string[1024];
-char swift_url_string[1024];
+extern char swift_auth_string[1024];
+extern char swift_url_string[1024];
 
 CURL_HANDLE download_curl_handles[MAX_DOWNLOAD_CURL_HANDLE];
 CURL_HANDLE download_usermeta_curl_handle;
@@ -50,6 +50,7 @@ sem_t pin_download_curl_sem;
 
 int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 			CURL_HANDLE *curl_handle);
+int32_t hcfs_get_auth_swifttoken();
 int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_swift_backend(CURL *curl);
 int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle);
