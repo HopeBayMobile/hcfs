@@ -968,7 +968,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -1018,29 +1017,9 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	ispin = local_pin;
 #endif
 
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(ispin);
-	if (max_pinned_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
+	if (NO_META_SPACE()) {
 		fuse_reply_err(req, ENOSPC);
 		return;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(ispin);
-	if (max_cache_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
-		ret_val = sleep_on_cache_full();
-		if (ret_val < 0) {
-			fuse_reply_err(req, ret_val);
-			return;
-		}
 	}
 
 	if (!S_ISDIR(parent_stat.st_mode)) {

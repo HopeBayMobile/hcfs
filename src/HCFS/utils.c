@@ -52,6 +52,14 @@
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
+int32_t meta_nospc_log(const char *func_name)
+{
+	write_log(2, "Warn: meta space is exhausted in %s. Now meta"
+			" space usage is %"PRId64, func_name,
+			hcfs_system->systemdata.system_meta_size);
+	return 1;
+}
+
 int32_t check_and_create_metapaths(void)
 {
 	char tempname[METAPATHLEN];
@@ -1244,7 +1252,6 @@ int32_t update_sb_size()
 
 	/* Now both the pinned space and cache space do not include
 	 * meta and sb size */
-
 	hcfs_system->systemdata.system_size += (new_size - old_size);
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
