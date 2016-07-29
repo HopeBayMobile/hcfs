@@ -49,6 +49,7 @@
 #include "mount_manager.h"
 #include "enc.h"
 #include "super_block.h"
+#include "do_restoration.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
@@ -1871,6 +1872,7 @@ int32_t reload_system_config(const char *config_path)
 	/* Create backend related threads when backend status from
 	 * none to s3/swift */
 	enable_related_module = FALSE;
+	/* Do not enable related modules if going to restore */
 	if ((CURRENT_BACKEND == NONE) && (new_config->current_backend != NONE))
 		enable_related_module = TRUE;
 
@@ -1881,7 +1883,8 @@ int32_t reload_system_config(const char *config_path)
 	free(temp_config);
 
 	/* Init backend related threads */
-	if (enable_related_module == TRUE) {
+	if ((enable_related_module == TRUE)
+	    && (hcfs_system->system_restoring == NOT_RESTORING)) {
 		ret = prepare_FS_database_backup();
 		if (ret < 0) {
 			write_log(0, "Error: Fail to prepare FS backup."
@@ -1891,6 +1894,15 @@ int32_t reload_system_config(const char *config_path)
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		init_download_module();
 		init_backend_related_module();
+	} else if (enable_related_module == TRUE) {
+		/* Only bring up monitor thread if in restoration process */
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		/* Try to reduce cache size if now in stage 1 of restoration */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			ret = restore_stage1_reduce_cache();
+			if (ret == 0)
+				start_download_minimal();
+		}
 	}
 
 	return 0;

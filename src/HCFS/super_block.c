@@ -342,7 +342,7 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	int32_t ret_val;
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret_val = restore_meta_super_block_entry(this_inode, NULL);
 		if (ret_val < 0)
 			return ret_val;
@@ -1709,7 +1709,7 @@ int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 	int32_t ret;
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret = restore_meta_super_block_entry(this_inode, NULL);
 		if (ret < 0)
 			return ret;
@@ -1765,7 +1765,7 @@ int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 	int32_t ret;
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret = restore_meta_super_block_entry(this_inode, NULL);
 		if (ret < 0)
 			return ret;
@@ -2021,7 +2021,8 @@ int32_t check_init_super_block()
 			ret = create_sb_rebuilder();
 		} else {
 			if ((head.now_rebuild) ||
-			    (hcfs_system->system_restoring == TRUE)) {
+			    (hcfs_system->system_restoring ==
+			     RESTORING_STAGE2)) {
 				/* Keep rebuilding SB */
 				_ASSERT_BACKEND_EXIST_();
 				ret = init_rebuild_sb(KEEP_REBUILD_SB);

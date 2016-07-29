@@ -93,6 +93,13 @@ int32_t initiate_restoration(void)
 
 	/* First check if cache size is enough */
 	sem_wait(&(hcfs_system->access_sem));
+	/* FEATURE TODO: consider
+	1. current cache size
+	2. current pin size
+	3. current high-priority pin size
+	4. current meta size (later)
+	*/
+
 	/* Need cache size to be less than 0.2 of max possible cache size */
 	if (hcfs_system->systemdata.cache_size >= CACHE_HARD_LIMIT * 0.2) {
 		sem_post(&(hcfs_system->access_sem));
@@ -113,6 +120,11 @@ int32_t initiate_restoration(void)
 		errcode = ret;
 		goto errcode_handle;
 	}
+
+	sem_wait(&(hcfs_system->access_sem));
+	if (hcfs_system->system_restoring != RESTORING_STAGE1)
+		hcfs_system->system_restoring = RESTORING_STAGE1;
+	sem_post(&(hcfs_system->access_sem));
 
 	sem_post(&restore_sem);
 	return 0;
@@ -201,3 +213,15 @@ int32_t notify_restoration_result(int8_t stage, int32_t result)
 	return ret;
 }
 
+int32_t restore_stage1_reduce_cache(void)
+{
+
+	/* FEATURE TODO: consider
+	1. current cache size
+	2. current pin size
+	3. current high-priority pin size
+	4. current meta size (later)
+	*/
+	return 0;
+
+}

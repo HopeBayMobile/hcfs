@@ -7611,6 +7611,9 @@ int32_t hook_fuse(int32_t argc, char **argv)
 				destroy_rebuild_sb(TRUE);
 				/* Remove tag for rebuilding */
 				_unlink_restore_stat();
+				/* Notify user that the restoration is done */
+				notify_restoration_result(2, 0);
+
 				/* Enable backend related services */
 				init_backend_related_module();
 				write_log(10, "Debug: Finish rebuilding."

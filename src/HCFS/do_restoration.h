@@ -39,5 +39,7 @@ int32_t initiate_restoration(void);
 int32_t check_restoration_status(void);
 
 int32_t notify_restoration_result(int8_t stage, int32_t result);
+int32_t restore_stage1_reduce_cache(void);
+void start_download_minimal(void);
 
 #endif  /* GW20_DO_RESTORATION_H_ */

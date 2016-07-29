@@ -410,7 +410,7 @@ void wake_sb_rebuilder(void)
 {
 	/* Lock hcfs_system to avoid race condition */
 	sem_wait(&hcfs_system->access_sem);
-	if (hcfs_system->system_restoring == FALSE) {
+	if (hcfs_system->system_restoring != RESTORING_STAGE2) {
 		sem_post(&hcfs_system->access_sem);
 		return;
 	}
