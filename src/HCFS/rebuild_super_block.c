@@ -351,10 +351,12 @@ int32_t init_rebuild_sb(char rebuild_action)
 	if (ret < 0)
 		return ret;
 
+	/* FEATURE TODO: Add more error handling here as this is
+	not the normal case for entering super block rebuild */
 	/* Check system_restoring flag */
 	sem_wait(&(hcfs_system->access_sem));
-	if (hcfs_system->system_restoring == FALSE)
-		hcfs_system->system_restoring = TRUE;
+	if (hcfs_system->system_restoring != RESTORING_STAGE2)
+		hcfs_system->system_restoring = RESTORING_STAGE2;
 	sem_post(&(hcfs_system->access_sem));
 
 	return 0;

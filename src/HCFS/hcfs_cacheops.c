@@ -86,7 +86,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	          (uint64_t)this_inode);
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret = restore_meta_super_block_entry(this_inode,
 		                                     &(tempentry.inode_stat));
 		if (ret < 0)

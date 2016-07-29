@@ -701,7 +701,7 @@ int32_t delete_filesystem(char *fsname)
 	FS_root = temp_entry.d_ino;
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret = restore_meta_super_block_entry(FS_root, NULL);
 		if (ret < 0) {
 			errcode = ret;

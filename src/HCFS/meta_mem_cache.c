@@ -1129,7 +1129,8 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			discovered here */
 			tmpino = result_page->dir_entries[ret].d_ino;
 			this_type = result_page->dir_entries[ret].d_type;
-			if (hcfs_system->system_restoring) {
+			if (hcfs_system->system_restoring
+			    == RESTORING_STAGE2) {
 				if ((strcmp(childname, ".") != 0) &&
 				    (strcmp(childname, "..") != 0))
 					rebuild_parent_stat(tmpino,
@@ -1233,7 +1234,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	discovered here */
 	tmpino = result_page->dir_entries[*result_index].d_ino;
 	this_type = result_page->dir_entries[*result_index].d_type;
-	if (hcfs_system->system_restoring) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		if ((strcmp(childname, ".") != 0) &&
 		    (strcmp(childname, "..") != 0))
 			rebuild_parent_stat(tmpino,
@@ -1536,7 +1537,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		}
 
 		/* Try fetching meta file from backend if in restoring mode */
-		if (hcfs_system->system_restoring == TRUE) {
+		if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 			ret = restore_meta_super_block_entry(this_inode, NULL);
 			if (ret < 0)
 				return NULL;

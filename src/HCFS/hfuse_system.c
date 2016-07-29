@@ -63,13 +63,13 @@
 /************************************************************************
 *
 * Function name: init_hcfs_system_data
-*        Inputs: BOOL is_restoring
+*        Inputs: int8_t restoring_status
 *       Summary: Initialize HCFS system data.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t init_hcfs_system_data(BOOL is_restoring)
+int32_t init_hcfs_system_data(int8_t restoring_status)
 {
 	int32_t errcode, ret;
 	size_t ret_size;
@@ -107,7 +107,7 @@ int32_t init_hcfs_system_data(BOOL is_restoring)
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
-	hcfs_system->system_restoring = is_restoring;
+	hcfs_system->system_restoring = restoring_status;
 
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
@@ -231,17 +231,17 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: init_hfuse
-*        Inputs: BOOL is_restoring
+*        Inputs: int8_t restoring_status
 *       Summary: Initialize HCFS system.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t init_hfuse(BOOL is_restoring)
+int32_t init_hfuse(int8_t restoring_status)
 {
 	int32_t ret_val;
 
-	ret_val = init_hcfs_system_data(is_restoring);
+	ret_val = init_hcfs_system_data(restoring_status);
 	if (ret_val < 0)
 		return ret_val;
 	ret_val = init_system_fh_table();
@@ -452,7 +452,7 @@ int32_t main(int32_t argc, char **argv)
 #ifndef _ANDROID_ENV_
 	int32_t count;
 #endif
-	BOOL is_restoring;
+	int8_t restoring_status;
 
 	ret_val = ignore_sigpipe();
 
@@ -517,7 +517,7 @@ int32_t main(int32_t argc, char **argv)
 	switching metastorage / blockstorage */
 	/* FEATURE TODO: Need to check if can correctly unmount when stage 2
 	is in progress */
-	is_restoring = FALSE;
+	restoring_status = NOT_RESTORING;
 	init_restore_path();
 	ret_val = check_restoration_status();
 	/* FEATURE TODO: handling for stage 1 and 2 if reboot when stage
@@ -526,7 +526,7 @@ int32_t main(int32_t argc, char **argv)
 		/* If the system is in stage 2, make sure that
 		meta and block storage are pointed to the partially
 		restored one */
-		is_restoring = TRUE;
+		restoring_status = RESTORING_STAGE2;
 		write_log(10, "Checking if need to switch storage paths\n");
 		_check_partial_storage();
 	}
@@ -534,7 +534,7 @@ int32_t main(int32_t argc, char **argv)
 	/* FEATURE TODO: If the old meta/block storage
 	exists here, delete them */
 
-	ret_val = init_hfuse(is_restoring);
+	ret_val = init_hfuse(restoring_status);
 	if (ret_val < 0)
 		exit(-1);
 

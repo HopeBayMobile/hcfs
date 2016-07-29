@@ -206,7 +206,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	fetch_block_path(thisblockpath, ptr->this_inode, ptr->block_no);
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret = restore_meta_super_block_entry(ptr->this_inode, NULL);
 		if (ret < 0)
 			return;
@@ -810,7 +810,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	fetch_meta_path(metapath, inode);
 
 	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		ret = restore_meta_super_block_entry(inode, &tempstat);
 		if (ret < 0)
 			return ret;
@@ -827,7 +827,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
-	if (hcfs_system->system_restoring == TRUE) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 	} else {
 		FSEEK(fptr, 0, SEEK_SET);

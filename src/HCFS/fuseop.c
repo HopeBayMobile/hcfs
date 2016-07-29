@@ -5477,7 +5477,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			/* Rebuild parent lookup / dir statistics here
 			(excluding . and ..), for every pair of (parent / child)
 			discovered here */
-			if (hcfs_system->system_restoring) {
+			if (hcfs_system->system_restoring
+			    == RESTORING_STAGE2) {
 				tmpstrptr = temp_page.dir_entries[count].d_name;
 				if ((strcmp(tmpstrptr, ".") != 0) &&
 				    (strcmp(tmpstrptr, "..") != 0))
@@ -7604,9 +7605,9 @@ int32_t hook_fuse(int32_t argc, char **argv)
 
 		/* Check if restoring completed. */
 		sem_wait(&(hcfs_system->access_sem));
-		if (hcfs_system->system_restoring) {
+		if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 			if (rebuild_sb_jobs->job_finish) {
-				hcfs_system->system_restoring = FALSE;
+				hcfs_system->system_restoring = NOT_RESTORING;
 				destroy_rebuild_sb(TRUE);
 				/* Remove tag for rebuilding */
 				_unlink_restore_stat();
@@ -7620,7 +7621,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	}
 
 	/* Join thread if still restoring */
-	if (hcfs_system->system_restoring)
+	if (hcfs_system->system_restoring == RESTORING_STAGE2)
 		destroy_rebuild_sb(FALSE);
 
 	destroy_mount_mgr();

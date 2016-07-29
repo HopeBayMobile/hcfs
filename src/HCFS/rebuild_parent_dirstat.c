@@ -90,8 +90,8 @@ int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 	if ((this_inode <= 0) || (p_inode <= 0))
 		return -EINVAL;
 
-	/* If system is not being restored, don't do anything */
-	if (hcfs_system->system_restoring == FALSE)
+	/* If system is not in stage 2 of restoration, don't do anything */
+	if (hcfs_system->system_restoring != RESTORING_STAGE2)
 		return 0;
 
 	sem_wait(&(pathlookup_data_lock));

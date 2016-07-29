@@ -35,6 +35,11 @@
 
 #define ARCH_CODE ANDROID_64BIT
 
+/* Code for restoration stages */
+#define NOT_RESTORING 0
+#define RESTORING_STAGE1 1
+#define RESTORING_STAGE2 2
+
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
