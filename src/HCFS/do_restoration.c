@@ -254,5 +254,10 @@ int32_t restore_stage1_reduce_cache(void)
 
 void start_download_minimal(void)
 {
+/* FEATURE TODO:
+1. Setup path for downloading minimal
+2. Fork detachable threads
+3. Return
+*/
 	return;
 }
