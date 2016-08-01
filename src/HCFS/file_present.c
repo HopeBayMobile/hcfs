@@ -514,6 +514,8 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	else
 		*delta_meta_size = metasize;
 
+	super_block_mark_dirty(self_inode);
+
 	return 0;
 
 errcode_handle:
