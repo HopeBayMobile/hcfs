@@ -23,6 +23,8 @@ char restore_metapath[METAPATHLEN];
 char restore_blockpath[BLOCKPATHLEN];
 
 sem_t restore_sem;
+pthread_attr_t download_minimal_attr;
+pthread_t download_minimal_thread;
 
 #define RESTORE_METAPATH restore_metapath
 #define RESTORE_BLOCKPATH restore_blockpath
@@ -41,5 +43,9 @@ int32_t check_restoration_status(void);
 int32_t notify_restoration_result(int8_t stage, int32_t result);
 int32_t restore_stage1_reduce_cache(void);
 void start_download_minimal(void);
+int32_t run_download_minimal(void);
+
+int32_t fetch_restore_meta_path(char *pathname, ino_t this_inode);
+int32_t fetch_restore_block_path(char *pathname, ino_t this_inode, int64_t block_num);
 
 #endif  /* GW20_DO_RESTORATION_H_ */
