@@ -207,6 +207,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path);
  * | ------------- |:-------------|
  * | True | 0 if object is not pinned.|
  * | | 1 if object is pinned.|
+ * | | 2 if object is high-priority-pinned.|
  * | False | Linux errors.|
  */
 void HCFS_pin_status(char **json_res, char *pathname);

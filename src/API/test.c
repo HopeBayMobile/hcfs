@@ -45,7 +45,7 @@ int32_t main()
 	free(res2);
 
 	char *res3;
-	HCFS_unpin_path(&res3, pin_path2);
+	HCFS_unpin_path(&res3, pin_path);
 	printf("unpin path - %s\n", res3);
 	free(res3);
 
