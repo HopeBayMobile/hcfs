@@ -851,6 +851,11 @@ int32_t set_swift_token(int32_t arg_len, char *largebuf)
 	ssize_t str_size;
 	char *url_str, *token_str;
 
+	if (CURRENT_BACKEND != SWIFTTOKEN) {
+		write_log(4, "Set swift token API only supported for SWIFTTOKEN type");
+		return -EINVAL;
+	}
+
 	read_size = 0;
 
 	memcpy(&str_size, largebuf, sizeof(ssize_t));

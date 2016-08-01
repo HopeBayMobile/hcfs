@@ -549,9 +549,9 @@ int32_t set_notify_server(char *arg_buf, uint32_t arg_len)
 
 /************************************************************************
  * *
- * * Function name: set_notify_server
+ * * Function name: set_swift_access_token
  * *        Inputs: char *arg_buf, uint32_t arg_len
- * *       Summary: To set the location of event notify server.
+ * *       Summary: To set the value of swift storage url and auth token.
  * *
  * *  Return value: 0 if successful. Otherwise returns negation of error code
  * *
