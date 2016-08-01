@@ -1351,6 +1351,44 @@ TEST_F(api_moduleTest, GetQuotaSuccess) {
 	ASSERT_EQ(55667788, quota);
 }
 
+TEST_F(api_moduleTest, GetMetaSizeSuccess) {
+
+	int32_t ret_val;
+	uint32_t code, cmd_len, size_msg;
+	int64_t metasize;
+	char buf[300];
+
+	ret_val = init_api_interface();
+	ASSERT_EQ(0, ret_val);
+	ret_val = access(SOCK_PATH, F_OK);
+	ASSERT_EQ(0, ret_val);
+	ret_val = connect_sock();
+	ASSERT_EQ(0, ret_val);
+	ASSERT_NE(0, fd);
+
+	hcfs_system->systemdata.system_meta_size = 55667788;
+	code = GETMETASIZE;
+	cmd_len = 0;
+	memset(buf, 0, 300);
+
+	printf("Start sending\n");
+	size_msg=send(fd, &code, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &cmd_len, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), size_msg);
+	size_msg=send(fd, &buf, cmd_len, 0);
+	ASSERT_EQ(cmd_len, size_msg);
+
+	printf("Start recv\n");
+	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
+	ASSERT_EQ(sizeof(uint32_t), ret_val);
+	ASSERT_EQ(sizeof(int64_t), size_msg);
+	ret_val = recv(fd, &metasize, sizeof(int64_t), 0);
+	ASSERT_EQ(sizeof(int64_t), ret_val);
+	ASSERT_EQ(55667788, metasize);
+}
+
+
 TEST_F(api_moduleTest, UpdateQuotaSuccess) {
 
 	int32_t ret_val, errcode;

@@ -27,6 +27,7 @@
 #include "global.h"
 #include "params.h"
 #include "logger.h"
+#include "utils.h"
 #include "macro.h"
 
 /* TODO: How to integrate dir page reading / updating with mem cache? */
