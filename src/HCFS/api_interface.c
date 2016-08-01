@@ -1212,6 +1212,16 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
 			break;
+		case GETMETASIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(int64_t);
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.system_meta_size;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
+			break;
 		case GETDIRTYCACHESIZE:
 			buf[0] = 0;
 			retcode = 0;

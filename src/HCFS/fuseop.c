@@ -6378,7 +6378,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	old_metasize = 0;
 	new_metasize = 0;
 
-	if (NO_META_SPACE()) {
+	if ((flag != XATTR_REPLACE) && NO_META_SPACE()) {
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}

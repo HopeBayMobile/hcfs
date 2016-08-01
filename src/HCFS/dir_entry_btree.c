@@ -224,7 +224,10 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 			return 0; /*Insertion completed*/
 		}
 
-		/*Need to split*/
+		/* Need to split. First check if meta space is enough or not. */
+		if (NO_META_SPACE())
+			return -ENOSPC;
+		
 		if (s_index > 0)
 			memcpy(tmp_entries, tnode->dir_entries,
 						sizeof(DIR_ENTRY) * s_index);

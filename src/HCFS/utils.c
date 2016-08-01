@@ -52,10 +52,10 @@
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 
-int32_t meta_nospc_log(const char *func_name)
+int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
-	write_log(2, "Warn: meta space is exhausted in %s. Now meta"
-			" space usage is %"PRId64, func_name,
+	write_log(2, "Warn: meta space is exhausted in %s, line %d. Now meta"
+			" space usage is %"PRId64, func_name, lines, 
 			hcfs_system->systemdata.system_meta_size);
 	return 1;
 }

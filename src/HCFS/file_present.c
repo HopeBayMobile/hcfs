@@ -324,6 +324,9 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		return ret_val;
 
+	/* Mark dirty here so that dirty data size includes dirty meta size. */
+	super_block_mark_dirty(self_inode);
+
 	/* Storage location for new file is local */
 	DIR_STATS_TYPE tmpstat;
 	tmpstat.num_local = 1;
@@ -503,6 +506,9 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		return ret_val;
 
+	/* Mark dirty here so that dirty data size includes dirty meta size. */
+	super_block_mark_dirty(self_inode);
+
 	/* Init the dir stat for this node */
 	ret_val = reset_dirstat_lookup(self_inode);
 	if (ret_val < 0) {
@@ -513,8 +519,6 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
 	else
 		*delta_meta_size = metasize;
-
-	super_block_mark_dirty(self_inode);
 
 	return 0;
 
@@ -915,6 +919,9 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
+
+	/* Mark dirty here so that dirty data size includes dirty meta size. */
+	super_block_mark_dirty(self_inode);
 
 	if (old_metasize > 0 && new_metasize > 0)
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;

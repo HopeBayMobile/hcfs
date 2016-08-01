@@ -256,6 +256,7 @@
 	} while (0)
 
 #define NO_META_SPACE()\
-	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ? meta_nospc_log(__func__) : 0)
+	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ?\
+	meta_nospc_log(__func__, __LINE__) : 0)
 
 #endif  /* SRC_HCFS_MACRO_H_ */
