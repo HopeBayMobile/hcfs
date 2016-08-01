@@ -325,8 +325,6 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
 
-	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1000;
-	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	/* Insert many entries and verified the robustness */
 	for (int32_t times = 0 ; times < num_entries_insert ; times++) {
 		int32_t ret;
@@ -335,7 +333,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
 			tmp_child_pos);
-		ASSERT_NE(-1, ret);
+		ASSERT_TRUE(ret >= 0);
 		if ( ret == 1 ) {
 			generate_new_root();
 			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
@@ -343,7 +341,6 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 		}
 		free(entry);
 	}
-	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 
 	/* Check those entry in the b-tree */
 	for (int32_t times = 0 ; times < num_entries_insert ; times++) {
@@ -359,16 +356,16 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Entries_Cannot_Split_Since_NoSpace)
 {
 	int32_t ret;
 	int32_t reserved_stdout;
-	int32_t num_entries_insert = 30000;
+	int32_t num_entries_insert = MAX_DIR_ENTRIES_PER_PAGE - 2;
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
 	DIR_ENTRY entry;
-			
+
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
 
+	/* It will fail on splitting root */
 	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1000;
-	//_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	/* Insert many entries and verified the robustness */
 	for (int32_t times = 0 ; times < num_entries_insert ; times++) {
 		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
@@ -376,22 +373,14 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Entries_Cannot_Split_Since_NoSpace)
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
 			tmp_child_pos);
-		ASSERT_NE(-1, ret);
-		if ( ret == 1 ) {
-			printf("fuck!!\n");
-			generate_new_root();
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
-		}
+		ASSERT_TRUE(ret >= 0) << "times = " << times << "ret = "<< ret;
 		free(entry);
 	}
-	sprintf(entry.d_name, "test%d", num_entries_insert + 1);
+	sprintf(entry.d_name, "test%d", num_entries_insert);
 	ret = insert_dir_entry_btree(&entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
 			tmp_child_pos);
 	ASSERT_EQ(-ENOSPC, ret);
-
-	//_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 
 	/* Check those entry in the b-tree */
 	for (int32_t times = 0 ; times < num_entries_insert ; times++) {
