@@ -217,11 +217,42 @@ int32_t restore_stage1_reduce_cache(void)
 {
 
 	/* FEATURE TODO: consider
-	1. current cache size
-	2. current pin size
 	3. current high-priority pin size
 	4. current meta size (later)
 	*/
-	return 0;
 
+	sem_wait(&(hcfs_system->access_sem));
+
+	/* Need enough cache space */
+	if ((hcfs_system->systemdata).cache_size >=
+	    CACHE_HARD_LIMIT * REDUCED_RATIO) {
+		sem_post(&(hcfs_system->access_sem));
+		return -ENOSPC;
+	}
+	if ((hcfs_system->systemdata).pinned_size >=
+	    MAX_PINNED_LIMIT * REDUCED_RATIO) {
+		sem_post(&(hcfs_system->access_sem));
+		return -ENOSPC;
+	}
+
+	CACHE_HARD_LIMIT = CACHE_HARD_LIMIT * REDUCED_RATIO;
+	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
+	system_config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
+
+	system_config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT;
+	system_config->max_pinned_limit[P_PIN] = MAX_PINNED_LIMIT;
+
+	system_config->max_cache_limit[P_HIGH_PRI_PIN] =
+		CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
+	system_config->max_pinned_limit[P_HIGH_PRI_PIN] =
+		MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+
+	sem_post(&(hcfs_system->access_sem));
+
+	return 0;
+}
+
+void start_download_minimal(void)
+{
+	return;
 }

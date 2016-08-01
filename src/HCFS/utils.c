@@ -1902,6 +1902,8 @@ int32_t reload_system_config(const char *config_path)
 			ret = restore_stage1_reduce_cache();
 			if (ret == 0)
 				start_download_minimal();
+			else
+				notify_restoration_result(1, ret);
 		}
 	}
 

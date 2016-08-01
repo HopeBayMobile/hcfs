@@ -522,7 +522,9 @@ int32_t main(int32_t argc, char **argv)
 	ret_val = check_restoration_status();
 	/* FEATURE TODO: handling for stage 1 and 2 if reboot when stage
 	unfinished */
-	if (ret_val == 2) {
+	if (ret_val == 1) {
+		restoring_status = RESTORING_STAGE1;
+	} else if (ret_val == 2) {
 		/* If the system is in stage 2, make sure that
 		meta and block storage are pointed to the partially
 		restored one */
@@ -537,9 +539,6 @@ int32_t main(int32_t argc, char **argv)
 	ret_val = init_hfuse(restoring_status);
 	if (ret_val < 0)
 		exit(-1);
-
-/* FEATURE TODO: should check if system is started as restoring mode here */
-/* FEATURE TODO: If so, set hcfs_system->system_restoring to true here */
 
 	/* TODO: error handling for log files */
 	init_sync_stat_control();
@@ -573,7 +572,8 @@ int32_t main(int32_t argc, char **argv)
 		exit(ret_val);
 
 	/* Init backend related services and super block */
-	if (CURRENT_BACKEND != NONE) {
+	if ((CURRENT_BACKEND != NONE) &&
+	    (restoring_status != RESTORING_STAGE1)) {
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		init_download_module();
@@ -587,6 +587,29 @@ int32_t main(int32_t argc, char **argv)
 			write_log(4, "Rebuild superblock.\n");
 			/* Rebuild superblock.
 			 * Do NOT init upload/delete/cache mgmt */
+		}
+	} else if ((CURRENT_BACKEND != NONE) &&
+	    (restoring_status == RESTORING_STAGE1)) {
+		/* FEATURE TODO: stage 1 bootup */
+		ret = check_init_super_block();
+		if (ret < 0) {
+			exit(ret);
+		} else if (ret > 0) { /* Just opened old superblock */
+			write_log(8, "Open old (or create new) superblock\n");
+		} else {
+			write_log(0, "Unexpected sb error in stage 1\n");
+			exit(-1);
+		}
+
+		/* Only bring up monitor thread if in restoration process */
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		/* Try to reduce cache size if now in stage 1 of restoration */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			ret = restore_stage1_reduce_cache();
+			if (ret == 0)
+				start_download_minimal();
+			else
+				notify_restoration_result(1, ret);
 		}
 
 	} else {
@@ -603,8 +626,6 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	hook_fuse(argc, argv);
-	/* TODO: modify this so that backend config can be turned on
-	even when volumes are mounted */
 
 	destroy_event_worker_loop_thread();
 	pthread_join(event_loop_thread, NULL);
@@ -613,11 +634,12 @@ int32_t main(int32_t argc, char **argv)
 		/* When system restoring, deletion and uploading services
 		 * are not enabled. They are created after restoration
 		 * completed. */
-		if (hcfs_system->system_restoring == FALSE) {
+		if (hcfs_system->system_restoring == NOT_RESTORING) {
 			pthread_join(delete_loop_thread, NULL);
 			pthread_join(upload_loop_thread, NULL);
 		}
-		pthread_join(cache_loop_thread, NULL);
+		if (hcfs_system->system_restoring != RESTORING_STAGE1)
+			pthread_join(cache_loop_thread, NULL);
 		destroy_monitor_loop_thread();
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
