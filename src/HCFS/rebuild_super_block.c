@@ -198,8 +198,8 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		FSEEK(fptr, 0, SEEK_SET);
 		FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 		fclose(fptr);
-		if (max_inode < fs_cloud_stat.max_inode)
-			max_inode = fs_cloud_stat.max_inode;
+		if (max_inode < (ino_t) fs_cloud_stat.max_inode)
+			max_inode = (ino_t) fs_cloud_stat.max_inode;
 
 		write_log(10, "Max inode is now %" PRIu64
 		          ", per vol max is %" PRIu64 "\n",
