@@ -1008,6 +1008,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
+	mock_thread_type.is_revert = FALSE;
 
 	/* Run tested function */
 	init_upload_control();

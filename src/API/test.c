@@ -35,15 +35,15 @@ int32_t main()
 	char pin_path4[100] = "/home/yuxun/mp/haha3";
 	char pin_path5[100] = "/home/yuxun/mp/haha4";
 
-	char *res1;
-	HCFS_pin_path(&res1, pin_path, 1);
-	printf("pin path - %s\n", res1);
-	free(res1);
+	//char *res1;
+	//HCFS_pin_path(&res1, pin_path, 1);
+	//printf("pin path - %s\n", res1);
+	//free(res1);
 
-	char *res2;
-	HCFS_pin_path(&res2, pin_path2, 2);
-	printf("high-pri-pin path - %s\n", res2);
-	free(res2);
+	//char *res2;
+	//HCFS_pin_path(&res2, pin_path2, 2);
+	//printf("high-pri-pin path - %s\n", res2);
+	//free(res2);
 
 	//char *res3;
 	//HCFS_unpin_path(&res3, pin_path2);
@@ -101,6 +101,12 @@ int32_t main()
 	//HCFS_get_occupied_size(&res13);
 	//printf("occupied size - %s\n", res13);
 	//free(res13);
+
+	char *res14;
+	HCFS_set_notify_server(&res14, "mgmt.api.sock");
+	printf("set notify server - %s\n", res14);
+	free(res14);
+
 }
 
 

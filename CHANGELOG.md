@@ -7,6 +7,26 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.2.1128
+=====
+
+## New Features
+- [HCFS] Feature/log rotation compression (!437)
+- [HCFS] Added shutdown info to HCFS (!446)
+
+## Fixes
+- [HCFS] If battery level <= 3% at bootup, shutdown immediately (Hotfix/check battery at bootup !448)
+- [HCFS] Rearrange HCFS shutdown sequence so that all terminate steps (other than API shutdown) will be conducted before replying a shutdown request from API. (Hotfix/rearrange shutdown sequence !450)
+- [HCFS] bugfix/cannot_correctly_pin_all_files (!436)
+- [HCFS] Add some error handling when pin (about pin scheduler) (!449)
+- [HCFS] when file is syncing, do not expire it in meta cache (!447)
+- [HCFS] Reduced the number of sequence number updates in write and truncate.  Now will only increase the seq number after being synced to cloud or if loaded to meta cache (!438)
+- [Nexus-5x] Adjust auto shutdown threshold to power level 3 ([!13](gateway-2-0/nexus-5x!13))
+- [Android-System UI] Disable add user/guest button
+
+## Tests 
+- [HCFS] Test backend monitor  US-870  US-000 (!442)
+
 v 2.2.2.1074
 =====
 

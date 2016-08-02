@@ -113,6 +113,8 @@ int32_t main(int32_t argc, char **argv)
 		code = OCCUPIEDSIZE;
 	else if (strcasecmp(argv[1], "xferstatus") == 0)
 		code = GETXFERSTATUS;
+	else if (strcasecmp(argv[1], "setnotifyserver") == 0)
+		code = SETNOTIFYSERVER;
 	else if (strcasecmp(argv[1], "setsyncpoint") == 0)
 		code = SETSYNCPOINT;
 	else if (strcasecmp(argv[1], "cancelsyncpoint") == 0)
@@ -452,6 +454,21 @@ int32_t main(int32_t argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
+	case SETNOTIFYSERVER:
+		cmd_len = strlen(argv[2]) + 1;
+		strncpy(buf, argv[2], sizeof(buf));
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
 	case SETSYNCPOINT:
 	case CANCELSYNCPOINT:
 		if (argc >= 3) {
@@ -495,7 +512,6 @@ int32_t main(int32_t argc, char **argv)
 			}
 		}
 		break;
-
 	default:
 		break;
 	}

@@ -45,6 +45,7 @@
 #include "hcfs_cacheops.h"
 #include "hfuse_system.h"
 #include "syncpoint_control.h"
+#include "event_notification.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -474,6 +475,7 @@ int32_t list_FS_handle(DIR_ENTRY **entryarray, uint64_t *ret_entries)
 	uint64_t num_entries, temp;
 	int32_t ret;
 
+	temp = 0;
 	ret = list_filesystem(0, NULL, &num_entries);
 
 	write_log(10, "Debug list volume num volumes %ld\n", num_entries);
@@ -481,6 +483,7 @@ int32_t list_FS_handle(DIR_ENTRY **entryarray, uint64_t *ret_entries)
 		return ret;
 	if (num_entries > 0) {
 		*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
+		memset(*entryarray, 0, sizeof(DIR_ENTRY) * num_entries);
 		ret = list_filesystem(num_entries, *entryarray, &temp);
 	}
 	write_log(10, "Debug list volume %d, %ld\n", ret, temp);
@@ -828,6 +831,19 @@ int32_t get_xfer_status(void)
 	return 0;
 }
 
+int32_t set_notify_server_loc(int32_t arg_len, char *largebuf)
+{
+	char *path;
+	int32_t ret;
+
+	path = malloc(arg_len + 10);
+	memcpy(path, largebuf, arg_len);
+	ret = set_event_notify_server(path);
+
+	free(path);
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -977,6 +993,7 @@ void api_module(void *index)
 			goto return_message;
 		}
 
+		retcode = 0;
 		switch (api_code) {
 		case PIN:
 			memcpy(&reserved_pinned_size, largebuf,
@@ -1283,6 +1300,7 @@ void api_module(void *index)
 			break;
 		case LISTVOL:
 			/*Echos the arguments back to the caller*/
+			entryarray = NULL;
 			retcode = list_FS_handle(&entryarray, &num_entries);
 			tmpptr = (char *) entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;
@@ -1426,6 +1444,12 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(retcode),
 				     MSG_NOSIGNAL);
 			}
+			break;
+		case SETNOTIFYSERVER:
+			retcode = set_notify_server_loc(arg_len, largebuf);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		default:
 			retcode = ENOTSUP;

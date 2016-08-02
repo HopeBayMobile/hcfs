@@ -60,6 +60,8 @@ OBJS_F := objmeta.o \
 	tocloud_tools.o \
 	do_fallocate.o \
 	fuseproc_comm.o \
+	event_notification.o \
+	event_filter.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

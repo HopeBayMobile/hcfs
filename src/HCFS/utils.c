@@ -48,8 +48,35 @@
 #include "FS_manager.h"
 #include "mount_manager.h"
 #include "enc.h"
+#include "super_block.h"
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
+
+int32_t check_and_create_metapaths(void)
+{
+	char tempname[METAPATHLEN];
+	int32_t sub_dir;
+	int32_t errcode, ret;
+
+	if (METAPATH == NULL)
+		return -1;
+
+	/* Creates meta path if it does not exist */
+	if (access(METAPATH, F_OK) == -1)
+		MKDIR(METAPATH, 0700);
+
+	for (sub_dir = 0; sub_dir < NUMSUBDIR; sub_dir++) {
+		snprintf(tempname, METAPATHLEN, "%s/sub_%d", METAPATH, sub_dir);
+
+		/* Creates meta path for meta subfolder if it does not exist */
+		if (access(tempname, F_OK) == -1)
+			MKDIR(tempname, 0700);
+	}
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
 
 /************************************************************************
 *
@@ -67,28 +94,17 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -1;
 
-	/* Creates meta path if it does not exist */
-	if (access(METAPATH, F_OK) == -1)
-		MKDIR(METAPATH, 0700);
-
 	sub_dir = this_inode % NUMSUBDIR;
 	snprintf(tempname, METAPATHLEN, "%s/sub_%d", METAPATH, sub_dir);
-
-	/* Creates meta path for meta subfolder if it does not exist */
-	if (access(tempname, F_OK) == -1)
-		MKDIR(tempname, 0700);
 
 	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%" PRIu64 "",
 		METAPATH, sub_dir, (uint64_t)this_inode);
 
 	return 0;
-errcode_handle:
-	return errcode;
 }
 
 /************************************************************************
@@ -133,6 +149,29 @@ errcode_handle:
 	return errcode;
 }
 
+int32_t check_and_create_blockpaths(void)
+{
+	char tempname[BLOCKPATHLEN];
+	int32_t sub_dir;
+	int32_t errcode, ret;
+
+	if (BLOCKPATH == NULL)
+		return -EPERM;
+
+	if (access(BLOCKPATH, F_OK) == -1)
+		MKDIR(BLOCKPATH, 0700);
+
+	for (sub_dir = 0; sub_dir < NUMSUBDIR; sub_dir++) {
+		snprintf(tempname, BLOCKPATHLEN, "%s/sub_%d", BLOCKPATH,
+		         sub_dir);
+		if (access(tempname, F_OK) == -1)
+			MKDIR(tempname, 0700);
+	}
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
 /************************************************************************
 *
 * Function name: fetch_block_path
@@ -147,26 +186,17 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char tempname[BLOCKPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (BLOCKPATH == NULL)
 		return -EPERM;
 
-	if (access(BLOCKPATH, F_OK) == -1)
-		MKDIR(BLOCKPATH, 0700);
-
 	sub_dir = (this_inode + block_num) % NUMSUBDIR;
 	snprintf(tempname, BLOCKPATHLEN, "%s/sub_%d", BLOCKPATH, sub_dir);
-	if (access(tempname, F_OK) == -1)
-		MKDIR(tempname, 0700);
 
 	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 "_%"PRId64,
 			BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
 
 	return 0;
-
-errcode_handle:
-	return errcode;
 }
 
 /************************************************************************
@@ -1284,6 +1314,8 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	if (fs_cloud_stat.backend_num_inodes < 0)
 		fs_cloud_stat.backend_num_inodes = 0;
 
+	fs_cloud_stat.max_inode = sys_super_block->head.num_total_inodes + 1;
+
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
@@ -1665,13 +1697,15 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 			ino_t thisinode)
 {
 	int32_t ret, errcode;
-	size_t ret_size;
+	ssize_t ret_ssize;
 	FILE_STATS_TYPE meta_stats;
 	DIR_STATS_TYPE olddirstats, newdirstats, diffstats;
 
-	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
-		SEEK_SET);
-	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	PREAD(fileno(metafptr), &meta_stats, sizeof(FILE_STATS_TYPE),
+	      sizeof(struct stat) + sizeof(FILE_META_TYPE));
+	//FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	//	SEEK_SET);
+	//FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
 
 	_translate_storage_location(&meta_stats, &olddirstats);
 	meta_stats.num_blocks += num_blocks_delta;
@@ -1682,9 +1716,11 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 		meta_stats.dirty_data_size = 0;
 	_translate_storage_location(&meta_stats, &newdirstats);
 
-	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
-		SEEK_SET);
-	FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	PWRITE(fileno(metafptr), &meta_stats, sizeof(FILE_STATS_TYPE),
+	      sizeof(struct stat) + sizeof(FILE_META_TYPE));
+	//FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	//	SEEK_SET);
+	//FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
 
 	diffstats.num_local = newdirstats.num_local - olddirstats.num_local;
 	diffstats.num_cloud = newdirstats.num_cloud - olddirstats.num_cloud;

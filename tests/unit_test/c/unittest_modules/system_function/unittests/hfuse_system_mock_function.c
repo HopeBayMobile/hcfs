@@ -231,3 +231,20 @@ int32_t init_syncpoint_resource()
 {
 	return 0;
 }
+
+int32_t init_event_queue() {}
+#ifdef _ANDROID_ENV_
+void *event_worker_loop(void *ptr) {}
+#else
+void *event_worker_loop(void) {}
+#endif
+void destroy_event_worker_loop_thread() {}
+
+int32_t check_and_create_metapaths(void)
+{
+	return 0;
+}
+int32_t check_and_create_blockpaths(void)
+{
+	return 0;
+}

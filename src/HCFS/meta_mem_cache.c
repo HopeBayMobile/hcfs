@@ -792,6 +792,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 {
 	int32_t ret, errcode;
 	size_t ret_size;
+	ssize_t ret_ssize;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -824,9 +825,10 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			errcode = ret;
 			goto errcode_handle;
 		}
-
-		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
-		FREAD(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+		PREAD(fileno(body_ptr->fptr), block_page,
+		      sizeof(BLOCK_ENTRY_PAGE), page_pos);
+		//FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
+		//FREAD(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 	}
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);

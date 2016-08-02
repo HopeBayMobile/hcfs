@@ -54,6 +54,7 @@
 #include "hcfs_fromcloud.h"
 #include "pkg_cache.h"
 #include "api_interface.h"
+#include "event_notification.h"
 #include "syncpoint_control.h"
 
 /* TODO: A monitor thread to write system info periodically to a
@@ -333,6 +334,70 @@ void init_backend_related_module(void)
 	}
 }
 
+int32_t init_event_notify_module(void)
+{
+	pthread_create(&event_loop_thread, NULL, &event_worker_loop, NULL);
+	return init_event_queue();
+}
+
+/************************************************************************
+Helper function for checking if the battery is below a threshold
+******/
+int32_t _is_battery_low()
+{
+	FILE *fptr;
+	int32_t retval, powerlevel;
+
+	if (access("/sys/class/power_supply/battery/capacity", F_OK) == 0)
+		fptr = fopen("/sys/class/power_supply/battery/capacity", "r");
+	else if (access("/sys/class/power_supply/BAT0/capacity", F_OK) == 0)
+		fptr = fopen("/sys/class/power_supply/BAT0/capacity", "r");
+	else
+		fptr = NULL;
+
+	if (fptr == NULL) {
+		write_log(4, "Unable to access battery level\n");
+		return FALSE;
+	}
+
+	powerlevel = 0;
+
+	retval = fscanf(fptr, "%d\n", &powerlevel);
+
+	if (retval < 1) {
+		write_log(4, "Unable to read battery level\n");
+		fclose(fptr);
+		return FALSE;
+	}
+
+	/* Hack for Android: If powerlevel = 50, should check again
+	as the value might be a fake from system */
+	if (powerlevel == 50) {
+		write_log(4, "Re-reading battery level in 10 seconds\n");
+		sleep(10);
+		fseek(fptr, 0, SEEK_SET);
+		powerlevel = 0;
+		retval = fscanf(fptr, "%d\n", &powerlevel);
+		if (retval < 1) {
+			write_log(4, "Unable to read battery level\n");
+			fclose(fptr);
+			return FALSE;
+		}
+	}
+
+	fclose(fptr);
+
+	if (powerlevel <= BATTERY_LOW_LEVEL) {
+		write_log(4, "Battery low, shutting down. (level is %d)\n",
+		          powerlevel);
+		return TRUE;
+	}
+
+	write_log(4, "Battery level is %d. Continue with bootup\n",
+	          powerlevel);
+	return FALSE;
+}
+
 /************************************************************************
 *
 * Function name: main
@@ -382,6 +447,20 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(-1);
 
+	/* Move log opening earlier for android to log low battery events */
+#ifdef _ANDROID_ENV_
+	open_log("hcfs_android_log");
+#endif
+
+	/* Check if battery level is low. If so, shutdown */
+	ret_val = _is_battery_low();
+	if (ret_val == TRUE) {
+		close_log();
+		ret_val = execlp("setprop", "setprop", "sys.powerctl",
+		                 "shutdown", NULL);
+		exit(-1);
+	}
+
 	nofile_limit.rlim_cur = 150000;
 	nofile_limit.rlim_max = 150001;
 
@@ -392,32 +471,6 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	UNUSED(curl_handle);
-	/* Only init backend when actual transfer is needed */
-	/*
-		if (CURRENT_BACKEND != NONE) {
-			sprintf(curl_handle.id, "main");
-			ret_val = hcfs_init_backend(&curl_handle);
-			if ((ret_val < 200) || (ret_val > 299)) {
-				write_log(0,
-					"Error in connecting to backend. Code
-	   %d\n",
-					ret_val);
-				write_log(0, "Backend %d\n", CURRENT_BACKEND);
-				exit(-1);
-			}
-
-			ret_val = hcfs_list_container(&curl_handle);
-			if (((ret_val < 200) || (ret_val > 299)) && (ret_val !=
-	   404)) {
-				write_log(0, "Error in connecting to
-	   backend\n");
-				exit(-1);
-			}
-			write_log(10, "ret code %d\n", ret_val);
-
-			hcfs_destroy_backend(curl_handle.curl);
-		}
-	*/
 	ret_val = init_hfuse();
 	if (ret_val < 0)
 		exit(-1);
@@ -425,8 +478,15 @@ int32_t main(int32_t argc, char **argv)
 	/* TODO: error handling for log files */
 	init_sync_stat_control();
 
+	ret_val = check_and_create_metapaths();
+	if (ret_val < 0)
+		exit(ret_val);
+
+	ret_val = check_and_create_blockpaths();
+	if (ret_val < 0)
+		exit(ret_val);
+
 #ifdef _ANDROID_ENV_
-	open_log("hcfs_android_log");
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
 		exit(ret_val);
@@ -441,6 +501,11 @@ int32_t main(int32_t argc, char **argv)
 	write_log(2, "\nVersion: %s\nStart logging\n", VERSION_NUM);
 #endif
 
+	/* Init event notify service */
+	ret_val = init_event_notify_module();
+	if (ret_val < 0)
+		exit(ret_val);
+
 	/* Init backend related services */
 	if (CURRENT_BACKEND != NONE) {
 		init_backend_related_module();
@@ -449,6 +514,9 @@ int32_t main(int32_t argc, char **argv)
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
+
+	destroy_event_worker_loop_thread();
+	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
 		pthread_join(cache_loop_thread, NULL);
@@ -529,7 +597,7 @@ int32_t main(int32_t argc, char **argv)
 	case 2:
 		open_log("backend_upload.log");
 		write_log(2, "\nStart logging backend upload\n");
-		
+
 		/* Init curl handle */
 		sem_init(&download_curl_sem, 0,
 				MAX_DOWNLOAD_CURL_HANDLE);

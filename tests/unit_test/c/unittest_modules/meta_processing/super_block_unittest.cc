@@ -919,6 +919,7 @@ TEST_F(super_block_reclaimTest, ReclaimSuccess)
 	}
 
 	sys_super_block->head.num_to_be_reclaimed = num_inode; // Set head data
+	sys_super_block->head.num_total_inodes = num_inode;
 	pwrite(sys_super_block->iofptr, &sys_super_block->head,
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write head data
 
@@ -947,6 +948,56 @@ TEST_F(super_block_reclaimTest, ReclaimSuccess)
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 	EXPECT_EQ(0, sb_head.num_to_be_reclaimed);
 }
+
+TEST_F(super_block_reclaimTest, UnclaimedFileCorrupt_SkipInode)
+{
+	uint64_t num_inode = RECLAIM_TRIGGER + 123;
+	SUPER_BLOCK_ENTRY now_entry;
+	SUPER_BLOCK_HEAD sb_head;
+	ino_t now_reclaimed_inode;
+
+	/* Mock unclaimed list, head and entries. */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * num_inode); // Prepare entry
+
+	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+		SUPER_BLOCK_ENTRY sb_entry;
+
+		fwrite(&inode, sizeof(ino_t), 1,
+			sys_super_block->unclaimed_list_fptr); // Add unclaimed list
+
+		sb_entry.status = TO_BE_RECLAIMED; // Set status
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+			(inode - 1)); // Write entry status
+	}
+
+	sys_super_block->head.num_to_be_reclaimed = num_inode; // Set head data
+	sys_super_block->head.num_total_inodes = 0;
+	pwrite(sys_super_block->iofptr, &sys_super_block->head,
+		sizeof(SUPER_BLOCK_HEAD), 0); // Write head data
+
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim());
+
+	/* Verify. Just reclaim inode 1 */
+	uint64_t file_pos;
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode;
+	file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+		(now_reclaimed_inode - 1);
+	pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+	ASSERT_EQ(1, now_reclaimed_inode); // Check reclaimed inode
+	ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+
+	EXPECT_EQ(0, now_entry.util_ll_next);
+	EXPECT_EQ(1, sys_super_block->head.last_reclaimed_inode); // Check last inode
+	EXPECT_EQ(1, sys_super_block->head.num_inode_reclaimed);
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed); // Check number of to_be_reclaimed
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	EXPECT_EQ(0, sb_head.num_to_be_reclaimed);
+}
+
 
 /*
 	End of unittest of super_block_reclaim()

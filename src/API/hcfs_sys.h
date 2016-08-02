@@ -29,4 +29,6 @@ int32_t get_sync_status();
 
 int32_t reset_xfer_usage();
 
+int32_t set_notify_server(char *arg_buf, uint32_t arg_len);
+
 #endif  /* GW20_HCFSAPI_SYS_H_ */

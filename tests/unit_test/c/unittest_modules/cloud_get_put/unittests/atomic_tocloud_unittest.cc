@@ -1,3 +1,4 @@
+#include <dirent.h>
 extern "C" {
 #include "atomic_tocloud.h"
 #include "fuseop.h"
@@ -810,6 +811,8 @@ protected:
 
 	virtual void SetUp()
 	{
+		mock_target = "/tmp/copy_target";
+
 		system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 		hcfs_system = (SYSTEM_DATA_HEAD *)
@@ -821,6 +824,8 @@ protected:
 
 	virtual void TearDown()
 	{
+		mock_target = "/tmp/copy_target";
+
 		if (!access(mock_target, F_OK))
 			unlink(mock_target);
 		free(hcfs_system);
@@ -1306,8 +1311,7 @@ protected:
 		METAPATH = "/tmp";
 		MAX_BLOCK_SIZE = 1048576;
 		sprintf(bullpen_path, "%s/upload_bullpen", METAPATH);
-		if (!access(progress_path, F_OK))
-			unlink(progress_path);
+		cleanup(bullpen_path);
 		if (!access(bullpen_path, F_OK))
 			rmdir(bullpen_path);
 		mkdir(bullpen_path, 0700);
@@ -1315,13 +1319,30 @@ protected:
 
 	void TearDown()
 	{
-		if (!access(progress_path, F_OK))
-			unlink(progress_path);
+		cleanup(bullpen_path);
 		if (!access(backend_metapath, F_OK))
 			unlink(backend_metapath);
 		free(system_config);
 		rmdir(bullpen_path);
 	}
+	void cleanup(char *path) {
+	  DIR *dirp;
+	  dirent *tmpentry;
+	  char tmpname[400];
+
+	  dirp = opendir(path);
+	  if (dirp == NULL)
+	    return;
+	  while ((tmpentry = readdir(dirp)) != NULL) {
+	    if (!strcmp(tmpentry->d_name, "."))
+	      continue;
+	    if (!strcmp(tmpentry->d_name, ".."))
+	      continue;
+	    snprintf(tmpname, 400, "%s/%s", path, tmpentry->d_name);
+	    unlink(tmpname);
+	   }
+	  closedir(dirp);
+	 }
 };
 
 TEST_F(init_backend_file_infoTest, NotRevert_FirstUpload)

@@ -14,6 +14,7 @@ extern "C" {
 #include "params.h"
 #include "fuseop.h"
 #include "mount_manager.h"
+#include "super_block.h"
 }
 #include "gtest/gtest.h"
 #include "mock_params.h"
@@ -35,6 +36,168 @@ TEST(check_file_sizeTest, Test_8_bytes) {
 
   EXPECT_EQ(8,check_file_size("testpatterns/size8bytes"));
 }
+
+/* Begin of the test case for the function check_and_create_metapaths */
+
+class check_and_create_metapathsTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    METAPATH = (char *)malloc(METAPATHLEN);
+    mkdir("/tmp/testmeta",0700);
+    strcpy(METAPATH, "/tmp/testmeta/metapath");
+   }
+
+  virtual void TearDown() {
+    rmdir("/tmp/testmeta");
+    free(METAPATH);
+    free(system_config);
+   }
+
+ };
+
+TEST_F(check_and_create_metapathsTest, MetaPathNotCreatable) {
+  char pathname[METAPATHLEN];
+  int32_t ret_code;
+
+  ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
+  ret_code = 0;
+  if (access(METAPATH,F_OK)==0)
+   {
+    ret_code = rmdir(METAPATH);
+    ASSERT_EQ(0,ret_code);
+   }
+  ret_code = chmod("/tmp/testmeta", 0400);
+
+  ASSERT_EQ(ret_code,0);
+
+  EXPECT_EQ(-EACCES,check_and_create_metapaths());
+
+  chmod("/tmp/testmeta",0700);
+  rmdir(METAPATH);
+ }
+TEST_F(check_and_create_metapathsTest, MetaPathNotAccessible) {
+  char pathname[METAPATHLEN];
+  int32_t ret_code;
+
+  ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
+  ret_code = 0;
+  if (access(METAPATH,F_OK)<0)
+   {
+    ret_code = mkdir(METAPATH, 0400);
+    ASSERT_EQ(0,ret_code);
+   }
+  ret_code = chmod(METAPATH, 0400);
+
+  ASSERT_EQ(ret_code,0);
+
+  EXPECT_EQ(-EACCES,check_and_create_metapaths());
+
+  rmdir(METAPATH);
+ }
+TEST_F(check_and_create_metapathsTest, MkMetaPathSuccess) {
+  char pathname[METAPATHLEN];
+  int32_t ret_code, i;
+
+  ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
+  ret_code = 0;
+  if (access(METAPATH,F_OK)==0)
+   {
+    ret_code = rmdir(METAPATH);
+    ASSERT_EQ(0,ret_code);
+   }
+
+  ASSERT_EQ(0,check_and_create_metapaths());
+
+  for (i = 0; i < NUMSUBDIR; i++) {
+    snprintf(pathname, METAPATHLEN, "/tmp/testmeta/metapath/sub_%d", i);
+    rmdir(pathname);
+  }
+  rmdir(METAPATH);
+ }
+
+/* End of the test case for the function check_and_create_metapaths */
+
+/* Begin of the test case for the function check_and_create_blockpaths */
+
+class check_and_create_blockpathsTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+    BLOCKPATH = (char *)malloc(BLOCKPATHLEN);
+    mkdir("/tmp/testblock",0700);
+    strcpy(BLOCKPATH, "/tmp/testblock/blockpath");
+   }
+
+  virtual void TearDown() {
+    rmdir("/tmp/testblock");
+    free(BLOCKPATH);
+    free(system_config);
+   }
+
+ };
+
+TEST_F(check_and_create_blockpathsTest, BlockPathNotCreatable) {
+  char pathname[BLOCKPATHLEN];
+  int32_t ret_code;
+
+  ASSERT_STREQ("/tmp/testblock/blockpath", BLOCKPATH);
+  ret_code = 0;
+  if (access(BLOCKPATH,F_OK)==0)
+   {
+    ret_code = rmdir(BLOCKPATH);
+    ASSERT_EQ(0,ret_code);
+   }
+  ret_code = chmod("/tmp/testblock", 0400);
+
+  ASSERT_EQ(ret_code,0);
+
+  EXPECT_EQ(-EACCES,check_and_create_blockpaths());
+
+  chmod("/tmp/testblock",0700);
+  rmdir(BLOCKPATH);
+ }
+TEST_F(check_and_create_blockpathsTest, BlockPathNotAccessible) {
+  char pathname[BLOCKPATHLEN];
+  int32_t ret_code;
+
+  ASSERT_STREQ("/tmp/testblock/blockpath", BLOCKPATH);
+  ret_code = 0;
+  if (access(BLOCKPATH,F_OK)<0)
+   {
+    ret_code = mkdir(BLOCKPATH, 0400);
+    ASSERT_EQ(0,ret_code);
+   }
+  ret_code = chmod(BLOCKPATH, 0400);
+
+  ASSERT_EQ(ret_code,0);
+
+  EXPECT_EQ(-EACCES,check_and_create_blockpaths());
+
+  rmdir(BLOCKPATH);
+ }
+TEST_F(check_and_create_blockpathsTest, MkBlockPathSuccess) {
+  char pathname[BLOCKPATHLEN];
+  int32_t ret_code, i;
+
+  ASSERT_STREQ("/tmp/testblock/blockpath", BLOCKPATH);
+  ret_code = 0;
+  if (access(BLOCKPATH,F_OK)==0)
+   {
+    ret_code = rmdir(BLOCKPATH);
+    ASSERT_EQ(0,ret_code);
+   }
+
+  ASSERT_EQ(0,check_and_create_blockpaths());
+
+  for (i = 0; i < NUMSUBDIR; i++) {
+    snprintf(pathname, BLOCKPATHLEN, "/tmp/testblock/blockpath/sub_%d", i);
+    rmdir(pathname);
+  }
+  rmdir(BLOCKPATH);
+ }
+
+/* End of the test case for the function check_and_create_blockpaths */
 
 /* Begin of the test case for the function fetch_meta_path */
 
@@ -65,64 +228,6 @@ TEST_F(fetch_meta_pathTest, NullMetaPath) {
   EXPECT_EQ(-EPERM,fetch_meta_path(pathname,0));
 
   METAPATH = tempptr;
- }
-TEST_F(fetch_meta_pathTest, MetaPathNotCreatable) {
-  char pathname[METAPATHLEN];
-  int32_t ret_code;
-
-  ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
-  ret_code = 0;
-  if (access(METAPATH,F_OK)==0)
-   {
-    ret_code = rmdir(METAPATH);
-    ASSERT_EQ(0,ret_code);
-   }
-  ret_code = chmod("/tmp/testmeta", 0400);
-
-  ASSERT_EQ(ret_code,0);
-
-  EXPECT_EQ(-EACCES,fetch_meta_path(pathname,0));
-
-  chmod("/tmp/testmeta",0700);
-  rmdir(METAPATH);
- }
-TEST_F(fetch_meta_pathTest, MetaPathNotAccessible) {
-  char pathname[METAPATHLEN];
-  int32_t ret_code;
-
-  ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
-  ret_code = 0;
-  if (access(METAPATH,F_OK)<0)
-   {
-    ret_code = mkdir(METAPATH, 0400);
-    ASSERT_EQ(0,ret_code);
-   }
-  ret_code = chmod(METAPATH, 0400);
-
-  ASSERT_EQ(ret_code,0);
-
-  EXPECT_EQ(-EACCES,fetch_meta_path(pathname,0));
-
-  rmdir(METAPATH);
- }
-TEST_F(fetch_meta_pathTest, MkMetaPathSuccess) {
-  char pathname[METAPATHLEN];
-  int32_t ret_code;
-
-  ASSERT_STREQ("/tmp/testmeta/metapath", METAPATH);
-  ret_code = 0;
-  if (access(METAPATH,F_OK)==0)
-   {
-    ret_code = rmdir(METAPATH);
-    ASSERT_EQ(0,ret_code);
-   }
-
-  ASSERT_EQ(0,fetch_meta_path(pathname,0));
-
-  EXPECT_STREQ("/tmp/testmeta/metapath/sub_0/meta0",pathname);
-
-  rmdir("/tmp/testmeta/metapath/sub_0");
-  rmdir(METAPATH);
  }
 TEST_F(fetch_meta_pathTest, SubDirMod) {
   char pathname[METAPATHLEN];
@@ -315,64 +420,6 @@ TEST_F(fetch_block_pathTest, NullBlockPath) {
   EXPECT_EQ(-1,fetch_block_path(pathname,0,0));
 
   BLOCKPATH = tempptr;
- }
-TEST_F(fetch_block_pathTest, BlockPathNotCreatable) {
-  char pathname[METAPATHLEN];
-  int32_t ret_code;
-
-  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
-  ret_code = 0;
-  if (access(BLOCKPATH,F_OK)==0)
-   {
-    ret_code = rmdir(BLOCKPATH);
-    ASSERT_EQ(0,ret_code);
-   }
-  ret_code = chmod("/tmp/testmeta", 0400);
-
-  ASSERT_EQ(ret_code,0);
-
-  EXPECT_EQ(-EACCES,fetch_block_path(pathname,0,0));
-
-  chmod("/tmp/testmeta",0700);
-  rmdir(BLOCKPATH);
- }
-TEST_F(fetch_block_pathTest, BlockPathNotAccessible) {
-  char pathname[METAPATHLEN];
-  int32_t ret_code;
-
-  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
-  ret_code = 0;
-  if (access(BLOCKPATH,F_OK)<0)
-   {
-    ret_code = mkdir(BLOCKPATH, 0400);
-    ASSERT_EQ(0,ret_code);
-   }
-  ret_code = chmod(BLOCKPATH, 0400);
-
-  ASSERT_EQ(ret_code,0);
-
-  EXPECT_EQ(-EACCES,fetch_block_path(pathname,0,0));
-
-  rmdir(BLOCKPATH);
- }
-TEST_F(fetch_block_pathTest, MkBlockPathSuccess) {
-  char pathname[METAPATHLEN];
-  int32_t ret_code;
-
-  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
-  ret_code = 0;
-  if (access(BLOCKPATH,F_OK)==0)
-   {
-    ret_code = rmdir(BLOCKPATH);
-    ASSERT_EQ(0,ret_code);
-   }
-
-  ASSERT_EQ(0,fetch_block_path(pathname,0,0));
-
-  EXPECT_STREQ("/tmp/testmeta/blockpath/sub_0/block0_0",pathname);
-
-  rmdir("/tmp/testmeta/blockpath/sub_0");
-  rmdir(BLOCKPATH);
  }
 TEST_F(fetch_block_pathTest, SubDirMod) {
   char pathname[METAPATHLEN];
@@ -1019,6 +1066,8 @@ protected:
 	{
 		mkdir("utils_unittest_folder", 0700);
 		fptr = fopen("utils_unittest_folder/mock_FSstat", "w+");
+		sys_super_block = (SUPER_BLOCK_CONTROL *) malloc(sizeof(SUPER_BLOCK_CONTROL));
+		sys_super_block->head.num_total_inodes = 10;
 	}
 
 	void TearDown()
@@ -1026,6 +1075,7 @@ protected:
 		fclose(fptr);
 		unlink("utils_unittest_folder/mock_FSstat");
 		rmdir("utils_unittest_folder");
+		free(sys_super_block);
 	}
 };
 

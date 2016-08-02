@@ -150,7 +150,7 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		return 0;
 
 	ret_page_pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
-		sizeof(FILE_STATS_TYPE) + sizeof(FS_CLOUD_STAT_T) +
+		sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA) +
 		target_page * sizeof(BLOCK_ENTRY_PAGE);
 
 	return ret_page_pos;
