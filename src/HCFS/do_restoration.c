@@ -408,6 +408,28 @@ int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq)
 	return ret;
 }
 
+int32_t _fetch_FSstat(ino_t rootinode)
+{
+	char objname[METAPATHLEN];
+	char despath[METAPATHLEN];
+	int32_t ret, errcode;
+
+	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "",
+		 (uint64_t)rootinode);
+	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync",
+	         RESTORE_METAPATH);
+	if (access(despath, F_OK) < 0)
+		MKDIR(despath, 0700);
+	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+		 RESTORE_METAPATH, (uint64_t)rootinode);
+
+	ret = restore_fetch_obj(objname, despath);
+	return ret;
+
+errcode_handle:
+	return errcode;
+}
+
 int32_t _fetch_pinned(ino_t thisinode)
 {
 	FILE_META_TYPE tmpmeta;
@@ -620,13 +642,6 @@ int32_t run_download_minimal(void)
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 
-	/* TODO: Need to copy the sys and stat meta */
-	/* First check /data/app */
-
-	/* FEATURE TODO:
-	download fsmgr, and parse volume names to decide
-	which volume mounts to which path */
-
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
 	ret = restore_fetch_obj("FSmgr_backup", despath);
 
@@ -655,17 +670,20 @@ int32_t run_download_minimal(void)
 		if (!strcmp("hcfs_app", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
 			_fetch_meta(rootino);
+			_fetch_FSstat(rootino);
 			_expand_and_fetch(rootino, "/data/app", 0);
 			continue;
 		}
 		if (!strcmp("hcfs_data", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
 			_fetch_meta(rootino);
+			_fetch_FSstat(rootino);
 			_expand_and_fetch(rootino, "/data/data", 0);
 		}
 		if (!strcmp("hcfs_external", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
 			_fetch_meta(rootino);
+			_fetch_FSstat(rootino);
 			_expand_and_fetch(rootino, "/storage/emulated", 0);
 		}
 	}
