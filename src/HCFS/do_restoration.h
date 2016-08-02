@@ -15,6 +15,8 @@
 
 #include <inttypes.h>
 #include <semaphore.h>
+#include <pthread.h>
+#include <sys/types.h>
 
 #include "global.h"
 #include "params.h"
