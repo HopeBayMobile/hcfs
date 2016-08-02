@@ -464,3 +464,8 @@ void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
 {
 	return;
 }
+
+int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+{
+	return 0;
+}

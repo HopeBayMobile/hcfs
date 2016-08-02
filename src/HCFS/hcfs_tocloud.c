@@ -203,7 +203,14 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 
 	*this_mode = 0;
 	fptr = fopen(toupload_metapath, "r");
-	if (fptr != NULL) {
+	if (fptr == NULL) {
+		SUPER_BLOCK_ENTRY sb_entry;
+
+		/* Get inode mode */
+		super_block_read(inode, &sb_entry);
+		*this_mode = sb_entry.inode_stat.st_mode;
+
+	} else {
 		flock(fileno(fptr), LOCK_EX);
 		PREAD(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
 		*this_mode = tmpstat.st_mode;
