@@ -24,6 +24,9 @@
 #include "logger.h"
 #include "macro.h"
 #include "super_block.h"
+#include "event_notification.h"
+#include "event_filter.h"
+#include "hcfs_fromcloud.h"
 
 /**
  * Fetch path of sync point data.
@@ -155,6 +158,22 @@ errcode_handle:
 	return errcode;
 }
 
+void sync_complete_send_event()
+{
+	int32_t ret;
+
+	/* Block until event had been added into queue. */
+	ret = add_notify_event(SYNCDATACOMPLETE, NULL, TRUE);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to add event in %s."
+				" Code %d\n", __func__, -ret);
+	} else if (ret > 0) {
+		write_log(0, "Warn: Give up to add event in %s."
+				" Code %d\n", __func__, ret);
+	}
+	return;
+}
+
 /**
  * Check if both upload and delete thread all complete. If both of them complete
  * to sync all data, then check whether there are dirty data in queue. If it is
@@ -166,43 +185,65 @@ void check_sync_complete()
 {
 	SYNC_POINT_DATA *data;
 	BOOL sync_complete;
+	pthread_t event_thread;
+	int32_t ret;
 
 	data = &(sys_super_block->sync_point_info->data);
-	if (data->upload_sync_complete && data->delete_sync_complete) {
-		sync_complete = TRUE;
 
-		/* Retry some times */
-		if (sys_super_block->sync_point_info->sync_retry_times > 0) {
-			/* If queue is not empty or more than 2 element in
-			 * queue, reset the sync point */
-			if (sys_super_block->head.last_dirty_inode !=
-			    sys_super_block->head.first_dirty_inode) {
-				data->upload_sync_point =
-					sys_super_block->head.last_dirty_inode;
-				data->upload_sync_complete = FALSE;
-				sync_complete = FALSE;
-			}
+	/* Return if system is still dirty. */
+	if (!(data->upload_sync_complete && data->delete_sync_complete))
+		return;
 
-			if (sys_super_block->head.last_to_delete_inode !=
-			    sys_super_block->head.first_to_delete_inode) {
-				data->delete_sync_point =
-					sys_super_block->head.last_to_delete_inode;
-				data->delete_sync_complete = FALSE;
-				sync_complete = FALSE;
-			}
-			sys_super_block->sync_point_info->sync_retry_times -= 1;
-			if (sync_complete == FALSE) {
-				write_syncpoint_data();
-				write_log(6, "Info: System is still dirty,"
-					" sync again\n");
-			}
+	sync_complete = TRUE;
+	/* Retry some times */
+	if (sys_super_block->sync_point_info->sync_retry_times > 0) {
+		/* If queue is not empty or more than 2 element in
+		 * queue, reset the sync point */
+		if (sys_super_block->head.last_dirty_inode !=
+				sys_super_block->head.first_dirty_inode) {
+			data->upload_sync_point =
+				sys_super_block->head.last_dirty_inode;
+			data->upload_sync_complete = FALSE;
+			sync_complete = FALSE;
 		}
 
-		/* Check if task complete or not */
-		if (sync_complete) {
-			/* TODO: Send event to UI to tell that sync completed */
-			write_log(10, "Debug: Sync all data completed.\n");
-			free_syncpoint_resource(TRUE);
+		if (sys_super_block->head.last_to_delete_inode !=
+				sys_super_block->head.first_to_delete_inode) {
+			data->delete_sync_point =
+				sys_super_block->head.last_to_delete_inode;
+			data->delete_sync_complete = FALSE;
+			sync_complete = FALSE;
+		}
+		sys_super_block->sync_point_info->sync_retry_times -= 1;
+		if (sync_complete == FALSE) {
+			write_syncpoint_data();
+			write_log(6, "Info: System is still dirty,"
+					" sync again\n");
+		}
+	}
+
+	/* Check if task complete or not */
+	if (sync_complete) {
+		write_log(10, "Debug: Sync all data completed.\n");
+		free_syncpoint_resource(TRUE);
+
+		/* Send event to UI so as to tell that sync completed */
+		ret = add_notify_event(SYNCDATACOMPLETE, NULL, FALSE);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to add event in %s."
+					" Code %d\n", __func__, -ret);
+		} else if (ret > 0) {
+			write_log(4, "Warn: Retry to send "
+					"sync_complete event\n");
+			ret = pthread_create(&event_thread,
+					&prefetch_thread_attr,
+					(void *)&sync_complete_send_event,
+					NULL);
+			if (ret != 0) {
+				write_log(0, "Error: Fail to create"
+						" thread in %s. Code %d\n",
+						__func__, ret);
+			}
 		}
 	}
 
@@ -223,35 +264,49 @@ void move_sync_point(char which_ll, ino_t this_inode,
 			SUPER_BLOCK_ENTRY *this_entry)
 {
 	SYNC_POINT_DATA *syncpoint_data;
+	BOOL need_write;
 
 	if (!(sys_super_block->sync_point_info))
 		return;
 
+	need_write = FALSE;
 	syncpoint_data = &(sys_super_block->sync_point_info->data);
 	switch (which_ll) {
 	case IS_DIRTY:
 		/* Check when upload thread does not complete. */
 		if (syncpoint_data->upload_sync_complete == FALSE) {
-			if (syncpoint_data->upload_sync_point == this_inode)
+			if (syncpoint_data->upload_sync_point == this_inode) {
 				syncpoint_data->upload_sync_point =
 						this_entry->util_ll_prev;
-			if (syncpoint_data->upload_sync_point == 0)
+				need_write = TRUE;
+			}
+			if (syncpoint_data->upload_sync_point == 0) {
 				syncpoint_data->upload_sync_complete = TRUE;
+				need_write = TRUE;
+			}
 		}
-		write_syncpoint_data();
-		check_sync_complete();
+		if (need_write) {
+			write_syncpoint_data();
+			check_sync_complete();
+		}
 		break;
 	case TO_BE_DELETED:
 		/* Check when delete thread does not complete. */
 		if (syncpoint_data->delete_sync_complete == FALSE)  {
-			if (syncpoint_data->delete_sync_point == this_inode)
+			if (syncpoint_data->delete_sync_point == this_inode) {
 				syncpoint_data->delete_sync_point =
 						this_entry->util_ll_prev;
-			if (syncpoint_data->delete_sync_point == 0)
+				need_write = TRUE;
+			}
+			if (syncpoint_data->delete_sync_point == 0) {
 				syncpoint_data->delete_sync_complete = TRUE;
+				need_write = TRUE;
+			}
 		}
-		write_syncpoint_data();
-		check_sync_complete();
+		if (need_write) {
+			write_syncpoint_data();
+			check_sync_complete();
+		}
 		break;
 	default:
 		break;
