@@ -514,7 +514,8 @@ int32_t hcfs_get_auth_swifttoken()
 	ret_code = add_notify_event(TOKENEXPIRED, NULL, FALSE);
 
 	/* add event was successful or event already sent */
-	if (ret_code == 0 || ret_code == 3) {
+	if ((ret_code == 0 || ret_code == 3) &&
+			(hcfs_system->system_going_down == FALSE)) {
 		/* Wait for new token being set */
 		pthread_mutex_lock(&(swifttoken_control.waiting_lock));
 		clock_gettime(CLOCK_REALTIME, &timeout);
