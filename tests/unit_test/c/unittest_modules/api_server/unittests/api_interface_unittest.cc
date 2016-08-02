@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <ftw.h>
+#include <pthread.h>
 
 #include <unistd.h>
 #include <string.h>
@@ -19,6 +20,7 @@ extern "C" {
 #include "global.h"
 #include "params.h"
 #include "mount_manager.h"
+#include "hcfscurl.h"
 }
 #include "gtest/gtest.h"
 
@@ -27,6 +29,11 @@ extern "C" {
 extern int32_t api_server_monitor_time;
 SYSTEM_CONF_STRUCT *system_config;
 
+SWIFTTOKEN_CONTROL swifttoken_control = {
+	PTHREAD_MUTEX_INITIALIZER,
+	PTHREAD_MUTEX_INITIALIZER,
+	PTHREAD_COND_INITIALIZER
+};
 char swift_auth_string[1024] = {0};
 char swift_url_string[1024] = {0};
 

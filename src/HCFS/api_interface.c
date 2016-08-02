@@ -876,11 +876,20 @@ int32_t set_swift_token(int32_t arg_len, char *largebuf)
 	memcpy(token_str, largebuf + read_size, str_size);
 	read_size += str_size;
 
-	sprintf(swift_url_string, "%s", url_str);
-	sprintf(swift_auth_string, "X-Auth-Token: %s", token_str);
-
-	if (read_size != arg_len)
+	if (read_size != arg_len) {
 		ret_code = -EINVAL;
+	} else {
+		/* Lock before change values of url and token */
+		pthread_mutex_lock(&(swifttoken_control.access_lock));
+		sprintf(swift_url_string, "%s", url_str);
+		sprintf(swift_auth_string, "X-Auth-Token: %s", token_str);
+		pthread_mutex_unlock(&(swifttoken_control.access_lock));
+
+		/* Wake up all threads blocked in get_swift_auth fn */
+		pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+		pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
+		pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+	}
 
 	free(url_str);
 	free(token_str);

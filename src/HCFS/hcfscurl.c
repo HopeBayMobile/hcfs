@@ -41,6 +41,14 @@
 
 #define MAX_RETRIES 5
 
+
+/* For SWIFTTOKEN backend only */
+SWIFTTOKEN_CONTROL swifttoken_control = {
+	PTHREAD_MUTEX_INITIALIZER,
+	PTHREAD_MUTEX_INITIALIZER,
+	PTHREAD_COND_INITIALIZER
+};
+
 char swift_auth_string[1024] = {0};
 char swift_url_string[1024] = {0};
 
@@ -497,14 +505,28 @@ int32_t hcfs_get_auth_swifttoken()
 {
 
 	int32_t ret_code;
+	struct timespec timeout;
+
+	/* Token is already set */
+	if (swift_auth_string[0] != 0)
+		return 200;
 
 	ret_code = add_notify_event(TOKENEXPIRED, NULL, FALSE);
 
-	if (ret_code == 0 || ret_code == 3)
-		/* add event was successful or event already sent */
+	/* add event was successful or event already sent */
+	if (ret_code == 0 || ret_code == 3) {
+		/* Wait for new token being set */
+		pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+		clock_gettime(CLOCK_REALTIME, &timeout);
+		timeout.tv_sec += MAX_WAIT_TIME;
+		pthread_cond_timedwait(&(swifttoken_control.waiting_cond),
+				&(swifttoken_control.waiting_lock),
+				&timeout);
+		pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
 		return 200;
-	else
+	} else {
 		return -1;
+	}
 }
 
 /************************************************************************
@@ -604,6 +626,19 @@ int32_t hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 			hcfs_destroy_swift_backend(curl_handle->curl);
 
 		curl_handle->curl = curl_easy_init();
+
+		if (swift_auth_string[0] != 0) {
+			ret_code = pthread_mutex_trylock(
+					&(swifttoken_control.access_lock));
+			if (ret_code == 0) {
+				memset(swift_url_string,
+						0, sizeof(swift_url_string));
+				memset(swift_auth_string,
+						0, sizeof(swift_auth_string));
+				pthread_mutex_unlock(
+						&(swifttoken_control.access_lock));
+			}
+		}
 
 		if (curl_handle->curl) {
 			return hcfs_get_auth_swifttoken();
@@ -2412,3 +2447,4 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 errcode_handle:
 	return -1;
 }
+

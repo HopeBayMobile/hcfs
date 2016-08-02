@@ -886,6 +886,16 @@ TEST_F(hcfs_destroy_backendTest, DestroyS3)
 /*
 	Unittest of hcfs_swift_reauth()
  */
+void *set_swift_token(void *)
+{
+	int sleep_time = 5;
+	printf("Set up swift token after %d seconds later\n", sleep_time);
+	sleep(sleep_time);
+	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
+	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+}
+
 class hcfs_swift_reauthTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -914,13 +924,15 @@ TEST_F(hcfs_swift_reauthTest, BackendAuthFail)
 
 TEST_F(hcfs_swift_reauthTest, SwiftTokenBackendAuthOK)
 {
+	pthread_t tmpthread;
 	CURL_HANDLE curl_handle;
 
 	CURRENT_BACKEND = SWIFTTOKEN;
 	curl_handle.curl_backend = SWIFTTOKEN;
 
-	add_notify_event_fake.return_val = 0;
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
 
+	add_notify_event_fake.return_val = 0;
 	EXPECT_EQ(200, hcfs_swift_reauth(&curl_handle));
 }
 
@@ -960,6 +972,7 @@ TEST(hcfs_S3_reauthTest, ReAuthSuccess)
  */
 class hcfs_get_auth_swifttokenTest : public ::testing::Test {
 protected:
+	pthread_t tmpthread;
 	CURL_HANDLE tmphandle;
 	void SetUp()
 	{
@@ -972,12 +985,14 @@ protected:
 
 TEST_F(hcfs_get_auth_swifttokenTest, EventSentOK)
 {
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
 	add_notify_event_fake.return_val = 0;
 	EXPECT_EQ(200, hcfs_get_auth_swifttoken());
 }
 
 TEST_F(hcfs_get_auth_swifttokenTest, EventAlreadySent)
 {
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
 	add_notify_event_fake.return_val = 3;
 	EXPECT_EQ(200, hcfs_get_auth_swifttoken());
 }

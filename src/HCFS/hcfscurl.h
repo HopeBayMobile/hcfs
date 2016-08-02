@@ -21,6 +21,8 @@
 #include "params.h"
 
 #define MAX_DOWNLOAD_CURL_HANDLE 4
+/* For swift token control */
+#define MAX_WAIT_TIME 60
 
 typedef struct {
 	FILE *fptr;
@@ -36,6 +38,15 @@ typedef struct {
 	int32_t curl_backend;
 } CURL_HANDLE;
 
+typedef struct {
+	/* access storage url and token control*/
+	pthread_mutex_t access_lock;
+	/* control to make threads waiting for new token */
+	pthread_mutex_t waiting_lock;
+	pthread_cond_t waiting_cond;
+} SWIFTTOKEN_CONTROL;
+
+extern SWIFTTOKEN_CONTROL swifttoken_control;
 extern char swift_auth_string[1024];
 extern char swift_url_string[1024];
 
@@ -89,4 +100,5 @@ int32_t parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader, const char *, const char *,
 				  const char *, const char *);
 int32_t _http_is_success(int32_t code);
+
 #endif /* GW20_HCFS_HCFSCURL_H_ */
