@@ -935,9 +935,6 @@ int32_t prepare_FS_database_backup(void)
 	ssize_t ret_ssize;
 	off_t curpos;
 
-	if (CURRENT_BACKEND == NONE)
-		return 0;
-
 	snprintf(tmppath, METAPATHLEN, "%s/fsmgr_upload", METAPATH);
 
 	/* Assume that the access lock is locked already */
