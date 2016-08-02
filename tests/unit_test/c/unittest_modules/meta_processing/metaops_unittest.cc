@@ -38,6 +38,7 @@ class metaopsEnvironment : public ::testing::Environment {
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+			META_SPACE_LIMIT = 10000;
 
 			system_config->max_cache_limit =
 				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
@@ -808,6 +809,7 @@ protected:
 	{
 		FILE_META_TYPE empty_file_meta;
 
+		hcfs_system->systemdata.system_meta_size = 0;
 		metapath = "testpatterns/create_page_meta_file";
 		body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		body_ptr->inode_num = INO_CREATE_PAGE_SUCCESS;
@@ -872,6 +874,29 @@ TEST_F(create_pageTest, NegativeTargetPageError)
 {
 	sem_wait(&body_ptr->access_sem);	
 	EXPECT_EQ(-1, create_page(body_ptr, -1));
+}
+
+TEST_F(create_pageTest, DirectPageCreateFail_NoSpace)
+{
+	/* Mock data */
+	int64_t target_page;
+	int64_t result_pos;
+	int64_t expected_pos;
+	FILE_META_TYPE file_meta;
+
+	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
+	target_page = 0;
+	expected_pos = sizeof(FILE_META_TYPE);
+	
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	result_pos = create_page(body_ptr, target_page);
+
+	/* Verify */
+	EXPECT_EQ(expected_pos, result_pos);
+	sem_post(&body_ptr->access_sem);
+	pread(fileno(body_ptr->fptr), &file_meta, sizeof(FILE_META_TYPE), 0);
+	EXPECT_EQ(expected_pos, file_meta.direct);
 }
 
 TEST_F(create_pageTest, DirectPageCreateSuccess)

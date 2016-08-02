@@ -8,6 +8,10 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 #include "mock_param.h"
+#include "../../fff.h"
+DEFINE_FFF_GLOBALS;
+
+FAKE_VALUE_FUNC(int32_t, super_block_mark_dirty, ino_t);
 fuse_req_t req1;
 
 class file_presentEnvironment : public ::testing::Environment {

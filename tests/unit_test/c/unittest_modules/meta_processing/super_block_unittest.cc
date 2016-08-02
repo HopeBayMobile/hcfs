@@ -11,7 +11,6 @@ extern "C" {
 #include "gtest/gtest.h"
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
-
 class superblockEnvironment : public ::testing::Environment {
 	public:
 		void SetUp()
@@ -25,6 +24,7 @@ class superblockEnvironment : public ::testing::Environment {
 
 			system_config->max_pinned_limit =
 				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+			META_SPACE_LIMIT = 12345;
 
 			hcfs_system = (SYSTEM_DATA_HEAD *)
 					malloc(sizeof(SYSTEM_DATA_HEAD));
@@ -1135,18 +1135,19 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 		sizeof(struct stat)));
 }
 
-TEST_F(super_block_new_inodeTest, NoReclaimedNodes_ExceedPinSizeLimit)
+TEST_F(super_block_new_inodeTest, NoReclaimedNodes_NoMoreMetaSpace)
 {
 	uint64_t generation;
 	ino_t ret_node;
 
 	/* Mock stat */
 	generation = 0;
-	hcfs_system->systemdata.pinned_size = MAX_PINNED_LIMIT + 1;
+	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
 
 	/* Run */
 	ret_node = super_block_new_inode(&expected_stat, &generation, TRUE);
 	EXPECT_EQ(0, ret_node); /*Return 0 because exceeding pinned size limit*/
+	hcfs_system->systemdata.system_meta_size = 0;
 }
 
 TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes)

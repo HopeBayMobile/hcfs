@@ -70,3 +70,8 @@ int32_t write_syncpoint_data()
 {
 	return 0;
 }
+
+int32_t meta_nospc_log(const char *func_name, int32_t lines)
+{
+	return 1;
+}

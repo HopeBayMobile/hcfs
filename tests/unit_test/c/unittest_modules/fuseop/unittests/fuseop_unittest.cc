@@ -113,7 +113,9 @@ class fuseopEnvironment : public ::testing::Environment {
     system_config->max_cache_limit[1] = 3200000;
     system_config->max_pinned_limit[1] = 3200000 * 0.8;
     system_config->current_backend = 1;
+    system_config->meta_space_limit = 1000000;
     hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.system_meta_size = 0;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     hcfs_system->systemdata.pinned_size = 0;
@@ -287,6 +289,21 @@ TEST_F(hfuse_mknodTest, MknodOK) {
   EXPECT_EQ(ret_val, 0);
 }
 
+TEST_F(hfuse_mknodTest, Mknod_NoSpace) {
+  int32_t ret_val;
+  int32_t tmp_err;
+
+  hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
+
+  ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
+  tmp_err = errno;
+
+  EXPECT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOSPC);
+  hcfs_system->systemdata.system_meta_size = 0;
+}
+
+
 /* End of the test case for the function hfuse_mknod */
 
 /* Begin of the test case for the function hfuse_mkdir */
@@ -361,6 +378,20 @@ TEST_F(hfuse_mkdirTest, MkdirOK) {
 
   EXPECT_EQ(ret_val, 0);
 }
+
+TEST_F(hfuse_mkdirTest, Mkdir_NoSpace) {
+  int32_t ret_val;
+  int32_t tmp_err;
+
+  hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
+  ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
+  tmp_err = errno;
+
+  EXPECT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOSPC);
+  hcfs_system->systemdata.system_meta_size = 0;
+}
+
 
 /* End of the test case for the function hfuse_mkdir */
 
@@ -2425,6 +2456,7 @@ protected:
 	{
 		root_updated = FALSE;
 		before_update_file_data = TRUE;
+  		hcfs_system->systemdata.system_meta_size = 0;
 	}
 
 	void TearDown()
@@ -2504,6 +2536,22 @@ TEST_F(hfuse_ll_setxattrTest, InsertXattrSuccess)
 
 	EXPECT_EQ(0, ret);
 }
+
+TEST_F(hfuse_ll_setxattrTest, InsertXattr_NoSpace)
+{
+	int32_t ret;
+	int32_t errcode;
+
+  	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
+	ret = setxattr("/tmp/test_fuse/testsetxattr", 
+		"user.aaa", "123", 3, 0);
+  	hcfs_system->systemdata.system_meta_size = 0;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENOSPC, errno);
+}
+
+
 /*
 	End of unittest of hfuse_ll_setxattr()
  */
@@ -3034,6 +3082,7 @@ protected:
 	{
 		root_updated = FALSE;
 		before_update_file_data = TRUE;
+  		hcfs_system->systemdata.system_meta_size = 0;
 	}
 
 	void TearDown()
@@ -3137,6 +3186,21 @@ TEST_F(hfuse_ll_createTest, CreateSuccess)
 
 	EXPECT_GT(fd, 0);
 }
+
+TEST_F(hfuse_ll_createTest, Create_NoSpace)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int32_t errcode;
+
+  	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
+	fd = creat(name, 0777);
+	errcode = errno;
+  	hcfs_system->systemdata.system_meta_size = 0;
+
+	EXPECT_EQ(fd, -1);
+	EXPECT_EQ(ENOSPC, errcode);
+}
+
 /*
 	End of unittest of hfuse_ll_create()
  */

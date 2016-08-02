@@ -1041,3 +1041,8 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+
+int32_t meta_nospc_log(const char *func_name, int32_t lines)
+{
+	return 1;
+}
