@@ -57,6 +57,8 @@ int32_t tag_restoration(char *content)
 
 	is_open = FALSE;
 	fetch_restore_stat_path(restore_stat_path);
+	if (access(restore_stat_path, F_OK) == 0)
+		unlink(restore_stat_path);
 	fptr = fopen(restore_stat_path, "w");
 	if (fptr == NULL) {
 		write_log(4, "Unable to determine restore status\n");
@@ -70,6 +72,9 @@ int32_t tag_restoration(char *content)
 
 	snprintf(restore_stat_path2, METAPATHLEN, "%s/system_restoring_status",
 	         RESTORE_METAPATH);
+	if (access(restore_stat_path2, F_OK) == 0)
+		unlink(restore_stat_path2);
+
 	ret = link(restore_stat_path, restore_stat_path2);
 	if (ret < 0) {
 		errcode = errno;
@@ -631,6 +636,7 @@ errcode_handle:
 	return errcode;
 }
 
+/* FEATURE TODO: Verify if downloaded objects are enough for restoration */
 int32_t run_download_minimal(void)
 {
 	ino_t rootino;
@@ -688,8 +694,22 @@ int32_t run_download_minimal(void)
 		}
 	}
 
+	sem_wait(&restore_sem);
+
+	/* Tag status of restoration */
+	ret = tag_restoration("rebuilding_meta");
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	sem_post(&restore_sem);
+
+	notify_restoration_result(1, 0);
+
 	return 0;
 errcode_handle:
 	fclose(fptr);
+	notify_restoration_result(1, errcode);
 	return errcode;
 }
