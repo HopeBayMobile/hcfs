@@ -12,6 +12,12 @@ extern "C" {
 #include "hfuse_system.c"
 }
 
+SWIFTTOKEN_CONTROL swifttoken_control = {
+	PTHREAD_MUTEX_INITIALIZER,
+	PTHREAD_MUTEX_INITIALIZER,
+	PTHREAD_COND_INITIALIZER
+};
+
 class hfuse_systemEnvironment : public ::testing::Environment {
 	public:
 		void SetUp()

@@ -44,6 +44,7 @@
 #include "hcfs_fromcloud.h"
 #include "hcfs_cacheops.h"
 #include "hfuse_system.h"
+#include "hcfscurl.h"
 #include "event_notification.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
@@ -843,6 +844,59 @@ int32_t set_notify_server_loc(int32_t arg_len, char *largebuf)
 	return ret;
 }
 
+int32_t set_swift_token(int32_t arg_len, char *largebuf)
+{
+	int32_t ret_code = 0;
+	int64_t read_size;
+	ssize_t str_size;
+	char *url_str, *token_str;
+
+	if (CURRENT_BACKEND != SWIFTTOKEN) {
+		write_log(4, "Set swift token API only supported for SWIFTTOKEN type");
+		return -EINVAL;
+	}
+
+	read_size = 0;
+
+	memcpy(&str_size, largebuf, sizeof(ssize_t));
+	read_size += sizeof(ssize_t);
+	url_str = calloc(str_size + 10, 1);
+	if (url_str == NULL)
+		return -errno;
+	memcpy(url_str, largebuf + sizeof(ssize_t), str_size);
+	read_size += str_size;
+
+	memcpy(&str_size, largebuf + read_size, sizeof(ssize_t));
+	read_size += sizeof(ssize_t);
+	token_str = calloc(str_size + 10, 1);
+	if (token_str == NULL) {
+		free(url_str);
+		return -errno;
+	}
+	memcpy(token_str, largebuf + read_size, str_size);
+	read_size += str_size;
+
+	if (read_size != arg_len) {
+		ret_code = -EINVAL;
+	} else {
+		/* Lock before change values of url and token */
+		pthread_mutex_lock(&(swifttoken_control.access_lock));
+		sprintf(swift_url_string, "%s", url_str);
+		sprintf(swift_auth_string, "X-Auth-Token: %s", token_str);
+		pthread_mutex_unlock(&(swifttoken_control.access_lock));
+
+		/* Wake up all threads blocked in get_swift_auth fn */
+		pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+		pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
+		pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+	}
+
+	free(url_str);
+	free(token_str);
+
+	return ret_code;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -1432,6 +1486,12 @@ void api_module(void *index)
 			break;
 		case SETNOTIFYSERVER:
 			retcode = set_notify_server_loc(arg_len, largebuf);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
+		case SETSWIFTTOKEN:
+			retcode = set_swift_token(arg_len, largebuf);
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);

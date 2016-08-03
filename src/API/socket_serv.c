@@ -181,6 +181,9 @@ int32_t do_get_hcfs_stat(char *largebuf, int32_t arg_len,
 	uint32_t ret_len = 0;
 	HCFS_STAT_TYPE stats;
 
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
 	write_log(8, "Start get statistics\n");
 	ret_code = get_hcfs_stat(&stats);
 
@@ -205,6 +208,9 @@ int32_t do_get_occupied_size(char *largebuf, int32_t arg_len,
 	int32_t ret_code;
 	uint32_t ret_len = 0;
 	int64_t occupied;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
 
 	write_log(8, "Start get occupied size\n");
 	ret_code = get_occupied_size(&occupied);
@@ -304,6 +310,21 @@ int32_t do_set_notify_server(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_set_swift_token(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	write_log(8, "Start set swift access token\n");
+	ret_code = set_swift_access_token(largebuf, arg_len);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End set swift access token\n");
+	return ret_code;
+}
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -338,13 +359,15 @@ int32_t _get_unused_thread()
  * *  Return value: 0 if successful. Otherwise returns negation of error code.
  * *
  * *************************************************************************/
-int32_t process_request(int32_t thread_idx)
+int32_t process_request(void *arg)
 {
-	int32_t fd, ret_code, res_size;
+	int32_t thread_idx, fd, ret_code, res_size;
 	uint32_t api_code, arg_len;
 	char buf_reused;
 	char buf[512], resbuf[512];
 	char *largebuf;
+
+	thread_idx = *((int *)arg);
 
 	fd = thread_pool[thread_idx].fd;
 	write_log(8, "Process a new request with socket fd %d\n", fd);
@@ -392,6 +415,7 @@ int32_t process_request(int32_t thread_idx)
 		{RELOADCONFIG,	do_reload_hcfs_config},
 		{OCCUPIEDSIZE,	do_get_occupied_size},
 		{SETNOTIFYSERVER,	do_set_notify_server},
+		{SETSWIFTTOKEN,	do_set_swift_token},
 	};
 
 	uint32_t n;
@@ -405,6 +429,12 @@ int32_t process_request(int32_t thread_idx)
 	}
 	write_log(0, "API code not found (API code %d)\n",
 			api_code);
+
+	ret_code = -EINVAL;
+	res_size = 0;
+	sends(fd, &res_size, sizeof(int32_t));
+	sends(fd, &ret_code, sizeof(int32_t));
+	goto done;
 
 error:
 	ret_code = -1;
@@ -518,7 +548,7 @@ int32_t init_server()
 					    PTHREAD_CREATE_DETACHED);
 		pthread_create(&(thread_pool[thread_idx].thread),
 			       &(thread_pool[thread_idx].attr),
-			       (void *)process_request, (void *)thread_idx);
+			       (void *)process_request, (void *)&thread_idx);
 	}
 
 	close(sock_fd);

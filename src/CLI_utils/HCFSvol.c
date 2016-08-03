@@ -39,6 +39,7 @@ int32_t main(int32_t argc, char **argv)
 	int64_t downxfersize, upxfersize;
 	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
 	int32_t first_size, rest_size, loglevel;
+	ssize_t str_size;
 	char vol_mode;
 
 	if (argc < 2) {
@@ -115,6 +116,8 @@ int32_t main(int32_t argc, char **argv)
 		code = GETXFERSTATUS;
 	else if (strcasecmp(argv[1], "setnotifyserver") == 0)
 		code = SETNOTIFYSERVER;
+	else if (strcasecmp(argv[1], "setswifttoken") == 0)
+		code = SETSWIFTTOKEN;
 	else
 		code = -1;
 	if (code < 0) {
@@ -453,6 +456,35 @@ int32_t main(int32_t argc, char **argv)
 	case SETNOTIFYSERVER:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
+	case SETSWIFTTOKEN:
+		cmd_len = 0;
+		str_size = strlen(argv[2]) + 1;
+		memcpy(buf + cmd_len, &str_size, sizeof(ssize_t));
+
+		cmd_len += sizeof(ssize_t);
+		memcpy(buf + cmd_len, argv[2], str_size);
+
+		cmd_len += str_size;
+		str_size = strlen(argv[3]) + 1;
+		memcpy(buf + cmd_len, &str_size, sizeof(ssize_t));
+
+		cmd_len += sizeof(ssize_t);
+		memcpy(buf + cmd_len, argv[3], str_size);
+
+		cmd_len += str_size;
+
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);

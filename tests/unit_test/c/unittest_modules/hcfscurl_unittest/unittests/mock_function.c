@@ -98,6 +98,7 @@ void curl_easy_cleanup(CURL *handle)
 {
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+	case SWIFTTOKEN:
 		swift_destroy = FALSE;
 		break;
 	case S3:
@@ -151,3 +152,4 @@ int32_t ignore_sigpipe(void)
 int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 		     int64_t xfer_throughtput, int64_t xfer_total_obj)
 {}
+

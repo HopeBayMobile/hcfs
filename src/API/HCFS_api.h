@@ -207,6 +207,7 @@ void HCFS_unpin_path(char **json_res, char *pin_path);
  * | ------------- |:-------------|
  * | True | 0 if object is not pinned.|
  * | | 1 if object is pinned.|
+ * | | 2 if object is high-priority-pinned.|
  * | False | Linux errors.|
  */
 void HCFS_pin_status(char **json_res, char *pathname);
@@ -281,4 +282,20 @@ void HCFS_reset_xfer(char **json_res);
  * | False | Linux errors.|
  */
 void HCFS_set_notify_server(char **json_res, char *path);
+
+/*Set Swift Token
+ * @json_res result string in json format.
+ * @url swift storage url(container name not included).
+ * @token swift auth token
+ *
+ * To set the value of storage url and access token of swift.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0|
+ * | False | Linux errors.|
+ */
+void HCFS_set_swift_token(char **json_res, char *url, char *token);
 #endif  /* GW20_HCFS_API_H_ */
