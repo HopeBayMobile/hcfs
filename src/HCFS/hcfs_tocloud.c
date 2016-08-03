@@ -196,7 +196,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 	int64_t num_blocks, bcount;
 	char block_path[300];
 	struct stat tmpstat;
-	int32_t errcode;
+	int32_t ret, errcode;
 	ssize_t ret_ssize;
 	FILE_META_TYPE tmpmeta;
 	int64_t current_page, which_page, page_pos;
