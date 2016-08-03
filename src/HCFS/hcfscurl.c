@@ -524,6 +524,11 @@ int32_t hcfs_get_auth_swifttoken()
 				&(swifttoken_control.waiting_lock),
 				&timeout);
 		pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+		/* If system is shutting down, do not attempt followup
+		operations */
+		if (hcfs_system->system_going_down == TRUE)
+			return -ESHUTDOWN;
+
 		return 200;
 	} else {
 		return -1;
