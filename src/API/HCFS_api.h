@@ -298,4 +298,35 @@ void HCFS_set_notify_server(char **json_res, char *path);
  * | False | Linux errors.|
  */
 void HCFS_set_swift_token(char **json_res, char *url, char *token);
+
+/*Set Sync Point
+ * @json_res result string in json format.
+ *
+ * To set the sync point so that hcfs will send a notification if all
+ * dirty data generated before this point are synchronized.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 when setting sync point completed|
+ * | | 1 if there is no dirty data|
+ * | False | Linux errors.|
+ */
+void HCFS_set_sync_point(char **json_res);
+
+/*Clear Sync Point
+ * @json_res result string in json format.
+ *
+ * To clear an existed sync point.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 when the sync point is removed successfully|
+ * | | 1 if no sync point is set|
+ * | False | Linux errors.|
+ */
+void HCFS_clear_sync_point(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */

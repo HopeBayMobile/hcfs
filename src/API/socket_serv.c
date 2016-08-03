@@ -325,6 +325,45 @@ int32_t do_set_swift_token(char *largebuf, int32_t arg_len,
 	write_log(8, "End set swift access token\n");
 	return ret_code;
 }
+
+int32_t do_set_sync_point(char *largebuf, int32_t arg_len,
+			  char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start set sync point\n");
+	ret_code = toggle_sync_point(SETSYNCPOINT);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End set sync point\n");
+	return ret_code;
+}
+
+int32_t do_clear_sync_point(char *largebuf, int32_t arg_len,
+			    char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start clear sync point\n");
+	ret_code = toggle_sync_point(CANCELSYNCPOINT);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End clear sync point\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -416,6 +455,8 @@ int32_t process_request(void *arg)
 		{OCCUPIEDSIZE,	do_get_occupied_size},
 		{SETNOTIFYSERVER,	do_set_notify_server},
 		{SETSWIFTTOKEN,	do_set_swift_token},
+		{SETSYNCPOINT,	do_set_sync_point},
+		{CANCELSYNCPOINT,	do_clear_sync_point},
 	};
 
 	uint32_t n;

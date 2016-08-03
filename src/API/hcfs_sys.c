@@ -579,3 +579,41 @@ int32_t set_swift_access_token(char *arg_buf, uint32_t arg_len)
 
 	return ret_code;
 }
+
+/************************************************************************
+ * *
+ * * Function name: toggle_sync_point
+ * *        Inputs: int32_t api_code
+ * *       Summary: To set/clear hcfs sync point. Parameter (api_code) should
+ * *                be SETSYNCPOINT or CANCELSYNCPOINT.
+ * *
+ * *  Return value: 0 if successful.
+ * *                1 if nothing changed.
+ * *                Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
+int32_t toggle_sync_point(int32_t api_code)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	if (api_code != SETSYNCPOINT && api_code != CANCELSYNCPOINT)
+		return -EINVAL;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = api_code;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}

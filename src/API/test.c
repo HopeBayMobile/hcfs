@@ -109,8 +109,18 @@ int32_t main()
 	char *res15;
 	HCFS_set_swift_token(&res15,
 			"http://127.0.0.1:12345/v1/AUTH_test",
-			"AUTH_tkd83318209e9e486fb190090445fd349d");
+			"AUTH_tk8305e30f9703426aae9228565dae33b7");
 	printf("set swift token - %s\n", res15);
 	free(res15);
+
+	char *res16;
+	HCFS_set_sync_point(&res16);
+	printf("set sync point - %s\n", res16);
+	free(res16);
+
+	char *res17;
+	HCFS_clear_sync_point(&res17);
+	printf("clear sync point - %s\n", res17);
+	free(res17);
 }
 
