@@ -15,12 +15,12 @@
 
 #include <inttypes.h>
 
-#define NUM_EVENTS 2
+#define NUM_EVENTS 3
 #define IS_EVENT_VALID(A) ((0 <= A) && (A < NUM_EVENTS))
 /* Event IDs */
 #define TESTSERVER 0
 #define TOKENEXPIRED 1
-
+#define SYNCDATACOMPLETE 2
 
 typedef struct {
 	int32_t name;

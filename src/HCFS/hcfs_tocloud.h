@@ -26,6 +26,7 @@
 #include "objmeta.h"
 #include "fuseop.h"
 #include "dedup_table.h"
+#include "tocloud_tools.h"
 
 #define MAX_UPLOAD_CONCURRENCY 4
 #define MAX_SYNC_CONCURRENCY 2
@@ -78,6 +79,7 @@ typedef struct {
 typedef struct {
 	sem_t sync_op_sem;
 	sem_t sync_queue_sem; /*similar to upload_queue_sem*/
+	IMMEDIATELY_RETRY_LIST retry_list;
 	pthread_t sync_handler_thread;
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
 

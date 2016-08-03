@@ -634,7 +634,7 @@ TEST_F(super_block_update_transitTest, Set_is_start_transit_TRUE)
 	EXPECT_EQ(FALSE, sb_entry.mod_after_in_transit);
 }
 
-TEST_F(super_block_update_transitTest, DequeueDirtyList_CancelTransitSuccess)
+TEST_F(super_block_update_transitTest, DequeueDirtyList_Success)
 {
 	ino_t inode = 7;
 	SUPER_BLOCK_ENTRY sb_entry;
@@ -665,6 +665,108 @@ TEST_F(super_block_update_transitTest, DequeueDirtyList_CancelTransitSuccess)
 
 	EXPECT_EQ(FALSE, sb_entry.in_transit);
 	EXPECT_EQ(FALSE, sb_entry.mod_after_in_transit);
+	EXPECT_EQ(0, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(0, sys_super_block->head.last_dirty_inode);
+}
+
+TEST_F(super_block_update_transitTest, FileModifyWhenSyncing_StayInQueue)
+{
+	ino_t inode = 7, inode_next = 8;
+	SUPER_BLOCK_ENTRY sb_entry, sb_entry_next;
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+	uint64_t next_entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode_next - 1);
+
+	/* Mock data. Write a entry */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * inode_next);
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = IS_DIRTY;
+	sb_entry.in_transit = TRUE;
+	sb_entry.mod_after_in_transit = TRUE;
+	sb_entry.util_ll_next = 8;
+	sb_entry.util_ll_prev = 0;
+
+	memset(&sb_entry_next, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry_next.status = IS_DIRTY;
+	sb_entry_next.in_transit = TRUE;
+	sb_entry_next.mod_after_in_transit = FALSE;
+	sb_entry_next.util_ll_next = 0;
+	sb_entry_next.util_ll_prev = 7;
+
+	/* Need to pass dirty inode list check */
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode_next;
+	sys_super_block->sync_point_is_set = FALSE;
+
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+	pwrite(sys_super_block->iofptr, &sb_entry_next,
+		sizeof(SUPER_BLOCK_ENTRY), next_entry_filepos);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_update_transit(inode, FALSE, FALSE));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+
+	EXPECT_EQ(FALSE, sb_entry.in_transit);
+	EXPECT_EQ(FALSE, sb_entry.mod_after_in_transit);
+	EXPECT_EQ(inode, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(inode_next, sys_super_block->head.last_dirty_inode);
+
+
+}
+
+TEST_F(super_block_update_transitTest, SyncPointIsSet_RelocateInodeToLastOne)
+{
+	ino_t inode = 7, inode_next = 8;
+	SUPER_BLOCK_ENTRY sb_entry, sb_entry_next;
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+	uint64_t next_entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode_next - 1);
+
+	/* Mock data. Write a entry */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * inode_next);
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = IS_DIRTY;
+	sb_entry.in_transit = TRUE;
+	sb_entry.mod_after_in_transit = TRUE;
+	sb_entry.util_ll_next = 8;
+	sb_entry.util_ll_prev = 0;
+
+	memset(&sb_entry_next, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry_next.status = IS_DIRTY;
+	sb_entry_next.in_transit = TRUE;
+	sb_entry_next.mod_after_in_transit = FALSE;
+	sb_entry_next.util_ll_next = 0;
+	sb_entry_next.util_ll_prev = 7;
+
+	/* Need to pass dirty inode list check */
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode_next;
+	sys_super_block->sync_point_is_set = TRUE;
+
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+	pwrite(sys_super_block->iofptr, &sb_entry_next,
+		sizeof(SUPER_BLOCK_ENTRY), next_entry_filepos);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_update_transit(inode, FALSE, FALSE));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+
+	EXPECT_EQ(FALSE, sb_entry.in_transit);
+	EXPECT_EQ(FALSE, sb_entry.mod_after_in_transit);
+	EXPECT_EQ(inode_next, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(inode, sys_super_block->head.last_dirty_inode);
 }
 
 /*
@@ -675,7 +777,6 @@ TEST_F(super_block_update_transitTest, DequeueDirtyList_CancelTransitSuccess)
 /*
 	Unittest of super_block_to_delete()
  */
-
 class super_block_to_deleteTest : public InitSuperBlockBaseClass {
 };
 
@@ -2539,3 +2640,100 @@ TEST_F(ll_rebuild_dirtyTest, rebuild_mix_enqueueERR_dequeueERR_listSUCCESS)
 	unlink(mocksb_path);
 }
 /* End for ll_rebuild_dirty */
+
+/**
+ * Unittest of super_block_set_syncpoint()
+ */
+class super_block_set_syncpointTest : public InitSuperBlockBaseClass {
+
+};
+
+TEST_F(super_block_set_syncpointTest, AllClean_DoNotNeedSet)
+{
+	sys_super_block->head.last_dirty_inode = 0;
+	sys_super_block->head.last_to_delete_inode = 0;
+
+	EXPECT_EQ(1, super_block_set_syncpoint());
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+}
+
+TEST_F(super_block_set_syncpointTest, InitSyncPointSuccess)
+{
+	SYNC_POINT_DATA exp_data;
+
+	sys_super_block->head.last_dirty_inode = 123;
+	sys_super_block->head.last_to_delete_inode = 456;
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 123;
+	exp_data.delete_sync_point = 456;
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = FALSE;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_set_syncpoint());
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data,
+			&(sys_super_block->sync_point_info->data),
+			sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(SYNC_RETRY_TIMES,
+		sys_super_block->sync_point_info->sync_retry_times);
+}
+
+TEST_F(super_block_set_syncpointTest, ResetSyncPointSuccess)
+{
+	SYNC_POINT_DATA exp_data;
+
+	sys_super_block->sync_point_is_set = TRUE;
+	sys_super_block->sync_point_info = (SYNC_POINT_INFO *)
+		malloc(sizeof(SYNC_POINT_INFO));
+	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
+	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
+
+	sys_super_block->head.last_dirty_inode = 123;
+	sys_super_block->head.last_to_delete_inode = 456;
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 123;
+	exp_data.delete_sync_point = 456;
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = FALSE;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_set_syncpoint());
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(0, memcmp(&exp_data,
+			&(sys_super_block->sync_point_info->data),
+			sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(SYNC_RETRY_TIMES,
+		sys_super_block->sync_point_info->sync_retry_times);
+}
+/**
+ * End of unittest of super_block_set_syncpoint()
+ */
+
+/**
+ * Unittest of super_block_cancel_syncpoint()
+ */
+class super_block_cancel_syncpointTest : public InitSuperBlockBaseClass {
+
+};
+
+TEST_F(super_block_cancel_syncpointTest, NoSyncPointIsSet)
+{
+	sys_super_block->sync_point_is_set = FALSE;
+
+	EXPECT_EQ(1, super_block_cancel_syncpoint());
+}
+
+TEST_F(super_block_cancel_syncpointTest, CancelSuccess)
+{
+	sys_super_block->sync_point_is_set = TRUE;
+
+	EXPECT_EQ(0, super_block_cancel_syncpoint());
+}
+/**
+ * End of unittest of super_block_cancel_syncpoint()
+ */

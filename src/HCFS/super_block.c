@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: super_block.c
 * Abstract: The c source code file for meta processing involving super
@@ -42,6 +42,7 @@
 #include "utils.h"
 #include "macro.h"
 #include "hcfs_cacheops.h"
+#include "syncpoint_control.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -506,22 +507,48 @@ int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 	if (ret_val >= 0) {
-		if (((is_start_transit == FALSE) &&
+		if (((is_start_transit == FALSE) && /* End of transit */
 				(tempentry.status == IS_DIRTY)) &&
-				((transit_incomplete != TRUE) &&
-				(tempentry.mod_after_in_transit == FALSE))) {
+				((transit_incomplete != TRUE))) { /* Complete */
+			if (tempentry.mod_after_in_transit == TRUE) {
+				/* If sync point is set, relocate this inode
+				 * so that it is going to be last one. */
+				if (sys_super_block->sync_point_is_set
+						== TRUE) {
+					write_log(10, "Debug: Re-queue inode %"
+						PRIu64, (uint64_t)this_inode);
+					ret_val = ll_dequeue(this_inode,
+						&tempentry);
+					if (ret_val < 0) {
+						super_block_exclusive_release();
+						return ret_val;
+					}
+					ret_val = ll_enqueue(this_inode,
+						IS_DIRTY, &tempentry);
+					if (ret_val < 0) {
+						super_block_exclusive_release();
+						return ret_val;
+					}
+					ret_val = write_super_block_head();
+					if (ret_val < 0) {
+						super_block_exclusive_release();
+						return ret_val;
+					}
+				}
+			} else {
 			/* If finished syncing and no more mod is done after
 			*  queueing the inode for syncing */
 			/* Remove from is_dirty list */
-			ret_val = ll_dequeue(this_inode, &tempentry);
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
-			}
-			ret_val = write_super_block_head();
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
+				ret_val = ll_dequeue(this_inode, &tempentry);
+				if (ret_val < 0) {
+					super_block_exclusive_release();
+					return ret_val;
+				}
+				ret_val = write_super_block_head();
+				if (ret_val < 0) {
+					super_block_exclusive_release();
+					return ret_val;
+				}
 			}
 		}
 		tempentry.in_transit = is_start_transit;
@@ -1421,7 +1448,7 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		return 0;
 
 	if (old_which_ll == IS_DIRTY) {
-		/* Need to check if the dirty linked list in superblock was currupted */
+		/* Need to check if the dirty linked list in superblock was corrupted */
 		if (this_entry->util_ll_next == 0) {
 			if (sys_super_block->head.last_dirty_inode != thisinode)
 				need_rebuild = TRUE;
@@ -1456,6 +1483,11 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		}
 	}
 
+	/* After trying to rebuild, check if sync point is set. */
+	if (sys_super_block->sync_point_is_set == TRUE)
+		move_sync_point(old_which_ll, thisinode, this_entry);
+
+	/* Begin to dequeue */
 	if (this_entry->util_ll_next == 0) {
 		switch (old_which_ll) {
 		case IS_DIRTY:
@@ -1874,3 +1906,85 @@ error_handling:
 	return ret;
 }
 
+/**
+ * Set sync point. If the sync point had been set, then just overwrite
+ * old sync point information. Otherwise allocate new resource it needs.
+ *
+ * @return 0 on success, and 1 when all data is clean now. Otherwise return
+ *         negative error code.
+ */
+int32_t super_block_set_syncpoint()
+{
+	SYNC_POINT_DATA *tmp_syncpoint_data;
+	int32_t ret;
+
+	super_block_exclusive_locking();
+	/* Do nothing when data is clean */
+	if (sys_super_block->head.last_dirty_inode == 0 &&
+		sys_super_block->head.last_to_delete_inode == 0) {
+		super_block_exclusive_release();
+		return 1;
+	}
+
+	/* Init memory if sync point is not set */
+	if (sys_super_block->sync_point_is_set == FALSE) {
+		write_log(10, "Debug: Allocate sync point resource\n");
+		ret = init_syncpoint_resource();
+		if (ret < 0) {
+			super_block_exclusive_release();
+			return ret;
+		}
+	} else {
+		write_log(10, "Debug: Sync point had been set."
+				" Cover old info.\n");
+	}
+
+	/* Set sync point */
+	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;
+
+	tmp_syncpoint_data = &(sys_super_block->sync_point_info->data);
+	if (sys_super_block->head.last_dirty_inode) {
+		tmp_syncpoint_data->upload_sync_point =
+				sys_super_block->head.last_dirty_inode;
+		tmp_syncpoint_data->upload_sync_complete = FALSE;
+	} else {
+		tmp_syncpoint_data->upload_sync_complete = TRUE;
+	}
+
+	if (sys_super_block->head.last_to_delete_inode) {
+		tmp_syncpoint_data->delete_sync_point =
+				sys_super_block->head.last_to_delete_inode;
+		tmp_syncpoint_data->delete_sync_complete = FALSE;
+	} else {
+		tmp_syncpoint_data->delete_sync_complete = TRUE;
+	}
+
+	/* Write to disk */
+	ret = write_syncpoint_data();
+	if (ret < 0) {
+		free_syncpoint_resource(TRUE);
+		super_block_exclusive_release();
+		return ret;
+	}
+
+	super_block_exclusive_release();
+	return 0;
+}
+
+/**
+ * Cancel the setting of sync point and free all resource about it.
+ *
+ * @return 0 on success, and 1 when no sync point is set.
+ */
+int32_t super_block_cancel_syncpoint()
+{
+	super_block_exclusive_locking();
+	if (sys_super_block->sync_point_is_set == FALSE) {
+		super_block_exclusive_release();
+		return 1;
+	}
+
+	free_syncpoint_resource(TRUE);
+	super_block_exclusive_release();
+	return 0;
+}

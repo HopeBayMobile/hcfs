@@ -186,6 +186,16 @@ int32_t sync_hcfs_system_data(char need_lock)
 	return 0;
 }
 
+int32_t super_block_set_syncpoint()
+{
+	return 0;
+}
+
+int32_t super_block_cancel_syncpoint()
+{
+	return 0;
+}
+
 int32_t set_event_notify_server(char *path)
 {
 	if (strcmp(path, "setok") == 0)

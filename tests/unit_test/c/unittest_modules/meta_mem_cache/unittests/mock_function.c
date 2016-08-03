@@ -117,7 +117,7 @@ int check_and_copy_file(const char *srcpath, const char *tarpath,
 	return MOCK_RETURN_VAL;
 }
 
-int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	return 0;
 }

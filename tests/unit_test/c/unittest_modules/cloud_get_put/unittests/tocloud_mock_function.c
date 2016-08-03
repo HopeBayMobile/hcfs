@@ -359,8 +359,8 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 	return 0;
 }
 
-int change_block_status_to_BOTH(ino_t inode, long long blockno,
-		long long page_pos, long long toupload_seq)
+int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
+		int64_t page_pos, int64_t toupload_seq)
 {
 	FILE *fptr;
 	BLOCK_ENTRY_PAGE tmppage;
@@ -453,4 +453,19 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 void notify_sleep_on_cache(int32_t cache_replace_status)
 {
 	return;
+}
+
+ino_t pull_retry_inode(IMMEDIATELY_RETRY_LIST *list)
+{
+	return 0;
+}
+
+void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
+{
+	return;
+}
+
+int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
+{
+	return 0;
 }

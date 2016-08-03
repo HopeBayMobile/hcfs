@@ -22,6 +22,8 @@
 
 #include "hcfscurl.h"
 #include "dedup_table.h"
+#include "tocloud_tools.h"
+#include "global.h"
 
 #define MAX_DELETE_CONCURRENCY 4
 #define MAX_DSYNC_CONCURRENCY 2
@@ -66,12 +68,14 @@ typedef struct {
 typedef struct {
 	sem_t dsync_op_sem;
 	sem_t dsync_queue_sem; /*similar to delete_queue_sem*/
+	IMMEDIATELY_RETRY_LIST retry_list;
 	pthread_t dsync_handler_thread;
 	pthread_t inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
 	char threads_created[MAX_DSYNC_CONCURRENCY];
 	char threads_finished[MAX_DSYNC_CONCURRENCY];
 	char threads_error[MAX_DSYNC_CONCURRENCY];
+	BOOL retry_right_now[MAX_DSYNC_CONCURRENCY];
 	int32_t total_active_dsync_threads;
 } DSYNC_THREAD_CONTROL;
 

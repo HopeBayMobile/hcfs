@@ -49,7 +49,8 @@ endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest dir_entry_btree_unittest logger_unittest pkg_cache_unittest
+TESTS = utils_unittest dir_entry_btree_unittest logger_unittest \
+	pkg_cache_unittest syncpoint_control_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
@@ -154,7 +155,6 @@ logger_unittest : logger.o logger_unittest.o gtest_main.a
 
 
 # unittest for pkg_cache.c
-
 pkg_cache.o : $(USER_DIR)/pkg_cache.c $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/pkg_cache.c
 
@@ -166,4 +166,18 @@ pkg_cache_unittest.o : $(UNITTEST_DIR)/pkg_cache_unittest.cc \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/pkg_cache_unittest.cc
 
 pkg_cache_unittest : pkg_cache.o pkg_cache_mock_ftn.o pkg_cache_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# unittest for syncpoint_control.c
+syncpoint_control.o : $(USER_DIR)/syncpoint_control.c $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/syncpoint_control.c
+
+syncpoint_control_mock_ftn.o : $(UNITTEST_DIR)/syncpoint_control_mock_ftn.c 
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/syncpoint_control_mock_ftn.c
+
+syncpoint_control_unittest.o : $(UNITTEST_DIR)/syncpoint_control_unittest.cc \
+                      $(USER_DIR)/syncpoint_control.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/syncpoint_control_unittest.cc
+
+syncpoint_control_unittest : syncpoint_control.o syncpoint_control_mock_ftn.o syncpoint_control_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++

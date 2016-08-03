@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright Â2016 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright Â© 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: event_notification.c
 * Abstract: The c source file for event notification functions
@@ -497,7 +497,7 @@ void destroy_event_worker_loop_thread()
  *                Passing TRUE|FALSE to arg (blocking) to control whether
  *                this function should be blocked when queue is full or not.
  *  Return value: 0 - Operation was successful.
- *                1 - Event is dropped because notify server not set.
+ *                1 - Event is dropped because notify server is not set.
  *                2 - Event is dropped due to queue full error.
  *                3 - Event is dropped by event filter.
  *        Otherwise - The negation of the appropriate error code.

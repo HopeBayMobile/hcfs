@@ -17,8 +17,9 @@
 /* Register event filter here */
 EVENT_FILTER event_filters[] = {
 	/* name, last_send_timestamp, send_interval */
-	{TESTSERVER,	0,	0},
-	{TOKENEXPIRED,	0,	120}
+	{TESTSERVER,	   0,	  0},
+	{TOKENEXPIRED,	   0,	120},
+	{SYNCDATACOMPLETE, 0,     0},
 };
 
 

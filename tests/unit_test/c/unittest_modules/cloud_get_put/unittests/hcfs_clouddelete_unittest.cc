@@ -86,6 +86,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		dsync_ctl.threads_in_use[t_index] = inode;
 		dsync_ctl.threads_created[t_index] = TRUE;
 		dsync_ctl.threads_finished[t_index] = TRUE;
+		dsync_ctl.retry_right_now[t_index] = FALSE;
 		dsync_ctl.total_active_dsync_threads++;
 		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL,
 			dsync_test_thread_fn, (void *)&i));

@@ -8,6 +8,7 @@
 #include "super_block.h"
 #include "params.h"
 #include "fuseop.h"
+#include "tocloud_tools.h"
 
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
@@ -171,4 +172,19 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 void fetch_del_backend_meta_path(char *backend_metapath, ino_t this_inode)
 {
 	sprintf(backend_metapath, "/tmp/mock_backend_meta");
+}
+
+ino_t pull_retry_inode(IMMEDIATELY_RETRY_LIST *list)
+{
+	return 0;
+}
+
+void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
+{
+	return;
+}
+
+int32_t unlink_upload_file(char *filename)
+{
+	return 0;
 }

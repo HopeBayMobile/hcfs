@@ -2,7 +2,7 @@
 
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: super_block.c
+* File Name: super_block.h
 * Abstract: The c header file for meta processing involving super
 *           block in HCFS. Super block is used for fast inode accessing
 *           and also tracking of status of filesystem objects (data sync
@@ -24,6 +24,7 @@
 #include <inttypes.h>
 
 #include "global.h"
+#include "syncpoint_control.h"
 
 /* pin-status in super block */
 #define ST_DEL 0
@@ -32,7 +33,7 @@
 #define ST_PIN 3
 
 /* SUPER_BLOCK_ENTRY defines the structure for an entry in super block */
-typedef struct {
+typedef struct SUPER_BLOCK_ENTRY {
 	struct stat inode_stat;
 	ino_t util_ll_next;
 	ino_t util_ll_prev;
@@ -88,6 +89,8 @@ typedef struct {
 	sem_t share_lock_sem;
 	sem_t share_CR_lock_sem;
 	int32_t share_counter;
+	BOOL sync_point_is_set; /* Indicate if need to sync all data */
+	struct SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
 } SUPER_BLOCK_CONTROL;
 
 SUPER_BLOCK_CONTROL *sys_super_block;
@@ -126,5 +129,8 @@ int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode);
 
 int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 int32_t pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
+
+int32_t super_block_set_syncpoint();
+int32_t super_block_cancel_syncpoint();
 
 #endif  /* GW20_HCFS_SUPER_BLOCK_H_ */

@@ -118,6 +118,10 @@ int32_t main(int32_t argc, char **argv)
 		code = SETNOTIFYSERVER;
 	else if (strcasecmp(argv[1], "setswifttoken") == 0)
 		code = SETSWIFTTOKEN;
+	else if (strcasecmp(argv[1], "setsyncpoint") == 0)
+		code = SETSYNCPOINT;
+	else if (strcasecmp(argv[1], "cancelsyncpoint") == 0)
+		code = CANCELSYNCPOINT;
 	else
 		code = -1;
 	if (code < 0) {
@@ -468,6 +472,50 @@ int32_t main(int32_t argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
+	case SETSYNCPOINT:
+	case CANCELSYNCPOINT:
+		if (argc >= 3) {
+			cmd_len = strlen(argv[2]) + 1;
+			strcpy(buf, argv[2]);
+		} else {
+			cmd_len = 1;
+			buf[0] = 0;
+		}
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retllcode, sizeof(int64_t), 0);
+		if (code == SETSYNCPOINT) {
+			if (retllcode < 0) {
+				retcode = (int32_t) retllcode;
+				printf("Command error: Code %d, %s\n",
+						-retcode, strerror(-retcode));
+			} else if (retllcode == 1) {
+				printf("All data is clean now\n");
+			} else if (retllcode == 0) {
+				printf("Successfully set sync point.\n");
+			} else {
+				printf("Returned value is %" PRId64 "\n",
+					retllcode);
+			}
+		} else {
+			if (retllcode < 0) {
+				retcode = (int32_t) retllcode;
+				printf("Command error: Code %d, %s\n",
+						-retcode, strerror(-retcode));
+			} else if (retllcode == 1) {
+				printf("Sync point was not set.\n");
+			} else if (retllcode == 0) {
+				printf("Successfully cancel sync point.\n");
+			} else {
+				printf("Returned value is %" PRId64 "\n",
+					retllcode);
+			}
+		}
+		break;
+
 	case SETSWIFTTOKEN:
 		cmd_len = 0;
 		str_size = strlen(argv[2]) + 1;

@@ -39,8 +39,8 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
-int change_block_status_to_BOTH(ino_t inode, long long blockno,
-		long long page_pos, long long toupload_seq)
+int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
+		int64_t page_pos, int64_t toupload_seq)
 {
 	BLOCK_ENTRY_PAGE tmp_page;
 	int64_t local_seq;
@@ -130,13 +130,13 @@ int change_block_status_to_BOTH(ino_t inode, long long blockno,
 			if ((ret == 0) && (semval == 0))
 				sem_post(semptr);
 		}
+		write_log(10, "Debug sync: block_%"PRIu64"_%lld"
+				" is changed to ST_BOTH\n",
+				(uint64_t)inode, blockno);
 	}
 
 	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
-	write_log(10, "Debug sync: block_%"PRIu64"_%lld"
-			" is changed to ST_BOTH\n",
-			(uint64_t)inode, blockno);
 
 	return 0;
 
@@ -506,3 +506,56 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Pull an inode number which has higher priority to retry to sync.
+ *
+ * @return an inode number if retry_list is not empty. Otherwise return 0.
+ */
+ino_t pull_retry_inode(IMMEDIATELY_RETRY_LIST *list)
+{
+	int32_t idx;
+	ino_t ret_inode;
+
+	if (list->num_retry == 0)
+		return 0;
+
+	for (idx = 0; idx < list->list_size; idx++)
+		if (list->retry_inode[idx] > 0)
+			break;
+
+	if (idx < list->list_size) {
+		ret_inode = list->retry_inode[idx];
+		list->retry_inode[idx] = 0;
+		list->num_retry--;
+		return ret_inode;
+	} else {
+		list->num_retry = 0;
+	}
+
+	return 0;
+}
+
+/*
+ * Push an inode to retry_list.
+ *
+ * @param inode Inode number to be retried immediately.
+ *
+ * @return none.
+ */
+void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
+{
+	int32_t idx;
+
+	for (idx = 0; idx < list->list_size; idx++)
+		if (list->retry_inode[idx] == 0)
+			break;
+
+	if (idx < list->list_size) {
+		list->retry_inode[idx] = inode;
+		list->num_retry++;
+	} else {
+		write_log(4, "Warn: Retry list overflow?");
+	}
+
+	return;
+}

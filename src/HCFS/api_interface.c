@@ -44,6 +44,7 @@
 #include "hcfs_fromcloud.h"
 #include "hcfs_cacheops.h"
 #include "hfuse_system.h"
+#include "syncpoint_control.h"
 #include "hcfscurl.h"
 #include "event_notification.h"
 
@@ -1483,6 +1484,20 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
 			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
 			uint32_ret = 0;
+			break;
+		case SETSYNCPOINT:
+		case CANCELSYNCPOINT:
+			if (api_code == SETSYNCPOINT)
+				retcode = super_block_set_syncpoint();
+			else
+				retcode = super_block_cancel_syncpoint();
+			if (retcode == 0) {
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
+			}
 			break;
 		case SETNOTIFYSERVER:
 			retcode = set_notify_server_loc(arg_len, largebuf);

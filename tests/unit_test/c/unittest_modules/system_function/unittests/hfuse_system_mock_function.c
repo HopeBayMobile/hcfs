@@ -217,7 +217,20 @@ int32_t destroy_api_interface(void)
 {
 	return 0;
 }
-void destroy_monitor_loop_thread() {}
+void destroy_monitor_loop_thread()
+{
+	return;
+}
+
+void fetch_syncpoint_data_path(char *path)
+{
+	strcpy(path, "mock_syncpoint_data");
+}
+
+int32_t init_syncpoint_resource()
+{
+	return 0;
+}
 
 int32_t init_event_queue() {}
 #ifdef _ANDROID_ENV_
@@ -236,3 +249,12 @@ int32_t check_and_create_blockpaths(void)
 	return 0;
 }
 
+int32_t super_block_exclusive_locking(void)
+{
+	return 0;
+}
+
+int32_t super_block_exclusive_release(void)
+{
+	return 0;
+}

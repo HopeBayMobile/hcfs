@@ -49,7 +49,8 @@ endif
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest atomic_tocloud_unittest
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest \
+	atomic_tocloud_unittest tocloud_tools_unittest
 
 .PHONY: $(DO_TESTS)
 DO_TESTS = $(TESTS:%=test-%)
@@ -147,7 +148,6 @@ hcfs_fromcloud_unittest : fromcloud_mock_function.o hcfs_fromcloud.o hcfs_fromcl
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto -llz4
 
 # hcfs_tocloud testing
-
 hcfs_tocloud.o : $(USER_DIR)/hcfs_tocloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_tocloud.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_tocloud.c
@@ -164,7 +164,6 @@ hcfs_tocloud_unittest : b64encode.o enc.o compress.o objmeta.o dedup_mock_functi
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto -llz4
 
 # hcfs_clouddelete testing
-
 hcfs_clouddelete.o : $(USER_DIR)/hcfs_clouddelete.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_clouddelete.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_clouddelete.c
@@ -196,4 +195,20 @@ atomic_tocloud_unittest : atomic_tocloud_mock_function.o atomic_tocloud.o \
 	atomic_tocloud_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
+# tocloud_tools_unittest
+tocloud_tools.o : $(USER_DIR)/tocloud_tools.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/tocloud_tools.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/tocloud_tools.c
 
+tocloud_tools_mock_function.o : $(UNITTEST_DIR)/tocloud_tools_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_tools_mock_function.c
+
+tocloud_tools_unittest.o : $(UNITTEST_DIR)/tocloud_tools_unittest.cc \
+                      $(USER_DIR)/tocloud_tools.h $(USER_DIR)/tocloud_tools.c \
+		      $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_tools_unittest.cc
+
+#tocloud_tools_unittest : tocloud_tools_mock_function.o tocloud_tools.o tocloud_tools_unittest.o gtest_main.a
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
+tocloud_tools_unittest : tocloud_tools_mock_function.o tocloud_tools.o tocloud_tools_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
