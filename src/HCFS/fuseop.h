@@ -88,6 +88,10 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 
 #define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
 
+/* Defines for caching value of selinux xattr */
+#define SELINUX_XATTR_KEY "selinux"
+#define SELINUX_EXTERNAL_XATTR_VAL "u:object_r:fuse:s0"
+
 /* Defines for local pin property */
 #define NUM_PIN_TYPES 3
 #define P_UNPIN 0

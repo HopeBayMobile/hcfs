@@ -6405,8 +6405,14 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	if (name_space == SECURITY)
-		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+	if (name_space == SECURITY) {
+		/* Skip perm check if SECURITY domain */
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+				strncmp(key, SELINUX_XATTR_KEY, sizeof(SELINUX_XATTR_KEY)) == 0)
+			goto use_default_val;
+		else
+			goto fetch_xattr;
+	}
 
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
@@ -6482,6 +6488,16 @@ fetch_xattr:
 	fuse_reply_err(req, 0);
 	return;
 
+use_default_val:
+	/* Close & unlock meta */
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+
+	/* We don't store this xattr in meta, just return here. */
+	fuse_reply_err(req, 0);
+	write_log(0, "In setxattr run 1\n");
+	return;
+
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
@@ -6544,8 +6560,15 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	if (name_space == SECURITY)
-		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+	if (name_space == SECURITY) {
+		/* Skip perm check if SECURITY domain */
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+				strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
+			goto use_default_val;
+		} else {
+			goto fetch_xattr;
+		}
+	}
 
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
@@ -6641,6 +6664,26 @@ fetch_xattr:
 		free(xattr_page);
 	if (value)
 		free(value);
+	return;
+
+use_default_val:
+	/* Close & unlock meta */
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+
+	/* Since this xattr not stored in meta, just return default value. */
+	actual_size = strlen(SELINUX_EXTERNAL_XATTR_VAL);
+	if (size <= 0) { /* Reply with needed buffer size */
+		write_log(5, "Get xattr needed size of %s\n",
+				name);
+		fuse_reply_xattr(req, actual_size);
+
+	} else { /* Reply with value of given key */
+		write_log(5, "Get xattr value %s success\n",
+				actual_size);
+		fuse_reply_buf(req, SELINUX_EXTERNAL_XATTR_VAL,
+				actual_size);
+	}
 	return;
 
 error_handle:
