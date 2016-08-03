@@ -519,6 +519,12 @@ int32_t main(int32_t argc, char **argv)
 	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
+		if (CURRENT_BACKEND == SWIFTTOKEN) {
+			/* Wake up all threads blocked in get_swift_auth fn */
+			pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+			pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
+			pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+		}
 		pthread_join(cache_loop_thread, NULL);
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(upload_loop_thread, NULL);

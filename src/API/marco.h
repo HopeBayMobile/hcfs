@@ -51,4 +51,6 @@
 		buf_idx += sizeof(int64_t);\
 	}
 
+#define UNUSED(x) ((void)x)
+
 #endif  /* GW20_HCFSAPI_MARCO_H_ */

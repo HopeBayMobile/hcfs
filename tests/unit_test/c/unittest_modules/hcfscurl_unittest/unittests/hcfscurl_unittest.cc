@@ -6,6 +6,11 @@ extern "C" {
 #include <gtest/gtest.h>
 #include "mock_params.h"
 
+#include "../../fff.h"
+DEFINE_FFF_GLOBALS;
+
+/* Fake functions for hcfs */
+FAKE_VALUE_FUNC(int32_t, add_notify_event, int32_t, char *, char);
 
 class hcfscurlEnvironment : public ::testing::Environment {
 	public:
@@ -130,6 +135,9 @@ TEST_F(hcfs_init_swift_backendTest, InitBackendGetAuthFail)
 {
 	CURL_HANDLE curl_handle;
 
+	CURRENT_BACKEND = SWIFT;
+	curl_handle.curl_backend = SWIFT;
+
 	http_perform_retry_fail = TRUE;
 	SWIFT_ACCOUNT = "kewei_account";
 	SWIFT_USER = "kewei";
@@ -138,6 +146,31 @@ TEST_F(hcfs_init_swift_backendTest, InitBackendGetAuthFail)
 	EXPECT_EQ(-1, hcfs_init_swift_backend(&curl_handle));
 
 	http_perform_retry_fail = FALSE;
+}
+
+TEST_F(hcfs_init_swift_backendTest, InitSwiftTokenBackendOK)
+{
+	CURL_HANDLE curl_handle;
+
+	CURRENT_BACKEND = SWIFTTOKEN;
+	curl_handle.curl_backend = SWIFTTOKEN;
+
+	add_notify_event_fake.return_val = 0;
+
+	EXPECT_EQ(200, hcfs_init_swift_backend(&curl_handle));
+}
+
+TEST_F(hcfs_init_swift_backendTest, InitSwiftTokenBackendFailed)
+{
+	CURL_HANDLE curl_handle;
+
+	CURRENT_BACKEND = SWIFTTOKEN;
+	curl_handle.curl_backend = SWIFTTOKEN;
+
+	add_notify_event_fake.return_val = -1;
+	memset(swift_auth_string, 0, sizeof(swift_auth_string));
+
+	EXPECT_EQ(-1, hcfs_init_swift_backend(&curl_handle));
 }
 /*
 	End of unittest of hcfs_init_swift_backend()
@@ -766,6 +799,19 @@ TEST(hcfs_init_backendTest, InitSwiftBackendGetAuthFail)
 	http_perform_retry_fail = FALSE;
 }
 
+TEST(hcfs_init_backendTest, InitSwiftTokenBackendOK)
+{
+	CURL_HANDLE curl_handle;
+
+	CURRENT_BACKEND = SWIFTTOKEN;
+	curl_handle.curl_backend = SWIFTTOKEN;
+
+	add_notify_event_fake.return_val = 0;
+
+	EXPECT_EQ(200, hcfs_init_backend(&curl_handle));
+	EXPECT_EQ(SWIFTTOKEN, curl_handle.curl_backend);
+}
+
 TEST(hcfs_init_backendTest, InitS3BackendSuccess)
 {
 	CURL_HANDLE curl_handle;
@@ -810,6 +856,18 @@ TEST_F(hcfs_destroy_backendTest, DestroySwift)
 	EXPECT_EQ(FALSE, s3_destroy);
 }
 
+TEST_F(hcfs_destroy_backendTest, DestroySwiftToken)
+{
+	swift_destroy = TRUE; /* Destroy swift */
+	CURRENT_BACKEND = SWIFTTOKEN;
+	tmphandle.curl_backend = SWIFTTOKEN;
+
+	hcfs_destroy_backend(&tmphandle);
+
+	EXPECT_EQ(FALSE, swift_destroy);
+	EXPECT_EQ(FALSE, s3_destroy);
+}
+
 TEST_F(hcfs_destroy_backendTest, DestroyS3)
 {
 	s3_destroy = TRUE; /* Destroy s3 */
@@ -828,6 +886,16 @@ TEST_F(hcfs_destroy_backendTest, DestroyS3)
 /*
 	Unittest of hcfs_swift_reauth()
  */
+void *set_swift_token(void *)
+{
+	int sleep_time = 5;
+	printf("Set up swift token after %d seconds later\n", sleep_time);
+	sleep(sleep_time);
+	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
+	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+}
+
 class hcfs_swift_reauthTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -840,6 +908,9 @@ TEST_F(hcfs_swift_reauthTest, BackendAuthFail)
 {
 	CURL_HANDLE curl_handle;
 
+	CURRENT_BACKEND = SWIFT;
+	curl_handle.curl_backend = SWIFT;
+
 	http_perform_retry_fail = TRUE;
 	SWIFT_ACCOUNT = "kewei_account";
 	SWIFT_USER = "kewei";
@@ -849,6 +920,32 @@ TEST_F(hcfs_swift_reauthTest, BackendAuthFail)
 	EXPECT_EQ(-1, hcfs_swift_reauth(&curl_handle));
 
 	http_perform_retry_fail = FALSE;
+}
+
+TEST_F(hcfs_swift_reauthTest, SwiftTokenBackendAuthOK)
+{
+	pthread_t tmpthread;
+	CURL_HANDLE curl_handle;
+
+	CURRENT_BACKEND = SWIFTTOKEN;
+	curl_handle.curl_backend = SWIFTTOKEN;
+
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
+
+	add_notify_event_fake.return_val = 0;
+	EXPECT_EQ(200, hcfs_swift_reauth(&curl_handle));
+}
+
+TEST_F(hcfs_swift_reauthTest, SwiftTokenBackendAuthFailed)
+{
+	CURL_HANDLE curl_handle;
+
+	CURRENT_BACKEND = SWIFTTOKEN;
+	curl_handle.curl_backend = SWIFTTOKEN;
+
+	add_notify_event_fake.return_val = -1;
+
+	EXPECT_EQ(-1, hcfs_swift_reauth(&curl_handle));
 }
 /*
 	End of unittest of hcfs_swift_reauth()
@@ -868,4 +965,49 @@ TEST(hcfs_S3_reauthTest, ReAuthSuccess)
 }
 /*
 	End of unittest of hcfs_S3_reauth()
+ */
+
+/*
+	Unittest of hcfs_get_auth_swifttoken()
+ */
+class hcfs_get_auth_swifttokenTest : public ::testing::Test {
+protected:
+	pthread_t tmpthread;
+	CURL_HANDLE tmphandle;
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hcfs_get_auth_swifttokenTest, EventSentOK)
+{
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
+	add_notify_event_fake.return_val = 0;
+	EXPECT_EQ(200, hcfs_get_auth_swifttoken());
+}
+
+TEST_F(hcfs_get_auth_swifttokenTest, EventAlreadySent)
+{
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
+	add_notify_event_fake.return_val = 3;
+	EXPECT_EQ(200, hcfs_get_auth_swifttoken());
+}
+
+TEST_F(hcfs_get_auth_swifttokenTest, NotifyServerNotSet)
+{
+	add_notify_event_fake.return_val = 1;
+	EXPECT_EQ(-1, hcfs_get_auth_swifttoken());
+}
+
+TEST_F(hcfs_get_auth_swifttokenTest, EventQueueFullError)
+{
+	add_notify_event_fake.return_val = 2;
+	EXPECT_EQ(-1, hcfs_get_auth_swifttoken());
+}
+/*
+	End of unittest of hcfs_get_auth_swifttoken()
  */

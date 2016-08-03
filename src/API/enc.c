@@ -51,7 +51,7 @@ int32_t generate_random_bytes(uint8_t *bytes, uint32_t length)
 		write_log(0, "In %s, RAND_bytes not supported", __func__);
 		return -2;
 	default:
-		write_log("In %s, RAND_bytes: some openssl error may occurs: %ld",
+		write_log(0, "In %s, RAND_bytes: some openssl error may occurs: %ld",
 			  __func__, ERR_peek_last_error());
 		return -3;
 	}

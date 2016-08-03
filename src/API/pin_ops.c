@@ -21,9 +21,11 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "global.h"
 #include "socket_util.h"
+#include "marco.h"
 
 
 #define DATA_PREFIX "/data/data"
@@ -65,7 +67,7 @@ int32_t _walk_folder(char *pathname, int64_t *total_size)
 			stat(tmp_path, &stat_buf);
 			*total_size += stat_buf.st_size;
 		}
-	} while (dent = readdir(dir));
+	} while ((dent = readdir(dir)));
 
 	closedir(dir);
 	return 0;
@@ -116,6 +118,8 @@ int32_t _get_path_stat(char *pathname, ino_t *inode, int64_t *total_size)
 	int32_t ret_code;
 	struct stat stat_buf;
 
+	UNUSED(total_size);
+
 	ret_code = _validate_hcfs_path(pathname);
 	if (ret_code < 0)
 		return ret_code;
@@ -148,9 +152,9 @@ int32_t _pin_by_inode(const int64_t reserved_size, const char pin_type,
 		      const uint32_t num_inodes, const char *inode_array)
 {
 
-	int32_t fd, count, ret_code;
+	int32_t fd, ret_code;
 	int32_t buf_idx;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	uint32_t code, cmd_len, reply_len;
 	char buf[1000];
 
 	fd = get_hcfs_socket_conn();
@@ -246,9 +250,9 @@ int32_t pin_by_path(char *buf, uint32_t arg_len)
  * *************************************************************************/
 int32_t _unpin_by_inode(const uint32_t num_inodes, const char *inode_array)
 {
-	int32_t fd, count, ret_code;
+	int32_t fd, ret_code;
 	int32_t buf_idx;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	uint32_t code, cmd_len, reply_len;
 	char buf[1000];
 
 	fd = get_hcfs_socket_conn();
@@ -332,9 +336,11 @@ int32_t unpin_by_path(char *buf, uint32_t arg_len)
 int32_t check_pin_status(char *buf, uint32_t arg_len)
 {
 
-	int32_t fd, count, ret_code;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ino_t tmp_inode;
+
+	UNUSED(arg_len);
 
 	ret_code = _get_path_stat(buf, &tmp_inode, NULL);
 	if (ret_code < 0)
@@ -375,9 +381,11 @@ int32_t check_dir_status(char *buf, uint32_t arg_len,
 			 int64_t *num_hybrid)
 {
 
-	int32_t fd, count, ret_code;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ino_t tmp_inode;
+
+	UNUSED(arg_len);
 
 	ret_code = _get_path_stat(buf, &tmp_inode, NULL);
 	if (ret_code < 0)
@@ -419,9 +427,11 @@ int32_t check_dir_status(char *buf, uint32_t arg_len,
 int32_t check_file_loc(char *buf, uint32_t arg_len)
 {
 
-	int32_t fd, count, ret_code;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
 	ino_t tmp_inode;
+
+	UNUSED(arg_len);
 
 	ret_code = _get_path_stat(buf, &tmp_inode, NULL);
 	if (ret_code < 0)

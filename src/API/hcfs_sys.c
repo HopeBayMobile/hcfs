@@ -77,13 +77,12 @@ int32_t _encrypt_config(uint8_t *output, uint8_t *input,
 	int32_t ret;
 	uint8_t iv[IV_SIZE] = {0};
 	uint8_t *enc_key, *enc_data;
-	int64_t data_size, enc_size;
 
 	/* Key and iv */
 	enc_key = get_key(PASSPHRASE);
 	generate_random_bytes(iv, IV_SIZE);
 
-	enc_data = (char*)malloc(
+	enc_data = (uint8_t*)malloc(
 			sizeof(uint8_t) * (input_len + TAG_SIZE));
 
 	ret = aes_gcm_encrypt_core(enc_data, input, input_len, enc_key, iv);
@@ -135,9 +134,9 @@ FILE *_get_decrypt_configfp()
 	enc_size = file_size - IV_SIZE;
 	data_size = enc_size - TAG_SIZE;
 
-	iv_buf = (char*)malloc(sizeof(char)*IV_SIZE);
-	enc_buf = (char*)malloc(sizeof(char)*(enc_size));
-	data_buf = (char*)malloc(sizeof(char)*(data_size));
+	iv_buf = (uint8_t*)malloc(sizeof(char)*IV_SIZE);
+	enc_buf = (uint8_t*)malloc(sizeof(char)*(enc_size));
+	data_buf = (uint8_t*)malloc(sizeof(char)*(data_size));
 	if (!iv_buf || !enc_buf || !data_buf)
 		goto error;
 
@@ -186,8 +185,8 @@ end:
  * *************************************************************************/
 int32_t set_hcfs_config(char *arg_buf, uint32_t arg_len)
 {
-	int32_t idx, ret_code;
-	uint32_t msg_len;
+	int32_t ret_code;
+	uint32_t idx, msg_len;
 	ssize_t str_len;
 	char tmp_path[100];
 	char buf[300];
@@ -304,10 +303,9 @@ end:
  * *************************************************************************/
 int32_t get_hcfs_config(char *arg_buf, uint32_t arg_len, char **value)
 {
-	int32_t idx, ret_code;
-	uint32_t msg_len;
+	int32_t ret_code;
+	uint32_t idx, msg_len;
 	ssize_t str_len;
-	char tmp_path[100];
 	char buf[300];
 	char key[100], upper_key[100];
 	char *tmp_ptr, *line, *token;
@@ -423,9 +421,9 @@ int32_t reload_hcfs_config()
 int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 {
 	int32_t fd, ret_code, enabled;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	uint32_t code, cmd_len, reply_len;
 
-	memcpy(&enabled, arg_buf, sizeof(int32_t));
+	memcpy(&enabled, arg_buf, arg_len);
 	if (enabled != 0 && enabled != 1)
 		return -EINVAL;
 
@@ -434,7 +432,7 @@ int32_t toggle_cloud_sync(char *arg_buf, uint32_t arg_len)
 		return fd;
 
 	code = SETSYNCSWITCH;
-	cmd_len = sizeof(int32_t);
+	cmd_len = arg_len;
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -493,7 +491,7 @@ int32_t get_sync_status()
 int32_t reset_xfer_usage()
 {
 	int32_t fd, ret_code;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	uint32_t code, cmd_len, reply_len;
 
 	fd = get_hcfs_socket_conn();
 	if (fd < 0)
@@ -525,7 +523,7 @@ int32_t reset_xfer_usage()
 int32_t set_notify_server(char *arg_buf, uint32_t arg_len)
 {
 	int32_t fd, ret_code;
-	uint32_t code, cmd_len, reply_len, total_recv, to_recv;
+	uint32_t code, cmd_len, reply_len;
 	char path[arg_len + 10];
 
 	fd = get_hcfs_socket_conn();
@@ -540,6 +538,39 @@ int32_t set_notify_server(char *arg_buf, uint32_t arg_len)
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
 	send(fd, path, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+/************************************************************************
+ * *
+ * * Function name: set_swift_access_token
+ * *        Inputs: char *arg_buf, uint32_t arg_len
+ * *       Summary: To set the value of swift storage url and auth token.
+ * *
+ * *  Return value: 0 if successful. Otherwise returns negation of error code
+ * *
+ * *************************************************************************/
+int32_t set_swift_access_token(char *arg_buf, uint32_t arg_len)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = SETSWIFTTOKEN;
+	cmd_len = arg_len;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, arg_buf, cmd_len, 0);
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);

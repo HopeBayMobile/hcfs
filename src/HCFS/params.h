@@ -49,7 +49,8 @@ typedef struct {
 #define LOG_LEVEL system_config->log_level
 #define LOG_PATH system_config->log_path
 
-#define S3 2
+#define S3 3
+#define SWIFTTOKEN 2
 #define SWIFT 1
 #define NONE 0
 
