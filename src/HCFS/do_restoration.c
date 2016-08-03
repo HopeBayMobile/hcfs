@@ -103,7 +103,6 @@ int32_t initiate_restoration(void)
 	/* First check if cache size is enough */
 	sem_wait(&(hcfs_system->access_sem));
 	/* FEATURE TODO: consider
-	1. current cache size
 	2. current pin size
 	3. current high-priority pin size
 	4. current meta size (later)
@@ -245,6 +244,8 @@ int32_t restore_stage1_reduce_cache(void)
 	}
 
 	CACHE_HARD_LIMIT = CACHE_HARD_LIMIT * REDUCED_RATIO;
+	/* Change the max system size as well */
+	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
 	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
 	system_config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
 
@@ -466,8 +467,6 @@ int32_t _fetch_pinned(ino_t thisinode)
 	/* Assuming fixed block size now */
 	tmpsize = tmpstat.st_size;
 	totalblocks = ((tmpsize - 1) / 1048576) + 1;
-	/* FEATURE TODO: Need to fetch seq number for
-	each block */
 	lastpage = -1;
 	for (count = 0; count < totalblocks; count++) {
 		nowpage = count / MAX_BLOCK_ENTRIES_PER_PAGE;
