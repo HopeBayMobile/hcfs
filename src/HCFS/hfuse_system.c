@@ -304,7 +304,9 @@ void init_backend_related_module(void)
 
 	fetch_syncpoint_data_path(syncpoint_path);
 	if (!access(syncpoint_path, F_OK)) {
+		super_block_exclusive_locking();
 		ret = init_syncpoint_resource();
+		super_block_exclusive_release();
 		if (ret < 0) {
 			write_log(0, "Error: Fail to init sync point data\n");
 			exit(-1);

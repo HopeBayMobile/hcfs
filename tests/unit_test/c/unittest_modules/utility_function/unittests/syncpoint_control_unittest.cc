@@ -262,7 +262,7 @@ TEST_F(check_sync_completeTest, RetrySuccess_StillNeedToSync)
 	exp_data.delete_sync_complete = FALSE;
 
 	/* Run */
-	check_sync_complete();
+	check_sync_complete(IS_DIRTY, 12);
 
 	/* Verify */
 	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
@@ -276,7 +276,75 @@ TEST_F(check_sync_completeTest, RetrySuccess_StillNeedToSync)
 		sizeof(SYNC_POINT_DATA)));
 }
 
-TEST_F(check_sync_completeTest, SyncComplete)
+TEST_F(check_sync_completeTest, RetrySuccess_StillNeedToSyncDeleteQueue)
+{
+	SYNC_POINT_DATA *data;
+	SYNC_POINT_DATA exp_data, verified_data;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = TRUE;
+	data->delete_sync_complete = TRUE;
+	sys_super_block->head.first_dirty_inode = 12;
+	sys_super_block->head.last_dirty_inode = 12;
+	sys_super_block->head.first_to_delete_inode = 78;
+	sys_super_block->head.last_to_delete_inode = 78;
+
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 0;
+	exp_data.delete_sync_point = 78;
+	exp_data.upload_sync_complete = TRUE;
+	exp_data.delete_sync_complete = FALSE;
+
+	/* Run */
+	check_sync_complete(IS_DIRTY, 12);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(SYNC_RETRY_TIMES - 1,
+		sys_super_block->sync_point_info->sync_retry_times);
+	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(sizeof(SYNC_POINT_DATA),
+		pread(fileno(sys_super_block->sync_point_info->fptr),
+		&verified_data, sizeof(SYNC_POINT_DATA), 0));
+	EXPECT_EQ(0, memcmp(&exp_data, &verified_data,
+		sizeof(SYNC_POINT_DATA)));
+}
+
+TEST_F(check_sync_completeTest, RetrySuccess_StillNeedToSyncDirtyQueue)
+{
+	SYNC_POINT_DATA *data;
+	SYNC_POINT_DATA exp_data, verified_data;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = TRUE;
+	data->delete_sync_complete = TRUE;
+	sys_super_block->head.first_dirty_inode = 12;
+	sys_super_block->head.last_dirty_inode = 12;
+	sys_super_block->head.first_to_delete_inode = 78;
+	sys_super_block->head.last_to_delete_inode = 78;
+
+	memset(&exp_data, 0, sizeof(SYNC_POINT_DATA));
+	exp_data.upload_sync_point = 12;
+	exp_data.delete_sync_point = 0;
+	exp_data.upload_sync_complete = FALSE;
+	exp_data.delete_sync_complete = TRUE;
+
+	/* Run */
+	check_sync_complete(TO_BE_DELETED, 78);
+
+	/* Verify */
+	EXPECT_EQ(TRUE, sys_super_block->sync_point_is_set);
+	EXPECT_EQ(SYNC_RETRY_TIMES - 1,
+		sys_super_block->sync_point_info->sync_retry_times);
+	EXPECT_EQ(0, memcmp(&exp_data, data, sizeof(SYNC_POINT_DATA)));
+	EXPECT_EQ(sizeof(SYNC_POINT_DATA),
+		pread(fileno(sys_super_block->sync_point_info->fptr),
+		&verified_data, sizeof(SYNC_POINT_DATA), 0));
+	EXPECT_EQ(0, memcmp(&exp_data, &verified_data,
+		sizeof(SYNC_POINT_DATA)));
+}
+
+TEST_F(check_sync_completeTest, DoNotNeedRetry_SyncComplete_DequeueDirtyInode)
 {
 	char path[300];
 	SYNC_POINT_DATA *data;
@@ -285,10 +353,64 @@ TEST_F(check_sync_completeTest, SyncComplete)
 	data = &(sys_super_block->sync_point_info->data);
 	data->upload_sync_complete = TRUE;
 	data->delete_sync_complete = TRUE;
+	sys_super_block->head.first_dirty_inode = 12;
+	sys_super_block->head.last_dirty_inode = 12;
+	sys_super_block->head.first_to_delete_inode = 0;
+	sys_super_block->head.last_to_delete_inode = 0;
+
+	/* Run */
+	check_sync_complete(IS_DIRTY, 12);
+
+	/* Verify */
+	data = &(sys_super_block->sync_point_info->data);
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+	EXPECT_TRUE(NULL == sys_super_block->sync_point_info);
+	EXPECT_EQ(-1, access(path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
+}
+
+TEST_F(check_sync_completeTest, DoNotNeedRetry_SyncComplete_DequeueDeleteInode)
+{
+	char path[300];
+	SYNC_POINT_DATA *data;
+
+	fetch_syncpoint_data_path(path);
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = TRUE;
+	data->delete_sync_complete = TRUE;
+	sys_super_block->head.first_dirty_inode = 0;
+	sys_super_block->head.last_dirty_inode = 0;
+	sys_super_block->head.first_to_delete_inode = 78;
+	sys_super_block->head.last_to_delete_inode = 78;
+
+	/* Run */
+	check_sync_complete(TO_BE_DELETED, 78);
+
+	/* Verify */
+	data = &(sys_super_block->sync_point_info->data);
+	EXPECT_EQ(FALSE, sys_super_block->sync_point_is_set);
+	EXPECT_TRUE(NULL == sys_super_block->sync_point_info);
+	EXPECT_EQ(-1, access(path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
+}
+
+TEST_F(check_sync_completeTest, NoChanceToSyncAgain_SyncComplete)
+{
+	char path[300];
+	SYNC_POINT_DATA *data;
+
+	fetch_syncpoint_data_path(path);
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_complete = TRUE;
+	data->delete_sync_complete = TRUE;
+	sys_super_block->head.first_dirty_inode = 12;
+	sys_super_block->head.last_dirty_inode = 345;
+	sys_super_block->head.first_to_delete_inode = 78;
+	sys_super_block->head.last_to_delete_inode = 910;
 	sys_super_block->sync_point_info->sync_retry_times = 0;
 
 	/* Run */
-	check_sync_complete();
+	check_sync_complete(IS_DIRTY, 12);
 
 	/* Verify */
 	data = &(sys_super_block->sync_point_info->data);

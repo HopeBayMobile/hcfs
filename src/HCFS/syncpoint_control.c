@@ -51,7 +51,7 @@ int32_t init_syncpoint_resource()
 	int64_t ret_ssize;
 
 	if (!sys_super_block) {
-		write_log(0, "Error: Superblock should be initializedi"
+		write_log(0, "Error: Superblock should be initialized"
 			" before init sync point data.");
 		return -EINVAL;
 	}
@@ -62,7 +62,7 @@ int32_t init_syncpoint_resource()
 		if (sys_super_block->sync_point_info->fptr)
 			fclose(sys_super_block->sync_point_info->fptr);
 		sem_destroy(&(sys_super_block->sync_point_info->ctl_sem));
-		FREE(sys_super_block->sync_point_info);	
+		FREE(sys_super_block->sync_point_info);
 	}
 
 	/* Begin to allocate memory and open file */
@@ -70,7 +70,7 @@ int32_t init_syncpoint_resource()
 	sys_super_block->sync_point_info = (SYNC_POINT_INFO *)
 		malloc(sizeof(SYNC_POINT_INFO));
 	if (!(sys_super_block->sync_point_info)) {
-		FREE(sys_super_block->sync_point_info);	
+		FREE(sys_super_block->sync_point_info);
 		return -ENOMEM;
 	}
 	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
@@ -81,7 +81,7 @@ int32_t init_syncpoint_resource()
 	if (!access(path, F_OK)) {
 		temp_fptr = fopen(path, "r+");
 		if (!temp_fptr) {
-			FREE(sys_super_block->sync_point_info);	
+			FREE(sys_super_block->sync_point_info);
 			return -errno;
 		}
 		sys_super_block->sync_point_info->fptr = temp_fptr;
@@ -94,7 +94,7 @@ int32_t init_syncpoint_resource()
 	/* Open file */
 	temp_fptr = fopen(path, "w+");
 	if (!temp_fptr) {
-		FREE(sys_super_block->sync_point_info);	
+		FREE(sys_super_block->sync_point_info);
 		return -errno;
 	}
 	sys_super_block->sync_point_info->fptr = temp_fptr;
@@ -174,6 +174,25 @@ void sync_complete_send_event()
 	return;
 }
 
+static inline void _reset_upload_sync_point()
+{
+	SYNC_POINT_DATA *data;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->upload_sync_point =
+		sys_super_block->head.last_dirty_inode;
+	data->upload_sync_complete = FALSE;
+}
+
+static inline void _reset_delete_sync_point()
+{
+	SYNC_POINT_DATA *data;
+
+	data = &(sys_super_block->sync_point_info->data);
+	data->delete_sync_point =
+		sys_super_block->head.last_to_delete_inode;
+	data->delete_sync_complete = FALSE;
+}
 /**
  * Check if both upload and delete thread all complete. If both of them complete
  * to sync all data, then check whether there are dirty data in queue. If it is
@@ -181,7 +200,7 @@ void sync_complete_send_event()
  *
  * @return none.
  */
-void check_sync_complete()
+void check_sync_complete(char which_ll, ino_t this_inode)
 {
 	SYNC_POINT_DATA *data;
 	BOOL sync_complete;
@@ -197,22 +216,30 @@ void check_sync_complete()
 	sync_complete = TRUE;
 	/* Retry some times */
 	if (sys_super_block->sync_point_info->sync_retry_times > 0) {
-		/* If queue is not empty or more than 2 element in
-		 * queue, reset the sync point */
-		if (sys_super_block->head.last_dirty_inode !=
-				sys_super_block->head.first_dirty_inode) {
-			data->upload_sync_point =
-				sys_super_block->head.last_dirty_inode;
-			data->upload_sync_complete = FALSE;
-			sync_complete = FALSE;
-		}
-
-		if (sys_super_block->head.last_to_delete_inode !=
-				sys_super_block->head.first_to_delete_inode) {
-			data->delete_sync_point =
-				sys_super_block->head.last_to_delete_inode;
-			data->delete_sync_complete = FALSE;
-			sync_complete = FALSE;
+		/* Reset the sync point if queue is not empty. */
+		switch (which_ll) {
+		case IS_DIRTY:
+			if (sys_super_block->head.last_dirty_inode !=
+					this_inode) {
+				_reset_upload_sync_point();
+				sync_complete = FALSE;
+			}
+			if (sys_super_block->head.last_to_delete_inode != 0) {
+				_reset_delete_sync_point();
+				sync_complete = FALSE;
+			}
+			break;
+		case TO_BE_DELETED:
+			if (sys_super_block->head.last_dirty_inode != 0) {
+				_reset_upload_sync_point();
+				sync_complete = FALSE;
+			}
+			if (sys_super_block->head.last_to_delete_inode !=
+					this_inode) {
+				_reset_delete_sync_point();
+				sync_complete = FALSE;
+			}
+			break;
 		}
 		sys_super_block->sync_point_info->sync_retry_times -= 1;
 		if (sync_complete == FALSE) {
@@ -287,7 +314,7 @@ void move_sync_point(char which_ll, ino_t this_inode,
 		}
 		if (need_write) {
 			write_syncpoint_data();
-			check_sync_complete();
+			check_sync_complete(which_ll, this_inode);
 		}
 		break;
 	case TO_BE_DELETED:
@@ -305,7 +332,7 @@ void move_sync_point(char which_ll, ino_t this_inode,
 		}
 		if (need_write) {
 			write_syncpoint_data();
-			check_sync_complete();
+			check_sync_complete(which_ll, this_inode);
 		}
 		break;
 	default:

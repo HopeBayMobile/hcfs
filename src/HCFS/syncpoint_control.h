@@ -48,7 +48,7 @@ int32_t init_syncpoint_resource();
 void free_syncpoint_resource(BOOL remove_file);
 int32_t write_syncpoint_data();
 void fetch_syncpoint_data_path(char *path);
-void check_sync_complete();
+void check_sync_complete(char which_ll, ino_t this_inode);
 void move_sync_point(char which_ll, ino_t this_inode,
 		struct SUPER_BLOCK_ENTRY *this_entry);
 

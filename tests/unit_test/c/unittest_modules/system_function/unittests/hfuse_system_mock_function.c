@@ -248,3 +248,13 @@ int32_t check_and_create_blockpaths(void)
 {
 	return 0;
 }
+
+int32_t super_block_exclusive_locking(void)
+{
+	return 0;
+}
+
+int32_t super_block_exclusive_release(void)
+{
+	return 0;
+}
