@@ -207,7 +207,9 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 		SUPER_BLOCK_ENTRY sb_entry;
 
 		/* Get inode mode */
-		super_block_read(inode, &sb_entry);
+		ret = super_block_read(inode, &sb_entry);
+		if (ret < 0)
+			return ret;
 		*this_mode = sb_entry.inode_stat.st_mode;
 
 	} else {
