@@ -6495,7 +6495,6 @@ use_default_val:
 
 	/* We don't store this xattr in meta, just return here. */
 	fuse_reply_err(req, 0);
-	write_log(0, "In setxattr run 1\n");
 	return;
 
 error_handle:
