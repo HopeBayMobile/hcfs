@@ -330,6 +330,8 @@ static inline void _sync_terminate_thread(int32_t index)
 				}
 
 				/* Retry immediately */
+				write_log(8, "Debug: Immediately retry to sync "
+					"inode %"PRIu64, (uint64_t)retry_inode);
 				push_retry_inode(&(sync_ctl.retry_list), inode);
 
 			} else { /* Successfully sync, remove progress file */

@@ -92,8 +92,11 @@ static inline void _dsync_terminate_thread(int32_t index)
 		dsync_ctl.total_active_dsync_threads--;
 		sem_post(&(dsync_ctl.dsync_queue_sem));
 
-		if (retry_inode > 0)
+		if (retry_inode > 0) {
+			write_log(8, "Debug: Immediately retry to delete"
+				" inode %"PRIu64, (uint64_t)retry_inode);
 			push_retry_inode(&(dsync_ctl.retry_list), retry_inode);
+		}
 	}
 }
 
@@ -968,9 +971,13 @@ void delete_loop(void)
 		if (retry_inode > 0) { /* Jump to retried inode */
 			inode_to_check = retry_inode;
 		} else {
+			ino_t tmp_ino;
+
+			/* Go to first to-delete inode if it is now
+			 * end of queue */
+			tmp_ino = sys_super_block->head.first_to_delete_inode;
 			if (inode_to_check == 0)
-				inode_to_check =
-				sys_super_block->head.first_to_delete_inode;
+				inode_to_check = tmp_ino;
 		}
 		/* Find next to-delete inode if inode_to_check is not the
 			last one. */
