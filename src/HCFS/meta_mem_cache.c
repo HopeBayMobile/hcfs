@@ -324,7 +324,8 @@ int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t ei
 	FWRITE(body_ptr->dir_entry_cache[eindex], sizeof(DIR_ENTRY_PAGE),
 							1, body_ptr->fptr);
 
-	ret = super_block_mark_dirty((body_ptr->this_stat).st_ino);
+	if (body_ptr->can_be_synced_cloud_later == FALSE)
+		ret = super_block_mark_dirty((body_ptr->this_stat).st_ino);
 
 	return ret;
 
@@ -431,7 +432,6 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	/* Update stat info in super inode and push to cloud if needed */
 	if (body_ptr->can_be_synced_cloud_later == TRUE) { /* Skip sync */
 		write_log(10, "Can be synced to cloud later\n");
-		body_ptr->can_be_synced_cloud_later = FALSE;
 		ret = super_block_update_stat(body_ptr->inode_num,
 				&(body_ptr->this_stat), TRUE);
 		if (ret < 0) {
@@ -604,7 +604,8 @@ processing the new one */
 		/* If not syncing struct stat or meta, need to sync
 		block page */
 		if ((body_ptr->stat_dirty != TRUE) &&
-		    (body_ptr->meta_dirty != TRUE)) {
+		    (body_ptr->meta_dirty != TRUE) &&
+		    (body_ptr->can_be_synced_cloud_later == FALSE)) {
 			tmpino = (body_ptr->this_stat).st_ino;
 			ret = super_block_mark_dirty(tmpino);
 			if (ret < 0) {
@@ -711,6 +712,7 @@ processing the new one */
 			errcode = ret;
 			goto errcode_handle;
 		}
+		body_ptr->can_be_synced_cloud_later = FALSE;
 	}
 
 	return 0;
@@ -762,6 +764,7 @@ int32_t meta_cache_update_stat_nosync(ino_t this_inode,
 			errcode = ret;
 			goto errcode_handle;
 		}
+		body_ptr->can_be_synced_cloud_later = FALSE;
 	}
 
 	return 0;
@@ -877,9 +880,11 @@ static inline int32_t _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
 		FSEEK(ptr->fptr, tmp_fpos, SEEK_SET);
 		FWRITE(ptr->dir_entry_cache[1],
 			sizeof(DIR_ENTRY_PAGE), 1, ptr->fptr);
-		ret = super_block_mark_dirty((ptr->this_stat).st_ino);
-		if (ret < 0)
-			return ret;
+		if (ptr->can_be_synced_cloud_later == FALSE) {
+			ret = super_block_mark_dirty((ptr->this_stat).st_ino);
+			if (ret < 0)
+				return ret;
+		}
 	}
 
 	memcpy(ptr->dir_entry_cache[1], ptr->dir_entry_cache[0],
@@ -1575,6 +1580,8 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
 
+	if (target_ptr->can_be_synced_cloud_later == TRUE)
+		target_ptr->can_be_synced_cloud_later = FALSE;
 	/* Unlock meta file if opened */
 	if (target_ptr->meta_opened == TRUE)
 		flock(fileno(target_ptr->fptr), LOCK_UN);
@@ -1915,5 +1922,13 @@ int32_t meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	body_ptr->can_be_synced_cloud_later = TRUE;
+	return 0;
+}
+
+int32_t meta_cache_remove_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	body_ptr->can_be_synced_cloud_later = FALSE;
 	return 0;
 }

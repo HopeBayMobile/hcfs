@@ -194,6 +194,7 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	char is_now_uploading, int32_t new_fd, int64_t toupload_blocks);
 
 int32_t meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr);
+int32_t meta_cache_remove_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
 	int64_t bindex, int64_t seq);
