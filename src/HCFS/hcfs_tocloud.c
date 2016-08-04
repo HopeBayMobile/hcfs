@@ -2030,6 +2030,8 @@ void upload_loop(void)
 	int32_t ret_val, ret;
 	char is_start_check;
 	char sync_paused_status = FALSE;
+	char need_retry_backup;
+	struct timeval last_retry_time, current_time;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -2041,11 +2043,17 @@ void upload_loop(void)
 
 	write_log(2, "Start upload loop\n");
 
+	need_retry_backup = FALSE;
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			/* Backup FS db if needed at the beginning of a round
 			of to-upload inode scanning */
-			backup_FS_database();
+			ret = backup_FS_database();
+			if (ret < 0) {
+				need_retry_backup = TRUE;
+				gettimeofday(&last_retry_time, NULL);
+			}
+
 			for (sleep_count = 0; sleep_count < 10; sleep_count++) {
 				/* Break if system going down */
 				if (hcfs_system->system_going_down == TRUE)
@@ -2084,6 +2092,21 @@ void upload_loop(void)
 		if (hcfs_system->sync_paused) {
 			sleep(1);
 			continue;
+		}
+
+		/* If FSmgr backup failed, retry if network
+		connection is on with at least 5 seconds
+		if between */
+		if (need_retry_backup == TRUE) {
+			gettimeofday(&current_time, NULL);
+			if (current_time.tv_sec >
+			    (last_retry_time.tv_sec + 5)) {
+				ret = backup_FS_database();
+				if (ret == 0)
+					need_retry_backup = FALSE;
+				else
+					last_retry_time = current_time;
+			}
 		}
 
 		/* Get first dirty inode or next inode. Before getting dirty

@@ -537,6 +537,7 @@ int32_t main(int32_t argc, char **argv)
 	sync_hcfs_system_data(TRUE);
 	write_log(4, "HCFS shutting down normally\n");
 	close_log();
+	sync();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();
