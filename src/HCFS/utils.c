@@ -840,7 +840,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		return -1;
 	}
 	if (config->meta_space_limit <= 0) {
-		write_log(0, "Meta space limit cannot be zeor\n");
+		write_log(0, "Meta space limit cannot be zero or less.\n");
 		return -1;
 	}
 	if (config->cache_update_delta < config->max_block_size) {
