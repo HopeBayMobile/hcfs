@@ -839,6 +839,10 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		write_log(0, "Block size cannot be zero or less\n");
 		return -1;
 	}
+	if (config->meta_space_limit <= 0) {
+		write_log(0, "Meta space limit cannot be zeor\n");
+		return -1;
+	}
 	if (config->cache_update_delta < config->max_block_size) {
 		write_log(0, "cache_delta must be at least max_block_size\n");
 		return -1;
