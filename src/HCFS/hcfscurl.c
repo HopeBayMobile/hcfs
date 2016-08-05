@@ -556,12 +556,13 @@ int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 			sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
 				SWIFT_USER);
 
-			ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
-						       SWIFT_URL, curl_handle);
+			ret_code =
+			    hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
+						SWIFT_URL, curl_handle);
 
 			return ret_code;
 		}
-		return -1;
+		break;
 	case SWIFTTOKEN:
 		curl_handle->curl = curl_easy_init();
 
@@ -572,11 +573,11 @@ int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 			else
 				return ret_code;
 		}
-		return -1;
+		break;
 	default:
-		return -1;
+		break;
 	}
-
+	return -1;
 }
 
 /************************************************************************

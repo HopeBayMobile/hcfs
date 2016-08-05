@@ -17,8 +17,3 @@ int32_t b64encode_str(uint8_t *inputstr,
 		      int32_t *outlen,
 		      int32_t inputlen);
 void update_backend_status(int32_t status, struct timespec *status_time);
-int32_t change_xfer_meta(int64_t xfer_size_upload,
-			 int64_t xfer_size_download,
-			 int64_t xfer_throughtput,
-			 int64_t xfer_total_obj);
-int32_t ignore_sigpipe(void);

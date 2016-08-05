@@ -18,8 +18,6 @@
 #include <stdio.h>
 #include "params.h"
 
-extern SYSTEM_CONF_STRUCT *system_config;
-
 #include "dir_statistics.h"
 #include "global.h"
 
@@ -58,8 +56,10 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	int64_t unpin_dirty_data_size, BOOL need_sync);
 
 void _shift_xfer_window(void);
-int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
-		int64_t xfer_throughput, int64_t xfer_total_obj);
+int32_t change_xfer_meta(int64_t xfer_size_upload,
+			 int64_t xfer_size_download,
+			 int64_t xfer_throughput,
+			 int64_t xfer_total_obj);
 
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta);
