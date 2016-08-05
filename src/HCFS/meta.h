@@ -16,7 +16,6 @@
 
 #include <assert.h>
 #include <sys/stat.h>
-#include "params.h"
 #include "macro.h"
 
 /******************************************************************************
@@ -299,5 +298,6 @@ typedef struct {
 
 void init_hcfs_stat(HCFS_STAT *this_stat);
 void convert_hcfsstat_to_sysstat(struct stat *ret_stat, HCFS_STAT *tmp_stat);
+void set_timestamp_now(HCFS_STAT *thisstat, char mode);
 
 #endif /* SRC_HCFS_META_H_ */

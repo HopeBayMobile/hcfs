@@ -19,8 +19,8 @@ extern "C" {
 #include "gtest/gtest.h"
 #include "mock_params.h"
 
-extern SYSTEM_CONF_STRUCT *system_config;
 extern SYSTEM_DATA_HEAD *hcfs_system;
+SYSTEM_CONF_STRUCT *system_config;
 
 // Tests non-existing file
 TEST(check_file_sizeTest, Nonexist) {

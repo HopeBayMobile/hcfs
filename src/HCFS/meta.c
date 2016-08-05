@@ -96,3 +96,42 @@ void static_assert_test(void) {
 	static_assert(sizeof(HCFS_STAT_v1) == 128, GUARDIAN_MSG);
 }
 #pragma GCC diagnostic pop
+
+/* Helper function for setting timestamp(s) to the current time, in
+nanosecond precision.
+   "mode" is the bit-wise OR of ATIME, MTIME, CTIME.
+*/
+void set_timestamp_now(HCFS_STAT *thisstat, char mode)
+{
+	struct timespec timenow;
+	int32_t ret;
+
+	ret = clock_gettime(CLOCK_REALTIME, &timenow);
+
+	write_log(10, "Current time %s, ret %d\n",
+		ctime(&(timenow.tv_sec)), ret);
+	if (mode & ATIME) {
+		thisstat->atime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
+		memcpy(&(thisstat->atime), &timenow,
+			sizeof(struct timespec));
+#endif
+	}
+
+	if (mode & MTIME) {
+		thisstat->mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
+		memcpy(&(thisstat->mtime), &timenow,
+			sizeof(struct timespec));
+#endif
+	}
+
+	if (mode & CTIME) {
+		thisstat->ctime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
+		memcpy(&(thisstat->ctime), &timenow,
+			sizeof(struct timespec));
+#endif
+	}
+}
+

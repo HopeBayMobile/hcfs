@@ -90,9 +90,6 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
-void set_timestamp_now(HCFS_STAT *thisstat, char mode)
-{
-}
 int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
 						int64_t this_page_pos)
 {
@@ -176,8 +173,12 @@ int32_t get_meta_size(ino_t inode, int64_t *metasize)
 }
 
 int32_t change_system_meta(int64_t system_data_size_delta,
-	int64_t meta_size_delta, int64_t cache_data_size_delta,
-	int64_t cache_blocks_delta, int64_t dirty_cache_delta)
+			   int64_t meta_size_delta,
+			   int64_t cache_data_size_delta,
+			   int64_t cache_blocks_delta,
+			   int64_t dirty_cache_delta,
+			   int64_t unpin_dirty_data_size,
+			   BOOL need_sync)
 {
 	return 0;
 }

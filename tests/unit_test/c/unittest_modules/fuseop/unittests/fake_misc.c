@@ -236,13 +236,17 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 	return 0;
 }
 
-int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
-		int64_t cache_size_delta, int64_t cache_blocks_delta,
-		int64_t dirty_cache_delta)
+int32_t change_system_meta(int64_t system_data_size_delta,
+			   int64_t meta_size_delta,
+			   int64_t cache_data_size_delta,
+			   int64_t cache_blocks_delta,
+			   int64_t dirty_cache_delta,
+			   int64_t unpin_dirty_data_size,
+			   BOOL need_sync)
 {
 	hcfs_system->systemdata.system_meta_size += meta_size_delta;
-	hcfs_system->systemdata.system_size += system_size_delta;
-	hcfs_system->systemdata.cache_size += cache_size_delta;
+	hcfs_system->systemdata.system_size += system_data_size_delta;
+	hcfs_system->systemdata.cache_size += cache_data_size_delta;
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	return 0;
 }
@@ -878,9 +882,12 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	return 0;
 }
-int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
-			int64_t num_cached_blocks_delta,
-			int64_t cached_size_delta)
+int32_t update_file_stats(FILE *metafptr,
+			  int64_t num_blocks_delta,
+			  int64_t num_cached_blocks_delta,
+			  int64_t cached_size_delta,
+			  int64_t dirty_data_size_delta,
+			  ino_t thisinode)
 {
 	return 0;
 }

@@ -75,16 +75,6 @@ int32_t ENGINE_register_all_complete(void)
 	return 0;
 }
 
-int32_t read_system_config(char *config_path)
-{
-	return 0;
-}
-
-int32_t validate_system_config(void)
-{
-	return 0;
-}
-
 int32_t init_cache_thresholds(SYSTEM_CONF_STRUCT *config)
 {
 	return 0;
@@ -232,7 +222,7 @@ int32_t init_syncpoint_resource(void)
 	return 0;
 }
 
-int32_t init_event_queue(void) {}
+int32_t init_event_queue(void) { return 0; }
 #ifdef _ANDROID_ENV_
 void *event_worker_loop(void *ptr) {}
 #else

@@ -7,6 +7,8 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
+SYSTEM_CONF_STRUCT *system_config;
+
 static inline int32_t compare(const void *a, const void *b)
 {
 	return strcmp(((DIR_ENTRY *)a)->d_name, ((DIR_ENTRY *)b)->d_name);

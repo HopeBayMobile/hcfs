@@ -10,6 +10,8 @@ extern "C" {
 #include "global.h"
 }
 
+SYSTEM_CONF_STRUCT *system_config;
+
 class cacheopEnvironment : public ::testing::Environment {
  public:
   char *workpath, *tmppath;

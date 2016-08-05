@@ -13,6 +13,8 @@ extern "C" {
 #include "global.h"
 }
 
+SYSTEM_CONF_STRUCT *system_config;
+
 /* A base class used to be derived from those need to mock cache_usage_node */
 
 class BaseClassForCacheUsageArray : public ::testing::Test {

@@ -48,8 +48,6 @@
 #include "enc.h"
 #include "super_block.h"
 
-SYSTEM_CONF_STRUCT *system_config = NULL;
-
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
 	write_log(2, "Warn: meta space is exhausted in %s, line %d. Now meta"

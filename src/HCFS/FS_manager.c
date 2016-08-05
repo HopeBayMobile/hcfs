@@ -37,6 +37,7 @@
 #include "utils.h"
 #include "meta.h"
 #include "path_reconstruct.h"
+#include "params.h"
 
 /************************************************************************
 *
