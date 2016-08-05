@@ -60,6 +60,7 @@ case "$setup_dev_env_mode" in
 unit_test )
 	source $here/require_compile_deps.bash
 	packages="$packages gcovr"
+	packages="$packages valgrind"
 	install_pkg
 	;;
 functional_test )
