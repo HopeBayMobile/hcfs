@@ -14,7 +14,8 @@ GTEST_DIR = $(realpath $(HCFS_ROOT)/tests/unit_test/c/gtest-1.7.0)
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include $(EXTRACPPFLAGS)
+CXXFLAGS += -isystem $(GTEST_DIR)/include
+CPPFLAGS += $(EXTRACPPFLAGS)
 
 # gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CC	=	gcc
@@ -159,7 +160,7 @@ define ADDTEST
   $(MD_PATH)/$(T): CPPFLAGS+=-iquote $(MD_PATH)/unittests
   $(MD_PATH)/$(T): VPATH+=$(MD_PATH)/unittests
   $(MD_PATH)/$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
-	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) -g $$^ -o $$@ $(LNFLAGS)
+	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LNFLAGS)
   
   # Clean UT
   .PHONY: clean-ut-$(T)
