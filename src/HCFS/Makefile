@@ -17,7 +17,7 @@ CPPFLAGS = -DDEDUP_ENABLE=0 \
 	   -D_ANDROID_ENV_ \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\"
 
-CFLAGS = -g -pthread -Wall -Wextra -Werror
+CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
 LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"

@@ -31,7 +31,7 @@ include $(realpath $(HCFS_ROOT)/build/ccache.mk)
 # Flags for gcc (We trace coverage of hcfs source only)
 CFLAGS += -ftest-coverage
 # Flags for g++
-CXXFLAGS += -fpermissive -Wno-missing-field-initializers -std=c++11
+CXXFLAGS += -fpermissive -Wno-missing-field-initializers -std=gnu11
 # Flags passed to C and C++ compilers
 CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -pthread -fprofile-arcs \
@@ -41,7 +41,7 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DCOMPRESS_ENABLE=0 \
 	    -DARM_32bit_ \
 	    -D_ANDROID_ENV_
-LNFLAGS += -lstdc++ -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3
+LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3
 
 # Support  gcc4.9 color output
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
@@ -147,13 +147,14 @@ endef
 define ADDTEST
   export GEN_TEST ?= 1
   $(eval T := $(strip $1))
-  $(eval OBJ_DIR := $(realpath $(MD_PATH)/obj))
+  $(eval OBJ_DIR := $(MD_PATH)/obj)
   $(eval OBJS := $(addprefix $(OBJ_DIR)/, $2))
   ifneq ($(MAKECMDGOALS),clean)
     -include $(OBJS:%.o=%.d) # Load dependency info for *existing* .o files
   endif
 
   # Build UT
+  $(OBJS) $(OBJ_DIR)/gtest_main.a: | $(OBJ_DIR)
   all test: $(MD_PATH)/$(T)
   $(MD_PATH)/$(T): CPPFLAGS+=-iquote $(MD_PATH)/unittests
   $(MD_PATH)/$(T): VPATH+=$(MD_PATH)/unittests

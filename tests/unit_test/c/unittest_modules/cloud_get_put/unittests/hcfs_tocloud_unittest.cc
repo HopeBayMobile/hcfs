@@ -616,8 +616,8 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	strcpy(local_path, MOCK_META_PATH);
 	mknod(local_path, 0700, 0);
 	mknod(metapath, 0700, 0);
-	tmpstat.st_mode = S_IFREG;
-	tmpstat.st_size = 0;
+	tmpstat.mode = S_IFREG;
+	tmpstat.size = 0;
 	fptr = fopen(metapath, "r+");
 	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);

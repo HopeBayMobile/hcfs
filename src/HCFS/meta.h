@@ -190,12 +190,6 @@ typedef struct {
 	CLOUD_RELATED_DATA crd;
 	uint8_t padding[64];
 } DIR_META_HEADER, DIR_META_HEADER_v1;
-static_assert(sizeof(HCFS_STAT)
-		+ sizeof(DIR_META_TYPE)
-		+ sizeof(CLOUD_RELATED_DATA)
-		+ sizeof(uint8_t) * 64
-		== sizeof(DIR_META_HEADER),
-		"Makesure read all sub-struct equal to read whole header");
 
 /******************************************************************************
  * Structures for regular files
@@ -253,13 +247,6 @@ typedef struct {
 	CLOUD_RELATED_DATA crd;
 	uint8_t padding[64];
 } FILE_META_HEADER, FILE_META_HEADER_v1;
-static_assert(sizeof(HCFS_STAT)
-		+ sizeof(FILE_META_TYPE)
-		+ sizeof(FILE_STATS_TYPE)
-		+ sizeof(CLOUD_RELATED_DATA)
-		+ sizeof(uint8_t) * 64
-		== sizeof(FILE_META_HEADER),
-		"Makesure read all sub-struct equal to read whole header");
 
 /******************************************************************************
  * Defining the structure of symbolic link meta
@@ -281,11 +268,6 @@ typedef struct {
 	SYMLINK_META_TYPE smt;
 	CLOUD_RELATED_DATA crd;
 } SYMLINK_META_HEADER, SYMLINK_META_HEADER_v1;
-static_assert(sizeof(HCFS_STAT)
-		+ sizeof(SYMLINK_META_TYPE)
-		+ sizeof(CLOUD_RELATED_DATA)
-		== sizeof(SYMLINK_META_HEADER),
-		"Makesure read all sub-struct equal to read whole header");
 
 /*END META definition*/
 
@@ -313,17 +295,6 @@ static_assert(sizeof(HCFS_STAT)
  * 	- Increase CURRENT_META_VER
  * 	- Handle meta version conversion in metaops.c
  ******************************************************************************/
-#define GUARDIAN_MSG "Structure size changed"
-static_assert(sizeof(HCFS_STAT) == 128, GUARDIAN_MSG);
-static_assert(sizeof(DIR_META_HEADER) == 296, GUARDIAN_MSG);
-static_assert(sizeof(FILE_META_HEADER) == 336, GUARDIAN_MSG);
-static_assert(sizeof(SYMLINK_META_HEADER) == 4304, GUARDIAN_MSG);
-
-/* Struct with fixed size, Do not change or remove them. */
-static_assert(sizeof(DIR_META_HEADER_v1) == 296, GUARDIAN_MSG);
-static_assert(sizeof(FILE_META_HEADER_v1) == 336, GUARDIAN_MSG);
-static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4304, GUARDIAN_MSG);
-static_assert(sizeof(HCFS_STAT_v1) == 128, GUARDIAN_MSG);
 
 
 void init_hcfs_stat(HCFS_STAT *this_stat);
