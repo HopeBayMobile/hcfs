@@ -138,7 +138,8 @@ define ADDCASE
   $(CASE_PASS): $(MD_PATH)/$(T)
 	@echo $$< --gtest_filter=$(C)
 	@cd $(MD_PATH) && \
-	  $$< --gtest_filter=$(C) --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T)-$(C).xml
+	  $$< --gtest_filter=$(C) --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T)-$(C).xml \
+	  || valgrind $$< --gtest_filter=$(C)
 	@touch $(CASE_PASS)
   endif
 endef

@@ -45,10 +45,20 @@ class metaopsEnvironment : public ::testing::Environment {
 
 			system_config->max_pinned_limit =
 				(int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
+
+		/* Mock system statistics */
+		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
+		hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
+
+
 		}
 		void TearDown()
 		{
 			free(system_config);
+			free(hcfs_system);
 		}
 };
 
@@ -554,23 +564,12 @@ protected:
 	{
 		/* Mock user-defined parameters */
 		MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
-
-		/* Mock system statistics */
-		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
-		sem_init(&(hcfs_system->access_sem), 0, 1);
-		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
-		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
-		hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
-
-
 	}
 
 	virtual void TearDown() 
 	{
 		if (!access("testpatterns/markdelete", F_OK))
 			rmdir("testpatterns/markdelete");
-
-		free(hcfs_system);
 	}
 };
 
@@ -1151,12 +1150,6 @@ protected:
 		fsync(fileno(statfptr));
 
 		fclose(statfptr);
-	
-		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
-		sem_init(&(hcfs_system->access_sem), 0, 1);
-		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
-		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
-		hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
 	}
 
 	void TearDown()
@@ -1188,7 +1181,6 @@ protected:
 		fetch_meta_path(thismetapath, INO_DELETE_LNK);
 		if (!access(thismetapath, F_OK))
 			unlink(thismetapath);
-		free(hcfs_system);
 	}
 };
 
@@ -1543,7 +1535,6 @@ protected:
 		fsync(fileno(statfptr));
 
 		fclose(statfptr);
-		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
 	}
 
 	void TearDown()
@@ -1564,7 +1555,6 @@ protected:
 		
 		if (!access(TO_DELETE_METAPATH, F_OK))
 			unlink(TO_DELETE_METAPATH);
-		free(hcfs_system);
 	}
 };
 
@@ -1631,7 +1621,6 @@ protected:
 		if(fptr)
 			fclose(fptr);
 		test_change_pin_flag = TRUE;
-		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
 		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
 		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
@@ -1642,7 +1631,6 @@ protected:
 	{
 		unlink("test_meta_file");
 		test_change_pin_flag = FALSE;
-		free(hcfs_system);
 	}
 };
 
