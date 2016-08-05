@@ -175,11 +175,9 @@ TEST_F(insert_cache_usage_nodeTest, InsertSuccess)
 	bool found_node;
 
 	ASSERT_EQ(0, cache_usage_hash_init());
-	for (uint32_t node_id = 0 ; node_id < 500000 ; node_id++) {
+	for (uint32_t node_id = 0 ; node_id <= 500000 ; node_id++) {
 		if (node_id % 10000 == 0)
-			printf("%u ", node_id);
-		if (node_id == 500000-1)
-			printf("%u ", node_id);
+			printf("%u\n", node_id);
 		fflush(stdout);
 
 		/* Mock data */
