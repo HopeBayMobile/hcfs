@@ -36,9 +36,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <errno.h>
 #include <dirent.h>
 #include <sys/mman.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+#include <sys/xattr.h>
 #include <inttypes.h>
 
 #include "hcfs_tocloud.h"
@@ -466,9 +464,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
-#ifndef _ANDROID_ENV_
-	int64_t ret_ssize;
-#endif
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -923,11 +918,7 @@ static BOOL _sleep_wakeup(void)
 		return FALSE;
 }
 
-#ifdef _ANDROID_ENV_
 void *delete_loop(void *ptr)
-#else
-void delete_loop(void)
-#endif
 {
 	ino_t inode_to_dsync, inode_to_check, retry_inode;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -935,9 +926,7 @@ void delete_loop(void)
 	char in_dsync;
 	int32_t ret_val;
 
-#ifdef _ANDROID_ENV_
 	UNUSED(ptr);
-#endif
 	init_delete_control();
 	init_dsync_control();
 
@@ -1032,7 +1021,5 @@ void delete_loop(void)
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		}
 	}
-#ifdef _ANDROID_ENV_
 	return NULL;
-#endif
 }

@@ -192,11 +192,13 @@ errcode_handle:
 int32_t create_FS_handle(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY tmp_entry;
-	char *buf, tmptype;
+	char *buf;
 	int32_t ret;
 
 	buf = malloc(arg_len + 10);
 #ifdef _ANDROID_ENV_
+	char tmptype;
+
 	memcpy(buf, largebuf, arg_len - 1);
 	buf[arg_len - 1] = 0;
 	tmptype = largebuf[arg_len - 1];

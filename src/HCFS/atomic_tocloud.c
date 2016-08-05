@@ -26,6 +26,10 @@
 #include "hcfs_fromcloud.h"
 #include "tocloud_tools.h"
 #include "file_present.h"
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
+
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -827,6 +831,10 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	FILE *src_ptr, *tar_ptr;
 	char filebuf[4100];
 	int64_t ret_pos;
+#ifndef _ANDROID_ENV_
+	int64_t ret_ssize;
+	int64_t temp_trunc_size;
+#endif
 
 	tar_ptr = fopen(tarpath, "a+");
 	if (tar_ptr == NULL) {

@@ -60,7 +60,4 @@ void convert_hcfsstat_to_sysstat(struct stat *ret_stat, HCFS_STAT *tmp_stat)
 	ret_stat->st_ctim.tv_sec  = tmp_stat->ctime;
 	ret_stat->st_ctim.tv_nsec = tmp_stat->ctime_nsec;
 #endif
-	/* hide dev which we save version number temporary */
-	ret_stat->st_dev = 0;
-	
 }

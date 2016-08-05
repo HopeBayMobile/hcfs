@@ -79,29 +79,6 @@ typedef struct { /* 128 bytes */
 	X(dev);     X(ino);        X(mode);  X(nlink);      \
 	X(uid);     X(gid);        X(rdev);  X(size);       \
 	X(blksize); X(blocks);
-/* Origin android stat in aarch64, 128 bytes */
-typedef struct {
-	uint64_t dev;
-	uint64_t ino;
-	uint32_t mode;
-	uint32_t nlink;
-	uint32_t uid;
-	uint32_t gid;
-	uint64_t rdev;
-	uint64_t __pad1;
-	int64_t size;
-	int32_t blksize;
-	int32_t __pad2;
-	int64_t blocks;
-	int64_t atime;
-	uint64_t atime_nsec;
-	int64_t mtime;
-	uint64_t mtime_nsec;
-	int64_t ctime;
-	uint64_t ctime_nsec;
-	uint32_t __unused4;
-	uint32_t __unused5;
-} android_aarch64_stat;
 
 /******************************************************************************
  * XATTR definition
@@ -174,6 +151,7 @@ typedef struct {
 	uint64_t d_ino;
 	char d_name[MAX_FILENAME_LEN + 1];
 	char d_type;
+	uint8_t padding[6];
 } DIR_ENTRY, DIR_ENTRY_v1;
 
 /* Defining the structure of directory object meta */
@@ -187,7 +165,8 @@ typedef struct {
 	uint8_t source_arch;
 	uint64_t root_inode;
 	int64_t finished_seq;
-	char local_pin;
+	uint8_t local_pin;
+	uint8_t padding[7];
 } DIR_META_TYPE, DIR_META_TYPE_v1;
 
 /* Defining the structure for a page of directory entries */
@@ -211,6 +190,12 @@ typedef struct {
 	CLOUD_RELATED_DATA crd;
 	uint8_t padding[64];
 } DIR_META_HEADER, DIR_META_HEADER_v1;
+static_assert(sizeof(HCFS_STAT)
+		+ sizeof(DIR_META_TYPE)
+		+ sizeof(CLOUD_RELATED_DATA)
+		+ sizeof(uint8_t) * 64
+		== sizeof(DIR_META_HEADER),
+		"Makesure read all sub-struct equal to read whole header");
 
 /******************************************************************************
  * Structures for regular files
@@ -249,7 +234,8 @@ typedef struct {
 	uint8_t source_arch;
 	uint64_t root_inode;
 	int64_t finished_seq;
-	char local_pin;
+	uint8_t local_pin;
+	uint8_t padding[7]; // gcc auto pad to 8 byte even without this
 } FILE_META_TYPE, FILE_META_TYPE_v1;
 
 /* The structure for keeping statistics for a file */
@@ -267,6 +253,13 @@ typedef struct {
 	CLOUD_RELATED_DATA crd;
 	uint8_t padding[64];
 } FILE_META_HEADER, FILE_META_HEADER_v1;
+static_assert(sizeof(HCFS_STAT)
+		+ sizeof(FILE_META_TYPE)
+		+ sizeof(FILE_STATS_TYPE)
+		+ sizeof(CLOUD_RELATED_DATA)
+		+ sizeof(uint8_t) * 64
+		== sizeof(FILE_META_HEADER),
+		"Makesure read all sub-struct equal to read whole header");
 
 /******************************************************************************
  * Defining the structure of symbolic link meta
@@ -279,7 +272,8 @@ typedef struct {
 	uint8_t source_arch;
 	uint64_t root_inode;
 	int64_t finished_seq;
-	char local_pin;
+	uint8_t local_pin;
+	uint8_t padding[7];
 } SYMLINK_META_TYPE, SYMLINK_META_TYPE_v1;
 
 typedef struct {
@@ -287,6 +281,11 @@ typedef struct {
 	SYMLINK_META_TYPE smt;
 	CLOUD_RELATED_DATA crd;
 } SYMLINK_META_HEADER, SYMLINK_META_HEADER_v1;
+static_assert(sizeof(HCFS_STAT)
+		+ sizeof(SYMLINK_META_TYPE)
+		+ sizeof(CLOUD_RELATED_DATA)
+		== sizeof(SYMLINK_META_HEADER),
+		"Makesure read all sub-struct equal to read whole header");
 
 /*END META definition*/
 
@@ -321,7 +320,6 @@ static_assert(sizeof(FILE_META_HEADER) == 336, GUARDIAN_MSG);
 static_assert(sizeof(SYMLINK_META_HEADER) == 4304, GUARDIAN_MSG);
 
 /* Struct with fixed size, Do not change or remove them. */
-static_assert(sizeof(android_aarch64_stat) == 128, GUARDIAN_MSG);
 static_assert(sizeof(DIR_META_HEADER_v1) == 296, GUARDIAN_MSG);
 static_assert(sizeof(FILE_META_HEADER_v1) == 336, GUARDIAN_MSG);
 static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4304, GUARDIAN_MSG);

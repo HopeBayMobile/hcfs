@@ -1512,10 +1512,10 @@ int32_t disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
 {
 	char pathname[200];
 	int32_t ret, errcode;
-	char *tmppath;
+#ifdef _ANDROID_ENV_
+	char *tmppath = NULL;
 	FILE *fptr;
-
-	tmppath = NULL;
+#endif
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 

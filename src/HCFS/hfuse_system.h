@@ -24,6 +24,9 @@ int32_t sync_hcfs_system_data(char need_lock);
 void init_backend_related_module(void);
 int32_t init_event_notify_module(void);
 
+#define CHILD_NUM 2
+#define BATTERY_LOW_LEVEL 3
+
 pthread_t delete_loop_thread;
 pthread_t monitor_loop_thread;
 pthread_t event_loop_thread;
@@ -35,8 +38,5 @@ pid_t child_pids[CHILD_NUM];
 pid_t this_pid;
 int32_t proc_idx;
 #endif /* _ANDROID_ENV_ */
-
-#define CHILD_NUM 2
-#define BATTERY_LOW_LEVEL 3
 
 #endif  /* GW20_SRC_HFUSE_SYSTEM_H_ */

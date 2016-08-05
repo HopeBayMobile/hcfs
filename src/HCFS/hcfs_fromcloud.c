@@ -57,7 +57,9 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	int32_t status;
 	int32_t which_curl_handle;
 	int32_t ret, errcode;
+#if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	int64_t tmplen;
+#endif
 
 	if (hcfs_system->sync_paused)
 		return -EIO;
@@ -371,6 +373,7 @@ void* download_block_manager(void *arg)
 	struct timespec time_to_sleep;
 	char error_path[200];
 	FILE *fptr;
+	UNUSED(arg);
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -440,6 +443,8 @@ void* download_block_manager(void *arg)
 
 		nanosleep(&time_to_sleep, NULL);
 	}
+
+	return NULL;
 }
 
 static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
@@ -541,7 +546,7 @@ void* fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
-		return;
+		return NULL;
 	}
 	fclose(block_fptr);
 
@@ -550,7 +555,7 @@ void* fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
-		return;
+		return NULL;
 	}
 
 	/* Fetch block from cloud */
@@ -581,7 +586,7 @@ void* fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
-			return;
+			return NULL;
 		}
 	}
 
@@ -634,7 +639,7 @@ void* fetch_backend_block(void *ptr)
 				block_info->block_no, __func__);
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
-			return;
+			return NULL;
 
 		} else { /* Strange.. */
 			write_log(5, "block_%"PRIu64"_%lld has status %d when"
@@ -667,7 +672,7 @@ void* fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
-			return;
+			return NULL;
 		}
 	}
 
@@ -681,13 +686,13 @@ void* fetch_backend_block(void *ptr)
 		block_info->dl_error = TRUE;
 	*/
 
-	return;
+	return NULL;
 
 thread_error:
 	block_info->dl_error = TRUE;
 	flock(fileno(block_fptr), LOCK_UN);
 	fclose(block_fptr);
-	return;
+	return NULL;
 }
 
 static inline int32_t _select_thread(void)

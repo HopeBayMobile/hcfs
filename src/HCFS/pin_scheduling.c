@@ -88,6 +88,8 @@ void* pinning_collect(void *arg)
 	int32_t idx;
 	struct timespec time_to_sleep;
 
+	UNUSED(arg);
+
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 

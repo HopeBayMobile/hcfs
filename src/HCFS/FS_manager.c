@@ -36,6 +36,7 @@
 #include "dir_entry_btree.h"
 #include "utils.h"
 #include "meta.h"
+#include "path_reconstruct.h"
 
 /************************************************************************
 *

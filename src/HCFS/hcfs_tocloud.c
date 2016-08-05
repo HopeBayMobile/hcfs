@@ -44,9 +44,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+#include <sys/xattr.h>
 #include <openssl/sha.h>
 #include <inttypes.h>
 
@@ -1036,8 +1034,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	char local_metapath[METAPATHLEN];
 	ino_t this_inode;
 	FILE *toupload_metafptr, *local_metafptr;
-	char truncpath[METAPATHLEN];
-	FILE *truncfptr;
 	HCFS_STAT tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	SYMLINK_META_TYPE tempsymmeta;
@@ -1049,7 +1045,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t block_count;
 	int32_t ret, errcode;
 	off_t toupload_size;
-	int64_t temp_trunc_size;
 	size_t ret_size;
 	BOOL sync_error;
 	ino_t root_inode;
@@ -1062,6 +1057,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t upload_seq;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int64_t pos;
+	int64_t temp_trunc_size;
+#ifdef _ANDROID_ENV_
+	char truncpath[METAPATHLEN];
+	FILE *truncfptr;
+#else
+	ssize_t ret_ssize;
+#endif
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1163,9 +1165,9 @@ store in some other file */
 			fclose(truncfptr);
 		}
 #else
+		/* TODO: fix error of missing metafptr*/
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
 				&temp_trunc_size, sizeof(int64_t));
-
 		if ((ret_ssize >= 0) && (toupload_size < temp_trunc_size)) {
 			toupload_size = temp_trunc_size;
 		}

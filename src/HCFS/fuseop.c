@@ -64,11 +64,7 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
-#ifdef _ANDROID_ENV_
 #include <sys/xattr.h>
-#else
-#include <attr/xattr.h>
-#endif
 #include <inttypes.h>
 #include <sqlite3.h>
 #include <sys/capability.h>
@@ -107,6 +103,7 @@
 #include "meta.h"
 #ifndef _ANDROID_ENV_
 #include "fuseproc_comm.h"
+#include <attr/xattr.h>
 #endif
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
@@ -164,7 +161,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 	if (mode & ATIME) {
 		thisstat->atime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(thisstat->atim), &timenow,
+		memcpy(&(thisstat->atime), &timenow,
 			sizeof(struct timespec));
 #endif
 	}
@@ -172,7 +169,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 	if (mode & MTIME) {
 		thisstat->mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(thisstat->mtim), &timenow,
+		memcpy(&(thisstat->mtime), &timenow,
 			sizeof(struct timespec));
 #endif
 	}
@@ -180,7 +177,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 	if (mode & CTIME) {
 		thisstat->ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(thisstat->ctim), &timenow,
+		memcpy(&(thisstat->ctime), &timenow,
 			sizeof(struct timespec));
 #endif
 	}
@@ -902,7 +899,9 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	struct timeval tmp_time1, tmp_time2;
 	HCFS_STAT tmp_stat;
 	struct stat ret_stat; /* fuse reply sys stat */
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	UNUSED(fi);
 
@@ -914,7 +913,9 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 		  (uint64_t)hit_inode);
 
 	if (hit_inode > 0) {
+#ifdef _ANDROID_ENV_
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+#endif
 
 		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL, NULL);
 		if (ret_code < 0) {
@@ -978,8 +979,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-
-	UNUSED(dev);
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -1056,7 +1055,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	init_hcfs_stat(&this_stat);
 
-	/* this_stat.dev = dev; */
+	this_stat.dev = dev;
 	this_stat.size = 0;
 	this_stat.blksize = MAX_BLOCK_SIZE;
 	this_stat.blocks = 0;
@@ -1269,10 +1268,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 	}
 
+#ifdef _ANDROID_ENV_
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
 		remove_cache_pkg(selfname);
 	}
+#endif
 
 	fuse_reply_entry(req, &(tmp_param));
 
@@ -1293,11 +1294,14 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
-	ino_t parent_inode, this_inode;
+	ino_t parent_inode;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+	ino_t this_inode;
+#endif
 
 	parent_inode = real_ino(req, parent);
         write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1316,9 +1320,9 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -1346,7 +1350,9 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+#ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
+#endif
 
 	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry);
 	if (ret_val < 0) {
@@ -1377,7 +1383,9 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
@@ -1395,9 +1403,9 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -1450,13 +1458,13 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
-#endif
 
 	/* TODO: Check if this still works for app to sdcard */
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
 		remove_cache_pkg(selfname);
 	}
+#endif
 
 	fuse_reply_err(req, -ret_val);
 }
@@ -2849,15 +2857,16 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t last_index;
 	int64_t temp_trunc_size, sizediff;
-#ifndef _ANDROID_ENV_
-	ssize_t ret_ssize;
-#endif
 	MOUNT_T *tmpptr;
+	int64_t now_seq;
+	int64_t max_pinned_size;
+#ifdef _ANDROID_ENV_
 	size_t ret_size;
 	FILE *truncfptr;
 	char truncpath[METAPATHLEN];
-	int64_t now_seq;
-	int64_t max_pinned_size;
+#else
+	ssize_t ret_ssize;
+#endif
 
 	/* Return error -EFBIG if offset is greater than expected */
 	if (offset > (off_t) MAX_FILE_SIZE)
@@ -3150,8 +3159,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 				&temp_trunc_size, sizeof(int64_t));
 		if (((ret_ssize < 0) && (errno == ENOATTR)) ||
 			((ret_ssize >= 0) &&
-				(temp_trunc_size < filestat->st_size))) {
-			temp_trunc_size = filestat->st_size;
+				(temp_trunc_size < filestat->size))) {
+			temp_trunc_size = filestat->size;
 			ret = fsetxattr(fileno((*body_ptr)->fptr),
 				"user.trunc_size", &(temp_trunc_size),
 				sizeof(int64_t), 0);
@@ -3242,7 +3251,9 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	int32_t ret_val;
 	HCFS_STAT this_stat;
 	int32_t file_flags;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	write_log(8, "Debug open inode %ld\n", ino);
 
@@ -3260,9 +3271,9 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -5202,8 +5213,10 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	int32_t ret_val;
 	HCFS_STAT this_stat;
 	ino_t thisinode;
-	MOUNT_T *tmpptr;
 	long long dirh;
+#ifdef _ANDROID_ENV_
+	MOUNT_T *tmpptr;
+#endif
 
 	thisinode = real_ino(req, ino);
 
@@ -5214,9 +5227,9 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -5853,7 +5866,7 @@ allow_truncate:
 
 		newstat.atime = attr->st_atime;
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_atim), &(attr->st_atim),
+		memcpy(&(newstat.atime), &(attr->st_atime),
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5872,7 +5885,7 @@ allow_truncate:
 		}
 		newstat.mtime = attr->st_mtime;
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.mtim), &(attr->st_mtim),
+		memcpy(&(newstat.mtime), &(attr->st_mtime),
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5896,7 +5909,7 @@ allow_truncate:
 		}
 		newstat.atime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.atim), &timenow,
+		memcpy(&(newstat.atime), &timenow,
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5916,7 +5929,7 @@ allow_truncate:
 		}
 		newstat.mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.mtim), &timenow,
+		memcpy(&(newstat.mtime), &timenow,
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5927,13 +5940,13 @@ allow_truncate:
 	if (attr_changed == TRUE) {
 		newstat.ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.ctim), &timenow,
+		memcpy(&(newstat.ctime), &timenow,
 			sizeof(struct timespec));
 #endif
 		if (to_set & FUSE_SET_ATTR_SIZE) {
 			newstat.mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-			memcpy(&(newstat.mtim), &timenow,
+			memcpy(&(newstat.mtime), &timenow,
 				sizeof(struct timespec));
 #endif
 		}
@@ -5973,7 +5986,9 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int32_t mode)
 	HCFS_STAT thisstat;
 	int32_t ret_val;
 	ino_t thisinode;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	thisinode = real_ino(req, ino);
 
@@ -5984,9 +5999,9 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int32_t mode)
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -6274,12 +6289,14 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	HCFS_STAT symlink_stat;
 	char link_buffer[MAX_LINK_PATH + 1];
 	int32_t ret_code;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_inode = real_ino(req, ino);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		fuse_reply_err(req, ENOTSUP);
 		return;
@@ -6552,10 +6569,10 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
 	size_t actual_size;
 	char *value;
-        MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
-
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+#ifdef _ANDROID_ENV_
+        MOUNT_T *tmpptr;
+#endif
 
 	this_inode = real_ino(req, ino);
 	value = NULL;
@@ -6615,6 +6632,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
         if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
@@ -6846,10 +6864,11 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	char name_space;
 	char key[MAX_KEY_SIZE];
 	HCFS_STAT stat_data;
-        MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
+#ifdef _ANDROID_ENV_
+        MOUNT_T *tmpptr;
+#endif
 
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -6886,6 +6905,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
         if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
@@ -7211,7 +7231,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	init_hcfs_stat(&this_stat);
-	/* this_stat.dev = 0; */
+	this_stat.dev = 0;
 	this_stat.size = 0;
 	this_stat.blksize = MAX_BLOCK_SIZE;
 	this_stat.blocks = 0;
@@ -7370,12 +7390,12 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int32_t mode,
 	if ((mode == 3) || (old_file_size != newstat.size)) {
 		newstat.ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.ctim), &timenow,
+		memcpy(&(newstat.ctime), &timenow,
 			sizeof(struct timespec));
 #endif
 		newstat.mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.mtim), &timenow,
+		memcpy(&(newstat.mtime), &timenow,
 			sizeof(struct timespec));
 #endif
 	}

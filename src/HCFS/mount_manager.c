@@ -576,6 +576,10 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	sem_wait(&(fs_mgr_head->op_lock));
 	sem_wait(&(mount_mgr.mount_lock));
 
+#ifndef _ANDROID_ENV_
+	UNUSED(mp_mode);
+#endif
+
 	/* TODO: check if mp is a valid mountpoint */
 
 	if (fsname == NULL || mp == NULL)
@@ -674,9 +678,9 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
+#ifdef _ANDROID_ENV_
 	new_info->mp_mode = mp_mode;
 
-#ifdef _ANDROID_ENV_
 	new_info->volume_type = tmp_entry.d_type;
 	if (new_info->volume_type == ANDROID_EXTERNAL ||
 	    new_info->volume_type == ANDROID_MULTIEXTERNAL) {
@@ -798,6 +802,7 @@ errcode_handle:
 	return errcode;
 }
 
+#ifdef _ANDROID_ENV_
 static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 {
 	int32_t ret;
@@ -841,6 +846,7 @@ static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 
 	return 0;
 }
+#endif
 
 /************************************************************************
 *

@@ -23,11 +23,7 @@
 #include "global.h"
 #include "params.h"
 
-#ifdef _ANDROID_ENV_
 void *monitor_loop(void *ptr);
-#else
-void monitor_loop(void);
-#endif
 int32_t check_backend_status(void);
 void destroy_monitor_loop_thread(void);
 double diff_time(const struct timespec *start, const struct timespec *end);

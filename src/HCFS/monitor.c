@@ -80,20 +80,16 @@ void _write_monitor_loop_status_log(double duration)
  *  Return value: None
  *
  *************************************************************************/
-#ifdef _ANDROID_ENV_
 void *monitor_loop(void *ptr)
-#else
-void monitor_loop(void)
-#endif
 {
 	struct timespec ts;
 	int32_t ret_val;
 	int32_t wait_sec = 0;
 	int32_t min, max;
 #ifdef _ANDROID_ENV_
-	UNUSED(ptr);
 	prctl(PR_SET_NAME, "monitor_loop");
 #endif /* _ANDROID_ENV_ */
+	UNUSED(ptr);
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	srand( ts.tv_sec * 1000 * 1000 + ts.tv_nsec);
@@ -133,11 +129,7 @@ void monitor_loop(void)
 			update_sync_state();
 		}
 	}
-#ifdef _ANDROID_ENV_
 	return NULL;
-#else
-	return;
-#endif
 }
 
 /**************************************************************************

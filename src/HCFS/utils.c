@@ -29,9 +29,7 @@
 #include <limits.h>
 #include <signal.h>
 #include <time.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+#include <sys/xattr.h>
 #include <inttypes.h>
 #include <jansson.h>
 
@@ -1723,7 +1721,6 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 {
 	int32_t ret, errcode;
 	ssize_t ret_ssize;
-	size_t ret_size;
 	FILE_STATS_TYPE meta_stats;
 	DIR_STATS_TYPE olddirstats, newdirstats, diffstats;
 
