@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <curl/curl.h>
 #include <semaphore.h>
+#include <pthread.h>
 #include "objmeta.h"
 #include "params.h"
 
