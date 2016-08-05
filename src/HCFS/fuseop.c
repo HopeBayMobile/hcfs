@@ -6357,7 +6357,6 @@ static int32_t _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	const char *value, size_t size, int32_t flag)
 {
-	/* TODO: Tmp ignore permission of namespace */
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
 	int64_t xattr_filepos;
@@ -6392,6 +6391,15 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
 		name_space, key, flag);
 
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+	    name_space == SECURITY &&
+	    strncmp(key, SELINUX_XATTR_KEY, sizeof(SELINUX_XATTR_KEY)) == 0) {
+		fuse_reply_err(req, 0);
+		return;
+	}
+#endif
+
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -6405,14 +6413,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	if (name_space == SECURITY) {
-		/* Skip perm check if SECURITY domain */
-		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
-				strncmp(key, SELINUX_XATTR_KEY, sizeof(SELINUX_XATTR_KEY)) == 0)
-			goto use_default_val;
-		else
-			goto fetch_xattr;
-	}
+	if (name_space == SECURITY)
+		goto fetch_xattr;
 
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
@@ -6488,15 +6490,6 @@ fetch_xattr:
 	fuse_reply_err(req, 0);
 	return;
 
-use_default_val:
-	/* Close & unlock meta */
-	meta_cache_close_file(meta_cache_entry);
-	meta_cache_unlock_entry(meta_cache_entry);
-
-	/* We don't store this xattr in meta, just return here. */
-	fuse_reply_err(req, 0);
-	return;
-
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
@@ -6551,7 +6544,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* If get xattr of security.selinux in external volume, return the
 	   adhoc value. */
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
-	    (name_space == SECURITY) &&
+	    name_space == SECURITY &&
 	    strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
 		actual_size = strlen(SELINUX_EXTERNAL_XATTR_VAL);
 
@@ -6581,10 +6574,9 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	if (name_space == SECURITY) {
+	if (name_space == SECURITY)
 		/* Skip perm check if SECURITY domain */
-			goto fetch_xattr;
-	}
+		goto fetch_xattr;
 
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
