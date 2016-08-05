@@ -290,6 +290,7 @@ protected:
 	{
 		no_backend_stat = TRUE;
 		init_sync_stat_control();
+		init_sync_control(); /* Add this init so that upload thread will not hang up */
 		sem_init(&upload_ctl.upload_queue_sem, 0, 1);
 		sem_init(&upload_ctl.upload_op_sem, 0, 1);
 	}
@@ -298,6 +299,11 @@ protected:
 	{
 		char tmppath[200];
 		char tmppath2[200];
+
+		/* Join the sync_control thread */
+		hcfs_system->system_going_down = TRUE;
+		pthread_join(sync_ctl.sync_handler_thread, NULL);
+
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
@@ -379,7 +385,7 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	unlink(MOCK_META_PATH);
 }
 
-TEST_F(init_upload_controlTest, DISABLED_MetaIsDeleted_and_TerminateThreadSuccess)
+TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 {
 	void *res;
 	int32_t num_block_entry = 80;
@@ -739,6 +745,7 @@ protected:
 		fd = open(progress_file, O_CREAT | O_RDWR);
 
 		no_backend_stat = TRUE;
+		init_sync_control(); /* Add this init so that upload thread will not hang up */
 		init_sync_stat_control();
 		max_objname_num = 4000;
 		sem_init(&objname_counter_sem, 0, 1);
@@ -770,6 +777,9 @@ protected:
 		pthread_cancel(sync_ctl.sync_handler_thread);
 		pthread_join(sync_ctl.sync_handler_thread, &res);
 
+		/* Join the sync_control thread */
+		hcfs_system->system_going_down = TRUE;
+		pthread_join(sync_ctl.sync_handler_thread, NULL);
 		close(fd);
 		unlink(progress_file);
 		unlink(toupload_meta);
@@ -861,7 +871,7 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 	sync_single_inode(&mock_thread_type);
 }
 
-TEST_F(sync_single_inodeTest, DISABLED_SyncBlockFileSuccessNoPin)
+TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
 	char metapath[] = MOCK_META_PATH;
@@ -926,7 +936,7 @@ TEST_F(sync_single_inodeTest, DISABLED_SyncBlockFileSuccessNoPin)
 	unlink(metapath);
 }
 
-TEST_F(sync_single_inodeTest, DISABLED_SyncBlockFileSuccessPin)
+TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
 	char metapath[] = MOCK_META_PATH;
