@@ -359,8 +359,8 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Entries_Cannot_Split_Since_NoSpace)
 	DIR_ENTRY_PAGE root_node;
 	DIR_ENTRY entry;
 
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
 
 	/* It will fail on splitting root */
 	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1000;

@@ -212,7 +212,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 
 	} else {
 		flock(fileno(fptr), LOCK_EX);
-		PREAD(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
+		PREAD(fileno(fptr), &tmpstat, sizeof(HCFS_STAT), 0);
 		*this_mode = tmpstat.mode;
 		if (!S_ISREG(tmpstat.mode)) { /* Return when not regfile */
 			flock(fileno(fptr), LOCK_UN);
@@ -221,7 +221,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 		}
 
 		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
-				sizeof(struct stat));
+				sizeof(HCFS_STAT));
 
 		num_blocks = ((tmpstat.size == 0) ? 0
 				: (tmpstat.size - 1) / MAX_BLOCK_SIZE + 1);

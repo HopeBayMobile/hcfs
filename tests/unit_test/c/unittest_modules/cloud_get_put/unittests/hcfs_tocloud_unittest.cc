@@ -605,7 +605,7 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	void *res;
 	FILE_META_TYPE filemeta;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	char local_path[200];
 
 	/* Run tested function */
@@ -619,7 +619,7 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	tmpstat.st_mode = S_IFREG;
 	tmpstat.st_size = 0;
 	fptr = fopen(metapath, "r+");
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fclose(fptr);
 

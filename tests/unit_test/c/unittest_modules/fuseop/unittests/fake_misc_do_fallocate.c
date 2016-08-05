@@ -217,7 +217,7 @@ int32_t lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 
 off_t check_file_size(const char *path)
 {
-	struct stat tempstat;
+	struct stat tempstat; /* raw ops */
 
 	stat(path, &tempstat);
 	return tempstat.st_size;

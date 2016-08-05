@@ -214,7 +214,7 @@ int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 off_t check_file_size(const char *path)
 {
 	printf("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
-	struct stat block_stat;
+	struct stat block_stat; /* raw file ops */
 	int32_t errcode;
 
 	errcode = stat(path, &block_stat);

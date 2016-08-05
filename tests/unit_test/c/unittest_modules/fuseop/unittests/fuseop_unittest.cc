@@ -799,7 +799,7 @@ TEST_F(hfuse_utimensTest, FileNotExist) {
 TEST_F(hfuse_utimensTest, UtimeTest) {
   int32_t ret_val;
   struct utimbuf target_time;
-  struct stat tempstat;
+  struct stat tempstat; /* raw file ops */
 
   target_time.actime = 123456;
   target_time.modtime = 456789;
