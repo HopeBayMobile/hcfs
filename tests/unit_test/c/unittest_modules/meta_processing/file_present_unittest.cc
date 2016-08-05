@@ -537,7 +537,7 @@ TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 		sizeof(XATTR_PAGE)));
 }
 
-TEST_F(fetch_xattr_pageTest, FetchSymlinkXattrSuccess)
+TEST_F(fetch_xattr_pageTest, DISABLED_FetchSymlinkXattrSuccess)
 {
 	int32_t ret;
 	int64_t xattr_pos;
