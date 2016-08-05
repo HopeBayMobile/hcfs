@@ -35,6 +35,7 @@ $(eval $(call ADDTEST, hcfs_tocloud_unittest, \
   hcfs_tocloud.o \
   hcfs_tocloud_unittest.o ))
 
+BATCH_UT := 1
 $(eval $(call ADDTEST, hcfs_clouddelete_unittest, \
   clouddelete_mock_function.o \
   hcfs_clouddelete.o \

@@ -183,8 +183,7 @@ protected:
 			malloc(sizeof(SYSTEM_CONF_STRUCT));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
-		if (!access(backend_meta, F_OK))
-			unlink(backend_meta);
+		backend_meta[0] = 0;
 	}
 	virtual void TearDown()
 	{
@@ -202,7 +201,7 @@ protected:
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * num_objname);
 		for (int32_t i = 0 ; i < num_objname ; i++)
-			objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
+			objname_list[i] = (char *)calloc(size_objname, sizeof(char));
 		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
 	}
 	void destroy_objname_buffer(uint32_t num_objname)
@@ -308,7 +307,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
 }
 
-TEST_F(dsync_single_inodeTest, DISABLED_DeleteDirectorySuccess)
+TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 {
 	FILE *meta;
 	HCFS_STAT meta_stat;
@@ -355,7 +354,7 @@ int32_t inode_cmp(const void *a, const void *b)
 	return *(int32_t *)a - *(int32_t *)b;
 }
 
-TEST(delete_loopTest, DISABLED_DeleteSuccess)
+TEST(delete_loopTest, DeleteSuccess)
 {
 	pthread_t thread;
 	void *res;

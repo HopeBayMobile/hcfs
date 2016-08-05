@@ -25,14 +25,17 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 
 int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	printf("[MOCK] clouddelete_mock_function.c line %4d func %s",  __LINE__, __func__);
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
+		puts(" this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
 		strcpy(pathname, TODELETE_PATH);
 		return 0;
 	} else if (this_inode == INODE__FETCH_TODELETE_PATH_FAIL) {
 		pathname[0] = '\0';
+		puts(" this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
 		return -1;
 	} else {
+		puts(" this_inode == ?. Record this inode for later");
 		/* Record inode. Called when deleting inode in delete_loop() */
 		usleep(500000); // Let threads busy
 		sem_wait(&(to_verified_data.record_inode_sem));
@@ -160,6 +163,7 @@ void fetch_backend_block_objname(char *objname,
 int fetch_backend_meta_path(char *pathname, ino_t inode)
 {
 	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	pathname[0] = 0;
 	return 0;
 }
 
@@ -208,4 +212,13 @@ void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
 int32_t unlink_upload_file(char *filename)
 {
 	return 0;
+}
+void init_hcfs_stat(HCFS_STAT *this_stat)
+{
+	memset(this_stat, 0, sizeof(HCFS_STAT));
+
+	this_stat->metaver = CURRENT_META_VER;
+	memcpy(&this_stat->magic, &META_MAGIC, sizeof(this_stat->magic));
+
+	return;
 }
