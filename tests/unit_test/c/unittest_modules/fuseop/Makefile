@@ -30,7 +30,7 @@ $(eval $(call ADDTEST, fuseop_unittest, \
 # Cleanup before test
 $(MD_PATH)/obj/fuseop_unittest.pass: | /tmp/test_fuse
 /tmp/test_fuse:
-	@sudo fusermount -uz /tmp/test_fuse || :
+	@sudo fusermount -uz /tmp/test_fuse 2>/dev/null || :
 
 $(eval $(call ADDTEST, do_fallocate_unittest, \
   do_fallocate.o \
