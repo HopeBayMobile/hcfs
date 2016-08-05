@@ -78,12 +78,12 @@ define COMPILE
   $(eval INC_DIR := $(addprefix -iquote,$(USER_DIR)))
 
   $(OBJ_DIR)/%.d: $1/%.c | $(OBJ_DIR)
-	  $(CC) -MM -MT $$(@.d=.o) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) $$< > $$@
+	$(CC) -MM -MT $$(@:.d=.o) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) $$< > $$@
   $(OBJ_DIR)/%.o: $1/%.c | $(OBJ_DIR)
-	  $(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@
+	$(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@
 
   $(OBJ_DIR)/%.o: $1/%.cc | $(OBJ_DIR)
-	  $(CXX) $(CPPFLAGS) $(INC_DIR) $(CXXFLAGS) -c $$< -o $$@
+	$(CXX) $(CPPFLAGS) $(INC_DIR) $(CXXFLAGS) -c $$< -o $$@
 endef
 
 define ADDMODULE
@@ -93,10 +93,10 @@ define ADDMODULE
   clean: clean-module-$(MD_NAME)
   .PHONY: clean-module-$(MD_NAME)
   clean-module-$(MD_NAME):
-	  rm -rf $(OBJ_DIR)/* $(MD_PATH)/*.gc*
+	rm -rf $(OBJ_DIR)/* $(MD_PATH)/*.gc*
 
   $(OBJ_DIR):
-	  mkdir -p $$@
+	mkdir -p $$@
 
   ###########################################################################
   # Builds gtest.a and gtest_main.a.
@@ -107,16 +107,16 @@ define ADDMODULE
   # compiles fast and for ordinary users its source rarely changes.
 
   $(OBJ_DIR)/gtest-all.o : $(GTEST_SRCS_)
-	  $(CXX) $(CPPFLAGS) -I$(GTEST_DIR) $(CXXFLAGS) -c $(GTEST_DIR)/src/gtest-all.cc -o $$@ -lstdc++
+	$(CXX) $(CPPFLAGS) -I$(GTEST_DIR) $(CXXFLAGS) -c $(GTEST_DIR)/src/gtest-all.cc -o $$@ -lstdc++
 
   $(OBJ_DIR)/gtest_main.o : $(GTEST_SRCS_)
-	  $(CXX) $(CPPFLAGS) -I$(GTEST_DIR) $(CXXFLAGS) -c $(GTEST_DIR)/src/gtest_main.cc -o $$@ -lstdc++
+	$(CXX) $(CPPFLAGS) -I$(GTEST_DIR) $(CXXFLAGS) -c $(GTEST_DIR)/src/gtest_main.cc -o $$@ -lstdc++
 
   $(OBJ_DIR)/gtest.a : $(OBJ_DIR)/gtest-all.o
-	  $(AR) $(ARFLAGS) $$@ $$^
+	$(AR) $(ARFLAGS) $$@ $$^
 
   $(OBJ_DIR)/gtest_main.a : $(OBJ_DIR)/gtest-all.o $(OBJ_DIR)/gtest_main.o
-	  $(AR) $(ARFLAGS) $$@ $$^
+	$(AR) $(ARFLAGS) $$@ $$^
 
   ###########################################################################
   # Auto maintain compiling and dependency
@@ -160,7 +160,7 @@ define ADDTEST
   $(MD_PATH)/$(T): CPPFLAGS+=-iquote $(MD_PATH)/unittests
   $(MD_PATH)/$(T): VPATH+=$(MD_PATH)/unittests
   $(MD_PATH)/$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
-	  $(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LNFLAGS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LNFLAGS)
   
   # Clean UT
   .PHONY: clean-ut-$(T)
@@ -177,10 +177,10 @@ define ADDTEST
     $(eval UT_PASS := $(MD_PATH)/obj/$(T).pass)
     test: $(UT_PASS)
     $(UT_PASS): $(MD_PATH)/$(T)
-	  @echo $$<
-	  @cd $(MD_PATH) && \
-	    $$< --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T).xml
-	  @touch $(UT_PASS)
+	@echo $$<
+	@cd $(MD_PATH) && \
+	  $$< --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T).xml
+	@touch $(UT_PASS)
     $(eval BATCH_UT := )
   endif
 endef
