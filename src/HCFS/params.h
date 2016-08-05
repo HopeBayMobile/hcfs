@@ -27,6 +27,7 @@ typedef struct {
 	int64_t cache_hard_limit;
 	int64_t cache_update_delta;
 	int64_t cache_reserved_space;
+	int64_t meta_space_limit;
 	/* Cache management thresholds */
 	int64_t *max_cache_limit;
 	int64_t *max_pinned_limit;
@@ -80,6 +81,7 @@ typedef struct {
 #define CACHE_SOFT_LIMIT system_config->cache_soft_limit
 #define CACHE_HARD_LIMIT system_config->cache_hard_limit
 #define CACHE_DELTA system_config->cache_update_delta
+#define META_SPACE_LIMIT system_config->meta_space_limit
 
 #define MAX_PINNED_RATIO 0.8
 #define MAX_PINNED_LIMIT (CACHE_HARD_LIMIT * MAX_PINNED_RATIO)

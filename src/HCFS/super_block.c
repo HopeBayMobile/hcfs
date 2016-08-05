@@ -1001,7 +1001,6 @@ ino_t super_block_new_inode(struct stat *in_stat,
 	uint64_t this_generation;
 	int32_t errcode, ret;
 	BOOL update_size;
-	int64_t max_pinned_size;
 
 	super_block_exclusive_locking();
 
@@ -1037,15 +1036,11 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		this_generation = tempentry.generation + 1;
 		update_size = FALSE;
 	} else {
-		max_pinned_size = get_pinned_limit(local_pin);
-		if (max_pinned_size < 0) {
+		if (NO_META_SPACE()) {
 			super_block_exclusive_release();
 			return 0;
 		}
-		if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
-			super_block_exclusive_release();
-			return 0;
-		}
+
 		/* If need to append a new super inode and add total
 		*  inode count*/
 		sys_super_block->head.num_total_inodes++;

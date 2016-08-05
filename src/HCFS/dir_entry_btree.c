@@ -27,6 +27,7 @@
 #include "global.h"
 #include "params.h"
 #include "logger.h"
+#include "utils.h"
 #include "macro.h"
 
 /* TODO: How to integrate dir page reading / updating with mem cache? */
@@ -224,7 +225,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 			return 0; /*Insertion completed*/
 		}
 
-		/*Need to split*/
+		/* Need to split. */
 		if (s_index > 0)
 			memcpy(tmp_entries, tnode->dir_entries,
 						sizeof(DIR_ENTRY) * s_index);
@@ -259,6 +260,10 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 			newpage.this_page_pos = this_meta->entry_page_gc_list;
 			this_meta->entry_page_gc_list = newpage.gc_list_next;
 		} else {
+			/* Check if meta space is enough or not. */
+			if (NO_META_SPACE())
+				return -ENOSPC;
+
 			memset(&newpage, 0, sizeof(DIR_ENTRY_PAGE));
 			LSEEK(fh, 0, SEEK_END);
 			newpage.this_page_pos = ret_pos;

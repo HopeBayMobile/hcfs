@@ -968,10 +968,15 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
+
+	if (NO_META_SPACE()) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+
 	gettimeofday(&tmp_time1, NULL);
 
 	/* Reject if not creating a regular file or fifo */
@@ -1017,31 +1022,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	/* Default inherit parent's pin status */
 	ispin = local_pin;
 #endif
-
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(ispin);
-	if (max_pinned_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
-		fuse_reply_err(req, ENOSPC);
-		return;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(ispin);
-	if (max_cache_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
-		ret_val = sleep_on_cache_full();
-		if (ret_val < 0) {
-			fuse_reply_err(req, ret_val);
-			return;
-		}
-	}
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -1158,7 +1138,11 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
+
+	if (NO_META_SPACE()) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -1199,32 +1183,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	/* Default inherit parent's pin status */
 	ispin = local_pin;
 #endif
-
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(ispin);
-	if (max_pinned_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
-		fuse_reply_err(req, ENOSPC);
-		return;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(ispin);
-	if (max_cache_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
-		ret_val = sleep_on_cache_full();
-		if (ret_val < 0) {
-			fuse_reply_err(req, ret_val);
-			return;
-		}
-	}
-
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
@@ -6098,7 +6056,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -6108,6 +6065,12 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 #endif
+
+	/* Reject if no more meta space */
+	if (NO_META_SPACE()) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
 
 	parent_inode = real_ino(req, parent);
 
@@ -6180,31 +6143,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	    strcmp(name, "lib") == 0)
 		local_pin = P_HIGH_PRI_PIN;
 #endif
-
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(local_pin);
-	if (max_pinned_size < 0) {
-		errcode = -EIO;
-		goto error_handle;
-	}
-	if (hcfs_system->systemdata.pinned_size > max_pinned_size) {
-		errcode = -ENOSPC;
-		goto error_handle;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(local_pin);
-	if (max_cache_size < 0) {
-		errcode = -EIO;
-		goto error_handle;
-	}
-	if (hcfs_system->systemdata.cache_size > max_cache_size) {
-		ret_val = sleep_on_cache_full();
-		if (ret_val < 0) {
-			errcode = ret_val;
-			goto error_handle;
-		}
-	}
 
 	/* Prepare stat and request a new inode from superblock */
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
@@ -6431,7 +6369,6 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 	int64_t old_metasize, new_metasize, delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 	FILE_META_TYPE this_filemeta;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -6440,6 +6377,11 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	xattr_page = NULL;
 	old_metasize = 0;
 	new_metasize = 0;
+
+	if ((flag != XATTR_REPLACE) && NO_META_SPACE()) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
@@ -6471,31 +6413,6 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		&this_filemeta, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
-
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(this_filemeta.local_pin);
-	if (max_pinned_size < 0) {
-		retcode = -EIO;
-		goto error_handle;
-	}
-	if (hcfs_system->systemdata.pinned_size >
-			max_pinned_size) {
-		retcode = -ENOSPC;
-		goto error_handle;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(this_filemeta.local_pin);
-	if (max_cache_size < 0) {
-		retcode = -EIO;
-		goto error_handle;
-	}
-	if (hcfs_system->systemdata.cache_size >
-			max_cache_size) {
-		retcode = sleep_on_cache_full();
-		if (retcode < 0)
-			goto error_handle;
-	}
 
 #ifdef _ANDROID_ENV_
         if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
@@ -7002,7 +6919,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
 	int64_t old_metasize, new_metasize, delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 	char local_pin;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -7054,33 +6970,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	if (!parent_meta_cache_entry) {
 		fuse_reply_err(req, ENOMEM);
 		return;
-	}
-
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(local_pin);
-	if (max_pinned_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.pinned_size >
-			max_pinned_size) {
-		fuse_reply_err(req, ENOSPC);
-		return;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(local_pin);
-	if (max_cache_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.cache_size >
-			max_cache_size) {
-		ret_val = sleep_on_cache_full();
-		if (ret_val < 0) {
-			fuse_reply_err(req, -ret_val);
-			return;
-		}
 	}
 
 	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
@@ -7191,12 +7080,16 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
-	int64_t max_cache_size, max_pinned_size;
 
 	parent_inode = real_ino(req, parent);
 
 	write_log(10, "DEBUG parent %" PRIu64 ", name %s mode %d\n",
 			(uint64_t)parent_inode, name, mode);
+
+	if (NO_META_SPACE()) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
 
 	/* Reject if not creating a regular file */
 	if (!S_ISREG(mode)) {
@@ -7236,33 +7129,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	/* Default inherit parent's pin status */
 	ispin = local_pin;
 #endif
-
-	/* Reject if no more pinned size */
-	max_pinned_size = get_pinned_limit(ispin);
-	if (max_pinned_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.pinned_size >
-			max_pinned_size) {
-		fuse_reply_err(req, ENOSPC);
-		return;
-	}
-
-	/* Reject if no more cache size */
-	max_cache_size = get_cache_limit(ispin);
-	if (max_cache_size < 0) {
-		fuse_reply_err(req, EIO);
-		return;
-	}
-	if (hcfs_system->systemdata.cache_size >
-			max_cache_size) {
-		ret_val = sleep_on_cache_full();
-		if (ret_val < 0) {
-			fuse_reply_err(req, ret_val);
-			return;
-		}
-	}
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);

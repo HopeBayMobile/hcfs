@@ -14,6 +14,7 @@
 #define SRC_HCFS_MACRO_H_
 
 #include "logger.h"
+#include "utils.h"
 
 #define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode) || S_ISSOCK(mode))
 
@@ -253,5 +254,9 @@
 		free(ptr);\
 		(ptr) = NULL;\
 	} while (0)
+
+#define NO_META_SPACE()\
+	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ?\
+	meta_nospc_log(__func__, __LINE__) : 0)
 
 #endif  /* SRC_HCFS_MACRO_H_ */

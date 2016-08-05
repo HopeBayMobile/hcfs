@@ -72,6 +72,8 @@ int32_t main(int32_t argc, char **argv)
 		code = CHECKDIRSTAT;
 	else if (strcasecmp(argv[1], "volsize") == 0)
 		code = GETVOLSIZE;
+	else if (strcasecmp(argv[1], "metasize") == 0)
+		code = GETMETASIZE;
 	else if (strcasecmp(argv[1], "cloudsize") == 0)
 		code = GETCLOUDSIZE;
 	else if (strcasecmp(argv[1], "pinsize") == 0)
@@ -268,6 +270,7 @@ int32_t main(int32_t argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	case GETVOLSIZE:
+	case GETMETASIZE:
 	case GETCLOUDSIZE:
 	case UNPINDIRTYSIZE:
 	case OCCUPIEDSIZE:

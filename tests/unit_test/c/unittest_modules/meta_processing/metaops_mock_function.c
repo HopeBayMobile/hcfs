@@ -486,3 +486,8 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 {
 	return 0;
 }
+
+int32_t meta_nospc_log(const char *func_name, int32_t lines)
+{
+	return 1;
+}

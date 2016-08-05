@@ -924,6 +924,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	case 1:
 		tmp_target_pos = temp_meta->single_indirect;
 		if (tmp_target_pos == 0) {
+			if (NO_META_SPACE())
+				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
 			FTELL(body_ptr->fptr);
 			temp_meta->single_indirect = ret_pos;
@@ -940,6 +942,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	case 2:
 		tmp_target_pos = temp_meta->double_indirect;
 		if (tmp_target_pos == 0) {
+			if (NO_META_SPACE())
+				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
 			FTELL(body_ptr->fptr);
 			temp_meta->double_indirect = ret_pos;
@@ -956,6 +960,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	case 3:
 		tmp_target_pos = temp_meta->triple_indirect;
 		if (tmp_target_pos == 0) {
+			if (NO_META_SPACE())
+				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
 			FTELL(body_ptr->fptr);
 			temp_meta->triple_indirect = ret_pos;
@@ -972,6 +978,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	case 4:
 		tmp_target_pos = temp_meta->quadruple_indirect;
 		if (tmp_target_pos == 0) {
+			if (NO_META_SPACE())
+				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
 			FTELL(body_ptr->fptr);
 			temp_meta->quadruple_indirect = ret_pos;
@@ -1007,6 +1015,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 		tmp_ptr_index = tmp_ptr_index %
 				(longpow(POINTERS_PER_PAGE, count));
 		if (tmp_ptr_page.ptr[tmp_ptr_page_index] == 0) {
+			if (NO_META_SPACE())
+				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
 			FTELL(body_ptr->fptr);
 			tmp_ptr_page.ptr[tmp_ptr_page_index] = ret_pos;
@@ -1021,6 +1031,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	}
 
 	if (tmp_ptr_page.ptr[tmp_ptr_index] == 0) {
+		if (NO_META_SPACE())
+			return -ENOSPC;
 		FSEEK(body_ptr->fptr, 0, SEEK_END);
 		FTELL(body_ptr->fptr);
 		tmp_ptr_page.ptr[tmp_ptr_index] = ret_pos;

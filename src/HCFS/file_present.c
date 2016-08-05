@@ -276,6 +276,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		return -ENOMEM;
 	}
 
+	meta_cache_sync_later(body_ptr);
 	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
 							NULL, 0, body_ptr);
 	if (ret_val < 0) {
@@ -314,6 +315,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	meta_cache_get_meta_size(body_ptr, &metasize);
 
+	meta_cache_remove_sync_later(body_ptr);
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -323,6 +325,9 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	if (ret_val < 0)
 		return ret_val;
+
+	/* Mark dirty here so that dirty data size includes dirty meta size. */
+	super_block_mark_dirty(self_inode);
 
 	/* Storage location for new file is local */
 	DIR_STATS_TYPE tmpstat;
@@ -459,6 +464,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 	}
 
+	meta_cache_sync_later(body_ptr);
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
 							NULL, body_ptr);
 	if (ret_val < 0) {
@@ -493,6 +499,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	meta_cache_get_meta_size(body_ptr, &metasize);
 
+	meta_cache_remove_sync_later(body_ptr);
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -502,6 +509,9 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	ret_val = meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0)
 		return ret_val;
+
+	/* Mark dirty here so that dirty data size includes dirty meta size. */
+	super_block_mark_dirty(self_inode);
 
 	/* Init the dir stat for this node */
 	ret_val = reset_dirstat_lookup(self_inode);
@@ -867,6 +877,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
+	meta_cache_sync_later(self_meta_cache_entry);
 	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
 		&symlink_meta, self_meta_cache_entry);
 	if (ret_code < 0) {
@@ -905,6 +916,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 #endif
 	meta_cache_get_meta_size(self_meta_cache_entry, &metasize);
 
+	meta_cache_remove_sync_later(self_meta_cache_entry);
 	ret_code = meta_cache_close_file(self_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_unlock_entry(self_meta_cache_entry);
@@ -913,6 +925,9 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
+
+	/* Mark dirty here so that dirty data size includes dirty meta size. */
+	super_block_mark_dirty(self_inode);
 
 	if (old_metasize > 0 && new_metasize > 0)
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;

@@ -327,6 +327,11 @@ int meta_cache_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
 	return 0;
 }
 
+int32_t meta_cache_remove_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
 int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 		char is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
 {
