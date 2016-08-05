@@ -6530,7 +6530,6 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	xattr_page = NULL;
 	actual_size = 0;
 
-
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
 	if (retcode < 0) {
