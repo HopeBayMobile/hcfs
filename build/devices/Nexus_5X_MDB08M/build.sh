@@ -81,6 +81,7 @@ function main()
 	pull_management_app
 
 	push_system_diff
+	push_launcher_tag
 	build_system
 	publish_image
 	stop_builder
@@ -170,6 +171,14 @@ function push_system_diff() {
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
 	git add -f * && \
 	git commit -m '${VERSION_NUM}' && \
+	git tag -a -m '${VERSION_NUM}' '${VERSION_NUM}' && \
+	{ git push origin '${VERSION_NUM}' -f || :; }"'
+}
+
+function push_launcher_tag() {
+	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
+	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
+	cd packages/apps/Launcher3/
 	git tag -a -m '${VERSION_NUM}' '${VERSION_NUM}' && \
 	{ git push origin '${VERSION_NUM}' -f || :; }"'
 }
