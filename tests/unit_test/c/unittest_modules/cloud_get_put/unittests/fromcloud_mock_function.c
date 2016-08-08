@@ -162,7 +162,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode,
 		if (NOW_STATUS == ST_CLOUD)
 			NOW_STATUS = ST_CtoL;
 		else if (NOW_STATUS == ST_CtoL)
-			NOW_STATUS = ST_LDISK;
+			NOW_STATUS = ST_BOTH;
 	}
 	return 0;
 }

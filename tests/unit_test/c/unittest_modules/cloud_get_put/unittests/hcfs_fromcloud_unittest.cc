@@ -30,6 +30,7 @@ class fromcloudEnvironment : public ::testing::Environment {
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
+    sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 
     workpath = NULL;
     tmppath = NULL;
@@ -68,7 +69,7 @@ protected:
 	{
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
-		sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
+		//sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 		for (int32_t i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
 
