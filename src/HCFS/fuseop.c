@@ -6357,7 +6357,6 @@ static int32_t _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	const char *value, size_t size, int32_t flag)
 {
-	/* TODO: Tmp ignore permission of namespace */
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
 	int64_t xattr_filepos;
@@ -6392,6 +6391,15 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
 		name_space, key, flag);
 
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+	    name_space == SECURITY &&
+	    strncmp(key, SELINUX_XATTR_KEY, sizeof(SELINUX_XATTR_KEY)) == 0) {
+		fuse_reply_err(req, 0);
+		return;
+	}
+#endif
+
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -6406,7 +6414,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 	if (name_space == SECURITY)
-		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+		goto fetch_xattr; /* Skip perm check if SECURITY domain */
 
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
@@ -6531,6 +6539,27 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n",
 		name_space, key, size);
 
+#ifdef _ANDROID_ENV_
+	/* If get xattr of security.selinux in external volume, return the
+	   adhoc value. */
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+	    name_space == SECURITY &&
+	    strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
+		actual_size = strlen(SELINUX_EXTERNAL_XATTR_VAL);
+
+		if (size <= 0)
+			fuse_reply_xattr(req, actual_size);
+
+		else if (size < actual_size)
+			fuse_reply_err(req, ERANGE);
+
+		else
+			fuse_reply_buf(req, SELINUX_EXTERNAL_XATTR_VAL,
+				actual_size);
+		return;
+	}
+#endif
+
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -6545,7 +6574,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 	if (name_space == SECURITY)
-		goto fetch_xattr;  /* Skip perm check if SECURITY domain */
+		goto fetch_xattr; /* Skip perm check if SECURITY domain */
 
 	/* Check permission */
 	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
