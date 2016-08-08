@@ -544,7 +544,7 @@ protected:
 
 		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 		download_thread_ctl.block_info[0].this_inode = 1;
-		download_thread_ctl.block_info[0].block_no = 123;
+		download_thread_ctl.block_info[0].block_no = 0;
 		download_thread_ctl.block_info[0].dl_error = FALSE;
 
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
