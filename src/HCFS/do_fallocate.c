@@ -104,6 +104,7 @@ static int32_t do_fallocate_extend(ino_t this_inode, struct stat *filestat,
 		return ret;
 
 	filestat->st_size = offset;
+	filestat->st_blocks = (filestat->st_size + 511) / 512;
 	filestat->st_mtime = time(NULL);
 
 	return 0;
