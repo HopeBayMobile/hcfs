@@ -483,7 +483,12 @@ int32_t _fetch_pinned(ino_t thisinode)
 				count += (BLK_INCREMENTS - 1);
 				continue;
 			}
+			write_log(10, "Debug fetch: %" PRId64 ", %" PRId64 "\n",
+			          filepos, nowpage);
+			FSEEK(fptr, filepos, SEEK_SET);
+			memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+			lastpage = nowpage;
 		}
 
 		seq = temppage.block_entries[nowindex].seqnum;
