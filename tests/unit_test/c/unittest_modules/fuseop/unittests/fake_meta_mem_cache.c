@@ -43,7 +43,7 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 	fh = target_ptr->inode_num % 100;
 	sem_post(&(target_ptr->access_sem));
 
-	if (system_fh_table.entry_table_flags[fh] != TRUE) {
+	if (system_fh_table.entry_table_flags[fh] == NO_FH) {
 
 		if (target_ptr->fptr != NULL) {
 			fclose(target_ptr->fptr);
@@ -332,7 +332,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 
 	fh = this_inode % 100;
 
-	if (system_fh_table.entry_table_flags[fh] == TRUE) {
+	if (system_fh_table.entry_table_flags[fh] != NO_FH) {
 		ptr = system_fh_table.entry_table[fh].meta_cache_ptr;
 		if (ptr != NULL) {
 			sem_wait(&(ptr->access_sem));
@@ -346,7 +346,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		ptr->inode_num = this_inode;
 		sem_init(&(ptr->access_sem), 0, 1);
 		sem_wait(&(ptr->access_sem));
-		if (system_fh_table.entry_table_flags[fh] == TRUE)
+		if (system_fh_table.entry_table_flags[fh] == IS_FH)
 			system_fh_table.entry_table[fh].meta_cache_ptr =
 				ptr;
 	}
