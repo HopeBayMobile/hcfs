@@ -8,12 +8,15 @@
 # Contact: william.liang@hopebaytech.com
 #          can.yu@hopebaytech.com
 #
-# Date: $Date: 2016/07/13 17:17:00 $
-# Version: $Revision: 1.13 $
+# Date: $Date: 2016/07/21 11:56:00 $
+# Version: $Revision: 1.14 $
 #
 # History:
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.14  2016/07/21 11:56:00  chingyi
+# Foolproof against flashing unexpected device when multiple devices are attached
+#
 # Revision 1.13  2016/07/13 17:17:00  jethro
 # Support Ubuntu VM in virtualbox, use local cache fro gapps
 #
@@ -71,6 +74,7 @@ FACTORY_DIR=$(echo $FACTORY_FILE | awk -F- '{ print $1"-"$2 }')
 ROM_DIR=tera
 ROM_ZIP=
 BOOT4PERM_IMG=
+TARGET_DEVICE=
 HERE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Usage Info
@@ -79,6 +83,7 @@ Usage() {
   local _prog=$(basename $0)
   echo "Usage: $_prog [option]..."
   echo "option:"
+  echo "  -device <specific device>: specify the targated device if multiple devices is connected."
   echo "  -fr: flash ROM, from the source specified by either '-rom-zip' or '-rom', where '-rom-zip' is used first."
   echo "  -ff: flash factory image ONLY"
   echo "  -rom <rom dir>: specify the directory containing ROM images (Default <rom dir>: $ROM_DIR). The '-fr' option is implied."
@@ -306,15 +311,59 @@ GetFile () {
   return 0
 }
 
+# TODO: FUNCTION `GetMode` & `CheckMode` NEED TO RE-IMPLEMENT TO HANDLE CASE FOR 2 OR MORE DEVICES
 GetMode() {
-  local mode=$({ adb devices; fastboot devices; } | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
+  local mode=""
+
+  case $TARGET_DEVICE in
+    "")
+      mode=$({ adb devices; fastboot devices; } | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
+      # if [[ $(adb devices | wc -l) == "3" ]]; then
+      #   mode=$(adb devices | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
+      # elif [[ $(fastboot devices | wc -l) == "1" ]]; then
+      #   mode=$(fastboot devices | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
+      # else
+      #   Error "[GetMode] [noTarget] $(adb devices | wc -l), $(fastboot devices | wc -l)"
+      # fi
+      ;;
+    *)
+      if [[ $(adb devices | grep $TARGET_DEVICE | wc -l) == "1" ]]; then
+        mode=$(adb devices | grep $TARGET_DEVICE | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
+      elif [[ $(fastboot devices | grep $TARGET_DEVICE  | wc -l) == "1" ]]; then
+        mode=$(fastboot devices | grep $TARGET_DEVICE | tr -d "\n"| sed $SED_OPT -n "s/.*(fastboot|device|recovery|sideload).*/\1/p")
+      else
+        Error "[GetMode] [$TARGET_DEVICE] adb: $(adb devices | grep $TARGET_DEVICE  | wc -l), fastboot: $(fastboot devices | grep $TARGET_DEVICE  | wc -l)"
+      fi
+      ;;
+  esac
+
   printf ${mode:-unknown}
 }
 
 CheckMode() {
   local _mode=$1
 
-  { adb devices; fastboot devices; } 2>&1 | egrep "$_mode" > /dev/null 2>&1
+  case $TARGET_DEVICE in
+    "")
+      { adb devices; fastboot devices; } 2>&1 | egrep "$_mode" > /dev/null 2>&1
+      # if [[ "$(adb devices | wc -l)" == "3" ]]; then
+      #   adb devices 2>&1 | egrep "$_mode" > /dev/null 2>&1
+      # elif [[ "$(fastboot devices | wc -l)" == "1" ]]; then
+      #   fastboot devices 2>&1 | egrep "$_mode" > /dev/null 2>&1
+      # else
+      #   { adb devices; fastboot devices; } 2>&1 | egrep "$_mode" > /dev/null 2>&1
+      # fi
+      ;;
+    *)
+      if [[ "$(adb devices | grep $TARGET_DEVICE | wc -l)" == "1" ]]; then
+        adb devices 2>&1 | grep $TARGET_DEVICE | egrep "$_mode" > /dev/null 2>&1
+      elif [[ "$(fastboot devices | grep $TARGET_DEVICE | wc -l)" == "1" ]]; then
+        fastboot devices | grep $TARGET_DEVICE 2>&1 | egrep "$_mode" > /dev/null 2>&1
+      else
+        { adb devices | grep $TARGET_DEVICE; fastboot devices | grep $TARGET_DEVICE; } 2>&1 | egrep "$_mode" > /dev/null 2>&1
+      fi
+      ;;
+  esac
 }
 
 WaitMode () {
@@ -343,11 +392,61 @@ Wait4App2Appear() {
   printf ">> Wait for the App '$_app' to get ready"
 
   for ((_i=0; _i<$_timeout; _i++)); do
-    adb shell pm list packages 2> /dev/null | grep $_app > /dev/null > /dev/null 2>&1 && break || Sleep 1
+    adb -s $TARGET_DEVICE shell pm list packages 2> /dev/null | grep $_app > /dev/null > /dev/null 2>&1 && break || Sleep 1
   done
   Sleep 2
 
   [ "$_i" -lt "$_timeout" ] && { echo "done"; return 0; } || { echo "stop waiting"; return 1; }
+}
+
+CheckAttachedDevice() {
+  # 0. count num of devices
+  local _num_of_devices=""
+
+  if [ "$(adb devices | wc -l)" -ne "2" ]; then
+    let local device_in_adb=$(adb devices | wc -l)-2
+    echo ">> $device_in_adb device(s) is in adb mode"
+    ((_num_of_devices += $device_in_adb))
+  fi
+
+  if [ "$(fastboot devices | wc -l)" -ne "0" ]; then
+    let local device_in_fastboot=$(fastboot devices | wc -l)
+    echo ">> $device_in_fastboot device(s) is in fastboot mode"
+    ((_num_of_devices += $device_in_fastboot))
+  fi
+
+  if [ "$_num_of_devices" == "" ]; then
+    Error "No devices is attached!"
+  fi
+
+  if [ "$_num_of_devices" -eq "1" ]; then
+    if [[ "$TARGET_DEVICE" == "" ]]; then
+    # 1-1. Set TARGET_DEVICE if no specified device mentioned
+      case `GetMode` in
+      fastboot)
+        TARGET_DEVICE=$(fastboot devices | awk '{if ($2=="fastboot") print $1}')
+        ;;
+      device|recovery)
+        TARGET_DEVICE=$(adb devices | sed '2!d' | awk '{if ($2=="device") print $1}')
+        ;;
+      esac
+    else
+    # 1-2. Check existance of TARGET_DEVICE specified
+      if [[ "$(adb devices | grep $TARGET_DEVICE | wc -l)" -ne "0" ]] ; then
+        echo "device specified ($TARGET_DEVICE) is in adb mode."
+      elif [[ "$(fastboot devices | grep $TARGET_DEVICE | wc -l)" -ne "0" ]]; then
+        echo "device specified ($TARGET_DEVICE) is in fastboot mode."
+      else
+        Error "device specified $TARGET_DEVICE not found!"
+      fi
+    fi
+  else
+    # 1-3. Terminate if multiple devices are attached, yet no specific devices is mentioned
+    if [ "$TARGET_DEVICE" == "" ]; then
+      Error "More than one device are attached, please specify targeted device via \"-device <specific device>\""
+    fi
+  fi
+  echo ">> Targeted device: $TARGET_DEVICE"
 }
 
 # Major Functions
@@ -361,6 +460,10 @@ CheckParams() {
     -v)
       grep "\$Revision" $0 | head -1 | awk '{ print "version", $4 }'
       exit 0
+      ;;
+    -device)
+      TARGET_DEVICE=$2
+      shift
       ;;
     -ff)
       FLASH_FACTORY=1
@@ -436,7 +539,7 @@ CheckParams() {
   done
 
   # set PATH
-  export PATH=$PATH:$SDK_PATH/platform-tools
+  export PATH=$PATH:$SDK_PATH/platform-tools:$HERE/utils
 
   # cross-arguments checks
   if [ -n "$BOOT4PERM_IMG" ]; then
@@ -467,7 +570,7 @@ Boot2Fastboot() {
       break
       ;;
     device|recovery)
-      adb reboot bootloader
+      adb -s $TARGET_DEVICE reboot bootloader
       WaitMode "fastboot" 30
       ;;
     *)
@@ -477,7 +580,7 @@ Boot2Fastboot() {
       ;;
     esac
   done
-  fastboot oem unlock > /dev/null 2>&1 || : # continue script on failure
+  fastboot -s $TARGET_DEVICE oem unlock > /dev/null 2>&1 || :
 
   echo " done"
 }
@@ -515,11 +618,11 @@ FlashFactoryImage() {
 FlashImages() {
   if [ -n "$ROM_ZIP" ] && CheckFile "$ROM_ZIP"; then
     printf ">> Flash ROM zip images '$ROM_ZIP' " && ToConfirm
-    fastboot -w update "$ROM_ZIP"
+    fastboot -s $TARGET_DEVICE -w update "$ROM_ZIP"
 
     echo ">> Get ready to reboot the device"
     if WaitMode "device$" 30; then
-      adb reboot bootloader
+      adb -s $TARGET_DEVICE reboot bootloader
     else
       Error newline "unable to reboot the device into the fastboot mode, perhapse the USB debug mode is disabled in the flashed image."
     fi
@@ -530,12 +633,12 @@ FlashImages() {
     pushd $ROM_DIR > /dev/null
 
     echo ">> Flash ROM images in '$ROM_DIR' " && ToConfirm
-    CheckFile boot.img probe-only     && fastboot flash boot boot.img
-    CheckFile recovery.img probe-only && fastboot flash recovery recovery.img
-    CheckFile system.img probe-only   && fastboot flash system system.img
-    CheckFile vendor.img probe-only   && fastboot flash vendor vendor.img
-    CheckFile userdata.img probe-only && fastboot flash userdata userdata.img || fastboot erase data
-    CheckFile cache.img probe-only    && fastboot flash cache cache.img || fastboot erase cache
+    CheckFile boot.img probe-only     && fastboot -s $TARGET_DEVICE flash boot boot.img
+    CheckFile recovery.img probe-only && fastboot -s $TARGET_DEVICE flash recovery recovery.img
+    CheckFile system.img probe-only   && fastboot -s $TARGET_DEVICE flash system system.img
+    CheckFile vendor.img probe-only   && fastboot -s $TARGET_DEVICE flash vendor vendor.img
+    CheckFile userdata.img probe-only && fastboot -s $TARGET_DEVICE flash userdata userdata.img || fastboot -s $TARGET_DEVICE erase data
+    CheckFile cache.img probe-only    && fastboot -s $TARGET_DEVICE flash cache cache.img || fastboot -s $TARGET_DEVICE erase cache
     echo "done"
 
     popd > /dev/null
@@ -553,12 +656,12 @@ Boot2Recovery() {
   do
     case `GetMode` in
     fastboot)
-      fastboot boot $RECOVERY_FILE
+      fastboot -s $TARGET_DEVICE boot $RECOVERY_FILE
       WaitMode "recovery" 30
       break
       ;;
     device|recovery)
-      adb reboot bootloader
+      adb -s $TARGET_DEVICE reboot bootloader
       WaitMode "fastboot" 30
       ;;
     esac
@@ -578,24 +681,24 @@ InstallOpenGapps() {
     case `GetMode` in
     recovery)
       echo ">> Now wipe the device"
-      adb shell twrp wipe cache
+      adb -s $TARGET_DEVICE shell twrp wipe cache
       WaitMode "recovery" 30
       sleep 2
       echo ">> Upload Gapps into the device"
-      adb push "$GAPPS_FILE" "/cache/$GAPPS_FILE"
+      adb -s $TARGET_DEVICE push "$GAPPS_FILE" "/cache/$GAPPS_FILE"
       echo ">> Install Gapps"
-      adb shell twrp install "/cache/$GAPPS_FILE"
+      adb -s $TARGET_DEVICE shell twrp install "/cache/$GAPPS_FILE"
       # wipe cache again
       WaitMode "recovery" 30
       sleep 2
-      adb shell twrp wipe cache
+      adb -s $TARGET_DEVICE shell twrp wipe cache
       WaitMode "recovery" 30
       sleep 2
       echo "done"
       break;
       ;;
     fastboot)
-      echo fastboot; sleep 1
+      echo 'fastboot'; sleep 1
       ;;
     device)
       echo 'device'; sleep 1
@@ -613,37 +716,37 @@ GrantPermissions() {
 
   if [ "$DO_BOOT4PERM" -eq 1 ]; then
     echo ">> Replace the boot image with the specified '$BOOT4PERM_IMG'"
-    adb reboot bootloader
-    fastboot flash boot "$BOOT4PERM_IMG"
-    fastboot reboot
+    adb -s $TARGET_DEVICE reboot bootloader
+    fastboot -s $TARGET_DEVICE flash boot "$BOOT4PERM_IMG"
+    fastboot -s $TARGET_DEVICE reboot
   else
     echo ">> Reboot into Android"
-    adb reboot
+    adb -s $TARGET_DEVICE reboot
   fi
 
-  if Wait4App2Appear gms 60; then
+  if Wait4App2Appear gms 120; then
     echo ">> Start to grant permissions"
-    adb shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
-    adb shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
-    adb shell pm grant com.google.android.gms android.permission.ACCESS_COARSE_LOCATION
-    adb shell pm grant com.google.android.gms android.permission.INTERACT_ACROSS_USERS
-    adb shell pm grant com.google.android.gms android.permission.BODY_SENSORS
-    adb shell pm grant com.google.android.gms android.permission.READ_SMS
-    adb shell pm grant com.google.android.gms android.permission.RECEIVE_MMS
-    adb shell pm grant com.google.android.gms android.permission.READ_EXTERNAL_STORAGE
-    adb shell pm grant com.google.android.gms android.permission.WRITE_EXTERNAL_STORAGE
-    adb shell pm grant com.google.android.gms android.permission.READ_CALENDAR
-    adb shell pm grant com.google.android.gms android.permission.CAMERA
-    adb shell pm grant com.google.android.gms android.permission.READ_CONTACTS
-    adb shell pm grant com.google.android.gms android.permission.WRITE_CONTACTS
-    adb shell pm grant com.google.android.gms android.permission.GET_ACCOUNTS
-    adb shell pm grant com.google.android.gms android.permission.RECORD_AUDIO
-    adb shell pm grant com.google.android.gms android.permission.READ_PHONE_STATE
-    adb shell pm grant com.google.android.gms android.permission.CALL_PHONE
-    adb shell pm grant com.google.android.gms android.permission.READ_CALL_LOG
-    adb shell pm grant com.google.android.gms android.permission.PROCESS_OUTGOING_CALLS
-    adb shell pm grant com.google.android.gms android.permission.SEND_SMS
-    adb shell pm grant com.google.android.gms android.permission.RECEIVE_SMS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.ACCESS_COARSE_LOCATION
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.INTERACT_ACROSS_USERS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.BODY_SENSORS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.READ_SMS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.RECEIVE_MMS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.READ_EXTERNAL_STORAGE
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.WRITE_EXTERNAL_STORAGE
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.READ_CALENDAR
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.CAMERA
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.READ_CONTACTS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.WRITE_CONTACTS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.GET_ACCOUNTS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.RECORD_AUDIO
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.READ_PHONE_STATE
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.CALL_PHONE
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.READ_CALL_LOG
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.PROCESS_OUTGOING_CALLS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.SEND_SMS
+    adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.RECEIVE_SMS
     echo "done"
   else
     _failed=1
@@ -651,9 +754,9 @@ GrantPermissions() {
 
   if [ "$DO_BOOT4PERM" -eq 1 ]; then
     echo ">> Restore the original flashed boot image"
-    adb reboot bootloader
-    fastboot flash boot "$ROM_DIR/boot.img"
-    fastboot reboot
+    adb -s $TARGET_DEVICE reboot bootloader
+    fastboot -s $TARGET_DEVICE flash boot "$ROM_DIR/boot.img"
+    fastboot -s $TARGET_DEVICE reboot
   fi
 
   if [ "$_failed" -eq 1 ]; then
@@ -665,11 +768,14 @@ GrantPermissions() {
 # Main Program goes here
 # ----------------------
 
+# Check parameters
+CheckParams "$@"
+
 # Check to see if tools (adb, fastboot) can be found
 CheckTools
 
-# Check parameters
-CheckParams "$@"
+# Terminate if more than one devices are attached, yet no specific targeted device is mentioned
+CheckAttachedDevice
 
 # Try to boot the device into fastboot mode
 Boot2Fastboot
