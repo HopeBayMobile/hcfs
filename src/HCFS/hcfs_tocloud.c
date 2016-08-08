@@ -2011,9 +2011,6 @@ void upload_loop(void)
 
 	write_log(2, "Start upload loop\n");
 
-/* FEATURE TODO: Turn off sync in restoring mode, and some mechanism
-to notify sync to resume when restoring is done */
-
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			/* Backup FS db if needed at the beginning of a round
@@ -2187,8 +2184,6 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
 
-/* FEATURE TODO: Make sure that FSstat is downloaded before restoration
-begins, and the local stat file is inited accordingly */
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 METAPATH, (uint64_t)root_inode);
 	snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%" PRIu64,

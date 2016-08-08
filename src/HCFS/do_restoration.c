@@ -30,6 +30,10 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
+/* FEATURE TODO: Need to create system stat file hcfssystemfile
+for stage 1 restoration, and swap it to the correct place in
+stage 2 as well */
+
 void init_restore_path(void)
 {
 	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore",
@@ -367,12 +371,12 @@ int32_t fetch_restore_block_path(char *pathname, ino_t this_inode, int64_t block
 	return 0;
 }
 
-int32_t restore_fetch_obj(char *objname, char *despath)
+int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 {
 	FILE *fptr;
 	int32_t ret;
 
-	fptr = fopen(despath, "w");
+	fptr = fopen(despath, "w+");
 	if (fptr == NULL) {
 		write_log(0, "Unable to open file for writing\n");
 		return -EIO;
@@ -382,6 +386,8 @@ int32_t restore_fetch_obj(char *objname, char *despath)
 
 	if (ret < 0)
 		unlink(despath);
+	if (is_meta == TRUE)
+		restore_meta_structure(fptr);
 	fclose(fptr);
 	return ret;
 }
@@ -396,7 +402,7 @@ int32_t _fetch_meta(ino_t thisinode)
 		 (uint64_t)thisinode);
 	fetch_restore_meta_path(despath, thisinode);
 
-	ret = restore_fetch_obj(objname, despath);
+	ret = restore_fetch_obj(objname, despath, TRUE);
 	return ret;
 }
 
@@ -410,7 +416,7 @@ int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq)
 		(uint64_t)thisinode, blockno, seq);
 	fetch_restore_block_path(despath, thisinode, blockno);
 
-	ret = restore_fetch_obj(objname, despath);
+	ret = restore_fetch_obj(objname, despath, FALSE);
 	return ret;
 }
 
@@ -429,7 +435,7 @@ int32_t _fetch_FSstat(ino_t rootinode)
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 RESTORE_METAPATH, (uint64_t)rootinode);
 
-	ret = restore_fetch_obj(objname, despath);
+	ret = restore_fetch_obj(objname, despath, FALSE);
 	return ret;
 
 errcode_handle:
@@ -654,7 +660,7 @@ int32_t run_download_minimal(void)
 	DIR_ENTRY *tmpentry;
 
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
-	ret = restore_fetch_obj("FSmgr_backup", despath);
+	ret = restore_fetch_obj("FSmgr_backup", despath, FALSE);
 
 	if (ret < 0)
 		return ret;

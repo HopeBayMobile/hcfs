@@ -2489,6 +2489,9 @@ errcode_handle:
  */
 int32_t restore_meta_structure(FILE *fptr)
 {
+/* FEATURE TODO: Should change this function so that in stage 1
+system stat updates will go to the restored sys stat, not the
+current one */
 	int32_t errcode, ret;
 	struct stat this_stat, meta_stat;
 	FILE_META_TYPE file_meta;
