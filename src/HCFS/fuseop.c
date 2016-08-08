@@ -6535,11 +6535,13 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 #endif
 
+	write_log(10, "hfuse_ll_getxattr %d\n", __LINE__);
 	this_inode = real_ino(req, ino);
 	value = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
 
+	write_log(10, "hfuse_ll_getxattr %d\n", __LINE__);
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
 	if (retcode < 0) {
