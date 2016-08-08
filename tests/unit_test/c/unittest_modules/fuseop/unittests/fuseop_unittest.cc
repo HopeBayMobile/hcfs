@@ -84,6 +84,8 @@ class fuseopEnvironment : public ::testing::Environment {
   virtual void SetUp() {
     workpath = NULL;
     tmppath = NULL;
+    system("for i in `find /sys/fs/fuse/connections -name abort`; do echo 1 > $i;done");
+    system("fusermount -u /tmp/test_fuse");
     if (access("/tmp/testHCFS", F_OK) != 0) {
       workpath = get_current_dir_name();
       tmppath = (char *)malloc(strlen(workpath)+20);
@@ -143,10 +145,13 @@ class fuseopEnvironment : public ::testing::Environment {
     int32_t i;
 
     for (i = 0; i < 10; i++) {
+	    puts("unmount fuse...");
+	    system("for i in `find /sys/fs/fuse/connections -name abort`; do echo 1 > $i;done");
 	    exit_status = system("fusermount -u /tmp/test_fuse");
 	    if (exit_status == 0)
 		    break;
     }
+    puts("unmount fuse... done");
     ASSERT_EQ(exit_status, 0);
     pthread_join(unittest_mount.mt_thread, NULL);
     fuse_session_remove_chan(unittest_mount.chan_ptr);

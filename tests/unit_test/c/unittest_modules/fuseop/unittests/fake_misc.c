@@ -751,7 +751,6 @@ int32_t lookup_destroy(void)
 
 int32_t write_log(int32_t level, char *format, ...)
 {
-	MOCK();
 	va_list alist;
 
 	va_start(alist, format);

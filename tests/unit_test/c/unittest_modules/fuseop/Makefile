@@ -27,11 +27,6 @@ $(eval $(call ADDTEST, fuseop_unittest, \
   fake_misc.o \
   fuseop_unittest.o \
   meta.o ))
-# Cleanup before test
-$(MD_PATH)/obj/fuseop_unittest.pass: | /tmp/test_fuse
-/tmp/test_fuse:
-	@sudo find /sys/fs/fuse/connections -name abort -exec echo 1 \> {} \;
-	@sudo fusermount -u /tmp/test_fuse 2>/dev/null || :
 
 $(eval $(call ADDTEST, do_fallocate_unittest, \
   do_fallocate.o \
