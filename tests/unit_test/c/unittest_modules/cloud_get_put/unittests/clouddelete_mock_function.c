@@ -25,17 +25,18 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 
 int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	printf("[MOCK] clouddelete_mock_function.c line %4d func %s",  __LINE__, __func__);
+	char str[100];
+	sprintf(str, "[MOCK] clouddelete_mock_function.c line %4d func %s",  __LINE__, __func__);
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
-		puts(" this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
+		printf("%s %s\n", str, "this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
 		strcpy(pathname, TODELETE_PATH);
 		return 0;
 	} else if (this_inode == INODE__FETCH_TODELETE_PATH_FAIL) {
 		pathname[0] = '\0';
-		puts(" this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
+		printf("%s %s\n", str, "this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
 		return -1;
 	} else {
-		puts(" this_inode == ?. Record this inode for later");
+		printf("%s %s\n", str, "this_inode == ?. Record this inode for later");
 		/* Record inode. Called when deleting inode in delete_loop() */
 		usleep(500000); // Let threads busy
 		sem_wait(&(to_verified_data.record_inode_sem));
@@ -43,7 +44,7 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 		to_verified_data.record_inode_counter++;
 		sem_post(&(to_verified_data.record_inode_sem));
 		pathname[0] = '\0';
-		printf("Test: mock inode %d is deleted\n", this_inode);
+		printf("Test: mock inode %zu is deleted\n", this_inode);
 		return -1;
 	}
 }
@@ -170,7 +171,6 @@ int fetch_backend_meta_path(char *pathname, ino_t inode)
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
 	printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__);
-	return 0;
 }
 
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
@@ -184,11 +184,11 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	fseek(fptr, 0, SEEK_SET);
 	fseek(src, 0, SEEK_SET);
-	while (size = fread(buf, 1, 4096, src)) {
+	while ((size = fread(buf, 1, 4096, src))) {
 		fwrite(buf, 1, size, fptr);
 	}
 
-	close(src);
+	fclose(src);
 
 	return 0;
 }

@@ -134,8 +134,8 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
-	pthread_t tid[num_obj];
-	int32_t block_no[num_obj];
+	pthread_t *tid = (pthread_t *)calloc(num_obj, sizeof(pthread_t));
+	int32_t *block_no = (int32_t *)calloc(num_obj, sizeof(int32_t));
 
 	/* Run fetch_from_cloud() with multi-threads */
 	for (int32_t i = 0 ; i < num_obj ; i++) {
