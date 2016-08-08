@@ -493,6 +493,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 
 		seq = temppage.block_entries[nowindex].seqnum;
 		_fetch_block(thisinode, count, seq);
+		/* FEATURE TODO: Change block status in meta */
 	}
 
 	fclose(fptr);
