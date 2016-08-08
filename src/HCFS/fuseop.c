@@ -6554,6 +6554,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #ifdef _ANDROID_ENV_
 	/* If get xattr of security.selinux in external volume, return the
 	   adhoc value. */
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
 	    name_space == SECURITY &&
 	    strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
