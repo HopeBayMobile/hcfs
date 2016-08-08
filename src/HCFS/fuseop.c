@@ -6715,7 +6715,11 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	int32_t retcode;
 	char *key_buf;
 	size_t actual_size;
+	int32_t sel_keysize;
+	char sel_key[200];
+	MOUNT_T *tmpptr;
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_inode = real_ino(req, ino);
 	key_buf = NULL;
 	xattr_page = NULL;
@@ -6751,6 +6755,21 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 			meta_cache_close_file(meta_cache_entry);
 			meta_cache_unlock_entry(meta_cache_entry);
 			free(xattr_page);
+#ifdef _ANDROID_ENV_
+			if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+				sprintf(sel_key, "security.%s",
+						SELINUX_XATTR_KEY);
+				actual_size = strlen(sel_key) + 1;
+				if (size <= 0)
+					fuse_reply_xattr(req, actual_size);
+				else if (size < actual_size)
+					fuse_reply_err(req, ERANGE);
+				else
+					fuse_reply_buf(req, sel_key,
+						actual_size);
+				return;
+			}
+#endif
 			fuse_reply_xattr(req, 0);
 			return;
 		} else {
@@ -6782,11 +6801,30 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	meta_cache_unlock_entry(meta_cache_entry);
 
 	if (size <= 0) { /* Reply needed size */
+#ifdef _ANDROID_ENV_
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+			sprintf(sel_key, "security.%s", SELINUX_XATTR_KEY);
+			actual_size += (strlen(sel_key) + 1);
+		}
+#endif
 		write_log(5, "listxattr: Reply needed size = %d\n",
 			actual_size);
 		fuse_reply_xattr(req, actual_size);
 
 	} else { /* Reply list */
+#ifdef _ANDROID_ENV_
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+			sprintf(sel_key, "security.%s", SELINUX_XATTR_KEY);
+			sel_keysize = strlen(sel_key) + 1; /* null char */
+			if (size < actual_size + sel_keysize) {
+				fuse_reply_err(req, ERANGE);
+			} else {
+				memcpy(key_buf + actual_size, sel_key,
+					sel_keysize);
+				actual_size += sel_keysize;
+			}
+		}
+#endif
 		write_log(5, "listxattr operation success\n");
 		fuse_reply_buf(req, key_buf, actual_size);
 	}
@@ -6845,6 +6883,15 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	}
 	write_log(10, "Debug removexattr: namespace = %d, key = %s\n",
 		name_space, key);
+
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+	    name_space == SECURITY &&
+	    strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
+		fuse_reply_err(req, 0);
+		return;
+	}
+#endif
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
