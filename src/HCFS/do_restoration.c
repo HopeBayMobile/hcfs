@@ -444,7 +444,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 	char metapath[METAPATHLEN];
 	int64_t count, totalblocks, tmpsize, seq;
 	int64_t nowpage, lastpage, filepos, nowindex;
-	int32_t errcode;
+	int32_t errcode, ret;
 	size_t ret_size;
 	BLOCK_ENTRY_PAGE temppage;
 
