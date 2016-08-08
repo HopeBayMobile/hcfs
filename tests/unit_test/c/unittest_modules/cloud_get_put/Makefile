@@ -20,7 +20,6 @@ $(eval $(call ADDMODULE))
 
 # All tests produced by this Makefile.
 
-BATCH_UT := 1
 $(eval $(call ADDTEST, hcfs_fromcloud_unittest, \
   fromcloud_mock_function.o \
   hcfs_fromcloud.o \

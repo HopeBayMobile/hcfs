@@ -31,6 +31,7 @@ class fromcloudEnvironment : public ::testing::Environment {
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
     sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
+    sem_init(&(hcfs_system->something_to_replace), 0, 0);
 
     workpath = NULL;
     tmppath = NULL;
@@ -534,7 +535,6 @@ TEST_F(fetch_pinned_blocksTest, BlockStatusIsLocal)
 /* Unittest for fetch_backend_block */
 class fetch_backend_blockTest : public ::testing::Test {
 protected:
-	char metapath[300];
 	void SetUp()
 	{
 		mkdir("/tmp/testHCFS", 0700);
@@ -558,8 +558,6 @@ protected:
 	{
 		unlink("/tmp/testHCFS/tmp_meta");
 		rmdir("/tmp/testHCFS");
-		if (access(metapath, F_OK) == 0)
-			unlink(metapath);
 	}
 };
 
@@ -608,8 +606,6 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 
 	/* Verify */
 	EXPECT_EQ(FALSE, download_thread_ctl.block_info[0].dl_error);
-
-	unlink(metapath);
 }
 
 /* End of unittest for fetch_backend_block */
