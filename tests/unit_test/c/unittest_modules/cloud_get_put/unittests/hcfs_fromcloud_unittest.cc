@@ -95,7 +95,7 @@ protected:
 	/* Static thread function, which is used to run function fetch_from_cloud() */
 	static void *fetch_from_cloud_for_thread(void *arg)
 	{
-		int64_t block_no = (intptr_t)arg;
+		int64_t block_no = *((int64_t*)arg);
 		char tmp_filename[50];
 		char objname[100];
 		FILE *fptr;
@@ -135,16 +135,16 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
 	pthread_t *tid = (pthread_t *)calloc(num_obj, sizeof(pthread_t));
-	int32_t *block_no = (int32_t *)calloc(num_obj, sizeof(int32_t));
+	int64_t *block_no = (int64_t *)calloc(num_obj, sizeof(int64_t));
 
 	/* Run fetch_from_cloud() with multi-threads */
 	for (int32_t i = 0 ; i < num_obj ; i++) {
 		char tmp_filename[20];
 		block_no[i] = (i + 1)*5;
 		EXPECT_EQ(0, pthread_create(&tid[i], NULL,
-			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)block_no[i]));
+			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
 
-		sprintf(tmp_filename, "data_%d_%d", 1, block_no[i]); // Expected value
+		sprintf(tmp_filename, "data_%d_%ld", 1, block_no[i]); // Expected value
 		expected_objname[expected_obj_counter++] = std::string(tmp_filename);
 	}
 	sleep(1);
@@ -601,7 +601,7 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 	OPEN_META_PATH_FAIL = FALSE;
 
 	/* Test */
-	pthread_create(&tid, NULL, &fetch_backend_block,
+	pthread_create(&tid, NULL, fetch_backend_block,
 		&(download_thread_ctl.block_info[0]));
 	pthread_join(tid, NULL);
 
