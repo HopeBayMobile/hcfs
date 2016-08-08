@@ -20,7 +20,7 @@ $(eval $(call ADDMODULE))
 
 # All tests produced by this Makefile.
 
-$(eval BATCH_UT := 1)
+BATCH_UT := 1
 $(eval $(call ADDTEST, fuseop_unittest, \
   fuseop.o \
   fake_meta_mem_cache.o \
@@ -30,7 +30,8 @@ $(eval $(call ADDTEST, fuseop_unittest, \
 # Cleanup before test
 $(MD_PATH)/obj/fuseop_unittest.pass: | /tmp/test_fuse
 /tmp/test_fuse:
-	@sudo fusermount -uz /tmp/test_fuse 2>/dev/null || :
+	@find /sys/fs/fuse/connections -name abort -exec echo 1 \> {} \;
+	@sudo fusermount -u /tmp/test_fuse 2>/dev/null || :
 
 $(eval $(call ADDTEST, do_fallocate_unittest, \
   do_fallocate.o \

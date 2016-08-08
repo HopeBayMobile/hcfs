@@ -74,7 +74,6 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   tmpmount->is_unmount = FALSE;
   pthread_create(&(tmpmount->mt_thread), NULL,
 			mount_multi_thread, (void *) tmpmount);
-  sleep(5);
   return;
 }
 
@@ -140,13 +139,15 @@ class fuseopEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
     int32_t ret_val;
+    int32_t exit_status;
+    int32_t i;
 
-    sleep(3);
-    if (fork() == 0)
-     execlp("fusermount","fusermount","-u","/tmp/test_fuse",(char *) NULL);
-    else
-     wait(NULL);
-    sleep(1);
+    for (i = 0; i < 10; i++) {
+	    exit_status = system("fusermount -u /tmp/test_fuse");
+	    if (exit_status == 0)
+		    break;
+    }
+    ASSERT_EQ(exit_status, 0);
     pthread_join(unittest_mount.mt_thread, NULL);
     fuse_session_remove_chan(unittest_mount.chan_ptr);
     fuse_remove_signal_handlers(unittest_mount.session_ptr);
