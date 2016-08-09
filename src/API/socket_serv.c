@@ -36,6 +36,7 @@
 #include "logger.h"
 
 SOCK_THREAD thread_pool[MAX_THREAD];
+sem_t thread_access_sem; /* For thread pool control */
 
 int32_t do_pin_by_path(char *largebuf, int32_t arg_len,
 		       char *resbuf, int32_t *res_size)
@@ -378,13 +379,15 @@ int32_t _get_unused_thread()
 {
 	int32_t idx;
 
+	sem_wait(&thread_access_sem);
 	for (idx = 0; idx < MAX_THREAD; idx++) {
 		if (!thread_pool[idx].in_used) {
 			thread_pool[idx].in_used = TRUE;
+			sem_post(&thread_access_sem);
 			return idx;
 		}
 	}
-
+	sem_post(&thread_access_sem);
 	return -1;
 }
 
@@ -406,23 +409,24 @@ int32_t process_request(void *arg)
 	char buf[512], resbuf[512];
 	char *largebuf;
 
-	thread_idx = *((int *)arg);
+	thread_idx = (int)arg;
 
 	fd = thread_pool[thread_idx].fd;
-	write_log(8, "Process a new request with socket fd %d\n", fd);
+	write_log(8, "Process a new request with socket fd %d and thread_id %d",
+			fd, thread_idx);
 
 	if (reads(fd, &api_code, sizeof(uint32_t))) {
-		write_log(0, "Failed to receive API code\n");
+		write_log(0, "[%d] Failed to receive API code\n", thread_idx);
 		goto error;
 	}
-	write_log(8, "API code is %d\n", api_code);
+	write_log(8, "[%d] API code is %d\n", thread_idx, api_code);
 
 	if (reads(fd, &arg_len, sizeof(uint32_t))) {
 		write_log(0, "Failed to receive arg length. (API code %d)\n",
 				api_code);
 		goto error;
 	}
-	write_log(8, "Argument length is %d\n", arg_len);
+	write_log(8, "[%d] Argument length is %d\n", thread_idx, arg_len);
 
 	if (arg_len < 500) {
 		largebuf = buf;
@@ -434,8 +438,8 @@ int32_t process_request(void *arg)
 	}
 
 	if (reads(fd, largebuf, arg_len)) {
-		write_log(0, "Failed to receive args. (API code %d)\n",
-				api_code);
+		write_log(0, "[%d] Failed to receive args. (API code %d)\n",
+				thread_idx, api_code);
 		goto error;
 	}
 
@@ -468,8 +472,8 @@ int32_t process_request(void *arg)
 			goto done;
 		}
 	}
-	write_log(0, "API code not found (API code %d)\n",
-			api_code);
+	write_log(0, "[%d] API code not found (API code %d)\n",
+			thread_idx, api_code);
 
 	ret_code = -EINVAL;
 	res_size = 0;
@@ -478,16 +482,21 @@ int32_t process_request(void *arg)
 	goto done;
 
 error:
-	ret_code = -1;
+	ret_code = -EAGAIN;
+	res_size = 0;
+	sends(fd, &res_size, sizeof(int32_t));
+	sends(fd, &ret_code, sizeof(int32_t));
 
 done:
-	write_log(8, "API %d done with fd %d", api_code, fd);
-
+	write_log(0, "[%d] Finished API request (API code %d)\n",
+			thread_idx, api_code);
 	close(fd);
 	if (largebuf != NULL && !buf_reused)
 		free(largebuf);
 
+	sem_wait(&thread_access_sem);
 	thread_pool[thread_idx].in_used = FALSE;
+	sem_post(&thread_access_sem);
 
 	return ret_code;
 }
@@ -504,7 +513,7 @@ done:
 int32_t init_server()
 {
 	int32_t sock_fd, sock_flag;
-	int32_t new_sock_fd, thread_idx, ret_code, count;
+	int32_t new_sock_fd, new_thread_idx, ret_code, count;
 	char sock_path[200];
 	char *sock_dir;
 	struct sockaddr_un addr;
@@ -573,23 +582,24 @@ int32_t init_server()
 		}
 
 		while (1) {
-			thread_idx = _get_unused_thread();
-			if (thread_idx < 0) {
+			new_thread_idx = _get_unused_thread();
+			if (new_thread_idx < 0) {
+				sem_post(&thread_access_sem);
 				nanosleep(&timer, NULL);
 				continue;
 			} else {
+				thread_pool[new_thread_idx].fd = new_sock_fd;
+				/* Set thread detached */
+				pthread_attr_init(&(thread_pool[new_thread_idx].attr));
+				pthread_attr_setdetachstate(&(thread_pool[new_thread_idx].attr),
+					    PTHREAD_CREATE_DETACHED);
+				pthread_create(&(thread_pool[new_thread_idx].thread),
+					       &(thread_pool[new_thread_idx].attr),
+					       (void *)process_request, (void *)new_thread_idx);
 				break;
 			}
 		}
 
-		thread_pool[thread_idx].fd = new_sock_fd;
-		/* Set thread detached */
-		pthread_attr_init(&(thread_pool[thread_idx].attr));
-		pthread_attr_setdetachstate(&(thread_pool[thread_idx].attr),
-					    PTHREAD_CREATE_DETACHED);
-		pthread_create(&(thread_pool[thread_idx].thread),
-			       &(thread_pool[thread_idx].attr),
-			       (void *)process_request, (void *)&thread_idx);
 	}
 
 	close(sock_fd);
@@ -599,8 +609,12 @@ int32_t init_server()
 int32_t main()
 {
 	open_log(LOG_NAME);
-	write_log(0, "Start HCFSAPID\n");
+	write_log(0, "Initailizing...");
+	sem_post(&thread_access_sem);
+	memset(thread_pool, 0, sizeof(SOCK_THREAD) * MAX_THREAD);
+	sem_init(&thread_access_sem, 0, 1);
+	write_log(0, "Starting HCFSAPID Server...");
 	init_server();
-	write_log(0, "End HCFSAPID\n");
+	write_log(0, "End HCFSAPID Server");
 	return 0;
 }
