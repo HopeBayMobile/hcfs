@@ -6869,8 +6869,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	struct fuse_ctx *temp_context;
 #ifdef _ANDROID_ENV_
         MOUNT_T *tmpptr;
-#endif
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+#endif
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
