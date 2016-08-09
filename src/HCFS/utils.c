@@ -899,6 +899,11 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 	}
 
 	if (config->current_backend == SWIFTTOKEN) {
+		if (config->swift_user == NULL) {
+			write_log(0,
+				"Swift user missing from configuration\n");
+			return -1;
+		}
 		if (config->swift_container == NULL) {
 			write_log(0,
 				"Swift container missing from configuration\n");
