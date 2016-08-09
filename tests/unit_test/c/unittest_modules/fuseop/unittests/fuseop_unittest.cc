@@ -1533,22 +1533,26 @@ TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
   int32_t fd;
   size_t ret_items;
 
-  hcfs_system->systemdata.system_quota = 12800000 - 1;
+  hcfs_system->systemdata.system_quota =
+    hcfs_system->systemdata.system_size - 1;
 
   fetch_block_path(temppath, 16, 0);
 
+  EXPECT_EQ(0, access("/tmp/test_fuse/testwrite", F_OK));
   fptr = fopen("/tmp/test_fuse/testwrite", "r+");
-  ASSERT_NE(fptr != NULL, 0);
+  ASSERT_NE(fptr, NULL);
+  setbuf(fptr, NULL);
 
   snprintf(tempbuf, 10, "test");
   fseek(fptr, 0, SEEK_SET);
   tmp_len = strlen(tempbuf)+1;
+  errno = 0;
   ret_items = fwrite(tempbuf, tmp_len, 1, fptr);
   tmp_err = errno;
-  EXPECT_EQ(ret_items,0);
+  EXPECT_EQ(ret_items, 0);
+  EXPECT_EQ(tmp_err, ENOSPC);
   fclose(fptr);
   fptr = NULL;
-  EXPECT_EQ(tmp_err, ENOSPC);
 }
 
 TEST_F(hfuse_ll_writeTest, WritePastEnd) {
