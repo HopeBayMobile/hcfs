@@ -21,7 +21,6 @@ $(eval $(call ADDMODULE))
 # All tests produced by this Makefile.
 
 RERUN_TIMEOUT := 5
-BATCH_UT := 1
 $(eval $(call ADDTEST, fuseop_unittest, \
   fuseop.o \
   fake_meta_mem_cache.o \

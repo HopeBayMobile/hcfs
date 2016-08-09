@@ -43,6 +43,7 @@ void init_hcfs_stat(HCFS_STAT *this_stat)
  */
 void convert_hcfsstat_to_sysstat(struct stat *ret_stat, HCFS_STAT *tmp_stat)
 {
+	memset(ret_stat, 0, sizeof(struct stat));
 #define X(MEMBER) ret_stat->st_##MEMBER = tmp_stat->MEMBER
 	COMMON_STAT_MEMBER;
 #undef X

@@ -1146,14 +1146,12 @@ TEST_F(hfuse_openTest, OpenFileOK) {
   int32_t tmp_err;
   int32_t ret_val;
 
+  errno = 0;
   fptr = fopen("/tmp/test_fuse/testfile1", "r");
   tmp_err = errno;
   
-  ret_val = 0;
-  if (fptr == NULL)
-    ret_val = -1;
-  ASSERT_EQ(ret_val, 0);
-  EXPECT_EQ(tmp_err, ENFILE);
+  EXPECT_NE(fptr, NULL);
+  EXPECT_EQ(tmp_err, 0);
   fclose(fptr);
   fptr = NULL;
 }
