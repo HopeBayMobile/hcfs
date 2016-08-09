@@ -6870,7 +6870,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 #ifdef _ANDROID_ENV_
         MOUNT_T *tmpptr;
 #endif
-
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -6885,6 +6885,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		name_space, key);
 
 #ifdef _ANDROID_ENV_
+	/* If remove security.selinux under sd_card, just return */
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
 	    name_space == SECURITY &&
 	    strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
@@ -6916,7 +6917,6 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
         if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
