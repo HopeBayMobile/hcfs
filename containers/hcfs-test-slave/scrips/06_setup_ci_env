@@ -30,7 +30,7 @@ function main() {
 }
 
 function install_oclint() {
-	if [ ! -d Bear ]; then
+	if ! bear >/dev/null; then
 		git clone --depth 1 https://github.com/rizsotto/Bear.git
 		pushd Bear
 		cmake .
@@ -38,9 +38,8 @@ function install_oclint() {
 		make install
 		popd
 	fi
-	if [ ! -d oclint-0.8.1 ]; then
-		http_proxy="http://10.0.1.5:8000" \
-			wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+	if [ ! -f oclint-0.8.1/bin/oclint ]; then
+		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 		tar -zxf oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 		rm -f oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 	fi
@@ -49,8 +48,7 @@ function install_oclint() {
 function install_pmd() {
 	# Install PMD for CPD(duplicate code)
 	if [ ! -d pmd-bin-5.2.2 ]; then
-		http_proxy="http://10.0.1.5:8000" \
-			wget http://downloads.sourceforge.net/project/pmd/pmd/5.2.2/pmd-bin-5.2.2.zip
+		wget http://downloads.sourceforge.net/project/pmd/pmd/5.2.2/pmd-bin-5.2.2.zip
 		unzip pmd-bin-5.2.2.zip
 		rm -f pmd-bin-5.2.2.zip
 	fi
@@ -60,7 +58,7 @@ function install_ccm() {
 	# Install mono and CCM for complexity
 	if [ ! -f CCM.exe ]; then
 		https_proxy="http://10.0.1.5:8000" \
-			wget https://github.com/jonasblunck/ccm/releases/download/v1.1.7/ccm_binaries.zip
+			wget https://github.com/jonasblunck/ccm/releases/download/v1.1.11/ccm_binaries.zip
 		unzip ccm_binaries.zip
 		rm -f ccm_binaries.zip
 	fi
@@ -74,10 +72,7 @@ function setup_dev_env() {
 	if [ -e /.dockerinit ]; then
 		RUN_IN_SLAVE="sudo -E -u jenkins"
 	fi
-	$RUN_IN_SLAVE $repo/utils/setup_dev_env.sh -v -m docker_host
-	$RUN_IN_SLAVE $repo/utils/setup_dev_env.sh -v -m functional_test
-	$RUN_IN_SLAVE $repo/utils/setup_dev_env.sh -v -m unit_test
-	$RUN_IN_SLAVE $repo/utils/setup_dev_env.sh -v
+	$RUN_IN_SLAVE $repo/utils/setup_dev_env.sh -v -m ci,docker_host,functional_test,unit_test
 	$RUN_IN_SLAVE $repo/utils/install_ccache.bash
 }
 function cleanup_ci_remains() {
