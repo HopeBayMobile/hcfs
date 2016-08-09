@@ -120,7 +120,7 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 
 	/* Create pinning collector */
 	pthread_create(&pinning_scheduler.pinning_collector, NULL,
-			(void *)pinning_collect, NULL);
+			pinning_collect, NULL);
 
 	/* Create 100 threads */
 	for (int32_t i = 0; i < 100 ; i++) {
@@ -175,6 +175,7 @@ protected:
 
 		memset(&pinning_scheduler, 0, sizeof(PINNING_SCHEDULER));
 		sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
+		sem_init(&verified_inodes_sem, 0, 1);
 
 		FINISH_PINNING = FALSE;
 	}

@@ -44,9 +44,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+#include <sys/xattr.h>
 #include <openssl/sha.h>
 #include <inttypes.h>
 
@@ -82,7 +80,7 @@ CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
  */
 int32_t unlink_upload_file(char *filename)
 {
-	struct stat filestat;
+	struct stat filestat; /* raw file ops */
 	int64_t filesize;
 	int32_t ret, errcode;
 	int64_t old_cachesize, new_cachesize, threshold;
@@ -182,7 +180,7 @@ static inline int32_t _set_inode_continue_nexttime(ino_t inode)
 }
 
 
-/**
+/*
  * _del_toupload_blocks()
  *
  * When sync error, perhaps there are many copied blocks prepared to be
@@ -195,7 +193,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 	FILE *fptr;
 	int64_t num_blocks, bcount;
 	char block_path[300];
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	int32_t ret, errcode;
 	ssize_t ret_ssize;
 	FILE_META_TYPE tmpmeta;
@@ -210,23 +208,23 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 		ret = super_block_read(inode, &sb_entry);
 		if (ret < 0)
 			return ret;
-		*this_mode = sb_entry.inode_stat.st_mode;
+		*this_mode = sb_entry.inode_stat.mode;
 
 	} else {
 		flock(fileno(fptr), LOCK_EX);
-		PREAD(fileno(fptr), &tmpstat, sizeof(struct stat), 0);
-		*this_mode = tmpstat.st_mode;
-		if (!S_ISREG(tmpstat.st_mode)) { /* Return when not regfile */
+		PREAD(fileno(fptr), &tmpstat, sizeof(HCFS_STAT), 0);
+		*this_mode = tmpstat.mode;
+		if (!S_ISREG(tmpstat.mode)) { /* Return when not regfile */
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
 			return 0;
 		}
 
 		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
-				sizeof(struct stat));
+				sizeof(HCFS_STAT));
 
-		num_blocks = ((tmpstat.st_size == 0) ? 0
-				: (tmpstat.st_size - 1) / MAX_BLOCK_SIZE + 1);
+		num_blocks = ((tmpstat.size == 0) ? 0
+				: (tmpstat.size - 1) / MAX_BLOCK_SIZE + 1);
 
 		current_page = -1;
 		for (bcount = 0; bcount < num_blocks; bcount++) {
@@ -640,10 +638,6 @@ void init_sync_control(void)
 	memset(&(sync_ctl.threads_finished), 0,
 	       sizeof(char) * MAX_SYNC_CONCURRENCY);
 	sync_ctl.total_active_sync_threads = 0;
-	sync_ctl.retry_list.num_retry = 0;
-	sync_ctl.retry_list.list_size = MAX_SYNC_CONCURRENCY;
-	sync_ctl.retry_list.retry_inode = calloc(sizeof(ino_t) *
-			MAX_SYNC_CONCURRENCY, 1);
 
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
 		       (void *)&collect_finished_sync_threads, NULL);
@@ -1040,9 +1034,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	char local_metapath[METAPATHLEN];
 	ino_t this_inode;
 	FILE *toupload_metafptr, *local_metafptr;
-	char truncpath[METAPATHLEN];
-	FILE *truncfptr;
-	struct stat tempfilestat;
+	HCFS_STAT tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	DIR_META_TYPE tempdirmeta;
@@ -1053,7 +1045,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t block_count;
 	int32_t ret, errcode;
 	off_t toupload_size;
-	int64_t temp_trunc_size;
 	size_t ret_size;
 	BOOL sync_error;
 	ino_t root_inode;
@@ -1066,6 +1057,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t upload_seq;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int64_t pos;
+	int64_t temp_trunc_size;
+#ifdef _ANDROID_ENV_
+	char truncpath[METAPATHLEN];
+	FILE *truncfptr;
+#else
+	ssize_t ret_ssize;
+#endif
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1122,7 +1120,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		/* First download backend meta and init backend block info in
 		 * upload progress file. If it is revert mode now, then
 		 * just read progress meta. */
-		pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+		pos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 				sizeof(FILE_STATS_TYPE);
 		FSEEK(toupload_metafptr, pos, SEEK_SET);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
@@ -1139,12 +1137,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 
 		FSEEK(toupload_metafptr, 0, SEEK_SET);
-		FREAD(&tempfilestat, sizeof(struct stat), 1,
+		FREAD(&tempfilestat, sizeof(HCFS_STAT), 1,
 			toupload_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			toupload_metafptr);
 
-		toupload_size = tempfilestat.st_size;
+		toupload_size = tempfilestat.size;
 		root_inode = tempfilemeta.root_inode;
 
 /* Check if need to sync past the current size */
@@ -1167,9 +1165,9 @@ store in some other file */
 			fclose(truncfptr);
 		}
 #else
+		/* TODO: fix error of missing metafptr*/
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
 				&temp_trunc_size, sizeof(int64_t));
-
 		if ((ret_ssize >= 0) && (toupload_size < temp_trunc_size)) {
 			toupload_size = temp_trunc_size;
 		}
@@ -1248,7 +1246,7 @@ store in some other file */
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
 				/* Restore cloud usage statistics */
-				pos = sizeof(struct stat) +
+				pos = sizeof(HCFS_STAT) +
 					sizeof(FILE_META_TYPE) +
 					sizeof(FILE_STATS_TYPE);
 				FSEEK(toupload_metafptr, pos, SEEK_SET);
@@ -1301,7 +1299,7 @@ store in some other file */
 	flock(fileno(local_metafptr), LOCK_EX);
 
 	if (!access(local_metapath, F_OK)) {
-		struct stat metastat;
+		struct stat metastat; /* meta file ops */
 		int64_t now_meta_size;
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
@@ -1314,24 +1312,24 @@ store in some other file */
 		now_meta_size = metastat.st_size;
 
 		if (S_ISFILE(ptr->this_mode)) {
-			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			      toupload_metafptr);
 
-			pos = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
-					sizeof(FILE_STATS_TYPE);
+			pos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+			      sizeof(FILE_STATS_TYPE);
 			FSEEK(toupload_metafptr, pos, SEEK_SET);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
 					1, toupload_metafptr);
 			root_inode = tempfilemeta.root_inode;
 			upload_seq = cloud_related_data.upload_seq;
-			size_diff = (tempfilestat.st_size + now_meta_size) -
+			size_diff = (tempfilestat.size + now_meta_size) -
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
 			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload =
-					tempfilestat.st_size + now_meta_size;
+					tempfilestat.size + now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
 			FSEEK(local_metafptr, pos, SEEK_SET);
@@ -1339,7 +1337,7 @@ store in some other file */
 					1, local_metafptr);
 		}
 		if (S_ISDIR(ptr->this_mode)) {
-			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
 			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
 					1, toupload_metafptr);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
@@ -1354,13 +1352,13 @@ store in some other file */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, sizeof(struct stat) +
+			FSEEK(local_metafptr, sizeof(HCFS_STAT) +
 					sizeof(DIR_META_TYPE), SEEK_SET);
 			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
 					1, local_metafptr);
 		}
 		if (S_ISLNK(ptr->this_mode)) {
-			FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
 			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
 					toupload_metafptr);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
@@ -1375,7 +1373,7 @@ store in some other file */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, sizeof(struct stat) +
+			FSEEK(local_metafptr, sizeof(HCFS_STAT) +
 					sizeof(SYMLINK_META_TYPE), SEEK_SET);
 			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
 					1, local_metafptr);
@@ -1432,7 +1430,7 @@ store in some other file */
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
 				/* Restore cloud usage statistics */
-				pos = sizeof(struct stat) +
+				pos = sizeof(HCFS_STAT) +
 					sizeof(FILE_META_TYPE) +
 					sizeof(FILE_STATS_TYPE);
 				FSEEK(toupload_metafptr, pos, SEEK_SET);
@@ -1586,7 +1584,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 #endif
 
 	} else {
-		write_log(10, "Debug datasync: start to sync obj %s", objname);
+		write_log(10, "Debug datasync: start to sync obj %s\n", objname);
 
 		uint8_t *data = NULL;
 		HCFS_encode_object_meta *object_meta = NULL;
@@ -1703,7 +1701,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
 	int32_t which_curl, ret, errcode, which_index;
 	char local_metapath[300];
-	struct stat filestat;
+	struct stat filestat; /* raw file ops */
 	int64_t filesize;
 
 	filesize = 0;
@@ -2182,7 +2180,7 @@ void upload_loop(void)
 
 			if (in_sync == FALSE) {
 				ret_val = _sync_mark(ino_sync,
-						tempentry.inode_stat.st_mode,
+						tempentry.inode_stat.mode,
 								sync_threads);
 				if (ret_val < 0) { /* Sync next time */
 					ret = super_block_update_transit(

@@ -15,7 +15,6 @@ repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d utils ] ; do cd .
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
-set -v
 
 # init submodules
 if [ ! -n "$(grep "^gitlab.hopebaytech.com " $HOME/.ssh/known_hosts)" ]; then

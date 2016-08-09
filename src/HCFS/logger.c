@@ -34,11 +34,11 @@
  * Open/create the log file named "log_filename" and initialize some
  * log file info, such as "now_log_size", file mode.
  */
-int32_t _open_log_file()
+int32_t _open_log_file(void)
 {
 	int32_t ret, errcode;
 	char log_file[500];
-	struct stat logstat;
+	struct stat logstat; /* raw file ops */
 
 	logptr->now_log_size = 0;
 	if (LOG_PATH != NULL)
@@ -130,7 +130,7 @@ int32_t open_log(char *filename)
  * Shift log files by renaming the file name. Latest log file is <file name>.1,
  * and Oldest one is <file name>.5.
  */
-void _rename_logfile()
+void _rename_logfile(void)
 {
 	int32_t log_idx, miss_log_idx;
 	char base_log_path[400], log_path[500], prev_log_path[500];
@@ -165,7 +165,7 @@ void _rename_logfile()
 	}
 }
 
-static inline void _write_repeated_log()
+static inline void _write_repeated_log(void)
 {
 	int32_t log_size;
 	struct tm tmptm;
@@ -203,7 +203,7 @@ static inline void _write_repeated_log()
 	return;
 }
 
-static inline void _check_log_file_size()
+static inline void _check_log_file_size(void)
 {
 	if (logptr->now_log_size >= MAX_LOG_FILE_SIZE) {
 		fclose(logptr->fptr);

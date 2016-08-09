@@ -20,4 +20,9 @@ clean:
 check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
 
+demo: all
+	mv -vf _pyhcfs.*.so _pyhcfs.so || :
+	@echo ====== start demo ======
+	python3 demo_pyhcfs.py
+
 .PHONY: _pyhcfs.so parser

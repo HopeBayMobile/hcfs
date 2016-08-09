@@ -25,7 +25,7 @@
 #define TOTAL_CHILDREN_NUM 23
 #define LINK_NUM 12
 DIR_META_TYPE to_verified_meta;
-struct stat to_verified_stat;
+HCFS_STAT to_verified_stat;
 
 /* delete_inode_meta() */
 #define INO_RENAME_SUCCESS 3

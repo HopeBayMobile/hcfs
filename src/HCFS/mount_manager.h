@@ -28,11 +28,10 @@
 #include "path_reconstruct.h"
 #endif
 
-#ifdef _ANDROID_ENV_
 #define MP_DEFAULT 1
 #define MP_READ 2
 #define MP_WRITE 3
-#endif
+
 /*
 Binary search tree
 

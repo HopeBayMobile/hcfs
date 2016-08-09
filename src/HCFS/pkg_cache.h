@@ -43,8 +43,8 @@ typedef struct {
 
 PKG_CACHE pkg_cache;
 
-int32_t init_pkg_cache();
-int32_t destroy_pkg_cache();
+int32_t init_pkg_cache(void);
+int32_t destroy_pkg_cache(void);
 int32_t lookup_cache_pkg(const char *pkgname, uid_t *uid);
 int32_t insert_cache_pkg(const char *pkgname, uid_t uid);
 int32_t remove_cache_pkg(const char *pkgname);

@@ -40,7 +40,7 @@ class FS_managerEnvironment : public ::testing::Environment {
 	::testing::AddGlobalTestEnvironment(new FS_managerEnvironment);
 
 
-static int32_t do_delete (const char *fpath, const struct stat *sb,
+static int do_delete (const char *fpath, const struct stat *sb,
 		int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {
@@ -84,7 +84,7 @@ class init_fs_managerTest : public ::testing::Test {
      }
     if (fs_mgr_path != NULL)
       free(fs_mgr_path);
-    nftw ("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
    }
@@ -538,10 +538,10 @@ TEST_F(delete_filesystemTest, RootNotEmpty) {
   else
     ret = 0;
   ASSERT_EQ(0, ret);
-  fseek(fptr, sizeof(struct stat), SEEK_SET);
+  fseek(fptr, sizeof(HCFS_STAT), SEEK_SET);
   fread(&tmpmeta, sizeof(DIR_META_TYPE), 1, fptr);
   tmpmeta.total_children = 1;
-  fseek(fptr, sizeof(struct stat), SEEK_SET);
+  fseek(fptr, sizeof(HCFS_STAT), SEEK_SET);
   fwrite(&tmpmeta, sizeof(DIR_META_TYPE), 1, fptr);
   fclose(fptr);
 

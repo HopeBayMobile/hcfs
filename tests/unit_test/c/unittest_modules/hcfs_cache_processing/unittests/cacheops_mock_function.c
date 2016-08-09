@@ -1,10 +1,10 @@
-#include <stdarg.h>
-#include <inttypes.h>
+#include "fuseop.h"
+#include "hcfs_cachebuild.h"
 #include "mock_params.h"
 #include "super_block.h"
-#include "hcfs_cachebuild.h"
-#include "fuseop.h"
+#include <inttypes.h>
 #include <stdarg.h>
+#include <string.h>
 
 void init_mock_system_config()
 {
@@ -16,8 +16,9 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char block_name[200];
 
-	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%lld",
-			(uint64_t)this_inode, block_num);
+	sprintf(block_name,
+		"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%" PRId64,
+		(uint64_t)this_inode, block_num);
 	strcpy(pathname, block_name);
 	
 	return 0;
@@ -36,7 +37,7 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 
 int32_t build_cache_usage(void)
 {
-	return ;
+	return 0;
 }
 
 int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
@@ -44,8 +45,8 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *) malloc(sizeof(SUPER_BLOCK_ENTRY));
 	
-	inode_ptr->inode_stat.st_ino = 1;
-	inode_ptr->inode_stat.st_mode = S_IFREG;
+	inode_ptr->inode_stat.ino = 1;
+	inode_ptr->inode_stat.mode = S_IFREG;
 
 	return 0;
 }
@@ -71,7 +72,7 @@ CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	int64_t target_page, int64_t hint_page)
 {	
-	int64_t ret = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
+	int64_t ret = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) + 
 		target_page * sizeof(BLOCK_ENTRY_PAGE);
 	
 	return ret;

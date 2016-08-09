@@ -24,9 +24,8 @@
 #define OFF 0
 
 /* Defines the version of the current meta defs */
-#define CURRENT_META_VER 3
-#define BACKWARD_COMPATIBILITY 3
-/* TODO: force backward compability check when reading meta file */
+#define CURRENT_META_VER 1
+#define BACKWARD_COMPATIBILITY 1
 
 #define X64 1
 #define ARM_32BIT 2

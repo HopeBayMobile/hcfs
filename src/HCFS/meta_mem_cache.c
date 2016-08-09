@@ -325,7 +325,7 @@ int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t ei
 							1, body_ptr->fptr);
 
 	if (body_ptr->can_be_synced_cloud_later == FALSE)
-		ret = super_block_mark_dirty((body_ptr->this_stat).st_ino);
+		ret = super_block_mark_dirty((body_ptr->this_stat).ino);
 
 	return ret;
 
@@ -380,10 +380,10 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	if (ret < 0)
 		return ret;
 
-	/* Sync struct stat */
+	/* Sync HCFS_STAT */
 	if (body_ptr->stat_dirty == TRUE) {
 		FSEEK(body_ptr->fptr, 0, SEEK_SET);
-		FWRITE(&(body_ptr->this_stat), sizeof(struct stat), 1,
+		FWRITE(&(body_ptr->this_stat), sizeof(HCFS_STAT), 1,
 							body_ptr->fptr);
 		body_ptr->stat_dirty = FALSE;
 	}
@@ -392,20 +392,20 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	/* TODO Right now, may not set meta_dirty to TRUE if only changes
 			pages */
 	if (body_ptr->meta_dirty == TRUE) {
-		if (S_ISFILE(body_ptr->this_stat.st_mode)) {
-			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+		if (S_ISFILE(body_ptr->this_stat.mode)) {
+			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 			FWRITE((body_ptr->file_meta), sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);
 		} else {
-			if (S_ISDIR(body_ptr->this_stat.st_mode)) {
-				FSEEK(body_ptr->fptr, sizeof(struct stat),
+			if (S_ISDIR(body_ptr->this_stat.mode)) {
+				FSEEK(body_ptr->fptr, sizeof(HCFS_STAT),
 							SEEK_SET);
 				FWRITE((body_ptr->dir_meta),
 						sizeof(DIR_META_TYPE),
 							1, body_ptr->fptr);
 			}
-			if (S_ISLNK(body_ptr->this_stat.st_mode)) {
-				FSEEK(body_ptr->fptr, sizeof(struct stat),
+			if (S_ISLNK(body_ptr->this_stat.mode)) {
+				FSEEK(body_ptr->fptr, sizeof(HCFS_STAT),
 					SEEK_SET);
 				FWRITE((body_ptr->symlink_meta),
 					sizeof(SYMLINK_META_TYPE), 1,
@@ -416,7 +416,7 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 		body_ptr->meta_dirty = FALSE;
 	}
 
-	if (S_ISDIR(body_ptr->this_stat.st_mode)) {
+	if (S_ISDIR(body_ptr->this_stat.mode)) {
 		ret = _cache_sync(body_ptr, 0);
 		if (ret < 0) {
 			errcode = ret;
@@ -548,7 +548,7 @@ static inline int32_t hash_inode_to_meta_cache(ino_t this_inode)
 /************************************************************************
 *
 * Function name: meta_cache_update_file_data
-*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 *                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Update the cache content for inode "this_inode". Content
@@ -559,9 +559,12 @@ static inline int32_t hash_inode_to_meta_cache(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
-	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_update_file_data(ino_t this_inode,
+				    const HCFS_STAT *inode_stat,
+				    const FILE_META_TYPE *file_meta_ptr,
+				    const BLOCK_ENTRY_PAGE *block_page,
+				    const int64_t page_pos,
+				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /* Always change dirty status to TRUE here as we always update */
 /* For block entry page lookup or update, only allow one lookup/update at a
@@ -577,7 +580,7 @@ processing the new one */
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
-		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(HCFS_STAT));
 		body_ptr->stat_dirty = TRUE;
 	}
 
@@ -601,12 +604,12 @@ processing the new one */
 		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
 		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 
-		/* If not syncing struct stat or meta, need to sync
+		/* If not syncing HCFS_STAT or meta, need to sync
 		block page */
 		if ((body_ptr->stat_dirty != TRUE) &&
 		    (body_ptr->meta_dirty != TRUE) &&
 		    (body_ptr->can_be_synced_cloud_later == FALSE)) {
-			tmpino = (body_ptr->this_stat).st_ino;
+			tmpino = (body_ptr->this_stat).ino;
 			ret = super_block_mark_dirty(tmpino);
 			if (ret < 0) {
 				errcode = ret;
@@ -640,7 +643,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: meta_cache_update_file_nosync
-*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 *                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Update the cache content for inode "this_inode". Content
@@ -652,9 +655,11 @@ errcode_handle:
 *
 *************************************************************************/
 int32_t meta_cache_update_file_nosync(ino_t this_inode,
-	const struct stat *inode_stat,
-	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+				      const HCFS_STAT *inode_stat,
+				      const FILE_META_TYPE *file_meta_ptr,
+				      const BLOCK_ENTRY_PAGE *block_page,
+				      const int64_t page_pos,
+				      META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /* Always change dirty status to TRUE here as we always update */
 /* For block entry page lookup or update, only allow one lookup/update at a
@@ -669,7 +674,7 @@ processing the new one */
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
-		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(HCFS_STAT));
 		body_ptr->stat_dirty = TRUE;
 	}
 
@@ -726,14 +731,14 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: meta_cache_update_stat_nosync
-*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
-*       Summary: Write file struct stat to disk but do not sync to backend
+*       Summary: Write file's HCFS_STAT to disk but do not sync to backend
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int32_t meta_cache_update_stat_nosync(ino_t this_inode,
-                                       const struct stat *inode_stat,
+                                       const HCFS_STAT *inode_stat,
                                        META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
@@ -742,7 +747,7 @@ int32_t meta_cache_update_stat_nosync(ino_t this_inode,
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
-		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
+		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(HCFS_STAT));
 		body_ptr->stat_dirty = TRUE;
 	}
 
@@ -778,7 +783,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: meta_cache_lookup_file_data
-*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat,
 *                FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 *                int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Read the cache content for inode "this_inode". Content
@@ -789,9 +794,12 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_file_data(ino_t this_inode,
+				    HCFS_STAT *inode_stat,
+				    FILE_META_TYPE *file_meta_ptr,
+				    BLOCK_ENTRY_PAGE *block_page,
+				    int64_t page_pos,
+				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -801,7 +809,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
-		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
+		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT));
 
 	if (file_meta_ptr != NULL) {
 		if (body_ptr->file_meta == NULL) {
@@ -813,7 +821,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			if (ret < 0)
 				return ret;
 
-			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 			FREAD(body_ptr->file_meta, sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);
 		}
@@ -881,7 +889,7 @@ static inline int32_t _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
 		FWRITE(ptr->dir_entry_cache[1],
 			sizeof(DIR_ENTRY_PAGE), 1, ptr->fptr);
 		if (ptr->can_be_synced_cloud_later == FALSE) {
-			ret = super_block_mark_dirty((ptr->this_stat).st_ino);
+			ret = super_block_mark_dirty((ptr->this_stat).ino);
 			if (ret < 0)
 				return ret;
 		}
@@ -903,7 +911,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: meta_cache_lookup_dir_data
-*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat,
 *                DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Read the cache content for inode "this_inode". Content
@@ -914,9 +922,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
-	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
-				META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_dir_data(ino_t this_inode,
+				   HCFS_STAT *inode_stat,
+				   DIR_META_TYPE *dir_meta_ptr,
+				   DIR_ENTRY_PAGE *dir_page,
+				   META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -925,7 +935,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
-		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
+		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT));
 
 	if (dir_meta_ptr != NULL) {
 		if (body_ptr->dir_meta == NULL) {
@@ -938,7 +948,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 			if (ret < 0)
 				return ret;
 
-			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 			FREAD(body_ptr->dir_meta, sizeof(DIR_META_TYPE),
 							1, body_ptr->fptr);
 		}
@@ -989,7 +999,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: meta_cache_update_dir_data
-*        Inputs: ino_t this_inode, struct stat *inode_stat,
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat,
 *                DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 *                META_CACHE_ENTRY_STRUCT *bptr
 *       Summary: Update the cache content for inode "this_inode". Content
@@ -1000,9 +1010,11 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
-	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
-	META_CACHE_ENTRY_STRUCT *bptr)
+int32_t meta_cache_update_dir_data(ino_t this_inode,
+				   const HCFS_STAT *inode_stat,
+				   const DIR_META_TYPE *dir_meta_ptr,
+				   const DIR_ENTRY_PAGE *dir_page,
+				   META_CACHE_ENTRY_STRUCT *bptr)
 {
 /*Always change dirty status to TRUE here as we always update*/
 /*For dir entry page lookup or update, only allow one lookup/update at a time,
@@ -1018,7 +1030,7 @@ the new one */
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(bptr->access_sem));
 
 	if (inode_stat != NULL) {
-		memcpy(&(bptr->this_stat), inode_stat, sizeof(struct stat));
+		memcpy(&(bptr->this_stat), inode_stat, sizeof(HCFS_STAT));
 		bptr->stat_dirty = TRUE;
 	}
 
@@ -1153,7 +1165,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			flock(fileno(body_ptr->fptr), LOCK_EX);
 			body_ptr->meta_opened = TRUE;
 		}
-		FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(body_ptr->dir_meta, sizeof(DIR_META_TYPE), 1,
 							body_ptr->fptr);
 	 }
@@ -1544,7 +1556,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		(current_ptr->body).meta_opened = FALSE;
 		(current_ptr->body).need_inc_seq = TRUE;
 		memcpy(&((current_ptr->body).this_stat),
-				&(tempentry.inode_stat), sizeof(struct stat));
+		       &(tempentry.inode_stat), sizeof(HCFS_STAT));
 		/* need_new = FALSE; */
 		break;
 	}
@@ -1665,17 +1677,18 @@ int32_t meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 /************************************************************************
 *
 * Function name: meta_cache_update_symlink_data
-*        Inputs: ino_t this_inode, const struct stat *inode_stat,
+*        Inputs: ino_t this_inode, const HCFS_STAT *inode_stat,
 *                const SYMLINK_META_TYPE *symlink_meta_ptr,
 *                META_CACHE_ENTRY_STRUCT *bptr
 *       Summary: Update symlink stat or meta data in memory cache.
 *  Return value: 0 if successful, otherwise return negative error code.
 *
 *************************************************************************/
-int32_t meta_cache_update_symlink_data(ino_t this_inode,
-	const struct stat *inode_stat,
-	const SYMLINK_META_TYPE *symlink_meta_ptr,
-	META_CACHE_ENTRY_STRUCT *bptr)
+int32_t meta_cache_update_symlink_data(
+    ino_t this_inode,
+    const HCFS_STAT *inode_stat,
+    const SYMLINK_META_TYPE *symlink_meta_ptr,
+    META_CACHE_ENTRY_STRUCT *bptr)
 {
 	int32_t ret;
 
@@ -1686,7 +1699,7 @@ int32_t meta_cache_update_symlink_data(ino_t this_inode,
 
 	/* Update stat */
 	if (inode_stat != NULL) {
-		memcpy(&(bptr->this_stat), inode_stat, sizeof(struct stat));
+		memcpy(&(bptr->this_stat), inode_stat, sizeof(HCFS_STAT));
 		bptr->stat_dirty = TRUE;
 	}
 
@@ -1720,7 +1733,7 @@ int32_t meta_cache_update_symlink_data(ino_t this_inode,
 /************************************************************************
 *
 * Function name: meta_cache_lookup_symlink_data
-*        Inputs: ino_t this_inode, const struct stat *inode_stat,
+*        Inputs: ino_t this_inode, const HCFS_STAT *inode_stat,
 *                const SYMLINK_META_TYPE *symlink_meta_ptr,
 *                META_CACHE_ENTRY_STRUCT *bptr
 *       Summary: Lookup symlink stat or meta data in memory cache. If
@@ -1728,8 +1741,10 @@ int32_t meta_cache_update_symlink_data(ino_t this_inode,
 *  Return value: 0 if successful, otherwise return negative error code.
 *
 *************************************************************************/
-int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
-	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode,
+				       HCFS_STAT *inode_stat,
+				       SYMLINK_META_TYPE *symlink_meta_ptr,
+				       META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -1740,7 +1755,7 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
-		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
+		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(HCFS_STAT));
 
 	if (symlink_meta_ptr != NULL) {
 		if (body_ptr->symlink_meta == NULL) {
@@ -1754,7 +1769,7 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat
 			if (ret < 0)
 				return ret;
 
-			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 			FREAD(body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE),
 							1, body_ptr->fptr);
 		}

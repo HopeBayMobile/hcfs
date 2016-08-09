@@ -1,13 +1,13 @@
+#include "gtest/gtest.h"
 #include "cstdlib"
 extern "C" {
 #include "dir_entry_btree.h"
 #include "fuseop.h"
-#include "utils.h"
 #include <errno.h>
 }
 #include "gtest/gtest.h"
 
-SYSTEM_CONF_STRUCT *system_config; 
+SYSTEM_CONF_STRUCT *system_config;
 
 static inline int32_t compare(const void *a, const void *b)
 {
@@ -124,11 +124,11 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 	protected:
 		virtual void SetUp()
 		{
-			struct stat dir_stat;
+			HCFS_STAT dir_stat;
 			DIR_META_TYPE meta;
 			DIR_ENTRY_PAGE node;
 			
-			memset(&dir_stat, 0, sizeof(struct stat));
+			memset(&dir_stat, 0, sizeof(HCFS_STAT));
 			memset(&meta, 0, sizeof(DIR_META_TYPE));
 			memset(&node, 0, sizeof(DIR_ENTRY_PAGE));
 			overflow_median = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
@@ -144,19 +144,19 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 
 			node.num_entries = 2;
 			node.this_page_pos = 
-				sizeof(struct stat) + sizeof(DIR_META_TYPE);
+				sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
 			// meta
 			meta.root_entry_page = 
-				sizeof(struct stat) + sizeof(DIR_META_TYPE);
+				sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
 			meta.tree_walk_list_head = 
-				sizeof(struct stat) + sizeof(DIR_META_TYPE);
+				sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
 			// open dir meta file
 			fptr = fopen("/tmp/test_dir_meta", "wb+");
 			fh = fileno(fptr);
 			ASSERT_TRUE(fptr != NULL);
-			pwrite(fh, &dir_stat, sizeof(struct stat), 0);
-			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-			pwrite(fh, &node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat)+sizeof(DIR_META_TYPE));
+			pwrite(fh, &dir_stat, sizeof(HCFS_STAT), 0);
+			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
+			pwrite(fh, &node, sizeof(DIR_ENTRY_PAGE), sizeof(HCFS_STAT)+sizeof(DIR_META_TYPE));
 
 			system_config = (SYSTEM_CONF_STRUCT *) calloc(sizeof(SYSTEM_CONF_STRUCT), 1);
 			hcfs_system = (SYSTEM_DATA_HEAD *) calloc(sizeof(SYSTEM_DATA_HEAD), 1);
@@ -182,7 +182,7 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 			DIR_ENTRY_PAGE root;
 			DIR_ENTRY_PAGE new_root;
 
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, &root, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 			/* create a new root */
 			if (meta.entry_page_gc_list != 0) {
@@ -232,7 +232,7 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 				splitted_node.parent_page_pos = new_root.this_page_pos;
 				pwrite(fh, &splitted_node, sizeof(DIR_ENTRY_PAGE), *overflow_new_pos);
 			}
-			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			//std::cerr << "\x1B[33mNew root at position " << meta.root_entry_page << std::endl;
 			std::cerr << "New root at position " << meta.root_entry_page << std::endl;
 		}
@@ -245,7 +245,7 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 			int32_t index;
 			bool found;
 
-			pread(fh, meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, node, sizeof(DIR_ENTRY_PAGE), meta->root_entry_page);
 			found = false;
 			while (!found) {
@@ -290,7 +290,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
 			
-	fseek(fptr, sizeof(struct stat), SEEK_SET);
+	fseek(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fread(&meta, sizeof(DIR_META_TYPE), 1, fptr);
 	fread(&root_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 	overflow_median = NULL;
@@ -308,7 +308,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
 		ASSERT_TRUE(overflow_median == NULL);
 		ASSERT_TRUE(overflow_new_pos == NULL);
 		ASSERT_EQ(times + 2 + 1, root_node.num_entries);
-		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
 		ASSERT_EQ(times + 2 + 1, root_node.num_entries);
 		free(entry);
 		// ASSERT_EQ(times + 1, meta.total_children); // Why not plus 1 in this function?
@@ -322,8 +322,8 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
 			
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
 
 	/* Insert many entries and verified the robustness */
 	for (int32_t times = 0 ; times < num_entries_insert ; times++) {
@@ -336,7 +336,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 		ASSERT_TRUE(ret >= 0);
 		if ( ret == 1 ) {
 			generate_new_root();
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 		}
 		free(entry);
@@ -361,8 +361,8 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Entries_Cannot_Split_Since_NoSpace)
 	DIR_ENTRY_PAGE root_node;
 	DIR_ENTRY entry;
 
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
 
 	/* It will fail on splitting root */
 	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1000;
@@ -398,8 +398,8 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
 			
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
 
 	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	/* Insert many entries */
@@ -413,7 +413,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		ASSERT_NE(-1, ret);
 		if ( ret == 1 ) {
 			generate_new_root();
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 		}
 		free(entry);
@@ -454,9 +454,9 @@ class BaseClassInsertBtreeEntryIsUsable : public insert_dir_entry_btreeTest {
 			DIR_META_TYPE meta;
 			DIR_ENTRY_PAGE root_node;
 			
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), 
-				sizeof(struct stat) + sizeof(DIR_META_TYPE));
+				sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
 
 			_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 			/* Insert many entries */
@@ -471,7 +471,7 @@ class BaseClassInsertBtreeEntryIsUsable : public insert_dir_entry_btreeTest {
 				if ( ret == 1 ) {
 					generate_new_root();
 					pread(fh, &meta, sizeof(DIR_META_TYPE), 
-						sizeof(struct stat));
+						sizeof(HCFS_STAT));
 					pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), 
 						meta.root_entry_page);
 				}
@@ -492,7 +492,7 @@ TEST_F(search_dir_entry_btreeTest, SearchEmptyBtree)
 	DIR_ENTRY_PAGE root_node;
 	DIR_ENTRY_PAGE result_node;
 
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	
 	for (int32_t i = 0 ; i < 5000 ; i++) {
@@ -513,7 +513,7 @@ TEST_F(search_dir_entry_btreeTest, EntryNotFound)
 	/* Mock data */
 	init_insert_many_entries(4000, 6000, "test_file");
 	/* Search entries */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	
 	for (int32_t i = 0 ; i < 3000 ; i++) {
@@ -534,7 +534,7 @@ TEST_F(search_dir_entry_btreeTest, SearchEntrySuccess)
 	/* Mock data */
 	init_insert_many_entries(0, 10000, "test_file");
 	/* Search entries */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	
 	for (int32_t i = 0 ; i < 7000 ; i++) {
@@ -572,7 +572,7 @@ TEST_F(rebalance_btreeTest, ChildIndexOutofBound)
 	/* A mock btree with only one page, which is root page. */
 	init_insert_many_entries(0, 10, "test_file");
 	/* Test */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 
 	for (int32_t child_index = root_node.num_entries+1 ; 
@@ -589,7 +589,7 @@ TEST_F(rebalance_btreeTest, RebalanceBtreeWithOnlyRootPage)
 	/* A mock btree with only one page, which is root. */
 	init_insert_many_entries(0, MAX_DIR_ENTRIES_PER_PAGE-2, "test_file");
 	/* Root node is leaf node, so it needs not rebalance */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 
 	for (int32_t child_index = 0 ; child_index < root_node.num_entries+1 ; child_index++) {
@@ -607,7 +607,7 @@ TEST_F(rebalance_btreeTest, CheckCase_NoRebalanceNeeded)
 	   for All the children, so it needs not rebalance. */
 	init_insert_many_entries(0, 4000, "test_file");
 	/* Leaf node needs not rebalance */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	
 	for (int32_t child_index = 0 ; child_index < root_node.num_entries+1 ; child_index++) {
@@ -631,7 +631,7 @@ TEST_F(rebalance_btreeTest, Merge_Without_NewRoot)
 	/* A mock btree with depth = 2. For each child, let num of 
 	   entries < MIN_DIR_ENTRIES_PER_PAGE. */
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	num_nodes = root_node.num_entries + 1 + 1; // num of pages(nodes)
 	num_entries = 0;
@@ -690,7 +690,7 @@ TEST_F(rebalance_btreeTest, Merge_Without_NewRoot)
 		ASSERT_EQ(true, search_entry(&remaining_entries[i]));
 	/* 3.4. Garbage is correctly collected & tree walking */
 	// Count num of gc list
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &now_node, sizeof(DIR_ENTRY_PAGE), meta.entry_page_gc_list);
 	gc_counter = 1;
 	while (now_node.gc_list_next != 0) {
@@ -722,7 +722,7 @@ TEST_F(rebalance_btreeTest, Merge_With_NewRoot)
 	
 	/* Init mock btree */
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	ASSERT_EQ(1, root_node.num_entries);
 	num_entries = 0;
@@ -742,7 +742,7 @@ TEST_F(rebalance_btreeTest, Merge_With_NewRoot)
 		0, tmp_entries, tmp_child_pos));
 
 	/* Check answer */	
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	EXPECT_EQ(num_entries + 1, root_node.num_entries);
 	
@@ -766,7 +766,7 @@ TEST_F(rebalance_btreeTest, NoMerge_SplitInto2Pages)
 	/* Init mock btree */
 	remaining_entries = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY) * num_entries);
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	// Let num_entries of left node < MIN_DIR_ENTRIES_PER_PAGE
 	num_entries = 0;
@@ -788,7 +788,7 @@ TEST_F(rebalance_btreeTest, NoMerge_SplitInto2Pages)
 		0, tmp_entries, tmp_child_pos));
 
 	/* Check answer */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	
 	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[0]);
@@ -821,7 +821,7 @@ TEST_F(extract_largest_childTest, ExtractEmptyDirectory)
 	DIR_ENTRY_PAGE root_node;
 	DIR_ENTRY largest_child;
 	
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 
 	/* Run function */
@@ -837,7 +837,7 @@ TEST_F(extract_largest_childTest, ExtractStartFromRootNode)
 	DIR_ENTRY largest_child;
 
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	
 	/* Run function */
@@ -871,7 +871,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree_EntryNotFound)
 	int32_t ret[num_tests];
 		
 	/* Delete failure in empty dir btree */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	for (int32_t i = 0 ; i < num_tests ; i++) {
@@ -897,7 +897,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree_EntryNotFound)
 
 	/* Delete failure in nonempty dir btree */
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	for (int32_t i = 0 ; i < num_tests ; i++) {
@@ -905,7 +905,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree_EntryNotFound)
 		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
 		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
 			fh, &meta, tmp_entries, tmp_child_pos);
-		pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+		pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	}
 	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
@@ -922,7 +922,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_1)
 
 	/* Deleting Entry Test */
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	for (int32_t i = 0 ; i < num_entries ; i++) {
 		DIR_ENTRY tmp_entry;
@@ -956,7 +956,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_2)
 
 	/* Deleting Entry Test*/
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	for (int32_t i = 0 ; i < num_entries ; i++) {
 		DIR_ENTRY tmp_entry;
@@ -966,13 +966,13 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_2)
 				fh, &meta, tmp_entries, tmp_child_pos);
 			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
 			// Reload root
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 		}
 	}
 
 	/* Check answer */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	for (int32_t i = 0 ; i < num_entries ; i++) {
 		DIR_ENTRY tmp_entry;
@@ -995,7 +995,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_exceed_2)
 
 	/* Deleting entry test */
 	init_insert_many_entries(0, num_entries, "test_file");
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	for (int32_t i = 0 ; i < num_entries ; i++) {
 		DIR_ENTRY tmp_entry;
@@ -1005,13 +1005,13 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_exceed_2)
 				fh, &meta, tmp_entries, tmp_child_pos);
 			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
 			// Reload root
-			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 		}
 	}
 
 	/* Check answer */
-	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	for (int32_t i = 0 ; i < num_entries ; i++) {
 		DIR_ENTRY tmp_entry;

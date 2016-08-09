@@ -26,7 +26,6 @@
 
 #define SYNC_RETRY_TIMES 2
 
-//extern SYSTEM_CONF_STRUCT *system_config;
 struct SUPER_BLOCK_ENTRY;
 
 /* Infomation and data of sync point */

@@ -1,6 +1,7 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 #include "mock_param.h"
 
@@ -12,7 +13,7 @@
 
 extern SYSTEM_CONF_STRUCT *system_config;
 
-int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_dir_data(ino_t this_inode, HCFS_STAT *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -35,7 +36,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 }
 
 
-int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_dir_data(ino_t this_inode, const HCFS_STAT *inode_stat,
     const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
     META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -88,29 +89,30 @@ int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 }
 
 
-int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_file_data(ino_t this_inode, HCFS_STAT *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (inode_stat) {
-		inode_stat->st_ino = this_inode;
-		inode_stat->st_nlink = 1;
-		inode_stat->st_size = NUM_BLOCKS * MOCK_BLOCK_SIZE;
+		inode_stat->ino = this_inode;
+		inode_stat->nlink = 1;
+		inode_stat->size = NUM_BLOCKS * MOCK_BLOCK_SIZE;
 		if (this_inode == INO_REGFILE || 
 			this_inode == INO_REGFILE_XATTR_PAGE_EXIST) {
-			inode_stat->st_mode = S_IFREG;
+			inode_stat->mode = S_IFREG;
 		} else if (this_inode == INO_DIR || 
 			this_inode == INO_DIR_XATTR_PAGE_EXIST) {
-			inode_stat->st_mode = S_IFDIR;
+			inode_stat->mode = S_IFDIR;
 		} else if (this_inode == INO_FIFO) {
-			inode_stat->st_mode = S_IFIFO;
-			inode_stat->st_size = 0;
+			inode_stat->mode = S_IFIFO;
+			inode_stat->size = 0;
 		} else {
-			inode_stat->st_mode = S_IFLNK;
+			inode_stat->mode = S_IFLNK;
 		}
 	}
 
 	if (file_meta_ptr) {
+		memset(file_meta_ptr, 0, sizeof(FILE_META_TYPE));
 		file_meta_ptr->generation = GENERATION_NUM;
 		if (this_inode == INO_REGFILE)
 			file_meta_ptr->next_xattr_page = 0;
@@ -121,12 +123,12 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	}
 
 	if (this_inode == INO_TOO_MANY_LINKS)
-		inode_stat->st_nlink = MAX_HARD_LINK;
+		inode_stat->nlink = MAX_HARD_LINK;
 
 	return 0;
 }
 
-int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+int32_t meta_cache_update_file_data(ino_t this_inode, const HCFS_STAT *inode_stat,
     const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
     const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -194,7 +196,7 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
 }
 
 int32_t meta_cache_update_symlink_data(ino_t this_inode, 
-	const struct stat *inode_stat, 
+	const HCFS_STAT *inode_stat, 
 	const SYMLINK_META_TYPE *symlink_meta_ptr, 
 	META_CACHE_ENTRY_STRUCT *bptr)
 {
@@ -215,7 +217,7 @@ int32_t meta_cache_update_symlink_data(ino_t this_inode,
 	return 0;
 }
 
-int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode, HCFS_STAT *inode_stat,
         SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (symlink_meta_ptr) {

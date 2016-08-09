@@ -47,6 +47,8 @@ typedef struct {
 	char *s3_bucket_url;
 } SYSTEM_CONF_STRUCT;
 
+extern SYSTEM_CONF_STRUCT *system_config;
+
 #define LOG_LEVEL system_config->log_level
 #define LOG_PATH system_config->log_path
 

@@ -43,72 +43,72 @@ class do_fallocateTest : public ::testing::Test {
 
 TEST_F(do_fallocateTest, WrongMode) {
   int32_t ret;
-  fuse_req_t req1;
+  fuse_req_t req1 = {0};
 
   ret = do_fallocate(10, NULL, 4, 0, 0, NULL, req1);
   ASSERT_EQ(-ENOTSUP, ret);
 }
 TEST_F(do_fallocateTest, NoExtend) {
   int32_t ret;
-  fuse_req_t req1;
-  struct stat tempstat;
+  fuse_req_t req1 = {0};
+  HCFS_STAT tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
 
-  tempstat.st_size = 1024;
-  tempstat.st_mode = S_IFREG;
+  tempstat.size = 1024;
+  tempstat.mode = S_IFREG;
   ret = do_fallocate(14, &tempstat, 0, 0, 10, &tmpptr, req1);
   ASSERT_EQ(0, ret);
 
-  EXPECT_EQ(tempstat.st_size, 1024);
+  EXPECT_EQ(tempstat.size, 1024);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
 }
 
 TEST_F(do_fallocateTest, Extend) {
   int32_t ret;
-  fuse_req_t req1;
-  struct stat tempstat;
+  fuse_req_t req1 = {0};
+  HCFS_STAT tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
 
-  tempstat.st_size = 1024;
-  tempstat.st_mode = S_IFREG;
+  tempstat.size = 1024;
+  tempstat.mode = S_IFREG;
   ret = do_fallocate(14, &tempstat, 0, 0, 1024768, &tmpptr, req1);
   ASSERT_EQ(0, ret);
 
-  EXPECT_EQ(tempstat.st_size, 1024768);
+  EXPECT_EQ(tempstat.size, 1024768);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 + 1024768 - 1024);
 }
 
 TEST_F(do_fallocateTest, ExceedPinSize) {
   int32_t ret;
-  fuse_req_t req1;
-  struct stat tempstat;
+  fuse_req_t req1 = {0};
+  HCFS_STAT tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
 
   hcfs_system->systemdata.pinned_size = 10000;
   system_config->max_cache_limit[1] = 1024768;
   system_config->max_pinned_limit[1] = 1024768 * 0.8;
-  tempstat.st_size = 1024;
-  tempstat.st_mode = S_IFREG;
+  tempstat.size = 1024;
+  tempstat.mode = S_IFREG;
   ret = do_fallocate(14, &tempstat, 0, 0, 1024768, &tmpptr, req1);
   ASSERT_EQ(-ENOSPC, ret);
 
-  EXPECT_EQ(tempstat.st_size, 1024);
+  EXPECT_EQ(tempstat.size, 1024);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
 }
 
 TEST_F(do_fallocateTest, ExceedSystemQuota) {
   int32_t ret;
-  fuse_req_t req1;
-  struct stat tempstat;
+  fuse_req_t req1 = {0};
+  HCFS_STAT tempstat;
   META_CACHE_ENTRY_STRUCT *tmpptr;
 
   hcfs_system->systemdata.system_quota = 12800000 - 1;
-  tempstat.st_size = 1024;
-  tempstat.st_mode = S_IFREG;
+  tempstat.size = 1024;
+  tempstat.mode = S_IFREG;
   ret = do_fallocate(14, &tempstat, 0, 0, 1024700000, &tmpptr, req1);
   ASSERT_EQ(-ENOSPC, ret);
 
-  EXPECT_EQ(tempstat.st_size, 1024);
+  EXPECT_EQ(tempstat.size, 1024);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000);
 }
 

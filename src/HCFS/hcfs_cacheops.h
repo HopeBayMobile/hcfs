@@ -18,8 +18,6 @@
 #include <unistd.h>
 #include <semaphore.h>
 
-#include "fuseop.h"
-
 #define SCAN_INT 300
 
 int32_t sleep_on_cache_full(void);

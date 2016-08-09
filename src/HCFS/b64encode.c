@@ -149,7 +149,7 @@ int32_t b64decode_str(char *inputstr, uint8_t *outputstr, int32_t *outlen,
 	char buf[4] = {0};
 
 	while (i < inputlen) {
-		char decode = decode_table(inputstr[i++]);
+		signed char decode = decode_table(inputstr[i++]);
 
 		if (decode == -1) {
 			/* not allowed characters occurs */

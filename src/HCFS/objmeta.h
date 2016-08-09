@@ -8,7 +8,7 @@ typedef struct {
 	int32_t count;
 } HTTP_meta;
 
-HTTP_meta *new_http_meta();
+HTTP_meta *new_http_meta(void);
 
 void delete_http_meta(HTTP_meta *);
 

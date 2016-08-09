@@ -18,8 +18,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "fuseop.h"
 #include "hcfscurl.h"
+#include "global.h"
 
 #ifdef _ANDROID_ENV_
 #include <pthread.h>
@@ -69,12 +69,12 @@ pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
 int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname);
 
-void download_block_manager();
-int32_t init_download_control();
-int32_t destroy_download_control();
-void fetch_backend_block(void *ptr);
+void* download_block_manager(void *arg);
+int32_t init_download_control(void);
+int32_t destroy_download_control(void);
+void* fetch_backend_block(void *ptr);
 int32_t fetch_pinned_blocks(ino_t inode);
 void fetch_quota_from_cloud(void *ptr);
-int32_t update_quota();
+int32_t update_quota(void);
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

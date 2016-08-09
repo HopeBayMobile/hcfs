@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ftw.h>
 extern "C" {
 #include "mock_params.h"
 #include "hcfs_cachebuild.h"
@@ -13,6 +14,23 @@ extern "C" {
 #include "global.h"
 }
 
+SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 /* A base class used to be derived from those need to mock cache_usage_node */
 
 class BaseClassForCacheUsageArray : public ::testing::Test {
@@ -173,8 +191,11 @@ TEST_F(insert_cache_usage_nodeTest, InsertSuccess)
 	bool found_node;
 
 	ASSERT_EQ(0, cache_usage_hash_init());
-	for (uint32_t node_id = 0 ; node_id < 500000 ; node_id++) {
-		
+	for (uint32_t node_id = 0 ; node_id <= 500000 ; node_id++) {
+		if (node_id % 10000 == 0)
+			printf("%u\n", node_id);
+		fflush(stdout);
+
 		/* Mock data */
 		CACHE_USAGE_NODE *node = (CACHE_USAGE_NODE *)malloc(sizeof(CACHE_USAGE_NODE));
 		memset(node, 0, sizeof(CACHE_USAGE_NODE));
@@ -226,16 +247,18 @@ protected:
 	}
 	void TearDown()
 	{
-		for (int32_t i = 0 ; i < answer_node_list.size() ; i++)
+		size_t i;
+		for (i = 0 ; i < answer_node_list.size() ; i++)
 			free(answer_node_list[i]);
-		delete_mock_dir(BLOCKPATH);
-		rmdir(BLOCKPATH);
+		nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
 		free(system_config);
 
 		BaseClassForCacheUsageArray::TearDown();
 	}
 	void generate_mock_data() {
-		int32_t num_node;	
+		int32_t num_node;
+		struct stat tmpstat; /* block ops */
+
 		srand(time(NULL));
 		num_node = rand() % 1000;
 		for (int32_t times = 0 ; times < num_node ; times++) {
@@ -259,7 +282,6 @@ protected:
 				rand_size = rand() % 100;
 				ftruncate(fd, rand_size);
 #ifdef _ANDROID_ENV_
-				struct stat tmpstat;
 				stat(path, &tmpstat);
 #endif
 				if (block_id % 2) {
@@ -278,7 +300,6 @@ protected:
 					answer_node->clean_cache_size += rand_size;
 				}
 				if (block_id == num_block_per_node - 1) {
-					struct stat tmpstat;
 					stat(path, &tmpstat);
 					answer_node->last_access_time = tmpstat.st_atime;
 					answer_node->last_mod_time = tmpstat.st_mtime;
@@ -314,7 +335,7 @@ protected:
 			readdir_r(dirptr, &tmp_dirent, &dirent_ptr);
 		}
 		closedir(dirptr);
-		rmdir(path);
+		nftw(path, do_delete, 20, FTW_DEPTH);
 	}
 
 };
@@ -330,10 +351,11 @@ TEST_F(build_cache_usageTest, Nothing_in_Directory)
 TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 {
 	int32_t semval;
+	size_t i;
 	/* generate mock data */
-	for (int32_t i = 0 ; i < NUMSUBDIR ; i++) {
+	for (i = 0 ; i < NUMSUBDIR ; i++) {
 		char tmp_path[100];
-		sprintf(tmp_path, "%s/sub_%d", BLOCKPATH, i);
+		sprintf(tmp_path, "%s/sub_%zu", BLOCKPATH, i);
 		ASSERT_EQ(0, mkdir(tmp_path, 0700));
 	}
 	generate_mock_data();
@@ -345,7 +367,7 @@ TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 	EXPECT_EQ(0, semval);
 
 	/* Check answer */
-	for (int32_t i = 0 ; i < answer_node_list.size() ; i++) {
+	for (i = 0 ; i < answer_node_list.size() ; i++) {
 		CACHE_USAGE_NODE *ans_node = answer_node_list[i];
 		CACHE_USAGE_NODE *now_node;
 		ino_t node_id = ans_node->this_inode;

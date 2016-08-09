@@ -1,6 +1,6 @@
 #include "objmeta.h"
 
-HTTP_meta *new_http_meta()
+HTTP_meta *new_http_meta(void)
 {
 	HTTP_meta *meta = calloc(1, sizeof(HTTP_meta));
 

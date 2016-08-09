@@ -314,9 +314,11 @@ void init_backend_related_module(void)
 	}
 
 	if (CURRENT_BACKEND != NONE) {
+#ifdef _ANDROID_ENV_
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
-		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+#endif
+		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
@@ -613,7 +615,7 @@ int32_t main(int32_t argc, char **argv)
 		sem_init(&download_curl_control_sem, 0, 1);
 		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
 				count++)
-			_init_download_curl(count, "upload_loop");
+			_init_download_curl(count);
 
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);

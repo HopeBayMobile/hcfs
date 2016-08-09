@@ -79,17 +79,19 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: fetch_inode_stat
-*        Inputs: ino_t this_inode, struct stat *inode_stat
-*       Summary: Read inode "struct stat" from meta cache, and then return
+*        Inputs: ino_t this_inode, HCFS_STAT *inode_stat
+*       Summary: Read inode "HCFS_STAT" from meta cache, and then return
 *                to the caller via "inode_stat".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		uint64_t *ret_gen, char *ret_pin_status)
+int32_t fetch_inode_stat(ino_t this_inode,
+			 HCFS_STAT *inode_stat,
+			 uint64_t *ret_gen,
+			 char *ret_pin_status)
 {
-	struct stat returned_stat;
+	HCFS_STAT returned_stat;
 	int32_t ret_code;
 	META_CACHE_ENTRY_STRUCT *temp_entry;
 	FILE_META_TYPE filemeta;
@@ -110,7 +112,7 @@ int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 			goto error_handling;
 
 		if (ret_gen != NULL || ret_pin_status != NULL) {
-			if (S_ISFILE(returned_stat.st_mode)) {
+			if (S_ISFILE(returned_stat.mode)) {
 				ret_code = meta_cache_lookup_file_data(
 						this_inode, NULL, &filemeta,
 						NULL, 0, temp_entry);
@@ -121,7 +123,7 @@ int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 				if (ret_gen)
 					*ret_gen = filemeta.generation;
 			}
-			if (S_ISDIR(returned_stat.st_mode)) {
+			if (S_ISDIR(returned_stat.mode)) {
 				ret_code = meta_cache_lookup_dir_data(
 						this_inode, NULL, &dirmeta,
 						NULL, temp_entry);
@@ -132,7 +134,7 @@ int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 				if (ret_gen)
 					*ret_gen = dirmeta.generation;
 			}
-			if (S_ISLNK(returned_stat.st_mode)) {
+			if (S_ISLNK(returned_stat.mode)) {
 				ret_code = meta_cache_lookup_symlink_data(
 						this_inode, NULL, &symlinkmeta,
 						temp_entry);
@@ -154,9 +156,9 @@ int32_t fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		ret_code = meta_cache_unlock_entry(temp_entry);
 
 		if ((ret_code == 0) && (inode_stat != NULL)) {
-			memcpy(inode_stat, &returned_stat, sizeof(struct stat));
+			memcpy(inode_stat, &returned_stat, sizeof(HCFS_STAT));
 			write_log(10, "fetch_inode_stat get inode %lld\n",
-				inode_stat->st_ino);
+				inode_stat->ino);
 			return 0;
 		}
 
@@ -192,7 +194,7 @@ static inline int32_t dir_remove_fail_node(ino_t parent_inode, ino_t child_inode
 *
 * Function name: mknod_update_meta
 *        Inputs: ino_t self_inode, ino_t parent_inode, char *selfname,
-*                struct stat *this_stat, ino_t root_ino
+*                HCFS_STAT *this_stat, ino_t root_ino
 *       Summary: Helper of "hfuse_mknod" function. Will save the inode stat
 *                of the newly create regular file to meta cache, and also
 *                add this new entry to its parent.
@@ -202,7 +204,7 @@ static inline int32_t dir_remove_fail_node(ino_t parent_inode, ino_t child_inode
 *************************************************************************/
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, uint64_t this_gen,
+			HCFS_STAT *this_stat, uint64_t this_gen,
 			ino_t root_ino, int64_t *delta_meta_size, char ispin)
 {
 	int32_t ret_val, ret, errcode;
@@ -242,7 +244,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	sem_post(&(pathlookup_data_lock));
 
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
-						this_stat->st_mode, body_ptr);
+						this_stat->mode, body_ptr);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -260,7 +262,6 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	/* Init file meta */
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
 	this_meta.generation = this_gen;
-	this_meta.metaver = CURRENT_META_VER;
         this_meta.finished_seq = 0;
 	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
@@ -272,7 +273,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		return -ENOMEM;
 	}
 
@@ -281,28 +282,28 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 							NULL, 0, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		goto error_handling;
 	}
 
 	ret_val = meta_cache_open_file(body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		goto error_handling;
 	}
 	memset(&file_stats, 0, sizeof(FILE_STATS_TYPE));
-	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	FSEEK(body_ptr->fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
 		SEEK_SET);
 	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
 	
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	FSEEK(body_ptr->fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE), SEEK_SET);
 	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, body_ptr->fptr);
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
-	if (S_ISFILE(this_stat->st_mode)) {
+	if (S_ISFILE(this_stat->mode)) {
 		write_log(10, "Debug:inode %"PRIu64" begin to inherit xattrs\n",
 				(uint64_t)self_inode);
 		ret_val = inherit_xattr(parent_inode, self_inode, body_ptr);
@@ -350,7 +351,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	return 0;
 errcode_handle:
 	dir_remove_fail_node(parent_inode, self_inode,
-				selfname, this_stat->st_mode);
+				selfname, this_stat->mode);
 	ret_val = errcode;
 error_handling:
 	meta_cache_close_file(body_ptr);
@@ -362,7 +363,7 @@ error_handling:
 *
 * Function name: mkdir_update_meta
 *        Inputs: ino_t self_inode, ino_t parent_inode, char *selfname,
-*                struct stat *this_stat, ino_t root_ino
+*                HCFS_STAT *this_stat, ino_t root_ino
 *       Summary: Helper of "hfuse_mkdir" function. Will save the inode stat
 *                of the newly create directory object to meta cache, and also
 *                add this new entry to its parent.
@@ -370,10 +371,14 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
-			const char *selfname,
-			struct stat *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_meta_size, char ispin)
+int32_t mkdir_update_meta(ino_t self_inode,
+			  ino_t parent_inode,
+			  const char *selfname,
+			  HCFS_STAT *this_stat,
+			  uint64_t this_gen,
+			  ino_t root_ino,
+			  int64_t *delta_meta_size,
+			  char ispin)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
@@ -409,7 +414,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	sem_post(&(pathlookup_data_lock));
 
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
-						this_stat->st_mode, body_ptr);
+						this_stat->mode, body_ptr);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -430,11 +435,10 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
 	/* Initialize new directory object and save the meta to meta cache */
-	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE)
-			+ sizeof(CLOUD_RELATED_DATA);
+	this_meta.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE) +
+				    sizeof(CLOUD_RELATED_DATA);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
-	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.finished_seq = 0;
@@ -445,14 +449,14 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		return ret_val;
 	}
 
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		return -ENOMEM;
 	}
 
@@ -460,7 +464,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		return ret_val;
 	}
 
@@ -469,12 +473,12 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 							NULL, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		goto error_handling;
 	}
 
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+	FSEEK(body_ptr->fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
 			SEEK_SET);
 	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 			body_ptr->fptr);
@@ -483,7 +487,7 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			&temppage, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->st_mode);
+			selfname, this_stat->mode);
 		goto error_handling;
 	}
 #ifdef _ANDROID_ENV_
@@ -784,7 +788,7 @@ error_handling:
 *
 * Function name: symlink_update_meta
 *        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
-*                const struct stat *this_stat, const char *link,
+*                const HCFS_STAT *this_stat, const char *link,
 *                const uint64_t generation, const char *name
 *                ino_t root_ino
 *       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
@@ -796,9 +800,13 @@ error_handling:
 *
 *************************************************************************/
 int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
-	const struct stat *this_stat, const char *link,
-	const uint64_t generation, const char *name,
-	ino_t root_ino, int64_t *delta_meta_size, char ispin)
+			    const HCFS_STAT *this_stat,
+			    const char *link,
+			    const uint64_t generation,
+			    const char *name,
+			    ino_t root_ino,
+			    int64_t *delta_meta_size,
+			    char ispin)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
@@ -810,7 +818,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	size_t ret_size;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
-	self_inode = this_stat->st_ino;
+	self_inode = this_stat->ino;
 	*delta_meta_size = 0;
 
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
@@ -836,7 +844,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	sem_post(&(pathlookup_data_lock));
 
 	ret_code = dir_add_entry(parent_inode, self_inode, name,
-		this_stat->st_mode, parent_meta_cache_entry);
+		this_stat->mode, parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
 		return ret_code;
@@ -852,7 +860,6 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
 	symlink_meta.link_len = strlen(link);
 	symlink_meta.generation = generation;
-	symlink_meta.metaver = CURRENT_META_VER;
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
 	symlink_meta.finished_seq = 0;
@@ -865,7 +872,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
 	if (self_meta_cache_entry == NULL) {
 		dir_remove_entry(parent_inode, self_inode, name,
-			this_stat->st_mode, parent_meta_cache_entry);
+			this_stat->mode, parent_meta_cache_entry);
 		return -ENOMEM;
 	}
 
@@ -873,7 +880,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	if (ret_code < 0) {
 		meta_cache_unlock_entry(self_meta_cache_entry);
 		dir_remove_entry(parent_inode, self_inode, name,
-			this_stat->st_mode, parent_meta_cache_entry);
+			this_stat->mode, parent_meta_cache_entry);
 		return ret_code;
 	}
 
@@ -884,12 +891,12 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		meta_cache_close_file(self_meta_cache_entry);
 		meta_cache_unlock_entry(self_meta_cache_entry);
 		dir_remove_entry(parent_inode, self_inode, name,
-			this_stat->st_mode, parent_meta_cache_entry);
+			this_stat->mode, parent_meta_cache_entry);
 		return ret_code;
 	}
 
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	FSEEK(self_meta_cache_entry->fptr, sizeof(struct stat) +
+	FSEEK(self_meta_cache_entry->fptr, sizeof(HCFS_STAT) +
 			sizeof(SYMLINK_META_TYPE), SEEK_SET);
 	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
 			1, self_meta_cache_entry->fptr);
@@ -962,7 +969,7 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 {
 	int32_t ret_code;
 	ino_t this_inode;
-	struct stat stat_data;
+	HCFS_STAT stat_data;
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
 	SYMLINK_META_TYPE symlinkmeta;
@@ -990,22 +997,22 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	/* Get metadata by case */
 #ifdef _ANDROID_ENV_
-	if (S_ISFILE(stat_data.st_mode)) {
+	if (S_ISFILE(stat_data.mode)) {
 #else
-	if (S_ISREG(stat_data.st_mode)) {
+	if (S_ISREG(stat_data.mode)) {
 #endif
 		ret_code = meta_cache_lookup_file_data(this_inode, NULL,
 			&filemeta, NULL, 0, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = filemeta.next_xattr_page;
-	} else if (S_ISDIR(stat_data.st_mode)) {
+	} else if (S_ISDIR(stat_data.mode)) {
 		ret_code = meta_cache_lookup_dir_data(this_inode, NULL,
 			&dirmeta, NULL, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = dirmeta.next_xattr_page;
-	} else if (S_ISLNK(stat_data.st_mode)) {
+	} else if (S_ISLNK(stat_data.mode)) {
 		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL,
 			&symlinkmeta, meta_cache_entry);
 		if (ret_code < 0)
@@ -1035,9 +1042,9 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 		/* Update xattr filepos in meta cache */
 #ifdef _ANDROID_ENV_
-		if (S_ISFILE(stat_data.st_mode)) {
+		if (S_ISFILE(stat_data.mode)) {
 #else
-		if (S_ISREG(stat_data.st_mode)) {
+		if (S_ISREG(stat_data.mode)) {
 #endif
 			filemeta.next_xattr_page = *xattr_pos;
 			ret_code = meta_cache_update_file_data(this_inode, NULL,
@@ -1047,7 +1054,7 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			write_log(10, "Debug: A new xattr page in "
 				"regfile meta\n");
 		}
-		if (S_ISDIR(stat_data.st_mode)) {
+		if (S_ISDIR(stat_data.mode)) {
 			dirmeta.next_xattr_page = *xattr_pos;
 			ret_code = meta_cache_update_dir_data(this_inode, NULL,
 				&dirmeta, NULL, meta_cache_entry);
@@ -1055,7 +1062,7 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 				return ret_code;
 			write_log(10, "Debug: A new xattr page in dir meta\n");
 		}
-		if (S_ISLNK(stat_data.st_mode)) {
+		if (S_ISLNK(stat_data.mode)) {
 			symlinkmeta.next_xattr_page = *xattr_pos;
 			ret_code = meta_cache_update_symlink_data(this_inode,
 				NULL, &symlinkmeta, meta_cache_entry);
@@ -1080,7 +1087,7 @@ errcode_handle:
 *
 * Function name: link_update_meta
 *        Inputs: ino_t link_inode, const char *newname,
-*                struct stat *link_stat, uint64_t *generation,
+*                HCFS_STAT *link_stat, uint64_t *generation,
 *                META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry
 *       Summary: Helper of link operation in FUSE. Given the inode numebr
 *                "link_inode", this function will increase link number
@@ -1093,9 +1100,11 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t link_update_meta(ino_t link_inode, const char *newname,
-	struct stat *link_stat, uint64_t *generation,
-	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+int32_t link_update_meta(ino_t link_inode,
+			 const char *newname,
+			 HCFS_STAT *link_stat,
+			 uint64_t *generation,
+			 META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {
 	META_CACHE_ENTRY_STRUCT *link_entry;
 	FILE_META_TYPE filemeta;
@@ -1119,23 +1128,23 @@ int32_t link_update_meta(ino_t link_inode, const char *newname,
 	*generation = filemeta.generation;
 
 	/* Hard link to dir is not allowed */
-	if (S_ISDIR(link_stat->st_mode)) {
+	if (S_ISDIR(link_stat->mode)) {
 		write_log(0, "Hard link to a dir is not allowed.\n");
 		ret_val = -EISDIR;
 		goto error_handle;
 	}
 
 	/* Check number of links */
-	if (link_stat->st_nlink >= MAX_HARD_LINK) {
+	if (link_stat->nlink >= MAX_HARD_LINK) {
 		write_log(0, "Too many links for this file, now %ld links",
-			link_stat->st_nlink);
+			link_stat->nlink);
 		ret_val = -EMLINK;
 		goto error_handle;
 	}
 
-	link_stat->st_nlink++; /* Hard link ++ */
+	link_stat->nlink++; /* Hard link ++ */
 	write_log(10, "Debug: inode %lld has %lld links\n",
-		link_inode, link_stat->st_nlink);
+		link_inode, link_stat->nlink);
 
 	ret_val = meta_cache_open_file(link_entry);
 	if (ret_val < 0)
@@ -1159,9 +1168,9 @@ int32_t link_update_meta(ino_t link_inode, const char *newname,
 
 	/* Add entry to this dir */
 	ret_val = dir_add_entry(parent_inode, link_inode, newname,
-		link_stat->st_mode, parent_meta_cache_entry);
+		link_stat->mode, parent_meta_cache_entry);
 	if (ret_val < 0) {
-		link_stat->st_nlink--; /* Recover nlink */
+		link_stat->nlink--; /* Recover nlink */
 		meta_cache_update_file_data(link_inode, link_stat,
 			NULL, NULL, 0, link_entry);
 		goto error_handle;
@@ -1251,10 +1260,12 @@ int32_t increase_pinned_size(int64_t *reserved_pinned_size,
  * @return 0 on success, 1 on case that regfile/symlink had been pinned,
  *         otherwise negative error code.
  */
-int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type)
+int32_t pin_inode(ino_t this_inode,
+		  int64_t *reserved_pinned_size,
+		  char pin_type)
 {
 	int32_t ret;
-	struct stat tempstat;
+	HCFS_STAT tempstat;
 	ino_t *dir_node_list, *nondir_node_list;
 	int64_t count, num_dir_node, num_nondir_node;
 
@@ -1263,7 +1274,7 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 		return ret;
 
 
-	ret = change_pin_flag(this_inode, tempstat.st_mode, pin_type);
+	ret = change_pin_flag(this_inode, tempstat.mode, pin_type);
 	if (ret < 0) {
 		return ret;
 
@@ -1273,29 +1284,29 @@ int32_t pin_inode(ino_t this_inode, int64_t *reserved_pinned_size, char pin_type
 							(uint64_t)this_inode);
 	} else { /* Succeed in pinning */
 		/* Change pinned size if succeding in pinning this inode. */
-		if (S_ISREG(tempstat.st_mode)) {
+		if (S_ISREG(tempstat.mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
-					tempstat.st_size, pin_type);
+					tempstat.size, pin_type);
 			if (ret == -ENOSPC) {
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
 				change_pin_flag(this_inode,
-					tempstat.st_mode, P_UNPIN);
+					tempstat.mode, P_UNPIN);
 				return ret;
 			}
 		}
 
-		ret = super_block_mark_pin(this_inode, tempstat.st_mode);
+		ret = super_block_mark_pin(this_inode, tempstat.mode);
 		if (ret < 0)
 			return ret;
 	}
 
 	/* After pinning self, pin all its children for dir.
 	 * Files(reg, fifo, socket) can be directly returned. */
-	if (S_ISFILE(tempstat.st_mode)) {
+	if (S_ISFILE(tempstat.mode)) {
 		return ret;
 
-	} else if (S_ISLNK(tempstat.st_mode)) {
+	} else if (S_ISLNK(tempstat.mode)) {
 		return ret;
 
 	} else { /* expand dir */
@@ -1390,7 +1401,7 @@ int32_t decrease_pinned_size(int64_t *reserved_release_size, int64_t file_size)
 int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 {
 	int32_t ret, semval;
-	struct stat tempstat;
+	HCFS_STAT tempstat;
 	ino_t *dir_node_list, *nondir_node_list;
 	int64_t count, num_dir_node, num_nondir_node;
 
@@ -1399,7 +1410,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		return ret;
 
 
-	ret = change_pin_flag(this_inode, tempstat.st_mode, P_UNPIN);
+	ret = change_pin_flag(this_inode, tempstat.mode, P_UNPIN);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to unpin inode %"PRIu64"."
 			" Code %d\n", (uint64_t)-ret);
@@ -1413,18 +1424,18 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 	} else { /* Succeed in unpinning */
 
 		/* Deduct from reserved size */
-		if (S_ISREG(tempstat.st_mode)) {
+		if (S_ISREG(tempstat.mode)) {
 			decrease_pinned_size(reserved_release_size,
-			 		tempstat.st_size);
+			 		tempstat.size);
 		}
 
-		ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
+		ret = super_block_mark_unpin(this_inode, tempstat.mode);
 		if (ret < 0)
 			return ret;
 	}
 
 	/* After unpinning itself, unpin all its children for dir */
-	if (S_ISFILE(tempstat.st_mode)) {
+	if (S_ISFILE(tempstat.mode)) {
 		/* First post the control for cache mangement */
 		semval = 0;
 		ret = sem_getvalue(&(hcfs_system->something_to_replace),
@@ -1434,7 +1445,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 
 		return ret;
 
-	} else if (S_ISLNK(tempstat.st_mode)) {
+	} else if (S_ISLNK(tempstat.mode)) {
 		return ret;
 
 	} else { /* expand dir */
@@ -1502,7 +1513,7 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	char toupload_metapath[300], local_metapath[300];
 	PROGRESS_META progress_meta;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	int32_t errcode;
 	ssize_t ret_ssize;
 	int64_t toupload_blocks;
@@ -1565,13 +1576,13 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 			}
 
 			/* Update info of to-upload blocks and size */
-			if (S_ISREG(tmpstat.st_mode)) {
+			if (S_ISREG(tmpstat.mode)) {
 				flock(data->progress_list_fd, LOCK_EX);
 				PREAD(data->progress_list_fd, &progress_meta,
 						sizeof(PROGRESS_META), 0);
-				progress_meta.toupload_size = tmpstat.st_size;
-				toupload_blocks = (tmpstat.st_size == 0) ?
-						0 : (tmpstat.st_size - 1) /
+				progress_meta.toupload_size = tmpstat.size;
+				toupload_blocks = (tmpstat.size == 0) ?
+						0 : (tmpstat.size - 1) /
 						MAX_BLOCK_SIZE + 1;
 				progress_meta.total_toupload_blocks =
 						toupload_blocks;

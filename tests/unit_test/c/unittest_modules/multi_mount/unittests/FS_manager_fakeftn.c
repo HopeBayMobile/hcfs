@@ -80,17 +80,13 @@ int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 }
 
 
-ino_t super_block_new_inode(struct stat *in_stat,
+ino_t super_block_new_inode(HCFS_STAT *in_stat,
 				uint64_t *ret_generation)
 {
 	return fakeino;
 }
 
 int32_t super_block_mark_dirty(ino_t this_inode)
-{
-	return 0;
-}
-void set_timestamp_now(struct stat *thisstat, char mode)
 {
 	return 0;
 }
@@ -107,7 +103,6 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 }
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
-	return 200;
 }
 int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HTTP_meta *meta)
@@ -178,8 +173,12 @@ int32_t get_meta_size(ino_t inode, int64_t *metasize)
 }
 
 int32_t change_system_meta(int64_t system_data_size_delta,
-	int64_t meta_size_delta, int64_t cache_data_size_delta,
-	int64_t cache_blocks_delta, int64_t dirty_cache_delta)
+			   int64_t meta_size_delta,
+			   int64_t cache_data_size_delta,
+			   int64_t cache_blocks_delta,
+			   int64_t dirty_cache_delta,
+			   int64_t unpin_dirty_data_size,
+			   BOOL need_sync)
 {
 	return 0;
 }

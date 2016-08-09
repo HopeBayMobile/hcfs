@@ -78,7 +78,7 @@ TEST_F(list_external_volumeTest, ListExternalVolumeEIO)
 
 	pread_fake.custom_fake = &real_pread;
 	ret_code = list_external_volume("/proc/self/mem", &list, &number);
-	ASSERT_TRUE(ret_code < 0);
+	EXPECT_LT(ret_code, 0);
 }
 
 TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
@@ -92,7 +92,7 @@ TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
 
 	ret_code = list_external_volume("test_nexus_5x/fsmgr", &list, &number);
 	printf("%d\n", ret_code);
-	printf("number %d\n", number);
+	printf("number %lu\n", number);
 	ASSERT_TRUE(ret_code < 0);
 }
 TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
@@ -126,61 +126,51 @@ class parse_metaTest : public ::testing::Test
 TEST_F(parse_metaTest, OpenDir)
 {
 	RET_META meta;
-	int32_t ret_code;
 
 	pread_fake.custom_fake = &real_pread;
-	ret_code = parse_meta("test_nexus_5x/meta", &meta);
-	ASSERT_EQ(ret_code, 0);
+	parse_meta("test_nexus_5x/meta", &meta);
 	ASSERT_EQ(meta.result, 0);
 	ASSERT_EQ(meta.file_type, D_ISDIR);
 }
 TEST_F(parse_metaTest, OpenFile)
 {
 	RET_META meta;
-	int32_t ret_code;
 
-	ret_code = parse_meta("test_nexus_5x/meta_isreg", &meta);
-	ASSERT_EQ(ret_code, 0);
+	parse_meta("test_nexus_5x/meta_isreg", &meta);
 	ASSERT_EQ(meta.result, 0);
 	ASSERT_EQ(meta.file_type, D_ISREG);
 }
 TEST_F(parse_metaTest, OpenFifo)
 {
 	RET_META meta;
-	int32_t ret_code;
 
-	ret_code = parse_meta("test_nexus_5x/meta_isfifo", &meta);
-	ASSERT_EQ(ret_code, 0);
+	parse_meta("test_nexus_5x/meta_isfifo", &meta);
 	ASSERT_EQ(meta.result, 0);
 	ASSERT_EQ(meta.file_type, D_ISFIFO);
 }
 TEST_F(parse_metaTest, OpenLink)
 {
 	RET_META meta;
-	int32_t ret_code;
 
-	ret_code = parse_meta("test_nexus_5x/meta_islink", &meta);
-	ASSERT_EQ(ret_code, 0);
+	parse_meta("test_nexus_5x/meta_islink", &meta);
 	ASSERT_EQ(meta.result, 0);
 	ASSERT_EQ(meta.file_type, D_ISLNK);
 }
 TEST_F(parse_metaTest, OpenError)
 {
 	RET_META meta;
-	int32_t ret_code;
 
-	ret_code = parse_meta("test_nexus_5x/not_exist", &meta);
-	ASSERT_TRUE(ret_code < 0);
+	parse_meta("test_nexus_5x/not_exist", &meta);
+	ASSERT_TRUE(meta.result < 0);
 	ASSERT_EQ(meta.result, -1);
 }
 TEST_F(parse_metaTest, ParseMetaEIO)
 {
 	RET_META meta;
-	int32_t ret_code;
 
-	ret_code = parse_meta("/proc/self/mem", &meta);
-	printf("parse_meta ret_code %d", ret_code);
-	ASSERT_TRUE(ret_code < 0);
+	parse_meta("/proc/self/mem", &meta);
+	printf("parse_meta meta.result %d", meta.result);
+	ASSERT_TRUE(meta.result < 0);
 	ASSERT_EQ(meta.result, -1);
 }
 /* End unittest for parse_meta */

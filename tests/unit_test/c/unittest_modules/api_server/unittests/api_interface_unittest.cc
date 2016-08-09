@@ -210,7 +210,7 @@ class api_moduleTest : public ::testing::Test
 		fd = 0;
 		METAPATH = (char *)malloc(sizeof(char) * 100);
 		snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
-		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+		nftw("/tmp/testHCFS", &do_delete, 20, FTW_DEPTH);
 		mkdir("/tmp/testHCFS", 0700);
 		if (access(METAPATH, F_OK) != 0)
 			mkdir(METAPATH, 0700);
@@ -255,8 +255,10 @@ class api_moduleTest : public ::testing::Test
 		return status;
 	}
 
-	static int32_t do_delete(const char *fpath, const struct stat *sb, int32_t tflag,
-		      struct FTW *ftwbuf)
+	static int32_t do_delete(const char *fpath,
+				 const HCFS_STAT *sb,
+				 int32_t tflag,
+				 struct FTW *ftwbuf)
 	{
 		UNUSED(sb);
 		UNUSED(ftwbuf);

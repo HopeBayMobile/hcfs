@@ -13,7 +13,7 @@
 #define GOODMSG "goodmsg"
 #define BADMSG "badmsg"
 
-void *init_mock_server()
+void *init_mock_server(void)
 {
 	int32_t r_size;
 	int32_t sock_fd, sock_flag, confirm_flag, sock_len;

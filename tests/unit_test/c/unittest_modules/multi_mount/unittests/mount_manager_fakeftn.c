@@ -10,7 +10,7 @@
 #include "lookup_count.h"
 
 struct fuse_chan {
-	int32_t test
+	int32_t test;
 } tmpchan;
 extern SYSTEM_CONF_STRUCT *system_config;
 

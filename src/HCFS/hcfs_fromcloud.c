@@ -57,7 +57,9 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	int32_t status;
 	int32_t which_curl_handle;
 	int32_t ret, errcode;
+#if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	int64_t tmplen;
+#endif
 
 	if (hcfs_system->sync_paused)
 		return -EIO;
@@ -183,7 +185,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	char thismetapath[METAPATHLEN];
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t entry_index;
-	struct stat tempstat;
+	struct stat blockstat; /* block ops */
 	int32_t ret, errcode, semval;
 	size_t ret_size;
 	char block, mlock, bopen, mopen;
@@ -261,7 +263,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		mlock = TRUE;
 		FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 		FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
-		if (stat(thisblockpath, &tempstat) == 0) {
+		if (stat(thisblockpath, &blockstat) == 0) {
 			if ((temppage).block_entries[entry_index].status ==
 					ST_CtoL) {
 				(temppage).block_entries[entry_index].status =
@@ -276,7 +278,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 						metafptr);
 			}
 			ret = update_file_stats(metafptr, 0, 1,
-						tempstat.st_size,
+						blockstat.st_size,
 						0, ptr->this_inode);
 			if (ret < 0) {
 				errcode = ret;
@@ -286,7 +288,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			fflush(metafptr);
 
 			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->systemdata.cache_size += tempstat.st_size;
+			hcfs_system->systemdata.cache_size += blockstat.st_size;
 			hcfs_system->systemdata.cache_blocks++;
 			sync_hcfs_system_data(FALSE);
 			sem_post(&(hcfs_system->access_sem));
@@ -362,7 +364,7 @@ int32_t destroy_download_control()
  * active threads later.
  *
  */
-void download_block_manager()
+void* download_block_manager(void *arg)
 {
 	int32_t t_idx;
 	int32_t ret;
@@ -371,6 +373,7 @@ void download_block_manager()
 	struct timespec time_to_sleep;
 	char error_path[200];
 	FILE *fptr;
+	UNUSED(arg);
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -440,6 +443,8 @@ void download_block_manager()
 
 		nanosleep(&time_to_sleep, NULL);
 	}
+
+	return NULL;
 }
 
 static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
@@ -522,14 +527,14 @@ static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
  *
  * @return none.
  */
-void fetch_backend_block(void *ptr)
+void* fetch_backend_block(void *ptr)
 {
 	char block_path[400];
 	char objname[600];
 	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
 	int32_t ret, semval;
-	struct stat blockstat;
+	struct stat blockstat; /* block ops */
 
 	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
 	fetch_block_path(block_path, block_info->this_inode,
@@ -541,7 +546,7 @@ void fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
-		return;
+		return NULL;
 	}
 	fclose(block_fptr);
 
@@ -550,7 +555,7 @@ void fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
-		return;
+		return NULL;
 	}
 
 	/* Fetch block from cloud */
@@ -581,7 +586,7 @@ void fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
-			return;
+			return NULL;
 		}
 	}
 
@@ -634,7 +639,7 @@ void fetch_backend_block(void *ptr)
 				block_info->block_no, __func__);
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
-			return;
+			return NULL;
 
 		} else { /* Strange.. */
 			write_log(5, "block_%"PRIu64"_%lld has status %d when"
@@ -667,7 +672,7 @@ void fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
-			return;
+			return NULL;
 		}
 	}
 
@@ -681,16 +686,16 @@ void fetch_backend_block(void *ptr)
 		block_info->dl_error = TRUE;
 	*/
 
-	return;
+	return NULL;
 
 thread_error:
 	block_info->dl_error = TRUE;
 	flock(fileno(block_fptr), LOCK_UN);
 	fclose(block_fptr);
-	return;
+	return NULL;
 }
 
-static inline int32_t _select_thread()
+static inline int32_t _select_thread(void)
 {
 	int32_t count;
 	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++) {
@@ -721,7 +726,7 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 	}
 
 	/* Check pin-status. It may be modified to UNPIN by other processes */
-	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (P_IS_UNPIN(filemeta.local_pin)) {
 		flock(fileno(fptr), LOCK_UN);
@@ -777,7 +782,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 {
 	char metapath[300];
 	FILE *fptr;
-	struct stat tempstat;
+	HCFS_STAT tempstat;
 	off_t total_size;
 	int64_t total_blocks, blkno;
 	int64_t which_page, current_page, page_pos;
@@ -803,8 +808,8 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
 	FSEEK(fptr, 0, SEEK_SET);
-	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
-	if (!S_ISREG(tempstat.st_mode)) {
+	FREAD(&tempstat, sizeof(HCFS_STAT), 1, fptr);
+	if (!S_ISREG(tempstat.mode)) {
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		return 0;
@@ -814,7 +819,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
 
-	total_size = tempstat.st_size;
+	total_size = tempstat.size;
 	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
 
 	fetch_error_download_path(error_path, inode);
@@ -917,7 +922,7 @@ errcode_handle:
 /**
  * Condition to wake the thread up.
  */
-static BOOL quota_wakeup()
+static BOOL quota_wakeup(void)
 {
 	if ((hcfs_system->system_going_down == TRUE) ||
 			(hcfs_system->backend_is_online == TRUE))

@@ -2,9 +2,10 @@
 #include <semaphore.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 #include "super_block.h"
 #include "fuseop.h"
-#include "mock_tool.h"
+#include "mock_function.h"
 #include "meta_mem_cache.h"
 /*
 	Mock fetch_meta_path() function
@@ -30,8 +31,9 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 	return 0;
 }
 
-int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
-                                BOOL no_sync)
+int32_t super_block_update_stat(ino_t this_inode,
+				HCFS_STAT *newstat,
+				BOOL no_sync)
 {
 	return 0;
 }
@@ -66,16 +68,16 @@ int32_t search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int32_t
 	return -ENOENT;
 }
 
-struct stat *generate_mock_stat(ino_t inode_num)
+HCFS_STAT *generate_mock_stat(ino_t inode_num)
 {
-	struct stat *test_stat = (struct stat *)malloc(sizeof(struct stat));
-	memset(test_stat, 0, sizeof(struct stat));
-	test_stat->st_ino = inode_num;
-	test_stat->st_nlink = inode_num + 3;
-	test_stat->st_uid = inode_num + 6;
-	test_stat->st_gid = inode_num + 9;
-	test_stat->st_size = inode_num * 97;
-	test_stat->st_mode = S_IFREG;
+	HCFS_STAT *test_stat = (HCFS_STAT *)malloc(sizeof(HCFS_STAT));
+	memset(test_stat, 0, sizeof(HCFS_STAT));
+	test_stat->ino = inode_num;
+	test_stat->nlink = inode_num + 3;
+	test_stat->uid = inode_num + 6;
+	test_stat->gid = inode_num + 9;
+	test_stat->size = inode_num * 97;
+	test_stat->mode = S_IFREG;
 	
 	return test_stat;
 }
@@ -85,7 +87,7 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *)malloc(sizeof(SUPER_BLOCK_ENTRY));
 
-	memcpy(&(inode_ptr->inode_stat), generate_mock_stat(this_inode), sizeof(struct stat));
+	memcpy(&(inode_ptr->inode_stat), generate_mock_stat(this_inode), sizeof(HCFS_STAT));
 	return 0;
 }
 
@@ -108,7 +110,6 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 void fetch_backend_block_objname(char *objname, ino_t inode,
 		long long block_no, long long seqnum)
 {
-	return 0;
 }
 
 int check_and_copy_file(const char *srcpath, const char *tarpath,

@@ -16,11 +16,7 @@
 #define GW20_XATTR_OPS_H_
 
 #include "meta_mem_cache.h"
-
-#define MAX_KEY_SIZE 256 /* Max key length */
-#define MAX_VALUE_BLOCK_SIZE 256 /* Max value size per block (256) */
-#define MAX_KEY_ENTRY_PER_LIST 4 /* Max key entry of the sorted array (4) */
-#define MAX_KEY_HASH_ENTRY 8 /* Max hash table entries (8) */
+#include "meta.h"
 
 /* Define namespace of xattr */
 #define USER 0
@@ -32,45 +28,6 @@ enum {
 	READ_XATTR, WRITE_XATTR
 };
 
-/* Struct of VALUE_BLOCK. Value of an extened attr is stored using linked
-   VALUE_BLOCK, and it will be reclaimed if xattr is removed. */
-typedef struct {
-	char content[MAX_VALUE_BLOCK_SIZE]; /* Content is NOT null-terminated */
-	int64_t next_block_pos;
-} VALUE_BLOCK;
-
-/* A key entry includes key size, value size, the key string, and a file
-   offset pointing to first value block. */
-typedef struct {
-	uint32_t key_size;
-	uint32_t value_size;
-	char key[MAX_KEY_SIZE]; /* Key is null-terminated string  */
-	int64_t first_value_block_pos;
-} KEY_ENTRY;
-
-/* KEY_LIST includes an array sorted by key, and number of xattr.
-   If the KEY_LIST is the first one, prev_list_pos is set to 0. If it is the
-   last one, then next_list_pos is set to 0. */
-typedef struct {
-	uint32_t num_xattr;
-	KEY_ENTRY key_list[MAX_KEY_ENTRY_PER_LIST];
-	int64_t next_list_pos;
-} KEY_LIST_PAGE;
-
-/* NAMESPACE_PAGE includes a hash table which is used to hash the input key.
-   Each hash entry points to a KEY_LIST. */
-typedef struct {
-	uint32_t num_xattr;
-	int64_t key_hash_table[MAX_KEY_HASH_ENTRY];
-} NAMESPACE_PAGE;
-
-/* XATTR_PAGE is pointed by next_xattr_page in meta file. Namespace is one of
-   user, system, security, and trusted. */
-typedef struct {
-	int64_t reclaimed_key_list_page;
-	int64_t reclaimed_value_block;
-	NAMESPACE_PAGE namespace_page[4];
-} XATTR_PAGE;
 
 int32_t parse_xattr_namespace(const char *name, char *name_space, char *key);
 

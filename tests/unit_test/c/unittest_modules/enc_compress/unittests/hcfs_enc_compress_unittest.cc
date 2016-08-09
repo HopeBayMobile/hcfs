@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <string.h>
 #include <stdio.h>
+#include <ftw.h>
 extern "C" {
 #include "params.h"
 #include "b64encode.h"
@@ -13,6 +14,22 @@ extern "C" {
 #define PASSPHRASE "this is hopebay testing"
 
 extern SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 class enc : public testing::Test
 {
@@ -380,7 +397,7 @@ protected:
 		if (!access(usermeta_path, F_OK))
 			unlink(usermeta_path);
 		if (!access(METAPATH, F_OK))
-			rmdir(METAPATH);
+			nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		mkdir(METAPATH, 0700);
 		ret_str = NULL;
 	}
@@ -390,7 +407,7 @@ protected:
 		if (!access(usermeta_path, F_OK))
 			unlink(usermeta_path);
 		if (!access(METAPATH, F_OK))
-			rmdir(METAPATH);
+			nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 
 		free(system_config);
 	}

@@ -32,6 +32,8 @@
 *           Let SELinux do the work here.
 * 2016/4/20 Jiahong adding dir handle operations to opendir / closedir
 * 2016/6/27 Jiahong adding file size limitation
+* 2016/8/1  Jethro moved init_hcfs_stat to meta.c
+*                  moved convert_hcfsstat_to_sysstat to meta.c 
 *
 **************************************************************************/
 
@@ -62,11 +64,7 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
-#ifdef _ANDROID_ENV_
 #include <sys/xattr.h>
-#else
-#include <attr/xattr.h>
-#endif
 #include <inttypes.h>
 #include <sqlite3.h>
 #include <sys/capability.h>
@@ -102,8 +100,10 @@
 #include "parent_lookup.h"
 #include "do_fallocate.h"
 #include "pkg_cache.h"
+#include "meta.h"
 #ifndef _ANDROID_ENV_
 #include "fuseproc_comm.h"
+#include <attr/xattr.h>
 #endif
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
@@ -144,50 +144,11 @@ ntpdate / ntpd or manual changes*/
 	changes */
 
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
-
-/* Helper function for setting timestamp(s) to the current time, in
-nanosecond precision.
-   "mode" is the bit-wise OR of ATIME, MTIME, CTIME.
-*/
-void set_timestamp_now(struct stat *thisstat, char mode)
-{
-	struct timespec timenow;
-	int32_t ret;
-
-	ret = clock_gettime(CLOCK_REALTIME, &timenow);
-
-	write_log(10, "Current time %s, ret %d\n",
-		ctime(&(timenow.tv_sec)), ret);
-	if (mode & ATIME) {
-		thisstat->st_atime = (time_t)(timenow.tv_sec);
-#ifndef _ANDROID_ENV_
-		memcpy(&(thisstat->st_atim), &timenow,
-			sizeof(struct timespec));
-#endif
-	}
-
-	if (mode & MTIME) {
-		thisstat->st_mtime = (time_t)(timenow.tv_sec);
-#ifndef _ANDROID_ENV_
-		memcpy(&(thisstat->st_mtim), &timenow,
-			sizeof(struct timespec));
-#endif
-	}
-
-	if (mode & CTIME) {
-		thisstat->st_ctime = (time_t)(timenow.tv_sec);
-#ifndef _ANDROID_ENV_
-		memcpy(&(thisstat->st_ctim), &timenow,
-			sizeof(struct timespec));
-#endif
-	}
-}
-
 /* Helper function for checking permissions.
-   Inputs: fuse_req_t req, struct stat *thisstat, char mode
+   Inputs: fuse_req_t req, HCFS_STAT *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
 */
-int32_t check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
+int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 {
 	struct fuse_ctx *temp_context;
 	gid_t *tmp_list, tmp1_list[10];
@@ -209,29 +170,29 @@ int32_t check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
 		return 0;
 
 	/* First check owner permission */
-	if (temp_context->uid == thisstat->st_uid) {
+	if (temp_context->uid == thisstat->uid) {
 		if (mode & 4)
-			if (!(thisstat->st_mode & S_IRUSR))
+			if (!(thisstat->mode & S_IRUSR))
 				return -EACCES;
 		if (mode & 2)
-			if (!(thisstat->st_mode & S_IWUSR))
+			if (!(thisstat->mode & S_IWUSR))
 				return -EACCES;
 		if (mode & 1)
-			if (!(thisstat->st_mode & S_IXUSR))
+			if (!(thisstat->mode & S_IXUSR))
 				return -EACCES;
 		return 0;
 	}
 
 	/* Check group permission */
-	if (temp_context->gid == thisstat->st_gid) {
+	if (temp_context->gid == thisstat->gid) {
 		if (mode & 4)
-			if (!(thisstat->st_mode & S_IRGRP))
+			if (!(thisstat->mode & S_IRGRP))
 				return -EACCES;
 		if (mode & 2)
-			if (!(thisstat->st_mode & S_IWGRP))
+			if (!(thisstat->mode & S_IWGRP))
 				return -EACCES;
 		if (mode & 1)
-			if (!(thisstat->st_mode & S_IXGRP))
+			if (!(thisstat->mode & S_IXGRP))
 				return -EACCES;
 		return 0;
 	}
@@ -260,8 +221,8 @@ int32_t check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
 	write_log(10, "Debug permission number of groups %d\n", num_groups);
 	for (count = 0; count < num_groups; count++) {
 		write_log(10, "group gid %d, %d\n", tmp_list[count],
-					thisstat->st_gid);
-		if (tmp_list[count] == thisstat->st_gid) {
+					thisstat->gid);
+		if (tmp_list[count] == thisstat->gid) {
 			is_in_group = TRUE;
 			break;
 		}
@@ -269,13 +230,13 @@ int32_t check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
 
 	if (is_in_group == TRUE) {
 		if (mode & 4)
-			if (!(thisstat->st_mode & S_IRGRP))
+			if (!(thisstat->mode & S_IRGRP))
 				return -EACCES;
 		if (mode & 2)
-			if (!(thisstat->st_mode & S_IWGRP))
+			if (!(thisstat->mode & S_IWGRP))
 				return -EACCES;
 		if (mode & 1)
-			if (!(thisstat->st_mode & S_IXGRP))
+			if (!(thisstat->mode & S_IXGRP))
 				return -EACCES;
 		return 0;
 	}
@@ -283,19 +244,21 @@ int32_t check_permission(fuse_req_t req, const struct stat *thisstat, char mode)
 	/* Check others */
 
 	if (mode & 4)
-		if (!(thisstat->st_mode & S_IROTH))
+		if (!(thisstat->mode & S_IROTH))
 			return -EACCES;
 	if (mode & 2)
-		if (!(thisstat->st_mode & S_IWOTH))
+		if (!(thisstat->mode & S_IWOTH))
 			return -EACCES;
 	if (mode & 1)
-		if (!(thisstat->st_mode & S_IXOTH))
+		if (!(thisstat->mode & S_IXOTH))
 			return -EACCES;
 	return 0;
 }
 
 /* Check permission routine for ll_access only */
-int32_t check_permission_access(fuse_req_t req, struct stat *thisstat, int32_t mode)
+int32_t check_permission_access(fuse_req_t req,
+				HCFS_STAT *thisstat,
+				int32_t mode)
 {
 	struct fuse_ctx *temp_context;
 	gid_t *tmp_list, tmp1_list[10];
@@ -310,8 +273,8 @@ int32_t check_permission_access(fuse_req_t req, struct stat *thisstat, int32_t m
 	if ((temp_context->uid == 0) ||
 	    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE)
 	                == TRUE)) {
-		if ((S_ISREG(thisstat->st_mode)) && (mode & X_OK)) {
-			if (!(thisstat->st_mode &
+		if ((S_ISREG(thisstat->mode)) && (mode & X_OK)) {
+			if (!(thisstat->mode &
 				(S_IXUSR | S_IXGRP | S_IXOTH)))
 				return -EACCES;
 		}
@@ -319,29 +282,29 @@ int32_t check_permission_access(fuse_req_t req, struct stat *thisstat, int32_t m
 	}
 
 	/* First check owner permission */
-	if (temp_context->uid == thisstat->st_uid) {
+	if (temp_context->uid == thisstat->uid) {
 		if (mode & R_OK)
-			if (!(thisstat->st_mode & S_IRUSR))
+			if (!(thisstat->mode & S_IRUSR))
 				return -EACCES;
 		if (mode & W_OK)
-			if (!(thisstat->st_mode & S_IWUSR))
+			if (!(thisstat->mode & S_IWUSR))
 				return -EACCES;
 		if (mode & X_OK)
-			if (!(thisstat->st_mode & S_IXUSR))
+			if (!(thisstat->mode & S_IXUSR))
 				return -EACCES;
 		return 0;
 	}
 
 	/* Check group permission */
-	if (temp_context->gid == thisstat->st_gid) {
+	if (temp_context->gid == thisstat->gid) {
 		if (mode & R_OK)
-			if (!(thisstat->st_mode & S_IRGRP))
+			if (!(thisstat->mode & S_IRGRP))
 				return -EACCES;
 		if (mode & W_OK)
-			if (!(thisstat->st_mode & S_IWGRP))
+			if (!(thisstat->mode & S_IWGRP))
 				return -EACCES;
 		if (mode & X_OK)
-			if (!(thisstat->st_mode & S_IXGRP))
+			if (!(thisstat->mode & S_IXGRP))
 				return -EACCES;
 		return 0;
 	}
@@ -370,8 +333,8 @@ int32_t check_permission_access(fuse_req_t req, struct stat *thisstat, int32_t m
 	write_log(10, "Debug permission number of groups %d\n", num_groups);
 	for (count = 0; count < num_groups; count++) {
 		write_log(10, "group gid %d, %d\n", tmp_list[count],
-					thisstat->st_gid);
-		if (tmp_list[count] == thisstat->st_gid) {
+					thisstat->gid);
+		if (tmp_list[count] == thisstat->gid) {
 			is_in_group = TRUE;
 			break;
 		}
@@ -379,13 +342,13 @@ int32_t check_permission_access(fuse_req_t req, struct stat *thisstat, int32_t m
 
 	if (is_in_group == TRUE) {
 		if (mode & R_OK)
-			if (!(thisstat->st_mode & S_IRGRP))
+			if (!(thisstat->mode & S_IRGRP))
 				return -EACCES;
 		if (mode & W_OK)
-			if (!(thisstat->st_mode & S_IWGRP))
+			if (!(thisstat->mode & S_IWGRP))
 				return -EACCES;
 		if (mode & X_OK)
-			if (!(thisstat->st_mode & S_IXGRP))
+			if (!(thisstat->mode & S_IXGRP))
 				return -EACCES;
 		return 0;
 	}
@@ -393,13 +356,13 @@ int32_t check_permission_access(fuse_req_t req, struct stat *thisstat, int32_t m
 	/* Check others */
 
 	if (mode & R_OK)
-		if (!(thisstat->st_mode & S_IROTH))
+		if (!(thisstat->mode & S_IROTH))
 			return -EACCES;
 	if (mode & W_OK)
-		if (!(thisstat->st_mode & S_IWOTH))
+		if (!(thisstat->mode & S_IWOTH))
 			return -EACCES;
 	if (mode & X_OK)
-		if (!(thisstat->st_mode & S_IXOTH))
+		if (!(thisstat->mode & S_IXOTH))
 			return -EACCES;
 	return 0;
 }
@@ -636,21 +599,22 @@ int32_t lookup_pkg_status(const char *pkgname, BOOL *ispin, BOOL *issys)
 	return 0;
 }
 
-static inline void _android6_permission(struct stat *thisstat,
-		char mp_mode, mode_t *newpermission)
+static inline void _android6_permission(HCFS_STAT *thisstat,
+					char mp_mode,
+					mode_t *newpermission)
 {
 	if (mp_mode == MP_DEFAULT) {
-		if (!S_ISDIR(thisstat->st_mode))
+		if (!S_ISDIR(thisstat->mode))
 			*newpermission = 0660;
 		else
 			*newpermission = 0771;
 	} else if (mp_mode == MP_READ) {
-		if (!S_ISDIR(thisstat->st_mode))
+		if (!S_ISDIR(thisstat->mode))
 			*newpermission = 0640;
 		else
 			*newpermission = 0750;
 	} else {
-		if (!S_ISDIR(thisstat->st_mode))
+		if (!S_ISDIR(thisstat->mode))
 			*newpermission = 0660;
 		else
 			*newpermission = 0770;
@@ -681,8 +645,10 @@ static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 	}
 }
 
-int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
-		const char *selfname, char *pin_status)
+int32_t _rewrite_stat(MOUNT_T *tmpptr,
+		      HCFS_STAT *thisstat,
+		      const char *selfname,
+		      char *pin_status)
 {
 	int32_t ret, errcode;
 	char *tmppath;
@@ -698,8 +664,8 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 	tmptok = NULL;
 	tmptoksave = NULL;
 	write_log(10, "Debug rewrite stat inode %" PRIu64,
-	          (uint64_t) thisstat->st_ino);
-	ret = construct_path(tmpptr->vol_path_cache, thisstat->st_ino,
+	          (uint64_t) thisstat->ino);
+	ret = construct_path(tmpptr->vol_path_cache, thisstat->ino,
 				&tmppath, tmpptr->f_ino);
 	if (ret < 0) {
 		if (tmppath != NULL)
@@ -736,15 +702,15 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 		}
 
 		if (keep_check == FALSE) {
-			thisstat->st_uid = 0;
+			thisstat->uid = 0;
 			if (tmpptr->mp_mode == MP_DEFAULT) /* default */
-				thisstat->st_gid = GID_SDCARD_RW;
+				thisstat->gid = GID_SDCARD_RW;
 			else /* read/write */
-				thisstat->st_gid = GID_EVERYBODY;
+				thisstat->gid = GID_EVERYBODY;
 			tmpmask = 0777;
 			tmpmask = ~tmpmask;
-			tmpmask = tmpmask & thisstat->st_mode;
-			thisstat->st_mode = tmpmask | newpermission;
+			tmpmask = tmpmask & thisstat->mode;
+			thisstat->mode = tmpmask | newpermission;
 			free(tmppath);
 			return 0;
 		}
@@ -763,33 +729,33 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 			switch (count) {
 			case 0:
 				/* It is root for android 5.0 */
-				thisstat->st_uid = 0;
-				thisstat->st_gid = 1028;
+				thisstat->uid = 0;
+				thisstat->gid = 1028;
 				newpermission = 0770;
 				break;
 			case 1:
 				/* Is /Android for 5.0, /x/Android for 6.0 */
-				if (!S_ISDIR(thisstat->st_mode)) {
+				if (!S_ISDIR(thisstat->mode)) {
 					/* If not a directory */
-					thisstat->st_uid = 0;
-					thisstat->st_gid = 1028;
+					thisstat->uid = 0;
+					thisstat->gid = 1028;
 					newpermission = 0770;
 				} else {
-					thisstat->st_uid = 0;
-					thisstat->st_gid = 1028;
+					thisstat->uid = 0;
+					thisstat->gid = 1028;
 					newpermission = 0771;
 				}
 				break;
 			case 2:
-				if (!S_ISDIR(thisstat->st_mode)) {
+				if (!S_ISDIR(thisstat->mode)) {
 					/* If not a directory */
-					thisstat->st_uid = 0;
-					thisstat->st_gid = 1028;
+					thisstat->uid = 0;
+					thisstat->gid = 1028;
 					newpermission = 0770;
 				} else {
 					/* If a subfolder under /Android */
-					thisstat->st_uid = 0;
-					thisstat->st_gid = 1028;
+					thisstat->uid = 0;
+					thisstat->gid = 1028;
 					newpermission = 0771;
 					/* When parent is /0/Android/data/,
 					 * need to check self pkg name */
@@ -809,10 +775,10 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 				}
 				break;
 			case 3:
-				if (!S_ISDIR(thisstat->st_mode)) {
+				if (!S_ISDIR(thisstat->mode)) {
 					/* If not a directory */
-					thisstat->st_uid = 0;
-					thisstat->st_gid = 1028;
+					thisstat->uid = 0;
+					thisstat->gid = 1028;
 					newpermission = 0770;
 				} else {
 					/* If this is a package folder */
@@ -823,14 +789,14 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 					if ((pin_status) && (tmpuid != 0))
 						_try_get_pin_st(tmptok_prev,
 								pin_status);
-					thisstat->st_uid = tmpuid;
-					thisstat->st_gid = 1028;
+					thisstat->uid = tmpuid;
+					thisstat->gid = 1028;
 					newpermission = 0770;
 				}
 				break;
 			default:
-				thisstat->st_uid = 0;
-				thisstat->st_gid = 1028;
+				thisstat->uid = 0;
+				thisstat->gid = 1028;
 				newpermission = 0770;
 				break;
 			}
@@ -843,16 +809,16 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 			if ((pin_status) && (tmpuid != 0))
 				_try_get_pin_st(tmptok_prev,
 						pin_status);
-			thisstat->st_uid = tmpuid;
-			thisstat->st_gid = 1028;
+			thisstat->uid = tmpuid;
+			thisstat->gid = 1028;
 			newpermission = 0770;
 			break;
 		}
 		tmptok_prev = tmptok;
 		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
 			/* Not under /Android for android 5.0 */
-			thisstat->st_uid = 0;
-			thisstat->st_gid = 1028;
+			thisstat->uid = 0;
+			thisstat->gid = 1028;
 			newpermission = 0770;
 			break;
 		}
@@ -863,15 +829,15 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat,
 		_android6_permission(thisstat, mp_mode,
 				&newpermission);
 		if (tmpptr->mp_mode == MP_DEFAULT) /* default */
-			thisstat->st_gid = GID_SDCARD_RW;
+			thisstat->gid = GID_SDCARD_RW;
 		else /* read/write */
-			thisstat->st_gid = GID_EVERYBODY;
+			thisstat->gid = GID_EVERYBODY;
 	}
 
 	tmpmask = 0777;
 	tmpmask = ~tmpmask;
-	tmpmask = tmpmask & thisstat->st_mode;
-	thisstat->st_mode = tmpmask | newpermission;
+	tmpmask = tmpmask & thisstat->mode;
+	thisstat->mode = tmpmask | newpermission;
 	free(tmppath);
 	return 0;
 errcode_handle:
@@ -892,8 +858,11 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	ino_t hit_inode;
 	int32_t ret_code;
 	struct timeval tmp_time1, tmp_time2;
-	struct stat tmp_stat;
+	HCFS_STAT tmp_stat;
+	struct stat ret_stat; /* fuse reply sys stat */
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	UNUSED(fi);
 
@@ -905,7 +874,9 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 		  (uint64_t)hit_inode);
 
 	if (hit_inode > 0) {
+#ifdef _ANDROID_ENV_
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+#endif
 
 		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL, NULL);
 		if (ret_code < 0) {
@@ -924,13 +895,14 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 #endif
 
 		write_log(10, "Debug getattr return inode %" PRIu64 "\n",
-				(uint64_t)tmp_stat.st_ino);
+				(uint64_t)tmp_stat.ino);
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
-		fuse_reply_attr(req, &tmp_stat, 0);
+		convert_hcfsstat_to_sysstat(&ret_stat, &tmp_stat);
+		fuse_reply_attr(req, &ret_stat, 0);
 	} else {
 		gettimeofday(&tmp_time2, NULL);
 
@@ -955,14 +927,14 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		const char *selfname, mode_t mode, dev_t dev)
 {
 	ino_t self_inode, parent_inode;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 	mode_t self_mode;
 	int32_t ret_val;
 	struct fuse_ctx *temp_context;
 	int32_t ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
-	struct stat parent_stat;
+	HCFS_STAT parent_stat;
 	uint64_t this_generation;
 	MOUNT_T *tmpptr;
 	char local_pin;
@@ -1023,7 +995,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	ispin = local_pin;
 #endif
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1042,21 +1014,21 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	memset(&this_stat, 0, sizeof(struct stat));
+	init_hcfs_stat(&this_stat);
 
-	this_stat.st_size = 0;
-	this_stat.st_blksize = MAX_BLOCK_SIZE;
-	this_stat.st_blocks = 0;
-	this_stat.st_dev = dev;
-	this_stat.st_nlink = 1;
+	this_stat.dev = dev;
+	this_stat.size = 0;
+	this_stat.blksize = MAX_BLOCK_SIZE;
+	this_stat.blocks = 0;
+	this_stat.nlink = 1;
 
 	self_mode = mode;
-	this_stat.st_mode = self_mode;
+	this_stat.mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 
-	this_stat.st_uid = temp_context->uid;
-	this_stat.st_gid = temp_context->gid;
+	this_stat.uid = temp_context->uid;
+	this_stat.gid = temp_context->gid;
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
@@ -1069,7 +1041,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	this_stat.st_ino = self_inode;
+	this_stat.ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
 			&this_stat, this_generation, tmpptr->f_ino,
@@ -1091,7 +1063,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
-	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
 
 	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISREG);
@@ -1125,14 +1097,14 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 				const char *selfname, mode_t mode)
 {
 	ino_t self_inode, parent_inode;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 	mode_t self_mode;
 	int32_t ret_val;
 	struct fuse_ctx *temp_context;
 	int32_t ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
-	struct stat parent_stat;
+	HCFS_STAT parent_stat;
 	uint64_t this_gen;
 	MOUNT_T *tmpptr;
 	char local_pin;
@@ -1183,7 +1155,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	/* Default inherit parent's pin status */
 	ispin = local_pin;
 #endif
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1196,27 +1168,27 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	memset(&this_stat, 0, sizeof(struct stat));
+	init_hcfs_stat(&this_stat);
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
 	if (temp_context == NULL) {
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
 
-	this_stat.st_nlink = 2; /*One pointed by the parent, another by self*/
+	this_stat.nlink = 2; /*One pointed by the parent, another by self*/
 
 	self_mode = mode | S_IFDIR;
-	this_stat.st_mode = self_mode;
+	this_stat.mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
-	this_stat.st_uid = temp_context->uid;
-	this_stat.st_gid = temp_context->gid;
+	this_stat.uid = temp_context->uid;
+	this_stat.gid = temp_context->gid;
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	this_stat.st_size = 0;
-	this_stat.st_blksize = MAX_BLOCK_SIZE;
-	this_stat.st_blocks = 0;
+	this_stat.size = 0;
+	this_stat.blksize = MAX_BLOCK_SIZE;
+	this_stat.blocks = 0;
 
 	self_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
 	if (self_inode < 1) {
@@ -1224,7 +1196,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	this_stat.st_ino = self_inode;
+	this_stat.ino = self_inode;
 
 	delta_meta_size = 0;
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
@@ -1239,7 +1211,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_gen;
 	tmp_param.ino = (fuse_ino_t) self_inode;
-	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
 
 	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISDIR);
@@ -1257,10 +1229,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 	}
 
+#ifdef _ANDROID_ENV_
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
 		remove_cache_pkg(selfname);
 	}
+#endif
 
 	fuse_reply_entry(req, &(tmp_param));
 
@@ -1281,11 +1255,14 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
-	ino_t parent_inode, this_inode;
+	ino_t parent_inode;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
-	struct stat parent_stat;
+	HCFS_STAT parent_stat;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+	ino_t this_inode;
+#endif
 
 	parent_inode = real_ino(req, parent);
         write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1304,9 +1281,9 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -1316,7 +1293,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1334,7 +1311,9 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+#ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
+#endif
 
 	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry);
 	if (ret_val < 0) {
@@ -1364,8 +1343,10 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	ino_t this_inode, parent_inode;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
-	struct stat parent_stat;
+	HCFS_STAT parent_stat;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
@@ -1383,9 +1364,9 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -1395,7 +1376,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1438,13 +1419,13 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
 		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						this_inode);
-#endif
 
 	/* TODO: Check if this still works for app to sdcard */
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
 		remove_cache_pkg(selfname);
 	}
+#endif
 
 	fuse_reply_err(req, -ret_val);
 }
@@ -1471,7 +1452,7 @@ a directory (for NFS) */
 	DIR_ENTRY temp_dentry;
 	struct fuse_entry_param output_param;
 	uint64_t this_gen;
-	struct stat parent_stat;
+	HCFS_STAT parent_stat, this_stat;
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
@@ -1487,7 +1468,7 @@ a directory (for NFS) */
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
-	write_log(10, "Debug lookup parent mode %d\n", parent_stat.st_mode);
+	write_log(10, "Debug lookup parent mode %d\n", parent_stat.mode);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1505,7 +1486,7 @@ a directory (for NFS) */
 	}
 #endif
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1532,12 +1513,12 @@ a directory (for NFS) */
 
 	this_inode = temp_dentry.d_ino;
 	output_param.ino = (fuse_ino_t) this_inode;
-	ret_val = fetch_inode_stat(this_inode, &(output_param.attr),
-			&this_gen, NULL);
+	ret_val = fetch_inode_stat(this_inode, &this_stat, &this_gen, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+	convert_hcfsstat_to_sysstat(&output_param.attr, &this_stat);
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
@@ -1545,7 +1526,7 @@ a directory (for NFS) */
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &(output_param.attr), NULL, NULL);
+		_rewrite_stat(tmpptr, &this_stat, NULL, NULL);
 	}
 #endif
 
@@ -1641,14 +1622,14 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	*/
 	ino_t parent_inode1, parent_inode2, self_inode, old_target_inode;
 	int32_t ret_val;
-	struct stat tempstat, old_target_stat;
+	HCFS_STAT tempstat, old_target_stat;
 	mode_t self_mode, old_target_mode;
 	DIR_META_TYPE tempmeta;
 	META_CACHE_ENTRY_STRUCT *body_ptr = NULL, *old_target_ptr = NULL;
 	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
 	DIR_ENTRY_PAGE temp_page;
 	int32_t temp_index;
-	struct stat parent_stat1, parent_stat2;
+	HCFS_STAT parent_stat1, parent_stat2;
 	MOUNT_T *tmpptr;
 	DIR_STATS_TYPE tmpstat;
 	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
@@ -1694,7 +1675,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
-	if (!S_ISDIR(parent_stat1.st_mode)) {
+	if (!S_ISDIR(parent_stat1.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1724,7 +1705,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
-	if (!S_ISDIR(parent_stat2.st_mode)) {
+	if (!S_ISDIR(parent_stat2.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -1846,7 +1827,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	/* Check if need to move to different parent inode, a dir is
 		writeable*/
-	if ((S_ISDIR(tempstat.st_mode)) && (parent_inode1 != parent_inode2)) {
+	if ((S_ISDIR(tempstat.mode)) && (parent_inode1 != parent_inode2)) {
 		ret_val = check_permission(req, &tempstat, 2);
 
 		if (ret_val < 0) {
@@ -1896,11 +1877,11 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	}
 
-	self_mode = tempstat.st_mode;
+	self_mode = tempstat.mode;
 
 	/* Start checking if the operation leads to an error */
 	if (old_target_inode > 0) {
-		old_target_mode = old_target_stat.st_mode;
+		old_target_mode = old_target_stat.mode;
 		if (S_ISDIR(self_mode) && (!S_ISDIR(old_target_mode))) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2198,10 +2179,13 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 }
 
 /* Helper function for waiting on full cache in the truncate function */
-int32_t truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	int64_t page_pos, META_CACHE_ENTRY_STRUCT **body_ptr,
-	int32_t entry_index)
+int32_t truncate_wait_full_cache(ino_t this_inode,
+				 HCFS_STAT *inode_stat,
+				 FILE_META_TYPE *file_meta_ptr,
+				 BLOCK_ENTRY_PAGE *block_page,
+				 int64_t page_pos,
+				 META_CACHE_ENTRY_STRUCT **body_ptr,
+				 int32_t entry_index)
 {
 	int32_t ret_val;
 	int64_t max_cache_size;
@@ -2229,9 +2213,9 @@ int32_t truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 			*body_ptr = meta_cache_lock_entry(this_inode);
 			if (*body_ptr == NULL)
 				return -ENOMEM;
-			ret_val = meta_cache_lookup_file_data(this_inode,
-					inode_stat, file_meta_ptr, block_page,
-					page_pos, *body_ptr);
+			ret_val = meta_cache_lookup_file_data(
+			    this_inode, inode_stat, file_meta_ptr, block_page,
+			    page_pos, *body_ptr);
 			if (ret_val < 0)
 				return ret_val;
 		} else {
@@ -2489,16 +2473,21 @@ errcode_handle:
 /* Helper function for hfuse_truncate. This will truncate the last block
 *  that remains after the truncate operation so that the size of this block
 *  fits (offset % MAX_BLOCK_SIZE) */
-int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
-	FILE_META_TYPE *tempfilemeta, BLOCK_ENTRY_PAGE *temppage,
-	int64_t currentfilepos, META_CACHE_ENTRY_STRUCT **body_ptr,
-	int32_t last_index, int64_t last_block, off_t offset)
+int32_t truncate_truncate(ino_t this_inode,
+			  HCFS_STAT *filestat,
+			  FILE_META_TYPE *tempfilemeta,
+			  BLOCK_ENTRY_PAGE *temppage,
+			  int64_t currentfilepos,
+			  META_CACHE_ENTRY_STRUCT **body_ptr,
+			  int32_t last_index,
+			  int64_t last_block,
+			  off_t offset)
 
 {
 	char thisblockpath[1024];
 	char objname[1000];
 	FILE *blockfptr;
-	struct stat tempstat;
+	struct stat tempstat; /* block ops */
 	off_t old_block_size, new_block_size;
 	int32_t ret, errcode;
 	int64_t cache_delta;
@@ -2513,12 +2502,12 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 	/*Offset not on the boundary of the block. Will need to truncate the
 	last block*/
 	ret = truncate_wait_full_cache(this_inode, filestat, tempfilemeta,
-			temppage, currentfilepos, body_ptr, last_index);
+				       temppage, currentfilepos, body_ptr,
+				       last_index);
 	if (ret < 0)
 		return ret;
 
-	ret = fetch_block_path(thisblockpath, filestat->st_ino,
-					last_block);
+	ret = fetch_block_path(thisblockpath, filestat->ino, last_block);
 	if (ret < 0)
 		return ret;
 
@@ -2588,7 +2577,7 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 			fetch_backend_block_objname(objname,
 					last_block_entry->obj_id);
 #else
-			fetch_backend_block_objname(objname, filestat->st_ino,
+			fetch_backend_block_objname(objname, filestat->ino,
 					last_block, last_block_entry->seqnum);
 #endif
 			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
@@ -2796,7 +2785,7 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 /************************************************************************
 *
 * Function name: hfuse_ll_truncate
-*        Inputs: ino_t this_inode, struct stat *filestat,
+*        Inputs: ino_t this_inode, HCFS_STAT *filestat,
 *                off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr
 *                fuse_req_t req
 *       Summary: Truncate the regular file pointed by "this_inode"
@@ -2806,8 +2795,11 @@ int32_t truncate_truncate(ino_t this_inode, struct stat *filestat,
 *          Note: This function is now called by hfuse_ll_setattr.
 *
 *************************************************************************/
-int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
-	off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
+int32_t hfuse_ll_truncate(ino_t this_inode,
+			  HCFS_STAT *filestat,
+			  off_t offset,
+			  META_CACHE_ENTRY_STRUCT **body_ptr,
+			  fuse_req_t req)
 {
 /* If truncate file smaller, do not truncate metafile, but instead set the
 *  affected entries to ST_TODELETE (which will be changed to ST_NONE once
@@ -2826,15 +2818,16 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t last_index;
 	int64_t temp_trunc_size, sizediff;
-#ifndef _ANDROID_ENV_
-	ssize_t ret_ssize;
-#endif
 	MOUNT_T *tmpptr;
+	int64_t now_seq;
+	int64_t max_pinned_size;
+#ifdef _ANDROID_ENV_
 	size_t ret_size;
 	FILE *truncfptr;
 	char truncpath[METAPATHLEN];
-	int64_t now_seq;
-	int64_t max_pinned_size;
+#else
+	ssize_t ret_ssize;
+#endif
 
 	/* Return error -EFBIG if offset is greater than expected */
 	if (offset > (off_t) MAX_FILE_SIZE)
@@ -2847,8 +2840,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	write_log(10, "Debug truncate: offset %ld\n", offset);
 	/* If the filesystem object is not a regular file, return error */
-	if (S_ISREG(filestat->st_mode) == FALSE) {
-		if (S_ISDIR(filestat->st_mode))
+	if (S_ISREG(filestat->mode) == FALSE) {
+		if (S_ISDIR(filestat->mode))
 			return -EISDIR;
 		else
 			return -EPERM;
@@ -2862,15 +2855,15 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	now_seq = tempfilemeta.finished_seq;
 
-	if (filestat->st_size == offset) {
+	if (filestat->size == offset) {
 		/*Do nothing if no change needed */
 		write_log(10,
 			"Debug truncate: no size change. Nothing changed.\n");
 		return 0;
 	}
 
-	if (filestat->st_size < offset) {
-		sizediff = (int64_t) offset - filestat->st_size;
+	if (filestat->size < offset) {
+		sizediff = (int64_t) offset - filestat->size;
 		sem_wait(&(hcfs_system->access_sem));
 		/* Check system size and reject if exceeding quota */
 		if (hcfs_system->systemdata.system_size + sizediff >
@@ -2900,8 +2893,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		sem_post(&(hcfs_system->access_sem));
 	}
 
-	/*If need to extend, only need to change st_size. Do that later.*/
-	if (filestat->st_size > offset) {
+	/*If need to extend, only need to change size. Do that later.*/
+	if (filestat->size > offset) {
 		if (offset == 0) {
 			last_block = -1;
 			last_page = -1;
@@ -2913,7 +2906,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			last_page = last_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 		}
 
-		old_last_block = ((filestat->st_size - 1) / MAX_BLOCK_SIZE);
+		old_last_block = ((filestat->size - 1) / MAX_BLOCK_SIZE);
 		old_last_page = old_last_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
 		if (last_page >= 0)
@@ -2947,11 +2940,10 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if ((offset % MAX_BLOCK_SIZE) != 0) {
 				/* Truncate the last block that remains
 				   after the truncate operation */
-				ret = truncate_truncate(this_inode, filestat,
-					&tempfilemeta,
-					&temppage, filepos,
-					body_ptr, last_index,
-					last_block, offset);
+				ret = truncate_truncate(
+				    this_inode, filestat, &tempfilemeta,
+				    &temppage, filepos, body_ptr, last_index,
+				    last_block, offset);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
@@ -2979,7 +2971,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, filepos, old_last_block,
-				filestat->st_ino, (*body_ptr), &tempfilemeta);
+				filestat->ino, (*body_ptr), &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -3036,7 +3028,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			ret = truncate_delete_block(&temppage, 0,
 				current_page, filepos, old_last_block,
-				filestat->st_ino, (*body_ptr), &tempfilemeta);
+				filestat->ino, (*body_ptr), &tempfilemeta);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -3096,7 +3088,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			}
 			setbuf(truncfptr, NULL);
 			flock(fileno(truncfptr), LOCK_EX);
-			temp_trunc_size = filestat->st_size;
+			temp_trunc_size = filestat->size;
 			FWRITE(&temp_trunc_size, sizeof(int64_t), 1,
 				truncfptr);
 			fclose(truncfptr);
@@ -3114,8 +3106,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			flock(fileno(truncfptr), LOCK_EX);
 			FREAD(&temp_trunc_size, sizeof(int64_t), 1,
 				truncfptr);
-			if (temp_trunc_size < filestat->st_size) {
-				temp_trunc_size = filestat->st_size;
+			if (temp_trunc_size < filestat->size) {
+				temp_trunc_size = filestat->size;
 				FSEEK(truncfptr, 0, SEEK_SET);
 				FWRITE(&temp_trunc_size, sizeof(int64_t), 1,
 					truncfptr);
@@ -3128,8 +3120,8 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				&temp_trunc_size, sizeof(int64_t));
 		if (((ret_ssize < 0) && (errno == ENOATTR)) ||
 			((ret_ssize >= 0) &&
-				(temp_trunc_size < filestat->st_size))) {
-			temp_trunc_size = filestat->st_size;
+				(temp_trunc_size < filestat->size))) {
+			temp_trunc_size = filestat->size;
 			ret = fsetxattr(fileno((*body_ptr)->fptr),
 				"user.trunc_size", &(temp_trunc_size),
 				sizeof(int64_t), 0);
@@ -3166,35 +3158,35 @@ int32_t hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	}
 
 	if (P_IS_PIN(tempfilemeta.local_pin) &&
-	    (offset < filestat->st_size)) {
+	    (offset < filestat->size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size +=
-			(int64_t)(offset - filestat->st_size);
+			(int64_t)(offset - filestat->size);
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((int64_t)(offset - filestat->st_size),
+	change_system_meta((int64_t)(offset - filestat->size),
 			0, 0, 0, 0, 0, TRUE);
 
 	ret = change_mount_stat(tmpptr,
-			(int64_t) (offset - filestat->st_size), 0, 0);
+			(int64_t) (offset - filestat->size), 0, 0);
 	if (ret < 0)
 		return ret;
 
-	filestat->st_size = offset;
-	filestat->st_mtime = time(NULL);
+	filestat->size = offset;
+	filestat->mtime = time(NULL);
 
 	return 0;
 errcode_handle:
 	/* If an error occurs, need to revert the changes to pinned size */
 	if (P_IS_PIN(tempfilemeta.local_pin) &&
-	    (offset > filestat->st_size)) {
+	    (offset > filestat->size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size -=
-			(int64_t)(offset - filestat->st_size);
+			(int64_t)(offset - filestat->size);
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -3218,9 +3210,11 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	ino_t thisinode;
 	int64_t fh;
 	int32_t ret_val;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 	int32_t file_flags;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	write_log(8, "Debug open inode %ld\n", ino);
 
@@ -3238,9 +3232,9 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -3392,7 +3386,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 {
 	char thisblockpath[400];
 	char objname[1000];
-	struct stat tempstat2;
+	struct stat tempstat2; /* block ops */
 	int32_t ret, errcode, semval;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 
@@ -3868,7 +3862,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	int32_t this_bytes_read;
 	off_t current_offset;
 	int32_t target_bytes_read;
-	struct stat temp_stat;
+	HCFS_STAT temp_stat;
 	size_t size;
 	char *buf;
 	char noatime;
@@ -3927,9 +3921,9 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	/* Decide the true maximum bytes to read */
 	/* If read request will exceed the size of the file, need to
 	*  reduce the size of request */
-	if (temp_stat.st_size < (offset+ (off_t)size_org)) {
-		if (temp_stat.st_size > offset)
-			size = (size_t) (temp_stat.st_size - offset);
+	if (temp_stat.size < (offset+ (off_t)size_org)) {
+		if (temp_stat.size > offset)
+			size = (size_t) (temp_stat.size - offset);
 		else
 			size = 0;
 	} else {
@@ -4099,7 +4093,7 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 {
 	char thisblockpath[400];
 	char objname[1000];
-	struct stat tempstat2;
+	struct stat tempstat2; /* block ops */
 	int32_t ret, errcode;
 	int64_t unpin_dirty_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
@@ -4707,7 +4701,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	size_t this_bytes_written;
 	off_t current_offset;
 	size_t target_bytes_written;
-	struct stat temp_stat;
+	HCFS_STAT temp_stat;
 	int32_t ret, errcode;
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
@@ -4831,14 +4825,14 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
 	          offset, size);
-	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.st_size,
+	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.size,
 	          hcfs_system->systemdata.pinned_size, max_pinned_size);
 	amount_preallocated = 0;
 	if (P_IS_PIN(thisfilemeta.local_pin) &&
-	    ((offset + (off_t)size) > temp_stat.st_size)) {
+	    ((offset + (off_t)size) > temp_stat.size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		sizediff =
-		    (int64_t)((offset + (off_t)size) - temp_stat.st_size);
+		    (int64_t)((offset + (off_t)size) - temp_stat.size);
 		write_log(10, "Write details: %lld, %lld\n", sizediff,
 		          (off_t) size);
 		if ((hcfs_system->systemdata.pinned_size + sizediff)
@@ -4907,14 +4901,14 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 
 	if (P_IS_PIN(thisfilemeta.local_pin) &&
-	    ((temp_stat.st_size < (offset + (off_t)size)) &&
+	    ((temp_stat.size < (offset + (off_t)size)) &&
 	     (((off_t) size) > total_bytes_written))) {
 		/* If size written not equal to as planned, need
 		to change pinned_size */
 		/* If offset + total_bytes_written < st_size, substract
 		the difference between size and st_size */
-		if (offset + total_bytes_written < temp_stat.st_size)
-			sizediff = (offset + (off_t) size) - temp_stat.st_size;
+		if (offset + total_bytes_written < temp_stat.size)
+			sizediff = (offset + (off_t) size) - temp_stat.size;
 		else
 			sizediff = ((off_t)size) - total_bytes_written;
 		sem_wait(&(hcfs_system->access_sem));
@@ -4924,13 +4918,13 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		sem_post(&(hcfs_system->access_sem));
 	}
 
-	if (temp_stat.st_size < (offset + total_bytes_written)) {
+	if (temp_stat.size < (offset + total_bytes_written)) {
 		change_system_meta((int64_t) ((offset + total_bytes_written)
-				- temp_stat.st_size), delta_meta_size,
+				- temp_stat.size), delta_meta_size,
 				0, 0, 0, 0, TRUE);
 		ret = change_mount_stat(tmpptr,
 			(int64_t) ((offset + total_bytes_written)
-			- temp_stat.st_size), delta_meta_size, 0);
+			- temp_stat.size), delta_meta_size, 0);
 		if (ret < 0) {
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -4940,8 +4934,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			return;
 		}
 
-		temp_stat.st_size = (offset + total_bytes_written);
-		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
+		temp_stat.size = (offset + total_bytes_written);
+		temp_stat.blocks = (temp_stat.size+511) / 512;
 	} else {
 		if (delta_meta_size != 0) {
 			change_system_meta(0, delta_meta_size,
@@ -5178,10 +5172,12 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
 	int32_t ret_val;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 	ino_t thisinode;
-	MOUNT_T *tmpptr;
 	long long dirh;
+#ifdef _ANDROID_ENV_
+	MOUNT_T *tmpptr;
+#endif
 
 	thisinode = real_ino(req, ino);
 
@@ -5192,9 +5188,9 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -5204,7 +5200,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	}
 #endif
 
-	if (!S_ISDIR(this_stat.st_mode)) {
+	if (!S_ISDIR(this_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -5247,7 +5243,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	off_t thisfile_pos;
 	DIR_META_TYPE tempmeta;
 	DIR_ENTRY_PAGE temp_page;
-	struct stat tempstat, thisstat;
+	struct stat tempstat; /* fuse reply sys stat */
+	HCFS_STAT thisstat;
 	struct timeval tmp_time1, tmp_time2;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	int64_t countn;
@@ -5335,7 +5332,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			sem_post(&(dirh_ptr->snap_ref_sem));
 			use_snap = TRUE;
 			PREAD(fileno(dirh_ptr->snapshot_ptr), &tempmeta,
-			      sizeof(DIR_META_TYPE), sizeof(struct stat));
+			      sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 		}
 	}
 
@@ -5415,7 +5412,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			temp_page.num_entries);
 		for (count = page_start; count < temp_page.num_entries;
 								count++) {
-			memset(&tempstat, 0, sizeof(struct stat));
+			memset(&tempstat, 0, sizeof(tempstat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 			this_type = temp_page.dir_entries[count].d_type;
 			if (this_type == D_ISREG)
@@ -5431,10 +5428,10 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
-			entry_size = fuse_add_direntry(req, &buf[buf_pos],
-					(size - buf_pos),
-					temp_page.dir_entries[count].d_name,
-					&tempstat, nextentry_pos);
+			entry_size = fuse_add_direntry(
+			    req, &buf[buf_pos], (size - buf_pos),
+			    temp_page.dir_entries[count].d_name, &tempstat,
+			    nextentry_pos);
 			write_log(10, "Debug readdir entry %s, %" PRIu64 "\n",
 				temp_page.dir_entries[count].d_name,
 				(uint64_t)tempstat.st_ino);
@@ -5650,16 +5647,20 @@ BOOL _check_capability(pid_t thispid, int32_t cap_to_check)
 *                routines such as chmod, chown, truncate, utimens.
 *
 *************************************************************************/
-void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
-	int32_t to_set, struct fuse_file_info *file_info)
+void hfuse_ll_setattr(fuse_req_t req,
+		      fuse_ino_t ino,
+		      struct stat *attr, /* Keep for Fuse low level API */
+		      int32_t to_set,
+		      struct fuse_file_info *file_info)
 {
 	int32_t ret_val;
 	ino_t this_inode;
 	BOOL attr_changed, only_atime_changed;
 	struct timespec timenow;
-	struct stat newstat;
+	HCFS_STAT newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
+	struct stat retstat; /* fuse reply */
 	FH_ENTRY *fh_ptr;
 
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
@@ -5693,7 +5694,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if ((to_set & FUSE_SET_ATTR_SIZE) &&
-			(newstat.st_size != attr->st_size)) {
+			(newstat.size != attr->st_size)) {
 		/* If opened file, check file table first */
 		if (file_info != NULL) {
 			if (system_fh_table.entry_table_flags[file_info->fh]
@@ -5744,12 +5745,12 @@ allow_truncate:
 	}
 
 	if ((to_set & FUSE_SET_ATTR_MODE) &&
-	    (newstat.st_mode != attr->st_mode)) {
+	    (newstat.mode != attr->st_mode)) {
 		write_log(10, "Debug setattr context %d, file %d\n",
-			temp_context->uid, newstat.st_uid);
+			temp_context->uid, newstat.uid);
 
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-			(temp_context->uid != newstat.st_uid)) {
+			(temp_context->uid != newstat.uid)) {
 			/* Not privileged and not owner */
 
 			meta_cache_close_file(body_ptr);
@@ -5758,14 +5759,14 @@ allow_truncate:
 			return;
 		}
 
-		newstat.st_mode = attr->st_mode;
+		newstat.mode = attr->st_mode;
 		attr_changed = TRUE;
 		only_atime_changed = FALSE;
 		write_log(10, "Mode changed\n");
 	}
 
 	if ((to_set & FUSE_SET_ATTR_UID) &&
-	    (newstat.st_uid != attr->st_uid)) {
+	    (newstat.uid != attr->st_uid)) {
 		/* Checks if process has CHOWN capabilities here */
 		if (_check_capability(temp_context->pid,
 			CAP_CHOWN) != TRUE) {
@@ -5776,26 +5777,26 @@ allow_truncate:
 			return;
 		}
 
-		newstat.st_uid = attr->st_uid;
+		newstat.uid = attr->st_uid;
 		attr_changed = TRUE;
 		only_atime_changed = FALSE;
 		write_log(10, "uid changed\n");
 	}
 
 	if ((to_set & FUSE_SET_ATTR_GID) &&
-	    (newstat.st_gid != attr->st_gid)) {
+	    (newstat.gid != attr->st_gid)) {
 		/* Checks if process has CHOWN capabilities here */
 		/* Or if is owner or in group */
 		if (_check_capability(temp_context->pid,
 			CAP_CHOWN) != TRUE) {
-			ret_val = is_member(req, newstat.st_gid, attr->st_gid);
+			ret_val = is_member(req, newstat.gid, attr->st_gid);
 			if (ret_val < 0) {
 				meta_cache_close_file(body_ptr);
 				meta_cache_unlock_entry(body_ptr);
 				fuse_reply_err(req, -ret_val);
 				return;
 			}
-			if ((temp_context->uid != newstat.st_uid) ||
+			if ((temp_context->uid != newstat.uid) ||
 				(ret_val == 0)) {
 				/* Not privileged and (not owner or
 				not in group) */
@@ -5806,16 +5807,16 @@ allow_truncate:
 			}
 		}
 
-		newstat.st_gid = attr->st_gid;
+		newstat.gid = attr->st_gid;
 		attr_changed = TRUE;
 		only_atime_changed = FALSE;
 		write_log(10, "gid changed\n");
 	}
 
 	if ((to_set & FUSE_SET_ATTR_ATIME) &&
-	    (newstat.st_atime != attr->st_atime)) {
+	    (newstat.atime != attr->st_atime)) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-			(temp_context->uid != newstat.st_uid)) {
+			(temp_context->uid != newstat.uid)) {
 			/* Not privileged and not owner */
 
 			meta_cache_close_file(body_ptr);
@@ -5824,18 +5825,18 @@ allow_truncate:
 			return;
 		}
 
-		newstat.st_atime = attr->st_atime;
+		newstat.atime = attr->st_atime;
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_atim), &(attr->st_atim),
+		memcpy(&(newstat.atime), &(attr->st_atime),
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
 	}
 
 	if ((to_set & FUSE_SET_ATTR_MTIME) &&
-	    (newstat.st_mtime != attr->st_mtime)) {
+	    (newstat.mtime != attr->st_mtime)) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-			(temp_context->uid != newstat.st_uid)) {
+			(temp_context->uid != newstat.uid)) {
 			/* Not privileged and not owner */
 
 			meta_cache_close_file(body_ptr);
@@ -5843,9 +5844,9 @@ allow_truncate:
 			fuse_reply_err(req, EPERM);
 			return;
 		}
-		newstat.st_mtime = attr->st_mtime;
+		newstat.mtime = attr->st_mtime;
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_mtim), &(attr->st_mtim),
+		memcpy(&(newstat.mtime), &(attr->st_mtime),
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5857,7 +5858,7 @@ allow_truncate:
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-			((temp_context->uid != newstat.st_uid) ||
+			((temp_context->uid != newstat.uid) ||
 				(check_permission(req, &newstat, 2) < 0))) {
 			/* Not privileged and
 				(not owner or no write permission)*/
@@ -5867,9 +5868,9 @@ allow_truncate:
 			fuse_reply_err(req, EACCES);
 			return;
 		}
-		newstat.st_atime = (time_t)(timenow.tv_sec);
+		newstat.atime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_atim), &timenow,
+		memcpy(&(newstat.atime), &timenow,
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5877,7 +5878,7 @@ allow_truncate:
 
 	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
-			((temp_context->uid != newstat.st_uid) ||
+			((temp_context->uid != newstat.uid) ||
 				(check_permission(req, &newstat, 2) < 0))) {
 			/* Not privileged and
 				(not owner or no write permission)*/
@@ -5887,9 +5888,9 @@ allow_truncate:
 			fuse_reply_err(req, EACCES);
 			return;
 		}
-		newstat.st_mtime = (time_t)(timenow.tv_sec);
+		newstat.mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_mtim), &timenow,
+		memcpy(&(newstat.mtime), &timenow,
 			sizeof(struct timespec));
 #endif
 		attr_changed = TRUE;
@@ -5898,15 +5899,15 @@ allow_truncate:
 	}
 
 	if (attr_changed == TRUE) {
-		newstat.st_ctime = (time_t)(timenow.tv_sec);
+		newstat.ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_ctim), &timenow,
+		memcpy(&(newstat.ctime), &timenow,
 			sizeof(struct timespec));
 #endif
 		if (to_set & FUSE_SET_ATTR_SIZE) {
-			newstat.st_mtime = (time_t)(timenow.tv_sec);
+			newstat.mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-			memcpy(&(newstat.st_mtim), &timenow,
+			memcpy(&(newstat.mtime), &timenow,
 				sizeof(struct timespec));
 #endif
 		}
@@ -5930,7 +5931,8 @@ allow_truncate:
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-	fuse_reply_attr(req, &newstat, 0);
+	convert_hcfsstat_to_sysstat(&retstat, &newstat);
+	fuse_reply_attr(req, &retstat, 0);
 }
 
 /************************************************************************
@@ -5942,10 +5944,12 @@ allow_truncate:
 *************************************************************************/
 static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int32_t mode)
 {
-	struct stat thisstat;
+	HCFS_STAT thisstat;
 	int32_t ret_val;
 	ino_t thisinode;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
 	thisinode = real_ino(req, ino);
 
@@ -5956,9 +5960,9 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int32_t mode)
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -6048,8 +6052,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	uint64_t this_generation;
 	struct fuse_ctx *temp_context;
 	struct fuse_entry_param tmp_param;
-	struct stat parent_stat;
-	struct stat this_stat;
+	HCFS_STAT parent_stat;
+	HCFS_STAT this_stat;
 	int32_t ret_val;
 	int32_t result_index;
 	int32_t errcode;
@@ -6104,7 +6108,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	/* Error if parent is not a dir */
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -6152,14 +6156,15 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 
-	memset(&this_stat, 0, sizeof(struct stat));
-	this_stat.st_nlink = 1;
-	this_stat.st_size = strlen(link);
+	init_hcfs_stat(&this_stat);
 
-	this_stat.st_mode = S_IFLNK | 0777;
+	this_stat.nlink = 1;
+	this_stat.size = strlen(link);
 
-	this_stat.st_uid = temp_context->uid;
-	this_stat.st_gid = temp_context->gid;
+	this_stat.mode = S_IFLNK | 0777;
+
+	this_stat.uid = temp_context->uid;
+	this_stat.gid = temp_context->gid;
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
@@ -6169,7 +6174,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 
-	this_stat.st_ino = self_inode;
+	this_stat.ino = self_inode;
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
@@ -6203,7 +6208,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
-	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
 
 	ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISLNK);
@@ -6242,15 +6247,17 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	ino_t this_inode;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
-	struct stat symlink_stat;
+	HCFS_STAT symlink_stat;
 	char link_buffer[MAX_LINK_PATH + 1];
 	int32_t ret_code;
+#ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
+#endif
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_inode = real_ino(req, ino);
 
 #ifdef _ANDROID_ENV_
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		fuse_reply_err(req, ENOTSUP);
 		return;
@@ -6315,8 +6322,11 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
  * @return 0 on allowing this action. Reject action when return
  *           negative error code.
  */
-static int32_t _xattr_permission(char name_space, pid_t thispid, fuse_req_t req,
-		const struct stat *thisstat, char ops)
+static int32_t _xattr_permission(char name_space,
+				 pid_t thispid,
+				 fuse_req_t req,
+				 const HCFS_STAT *thisstat,
+				 char ops)
 {
 	switch (name_space) {
 	case SYSTEM:
@@ -6363,7 +6373,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	char key[MAX_KEY_SIZE];
 	char name_space;
 	int32_t retcode;
-	struct stat stat_data;
+	HCFS_STAT stat_data;
 	ino_t this_inode;
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
@@ -6512,7 +6522,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 {
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
-	struct stat stat_data;
+	HCFS_STAT stat_data;
 	int64_t xattr_filepos;
 	char key[MAX_KEY_SIZE];
 	char name_space;
@@ -6520,16 +6530,18 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
 	size_t actual_size;
 	char *value;
-        MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
+#ifdef _ANDROID_ENV_
+        MOUNT_T *tmpptr;
+#endif
 
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-
+	write_log(10, "hfuse_ll_getxattr %d\n", __LINE__);
 	this_inode = real_ino(req, ino);
 	value = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
 
+	write_log(10, "hfuse_ll_getxattr %d\n", __LINE__);
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
 	if (retcode < 0) {
@@ -6542,6 +6554,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 #ifdef _ANDROID_ENV_
 	/* If get xattr of security.selinux in external volume, return the
 	   adhoc value. */
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
 	    name_space == SECURITY &&
 	    strncmp(key, SELINUX_XATTR_KEY, strlen(SELINUX_XATTR_KEY)) == 0) {
@@ -6583,6 +6596,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
         if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
@@ -6813,11 +6827,12 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	int32_t retcode;
 	char name_space;
 	char key[MAX_KEY_SIZE];
-	struct stat stat_data;
-        MOUNT_T *tmpptr;
+	HCFS_STAT stat_data;
 	struct fuse_ctx *temp_context;
+#ifdef _ANDROID_ENV_
+        MOUNT_T *tmpptr;
+#endif
 
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -6854,6 +6869,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
         if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
                 if (tmpptr->vol_path_cache == NULL) {
                         fuse_reply_err(req, EIO);
@@ -6940,7 +6956,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 {
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry;
 	DIR_ENTRY_PAGE dir_page;
-	struct stat parent_stat, link_stat;
+	HCFS_STAT parent_stat, link_stat;
 	struct fuse_entry_param tmp_param;
 	int32_t result_index;
 	int32_t ret_val, errcode;
@@ -6981,7 +6997,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Error if parent is not a dir */
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -7053,14 +7069,14 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) link_inode;
-	memcpy(&(tmp_param.attr), &link_stat, sizeof(struct stat));
-	if (S_ISFILE(link_stat.st_mode))
+	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &link_stat);
+	if (S_ISFILE(link_stat.mode))
 		ret_val = lookup_increase(tmpptr->lookup_table,
 			link_inode, 1, D_ISREG);
-	else if (S_ISLNK(link_stat.st_mode))
+	else if (S_ISLNK(link_stat.mode))
 		ret_val = lookup_increase(tmpptr->lookup_table,
 			link_inode, 1, D_ISLNK);
-	else if (S_ISDIR(link_stat.st_mode))
+	else if (S_ISDIR(link_stat.mode))
 		ret_val = -EISDIR;
 	else
 		ret_val = -EPERM;
@@ -7097,7 +7113,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	const char *name, mode_t mode, struct fuse_file_info *fi)
 {
 	int32_t ret_val;
-	struct stat parent_stat, this_stat;
+	HCFS_STAT parent_stat, this_stat;
 	ino_t parent_inode, self_inode;
 	mode_t self_mode;
 	int32_t file_flags;
@@ -7159,7 +7175,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	ispin = local_pin;
 #endif
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
@@ -7178,18 +7194,18 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	memset(&this_stat, 0, sizeof(struct stat));
-	this_stat.st_size = 0;
-	this_stat.st_blksize = MAX_BLOCK_SIZE;
-	this_stat.st_blocks = 0;
-	this_stat.st_dev = 0;
-	this_stat.st_nlink = 1;
+	init_hcfs_stat(&this_stat);
+	this_stat.dev = 0;
+	this_stat.size = 0;
+	this_stat.blksize = MAX_BLOCK_SIZE;
+	this_stat.blocks = 0;
+	this_stat.nlink = 1;
 	self_mode = mode | S_IFREG;
-	this_stat.st_mode = self_mode;
+	this_stat.mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
-	this_stat.st_uid = temp_context->uid;
-	this_stat.st_gid = temp_context->gid;
+	this_stat.uid = temp_context->uid;
+	this_stat.gid = temp_context->gid;
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
@@ -7202,7 +7218,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-	this_stat.st_ino = self_inode;
+	this_stat.ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
 			&this_stat, this_generation, tmpptr->f_ino,
 			&delta_meta_size, ispin);
@@ -7217,7 +7233,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
-	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
@@ -7225,9 +7240,11 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &(tmp_param.attr), NULL, NULL);
+		_rewrite_stat(tmpptr, &this_stat, NULL, NULL);
 	}
 #endif
+
+	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
 
 	if (delta_meta_size != 0)
 		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
@@ -7272,7 +7289,7 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int32_t mode,
 	int32_t ret_val;
 	ino_t this_inode;
 	struct timespec timenow;
-	struct stat newstat;
+	HCFS_STAT newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
 	off_t old_file_size;
@@ -7322,7 +7339,7 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int32_t mode,
 		return;
 	}
 
-	old_file_size = newstat.st_size;
+	old_file_size = newstat.size;
 	ret_val = do_fallocate(this_inode, &newstat, mode, offset, length,
 	                       &body_ptr, req);
 	if (ret_val < 0) {
@@ -7334,15 +7351,15 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int32_t mode,
 
 	clock_gettime(CLOCK_REALTIME, &timenow);
 
-	if ((mode == 3) || (old_file_size != newstat.st_size)) {
-		newstat.st_ctime = (time_t)(timenow.tv_sec);
+	if ((mode == 3) || (old_file_size != newstat.size)) {
+		newstat.ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_ctim), &timenow,
+		memcpy(&(newstat.ctime), &timenow,
 			sizeof(struct timespec));
 #endif
-		newstat.st_mtime = (time_t)(timenow.tv_sec);
+		newstat.mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
-		memcpy(&(newstat.st_mtim), &timenow,
+		memcpy(&(newstat.mtime), &timenow,
 			sizeof(struct timespec));
 #endif
 	}

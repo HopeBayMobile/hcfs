@@ -69,7 +69,7 @@ int32_t _api_socket_conn()
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -errno;
-	status = connect(fd, (struct sockaddr *) &addr, sizeof(addr));
+	status = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
 	if (status < 0)
 		return -errno;
 

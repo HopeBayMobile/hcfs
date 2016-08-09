@@ -25,6 +25,7 @@
 
 #include "global.h"
 #include "syncpoint_control.h"
+#include "meta.h"
 
 /* pin-status in super block */
 #define ST_DEL 0
@@ -34,7 +35,7 @@
 
 /* SUPER_BLOCK_ENTRY defines the structure for an entry in super block */
 typedef struct SUPER_BLOCK_ENTRY {
-	struct stat inode_stat;
+	HCFS_STAT inode_stat;
 	ino_t util_ll_next;
 	ino_t util_ll_prev;
 	ino_t pin_ll_next; /* Next file to be pinned */
@@ -103,10 +104,12 @@ int32_t super_block_to_delete(ino_t this_inode);
 int32_t super_block_delete(ino_t this_inode);
 int32_t super_block_reclaim(void);
 int32_t super_block_reclaim_fullscan(void);
-ino_t super_block_new_inode(struct stat *in_stat,
-				uint64_t *ret_generation, char local_pin);
-int32_t super_block_update_stat(ino_t this_inode, struct stat *newstat,
-                                BOOL no_sync);
+ino_t super_block_new_inode(HCFS_STAT *in_stat,
+			    uint64_t *ret_generation,
+			    char local_pin);
+int32_t super_block_update_stat(ino_t this_inode,
+				HCFS_STAT *newstat,
+				BOOL no_sync);
 
 int32_t ll_rebuild_dirty(ino_t missing_inode);
 int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry);
@@ -133,4 +136,4 @@ int32_t pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 int32_t super_block_set_syncpoint();
 int32_t super_block_cancel_syncpoint();
 
-#endif  /* GW20_HCFS_SUPER_BLOCK_H_ */
+#endif /* GW20_HCFS_SUPER_BLOCK_H_ */

@@ -1,5 +1,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <ftw.h>
 #include "gtest/gtest.h"
 #include "mock_params.h"
 extern "C" {
@@ -9,6 +10,22 @@ extern "C" {
 #include "fuseop.h"
 #include "super_block.h"
 #include "atomic_tocloud.h"
+}
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
 }
 
 class deleteEnvironment : public ::testing::Environment {
@@ -36,7 +53,7 @@ class deleteEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
     free(hcfs_system);
-    rmdir(tmppath);
+    nftw(tmppath, do_delete, 20, FTW_DEPTH);
     unlink("/tmp/testHCFS");
     if (workpath != NULL)
       free(workpath);
@@ -183,8 +200,7 @@ protected:
 			malloc(sizeof(SYSTEM_CONF_STRUCT));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
-		if (!access(backend_meta, F_OK))
-			unlink(backend_meta);
+		backend_meta[0] = 0;
 	}
 	virtual void TearDown()
 	{
@@ -201,8 +217,8 @@ protected:
 		size_objname = 50;
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * num_objname);
-		for (int32_t i = 0 ; i < num_objname ; i++)
-			objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
+		for (uint32_t i = 0 ; i < num_objname ; i++)
+			objname_list[i] = (char *)calloc(size_objname, sizeof(char));
 		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
 	}
 	void destroy_objname_buffer(uint32_t num_objname)
@@ -242,7 +258,7 @@ protected:
 TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 {
 	FILE *meta;
-	struct stat meta_stat;
+	HCFS_STAT meta_stat;
 	BLOCK_ENTRY_PAGE tmp_blockentry_page;
 	FILE_META_TYPE tmp_file_meta;
 	CLOUD_RELATED_DATA cloud_related;
@@ -257,8 +273,8 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
 	mock_thread_info->which_index = 0;
-	meta_stat.st_size = 1000000; // Let total_blocks = 1000000/100 = 10000
-	meta_stat.st_mode = S_IFREG; 
+	meta_stat.size = 1000000; // Let total_blocks = 1000000/100 = 10000
+	meta_stat.mode = S_IFREG; 
 	MAX_BLOCK_SIZE = 100;
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
 	memset(&cloud_related, 0, sizeof(CLOUD_RELATED_DATA));
@@ -267,7 +283,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	setbuf(meta, NULL);
 	fseek(meta, 0, SEEK_SET);
-	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
+	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
 	fwrite(&cloud_related, sizeof(CLOUD_RELATED_DATA), 1, meta);
 	for (int32_t i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
@@ -311,7 +327,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 {
 	FILE *meta;
-	struct stat meta_stat;
+	HCFS_STAT meta_stat;
 	void *res;
 	expected_num_objname = 1;
 	DIR_META_TYPE dirmeta;
@@ -322,7 +338,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	mock_thread_info->which_index = 0;
 	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
-	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
+	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
 	fwrite(&dirmeta, sizeof(DIR_META_TYPE), 1, meta);
 	fclose(meta);
 

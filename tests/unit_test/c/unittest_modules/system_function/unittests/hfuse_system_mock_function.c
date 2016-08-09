@@ -37,7 +37,7 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-ino_t super_block_new_inode(struct stat *in_stat)
+ino_t super_block_new_inode(HCFS_STAT *in_stat)
 {
 	return 1;
 }
@@ -71,16 +71,6 @@ void ENGINE_load_builtin_engines(void)
 }
 
 int32_t ENGINE_register_all_complete(void)
-{
-	return 0;
-}
-
-int32_t read_system_config(char *config_path)
-{
-	return 0;
-}
-
-int32_t validate_system_config(void)
 {
 	return 0;
 }
@@ -175,11 +165,11 @@ void destroy_pathlookup(void)
 {
 	return;
 }
-int32_t init_dirstat_lookup()
+int32_t init_dirstat_lookup(void)
 {
 	return 0;
 }
-void destroy_dirstat_lookup()
+void destroy_dirstat_lookup(void)
 {
 }
 void init_sync_stat_control(void)
@@ -193,7 +183,7 @@ int32_t ignore_sigpipe(void)
 	return 0;
 }
 
-int32_t update_quota()
+int32_t update_quota(void)
 {
 	return 0;
 }
@@ -204,12 +194,12 @@ int32_t get_quota_from_backup(int64_t *quota)
 	return 0;
 }
 
-int32_t init_pkg_cache()
+int32_t init_pkg_cache(void)
 {
 	return 0;
 }
 
-int32_t destroy_pkg_cache()
+int32_t destroy_pkg_cache(void)
 {
 	return 0;
 }
@@ -217,7 +207,7 @@ int32_t destroy_api_interface(void)
 {
 	return 0;
 }
-void destroy_monitor_loop_thread()
+void destroy_monitor_loop_thread(void)
 {
 	return;
 }
@@ -227,18 +217,18 @@ void fetch_syncpoint_data_path(char *path)
 	strcpy(path, "mock_syncpoint_data");
 }
 
-int32_t init_syncpoint_resource()
+int32_t init_syncpoint_resource(void)
 {
 	return 0;
 }
 
-int32_t init_event_queue() {}
+int32_t init_event_queue(void) { return 0; }
 #ifdef _ANDROID_ENV_
 void *event_worker_loop(void *ptr) {}
 #else
 void *event_worker_loop(void) {}
 #endif
-void destroy_event_worker_loop_thread() {}
+void destroy_event_worker_loop_thread(void) {}
 
 int32_t check_and_create_metapaths(void)
 {

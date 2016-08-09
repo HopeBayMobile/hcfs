@@ -9,11 +9,15 @@ ifndef VERSION_NUM
 endif
 
 CC = gcc
-CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=0 -DCOMPRESS_ENABLE=0 \
-	   -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_ \
+CPPFLAGS = -DDEDUP_ENABLE=0 \
+	   -DENCRYPT_ENABLE=0 \
+	   -DCOMPRESS_ENABLE=0 \
+	   -D_FILE_OFFSET_BITS=64 \
+	   -DARM_32bit_ \
+	   -D_ANDROID_ENV_ \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\"
 
-CFLAGS = -g -pthread -Wall -Wextra -Werror
+CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
 LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
@@ -24,7 +28,8 @@ endif
 # http://scottmcpeak.com/autodepend/autodepend.html
 
 OBJS_DIR = obj
-OBJS_F := objmeta.o \
+OBJS_F := \
+	objmeta.o \
 	mount_manager.o \
 	FS_manager.o \
 	api_interface.o \
@@ -62,6 +67,8 @@ OBJS_F := objmeta.o \
 	fuseproc_comm.o \
 	event_notification.o \
 	event_filter.o \
+	meta.o \
+	params.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

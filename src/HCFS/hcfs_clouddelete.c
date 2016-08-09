@@ -36,9 +36,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <errno.h>
 #include <dirent.h>
 #include <sys/mman.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+#include <sys/xattr.h>
 #include <inttypes.h>
 
 #include "hcfs_tocloud.h"
@@ -384,9 +382,9 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	if (S_ISFILE(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 				sizeof(FILE_STATS_TYPE), SEEK_SET);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 				metafptr);
@@ -395,7 +393,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	} else if (S_ISDIR(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 				metafptr);
@@ -404,7 +402,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	} else if (S_ISLNK(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
 		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
 				metafptr);
@@ -445,7 +443,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char objname[500];
 	ino_t this_inode;
 	FILE *backend_metafptr;
-	struct stat tempfilestat;
+	HCFS_STAT tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t curl_id, which_dsync_index;
@@ -466,9 +464,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
-#ifndef _ANDROID_ENV_
-	int64_t ret_ssize;
-#endif
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -548,10 +543,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		flock(fileno(backend_metafptr), LOCK_EX);
 		backend_mlock = TRUE;
 		FSEEK(backend_metafptr, 0, SEEK_SET);
-		FREAD(&tempfilestat, sizeof(struct stat), 1, backend_metafptr);
+		FREAD(&tempfilestat, sizeof(HCFS_STAT), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 							backend_metafptr);
-		tmp_size = tempfilestat.st_size;
+		tmp_size = tempfilestat.size;
 
 		/* Check if need to sync past the current size */
 
@@ -914,7 +909,7 @@ int32_t _dsync_use_thread(int32_t index, ino_t this_inode, mode_t this_mode)
 *
 *************************************************************************/
 
-static BOOL _sleep_wakeup()
+static BOOL _sleep_wakeup(void)
 {
 	if ((hcfs_system->sync_paused == TRUE) ||
 		(hcfs_system->system_going_down == TRUE))
@@ -923,11 +918,7 @@ static BOOL _sleep_wakeup()
 		return FALSE;
 }
 
-#ifdef _ANDROID_ENV_
 void *delete_loop(void *ptr)
-#else
-void delete_loop(void)
-#endif
 {
 	ino_t inode_to_dsync, inode_to_check, retry_inode;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -935,9 +926,7 @@ void delete_loop(void)
 	char in_dsync;
 	int32_t ret_val;
 
-#ifdef _ANDROID_ENV_
 	UNUSED(ptr);
-#endif
 	init_delete_control();
 	init_dsync_control();
 
@@ -1019,7 +1008,7 @@ void delete_loop(void)
 								count++) {
 					ret_val = _dsync_use_thread(count,
 							inode_to_dsync,
-						tempentry.inode_stat.st_mode);
+						tempentry.inode_stat.mode);
 					if (ret_val == 0)
 						break;
 				}
@@ -1032,7 +1021,5 @@ void delete_loop(void)
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		}
 	}
-#ifdef _ANDROID_ENV_
 	return NULL;
-#endif
 }

@@ -95,10 +95,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr);
 void collect_finished_dsync_threads(void *ptr);
 void collect_finished_delete_threads(void *ptr);
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr);
-#ifdef _ANDROID_ENV_
 void *delete_loop(void *ptr);
-#else
-void delete_loop(void);
-#endif
 
 #endif  /* GW20_HCFS_HCFS_CLOUDDELETE_H_ */

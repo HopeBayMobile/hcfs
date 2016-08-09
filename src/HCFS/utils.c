@@ -29,9 +29,7 @@
 #include <limits.h>
 #include <signal.h>
 #include <time.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+#include <sys/xattr.h>
 #include <inttypes.h>
 #include <jansson.h>
 
@@ -49,8 +47,6 @@
 #include "mount_manager.h"
 #include "enc.h"
 #include "super_block.h"
-
-SYSTEM_CONF_STRUCT *system_config = NULL;
 
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
@@ -1040,7 +1036,7 @@ int32_t init_system_config_settings(const char *config_path,
 *************************************************************************/
 off_t check_file_size(const char *path)
 {
-	struct stat block_stat;
+	struct stat block_stat; /* raw file ops */
 	int32_t errcode;
 
 	errcode = stat(path, &block_stat);
@@ -1234,7 +1230,7 @@ int32_t change_pin_size(int64_t delta_pin_size)
 int32_t update_sb_size()
 {
 	int64_t old_size, new_size;
-	struct stat sbstat;
+	struct stat sbstat; /* raw file ops */
 	int32_t ret, ret_code;
 
 	sem_wait(&(hcfs_system->access_sem));
@@ -1362,7 +1358,7 @@ int32_t set_block_dirty_status(char *path, FILE *fptr, char status)
 
 #ifdef _ANDROID_ENV_
 
-	struct stat tmpstat;
+	struct stat tmpstat; /* block ops */
 	if (path != NULL) {
 		ret = stat(path, &tmpstat);
 		if (ret < 0) {
@@ -1474,7 +1470,7 @@ int32_t get_block_dirty_status(char *path, FILE *fptr, char *status)
 
 #ifdef _ANDROID_ENV_
 
-	struct stat tmpstat;
+	struct stat tmpstat; /* block ops */
 	if (path != NULL) {
 		ret = stat(path, &tmpstat);
 		if (ret < 0) {
@@ -1727,8 +1723,8 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 	DIR_STATS_TYPE olddirstats, newdirstats, diffstats;
 
 	PREAD(fileno(metafptr), &meta_stats, sizeof(FILE_STATS_TYPE),
-	      sizeof(struct stat) + sizeof(FILE_META_TYPE));
-	//FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	//FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
 	//	SEEK_SET);
 	//FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
 
@@ -1742,8 +1738,8 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 	_translate_storage_location(&meta_stats, &newdirstats);
 
 	PWRITE(fileno(metafptr), &meta_stats, sizeof(FILE_STATS_TYPE),
-	      sizeof(struct stat) + sizeof(FILE_META_TYPE));
-	//FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	//FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
 	//	SEEK_SET);
 	//FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
 
@@ -1774,8 +1770,7 @@ int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	size_t ret_size;
 	FILE_STATS_TYPE meta_stats;
 
-	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
-		SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), SEEK_SET);
 	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
 
 	_translate_storage_location(&meta_stats, newstat);
@@ -1902,7 +1897,7 @@ int32_t reload_system_config(const char *config_path)
 	return 0;
 }
 
-void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void))
 {
 	uint32_t count;
 
@@ -1949,7 +1944,7 @@ int32_t ignore_sigpipe(void)
  *
  * @return TRUE when it is a natural number, else return FALSE
  */ 
-BOOL is_natural_number(char *str)
+BOOL is_natural_number(char const *str)
 {
 	int32_t num;
 	size_t i;
@@ -1999,10 +1994,11 @@ BOOL is_natural_number(char *str)
 int32_t get_meta_size(ino_t inode, int64_t *metasize)
 {
 	char metapath[300];
-	struct stat metastat;
+	struct stat metastat; /* raw file ops */
 	int32_t ret, ret_code;
 
 	fetch_meta_path(metapath, inode);
+	/* TODO: reduce duplicate code with check_file_size */
 	ret = stat(metapath, &metastat);
 	if (ret < 0) {
 		ret_code = errno;

@@ -13,6 +13,8 @@
 
 #include "utils.h"
 #include "macro.h"
+#include "compress.h"
+#include "b64encode.h"
 
 /************************************************************************
  * *

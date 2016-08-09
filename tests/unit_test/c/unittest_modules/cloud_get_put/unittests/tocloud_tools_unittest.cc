@@ -125,25 +125,25 @@ TEST_F(change_block_status_to_BOTHTest, ChangeStatusSuccess)
 {
 	char path[300];
 	ino_t inode = 5;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE tmppage, verified_page;
 	FILE *fptr;
-	int64_t pagepos = sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	int64_t pagepos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 	int64_t blockno = 10;
 	int64_t seqnum = 123;
 	int32_t val;
 
 	sprintf(path, "tocloud_tools_test_folder/mock_meta_%"PRIu64,
 			(uint64_t)inode);
-	memset(&tmpstat, 0, sizeof(struct stat));
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 	filemeta.local_pin = P_UNPIN;
 	fptr = fopen(path, "w+");
 	setbuf(fptr, NULL);
 	ASSERT_TRUE(fptr != NULL) << "ErrCode: " << errno;
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	tmppage.block_entries[10].status = ST_LtoC;
 	tmppage.block_entries[10].seqnum = seqnum;
@@ -173,25 +173,25 @@ TEST_F(change_block_status_to_BOTHTest, StatusIsNot_LtoC)
 {
 	char path[300];
 	ino_t inode = 5;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE tmppage, verified_page;
 	FILE *fptr;
-	int64_t pagepos = sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	int64_t pagepos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 	int64_t blockno = 10;
 	int64_t seqnum = 123;
 	int32_t val;
 
 	sprintf(path, "tocloud_tools_test_folder/mock_meta_%"PRIu64,
 			(uint64_t)inode);
-	memset(&tmpstat, 0, sizeof(struct stat));
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 	filemeta.local_pin = P_UNPIN;
 	fptr = fopen(path, "w+");
 	setbuf(fptr, NULL);
 	ASSERT_TRUE(fptr != NULL) << "ErrCode: " << errno;
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	tmppage.block_entries[10].status = ST_LDISK;
 	tmppage.block_entries[10].seqnum = seqnum + 1;
@@ -222,25 +222,25 @@ TEST_F(change_block_status_to_BOTHTest, StatusIs_NONE)
 {
 	char path[300];
 	ino_t inode = 5;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE tmppage, verified_page;
 	FILE *fptr;
-	int64_t pagepos = sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	int64_t pagepos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE);
 	int64_t blockno = 10;
 	int64_t seqnum = 123;
 	int32_t val;
 
 	sprintf(path, "tocloud_tools_test_folder/mock_meta_%"PRIu64,
 			(uint64_t)inode);
-	memset(&tmpstat, 0, sizeof(struct stat));
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
 	filemeta.local_pin = P_UNPIN;
 	fptr = fopen(path, "w+");
 	setbuf(fptr, NULL);
 	ASSERT_TRUE(fptr != NULL) << "ErrCode: " << errno;
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	tmppage.block_entries[10].status = ST_NONE;
 	tmppage.block_entries[10].seqnum = seqnum;

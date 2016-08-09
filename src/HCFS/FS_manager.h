@@ -14,8 +14,8 @@
 #define GW20_HCFS_FS_MANAGER_H_
 
 #include <semaphore.h>
-
-#include "fuseop.h"
+#include <inttypes.h>
+#include "meta.h"
 
 /* We will use DIR_ENTRY_PAGE as the b-tree node */
 /* Filesystem name ==> d_name in DIR_ENTRY */

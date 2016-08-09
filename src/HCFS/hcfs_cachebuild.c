@@ -242,7 +242,7 @@ int32_t build_cache_usage(void)
 	int32_t ret, errcode;
 	int64_t blockno;
 	ino_t this_inode;
-	struct stat tempstat;
+	struct stat tempstat; /* block ops */
 	CACHE_USAGE_NODE *tempnode;
 	size_t tmp_size;
 	char is_dirty;

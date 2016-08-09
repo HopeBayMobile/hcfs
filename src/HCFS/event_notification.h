@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright Â2016 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright ?2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: event_notification.c
 * Abstract: The header file for event notification functions
@@ -40,15 +40,11 @@ typedef struct {
 extern EVENT_QUEUE *event_queue;
 
 
-int32_t init_event_queue();
+int32_t init_event_queue(void);
 int32_t set_event_notify_server(char *path);
 
-#ifdef _ANDROID_ENV_
 void *event_worker_loop(void *ptr);
-#else
-void *event_worker_loop(void);
-#endif
-void destroy_event_worker_loop_thread();
+void destroy_event_worker_loop_thread(void);
 
 int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
 		      char blocking);

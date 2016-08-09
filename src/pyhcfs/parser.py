@@ -1,6 +1,21 @@
 # -*- coding: utf-8 -*-
 # See CFFI docs at https://cffi.readthedocs.org/en/latest/
 from _pyhcfs import ffi, lib
+import os, errno
+import inspect
+import sys
+
+error_msg = {
+        -2: "Unsupported meta version",
+        }
+
+def str_error_msg(name, ret_val):
+    msg = ""
+    if ret_val == -1:
+        msg = name + ': ' + os.strerror(ffi.errno)
+    else:
+        msg = name + ": " + error_msg[ret_val]
+    return msg
 
 def __convert_struct_field( s, fields ):
     for field,fieldtype in fields:
@@ -31,7 +46,8 @@ def list_external_volume(fsmgr_path):
     ptr_ret_entry = ffi.new("PORTABLE_DIR_ENTRY **")
     ret_num = ffi.new("uint64_t *")
     ret = lib.list_external_volume(fsmgr_path, ptr_ret_entry, ret_num)
-    if ret != 0:
+    if ret < 0:
+        print('Error:', str_error_msg(inspect.stack()[0][3], ret), file=sys.stderr)
         return ret
 
     response = []
@@ -46,7 +62,7 @@ def parse_meta(meta_path):
     Get data from hcfs metafile
 
     cdef: #define D_ISDIR 0
-        #define D_ISREG 1
+	#define D_ISREG 1
         #define D_ISLNK 2
         #define D_ISFIFO 3
         #define D_ISSOCK 4
@@ -59,8 +75,12 @@ def parse_meta(meta_path):
                 file_type is not D_ISDIR.
     """
     meta = ffi.new("RET_META *")
-    ret = lib.parse_meta(meta_path, meta)
-    return convert_to_python(meta[0])
+    lib.parse_meta(meta_path, meta)
+    ret = convert_to_python(meta[0])
+    if ret['result'] < 0:
+        ret['error_msg'] = str_error_msg(inspect.stack()[0][3], ret['result'])
+        print('Error:', ret['error_msg'], file=sys.stderr)
+    return ret
 
 
 def list_dir_inorder(meta_path="", offset=(0, 0), limit=1000):
@@ -90,6 +110,9 @@ def list_dir_inorder(meta_path="", offset=(0, 0), limit=1000):
     if ret_code > 0:
         ret['child_list'] = [ convert_to_python(file_list[i]) for i in range(ret_code) ]
 
+    if ret['result'] < 0:
+        ret['error_msg'] = str_error_msg(inspect.stack()[0][3], ret['result'])
+        print('Error:', ret['error_msg'], file=sys.stderr)
     return ret
 
 def get_external_vol(tmp_meta):

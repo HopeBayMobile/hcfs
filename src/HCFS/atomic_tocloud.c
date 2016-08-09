@@ -26,6 +26,10 @@
 #include "hcfs_fromcloud.h"
 #include "tocloud_tools.h"
 #include "file_present.h"
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
+
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -595,7 +599,7 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 	}
 
 	PREAD(fileno(backend_metafptr), &tempfilemeta, sizeof(FILE_META_TYPE),
-							sizeof(struct stat));
+							sizeof(HCFS_STAT));
 
 	write_log(10, "Debug: backend blocks = %lld\n", backend_blocks);
 
@@ -827,6 +831,10 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	FILE *src_ptr, *tar_ptr;
 	char filebuf[4100];
 	int64_t ret_pos;
+#ifndef _ANDROID_ENV_
+	int64_t ret_ssize;
+	int64_t temp_trunc_size;
+#endif
 
 	tar_ptr = fopen(tarpath, "a+");
 	if (tar_ptr == NULL) {
@@ -1001,7 +1009,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 	FILE *backend_metafptr;
 	char backend_metapath[400];
 	char objname[400];
-	struct stat tempfilestat;
+	HCFS_STAT tempfilestat;
 	int32_t errcode, ret;
 	ssize_t ret_ssize;
 	BOOL first_upload;
@@ -1077,8 +1085,8 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 
 		} else {
 			PREAD(fileno(backend_metafptr), &tempfilestat,
-					sizeof(struct stat), 0);
-			*backend_size = tempfilestat.st_size;
+					sizeof(HCFS_STAT), 0);
+			*backend_size = tempfilestat.size;
 			*total_backend_blocks = (*backend_size == 0) ? 
 				0 : (*backend_size - 1) / MAX_BLOCK_SIZE + 1;
 			ret = init_progress_info(ptr->progress_fd,

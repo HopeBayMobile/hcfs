@@ -35,8 +35,8 @@ typedef struct {
 
 PINNING_SCHEDULER pinning_scheduler;
 
-void pinning_loop();
-int32_t init_pin_scheduler();
-int32_t destroy_pin_scheduler();
-void pinning_collect();
+void pinning_loop(void);
+int32_t init_pin_scheduler(void);
+int32_t destroy_pin_scheduler(void);
+void* pinning_collect(void*);
 void pinning_worker(void *ptr);

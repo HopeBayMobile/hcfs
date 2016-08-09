@@ -43,7 +43,7 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 	fh = target_ptr->inode_num % 100;
 	sem_post(&(target_ptr->access_sem));
 
-	if (system_fh_table.entry_table_flags[fh] != TRUE) {
+	if (system_fh_table.entry_table_flags[fh] == NO_FH) {
 
 		if (target_ptr->fptr != NULL) {
 			fclose(target_ptr->fptr);
@@ -56,9 +56,12 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 	return 0;
 }
 
-int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
-	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
-	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_update_file_data(ino_t this_inode,
+				    const HCFS_STAT *inode_stat,
+				    const FILE_META_TYPE *file_meta_ptr,
+				    const BLOCK_ENTRY_PAGE *block_page,
+				    const int64_t page_pos,
+				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (this_inode == 1)
 		root_updated = TRUE;
@@ -66,9 +69,9 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_s
 		before_update_file_data = FALSE;
 	if (inode_stat != NULL) {
 		if (this_inode == 1)
-			memcpy(&updated_root, inode_stat, sizeof(struct stat));
+			memcpy(&updated_root, inode_stat, sizeof(HCFS_STAT));
 		else
-			memcpy(&updated_stat, inode_stat, sizeof(struct stat));
+			memcpy(&updated_stat, inode_stat, sizeof(HCFS_STAT));
 	}
 
 	if (block_page != NULL) {
@@ -80,7 +83,7 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_s
 }
 
 int32_t meta_cache_update_file_nosync(ino_t this_inode,
-	const struct stat *inode_stat,
+	const HCFS_STAT *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -90,9 +93,9 @@ int32_t meta_cache_update_file_nosync(ino_t this_inode,
 		before_update_file_data = FALSE;
 	if (inode_stat != NULL) {
 		if (this_inode == 1)
-			memcpy(&updated_root, inode_stat, sizeof(struct stat));
+			memcpy(&updated_root, inode_stat, sizeof(HCFS_STAT));
 		else
-			memcpy(&updated_stat, inode_stat, sizeof(struct stat));
+			memcpy(&updated_stat, inode_stat, sizeof(HCFS_STAT));
 	}
 
 	if (block_page != NULL) {
@@ -104,8 +107,8 @@ int32_t meta_cache_update_file_nosync(ino_t this_inode,
 }
 
 int32_t meta_cache_update_stat_nosync(ino_t this_inode,
-                                       const struct stat *inode_stat,
-                                       META_CACHE_ENTRY_STRUCT *body_ptr)
+				      const HCFS_STAT *inode_stat,
+				      META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (this_inode == 1)
 		root_updated = TRUE;
@@ -113,110 +116,113 @@ int32_t meta_cache_update_stat_nosync(ino_t this_inode,
 		before_update_file_data = FALSE;
 	if (inode_stat != NULL) {
 		if (this_inode == 1)
-			memcpy(&updated_root, inode_stat, sizeof(struct stat));
+			memcpy(&updated_root, inode_stat, sizeof(HCFS_STAT));
 		else
-			memcpy(&updated_stat, inode_stat, sizeof(struct stat));
+			memcpy(&updated_stat, inode_stat, sizeof(HCFS_STAT));
 	}
 
 	return 0;
 }
 
-int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_file_data(ino_t this_inode,
+				    HCFS_STAT *inode_stat,
+				    FILE_META_TYPE *file_meta_ptr,
+				    BLOCK_ENTRY_PAGE *block_page,
+				    int64_t page_pos,
+				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (inode_stat != NULL) {
 		switch (this_inode) {
 		case 1:
-			inode_stat->st_ino = 1;
-			inode_stat->st_mode = S_IFDIR | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 1;
+			inode_stat->mode = S_IFDIR | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 2:
-			inode_stat->st_ino = 2;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 2;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 4:
-			inode_stat->st_ino = 4;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 4;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
 			break;	
 		case 6:
-			inode_stat->st_ino = 6;
-			inode_stat->st_mode = S_IFDIR | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 6;
+			inode_stat->mode = S_IFDIR | 0700;
+			inode_stat->atime = 100000;
 			break;	
 		case 10:
-			inode_stat->st_ino = 10;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 10;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 11:
-			inode_stat->st_ino = 11;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
-			inode_stat->st_size = 1024;
+			inode_stat->ino = 11;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
+			inode_stat->size = 1024;
 			break;
 		case 12:
-			inode_stat->st_ino = 12;
-			inode_stat->st_mode = S_IFDIR | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 12;
+			inode_stat->mode = S_IFDIR | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 13:
-			inode_stat->st_ino = 13;
-			inode_stat->st_mode = S_IFDIR | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 13;
+			inode_stat->mode = S_IFDIR | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 14:
-			inode_stat->st_ino = 14;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
-			inode_stat->st_size = 102400;
+			inode_stat->ino = 14;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
+			inode_stat->size = 102400;
 			break;
 		case 15:
-			inode_stat->st_ino = 15;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
-			inode_stat->st_size = 204800;
+			inode_stat->ino = 15;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
+			inode_stat->size = 204800;
 			break;
 		case 16:
-			inode_stat->st_ino = 16;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
-			inode_stat->st_size = 204800;
+			inode_stat->ino = 16;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
+			inode_stat->size = 204800;
 			break;
 		case TEST_LISTDIR_INODE:
-			inode_stat->st_ino = TEST_LISTDIR_INODE;
-			inode_stat->st_mode = S_IFDIR | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = TEST_LISTDIR_INODE;
+			inode_stat->mode = S_IFDIR | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 18:
-			inode_stat->st_ino = 18;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 18;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
 			break;
 		case 19:
-			inode_stat->st_ino = 19;
-			inode_stat->st_mode = S_IFREG | 0000;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 19;
+			inode_stat->mode = S_IFREG | 0000;
+			inode_stat->atime = 100000;
 			break;
 		case 20:
-			inode_stat->st_ino = 20;
-			inode_stat->st_mode = S_IFREG | 0700;
-			inode_stat->st_atime = 100000;
+			inode_stat->ino = 20;
+			inode_stat->mode = S_IFREG | 0700;
+			inode_stat->atime = 100000;
 			break;
 		default:
 			break;
 		}
 
-		inode_stat->st_uid = geteuid();
-		inode_stat->st_gid = getegid();
+		inode_stat->uid = geteuid();
+		inode_stat->gid = getegid();
 
 		if (this_inode == 1 && root_updated == TRUE)
-			memcpy(inode_stat, &updated_root, sizeof(struct stat));
+			memcpy(inode_stat, &updated_root, sizeof(HCFS_STAT));
 		if (this_inode != 1 && before_update_file_data == FALSE)
-			memcpy(inode_stat, &updated_stat, sizeof(struct stat));
+			memcpy(inode_stat, &updated_stat, sizeof(HCFS_STAT));
 	}
 
 
@@ -234,7 +240,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		case 14:
 		case 15:
 		case 16:
-			file_meta_ptr->direct = sizeof(struct stat)
+			file_meta_ptr->direct = sizeof(HCFS_STAT)
 				+ sizeof(FILE_META_TYPE);
 			break;
 		default:
@@ -248,7 +254,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		case 14:
 		case 15:
 		case 16:
-			if (page_pos == sizeof(struct stat)
+			if (page_pos == sizeof(HCFS_STAT)
 				+ sizeof(FILE_META_TYPE)) {
 				block_page->num_entries = 1;
 				block_page->block_entries[0].status
@@ -268,16 +274,20 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
-int32_t meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
-	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
-	META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_update_dir_data(ino_t this_inode,
+				   const HCFS_STAT *inode_stat,
+				   const DIR_META_TYPE *dir_meta_ptr,
+				   const DIR_ENTRY_PAGE *dir_page,
+				   META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
 
-int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
-	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
-	META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_dir_data(ino_t this_inode,
+				   HCFS_STAT *inode_stat,
+				   DIR_META_TYPE *dir_meta_ptr,
+				   DIR_ENTRY_PAGE *dir_page,
+				   META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	FILE *fptr;
 	if (dir_meta_ptr != NULL) {
@@ -289,7 +299,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 			if (readdir_metapath == NULL)
 				break;
 			fptr = fopen(readdir_metapath, "r");
-			fseek(fptr, sizeof(struct stat), SEEK_SET);
+			fseek(fptr, sizeof(HCFS_STAT), SEEK_SET);
 			fread(dir_meta_ptr, sizeof(DIR_META_TYPE), 1, fptr);
 			fclose(fptr);
 			break;
@@ -322,7 +332,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 
 	fh = this_inode % 100;
 
-	if (system_fh_table.entry_table_flags[fh] == TRUE) {
+	if (system_fh_table.entry_table_flags[fh] != NO_FH) {
 		ptr = system_fh_table.entry_table[fh].meta_cache_ptr;
 		if (ptr != NULL) {
 			sem_wait(&(ptr->access_sem));
@@ -336,7 +346,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		ptr->inode_num = this_inode;
 		sem_init(&(ptr->access_sem), 0, 1);
 		sem_wait(&(ptr->access_sem));
-		if (system_fh_table.entry_table_flags[fh] == TRUE)
+		if (system_fh_table.entry_table_flags[fh] == IS_FH)
 			system_fh_table.entry_table[fh].meta_cache_ptr =
 				ptr;
 	}
@@ -417,17 +427,19 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	return 0;
 }
 
-
-int32_t meta_cache_update_symlink_data(ino_t this_inode,
-	const struct stat *inode_stat,
-        const SYMLINK_META_TYPE *symlink_meta_ptr,
-	META_CACHE_ENTRY_STRUCT *bptr)
+int32_t meta_cache_update_symlink_data(
+    ino_t this_inode,
+    const HCFS_STAT *inode_stat,
+    const SYMLINK_META_TYPE *symlink_meta_ptr,
+    META_CACHE_ENTRY_STRUCT *bptr)
 {
 	return 0;
 }
 
-int32_t meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
-        SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+int32_t meta_cache_lookup_symlink_data(ino_t this_inode,
+				       HCFS_STAT *inode_stat,
+				       SYMLINK_META_TYPE *symlink_meta_ptr,
+				       META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	char *target = "I_am_target_link";
 

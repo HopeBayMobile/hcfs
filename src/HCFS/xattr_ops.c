@@ -22,11 +22,7 @@
 #include "xattr_ops.h"
 
 #include <errno.h>
-#ifdef _ANDROID_ENV_
 #include <sys/xattr.h>
-#else
-#include <attr/xattr.h>
-#endif
 
 #include "meta_mem_cache.h"
 #include "super_block.h"

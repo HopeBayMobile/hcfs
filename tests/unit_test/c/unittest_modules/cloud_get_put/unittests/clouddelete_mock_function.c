@@ -10,26 +10,34 @@
 #include "fuseop.h"
 #include "tocloud_tools.h"
 
+#define MOCK() printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__)
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
+	MOCK();
 	return HTTP_OK;
 }
 
 
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
+	MOCK();
 	return;
 }
 
 int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
+	char str[100];
+	MOCK();
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
+		printf("%s %s\n", str, "this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
 		strcpy(pathname, TODELETE_PATH);
 		return 0;
 	} else if (this_inode == INODE__FETCH_TODELETE_PATH_FAIL) {
 		pathname[0] = '\0';
+		printf("%s %s\n", str, "this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
 		return -1;
 	} else {
+		printf("%s %s\n", str, "this_inode == ?. Record this inode for later");
 		/* Record inode. Called when deleting inode in delete_loop() */
 		usleep(500000); // Let threads busy
 		sem_wait(&(to_verified_data.record_inode_sem));
@@ -37,23 +45,26 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 		to_verified_data.record_inode_counter++;
 		sem_post(&(to_verified_data.record_inode_sem));
 		pathname[0] = '\0';
-		printf("Test: mock inode %d is deleted\n", this_inode);
+		printf("Test: mock inode %zu is deleted\n", this_inode);
 		return -1;
 	}
 }
 
 int32_t super_block_delete(ino_t this_inode)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t super_block_reclaim(void)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
+	MOCK();
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
@@ -64,11 +75,13 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 int32_t super_block_share_locking(void)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	MOCK();
 	if (this_inode == 0)
 		return -1;
 	if (test_data.tohandle_counter == test_data.num_inode) {
@@ -85,6 +98,7 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 int32_t super_block_share_release(void)
 {
+	MOCK();
 	return 0;
 }
 
@@ -92,9 +106,10 @@ int32_t super_block_share_release(void)
 int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	int64_t target_page, int64_t hint_page) 
 {
+	MOCK();
 	if (target_page >= 3)
 		return 0;
-	long long ret_page_pos = sizeof(struct stat) + 
+	long long ret_page_pos = sizeof(HCFS_STAT) + 
 		sizeof(FILE_META_TYPE) + sizeof(CLOUD_RELATED_DATA) +
 		target_page * sizeof(BLOCK_ENTRY_PAGE);
 	return ret_page_pos;
@@ -108,50 +123,59 @@ int32_t write_log(int32_t level, char *format, ...)
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 			int64_t num_inodes_delta)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
+	MOCK();
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
 
-void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)())
+void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void))
 {
+	MOCK();
 	sleep(secs);
 	return;
 }
 
 int fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
+	MOCK();
 	return 0;
 }
 
 void fetch_backend_meta_objname(char *objname, ino_t inode)
 {
+	MOCK();
 	return;
 }
 
 void fetch_backend_block_objname(char *objname,
 	ino_t inode, long long block_no, long long seqnum)
 {
+	MOCK();
 	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
 	return;
 }
 
 int fetch_backend_meta_path(char *pathname, ino_t inode)
 {
+	MOCK();
+	pathname[0] = 0;
 	return 0;
 }
 
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
-	return 0;
+	MOCK();
 }
 
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
+	MOCK();
 	FILE *src;
 	char buf[4100];
 	size_t size;
@@ -160,17 +184,18 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	fseek(fptr, 0, SEEK_SET);
 	fseek(src, 0, SEEK_SET);
-	while (size = fread(buf, 1, 4096, src)) {
+	while ((size = fread(buf, 1, 4096, src))) {
 		fwrite(buf, 1, size, fptr);
 	}
 
-	close(src);
+	fclose(src);
 
 	return 0;
 }
 
 void fetch_del_backend_meta_path(char *backend_metapath, ino_t this_inode)
 {
+	MOCK();
 	sprintf(backend_metapath, "/tmp/mock_backend_meta");
 }
 
@@ -187,4 +212,13 @@ void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
 int32_t unlink_upload_file(char *filename)
 {
 	return 0;
+}
+void init_hcfs_stat(HCFS_STAT *this_stat)
+{
+	memset(this_stat, 0, sizeof(HCFS_STAT));
+
+	this_stat->metaver = CURRENT_META_VER;
+	memcpy(&this_stat->magic, &META_MAGIC, sizeof(this_stat->magic));
+
+	return;
 }

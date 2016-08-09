@@ -81,7 +81,7 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 	}
 
 	PREAD(fileno(local_metafptr), &tempfilemeta, sizeof(FILE_META_TYPE),
-			sizeof(struct stat));
+			sizeof(HCFS_STAT));
 	PREAD(fileno(local_metafptr), &tmp_page,
 			sizeof(BLOCK_ENTRY_PAGE), page_pos);
 	e_index = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -300,7 +300,7 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 
 	flock(fileno(local_metafptr), LOCK_EX);
 	PREAD(fileno(local_metafptr), &filemeta, sizeof(FILE_META_TYPE),
-			sizeof(struct stat));
+			sizeof(HCFS_STAT));
 	PREAD(fileno(local_metafptr), &bentry_page,
 			sizeof(BLOCK_ENTRY_PAGE), page_pos);
 	status = bentry_page.block_entries[eindex].status;
@@ -427,7 +427,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 					flock(fileno(local_metafptr), LOCK_EX);
 					ret_size = pread(fileno(local_metafptr),
 						&filemeta, sizeof(FILE_META_TYPE),
-						sizeof(struct stat));
+						sizeof(HCFS_STAT));
 					if (ret_size == sizeof(FILE_META_TYPE))
 						page_pos = seek_page2(&filemeta,
 							local_metafptr,

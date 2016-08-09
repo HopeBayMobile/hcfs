@@ -159,7 +159,7 @@ static void _kick_entry(PKG_ENTRY_HEAD *entry_head,
  *
  * @return none.
  */
-int32_t init_pkg_cache()
+int32_t init_pkg_cache(void)
 {
 	memset(&pkg_cache, 0, sizeof(PKG_CACHE));
 	sem_init(&pkg_cache.pkg_cache_lock, 0, 1);
@@ -274,7 +274,7 @@ int32_t remove_cache_pkg(const char *pkgname)
  *
  * @return 0 on success.
  */
-int32_t destroy_pkg_cache()
+int32_t destroy_pkg_cache(void)
 {
 	int32_t hash_idx;
 	PKG_CACHE_ENTRY *now, *next;

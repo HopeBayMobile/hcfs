@@ -47,6 +47,7 @@
 #include "syncpoint_control.h"
 #include "hcfscurl.h"
 #include "event_notification.h"
+#include "meta_mem_cache.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -191,11 +192,13 @@ errcode_handle:
 int32_t create_FS_handle(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY tmp_entry;
-	char *buf, tmptype;
+	char *buf;
 	int32_t ret;
 
 	buf = malloc(arg_len + 10);
 #ifdef _ANDROID_ENV_
+	char tmptype;
+
 	memcpy(buf, largebuf, arg_len - 1);
 	buf[arg_len - 1] = 0;
 	tmptype = largebuf[arg_len - 1];
@@ -596,7 +599,7 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 	ino_t target_inode;
 	int32_t errcode;
 	char metapath[METAPATHLEN];
-	struct stat thisstat;
+	HCFS_STAT thisstat;
 	META_CACHE_ENTRY_STRUCT *thisptr;
 	char inode_loc;
 	FILE_STATS_TYPE tmpstats;
@@ -624,10 +627,10 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 	if (errcode < 0)
 		goto errcode_handle;
 
-	if (S_ISREG(thisstat.st_mode)) {
+	if (S_ISREG(thisstat.mode)) {
 		errcode = meta_cache_open_file(thisptr);
 		PREAD(fileno(thisptr->fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
-		      sizeof(struct stat) + sizeof(FILE_META_TYPE));
+		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
 		if ((tmpstats.num_blocks == 0) ||
 		    (tmpstats.num_blocks == tmpstats.num_cached_blocks))
 			inode_loc = 0;  /* If the location is "local" */
@@ -654,7 +657,7 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 	ino_t target_inode;
 	int32_t retcode;
 	char metapath[METAPATHLEN];
-	struct stat thisstat;
+	HCFS_STAT thisstat;
 	META_CACHE_ENTRY_STRUCT *thisptr;
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
@@ -681,7 +684,7 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 	if (retcode < 0)
 		goto error_handling;
 
-	if (S_ISFILE(thisstat.st_mode)) {
+	if (S_ISFILE(thisstat.mode)) {
 		retcode = meta_cache_lookup_file_data(target_inode, NULL,
 						&filemeta, NULL, 0, thisptr);
 		if (retcode < 0)
@@ -689,7 +692,7 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 		is_local_pin = filemeta.local_pin;
 	}
 
-	if (S_ISDIR(thisstat.st_mode)) {
+	if (S_ISDIR(thisstat.mode)) {
 		retcode = meta_cache_lookup_dir_data(target_inode, NULL,
 						&dirmeta, NULL, thisptr);
 		if (retcode < 0)
@@ -697,7 +700,7 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 		is_local_pin = dirmeta.local_pin;
 	}
 
-	if (S_ISLNK(thisstat.st_mode)) {
+	if (S_ISLNK(thisstat.mode)) {
 		retcode = meta_cache_lookup_symlink_data(target_inode, NULL,
 						&linkmeta, thisptr);
 		if (retcode < 0)
@@ -724,7 +727,7 @@ int32_t check_dir_stat_handle(int32_t arg_len, char *largebuf, DIR_STATS_TYPE *t
 {
 	ino_t target_inode;
 	int32_t retcode;
-	struct stat structstat;
+	HCFS_STAT structstat;
 	char metapath[METAPATHLEN];
 
 	if (arg_len != sizeof(ino_t))
@@ -751,7 +754,7 @@ int32_t check_dir_stat_handle(int32_t arg_len, char *largebuf, DIR_STATS_TYPE *t
 
 	retcode = fetch_inode_stat(target_inode, &structstat, NULL, NULL);
 	if (retcode == 0) {
-		if (S_ISDIR(structstat.st_mode))
+		if (S_ISDIR(structstat.mode))
 			retcode = read_dirstat_lookup(target_inode, tmpstats);
 		else
 			memset(tmpstats, 0, sizeof(DIR_STATS_TYPE));

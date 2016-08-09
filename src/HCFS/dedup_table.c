@@ -26,6 +26,7 @@
 #include "logger.h"
 #include "utils.h"
 
+#if (DEDUP_ENABLE)
 int32_t initialize_ddt_meta(char *meta_path)
 {
 
@@ -1069,7 +1070,7 @@ int32_t get_obj_id(char *path, uint8_t hash[], uint8_t start_bytes[],
 	const int32_t buf_size = 16384;
 	char *buf;
 	int32_t bytes_read;
-	struct stat obj_stat;
+	struct stat obj_stat; /* raw file ops */
 	off_t size;
 	SHA256_CTX ctx;
 	int32_t fd;
@@ -1131,3 +1132,4 @@ int32_t obj_id_to_string(uint8_t obj_id[OBJID_LENGTH],
 	output_str[OBJID_STRING_LENGTH - 1] = 0;
 	return 0;
 }
+#endif /* DEDUP_ENABLE */

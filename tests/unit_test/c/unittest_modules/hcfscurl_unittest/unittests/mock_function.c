@@ -10,12 +10,14 @@
 *
 **************************************************************************/
 #include "hcfscurl.h"
-#include "mock_params.h"
+#include "mock_function.h"
 #include <openssl/hmac.h>
 
 #undef curl_easy_setopt
+#define MOCK() printf("[MOCK] hcfscurl mock_function.c line %4d func %s\n",  __LINE__, __func__)
 CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 {
+	MOCK();
 	if ((write_auth_header_flag == FALSE) &&
 		(write_list_header_flag == FALSE))
 		return CURLE_OK;
@@ -59,10 +61,12 @@ CURLcode curl_easy_getinfo(CURL *curl, CURLINFO info, ...){
 struct curl_slist *curl_slist_append(struct curl_slist * list,
 	const char * string )
 {
+	MOCK();
 }
 
 void curl_slist_free_all(struct curl_slist * list)
 {
+	MOCK();
 }
 
 int32_t write_log(int32_t level, char *format, ...)
@@ -78,6 +82,7 @@ int32_t write_log(int32_t level, char *format, ...)
 
 CURLcode curl_easy_perform(CURL *easy_handle)
 {
+	MOCK();
 	if (http_perform_retry_fail == TRUE)
 		return -2;
 
@@ -86,16 +91,19 @@ CURLcode curl_easy_perform(CURL *easy_handle)
 
 const char *curl_easy_strerror(CURLcode errornum)
 {
+	MOCK();
 	return "test";
 }
 
 CURL *curl_easy_init()
 {
+	MOCK();
 	return 1;
 }
 
 void curl_easy_cleanup(CURL *handle)
 {
+	MOCK();
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 	case SWIFTTOKEN:
@@ -109,21 +117,25 @@ void curl_easy_cleanup(CURL *handle)
 
 void HMAC_CTX_init(HMAC_CTX *ctx)
 {
+	MOCK();
 }
 
 int32_t HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int32_t key_len,
 	const EVP_MD *md, ENGINE *impl)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t HMAC_Update(HMAC_CTX *ctx, const uint8_t *data, size_t len)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t HMAC_Final(HMAC_CTX *ctx, uint8_t *md, uint32_t *len)
 {
+	MOCK();
 	*len = strlen("test_hmac_final");
 	strcpy(md, "test_hmac_final");
 	return 0;
@@ -131,25 +143,33 @@ int32_t HMAC_Final(HMAC_CTX *ctx, uint8_t *md, uint32_t *len)
 
 void HMAC_CTX_cleanup(HMAC_CTX *ctx)
 {
+	MOCK();
 }
 
 const EVP_MD *EVP_sha1(void)
 {
+	MOCK();
 }
 
-int32_t b64encode_str(uint8_t *inputstr, char *outputstr,
-	int32_t *outlen, int32_t inputlen)
+int32_t b64encode_str(uint8_t *inputstr,
+		      char *outputstr,
+		      int32_t *outlen,
+		      int32_t inputlen)
 {
+	MOCK();
 	strcpy(outputstr, "test_b64encode");
 }
 
 void update_backend_status(int32_t status, struct timespec *status_time) {}
 int32_t ignore_sigpipe(void)
 {
+	MOCK();
 	return 0;
 }
 
 int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 		     int64_t xfer_throughtput, int64_t xfer_total_obj)
-{}
-
+{
+	MOCK();
+	return 0;
+}

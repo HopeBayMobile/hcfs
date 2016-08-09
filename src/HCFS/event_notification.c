@@ -360,11 +360,7 @@ int32_t send_event_to_server(int32_t fd, char *events_in_json)
  *  Return value: NONE
  *
  ***********************************************************************/
-#ifdef _ANDROID_ENV_
 void *event_worker_loop(void *ptr)
-#else
-void *event_worker_loop(void)
-#endif
 {
 	int32_t ret_code, count, server_fd;
 	int32_t queue_head, num_events_to_send, num_events_dequeue;
@@ -447,11 +443,7 @@ void *event_worker_loop(void)
 		write_log(8,
 			"Event queue is empty, worker will go to sleep.\n");
 	}
-#ifdef _ANDROID_ENV_
 	return NULL;
-#else
-	return;
-#endif
 }
 
 

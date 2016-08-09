@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ftw.h>
 extern "C" {
 #include "mount_manager.h"
 #include "FS_manager.h"
@@ -20,6 +21,22 @@ extern "C" {
 #include "gtest/gtest.h"
 
 SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 class mount_managerEnvironment : public ::testing::Environment {
 	public:
@@ -536,8 +553,8 @@ class mount_FSTest : public ::testing::Test {
     if (mount_mgr.root != NULL)
       free_tree(mount_mgr.root);
     unlink("/tmp/testHCFS/metapath/stat100");
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw(METAPATH, do_delete, 20, FTW_DEPTH);(METAPATH);
+    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
 
     free(hcfs_system);
@@ -840,8 +857,8 @@ class unmount_allTest : public ::testing::Test {
     if (mount_mgr.root != NULL)
       free_tree(mount_mgr.root);
     unlink("/tmp/testHCFS/metapath/stat100");
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw(METAPATH, do_delete, 20, FTW_DEPTH);
+    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(hcfs_system);
     free(fs_mgr_head);
@@ -909,8 +926,8 @@ class change_mount_statTest : public ::testing::Test {
   virtual void TearDown() {
     fclose(tmp_mount.stat_fptr);
     unlink("/tmp/testHCFS/metapath/tmpstat");
-    rmdir(METAPATH);
-    rmdir("/tmp/testHCFS");
+    nftw(METAPATH, do_delete, 20, FTW_DEPTH);
+    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(tmp_mount.FS_stat);
     free(METAPATH);
    }

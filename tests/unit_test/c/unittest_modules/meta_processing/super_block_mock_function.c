@@ -28,7 +28,7 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	return 0;
 }
 
-int32_t update_sb_size()
+int32_t update_sb_size(void)
 {
 	return 0;
 }
