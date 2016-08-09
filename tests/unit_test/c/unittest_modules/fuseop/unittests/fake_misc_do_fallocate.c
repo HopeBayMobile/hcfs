@@ -883,7 +883,7 @@ int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 	return 0;
 }
 
-BOOL is_natural_number(char *str)
+BOOL is_natural_number(char const *str)
 {
 	return TRUE;
 }

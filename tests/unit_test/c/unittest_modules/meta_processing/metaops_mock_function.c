@@ -231,7 +231,6 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	
 	*overflow_new_page = sizeof(DIR_ENTRY_PAGE);
 	pwrite(fh, &tmp_page, sizeof(DIR_ENTRY_PAGE), sizeof(DIR_ENTRY_PAGE));
-	overflow_median = NULL;
 	
 	switch (new_entry->d_ino) {
 	case INO_INSERT_DIR_ENTRY_FAIL:

@@ -1,4 +1,6 @@
+#include <inttypes.h>
 #include <dirent.h>
+#include <ftw.h>
 extern "C" {
 #include "atomic_tocloud.h"
 #include "fuseop.h"
@@ -8,12 +10,27 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 #include "mock_params.h"
-#include <inttypes.h>
 
 #define RESPONSE_FAIL 0
 #define RESPONSE_SUCCESS 1
 
 extern SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 /*
  * Unittest for comm2fuseproc()
@@ -680,7 +697,7 @@ protected:
 		sprintf(upload_bullpen_path, "%s/upload_bullpen", METAPATH);
 
 		if (!access(upload_bullpen_path, F_OK))
-			rmdir(upload_bullpen_path);
+			nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 	}
 
 	void TearDown()
@@ -689,7 +706,7 @@ protected:
 			unlink(path);
 
 		if (!access(upload_bullpen_path, F_OK))
-			rmdir(upload_bullpen_path);
+			nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 
 		free(system_config);
 	}
@@ -712,7 +729,7 @@ TEST_F(create_progress_fileTest, upload_pullpen_NotExist_OpenSuccess)
 	/* Recycle */
 	close(fd);
 	unlink(path);
-	rmdir(upload_bullpen_path);
+	nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 }
 
 TEST_F(create_progress_fileTest, progressfile_Exist_ReOpenSuccess)
@@ -739,7 +756,7 @@ TEST_F(create_progress_fileTest, progressfile_Exist_ReOpenSuccess)
 	/* Recycle */
 	close(fd);
 	unlink(path);
-	rmdir(upload_bullpen_path);
+	nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 }
 /*
  * End of unittest for create_progress_file()
@@ -761,7 +778,7 @@ protected:
 		sprintf(upload_bullpen_path, "%s/upload_bullpen", METAPATH);
 
 		if (!access(upload_bullpen_path, F_OK))
-			rmdir(upload_bullpen_path);
+			nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 	}
 
 	void TearDown()
@@ -770,7 +787,7 @@ protected:
 			unlink(path);
 
 		if (!access(upload_bullpen_path, F_OK))
-			rmdir(upload_bullpen_path);
+			nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 
 		free(system_config);
 	}
@@ -796,7 +813,7 @@ TEST_F(del_progress_fileTest, CloseSuccess)
 	EXPECT_EQ(0, access(upload_bullpen_path, F_OK));
 	EXPECT_EQ(-1, access(path, F_OK));
 
-	rmdir(upload_bullpen_path);
+	nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
 }
 /*
  * End of unittest for del_progress_file()
@@ -959,7 +976,7 @@ protected:
 		METAPATH = "/tmp";
 		sprintf(bullpen_path, "%s/upload_bullpen", METAPATH);
 		if (!access(bullpen_path, F_OK))
-			rmdir(bullpen_path);
+			nftw(bullpen_path, do_delete, 20, FTW_DEPTH);
 		init_sync_control();
 		memset(&test_sync_struct, 0, sizeof(TEST_REVERT_STRUCT));
 		sem_init(&test_sync_struct.record_sem, 0, 1);
@@ -980,10 +997,10 @@ protected:
 		if (!access(backend_metapath, F_OK))
 			unlink(backend_metapath);
 		if (!access(bullpen_path, F_OK))
-			rmdir(bullpen_path);
+			nftw(bullpen_path, do_delete, 20, FTW_DEPTH);
 		sem_destroy(&(sync_ctl.sync_op_sem));
 		sem_destroy(&(sync_ctl.sync_queue_sem));
-		rmdir(bullpen_path);
+		nftw(bullpen_path, do_delete, 20, FTW_DEPTH);
 		free(system_config);
 
 		unlink(localmetapath);
@@ -1313,7 +1330,7 @@ protected:
 		sprintf(bullpen_path, "%s/upload_bullpen", METAPATH);
 		cleanup(bullpen_path);
 		if (!access(bullpen_path, F_OK))
-			rmdir(bullpen_path);
+			nftw(bullpen_path, do_delete, 20, FTW_DEPTH);
 		mkdir(bullpen_path, 0700);
 	}
 
@@ -1323,7 +1340,7 @@ protected:
 		if (!access(backend_metapath, F_OK))
 			unlink(backend_metapath);
 		free(system_config);
-		rmdir(bullpen_path);
+		nftw(bullpen_path, do_delete, 20, FTW_DEPTH);
 	}
 	void cleanup(char *path) {
 	  DIR *dirp;

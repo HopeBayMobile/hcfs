@@ -1,12 +1,29 @@
+#include <vector>
+#include <ftw.h>
+#include "mock_params.h"
+#include "gtest/gtest.h"
 extern "C" {
 #include "meta_mem_cache.h"
 #include "filetables.h"
 #include "global.h"
 #include <errno.h>
 }
-#include <vector>
-#include "mock_params.h"
-#include "gtest/gtest.h"
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 /*
 	Unittest for init_system_fh_table()
@@ -127,6 +144,8 @@ TEST_F(close_fhTest, CloseSuccess)
 {
 	std::vector<int32_t> index_list;
 	int32_t ans_num_opened_files = 0;
+	uint32_t i;
+	int32_t index;
 
 	init_system_fh_table();
 	/* Mock data */
@@ -139,8 +158,8 @@ TEST_F(close_fhTest, CloseSuccess)
 		ans_num_opened_files++;
 	}
 	/* Test */
-	for (int32_t i = 0 ; i < index_list.size() ; i++) {
-		int32_t index = index_list[i];
+	for (i = 0 ; i < index_list.size() ; i++) {
+		index = index_list[i];
 		ASSERT_EQ(0, close_fh(index)) << "Fail to open fh with inode " << index;
 		ASSERT_EQ(FALSE, system_fh_table.entry_table_flags[index]);
 		ASSERT_EQ(--ans_num_opened_files, system_fh_table.num_opened_files);
@@ -181,7 +200,7 @@ class handle_dirmeta_snapshotTest : public ::testing::Test {
       if (tmpfptr != NULL)
         fclose(tmpfptr);
       unlink(tmpmeta);
-      rmdir(METAPATH);
+      nftw(METAPATH, do_delete, 20, FTW_DEPTH);
       free(METAPATH);
       free(system_config);
     }

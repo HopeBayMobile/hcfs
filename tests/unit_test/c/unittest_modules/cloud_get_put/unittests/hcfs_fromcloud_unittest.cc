@@ -2,6 +2,7 @@
 #include <semaphore.h>
 #include <string>
 #include <errno.h>
+#include <ftw.h>
 #include "gtest/gtest.h"
 #include "curl/curl.h"
 #include "attr/xattr.h"
@@ -16,6 +17,22 @@ extern "C"{
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 class fromcloudEnvironment : public ::testing::Environment {
  public:
@@ -48,7 +65,7 @@ class fromcloudEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
     free(hcfs_system);
-    rmdir(tmppath);
+    nftw(tmppath, do_delete, 20, FTW_DEPTH);
     unlink("/tmp/testHCFS");
     if (workpath != NULL)
       free(workpath);
@@ -556,8 +573,7 @@ protected:
 
 	void TearDown()
 	{
-		unlink("/tmp/testHCFS/tmp_meta");
-		rmdir("/tmp/testHCFS");
+		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
 	}
 };
 
@@ -621,7 +637,7 @@ protected:
 		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
 		if (!access(METAPATH, F_OK))
-			rmdir(METAPATH);
+			nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		mkdir(METAPATH, 0700);
 		hcfs_system->system_going_down = FALSE;
 		hcfs_system->backend_is_online = TRUE;
@@ -642,7 +658,7 @@ protected:
 	{
 		if (!access(download_path, F_OK))
 			unlink(download_path);
-		rmdir(METAPATH);
+		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		free(METAPATH);
 		free(system_config);
 	}
@@ -692,7 +708,7 @@ protected:
 		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
 		if (!access(METAPATH, F_OK))
-			rmdir(METAPATH);
+			nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		mkdir(METAPATH, 0700);
 		CURRENT_BACKEND = NONE;
 
@@ -707,7 +723,7 @@ protected:
 
 	void TearDown()
 	{
-		rmdir(METAPATH);
+		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		free(METAPATH);
 		free(system_config);
 	}

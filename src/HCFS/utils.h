@@ -106,7 +106,7 @@ void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void));
 
 int32_t ignore_sigpipe(void);
 
-BOOL is_natural_number(char *str);
+BOOL is_natural_number(char const *str);
 
 int32_t get_meta_size(ino_t inode, int64_t *metasize);
 

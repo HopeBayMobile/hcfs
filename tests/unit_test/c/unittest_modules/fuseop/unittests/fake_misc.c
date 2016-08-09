@@ -1021,7 +1021,7 @@ int update_block_seq(META_CACHE_ENTRY_STRUCT *bptr,
 	return 0;
 }
 
-BOOL is_natural_number(char *str)
+BOOL is_natural_number(char const *str)
 {
 	MOCK();
 	return TRUE;

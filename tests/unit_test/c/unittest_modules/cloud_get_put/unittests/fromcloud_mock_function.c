@@ -216,7 +216,7 @@ void json_delete(json_t *json)
 json_t *json_loads(const char *input, size_t flags, json_error_t *error)
 {
 	MOCK();
-	return 1;
+	return (json_t*)1;
 }
 
 json_t *json_object_get(const json_t *object, const char *key)
@@ -242,7 +242,7 @@ json_int_t json_integer_value(const json_t *integer)
 json_t *json_loadf(FILE *input, size_t flags, json_error_t *error)
 {
 	MOCK();
-	return 1;
+	return (json_t *)1;
 }
 
 char *json_dumps(const json_t *root, size_t flags)

@@ -1,6 +1,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <errno.h>
+#include <ftw.h>
 #include "gtest/gtest.h"
 extern "C" {
 #include "hcfs_cacheops.h"
@@ -11,6 +12,22 @@ extern "C" {
 }
 
 SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 class cacheopEnvironment : public ::testing::Environment {
  public:
@@ -33,7 +50,7 @@ class cacheopEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
     unlink("/tmp/testHCFS");
-    rmdir(tmppath);
+    nftw(tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)

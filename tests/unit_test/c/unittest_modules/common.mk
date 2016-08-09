@@ -136,6 +136,7 @@ define ADDCASE
 
   test: $(CASE_PASS)
 
+  $(CASE_PASS): export RERUN_TIMEOUT := $(RERUN_TIMEOUT)
   $(CASE_PASS): $(MD_PATH)/$(T)
 	@echo $$< --gtest_filter=$(C)
 	@cd $(MD_PATH) && \
@@ -147,6 +148,7 @@ endef
 
 define ADDTEST
   export GEN_TEST ?= 1
+  export RERUN_TIMEOUT ?= $(RERUN_TIMEOUT)
   $(eval T := $(strip $1))
   $(eval OBJ_DIR := $(MD_PATH)/obj)
   $(eval OBJS := $(addprefix $(OBJ_DIR)/, $2))
@@ -183,6 +185,7 @@ define ADDTEST
 	@touch $(UT_PASS)
     $(eval BATCH_UT := )
   endif
+  RERUN_TIMEOUT :=
 endef
 
 .PHONY: setup clean all test

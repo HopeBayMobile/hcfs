@@ -40,7 +40,7 @@ class FS_managerEnvironment : public ::testing::Environment {
 	::testing::AddGlobalTestEnvironment(new FS_managerEnvironment);
 
 
-static int do_delete (const char *fpath, const HCFS_STAT *sb,
+static int do_delete (const char *fpath, const struct stat *sb,
 		int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {

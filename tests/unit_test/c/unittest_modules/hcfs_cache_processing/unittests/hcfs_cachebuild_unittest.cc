@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ftw.h>
 extern "C" {
 #include "mock_params.h"
 #include "hcfs_cachebuild.h"
@@ -15,6 +16,21 @@ extern "C" {
 
 SYSTEM_CONF_STRUCT *system_config;
 
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 /* A base class used to be derived from those need to mock cache_usage_node */
 
 class BaseClassForCacheUsageArray : public ::testing::Test {
@@ -234,8 +250,7 @@ protected:
 		size_t i;
 		for (i = 0 ; i < answer_node_list.size() ; i++)
 			free(answer_node_list[i]);
-		delete_mock_dir(BLOCKPATH);
-		rmdir(BLOCKPATH);
+		nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
 		free(system_config);
 
 		BaseClassForCacheUsageArray::TearDown();
@@ -320,7 +335,7 @@ protected:
 			readdir_r(dirptr, &tmp_dirent, &dirent_ptr);
 		}
 		closedir(dirptr);
-		rmdir(path);
+		nftw(path, do_delete, 20, FTW_DEPTH);
 	}
 
 };

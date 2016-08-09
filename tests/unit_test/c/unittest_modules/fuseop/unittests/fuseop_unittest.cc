@@ -17,6 +17,7 @@
 #include <utime.h>
 #include <math.h>
 #include <dirent.h>
+#include <ftw.h>
 
 #include <fuse/fuse_lowlevel.h>
 
@@ -36,6 +37,22 @@ extern "C" {
 SYSTEM_CONF_STRUCT *system_config;
 extern struct fuse_lowlevel_ops hfuse_ops;
 MOUNT_T unittest_mount;
+
+static int do_delete (const char *fpath, const HCFS_STAT *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 static void _mount_test_fuse(MOUNT_T *tmpmount) {
   char **argv;
@@ -65,6 +82,7 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   sem_init((tmpmount->stat_lock), 0, 1);
   fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
   tmp_channel = fuse_mount(mount, &tmp_args);
+  ASSERT_NE(tmp_channel, NULL);
   tmp_session = fuse_lowlevel_new(&tmp_args,
 			&hfuse_ops, sizeof(hfuse_ops), (void *) tmpmount);
   fuse_set_signal_handlers(tmp_session);
@@ -146,8 +164,8 @@ class fuseopEnvironment : public ::testing::Environment {
 
     for (i = 0; i < 10; i++) {
 	    puts("unmount fuse...");
-	    system("for i in `find /sys/fs/fuse/connections -name abort`; do echo 1 > $i;done");
-	    exit_status = system("fusermount -u /tmp/test_fuse");
+	    system("for i in `\\ls /sys/fs/fuse/connections/`; do echo 1 > /sys/fs/fuse/connections/$i/abort; done");
+	    exit_status = system("sudo fusermount -u /tmp/test_fuse");
 	    if (exit_status == 0)
 		    break;
     }
@@ -160,7 +178,7 @@ class fuseopEnvironment : public ::testing::Environment {
     fuse_unmount(unittest_mount.f_mp, unittest_mount.chan_ptr);
     fuse_opt_free_args(&(unittest_mount.mount_args));
 
-    ret_val = rmdir("/tmp/test_fuse");
+    ret_val = nftw("/tmp/test_fuse", do_delete, 20, FTW_DEPTH);
     printf("delete return %d\n",ret_val);
     free(system_fh_table.entry_table_flags);
     free(system_fh_table.entry_table);
@@ -170,7 +188,7 @@ class fuseopEnvironment : public ::testing::Environment {
     free(system_config);
 
     unlink("/tmp/testHCFS");
-    rmdir(tmppath);
+    nftw (tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)

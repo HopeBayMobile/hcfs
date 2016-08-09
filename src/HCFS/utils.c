@@ -1944,7 +1944,7 @@ int32_t ignore_sigpipe(void)
  *
  * @return TRUE when it is a natural number, else return FALSE
  */ 
-BOOL is_natural_number(char *str)
+BOOL is_natural_number(char const *str)
 {
 	int32_t num;
 	size_t i;

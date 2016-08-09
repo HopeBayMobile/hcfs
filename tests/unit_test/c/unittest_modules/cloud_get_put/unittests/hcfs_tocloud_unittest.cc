@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <ftw.h>
 #include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
@@ -20,6 +21,22 @@ extern "C" {
 }
 
 extern SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 class uploadEnvironment : public ::testing::Environment {
  public:
@@ -71,12 +88,12 @@ class uploadEnvironment : public ::testing::Environment {
   virtual void TearDown() {
 //    free(hcfs_system);
     unlink("/tmp/testHCFS");
-    rmdir(tmppath);
+    nftw(tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
       free(tmppath);
-    rmdir(METAPATH);
+    nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(system_config);
   }
@@ -95,14 +112,14 @@ class init_sync_stat_controlTest : public ::testing::Test {
   {
 	  no_backend_stat = TRUE;
 	  snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
-	  rmdir(tmppath);
+	  nftw(tmppath, do_delete, 20, FTW_DEPTH);
    }
 
    virtual void TearDown()
    {
 	   char tmppath[200];
 	   snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
-	   rmdir(tmppath);
+	   nftw(tmppath, do_delete, 20, FTW_DEPTH);
    }
 
  };
@@ -121,7 +138,7 @@ TEST_F(init_sync_stat_controlTest, EmptyInit) {
   EXPECT_EQ(0, ret);
 
   /* Cleanup */
-  rmdir(tmppath);
+  nftw(tmppath, do_delete, 20, FTW_DEPTH);
  }
 
 TEST_F(init_sync_stat_controlTest, InitCleanup) {
@@ -154,7 +171,7 @@ TEST_F(init_sync_stat_controlTest, InitCleanup) {
 
   /* Cleanup */
   unlink(tmppath2);
-  rmdir(tmppath);
+  nftw(tmppath, do_delete, 20, FTW_DEPTH);
   ret = access(tmppath, F_OK);
   EXPECT_NE(0, ret);
 
@@ -307,7 +324,7 @@ protected:
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
-		rmdir(tmppath);
+		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		close(InitUploadControlTool::Tool()->fd);
 		unlink(InitUploadControlTool::Tool()->progress_path);
 
@@ -481,8 +498,8 @@ protected:
 
 		if (!access(metapath, F_OK))
 			unlink(metapath);
-		rmdir("/tmp/testHCFS");
-		rmdir("mock_meta_folder");
+		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+		nftw("mock_meta_folder", do_delete, 20, FTW_DEPTH);
 	}
 };
 
@@ -734,7 +751,7 @@ protected:
 		unlink(MOCK_META_PATH);
 		unlink(progress_file);
 		unlink(toupload_meta);
-		rmdir("mock_meta_folder");
+		nftw("mock_meta_folder", do_delete, 20, FTW_DEPTH);
 
 		mkdir("mock_meta_folder", 0700);
 		/* Mock toupload meta for each inode */	
@@ -767,7 +784,7 @@ protected:
 		unlink(tmppath2);
 		snprintf(tmppath2, 199, "%s/tmpFSstat10", tmppath);
 		unlink(tmppath2);
-		rmdir(tmppath);
+		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		for (int32_t i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
@@ -783,7 +800,7 @@ protected:
 		close(fd);
 		unlink(progress_file);
 		unlink(toupload_meta);
-		rmdir("mock_meta_folder");
+		nftw("mock_meta_folder", do_delete, 20, FTW_DEPTH);
 	}
 	void write_mock_meta_file(char *metapath, int32_t total_page, uint8_t block_status, BOOL topin)
 	{
@@ -833,7 +850,7 @@ protected:
 		mock_touploadptr = fopen(toupload_meta, "w+");
 		fseek(mock_metaptr, 0, SEEK_SET);
 		fseek(mock_touploadptr, 0, SEEK_SET);
-		while (size = fread(buf, 1, 4096, mock_metaptr)) {
+		while ((size = fread(buf, 1, 4096, mock_metaptr))) {
 			fwrite(buf, 1, size, mock_touploadptr);
 		}
 
@@ -912,7 +929,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
 		char expected_objname[50];
-		sprintf(expected_objname, "data_%lld_%d",
+		sprintf(expected_objname, "data_%lu_%d",
 				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
 		sprintf(expected_objname, "/tmp/testHCFS/data_%" PRIu64 "_%d",
@@ -982,7 +999,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
        	/* Check uploaded-object is recorded */
 	for (int32_t blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {
 		char expected_objname[50];
-		sprintf(expected_objname, "data_%lld_%d",
+		sprintf(expected_objname, "data_%lu_%d",
 				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) <<
 				"blockno = " << blockno;
@@ -1157,7 +1174,7 @@ protected:
 		unlink(tmppath2);
 		snprintf(tmppath2, 199, "%s/tmpFSstat10", tmppath);
 		unlink(tmppath2);
-		rmdir(tmppath);
+		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		for (int32_t i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
@@ -1167,7 +1184,7 @@ protected:
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
 
-		rmdir("mock_meta_folder");
+		nftw("mock_meta_folder", do_delete, 20, FTW_DEPTH);
 
 		free(shm_test_data->to_handle_inode);
 		free(shm_test_data);
@@ -1293,7 +1310,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   snprintf(tmppath2, 199, "%s/tmpFSstat14", tmppath);
   unlink(tmppath2);
 
-  rmdir(tmppath);
+  nftw(tmppath, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(update_backend_statTest, UpdateExistingStat) {
   char tmppath[200];
@@ -1344,9 +1361,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   EXPECT_EQ(34334 - 101, fs_cloud_stat.backend_num_inodes);
 
   /* Cleanup */
-  unlink(tmppath2);
-  unlink(tmppath3);
-  rmdir(tmppath);
+  nftw(tmppath, do_delete, 20, FTW_DEPTH);
  }
 
 TEST_F(update_backend_statTest, DownloadUpdate) {
@@ -1388,9 +1403,6 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
   EXPECT_EQ(34334 - 101, fs_cloud_stat.backend_num_inodes);
 
   /* Cleanup */
-  unlink(tmppath2);
-  snprintf(tmppath2, 199, "%s/tmpFSstat14", tmppath);
-  unlink(tmppath2);
   rmdir(tmppath);
  }
 

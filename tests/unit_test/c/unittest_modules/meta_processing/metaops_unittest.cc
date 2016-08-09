@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fuse/fuse_lowlevel.h>
+#include <ftw.h>
 
 extern "C" {
 #include "mock_param.h"
@@ -31,6 +32,21 @@ static const ino_t parent_inode = 5;
 extern int32_t DELETE_DIR_ENTRY_BTREE_RESULT;
 extern SYSTEM_CONF_STRUCT *system_config;
 
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 class metaopsEnvironment : public ::testing::Environment {
 	public:
 		void SetUp()
@@ -569,7 +585,7 @@ protected:
 	virtual void TearDown() 
 	{
 		if (!access("testpatterns/markdelete", F_OK))
-			rmdir("testpatterns/markdelete");
+			nftw("testpatterns/markdelete", do_delete, 20, FTW_DEPTH);
 	}
 };
 
@@ -1173,7 +1189,7 @@ protected:
 		snprintf(thisblockpath, 100, "%s/markdelete/inode%d", METAPATH, 
 			INO_DELETE_FILE_BLOCK);
 		unlink(thisblockpath);
-		rmdir("testpatterns/markdelete");
+		nftw("testpatterns/markdelete", do_delete, 20, FTW_DEPTH);
 
 		fetch_meta_path(thismetapath, INO_DELETE_DIR);
 		if (!access(thismetapath, F_OK))
@@ -1404,7 +1420,7 @@ TEST(disk_markdeleteTest, MarkSuccess)
 	EXPECT_EQ(0, access("/tmp/markdelete/inode6_556677", F_OK));
 	
 	unlink("/tmp/markdelete/inode6_556677");
-	rmdir("/tmp/markdelete");
+	nftw("/tmp/markdelete", do_delete, 20, FTW_DEPTH);
 }
 
 /*
@@ -1425,7 +1441,7 @@ protected:
 	void TearDown()
 	{
 		if (!access("/tmp/markdelete", F_OK))
-			rmdir("/tmp/markdelete");
+			nftw("/tmp/markdelete", do_delete, 20, FTW_DEPTH);
 	}
 };
 
@@ -1492,7 +1508,7 @@ TEST(disk_checkdeleteTest, InodeExist_Return1)
 	EXPECT_EQ(1, disk_checkdelete(6, root_inode));
 
 	unlink("/tmp/markdelete/inode6_556677");
-	rmdir("/tmp/markdelete");
+	nftw("/tmp/markdelete", do_delete, 20, FTW_DEPTH);
 }
 
 TEST(disk_checkdeleteTest, InodeNotExist_Return0)
@@ -1505,7 +1521,7 @@ TEST(disk_checkdeleteTest, InodeNotExist_Return0)
 
 	EXPECT_EQ(0, disk_checkdelete(6, root_inode));
 
-	rmdir("/tmp/markdelete");
+	nftw("/tmp/markdelete", do_delete, 20, FTW_DEPTH);
 }
 
 /*
@@ -1551,7 +1567,7 @@ protected:
 			if (!access(pathname, F_OK))
 				unlink(pathname);
 		}
-		rmdir("testpatterns/markdelete");
+		nftw("testpatterns/markdelete", do_delete, 20, FTW_DEPTH);
 		
 		if (!access(TO_DELETE_METAPATH, F_OK))
 			unlink(TO_DELETE_METAPATH);
@@ -1597,7 +1613,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 			i, ROOT_INODE);
 		ASSERT_EQ(-1, access(pathname, F_OK));
 	}
-	rmdir("testpatterns/markdelete");
+	nftw("testpatterns/markdelete", do_delete, 20, FTW_DEPTH);
 }
 
 /*
@@ -1724,14 +1740,14 @@ protected:
 	void SetUp()
 	{
 		if (!access(MOCK_META_PATH, F_OK))
-			rmdir(MOCK_META_PATH);
+			nftw(MOCK_META_PATH, do_delete, 20, FTW_DEPTH);
 		mkdir(MOCK_META_PATH, 0700);
 	}
 
 	void TearDown()
 	{
 		if (!access(MOCK_META_PATH, F_OK))
-			rmdir(MOCK_META_PATH);
+			nftw(MOCK_META_PATH, do_delete, 20, FTW_DEPTH);
 	}
 };
 

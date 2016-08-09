@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ftw.h>
 extern "C" {
 #include "utils.h"
 #include "global.h"
@@ -21,6 +22,22 @@ extern "C" {
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
 SYSTEM_CONF_STRUCT *system_config;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 // Tests non-existing file
 TEST(check_file_sizeTest, Nonexist) {
@@ -49,7 +66,7 @@ class check_and_create_metapathsTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testmeta");
+    nftw("/tmp/testmeta", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(system_config);
    }
@@ -64,7 +81,7 @@ TEST_F(check_and_create_metapathsTest, MetaPathNotCreatable) {
   ret_code = 0;
   if (access(METAPATH,F_OK)==0)
    {
-    ret_code = rmdir(METAPATH);
+    ret_code = nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     ASSERT_EQ(0,ret_code);
    }
   ret_code = chmod("/tmp/testmeta", 0400);
@@ -74,7 +91,7 @@ TEST_F(check_and_create_metapathsTest, MetaPathNotCreatable) {
   EXPECT_EQ(-EACCES,check_and_create_metapaths());
 
   chmod("/tmp/testmeta",0700);
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(check_and_create_metapathsTest, MetaPathNotAccessible) {
   char pathname[METAPATHLEN];
@@ -93,7 +110,7 @@ TEST_F(check_and_create_metapathsTest, MetaPathNotAccessible) {
 
   EXPECT_EQ(-EACCES,check_and_create_metapaths());
 
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(check_and_create_metapathsTest, MkMetaPathSuccess) {
   char pathname[METAPATHLEN];
@@ -103,17 +120,13 @@ TEST_F(check_and_create_metapathsTest, MkMetaPathSuccess) {
   ret_code = 0;
   if (access(METAPATH,F_OK)==0)
    {
-    ret_code = rmdir(METAPATH);
+    ret_code = nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     ASSERT_EQ(0,ret_code);
    }
 
   ASSERT_EQ(0,check_and_create_metapaths());
 
-  for (i = 0; i < NUMSUBDIR; i++) {
-    snprintf(pathname, METAPATHLEN, "/tmp/testmeta/metapath/sub_%d", i);
-    rmdir(pathname);
-  }
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 
 /* End of the test case for the function check_and_create_metapaths */
@@ -130,7 +143,7 @@ class check_and_create_blockpathsTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testblock");
+    nftw("/tmp/testblock", do_delete, 20, FTW_DEPTH);
     free(BLOCKPATH);
     free(system_config);
    }
@@ -145,7 +158,7 @@ TEST_F(check_and_create_blockpathsTest, BlockPathNotCreatable) {
   ret_code = 0;
   if (access(BLOCKPATH,F_OK)==0)
    {
-    ret_code = rmdir(BLOCKPATH);
+    ret_code = nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
     ASSERT_EQ(0,ret_code);
    }
   ret_code = chmod("/tmp/testblock", 0400);
@@ -155,7 +168,7 @@ TEST_F(check_and_create_blockpathsTest, BlockPathNotCreatable) {
   EXPECT_EQ(-EACCES,check_and_create_blockpaths());
 
   chmod("/tmp/testblock",0700);
-  rmdir(BLOCKPATH);
+  nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(check_and_create_blockpathsTest, BlockPathNotAccessible) {
   char pathname[BLOCKPATHLEN];
@@ -174,7 +187,7 @@ TEST_F(check_and_create_blockpathsTest, BlockPathNotAccessible) {
 
   EXPECT_EQ(-EACCES,check_and_create_blockpaths());
 
-  rmdir(BLOCKPATH);
+  nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(check_and_create_blockpathsTest, MkBlockPathSuccess) {
   char pathname[BLOCKPATHLEN];
@@ -184,17 +197,13 @@ TEST_F(check_and_create_blockpathsTest, MkBlockPathSuccess) {
   ret_code = 0;
   if (access(BLOCKPATH,F_OK)==0)
    {
-    ret_code = rmdir(BLOCKPATH);
+    ret_code = nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
     ASSERT_EQ(0,ret_code);
    }
 
   ASSERT_EQ(0,check_and_create_blockpaths());
 
-  for (i = 0; i < NUMSUBDIR; i++) {
-    snprintf(pathname, BLOCKPATHLEN, "/tmp/testblock/blockpath/sub_%d", i);
-    rmdir(pathname);
-  }
-  rmdir(BLOCKPATH);
+  nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
  }
 
 /* End of the test case for the function check_and_create_blockpaths */
@@ -211,7 +220,7 @@ class fetch_meta_pathTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testmeta");
+    nftw("/tmp/testmeta", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(system_config);
    }
@@ -248,9 +257,7 @@ TEST_F(fetch_meta_pathTest, SubDirMod) {
   EXPECT_STREQ(expected_pathname,pathname);
 
   sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_%d", NUMSUBDIR-1);
-  rmdir(expected_pathname);
-  rmdir("/tmp/testmeta/metapath/sub_0");
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 
 /* End of the test case for the function fetch_meta_path */
@@ -267,7 +274,7 @@ class fetch_todelete_pathTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testmeta");
+    nftw("/tmp/testmeta", do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(system_config);
    }
@@ -293,7 +300,7 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotCreatable) {
   ret_code = 0;
   if (access(METAPATH,F_OK)==0)
    {
-    ret_code = rmdir(METAPATH);
+    ret_code = nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     ASSERT_EQ(0,ret_code);
    }
   ret_code = chmod("/tmp/testmeta", 0400);
@@ -309,7 +316,7 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotCreatable) {
 
   EXPECT_EQ(-EACCES,fetch_todelete_path(pathname,0));
 
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(fetch_todelete_pathTest, ToDeletePathNotAccessible) {
   char pathname[METAPATHLEN];
@@ -339,8 +346,7 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotAccessible) {
 
   EXPECT_EQ(-EACCES,fetch_todelete_path(pathname,0));
 
-  rmdir(todelete_path);
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(fetch_todelete_pathTest, MkMetaPathSuccess) {
   char pathname[METAPATHLEN];
@@ -350,7 +356,7 @@ TEST_F(fetch_todelete_pathTest, MkMetaPathSuccess) {
   ret_code = 0;
   if (access(METAPATH,F_OK)==0)
    {
-    ret_code = rmdir(METAPATH);
+    ret_code = nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     ASSERT_EQ(0,ret_code);
    }
 
@@ -358,9 +364,7 @@ TEST_F(fetch_todelete_pathTest, MkMetaPathSuccess) {
 
   EXPECT_STREQ("/tmp/testmeta/metapath/todelete/sub_0/meta0",pathname);
 
-  rmdir("/tmp/testmeta/metapath/todelete/sub_0");
-  rmdir("/tmp/testmeta/metapath/todelete");
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 TEST_F(fetch_todelete_pathTest, SubDirMod) {
   char pathname[METAPATHLEN];
@@ -381,10 +385,7 @@ TEST_F(fetch_todelete_pathTest, SubDirMod) {
   EXPECT_STREQ(expected_pathname,pathname);
 
   sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_%d", NUMSUBDIR-1);
-  rmdir(expected_pathname);
-  rmdir("/tmp/testmeta/metapath/todelete/sub_0");
-  rmdir("/tmp/testmeta/metapath/todelete");
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
  }
 
 
@@ -403,7 +404,7 @@ class fetch_block_pathTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testmeta");
+    nftw("/tmp/testmeta", do_delete, 20, FTW_DEPTH);
     free(BLOCKPATH);
     free(system_config);
    }
@@ -440,9 +441,7 @@ TEST_F(fetch_block_pathTest, SubDirMod) {
   EXPECT_STREQ(expected_pathname,pathname);
 
   sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%d", NUMSUBDIR-1);
-  rmdir(expected_pathname);
-  rmdir("/tmp/testmeta/blockpath/sub_0");
-  rmdir(BLOCKPATH);
+  nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
  }
 
 /* End of the test case for the function fetch_meta_path */
@@ -537,9 +536,7 @@ class read_system_configTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testHCFS/metastorage");
-    rmdir("/tmp/testHCFS/blockstorage");
-    rmdir("/tmp/testHCFS");
+    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     free(system_config);
    }
  };
@@ -697,10 +694,8 @@ class validate_system_configTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    rmdir("/tmp/testHCFS/metastorage");
-    rmdir("/tmp/testHCFS/blockstorage");
     unlink("/tmp/testHCFS");
-    rmdir(tmppath);
+    nftw(tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
@@ -770,7 +765,7 @@ TEST_F(validate_system_configTest, NoMetaPath) {
 
   ASSERT_EQ(0,read_system_config(pathname, system_config));
 
-  rmdir(METAPATH);
+  nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 
   ASSERT_EQ(-1,validate_system_config(system_config));
  }
@@ -783,7 +778,7 @@ TEST_F(validate_system_configTest, NoBlockPath) {
 
   ASSERT_EQ(0,read_system_config(pathname, system_config));
 
-  rmdir(BLOCKPATH);
+  nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
 
   ASSERT_EQ(-1,validate_system_config(system_config));
  }
@@ -938,10 +933,8 @@ protected:
 
 	void TearDown()
 	{
-		rmdir("/tmp/testHCFS/metastorage");
-		rmdir("/tmp/testHCFS/blockstorage");
 		unlink("/tmp/testHCFS");
-		rmdir(tmppath);
+		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		if (workpath != NULL)
 			free(workpath);
 		if (tmppath != NULL)
@@ -1074,8 +1067,7 @@ protected:
 	void TearDown()
 	{
 		fclose(fptr);
-		unlink("utils_unittest_folder/mock_FSstat");
-		rmdir("utils_unittest_folder");
+		nftw("utils_unittest_folder", do_delete, 20, FTW_DEPTH);
 		free(sys_super_block);
 	}
 };
@@ -1289,8 +1281,7 @@ protected:
 
 	void TearDown()
 	{
-		unlink("get_quota_from_backup_dir/usermeta");
-		rmdir(METAPATH);
+		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 
 		free(METAPATH);
 		free(system_config);

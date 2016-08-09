@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <errno.h>
+#include <ftw.h>
 extern "C" {
 #include "global.h"
 #include "params.h"
@@ -27,6 +28,22 @@ extern "C" {
 
 extern META_CACHE_HEADER_STRUCT *meta_mem_cache;
 extern int64_t current_meta_mem_cache_entries;
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
+}
 
 class BaseClassWithMetaCacheEntry : public ::testing::Test {
 	protected:
@@ -54,7 +71,7 @@ protected:
 	{
 		if (!access(TMP_META_FILE_PATH, F_OK)) {
 			unlink(TMP_META_FILE_PATH);
-			rmdir(TMP_META_DIR);
+			nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH);
 		}
 
 		BaseClassWithMetaCacheEntry::TearDown();
@@ -96,7 +113,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathCannotAccess)
 
 	/* Delete tmp dir and file */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
-	ASSERT_EQ(0, rmdir(TMP_META_DIR));
+	ASSERT_EQ(0, nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH));
 }
 
 TEST_F(meta_cache_open_fileTest, MetaPathNotExist)
@@ -113,7 +130,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathNotExist)
 
 	/* Delete meta file and dir */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
-	ASSERT_EQ(0, rmdir(TMP_META_DIR));
+	ASSERT_EQ(0, nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH));
 }
 
 TEST_F(meta_cache_open_fileTest, MetaFileAlreadyOpened)
@@ -131,7 +148,7 @@ TEST_F(meta_cache_open_fileTest, MetaFileAlreadyOpened)
 
 	/* Delete mock data */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
-	ASSERT_EQ(0, rmdir(TMP_META_DIR));
+	ASSERT_EQ(0, nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH));
 }
 
 TEST_F(meta_cache_open_fileTest, OpenMetaPathSuccess)
@@ -148,7 +165,7 @@ TEST_F(meta_cache_open_fileTest, OpenMetaPathSuccess)
 
 	/* Delete tmp dir and file */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
-	ASSERT_EQ(0, rmdir(TMP_META_DIR));
+	ASSERT_EQ(0, nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH));
 }
 /*
 	End of unit testing for meta_cache_open_file()
@@ -182,7 +199,7 @@ protected:
 	{
 		if (!access(TMP_META_FILE_PATH, F_OK)) {
 			unlink(TMP_META_FILE_PATH);
-			rmdir(TMP_META_DIR);
+			nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH);
 		}
 
 		BaseClassWithMetaCacheEntry::TearDown();
@@ -199,7 +216,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, EntryCannotBeOpened)
 
 	EXPECT_EQ(-EACCES, meta_cache_flush_dir_cache(body_ptr, 0));
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
-	ASSERT_EQ(0, rmdir(TMP_META_DIR));
+	ASSERT_EQ(0, nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH));
 }
 
 TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
@@ -241,7 +258,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 		ASSERT_EQ(body_ptr->dir_entry_cache[eindex]->dir_entries[i].d_ino, i);
 	}
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
-	ASSERT_EQ(0, rmdir(TMP_META_DIR));
+	ASSERT_EQ(0, nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH));
 }
 /*
 	End of unit testing for meta_cache_flush_dir_cache()
@@ -1312,7 +1329,7 @@ class flush_single_entryTest : public ::testing::Test {
 			fclose(body_ptr->fptr);
 
 			unlink(TMP_META_FILE_PATH);
-			rmdir(TMP_META_DIR);
+			nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH);
 
 			free(body_ptr);
 		}
@@ -1702,7 +1719,7 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
 	EXPECT_EQ(0, verified_index);
 
 	unlink(TMP_META_FILE_PATH);
-	rmdir(TMP_META_DIR);
+	nftw(TMP_META_DIR, do_delete, 20, FTW_DEPTH);
 	free(verified_dir_entry_page);
 }
 

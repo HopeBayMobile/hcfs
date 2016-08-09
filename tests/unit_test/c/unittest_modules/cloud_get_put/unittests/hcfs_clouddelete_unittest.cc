@@ -1,5 +1,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <ftw.h>
 #include "gtest/gtest.h"
 #include "mock_params.h"
 extern "C" {
@@ -9,6 +10,22 @@ extern "C" {
 #include "fuseop.h"
 #include "super_block.h"
 #include "atomic_tocloud.h"
+}
+
+static int do_delete (const char *fpath, const struct stat *sb,
+		int32_t tflag, struct FTW *ftwbuf)
+{
+	switch (tflag) {
+		case FTW_D:
+		case FTW_DNR:
+		case FTW_DP:
+			rmdir (fpath);
+			break;
+		default:
+			unlink (fpath);
+			break;
+	}
+	return (0);
 }
 
 class deleteEnvironment : public ::testing::Environment {
@@ -36,7 +53,7 @@ class deleteEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
     free(hcfs_system);
-    rmdir(tmppath);
+    nftw(tmppath, do_delete, 20, FTW_DEPTH);
     unlink("/tmp/testHCFS");
     if (workpath != NULL)
       free(workpath);
@@ -200,7 +217,7 @@ protected:
 		size_objname = 50;
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * num_objname);
-		for (int32_t i = 0 ; i < num_objname ; i++)
+		for (uint32_t i = 0 ; i < num_objname ; i++)
 			objname_list[i] = (char *)calloc(size_objname, sizeof(char));
 		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
 	}
