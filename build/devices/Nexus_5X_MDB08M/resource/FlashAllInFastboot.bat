@@ -13,7 +13,7 @@
 :: See the License for the specific language governing permissions and
 :: limitations under the License.
 
-PATH=%PATH%;"%SYSTEMROOT%\System32"
+SET PATH="%PATH%;%cd%\utils;%SYSTEMROOT%\System32"
 
 @ECHO ON
 fastboot oem unlock-go

@@ -13,7 +13,7 @@
 :: See the License for the specific language governing permissions and
 :: limitations under the License.
 
-PATH=%PATH%;"%SYSTEMROOT%\System32"
+SET PATH="%PATH%;%cd%\utils;%SYSTEMROOT%\System32"
 
 @ECHO ON
 adb kill-server
@@ -22,5 +22,5 @@ adb root
 adb wait-for-device
 :: adb shell "set -- `ps | grep hcfs`; kill -9 $2"
 adb reboot bootloader
-call fastboot-flush-all.bat
+call FlashAllInFastboot.bat
 adb kill-server
