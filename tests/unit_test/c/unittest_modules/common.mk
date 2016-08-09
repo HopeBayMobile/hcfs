@@ -42,7 +42,7 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DCOMPRESS_ENABLE=0 \
 	    -DARM_32bit_ \
 	    -D_ANDROID_ENV_
-LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3
+LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
 # Support  gcc4.9 color output
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
