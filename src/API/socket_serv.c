@@ -488,6 +488,8 @@ error:
 	sends(fd, &ret_code, sizeof(int32_t));
 
 done:
+	write_log(0, "[%d] Finished API request (API code %d)\n",
+			thread_idx, api_code);
 	close(fd);
 	if (largebuf != NULL && !buf_reused)
 		free(largebuf);
