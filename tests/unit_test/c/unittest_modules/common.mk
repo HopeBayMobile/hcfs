@@ -69,7 +69,7 @@ setup:
 
 test:
 ifndef GEN_TEST
-	$(MAKE) test
+	@MAKEFLAGS=${MAKEFLAGS//B} $(MAKE) test
 else
 	gcovr -p -k --root=$(realpath $(HCFS_ROOT)/src/HCFS) .
 endif
