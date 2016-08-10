@@ -1,13 +1,8 @@
 #include <inttypes.h>
 
 #include "fuseop.h"
-#include "../HCFS/fuseop.h"
 #include "FS_manager.h"
-#include "../HCFS/FS_manager.h"
-#include "hcfs_stat.h"
-#include "../HCFS/hcfs_stat.h"
 #include "meta.h"
-#include "../HCFS/meta.h"
 
 /* Private declaration */
 #define LIST_DIR_LIMIT 1000
