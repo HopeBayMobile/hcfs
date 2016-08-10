@@ -1068,6 +1068,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 #else
 	ssize_t ret_ssize;
 #endif
+	BOOL is_reg_pin;
+
+	is_reg_pin = FALSE;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1145,6 +1148,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			toupload_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			toupload_metafptr);
+
+		if (tempfilemeta.local_pin != P_UNPIN)
+			is_reg_pin = TRUE;
 
 		toupload_size = tempfilestat.size;
 		root_inode = tempfilemeta.root_inode;
@@ -1464,11 +1470,12 @@ store in some other file */
 
 	/* Upload successfully. Update FS stat in backend */
 	if (upload_seq <= 0)
-		update_backend_stat(root_inode, size_diff, meta_size_diff, 1);
+		update_backend_stat(root_inode, size_diff, meta_size_diff,
+		                    1, is_reg_pin);
 	else
 		if (size_diff != 0)
 			update_backend_stat(root_inode, size_diff,
-					meta_size_diff, 0);
+					meta_size_diff, 0, is_reg_pin);
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
@@ -2222,13 +2229,15 @@ void upload_loop(void)
 *
 * Function name: update_backend_stat
 *        Inputs: ino_t root_inode, int64_t system_size_delta,
-*                int64_t num_inodes_delta
+*                int64_t meta_size_delta, int64_t num_inodes_delta,
+*                BOOL is_reg_pin
 *       Summary: Updates per-FS statistics stored in the backend.
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
-		int64_t meta_size_delta, int64_t num_inodes_delta)
+		int64_t meta_size_delta, int64_t num_inodes_delta,
+		BOOL is_reg_pin)
 {
 	int32_t ret, errcode;
 	char fname[METAPATHLEN], tmpname[METAPATHLEN];
@@ -2329,7 +2338,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	setbuf(fptr, NULL);
 	/* File lock is in update_fs_backend_usage() */
 	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
-			num_inodes_delta);
+			num_inodes_delta, is_reg_pin);
 	if (ret < 0)
 		goto errcode_handle;
 

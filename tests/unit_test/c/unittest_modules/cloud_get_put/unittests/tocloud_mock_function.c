@@ -454,7 +454,8 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
 }
 
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
-		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta)
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
+		BOOL is_reg_pin)
 {
 	FS_CLOUD_STAT_T	fs_cloud_stat;
 
@@ -464,6 +465,8 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.backend_system_size += fs_total_size_delta;
 	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
 	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
+	if (is_reg_pin == TRUE)
+		fs_cloud_stat.pinned_size += fs_total_size_delta;
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 

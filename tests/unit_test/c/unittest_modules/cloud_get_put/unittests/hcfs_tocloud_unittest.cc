@@ -1303,7 +1303,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, 5566, 101);
+  ret = update_backend_stat(14, 1024768, 5566, 101, FALSE);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1359,7 +1359,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  ret = update_backend_stat(14, 1024768, 123, -101);
+  ret = update_backend_stat(14, 1024768, 123, -101, FALSE);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1401,7 +1401,7 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, 111, -101);
+  ret = update_backend_stat(14, 1024768, 111, -101, FALSE);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);

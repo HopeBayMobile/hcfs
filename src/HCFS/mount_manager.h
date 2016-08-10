@@ -54,6 +54,7 @@ typedef struct {
 	int64_t backend_meta_size;
 	int64_t backend_num_inodes;
 	int64_t max_inode;
+	int64_t pinned_size;
 } FS_CLOUD_STAT_T;
 
 typedef struct {
