@@ -71,8 +71,6 @@ int32_t init_fs_manager(void)
 
 	sem_init(&(fs_mgr_head->op_lock), 0, 1);
 
-/* FEATURE TODO: Need to remember to download FS manager before restoring
-mode begins */
 	errcode = 0;
 	if (access(fs_mgr_path, F_OK) != 0) {
 		errcode = errno;
