@@ -7,6 +7,72 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.2.1262
+=====
+
+## New Features
+- [HCFS] feature/cache_xattr_value_for_exteral (!469)
+- [HCFS] Feature/reserved meta size (!466)
+- [HCFS] Feature/sync all data (!453)
+- [HCFS] Feature/connect_swift_by_token (!463)
+- [HCFS] Feature/event notification (!452)
+- [HCFS] Feature/xattr_size
+  1. Value block size is reduced to 256 bytes.
+  2. # of keys in a page is 4.
+  3. # of hash bucket is reduced to 8. (!455)
+- [HCFS] Feature/meta version
+  - Add magic number and version number in metafiles
+  - Replace all internal `struct stat` with `HCFS_STAT` (!468)
+- [Tera-App] Feature/factory reset on the phone and clear all data on the cloud ([!55](gateway-2-0/android-management-app!55))
+- [Tera-App] Feature/wipe a locked device ([!58](gateway-2-0/android-management-app!58))
+- [Tera-App] Feature/send a message to the locked device ([!58](gateway-2-0/android-management-app!58))
+- [Tera-App] Feature/events notified from HCFS ([!58](gateway-2-0/android-management-app!58))
+- [Tera-App] Transfer device. ([!58] (gateway-2-0/android-management-app!58))
+- [Tera-App] Improve system security by returning ArkFlex U token and url instead of the user password. ([!61] (gateway-2-0/android-management-app!61))
+- [Tera-App] Get new ArkFlexU access token when the older one is expired. ([!61] (gateway-2-0/android-management-app!61))
+- [Tera-Launcher] Update Launcher icon depends on app status. ([!6](gateway-2.0/tera-launcher!6))
+- [Tera-Launcher] Pop toast while pin/unpin complete ([!7](gateway-2.0/tera-launcher!7))
+- [Tera-Launcher] Show progress dialog while pin/unpin in progress ([!8](gateway-2.0/tera-launcher!8))
+- [Nexus-5x] Feature/factory reset on the phone and clear all data on the cloud ([!9](gateway-2-0/nexus-5x!9))
+- [Nexus-5x] Feature/download oldest package algorithm and setup downloaded functionality by wifi only ([!19](gateway-2-0/nexus-5x!19))
+- [Nexus-5x] Feature/factory reset_local only with sync_all_data ([!20](gateway-2-0/nexus-5x!20))
+- [Nexus-5x] remove some built-in apps (clock, calculator and camera) ([!15](gateway-2-0/nexus-5x!15))
+- [Nexus-5x] ADB on by default ([!16](gateway-2-0/nexus-5x!16))
+
+## Fixes
+- [HCFS] Bugfix/listxattr external selinux(!476)
+- [HCFS] Add lock to HCFSAPI thread pool and read swift user in config(!475)
+- [HCFS] Need to count # of blocks for fallocate op (!472)
+- [HCFS] Fixed an issue that FSmgr db will not be backed-up if there is no network connection initially (!467)
+- [HCFS] Fix signed / unsigned number checking error (!462)
+- [HCFS] Reducing number of sys calls by using PREAD/PWRITE and eliminating access checks (!451)
+- [HCFS] Error handling when reclaiming inode (!459)
+- [HCFS] Added statistics to track maximum inode number (!458)
+- [HCFS] bug fix #12224 
+- [HCFS] Fix compile error(!474)
+- [Tera-App] When pin folder failed, the pinned files in this folder became unpinned    Hide pin icon of folder[!66](gateway-2-0-android-management-app!66)
+- [Tera-App] Replace the pin/unpin failed message with revised version[!65](gateway-2-0-android-management-app!65)
+- [Tera-App] Code refactoring/mgmt auth ([!54](gateway-2-0/android-management-app!54))
+- [Tera-App] Fix Bug #11879 ([!56](gateway-2-0/android-management-app!56))
+- [Tera-App] Cannot unpin system app when pinned failed ([!57](gateway-2-0/android-management-app!57))
+- [Tera-App] bug fix #12365
+- [Tera-App] bug fix #12316
+- [Tera-App] bug fix #12155
+- [Tera-App] feature request #11779
+- [Nexus-5x] fix Bug #12329: phone can not be located position by network ([!14](gateway-2-0/nexus-5x!14))
+- [Nexus-5x] bug fix #11604 ([!17](gateway-2-0/nexus-5x!17))
+- [Nexus-5x] bug fix #12350
+- [Nexus-5x] add META_SPACE_LIMIT to hcfs.conf ([!18](gateway-2-0/nexus-5x!18))
+- [Nexus-5x] update sepolicy ([!10](gateway-2-0/nexus-5x!10))
+- [Nexus-5x] Adjust auto shutdown threshold to power level 3 ([!13](gateway-2-0/nexus-5x!13))
+- [Nexus-5x] move mgmt app to priv-app ([!12](gateway-2-0/nexus-5x!12))
+- [Nexus-5x] disable add user/guest button ([!11](gateway-2-0/nexus-5x!11))
+
+## CI / Refactoring
+- [Tera-Launcher] Push tag to launcher repo with current version number (!471)
+- [HCFS] Ci/update flash script (!430)
+
+
 v 2.2.2.1128
 =====
 
