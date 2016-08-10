@@ -310,6 +310,7 @@ protected:
 		init_sync_control(); /* Add this init so that upload thread will not hang up */
 		sem_init(&upload_ctl.upload_queue_sem, 0, 1);
 		sem_init(&upload_ctl.upload_op_sem, 0, 1);
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
@@ -346,9 +347,8 @@ TEST_F(init_upload_controlTest, DoNothing_JustRun)
 	EXPECT_EQ(0, memcmp(zero_mem, &(upload_ctl.threads_created), sizeof(zero_mem)));
 
 	/* Free resource */
-	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
 
 TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
@@ -396,9 +396,8 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	}
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
 	unlink(MOCK_META_PATH);
 }
 
@@ -447,9 +446,8 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 	}
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
 
 /*
@@ -486,10 +484,12 @@ protected:
 		sys_super_block = (SUPER_BLOCK_CONTROL *)
 			malloc(sizeof(SUPER_BLOCK_CONTROL));
 		sys_super_block->head.num_dirty = num_inode;
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
 	{
+		hcfs_system->system_going_down = TRUE;
 		free(shm_verified_data->record_handle_inode);
 		sem_destroy(&shm_verified_data->record_inode_sem);
 		free(shm_verified_data);
@@ -527,9 +527,8 @@ TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 	EXPECT_EQ(0, memcmp(empty_created_array, &sync_ctl.threads_created, sizeof(empty_created_array)));
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
 
 TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
@@ -575,9 +574,8 @@ TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
 	EXPECT_EQ(0, memcmp(empty_created_array, &sync_ctl.threads_created, sizeof(empty_created_array)));
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
 
 TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
@@ -610,7 +608,7 @@ TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
 	sleep(1);
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	/* Verify */
@@ -667,7 +665,7 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	sleep(1);
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	/* Verify */
@@ -715,7 +713,7 @@ TEST_F(init_sync_controlTest, SyncSuccess)
 	sleep(1);
 
 	/* Reclaim resource */
-	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	/* Verify */
@@ -791,7 +789,7 @@ protected:
 
 		unlink(MOCK_META_PATH);
 
-		pthread_cancel(sync_ctl.sync_handler_thread);
+		hcfs_system->system_going_down = TRUE;
 		pthread_join(sync_ctl.sync_handler_thread, &res);
 
 		/* Join the sync_control thread */
@@ -1261,9 +1259,13 @@ class update_backend_statTest : public ::testing::Test {
   char tmpmgrpath[100];
   virtual void SetUp() {
     no_backend_stat = TRUE;
+    hcfs_system->system_going_down = FALSE;
+    if (access(METAPATH, F_OK) < 0)
+	    mkdir(METAPATH, 0744);
    }
 
   virtual void TearDown() {
+    hcfs_system->system_going_down = TRUE;
    }
 
  };
