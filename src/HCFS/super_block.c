@@ -638,6 +638,14 @@ int32_t super_block_delete(ino_t this_inode)
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 
 	if (ret_val >= 0) {
+		/* Reduce number of active inodes if directly remove inode
+		 * rather than handled by clouddelete thread */
+		if (tempentry.status != TO_BE_DELETED)
+			sys_super_block->head.num_active_inodes--;
+		if (tempentry.pin_status == ST_PINNING)
+			pin_ll_dequeue(this_inode, &tempentry);
+
+		/* Dequeue and reclaim it. */
 		if (tempentry.status != TO_BE_RECLAIMED) {
 			ret_val = ll_dequeue(this_inode, &tempentry);
 			if (ret_val < 0) {
@@ -647,7 +655,7 @@ int32_t super_block_delete(ino_t this_inode)
 			tempentry.status = TO_BE_RECLAIMED;
 		}
 		tempentry.in_transit = FALSE;
-		init_hcfs_stat(&(tempentry.inode_stat));
+		tempentry.pin_status = ST_DEL;
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 		if (ret_val < 0) {
 			super_block_exclusive_release();
@@ -791,7 +799,7 @@ int32_t super_block_reclaim(void)
 		/* Skip if inode number is illegal. */
 		if ((now_ino <= 0) ||
 		    (now_ino >
-		     (ino_t) (sys_super_block->head.num_total_inodes + 1))) {
+		    (ino_t) (sys_super_block->head.num_total_inodes + 1))) {
 			write_log(0, "Error: unclaimed inode number is %"PRIu64
 				". Skip it.", (uint64_t)unclaimed_list[count]);
 			continue;
