@@ -13,7 +13,8 @@
 :: See the License for the specific language governing permissions and
 :: limitations under the License.
 
-SET PATH="%PATH%;%cd%\utils;%SYSTEMROOT%\System32"
+SET "PATH=%PATH%%CD%\utils;%SYSTEMROOT%\System32;"
+SET PATH
 
 @ECHO ON
 adb kill-server
