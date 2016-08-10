@@ -10,8 +10,9 @@
 #include "mock_params.h"
 #include "enc.h"
 #include "meta_mem_cache.h"
+#include "ut_global.h"
 
-#define MOCK() printf("[MOCK] fromcloud_mock_function.c:%4d %s\n",  __LINE__, __func__)
+#define MOCK() DEBUG_PRINT("[MOCK] fromcloud_mock_function.c:%4d %s\n",  __LINE__, __func__)
 int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	MOCK();

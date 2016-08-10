@@ -9,8 +9,9 @@
 #include "params.h"
 #include "fuseop.h"
 #include "tocloud_tools.h"
+#include "ut_global.h"
 
-#define MOCK() printf("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__)
+#define MOCK() DEBUG_PRINT("[MOCK] clouddelete_mock_function.c line %4d func %s\n",  __LINE__, __func__)
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	MOCK();
@@ -26,18 +27,18 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 
 int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	char str[100];
 	MOCK();
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
-		printf("%s %s\n", str, "this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
+		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
 		strcpy(pathname, TODELETE_PATH);
 		return 0;
 	} else if (this_inode == INODE__FETCH_TODELETE_PATH_FAIL) {
 		pathname[0] = '\0';
-		printf("%s %s\n", str, "this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
+		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
 		return -1;
 	} else {
-		printf("%s %s\n", str, "this_inode == ?. Record this inode for later");
+		DEBUG_PRINT("this_inode == %zu. Record this inode for later",
+				(uint64_t)this_inode);
 		/* Record inode. Called when deleting inode in delete_loop() */
 		usleep(500000); // Let threads busy
 		sem_wait(&(to_verified_data.record_inode_sem));
