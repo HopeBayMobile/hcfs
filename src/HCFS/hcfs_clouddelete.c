@@ -225,8 +225,8 @@ void init_dsync_control(void)
 	dsync_ctl.total_active_dsync_threads = 0;
 	dsync_ctl.retry_list.list_size = MAX_DSYNC_CONCURRENCY;
 	dsync_ctl.retry_list.num_retry = 0;
-	dsync_ctl.retry_list.retry_inode = calloc(sizeof(ino_t) *
-			MAX_DSYNC_CONCURRENCY, 1);
+	dsync_ctl.retry_list.retry_inode = (ino_t *)
+			calloc(MAX_DSYNC_CONCURRENCY, sizeof(ino_t));
 
 	pthread_create(&(dsync_ctl.dsync_handler_thread), NULL,
 				(void *)&collect_finished_dsync_threads, NULL);

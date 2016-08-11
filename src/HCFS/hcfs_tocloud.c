@@ -638,6 +638,10 @@ void init_sync_control(void)
 	memset(&(sync_ctl.threads_finished), 0,
 	       sizeof(char) * MAX_SYNC_CONCURRENCY);
 	sync_ctl.total_active_sync_threads = 0;
+	sync_ctl.retry_list.list_size = MAX_SYNC_CONCURRENCY;
+	sync_ctl.retry_list.num_retry = 0;
+	sync_ctl.retry_list.retry_inode = (ino_t *)
+			calloc(MAX_SYNC_CONCURRENCY, sizeof(ino_t));
 
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
 		       (void *)&collect_finished_sync_threads, NULL);
