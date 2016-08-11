@@ -2289,8 +2289,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
-		/* Download the object first if any */
-		write_log(10, "Checking for FS stat in backend\n");
+		/* Write a new one to disk */
 		fptr = fopen(fname, "w");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -2302,26 +2301,11 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		setbuf(fptr, NULL);
 		flock(fileno(fptr), LOCK_EX);
 		is_fopen = TRUE;
-		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl),
-				      NULL);
-		if ((ret >= 200) && (ret <= 299)) {
-			ret = 0;
-			errcode = 0;
-		} else if (ret != 404) {
-			errcode = -EIO;
-			/* If cannot download the previous backed-up copy,
-			revert to the cached one */
-			if (is_backedup == TRUE)
-				rename(tmpname, fname);
-			goto errcode_handle;
-		} else {
-			/* Not found, init a new one */
-			write_log(10, "Debug update stat: nothing stored\n");
-			memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
-			FTRUNCATE(fileno(fptr), 0);
-			FSEEK(fptr, 0, SEEK_SET);
-			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
-		}
+		write_log(5, "Writing a new cloud stat\n");
+		memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
+		FTRUNCATE(fileno(fptr), 0);
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
@@ -2335,6 +2319,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		errcode = -errcode;
 		goto errcode_handle;
 	}
+	is_fopen = TRUE;
 	setbuf(fptr, NULL);
 	/* File lock is in update_fs_backend_usage() */
 	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
@@ -2343,7 +2328,6 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		goto errcode_handle;
 
 	flock(fileno(fptr), LOCK_EX);
-	is_fopen = TRUE;
 	FSEEK(fptr, 0, SEEK_SET);
 	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
 	if ((ret < 200) || (ret > 299)) {
