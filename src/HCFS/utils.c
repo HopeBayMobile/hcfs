@@ -1344,7 +1344,8 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 
 	fs_cloud_stat.max_inode = sys_super_block->head.num_total_inodes + 1;
 	if (is_reg_pin == TRUE)
-		fs_cloud_stat.pinned_size += fs_total_size_delta;
+		fs_cloud_stat.pinned_size += (fs_total_size_delta -
+		                              fs_meta_size_delta);
 	if (fs_cloud_stat.pinned_size < 0)
 		fs_cloud_stat.pinned_size = 0;
 
