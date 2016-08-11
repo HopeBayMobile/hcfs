@@ -13,13 +13,14 @@
 :: See the License for the specific language governing permissions and
 :: limitations under the License.
 
-SET PATH="%PATH%;%cd%\utils;%SYSTEMROOT%\System32"
+SET "PATH=%PATH%%CD%\utils;%SYSTEMROOT%\System32;"
+SET PATH
 
 @ECHO ON
 fastboot oem unlock-go
-:: FOR %%f IN (aosp_bullhead-img-*.zip) DO fastboot.exe -w update %%f
-FOR %%f IN (*.img) DO ( fastboot.exe flash %%~nf %%f || goto :error )
-fastboot.exe reboot || goto :error
+:: FOR %%f IN (aosp_bullhead-img-*.zip) DO fastboot -w update %%f
+FOR %%f IN (*.img) DO ( fastboot flash %%~nf %%f || goto :error )
+fastboot reboot || goto :error
 @ECHO OFF
 echo Press any key to exit...
 pause >nul

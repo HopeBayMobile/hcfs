@@ -21,7 +21,6 @@ def relpath(target):
 ffi.set_source( '_pyhcfs',
     source="""
     #include "parser.h"
-    #include "hcfs_stat.h"
     """,
     include_dirs=[relpath("."), relpath("../HCFS")],
     sources=[relpath("parser.c")],

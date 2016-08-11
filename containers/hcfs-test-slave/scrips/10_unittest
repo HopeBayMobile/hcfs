@@ -67,7 +67,10 @@ function cloc_result()
 function ccm_result()
 {
 	mono /ci-tools/CCM.exe $repo/src /xml > $repo/ccm-result.xml
-	sed -i "s@<file>/@<file>src/HCFS/@g" $repo/ccm-result.xml
+	sed -i -e "s@<file>/@<file>src/HCFS/@g" \
+		-e "/^WARNING:/d" \
+		-e "/^Using default runtime:/d" \
+		$repo/ccm-result.xml
 }
 
 # Cehck code style

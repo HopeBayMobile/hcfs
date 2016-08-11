@@ -56,28 +56,46 @@ else
 	set -x;
 fi
 
-case "$setup_dev_env_mode" in
-unit_test )
-	source $here/require_compile_deps.bash
-	packages="$packages gcovr"
-	packages="$packages valgrind"
-	install_pkg
-	;;
-functional_test )
-	source $here/require_compile_deps.bash
-	$here/nopasswd_sudoer.bash
-	packages="$packages python-pip python-dev python-swiftclient"
-	# generate large file
-	packages="$packages openssl units pv"
-
-	install_pkg
-
-	if [ -f $repo/tests/functional_test/requirements.txt ]; then
-		sudo -H pip install -q -r $repo/tests/functional_test/requirements.txt
+function ci
+{
+	packages+=" cmake git build-essential" # Required by oclint / bear
+	packages+=" wget unzip"                # Required by PMD for CPD(duplicate code)
+	if lsb_release -r | grep -q 16.04; then
+		packages+=" openjdk-8-jdk "    # Required by PMD for CPD(duplicate code)
 	else
-		sudo -H pip install -q -r $here/requirements.txt
+		packages+=" openjdk-7-jdk "    # Required by PMD for CPD(duplicate code)
 	fi
-	echo "########## Configure user_allow_other in /etc/fuse.conf"
+	packages+=" cloc"                      # Install cloc for check code of line
+	packages+=" mono-complete"             # Required mono and CCM for complexity
+	packages+=" clang-3.5"                 # clang Scan Build Reports
+	packages+=" colormake"                 # colorful logs
+	packages+=" parallel"                  # parallel check source code style
+}
+
+function unit_test
+{
+	packages+=" gcovr"
+	packages+=" valgrind"
+}
+
+function post_install_pip_packages
+{
+	file=`\ls $here/requirements.txt \
+		$repo/tests/functional_test/requirements.txt \
+		2>/dev/null ||:`
+
+	sudo -H pip install -q -r $file
+}
+
+function functional_test
+{
+	$here/nopasswd_sudoer.bash
+	packages+=" python-pip python-dev python-swiftclient"
+	export post_pkg_install+=" post_install_pip_packages"
+
+	packages+=" openssl units pv" # To generate large file
+
+	echo "########## Setup Fuse config"
 	if sudo grep "#user_allow_other" /etc/fuse.conf; then
 		sudo sed -ir -e "s/#user_allow_other/user_allow_other/" /etc/fuse.conf
 	fi
@@ -87,39 +105,48 @@ functional_test )
 	if [[ `groups jenkins` != *fuse* ]]; then
 		sudo addgroup jenkins fuse || :
 	fi
-	;;
-docker_host )
-	if ! hash docker; then
-		install_docker=1
-	else
-		docker_ver=$(docker version | grep ersion | grep -v API | head -1 | sed s/[^.0-9]//g)
-		if dpkg --compare-versions 1.11.2 gt $docker_ver; then
-			install_docker=1
-		fi
+}
+
+function post_install_docker
+{
+	# skip is docker version is qualified
+	if hash docker && \
+		docker_ver=$(docker version | grep ersion | grep -v API | head -1 | sed s/[^.0-9]//g) && \
+		dpkg --compare-versions $docker_ver ge 1.11.2; then
+		return
 	fi
-	if [ ${install_docker:-0} -eq 1 ]; then
-		echo "Install Docker"
-		packages="$packages wget"
-		install_pkg
-		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
-		wget -qO- https://get.docker.com/ > /tmp/install_docker
-		sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
-		sudo sh /tmp/install_docker
-	fi
+
+	echo "Install Docker"
+	install_pkg
+	sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
+	wget -qO- https://get.docker.com/ > /tmp/install_docker
+	sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
+	sudo sh /tmp/install_docker
+
+	# Setup Docker config
 	if ! grep -q docker:5000 /etc/default/docker; then
 		echo "Updating /etc/default/docker"
 		echo 'DOCKER_OPTS="$DOCKER_OPTS --insecure-registry docker:5000"' \
 			| sudo tee -a /etc/default/docker
 		sudo service docker restart ||:
 	fi
-	install_pkg
-	;;
-* )
+}
+
+function docker_host
+{
+	packages+=" wget"
+	export post_pkg_install+=" post_install_docker"
+}
+
+for i in $(echo $setup_dev_env_mode | sed "s/,/ /g")
+do
+	echo "[[[$i]]]"
+	$i
 	source $here/require_compile_deps.bash
 	install_pkg
-	;;
-esac
+done
 
+# cleanup config file
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
 sudo mv -f /tmp/awk_tmp "$configfile"
 

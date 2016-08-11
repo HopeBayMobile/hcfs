@@ -1,5 +1,3 @@
-set +x
-export TERM=xterm-256color
 umask 000 # fix CI error
 
 function script_error_report() {
@@ -37,6 +35,11 @@ function install_pkg (){
 		force_install=""
 	fi
 	eval set $flag_x
+	for i in $post_pkg_install
+	do
+		echo === $i
+		$i
+	done
 }
 
 function check_script_changes()
