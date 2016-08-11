@@ -569,6 +569,40 @@ int32_t change_dir_entry_inode(ino_t self_inode,
 	return ret_val;
 }
 
+/**
+ * Remove meta file and reclaim it. If remove meta by involking this
+ * function, the meta file will immediately unlink rather than
+ * be moved to "todelete" folder.
+ *
+ * @param this_inode Inode number of the meta file to be removed.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t directly_delete_inode_meta(ino_t this_inode)
+{
+	char thismetapath[METAPATHLEN];
+	int32_t ret, errcode;
+
+	ret = fetch_meta_path(thismetapath, this_inode);
+	if (ret < 0)
+		return ret;
+	ret = unlink(thismetapath);
+	if (ret < 0) {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error: Fail to remove meta %"
+					PRIu64". Code %d\n",
+					(uint64_t)this_inode, errcode);
+			return -errcode;
+		}
+	}
+	ret = super_block_delete(this_inode);
+	if (ret < 0)
+		return ret;
+	ret = super_block_reclaim();
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: delete_inode_meta
@@ -588,32 +622,10 @@ int32_t delete_inode_meta(ino_t this_inode)
 	int32_t ret, errcode;
 	size_t ret_size, write_size;
 
-	ret = fetch_meta_path(thismetapath, this_inode);
-	if (ret < 0)
-		return ret;
-
-	/* When backend info is not set, immediately
-	 * delete all meta. */
-	if (CURRENT_BACKEND == NONE) {
-		ret = super_block_delete(this_inode);
-		if (ret < 0)
-			return ret;
-		ret = unlink(thismetapath);
-		if (ret < 0) {
-			errcode = errno;
-			write_log(0, "Error: Fail to remove meta %"PRIu64
-				". Code %d\n", (uint64_t)this_inode, errcode);
-			return -errcode;
-		}
-		ret = super_block_reclaim();
-		return ret;
-	}
-
-	/* Push to to-delete queue */
-	ret = super_block_to_delete(this_inode);
-	if (ret < 0)
-		return ret;
 	ret = fetch_todelete_path(todelete_metapath, this_inode);
+	if (ret < 0)
+		return ret;
+	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
 		return ret;
 
@@ -1309,10 +1321,22 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
 			return ret;
-		/*Need to delete the inode by moving it to "todelete" path*/
-		ret = delete_inode_meta(this_inode);
+
+		if (CURRENT_BACKEND == NONE) {
+			ret = directly_delete_inode_meta(this_inode);
+		} else {
+			/* Need to delete the inode by moving it to
+			 * "todelete" path*/
+			ret = delete_inode_meta(this_inode);
+			if (ret < 0)
+				return ret;
+			/* Push to to-delete queue */
+			ret = super_block_to_delete(this_inode);
+		}
+
 		if (ret < 0)
 			return ret;
+
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
 		else
@@ -1323,10 +1347,22 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
 			return ret;
-		/*Need to delete the inode by moving it to "todelete" path*/
-		ret = delete_inode_meta(this_inode);
+
+		if (CURRENT_BACKEND == NONE) {
+			ret = directly_delete_inode_meta(this_inode);
+		} else {
+			/* Need to delete the inode by moving it to
+			 * "todelete" path*/
+			ret = delete_inode_meta(this_inode);
+			if (ret < 0)
+				return ret;
+			/* Push to to-delete queue */
+			ret = super_block_to_delete(this_inode);
+		}
+
 		if (ret < 0)
 			return ret;
+
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
 		else
@@ -1475,9 +1511,29 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		}
 
-
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
+
+		/* Remove to-delete meta if no backend */
+		if (CURRENT_BACKEND == NONE) {
+			char todelete_metapath[METAPATHLEN];
+
+			fetch_todelete_path(todelete_metapath, this_inode);
+			ret = unlink(todelete_metapath);
+			if (ret < 0) {
+				errcode = errno;
+				write_log(0, "Error: Fail to remove meta %"
+						PRIu64". Code %d\n",
+						(uint64_t)this_inode, errcode);
+			}
+			super_block_delete(this_inode);
+			super_block_reclaim();
+		} else {
+			ret = super_block_to_delete(this_inode);
+			if (ret < 0)
+				write_log(0, "Error: Fail to delete meta"
+					" in %s. Code %d", __func__, -ret);
+		}
 		break;
 
 	default:
