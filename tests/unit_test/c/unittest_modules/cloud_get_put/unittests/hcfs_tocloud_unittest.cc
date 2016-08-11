@@ -516,6 +516,12 @@ void *sync_thread_function(void *ptr)
 TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 {
 	void *res;
+	IMMEDIATELY_RETRY_LIST retry_list;
+
+	retry_list.num_retry = 0;
+	retry_list.list_size = MAX_SYNC_CONCURRENCY;
+	retry_list.retry_inode = (ino_t *)
+		calloc(sizeof(ino_t) * MAX_SYNC_CONCURRENCY, 1);
 
 	/* Run tested function */
 	init_sync_control();
@@ -523,8 +529,15 @@ TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 
 	/* Verify */
 	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
-	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use, sizeof(empty_ino_array)));
-	EXPECT_EQ(0, memcmp(empty_created_array, &sync_ctl.threads_created, sizeof(empty_created_array)));
+	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use,
+			sizeof(empty_ino_array)));
+	EXPECT_EQ(0, memcmp(empty_created_array, &sync_ctl.threads_created,
+			sizeof(empty_created_array)));
+	EXPECT_EQ(0, sync_ctl.retry_list.num_retry);
+	EXPECT_EQ(MAX_SYNC_CONCURRENCY, sync_ctl.retry_list.list_size);
+	EXPECT_EQ(0, memcmp(retry_list.retry_inode,
+		sync_ctl.retry_list.retry_inode,
+		sizeof(ino_t) * MAX_SYNC_CONCURRENCY));
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
