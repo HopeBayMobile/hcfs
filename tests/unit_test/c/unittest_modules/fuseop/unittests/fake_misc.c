@@ -471,6 +471,12 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	MOCK();
 	return 0;
 }
+int32_t change_entry_name(ino_t parent_inode, const char *targetname,
+		          META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	MOCK();
+	return 0;
+}
 
 int32_t fetch_inode_stat(ino_t this_inode,
 			 HCFS_STAT *inode_stat,

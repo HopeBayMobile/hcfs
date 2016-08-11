@@ -37,6 +37,11 @@ int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 			const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
 			BOOL is_external);
+/* change_entry_name should only be called from a rename situation where
+the volume is "external" and if the old and the new name are the same if
+case insensitive */
+int32_t change_entry_name(ino_t parent_inode, const char *targetname,
+			META_CACHE_ENTRY_STRUCT *body_ptr);
 int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr,
 			BOOL is_external);

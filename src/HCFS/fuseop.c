@@ -1652,6 +1652,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
 	int64_t delta_meta_size1, delta_meta_size2;
 	BOOL is_external = FALSE;
+	BOOL rename_self_external = FALSE;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -1809,11 +1810,19 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		old_target_inode = temp_page.dir_entries[temp_index].d_ino;
 
 	/* If both newpath and oldpath refer to the same file, do nothing */
+	/* But if in external volume, will rename if name is different */
 	if (self_inode == old_target_inode) {
-		_cleanup_rename(body_ptr, old_target_ptr,
-				parent1_ptr, parent2_ptr);
-		fuse_reply_err(req, 0);
-		return;
+		if ((is_external == TRUE) &&
+		    (strcmp(selfname1, selfname2) != 0)) {
+			write_log(10, "Renaming self name for external\n");
+			old_target_inode = 0;
+			rename_self_external = TRUE;
+		} else {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, 0);
+			return;
+		}
 	}
 
 	/* Invalidate pathname cache for oldpath and newpath */
@@ -2039,8 +2048,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		old_target_ptr = NULL;
 	} else {
 		/* If newpath does not exist, add the new entry */
-		ret_val = dir_add_entry(parent_inode2, self_inode,
-			selfname2, self_mode, parent2_ptr, is_external);
+		/* But will not add new entry if rename self */
+		if (rename_self_external != TRUE)
+			ret_val = dir_add_entry(parent_inode2, self_inode,
+				selfname2, self_mode, parent2_ptr, is_external);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2050,8 +2061,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		}
 	}
 
-	ret_val = dir_remove_entry(parent_inode1, self_inode,
-			selfname1, self_mode, parent1_ptr, is_external);
+	if (rename_self_external == TRUE)
+		ret_val = change_entry_name(parent_inode1, selfname2,
+					    parent1_ptr);
+	else
+		ret_val = dir_remove_entry(parent_inode1, self_inode,
+				selfname1, self_mode, parent1_ptr, is_external);
 	if (ret_val < 0) {
 		_cleanup_rename(body_ptr, old_target_ptr,
 				parent1_ptr, parent2_ptr);

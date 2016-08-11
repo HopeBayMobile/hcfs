@@ -502,6 +502,41 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	return ret_val;
 }
 
+/* change_entry_name should only be called from a rename situation where
+the volume is "external" and if the old and the new name are the same if
+case insensitive */
+int32_t change_entry_name(ino_t parent_inode, const char *targetname,
+			META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	DIR_ENTRY_PAGE tpage;
+	int32_t count;
+	int32_t ret_val;
+	HCFS_STAT tmpstat;
+
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &tpage, &count,
+					targetname, body_ptr, TRUE);
+
+	if ((ret_val == 0) && (count >= 0)) {
+		/*Found the entry. Change parent inode*/
+		ret_val = meta_cache_lookup_dir_data(parent_inode, &tmpstat,
+					NULL, NULL, body_ptr);
+		if (ret_val < 0)
+			return ret_val;
+
+		snprintf(tpage.dir_entries[count].d_name, MAX_FILENAME_LEN + 1,
+		         "%s", targetname);
+		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		ret_val = meta_cache_update_dir_data(parent_inode, &tmpstat,
+					NULL, &tpage, body_ptr);
+		return ret_val;
+	}
+
+	if ((ret_val == 0) && (count < 0))  /* Not found */
+		ret_val = -ENOENT;
+
+	return ret_val;
+}
+
 /************************************************************************
 *
 * Function name: change_dir_entry_inode
