@@ -815,7 +815,8 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 			break;
 		}
 		tmptok_prev = tmptok;
-		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
+		/* Make path comparison in emulated case-insensitive */
+		if ((count == 0) && (strcasecmp(tmptok, "Android") != 0)) {
 			/* Not under /Android for android 5.0 */
 			thisstat->uid = 0;
 			thisstat->gid = 1028;
