@@ -39,7 +39,8 @@ int32_t super_block_update_stat(ino_t this_inode,
 }
 
 
-int32_t dentry_binary_search(DIR_ENTRY *entry_array, int32_t num_entries, DIR_ENTRY *new_entry, int32_t *index_to_insert)
+int32_t dentry_binary_search(DIR_ENTRY *entry_array, int32_t num_entries, DIR_ENTRY *new_entry, int32_t *index_to_insert,
+			     BOOL is_external)
 {
 	int32_t i;
 	for (i=0 ; i<num_entries ; i++) {
@@ -51,7 +52,8 @@ int32_t dentry_binary_search(DIR_ENTRY *entry_array, int32_t num_entries, DIR_EN
 	return -1;
 }
 
-int32_t search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node)
+int32_t search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int32_t fh, int32_t *result_index,
+			       DIR_ENTRY_PAGE *result_node, BOOL is_external)
 {
 	DIR_ENTRY tmp_entry;
 	int32_t tmp_index;
@@ -59,7 +61,7 @@ int32_t search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int32_t
 
 	strcpy(tmp_entry.d_name, target_name);
 	ret = dentry_binary_search(tnode->dir_entries, tnode->num_entries,
-		&tmp_entry, &tmp_index);
+		&tmp_entry, &tmp_index, is_external);
 	if (ret >= 0) {
 		memcpy(result_node, tnode, sizeof(DIR_ENTRY_PAGE));
 		*result_index = ret;

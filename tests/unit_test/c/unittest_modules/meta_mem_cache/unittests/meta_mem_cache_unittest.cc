@@ -1645,7 +1645,8 @@ TEST_F(meta_cache_seek_dir_entryTest, CacheNotLocked)
 {
 	DIR_ENTRY_PAGE verified_dir_entry_page;
 	int32_t verified_index;
-	ASSERT_EQ(-EINVAL, meta_cache_seek_dir_entry(0, &verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	ASSERT_EQ(-EINVAL, meta_cache_seek_dir_entry(0, &verified_dir_entry_page,
+	          &verified_index, "test_name", body_ptr, FALSE));
 }
 
 TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_Cache)
@@ -1659,7 +1660,8 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_Cache)
 	body_ptr->dir_entry_cache[1] = NULL;
 	/* Test for successing found in cache[0] */
 	sem_wait(&(body_ptr->access_sem));
-	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index,
+		  "test_name", body_ptr, FALSE));
 	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_NE(0, memcmp(verified_dir_entry_page, test_dir_entry_page2, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, verified_index);
@@ -1668,7 +1670,8 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_Cache)
 	verified_index = -1;
 	body_ptr->dir_entry_cache[1] = test_dir_entry_page2;
 	/* Test for successing found in cache[0] */
-	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name2", body_ptr));
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index,
+		  "test_name2", body_ptr, FALSE));
 	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page2, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_NE(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, verified_index);
@@ -1711,7 +1714,8 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
 
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
-	EXPECT_EQ(0, meta_cache_seek_dir_entry(inode, verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	EXPECT_EQ(0, meta_cache_seek_dir_entry(inode, verified_dir_entry_page, &verified_index,
+		  "test_name", body_ptr, FALSE));
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify & Free resource */

@@ -144,7 +144,7 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const HCFS_STAT *inode_sta
 }
 
 int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
-	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr, BOOL is_external)
 {
 	if (parent_inode == INO_DIR_ADD_ENTRY_SUCCESS)
 		return 0;
@@ -154,7 +154,7 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 }
 
 int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, 
-	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr, BOOL is_external)
 {
 	if (parent_inode == INO_DIR_REMOVE_ENTRY_FAIL)
 		return -1;

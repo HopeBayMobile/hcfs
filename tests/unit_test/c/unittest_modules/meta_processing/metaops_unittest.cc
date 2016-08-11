@@ -150,7 +150,7 @@ class dir_add_entryTest : public ::testing::Test {
 TEST_F(dir_add_entryTest, NoLockError) 
 {
 	EXPECT_EQ(-1, dir_add_entry(parent_inode, self_inode, 
-		self_name, S_IFMT, body_ptr));
+		self_name, S_IFMT, body_ptr, FALSE));
 }
 
 TEST_F(dir_add_entryTest, insert_dir_entryFail)
@@ -163,7 +163,7 @@ TEST_F(dir_add_entryTest, insert_dir_entryFail)
 	
 	/* Run */
 	EXPECT_EQ(-1, dir_add_entry(parent_inode, INO_INSERT_DIR_ENTRY_FAIL,
-		self_name, S_IFMT, body_ptr));
+		self_name, S_IFMT, body_ptr, FALSE));
 }
 
 TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
@@ -179,7 +179,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
 	/* Run */
 	EXPECT_EQ(0, dir_add_entry(parent_inode, 
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
-		self_name, S_IFREG, body_ptr));
+		self_name, S_IFREG, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 }
@@ -197,7 +197,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
 	/* Run */
 	EXPECT_EQ(0, dir_add_entry(parent_inode, 
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
-		self_name, S_IFDIR, body_ptr));
+		self_name, S_IFDIR, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.nlink);
 }
@@ -218,7 +218,7 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
 	/* Run */
 	EXPECT_EQ(0, dir_add_entry(parent_inode, 
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
-		self_name, S_IFREG, body_ptr));
+		self_name, S_IFREG, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
 }
@@ -239,7 +239,7 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
 	/* Run */
 	EXPECT_EQ(0, dir_add_entry(parent_inode, 
 		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
-		self_name, S_IFDIR, body_ptr));
+		self_name, S_IFDIR, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.nlink);
 }
@@ -295,7 +295,8 @@ class dir_remove_entryTest : public ::testing::Test {
 
 TEST_F(dir_remove_entryTest, NoLockError) 
 {
-	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr,
+		  FALSE));
 }
 
 TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail) 
@@ -305,7 +306,8 @@ TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail)
 	DELETE_DIR_ENTRY_BTREE_RESULT = 0;
 	
 	/* Run tested function */
-	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr,
+		  FALSE));
 		
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM, to_verified_meta.total_children);
@@ -320,7 +322,8 @@ TEST_F(dir_remove_entryTest, RemoveDirSuccess)
 	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
 	
 	/* Run tested function */
-	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFDIR, body_ptr));
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFDIR, body_ptr,
+		  FALSE));
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
@@ -335,7 +338,8 @@ TEST_F(dir_remove_entryTest, RemoveRegFileSuccess)
 	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
 	
 	/* Run tested function */
-	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFREG, body_ptr));
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFREG, body_ptr,
+	 	  FALSE));
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
@@ -350,7 +354,8 @@ TEST_F(dir_remove_entryTest, RemoveSymlinkSuccess)
 	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
 	
 	/* Run tested function */
-	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFLNK, body_ptr));
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFLNK, body_ptr,
+		  FALSE));
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
@@ -382,19 +387,19 @@ class change_parent_inodeTest : public ::testing::Test {
 TEST_F(change_parent_inodeTest, ChangeOK) 
 {
 	EXPECT_EQ(0, change_parent_inode(INO_SEEK_DIR_ENTRY_OK, parent_inode, 
-		parent_inode2, body_ptr));
+		parent_inode2, body_ptr, FALSE));
 }
 
 TEST_F(change_parent_inodeTest, DirEntryNotFound) 
 {
 	EXPECT_EQ(-ENOENT, change_parent_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
-		parent_inode, parent_inode2, body_ptr));
+		parent_inode, parent_inode2, body_ptr, FALSE));
 }
 
 TEST_F(change_parent_inodeTest, ChangeFail) 
 {
 	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_FAIL, parent_inode, 
-		parent_inode2, body_ptr));
+		parent_inode2, body_ptr, FALSE));
 }
 /*
 	End of unittest for change_parent_inode()
@@ -423,37 +428,37 @@ protected:
 TEST_F(change_dir_entry_inodeTest, ChangeREGOK) 
 {	
 	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
-		"/mock/target/name", new_inode, S_IFREG, body_ptr));
+		"/mock/target/name", new_inode, S_IFREG, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeFIFOOK) 
 {	
 	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
-		"/mock/target/name", new_inode, S_IFIFO, body_ptr));
+		"/mock/target/name", new_inode, S_IFIFO, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeLNKOK) 
 {	
 	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
-		"/mock/target/name", new_inode, S_IFLNK, body_ptr));
+		"/mock/target/name", new_inode, S_IFLNK, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeDIROK) 
 {	
 	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
-		"/mock/target/name", new_inode, S_IFDIR, body_ptr));
+		"/mock/target/name", new_inode, S_IFDIR, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, DirEntryNotFound) 
 {
 	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
-		"/mock/target/name", new_inode, S_IFDIR, body_ptr));
+		"/mock/target/name", new_inode, S_IFDIR, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeFail) 
 {
 	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, 
-		"/mock/target/name", new_inode, S_IFREG, body_ptr));
+		"/mock/target/name", new_inode, S_IFREG, body_ptr, FALSE));
 }
 /*
 	End of unittest for change_parent_inode()

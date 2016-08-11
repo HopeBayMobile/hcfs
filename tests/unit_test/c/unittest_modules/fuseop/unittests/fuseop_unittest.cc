@@ -164,10 +164,10 @@ class fuseopEnvironment : public ::testing::Environment {
 
     for (i = 0; i < 10; i++) {
 	    puts("unmount fuse...");
-	    system("for i in `\\ls /sys/fs/fuse/connections/`; do echo 1 > /sys/fs/fuse/connections/$i/abort; done");
-	    exit_status = system("sudo fusermount -u /tmp/test_fuse");
+	    exit_status = system("fusermount -u /tmp/test_fuse");
 	    if (exit_status == 0)
 		    break;
+	    system("for i in `\\ls /sys/fs/fuse/connections/`; do echo 1 > /sys/fs/fuse/connections/$i/abort; done");
     }
     puts("unmount fuse... done");
     ASSERT_EQ(exit_status, 0);
@@ -188,7 +188,8 @@ class fuseopEnvironment : public ::testing::Environment {
     free(system_config);
 
     unlink("/tmp/testHCFS");
-    nftw (tmppath, do_delete, 20, FTW_DEPTH);
+    if (tmppath != NULL)
+      nftw (tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
