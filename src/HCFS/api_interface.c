@@ -1167,9 +1167,10 @@ void api_module(void *index)
 			break;
 		case TERMINATE:
 			/* Terminate the system */
+			/* Moving system_going_down flag earlier */
+			hcfs_system->system_going_down = TRUE;
 			unmount_all();
 			sync_hcfs_system_data(TRUE);
-			hcfs_system->system_going_down = TRUE;
 			/* Wake up potential sleeping threads */
 			sem_post(&(hcfs_system->something_to_replace));
 			sem_post(&(hcfs_system->fuse_sem));

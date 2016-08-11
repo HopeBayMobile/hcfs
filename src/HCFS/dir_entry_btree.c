@@ -49,7 +49,8 @@
 *
 *************************************************************************/
 int32_t dentry_binary_search(const DIR_ENTRY *entry_array, const int32_t num_entries,
-			const DIR_ENTRY *new_entry, int32_t *index_to_insert)
+			const DIR_ENTRY *new_entry, int32_t *index_to_insert,
+			BOOL is_external)
 {
 	int32_t compare_entry, compare_result;
 	int32_t start_index, end_index;
@@ -77,7 +78,11 @@ int32_t dentry_binary_search(const DIR_ENTRY *entry_array, const int32_t num_ent
 		if (compare_entry >= num_entries)
 			compare_entry = num_entries - 1;
 
-		compare_result = strcmp(new_entry->d_name,
+		if (is_external == TRUE)
+			compare_result = strcasecmp(new_entry->d_name,
+					entry_array[compare_entry].d_name);
+		else
+			compare_result = strcmp(new_entry->d_name,
 					entry_array[compare_entry].d_name);
 
 		/* If entry is the same */
@@ -112,7 +117,8 @@ int32_t dentry_binary_search(const DIR_ENTRY *entry_array, const int32_t num_ent
 *
 *************************************************************************/
 int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
-		int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node)
+		int32_t fh, int32_t *result_index, DIR_ENTRY_PAGE *result_node,
+		BOOL is_external)
 {
 	DIR_ENTRY temp_entry;
 	int32_t s_index, ret_val;
@@ -123,7 +129,7 @@ int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 	strcpy(temp_entry.d_name, target_name);
 
 	ret_val = dentry_binary_search(tnode->dir_entries,
-		tnode->num_entries, &temp_entry, &s_index);
+		tnode->num_entries, &temp_entry, &s_index, is_external);
 
 	if (ret_val >= 0) {
 		*result_index = ret_val;
@@ -142,7 +148,8 @@ int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 			tnode->child_page_pos[s_index]);
 
 	return search_dir_entry_btree(target_name, &temp_page, fh,
-					result_index, result_node);
+					result_index, result_node,
+					is_external);
 errcode_handle:
 	return errcode;
 }
@@ -178,7 +185,7 @@ errcode_handle:
 int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	int32_t fh, DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-						int64_t *temp_child_page_pos)
+	int64_t *temp_child_page_pos, BOOL is_external)
 {
 	int32_t s_index, ret_val, median_entry;
 	DIR_ENTRY_PAGE newpage, temppage, temp_page2;
@@ -193,7 +200,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	/*First search for the index to insert or traverse*/
 	/* s_index: selected index to insert */
 	ret_val = dentry_binary_search(tnode->dir_entries,
-			tnode->num_entries, new_entry, &s_index);
+		tnode->num_entries, new_entry, &s_index, is_external);
 
 	/*If entry already in the tree, return error */
 	if (ret_val >= 0)
@@ -316,7 +323,8 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 					tnode->child_page_pos[s_index]);
 	ret_val = insert_dir_entry_btree(new_entry, &temppage, fh,
 				&tmp_overflow_median, &tmp_overflow_new_page,
-				this_meta, tmp_entries, temp_child_page_pos);
+				this_meta, tmp_entries, temp_child_page_pos,
+				is_external);
 
 	/*If finished. Just return*/
 	if (ret_val < 1)
@@ -477,7 +485,7 @@ errcode_handle:
 *************************************************************************/
 int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 		int32_t fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-		int64_t *temp_child_page_pos)
+		int64_t *temp_child_page_pos, BOOL is_external)
 {
 	int32_t s_index, ret_val, entry_to_delete;
 	DIR_ENTRY_PAGE temppage;
@@ -488,7 +496,7 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 
 	/* First search for the index to insert or traverse */
 	entry_to_delete = dentry_binary_search(tnode->dir_entries,
-			tnode->num_entries, to_delete_entry, &s_index);
+		tnode->num_entries, to_delete_entry, &s_index, is_external);
 
 	if (entry_to_delete >= 0) {
 		/* We found the element. Delete it. */
@@ -532,13 +540,15 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 				this_meta->root_entry_page);
 			return delete_dir_entry_btree(to_delete_entry,
 				&temppage, fh, this_meta, tmp_entries,
-						temp_child_page_pos);
+						temp_child_page_pos,
+						is_external);
 		}
 
 		if (ret_val > 0)
 			return delete_dir_entry_btree(to_delete_entry, tnode,
 					fh, this_meta, tmp_entries,
-					temp_child_page_pos);
+					temp_child_page_pos,
+					is_external);
 
 		if (ret_val < 0) {
 			write_log(5,
@@ -584,12 +594,14 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 		PREAD(fh, &temppage, sizeof(DIR_ENTRY_PAGE),
 			this_meta->root_entry_page);
 		return delete_dir_entry_btree(to_delete_entry, &temppage, fh,
-				this_meta, tmp_entries, temp_child_page_pos);
+				this_meta, tmp_entries, temp_child_page_pos,
+				is_external);
 	}
 
 	if (ret_val > 0)
 		return delete_dir_entry_btree(to_delete_entry, tnode, fh,
-				this_meta, tmp_entries, temp_child_page_pos);
+				this_meta, tmp_entries, temp_child_page_pos,
+				is_external);
 
 	if (ret_val < 0) {
 		write_log(5, "debug dtree error in/after rebalancing\n");
@@ -600,7 +612,8 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 						tnode->child_page_pos[s_index]);
 
 	return delete_dir_entry_btree(to_delete_entry, &temppage, fh,
-				this_meta, tmp_entries, temp_child_page_pos);
+				this_meta, tmp_entries, temp_child_page_pos,
+				is_external);
 
 errcode_handle:
 	return errcode;

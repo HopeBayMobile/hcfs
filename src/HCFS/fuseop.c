@@ -941,6 +941,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
+	BOOL is_external = FALSE;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -987,6 +988,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat, NULL, &ispin);
+		is_external = TRUE;
 	}
 	/* Inherit parent pin status if "ispin" is not modified */
 	if (ispin == (char) 255)
@@ -1046,7 +1048,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
 			&this_stat, this_generation, tmpptr->f_ino,
-			&delta_meta_size, ispin);
+			&delta_meta_size, ispin, is_external);
 
 	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0) {
@@ -1111,6 +1113,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
+	BOOL is_external = FALSE;
 
 	if (NO_META_SPACE()) {
 		fuse_reply_err(req, ENOSPC);
@@ -1148,6 +1151,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat, selfname, &ispin);
+		is_external = TRUE;
 	}
 	/* Inherit parent pin status if "ispin" is not modified */
 	if (ispin == (char) 255)
@@ -1202,7 +1206,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	delta_meta_size = 0;
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat, this_gen,
-			tmpptr->f_ino, &delta_meta_size, ispin);
+			tmpptr->f_ino, &delta_meta_size, ispin,
+			is_external);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_code);
@@ -1264,6 +1269,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	ino_t this_inode;
 #endif
+	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
         write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1291,6 +1297,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
+		is_external = TRUE;
 	}
 #endif
 
@@ -1307,7 +1314,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
+	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
+		             is_external);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1316,7 +1324,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	this_inode = temp_dentry.d_ino;
 #endif
 
-	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry);
+	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry,
+				     is_external);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1348,6 +1357,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 #ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
 #endif
+	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
@@ -1374,6 +1384,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat, selfname, NULL);
+		is_external = TRUE;
 	}
 #endif
 
@@ -1400,7 +1411,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
+	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
+			     is_external);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1409,7 +1421,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	this_inode = temp_dentry.d_ino;
 	write_log(10, "Debug rmdir: name %s, %" PRIu64 "\n",
 			temp_dentry.d_name, (uint64_t)this_inode);
-	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
+	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname,
+				    is_external);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1455,6 +1468,7 @@ a directory (for NFS) */
 	uint64_t this_gen;
 	HCFS_STAT parent_stat, this_stat;
 	MOUNT_T *tmpptr;
+	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
 
@@ -1484,6 +1498,7 @@ a directory (for NFS) */
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat, NULL, NULL);
+		is_external = TRUE;
 	}
 #endif
 
@@ -1502,7 +1517,8 @@ a directory (for NFS) */
 
 	memset(&output_param, 0, sizeof(struct fuse_entry_param));
 
-	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
+	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
+			     is_external);
 
 	write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
 		  (uint64_t)parent_inode, selfname, ret_val);
@@ -1635,6 +1651,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	DIR_STATS_TYPE tmpstat;
 	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
 	int64_t delta_meta_size1, delta_meta_size2;
+	BOOL is_external = FALSE;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -1673,6 +1690,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat1, NULL, NULL);
+		is_external = TRUE;
 	}
 #endif
 
@@ -1763,7 +1781,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	/* Check if oldpath and newpath exists already */
 	ret_val = meta_cache_seek_dir_entry(parent_inode1, &temp_page,
-			&temp_index, selfname1, parent1_ptr);
+			&temp_index, selfname1, parent1_ptr,
+			is_external);
 
 	if ((ret_val != 0) || (temp_index < 0)) {
 		_cleanup_rename(body_ptr, old_target_ptr,
@@ -1781,7 +1800,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	ret_val = meta_cache_seek_dir_entry(parent_inode2, &temp_page,
-			&temp_index, selfname2, parent2_ptr);
+			&temp_index, selfname2, parent2_ptr,
+			is_external);
 
 	if ((ret_val != 0) || (temp_index < 0))
 		old_target_inode = 0;
@@ -1913,7 +1933,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		the old target */
 	if (old_target_inode > 0) {
 		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
-				self_inode, self_mode, parent2_ptr);
+				self_inode, self_mode, parent2_ptr,
+				is_external);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2019,7 +2040,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	} else {
 		/* If newpath does not exist, add the new entry */
 		ret_val = dir_add_entry(parent_inode2, self_inode,
-			selfname2, self_mode, parent2_ptr);
+			selfname2, self_mode, parent2_ptr, is_external);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2030,7 +2051,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	ret_val = dir_remove_entry(parent_inode1, self_inode,
-			selfname1, self_mode, parent1_ptr);
+			selfname1, self_mode, parent1_ptr, is_external);
 	if (ret_val < 0) {
 		_cleanup_rename(body_ptr, old_target_ptr,
 				parent1_ptr, parent2_ptr);
@@ -2042,7 +2063,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if ((S_ISDIR(self_mode)) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
-				parent_inode2, body_ptr);
+				parent_inode2, body_ptr, is_external);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -6061,11 +6082,13 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	MOUNT_T *tmpptr;
 	char local_pin;
 	int64_t delta_meta_size;
+	BOOL is_external = FALSE;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		is_external = TRUE;
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -6128,7 +6151,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
-		&result_index, name, parent_meta_cache_entry);
+		&result_index, name, parent_meta_cache_entry,
+		is_external);
 	if (ret_val < 0) {
 		errcode = ret_val;
 		goto error_handle;
@@ -6180,7 +6204,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
 			link, this_generation, name, tmpptr->f_ino,
-			&delta_meta_size, local_pin);
+			&delta_meta_size, local_pin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		errcode = ret_val;
@@ -7013,11 +7037,13 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	MOUNT_T *tmpptr;
 	int64_t old_metasize, new_metasize, delta_meta_size;
 	char local_pin;
+	BOOL is_external = FALSE;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		is_external = TRUE;
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -7068,7 +7094,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
 
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
-		&result_index, newname, parent_meta_cache_entry);
+		&result_index, newname, parent_meta_cache_entry,
+		is_external);
 	if (ret_val < 0) {
 		errcode = ret_val;
 		goto error_handle;
@@ -7081,7 +7108,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 
 	/* Increase nlink and add "newname" to parent dir */
 	ret_val = link_update_meta(link_inode, newname, &link_stat,
-		&this_generation, parent_meta_cache_entry);
+		&this_generation, parent_meta_cache_entry,
+		is_external);
 	if (ret_val < 0) {
 		errcode = ret_val;
 		goto error_handle;
@@ -7173,6 +7201,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	char local_pin;
 	char ispin;
 	int64_t delta_meta_size;
+	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
 
@@ -7214,6 +7243,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 		_rewrite_stat(tmpptr, &parent_stat, NULL, &ispin);
+		is_external = TRUE;
 	}
 	/* Inherit parent pin status if "ispin" is not modified */
 	if (ispin == (char) 255)
@@ -7269,7 +7299,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
 			&this_stat, this_generation, tmpptr->f_ino,
-			&delta_meta_size, ispin);
+			&delta_meta_size, ispin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
