@@ -140,6 +140,7 @@ typedef struct {
 	int64_t size_last_upload; /* Record data + meta */
 	int64_t meta_last_upload; /* Record meta only */
 	int64_t upload_seq;
+	uint8_t padding[64];
 } CLOUD_RELATED_DATA, CLOUD_RELATED_DATA_v1;
 
 /******************************************************************************
@@ -187,7 +188,6 @@ typedef struct {
 	HCFS_STAT st;
 	DIR_META_TYPE dmt;
 	CLOUD_RELATED_DATA crd;
-	uint8_t padding[64];
 } DIR_META_HEADER, DIR_META_HEADER_v1;
 
 /******************************************************************************
@@ -244,7 +244,6 @@ typedef struct {
 	FILE_META_TYPE fmt;
 	FILE_STATS_TYPE fst;
 	CLOUD_RELATED_DATA crd;
-	uint8_t padding[64];
 } FILE_META_HEADER, FILE_META_HEADER_v1;
 
 /******************************************************************************

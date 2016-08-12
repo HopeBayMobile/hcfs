@@ -70,14 +70,12 @@ void static_assert_test(void) {
 	_Static_assert(sizeof(HCFS_STAT)
 			+ sizeof(DIR_META_TYPE)
 			+ sizeof(CLOUD_RELATED_DATA)
-			+ sizeof(uint8_t) * 64
 			== sizeof(DIR_META_HEADER),
 			"Makesure read all sub-struct equal to read whole header");
 	_Static_assert(sizeof(HCFS_STAT)
 			+ sizeof(FILE_META_TYPE)
 			+ sizeof(FILE_STATS_TYPE)
 			+ sizeof(CLOUD_RELATED_DATA)
-			+ sizeof(uint8_t) * 64
 			== sizeof(FILE_META_HEADER),
 			"Makesure read all sub-struct equal to read whole header");
 	_Static_assert(sizeof(HCFS_STAT)
@@ -89,12 +87,12 @@ void static_assert_test(void) {
 	_Static_assert(sizeof(HCFS_STAT) == 128, GUARDIAN_MSG);
 	_Static_assert(sizeof(DIR_META_HEADER) == 296, GUARDIAN_MSG);
 	_Static_assert(sizeof(FILE_META_HEADER) == 336, GUARDIAN_MSG);
-	_Static_assert(sizeof(SYMLINK_META_HEADER) == 4304, GUARDIAN_MSG);
+	_Static_assert(sizeof(SYMLINK_META_HEADER) == 4368, GUARDIAN_MSG);
 
 	/* Struct with fixed size, Do not change or remove them. */
 	_Static_assert(sizeof(DIR_META_HEADER_v1) == 296, GUARDIAN_MSG);
 	_Static_assert(sizeof(FILE_META_HEADER_v1) == 336, GUARDIAN_MSG);
-	_Static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4304, GUARDIAN_MSG);
+	_Static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4368, GUARDIAN_MSG);
 	_Static_assert(sizeof(HCFS_STAT_v1) == 128, GUARDIAN_MSG);
 }
 #pragma GCC diagnostic pop
