@@ -50,15 +50,17 @@ class fromcloudEnvironment : public ::testing::Environment {
     sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
     sem_init(&(hcfs_system->something_to_replace), 0, 0);
 
-    workpath = get_current_dir_name();
-    tmppath = (char *)malloc(strlen(workpath) + 20);
-    snprintf(tmppath, strlen(workpath) + 20, "%s/tmpdir", workpath);
-    if (access(tmppath, F_OK) != 0)
-	    mkdir(tmppath, 0700);
-    if (access("/tmp/testHCFS", F_OK) == 0) {
-	    unlink("/tmp/testHCFS");
-    }
-    symlink(tmppath, "/tmp/testHCFS");
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
+
   }
 
   virtual void TearDown() {
