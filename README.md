@@ -27,8 +27,9 @@ CACHE_SOFT_LIMIT = (Soft limit for triggering cache replacement, in bytes)
 CACHE_HARD_LIMIT = (Hard limit for blocking further IO, in bytes)
 CACHE_DELTA = (Amount of cache to be replaced after hitting hard limit and before allowing further IO, in bytes)
 CACHE_RESERVED = (Size of cache space reserved for high-priority pin files/dirs)
+META_SPACE_LIMIT = (Size of a reserved space to store metadata files)
 MAX_BLOCK_SIZE = (Data block size, in bytes)
-CURRENT_BACKEND = (Name of backend type)  (Currently supporting swift or S3)
+CURRENT_BACKEND = (Name of backend type)  (Currently supporting none, swift, swifttoken and S3)
 SWIFT_ACCOUNT = (swift account)
 SWIFT_USER = (swift user name)
 SWIFT_PASS = (swift password)
@@ -53,6 +54,7 @@ CACHE_SOFT_LIMIT = 53687091
 CACHE_HARD_LIMIT = 107374182
 CACHE_DELTA = 10485760
 CACHE_RESERVED = 536870912
+META_SPACE_LIMIT = 107374182
 MAX_BLOCK_SIZE = 1048576
 CURRENT_BACKEND = swift
 SWIFT_ACCOUNT = hopebay
@@ -91,3 +93,7 @@ Required packages
     libsqlite3-dev
     libjansson-dev
     libcap-dev
+
+Quick setup environment
+-----------------
+Execute `utils/setup_dev_env.sh` to setup development environment.
