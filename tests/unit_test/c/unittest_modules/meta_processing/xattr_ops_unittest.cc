@@ -442,11 +442,7 @@ class insert_xattrTest : public XattrOperationBase {
 TEST_F(insert_xattrTest, DefaultInsertManyKeys)
 {
 	int32_t ret;
-#ifdef ARM_32bit_
-	int32_t num_keys = 20000;
-#else
-	int32_t num_keys = 60000;
-#endif
+	int32_t num_keys = MAX_KEY_ENTRY_PER_LIST * MAX_KEY_HASH_ENTRY * 10;
 	size_t value_size = 30;
 	pair<string, string> mock_xattr[num_keys];
 
@@ -970,7 +966,7 @@ protected:
 TEST_F(list_xattrTest, GetNeededKeySizeSuccess)
 {
 	int32_t ret;
-	int32_t num_keys = 20000;
+	int32_t num_keys = 2000;
 	int32_t namespace_len = 0;
 	size_t value_size = 30;
 	size_t total_needed_size = 0;
@@ -1125,11 +1121,7 @@ TEST_F(remove_xattrTest, RemovedEntryNotFound)
 TEST_F(remove_xattrTest, RemoveManyKeysSuccess)
 {
 	int32_t ret;
-#ifdef ARM_32bit_
-	int32_t num_keys = 10000;
-#else
-	int32_t num_keys = 30000;
-#endif
+	int32_t num_keys = MAX_KEY_ENTRY_PER_LIST * MAX_KEY_HASH_ENTRY * 10;
 	int32_t reclaimed_count, expected_reclaimed_count;
 	size_t actual_size;
 	size_t value_size = MAX_VALUE_BLOCK_SIZE * 3 - 1;

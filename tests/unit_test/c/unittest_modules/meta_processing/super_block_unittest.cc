@@ -873,6 +873,7 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 
 	EXPECT_EQ(TO_BE_RECLAIMED, sb_entry.status);
 	EXPECT_EQ(FALSE, sb_entry.in_transit);
+	EXPECT_EQ(ST_DEL, sb_entry.pin_status);
 	EXPECT_EQ(1, sb_head.num_to_be_reclaimed);
 	EXPECT_EQ(inode, result_inode);
 }

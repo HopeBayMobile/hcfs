@@ -640,7 +640,8 @@ int32_t super_block_delete(ino_t this_inode)
 	if (ret_val >= 0) {
 		/* Reduce number of active inodes if directly remove inode
 		 * rather than handled by clouddelete thread */
-		if (tempentry.status != TO_BE_DELETED)
+		if (tempentry.status == NO_LL ||
+		    tempentry.status == IS_DIRTY)
 			sys_super_block->head.num_active_inodes--;
 		if (tempentry.pin_status == ST_PINNING)
 			pin_ll_dequeue(this_inode, &tempentry);

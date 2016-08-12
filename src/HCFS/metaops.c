@@ -589,6 +589,7 @@ int32_t directly_delete_inode_meta(ino_t this_inode)
 	ret = unlink(thismetapath);
 	if (ret < 0) {
 		errcode = errno;
+		/* If no entry, do not need to remove it. */
 		if (errcode != ENOENT) {
 			write_log(0, "Error: Fail to remove meta %"
 					PRIu64". Code %d\n",
@@ -1323,6 +1324,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			return ret;
 
 		if (CURRENT_BACKEND == NONE) {
+			/* Remove it and reclaim inode */
 			ret = directly_delete_inode_meta(this_inode);
 		} else {
 			/* Need to delete the inode by moving it to
@@ -1349,6 +1351,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			return ret;
 
 		if (CURRENT_BACKEND == NONE) {
+			/* Remove it and reclaim inode */
 			ret = directly_delete_inode_meta(this_inode);
 		} else {
 			/* Need to delete the inode by moving it to
@@ -1396,7 +1399,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			errcode = errno;
 			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
-			return errcode;
+			return -errcode;
 		}
 
 		/*Need to delete the meta. Move the meta file to "todelete"*/
@@ -1529,6 +1532,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			super_block_delete(this_inode);
 			super_block_reclaim();
 		} else {
+			/* Push to clouddelete queue */
 			ret = super_block_to_delete(this_inode);
 			if (ret < 0)
 				write_log(0, "Error: Fail to delete meta"

@@ -491,3 +491,13 @@ int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
 	return 1;
 }
+
+int32_t super_block_reclaim(void)
+{
+	return 0;
+}
+
+int32_t super_block_delete(ino_t this_inode)
+{
+	return 0;
+}
