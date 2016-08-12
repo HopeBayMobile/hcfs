@@ -2263,7 +2263,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t pin_size_delta)
 {
 	int32_t ret, errcode;
-	char fname[METAPATHLEN], tmpname[METAPATHLEN];
+	char fname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
 	char is_fopen;
@@ -2286,27 +2286,8 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 METAPATH, (uint64_t)root_inode);
-	snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%" PRIu64,
-		 METAPATH, (uint64_t)root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "",
 		 (uint64_t)root_inode);
-
-	/* If updating backend statistics for the first time, delete local
-	copy for this volume */
-	/* Note: tmpname is used as a tag to indicate whether the update
-	occurred for the first time. It is also a backup of the old cached
-	statistics since the last system shutdown for this volume */
-
-	if (access(tmpname, F_OK) != 0) {
-		errcode = errno;
-		if (errno == ENOENT) {
-			if (access(fname, F_OK) == 0) {
-				rename(fname, tmpname);
-			} else {
-				MKNOD(tmpname, S_IFREG | 0700, 0);
-			}
-		}
-	}
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
@@ -2322,11 +2303,12 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		setbuf(fptr, NULL);
 		flock(fileno(fptr), LOCK_EX);
 		is_fopen = TRUE;
-		write_log(5, "Writing a new cloud stat\n");
+		write_log(4, "Writing a new cloud stat\n");
 		memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
 		FTRUNCATE(fileno(fptr), 0);
 		FSEEK(fptr, 0, SEEK_SET);
 		FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		fsync(fileno(fptr));
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
