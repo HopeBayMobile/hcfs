@@ -1496,7 +1496,8 @@ store in some other file */
 		update_backend_stat(root_inode, size_diff, meta_size_diff,
 		                    1, pin_size_delta);
 	else
-		if (size_diff != 0)
+		if ((size_diff != 0) || (meta_size_diff != 0) ||
+		    (pin_size_delta != 0))
 			update_backend_stat(root_inode, size_diff,
 					meta_size_diff, 0, pin_size_delta);
 
