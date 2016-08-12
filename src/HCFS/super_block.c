@@ -572,7 +572,7 @@ int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t super_block_to_delete(ino_t this_inode)
+int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
 {
 	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -592,11 +592,17 @@ int32_t super_block_to_delete(ino_t this_inode)
 				super_block_exclusive_release();
 				return ret_val;
 			}
-			ret_val = ll_enqueue(this_inode, TO_BE_DELETED,
-					&tempentry);
-			if (ret_val < 0) {
-				super_block_exclusive_release();
-				return ret_val;
+			/* Deffer to enqueue to delete queue if flag is false */
+			if (enqueue_now == TRUE) {
+				ret_val = ll_enqueue(this_inode, TO_BE_DELETED,
+						&tempentry);
+				if (ret_val < 0) {
+					super_block_exclusive_release();
+					return ret_val;
+				}
+				tempentry.status = TO_BE_DELETED;
+			} else {
+				tempentry.status = NO_LL;
 			}
 		}
 		sys_super_block->head.num_active_inodes--;
@@ -613,6 +619,59 @@ int32_t super_block_to_delete(ino_t this_inode)
 	}
 	super_block_exclusive_release();
 
+	return ret_val;
+}
+
+/************************************************************************
+*
+* Function name: super_block_enqueue_delete
+*        Inputs: ino_t this_inode
+*       Summary: After involking super_block_to_delete(), Use this
+*                function to enqueue entry of "this_inode" to delete
+*                queue so that another thread can delete data and meta
+*                on cloud.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int32_t super_block_enqueue_delete(ino_t this_inode)
+{
+	int32_t ret_val;
+	SUPER_BLOCK_ENTRY tempentry;
+
+	ret_val = 0;
+	super_block_exclusive_locking();
+
+	ret_val = read_super_block_entry(this_inode, &tempentry);
+	if (ret_val < 0)
+		goto error_handle;
+
+	/* Status temporarily be NO_LL so as to enqueue to delete queue */
+	if (tempentry.status != NO_LL) {
+		ret_val = -EINVAL;
+		write_log(2, "Critical: Status of inode %"PRIu64
+			" is not TO_BE_DELETE", (uint64_t)this_inode);
+		goto error_handle;
+	}
+
+	ret_val = ll_enqueue(this_inode, TO_BE_DELETED,
+			&tempentry);
+	if (ret_val < 0)
+		goto error_handle;
+	ret_val = write_super_block_entry(this_inode, &tempentry);
+	if (ret_val < 0)
+		goto error_handle;
+	ret_val = write_super_block_head();
+	if (ret_val < 0)
+		goto error_handle;
+
+	super_block_exclusive_release();
+
+	return 0;
+
+error_handle:
+	write_log(0, "Error: Fail to enqueue to delete queue in %s. Code",
+		__func__, -ret_val);
+	super_block_exclusive_release();
 	return ret_val;
 }
 

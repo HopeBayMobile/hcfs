@@ -1333,7 +1333,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			if (ret < 0)
 				return ret;
 			/* Push to to-delete queue */
-			ret = super_block_to_delete(this_inode);
+			ret = super_block_to_delete(this_inode, TRUE);
 		}
 
 		if (ret < 0)
@@ -1360,7 +1360,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			if (ret < 0)
 				return ret;
 			/* Push to to-delete queue */
-			ret = super_block_to_delete(this_inode);
+			ret = super_block_to_delete(this_inode, TRUE);
 		}
 
 		if (ret < 0)
@@ -1405,6 +1405,12 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		/*Need to delete the meta. Move the meta file to "todelete"*/
 		if (meta_deleted == FALSE) {
 			ret = delete_inode_meta(this_inode);
+			if (ret < 0) {
+				fclose(metafptr);
+				return ret;
+			}
+			/* TODO: consider case NO_BACKEND */
+			ret = super_block_to_delete(this_inode, FALSE);
 			if (ret < 0) {
 				fclose(metafptr);
 				return ret;
@@ -1511,7 +1517,6 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				(this_inode_stat.size + metasize);
 			tmpstat.meta_size -= metasize;
 			tmpstat.num_inodes -= 1;
-
 		}
 
 		flock(fileno(metafptr), LOCK_UN);
@@ -1533,7 +1538,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			super_block_reclaim();
 		} else {
 			/* Push to clouddelete queue */
-			ret = super_block_to_delete(this_inode);
+			ret = super_block_enqueue_delete(this_inode);
 			if (ret < 0)
 				write_log(0, "Error: Fail to delete meta"
 					" in %s. Code %d", __func__, -ret);

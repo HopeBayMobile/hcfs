@@ -138,13 +138,26 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 
 	sub_dir = this_inode % NUMSUBDIR;
 	snprintf(tempname, METAPATHLEN, "%s/todelete", METAPATH);
-	if (access(tempname, F_OK) == -1)
-		MKDIR(tempname, 0700);
+	if (access(tempname, F_OK) == -1) {
+		ret = mkdir(tempname, 0700);
+		if (ret < 0){
+			errcode = errno;
+			if (errcode != EEXIST)
+				goto errcode_handle;
+		}
+	}
 
 	snprintf(tempname, METAPATHLEN, "%s/todelete/sub_%d",
 				METAPATH, sub_dir);
-	if (access(tempname, F_OK) == -1)
-		MKDIR(tempname, 0700);
+	if (access(tempname, F_OK) == -1) {
+		ret = mkdir(tempname, 0700);
+		if (ret < 0){
+			errcode = errno;
+			if (errcode != EEXIST)
+				goto errcode_handle;
+		}
+
+	}
 
 	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%" PRIu64 "",
 			METAPATH, sub_dir, (uint64_t)this_inode);
