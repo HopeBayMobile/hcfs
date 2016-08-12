@@ -722,9 +722,15 @@ errcode_handle:
 	}
 
 	/* Update FS stat in the backend if updated previously */
-	if (meta_on_cloud == TRUE)
-		update_backend_stat(root_inode, -backend_size_change,
-				-meta_size_change, -1, is_reg_pin);
+	if (meta_on_cloud == TRUE) {
+		if (is_reg_pin)
+			update_backend_stat(root_inode, -backend_size_change,
+				-meta_size_change, -1,
+				-backend_size_change + meta_size_change);
+		else
+			update_backend_stat(root_inode, -backend_size_change,
+				-meta_size_change, -1, 0);
+	}
 
 	_check_del_progress_file(this_inode);
 	unlink(thismetapath);

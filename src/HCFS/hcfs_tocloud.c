@@ -1069,6 +1069,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	ssize_t ret_ssize;
 #endif
 	BOOL is_reg_pin;
+	uint8_t last_pin_status = NUM_PIN_TYPES + 1;
+	int64_t pin_size_delta = 0, last_file_size = 0;
 
 	is_reg_pin = FALSE;
 
@@ -1134,7 +1136,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				1, toupload_metafptr);
 		ret = init_backend_file_info(ptr, &backend_size,
 				&total_backend_blocks,
-				cloud_related_data.upload_seq);
+				cloud_related_data.upload_seq,
+				&last_pin_status);
 		if (ret < 0) {
 			fclose(toupload_metafptr);
 			fclose(local_metafptr);
@@ -1337,6 +1340,8 @@ store in some other file */
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
+			last_file_size = cloud_related_data.size_last_upload -
+					 cloud_related_data.meta_last_upload;
 			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload =
 					tempfilestat.size + now_meta_size;
@@ -1469,13 +1474,31 @@ store in some other file */
 	fclose(local_metafptr);
 
 	/* Upload successfully. Update FS stat in backend */
+	/* First check if pin status changed since the last upload */
+	pin_size_delta = 0;
+	if (is_reg_pin == TRUE)
+		pin_size_delta = size_diff - meta_size_diff;
+
+	if ((last_pin_status < NUM_PIN_TYPES) && (S_ISREG(ptr->this_mode))) {
+		if ((last_pin_status == P_UNPIN) && (is_reg_pin == TRUE)) {
+			/* Change from unpin to pin, need to add file size
+			to pin size */
+			pin_size_delta = tempfilestat.size;
+		}
+		if ((last_pin_status != P_UNPIN) && (is_reg_pin == FALSE)) {
+			/* Change from pin to unpin, need to substract file size
+			of the last upload from pin size */
+			pin_size_delta = -last_file_size;
+		}
+	}
+
 	if (upload_seq <= 0)
 		update_backend_stat(root_inode, size_diff, meta_size_diff,
-		                    1, is_reg_pin);
+		                    1, pin_size_delta);
 	else
 		if (size_diff != 0)
 			update_backend_stat(root_inode, size_diff,
-					meta_size_diff, 0, is_reg_pin);
+					meta_size_diff, 0, pin_size_delta);
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
@@ -2237,13 +2260,13 @@ void upload_loop(void)
 *************************************************************************/
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta,
-		BOOL is_reg_pin)
+		int64_t pin_size_delta)
 {
 	int32_t ret, errcode;
 	char fname[METAPATHLEN], tmpname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
-	char is_fopen, is_backedup;
+	char is_fopen;
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
@@ -2274,13 +2297,11 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	occurred for the first time. It is also a backup of the old cached
 	statistics since the last system shutdown for this volume */
 
-	is_backedup = FALSE;
 	if (access(tmpname, F_OK) != 0) {
 		errcode = errno;
 		if (errno == ENOENT) {
 			if (access(fname, F_OK) == 0) {
 				rename(fname, tmpname);
-				is_backedup = TRUE;
 			} else {
 				MKNOD(tmpname, S_IFREG | 0700, 0);
 			}
@@ -2323,7 +2344,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	setbuf(fptr, NULL);
 	/* File lock is in update_fs_backend_usage() */
 	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
-			num_inodes_delta, is_reg_pin);
+			num_inodes_delta, pin_size_delta);
 	if (ret < 0)
 		goto errcode_handle;
 

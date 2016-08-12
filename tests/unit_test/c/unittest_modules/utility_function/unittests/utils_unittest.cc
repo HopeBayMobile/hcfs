@@ -1085,7 +1085,7 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess)
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	/* Run */
-	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, FALSE));
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 0));
 
 	/* Verify */
 	fseek(fptr, 0, SEEK_SET);
@@ -1109,7 +1109,7 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccessPin)
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	/* Run */
-	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, TRUE));
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 123));
 
 	/* Verify */
 	fseek(fptr, 0, SEEK_SET);
@@ -1132,7 +1132,7 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	/* Run */
-	EXPECT_EQ(0, update_fs_backend_usage(fptr, -12345678, -456666, -789999, FALSE));
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, -12345678, -456666, -789999, 0));
 
 	/* Verify */
 	fseek(fptr, 0, SEEK_SET);
