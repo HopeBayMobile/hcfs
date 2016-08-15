@@ -1,1 +1,6 @@
--iquote.
+-iquote src/pyhcfs
+-iquote src/HCFS
+-iquote unittests
+-iquote tests/unit_test/c/unittest_modules/*
+-iquote tests/unit_test/c/unittest_modules/*/unittests
+-iquote .
