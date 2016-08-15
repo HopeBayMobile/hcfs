@@ -740,7 +740,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 class pin_inodeTest : public ::testing::Test {
 protected:
 	int64_t mock_reserved_size;
-	char pin_type;
+	uint8_t pin_type;
 
 	void SetUp()
 	{
@@ -931,7 +931,7 @@ TEST_F(unpin_inodeTest, UnpinDirSuccess_ManyChildren)
 /* Unittest for increase_pinned_size() */
 class increase_pinned_sizeTest : public ::testing::Test {
 protected:
-	char pin_type;
+	uint8_t pin_type;
 
 	void SetUp()
 	{
@@ -1163,7 +1163,6 @@ TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
 {
 	UPLOADING_COMMUNICATION_DATA data;
 	PROGRESS_META progress_meta;
-	int fd;
 	int inode;
 	int ret;
 
@@ -1181,7 +1180,6 @@ TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
 	EXPECT_EQ(FALSE, CHECK_UPLOADING_FLAG);
 	EXPECT_EQ(0, CHECK_TOUPLOAD_BLOCKS);
 
-	close(fd);
 	unlink(progress_path);
 }
 /*

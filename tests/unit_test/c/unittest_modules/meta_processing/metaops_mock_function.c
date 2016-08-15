@@ -311,7 +311,7 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 
 int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
-	sprintf(pathname, "testpatterns/inode_%" PRIu64 "_block_%d",
+	sprintf(pathname, "testpatterns/inode_%" PRIu64 "_block_%"PRId64,
 			(uint64_t)this_inode, block_num);
 	return 0;
 }
