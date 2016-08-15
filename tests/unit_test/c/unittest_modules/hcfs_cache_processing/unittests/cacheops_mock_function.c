@@ -96,4 +96,9 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 {
 	return 0;
 }
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+                struct stat *ret_stat)
+{
+	return 0;
+}
 

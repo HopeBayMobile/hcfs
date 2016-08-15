@@ -468,17 +468,17 @@ int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
 		int64_t dirty_cache_delta, int64_t unpin_dirty_data_size,
 		BOOL need_sync)
 {
-	hcfs_system->systemdata.cache_size += cache_size_delta;
+	hcfs_system->systemdata.cache_size += (cache_size_delta + meta_size_delta);
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_data_size;
-	hcfs_system->systemdata.system_size += system_size_delta;
+	hcfs_system->systemdata.system_size += (system_size_delta + meta_size_delta);
 	return 0;
 }
 
 int32_t get_meta_size(ino_t inode, int64_t *metasize)
 {
-	*metasize = 123;
+	*metasize = MOCK_META_SIZE;
 	return 0;
 }
 
@@ -486,7 +486,6 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 {
 	return 0;
 }
-
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
 	return 1;
@@ -503,6 +502,20 @@ int32_t super_block_delete(ino_t this_inode)
 }
 
 int32_t super_block_enqueue_delete(ino_t this_inode)
+{
+	return 0;
+}
+int32_t change_pin_size(int64_t delta_pin_size)
+{
+	return 0;
+}
+void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+{
+	sprintf(pathname, "restore_meta_fileTestPath/restore_meta_%"PRIu64,
+			(uint64_t)this_inode);
+	return;
+}
+int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
 	return 0;
 }

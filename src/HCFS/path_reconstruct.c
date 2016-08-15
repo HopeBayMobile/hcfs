@@ -631,6 +631,7 @@ int32_t init_pathlookup()
 	if (access(pathname, F_OK) != 0) {
 		MKNOD(pathname, S_IFREG | 0600, 0);
 	}
+
 	pathlookup_data_fptr = fopen(pathname, "r+");
 	if (pathlookup_data_fptr == NULL) {
 		errcode = errno;

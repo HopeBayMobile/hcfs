@@ -48,6 +48,7 @@
 #include "hcfscurl.h"
 #include "event_notification.h"
 #include "meta_mem_cache.h"
+#include "do_restoration.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -362,7 +363,8 @@ int64_t get_vol_size(int32_t arg_len, char *largebuf)
 		llretval = (int64_t) ret;
 		goto error_handling;
 	}
-
+	/* FS_stat should exists even in restoration, as it will be
+	downloaded first before restoration begins. */
 	statfptr = fopen(temppath, "r+");
 	if (statfptr == NULL) {
 		ret = (int64_t) errno;
@@ -1517,6 +1519,19 @@ void api_module(void *index)
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+		case INITIATE_RESTORATION:
+			uint32_ret = initiate_restoration();
+			ret_len = sizeof(uint32_ret);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
+			break;
+		case CHECK_RESTORATION_STATUS:
+			uint32_ret = check_restoration_status();
+			ret_len = sizeof(uint32_ret);
+			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
+			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
+			uint32_ret = 0;
 			break;
 		case SETSWIFTTOKEN:
 			retcode = set_swift_token(arg_len, largebuf);

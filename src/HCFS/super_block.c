@@ -16,6 +16,8 @@
 *           comparing between int32_t and uint32_t integers.
 * 2015/5/27 Jiahong working on improving error handling
 * 2015/5/28 Jiahong resolving merges
+* 2016/6/7 Jiahong changing code for recovering mode
+*
 **************************************************************************/
 
 /* TODO: Consider to convert super inode to multiple files and use striping
@@ -28,6 +30,7 @@
 #include <sys/shm.h>
 #endif
 #include <sys/time.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
@@ -44,6 +47,8 @@
 #include "hcfs_cacheops.h"
 #include "syncpoint_control.h"
 #include "meta.h"
+#include "rebuild_super_block.h"
+#include "hcfs_fromcloud.h"
 
 #define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
@@ -337,6 +342,13 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	int32_t ret_val;
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret_val = restore_meta_super_block_entry(this_inode, NULL);
+		if (ret_val < 0)
+			return ret_val;
+	}
 
 	ret_val = 0;
 	super_block_exclusive_locking();
@@ -844,6 +856,8 @@ int32_t super_block_reclaim(void)
 	*  from that in superblock head */
 
 	/* Sort the list of unclaimed inodes. */
+/* FEATURE TODO: rebuild unclaimed list or reclaimed list at the end
+of restoration */
 	qsort(unclaimed_list, num_unclaimed, sizeof(ino_t), compino);
 
 	last_reclaimed = sys_super_block->head.first_reclaimed_inode;
@@ -929,7 +943,13 @@ int32_t super_block_reclaim_fullscan(void)
 	int64_t count;
 	off_t thisfilepos, retval;
 	ino_t last_reclaimed, first_reclaimed, old_last_reclaimed;
+	ino_t this_inode;
 	ssize_t retsize;
+/* FEATURE TODO: Be able to release the exclusive lock after a number
+of inodes are scanned, and then reclaim the lock. Should be able to
+integrate this process with other super block ops (perhaps should let
+super_block_reclaim return immediately if fullscan is in progress, but
+also add the list of to_reclaim to the reclaimed list here) */
 
 	last_reclaimed = 0;
 	first_reclaimed = 0;
@@ -946,9 +966,11 @@ int32_t super_block_reclaim_fullscan(void)
 		super_block_exclusive_release();
 		return -errcode;
 	}
+
 	/* Traverse all entries and reclaim. */
-	for (count = 0; count < sys_super_block->head.num_total_inodes;
+	for (count = 1; count < sys_super_block->head.num_total_inodes;
 								count++) {
+		this_inode = count + 1;
 		thisfilepos = SB_HEAD_SIZE + count * SB_ENTRY_SIZE;
 		retsize = pread(sys_super_block->iofptr, &tempentry,
 						SB_ENTRY_SIZE, thisfilepos);
@@ -963,12 +985,22 @@ int32_t super_block_reclaim_fullscan(void)
 		if (retsize < SB_ENTRY_SIZE)
 			break;
 
+		/* Reclaim all unused inode entries */
 		if ((tempentry.status == TO_BE_RECLAIMED) ||
-				((tempentry.inode_stat.ino == 0) &&
-					(tempentry.status != TO_BE_DELETED))) {
+			(tempentry.status == RECLAIMED) ||
+			(tempentry.this_index == 0) ||
+			((tempentry.inode_stat.ino == 0) &&
+				(tempentry.status != TO_BE_DELETED))) {
 
 			/* Modify status and reclaim the entry. */
 			tempentry.status = RECLAIMED;
+			if (tempentry.this_index != this_inode) {
+				write_log(10, "Debug: Entry inode is %"
+					PRIu64", inode is %"PRIu64,
+					(uint64_t)(tempentry.this_index),
+					(uint64_t)this_inode);
+				tempentry.this_index = this_inode;
+			}
 			sys_super_block->head.num_inode_reclaimed++;
 			tempentry.util_ll_next = 0;
 			retsize = pwrite(sys_super_block->iofptr, &tempentry,
@@ -1074,6 +1106,9 @@ ino_t super_block_new_inode(HCFS_STAT *in_stat,
 
 	super_block_exclusive_locking();
 
+/* FEATURE TODO: (need to integrate with Kewei's code) in restore mode, need
+to allocate new inode from inode number larger than the current ones,
+not reclaimed ones used before */
 	if (sys_super_block->head.num_inode_reclaimed > 0) {
 		this_inode = sys_super_block->head.first_reclaimed_inode;
 		retsize = pread(sys_super_block->iofptr, &tempentry,
@@ -1770,6 +1805,13 @@ int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 	SUPER_BLOCK_ENTRY this_entry;
 	int32_t ret;
 
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(this_inode, NULL);
+		if (ret < 0)
+			return ret;
+	}
+
 	super_block_exclusive_locking();
 	ret = read_super_block_entry(this_inode, &this_entry);
 	if (ret < 0) {
@@ -1818,6 +1860,13 @@ int32_t super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
 	int32_t ret;
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(this_inode, NULL);
+		if (ret < 0)
+			return ret;
+	}
 
 	super_block_exclusive_locking();
 	ret = read_super_block_entry(this_inode, &this_entry);
@@ -1971,6 +2020,7 @@ error_handling:
 	return ret;
 }
 
+<<<<<<< HEAD
 /**
  * Set sync point. If the sync point had been set, then just overwrite
  * old sync point information. Otherwise allocate new resource it needs.
@@ -2052,4 +2102,129 @@ int32_t super_block_cancel_syncpoint()
 	free_syncpoint_resource(TRUE);
 	super_block_exclusive_release();
 	return 0;
+=======
+#define _ASSERT_BACKEND_EXIST_() \
+	{\
+		if (CURRENT_BACKEND == NONE) \
+			return -ENOTCONN; \
+	}
+
+/**
+ * Check number of root inodes and super block status and decide
+ * if need to rebuild super block or create a new super block. In case
+ * of super block rebuilding, decide to start from begining or keep
+ * rebuilding.
+ *
+ * @return 0 when keep or start rebuilding super block. 1 when initialize
+ *         and open old super block. Otherwise negative error code.
+ */
+int32_t check_init_super_block()
+{
+	char fsmgr_path[400], objname[300];
+	FILE *fsmgr_fptr, *sb_fptr;
+	DIR_META_TYPE dirmeta;
+	SUPER_BLOCK_HEAD head;
+	int32_t errcode, ret;
+	int64_t ret_ssize;
+
+	sprintf(fsmgr_path, "%s/fsmgr", METAPATH);
+	if (access(fsmgr_path, F_OK) < 0) {
+		errcode = errno;
+		if (errcode == ENOENT) {
+			_ASSERT_BACKEND_EXIST_();
+			/* Get fsmgr from cloud */
+			sprintf(objname, "FSmgr_backup");
+			fsmgr_fptr = fopen(fsmgr_path, "w+");
+			if (!fsmgr_fptr) {
+				errcode = errno;
+				return -errcode;
+			}
+			setbuf(fsmgr_fptr, NULL);
+			ret = fetch_object_busywait_conn(fsmgr_fptr,
+					RESTORE_FETCH_OBJ, objname);
+			fclose(fsmgr_fptr);
+			if (ret < 0) {
+				unlink(fsmgr_path);
+				return ret;
+			}
+		} else {
+			return -errcode;
+		}
+	}
+	fsmgr_fptr = fopen(fsmgr_path, "r");
+	if (!fsmgr_fptr) {
+		errcode = errno;
+		return -errcode;
+	}
+	flock(fileno(fsmgr_fptr), LOCK_EX);
+	PREAD(fileno(fsmgr_fptr), &dirmeta, sizeof(DIR_META_TYPE), 16);
+	flock(fileno(fsmgr_fptr), LOCK_UN);
+	fclose(fsmgr_fptr);
+
+	if (dirmeta.total_children <= 0) {
+		ret = super_block_init();
+		if (ret < 0)
+			return ret;
+		else
+			return 1;
+	}
+
+	/* Check superblock status */
+	if (access(SUPERBLOCK, F_OK) < 0) {
+		/* Rebuild SB */
+		_ASSERT_BACKEND_EXIST_();
+		ret = init_rebuild_sb(START_REBUILD_SB);
+		if (ret < 0)
+			return ret;
+		/* Create rebuild sb mgr */
+		ret = create_sb_rebuilder();
+	} else {
+		/* Read SB and check status */
+		sb_fptr = fopen(SUPERBLOCK, "r");
+		if (!sb_fptr) {
+			errcode = errno;
+			return -errcode;
+		}
+		flock(fileno(sb_fptr), LOCK_EX);
+		ret_ssize = pread(fileno(sb_fptr), &head,
+				sizeof(SUPER_BLOCK_HEAD), 0);
+		flock(fileno(sb_fptr), LOCK_UN);
+		fclose(sb_fptr);
+		if (ret_ssize < (int64_t)sizeof(SUPER_BLOCK_HEAD)) {
+			unlink(SUPERBLOCK);
+			/* Rebuild SB */
+			_ASSERT_BACKEND_EXIST_();
+			ret = init_rebuild_sb(START_REBUILD_SB);
+			if (ret < 0)
+				return ret;
+			/* Create rebuild sb mgr */
+			ret = create_sb_rebuilder();
+		} else {
+			if ((head.now_rebuild) ||
+			    (hcfs_system->system_restoring ==
+			     RESTORING_STAGE2)) {
+				/* Keep rebuilding SB */
+				_ASSERT_BACKEND_EXIST_();
+				ret = init_rebuild_sb(KEEP_REBUILD_SB);
+				if (ret < 0)
+					return ret;
+				/* Create rebuild sb mgr */
+				ret = create_sb_rebuilder();
+			} else {
+				ret = super_block_init();
+				if (ret < 0)
+					return ret;
+				else
+					return 1;
+			}
+		}
+	}
+
+	return ret;
+
+errcode_handle:
+	flock(fileno(fsmgr_fptr), LOCK_UN);
+	fclose(fsmgr_fptr);
+	return errcode;
+>>>>>>> feature/stage1_transition
 }

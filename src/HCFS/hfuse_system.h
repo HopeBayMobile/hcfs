@@ -18,11 +18,14 @@
 #include "pthread.h"
 #include "inttypes.h"
 
-int32_t init_hfuse(void);
-int32_t init_hcfs_system_data(void);
+#include "global.h"
+
+int32_t init_hfuse(int8_t is_restoring);
+int32_t init_hcfs_system_data(int8_t is_restoring);
 int32_t sync_hcfs_system_data(char need_lock);
 void init_backend_related_module(void);
 int32_t init_event_notify_module(void);
+void init_download_module(void);
 
 #define CHILD_NUM 2
 #define BATTERY_LOW_LEVEL 3

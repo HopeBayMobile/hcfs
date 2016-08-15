@@ -56,7 +56,7 @@ CURL_HANDLE download_usermeta_curl_handle;
 int16_t curl_handle_mask[MAX_DOWNLOAD_CURL_HANDLE];
 sem_t download_curl_control_sem;
 sem_t download_curl_sem;
-sem_t pin_download_curl_sem;
+sem_t nonread_download_curl_sem;
 
 /* Swift collections */
 

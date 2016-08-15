@@ -105,7 +105,10 @@
 #include "fuseproc_comm.h"
 #include <attr/xattr.h>
 #endif
-
+#include "rebuild_parent_dirstat.h"
+#include "rebuild_super_block.h"
+#include "hfuse_system.h"
+#include "do_restoration.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
 	1. in lookup_count, add a field "to_delete". rmdir, unlink
@@ -5250,7 +5253,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	int64_t countn;
 	off_t nextentry_pos;
 	int32_t page_start;
-	char *buf;
+	char *buf, *tmpstrptr;;
 	off_t buf_pos;
 	size_t entry_size, ret_size;
 	int32_t ret, errcode;
@@ -5425,6 +5428,18 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				tempstat.st_mode = S_IFIFO;
 			else if (this_type == D_ISSOCK)
 				tempstat.st_mode = S_IFSOCK;
+
+			/* Rebuild parent lookup / dir statistics here
+			(excluding . and ..), for every pair of (parent / child)
+			discovered here */
+			if (hcfs_system->system_restoring
+			    == RESTORING_STAGE2) {
+				tmpstrptr = temp_page.dir_entries[count].d_name;
+				if ((strcmp(tmpstrptr, ".") != 0) &&
+				    (strcmp(tmpstrptr, "..") != 0))
+					rebuild_parent_stat(tempstat.st_ino,
+						this_inode, this_type);
+			}
 
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
@@ -7493,6 +7508,16 @@ void *mount_single_thread(void *ptr)
 	return 0;
 }
 
+void _unlink_restore_stat(void)
+{
+	char restore_stat_path[METAPATHLEN];
+
+	sem_wait(&(restore_sem));
+	fetch_restore_stat_path(restore_stat_path);
+	unlink(restore_stat_path);
+	sem_post(&(restore_sem));
+}
+
 int32_t hook_fuse(int32_t argc, char **argv)
 {
 	int32_t dl_count;
@@ -7533,7 +7558,33 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	database at least once after the network is enabled */
 
 	/* Wait on the fuse semaphore, until waked up by api_interface */
-	sem_wait(&(hcfs_system->fuse_sem));
+	while (!hcfs_system->system_going_down) {
+		/* Wait */
+		sem_wait(&(hcfs_system->fuse_sem));
+
+		/* Check if restoring completed. */
+		sem_wait(&(hcfs_system->access_sem));
+		if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+			if (rebuild_sb_jobs->job_finish) {
+				hcfs_system->system_restoring = NOT_RESTORING;
+				destroy_rebuild_sb(TRUE);
+				/* Remove tag for rebuilding */
+				_unlink_restore_stat();
+				/* Notify user that the restoration is done */
+				notify_restoration_result(2, 0);
+
+				/* Enable backend related services */
+				init_backend_related_module();
+				write_log(10, "Debug: Finish rebuilding."
+					" Now Enable sync/upload/cache mgmt");
+			}
+		}
+		sem_post(&(hcfs_system->access_sem));
+	}
+
+	/* Join thread if still restoring */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2)
+		destroy_rebuild_sb(FALSE);
 
 	destroy_mount_mgr();
 	destroy_fs_manager();

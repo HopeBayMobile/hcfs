@@ -248,3 +248,11 @@ int32_t super_block_exclusive_release(void)
 {
 	return 0;
 }
+int32_t fetch_restore_stat_path(char *pathname)
+{
+	return 0;
+}
+int32_t check_init_super_block()
+{
+	return 0;
+}

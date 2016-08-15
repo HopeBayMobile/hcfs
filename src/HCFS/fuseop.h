@@ -137,6 +137,7 @@ typedef struct {
 	/* Xfer window must be shifted in an interval */
 	time_t last_xfer_shift_time;
 
+	int32_t system_restoring;
 	struct timespec backend_status_last_time;
 } SYSTEM_DATA_HEAD;
 

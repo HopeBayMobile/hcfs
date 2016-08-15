@@ -19,6 +19,7 @@
 * 2016/1/18 Jiahong revised actual_delete_inode routine
 * 2016/1/19 Jiahong revised disk_markdelete
 * 2016/4/26 Jiahong adding routines for snapshotting dir meta before modifying
+* 2016/6/7 Jiahong changing code for recovering mode
 **************************************************************************/
 #include "metaops.h"
 
@@ -47,10 +48,13 @@
 #include "super_block.h"
 #include "filetables.h"
 #include "xattr_ops.h"
+#include "hcfs_fromcloud.h"
+#include "utils.h"
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #include "FS_manager.h"
 #endif
+#include "rebuild_super_block.h"
 
 static inline void logerr(int32_t errcode, char *msg)
 {
@@ -630,6 +634,10 @@ int32_t delete_inode_meta(ino_t this_inode)
 	ret = fetch_todelete_path(todelete_metapath, this_inode);
 	if (ret < 0)
 		return ret;
+
+	/* Meta file should be downloaded already in unlink, rmdir, or
+	rename ops */
+
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
 		return ret;
@@ -1306,6 +1314,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
 			return ret;
+
 		fptr = fopen(rootpath, "r+");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -1385,6 +1394,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = fetch_meta_path(thismetapath, this_inode);
 		if (ret < 0)
 			return ret;
+
+		/* Meta file should be downloaded already in unlink, rmdir, or
+		rename ops */
 
 		if (access(thismetapath, F_OK) != 0) {
 			errcode = errno;
@@ -2039,33 +2051,15 @@ static int32_t _check_shrink_size(ino_t **ptr, int64_t num_elem,
 	return 0;
 }
 
-/**
- * collect_dir_children
- *
- * Given a dir inode, collect all the children and classify them as
- * dir nodes and non-dir nodes. This function takes advantage of
- * tree-walk pointer in meta of a dir.
- *
- * @param this_inode The inode number of the dir
- * @param dir_node_list Address of a pointer used to point to dir-children-array
- * @param num_dir_node Number of elements in the dir-array
- * @param nondir_node_list Address of a pointer used to point to
- *                         non-dir-children-array
- * @param num_nondir_node Number of elements in the non-dir-array
- *
- * @return 0 on success, otherwise negative error code
- */
-int32_t collect_dir_children(ino_t this_inode,
-	ino_t **dir_node_list, int64_t *num_dir_node,
-	ino_t **nondir_node_list, int64_t *num_nondir_node)
+int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
+		ino_t **dir_node_list, int64_t *num_dir_node,
+		ino_t **nondir_node_list, int64_t *num_nondir_node,
+		char **nondir_type_list)
 {
-	char metapath[300];
-	FILE *fptr;
 	int32_t ret, errcode;
 	int32_t count;
 	int64_t ret_size, now_page_pos;
 	int64_t total_children, half, now_nondir_size, now_dir_size;
-	DIR_META_TYPE dir_meta;
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *tmpentry;
 
@@ -2073,6 +2067,8 @@ int32_t collect_dir_children(ino_t this_inode,
 	*num_nondir_node = 0;
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
+	if (nondir_type_list)
+		*nondir_type_list = NULL;
 
 	ret = fetch_meta_path(metapath, this_inode);
 	if (ret < 0)
@@ -2115,6 +2111,15 @@ int32_t collect_dir_children(ino_t this_inode,
 		goto errcode_handle;
 	}
 
+	if (nondir_type_list) { /* Malloc type array if needed */
+		*nondir_type_list = (char *)malloc(sizeof(char) *
+				(total_children + 1));
+		if (*nondir_type_list == NULL) {
+			errcode = -ENOMEM;
+			goto errcode_handle;
+		}
+	}
+
 	/* Collect all file in this dir */
 	while (now_page_pos) {
 		FSEEK(fptr, now_page_pos, SEEK_SET);
@@ -2145,6 +2150,9 @@ int32_t collect_dir_children(ino_t this_inode,
 					errcode = ret;
 					goto errcode_handle;
 				}
+				if (nondir_type_list) /* Get type if need */
+					(*nondir_type_list)[*num_nondir_node] =
+							tmpentry->d_type;
 				(*nondir_node_list)[*num_nondir_node] =
 								tmpentry->d_ino;
 				(*num_nondir_node)++;
@@ -2154,13 +2162,14 @@ int32_t collect_dir_children(ino_t this_inode,
 		now_page_pos = dir_page.tree_walk_next;
 	}
 
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
-
 	/* Shrink dir_node_list size */
 	ret = _check_shrink_size(dir_node_list, *num_dir_node, now_dir_size);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to malloc in %s\n", __func__);
+		if (nondir_type_list && *nondir_type_list) {
+			free(*nondir_type_list);
+			*nondir_type_list = NULL;
+		}
 		free(*dir_node_list);
 		free(*nondir_node_list);
 		*dir_node_list = NULL;
@@ -2173,6 +2182,10 @@ int32_t collect_dir_children(ino_t this_inode,
 			now_nondir_size);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to malloc in %s\n", __func__);
+		if (nondir_type_list && *nondir_type_list) {
+			free(*nondir_type_list);
+			*nondir_type_list = NULL;
+		}
 		free(*dir_node_list);
 		free(*nondir_node_list);
 		*dir_node_list = NULL;
@@ -2180,11 +2193,20 @@ int32_t collect_dir_children(ino_t this_inode,
 		return -ENOMEM;
 	}
 
+	if (nondir_type_list) {
+		if (*num_nondir_node == 0) {
+			free(*nondir_type_list);
+			*nondir_type_list = NULL;
+		}
+	}
+
 	return 0;
 
 errcode_handle:
-	flock(fileno(fptr), LOCK_UN);
-	fclose(fptr);
+	if (nondir_type_list && *nondir_type_list) {
+		free(*nondir_type_list);
+		*nondir_type_list = NULL;
+	}
 	free(*dir_node_list);
 	free(*nondir_node_list);
 	*dir_node_list = NULL;
@@ -2300,6 +2322,79 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 	return 0;
 }
 	
+/**
+ * collect_dir_children
+ *
+ * Given a dir inode, collect all the children and classify them as
+ * dir nodes and non-dir nodes. This function takes advantage of
+ * tree-walk pointer in meta of a dir.
+ *
+ * @param this_inode The inode number of the dir
+ * @param dir_node_list Address of a pointer used to point to dir-children-array
+ * @param num_dir_node Number of elements in the dir-array
+ * @param nondir_node_list Address of a pointer used to point to
+ *                         non-dir-children-array
+ * @param num_nondir_node Number of elements in the non-dir-array
+ *
+ * @return 0 on success, otherwise negative error code
+ */
+int32_t collect_dir_children(ino_t this_inode,
+	ino_t **dir_node_list, int64_t *num_dir_node,
+	ino_t **nondir_node_list, int64_t *num_nondir_node,
+	char **nondir_type_list)
+{
+	int32_t ret, errcode;
+	int64_t ret_size;
+	char metapath[300];
+	FILE *fptr;
+	DIR_META_TYPE dir_meta;
+
+	ret = fetch_meta_path(metapath, this_inode);
+	if (ret < 0)
+		return ret;
+
+	fptr = fopen(metapath, "r");
+	if (fptr == NULL) {
+		ret = errno;
+		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
+			(uint64_t)this_inode, __func__, ret);
+		return -ret;
+	}
+
+	flock(fileno(fptr), LOCK_EX);
+	if (access(metapath, F_OK) < 0) {
+		write_log(5, "meta %"PRIu64" does not exist in %s\n",
+			(uint64_t)this_inode, __func__);
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return -ENOENT;
+	}
+
+	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
+	ret = collect_dirmeta_children(&dir_meta, fptr, dir_node_list,
+			num_dir_node, nondir_node_list, num_nondir_node,
+			nondir_type_list);
+	if (ret < 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return ret;
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
+	return errcode;
+}
+
 static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
 {
 	if (namespace == SECURITY) {
@@ -2513,3 +2608,262 @@ errcode_handle:
 	return ret;
 }
 
+/**
+ * When restoring the meta file, system statistics and meta statistics
+ * should be updated. All the status of blocks existing on cloud should
+ * be modified to ST_CLOUD. Also need to update pin space usage if a file
+ * is pinned.
+ *
+ * @param fptr File pointer of the restored file. It should be locked.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t restore_meta_structure(FILE *fptr)
+{
+/* FEATURE TODO: Should change this function so that in stage 1
+system stat updates will go to the restored sys stat, not the
+current one */
+	int32_t errcode, ret;
+	struct stat this_stat, meta_stat;
+	FILE_META_TYPE file_meta;
+	BLOCK_ENTRY_PAGE tmppage;
+	int64_t page_pos, current_page, which_page;
+	int64_t total_blocks, count;
+	int32_t e_index;
+	BOOL block_status;
+	BOOL write_page;
+	size_t ret_size;
+	FILE_STATS_TYPE file_stats;
+	CLOUD_RELATED_DATA cloud_data;
+
+	FSEEK(fptr, 0, SEEK_SET);
+	fstat(fileno(fptr), &meta_stat);
+	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
+	if (S_ISDIR(this_stat.st_mode)) {
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		cloud_data.size_last_upload = meta_stat.st_size;
+		cloud_data.meta_last_upload = meta_stat.st_size;
+		cloud_data.upload_seq = 1;
+		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+		/* Update statistics */
+		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
+		return 0;
+
+	} else if (S_ISLNK(this_stat.st_mode)) {
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		cloud_data.size_last_upload = meta_stat.st_size;
+		cloud_data.meta_last_upload = meta_stat.st_size;
+		cloud_data.upload_seq = 1;
+		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+		/* Update statistics */
+		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
+		return 0;
+	}
+
+	/* Restore status and statistics */
+	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
+	total_blocks = (this_stat.st_size == 0) ? 0 :
+		((this_stat.st_size - 1) / MAX_BLOCK_SIZE + 1);
+
+	current_page = -1;
+	write_page = FALSE;
+	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+	
+	for (count = 0; count < total_blocks; count++) {
+		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+		if (current_page != which_page) {
+			if (write_page == TRUE) {
+				FSEEK(fptr, page_pos, SEEK_SET);
+				FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+						1, fptr);
+				write_page = FALSE;
+			}
+			page_pos = seek_page2(&file_meta, fptr,
+					which_page, 0);
+			if (page_pos <= 0) {
+				count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
+				continue;
+			}
+			current_page = which_page;
+			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+
+			FSEEK(fptr, page_pos, SEEK_SET);
+			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, fptr);
+		}
+		/* TODO: Perhaps check and delete local block? */
+		block_status = tmppage.block_entries[e_index].status;
+		switch (block_status) {
+		case ST_TODELETE:
+			tmppage.block_entries[e_index].status = ST_NONE;
+			write_page = TRUE;
+			break;
+		case ST_LDISK:
+		case ST_LtoC:
+		case ST_CtoL:
+		case ST_BOTH:
+			tmppage.block_entries[e_index].status = ST_CLOUD;
+			write_page = TRUE;
+			break;
+		default: /* Do nothing when st is ST_CLOUD / ST_NONE */
+			break;
+		}
+	}
+	if (write_page == TRUE) {
+		FSEEK(fptr, page_pos, SEEK_SET);
+		FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+				1, fptr);
+	}
+
+	/* Restore file statistics */
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	FREAD(&file_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
+	file_stats.num_cached_blocks = 0;
+	file_stats.dirty_data_size = 0;
+	file_stats.cached_size = 0;
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
+	/* Restore cloud related data */
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+	cloud_data.size_last_upload = this_stat.st_size + meta_stat.st_size;
+	cloud_data.meta_last_upload = meta_stat.st_size;
+	cloud_data.upload_seq = 1;
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+	/* Update statistics */
+	change_system_meta(this_stat.st_size, meta_stat.st_size,
+			0, 0, 0, 0, TRUE);
+	if (P_IS_PIN(file_meta.local_pin)) {
+		ret = change_pin_size(this_stat.st_size);
+		if (ret < 0) {
+			/* If no space, change pin status? */
+/* FEATURE TODO: Need to keep pin status if possible. If new pin
+requests surface before meta restoration is completed, should
+limit number / size of the requests, or should consider soft pin?
+*/
+			file_meta.local_pin = P_UNPIN;
+			FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+			FWRITE(&file_meta,
+				sizeof(FILE_META_TYPE), 1, fptr);
+		}
+	}
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
+/**
+ * Restore a meta file from cloud. Downlaod the meta file
+ * to a temp file, and rename to the correct meta file path.
+ *
+ * @param this_inode Inode number of the meta file to be restored.
+ *
+ * @return 0 on success or meta file had been restored. Otherwise
+ *         negative error code.
+ */
+int32_t restore_meta_file(ino_t this_inode)
+{
+	char metapath[METAPATHLEN];
+	char restored_metapath[400], objname[100];
+	FILE *fptr;
+	int32_t errcode, ret;
+
+	fetch_meta_path(metapath, this_inode);
+	/* Meta file had been restored. */
+	if (!access(metapath, F_OK))
+		return 0;
+
+	/* Begin to restore. Download meta file and restore content */
+	if (hcfs_system->backend_is_online == FALSE)
+		return -ENOTCONN;
+
+	fetch_restored_meta_path(restored_metapath, this_inode);
+	fptr = fopen(restored_metapath, "a+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errno));
+		return -EIO;
+	}
+	fclose(fptr);
+	fptr = fopen(restored_metapath, "r+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errno));
+		return -EIO;
+	}
+
+	/* Get file lock */
+	ret = flock(fileno(fptr), LOCK_EX);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errno));
+		if (fptr != NULL) {
+			fclose(fptr);
+			fptr = NULL;
+		}
+		return -EIO;
+	}
+	if (!access(metapath, F_OK)) { /* Check again when get lock */
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		unlink(restored_metapath);
+		return 0;
+	}
+	setbuf(fptr, NULL);
+
+	/* Fetch meta from cloud */
+	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
+	ret = fetch_from_cloud(fptr, RESTORE_FETCH_OBJ, objname);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to fetch meta from cloud in %s."
+			" Code %d", __func__, -ret);
+		goto errcode_handle;
+	}
+
+	ret = restore_meta_structure(fptr);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to restore meta struct in %s."
+			" Code %d", __func__, -ret);
+		goto errcode_handle;
+	}
+
+	ret = rename(restored_metapath, metapath);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to rename to meta path in %s."
+			" Code %d", __func__, -ret);
+		goto errcode_handle;
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return ret;
+}

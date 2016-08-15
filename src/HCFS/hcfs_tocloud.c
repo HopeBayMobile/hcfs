@@ -15,6 +15,7 @@
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
 * 2015/2/18, Kewei finish atomic upload.
 * 2016/5/23 Jiahong added control for cache mgmt
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -65,6 +66,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "tocloud_tools.h"
 #include "utils.h"
 #include "hcfs_cacheops.h"
+#include "rebuild_super_block.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -1409,7 +1411,6 @@ store in some other file */
 			write_log(10, "Checking for other error\n");
 			sync_error = sync_ctl.threads_error[ptr->which_index];
 		}
-
 	} else { /* meta is removed */
 		flock(fileno(local_metafptr), LOCK_UN);
 		fclose(local_metafptr);
@@ -2171,6 +2172,7 @@ void upload_loop(void)
 		if (ino_check != 0) {
 			ino_sync = ino_check;
 
+/* FEATURE TODO: double check that super block entry will be reconstructed here */
 			ret_val = read_super_block_entry(ino_sync, &tempentry);
 
 			if ((ret_val < 0) || (tempentry.status != IS_DIRTY)) {

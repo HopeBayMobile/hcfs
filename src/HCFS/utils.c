@@ -47,6 +47,7 @@
 #include "mount_manager.h"
 #include "enc.h"
 #include "super_block.h"
+#include "do_restoration.h"
 
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
@@ -109,6 +110,25 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 		METAPATH, sub_dir, (uint64_t)this_inode);
 
 	return 0;
+}
+
+void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+{
+	char restoring_meta_path[200];
+	int32_t errcode, ret;
+
+	sprintf(restoring_meta_path, "%s/restoring_meta", METAPATH);
+	if (access(restoring_meta_path, F_OK) < 0)
+		MKDIR(restoring_meta_path, 0700);
+
+	snprintf(pathname, METAPATHLEN, "%s/restored_meta_%" PRIu64 "",
+			restoring_meta_path, (uint64_t)this_inode);
+	return;
+
+errcode_handle:
+	snprintf(pathname, METAPATHLEN, "%s/restored_meta_%" PRIu64 "",
+			restoring_meta_path, (uint64_t)this_inode);
+	return;
 }
 
 /************************************************************************
@@ -1585,7 +1605,7 @@ errcode_handle:
 *        Inputs: char *pathname, ino_t this_inode
 *        Output: Integer
 *       Summary: Given the inode number this_inode,
-*                copy the filename to the stat file
+*                copy the filename of the stat file
 *                to the space pointed by pathname.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
@@ -1899,6 +1919,7 @@ int32_t reload_system_config(const char *config_path)
 	/* Create backend related threads when backend status from
 	 * none to s3/swift */
 	enable_related_module = FALSE;
+	/* Do not enable related modules if going to restore */
 	if ((CURRENT_BACKEND == NONE) && (new_config->current_backend != NONE))
 		enable_related_module = TRUE;
 
@@ -1909,13 +1930,28 @@ int32_t reload_system_config(const char *config_path)
 	free(temp_config);
 
 	/* Init backend related threads */
-	if (enable_related_module == TRUE) {
+	if ((enable_related_module == TRUE)
+	    && (hcfs_system->system_restoring == NOT_RESTORING)) {
 		ret = prepare_FS_database_backup();
 		if (ret < 0) {
 			write_log(0, "Error: Fail to prepare FS backup."
 				" Code %d\n", -ret);
 		}
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		init_download_module();
 		init_backend_related_module();
+	} else if (enable_related_module == TRUE) {
+		/* Only bring up monitor thread if in restoration process */
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		/* Try to reduce cache size if now in stage 1 of restoration */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			ret = restore_stage1_reduce_cache();
+			if (ret == 0)
+				start_download_minimal();
+			else
+				notify_restoration_result(1, ret);
+		}
 	}
 
 	return 0;

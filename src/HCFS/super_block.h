@@ -79,6 +79,7 @@ typedef struct {
 
 	/* This defines the number of inodes that are currently being used */
 	int64_t num_active_inodes;
+	char now_rebuild;
 } SUPER_BLOCK_HEAD;
 
 /* SUPER_BLOCK_CONTROL defines the structure for controling super block */
@@ -137,4 +138,5 @@ int32_t pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 int32_t super_block_set_syncpoint();
 int32_t super_block_cancel_syncpoint();
 
-#endif /* GW20_HCFS_SUPER_BLOCK_H_ */
+int32_t check_init_super_block();
+#endif  /* GW20_HCFS_SUPER_BLOCK_H_ */

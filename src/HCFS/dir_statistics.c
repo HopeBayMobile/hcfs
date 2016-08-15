@@ -39,6 +39,7 @@ int32_t init_dirstat_lookup()
 	int32_t ret, errcode;
 	char pathname[METAPATHLEN+10];
 
+	/* If system is being restored, also need to init a lookup db */
 	snprintf(pathname, METAPATHLEN, "%s/dirstat_lookup_db", METAPATH);
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0600, 0);

@@ -13,6 +13,7 @@
 * 2015/6/5 Jiahong added error handling.
 * 2015/8/5 Jiahong added routines for updating FS statistics
 * 2016/2/18 Kewei finished changing flow of deleting file on cloud.
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -981,7 +982,8 @@ void *delete_loop(void *ptr)
 		inode_to_dsync = 0;
 		if (inode_to_check != 0) {
 			inode_to_dsync = inode_to_check;
-
+/* FEATURE TODO: double check that super block rebuild will happen before
+anything can be deleted */
 			ret_val = read_super_block_entry(inode_to_dsync,
 								&tempentry);
 

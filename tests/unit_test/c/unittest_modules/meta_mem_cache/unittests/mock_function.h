@@ -15,3 +15,4 @@ HCFS_STAT *generate_mock_stat(ino_t inode_num);
 
 char MOCK_FINISH_UPLOADING;
 char MOCK_RETURN_VAL;
+ino_t num_stat_rebuilt;

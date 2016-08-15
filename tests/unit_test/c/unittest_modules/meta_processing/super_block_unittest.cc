@@ -7,10 +7,14 @@ extern "C" {
 #include "super_block.h"
 #include "global.h"
 #include "fuseop.h"
+#include "utils.h"
 }
+#include "super_block_mock_params.h"
 #include "gtest/gtest.h"
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
+extern SYSTEM_CONF_STRUCT *system_config;
+
 class superblockEnvironment : public ::testing::Environment {
 	public:
 		void SetUp()
@@ -1078,10 +1082,11 @@ TEST_F(super_block_reclaim_fullscanTest, num_total_inodes_EqualsZero)
 	/* Verify */
 	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
 	EXPECT_EQ(0, sys_super_block->head.num_inode_reclaimed);
-
+	EXPECT_EQ(0, sys_super_block->head.first_reclaimed_inode);
+	EXPECT_EQ(0, sys_super_block->head.last_reclaimed_inode);
 }
 
-TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
+TEST_F(super_block_reclaim_fullscanTest, ScanToBeReclaimedInodeSuccess)
 {
 	ino_t now_reclaimed_inode;
 	SUPER_BLOCK_ENTRY sb_entry;
@@ -1093,7 +1098,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 	/* Write mock entries to be reclaimed */
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.status = TO_BE_RECLAIMED;
-	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+	for (ino_t inode = 2 ; inode <= num_inode ; inode++) { /* start from 2 */
 		sb_entry.this_index = inode;
 		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
@@ -1106,7 +1111,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 
 	/* Verify */
 	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode; // first entry
-	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+	for (ino_t inode = 2 ; inode <= num_inode ; inode++) {
 		uint64_t file_pos;
 		SUPER_BLOCK_ENTRY now_entry;
 
@@ -1123,7 +1128,89 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
 
 	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
-	EXPECT_EQ(num_inode, sys_super_block->head.num_inode_reclaimed);
+	EXPECT_EQ(num_inode - 1, sys_super_block->head.num_inode_reclaimed);
+}
+
+TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
+{
+	ino_t now_reclaimed_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+	uint64_t num_inode = 20000;
+
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		num_inode * sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Write mock entries to be reclaimed */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = RECLAIMED;
+	for (ino_t inode = 2 ; inode <= num_inode ; inode++) { /* start from 2 */
+		sb_entry.this_index = inode;
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+			(inode - 1)); // Write entry status
+	}
+	sys_super_block->head.num_total_inodes = num_inode;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim_fullscan());
+
+	/* Verify */
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode; // first entry
+	for (ino_t inode = 2 ; inode <= num_inode ; inode++) {
+		uint64_t file_pos;
+		SUPER_BLOCK_ENTRY now_entry;
+
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+			(now_reclaimed_inode - 1);
+		pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+
+		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
+		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+
+		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
+	}
+	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
+
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
+	EXPECT_EQ(num_inode - 1, sys_super_block->head.num_inode_reclaimed);
+}
+
+TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_Success)
+{
+	ino_t now_reclaimed_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+	uint64_t num_inode = 20000;
+
+	/* Just truncate superblock */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		num_inode * sizeof(SUPER_BLOCK_ENTRY));
+
+	sys_super_block->head.num_total_inodes = num_inode;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim_fullscan());
+
+	/* Verify */
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode; // first entry
+	for (ino_t inode = 2 ; inode <= num_inode ; inode++) {
+		uint64_t file_pos;
+		SUPER_BLOCK_ENTRY now_entry;
+
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+			(now_reclaimed_inode - 1);
+		pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+
+		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
+		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+
+		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
+	}
+	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
+
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
+	EXPECT_EQ(num_inode - 1, sys_super_block->head.num_inode_reclaimed);
 }
 
 /*
@@ -2782,4 +2869,171 @@ TEST_F(super_block_cancel_syncpointTest, CancelSuccess)
 }
 /**
  * End of unittest of super_block_cancel_syncpoint()
+ */
+
+/*
+ * Unittest of check_init_super_block()
+ */
+class check_init_super_blockTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		METAPATH = "check_init_super_blockTestDir";
+		if (!access(METAPATH, F_OK))
+			system("rm -rf check_init_super_blockTestDir");
+		mkdir(METAPATH, 0777);
+	}
+	void TearDown()
+	{
+		if (!access(METAPATH, F_OK))
+			system("rm -rf check_init_super_blockTestDir");
+	}
+};
+
+TEST_F(check_init_super_blockTest, Init_OldSuperblock_Success)
+{
+	char sb_path[400];
+	char unclaimedfile_path[400] = "testpatterns/unclaimedfile_path";
+
+	sprintf(sb_path, "%s/superblock", METAPATH);
+	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
+
+	SUPERBLOCK = sb_path;
+	UNCLAIMEDFILE = unclaimedfile_path;
+
+	NUM_VOL = 0;
+	CURRENT_BACKEND = SWIFT;
+
+	/* Run */
+	EXPECT_EQ(1, check_init_super_block());
+
+	/* Verify */
+	EXPECT_EQ(0, access(sb_path, F_OK));
+	EXPECT_EQ(0, access(unclaimedfile_path, F_OK));
+
+	unlink(sb_path);
+	unlink(unclaimedfile_path);
+}
+
+TEST_F(check_init_super_blockTest, No_Superblock_But_RootExist_StartRebuild)
+{
+	char sb_path[400];
+	char unclaimedfile_path[400] = "testpatterns/unclaimedfile_path";
+
+	sprintf(sb_path, "%s/superblock", METAPATH);
+	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
+
+	SUPERBLOCK = sb_path;
+	UNCLAIMEDFILE = unclaimedfile_path;
+
+	NUM_VOL = 1;
+	CURRENT_BACKEND = SWIFT;
+
+	/* Run */
+	EXPECT_EQ(0, check_init_super_block());
+
+	/* Verify */
+	EXPECT_EQ(0, access(sb_path, F_OK));
+	EXPECT_EQ(0, access(unclaimedfile_path, F_OK));
+
+	unlink(sb_path);
+	unlink(unclaimedfile_path);
+}
+
+TEST_F(check_init_super_blockTest, SuperblockExist_JustOpenIt)
+{
+	char sb_path[400];
+	char unclaimedfile_path[400] = "testpatterns/unclaimedfile_path";
+	FILE *fptr;
+	SUPER_BLOCK_HEAD sb_head;
+
+	memset(&sb_head, 0, sizeof(SUPER_BLOCK_HEAD));
+	sb_head.now_rebuild = FALSE;
+	sprintf(sb_path, "%s/superblock", METAPATH);
+	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
+
+	SUPERBLOCK = sb_path;
+	UNCLAIMEDFILE = unclaimedfile_path;
+	fptr = fopen(SUPERBLOCK, "w+");
+	pwrite(fileno(fptr), &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	fclose(fptr);
+
+	NUM_VOL = 1;
+	CURRENT_BACKEND = SWIFT;
+
+	/* Run */
+	EXPECT_EQ(1, check_init_super_block());
+
+	/* Verify */
+	EXPECT_EQ(0, access(sb_path, F_OK));
+	EXPECT_EQ(0, access(unclaimedfile_path, F_OK));
+
+	unlink(sb_path);
+	unlink(unclaimedfile_path);
+}
+
+TEST_F(check_init_super_blockTest, SuperblockExist_KeepRebuilding)
+{
+	char sb_path[400];
+	char unclaimedfile_path[400] = "testpatterns/unclaimedfile_path";
+	FILE *fptr;
+	SUPER_BLOCK_HEAD sb_head;
+
+	memset(&sb_head, 0, sizeof(SUPER_BLOCK_HEAD));
+	sb_head.now_rebuild = TRUE;
+	sprintf(sb_path, "%s/superblock", METAPATH);
+	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
+
+	SUPERBLOCK = sb_path;
+	UNCLAIMEDFILE = unclaimedfile_path;
+	fptr = fopen(SUPERBLOCK, "w+");
+	pwrite(fileno(fptr), &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	fclose(fptr);
+
+	NUM_VOL = 1;
+	CURRENT_BACKEND = SWIFT;
+
+	/* Run */
+	EXPECT_EQ(0, check_init_super_block());
+
+	/* Verify */
+	EXPECT_EQ(0, access(sb_path, F_OK));
+	EXPECT_EQ(0, access(unclaimedfile_path, F_OK));
+
+	unlink(sb_path);
+	unlink(unclaimedfile_path);
+}
+
+TEST_F(check_init_super_blockTest, SuperblockHeadCorrupted_StartRebuild)
+{
+	char sb_path[400];
+	char unclaimedfile_path[400] = "testpatterns/unclaimedfile_path";
+	FILE *fptr;
+	char sb_head[5];
+
+	memset(&sb_head, 0, 5);
+	sprintf(sb_path, "%s/superblock", METAPATH);
+	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
+
+	SUPERBLOCK = sb_path;
+	UNCLAIMEDFILE = unclaimedfile_path;
+	fptr = fopen(SUPERBLOCK, "w+");
+	pwrite(fileno(fptr), &sb_head, 5, 0);
+	fclose(fptr);
+
+	NUM_VOL = 1;
+	CURRENT_BACKEND = SWIFT;
+
+	/* Run */
+	EXPECT_EQ(0, check_init_super_block());
+
+	/* Verify */
+	EXPECT_EQ(0, access(sb_path, F_OK));
+	EXPECT_EQ(0, access(unclaimedfile_path, F_OK));
+
+	unlink(sb_path);
+	unlink(unclaimedfile_path);
+}
+/*
+ * End unittest of check_init_super_block()
  */

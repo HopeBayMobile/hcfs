@@ -339,9 +339,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
 	if (ret_val < 0) {
 		sem_post(&(pathlookup_data_lock));
-		return ret_val;
 	}
-	sem_post(&(pathlookup_data_lock));
 
 	if (old_metasize > 0 && new_metasize > 0)
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
@@ -1315,7 +1313,8 @@ int32_t pin_inode(ino_t this_inode,
 		dir_node_list = NULL;
 		nondir_node_list = NULL;
 		ret = collect_dir_children(this_inode, &dir_node_list,
-			&num_dir_node, &nondir_node_list, &num_nondir_node);
+			&num_dir_node, &nondir_node_list,
+			&num_nondir_node, NULL);
 		if (ret < 0)
 			return ret;
 
@@ -1454,7 +1453,8 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		dir_node_list = NULL;
 		nondir_node_list = NULL;
 		ret = collect_dir_children(this_inode, &dir_node_list,
-			&num_dir_node, &nondir_node_list, &num_nondir_node);
+			&num_dir_node, &nondir_node_list,
+			&num_nondir_node, NULL);
 		if (ret < 0)
 			return ret;
 

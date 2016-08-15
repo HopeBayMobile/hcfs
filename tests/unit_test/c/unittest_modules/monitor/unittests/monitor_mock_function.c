@@ -35,3 +35,9 @@ void notify_sleep_on_cache(int32_t cache_replace_status)
 {
 	mock_status = cache_replace_status;
 }
+
+void wake_sb_rebuilder(void)
+{
+	return;
+}
+

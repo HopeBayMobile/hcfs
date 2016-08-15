@@ -28,6 +28,7 @@ int32_t check_and_create_blockpaths(void);
 
 /*Will copy the filename of the meta file to pathname*/
 int32_t fetch_meta_path(char *pathname, ino_t this_inode);
+void fetch_restored_meta_path(char *pathname, ino_t this_inode);
 
 int32_t fetch_stat_path(char *pathname, ino_t this_inode);
 
@@ -91,6 +92,7 @@ int32_t fetch_error_download_path(char *path, ino_t inode);
 void get_system_size(int64_t *cache_size, int64_t *pinned_size);
 
 int32_t update_sb_size(void);
+int32_t change_pin_size(int64_t delta_pin_size);
 
 int32_t update_file_stats(FILE *metafptr,
 			  int64_t num_blocks_delta,

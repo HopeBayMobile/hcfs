@@ -56,6 +56,7 @@
 #include "api_interface.h"
 #include "event_notification.h"
 #include "syncpoint_control.h"
+#include "do_restoration.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -63,13 +64,13 @@
 /************************************************************************
 *
 * Function name: init_hcfs_system_data
-*        Inputs: None
+*        Inputs: int8_t restoring_status
 *       Summary: Initialize HCFS system data.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t init_hcfs_system_data(void)
+int32_t init_hcfs_system_data(int8_t restoring_status)
 {
 	int32_t errcode, ret;
 	size_t ret_size;
@@ -107,9 +108,13 @@ int32_t init_hcfs_system_data(void)
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
+	hcfs_system->system_restoring = restoring_status;
+
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
 
+/* FEATURE TODO: Make sure that system meta can be reconstructed or
+restored from a backup copy */
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {
 		errcode = errno;
@@ -227,20 +232,17 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: init_hfuse
-*        Inputs: None
+*        Inputs: int8_t restoring_status
 *       Summary: Initialize HCFS system.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t init_hfuse(void)
+int32_t init_hfuse(int8_t restoring_status)
 {
 	int32_t ret_val;
 
-	ret_val = init_hcfs_system_data();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = super_block_init();
+	ret_val = init_hcfs_system_data(restoring_status);
 	if (ret_val < 0)
 		return ret_val;
 	ret_val = init_system_fh_table();
@@ -299,6 +301,7 @@ int32_t _init_download_curl(int32_t count)
  */
 void init_backend_related_module(void)
 {
+<<<<<<< HEAD
 	int32_t ret, count;
 	char syncpoint_path[400];
 
@@ -320,9 +323,24 @@ void init_backend_related_module(void)
 #endif
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+=======
+	if (CURRENT_BACKEND != NONE) {
+		//pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
+		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+		//pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+	}
+}
+
+void init_download_module(void)
+{
+	int32_t count;
+
+	if (CURRENT_BACKEND != NONE) {
+>>>>>>> feature/stage1_transition
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
-		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
 		/* Init usermeta curl handle */
@@ -336,6 +354,7 @@ void init_backend_related_module(void)
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
 		update_quota();
 	}
+
 }
 
 int32_t init_event_notify_module(void)
@@ -402,6 +421,45 @@ int32_t _is_battery_low()
 	return FALSE;
 }
 
+int32_t _check_partial_storage(void)
+{
+	char todelete_metapath[METAPATHLEN];
+	char todelete_blockpath[BLOCKPATHLEN];
+
+	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete",
+	         METAPATH);
+	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete",
+	         BLOCKPATH);
+
+/* FEATURE TODO: It's possible that restore_metapath exists but restore_blockpath
+does not (i.e. no block to be restored in stage 1). Will need to first
+check this situation to decide if need to rename blockpath to todelete
+and then create a new blockpath */
+
+/* FEATURE TODO: Need an upgrade mechanism to add max_inode from super block to
+FSstats (now used for tracking max inode in the backend). An OTA is needed for
+allowing current devices to restore */
+
+/* FEATURE TODO: error handling? */
+	if (access(RESTORE_METAPATH, F_OK) == 0) {
+		/* Need to rename the path to the current one */
+		/* First check if need to rename old path to todelete */
+		if (access(METAPATH, F_OK) == 0)
+			rename(METAPATH, todelete_metapath);
+		rename(RESTORE_METAPATH, METAPATH);
+	}
+
+	if (access(RESTORE_BLOCKPATH, F_OK) == 0) {
+		/* Need to rename the path to the current one */
+		/* First check if need to rename old path to todelete */
+		if (access(BLOCKPATH, F_OK) == 0)
+			rename(BLOCKPATH, todelete_blockpath);
+		rename(RESTORE_BLOCKPATH, BLOCKPATH);
+	}
+
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: main
@@ -414,11 +472,12 @@ int32_t _is_battery_low()
 int32_t main(int32_t argc, char **argv)
 {
 	CURL_HANDLE curl_handle;
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	struct rlimit nofile_limit;
 #ifndef _ANDROID_ENV_
 	int32_t count;
 #endif
+	int8_t restoring_status;
 
 	ret_val = ignore_sigpipe();
 
@@ -475,7 +534,34 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	UNUSED(curl_handle);
-	ret_val = init_hfuse();
+
+	open_log("hcfs_android_log");
+
+	/* Check if the system is being restored (and in stage 2) */
+	/* FEATURE TODO: Check if the backend setting is correct before
+	switching metastorage / blockstorage */
+	/* FEATURE TODO: Need to check if can correctly unmount when stage 2
+	is in progress */
+	restoring_status = NOT_RESTORING;
+	init_restore_path();
+	ret_val = check_restoration_status();
+	/* FEATURE TODO: handling for stage 1 and 2 if reboot when stage
+	unfinished */
+	if (ret_val == 1) {
+		restoring_status = RESTORING_STAGE1;
+	} else if (ret_val == 2) {
+		/* If the system is in stage 2, make sure that
+		meta and block storage are pointed to the partially
+		restored one */
+		restoring_status = RESTORING_STAGE2;
+		write_log(10, "Checking if need to switch storage paths\n");
+		_check_partial_storage();
+	}
+
+	/* FEATURE TODO: If the old meta/block storage
+	exists here, delete them */
+
+	ret_val = init_hfuse(restoring_status);
 	if (ret_val < 0)
 		exit(-1);
 
@@ -510,14 +596,61 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(ret_val);
 
-	/* Init backend related services */
-	if (CURRENT_BACKEND != NONE) {
-		init_backend_related_module();
+	/* Init backend related services and super block */
+	if ((CURRENT_BACKEND != NONE) &&
+	    (restoring_status != RESTORING_STAGE1)) {
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		init_download_module();
+		ret = check_init_super_block();
+		if (ret < 0) {
+			exit(ret);
+		} else if (ret > 0) { /* It just opened old superblock */
+			write_log(10, "Debug: Open old superblock.\n");
+			init_backend_related_module();
+		} else {
+			write_log(4, "Rebuild superblock.\n");
+			/* Rebuild superblock.
+			 * Do NOT init upload/delete/cache mgmt */
+		}
+	} else if ((CURRENT_BACKEND != NONE) &&
+	    (restoring_status == RESTORING_STAGE1)) {
+		/* FEATURE TODO: stage 1 bootup */
+		ret = check_init_super_block();
+		if (ret < 0) {
+			exit(ret);
+		} else if (ret > 0) { /* Just opened old superblock */
+			write_log(8, "Open old (or create new) superblock\n");
+		} else {
+			write_log(0, "Unexpected sb error in stage 1\n");
+			exit(-1);
+		}
+
+		/* Only bring up monitor thread if in restoration process */
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		/* Try to reduce cache size if now in stage 1 of restoration */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			ret = restore_stage1_reduce_cache();
+			if (ret == 0)
+				start_download_minimal();
+			else
+				notify_restoration_result(1, ret);
+		}
+
+	} else {
+		ret = check_init_super_block();
+		if (ret < 0) {
+			exit(ret);
+		} else if (ret > 0) { /* Just opened old superblock */
+			write_log(8, "Open old (or create new) superblock\n");
+		} else {
+			write_log(0, "Error: Cannot restore because"
+				" there is no backend info.\n");
+			exit(-1);
+		}
 	}
 
 	hook_fuse(argc, argv);
-	/* TODO: modify this so that backend config can be turned on
-	even when volumes are mounted */
 
 	destroy_event_worker_loop_thread();
 	pthread_join(event_loop_thread, NULL);
@@ -529,9 +662,15 @@ int32_t main(int32_t argc, char **argv)
 			pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
 			pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
 		}
-		pthread_join(cache_loop_thread, NULL);
-		pthread_join(delete_loop_thread, NULL);
-		pthread_join(upload_loop_thread, NULL);
+		/* When system restoring, deletion and uploading services
+		 * are not enabled. They are created after restoration
+		 * completed. */
+		if (hcfs_system->system_restoring == NOT_RESTORING) {
+			pthread_join(delete_loop_thread, NULL);
+			pthread_join(upload_loop_thread, NULL);
+		}
+		if (hcfs_system->system_restoring != RESTORING_STAGE1)
+			pthread_join(cache_loop_thread, NULL);
 		destroy_monitor_loop_thread();
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
@@ -571,7 +710,7 @@ int32_t main(int32_t argc, char **argv)
 		open_log("fuse.log");
 		write_log(2, "\nStart logging fuse\n");
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		sem_init(&download_curl_control_sem, 0, 1);
 
 		if (CURRENT_BACKEND != NONE) {

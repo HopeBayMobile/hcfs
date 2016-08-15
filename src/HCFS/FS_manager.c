@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: FS_manager.c
 * Abstract: The c source file for filesystem manager
@@ -8,6 +8,7 @@
 * Revision History
 * 2015/7/1 Jiahong created this file
 * 2015/11/27 Jiahong modifying format for inode printout
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -38,6 +39,7 @@
 #include "meta.h"
 #include "path_reconstruct.h"
 #include "params.h"
+#include "rebuild_super_block.h"
 
 /************************************************************************
 *
@@ -697,6 +699,15 @@ int32_t delete_filesystem(char *fsname)
 	memcpy(&temp_entry, &(tpage2.dir_entries[ret_index]),
 	       sizeof(DIR_ENTRY));
 	FS_root = temp_entry.d_ino;
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(FS_root, NULL);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
 
 	ret = fetch_meta_path(thismetapath, FS_root);
 	metafptr = NULL;

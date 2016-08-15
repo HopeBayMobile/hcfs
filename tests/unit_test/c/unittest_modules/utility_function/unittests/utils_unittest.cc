@@ -1066,6 +1066,7 @@ protected:
 
 	void TearDown()
 	{
+		free(sys_super_block);
 		fclose(fptr);
 		nftw("utils_unittest_folder", do_delete, 20, FTW_DEPTH);
 		free(sys_super_block);

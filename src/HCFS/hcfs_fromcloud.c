@@ -9,6 +9,7 @@
 * Revision History
 * 2015/2/12 Jiahong added header for this file, and revising coding style.
 * 2015/6/4 Jiahong added error handling
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -39,6 +40,7 @@
 #include "dedup_table.h"
 #include "metaops.h"
 #include "super_block.h"
+#include "rebuild_super_block.h"
 
 /************************************************************************
 *
@@ -61,15 +63,20 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	int64_t tmplen;
 #endif
 
-	if (hcfs_system->sync_paused)
-		return -EIO;
+	if (action_from == RESTORE_FETCH_OBJ) {
+		if (hcfs_system->backend_is_online == FALSE)
+			return -EIO;
+	} else {
+		if (hcfs_system->sync_paused)
+			return -EIO;
+	}
 
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 	write_log(10, "Start a new download job, download_in_progress should plus 1\n");
 
 	/* Get sem if action is from pinning file or from download meta. */
-	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
-		sem_wait(&pin_download_curl_sem);
+	if (action_from != READ_BLOCK) 
+		sem_wait(&nonread_download_curl_sem);
 	sem_wait(&download_curl_sem);
 	sem_wait(&download_curl_control_sem);
 	for (which_curl_handle = 0;
@@ -157,8 +164,8 @@ errcode_handle:
 	curl_handle_mask[which_curl_handle] = FALSE;
 
 	/*Release sem if action from pinning file*/
-	if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META) 
-		sem_post(&pin_download_curl_sem);
+	if (action_from != READ_BLOCK) 
+		sem_post(&nonread_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 
@@ -199,6 +206,13 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	/*Download from backend */
 	fetch_meta_path(thismetapath, ptr->this_inode);
 	fetch_block_path(thisblockpath, ptr->this_inode, ptr->block_no);
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(ptr->this_inode, NULL);
+		if (ret < 0)
+			return;
+	}
 
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
@@ -799,6 +813,17 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	fetch_meta_path(metapath, inode);
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(inode, &tempstat);
+		if (ret < 0)
+			return ret;
+		/* If not a regular file, do nothing */
+		if (!S_ISREG(tempstat.st_mode))
+			return 0;
+	}
+
 	fptr = fopen(metapath, "r+");
 	if (fptr == NULL) {
 		write_log(2, "Cannot open %s in %s\n", metapath, __func__);
@@ -807,12 +832,17 @@ int32_t fetch_pinned_blocks(ino_t inode)
 
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
-	FSEEK(fptr, 0, SEEK_SET);
-	FREAD(&tempstat, sizeof(HCFS_STAT), 1, fptr);
-	if (!S_ISREG(tempstat.mode)) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return 0;
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	} else {
+		FSEEK(fptr, 0, SEEK_SET);
+		FREAD(&tempstat, sizeof(struct stat), 1, fptr);
+		/* If not a regular file, do nothing */
+		if (!S_ISREG(tempstat.st_mode)) {
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			return 0;
+		}
 	}
 	/* Do not need to re-load meta in loop because just need to check those
 	blocks that existing before setting local_pin = true.*/
@@ -1085,3 +1115,58 @@ int32_t update_quota()
 	sem_post(&(download_usermeta_ctl.access_sem));
 	return 0;
 }
+
+/**
+ * Wait for backend connection until backend is online and then download
+ * object from cloud. If backend is offline, check flag "backend_is_online"
+ * every 0.1 second.
+ *
+ * @param fptr Object file stream.
+ * @param action_from Download action type.
+ * @param objname Object name on cloud.
+ *
+ * @return 0 on success, -ENOENT if object not found, -ESHUTDOWN if
+ *           system shutdown, or other negative error code.
+ */
+int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
+{
+	int32_t ret, errcode;
+	struct timespec time_to_sleep;
+
+	time_to_sleep.tv_sec = 0;
+	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
+
+	if (CURRENT_BACKEND == NONE)
+		return -ENOTCONN;
+
+	ret = 0;
+	while (hcfs_system->system_going_down == FALSE) {
+		if (hcfs_system->backend_is_online) {
+			flock(fileno(fptr), LOCK_EX);
+			FTRUNCATE(fileno(fptr), 0);
+			ret = fetch_from_cloud(fptr,
+				action_from, objname);
+			flock(fileno(fptr), LOCK_UN);
+			if (ret < 0) {
+				if (ret == -ENOENT)
+					break;
+				else
+					continue;
+			}
+
+			break;
+		} else {
+			nanosleep(&time_to_sleep, NULL);
+		}
+	}
+
+	if (hcfs_system->system_going_down == TRUE)
+		ret = -ESHUTDOWN;
+
+	return ret;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	return errcode;
+}
+

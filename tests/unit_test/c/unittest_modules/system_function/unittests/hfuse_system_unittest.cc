@@ -240,6 +240,8 @@ TEST_F(mainTest, MainFunctionSuccess)
 
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = TRUE;
+	CURRENT_BACKEND = SWIFT;
+	
 	/* Test */
 	EXPECT_EQ(0, main(1, tmp_argv));
 	sleep(1); // Waiting for child process finishing their work

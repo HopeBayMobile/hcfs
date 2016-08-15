@@ -33,6 +33,7 @@
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #endif
+#include "rebuild_super_block.h"
 
 /************************************************************************
 *
@@ -680,7 +681,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	new_info->f_ino = tmp_entry.d_ino;
 #ifdef _ANDROID_ENV_
 	new_info->mp_mode = mp_mode;
-
 	new_info->volume_type = tmp_entry.d_type;
 	if (new_info->volume_type == ANDROID_EXTERNAL ||
 	    new_info->volume_type == ANDROID_MULTIEXTERNAL) {
@@ -693,6 +693,16 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		new_info->vol_path_cache = NULL;
 	}
 #endif
+
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(new_info->f_ino, NULL);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
 	ret = fetch_meta_path(new_info->rootpath, new_info->f_ino);
 	if (ret < 0) {
 		errcode = ret;

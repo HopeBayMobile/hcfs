@@ -182,3 +182,10 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 {
 	return 0;
 }
+
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+                struct stat *ret_stat)
+{
+	return 0;
+}
+

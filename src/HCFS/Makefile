@@ -69,6 +69,9 @@ OBJS_F := \
 	event_filter.o \
 	meta.o \
 	params.o \
+	rebuild_super_block.o \
+	rebuild_parent_dirstat.o \
+	do_restoration.o
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"
