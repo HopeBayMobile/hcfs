@@ -141,8 +141,8 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1) {
 		ret = mkdir(tempname, 0700);
 		if (ret < 0){
-			errcode = errno;
-			if (errcode != EEXIST)
+			errcode = -errno;
+			if (errcode != -EEXIST)
 				goto errcode_handle;
 		}
 	}
@@ -152,8 +152,8 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1) {
 		ret = mkdir(tempname, 0700);
 		if (ret < 0){
-			errcode = errno;
-			if (errcode != EEXIST)
+			errcode = -errno;
+			if (errcode != -EEXIST)
 				goto errcode_handle;
 		}
 
