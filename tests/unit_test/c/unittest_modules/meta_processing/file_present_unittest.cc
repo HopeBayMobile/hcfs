@@ -196,6 +196,7 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
 		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(FILE_META_HEADER));
 }
 
 /*
@@ -244,6 +245,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(DIR_META_HEADER));
 }
 
 /*
@@ -633,6 +635,7 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"link_not_used", 12, "name_not_used", 1,
 		&delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(SYMLINK_META_HEADER));
 }
 /*
 	End of unittest of symlink_update_meta()

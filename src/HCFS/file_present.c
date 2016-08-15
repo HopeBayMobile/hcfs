@@ -213,7 +213,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	FILE_META_TYPE this_meta;
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	int64_t metasize, old_metasize, new_metasize;
+	int64_t metasize, old_metasize = 0, new_metasize = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
 
 	*delta_meta_size = 0;
@@ -223,6 +223,11 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
 	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
