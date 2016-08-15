@@ -309,8 +309,9 @@ int64_t query_status_page(int32_t fd, int64_t block_index)
 		sizeof(BLOCK_UPLOADING_PAGE);
 }
 
-int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
-		int64_t *total_backend_blocks, int64_t upload_seq)
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
+		int64_t *backend_size, int64_t *total_backend_blocks,
+		int64_t upload_seq, uint8_t *last_pin_status)
 {
 	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
 	return 0;
@@ -454,7 +455,8 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
 }
 
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
-		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta)
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
+		int64_t fs_pin_size_delta)
 {
 	FS_CLOUD_STAT_T	fs_cloud_stat;
 
@@ -464,6 +466,7 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.backend_system_size += fs_total_size_delta;
 	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
 	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
+	fs_cloud_stat.pinned_size += fs_pin_size_delta;
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 

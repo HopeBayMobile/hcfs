@@ -164,6 +164,7 @@ TEST_F(comm2fuseprocTest, SucceedToConn_ResponseSuccess)
 class init_progress_infoTest : public ::testing::Test {
 protected:
 	char mock_progress_path[100];
+	uint8_t last_pin_status = 0;
 
 	void SetUp()
 	{
@@ -189,7 +190,7 @@ TEST_F(init_progress_infoTest, Init_Bad_fd)
 	int ret;
 
 	fd = 0;
-	ret = init_progress_info(fd, 0, 0, NULL);
+	ret = init_progress_info(fd, 0, 0, NULL, &last_pin_status);
 
 	EXPECT_EQ(-ESPIPE, ret);
 }
@@ -205,7 +206,7 @@ TEST_F(init_progress_infoTest, Init_backend_fptr_Is_NULL)
 	ASSERT_GT(fd, 0);
 
 	/* run */
-	ret = init_progress_info(fd, 0, 0, NULL);
+	ret = init_progress_info(fd, 0, 0, NULL, &last_pin_status);
 
 	/* verify */
 	ASSERT_EQ(0, ret);
@@ -257,7 +258,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 
 	/* run */
 	ret = init_progress_info(fd, num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
-		0, file_metafptr);
+		0, file_metafptr, &last_pin_status);
 
 	/* verify */
 	ASSERT_EQ(0, ret);
@@ -316,7 +317,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 
 	/* run */
 	ret = init_progress_info(fd, num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
-		123, file_metafptr);
+		123, file_metafptr, &last_pin_status);
 
 	/* verify */
 	ASSERT_EQ(0, ret);
@@ -386,7 +387,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 
 	/* run */
 	ret = init_progress_info(fd, num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
-		123, file_metafptr);
+		123, file_metafptr, &last_pin_status);
 
 	/* verify */
 	ASSERT_EQ(0, ret);
@@ -1320,6 +1321,7 @@ protected:
 	char bullpen_path[200];
 	char progress_path[200];
 	int fd;
+	uint8_t last_pin_status = 0;
 
 	void SetUp()
 	{
@@ -1386,7 +1388,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FirstUpload)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 0);
+			&total_backend_blocks, 0, &last_pin_status);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1423,7 +1425,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FailToFetchFromCloud)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1);
+			&total_backend_blocks, 1, &last_pin_status);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1458,7 +1460,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_NotFirstUpload)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1);
+			&total_backend_blocks, 1, &last_pin_status);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1498,7 +1500,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_FinishInit)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1);
+			&total_backend_blocks, 1, &last_pin_status);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1536,7 +1538,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_NotFinishInit)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1);
+			&total_backend_blocks, 1, &last_pin_status);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);

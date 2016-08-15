@@ -464,6 +464,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
+	uint8_t backend_pin_st;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -546,6 +547,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilestat, sizeof(HCFS_STAT), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 							backend_metafptr);
+		backend_pin_st = tempfilemeta.local_pin;
 		tmp_size = tempfilestat.size;
 
 		/* Check if need to sync past the current size */
@@ -716,9 +718,15 @@ errcode_handle:
 	}
 
 	/* Update FS stat in the backend if updated previously */
-	if (meta_on_cloud == TRUE)
-		update_backend_stat(root_inode, -backend_size_change,
-				-meta_size_change, -1);
+	if (meta_on_cloud == TRUE) {
+		if (P_IS_PIN(backend_pin_st))
+			update_backend_stat(root_inode, -backend_size_change,
+				-meta_size_change, -1,
+				-backend_size_change + meta_size_change);
+		else
+			update_backend_stat(root_inode, -backend_size_change,
+				-meta_size_change, -1, 0);
+	}
 
 	_check_del_progress_file(this_inode);
 	unlink(thismetapath);

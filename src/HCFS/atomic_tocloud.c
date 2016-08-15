@@ -572,7 +572,8 @@ errcode_handle:
  *
  */
 int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
-		int64_t backend_size, FILE *backend_metafptr)
+		int64_t backend_size, FILE *backend_metafptr,
+		uint8_t *last_pin_status)
 {
 	int32_t errcode;
 	int64_t offset, ret_ssize;
@@ -600,6 +601,7 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 
 	PREAD(fileno(backend_metafptr), &tempfilemeta, sizeof(FILE_META_TYPE),
 							sizeof(HCFS_STAT));
+	*last_pin_status = tempfilemeta.local_pin;
 
 	write_log(10, "Debug: backend blocks = %lld\n", backend_blocks);
 
@@ -1003,8 +1005,9 @@ errcode_handle:
  * @return 0 on success, -ECANCELED when cancelling to sync,
  *         or other negative error code.
  */
-int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
-		int64_t *total_backend_blocks, int64_t upload_seq)
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
+		int64_t *backend_size, int64_t *total_backend_blocks,
+		int64_t upload_seq, uint8_t *last_pin_status)
 {
 	FILE *backend_metafptr;
 	char backend_metapath[400];
@@ -1039,7 +1042,8 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 	} else {
 
 		if (upload_seq <= 0) {
-			ret = init_progress_info(ptr->progress_fd, 0, 0, NULL);
+			ret = init_progress_info(ptr->progress_fd, 0, 0, NULL,
+						 last_pin_status);
 			*backend_size = 0;
 			*total_backend_blocks = 0;
 			return 0;
@@ -1079,7 +1083,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 		/* Init backend info and unlink it */
 		if (first_upload == TRUE) {
 			ret = init_progress_info(ptr->progress_fd, 0, 0,
-					NULL);
+					NULL, last_pin_status);
 			*backend_size = 0;
 			*total_backend_blocks = 0; 
 
@@ -1090,8 +1094,8 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_siz
 			*total_backend_blocks = (*backend_size == 0) ? 
 				0 : (*backend_size - 1) / MAX_BLOCK_SIZE + 1;
 			ret = init_progress_info(ptr->progress_fd,
-				*total_backend_blocks, *backend_size,
-				backend_metafptr);
+					*total_backend_blocks, *backend_size,
+					backend_metafptr, last_pin_status);
 
 			fclose(backend_metafptr);
 			unlink(backend_metapath);

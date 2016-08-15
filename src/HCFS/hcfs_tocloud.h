@@ -145,7 +145,8 @@ void *upload_loop(void *ptr);
 void upload_loop(void);
 #endif
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
-		int64_t meta_size_delta, int64_t num_inodes_delta);
+		int64_t meta_size_delta, int64_t num_inodes_delta,
+		int64_t pin_size_delta);
 
 int32_t select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)

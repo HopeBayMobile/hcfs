@@ -1068,6 +1068,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 #else
 	ssize_t ret_ssize;
 #endif
+	uint8_t now_pin_status = NUM_PIN_TYPES + 1;
+	uint8_t last_pin_status = NUM_PIN_TYPES + 1;
+	int64_t pin_size_delta = 0, last_file_size = 0;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1131,7 +1134,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				1, toupload_metafptr);
 		ret = init_backend_file_info(ptr, &backend_size,
 				&total_backend_blocks,
-				cloud_related_data.upload_seq);
+				cloud_related_data.upload_seq,
+				&last_pin_status);
 		if (ret < 0) {
 			fclose(toupload_metafptr);
 			fclose(local_metafptr);
@@ -1146,6 +1150,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			toupload_metafptr);
 
+		now_pin_status = tempfilemeta.local_pin;
 		toupload_size = tempfilestat.size;
 		root_inode = tempfilemeta.root_inode;
 
@@ -1331,6 +1336,8 @@ store in some other file */
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
+			last_file_size = cloud_related_data.size_last_upload -
+					 cloud_related_data.meta_last_upload;
 			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload =
 					tempfilestat.size + now_meta_size;
@@ -1463,12 +1470,32 @@ store in some other file */
 	fclose(local_metafptr);
 
 	/* Upload successfully. Update FS stat in backend */
+	/* First check if pin status changed since the last upload */
+	pin_size_delta = 0;
+	if (P_IS_PIN(now_pin_status))
+		pin_size_delta = size_diff - meta_size_diff;
+
+	if (P_IS_VALID_PIN(last_pin_status) && (S_ISREG(ptr->this_mode))) {
+		if (P_IS_UNPIN(last_pin_status) && P_IS_PIN(now_pin_status)) {
+			/* Change from unpin to pin, need to add file size
+			to pin size */
+			pin_size_delta = tempfilestat.size;
+		}
+		if (P_IS_PIN(last_pin_status) && P_IS_UNPIN(now_pin_status)) {
+			/* Change from pin to unpin, need to substract file size
+			of the last upload from pin size */
+			pin_size_delta = -last_file_size;
+		}
+	}
+
 	if (upload_seq <= 0)
-		update_backend_stat(root_inode, size_diff, meta_size_diff, 1);
+		update_backend_stat(root_inode, size_diff, meta_size_diff,
+		                    1, pin_size_delta);
 	else
-		if (size_diff != 0)
+		if ((size_diff != 0) || (meta_size_diff != 0) ||
+		    (pin_size_delta != 0))
 			update_backend_stat(root_inode, size_diff,
-					meta_size_diff, 0);
+					meta_size_diff, 0, pin_size_delta);
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
@@ -2222,19 +2249,21 @@ void upload_loop(void)
 *
 * Function name: update_backend_stat
 *        Inputs: ino_t root_inode, int64_t system_size_delta,
-*                int64_t num_inodes_delta
+*                int64_t meta_size_delta, int64_t num_inodes_delta,
+*                BOOL is_reg_pin
 *       Summary: Updates per-FS statistics stored in the backend.
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
-		int64_t meta_size_delta, int64_t num_inodes_delta)
+		int64_t meta_size_delta, int64_t num_inodes_delta,
+		int64_t pin_size_delta)
 {
 	int32_t ret, errcode;
-	char fname[METAPATHLEN], tmpname[METAPATHLEN];
+	char fname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
-	char is_fopen, is_backedup;
+	char is_fopen;
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
@@ -2254,34 +2283,12 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 METAPATH, (uint64_t)root_inode);
-	snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%" PRIu64,
-		 METAPATH, (uint64_t)root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "",
 		 (uint64_t)root_inode);
 
-	/* If updating backend statistics for the first time, delete local
-	copy for this volume */
-	/* Note: tmpname is used as a tag to indicate whether the update
-	occurred for the first time. It is also a backup of the old cached
-	statistics since the last system shutdown for this volume */
-
-	is_backedup = FALSE;
-	if (access(tmpname, F_OK) != 0) {
-		errcode = errno;
-		if (errno == ENOENT) {
-			if (access(fname, F_OK) == 0) {
-				rename(fname, tmpname);
-				is_backedup = TRUE;
-			} else {
-				MKNOD(tmpname, S_IFREG | 0700, 0);
-			}
-		}
-	}
-
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
-		/* Download the object first if any */
-		write_log(10, "Checking for FS stat in backend\n");
+		/* Write a new one to disk */
 		fptr = fopen(fname, "w");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -2293,26 +2300,12 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		setbuf(fptr, NULL);
 		flock(fileno(fptr), LOCK_EX);
 		is_fopen = TRUE;
-		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl),
-				      NULL);
-		if ((ret >= 200) && (ret <= 299)) {
-			ret = 0;
-			errcode = 0;
-		} else if (ret != 404) {
-			errcode = -EIO;
-			/* If cannot download the previous backed-up copy,
-			revert to the cached one */
-			if (is_backedup == TRUE)
-				rename(tmpname, fname);
-			goto errcode_handle;
-		} else {
-			/* Not found, init a new one */
-			write_log(10, "Debug update stat: nothing stored\n");
-			memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
-			FTRUNCATE(fileno(fptr), 0);
-			FSEEK(fptr, 0, SEEK_SET);
-			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
-		}
+		write_log(4, "Writing a new cloud stat\n");
+		memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
+		FTRUNCATE(fileno(fptr), 0);
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		fsync(fileno(fptr));
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
@@ -2326,15 +2319,15 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		errcode = -errcode;
 		goto errcode_handle;
 	}
+	is_fopen = TRUE;
 	setbuf(fptr, NULL);
 	/* File lock is in update_fs_backend_usage() */
 	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
-			num_inodes_delta);
+			num_inodes_delta, pin_size_delta);
 	if (ret < 0)
 		goto errcode_handle;
 
 	flock(fileno(fptr), LOCK_EX);
-	is_fopen = TRUE;
 	FSEEK(fptr, 0, SEEK_SET);
 	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
 	if ((ret < 200) || (ret > 299)) {

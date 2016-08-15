@@ -1315,11 +1315,13 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
  *        backend space.
  * @param fs_meta_size_delta Amount of meta size change in backend spsace.
  * @param fs_num_inodes_delta Delta of # of inodes in backend space.
+ * @param fs_pin_size_delta Amount of pin size change in backend space.
  *
  * @return 0 on success, otherwise negative error code.
  */
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
-		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta)
+		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
+		int64_t fs_pin_size_delta)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -1341,6 +1343,10 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		fs_cloud_stat.backend_num_inodes = 0;
 
 	fs_cloud_stat.max_inode = sys_super_block->head.num_total_inodes + 1;
+
+	fs_cloud_stat.pinned_size += fs_pin_size_delta;
+	if (fs_cloud_stat.pinned_size < 0)
+		fs_cloud_stat.pinned_size = 0;
 
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);

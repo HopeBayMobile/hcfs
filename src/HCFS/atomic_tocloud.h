@@ -87,7 +87,7 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 #endif
 
 int32_t init_progress_info(int32_t fd, int64_t backend_blocks, int64_t backend_size,
-	FILE *backend_metafptr);
+	FILE *backend_metafptr, uint8_t *last_pin_status);
 
 int32_t create_progress_file(ino_t inode);
 
@@ -108,8 +108,9 @@ char block_finish_uploading(int32_t fd, int64_t blockno);
 
 int64_t query_status_page(int32_t fd, int64_t block_index);
 
-int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr, int64_t *backend_size,
-		int64_t *total_backend_blocks, int64_t upload_seq);
+int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
+		int64_t *backend_size, int64_t *total_backend_blocks,
+		int64_t upload_seq, uint8_t *last_pin_status);
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr);
 
