@@ -13,6 +13,10 @@ static inline int32_t compare(const void *a, const void *b)
 {
 	return strcmp(((DIR_ENTRY *)a)->d_name, ((DIR_ENTRY *)b)->d_name);
 }
+static inline int32_t compare_nocase(const void *a, const void *b)
+{
+	return strcasecmp(((DIR_ENTRY *)a)->d_name, ((DIR_ENTRY *)b)->d_name);
+}
 
 /*
 	Unittest of dentry_binary_search()
@@ -49,6 +53,13 @@ class dentry_binary_searchTest : public ::testing::Test {
 					return i;
 			return num;
 		}
+		int32_t linear_search_nocase(int32_t num, DIR_ENTRY *entry)
+		{
+			for (int32_t i = 0 ; i < num ; i++) 
+				if (compare_nocase(entry_array + i, entry) >= 0)
+					return i;
+			return num;
+		}
 		DIR_ENTRY *entry_array;
 };
 
@@ -62,7 +73,8 @@ TEST_F(dentry_binary_searchTest, EntryNotFound)
 		DIR_ENTRY entry;
 		int32_t index;
 		sprintf(entry.d_name, "test_filename%d123", times);
-		ASSERT_EQ(-1, dentry_binary_search(entry_array, num_entry, &entry, &index));
+		ASSERT_EQ(-1, dentry_binary_search(entry_array, num_entry, &entry, &index,
+			  FALSE));
 		EXPECT_EQ(linear_search(num_entry, &entry), index);
 	}
 }
@@ -76,11 +88,11 @@ TEST_F(dentry_binary_searchTest, BoundaryTest)
 	generate_mock_data(num_entry);
 	/* Test index 0 */
 	strcpy(entry.d_name, "test");
-	ASSERT_EQ(-1, dentry_binary_search(entry_array, num_entry, &entry, &index));
+	ASSERT_EQ(-1, dentry_binary_search(entry_array, num_entry, &entry, &index, FALSE));
 	EXPECT_EQ(0, index);
 	/* Test last index */
 	strcpy(entry.d_name, "test_filename9999999");
-	ASSERT_EQ(-1, dentry_binary_search(entry_array, num_entry, &entry, &index));
+	ASSERT_EQ(-1, dentry_binary_search(entry_array, num_entry, &entry, &index, FALSE));
 	EXPECT_EQ(500, index);
 }
 
@@ -96,10 +108,27 @@ TEST_F(dentry_binary_searchTest, FindEntrySuccess)
 		int32_t ans;
 		sprintf(entry.d_name, "test_filename%d", times * 23);
 		ans = linear_search(num_entry, &entry);
-		ASSERT_EQ(ans, dentry_binary_search(entry_array, num_entry, &entry, &index));
+		ASSERT_EQ(ans, dentry_binary_search(entry_array, num_entry, &entry, &index,
+			  FALSE));
 	}
 }
 
+TEST_F(dentry_binary_searchTest, FindEntrySuccessCaseInsensitive)
+{
+	int32_t num_entry = 5000;
+	/* Mock data */
+	generate_mock_data(num_entry);
+	/* Test */
+	for (int32_t times = 0 ; times < 100 ; times++) {
+		DIR_ENTRY entry;
+		int32_t index;
+		int32_t ans;
+		sprintf(entry.d_name, "TEST_filename%d", times * 23);
+		ans = linear_search_nocase(num_entry, &entry);		
+		ASSERT_EQ(ans, dentry_binary_search(entry_array, num_entry, &entry, &index,
+			  TRUE));
+	}
+}
 
 /*
 	End of unittest of dentry_binary_search()
@@ -304,7 +333,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
 		entry->d_type = D_ISDIR;
 		ASSERT_EQ(0, insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos));
+			tmp_child_pos, FALSE));
 		ASSERT_TRUE(overflow_median == NULL);
 		ASSERT_TRUE(overflow_new_pos == NULL);
 		ASSERT_EQ(times + 2 + 1, root_node.num_entries);
@@ -332,7 +361,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos);
+			tmp_child_pos, FALSE);
 		ASSERT_TRUE(ret >= 0);
 		if ( ret == 1 ) {
 			generate_new_root();
@@ -372,14 +401,14 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Entries_Cannot_Split_Since_NoSpace)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos);
+			tmp_child_pos, FALSE);
 		ASSERT_TRUE(ret >= 0) << "times = " << times << "ret = "<< ret;
 		free(entry);
 	}
 	sprintf(entry.d_name, "test%d", num_entries_insert);
 	ret = insert_dir_entry_btree(&entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos);
+			tmp_child_pos, FALSE);
 	ASSERT_EQ(-ENOSPC, ret);
 
 	/* Check those entry in the b-tree */
@@ -409,7 +438,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos);
+			tmp_child_pos, FALSE);
 		ASSERT_NE(-1, ret);
 		if ( ret == 1 ) {
 			generate_new_root();
@@ -427,7 +456,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos);
+			tmp_child_pos, FALSE);
 		ASSERT_EQ(-EEXIST, ret);
 		free(entry);
 	}
@@ -466,7 +495,7 @@ class BaseClassInsertBtreeEntryIsUsable : public insert_dir_entry_btreeTest {
 				sprintf(entry->d_name, "%s%d", filename_prefix, times);
 				ret = insert_dir_entry_btree(entry, &root_node, fh, 
 					overflow_median, overflow_new_pos, &meta, tmp_entries, 
-					tmp_child_pos);
+					tmp_child_pos, FALSE);
 				ASSERT_NE(-1, ret);
 				if ( ret == 1 ) {
 					generate_new_root();
@@ -499,7 +528,7 @@ TEST_F(search_dir_entry_btreeTest, SearchEmptyBtree)
 		char filename[50];
 		sprintf(filename, "search_file_%d", i);
 		index = search_dir_entry_btree(filename, &root_node, 
-			fh, &index, &result_node);
+			fh, &index, &result_node, FALSE);
 		ASSERT_EQ(-ENOENT, index);
 	}
 }
@@ -520,7 +549,7 @@ TEST_F(search_dir_entry_btreeTest, EntryNotFound)
 		char filename[50];
 		sprintf(filename, "test_file_not_found%d", i);
 		index = search_dir_entry_btree(filename, &root_node, 
-			fh, &index, &result_node);
+			fh, &index, &result_node, FALSE);
 		ASSERT_EQ(-ENOENT, index);
 	}
 }
@@ -541,15 +570,15 @@ TEST_F(search_dir_entry_btreeTest, SearchEntrySuccess)
 		char filename[50];
 		sprintf(filename, "test_file%d", i);
 		index = search_dir_entry_btree(filename, &root_node, 
-			fh, &index, &result_node);
+			fh, &index, &result_node, FALSE);
 		EXPECT_TRUE(index >= 0);
 	}
 	/* Finally check "." and ".." */
 	index = search_dir_entry_btree(".", &root_node, 
-			fh, &index, &result_node);
+			fh, &index, &result_node, FALSE);
 	EXPECT_TRUE(index >= 0);
 	index = search_dir_entry_btree("..", &root_node, 
-			fh, &index, &result_node);
+			fh, &index, &result_node, FALSE);
 	EXPECT_TRUE(index >= 0);
 }
 
@@ -878,7 +907,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree_EntryNotFound)
 		DIR_ENTRY tmp_entry;
 		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
 		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
-			fh, &meta, tmp_entries, tmp_child_pos);
+			fh, &meta, tmp_entries, tmp_child_pos, FALSE);
 	}
 	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 	for (int32_t i = 0 ; i < num_tests ; i++)
@@ -904,7 +933,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree_EntryNotFound)
 		DIR_ENTRY tmp_entry;
 		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
 		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
-			fh, &meta, tmp_entries, tmp_child_pos);
+			fh, &meta, tmp_entries, tmp_child_pos, FALSE);
 		pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	}
@@ -929,7 +958,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_1)
 		sprintf(tmp_entry.d_name, "test_file%d", i);
 		if (i % 2) // Just delete 50% nodes
 			ASSERT_EQ(0, delete_dir_entry_btree(&tmp_entry, &root_node, 
-				fh, &meta, tmp_entries, tmp_child_pos));
+				fh, &meta, tmp_entries, tmp_child_pos, FALSE));
 	}
 
 	/* Check answer */
@@ -963,7 +992,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_2)
 		sprintf(tmp_entry.d_name, "test_file%d", i);
 		if (i % 5) { // Just delete 80% nodes
 			int32_t ret = delete_dir_entry_btree(&tmp_entry, &root_node, 
-				fh, &meta, tmp_entries, tmp_child_pos);
+				fh, &meta, tmp_entries, tmp_child_pos, FALSE);
 			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
 			// Reload root
 			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
@@ -1002,7 +1031,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_exceed_2)
 		sprintf(tmp_entry.d_name, "test_file%d", i);
 		if (i % 10) { // Just delete 90% nodes
 			int32_t ret = delete_dir_entry_btree(&tmp_entry, &root_node, 
-				fh, &meta, tmp_entries, tmp_child_pos);
+				fh, &meta, tmp_entries, tmp_child_pos, FALSE);
 			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
 			// Reload root
 			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));

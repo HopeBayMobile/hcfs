@@ -180,7 +180,8 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode,
 				  DIR_ENTRY_PAGE *result_page,
 				  int32_t *result_index,
 				  const char *childname,
-				  META_CACHE_ENTRY_STRUCT *body_ptr);
+				  META_CACHE_ENTRY_STRUCT *body_ptr,
+				  BOOL is_external);
 
 int32_t meta_cache_remove(ino_t this_inode);
 int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,

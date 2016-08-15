@@ -102,7 +102,8 @@ int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 *
 *************************************************************************/
 int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
+			BOOL is_external)
 {
 	HCFS_STAT parent_stat;
 	DIR_META_TYPE parent_meta;
@@ -179,7 +180,7 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 	ret = insert_dir_entry_btree(&temp_entry, &tpage,
 			fileno(body_ptr->fptr), &overflow_entry,
 			&overflow_new_page, &parent_meta, temp_dir_entries,
-							temp_child_page_pos);
+			temp_child_page_pos, is_external);
 
 	/* An error occured and the routine will terminate now */
 	/* TODO: Consider error recovering here */
@@ -350,7 +351,8 @@ errcode_handle:
 *************************************************************************/
 int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 			const char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
+			BOOL is_external)
 {
 	HCFS_STAT parent_stat;
 	DIR_META_TYPE parent_meta;
@@ -419,7 +421,7 @@ int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 	/* Recursive B-tree deletion routine*/
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
 			fileno(body_ptr->fptr), &parent_meta, temp_dir_entries,
-							temp_child_page_pos);
+			temp_child_page_pos, is_external);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -467,7 +469,8 @@ errcode_handle:
 *
 *************************************************************************/
 int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
-			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr)
+			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr,
+			BOOL is_external)
 {
 	DIR_ENTRY_PAGE tpage;
 	int32_t count;
@@ -477,7 +480,7 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	/* TODO: remove unused parameter ‘parent_inode1’ */
 	UNUSED(parent_inode1);
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
-								"..", body_ptr);
+						"..", body_ptr, is_external);
 
 	if ((ret_val == 0) && (count >= 0)) {
 		/*Found the entry. Change parent inode*/
@@ -489,6 +492,41 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 		tpage.dir_entries[count].d_ino = parent_inode2;
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
+					NULL, &tpage, body_ptr);
+		return ret_val;
+	}
+
+	if ((ret_val == 0) && (count < 0))  /* Not found */
+		ret_val = -ENOENT;
+
+	return ret_val;
+}
+
+/* change_entry_name should only be called from a rename situation where
+the volume is "external" and if the old and the new name are the same if
+case insensitive */
+int32_t change_entry_name(ino_t parent_inode, const char *targetname,
+			META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	DIR_ENTRY_PAGE tpage;
+	int32_t count;
+	int32_t ret_val;
+	HCFS_STAT tmpstat;
+
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &tpage, &count,
+					targetname, body_ptr, TRUE);
+
+	if ((ret_val == 0) && (count >= 0)) {
+		/*Found the entry. Change parent inode*/
+		ret_val = meta_cache_lookup_dir_data(parent_inode, &tmpstat,
+					NULL, NULL, body_ptr);
+		if (ret_val < 0)
+			return ret_val;
+
+		snprintf(tpage.dir_entries[count].d_name, MAX_FILENAME_LEN + 1,
+		         "%s", targetname);
+		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		ret_val = meta_cache_update_dir_data(parent_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
 		return ret_val;
 	}
@@ -515,7 +553,8 @@ int32_t change_dir_entry_inode(ino_t self_inode,
 			       const char *targetname,
 			       ino_t new_inode,
 			       mode_t new_mode,
-			       META_CACHE_ENTRY_STRUCT *body_ptr)
+			       META_CACHE_ENTRY_STRUCT *body_ptr,
+			       BOOL is_external)
 {
 	DIR_ENTRY_PAGE tpage;
 	int32_t count;
@@ -523,7 +562,7 @@ int32_t change_dir_entry_inode(ino_t self_inode,
 	HCFS_STAT tmpstat;
 
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
-						targetname, body_ptr);
+				targetname, body_ptr, is_external);
 
 	if ((ret_val == 0) && (count >= 0)) {
 		/*Found the entry. Change inode*/
@@ -1790,7 +1829,8 @@ int32_t startup_finish_delete(void)
 /* Given parent "parent", search for "childname" in parent and return
 the directory entry in structure pointed by "dentry" if found. If not or
 if error, return the negation of error code. */
-int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
+int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
+		   BOOL is_external)
 {
 	META_CACHE_ENTRY_STRUCT *cache_entry;
 	DIR_ENTRY_PAGE temp_page;
@@ -1801,7 +1841,7 @@ int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 		return -ENOMEM;
 
 	ret_val = meta_cache_seek_dir_entry(parent, &temp_page,
-				&temp_index, childname, cache_entry);
+			&temp_index, childname, cache_entry, is_external);
 	meta_cache_close_file(cache_entry);
 	meta_cache_unlock_entry(cache_entry);
 
