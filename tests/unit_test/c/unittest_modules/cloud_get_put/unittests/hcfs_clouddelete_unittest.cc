@@ -276,7 +276,6 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
 	mock_thread_info->which_index = 0;
-	init_hcfs_stat(&meta_stat);
 	meta_stat.size = 1000000; // Let total_blocks = 1000000/100 = 10000
 	meta_stat.mode = S_IFREG; 
 	MAX_BLOCK_SIZE = 100;
