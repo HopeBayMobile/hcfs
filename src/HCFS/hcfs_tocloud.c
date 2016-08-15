@@ -1068,11 +1068,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 #else
 	ssize_t ret_ssize;
 #endif
-	BOOL is_reg_pin;
+	uint8_t now_pin_status = NUM_PIN_TYPES + 1;
 	uint8_t last_pin_status = NUM_PIN_TYPES + 1;
 	int64_t pin_size_delta = 0, last_file_size = 0;
-
-	is_reg_pin = FALSE;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1152,9 +1150,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			toupload_metafptr);
 
-		if (tempfilemeta.local_pin != P_UNPIN)
-			is_reg_pin = TRUE;
-
+		now_pin_status = tempfilemeta.local_pin;
 		toupload_size = tempfilestat.size;
 		root_inode = tempfilemeta.root_inode;
 
@@ -1476,16 +1472,16 @@ store in some other file */
 	/* Upload successfully. Update FS stat in backend */
 	/* First check if pin status changed since the last upload */
 	pin_size_delta = 0;
-	if (is_reg_pin == TRUE)
+	if (P_IS_PIN(now_pin_status))
 		pin_size_delta = size_diff - meta_size_diff;
 
-	if ((last_pin_status < NUM_PIN_TYPES) && (S_ISREG(ptr->this_mode))) {
-		if ((last_pin_status == P_UNPIN) && (is_reg_pin == TRUE)) {
+	if (P_IS_VALID_PIN(last_pin_status) && (S_ISREG(ptr->this_mode))) {
+		if (P_IS_UNPIN(last_pin_status) && P_IS_PIN(now_pin_status)) {
 			/* Change from unpin to pin, need to add file size
 			to pin size */
 			pin_size_delta = tempfilestat.size;
 		}
-		if ((last_pin_status != P_UNPIN) && (is_reg_pin == FALSE)) {
+		if (P_IS_PIN(last_pin_status) && P_IS_UNPIN(now_pin_status)) {
 			/* Change from pin to unpin, need to substract file size
 			of the last upload from pin size */
 			pin_size_delta = -last_file_size;
