@@ -501,3 +501,8 @@ int32_t super_block_delete(ino_t this_inode)
 {
 	return 0;
 }
+
+int32_t super_block_enqueue_delete(ino_t this_inode)
+{
+	return 0;
+}

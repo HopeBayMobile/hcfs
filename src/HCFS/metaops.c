@@ -597,6 +597,10 @@ int32_t directly_delete_inode_meta(ino_t this_inode)
 			return -errcode;
 		}
 	}
+	/* When backend is not set, do not enqueue to delete queue */
+	ret = super_block_to_delete(this_inode, FALSE);
+	if (ret < 0)
+		return ret;
 	ret = super_block_delete(this_inode);
 	if (ret < 0)
 		return ret;
@@ -1409,7 +1413,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				fclose(metafptr);
 				return ret;
 			}
-			/* TODO: consider case NO_BACKEND */
+			/* Enqueue later */
 			ret = super_block_to_delete(this_inode, FALSE);
 			if (ret < 0) {
 				fclose(metafptr);

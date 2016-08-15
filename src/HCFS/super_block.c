@@ -602,6 +602,7 @@ int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
 				}
 				tempentry.status = TO_BE_DELETED;
 			} else {
+				/* Just dequeue and set status NO_LL */
 				tempentry.status = NO_LL;
 			}
 		}
@@ -626,10 +627,10 @@ int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
 *
 * Function name: super_block_enqueue_delete
 *        Inputs: ino_t this_inode
-*       Summary: After involking super_block_to_delete(), Use this
-*                function to enqueue entry of "this_inode" to delete
-*                queue so that another thread can delete data and meta
-*                on cloud.
+*       Summary: After involking super_block_to_delete() with param
+*                enqueue_now = false, use this function to enqueue entry
+*                of "this_inode" to delete queue so that another thread
+*                can delete data and meta on cloud.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
@@ -649,7 +650,7 @@ int32_t super_block_enqueue_delete(ino_t this_inode)
 	if (tempentry.status != NO_LL) {
 		ret_val = -EINVAL;
 		write_log(2, "Critical: Status of inode %"PRIu64
-			" is not TO_BE_DELETE", (uint64_t)this_inode);
+			" is not NO_LL", (uint64_t)this_inode);
 		goto error_handle;
 	}
 
@@ -697,11 +698,6 @@ int32_t super_block_delete(ino_t this_inode)
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 
 	if (ret_val >= 0) {
-		/* Reduce number of active inodes if directly remove inode
-		 * rather than handled by clouddelete thread */
-		if (tempentry.status == NO_LL ||
-		    tempentry.status == IS_DIRTY)
-			sys_super_block->head.num_active_inodes--;
 		if (tempentry.pin_status == ST_PINNING)
 			pin_ll_dequeue(this_inode, &tempentry);
 
@@ -721,6 +717,9 @@ int32_t super_block_delete(ino_t this_inode)
 			super_block_exclusive_release();
 			return ret_val;
 		}
+		write_log(10 ,"Debug: remove %"PRIu64", now num active is %lld",
+			(uint64_t)this_inode,
+			sys_super_block->head.num_active_inodes);
 	}
 
 	/* Add to unclaimed_list file */
