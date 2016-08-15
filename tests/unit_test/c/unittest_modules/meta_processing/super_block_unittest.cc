@@ -789,10 +789,10 @@ TEST_F(super_block_to_deleteTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-EBADF, super_block_to_delete(inode));
+	EXPECT_EQ(-EBADF, super_block_to_delete(inode, TRUE));
 }
 
-TEST_F(super_block_to_deleteTest, MarkToDeleteSuccess)
+TEST_F(super_block_to_deleteTest, MarkToDelete_EnqueueSuccess)
 {
 	ino_t inode = 7;
 	SUPER_BLOCK_ENTRY sb_entry;
@@ -812,16 +812,60 @@ TEST_F(super_block_to_deleteTest, MarkToDeleteSuccess)
 	sys_super_block->head.num_active_inodes++;
 
 	/* Run */
-	EXPECT_EQ(0, super_block_to_delete(inode));
+	EXPECT_EQ(0, super_block_to_delete(inode, TRUE));
 
 	/* Verify */
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 
+	EXPECT_EQ(TO_BE_DELETED, sb_entry.status);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+	EXPECT_EQ(ST_DEL, sb_entry.pin_status);
 	EXPECT_EQ(FALSE, sb_entry.in_transit);
 	EXPECT_EQ(0, sb_head.num_active_inodes);
 	EXPECT_EQ(1, sb_head.num_to_be_deleted);
+	EXPECT_EQ(inode, sb_head.first_to_delete_inode);
+	EXPECT_EQ(inode, sb_head.last_to_delete_inode);
+}
+
+TEST_F(super_block_to_deleteTest, MarkToDelete_DeferEnqueueSuccess)
+{
+	ino_t inode = 7;
+	SUPER_BLOCK_ENTRY sb_entry;
+	SUPER_BLOCK_HEAD sb_head;
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+
+	/* Mock data. Write a entry */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * inode);
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = NO_LL;
+	sb_entry.in_transit = TRUE;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+
+	sys_super_block->head.num_active_inodes++;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_to_delete(inode, FALSE));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+
+	EXPECT_EQ(NO_LL, sb_entry.status);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+	EXPECT_EQ(ST_DEL, sb_entry.pin_status);
+	EXPECT_EQ(FALSE, sb_entry.in_transit);
+	EXPECT_EQ(0, sb_head.num_active_inodes);
+	EXPECT_EQ(0, sb_head.num_to_be_deleted);
+	EXPECT_EQ(0, sb_head.first_to_delete_inode);
+	EXPECT_EQ(0, sb_head.last_to_delete_inode);
 }
 
 /*
@@ -873,6 +917,7 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 
 	EXPECT_EQ(TO_BE_RECLAIMED, sb_entry.status);
 	EXPECT_EQ(FALSE, sb_entry.in_transit);
+	EXPECT_EQ(ST_DEL, sb_entry.pin_status);
 	EXPECT_EQ(1, sb_head.num_to_be_reclaimed);
 	EXPECT_EQ(inode, result_inode);
 }

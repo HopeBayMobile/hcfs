@@ -87,13 +87,13 @@ class uploadEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
 //    free(hcfs_system);
+    nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     unlink("/tmp/testHCFS");
     nftw(tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
       free(tmppath);
-    nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     free(METAPATH);
     free(system_config);
   }
@@ -1113,6 +1113,8 @@ protected:
 	FILE *mock_file_meta;
 	int max_objname_num;
 	char toupload_meta[100];
+	char sync_path[100];
+	int ret, errcode;
 
 	void SetUp()
 	{
@@ -1122,6 +1124,13 @@ protected:
 		init_sync_stat_control();
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
+		snprintf(sync_path, 100, "%s/FS_sync", METAPATH);
+		printf("%s\n", sync_path);
+		ret = mkdir(sync_path, 0700);
+		if (ret != 0) {
+			errcode = errno;
+			printf("%s\n", strerror(errcode));
+		}
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
 		setbuf(mock_file_meta, NULL);
 
@@ -1303,7 +1312,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, 5566, 101);
+  ret = update_backend_stat(14, 1024768, 5566, 101, 0);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1359,7 +1368,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  ret = update_backend_stat(14, 1024768, 123, -101);
+  ret = update_backend_stat(14, 1024768, 123, -101, 0);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1377,48 +1386,6 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
 
   /* Cleanup */
   nftw(tmppath, do_delete, 20, FTW_DEPTH);
- }
-
-TEST_F(update_backend_statTest, DownloadUpdate) {
-  char tmppath[200];
-  char tmppath2[200];
-  int32_t ret;
-  FILE *fptr;
-  int64_t sys_size, num_ino;
-  FS_CLOUD_STAT_T fs_cloud_stat;
-
-  snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
-  snprintf(tmppath2, 199, "%s/FSstat14", tmppath);
-
-  no_backend_stat = FALSE;
-  ret = access(tmppath, F_OK);
-  ASSERT_NE(0, ret);
-  init_sync_stat_control();
-
-  ret = access(tmppath, F_OK);
-  EXPECT_EQ(0, ret);
-
-  ret = access(tmppath2, F_OK);
-  ASSERT_NE(0, ret);
-
-  ret = update_backend_stat(14, 1024768, 111, -101);
-
-  EXPECT_EQ(0, ret);
-  ret = access(tmppath2, F_OK);
-  ASSERT_EQ(0, ret);
-
-  /* Verify content */
-
-  fptr = fopen(tmppath2, "r");
-  fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
-  fclose(fptr);
-
-  EXPECT_EQ(1024768 + 7687483, fs_cloud_stat.backend_system_size);
-  EXPECT_EQ(5566 + 111, fs_cloud_stat.backend_meta_size);
-  EXPECT_EQ(34334 - 101, fs_cloud_stat.backend_num_inodes);
-
-  /* Cleanup */
-  rmdir(tmppath);
  }
 
 /* End of the test case for the function update_backend_stat */

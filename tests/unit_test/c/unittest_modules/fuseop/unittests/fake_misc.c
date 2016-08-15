@@ -316,6 +316,10 @@ int64_t open_fh(ino_t thisinode, int32_t flags, BOOL isdir)
 		return -1;
 
 	index = (int64_t) thisinode;
+	/* To avoid file table conflicts in between tests */
+	if (system_fh_table.entry_table_flags[index] != NO_FH)
+		sleep(2);
+
 	if (isdir == TRUE) {
 		system_fh_table.entry_table_flags[index] = IS_DIRH;
 		dirh_ptr = &(system_fh_table.direntry_table[index]);
