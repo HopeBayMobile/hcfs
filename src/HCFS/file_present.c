@@ -228,6 +228,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		meta_cache_unlock_entry(body_ptr);
 		return ret_val;
 	}
+
 	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
@@ -401,6 +402,12 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
 
 	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0)

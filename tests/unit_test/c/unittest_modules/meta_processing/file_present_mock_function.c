@@ -351,7 +351,8 @@ int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize
 	int64_t ret_pos;
 
 	*metasize = 0;
-
+	assert(ptr != NULL);
+	assert(ptr->fptr != NULL);
 	LSEEK(fileno(ptr->fptr), 0, SEEK_END);
 	*metasize = ret_pos;
 	return 0;
