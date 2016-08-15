@@ -115,15 +115,26 @@ int32_t comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 
 static inline int64_t longpow(int64_t base, int32_t power)
 {
-	int64_t tmp;
-	int32_t count;
+	if (power < 0) return 0; /* FIXME: error handling */
+	int64_t pow1024[] = {
+		1, 1024, 1048576, 1073741824,
+		1099511627776, 1125899906842624, 1152921504606846976};
+	if (base == 1024 && power <= 6) { /* fast path */
+		return pow1024[power];
+		/* FIXME: if power >= 7, integer overflow */
+	}
 
-	tmp = 1;
-
-	for (count = 0; count < power; count++)
-		tmp = tmp * base;
-
-	return tmp;
+	uint64_t r = 1;
+	/* slow path with slight optimization */
+	while (power != 0) {
+		if (power % 2 == 1) { /* q is odd */
+			r *= base;
+			power--;
+		}
+		base *= base;
+		power /= 2;
+	}
+	return r;
 }
 
 /**
