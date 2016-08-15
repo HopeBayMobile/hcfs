@@ -14,17 +14,19 @@
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "ut_global.h"
 
+#define MOCK() DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__)
 int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 
 int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	char mock_block_path[50];
 	FILE *ptr;
 	sprintf(mock_block_path, "/tmp/testHCFS/data_%" PRIu64 "_%" PRId64,
@@ -38,7 +40,7 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	// Record to-delete block number
 	upload_ctl_todelete_blockno[delete_thread_ptr->blockno] = TRUE;
 	delete_ctl.threads_in_use[delete_thread_ptr->which_curl] = FALSE;
@@ -48,14 +50,14 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return HTTP_OK;
 }
 
 int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 	char transit_incomplete)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	if (this_inode > 1 && transit_incomplete == FALSE) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
 		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
@@ -71,7 +73,7 @@ int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 
 int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	char objectpath[40];
 	FILE *objptr;
 	int32_t readsize1, readsize2;
@@ -101,7 +103,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 		    CURL_HANDLE *curl_handle)
 #endif
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	char deleteobjname[30];
 	sprintf(deleteobjname, "data_%" PRIu64 "_%ld", (uint64_t)this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
@@ -116,13 +118,13 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 
 int32_t super_block_exclusive_locking(void)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	if (this_inode == 0)
 		return -1;
 
@@ -143,13 +145,13 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 int32_t write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int32_t super_block_exclusive_release(void)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
@@ -157,7 +159,7 @@ int32_t super_block_exclusive_release(void)
 int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	int64_t target_page, int64_t hint_page)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	int64_t ret_page_pos;
 
 	/* target_page starts from 0 */
@@ -183,7 +185,7 @@ int32_t write_log(int32_t level, char *format, ...)
 
 int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	if (no_backend_stat == TRUE)
@@ -200,21 +202,21 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCF
 
 int32_t set_block_dirty_status(char *path, FILE *fptr, char status)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	setxattr(path, "user.dirty", "F", 1, 0);
 	return 0;
 }
 
 int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
 
 off_t check_file_size(const char *path)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	struct stat block_stat; /* raw file ops */
 	int32_t errcode;
 
@@ -228,20 +230,20 @@ off_t check_file_size(const char *path)
 }
 int32_t sync_hcfs_system_data(char need_lock)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int32_t backup_FS_database(void)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 void fetch_backend_block_objname(char *objname, ino_t inode,
 		long long block_no, long long seqnum)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	sprintf(objname, "data_%"PRIu64"_%lld", (uint64_t)inode, block_no);
 	return;
 }
@@ -249,7 +251,7 @@ void fetch_backend_block_objname(char *objname, ino_t inode,
 int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
 		int64_t block_no, int64_t seq)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	sprintf(pathname,
 		"mock_meta_folder/mock_toupload_block_%" PRIu64 "_%" PRId64,
 		inode, block_no);
@@ -258,7 +260,7 @@ int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
 
 int fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	sprintf(pathname, "mock_meta_folder/mock_toupload_meta_%"PRIu64,
 			(uint64_t)inode);
 
@@ -268,13 +270,13 @@ int fetch_toupload_meta_path(char *pathname, ino_t inode)
 int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 		int fd, BOOL is_revert, BOOL finish_sync)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int del_progress_file(int fd, ino_t inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	close(fd);
 	unlink("/tmp/mock_progress_file");
 	return 0;
@@ -285,7 +287,7 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const int64_t *toupload_seq, const int64_t *backend_seq,
 	const char *finish)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	BLOCK_UPLOADING_STATUS block_entry;
 
 	if (toupload_seq)
@@ -304,7 +306,7 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 
 int64_t query_status_page(int32_t fd, int64_t block_index)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return (block_index / MAX_BLOCK_ENTRIES_PER_PAGE) *
 		sizeof(BLOCK_UPLOADING_PAGE);
 }
@@ -313,52 +315,53 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 		int64_t *backend_size, int64_t *total_backend_blocks,
 		int64_t upload_seq, uint8_t *last_pin_status)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int check_and_copy_file(const char *srcpath, const char *tarpath,
 		BOOL lock_src, BOOL reject_if_nospc)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	mknod(tarpath, 0700, 0);
 	return 0;
 }
 
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
+	pathname[0] = 0;
 	return;
 }
 
 char block_finish_uploading(int32_t fd, int64_t blockno)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return TRUE;
 }
 
 int create_progress_file(ino_t inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return;
 }
 
 int change_action(int fd, char now_action)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int change_status_to_BOTH(ino_t inode, int progress_fd,
 		FILE *local_metafptr, char *local_metapath)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE block_page;
 	int i;
@@ -404,7 +407,7 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 	BLOCK_ENTRY_PAGE tmppage;
 	int i;
 
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	i = blockno % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	if (page_pos <= 0)
@@ -430,27 +433,27 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		char delete_which_one)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 void busy_wait_all_specified_upload_threads(ino_t inode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return;
 }
 
 int revert_block_status_LDISK(ino_t this_inode, long long blockno,
 		int e_index, long long page_filepos)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int32_t update_backend_usage(int64_t total_backend_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
@@ -460,7 +463,7 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 {
 	FS_CLOUD_STAT_T	fs_cloud_stat;
 
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	fseek(fptr, 0, SEEK_SET);
 	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	fs_cloud_stat.backend_system_size += fs_total_size_delta;
@@ -479,14 +482,14 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 			int64_t dirty_data_size_delta,
 			ino_t thisinode)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 int32_t get_progress_info(int32_t fd, int64_t block_index,
 		BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
@@ -495,13 +498,13 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
 		int64_t unpin_dirty_data_size, BOOL need_sync)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return 0;
 }
 
 void notify_sleep_on_cache(int32_t cache_replace_status)
 {
-	DEBUG_PRINT("[MOCK] tocloud_mock_function.c line %4d func %s\n",  __LINE__, __func__);
+	MOCK();
 	return;
 }
 

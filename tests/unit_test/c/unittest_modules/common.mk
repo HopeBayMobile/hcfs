@@ -40,7 +40,8 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DDEDUP_ENABLE=0 \
 	    -DENCRYPT_ENABLE=1 \
 	    -DCOMPRESS_ENABLE=0 \
-	    -D_ANDROID_ENV_
+	    -D_ANDROID_ENV_ \
+
 LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
 # Support  gcc4.9 color output

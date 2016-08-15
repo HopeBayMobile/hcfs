@@ -45,6 +45,7 @@
 #define              MAX_LINK_PATH 4096
 
 /* All versions value */
+#define MAX_BLOCK_ENTRIES_PER_PAGE_v1 100
 #define   MAX_DIR_ENTRIES_PER_PAGE_v1 99
 #define   MIN_DIR_ENTRIES_PER_PAGE_v1 30
 #define          POINTERS_PER_PAGE_v1 1024
