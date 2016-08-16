@@ -196,6 +196,7 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
 		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(FILE_META_HEADER));
 }
 
 /*
@@ -244,6 +245,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(DIR_META_HEADER));
 }
 
 /*
@@ -633,6 +635,7 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"link_not_used", 12, "name_not_used", 1,
 		&delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(SYMLINK_META_HEADER));
 }
 /*
 	End of unittest of symlink_update_meta()
@@ -737,7 +740,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 class pin_inodeTest : public ::testing::Test {
 protected:
 	int64_t mock_reserved_size;
-	char pin_type;
+	uint8_t pin_type;
 
 	void SetUp()
 	{
@@ -928,7 +931,7 @@ TEST_F(unpin_inodeTest, UnpinDirSuccess_ManyChildren)
 /* Unittest for increase_pinned_size() */
 class increase_pinned_sizeTest : public ::testing::Test {
 protected:
-	char pin_type;
+	uint8_t pin_type;
 
 	void SetUp()
 	{
@@ -1160,7 +1163,6 @@ TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
 {
 	UPLOADING_COMMUNICATION_DATA data;
 	PROGRESS_META progress_meta;
-	int fd;
 	int inode;
 	int ret;
 
@@ -1178,7 +1180,6 @@ TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
 	EXPECT_EQ(FALSE, CHECK_UPLOADING_FLAG);
 	EXPECT_EQ(0, CHECK_TOUPLOAD_BLOCKS);
 
-	close(fd);
 	unlink(progress_path);
 }
 /*

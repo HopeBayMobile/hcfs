@@ -53,8 +53,7 @@ class deleteEnvironment : public ::testing::Environment {
 
   virtual void TearDown() {
     free(hcfs_system);
-    nftw(tmppath, do_delete, 20, FTW_DEPTH);
-    unlink("/tmp/testHCFS");
+    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
@@ -188,7 +187,7 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 	Unittest of dsync_single_inode()
 */
 class dsync_single_inodeTest : public ::testing::Test {
-protected:
+public:
 	DSYNC_THREAD_TYPE *mock_thread_info;
 	unsigned expected_num_objname;
 	unsigned size_objname;
@@ -199,7 +198,8 @@ protected:
 		system_config = (SYSTEM_CONF_STRUCT *)
 			malloc(sizeof(SYSTEM_CONF_STRUCT));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
-		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
+		mock_thread_info =
+		    (DSYNC_THREAD_TYPE *)calloc(1, sizeof(DSYNC_THREAD_TYPE));
 		backend_meta[0] = 0;
 	}
 	virtual void TearDown()
@@ -223,7 +223,8 @@ protected:
 	}
 	void destroy_objname_buffer(uint32_t num_objname)
 	{
-		for (int32_t i = 0 ; i < num_objname ; i++)
+		uint32_t i;
+		for (i = 0 ; i < num_objname ; i++)
 			if(objname_list[i])
 				free(objname_list[i]);
 		if (objname_list)
@@ -259,9 +260,10 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 {
 	FILE *meta;
 	HCFS_STAT meta_stat;
-	BLOCK_ENTRY_PAGE tmp_blockentry_page;
-	FILE_META_TYPE tmp_file_meta;
-	CLOUD_RELATED_DATA cloud_related;
+	BLOCK_ENTRY_PAGE tmp_blockentry_page = {0};
+	FILE_META_TYPE tmp_file_meta = {0};
+	CLOUD_RELATED_DATA cloud_related = {0};
+	FILE_STATS_TYPE file_stst = {0};
 	int total_page = 3;
 	void *res;
 	FILE *backend_meta_fptr;
@@ -269,6 +271,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	char buf[5000];
 	expected_num_objname = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 
+	init_hcfs_stat(&meta_stat);
 	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
@@ -276,15 +279,15 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	meta_stat.size = 1000000; // Let total_blocks = 1000000/100 = 10000
 	meta_stat.mode = S_IFREG; 
 	MAX_BLOCK_SIZE = 100;
-	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
-	memset(&cloud_related, 0, sizeof(CLOUD_RELATED_DATA));
 	cloud_related.upload_seq = 1;
 
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
+	ASSERT_NE(meta, NULL);
 	setbuf(meta, NULL);
 	fseek(meta, 0, SEEK_SET);
 	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
+	fwrite(&file_stst, sizeof(FILE_STATS_TYPE), 1, meta); // Write file_meta_type
 	fwrite(&cloud_related, sizeof(CLOUD_RELATED_DATA), 1, meta);
 	for (int32_t i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 		tmp_blockentry_page.block_entries[i].status = ST_CLOUD;
@@ -305,23 +308,24 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	dsync_single_inode(mock_thread_info);
 
 	/* Check answer */
-	EXPECT_EQ(expected_num_objname, objname_counter); // Check # of object name.
+	ASSERT_EQ(expected_num_objname, objname_counter); // Check # of object name.
 	qsort(objname_list, expected_num_objname, sizeof(char *),
 			dsync_single_inodeTest::objname_cmp);
-	for (int32_t block = 0 ; block < expected_num_objname - 1 ; block++) {
+	uint32_t block;
+	for (block = 0 ; block < expected_num_objname - 1 ; block++) {
 		char expected_objname[size_objname];
 		sprintf(expected_objname, "data_%" PRIu64 "_%d",
 				(uint64_t)mock_thread_info->inode, block);
 		ASSERT_STREQ(expected_objname, objname_list[block]); // Check all obj was recorded.
 	}
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%" PRIu64 "", (uint64_t)mock_thread_info->inode);
-	EXPECT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
+	sprintf(expected_objname, "meta_%" PRIu64, (uint64_t)mock_thread_info->inode);
+	ASSERT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
 
-	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
-	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
-	EXPECT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
+	ASSERT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
+	ASSERT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
+	ASSERT_EQ(PTHREAD_CANCELED, res);
+	ASSERT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
 }
 
 TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
@@ -329,17 +333,20 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	FILE *meta;
 	HCFS_STAT meta_stat;
 	void *res;
-	expected_num_objname = 1;
-	DIR_META_TYPE dirmeta;
+	DIR_META_TYPE dirmeta = {0};
+	CLOUD_RELATED_DATA cloud_related = {0};
 
+	expected_num_objname = 1;
+	init_hcfs_stat(&meta_stat);
+	cloud_related.upload_seq = 1;
 	/* Mock a dir meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFDIR;
 	mock_thread_info->which_index = 0;
-	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
 	fwrite(&dirmeta, sizeof(DIR_META_TYPE), 1, meta);
+	fwrite(&cloud_related, sizeof(CLOUD_RELATED_DATA), 1, meta);
 	fclose(meta);
 
 	/* Begin to test */
@@ -351,7 +358,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Check answer */
 	EXPECT_EQ(1, objname_counter); // Check # of object name.
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%d", mock_thread_info->inode);
+	sprintf(expected_objname, "meta_%"PRIu64, (uint64_t)mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[0]); // Check meta was recorded.
 
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));

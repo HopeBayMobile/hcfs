@@ -873,7 +873,7 @@ protected:
 			int32_t level_index = tmp_target_page / pointers_per_page[deep - level];
 			fread(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 			fseek(body_ptr->fptr, ptr_entry_page.ptr[level_index], SEEK_SET);
-			printf("Test: level %d: ptr_page_index = %d, next_filepos = %lld\n",
+			printf("Test: level %d: ptr_page_index = %d, next_filepos = %" PRId64 "\n",
 				level, level_index, ptr_entry_page.ptr[level_index]);
 			tmp_target_page = tmp_target_page % pointers_per_page[deep - level];
 		}
@@ -1164,7 +1164,7 @@ protected:
 		snprintf(markdelete_path, 100, "%s/markdelete/inode%d", METAPATH,
 			INO_DELETE_FILE_BLOCK);
 		mknod(markdelete_path, S_IFREG, 0);
-		snprintf(statpath, 100, "%s/stat%ld", METAPATH, ROOT_INODE);
+		snprintf(statpath, 100, "%s/stat%d", METAPATH, ROOT_INODE);
 		statfptr = fopen(statpath, "w");
 		memset(&tmp_stat, 0, sizeof(FS_STAT_T));
 		tmp_stat.num_inodes = 1;
@@ -1696,7 +1696,7 @@ protected:
 	void SetUp()
 	{
 		METAPATH = "testpatterns";
-		snprintf(statpath, 100, "%s/stat%ld", METAPATH, ROOT_INODE);
+		snprintf(statpath, 100, "%s/stat%d", METAPATH, ROOT_INODE);
 		statfptr = fopen(statpath, "w");
 		memset(&tmp_stat, 0, sizeof(FS_STAT_T));
 		tmp_stat.num_inodes = 1;
