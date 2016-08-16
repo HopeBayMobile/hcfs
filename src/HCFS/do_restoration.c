@@ -395,6 +395,7 @@ int32_t _fetch_meta(ino_t thisinode)
 	char despath[METAPATHLEN];
 	int32_t ret;
 
+/* FEATURE TODO: reset block status to ST_CLOUD if needed */
 	snprintf(objname, sizeof(objname), "meta_%" PRIu64 "",
 		 (uint64_t)thisinode);
 	fetch_restore_meta_path(despath, thisinode);
@@ -710,6 +711,24 @@ errcode_handle:
 
 int32_t _restore_system_quota(void)
 {
+	char srcpath[METAPATHLEN];
+	char despath[METAPATHLEN];
+	int32_t ret, errcode;
+
+	fetch_quota_from_cloud(NULL, FALSE);
+
+	/* Need to rename quota backup from metastorage to metastore_restore */
+	snprintf(srcpath, sizeof(METAPATHLEN), "%s/usermeta", METAPATH);
+	snprintf(despath, sizeof(METAPATHLEN), "%s/usermeta", RESTORE_METAPATH);
+
+	ret = rename(srcpath, despath);
+	if (ret < 0) {
+		errcode = -errno;
+		write_log(0, "Unable to fetch quota in restoration (%d)\n",
+		          -errcode);
+		return errcode;
+	}
+
 	return 0;
 }
 

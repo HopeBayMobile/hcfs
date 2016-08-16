@@ -78,7 +78,7 @@ int32_t init_download_control(void);
 int32_t destroy_download_control(void);
 void* fetch_backend_block(void *ptr);
 int32_t fetch_pinned_blocks(ino_t inode);
-void fetch_quota_from_cloud(void *ptr);
+void fetch_quota_from_cloud(void *ptr, BOOL enable_quota);
 int32_t update_quota(void);
 int32_t fetch_object_from_cloud(FILE *fptr, char *objname);
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

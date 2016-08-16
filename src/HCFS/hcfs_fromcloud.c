@@ -969,7 +969,7 @@ static BOOL quota_wakeup(void)
  * locally and encrypt the file.
  *
  */
-void fetch_quota_from_cloud(void *ptr)
+void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 {
 	int32_t status;
 	char objname[100];
@@ -1047,11 +1047,13 @@ void fetch_quota_from_cloud(void *ptr)
 		write_log(0, "Error: Quota from cloud is less than zero");
 		goto errcode_handle;
 	}
-	sem_wait(&(hcfs_system->access_sem));
-	hcfs_system->systemdata.system_quota = quota;
-	sem_post(&(hcfs_system->access_sem));
-	write_log(10, "Now system quota is %lld\n",
-			hcfs_system->systemdata.system_quota);
+	if (enable_quota == TRUE) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.system_quota = quota;
+		sem_post(&(hcfs_system->access_sem));
+		write_log(10, "Now system quota is %lld\n",
+				hcfs_system->systemdata.system_quota);
+	}
 
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
@@ -1078,6 +1080,12 @@ errcode_handle:
 	download_usermeta_ctl.active = FALSE;
 	sem_post(&(download_usermeta_ctl.access_sem));
 	return;
+}
+
+/* Wrapper for calling from update_quota */
+void fetch_quota_from_cloud_wrapper(void *ptr)
+{
+	fetch_quota_from_cloud(ptr, TRUE);
 }
 
 /**
@@ -1111,7 +1119,7 @@ int32_t update_quota()
 			PTHREAD_CREATE_DETACHED);
 	pthread_create(&(download_usermeta_ctl.download_usermeta_tid),
 			&(download_usermeta_ctl.thread_attr),
-			(void *)fetch_quota_from_cloud, NULL);
+			(void *)fetch_quota_from_cloud_wrapper, NULL);
 	sem_post(&(download_usermeta_ctl.access_sem));
 	return 0;
 }
