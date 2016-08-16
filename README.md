@@ -93,7 +93,21 @@ Required packages
     libsqlite3-dev
     libjansson-dev
     libcap-dev
+    libfuse-dev (Version > 2.9)
 
 Quick setup environment
 -----------------
 Execute `utils/setup_dev_env.sh` to setup development environment.
+
+
+Use Docker as Swift Backend
+-----------------
+1. Install Docker Environment
+2. Pull Docker Image
+   $docker run -d -p 12345:8080 -v /home/stanley/docker_data:/srv -t aerofs/swift
+3. Install Swift client
+   $apt-get install python-pip
+   $pip install python-swiftclient
+4. Setup swift container
+   swift -A http://127.0.0.1:12345/auth/v1.0 -U test:tester -K testing post swift_test
+   
