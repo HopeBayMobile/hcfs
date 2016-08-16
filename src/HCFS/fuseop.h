@@ -142,6 +142,10 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
+#define NO_META_SPACE()\
+	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ?\
+	meta_nospc_log(__func__, __LINE__) : 0)
+
 int32_t global_argc;
 char **global_argv;
 struct fuse_args global_fuse_args;

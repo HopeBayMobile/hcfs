@@ -15,12 +15,13 @@
 
 #include "logger.h"
 #include "utils.h"
-#include "fuseop.h"
 #include "params.h"
 
-#define NO_META_SPACE()\
-	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ?\
-	meta_nospc_log(__func__, __LINE__) : 0)
+#if defined(__GNUC__)
+#define _PACKED __attribute__((packed))
+#else
+#define _PACKED
+#endif
 
 #define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode) || S_ISSOCK(mode))
 

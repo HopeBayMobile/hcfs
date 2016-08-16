@@ -17,6 +17,7 @@
 #include <string.h>
 #include <time.h>
 #include "meta.h"
+#include "fuseop.h"
 /*
  * Erase then setup magic number and meta version on HCFS_STAT.
  *
@@ -85,15 +86,15 @@ void static_assert_test(void) {
 			"Makesure read all sub-struct equal to read whole header");
 #define GUARDIAN_MSG "Structure size changed"
 	_Static_assert(sizeof(HCFS_STAT) == 128, GUARDIAN_MSG);
-	_Static_assert(sizeof(DIR_META_HEADER) == 296, GUARDIAN_MSG);
-	_Static_assert(sizeof(FILE_META_HEADER) == 336, GUARDIAN_MSG);
-	_Static_assert(sizeof(SYMLINK_META_HEADER) == 4368, GUARDIAN_MSG);
+	_Static_assert(sizeof(DIR_META_HEADER) == 289, GUARDIAN_MSG);
+	_Static_assert(sizeof(FILE_META_HEADER) == 329, GUARDIAN_MSG);
+	_Static_assert(sizeof(SYMLINK_META_HEADER) == 4357, GUARDIAN_MSG);
 
 	/* Struct with fixed size, Do not change or remove them. */
-	_Static_assert(sizeof(DIR_META_HEADER_v1) == 296, GUARDIAN_MSG);
-	_Static_assert(sizeof(FILE_META_HEADER_v1) == 336, GUARDIAN_MSG);
-	_Static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4368, GUARDIAN_MSG);
 	_Static_assert(sizeof(HCFS_STAT_v1) == 128, GUARDIAN_MSG);
+	_Static_assert(sizeof(DIR_META_HEADER_v1) == 289, GUARDIAN_MSG);
+	_Static_assert(sizeof(FILE_META_HEADER_v1) == 329, GUARDIAN_MSG);
+	_Static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4357, GUARDIAN_MSG);
 }
 #pragma GCC diagnostic pop
 
