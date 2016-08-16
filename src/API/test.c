@@ -122,5 +122,15 @@ int32_t main()
 	HCFS_clear_sync_point(&res17);
 	printf("clear sync point - %s\n", res17);
 	free(res17);
+
+	char *res18;
+	HCFS_trigger_restore(&res18);
+	printf("Trigger restore - %s\n", res18);
+	free(res18);
+
+	char *res19;
+	HCFS_check_restore_status(&res19);
+	printf("check restore status - %s\n", res19);
+	free(res19);
 }
 
