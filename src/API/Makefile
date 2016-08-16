@@ -1,7 +1,7 @@
 CC = gcc
 CPPFLAGS =
 CFLAGS = -g -pthread -Wall -Wextra
-LFLAGS = -lsqlite3 -ljansson -lcrypto
+LDFLAGS = -lsqlite3 -ljansson -lcrypto
 
 # [Autodependencies with GNU make]
 # http://scottmcpeak.com/autodepend/autodepend.html
@@ -20,13 +20,13 @@ hcfsconf_OBJS = $(addprefix $(OBJS_DIR), \
 OBJS := $(hcfsapid_OBJS) $(test_OBJS)
 
 hcfsapid: $(hcfsapid_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsapid_OBJS) -o $@ $(LFLAGS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsapid_OBJS) -o $@ $(LDFLAGS)
 
 test: $(test_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(test_OBJS) -o $@ $(LFLAGS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(test_OBJS) -o $@ $(LDFLAGS)
 
 hcfsconf: $(hcfsconf_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsconf_OBJS) -o $@ $(LFLAGS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsconf_OBJS) -o $@ $(LDFLAGS)
 
 publish: doc
 	sudo cp -r doc /mnt/nas/CloudDataSolution/Gateway_2.0/
