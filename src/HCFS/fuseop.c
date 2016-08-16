@@ -5380,6 +5380,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				meta_cache_close_file(body_ptr);
 				meta_cache_unlock_entry(body_ptr);
 				fuse_reply_err(req, -ret);
+				free(buf);
 				return;
 			}
 		}
@@ -5394,6 +5395,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					meta_cache_close_file(body_ptr);
 					meta_cache_unlock_entry(body_ptr);
 					fuse_reply_err(req, -ret);
+					free(buf);
 					return;
 				}
 			}
