@@ -35,6 +35,6 @@ eval $make
 export TERM=xterm-color
 export GTEST_COLOR=yes
 export NOGCOVR=1
-make EXTRACPPFLAGS=-DARM_32bit_ test
+make test
 
 gcovr -r $repo/src .
