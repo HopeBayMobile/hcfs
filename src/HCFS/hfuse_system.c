@@ -525,8 +525,6 @@ int32_t main(int32_t argc, char **argv)
 
 	UNUSED(curl_handle);
 
-	open_log("hcfs_android_log");
-
 	/* Check if the system is being restored (and in stage 2) */
 	/* FEATURE TODO: Check if the backend setting is correct before
 	switching metastorage / blockstorage */

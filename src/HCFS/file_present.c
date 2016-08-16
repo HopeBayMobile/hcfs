@@ -337,9 +337,9 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	tmpstat.num_hybrid = 0;
 	sem_wait(&(pathlookup_data_lock));
 	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
-	if (ret_val < 0) {
-		sem_post(&(pathlookup_data_lock));
-	}
+	sem_post(&(pathlookup_data_lock));
+	if (ret_val < 0)
+		return ret_val;
 
 	if (old_metasize > 0 && new_metasize > 0)
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
