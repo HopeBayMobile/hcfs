@@ -395,7 +395,6 @@ int32_t _fetch_meta(ino_t thisinode)
 	char despath[METAPATHLEN];
 	int32_t ret;
 
-/* FEATURE TODO: reset block status to ST_CLOUD if needed */
 	snprintf(objname, sizeof(objname), "meta_%" PRIu64 "",
 		 (uint64_t)thisinode);
 	fetch_restore_meta_path(despath, thisinode);
