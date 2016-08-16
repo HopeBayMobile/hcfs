@@ -20,6 +20,7 @@
 
 #include "global.h"
 #include "params.h"
+#include "fuseop.h"
 
 char restore_metapath[METAPATHLEN];
 char restore_blockpath[BLOCKPATHLEN];

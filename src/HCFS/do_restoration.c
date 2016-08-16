@@ -27,6 +27,7 @@
 #include "event_notification.h"
 #include "hcfs_fromcloud.h"
 #include "metaops.h"
+#include "mount_manager.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -468,7 +469,7 @@ int32_t _update_FS_stat(ino_t rootinode)
 	restored_system_meta.backend_meta_size += tmpFSstat.backend_meta_size;
 	restored_system_meta.backend_inodes += tmpFSstat.backend_num_inodes;
 
-	return ret;
+	return 0;
 
 errcode_handle:
 	fclose(fptr);
@@ -698,13 +699,18 @@ int32_t _rebuild_system_meta(void)
 		          -errcode);
 		return errcode;
 	}
-	FWRITE(restored_system_meta, sizeof(SYSTEM_DATA_TYPE), 1, fptr);
+	FWRITE(&restored_system_meta, sizeof(SYSTEM_DATA_TYPE), 1, fptr);
 	fclose(fptr);
 	return 0;
 
 errcode_handle:
 	fclose(fptr);
 	return errcode;
+}
+
+int32_t _restore_system_quota(void)
+{
+	return 0;
 }
 
 /* FEATURE TODO: Verify if downloaded objects are enough for restoration */
