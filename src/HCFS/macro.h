@@ -255,10 +255,12 @@
 		time_spent = diff.tv_sec + (double)diff.tv_usec/1000000;\
 	} while (0)
 
-#define FREE(ptr)\
-	do {\
-		free(ptr);\
-		(ptr) = NULL;\
+#define FREE(ptr)                                                              \
+	do {                                                                   \
+		if ((ptr) != NULL) {                                           \
+			free(ptr);                                             \
+			(ptr) = NULL;                                          \
+		}                                                              \
 	} while (0)
 
 #endif  /* SRC_HCFS_MACRO_H_ */
