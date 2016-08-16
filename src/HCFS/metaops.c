@@ -1756,7 +1756,7 @@ there are inodes to be deleted. */
 int32_t startup_finish_delete(void)
 {
 	DIR *dirp;
-	struct dirent tmpent, *tmpptr;
+	struct dirent *de;
 	HCFS_STAT tmpstat;
 	char pathname[200];
 	int32_t ret_val;
@@ -1781,16 +1781,17 @@ int32_t startup_finish_delete(void)
 		return -errcode;
 	}
 
-	errcode = readdir_r(dirp, &tmpent, &tmpptr);
-	if (errcode > 0) {
+	errno = 0; de = readdir(dirp);
+	if (de == NULL && errno) {
+		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 		closedir(dirp);
 		return -errcode;
 	}
 
-	while (tmpptr != NULL) {
-		ret_val = sscanf(tmpent.d_name, "inode%" PRIu64 "_%" PRIu64 "",
+	while (de != NULL) {
+		ret_val = sscanf(de->d_name, "inode%" PRIu64 "_%" PRIu64 "",
 				(uint64_t *)&tmp_ino, (uint64_t *)&root_inode);
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL, NULL);
@@ -1813,8 +1814,9 @@ int32_t startup_finish_delete(void)
 				return ret;
 			}
 		}
-		errcode = readdir_r(dirp, &tmpent, &tmpptr);
-		if (errcode > 0) {
+		errno = 0; de = readdir(dirp);
+		if (de == NULL && errno) {
+			errcode = errno;
 			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			closedir(dirp);

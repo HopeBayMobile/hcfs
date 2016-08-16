@@ -687,7 +687,7 @@ void init_sync_stat_control(void)
 {
 	char *FS_stat_path, *fname;
 	DIR *dirp;
-	struct dirent tmp_entry, *tmpptr;
+	struct dirent *de;
 	int32_t ret, errcode;
 
 	FS_stat_path = (char *)malloc(METAPATHLEN);
@@ -706,16 +706,13 @@ void init_sync_stat_control(void)
 			errcode = -errcode;
 			goto errcode_handle;
 		}
-		tmpptr = NULL;
-		ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		/* Delete all existing temp FS stat */
-		while ((ret == 0) && (tmpptr != NULL)) {
-			if (strncmp(tmp_entry.d_name, "tmpFSstat", 9) == 0) {
+		while ((de = readdir(dirp)) != NULL) {
+			if (strncmp(de->d_name, "tmpFSstat", 9) == 0) {
 				snprintf(fname, METAPATHLEN - 1, "%s/%s",
-					 FS_stat_path, tmp_entry.d_name);
+					 FS_stat_path, de->d_name);
 				unlink(fname);
 			}
-			ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		}
 		closedir(dirp);
 	}
