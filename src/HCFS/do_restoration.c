@@ -478,7 +478,7 @@ errcode_handle:
 int32_t _fetch_pinned(ino_t thisinode)
 {
 	FILE_META_TYPE tmpmeta;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE *fptr;
 	char metapath[METAPATHLEN];
 	int64_t count, totalblocks, tmpsize, seq;
@@ -495,7 +495,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 		return errcode;
 	}
 
-	FREAD(&tmpstat, sizeof(struct stat), 1, fptr);
+	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	FREAD(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (tmpmeta.local_pin == P_UNPIN) {
 		/* Don't fetch blocks */
@@ -504,7 +504,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 	}
 
 	/* Assuming fixed block size now */
-	tmpsize = tmpstat.st_size;
+	tmpsize = tmpstat.size;
 	totalblocks = ((tmpsize - 1) / 1048576) + 1;
 	lastpage = -1;
 	for (count = 0; count < totalblocks; count++) {
@@ -591,7 +591,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		return errcode;
 	}
 
-	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
 
 	/* Do not expand if not high priority pin and not needed */

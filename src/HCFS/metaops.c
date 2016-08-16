@@ -2070,36 +2070,10 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 	if (nondir_type_list)
 		*nondir_type_list = NULL;
 
-	ret = fetch_meta_path(metapath, this_inode);
-	if (ret < 0)
-		return ret;
-
-	fptr = fopen(metapath, "r");
-	if (fptr == NULL) {
-		ret = errno;
-		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
-			(uint64_t)this_inode, __func__, ret);
-		return -ret;
-	}
-
-	flock(fileno(fptr), LOCK_EX);
-	if (access(metapath, F_OK) < 0) {
-		write_log(5, "meta %"PRIu64" does not exist in %s\n",
-			(uint64_t)this_inode, __func__);
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return -ENOENT;
-	}
-
-	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
-	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
-	total_children = dir_meta.total_children;
-	now_page_pos = dir_meta.tree_walk_list_head;
-	if (total_children == 0 || now_page_pos == 0) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
+	total_children = dir_meta->total_children;
+	now_page_pos = dir_meta->tree_walk_list_head;
+	if (total_children == 0 || now_page_pos == 0)
 		return 0;
-	}
 
 	half = total_children / 2 + 1; /* Avoid zero malloc */
 	now_dir_size = half;
@@ -2128,7 +2102,7 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 		for (count = 0; count < dir_page.num_entries; count++) {
 
 			tmpentry = &(dir_page.dir_entries[count]);
-			if (!strcmp(tmpentry->d_name, ".") || /* Ingore */
+			if (!strcmp(tmpentry->d_name, ".") || /* Ignore */
 				!strcmp(tmpentry->d_name, ".."))
 				continue;
 
@@ -2370,7 +2344,7 @@ int32_t collect_dir_children(ino_t this_inode,
 		return -ENOENT;
 	}
 
-	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	ret = collect_dirmeta_children(&dir_meta, fptr, dir_node_list,
 			num_dir_node, nondir_node_list, num_nondir_node,
@@ -2624,7 +2598,8 @@ int32_t restore_meta_structure(FILE *fptr)
 system stat updates will go to the restored sys stat, not the
 current one */
 	int32_t errcode, ret;
-	struct stat this_stat, meta_stat;
+	HCFS_STAT this_stat;
+	struct stat meta_stat; /* Meta file system stat */
 	FILE_META_TYPE file_meta;
 	BLOCK_ENTRY_PAGE tmppage;
 	int64_t page_pos, current_page, which_page;
@@ -2638,16 +2613,16 @@ current one */
 
 	FSEEK(fptr, 0, SEEK_SET);
 	fstat(fileno(fptr), &meta_stat);
-	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
-	if (S_ISDIR(this_stat.st_mode)) {
+	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+	if (S_ISDIR(this_stat.mode)) {
 		/* Restore cloud related data */
-		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
 				SEEK_SET);
 		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 		cloud_data.size_last_upload = meta_stat.st_size;
 		cloud_data.meta_last_upload = meta_stat.st_size;
 		cloud_data.upload_seq = 1;
-		FSEEK(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE),
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
@@ -2655,15 +2630,15 @@ current one */
 		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
 		return 0;
 
-	} else if (S_ISLNK(this_stat.st_mode)) {
+	} else if (S_ISLNK(this_stat.mode)) {
 		/* Restore cloud related data */
-		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
 				SEEK_SET);
 		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 		cloud_data.size_last_upload = meta_stat.st_size;
 		cloud_data.meta_last_upload = meta_stat.st_size;
 		cloud_data.upload_seq = 1;
-		FSEEK(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE),
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
@@ -2674,8 +2649,8 @@ current one */
 
 	/* Restore status and statistics */
 	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
-	total_blocks = (this_stat.st_size == 0) ? 0 :
-		((this_stat.st_size - 1) / MAX_BLOCK_SIZE + 1);
+	total_blocks = (this_stat.size == 0) ? 0 :
+		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
 
 	current_page = -1;
 	write_page = FALSE;
@@ -2730,29 +2705,29 @@ current one */
 	}
 
 	/* Restore file statistics */
-	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), SEEK_SET);
 	FREAD(&file_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
 	file_stats.num_cached_blocks = 0;
 	file_stats.dirty_data_size = 0;
 	file_stats.cached_size = 0;
-	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), SEEK_SET);
 	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
 	/* Restore cloud related data */
-	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE), SEEK_SET);
 	FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-	cloud_data.size_last_upload = this_stat.st_size + meta_stat.st_size;
+	cloud_data.size_last_upload = this_stat.size + meta_stat.st_size;
 	cloud_data.meta_last_upload = meta_stat.st_size;
 	cloud_data.upload_seq = 1;
-	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE), SEEK_SET);
 	FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 	/* Update statistics */
-	change_system_meta(this_stat.st_size, meta_stat.st_size,
+	change_system_meta(this_stat.size, meta_stat.st_size,
 			0, 0, 0, 0, TRUE);
 	if (P_IS_PIN(file_meta.local_pin)) {
-		ret = change_pin_size(this_stat.st_size);
+		ret = change_pin_size(this_stat.size);
 		if (ret < 0) {
 			/* If no space, change pin status? */
 /* FEATURE TODO: Need to keep pin status if possible. If new pin
@@ -2760,7 +2735,7 @@ requests surface before meta restoration is completed, should
 limit number / size of the requests, or should consider soft pin?
 */
 			file_meta.local_pin = P_UNPIN;
-			FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+			FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 			FWRITE(&file_meta,
 				sizeof(FILE_META_TYPE), 1, fptr);
 		}

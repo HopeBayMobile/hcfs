@@ -820,7 +820,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 		if (ret < 0)
 			return ret;
 		/* If not a regular file, do nothing */
-		if (!S_ISREG(tempstat.st_mode))
+		if (!S_ISREG(tempstat.mode))
 			return 0;
 	}
 
@@ -833,12 +833,12 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
 	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
-		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	} else {
 		FSEEK(fptr, 0, SEEK_SET);
-		FREAD(&tempstat, sizeof(struct stat), 1, fptr);
+		FREAD(&tempstat, sizeof(HCFS_STAT), 1, fptr);
 		/* If not a regular file, do nothing */
-		if (!S_ISREG(tempstat.st_mode)) {
+		if (!S_ISREG(tempstat.mode)) {
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
 			return 0;
