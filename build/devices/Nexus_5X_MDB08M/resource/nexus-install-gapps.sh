@@ -427,7 +427,7 @@ CheckAttachedDevice() {
         TARGET_DEVICE=$(fastboot devices | awk '{if ($2=="fastboot") print $1}')
         ;;
       device|recovery)
-        TARGET_DEVICE=$(adb devices | sed '2!d' | awk '{if ($2=="device") print $1}')
+        TARGET_DEVICE=$(adb devices | sed '2!d' | awk '{if ($2=="device"||$2=="recovery") print $1}')
         ;;
       esac
     else
