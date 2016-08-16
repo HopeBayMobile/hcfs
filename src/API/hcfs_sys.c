@@ -617,3 +617,71 @@ int32_t toggle_sync_point(int32_t api_code)
 
 	return ret_code;
 }
+
+/************************************************************************
+ * *
+ * * Function name: trigger_restore
+ * *        Inputs:
+ * *       Summary: To initiate a restoration process.
+ * *
+ * *  Return value: 0 if successful.
+ * *                Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
+int32_t trigger_restore()
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = INITIATE_RESTORATION;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+/************************************************************************
+ * *
+ * * Function name: check_restore_status
+ * *        Inputs:
+ * *       Summary: To check the status of restoration process.
+ * *
+ * *  Return value: 0 if not being restored.
+ * *		    1 if in stage 1 of restoration process.
+ * *		    2 if in stage 2 of restoration process.
+ * *                Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
+int32_t check_restore_status()
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = CHECK_RESTORATION_STATUS;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
