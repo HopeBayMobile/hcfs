@@ -93,7 +93,7 @@ void HCFS_set_config(char **json_res, char *key, char *value)
 	cmd_len = 0;
 
 	CONCAT_ARGS(key);
-	CONCAT_ARGS(value)
+	CONCAT_ARGS(value);
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);

@@ -24,7 +24,7 @@ ffi.set_source( '_pyhcfs',
     """,
     include_dirs=[relpath("."), relpath("../HCFS")],
     sources=[relpath("parser.c")],
-    extra_compile_args=['-D_ANDROID_ENV_','-fdiagnostics-color=auto'])
+    extra_compile_args=['-D_ANDROID_ENV_', '-D_FILE_OFFSET_BITS=64'])
 
 # declare the functions, variables, etc. from the stuff in set_source
 # that you want to access from your C extension:
@@ -62,6 +62,11 @@ typedef struct {
 } PORTABLE_DIR_ENTRY;
 
 typedef struct {
+	uint64_t block_num;
+	uint64_t block_seq;
+} PORTABLE_BLOCK_NAME;
+
+typedef struct {
 	int32_t result;
 	int32_t file_type;
 	uint64_t child_number;
@@ -77,7 +82,13 @@ void parse_meta(char *meta_path, RET_META *meta);
 int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 			 const int32_t start_el, const int32_t limit,
 			 int64_t *end_page_pos, int32_t *end_el_no,
-			 PORTABLE_DIR_ENTRY *file_list);
+			 int32_t *num_children, PORTABLE_DIR_ENTRY *file_list);
+
+int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage);
+
+int32_t list_file_blocks(const char *meta_path,
+			 PORTABLE_BLOCK_NAME **block_list_ptr,
+			 int64_t *ret_num, int64_t *inode_num);
     """)
 
 if __name__ == "__main__":

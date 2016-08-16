@@ -4,58 +4,91 @@ import os
 from itertools import islice
 _HERE = os.path.dirname(__file__)
 
+TEST_DATA_PATHS = [
+        "test_data/v1/android",
+        "test_data/v1/linux/"
+]
 
 pp = pprint.PrettyPrinter(indent=4)
 
 def test_list_external_volume():
-    _TEST_FSMGR_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'fsmgr'))
-    ret = parser.list_external_volume(_TEST_FSMGR_FILENAME)
-    pp.pprint(ret)
-    assert ret == [(187, b'hcfs_external')]
+    for dir_path in TEST_DATA_PATHS:
+        _TEST_FSMGR_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'fsmgr'))
+        ret = parser.list_external_volume(_TEST_FSMGR_FILENAME)
+        pp.pprint(ret)
+        assert ret[0][0] > 1
+        assert ret[0][1] == b'hcfs_external'
 
 def test_parse_meta():
-    _TEST_META_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'meta'))
-    ret = parser.parse_meta(_TEST_META_FILENAME)
-    pp.pprint(ret)
-    assert ret == {
-            'child_number': 3001,
-            'file_type': 0,
-            'result': 0,
-            'stat': {   '__pad1': 0,
-                '__unused4': 0,
-                '__unused5': 0,
-                'atime': 1466493536,
-                'atime_nsec': 0,
-                'blksize': 1048576,
-                'blocks': 0,
-                'ctime': 1466493534,
-                'ctime_nsec': 0,
-                'dev': 0,
-                'gid': 2000,
-                'ino': 423,
-                'mode': 16895,
-                'mtime': 1466493534,
-                'mtime_nsec': 0,
-                'nlink': 2,
-                'rdev': 0,
-                'size': 0,
-                'uid': 2000}
-            }
-
+    for dir_path in TEST_DATA_PATHS:
+        _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'meta_isdir'))
+        ret = parser.parse_meta(_TEST_META_FILENAME)
+        pp.pprint(ret)
+        assert ret['result'] == 0
+        assert ret['file_type'] == 0
+        assert ret['child_number'] == 1002
 
 def test_list_dir_inorder():
-    _TEST_META_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'meta'))
-    _TEST_META_FILELIST_FILENAME = str.encode(os.path.join(_HERE, 'test_nexus_5x', 'meta_filelist'))
-    f = open(_TEST_META_FILELIST_FILENAME, 'r')
-    ret = { 'offset': (0, 0)}
-    sum=0
-    while True:
-        ret = parser.list_dir_inorder(_TEST_META_FILENAME, ret['offset'], limit=33)
-        files = [ x['d_name'] for x in ret['child_list'] ]
-        if len(files) == 0:
-            break
-        print(files)
-        sum += len(files)
-        for filename in files:
-            assert str.encode(f.readline().strip()) == filename
-    assert sum == 3003
+    for dir_path in TEST_DATA_PATHS:
+        _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'meta_isdir'))
+        _TEST_META_FILELIST_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'meta_isdir_filelist'))
+        f = open(_TEST_META_FILELIST_FILENAME, 'r')
+        ret = { 'offset': (0, 0)}
+        sum=0
+        while True:
+            ret = parser.list_dir_inorder(_TEST_META_FILENAME, ret['offset'], limit=33)
+            files = [ x['d_name'] for x in ret['child_list'] ]
+            if len(files) == 0:
+                break
+            #print(files)
+            sum += len(files)
+            for filename in files:
+                assert str.encode(f.readline().strip()) == filename
+        assert sum == 1002
+
+def test_get_vol_usage():
+    for dir_path in TEST_DATA_PATHS:
+        _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'FSstat2'))
+        ret = parser.get_vol_usage(_TEST_META_FILENAME)
+        pp.pprint(ret)
+        assert ret['result'] == 0
+        assert ret['usage'] > 1*10**10
+        assert ret['usage'] < 2*10**10
+
+def test_list_file_blocks():
+    for dir_path in TEST_DATA_PATHS:
+        _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'meta_isreg'))
+        ret = parser.list_file_blocks(_TEST_META_FILENAME)
+        pp.pprint(ret)
+        assert ret['result'] == 0
+        assert ret['ret_num'] == len(ret['block_list'])
+
+if __name__ == '__main__':
+    print("-----------------------------")
+    print("- Test list_external_volume -")
+    print("-----------------------------")
+    test_list_external_volume()
+
+    print("\n\n")
+    print("-----------------------------")
+    print("-      Test parse_meta      -")
+    print("-----------------------------")
+    test_parse_meta()
+
+    print("\n\n")
+    print("-----------------------------")
+    print("-   Test list_dir_inorder   -")
+    print("-----------------------------")
+    test_list_dir_inorder()
+
+    print("\n\n")
+    print("-----------------------------")
+    print("-     Test get_vol_usage    -")
+    print("-----------------------------")
+    test_get_vol_usage()
+
+    print("\n\n")
+    print("-----------------------------")
+    print("-   Test list_file_blocks   -")
+    print("-----------------------------")
+    test_list_file_blocks()
