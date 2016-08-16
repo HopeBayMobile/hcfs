@@ -105,16 +105,19 @@ Use Docker as Swift Backend
 1. Install Docker Environment
 2. Pull Docker Image
 Example:
-   ```
-   $mkdir /home/jiahongwu/docker_data
-   $docker run -d -p 12345:8080 -v /home/jiahongwu/docker_data:/srv -t aerofs/swift
-   ```
+
+    ```
+    $mkdir /home/jiahongwu/docker_data
+    $docker run -d -p 12345:8080 -v /home/jiahongwu/docker_data:/srv -t aerofs/swift
+    ```
 3. Install Swift client
-   ```
-   $apt-get install python-pip
-   $pip install python-swiftclient
-   ```
+
+    ```
+    $apt-get install python-pip
+    $pip install python-swiftclient
+    ```
 4. Setup swift container
-   ```
-   $swift -A http://127.0.0.1:12345/auth/v1.0 -U test:tester -K testing post swift_test
-   ```
+
+    ```
+    $swift -A http://127.0.0.1:12345/auth/v1.0 -U test:tester -K testing post swift_test
+    ```
