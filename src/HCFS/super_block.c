@@ -2020,7 +2020,6 @@ error_handling:
 	return ret;
 }
 
-<<<<<<< HEAD
 /**
  * Set sync point. If the sync point had been set, then just overwrite
  * old sync point information. Otherwise allocate new resource it needs.
@@ -2102,7 +2101,8 @@ int32_t super_block_cancel_syncpoint()
 	free_syncpoint_resource(TRUE);
 	super_block_exclusive_release();
 	return 0;
-=======
+}
+
 #define _ASSERT_BACKEND_EXIST_() \
 	{\
 		if (CURRENT_BACKEND == NONE) \
@@ -2226,5 +2226,4 @@ errcode_handle:
 	flock(fileno(fsmgr_fptr), LOCK_UN);
 	fclose(fsmgr_fptr);
 	return errcode;
->>>>>>> feature/stage1_transition
 }

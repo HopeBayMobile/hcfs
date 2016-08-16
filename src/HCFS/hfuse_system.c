@@ -301,8 +301,7 @@ int32_t _init_download_curl(int32_t count)
  */
 void init_backend_related_module(void)
 {
-<<<<<<< HEAD
-	int32_t ret, count;
+	int32_t ret;
 	char syncpoint_path[400];
 
 	fetch_syncpoint_data_path(syncpoint_path);
@@ -317,18 +316,10 @@ void init_backend_related_module(void)
 	}
 
 	if (CURRENT_BACKEND != NONE) {
-#ifdef _ANDROID_ENV_
-		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
-		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
-#endif
-		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
-		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
-=======
-	if (CURRENT_BACKEND != NONE) {
-		//pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		/*pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);*/
+		/*pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);*/
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
-		//pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 	}
 }
 
@@ -337,7 +328,6 @@ void init_download_module(void)
 	int32_t count;
 
 	if (CURRENT_BACKEND != NONE) {
->>>>>>> feature/stage1_transition
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
 		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
