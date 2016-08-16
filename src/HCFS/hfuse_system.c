@@ -113,8 +113,6 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
 
-/* FEATURE TODO: Make sure that system meta can be reconstructed or
-restored from a backup copy */
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {
 		errcode = errno;

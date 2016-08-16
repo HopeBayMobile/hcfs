@@ -27,12 +27,9 @@
 #include "event_notification.h"
 #include "hcfs_fromcloud.h"
 #include "metaops.h"
+#include "mount_manager.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
-
-/* FEATURE TODO: Need to create system stat file hcfssystemfile
-for stage 1 restoration, and swap it to the correct place in
-stage 2 as well */
 
 void init_restore_path(void)
 {
@@ -442,6 +439,43 @@ errcode_handle:
 	return errcode;
 }
 
+int32_t _update_FS_stat(ino_t rootinode)
+{
+	char despath[METAPATHLEN];
+	int32_t errcode;
+	FILE *fptr;
+	FS_CLOUD_STAT_T tmpFSstat;
+	size_t ret_size;
+
+	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync",
+	         RESTORE_METAPATH);
+	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+		 RESTORE_METAPATH, (uint64_t)rootinode);
+
+	fptr = fopen(despath, "r");
+	if (fptr == NULL) {
+		errcode = -errno;
+		write_log(0, "Unable to open FS stat for restoration (%d)\n",
+		          -errcode);
+		return errcode;
+	}
+	FREAD(&tmpFSstat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fclose(fptr);
+
+	restored_system_meta.system_size += tmpFSstat.backend_system_size;
+	restored_system_meta.system_meta_size += tmpFSstat.backend_meta_size;
+	restored_system_meta.pinned_size += tmpFSstat.pinned_size;
+	restored_system_meta.backend_size += tmpFSstat.backend_system_size;
+	restored_system_meta.backend_meta_size += tmpFSstat.backend_meta_size;
+	restored_system_meta.backend_inodes += tmpFSstat.backend_num_inodes;
+
+	return 0;
+
+errcode_handle:
+	fclose(fptr);
+	return errcode;
+}
+
 int32_t _fetch_pinned(ino_t thisinode)
 {
 	FILE_META_TYPE tmpmeta;
@@ -647,6 +681,38 @@ errcode_handle:
 	return errcode;
 }
 
+/* This is a helper function for writing reconstructed system stat to
+hcfssystemfile in restored meta storage folder */
+int32_t _rebuild_system_meta(void)
+{
+	char restored_sysmeta[METAPATHLEN];
+	FILE *fptr;
+	int32_t errcode;
+	size_t ret_size;
+
+	snprintf(restored_sysmeta, METAPATHLEN, "%s/hcfssystemfile",
+	         RESTORE_METAPATH);
+	fptr = fopen(restored_sysmeta, "w");
+	if (fptr == NULL) {
+		errcode = -errno;
+		write_log(0, "Unable to open sys file for restoration (%d)\n",
+		          -errcode);
+		return errcode;
+	}
+	FWRITE(&restored_system_meta, sizeof(SYSTEM_DATA_TYPE), 1, fptr);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:
+	fclose(fptr);
+	return errcode;
+}
+
+int32_t _restore_system_quota(void)
+{
+	return 0;
+}
+
 /* FEATURE TODO: Verify if downloaded objects are enough for restoration */
 int32_t run_download_minimal(void)
 {
@@ -659,6 +725,7 @@ int32_t run_download_minimal(void)
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 
+	memset(&restored_system_meta, 0, sizeof(SYSTEM_DATA_TYPE));
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
 	ret = restore_fetch_obj("FSmgr_backup", despath, FALSE);
 
@@ -686,23 +753,66 @@ int32_t run_download_minimal(void)
 		          tmpentry->d_name);
 		if (!strcmp("hcfs_app", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
-			_fetch_meta(rootino);
-			_fetch_FSstat(rootino);
-			_expand_and_fetch(rootino, "/data/app", 0);
+			ret = _fetch_meta(rootino);
+			if (ret == 0)
+				ret = _fetch_FSstat(rootino);
+			if (ret == 0)
+				ret = _update_FS_stat(rootino);
+			if (ret == 0)
+				ret = _expand_and_fetch(rootino,
+						"/data/app", 0);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 			continue;
 		}
 		if (!strcmp("hcfs_data", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
-			_fetch_meta(rootino);
-			_fetch_FSstat(rootino);
-			_expand_and_fetch(rootino, "/data/data", 0);
+			ret = _fetch_meta(rootino);
+			if (ret == 0)
+				ret = _fetch_FSstat(rootino);
+			if (ret == 0)
+				ret = _update_FS_stat(rootino);
+			if (ret == 0)
+				ret = _expand_and_fetch(rootino,
+						"/data/data", 0);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			continue;
 		}
 		if (!strcmp("hcfs_external", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
-			_fetch_meta(rootino);
-			_fetch_FSstat(rootino);
-			_expand_and_fetch(rootino, "/storage/emulated", 0);
+			ret = _fetch_meta(rootino);
+			if (ret == 0)
+				ret = _fetch_FSstat(rootino);
+			if (ret == 0)
+				ret = _update_FS_stat(rootino);
+			if (ret == 0)
+				ret = _expand_and_fetch(rootino,
+						"/storage/emulated", 0);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			continue;
 		}
+	}
+
+	/* Rebuild hcfssystemmeta in the restoration path */
+	ret = _rebuild_system_meta();
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	/* Fetch quota value from backend and store in the restoration path */
+	ret = _restore_system_quota();
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
 	}
 
 	sem_wait(&restore_sem);
@@ -713,6 +823,7 @@ int32_t run_download_minimal(void)
 		errcode = ret;
 		goto errcode_handle;
 	}
+	sync();
 
 	sem_post(&restore_sem);
 
