@@ -373,6 +373,7 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 	FILE *fptr;
 	int32_t ret;
 
+	ret = 0;
 	fptr = fopen(despath, "w+");
 	if (fptr == NULL) {
 		write_log(0, "Unable to open file for writing\n");
@@ -380,11 +381,15 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 	}
 
 	ret = fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname);
-
-	if (ret < 0)
+	if (ret < 0) {
+		fclose(fptr);
 		unlink(despath);
+		return ret;
+	}
+
 	if (is_meta == TRUE)
-		restore_meta_structure(fptr);
+		/* Reset block status to ST_CLOUD */
+		ret = restore_meta_structure(fptr);
 	fclose(fptr);
 	return ret;
 }
@@ -487,6 +492,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 	int32_t errcode, ret;
 	size_t ret_size;
 	BLOCK_ENTRY_PAGE temppage;
+	BOOL write_page;
 
 	fetch_restore_meta_path(metapath, thisinode);
 	fptr = fopen(metapath, "r");
@@ -498,13 +504,14 @@ int32_t _fetch_pinned(ino_t thisinode)
 
 	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	FREAD(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
-	if (tmpmeta.local_pin == P_UNPIN) {
+	if (P_IS_UNPIN(tmpmeta.local_pin)) {
 		/* Don't fetch blocks */
 		fclose(fptr);
 		return 0;
 	}
 
 	/* Assuming fixed block size now */
+	write_page = FALSE;
 	tmpsize = tmpstat.size;
 	totalblocks = ((tmpsize - 1) / 1048576) + 1;
 	lastpage = -1;
@@ -512,6 +519,12 @@ int32_t _fetch_pinned(ino_t thisinode)
 		nowpage = count / MAX_BLOCK_ENTRIES_PER_PAGE;
 		nowindex = count % MAX_BLOCK_ENTRIES_PER_PAGE;
 		if (lastpage != nowpage) {
+			if (write_page == TRUE) {
+				FSEEK(fptr, filepos, SEEK_SET);
+				FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE),
+						1, fptr);
+				write_page = FALSE;
+			}
 			/* Reload page pos */
 			filepos = seek_page2(&tmpmeta, fptr, nowpage, 0);
 			if (filepos < 0) {
@@ -531,15 +544,30 @@ int32_t _fetch_pinned(ino_t thisinode)
 			lastpage = nowpage;
 		}
 
-		seq = temppage.block_entries[nowindex].seqnum;
-		_fetch_block(thisinode, count, seq);
-		/* FEATURE TODO: Change block status in meta */
+		/* Skip if block does not exist */
+		if (temppage.block_entries[nowindex].status == ST_CLOUD) {
+			seq = temppage.block_entries[nowindex].seqnum;
+			ret = _fetch_block(thisinode, count, seq);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			/* Change block status in meta */
+			temppage.block_entries[nowindex].status = ST_BOTH;
+			write_page = TRUE;
+		}
+	}
+	if (write_page == TRUE) {
+		FSEEK(fptr, filepos, SEEK_SET);
+		FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+		write_page = FALSE;
 	}
 
 	fclose(fptr);
 	return 0;
 errcode_handle:
 	fclose(fptr);
+	write_log(0, "Restore Error: Error in %s. Code %d\n", __func__, -errcode);
 	return errcode;
 }
 
