@@ -51,6 +51,9 @@
 #define          POINTERS_PER_PAGE_v1 1024
 #define              MAX_LINK_PATH_v1 4096
 
+/* Default values for struct stat */
+#define                    ST_BLKSIZE 4096
+
 static const char META_MAGIC[] = "hcfs";
 
 typedef struct { /* 128 bytes */

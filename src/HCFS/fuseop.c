@@ -1021,7 +1021,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.dev = dev;
 	this_stat.size = 0;
-	this_stat.blksize = MAX_BLOCK_SIZE;
+	this_stat.blksize = ST_BLKSIZE;
 	this_stat.blocks = 0;
 	this_stat.nlink = 1;
 
@@ -1192,7 +1192,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	this_stat.size = 0;
-	this_stat.blksize = MAX_BLOCK_SIZE;
+	this_stat.blksize = ST_BLKSIZE;
 	this_stat.blocks = 0;
 
 	self_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
@@ -7275,7 +7275,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	init_hcfs_stat(&this_stat);
 	this_stat.dev = 0;
 	this_stat.size = 0;
-	this_stat.blksize = MAX_BLOCK_SIZE;
+	this_stat.blksize = ST_BLKSIZE;
 	this_stat.blocks = 0;
 	this_stat.nlink = 1;
 	self_mode = mode | S_IFREG;
