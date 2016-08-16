@@ -47,6 +47,7 @@ pip-log.txt
 /tests/unit_test/c/unittest_modules/*/test_detail_*.xml
 /tests/unit_test/c/unittest_modules/*/*_unittest
 /clangScanBuildReports
+/tests/unit_test/c/unittest_modules/*/core
 
 # Auto tests
 /tmp
