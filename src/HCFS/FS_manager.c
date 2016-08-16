@@ -363,7 +363,7 @@ errcode_handle:
 	if (metafptr != NULL)
 		fclose(metafptr);
 	if (statfptr != NULL)
-		fclose(metafptr);
+		fclose(statfptr);
 	return 0;
 }
 
