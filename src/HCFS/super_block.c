@@ -822,6 +822,7 @@ int32_t super_block_reclaim(void)
 		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
+		free(unclaimed_list);
 		return -errcode;
 	}
 
@@ -833,6 +834,7 @@ int32_t super_block_reclaim(void)
 			clearerr(sys_super_block->unclaimed_list_fptr);
 			write_log(0, "IO error in inode reclaiming\n");
 			super_block_exclusive_release();
+			free(unclaimed_list);
 			return -EIO;
 		}
 
@@ -868,6 +870,7 @@ int32_t super_block_reclaim(void)
 								&tempentry);
 		if (ret_val < 0) {
 			super_block_exclusive_release();
+			free(unclaimed_list);
 			return ret_val;
 		}
 
@@ -885,6 +888,7 @@ int32_t super_block_reclaim(void)
 								&tempentry);
 			if (ret_val < 0) {
 				super_block_exclusive_release();
+				free(unclaimed_list);
 				return ret_val;
 			}
 		}
@@ -895,6 +899,7 @@ int32_t super_block_reclaim(void)
 	ret_val = write_super_block_head();
 	if (ret_val < 0) {
 		super_block_exclusive_release();
+		free(unclaimed_list);
 		return ret_val;
 	}
 
@@ -904,6 +909,7 @@ int32_t super_block_reclaim(void)
 		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
+		free(unclaimed_list);
 		return -errcode;
 	}
 
