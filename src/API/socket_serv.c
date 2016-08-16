@@ -365,6 +365,44 @@ int32_t do_clear_sync_point(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_trigger_restore(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start trigger restore\n");
+	ret_code = trigger_restore();
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End trigger restore\n");
+	return ret_code;
+}
+
+int32_t do_check_restore_status(char *largebuf, int32_t arg_len,
+				char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start check restore status\n");
+	ret_code = check_restore_status();
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End check restore status\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -444,23 +482,25 @@ int32_t process_request(void *arg)
 	}
 
 	SOCK_CMDS cmds[] = {
-		{PIN,		do_pin_by_path},
-		{UNPIN,		do_unpin_by_path},
-		{CHECKDIRSTAT,	do_check_dir_status},
-		{CHECKLOC,	do_check_file_loc},
-		{CHECKPIN,	do_check_pin_status},
-		{SETCONFIG,	do_set_hcfs_config},
-		{GETCONFIG,	do_get_hcfs_config},
-		{GETSTAT,	do_get_hcfs_stat},
-		{RESETXFERSTAT,	do_reset_xfer_usage},
-		{SETSYNCSWITCH,	do_toggle_cloud_sync},
-		{GETSYNCSWITCH,	do_get_sync_status},
-		{RELOADCONFIG,	do_reload_hcfs_config},
-		{OCCUPIEDSIZE,	do_get_occupied_size},
+		{PIN,			do_pin_by_path},
+		{UNPIN,			do_unpin_by_path},
+		{CHECKDIRSTAT,		do_check_dir_status},
+		{CHECKLOC,		do_check_file_loc},
+		{CHECKPIN,		do_check_pin_status},
+		{SETCONFIG,		do_set_hcfs_config},
+		{GETCONFIG,		do_get_hcfs_config},
+		{GETSTAT,		do_get_hcfs_stat},
+		{RESETXFERSTAT,		do_reset_xfer_usage},
+		{SETSYNCSWITCH,		do_toggle_cloud_sync},
+		{GETSYNCSWITCH,		do_get_sync_status},
+		{RELOADCONFIG,		do_reload_hcfs_config},
+		{OCCUPIEDSIZE,		do_get_occupied_size},
 		{SETNOTIFYSERVER,	do_set_notify_server},
-		{SETSWIFTTOKEN,	do_set_swift_token},
-		{SETSYNCPOINT,	do_set_sync_point},
+		{SETSWIFTTOKEN,		do_set_swift_token},
+		{SETSYNCPOINT,		do_set_sync_point},
 		{CANCELSYNCPOINT,	do_clear_sync_point},
+		{INITIATE_RESTORATION,	do_trigger_restore},
+		{CHECK_RESTORATION_STATUS,	do_check_restore_status},
 	};
 
 	uint32_t n;
@@ -599,7 +639,6 @@ int32_t init_server()
 				break;
 			}
 		}
-
 	}
 
 	close(sock_fd);
