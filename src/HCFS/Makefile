@@ -17,7 +17,7 @@ CPPFLAGS = -DDEDUP_ENABLE=0 \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\"
 
 CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
-LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
+LDFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
 	CPPFLAGS += -fdiagnostics-color=auto
@@ -84,7 +84,7 @@ check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
 
 hcfs: $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LFLAGS)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LDFLAGS)
 
 # compile and generate dependency info
 $(OBJS_DIR)/%.o: %.c | $(OBJS_DIR)
