@@ -74,9 +74,9 @@ SB_THREAD_POOL *rebuild_sb_tpool;
 REBUILD_SB_JOBS *rebuild_sb_jobs;
 
 int32_t rebuild_super_block_entry(ino_t this_inode,
-		struct stat *this_stat, char pin_status);
+		HCFS_STAT *this_stat, char pin_status);
 int32_t restore_meta_super_block_entry(ino_t this_inode,
-		struct stat *ret_stat);
+		HCFS_STAT *ret_stat);
 int32_t init_rebuild_sb(char rebuild_action);
 void destroy_rebuild_sb(BOOL destroy_queue_file);
 int32_t create_sb_rebuilder();

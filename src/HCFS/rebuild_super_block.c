@@ -662,7 +662,7 @@ void rebuild_sb_worker(void *t_idx)
 	int32_t tidx;
 	BOOL leave;
 	INODE_JOB_HANDLE inode_job;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 
 	write_log(4, "Now begin to rebuild sb\n");
 	write_log(4, "Number of remaining jobs %lld\n",
@@ -706,7 +706,7 @@ void rebuild_sb_worker(void *t_idx)
 		}
 
 		/* Push new job */
-		if (S_ISDIR(this_stat.st_mode)) {
+		if (S_ISDIR(this_stat.mode)) {
 			ino_t *dir_list, *nondir_list;
 			int64_t num_dir, num_nondir;
 			char *nondir_type_list;
@@ -876,7 +876,7 @@ int32_t create_sb_rebuilder()
  * @return 0 on success. Otherwise negative error code.
  */
 int32_t rebuild_super_block_entry(ino_t this_inode,
-	struct stat *this_stat, char pin_status)
+	HCFS_STAT *this_stat, char pin_status)
 {
 	int32_t ret;
 	SUPER_BLOCK_ENTRY sb_entry, tmp_sb_entry;
@@ -890,7 +890,7 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 
 	/* Rebuild entry */
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	memcpy(&(sb_entry.inode_stat), this_stat, sizeof(struct stat));
+	memcpy(&(sb_entry.inode_stat), this_stat, sizeof(HCFS_STAT));
 	sb_entry.this_index = this_inode;
 	sb_entry.generation = 1;
 	sb_entry.status = NO_LL;
@@ -910,7 +910,7 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 
 	/* Begin to write entry */
 	if (pin_status == PIN) {
-		if (S_ISREG(this_stat->st_mode)) {
+		if (S_ISREG(this_stat->mode)) {
 			/* Enqueue and set as ST_PINNING */
 			ret = pin_ll_enqueue(this_inode, &sb_entry);
 			sb_entry.pin_status = ST_PINNING;
@@ -941,13 +941,13 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
  *
  * @return 0 on success. Otherwise negative error code.
  */
-int32_t restore_meta_super_block_entry(ino_t this_inode, struct stat *ret_stat)
+int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 {
 	char metapath[300];
 	int32_t errcode, ret;
 	size_t ret_size;
 	char pin_status;
-	struct stat this_stat;
+	HCFS_STAT this_stat;
 	FILE_META_TYPE this_meta;
 	FILE *fptr;
 	SUPER_BLOCK_ENTRY sb_entry;
@@ -961,7 +961,7 @@ restoring mode is early enough so that read will always be successful here */
 	if (sb_entry.this_index > 0) {
 		if (ret_stat)
 			memcpy(ret_stat, &(sb_entry.inode_stat),
-					sizeof(struct stat));
+					sizeof(HCFS_STAT));
 		return 0;
 	}
 
@@ -985,9 +985,9 @@ restoring mode is early enough so that read will always be successful here */
 	flock(fileno(fptr), LOCK_EX);
 	/* Get pin status */
 	FSEEK(fptr, 0, SEEK_SET);
-	FREAD(&this_stat, sizeof(struct stat), 1, fptr);
-	if (S_ISREG(this_stat.st_mode)) {
-		FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+	if (S_ISREG(this_stat.mode)) {
+		FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 		FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
 		if (P_IS_PIN(this_meta.local_pin))
 			pin_status = PIN;
@@ -1009,7 +1009,7 @@ restoring mode is early enough so that read will always be successful here */
 	}
 
 	if (ret_stat)
-		memcpy(ret_stat, &this_stat, sizeof(struct stat));
+		memcpy(ret_stat, &this_stat, sizeof(HCFS_STAT));
 	return 0;
 
 errcode_handle:

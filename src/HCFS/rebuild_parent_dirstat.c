@@ -167,7 +167,7 @@ int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 			goto errcode_handle;
 		}
 		/* Translate info of blocks to file location */
-		FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
 		      SEEK_SET);
 		FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
 		memset(&tmp_dirstat, 0, sizeof(DIR_STATS_TYPE));
