@@ -125,7 +125,7 @@ def list_dir_inorder(meta_path="", offset=(0, 0), limit=1000):
         end_page_pos,
         end_el_no,
         num_child_walked,
-     file_list)
+        file_list)
 
     ret['result'] = ret_code
     ret['offset'] = (end_page_pos[0], end_el_no[0])

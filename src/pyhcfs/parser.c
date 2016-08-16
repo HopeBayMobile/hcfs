@@ -480,7 +480,7 @@ int32_t list_file_blocks(const char *meta_path,
 #endif
 	FILE *metafptr;
 	int ret;
-	int32_t meta_fd, tmp_errno, ret_val, errcode;
+	int32_t tmp_errno, ret_val, errcode;
 	size_t ret_size;
 	//ssize_t ret_ssize;
 	HCFS_STAT_v1 meta_stat;
@@ -508,11 +508,7 @@ int32_t list_file_blocks(const char *meta_path,
 	if (metafptr == NULL)
 		 return ERROR_SYSCALL;
 
-	meta_fd = fileno(metafptr);
-
-	ret_val = read(meta_fd, &meta_stat, sizeof(HCFS_STAT_v1));
-	if (ret_val == -1)
-		goto errcode_handle;
+	FREAD(&meta_stat, sizeof(HCFS_STAT_v1), 1, metafptr);
 
 	ret_val = check_meta_ver(&meta_stat);
 	if (ret_val != 0)
@@ -525,9 +521,7 @@ int32_t list_file_blocks(const char *meta_path,
 	}
 
 	/* Load file meta */
-	ret_val = read(meta_fd, &file_meta, sizeof(FILE_META_TYPE_v1));
-	if (ret_val == -1)
-		goto errcode_handle;
+	FREAD(&file_meta, sizeof(FILE_META_TYPE_v1), 1, metafptr);
 
 	/* loop over all meta blocks */
 	current_page = -1;
@@ -573,7 +567,7 @@ int32_t list_file_blocks(const char *meta_path,
 errcode_handle:
 	tmp_errno = errno;
 end:
-	close(meta_fd);
+	fclose(metafptr);
 	errno = tmp_errno;
 	return (ret_val >= 0) ? 0 : ret_val;
 }
@@ -735,15 +729,26 @@ int32_t check_page_level(int64_t page_index)
 
 int64_t longpow(int64_t base, int32_t power)
 {
-	int64_t tmp;
-	int32_t count;
+	if (power < 0) return 0; /* FIXME: error handling */
+	int64_t pow1024[] = {
+		1, 1024, 1048576, 1073741824,
+		1099511627776, 1125899906842624, 1152921504606846976};
+	if (base == 1024 && power <= 6) { /* fast path */
+		return pow1024[power];
+		/* FIXME: if power >= 7, integer overflow */
+	}
 
-	tmp = 1;
-
-	for (count = 0; count < power; count++)
-		tmp = tmp * base;
-
-	return tmp;
+	uint64_t r = 1;
+	/* slow path with slight optimization */
+	while (power != 0) {
+		if (power % 2 == 1) { /* q is odd */
+			r *= base;
+			power--;
+		}
+		base *= base;
+		power /= 2;
+	}
+	return r;
 }
 
 int32_t write_log(int32_t level, char *format, ...)

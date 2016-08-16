@@ -12,6 +12,7 @@
 *
 **************************************************************************/
 
+#define _GNU_SOURCE
 #include "parser.h"
 #include <assert.h>
 #include <errno.h>
@@ -25,12 +26,14 @@
 
 #define TEST_FILE(file) "test_data/v1/android/" #file
 
+#define test_target "test_data/v1/android"
 void test_list_file_blocks()
 {
 	int32_t ret_val = 0;
 	int64_t vol_usage = 0;
 	int64_t ret_num, i, inode;
 	PORTABLE_BLOCK_NAME *list;
+	char * s = NULL;
 
 	printf("\n\nDemo list_file_blocks(\"%s\");\n", TEST_FILE(meta_isreg));
 	puts("============================================");
@@ -50,6 +53,7 @@ void test_get_vol_usage()
 {
 	int32_t ret_val = 0;
 	int64_t vol_usage = 0;
+	char * s = NULL;
 
 	printf("\n\nDemo get_vol_usage(\"%s\")\n", TEST_FILE(FSstat2));
 	puts("============================================");
@@ -68,6 +72,9 @@ void test_list_dir_inorder()
 	int32_t end_el = 0;
 	int64_t end_pos = 0;
 	PORTABLE_DIR_ENTRY file_list[400];
+	char * s = NULL;
+
+	asprintf(&s, "%s/meta_isdir", test_target);
 
 	printf("\n\nDemo list_dir_inorder(\"%s\"), 0, 0, 400, &end_pos, "
 	       "&end_el, &(file_list[0]);\n",
@@ -107,6 +114,9 @@ void test_parse_meta()
 	int32_t i;
 	RET_META meta_data = {0};
 	HCFS_STAT *stat_data = &meta_data.stat;
+	char * s = NULL;
+
+	asprintf(&s, "%s/FSstat2", test_target);
 
 	printf("\n\nDemo list_external_volume(\"%s\", &ret_entry, &ret_num);\n",
 	       TEST_FILE(fsmgr));
