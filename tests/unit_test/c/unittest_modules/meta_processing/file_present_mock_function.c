@@ -223,6 +223,7 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode, HCFS_STAT *inode_stat,
         SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (symlink_meta_ptr) {
+		memset(symlink_meta_ptr, 0, sizeof(SYMLINK_META_TYPE));
 		symlink_meta_ptr->generation = GENERATION_NUM;
 
 		if (this_inode == INO_LNK)
