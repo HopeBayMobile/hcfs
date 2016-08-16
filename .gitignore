@@ -7,7 +7,7 @@
 # C extensions
 *.a
 *.o
-*.d
+*.o.d
 
 # Distribution / packaging
 /*.egg
