@@ -122,7 +122,7 @@ void drop_cache_entry(PATH_CACHE *cacheptr)
 	num_dropped = 0;
 	while (num_dropped < NUM_NODES_DROP) {
 		tmpptr = cacheptr->gfirst;
-		if (cacheptr->num_nodes <= 0)
+		if (!tmpptr || cacheptr->num_nodes <= 0)
 			break;
 		cacheptr->gfirst = tmpptr->gnext;
 		if (cacheptr->gfirst != NULL)
