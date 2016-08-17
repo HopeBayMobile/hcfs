@@ -278,6 +278,7 @@ TEST_P(list_dir_inorderTest, FromTreeRootSuccessful)
 	int32_t count = 0;
 	FILE *fp;
 	char fname[100];
+	char *pos;
 	CONCAT_TEST_META_PATH("meta_isdir");
 
 	ret_val = list_dir_inorder(
@@ -293,6 +294,8 @@ TEST_P(list_dir_inorderTest, FromTreeRootSuccessful)
 
 	for (;;) {
 		fgets(fname, 100, fp);
+		if ((pos = strchr(fname, '\n')) != NULL)
+			*pos = '\0';
 		ASSERT_STREQ(file_list[count].d_name, fname);
 		count += 1;
 		if (count >= limit)
@@ -488,7 +491,7 @@ class get_vol_usageTest : public ::testing::TestWithParam<const char*>
 TEST_P(get_vol_usageTest, OPSuccessful)
 {
 	int64_t vol_usage = 0;
-	CONCAT_TEST_META_PATH("FSstat2");
+	CONCAT_TEST_META_PATH("FSstat");
 	ret_val = get_vol_usage(meta_path, &vol_usage);
 	EXPECT_EQ(ret_val, 0);
 	EXPECT_GT(vol_usage, 10000000000);
