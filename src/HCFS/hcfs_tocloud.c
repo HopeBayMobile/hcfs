@@ -1561,6 +1561,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
 	if (ddt_fptr == NULL) {
 		/* Can't access ddt btree file */
+		fclose(fptr);
 		return -EBADF;
 	}
 	ddt_fd = fileno(ddt_fptr);
@@ -1605,6 +1606,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 				block_no);
 			flock(ddt_fd, LOCK_UN);
 			fclose(ddt_fptr);
+			fclose(fptr);
 			return ret;
 		}
 
