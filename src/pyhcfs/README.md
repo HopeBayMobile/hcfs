@@ -200,7 +200,7 @@ Demo list_dir_inorder
 Demo get_vol_usage
 ==============================
 
-    get_vol_usage(b"test_data/v1/android/FSstat2")
+    get_vol_usage(b"test_data/v1/android/FSstat")
 
     {'result': 0, 'usage': 1373381904}
 
