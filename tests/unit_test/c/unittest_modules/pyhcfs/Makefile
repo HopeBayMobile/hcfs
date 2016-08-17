@@ -21,6 +21,6 @@ $(eval $(call ADDMODULE))
 
 # All tests produced by this Makefile.
 
-#$(eval $(call ADDTEST, pyhcfs_unittest, \
-#  pyhcfs_unittest.o \
-#  parser.o ))
+$(eval $(call ADDTEST, pyhcfs_unittest, \
+  pyhcfs_unittest.o \
+  parser.o ))
