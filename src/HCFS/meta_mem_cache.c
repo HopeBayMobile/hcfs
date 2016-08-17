@@ -88,11 +88,12 @@ inline char is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr,
+		int64_t *metasize, int64_t *metalocalsize)
 {
 	int32_t ret;
 	int32_t errcode;
-	int64_t ret_pos;
+	struct stat tmpstat;
 
 	*metasize = 0;
 	if (ptr->meta_opened == FALSE || ptr->fptr == NULL) {
@@ -101,8 +102,16 @@ int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize
 			return ret;
 	}
 
-	LSEEK(fileno(ptr->fptr), 0, SEEK_END);
-	*metasize = ret_pos;
+	ret = fstat(fileno(ptr->fptr), &tmpstat);
+	if (ret < 0) {
+		errcode = -errno;
+		goto errcode_handle;
+	}
+
+	if (metasize)
+		*metasize = tmpstat.st_size;
+	if (metalocalsize)
+		*metalocalsize = tmpstat.st_blocks * 512;
 	return 0;
 
 errcode_handle:

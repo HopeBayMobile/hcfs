@@ -1077,7 +1077,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1228,7 +1228,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1650,7 +1650,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	DIR_STATS_TYPE tmpstat;
 	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
+	int64_t old_metasize1_blk, old_metasize2_blk;
+	int64_t new_metasize1_blk, new_metasize2_blk;
 	int64_t delta_meta_size1, delta_meta_size2;
+	int64_t delta_meta_size1_blk, delta_meta_size2_blk;
 	BOOL is_external = FALSE;
 
 	parent_inode1 = real_ino(req, parent);
@@ -1755,7 +1758,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-	meta_cache_get_meta_size(parent1_ptr, &old_metasize1);
+	meta_cache_get_meta_size(parent1_ptr, &old_metasize1,
+			&old_metasize1_blk);
 
 	if (parent_inode1 != parent_inode2) {
 		parent2_ptr = meta_cache_lock_entry(parent_inode2);
@@ -1773,7 +1777,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
-		meta_cache_get_meta_size(parent2_ptr, &old_metasize2);
+		meta_cache_get_meta_size(parent2_ptr, &old_metasize2,
+				&old_metasize2_blk);
 	} else {
 		parent2_ptr = parent1_ptr;
 		old_metasize2 = old_metasize1;
@@ -2175,23 +2180,32 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 #endif
 	}
 
-	meta_cache_get_meta_size(parent1_ptr, &new_metasize1);
-	meta_cache_get_meta_size(parent2_ptr, &new_metasize2);
+	meta_cache_get_meta_size(parent1_ptr, &new_metasize1,
+			&new_metasize1_blk);
+	meta_cache_get_meta_size(parent2_ptr, &new_metasize2,
+			&new_metasize2_blk);
 
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
 
-	if (new_metasize1 > 0 && old_metasize1 > 0)
+	if (new_metasize1 > 0 && old_metasize1 > 0) {
 		delta_meta_size1 = new_metasize1 - old_metasize1;
-	else
+		delta_meta_size1_blk = new_metasize1_blk - old_metasize1_blk;
+	} else {
 		delta_meta_size1 = 0;
-	if (new_metasize2 > 0 && old_metasize2 > 0)
+		delta_meta_size1_blk = 0;
+	}
+	if (new_metasize2 > 0 && old_metasize2 > 0) {
 		delta_meta_size2 = new_metasize2 - old_metasize2;
-	else
+		delta_meta_size2_blk = new_metasize2_blk - old_metasize2_blk;
+	} else {
 		delta_meta_size2 = 0;
+		delta_meta_size2_blk = 0;
+	}
 
 	if (delta_meta_size1 + delta_meta_size2 != 0) {
-		change_system_meta(0, delta_meta_size1 + delta_meta_size2,
+		change_system_meta(delta_meta_size1 + delta_meta_size2,
+				delta_meta_size1_blk + delta_meta_size2_blk,
 				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0,
 				delta_meta_size1 + delta_meta_size2 , 0);
@@ -4739,6 +4753,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	FILE_META_TYPE thisfilemeta;
 	int64_t sizediff, amount_preallocated;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	int64_t now_seq;
 	int64_t max_pinned_size;
 
@@ -4812,7 +4827,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 	fh_ptr->meta_cache_locked = TRUE;
 
-	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize);
+	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize,
+			&old_metasize_blk);
 
 	/* Move update_meta_seq() here so that avoid race condition
 	 * caused from write by multi-threads */
@@ -4914,11 +4930,15 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			break;
 	}
 
-	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &new_metasize);
-	if (old_metasize > 0 && new_metasize > 0)
+	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &new_metasize,
+			&new_metasize_blk);
+	if (old_metasize > 0 && new_metasize > 0) {
 		delta_meta_size = (new_metasize - old_metasize);
-	else
+		delta_meta_size_blk = (new_metasize_blk - old_metasize_blk);
+	} else {
 		delta_meta_size = 0;
+		delta_meta_size_blk = 0;
+	}
 
 	/*Update and flush file meta*/
 	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
@@ -4951,7 +4971,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	if (temp_stat.size < (offset + total_bytes_written)) {
 		change_system_meta((int64_t) ((offset + total_bytes_written)
-				- temp_stat.size), delta_meta_size,
+				- temp_stat.size + delta_meta_size),
+				delta_meta_size_blk,
 				0, 0, 0, 0, TRUE);
 		ret = change_mount_stat(tmpptr,
 			(int64_t) ((offset + total_bytes_written)
@@ -4969,7 +4990,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		temp_stat.blocks = (temp_stat.size+511) / 512;
 	} else {
 		if (delta_meta_size != 0) {
-			change_system_meta(0, delta_meta_size,
+			change_system_meta(delta_meta_size, delta_meta_size_blk,
 					0, 0, 0, 0, TRUE);
 			ret = change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 			if (ret < 0) {
@@ -6254,7 +6275,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -6414,6 +6435,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	FILE_META_TYPE this_filemeta;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -6501,7 +6523,8 @@ fetch_xattr:
 		goto error_handle;
 	}
 
-	meta_cache_get_meta_size(meta_cache_entry, &old_metasize);
+	meta_cache_get_meta_size(meta_cache_entry, &old_metasize,
+			&old_metasize_blk);
 
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos, TRUE);
@@ -6516,20 +6539,24 @@ fetch_xattr:
 	if (retcode < 0)
 		goto error_handle;
 
-	meta_cache_get_meta_size(meta_cache_entry, &new_metasize);
+	meta_cache_get_meta_size(meta_cache_entry, &new_metasize,
+			&new_metasize_blk);
 
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
 
-	if (new_metasize > 0 && old_metasize > 0)
+	if (new_metasize > 0 && old_metasize > 0) {
 		delta_meta_size = new_metasize - old_metasize;
-	else
-		delta_meta_size = 0;
+		delta_meta_size_blk = new_metasize_blk - old_metasize_blk;
+	} else {
+		delta_meta_size_blk = 0;
+	}
 
 	if (delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, delta_meta_size_blk,
+				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -7047,6 +7074,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	char local_pin;
 	BOOL is_external = FALSE;
 
@@ -7102,7 +7130,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize,
+			&old_metasize_blk);
 
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
 		&result_index, newname, parent_meta_cache_entry,
@@ -7131,10 +7160,13 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		errcode = ret_val;
 		goto error_handle;
 	}
-	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize,
+			&new_metasize_blk);
 	delta_meta_size = new_metasize - old_metasize;
+	delta_meta_size_blk = new_metasize_blk - old_metasize_blk;
 	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, delta_meta_size_blk,
+				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -7336,7 +7368,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);

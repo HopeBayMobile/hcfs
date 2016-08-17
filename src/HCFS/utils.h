@@ -109,7 +109,7 @@ int32_t ignore_sigpipe(void);
 
 BOOL is_natural_number(char const *str);
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize);
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metalocalsize);
 
 int32_t get_quota_from_backup(int64_t *quota);
 int32_t meta_nospc_log(const char *func_name, int32_t lines);
