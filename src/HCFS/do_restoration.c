@@ -31,6 +31,12 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
+/* FEATURE TODO: How to verify that the meta / data stored on cloud
+is enough for restoration (what if important system app / files cannot
+be restored?) */
+/* FEATURE TODO: How to purge files that cannot be restored correctly
+from the directory structure */
+
 void init_restore_path(void)
 {
 	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore",
