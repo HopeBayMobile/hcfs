@@ -168,7 +168,9 @@ int32_t fetch_inode_stat(ino_t this_inode,
 		return -ENOENT;
 	}
 
-	write_log(10, "fetch_inode_stat get only generation %lld\n", *ret_gen);
+	if (ret_gen)
+		write_log(10, "fetch_inode_stat get only generation %lld\n",
+		          *ret_gen);
 	return 0;
 
 error_handling:
