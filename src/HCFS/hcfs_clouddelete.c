@@ -424,6 +424,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 errcode_handle:
 	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
 	return errcode;
 }
 
