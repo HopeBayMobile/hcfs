@@ -1,5 +1,4 @@
 CC = gcc
-CPPFLAGS =
 CFLAGS = -g -pthread -Wall -Wextra
 LDFLAGS = -lsqlite3 -ljansson -lcrypto
 
@@ -8,27 +7,39 @@ LDFLAGS = -lsqlite3 -ljansson -lcrypto
 
 OBJS_DIR = obj/
 
-hcfsapid_OBJS = $(addprefix $(OBJS_DIR), \
-		   socket_serv.o pin_ops.o hcfs_stat.o hcfs_sys.o enc.o socket_util.o logger.o)
+hcfsapid_OBJS = \
+	socket_serv.o \
+	pin_ops.o \
+	hcfs_stat.o \
+	hcfs_sys.o \
+	enc.o \
+	socket_util.o \
+	logger.o
+hcfsapid_OBJS := $(addprefix $(OBJS_DIR),$(hcfsapid_OBJS))
 
-test_OBJS = $(addprefix $(OBJS_DIR), \
-	    test.o HCFS_api.o)
+test_OBJS = \
+	test.o \
+	HCFS_api.o
+test_OBJS := $(addprefix $(OBJS_DIR),$(test_OBJS))
 
-hcfsconf_OBJS = $(addprefix $(OBJS_DIR), \
-	    hcfsconf.o enc.o logger.o)
+hcfsconf_OBJS = \
+	hcfsconf.o \
+	enc.o \
+	logger.o
+hcfsconf_OBJS := $(addprefix $(OBJS_DIR),$(hcfsconf_OBJS))
 
 deps =
-OBJS := $(hcfsapid_OBJS) $(test_OBJS)
+OBJS := $(hcfsapid_OBJS) $(test_OBJS) $(hcfsconf_OBJS)
 deps += $(OBJS:%.o=%.o.d)
 
 hcfsapid: $(hcfsapid_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsapid_OBJS) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -g $(hcfsapid_OBJS) -o $@ $(LDFLAGS)
 
 test: $(test_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(test_OBJS) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -g $(test_OBJS) -o $@ $(LDFLAGS)
 
 hcfsconf: $(hcfsconf_OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(hcfsconf_OBJS) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -g $(hcfsconf_OBJS) -o $@ $(LDFLAGS)
 
 publish: doc
 	sudo cp -r doc /mnt/nas/CloudDataSolution/Gateway_2.0/
@@ -37,14 +48,11 @@ doc: HCFS_api.c HCFS_api.h
 	cldoc generate -c -- --static --basedir . --type html --merge docs --output doc HCFS_api.h
 
 clean:
-	rm -rf $(OBJS_DIR) $(OBJS_DIR) hcfsapid test hcfsconf
-
-# pull in dependency info for *existing* .o files
--include $(OBJS:.o=.d)
+	rm -rf $(OBJS_DIR) hcfsapid test hcfsconf
 
 # compile and generate dependency info
 $(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@ -MMD -MF $@.d
+	$(CC) -c $(CFLAGS) $< -o $@ -MMD -MF $@.d
 
 $(OBJS_DIR):
 	mkdir $@
