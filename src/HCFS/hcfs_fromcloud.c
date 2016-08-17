@@ -286,12 +286,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			}
 
 			fflush(metafptr);
-
-			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->systemdata.cache_size += blockstat.st_size;
-			hcfs_system->systemdata.cache_blocks++;
-			sync_hcfs_system_data(FALSE);
-			sem_post(&(hcfs_system->access_sem));
+			change_system_meta(0, 0, blockstat.st_size,
+					1, 0, 0, TRUE);
 
 			/* Signal cache management that something can be paged
 			out */

@@ -202,10 +202,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					errcode = -errcode;
 					goto errcode_handle;
 				}
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_size -=
-							block_stat.st_size;
-				hcfs_system->systemdata.cache_blocks--;
+				change_system_meta(0, 0, -block_stat.st_size,
+						-1, 0, 0, TRUE);
 				ret = unlink(thisblockpath);
 				if (ret < 0) {
 					errcode = errno;
@@ -214,10 +212,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 						__func__, errcode,
 						strerror(errcode));
 					errcode = -errcode;
-					sem_post(&(hcfs_system->access_sem));
 					goto errcode_handle;
 				}
-				sync_hcfs_system_data(FALSE);
 				ret = update_file_stats(metafptr, 0, -1,
 							-(block_stat.st_size),
 							0, this_inode);
@@ -225,8 +221,6 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					errcode = ret;
 					goto errcode_handle;
 				}
-
-				sem_post(&(hcfs_system->access_sem));
 
 				/* Do not sync the block status change
 				due to paging out */

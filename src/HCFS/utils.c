@@ -1066,6 +1066,18 @@ off_t check_file_size(const char *path)
 	return -errcode;
 }
 
+int64_t block_4k_unit(int64_t input)
+{
+	int64_t output;
+	int32_t sign;
+
+	sign = input >= 0 ? 1 : -1;
+	input *= sign; /* absolute value */
+	output = (input % 4096 == 0) ? input : (input / 4096 + 1) * 4096;
+
+	return sign * output;
+}
+
 /************************************************************************
 *
 * Function name: change_system_meta
@@ -1092,12 +1104,14 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
 
-	hcfs_system->systemdata.system_meta_size += meta_size_delta;
+	hcfs_system->systemdata.system_meta_size +=
+			block_4k_unit(meta_size_delta);
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
 
 	/* Cached size includes meta size */
-	hcfs_system->systemdata.cache_size += cache_data_size_delta;
+	hcfs_system->systemdata.cache_size +=
+			block_4k_unit(cache_data_size_delta);
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;
 
