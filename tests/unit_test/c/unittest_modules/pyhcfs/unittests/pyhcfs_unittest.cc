@@ -276,7 +276,6 @@ class list_dir_inorderTest : public ::testing::TestWithParam<const char*>
 TEST_P(list_dir_inorderTest, FromTreeRootSuccessful)
 {
 	int32_t count = 0;
-	int32_t cmp_res;
 	FILE *fp;
 	char fname[100];
 	CONCAT_TEST_META_PATH("meta_isdir");
@@ -294,9 +293,7 @@ TEST_P(list_dir_inorderTest, FromTreeRootSuccessful)
 
 	for (;;) {
 		fgets(fname, 100, fp);
-		cmp_res = strncmp(file_list[count].d_name, fname,
-				  strlen(file_list[count].d_name));
-		EXPECT_EQ(0, cmp_res);
+		ASSERT_STREQ(file_list[count].d_name, fname);
 		count += 1;
 		if (count >= limit)
 			break;
@@ -316,9 +313,9 @@ TEST_P(list_dir_inorderTest, TraverseAllSuccessful)
 					   &num_children, &(file_list[0]));
 
 		if (num_children > 0 && num_children < limit) {
-			EXPECT_EQ(num_children, total_children % limit);
+			ASSERT_EQ(num_children, total_children % limit);
 		} else if (num_children > 0) {
-			EXPECT_EQ(num_children, limit);
+			ASSERT_EQ(num_children, limit);
 		} else {
 			break;
 		}
