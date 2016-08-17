@@ -2636,9 +2636,8 @@ errcode_handle:
  */
 int32_t restore_meta_structure(FILE *fptr)
 {
-/* FEATURE TODO: Should change this function so that in stage 1
-system stat updates will go to the restored sys stat, not the
-current one */
+/* FEATURE TODO: system size change should be only for verifying
+correctness of restored system meta here */
 	int32_t errcode, ret;
 	HCFS_STAT this_stat;
 	struct stat meta_stat; /* Meta file system stat */
@@ -2669,7 +2668,7 @@ current one */
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 		/* Update statistics */
-		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
+//		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
 		return 0;
 
 	} else if (S_ISLNK(this_stat.mode)) {
@@ -2685,7 +2684,7 @@ current one */
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 		/* Update statistics */
-		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
+//		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
 		return 0;
 	}
 
@@ -2766,22 +2765,20 @@ current one */
 	FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 	/* Update statistics */
-	change_system_meta(this_stat.size, meta_stat.st_size,
-			0, 0, 0, 0, TRUE);
-	if (P_IS_PIN(file_meta.local_pin)) {
-		ret = change_pin_size(this_stat.size);
-		if (ret < 0) {
+//	change_system_meta(this_stat.size, meta_stat.st_size,
+//			0, 0, 0, 0, TRUE);
+//	if (P_IS_PIN(file_meta.local_pin)) {
+/* FEATURE TODO: Pin size will be restored, so change_pin_size
+should only be for verifying the correctness. */
+//		ret = change_pin_size(this_stat.size);
+//		if (ret < 0) {
 			/* If no space, change pin status? */
-/* FEATURE TODO: Need to keep pin status if possible. If new pin
-requests surface before meta restoration is completed, should
-limit number / size of the requests, or should consider soft pin?
-*/
-			file_meta.local_pin = P_UNPIN;
-			FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
-			FWRITE(&file_meta,
-				sizeof(FILE_META_TYPE), 1, fptr);
-		}
-	}
+//			file_meta.local_pin = P_UNPIN;
+//			FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+//			FWRITE(&file_meta,
+//				sizeof(FILE_META_TYPE), 1, fptr);
+//		}
+//	}
 
 	return 0;
 

@@ -89,6 +89,28 @@ errcode_handle:
 		fclose(fptr);
 	return errcode;
 }
+
+BOOL _enough_local_space(void)
+{
+
+	/* Need cache size to be less than 0.2 of max possible cache size */
+	if (hcfs_system->systemdata.cache_size >=
+	    CACHE_HARD_LIMIT * REDUCED_RATIO)
+		return FALSE;
+
+	/* Need pin size to be less than 0.2 of max possible pin size */
+	if (hcfs_system->systemdata.pinned_size >=
+	    MAX_PINNED_LIMIT * REDUCED_RATIO)
+		return FALSE;
+
+	/* Need pin size to be less than 0.2 of max possible meta size */
+	if (hcfs_system->systemdata.system_meta_size >=
+	    META_SPACE_LIMIT * REDUCED_RATIO)
+		return FALSE;
+
+	return TRUE;
+}
+
 int32_t initiate_restoration(void)
 {
 	int32_t ret, errcode;
@@ -101,20 +123,15 @@ int32_t initiate_restoration(void)
 
 	sem_wait(&restore_sem);
 
-	/* First check if cache size is enough */
+	/* First check if there is enough space for restoration */
 	sem_wait(&(hcfs_system->access_sem));
-	/* FEATURE TODO: consider
-	2. current pin size
-	3. current high-priority pin size
-	4. current meta size (later)
-	*/
 
-	/* Need cache size to be less than 0.2 of max possible cache size */
-	if (hcfs_system->systemdata.cache_size >= CACHE_HARD_LIMIT * 0.2) {
+	if (_enough_local_space() == FALSE) {
 		sem_post(&(hcfs_system->access_sem));
 		errcode = -ENOSPC;
 		goto errcode_handle;
 	}
+
 	sem_post(&(hcfs_system->access_sem));
 
 	/* First create the restoration folders if needed */
@@ -224,27 +241,17 @@ int32_t notify_restoration_result(int8_t stage, int32_t result)
 
 int32_t restore_stage1_reduce_cache(void)
 {
-
-	/* FEATURE TODO: consider
-	3. current high-priority pin size
-	4. current meta size (later)
-	*/
-
 	sem_wait(&(hcfs_system->access_sem));
 
 	/* Need enough cache space */
-	if ((hcfs_system->systemdata).cache_size >=
-	    CACHE_HARD_LIMIT * REDUCED_RATIO) {
-		sem_post(&(hcfs_system->access_sem));
-		return -ENOSPC;
-	}
-	if ((hcfs_system->systemdata).pinned_size >=
-	    MAX_PINNED_LIMIT * REDUCED_RATIO) {
+	if (_enough_local_space() == FALSE) {
 		sem_post(&(hcfs_system->access_sem));
 		return -ENOSPC;
 	}
 
 	CACHE_HARD_LIMIT = CACHE_HARD_LIMIT * REDUCED_RATIO;
+	META_SPACE_LIMIT = META_SPACE_LIMIT * REDUCED_RATIO;
+
 	/* Change the max system size as well */
 	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
 	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;

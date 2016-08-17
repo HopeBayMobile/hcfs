@@ -424,10 +424,6 @@ does not (i.e. no block to be restored in stage 1). Will need to first
 check this situation to decide if need to rename blockpath to todelete
 and then create a new blockpath */
 
-/* FEATURE TODO: Need an upgrade mechanism to add max_inode from super block to
-FSstats (now used for tracking max inode in the backend). An OTA is needed for
-allowing current devices to restore */
-
 /* FEATURE TODO: error handling? */
 	if (access(RESTORE_METAPATH, F_OK) == 0) {
 		/* Need to rename the path to the current one */
@@ -585,8 +581,6 @@ int32_t main(int32_t argc, char **argv)
 	/* Init backend related services and super block */
 	if ((CURRENT_BACKEND != NONE) &&
 	    (restoring_status != RESTORING_STAGE1)) {
-		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
-		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		init_download_module();
 		ret = check_init_super_block();
 		if (ret < 0) {
@@ -599,9 +593,10 @@ int32_t main(int32_t argc, char **argv)
 			/* Rebuild superblock.
 			 * Do NOT init upload/delete/cache mgmt */
 		}
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 	} else if ((CURRENT_BACKEND != NONE) &&
 	    (restoring_status == RESTORING_STAGE1)) {
-		/* FEATURE TODO: stage 1 bootup */
 		ret = check_init_super_block();
 		if (ret < 0) {
 			exit(ret);

@@ -701,14 +701,8 @@ int32_t delete_filesystem(char *fsname)
 	       sizeof(DIR_ENTRY));
 	FS_root = temp_entry.d_ino;
 
-	/* Try fetching meta file from backend if in restoring mode */
-	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
-		ret = restore_meta_super_block_entry(FS_root, NULL);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
-		}
-	}
+	/* Root meta will always be fetched in stage 1, so don't need
+	to worry if it is stored locally in stage 2 */
 
 	ret = fetch_meta_path(thismetapath, FS_root);
 	metafptr = NULL;
