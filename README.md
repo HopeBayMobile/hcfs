@@ -57,11 +57,11 @@ CACHE_RESERVED = 536870912
 META_SPACE_LIMIT = 107374182
 MAX_BLOCK_SIZE = 1048576
 CURRENT_BACKEND = swift
-SWIFT_ACCOUNT = hopebay
-SWIFT_USER = hopebay
-SWIFT_PASS = ZZZZZZZZ
-SWIFT_URL = 192.168.0.100:8080
-SWIFT_CONTAINER = hopebay_private_container
+SWIFT_ACCOUNT = test
+SWIFT_USER = tester
+SWIFT_PASS = testing
+SWIFT_URL = 127.0.0.1:12345
+SWIFT_CONTAINER = swift_test
 SWIFT_PROTOCOL = https
 S3_ACCESS = XXXXX
 S3_SECRET = YYYYY
@@ -93,7 +93,31 @@ Required packages
     libsqlite3-dev
     libjansson-dev
     libcap-dev
+    libfuse-dev (Version > 2.9)
 
 Quick setup environment
 -----------------
 Execute `utils/setup_dev_env.sh` to setup development environment.
+
+
+Use Docker as Swift Backend
+-----------------
+1. Install Docker Environment
+2. Pull Docker Image
+Example:
+
+    ```
+    $ mkdir /home/jiahongwu/docker_data
+    $ docker run -d -p 12345:8080 -v /home/jiahongwu/docker_data:/srv -t aerofs/swift
+    ```
+3. Install Swift client
+
+    ```
+    $ apt-get install python-pip
+    $ pip install python-swiftclient
+    ```
+4. Setup swift container
+
+    ```
+    $ swift -A http://127.0.0.1:12345/auth/v1.0 -U test:tester -K testing post swift_test
+    ```

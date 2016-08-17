@@ -82,7 +82,8 @@ int32_t meta_cache_update_dir_data(ino_t this_inode, const HCFS_STAT *inode_stat
 }
 
 int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-	int32_t *result_index, const char *childname, META_CACHE_ENTRY_STRUCT *body_ptr)
+	int32_t *result_index, const char *childname, META_CACHE_ENTRY_STRUCT *body_ptr,
+	BOOL is_external)
 {
 	switch(this_inode) {
         case INO_SEEK_DIR_ENTRY_OK:
@@ -310,7 +311,7 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 
 int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
-	sprintf(pathname, "testpatterns/inode_%" PRIu64 "_block_%d",
+	sprintf(pathname, "testpatterns/inode_%" PRIu64 "_block_%"PRId64,
 			(uint64_t)this_inode, block_num);
 	return 0;
 }

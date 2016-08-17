@@ -13,12 +13,11 @@ CPPFLAGS = -DDEDUP_ENABLE=0 \
 	   -DENCRYPT_ENABLE=0 \
 	   -DCOMPRESS_ENABLE=0 \
 	   -D_FILE_OFFSET_BITS=64 \
-	   -DARM_32bit_ \
 	   -D_ANDROID_ENV_ \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\"
 
 CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
-LFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
+LDFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
 	CPPFLAGS += -fdiagnostics-color=auto
@@ -78,7 +77,9 @@ ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"
 	OBJS_F += pkg_cache.o
 endif
 
+deps =
 OBJS = $(addprefix $(OBJS_DIR)/, $(OBJS_F))
+deps += $(OBJS:%.o=%.o.d)
 
 all: check_pkgs hcfs
 
@@ -86,22 +87,16 @@ check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
 
 hcfs: $(OBJS)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LFLAGS)
-
-# pull in dependency info for *existing* .o files
-include $(wildcard $(OBJS_DIR)/*.d)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -g $(OBJS) -o hcfs $(LDFLAGS)
 
 # compile and generate dependency info
 $(OBJS_DIR)/%.o: %.c | $(OBJS_DIR)
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $*.c -o $(OBJS_DIR)/$*.o
-	@$(CC) -MM $(CPPFLAGS) $(CFLAGS) $*.c > $(OBJS_DIR)/$*.d
-	@sed -i"" -r -e 's#.*\.o#obj/&#g' \
-		-e ':a;$$!N;$$!ba;s# \\\n##g' \
-		-e 'p;s/\\ //g' -e 's/.*: //' \
-		-e '$$s/ |$$/:\n/g' $(OBJS_DIR)/$*.d
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@ -MMD -MF $@.d
 
 $(OBJS_DIR):
 	mkdir -p $@
 
 clean:
-	rm -rf hcfs $(OBJS_DIR)/*.o $(OBJS_DIR)/*.d
+	rm -rf hcfs $(OBJS_DIR)/*.o $(deps)
+
+-include $(deps)

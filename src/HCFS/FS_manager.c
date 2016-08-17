@@ -365,7 +365,7 @@ errcode_handle:
 	if (metafptr != NULL)
 		fclose(metafptr);
 	if (statfptr != NULL)
-		fclose(metafptr);
+		fclose(statfptr);
 	return 0;
 }
 
@@ -434,7 +434,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		      tmp_head.root_entry_page);
 	}
 	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
-				     &ret_index, &tpage2);
+				     &ret_index, &tpage2, FALSE);
 
 	if (ret >= 0) {
 		errcode = -EEXIST;
@@ -483,7 +483,8 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	ret = insert_dir_entry_btree(&temp_entry, &tpage,
 				     fs_mgr_head->FS_list_fh, &overflow_entry,
 				     &overflow_new_page, &tmp_head,
-				     temp_dir_entries, temp_child_page_pos);
+				     temp_dir_entries, temp_child_page_pos,
+				     FALSE);
 
 	if (ret < 0) {
 		errcode = ret;
@@ -667,7 +668,7 @@ int32_t delete_filesystem(char *fsname)
 	/* Check if the FS name exists. If not, return error */
 
 	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
-				     &ret_index, &tpage2);
+				     &ret_index, &tpage2, FALSE);
 
 	if (ret < 0) {
 		if (ret == -ENOENT)
@@ -749,7 +750,8 @@ int32_t delete_filesystem(char *fsname)
 	/* Delete FS from database */
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
 				     fs_mgr_head->FS_list_fh, &tmp_head,
-				     temp_dir_entries, temp_child_page_pos);
+				     temp_dir_entries, temp_child_page_pos,
+				     FALSE);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -824,7 +826,7 @@ int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 	/* Check if the FS name exists. If not, return error */
 
 	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
-				     &ret_index, &tpage2);
+				     &ret_index, &tpage2, FALSE);
 
 	if (ret < 0) {
 		errcode = ret;

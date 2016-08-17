@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_ -Wall -Wextra -g
+CFLAGS = -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -Wall -Wextra -g
 
 HCFSvol: HCFSvol.o pin_test.o fake_copy_minimal.o
 	$(CC) -o HCFSvol HCFSvol.o

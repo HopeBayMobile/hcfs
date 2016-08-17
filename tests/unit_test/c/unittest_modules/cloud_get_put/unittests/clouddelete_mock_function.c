@@ -29,15 +29,15 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
 	MOCK();
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
-		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS");
+		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS\n");
 		strcpy(pathname, TODELETE_PATH);
 		return 0;
 	} else if (this_inode == INODE__FETCH_TODELETE_PATH_FAIL) {
 		pathname[0] = '\0';
-		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_FAIL");
+		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_FAIL\n");
 		return -1;
 	} else {
-		DEBUG_PRINT("this_inode == %zu. Record this inode for later",
+		DEBUG_PRINT("this_inode == %zu. Record this inode for later\n",
 				(uint64_t)this_inode);
 		/* Record inode. Called when deleting inode in delete_loop() */
 		usleep(500000); // Let threads busy
@@ -110,14 +110,22 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	MOCK();
 	if (target_page >= 3)
 		return 0;
-	long long ret_page_pos = sizeof(HCFS_STAT) + 
-		sizeof(FILE_META_TYPE) + sizeof(CLOUD_RELATED_DATA) +
-		target_page * sizeof(BLOCK_ENTRY_PAGE);
+	long long ret_page_pos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+				 sizeof(FILE_STATS_TYPE) +
+				 sizeof(CLOUD_RELATED_DATA) +
+				 target_page * sizeof(BLOCK_ENTRY_PAGE);
 	return ret_page_pos;
 }
 
 int32_t write_log(int32_t level, char *format, ...)
 {
+#ifdef UT_DEBUG
+	va_list args;
+	va_start (args, format);
+	vprintf(format, args);
+	va_end (args);
+	fflush(stdout);
+#endif
 	return 0;
 }
 
@@ -146,6 +154,7 @@ void nonblock_sleep(uint32_t secs, BOOL (*wakeup_condition)(void))
 int fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
 	MOCK();
+	pathname[0] = 0;
 	return 0;
 }
 
@@ -173,6 +182,7 @@ int fetch_backend_meta_path(char *pathname, ino_t inode)
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
 	MOCK();
+	pathname[0] = 0;
 }
 
 int fetch_from_cloud(FILE *fptr, char action_from, char *objname)

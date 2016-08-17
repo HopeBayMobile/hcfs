@@ -26,7 +26,6 @@ $(eval $(call ADDTEST, metaops_unittest, \
     metaops.o \
     metaops_unittest.o ))
 
-BATCH_UT := 1
 $(eval $(call ADDTEST, file_present_unittest, \
     file_present_mock_function.o \
     file_present.o \

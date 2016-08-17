@@ -2519,40 +2519,38 @@ protected:
 
 	int32_t inject_fault_enqueue(ino_t this_inode, int32_t fault_loc)
 	{
-		int32_t ret;
 		SUPER_BLOCK_ENTRY tempentry;
 
-		ret = read_super_block_entry(this_inode, &tempentry);
+		read_super_block_entry(this_inode, &tempentry);
 
-		ret = ll_enqueue(this_inode, IS_DIRTY, &tempentry);
+		ll_enqueue(this_inode, IS_DIRTY, &tempentry);
 		if (fault_loc == 1)
 			return -81;
 
-		ret = write_super_block_entry(this_inode, &tempentry);
+		write_super_block_entry(this_inode, &tempentry);
 		if (fault_loc == 2)
 			return -82;
 
-		ret = write_super_block_head();
+		write_super_block_head();
 
 		return 0;
 	}
 
 	int32_t inject_fault_dequeue(ino_t this_inode, int32_t fault_loc)
 	{
-		int32_t ret;
 		SUPER_BLOCK_ENTRY tempentry;
 
-		ret = read_super_block_entry(this_inode, &tempentry);
+		read_super_block_entry(this_inode, &tempentry);
 
-		ret = ll_dequeue(this_inode, &tempentry);
+		ll_dequeue(this_inode, &tempentry);
 		if (fault_loc == 1)
 			return -91;
 
-		ret = write_super_block_head();
+		write_super_block_head();
 		if (fault_loc == 2)
 			return -92;
 
-		ret = write_super_block_entry(this_inode, &tempentry);
+		write_super_block_entry(this_inode, &tempentry);
 		return 0;
 	}
 

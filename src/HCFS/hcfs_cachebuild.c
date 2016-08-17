@@ -237,8 +237,7 @@ int32_t build_cache_usage(void)
 	char thisblockpath[400];
 	DIR *dirptr;
 	int32_t count;
-	struct dirent temp_dirent;
-	struct dirent *direntptr;
+	struct dirent *de;
 	int32_t ret, errcode;
 	int64_t blockno;
 	ino_t this_inode;
@@ -283,9 +282,9 @@ int32_t build_cache_usage(void)
 			continue;
 		}
 
-		ret = readdir_r(dirptr, &temp_dirent, &direntptr);
-		if (ret > 0) {
-			errcode = ret;
+		errno = 0; de = readdir(dirptr);
+		if (de == NULL && errno) {
+			errcode = errno;
 			write_log(0, "Error in cache replacement. Skipping\n");
 			write_log(2, "Code %d, %s\n", errcode,
 				strerror(errcode));
@@ -294,21 +293,20 @@ int32_t build_cache_usage(void)
 		}
 	//	write_log(10, "count is now %d\n", count);
 
-		while (direntptr != NULL) {
+		while (de != NULL) {
 	//		write_log(10, "count is now %d\n", count);
 			write_log(10, "Scanning file name %s\n",
-			          temp_dirent.d_name);
+			          de->d_name);
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
-			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%" PRId64,
+			ret = sscanf(de->d_name, "block%" PRIu64 "_%" PRId64,
 			             (uint64_t *)&this_inode, &blockno);
 			if (ret != 2) {
 				write_log(10, "Scan file does not match\n");
-				ret = readdir_r(dirptr, &temp_dirent,
-					&direntptr);
-				if (ret > 0) {
-					errcode = ret;
+				errno = 0; de = readdir(dirptr);
+				if (de == NULL && errno) {
+					errcode = errno;
 					break;
 				}
 				continue;
@@ -327,10 +325,9 @@ int32_t build_cache_usage(void)
 			ret = stat(thisblockpath, &tempstat);
 
 			if (ret != 0) {
-				ret = readdir_r(dirptr, &temp_dirent,
-					&direntptr);
-				if (ret > 0) {
-					errcode = ret;
+				errno = 0; de = readdir(dirptr);
+				if (de == NULL && errno) {
+					errcode = errno;
 					break;
 				}
 				continue;
@@ -369,9 +366,9 @@ int32_t build_cache_usage(void)
 			write_log(10, "Inserting the node\n");
 //			write_log(10, "count is now %d\n", count);
 			insert_cache_usage_node(this_inode, tempnode);
-			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
-			if (ret > 0) {
-				errcode = ret;
+			errno = 0; de = readdir(dirptr);
+			if (de == NULL && errno) {
+				errcode = errno;
 				break;
 			}
 //			write_log(10, "count is now %d\n", count);

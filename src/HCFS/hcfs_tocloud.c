@@ -689,7 +689,7 @@ void init_sync_stat_control(void)
 {
 	char *FS_stat_path, *fname;
 	DIR *dirp;
-	struct dirent tmp_entry, *tmpptr;
+	struct dirent *de;
 	int32_t ret, errcode;
 
 	FS_stat_path = (char *)malloc(METAPATHLEN);
@@ -708,16 +708,13 @@ void init_sync_stat_control(void)
 			errcode = -errcode;
 			goto errcode_handle;
 		}
-		tmpptr = NULL;
-		ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		/* Delete all existing temp FS stat */
-		while ((ret == 0) && (tmpptr != NULL)) {
-			if (strncmp(tmp_entry.d_name, "tmpFSstat", 9) == 0) {
+		while ((de = readdir(dirp)) != NULL) {
+			if (strncmp(de->d_name, "tmpFSstat", 9) == 0) {
 				snprintf(fname, METAPATHLEN - 1, "%s/%s",
-					 FS_stat_path, tmp_entry.d_name);
+					 FS_stat_path, de->d_name);
 				unlink(fname);
 			}
-			ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		}
 		closedir(dirp);
 	}
@@ -1565,6 +1562,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
 	if (ddt_fptr == NULL) {
 		/* Can't access ddt btree file */
+		fclose(fptr);
 		return -EBADF;
 	}
 	ddt_fd = fileno(ddt_fptr);
@@ -1609,6 +1607,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 				block_no);
 			flock(ddt_fd, LOCK_UN);
 			fclose(ddt_fptr);
+			fclose(fptr);
 			return ret;
 		}
 

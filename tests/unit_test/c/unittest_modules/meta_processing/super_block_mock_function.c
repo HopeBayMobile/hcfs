@@ -1,6 +1,7 @@
 #include "super_block_mock_params.h"
 #include <sys/types.h>
 #include <errno.h>
+#include <string.h>
 #include "params.h"
 #include "fuseop.h"
 #include "super_block.h"
@@ -34,9 +35,8 @@ int32_t update_sb_size(void)
 	return 0;
 }
 
-sleep_on_cache_full(void)
+void sleep_on_cache_full(void)
 {
-	return;
 }
 
 int64_t get_pinned_limit(const char pin_type)
@@ -50,7 +50,6 @@ int64_t get_pinned_limit(const char pin_type)
 void move_sync_point(char which_ll, ino_t this_inode,
 		struct SUPER_BLOCK_ENTRY *this_entry)
 {
-	return 0;
 }
 int32_t restore_meta_super_block_entry(ino_t this_inode,
                 struct stat *ret_stat)
@@ -65,6 +64,7 @@ int32_t init_syncpoint_resource()
 		malloc(sizeof(SYNC_POINT_INFO));
 	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
 	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);
+	return 0;
 }
 
 void free_syncpoint_resource(BOOL remove_file)

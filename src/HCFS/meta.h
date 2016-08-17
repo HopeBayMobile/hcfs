@@ -45,10 +45,14 @@
 #define              MAX_LINK_PATH 4096
 
 /* All versions value */
+#define MAX_BLOCK_ENTRIES_PER_PAGE_v1 100
 #define   MAX_DIR_ENTRIES_PER_PAGE_v1 99
 #define   MIN_DIR_ENTRIES_PER_PAGE_v1 30
 #define          POINTERS_PER_PAGE_v1 1024
 #define              MAX_LINK_PATH_v1 4096
+
+/* Default values for struct stat */
+#define                    ST_BLKSIZE 4096
 
 static const char META_MAGIC[] = "hcfs";
 
@@ -72,7 +76,7 @@ typedef struct { /* 128 bytes */
 	uint64_t mtime_nsec;
 	int64_t ctime;
 	uint64_t ctime_nsec;
-} HCFS_STAT, HCFS_STAT_v1;
+} _PACKED HCFS_STAT, HCFS_STAT_v1;
 
 #define COMMON_STAT_MEMBER \
 	X(dev);     X(ino);        X(mode);  X(nlink);      \
@@ -100,7 +104,7 @@ typedef struct { /* 128 bytes */
 typedef struct {
 	char content[MAX_VALUE_BLOCK_SIZE]; /* Content is NOT null-terminated */
 	int64_t next_block_pos;
-} VALUE_BLOCK, VALUE_BLOCK_v1;
+} _PACKED VALUE_BLOCK, VALUE_BLOCK_v1;
 
 /* A key entry includes key size, value size, the key string, and a file
    offset pointing to first value block. */
@@ -109,7 +113,7 @@ typedef struct {
 	uint32_t value_size;
 	char key[MAX_KEY_SIZE]; /* Key is null-terminated string  */
 	int64_t first_value_block_pos;
-} KEY_ENTRY, KEY_ENTRY_v1;
+} _PACKED KEY_ENTRY, KEY_ENTRY_v1;
 
 /* KEY_LIST includes an array sorted by key, and number of xattr.
    If the KEY_LIST is the first one, prev_list_pos is set to 0. If it is the
@@ -118,14 +122,14 @@ typedef struct {
 	uint32_t num_xattr;
 	KEY_ENTRY key_list[MAX_KEY_ENTRY_PER_LIST];
 	int64_t next_list_pos;
-} KEY_LIST_PAGE, KEY_LIST_PAGE_v1;
+} _PACKED KEY_LIST_PAGE, KEY_LIST_PAGE_v1;
 
 /* NAMESPACE_PAGE includes a hash table which is used to hash the input key.
    Each hash entry points to a KEY_LIST. */
 typedef struct {
 	uint32_t num_xattr;
 	int64_t key_hash_table[MAX_KEY_HASH_ENTRY];
-} NAMESPACE_PAGE, NAMESPACE_PAGE_v1;
+} _PACKED NAMESPACE_PAGE, NAMESPACE_PAGE_v1;
 
 /* XATTR_PAGE is pointed by next_xattr_page in meta file. Namespace is one of
    user, system, security, and trusted. */
@@ -133,14 +137,15 @@ typedef struct {
 	int64_t reclaimed_key_list_page;
 	int64_t reclaimed_value_block;
 	NAMESPACE_PAGE namespace_page[4];
-} XATTR_PAGE, XATTR_PAGE_v1;
+} _PACKED XATTR_PAGE, XATTR_PAGE_v1;
 
 
 typedef struct {
 	int64_t size_last_upload; /* Record data + meta */
 	int64_t meta_last_upload; /* Record meta only */
 	int64_t upload_seq;
-} CLOUD_RELATED_DATA, CLOUD_RELATED_DATA_v1;
+	uint8_t padding[64];
+} _PACKED CLOUD_RELATED_DATA, CLOUD_RELATED_DATA_v1;
 
 /******************************************************************************
  * Structures for directories
@@ -151,7 +156,7 @@ typedef struct {
 	char d_name[MAX_FILENAME_LEN + 1];
 	char d_type;
 	uint8_t padding[6];
-} DIR_ENTRY, DIR_ENTRY_v1;
+} _PACKED DIR_ENTRY, DIR_ENTRY_v1;
 
 /* Defining the structure of directory object meta */
 typedef struct {
@@ -166,7 +171,7 @@ typedef struct {
 	int64_t finished_seq;
 	uint8_t local_pin;
 	uint8_t padding[7];
-} DIR_META_TYPE, DIR_META_TYPE_v1;
+} _PACKED DIR_META_TYPE, DIR_META_TYPE_v1;
 
 /* Defining the structure for a page of directory entries */
 typedef struct {
@@ -181,14 +186,13 @@ typedef struct {
 	int64_t gc_list_next;
 	int64_t tree_walk_next;
 	int64_t tree_walk_prev;
-} DIR_ENTRY_PAGE, DIR_ENTRY_PAGE_v1;
+} _PACKED DIR_ENTRY_PAGE, DIR_ENTRY_PAGE_v1;
 
 typedef struct {
 	HCFS_STAT st;
 	DIR_META_TYPE dmt;
 	CLOUD_RELATED_DATA crd;
-	uint8_t padding[64];
-} DIR_META_HEADER, DIR_META_HEADER_v1;
+} _PACKED DIR_META_HEADER, DIR_META_HEADER_v1;
 
 /******************************************************************************
  * Structures for regular files
@@ -202,18 +206,18 @@ typedef struct {
 #endif
 	uint32_t paged_out_count;
 	int64_t seqnum;
-} BLOCK_ENTRY, BLOCK_ENTRY_v1;
+} _PACKED BLOCK_ENTRY, BLOCK_ENTRY_v1;
 
 /* Defining the structure of one page of block status page */
 typedef struct {
 	int32_t num_entries;
 	BLOCK_ENTRY block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
-} BLOCK_ENTRY_PAGE, BLOCK_ENTRY_PAGE_v1;
+} _PACKED BLOCK_ENTRY_PAGE, BLOCK_ENTRY_PAGE_v1;
 
 /* Defining the structure of pointer page (pointers to other pages) */
 typedef struct {
 	int64_t ptr[POINTERS_PER_PAGE];
-} PTR_ENTRY_PAGE, PTR_ENTRY_PAGE_v1;
+} _PACKED PTR_ENTRY_PAGE, PTR_ENTRY_PAGE_v1;
 
 /* Defining the structure of file meta */
 typedef struct {
@@ -229,7 +233,7 @@ typedef struct {
 	int64_t finished_seq;
 	uint8_t local_pin;
 	uint8_t padding[7]; // gcc auto pad to 8 byte even without this
-} FILE_META_TYPE, FILE_META_TYPE_v1;
+} _PACKED FILE_META_TYPE, FILE_META_TYPE_v1;
 
 /* The structure for keeping statistics for a file */
 typedef struct {
@@ -237,15 +241,14 @@ typedef struct {
 	int64_t num_cached_blocks;
 	int64_t cached_size;
 	int64_t dirty_data_size;
-} FILE_STATS_TYPE, FILE_STATS_TYPE_v1;
+} _PACKED FILE_STATS_TYPE, FILE_STATS_TYPE_v1;
 
 typedef struct {
 	HCFS_STAT st;
 	FILE_META_TYPE fmt;
 	FILE_STATS_TYPE fst;
 	CLOUD_RELATED_DATA crd;
-	uint8_t padding[64];
-} FILE_META_HEADER, FILE_META_HEADER_v1;
+} _PACKED FILE_META_HEADER, FILE_META_HEADER_v1;
 
 /******************************************************************************
  * Defining the structure of symbolic link meta
@@ -260,13 +263,13 @@ typedef struct {
 	int64_t finished_seq;
 	uint8_t local_pin;
 	uint8_t padding[7];
-} SYMLINK_META_TYPE, SYMLINK_META_TYPE_v1;
+} _PACKED SYMLINK_META_TYPE, SYMLINK_META_TYPE_v1;
 
 typedef struct {
 	HCFS_STAT st;
 	SYMLINK_META_TYPE smt;
 	CLOUD_RELATED_DATA crd;
-} SYMLINK_META_HEADER, SYMLINK_META_HEADER_v1;
+} _PACKED SYMLINK_META_HEADER, SYMLINK_META_HEADER_v1;
 
 /*END META definition*/
 

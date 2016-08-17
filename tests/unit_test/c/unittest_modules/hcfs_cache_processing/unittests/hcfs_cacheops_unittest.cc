@@ -45,16 +45,19 @@ class cacheopEnvironment : public ::testing::Environment {
         mkdir(tmppath, 0700);
       symlink(tmppath, "/tmp/testHCFS");
      }
+     FREE(tmppath);
 
   }
 
   virtual void TearDown() {
-    unlink("/tmp/testHCFS");
-    nftw(tmppath, do_delete, 20, FTW_DEPTH);
-    if (workpath != NULL)
-      free(workpath);
-    if (tmppath != NULL)
-      free(tmppath);
+	  unlink("/tmp/testHCFS");
+
+	  workpath = get_current_dir_name();
+	  tmppath = (char *)malloc(strlen(workpath) + 20);
+	  snprintf(tmppath, strlen(workpath) + 20, "%s/tmpdir", workpath);
+	  nftw(tmppath, do_delete, 20, FTW_DEPTH);
+	  FREE(workpath);
+	  FREE(tmppath);
   }
 };
 
@@ -155,6 +158,7 @@ private:
 		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
 				(uint64_t)inode);
 		fptr = fopen(meta_name, "w+");
+		assert(fptr != NULL);
 		fseek(fptr, 0, SEEK_SET);
 		fwrite(&file_stat, sizeof(HCFS_STAT), 1, fptr);
 		fwrite(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
@@ -204,14 +208,9 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 	
 	/* Run */
 	pthread_create(&thread_id, NULL, cache_loop_function, NULL);
-#ifdef ARM_32bit_
 	/* Change wait time to 120 secs for slower cpu */
 	printf("Test: cache_loop() is running. process sleep 20 seconds.\n");
 	sleep(20);
-#else
-	printf("Test: cache_loop() is running. process sleep 15 seconds.\n");
-	sleep(15);
-#endif
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT - 1; 
 	hcfs_system->system_going_down = TRUE;
 	printf("Test: Let thread leave.\n");

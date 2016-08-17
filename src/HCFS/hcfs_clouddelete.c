@@ -412,6 +412,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	} else {
 		write_log(0, "Error: Unknown type %d\n", this_mode);
+		fclose(metafptr);
 		return -EPERM;
 	}
 
@@ -424,6 +425,7 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 errcode_handle:
 	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
 	return errcode;
 }
 

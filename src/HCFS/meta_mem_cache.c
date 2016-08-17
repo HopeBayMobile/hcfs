@@ -1106,7 +1106,7 @@ the new one */
 *************************************************************************/
 int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	int32_t *result_index, const char *childname,
-				META_CACHE_ENTRY_STRUCT *body_ptr)
+	META_CACHE_ENTRY_STRUCT *body_ptr, BOOL is_external)
 {
 	char thismetapath[METAPATHLEN];
 	DIR_META_TYPE dir_meta;
@@ -1134,7 +1134,8 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 		tmp_page_ptr = body_ptr->dir_entry_cache[cache_idx];
 		ret = dentry_binary_search(tmp_page_ptr->dir_entries,
-			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
+			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index,
+			is_external);
 		if (ret >= 0) {
 			*result_index = ret;
 			memcpy(result_page, tmp_page_ptr,
@@ -1224,7 +1225,8 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	FREAD(&rootpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	ret = search_dir_entry_btree(childname, &rootpage,
-			fileno(body_ptr->fptr), &tmp_index, &tmp_resultpage);
+			fileno(body_ptr->fptr), &tmp_index, &tmp_resultpage,
+			is_external);
 	if ((ret < 0) && (ret != -ENOENT)) {
 		errcode = ret;
 		goto errcode_handle;

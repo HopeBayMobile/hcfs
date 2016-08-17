@@ -40,8 +40,8 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DDEDUP_ENABLE=0 \
 	    -DENCRYPT_ENABLE=1 \
 	    -DCOMPRESS_ENABLE=0 \
-	    -DARM_32bit_ \
-	    -D_ANDROID_ENV_
+	    -D_ANDROID_ENV_ \
+
 LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
 # Support  gcc4.9 color output
@@ -77,8 +77,8 @@ endif
 define COMPILE
   $(eval INC_DIR := $(addprefix -iquote,$(USER_DIR)))
 
-  $(OBJ_DIR)/%.d: $1/%.c | $(OBJ_DIR)
-	$(CC) -MM -MT $$(@:.d=.o) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) $$< > $$@
+  $(OBJ_DIR)/%.o.d: $1/%.c | $(OBJ_DIR)
+	$(CC) -MM -MT $$(@:.o.d=.o) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) $$< > $$@
   $(OBJ_DIR)/%.o: $1/%.c | $(OBJ_DIR)
 	$(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@
 
@@ -153,7 +153,7 @@ define ADDTEST
   $(eval OBJ_DIR := $(MD_PATH)/obj)
   $(eval OBJS := $(addprefix $(OBJ_DIR)/, $2))
   ifneq ($(MAKECMDGOALS),clean)
-    -include $(OBJS:%.o=%.d) # Load dependency info for *existing* .o files
+    -include $(OBJS:%.o=%.o.d) # Load dependency info for *existing* .o files
   endif
 
   # Build UT

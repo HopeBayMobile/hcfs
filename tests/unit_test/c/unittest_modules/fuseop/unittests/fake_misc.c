@@ -475,6 +475,12 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	MOCK();
 	return 0;
 }
+int32_t change_entry_name(ino_t parent_inode, const char *targetname,
+		          META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	MOCK();
+	return 0;
+}
 
 int32_t fetch_inode_stat(ino_t this_inode,
 			 HCFS_STAT *inode_stat,
@@ -601,7 +607,8 @@ int32_t fetch_inode_stat(ino_t this_inode,
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_metasize, char ispin)
+			ino_t root_ino, int64_t *delta_metasize, char ispin,
+			BOOL is_external)
 {
 	MOCK();
 	if (fail_mknod_update_meta == TRUE)
@@ -613,7 +620,8 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_metasize, char ispin)
+			ino_t root_ino, int64_t *delta_metasize, char ispin,
+			BOOL is_external)
 {
 	MOCK();
 	if (fail_mkdir_update_meta == TRUE)
@@ -623,7 +631,8 @@ int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 }
 
 int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
-			const DIR_ENTRY *this_entry)
+			const DIR_ENTRY *this_entry,
+			BOOL is_external)
 {
 	MOCK();
 	if (this_entry->d_ino == 4)
@@ -638,7 +647,7 @@ int32_t meta_forget_inode(ino_t self_inode)
 }
 
 int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
-			char *selfname)
+			char *selfname, BOOL is_external)
 {
 	MOCK();
 	if (this_inode == 6)
@@ -678,7 +687,8 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 	return;
 }
 int32_t change_dir_entry_inode(ino_t self_inode, char *targetname,
-	ino_t new_inode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	ino_t new_inode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
+	BOOL is_external)
 {
 	MOCK();
 	return 0;
@@ -867,7 +877,7 @@ void destroy_fs_manager(void)
 int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
 	const HCFS_STAT *this_stat, const char *link, 
 	const uint64_t generation, const char *name,
-	int64_t *delta_metasize, char ispin)
+	int64_t *delta_metasize, char ispin, BOOL is_external)
 {
 	MOCK();
 	if (!strcmp("update_meta_fail", link))
@@ -885,7 +895,8 @@ int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 
 int32_t link_update_meta(ino_t link_inode, const char *newname,
 	HCFS_STAT *link_stat, uint64_t *generation, 
-	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
+	BOOL is_external)
 {
 	MOCK();
 	memset(link_stat, 0, sizeof(HCFS_STAT));

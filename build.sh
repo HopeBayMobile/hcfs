@@ -32,7 +32,7 @@ ACTION:
 		5x|s58a
 			Build Android image.
 		--userdebug|--user
-			buila userdebug or user type with --userdebug and --user
+			build userdebug or user type with --userdebug and --user
 			respectively. Script will build both type if not specified.
 		--test
 			test image build process.
@@ -108,7 +108,7 @@ function pyhcfs ()
 	$repo/utils/setup_dev_env.sh -m docker_host
 	$repo/utils/setup_dev_env.sh
 	if ! groups $USER | grep  -q "\(docker\|root\)"; then
-		echo To run docker with user, please add your user into docker group and re-login session:
+		echo To run docker with user, please add your username into docker group and re-login session:
 		echo "sudo usermod -aG docker <user_name>"
 		exit 1
 	fi

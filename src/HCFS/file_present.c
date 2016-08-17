@@ -179,13 +179,13 @@ error_handling:
 
 /* Remove entry when this child inode fail to create meta */
 static inline int32_t dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
-	const char *childname, mode_t child_mode)
+	const char *childname, mode_t child_mode, BOOL is_external)
 {
 	META_CACHE_ENTRY_STRUCT *tmp_bodyptr;
 
 	tmp_bodyptr = meta_cache_lock_entry(parent_inode);
 	dir_remove_entry(parent_inode, child_inode, childname, child_mode,
-		tmp_bodyptr);
+		tmp_bodyptr, is_external);
 	meta_cache_unlock_entry(tmp_bodyptr);
 	return 0;
 }
@@ -205,14 +205,15 @@ static inline int32_t dir_remove_fail_node(ino_t parent_inode, ino_t child_inode
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_meta_size, char ispin)
+			ino_t root_ino, int64_t *delta_meta_size, char ispin,
+			BOOL is_external)
 {
 	int32_t ret_val, ret, errcode;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	int64_t metasize, old_metasize, new_metasize;
+	int64_t metasize, old_metasize = 0, new_metasize = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
 
 	*delta_meta_size = 0;
@@ -221,6 +222,12 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
 
 	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0) {
@@ -244,7 +251,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	sem_post(&(pathlookup_data_lock));
 
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
-						this_stat->mode, body_ptr);
+				this_stat->mode, body_ptr, is_external);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -273,7 +280,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		return -ENOMEM;
 	}
 
@@ -282,14 +289,14 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 							NULL, 0, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		goto error_handling;
 	}
 
 	ret_val = meta_cache_open_file(body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		goto error_handling;
 	}
 	memset(&file_stats, 0, sizeof(FILE_STATS_TYPE));
@@ -349,7 +356,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	return 0;
 errcode_handle:
 	dir_remove_fail_node(parent_inode, self_inode,
-				selfname, this_stat->mode);
+				selfname, this_stat->mode, is_external);
 	ret_val = errcode;
 error_handling:
 	meta_cache_close_file(body_ptr);
@@ -376,7 +383,8 @@ int32_t mkdir_update_meta(ino_t self_inode,
 			  uint64_t this_gen,
 			  ino_t root_ino,
 			  int64_t *delta_meta_size,
-			  char ispin)
+			  char ispin,
+			  BOOL is_external)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
@@ -392,6 +400,12 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
 
 	ret_val = update_meta_seq(body_ptr);
 	if (ret_val < 0)
@@ -412,7 +426,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	sem_post(&(pathlookup_data_lock));
 
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
-						this_stat->mode, body_ptr);
+				this_stat->mode, body_ptr, is_external);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -447,14 +461,14 @@ int32_t mkdir_update_meta(ino_t self_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		return ret_val;
 	}
 
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		return -ENOMEM;
 	}
 
@@ -462,7 +476,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		return ret_val;
 	}
 
@@ -471,7 +485,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 							NULL, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		goto error_handling;
 	}
 
@@ -485,7 +499,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 			&temppage, body_ptr);
 	if (ret_val < 0) {
 		dir_remove_fail_node(parent_inode, self_inode,
-			selfname, this_stat->mode);
+			selfname, this_stat->mode, is_external);
 		goto error_handling;
 	}
 #ifdef _ANDROID_ENV_
@@ -553,7 +567,7 @@ error_handling:
 *
 *************************************************************************/
 int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
-			const DIR_ENTRY *this_entry)
+			const DIR_ENTRY *this_entry, BOOL is_external)
 {
 	int32_t ret_val;
 	ino_t this_inode;
@@ -609,7 +623,8 @@ int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 
 	/* Remove entry */
 	ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, this_mode, parent_ptr);
+				   this_entry->d_name, this_mode, parent_ptr,
+				   is_external);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -701,7 +716,7 @@ error_handling:
 *
 *************************************************************************/
 int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
-			const char *selfname)
+			const char *selfname, BOOL is_external)
 {
 	DIR_META_TYPE tempmeta;
 	int32_t ret_val;
@@ -737,7 +752,7 @@ int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	if (body_ptr == NULL)
 		return -ENOMEM;
 	ret_val = dir_remove_entry(parent_inode, this_inode, selfname, S_IFDIR,
-								body_ptr);
+				   body_ptr, is_external);
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -804,7 +819,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			    const char *name,
 			    ino_t root_ino,
 			    int64_t *delta_meta_size,
-			    char ispin)
+			    char ispin,
+			    BOOL is_external)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
@@ -842,7 +858,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	sem_post(&(pathlookup_data_lock));
 
 	ret_code = dir_add_entry(parent_inode, self_inode, name,
-		this_stat->mode, parent_meta_cache_entry);
+		this_stat->mode, parent_meta_cache_entry,
+		is_external);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
 		return ret_code;
@@ -870,7 +887,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
 	if (self_meta_cache_entry == NULL) {
 		dir_remove_entry(parent_inode, self_inode, name,
-			this_stat->mode, parent_meta_cache_entry);
+			this_stat->mode, parent_meta_cache_entry,
+			is_external);
 		return -ENOMEM;
 	}
 
@@ -878,7 +896,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	if (ret_code < 0) {
 		meta_cache_unlock_entry(self_meta_cache_entry);
 		dir_remove_entry(parent_inode, self_inode, name,
-			this_stat->mode, parent_meta_cache_entry);
+			this_stat->mode, parent_meta_cache_entry,
+			is_external);
 		return ret_code;
 	}
 
@@ -889,7 +908,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		meta_cache_close_file(self_meta_cache_entry);
 		meta_cache_unlock_entry(self_meta_cache_entry);
 		dir_remove_entry(parent_inode, self_inode, name,
-			this_stat->mode, parent_meta_cache_entry);
+			this_stat->mode, parent_meta_cache_entry,
+			is_external);
 		return ret_code;
 	}
 
@@ -1102,7 +1122,8 @@ int32_t link_update_meta(ino_t link_inode,
 			 const char *newname,
 			 HCFS_STAT *link_stat,
 			 uint64_t *generation,
-			 META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+			 META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
+			 BOOL is_external)
 {
 	META_CACHE_ENTRY_STRUCT *link_entry;
 	FILE_META_TYPE filemeta;
@@ -1166,7 +1187,8 @@ int32_t link_update_meta(ino_t link_inode,
 
 	/* Add entry to this dir */
 	ret_val = dir_add_entry(parent_inode, link_inode, newname,
-		link_stat->mode, parent_meta_cache_entry);
+		link_stat->mode, parent_meta_cache_entry,
+		is_external);
 	if (ret_val < 0) {
 		link_stat->nlink--; /* Recover nlink */
 		meta_cache_update_file_data(link_inode, link_stat,

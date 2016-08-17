@@ -260,8 +260,10 @@ uint8_t *get_key(const char *passphrase)
 
 	m = EVP_sha256();
 
-	if (!m)
+	if (!m) {
+		free(ret);
 		return NULL;
+	}
 	EVP_DigestInit(&ctx, m);
 	uint8_t *salt = (uint8_t *)"oluik.354jhmnk,";
 

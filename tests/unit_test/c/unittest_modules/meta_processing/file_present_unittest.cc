@@ -169,7 +169,7 @@ TEST_F(mknod_update_metaTest, FailTo_dir_add_entry)
 	tmp_stat.mode = S_IFREG;
 
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
 }
 
 TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
@@ -181,7 +181,7 @@ TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 
 	tmp_stat.mode = S_IFREG;
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
 }
 
 TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
@@ -195,7 +195,8 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 	tmp_stat.mode = S_IFREG;
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
-		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE));
+		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(FILE_META_HEADER));
 }
 
 /*
@@ -216,7 +217,7 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
 }
 
 TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
@@ -229,7 +230,7 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
 }
 
 TEST(mkdir_update_metaTest, FunctionWorkSuccess)
@@ -243,7 +244,8 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE));
+		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(DIR_META_HEADER));
 }
 
 /*
@@ -280,7 +282,7 @@ TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 	mock_entry.d_type = D_ISREG;
 
 	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode,
-		&mock_entry));
+		&mock_entry, FALSE));
 }
 
 TEST_F(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
@@ -293,7 +295,7 @@ TEST_F(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 	mock_entry.d_type = D_ISREG;
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
-			&mock_entry));
+			&mock_entry, FALSE));
 }
 
 TEST_F(unlink_update_metaTest, UnlinkUpdateFIFOfileMetaSuccess)
@@ -306,7 +308,7 @@ TEST_F(unlink_update_metaTest, UnlinkUpdateFIFOfileMetaSuccess)
 	mock_entry.d_type = D_ISFIFO;
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
-			&mock_entry));
+			&mock_entry, FALSE));
 }
 
 TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
@@ -319,7 +321,7 @@ TEST_F(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 	mock_entry.d_type = D_ISLNK;
 
 	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode,
-			&mock_entry));
+			&mock_entry, FALSE));
 }
 
 TEST_F(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
@@ -332,7 +334,7 @@ TEST_F(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 	mock_entry.d_type = D_ISLNK;
 
 	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode,
-			&mock_entry));
+			&mock_entry, FALSE));
 }
 
 /*
@@ -350,7 +352,7 @@ TEST(rmdir_update_metaTest, ChildrenNonempty)
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(req1, parent_inode, 
-		self_inode, "\0"));
+		self_inode, "\0", FALSE));
 }
 
 TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
@@ -360,7 +362,7 @@ TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, rmdir_update_meta(req1, parent_inode, 
-		self_inode, "\0"));
+		self_inode, "\0", FALSE));
 }
 
 TEST(rmdir_update_metaTest, FunctionWorkSuccess)
@@ -370,7 +372,7 @@ TEST(rmdir_update_metaTest, FunctionWorkSuccess)
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, rmdir_update_meta(req1, parent_inode, 
-		self_inode, "\0"));
+		self_inode, "\0", FALSE));
 }
 
 /*
@@ -606,7 +608,7 @@ TEST_F(symlink_update_metaTest, AddDirEntryFail)
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"link_not_used", 12, "name_not_used", 1, &delta_metasize,
-		TRUE));
+		TRUE, FALSE));
 }
 
 TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
@@ -619,7 +621,7 @@ TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"update_symlink_data_fail", 12, "name_not_used", 1,
-		&delta_metasize, TRUE));
+		&delta_metasize, TRUE, FALSE));
 }
 
 TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
@@ -632,7 +634,8 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"link_not_used", 12, "name_not_used", 1,
-		&delta_metasize, TRUE));
+		&delta_metasize, TRUE, FALSE));
+	EXPECT_EQ(delta_metasize, sizeof(SYMLINK_META_HEADER));
 }
 /*
 	End of unittest of symlink_update_meta()
@@ -670,7 +673,7 @@ TEST_F(link_update_metaTest, HardlinkToDirFail)
 	link_inode = INO_DIR;
 
 	EXPECT_EQ(-EISDIR, link_update_meta(link_inode, "new_name_not_used",
-		&link_stat, &gen, mock_parent_entry));
+		&link_stat, &gen, mock_parent_entry, FALSE));
 }
 
 TEST_F(link_update_metaTest, TooManyLinks)
@@ -682,7 +685,7 @@ TEST_F(link_update_metaTest, TooManyLinks)
 	link_inode = INO_TOO_MANY_LINKS;
 
 	EXPECT_EQ(-EMLINK, link_update_meta(link_inode, "new_name_not_used",
-		&link_stat, &gen, mock_parent_entry));
+		&link_stat, &gen, mock_parent_entry, FALSE));
 }
 
 TEST_F(link_update_metaTest, UpdateMetaFail)
@@ -694,7 +697,7 @@ TEST_F(link_update_metaTest, UpdateMetaFail)
 	link_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 
 	EXPECT_EQ(-1, link_update_meta(link_inode, "new_name_not_used",
-		&link_stat, &gen, mock_parent_entry));
+		&link_stat, &gen, mock_parent_entry, FALSE));
 }
 
 TEST_F(link_update_metaTest, AddEntryToParentDirFail)
@@ -707,7 +710,7 @@ TEST_F(link_update_metaTest, AddEntryToParentDirFail)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
 
 	EXPECT_EQ(-1, link_update_meta(link_inode, "new_name_not_used",
-		&link_stat, &gen, mock_parent_entry));
+		&link_stat, &gen, mock_parent_entry, FALSE));
 
 	/* Verify */
 	EXPECT_EQ(1, link_stat.nlink); // Set to 1 in fetch_inode_stat()
@@ -723,7 +726,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(0, link_update_meta(link_inode, "new_name_not_used",
-		&link_stat, &gen, mock_parent_entry));
+		&link_stat, &gen, mock_parent_entry, FALSE));
 
 	/* Verify */
 	EXPECT_EQ(GENERATION_NUM, gen);
@@ -737,7 +740,7 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 class pin_inodeTest : public ::testing::Test {
 protected:
 	int64_t mock_reserved_size;
-	char pin_type;
+	uint8_t pin_type;
 
 	void SetUp()
 	{
@@ -928,7 +931,7 @@ TEST_F(unpin_inodeTest, UnpinDirSuccess_ManyChildren)
 /* Unittest for increase_pinned_size() */
 class increase_pinned_sizeTest : public ::testing::Test {
 protected:
-	char pin_type;
+	uint8_t pin_type;
 
 	void SetUp()
 	{
@@ -1160,7 +1163,6 @@ TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
 {
 	UPLOADING_COMMUNICATION_DATA data;
 	PROGRESS_META progress_meta;
-	int fd;
 	int inode;
 	int ret;
 
@@ -1178,7 +1180,6 @@ TEST_F(fuseproc_set_uploading_infoTest, FinishUploading)
 	EXPECT_EQ(FALSE, CHECK_UPLOADING_FLAG);
 	EXPECT_EQ(0, CHECK_TOUPLOAD_BLOCKS);
 
-	close(fd);
 	unlink(progress_path);
 }
 /*

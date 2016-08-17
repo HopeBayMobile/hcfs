@@ -72,8 +72,10 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 
 int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	if (body_ptr->fptr == NULL)
+	if (body_ptr->fptr == NULL) {
 		body_ptr->fptr = fopen(MOCK_META_PATH, "w+");
+		setbuf(body_ptr->fptr, NULL);
+	}
 	return 0;
 }
 
@@ -144,7 +146,7 @@ int32_t meta_cache_update_file_data(ino_t this_inode, const HCFS_STAT *inode_sta
 }
 
 int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
-	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr, BOOL is_external)
 {
 	if (parent_inode == INO_DIR_ADD_ENTRY_SUCCESS)
 		return 0;
@@ -154,7 +156,7 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 }
 
 int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, 
-	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr, BOOL is_external)
 {
 	if (parent_inode == INO_DIR_REMOVE_ENTRY_FAIL)
 		return -1;
@@ -221,6 +223,7 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode, HCFS_STAT *inode_stat,
         SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	if (symlink_meta_ptr) {
+		memset(symlink_meta_ptr, 0, sizeof(SYMLINK_META_TYPE));
 		symlink_meta_ptr->generation = GENERATION_NUM;
 
 		if (this_inode == INO_LNK)
@@ -344,6 +347,19 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 
 int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
 {
+	int32_t ret;
+	int32_t errcode;
+	int64_t ret_pos;
+
+	*metasize = 0;
+	assert(ptr != NULL);
+	assert(ptr->fptr != NULL);
+	LSEEK(fileno(ptr->fptr), 0, SEEK_END);
+	*metasize = ret_pos;
+	return 0;
+
+errcode_handle:
+	return errcode;
 	return 0;
 }
 
