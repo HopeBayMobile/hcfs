@@ -607,7 +607,7 @@ int32_t fetch_inode_stat(ino_t this_inode,
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_metasize, char ispin,
+			MOUNT_T *mountptr, int64_t *delta_metasize, char ispin,
 			BOOL is_external)
 {
 	MOCK();
@@ -620,7 +620,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_metasize, char ispin,
+			MOUNT_T *mountptr, int64_t *delta_metasize, char ispin,
 			BOOL is_external)
 {
 	MOCK();
@@ -876,7 +876,7 @@ void destroy_fs_manager(void)
 
 int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
 	const HCFS_STAT *this_stat, const char *link, 
-	const uint64_t generation, const char *name,
+	const uint64_t generation, const char *name, MOUNT_T *mountptr,
 	int64_t *delta_metasize, char ispin, BOOL is_external)
 {
 	MOCK();

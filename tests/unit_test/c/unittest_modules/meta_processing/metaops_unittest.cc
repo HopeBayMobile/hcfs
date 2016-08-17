@@ -873,7 +873,7 @@ protected:
 			int32_t level_index = tmp_target_page / pointers_per_page[deep - level];
 			fread(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 			fseek(body_ptr->fptr, ptr_entry_page.ptr[level_index], SEEK_SET);
-			printf("Test: level %d: ptr_page_index = %d, next_filepos = %" PRId64 "\n",
+			printf("Test: level %d: ptr_page_index = %d, next_filepos = %lld\n",
 				level, level_index, ptr_entry_page.ptr[level_index]);
 			tmp_target_page = tmp_target_page % pointers_per_page[deep - level];
 		}

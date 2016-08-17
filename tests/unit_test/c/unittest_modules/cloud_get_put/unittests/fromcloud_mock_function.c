@@ -191,6 +191,8 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	int64_t unpin_dirty_data_size, BOOL need_sync)
 {
 	MOCK();
+	hcfs_system->systemdata.cache_size += cache_data_size_delta;
+	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	return 0;
 }
 

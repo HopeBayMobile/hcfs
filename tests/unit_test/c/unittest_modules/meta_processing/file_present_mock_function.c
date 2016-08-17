@@ -10,6 +10,7 @@
 #include "params.h"
 #include "global.h"
 #include "dir_statistics.h"
+#include "mount_manager.h"
 
 extern SYSTEM_CONF_STRUCT *system_config;
 
@@ -369,4 +370,19 @@ int64_t get_pinned_limit(const char pin_type)
 		return PINNED_LIMITS(pin_type);
 	else
 		return -EINVAL;
+}
+
+
+int32_t change_system_meta(int64_t system_data_size_delta,
+		int64_t meta_size_delta, int64_t cache_data_size_delta,
+		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+		int64_t unpin_dirty_delta, BOOL need_sync)
+{
+	return 0;
+}
+
+int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
+{
+	return 0;
 }
