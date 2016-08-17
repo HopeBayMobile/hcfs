@@ -1,3 +1,8 @@
+# Usage of common.mk:
+#
+# * To stop re-run failed unittest with valgrind:
+#   make test VALGRIND=false
+
 # mentioning default target first, finalizing it at end of file.
 all :
 
