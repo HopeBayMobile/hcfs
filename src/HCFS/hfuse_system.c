@@ -588,7 +588,7 @@ int32_t main(int32_t argc, char **argv)
 		hook_fuse(argc, argv);
 		write_log(2, "Waiting for subprocesses to terminate\n");
 		if (CURRENT_BACKEND != NONE) {
-			for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
+			for (proc_idx = 1; proc_idx < CHILD_NUM; ++proc_idx)
 				waitpid(child_pids[proc_idx], NULL, 0);
 		}
 		write_log(4, "HCFS (fuse) shutting down normally\n");
