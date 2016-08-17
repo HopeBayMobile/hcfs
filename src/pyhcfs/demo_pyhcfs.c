@@ -55,9 +55,9 @@ void test_get_vol_usage()
 	int64_t vol_usage = 0;
 	char * s = NULL;
 
-	printf("\n\nDemo get_vol_usage(\"%s\")\n", TEST_FILE(FSstat2));
+	printf("\n\nDemo get_vol_usage(\"%s\")\n", TEST_FILE(FSstat));
 	puts("============================================");
-	ret_val = get_vol_usage(TEST_FILE(FSstat2), &vol_usage);
+	ret_val = get_vol_usage(TEST_FILE(FSstat), &vol_usage);
 	if (ret_val < 0)
 		printf("Failed to get volume usage, errno %d\n", errno);
 	else
@@ -116,7 +116,7 @@ void test_parse_meta()
 	HCFS_STAT *stat_data = &meta_data.stat;
 	char * s = NULL;
 
-	asprintf(&s, "%s/FSstat2", test_target);
+	asprintf(&s, "%s/FSstat", test_target);
 
 	printf("\n\nDemo list_external_volume(\"%s\", &ret_entry, &ret_num);\n",
 	       TEST_FILE(fsmgr));

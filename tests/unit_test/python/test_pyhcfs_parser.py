@@ -32,6 +32,7 @@ def test_list_dir_inorder():
     for dir_path in TEST_DATA_PATHS:
         _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'meta_isdir'))
         _TEST_META_FILELIST_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'meta_isdir_filelist'))
+        print(_TEST_META_FILELIST_FILENAME)
         f = open(_TEST_META_FILELIST_FILENAME, 'r')
         ret = { 'offset': (0, 0)}
         sum=0
@@ -48,7 +49,7 @@ def test_list_dir_inorder():
 
 def test_get_vol_usage():
     for dir_path in TEST_DATA_PATHS:
-        _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'FSstat2'))
+        _TEST_META_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'FSstat'))
         ret = parser.get_vol_usage(_TEST_META_FILENAME)
         pp.pprint(ret)
         assert ret['result'] == 0

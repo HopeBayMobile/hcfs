@@ -24,19 +24,19 @@ typedef struct {
 	uint64_t inode;
 	char d_name[256];
 	uint8_t d_type;
-} PORTABLE_DIR_ENTRY;
+} _PACKED PORTABLE_DIR_ENTRY;
 
 typedef struct {
 	uint64_t block_num;
 	uint64_t block_seq;
-} PORTABLE_BLOCK_NAME;
+} _PACKED PORTABLE_BLOCK_NAME;
 
 typedef struct {
 	int32_t result;
 	int32_t file_type;
 	uint64_t child_number;
 	HCFS_STAT_v1 stat;
-} RET_META;
+} _PACKED RET_META;
 
 int32_t list_external_volume(const char *meta_path,
 			     PORTABLE_DIR_ENTRY **ptr_ret_entry,
