@@ -3,11 +3,12 @@ set -ex
 COPY_TO=sample
 MPATH=/data/hcfs/metastorage
 MOUNT_DIR=/data/data
+MOUND_EXT=/storage/emulated/0
 
 fifo=$MOUNT_DIR/tmp.fifo
 link=$MOUNT_DIR/tmp.link
-reg=$MOUNT_DIR/tmp.reg
 dir=$MOUNT_DIR/tmp.dir
+reg=$MOUND_EXT/tmp.reg
 
 rm -rf $COPY_TO
 mkdir $COPY_TO
