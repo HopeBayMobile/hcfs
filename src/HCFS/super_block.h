@@ -27,6 +27,8 @@
 #include "syncpoint_control.h"
 #include "meta.h"
 
+#define NUM_SCAN_RECLAIMED 512
+
 /* pin-status in super block */
 #define ST_DEL 0
 #define ST_UNPIN 1
