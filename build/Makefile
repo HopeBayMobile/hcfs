@@ -11,7 +11,7 @@ TARGETS          += acer-s58a
 TARGETS          += nexus-5x
 #TARGETS          += acer-z630
 
-all : out third_party/jansson $(TARGETS)
+all : out $(TARGETS)
 	cd out; find -type f ! -name md5sum.md5 -exec md5sum {} \; > md5sum.md5
 
 clean :
@@ -56,7 +56,7 @@ $(hcfs_gdb): NDK_ARG += NDK_DEBUG=1
 $(hcfs_gdb): APP_CFLAGS+=-ggdb -O0 -DDEBUG_ON
 $(hcfs_gdb): APP_LDFLAGS+=-ggdb -O0
 
-out/%-hcfs: force
+out/%-hcfs: third_party/jansson force
 	ndk-build $(NDK_ARG)
 	@mkdir -p $@/system/{bin,lib64}
 	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -0r mv -t $@/system/lib64
@@ -66,7 +66,7 @@ out/%-hcfs: force
 	@cp -r $(build_dir)/internal_testing_resource/* $@/
 	@rm -rf $@/gdb.* $@/$(APP_ABI)
 
-out/%-hcfs-gdb: force
+out/%-hcfs-gdb: third_party/jansson force
 	ndk-build $(NDK_ARG)
 	@mkdir -p $@/system/{bin,lib64}
 	@rsync -ac -f'- /*/' $(@:out/%=obj/%)/local/$(APP_ABI)/ $@/$(APP_ABI)/
