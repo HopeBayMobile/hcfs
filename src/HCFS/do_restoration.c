@@ -783,13 +783,25 @@ int32_t run_download_minimal(void)
 	int32_t errcode, count, ret;
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
+	BOOL is_fopen = FALSE;
+
+
+	/* Fetch quota value from backend and store in the restoration path */
+	ret = _restore_system_quota();
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	memset(&restored_system_meta, 0, sizeof(SYSTEM_DATA_TYPE));
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
 	ret = restore_fetch_obj("FSmgr_backup", despath, FALSE);
 
 	if (ret < 0)
-		return ret;
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	/* Parse file mgr */
 	fptr = fopen(despath, "r");
@@ -798,6 +810,7 @@ int32_t run_download_minimal(void)
 		errcode = -errno;
 		return errcode;
 	}
+	is_fopen = TRUE;
 
 	setbuf(fptr, NULL);
 
@@ -805,6 +818,8 @@ int32_t run_download_minimal(void)
 	      16);
 	PREAD(fileno(fptr), &tmppage, sizeof(DIR_ENTRY_PAGE),
 	      tmp_head.tree_walk_list_head);
+	fclose(fptr);
+	is_fopen = FALSE;
 
 	for (count = 0; count < tmppage.num_entries; count++) {
 		tmpentry = &(tmppage.dir_entries[count]);
@@ -867,13 +882,6 @@ int32_t run_download_minimal(void)
 		goto errcode_handle;
 	}
 
-	/* Fetch quota value from backend and store in the restoration path */
-	ret = _restore_system_quota();
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
-	}
-
 	sem_wait(&restore_sem);
 
 	/* Tag status of restoration */
@@ -890,7 +898,8 @@ int32_t run_download_minimal(void)
 
 	return 0;
 errcode_handle:
-	fclose(fptr);
+	if (is_fopen == TRUE)
+		fclose(fptr);
 	notify_restoration_result(1, errcode);
 	return errcode;
 }
