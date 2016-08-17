@@ -113,4 +113,5 @@ int32_t get_meta_size(ino_t inode, int64_t *metasize);
 
 int32_t get_quota_from_backup(int64_t *quota);
 int32_t meta_nospc_log(const char *func_name, int32_t lines);
+int64_t block_4k_unit(int64_t input);
 #endif  /* SRC_HCFS_UTILS_H_ */

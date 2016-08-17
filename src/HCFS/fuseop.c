@@ -1047,7 +1047,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation, tmpptr->f_ino,
+			&this_stat, this_generation, tmpptr,
 			&delta_meta_size, ispin, is_external);
 
 	/* TODO: May need to delete from super block and parent if failed. */
@@ -1206,7 +1206,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	delta_meta_size = 0;
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat, this_gen,
-			tmpptr->f_ino, &delta_meta_size, ispin,
+			tmpptr, &delta_meta_size, ispin,
 			is_external);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -6214,7 +6214,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
-			link, this_generation, name, tmpptr->f_ino,
+			link, this_generation, name, tmpptr,
 			&delta_meta_size, local_pin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -7309,7 +7309,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_stat.ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
-			&this_stat, this_generation, tmpptr->f_ino,
+			&this_stat, this_generation, tmpptr,
 			&delta_meta_size, ispin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);

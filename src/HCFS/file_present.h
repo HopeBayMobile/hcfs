@@ -24,6 +24,7 @@
 
 #include "atomic_tocloud.h"
 #include "meta_mem_cache.h"
+#include "mount_manager.h"
 
 int32_t fetch_inode_stat(ino_t this_inode,
 			 HCFS_STAT *inode_stat,
@@ -35,7 +36,7 @@ int32_t mknod_update_meta(ino_t self_inode,
 			  const char *selfname,
 			  HCFS_STAT *this_stat,
 			  uint64_t this_gen,
-			  ino_t root_ino,
+			  MOUNT_T *mountptr,
 			  int64_t *delta_meta_size,
 			  char ispin,
 			  BOOL is_external);
@@ -45,7 +46,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 			  const char *selfname,
 			  HCFS_STAT *this_stat,
 			  uint64_t this_gen,
-			  ino_t root_ino,
+			  MOUNT_T *mountptr,
 			  int64_t *delta_meta_size,
 			  char ispin,
 			  BOOL is_external);
@@ -68,7 +69,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			    const char *link,
 			    const uint64_t generation,
 			    const char *name,
-			    ino_t root_ino,
+			    MOUNT_T *mountptr,
 			    int64_t *delta_meta_size,
 			    char ispin,
 			    BOOL is_external);
