@@ -2414,9 +2414,6 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 					(int64_t) cache_block_size;
 				total_deleted_blocks += 1;
 				total_deleted_fileblocks++;
-				change_system_meta(0, 0,
-						-cache_block_size,
-						0, 0, 0, FALSE);
 				break;
 			case ST_CLOUD:
 				tmpentry->status =
@@ -2435,9 +2432,6 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 					total_deleted_cache +=
 						(int64_t) cache_block_size;
 					total_deleted_blocks += 1;
-					change_system_meta(0, 0,
-						-cache_block_size,
-						0, 0, 0, FALSE);
 				}
 				tmpentry->status = ST_TODELETE;
 				total_deleted_fileblocks++;
@@ -2464,9 +2458,6 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 					total_deleted_dirty_cache +=
 						(int64_t) cache_block_size;
 					total_deleted_blocks += 1;
-					change_system_meta(0, 0,
-						-cache_block_size,
-						0, 0, 0, FALSE);
 				}
 				tmpentry->status = ST_TODELETE;
 				total_deleted_fileblocks++;
@@ -2494,7 +2485,7 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 	}
 	if (total_deleted_blocks > 0) {
 		unpin_dirty_size = (P_IS_UNPIN(ispin) ? -total_deleted_dirty_cache : 0);
-		change_system_meta(0, 0, 0,
+		change_system_meta(0, 0, -total_deleted_cache,
 				   -total_deleted_blocks,
 				   -total_deleted_dirty_cache,
 				   unpin_dirty_size, TRUE);
