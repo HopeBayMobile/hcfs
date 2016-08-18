@@ -1520,6 +1520,7 @@ void api_module(void *index)
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
 		case INITIATE_RESTORATION:
 			uint32_ret = initiate_restoration();
 			ret_len = sizeof(uint32_ret);
