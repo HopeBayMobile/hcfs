@@ -755,6 +755,17 @@ int32_t _restore_system_quota(void)
 	char despath[METAPATHLEN];
 	int32_t ret, errcode;
 
+
+        sem_wait(&(download_usermeta_ctl.access_sem));
+        if (download_usermeta_ctl.active == TRUE) {
+                sem_post(&(download_usermeta_ctl.access_sem));
+                write_log(0, "Quota download is already in progress?\n");
+                return -EBUSY;
+        } else {
+                download_usermeta_ctl.active = TRUE;
+        }
+	sem_post(&(download_usermeta_ctl.access_sem));
+
 	fetch_quota_from_cloud(NULL, FALSE);
 
 	/* Need to rename quota backup from metastorage to metastore_restore */
@@ -772,6 +783,19 @@ int32_t _restore_system_quota(void)
 	return 0;
 }
 
+void _init_quota_restore()
+{
+	/* Init usermeta curl handle */
+	snprintf(download_usermeta_curl_handle.id,
+	         sizeof(((CURL_HANDLE *)0)->id) - 1, "download_usermeta");
+	download_usermeta_curl_handle.curl_backend = NONE;
+	download_usermeta_curl_handle.curl = NULL;
+
+	/* Setup download control */
+	memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
+	sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+}
+
 /* FEATURE TODO: Verify if downloaded objects are enough for restoration */
 int32_t run_download_minimal(void)
 {
@@ -787,6 +811,8 @@ int32_t run_download_minimal(void)
 
 
 	/* Fetch quota value from backend and store in the restoration path */
+
+	_init_quota_restore();
 	ret = _restore_system_quota();
 	if (ret < 0) {
 		errcode = ret;
