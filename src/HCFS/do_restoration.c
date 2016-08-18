@@ -177,7 +177,7 @@ int32_t check_restoration_status(void)
 
 	sem_wait(&restore_sem);
 
-	retval = 0;
+	retval = NOT_RESTORING;
 	is_open = FALSE;
 	fetch_restore_stat_path(restore_stat_path);
 	if (access(restore_stat_path, F_OK) == 0) {
@@ -197,11 +197,11 @@ int32_t check_restoration_status(void)
 		if (strncmp(restore_stat, "downloading_minimal",
 		            strlen("downloading_minimal")) == 0) {
 			write_log(10, "Restoring: downloading meta\n");
-			retval = 1;
+			retval = RESTORING_STAGE1;
 		} else if (strncmp(restore_stat, "rebuilding_meta",
 		            strlen("rebuilding_meta")) == 0) {
 			write_log(10, "Rebuilding meta\n");
-			retval = 2;
+			retval = RESTORING_STAGE2;
 		}
 	}
 
