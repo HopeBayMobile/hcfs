@@ -769,8 +769,8 @@ int32_t _restore_system_quota(void)
 	fetch_quota_from_cloud(NULL, FALSE);
 
 	/* Need to rename quota backup from metastorage to metastore_restore */
-	snprintf(srcpath, sizeof(METAPATHLEN), "%s/usermeta", METAPATH);
-	snprintf(despath, sizeof(METAPATHLEN), "%s/usermeta", RESTORE_METAPATH);
+	snprintf(srcpath, sizeof(srcpath), "%s/usermeta", METAPATH);
+	snprintf(despath, sizeof(despath), "%s/usermeta", RESTORE_METAPATH);
 
 	ret = rename(srcpath, despath);
 	if (ret < 0) {
