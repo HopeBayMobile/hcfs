@@ -356,16 +356,13 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	sem_post(&(pathlookup_data_lock));
 
 	if (old_metasize > 0 && new_metasize > 0) {
-		change_system_meta(new_metasize - old_metasize,
+		change_system_meta(0,
 			(new_metasize_blk - old_metasize_blk) + metasize_blk,
 			0, 0, 0, 0, FALSE);
-		ret_val = change_mount_stat(mountptr, 0,
-				new_metasize - old_metasize, 0);
-		if (ret_val < 0)
-			return ret_val;
+		*delta_meta_size = (new_metasize - old_metasize) + metasize;
+	} else {
+		*delta_meta_size = metasize;
 	}
-
-	*delta_meta_size = metasize;
 
 	return 0;
 errcode_handle:
@@ -553,15 +550,13 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	}
 
 	if (old_metasize > 0 && new_metasize > 0) {
-		change_system_meta(new_metasize - old_metasize,
+		change_system_meta(0,
 			(new_metasize_blk - old_metasize_blk) + metasize_blk,
 			0, 0, 0, 0, FALSE);
-		ret_val = change_mount_stat(mountptr, 0,
-				new_metasize - old_metasize, 0);
-		if (ret_val < 0)
-			return ret_val;
+		*delta_meta_size = (new_metasize - old_metasize) + metasize;
+	} else {
+		*delta_meta_size = metasize;
 	}
-	*delta_meta_size = metasize;
 
 	return 0;
 
@@ -984,15 +979,13 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	super_block_mark_dirty(self_inode);
 
 	if (old_metasize > 0 && new_metasize > 0) {
-		change_system_meta(new_metasize - old_metasize,
+		change_system_meta(0,
 			(new_metasize_blk - old_metasize_blk) + metasize_blk,
 			0, 0, 0, 0, FALSE);
-		ret_code = change_mount_stat(mountptr, 0,
-				new_metasize - old_metasize, 0);
-		if (ret_code < 0)
-			return ret_code;
+		*delta_meta_size = (new_metasize - old_metasize) + metasize;
+	} else {
+		*delta_meta_size = metasize;
 	}
-	*delta_meta_size = metasize;
 
 	return 0;
 

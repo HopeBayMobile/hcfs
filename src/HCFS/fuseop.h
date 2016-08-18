@@ -89,17 +89,17 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 
 /* Defining the system meta resources */
 typedef struct {
-	int64_t system_size; /* data + meta + sb */
-	int64_t system_meta_size; /* meta + sb */
+	int64_t system_size; /* data + meta + sb (real size) */
+	int64_t system_meta_size; /* meta + sb (block unit size) */
 	int64_t super_block_size; /* sb */
-	int64_t cache_size; /* data(local) + meta + sb */
+	int64_t cache_size; /* data(local, block unit size) */
 	int64_t cache_blocks;
-	int64_t pinned_size; /* data(pin) + meta + sb */
-	int64_t unpin_dirty_data_size; /* dirty data w/ unpin property */
+	int64_t pinned_size; /* data(pin) */
+	int64_t unpin_dirty_data_size; /* dirty data w/ unpin property (block unit) */
 	int64_t backend_size; /* data(sync) + meta(sync) */
 	int64_t backend_meta_size;
 	int64_t backend_inodes;
-	int64_t dirty_cache_size; /* data + meta */
+	int64_t dirty_cache_size; /* data + meta (block unit size) */
 	int64_t system_quota;
 	int32_t cache_replace_status;
 	/* data for xfer statistics */

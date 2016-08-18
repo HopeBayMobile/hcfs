@@ -2657,6 +2657,8 @@ int32_t truncate_truncate(ino_t this_inode,
 			}
 
 			if (stat(thisblockpath, &tempstat) == 0) {
+				int64_t block_size_blk;
+
 				last_block_entry->status = ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
@@ -2678,9 +2680,10 @@ int32_t truncate_truncate(ino_t this_inode,
 					return ret;
 				}
 
-				change_system_meta(0, 0, tempstat.st_size, 1,
-						   tempstat.st_size, 0, TRUE);
-				cache_delta += tempstat.st_size;
+				block_size_blk = tempstat.st_blocks * 512;
+				change_system_meta(0, 0, block_size_blk, 1,
+						   block_size_blk, 0, TRUE);
+				cache_delta += block_size_blk;
 				cache_block_delta += 1;
 			}
 		} else {
@@ -3584,6 +3587,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		}
 
 		if (stat(thisblockpath, &tempstat2) == 0) {
+			int64_t block_size_blk;
+
 			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
 				(tpage->block_entries[eindex]).status = ST_BOTH;
 				tmpptr = fh_ptr->meta_cache_ptr;
@@ -3608,7 +3613,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 					goto error_handling;
 			}
 			/* Update system meta to reflect correct cache size */
-			change_system_meta(0, 0, tempstat2.st_size,
+			block_size_blk = tempstat2.st_blocks * 512;
+			change_system_meta(0, 0, block_size_blk,
 					1, 0, 0, TRUE);
 
 			/* Signal cache management that something can be paged
@@ -3623,7 +3629,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			if (ret < 0)
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
-						1, tempstat2.st_size,
+						1, block_size_blk,
 						0, fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
@@ -4244,6 +4250,8 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		}
 
 		if (stat(thisblockpath, &tempstat2) == 0) {
+			int64_t block_size_blk;
+
 			(tpage->block_entries[eindex]).status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
@@ -4265,18 +4273,19 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 				}
 				return ret;
 			}
+			block_size_blk = tempstat2.st_blocks * 512;
 			unpin_dirty_size = (P_IS_UNPIN(ispin) ?
-					tempstat2.st_size : 0);
-			change_system_meta(0, 0, tempstat2.st_size, 1,
-					tempstat2.st_size,
+					block_size_blk : 0);
+			change_system_meta(0, 0, block_size_blk, 1,
+					block_size_blk,
 					unpin_dirty_size, TRUE);
 			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
-						1, tempstat2.st_size,
-						tempstat2.st_size,
+						1, block_size_blk,
+						block_size_blk,
 						fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;

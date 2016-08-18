@@ -844,6 +844,7 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	FILE *src_ptr, *tar_ptr;
 	char filebuf[4100];
 	int64_t ret_pos;
+	struct stat tar_stat;
 #ifndef _ANDROID_ENV_
 	int64_t ret_ssize;
 	int64_t temp_trunc_size;
@@ -931,7 +932,14 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 			break;
 		}
 	}
-
+	ret = fstat(fileno(tar_ptr), &tar_stat);
+	if (ret == 0) {
+		total_size = tar_stat.st_blocks * 512;
+	} else {
+		total_size = 0;
+		errcode = -errno;
+		goto errcode_handle;
+	}
 	/* Copy xattr "trunc_size" if it exists */
 #ifndef _ANDROID_ENV_
 	ret_ssize = fgetxattr(fileno(src_ptr), "user.trunc_size",
@@ -944,7 +952,6 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 		write_log(10, "Debug: trunc_size = %lld",temp_trunc_size);
 	}
 #endif
-
 	/* Unlock soruce file */
 	if (lock_src == TRUE)
 		flock(fileno(src_ptr), LOCK_UN);

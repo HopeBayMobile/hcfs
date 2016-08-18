@@ -66,6 +66,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	FILE *metafptr;
 	int64_t current_block;
 	int64_t total_blocks;
+	int64_t block_size_blk;
 	HCFS_STAT temphead_stat;
 	struct stat block_stat; /* block ops */
 	FILE_META_TYPE temphead;
@@ -202,7 +203,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					errcode = -errcode;
 					goto errcode_handle;
 				}
-				change_system_meta(0, 0, -block_stat.st_size,
+				block_size_blk = block_stat.st_blocks * 512;
+				change_system_meta(0, 0, -block_size_blk,
 						-1, 0, 0, TRUE);
 				ret = unlink(thisblockpath);
 				if (ret < 0) {
@@ -215,7 +217,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					goto errcode_handle;
 				}
 				ret = update_file_stats(metafptr, 0, -1,
-							-(block_stat.st_size),
+							-block_size_blk,
 							0, this_inode);
 				if (ret < 0) {
 					errcode = ret;

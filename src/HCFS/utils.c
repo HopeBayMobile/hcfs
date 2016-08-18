@@ -1059,7 +1059,7 @@ off_t check_file_size(const char *path)
 
 	errcode = stat(path, &block_stat);
 	if (errcode == 0)
-		return block_stat.st_size;
+		return block_stat.st_blocks * 512;
 	errcode = errno;
 	write_log(0, "Error when checking file size. Code %d, %s\n",
 			errcode, strerror(errcode));

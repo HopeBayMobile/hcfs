@@ -189,6 +189,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	int32_t ret, errcode, semval;
 	size_t ret_size;
 	char block, mlock, bopen, mopen;
+	int64_t block_size_blk;
 
 	block = FALSE;
 	mlock = FALSE;
@@ -277,8 +278,9 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 				FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 						metafptr);
 			}
+			block_size_blk = blockstat.st_blocks * 512;
 			ret = update_file_stats(metafptr, 0, 1,
-						blockstat.st_size,
+						block_size_blk,
 						0, ptr->this_inode);
 			if (ret < 0) {
 				errcode = ret;
@@ -286,7 +288,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			}
 
 			fflush(metafptr);
-			change_system_meta(0, 0, blockstat.st_size,
+			change_system_meta(0, 0, block_size_blk,
 					1, 0, 0, TRUE);
 
 			/* Signal cache management that something can be paged
@@ -530,6 +532,7 @@ void* fetch_backend_block(void *ptr)
 	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
 	int32_t ret, semval;
+	int64_t block_size_blk;
 	struct stat blockstat; /* block ops */
 
 	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
@@ -598,7 +601,8 @@ void* fetch_backend_block(void *ptr)
 	/* Update dirty status and system meta */
 	if (stat(block_path, &blockstat) == 0) {
 		set_block_dirty_status(NULL, block_fptr, FALSE);
-		change_system_meta(0, 0, blockstat.st_size, 1, 0, 0, TRUE);
+		block_size_blk = blockstat.st_blocks * 512;
+		change_system_meta(0, 0, block_size_blk, 1, 0, 0, TRUE);
 		write_log(10, "Debug: Now cache size %lld",
 			hcfs_system->systemdata.cache_size);
 		/* Signal cache management that something can be paged
@@ -649,7 +653,7 @@ void* fetch_backend_block(void *ptr)
 
 	/* Update status */
 	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH,
-				blockstat.st_size);
+				block_size_blk);
 	if (ret < 0) {
 		if (ret == -ENOENT)
 			write_log(5, "Fail to modify block status in %s because"
