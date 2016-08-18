@@ -3,10 +3,11 @@
 #
 # Description: # This is to apply opengapps into Nexus devices with AOSP ROM
 #
-# Authors: William W.-Y. Liang, Can Yu, etc
+# Authors: William W.-Y. Liang, Can Yu, Jethro Yu, etc
 #          from Hope Bay Tech, Copyright (C) 2016-
 # Contact: william.liang@hopebaytech.com
 #          can.yu@hopebaytech.com
+#          jethro.yu@hopebaytech.com
 #
 # Date: $Date: 2016/07/21 11:56:00 $
 # Version: $Revision: 1.14 $
@@ -14,8 +15,15 @@
 # History:
 #
 # $Log: nexus-install-gapps.sh,v $
-# Revision 1.14  2016/07/21 11:56:00  chingyi
+# Revision 1.16  2016/07/21 11:56:00  chingyi
 # Foolproof against flashing unexpected device when multiple devices are attached
+#
+# Revision 1.15  2016/07/13 17:17:00  wyliang
+# Support -keepdata to keep the data partition; Support -rom-only for debug purpose; 
+# Improve -boot4perm to avoid flashing twice for the first-time unlocked device
+#
+# Revision 1.14  2016/07/20 11:48:35  jethro
+# Make script independent from CI env and reduece platform related code
 #
 # Revision 1.13  2016/07/13 17:17:00  jethro
 # Support Ubuntu VM in virtualbox, use local cache fro gapps
@@ -95,6 +103,8 @@ Usage() {
   echo "  -recovery <recovery image>: specify the recovery image file name (e.g. <recovery image>: $RECOVERY_FILE)"
   echo "  -recovery-url <recovery URL>: specify the recovery URL (Default <recovery URL>: $RECOVERY_URL)"
   echo "  -boot4perm <boot image>: specify the temporary boot image for granting permissions"
+  echo "  -keepdata: keep the data partition. This option is valid only when -rom is used."
+  echo "  -rom-only: debug purpose, stop after the ROM images has been flashed."
   echo "  -sdk <sdk path>: set the SDK path (Default: $SDK_PATH)"
   echo "  -ask: ask the user to confirm every major step (Default: do no ask)"
   echo "  -fd: force to download again (for recovery and gapps)"
@@ -129,6 +139,8 @@ NEED_CONFIRM=0
 FORCE_DOWNLOAD=0
 FORCE_GRANT_PERM=0
 DO_BOOT4PERM=0
+KEEP_DATA=0
+ROM_ONLY=0
 
 ERROR_HDR="** Error:"
 
@@ -483,7 +495,7 @@ CheckParams() {
       ;;
     -gp)
       # FORCE_GRANT_PERM=1
-      GrantPermissions
+      GrantPermissions only
       exit 0
       ;;
     -rom)
@@ -532,6 +544,12 @@ CheckParams() {
       BOOT4PERM_IMG=$2
       shift
       ;;
+    -keepdata)
+        KEEP_DATA=1
+        ;;
+    -rom-only)
+        ROM_ONLY=1
+        ;;
     *)
       Usage 1
     esac
@@ -629,6 +647,15 @@ FlashImages() {
 
     return 0
   else
+    echo ">> Flash ROM images in '$ROM_DIR' " && ToConfirm
+
+    if [ "$DO_BOOT4PERM" -eq 1 ]; then
+      echo ">> Use '$BOOT4PERM_IMG' for permission grant. $ROM_DIR/boot.img will be flashed later."
+      fastboot flash boot "$BOOT4PERM_IMG"
+    else
+      CheckFile "$ROM_DIR"/boot.img probe-only && fastboot flash boot "$ROM_DIR"/boot.img
+    fi
+
     CheckDir "$ROM_DIR"
     pushd $ROM_DIR > /dev/null
 
@@ -637,8 +664,14 @@ FlashImages() {
     CheckFile recovery.img probe-only && fastboot -s $TARGET_DEVICE flash recovery recovery.img
     CheckFile system.img probe-only   && fastboot -s $TARGET_DEVICE flash system system.img
     CheckFile vendor.img probe-only   && fastboot -s $TARGET_DEVICE flash vendor vendor.img
-    CheckFile userdata.img probe-only && fastboot -s $TARGET_DEVICE flash userdata userdata.img || fastboot -s $TARGET_DEVICE erase data
-    CheckFile cache.img probe-only    && fastboot -s $TARGET_DEVICE flash cache cache.img || fastboot -s $TARGET_DEVICE erase cache
+    CheckFile cache.img probe-only    && fastboot -s $TARGET_DEVICE flash cache cache.img || fastboot erase cache
+
+    if [ "$KEEP_DATA" -eq 1 ]; then 
+      echo ">> The data partition will be kept."
+    else
+      CheckFile userdata.img probe-only && fastboot flash userdata userdata.img || fastboot erase userdata
+    fi
+
     echo "done"
 
     popd > /dev/null
@@ -711,10 +744,11 @@ InstallOpenGapps() {
 
 GrantPermissions() {
   local _failed=0
+  local _gp_only=$1
 
   echo ">> Prepare to grant permissions to GApps " && ToConfirm
 
-  if [ "$DO_BOOT4PERM" -eq 1 ]; then
+  if [ "$_gp_only" = "only" -a "$DO_BOOT4PERM" -eq 1 ]; then
     echo ">> Replace the boot image with the specified '$BOOT4PERM_IMG'"
     adb -s $TARGET_DEVICE reboot bootloader
     fastboot -s $TARGET_DEVICE flash boot "$BOOT4PERM_IMG"
@@ -724,7 +758,7 @@ GrantPermissions() {
     adb -s $TARGET_DEVICE reboot
   fi
 
-  if Wait4App2Appear gms 120; then
+  if Wait4App2Appear gms 80; then
     echo ">> Start to grant permissions"
     adb -s $TARGET_DEVICE shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
     adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
@@ -785,6 +819,9 @@ Boot2Fastboot
 
 # flash aosp image
 [ "$FLASH_ROM" -eq 1 ] && FlashImages
+
+# check to see if -rom-only has been specified
+[ "$ROM_ONLY" -eq 1 ] && exit
 
 # boot in to recovery mode
 Boot2Recovery
