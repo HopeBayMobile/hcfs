@@ -2092,3 +2092,20 @@ int32_t get_quota_from_backup(int64_t *quota)
 	json_delete(json_data);
 	return 0;
 }
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

@@ -1541,7 +1541,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		sem_wait(&(hcfs_system->access_sem));
 		if (P_IS_PIN(file_meta.local_pin)) {
 			hcfs_system->systemdata.pinned_size -=
-						this_inode_stat.size;
+					round_size(this_inode_stat.size);
 			if (hcfs_system->systemdata.pinned_size < 0)
 				hcfs_system->systemdata.pinned_size = 0;
 		}

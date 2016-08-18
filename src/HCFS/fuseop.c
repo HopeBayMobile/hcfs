@@ -2720,7 +2720,7 @@ int32_t truncate_truncate(ino_t this_inode,
 			delta_dirty_size = new_block_size - old_block_size;
 
 		unpin_dirty_size = (P_IS_UNPIN(tempfilemeta->local_pin) ?
-				delta_dirty_size: 0);
+				delta_dirty_size : 0);
 		change_system_meta(0, 0, new_block_size - old_block_size,
 				0, delta_dirty_size, unpin_dirty_size, TRUE);
 
@@ -2911,7 +2911,11 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 	}
 
 	if (filestat->size < offset) {
+		int64_t pin_sizediff;
+
 		sizediff = (int64_t) offset - filestat->size;
+		pin_sizediff = round_size((int64_t)offset) -
+					round_size(filestat->size);
 		sem_wait(&(hcfs_system->access_sem));
 		/* Check system size and reject if exceeding quota */
 		if (hcfs_system->systemdata.system_size + sizediff >
@@ -2931,12 +2935,12 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 				sem_post(&(hcfs_system->access_sem));
 				return -EIO;
 			}
-			if ((hcfs_system->systemdata.pinned_size + sizediff)
+			if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 					> max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				return -ENOSPC;
 			}
-			hcfs_system->systemdata.pinned_size += sizediff;
+			hcfs_system->systemdata.pinned_size += pin_sizediff;
 		}
 		sem_post(&(hcfs_system->access_sem));
 	}
@@ -3209,7 +3213,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 	    (offset < filestat->size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size +=
-			(int64_t)(offset - filestat->size);
+			(round_size(offset) - round_size(filestat->size));
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -3234,7 +3238,7 @@ errcode_handle:
 	    (offset > filestat->size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size -=
-			(int64_t)(offset - filestat->size);
+			(round_size(offset) - round_size(filestat->size));
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -4346,6 +4350,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	int64_t max_cache_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 	ssize_t ret_ssize;
+	BOOL block_dirty;
 
 	/* Check system size before writing */
 	if (hcfs_system->systemdata.system_size >
@@ -4468,6 +4473,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		break;
 	}
 
+	block_dirty = FALSE;
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		int64_t seq;
@@ -4532,6 +4538,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				}
 				break;
 			case ST_LDISK:
+				block_dirty = TRUE;
 				ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4547,6 +4554,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			case ST_LtoC:
 				if ((temppage).block_entries[entry_index].status ==
 						ST_LtoC) {
+					block_dirty = TRUE;
 					ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4616,6 +4624,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			/* Check if there is a need for status change */
 			switch ((temppage).block_entries[entry_index].status) {
 			case ST_LDISK:
+				block_dirty = TRUE;
 				ret = _check_sync_wait_full_cache(
 					&(fh_ptr->meta_cache_ptr),
 					this_inode, bindex, seq,
@@ -4631,6 +4640,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			case ST_LtoC:
 				if ((temppage).block_entries[entry_index].status
 						== ST_LtoC) {
+					block_dirty = TRUE;
 					ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4687,19 +4697,22 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
 	//FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
-
 	//FWRITE(buf, sizeof(char), size, fh_ptr->blockfptr);
 
 	this_bytes_written = (size_t) ret_ssize;
-
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size) {
-		unpin_dirty_size = (P_IS_UNPIN(ispin) ?
-				new_cache_size - old_cache_size : 0);
+	if (this_bytes_written != 0) {
+		int64_t dirty_delta;
+
+		if (block_dirty == TRUE)
+			dirty_delta = new_cache_size - old_cache_size;
+		else
+			dirty_delta = new_cache_size;
+
+		unpin_dirty_size = (P_IS_UNPIN(ispin) ? dirty_delta : 0);
 		change_system_meta(0, 0, new_cache_size - old_cache_size, 0,
-				new_cache_size - old_cache_size,
-				unpin_dirty_size, TRUE);
+				dirty_delta, unpin_dirty_size, TRUE);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
@@ -4709,8 +4722,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		ret = update_file_stats(tmpptr->fptr, 0,
 				0, new_cache_size - old_cache_size,
-				new_cache_size - old_cache_size,
-				fh_ptr->thisinode);
+				dirty_delta, fh_ptr->thisinode);
 		if (ret < 0) {
 			*reterr = ret;
 			return 0;
@@ -4760,7 +4772,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
-	int64_t sizediff, amount_preallocated;
+	int64_t pin_sizediff, amount_preallocated;
 	int64_t old_metasize, new_metasize, delta_meta_size;
 	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	int64_t now_seq;
@@ -4887,11 +4899,11 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if (P_IS_PIN(thisfilemeta.local_pin) &&
 	    ((offset + (off_t)size) > temp_stat.size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		sizediff =
-		    (int64_t)((offset + (off_t)size) - temp_stat.size);
-		write_log(10, "Write details: %lld, %lld\n", sizediff,
+		pin_sizediff = round_size(offset + (off_t)size) -
+					round_size(temp_stat.size);
+		write_log(10, "Write details: %lld, %lld\n", pin_sizediff,
 		          (off_t) size);
-		if ((hcfs_system->systemdata.pinned_size + sizediff)
+		if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 			> max_pinned_size) {
 			sem_post(&(hcfs_system->access_sem));
 			fh_ptr->meta_cache_locked = FALSE;
@@ -4902,8 +4914,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			return;
 		}
 
-		hcfs_system->systemdata.pinned_size += sizediff;
-		amount_preallocated = sizediff;
+		hcfs_system->systemdata.pinned_size += pin_sizediff;
+		amount_preallocated = pin_sizediff;
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -4968,11 +4980,13 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		/* If offset + total_bytes_written < st_size, substract
 		the difference between size and st_size */
 		if (offset + total_bytes_written < temp_stat.size)
-			sizediff = (offset + (off_t) size) - temp_stat.size;
+			pin_sizediff = round_size(offset + (off_t) size) -
+				round_size(temp_stat.size);
 		else
-			sizediff = ((off_t)size) - total_bytes_written;
+			pin_sizediff = round_size(offset + (off_t)size) -
+				round_size(offset + total_bytes_written);
 		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size -= sizediff;
+		hcfs_system->systemdata.pinned_size -= pin_sizediff;
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));

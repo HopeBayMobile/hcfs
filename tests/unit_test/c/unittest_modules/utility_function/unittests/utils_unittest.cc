@@ -51,7 +51,7 @@ TEST(check_file_sizeTest, Nonexist) {
 
 TEST(check_file_sizeTest, Test_8_bytes) {
 
-  EXPECT_EQ(8,check_file_size("testpatterns/size8bytes"));
+  EXPECT_EQ(4096, check_file_size("testpatterns/size8bytes"));
 }
 
 /* Begin of the test case for the function check_and_create_metapaths */
@@ -1170,9 +1170,9 @@ TEST_F(change_system_metaTest, UpdateSuccess)
 	ret = change_system_meta(1, 2, 3, 4, 5, 6, FALSE);
 	EXPECT_EQ(0, ret);
 
-	EXPECT_EQ(1 + 2, hcfs_system->systemdata.system_size);
-	EXPECT_EQ(4096, hcfs_system->systemdata.system_meta_size);
-	EXPECT_EQ(4096, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(1, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(2, hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(3, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
 	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
 	EXPECT_EQ(6, hcfs_system->systemdata.unpin_dirty_data_size);
@@ -1390,12 +1390,12 @@ TEST_F(init_cache_thresholdsTest, Successful)
         End of unittest of init_cache_thresholds()
  */
 
-TEST(block_4k_unitTest, Change4KSuccess)
+TEST(round_sizeTest, Change4KSuccess)
 {
-	EXPECT_EQ(0, block_4k_unit(0));
-	EXPECT_EQ(0, block_4k_unit(-0));
-	EXPECT_EQ(4096, block_4k_unit(1));
-	EXPECT_EQ(8192, block_4k_unit(4097));
-	EXPECT_EQ(-4096, block_4k_unit(-1));
-	EXPECT_EQ(-8192, block_4k_unit(-4097));
+	EXPECT_EQ(0, round_size(0));
+	EXPECT_EQ(0, round_size(-0));
+	EXPECT_EQ(4096, round_size(1));
+	EXPECT_EQ(8192, round_size(4097));
+	EXPECT_EQ(-4096, round_size(-1));
+	EXPECT_EQ(-8192, round_size(-4097));
 }

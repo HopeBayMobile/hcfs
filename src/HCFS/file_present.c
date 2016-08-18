@@ -1334,7 +1334,7 @@ int32_t pin_inode(ino_t this_inode,
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
-					tempstat.size, pin_type);
+					round_size(tempstat.size), pin_type);
 			if (ret == -ENOSPC) {
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
@@ -1474,7 +1474,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		/* Deduct from reserved size */
 		if (S_ISREG(tempstat.mode)) {
 			decrease_pinned_size(reserved_release_size,
-			 		tempstat.size);
+			 		round_size(tempstat.size));
 		}
 
 		ret = super_block_mark_unpin(this_inode, tempstat.mode);

@@ -911,3 +911,8 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+
+int64_t round_size(int64_t size)
+{
+	return 0;
+}
