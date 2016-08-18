@@ -230,7 +230,7 @@ off_t check_file_size(const char *path)
 	struct stat tempstat; /* file ops */
 
 	stat(path, &tempstat);
-	return tempstat.st_size;
+	return tempstat.st_blocks * 512;
 }
 
 int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
@@ -422,13 +422,16 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	int tmp_len;
 	ino_t this_inode;
 	long long block_no, seqnum;
+	char buffer[102400] = {0};
 
 	sscanf(objname, "data_%"PRIu64"_%lld_%lld",
 			(uint64_t *)&this_inode, &block_no, &seqnum);
 
 	switch (this_inode) {
 	case 14:
-		ftruncate(fileno(fptr), 102400);
+		setbuf(fptr, NULL);
+		pwrite(fileno(fptr), buffer, 102400, 0);
+		//ftruncate(fileno(fptr), 102400);
 		break;
 	case 15:
 	case 16:
@@ -1166,5 +1169,17 @@ int32_t meta_nospc_log(const char *func_name, int32_t lines)
 
 int64_t round_size(int64_t size)
 {
-	return 0;
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
 }
+

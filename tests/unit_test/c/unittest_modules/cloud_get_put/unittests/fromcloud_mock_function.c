@@ -50,7 +50,9 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCF
 
 	sscanf(objname, "data_%d_%d", &inode, &block_no);
 	if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
-		ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
+		char buffer[EXTEND_FILE_SIZE] = {0};
+		setbuf(fptr, NULL);
+		pwrite(fileno(fptr), buffer, EXTEND_FILE_SIZE, 0);
 		return HTTP_OK;
 	} else {
 		sem_wait(&objname_counter_sem);
@@ -72,9 +74,12 @@ int32_t write_log(int32_t level, char *format, ...)
 	return 0;
 }
 
-int32_t decode_to_fd(FILE *fptr, uint8_t *key, uint8_t *input, int32_t input_length, int32_t enc_flag, int32_t compress_flag){
-
-  ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
+int32_t decode_to_fd(FILE *fptr, uint8_t *key, uint8_t *input, int32_t input_length, int32_t enc_flag, int32_t compress_flag)
+{
+	char buffer[EXTEND_FILE_SIZE] = {0};
+	setbuf(fptr, NULL);
+	pwrite(fileno(fptr), buffer, EXTEND_FILE_SIZE, 0);
+	//ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
 	return 0;
 }
 
