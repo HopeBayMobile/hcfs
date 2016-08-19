@@ -106,6 +106,8 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 		cache_block_size = check_file_size(blockpath);
 		if (P_IS_UNPIN(tempfilemeta.local_pin))
 			delta_unpin_dirty_size = -cache_block_size;
+		else
+			delta_unpin_dirty_size = 0;
 		change_system_meta(0, 0, 0, 0, -cache_block_size,
 				delta_unpin_dirty_size, TRUE);
 		/* Update dirty size in file meta */
