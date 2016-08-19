@@ -356,6 +356,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	sem_post(&(pathlookup_data_lock));
 
 	if (old_metasize > 0 && new_metasize > 0) {
+		/* Update local meta round size */
 		change_system_meta(0,
 			(new_metasize_blk - old_metasize_blk) + metasize_blk,
 			0, 0, 0, 0, FALSE);

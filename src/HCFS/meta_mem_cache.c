@@ -95,11 +95,12 @@ int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr,
 	int32_t errcode;
 	struct stat tmpstat;
 
-	*metasize = 0;
 	if (ptr->meta_opened == FALSE || ptr->fptr == NULL) {
 		ret = meta_cache_open_file(ptr);
-		if (ret < 0)
-			return ret;
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	}
 
 	ret = fstat(fileno(ptr->fptr), &tmpstat);
@@ -115,6 +116,10 @@ int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr,
 	return 0;
 
 errcode_handle:
+	if (metasize)
+		*metasize = 0;
+	if (metalocalsize)
+		*metalocalsize = 0;
 	return errcode;
 }
 

@@ -1274,7 +1274,8 @@ int32_t update_sb_size()
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
 
-	hcfs_system->systemdata.system_meta_size += (new_size - old_size);
+	hcfs_system->systemdata.system_meta_size +=
+			(round_size(new_size) - round_size(old_size));
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
 
@@ -2022,13 +2023,15 @@ int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metalocalsize)
 	int32_t ret, ret_code;
 
 	fetch_meta_path(metapath, inode);
-	/* TODO: reduce duplicate code with check_file_size */
 	ret = stat(metapath, &metastat);
 	if (ret < 0) {
 		ret_code = errno;
 		write_log(0, "Error on get stat of meta %"PRIu64
 				". Code %d\n", (uint64_t)inode, ret_code);
-		*metasize = 0;
+		if (metasize)
+			*metasize = 0;
+		if (metalocalsize)
+			*metalocalsize = 0;
 		return -ret_code;
 	}
 	if (metasize)

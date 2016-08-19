@@ -318,7 +318,7 @@ int fetch_toupload_meta_path(char *pathname, ino_t inode)
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metaroundsize)
 {
 	return 0;
 }
@@ -346,7 +346,7 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	return 0;
 }
 
-int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize, int64_t *metaroundsize)
 {
 	int32_t ret;
 	int32_t errcode;
@@ -386,3 +386,20 @@ int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 {
 	return 0;
 }
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

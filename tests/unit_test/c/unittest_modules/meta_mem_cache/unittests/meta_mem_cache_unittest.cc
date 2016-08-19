@@ -2103,6 +2103,7 @@ TEST_F(meta_cache_check_uploadingTest, FileIsUploading_Success)
 class meta_cache_get_meta_sizeTest : public BaseClassWithMetaCacheEntry {
 protected:
 	const char *mock_file_meta;
+	struct stat metastat;
 
 	void SetUp()
 	{
@@ -2113,8 +2114,10 @@ protected:
 		unlink(mock_file_meta);
 		body_ptr->fptr = fopen(mock_file_meta, "w+");
 		body_ptr->meta_opened = TRUE;
+		setbuf(body_ptr->fptr, NULL);
 		fwrite(mock_file_meta, 1, strlen(mock_file_meta),
 				body_ptr->fptr);
+		fstat(fileno(body_ptr->fptr), &metastat);
 		rewind(body_ptr->fptr);
 	}
 	void TearDown()
@@ -2127,8 +2130,10 @@ protected:
 
 TEST_F(meta_cache_get_meta_sizeTest, MetaOpened_GetSuccess)
 {
-	int64_t metasize;
+	int64_t metasize, metaroundsize;
 
-	EXPECT_EQ(0, meta_cache_get_meta_size(body_ptr, &metasize));
-	EXPECT_EQ(strlen(mock_file_meta), metasize);
+	EXPECT_EQ(0, meta_cache_get_meta_size(body_ptr,
+		&metasize, &metaroundsize));
+	EXPECT_EQ(metastat.st_size, metasize);
+	EXPECT_EQ(metastat.st_blocks * 512, metaroundsize);
 }
