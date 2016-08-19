@@ -508,12 +508,13 @@ int32_t _fetch_pinned(ino_t thisinode)
 	BOOL write_page;
 
 	fetch_restore_meta_path(metapath, thisinode);
-	fptr = fopen(metapath, "r");
+	fptr = fopen(metapath, "r+");
 	if (fptr == NULL) {
 		write_log(0, "Error when fetching file to restore\n");
 		errcode = -errno;
 		return errcode;
 	}
+	setbuf(fptr, NULL);
 
 	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	FREAD(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
