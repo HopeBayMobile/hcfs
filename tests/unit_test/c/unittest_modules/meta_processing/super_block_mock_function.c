@@ -14,9 +14,12 @@ int32_t write_log(int32_t level, char *format, ...)
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *roundmetasize)
 {
-	*metasize = 5566;
+	if (metasize)
+		*metasize = 5566;
+	if (roundmetasize)
+		*roundmetasize = 8192;
 	return 0;
 }
 

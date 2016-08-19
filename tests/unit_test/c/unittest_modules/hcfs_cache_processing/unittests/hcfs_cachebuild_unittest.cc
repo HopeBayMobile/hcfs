@@ -191,7 +191,7 @@ TEST_F(insert_cache_usage_nodeTest, InsertSuccess)
 	bool found_node;
 
 	ASSERT_EQ(0, cache_usage_hash_init());
-	for (uint32_t node_id = 0 ; node_id <= 500000 ; node_id++) {
+	for (uint32_t node_id = 0 ; node_id <= 100000 ; node_id++) {
 		if (node_id % 10000 == 0)
 			printf("%u\n", node_id);
 		fflush(stdout);
@@ -274,15 +274,18 @@ protected:
 			/* Generate a mock block data */
 			for (int32_t block_id = 0 ; block_id < num_block_per_node ; block_id++) {
 				char path[500];
-				int32_t rand_size;
+				int32_t rand_size, randsize_blk;
 				int32_t fd;
+				char buffer[200] = {0};
 
 				fetch_block_path(path, node_id, block_id);
 				fd = creat(path, 0700);
 				rand_size = rand() % 100;
-				ftruncate(fd, rand_size);
+				pwrite(fd, buffer, rand_size, 0);
+				//ftruncate(fd, rand_size);
 #ifdef _ANDROID_ENV_
 				stat(path, &tmpstat);
+				randsize_blk = tmpstat.st_blocks * 512;
 #endif
 				if (block_id % 2) {
 #ifdef _ANDROID_ENV_
@@ -290,14 +293,14 @@ protected:
 #else
 					setxattr(path, "user.dirty", "T", 1, XATTR_CREATE);
 #endif
-					answer_node->dirty_cache_size += rand_size;
+					answer_node->dirty_cache_size += randsize_blk;
 				} else {
 #ifdef _ANDROID_ENV_
 					chmod(path, tmpstat.st_mode & ~S_ISVTX);
 #else
 					setxattr(path, "user.dirty", "F", 1, XATTR_CREATE);
 #endif
-					answer_node->clean_cache_size += rand_size;
+					answer_node->clean_cache_size += randsize_blk;
 				}
 				if (block_id == num_block_per_node - 1) {
 					stat(path, &tmpstat);

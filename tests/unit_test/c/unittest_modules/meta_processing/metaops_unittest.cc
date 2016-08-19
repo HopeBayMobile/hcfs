@@ -873,7 +873,7 @@ protected:
 			int32_t level_index = tmp_target_page / pointers_per_page[deep - level];
 			fread(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 			fseek(body_ptr->fptr, ptr_entry_page.ptr[level_index], SEEK_SET);
-			printf("Test: level %d: ptr_page_index = %d, next_filepos = %" PRId64 "\n",
+			printf("Test: level %d: ptr_page_index = %d, next_filepos = %lld\n",
 				level, level_index, ptr_entry_page.ptr[level_index]);
 			tmp_target_page = tmp_target_page % pointers_per_page[deep - level];
 		}
@@ -1385,6 +1385,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess_NoBackend)
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 0, 1);
 	hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+	hcfs_system->systemdata.system_meta_size = MOCK_SYSTEM_META_SIZE;
 	hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
 	hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
 	hcfs_system->systemdata.unpin_dirty_data_size = MOCK_CACHE_SIZE;
@@ -1422,11 +1423,13 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess_NoBackend)
 		mock_root, &mount_t));
 
 	/* Verify if block files are removed correctly */
-	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE,
+	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE - MOCK_META_SIZE,
 		hcfs_system->systemdata.system_size);
-	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS,
+	EXPECT_EQ(MOCK_SYSTEM_META_SIZE - round_size(MOCK_META_SIZE),
+		hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(MOCK_CACHE_SIZE - round_size(MOCK_BLOCK_SIZE) * NUM_BLOCKS,
 		hcfs_system->systemdata.cache_size);
-	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS,
+	EXPECT_EQ(MOCK_CACHE_SIZE - round_size(MOCK_BLOCK_SIZE) *NUM_BLOCKS,
 		hcfs_system->systemdata.unpin_dirty_data_size);
 	EXPECT_EQ(MOCK_CACHE_SIZE, hcfs_system->systemdata.pinned_size);
 	EXPECT_EQ(MOCK_CACHE_BLOCKS - NUM_BLOCKS,
@@ -1475,6 +1478,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 0, 1);
 	hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+	hcfs_system->systemdata.system_meta_size = MOCK_SYSTEM_META_SIZE;
 	hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
 	hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
 	hcfs_system->systemdata.unpin_dirty_data_size = MOCK_CACHE_SIZE;
@@ -1512,11 +1516,13 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 		mock_root, &mount_t));
 
 	/* Verify if block files are removed correctly */
-	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE,
+	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE - MOCK_META_SIZE,
 		hcfs_system->systemdata.system_size);
-	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS,
+	EXPECT_EQ(MOCK_SYSTEM_META_SIZE - round_size(MOCK_META_SIZE),
+		hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(MOCK_CACHE_SIZE - round_size(MOCK_BLOCK_SIZE) * NUM_BLOCKS,
 		hcfs_system->systemdata.cache_size);
-	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS,
+	EXPECT_EQ(MOCK_CACHE_SIZE - round_size(MOCK_BLOCK_SIZE) * NUM_BLOCKS,
 		hcfs_system->systemdata.unpin_dirty_data_size);
 	EXPECT_EQ(MOCK_CACHE_SIZE, hcfs_system->systemdata.pinned_size);
 	EXPECT_EQ(MOCK_CACHE_BLOCKS - NUM_BLOCKS,

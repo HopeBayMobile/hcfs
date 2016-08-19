@@ -459,7 +459,7 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 		} else if (tempentry.status == IS_DIRTY) {
 			/* When marking dirty again, just update
 			 * dirty meta size */
-			get_meta_size(this_inode, &now_meta_size);
+			get_meta_size(this_inode, NULL, &now_meta_size);
 			if (now_meta_size > 0) {
 				dirty_delta_meta_size = now_meta_size -
 						tempentry.dirty_meta_size;
@@ -1338,7 +1338,7 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */
 		if (which_ll == IS_DIRTY) {
-			get_meta_size(thisinode, &now_meta_size);
+			get_meta_size(thisinode, NULL, &now_meta_size);
 			if (now_meta_size == 0)
 				return 0;
 			dirty_delta_meta_size = now_meta_size -
@@ -1431,7 +1431,7 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 				return ret;
 		}
 		/* Update dirty meta size (from X to DIRTY) */
-		get_meta_size(thisinode, &now_meta_size);
+		get_meta_size(thisinode, NULL, &now_meta_size);
 		if (now_meta_size) {
 			this_entry->dirty_meta_size = now_meta_size;
 			change_system_meta(0, 0, 0, 0, now_meta_size, 0, TRUE);

@@ -230,7 +230,7 @@ off_t check_file_size(const char *path)
 	struct stat tempstat; /* file ops */
 
 	stat(path, &tempstat);
-	return tempstat.st_size;
+	return tempstat.st_blocks * 512;
 }
 
 int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
@@ -422,13 +422,16 @@ int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	int tmp_len;
 	ino_t this_inode;
 	long long block_no, seqnum;
+	char buffer[102400] = {0};
 
 	sscanf(objname, "data_%"PRIu64"_%lld_%lld",
 			(uint64_t *)&this_inode, &block_no, &seqnum);
 
 	switch (this_inode) {
 	case 14:
-		ftruncate(fileno(fptr), 102400);
+		setbuf(fptr, NULL);
+		pwrite(fileno(fptr), buffer, 102400, 0);
+		//ftruncate(fileno(fptr), 102400);
 		break;
 	case 15:
 	case 16:
@@ -607,7 +610,7 @@ int32_t fetch_inode_stat(ino_t this_inode,
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_metasize, char ispin,
+			MOUNT_T *mountptr, int64_t *delta_metasize, char ispin,
 			BOOL is_external)
 {
 	MOCK();
@@ -620,7 +623,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 int32_t mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_metasize, char ispin,
+			MOUNT_T *mountptr, int64_t *delta_metasize, char ispin,
 			BOOL is_external)
 {
 	MOCK();
@@ -876,7 +879,7 @@ void destroy_fs_manager(void)
 
 int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
 	const HCFS_STAT *this_stat, const char *link, 
-	const uint64_t generation, const char *name,
+	const uint64_t generation, const char *name, MOUNT_T *mountptr,
 	int64_t *delta_metasize, char ispin, BOOL is_external)
 {
 	MOCK();
@@ -1109,15 +1112,24 @@ int32_t do_fallocate(ino_t this_inode, HCFS_STAT *newstat, int32_t mode,
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr,
+		int64_t *metasize, int64_t *metalocalsize)
 {
-	MOCK();
-	return 0;
-}
+	struct stat tmpstat;
+	int64_t size, roundsize;
 
-int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
-{
 	MOCK();
+	if (ptr->fptr) {
+		fstat(fileno(ptr->fptr), &tmpstat);
+		size = tmpstat.st_size;
+		roundsize = tmpstat.st_blocks * 512;
+	}
+
+	if (metasize)
+		*metasize = size;
+	if (metalocalsize)
+		*metalocalsize = roundsize;
+
 	return 0;
 }
 
@@ -1162,3 +1174,20 @@ int32_t meta_nospc_log(const char *func_name, int32_t lines)
 	MOCK();
 	return 1;
 }
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

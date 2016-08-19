@@ -1032,10 +1032,12 @@ TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
   char temppath[1024];
   int32_t fd;
   struct stat tempstat;
+  char buffer[102400] = {0};
 
   fetch_block_path(temppath, 14, 0);
   fd = creat(temppath, 0700);
-  ftruncate(fd, 102400);
+  pwrite(fd, buffer, 102400, 0);
+  //ftruncate(fd, 102400);
   close(fd);
   stat(temppath, &tempstat);
   ASSERT_EQ(tempstat.st_size, 102400);
@@ -1050,7 +1052,7 @@ TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
   stat(temppath, &tempstat);
   EXPECT_EQ(tempstat.st_size, 51200);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 51200);
-  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000 - 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000 - (round_size(102400) - round_size(51200)));
   EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
 }
 TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
@@ -1090,7 +1092,7 @@ TEST_F(hfuse_truncateTest, TruncateHalfCloud) {
   stat(temppath, &tempstat);
   EXPECT_EQ(tempstat.st_size, 51200);
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 51200);
-  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000 + 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000 + round_size(51200));
   EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 14);
 }
 
@@ -1490,6 +1492,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 0;
     fptr = NULL;
   }
 
@@ -1724,7 +1727,7 @@ TEST_F(hfuse_ll_writeTest, ReWritePagedOutLocal) {
   fread(tempbuf, tmp_len, 1, fptr);
   fclose(fptr);
   fptr = NULL;
-  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0) << tempbuf;
 }
 
 TEST_F(hfuse_ll_writeTest, ReWritePagedOut) {

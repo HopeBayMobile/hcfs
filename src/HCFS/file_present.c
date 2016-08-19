@@ -207,8 +207,8 @@ static inline int32_t dir_remove_fail_node(ino_t parent_inode, ino_t child_inode
 int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
-			ino_t root_ino, int64_t *delta_meta_size, char ispin,
-			BOOL is_external)
+			MOUNT_T *mountptr, int64_t *delta_meta_size,
+			char ispin, BOOL is_external)
 {
 	int32_t ret_val, ret, errcode;
 	size_t ret_size;
@@ -216,8 +216,11 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	int64_t metasize, old_metasize = 0, new_metasize = 0;
+	int64_t metasize_blk, old_metasize_blk = 0, new_metasize_blk = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
+	ino_t root_ino;
 
+	root_ino = mountptr->f_ino;
 	*delta_meta_size = 0;
 
 	/* Add "self_inode" to its parent "parent_inode" */
@@ -239,7 +242,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 
 	/* Get old meta size before adding new entry */
-	meta_cache_get_meta_size(body_ptr, &old_metasize);
+	meta_cache_get_meta_size(body_ptr, &old_metasize, &old_metasize_blk);
 
 	/* Add path lookup table */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -258,7 +261,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		goto error_handling;
 
 	/* Get old meta size after adding new entry */
-	meta_cache_get_meta_size(body_ptr, &new_metasize);
+	meta_cache_get_meta_size(body_ptr, &new_metasize, &new_metasize_blk);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -323,7 +326,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 #endif
 
-	meta_cache_get_meta_size(body_ptr, &metasize);
+	meta_cache_get_meta_size(body_ptr, &metasize, &metasize_blk);
 
 	meta_cache_remove_sync_later(body_ptr);
 	ret_val = meta_cache_close_file(body_ptr);
@@ -352,10 +355,15 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 	sem_post(&(pathlookup_data_lock));
 
-	if (old_metasize > 0 && new_metasize > 0)
+	if (old_metasize > 0 && new_metasize > 0) {
+		/* Update local meta round size */
+		change_system_meta(0,
+			(new_metasize_blk - old_metasize_blk) + metasize_blk,
+			0, 0, 0, 0, FALSE);
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
-	else
+	} else {
 		*delta_meta_size = metasize;
+	}
 
 	return 0;
 errcode_handle:
@@ -385,7 +393,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 			  const char *selfname,
 			  HCFS_STAT *this_stat,
 			  uint64_t this_gen,
-			  ino_t root_ino,
+			  MOUNT_T *mountptr,
 			  int64_t *delta_meta_size,
 			  char ispin,
 			  BOOL is_external)
@@ -395,10 +403,13 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	int32_t ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	int64_t metasize, old_metasize, new_metasize;
+	int64_t metasize_blk, old_metasize_blk = 0, new_metasize_blk = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int32_t ret, errcode;
 	size_t ret_size;
+	ino_t root_ino;
 
+	root_ino = mountptr->f_ino;
 	*delta_meta_size = 0;
 	/* Save the new entry to its parent and update meta */
 	body_ptr = meta_cache_lock_entry(parent_inode);
@@ -415,7 +426,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
-	meta_cache_get_meta_size(body_ptr, &old_metasize);
+	meta_cache_get_meta_size(body_ptr, &old_metasize, &old_metasize_blk);
 
 	/* Add parent to lookup db */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -434,7 +445,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
-	meta_cache_get_meta_size(body_ptr, &new_metasize);
+	meta_cache_get_meta_size(body_ptr, &new_metasize, &new_metasize_blk);
 
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
@@ -517,7 +528,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 				(uint64_t)self_inode, (uint64_t)parent_inode);
 #endif
 
-	meta_cache_get_meta_size(body_ptr, &metasize);
+	meta_cache_get_meta_size(body_ptr, &metasize, &metasize_blk);
 
 	meta_cache_remove_sync_later(body_ptr);
 	ret_val = meta_cache_close_file(body_ptr);
@@ -539,10 +550,14 @@ int32_t mkdir_update_meta(ino_t self_inode,
 		return ret_val;
 	}
 
-	if (old_metasize > 0 && new_metasize > 0)
+	if (old_metasize > 0 && new_metasize > 0) {
+		change_system_meta(0,
+			(new_metasize_blk - old_metasize_blk) + metasize_blk,
+			0, 0, 0, 0, FALSE);
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
-	else
+	} else {
 		*delta_meta_size = metasize;
+	}
 
 	return 0;
 
@@ -821,7 +836,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			    const char *link,
 			    const uint64_t generation,
 			    const char *name,
-			    ino_t root_ino,
+			    MOUNT_T *mountptr,
 			    int64_t *delta_meta_size,
 			    char ispin,
 			    BOOL is_external)
@@ -831,10 +846,13 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ino_t parent_inode, self_inode;
 	int32_t ret_code;
 	int64_t metasize, old_metasize, new_metasize;
+	int64_t metasize_blk, old_metasize_blk = 0, new_metasize_blk = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int32_t ret, errcode;
 	size_t ret_size;
+	ino_t root_ino;
 
+	root_ino = mountptr->f_ino;
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->ino;
 	*delta_meta_size = 0;
@@ -848,7 +866,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
-	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize,
+			&old_metasize_blk);
 
 	/* Add parent to lookup first */
 	ret_code = sem_wait(&(pathlookup_data_lock));
@@ -869,7 +888,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
-	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize,
+			&new_metasize_blk);
 
 	ret_code = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_code < 0)
@@ -943,7 +963,8 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return -ENOMEM;
 	}
 #endif
-	meta_cache_get_meta_size(self_meta_cache_entry, &metasize);
+	meta_cache_get_meta_size(self_meta_cache_entry, &metasize,
+			&metasize_blk);
 
 	meta_cache_remove_sync_later(self_meta_cache_entry);
 	ret_code = meta_cache_close_file(self_meta_cache_entry);
@@ -958,10 +979,14 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	/* Mark dirty here so that dirty data size includes dirty meta size. */
 	super_block_mark_dirty(self_inode);
 
-	if (old_metasize > 0 && new_metasize > 0)
+	if (old_metasize > 0 && new_metasize > 0) {
+		change_system_meta(0,
+			(new_metasize_blk - old_metasize_blk) + metasize_blk,
+			0, 0, 0, 0, FALSE);
 		*delta_meta_size = (new_metasize - old_metasize) + metasize;
-	else
+	} else {
 		*delta_meta_size = metasize;
+	}
 
 	return 0;
 
@@ -1310,7 +1335,7 @@ int32_t pin_inode(ino_t this_inode,
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
-					tempstat.size, pin_type);
+					round_size(tempstat.size), pin_type);
 			if (ret == -ENOSPC) {
 				/* Roll back local_pin flag because the size
 				had not been added to system pinned size */
@@ -1450,7 +1475,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		/* Deduct from reserved size */
 		if (S_ISREG(tempstat.mode)) {
 			decrease_pinned_size(reserved_release_size,
-			 		tempstat.size);
+			 		round_size(tempstat.size));
 		}
 
 		ret = super_block_mark_unpin(this_inode, tempstat.mode);

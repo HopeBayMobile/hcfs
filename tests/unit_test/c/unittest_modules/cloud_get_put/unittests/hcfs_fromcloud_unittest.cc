@@ -14,6 +14,7 @@ extern "C"{
 #include "mock_params.h"
 #include "meta_mem_cache.h"
 #include "utils.h"
+#include "ut_global.h"
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
@@ -259,7 +260,7 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	prefetch_block(prefetch_ptr);
 
 	/* Check answer */
-	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size); // Total size = expected block size
+	EXPECT_EQ(ROUND_SIZE(EXTEND_FILE_SIZE), hcfs_system->systemdata.cache_size); // Total size = expected block size
 	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks); // Prefetch one block from cloud
 	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK)); // Mock block path
 	ret = getxattr("/tmp/testHCFS/tmp_block", "user.dirty", &xattr_result,

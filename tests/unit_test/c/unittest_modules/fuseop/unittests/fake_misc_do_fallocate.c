@@ -911,3 +911,20 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

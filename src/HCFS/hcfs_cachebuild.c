@@ -240,6 +240,7 @@ int32_t build_cache_usage(void)
 	struct dirent *de;
 	int32_t ret, errcode;
 	int64_t blockno;
+	int64_t block_size_blk;
 	ino_t this_inode;
 	struct stat tempstat; /* block ops */
 	CACHE_USAGE_NODE *tempnode;
@@ -357,11 +358,11 @@ int32_t build_cache_usage(void)
 				break;
 			}
 			/*If this is dirty cache entry*/
+			block_size_blk = tempstat.st_blocks * 512;
 			if (is_dirty == TRUE)
-				tempnode->dirty_cache_size += tempstat.st_size;
+				tempnode->dirty_cache_size += block_size_blk;
 			else
-				tempnode->clean_cache_size +=
-							tempstat.st_size;
+				tempnode->clean_cache_size += block_size_blk;
 
 			write_log(10, "Inserting the node\n");
 //			write_log(10, "count is now %d\n", count);

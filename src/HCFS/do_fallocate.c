@@ -37,7 +37,7 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 {
 	FILE_META_TYPE tempfilemeta;
 	int32_t ret;
-	int64_t sizediff;
+	int64_t sizediff, pin_sizediff;
 	int64_t max_pinned_size;
 	MOUNT_T *tmpptr;
 
@@ -67,6 +67,8 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 
 	if (filestat->size < offset) {
 		sizediff = (int64_t) offset - filestat->size;
+		pin_sizediff = round_size((int64_t)offset) -
+				round_size(filestat->size);
 		sem_wait(&(hcfs_system->access_sem));
 		/* Check system size and reject if exceeding quota */
 		if (hcfs_system->systemdata.system_size + sizediff >
@@ -86,12 +88,12 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 				sem_post(&(hcfs_system->access_sem));
 				return -EINVAL;
 			}
-			if ((hcfs_system->systemdata.pinned_size + sizediff)
+			if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 					> max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				return -ENOSPC;
 			}
-			hcfs_system->systemdata.pinned_size += sizediff;
+			hcfs_system->systemdata.pinned_size += pin_sizediff;
 		}
 		sem_post(&(hcfs_system->access_sem));
 	}

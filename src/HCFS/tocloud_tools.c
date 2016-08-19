@@ -49,8 +49,8 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 	int32_t ret, errcode;
 	int32_t semval;
 	ssize_t ret_ssize;
+	int64_t delta_unpin_dirty_size;
 	char blockpath[300], local_metapath[300];
-	SYSTEM_DATA_TYPE *statptr;
 	off_t cache_block_size;
 	FILE *local_metafptr;
 	FILE_META_TYPE tempfilemeta;
@@ -104,19 +104,12 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 		}
 		/* Remember to decrease dirty_cache_size */
 		cache_block_size = check_file_size(blockpath);
-		sem_wait(&(hcfs_system->access_sem));
-		statptr = &(hcfs_system->systemdata);
-		statptr->dirty_cache_size -= cache_block_size;
-		if (statptr->dirty_cache_size < 0)
-			statptr->dirty_cache_size = 0;
-		/* Update unpin-dirty size */
-		if (P_IS_UNPIN(tempfilemeta.local_pin)) {
-			statptr->unpin_dirty_data_size -=
-				cache_block_size;
-			if (statptr->unpin_dirty_data_size < 0)
-				statptr->unpin_dirty_data_size = 0;
-		}
-		sem_post(&(hcfs_system->access_sem));
+		if (P_IS_UNPIN(tempfilemeta.local_pin))
+			delta_unpin_dirty_size = -cache_block_size;
+		else
+			delta_unpin_dirty_size = 0;
+		change_system_meta(0, 0, 0, 0, -cache_block_size,
+				delta_unpin_dirty_size, TRUE);
 		/* Update dirty size in file meta */
 		update_file_stats(local_metafptr, 0, 0, 0,
 				-cache_block_size, inode);
