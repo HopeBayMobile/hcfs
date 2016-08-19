@@ -71,7 +71,7 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   snprintf(argv[1],90,"/tmp/test_fuse");
   snprintf(argv[2],90,"-d");
   ret_val = mkdir("/tmp/test_fuse",0777);
-  printf("created return %d\n",ret_val);
+  printf("create /tmp/test_fuse return %d\n",ret_val);
 //  hook_fuse(3, argv);
   struct fuse_args tmp_args = FUSE_ARGS_INIT(3, argv);
 
@@ -170,6 +170,8 @@ class fuseopEnvironment : public ::testing::Environment {
 	    system("for i in `\\ls /sys/fs/fuse/connections/`; do echo 1 > /sys/fs/fuse/connections/$i/abort; done");
     }
     puts("unmount fuse... done");
+    ret_val = nftw("/tmp/test_fuse", do_delete, 20, FTW_DEPTH);
+    printf("delete return %d\n",ret_val);
     ASSERT_EQ(exit_status, 0);
     pthread_join(unittest_mount.mt_thread, NULL);
     fuse_session_remove_chan(unittest_mount.chan_ptr);
@@ -178,8 +180,6 @@ class fuseopEnvironment : public ::testing::Environment {
     fuse_unmount(unittest_mount.f_mp, unittest_mount.chan_ptr);
     fuse_opt_free_args(&(unittest_mount.mount_args));
 
-    ret_val = nftw("/tmp/test_fuse", do_delete, 20, FTW_DEPTH);
-    printf("delete return %d\n",ret_val);
     free(system_fh_table.entry_table_flags);
     free(system_fh_table.entry_table);
     free(system_fh_table.direntry_table);

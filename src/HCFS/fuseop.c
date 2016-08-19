@@ -33,7 +33,7 @@
 * 2016/4/20 Jiahong adding dir handle operations to opendir / closedir
 * 2016/6/27 Jiahong adding file size limitation
 * 2016/8/1  Jethro moved init_hcfs_stat to meta.c
-*                  moved convert_hcfsstat_to_sysstat to meta.c 
+*                  moved convert_hcfsstat_to_sysstat to meta.c
 *
 **************************************************************************/
 
@@ -1254,7 +1254,26 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	write_log(10, "mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 }
-
+typedef struct {
+	MOUNT_T *mount_ptr;
+	fuse_ino_t parent;
+	fuse_ino_t child;
+	const char *name;
+} TTTT;
+void *test_notify_vfs(void *ptr)
+{
+	TTTT t;
+	memcpy(&t, ptr, sizeof(TTTT));
+	free(ptr);
+	write_log(8, "Debug fuse_lowlevel_notify_delete: %s, %" PRIu64 "\n",
+		  t.name, (uint64_t)t.child);
+	fuse_lowlevel_notify_inval_entry(t.mount_ptr->chan_ptr, t.parent,
+					 t.name, strlen(t.name));
+	fuse_lowlevel_notify_inval_inode(t.mount_ptr->chan_ptr, t.child, 0, 0);
+	fuse_lowlevel_notify_delete(t.mount_ptr->chan_ptr, t.parent, t.child,
+				    t.name, strlen(t.name));
+	return NULL;
+}
 /************************************************************************
 *
 * Function name: hfuse_ll_unlink
@@ -1266,14 +1285,14 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
+#ifdef _ANDROID_ENV_
+	ino_t this_inode;
+#endif
 	ino_t parent_inode;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
-#ifdef _ANDROID_ENV_
-	MOUNT_T *tmpptr;
-	ino_t this_inode;
-#endif
+	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
@@ -1295,7 +1314,6 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 
 
 #ifdef _ANDROID_ENV_
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -1325,6 +1343,22 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	/* When a filename is deleted with different cases, upper level
+	 * VFS does not know the actual file is deleted. HCFS need to
+	 * notify VFS to invalidate the actually deleted file.
+	 *
+	 * To avoid a deadlock don't call this function from a filesystem
+	 * operation and don't call it with a lock held that can also be
+	 * held by a filesystem operation.
+	 */
+	pthread_t tmp_test_thread;
+	TTTT *t = (TTTT *)malloc(sizeof(TTTT));
+	t->mount_ptr = tmpptr;
+	t->parent = parent_inode;
+	t->child = temp_dentry.d_ino;
+	t->name = temp_dentry.d_name;
+	pthread_create(&tmp_test_thread, NULL, test_notify_vfs, (void *)t);
 #ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
 #endif
@@ -3768,7 +3802,7 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 		/* Close the cached file if paged out previously */
 		if (((temppage).block_entries[entry_index].paged_out_count !=
 		    fh_ptr->cached_paged_out_count) &&
-		    (fh_ptr->opened_block != -1)) { 
+		    (fh_ptr->opened_block != -1)) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
 		}
@@ -4478,7 +4512,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		/* Close the cached file if paged out previously */
 		if (((temppage).block_entries[entry_index].paged_out_count !=
 		    fh_ptr->cached_paged_out_count) &&
-		    (fh_ptr->opened_block != -1)) { 
+		    (fh_ptr->opened_block != -1)) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
 		}
@@ -4575,7 +4609,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 						*reterr = ret;
 						return 0;
 					/* Check status again */
-					} else if (ret > 0) { 
+					} else if (ret > 0) {
 						continue;
 					}
 				}

@@ -350,7 +350,7 @@ errcode_handle:
 *
 *************************************************************************/
 int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
-			const char *childname,
+			const char const *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
 			BOOL is_external)
 {
