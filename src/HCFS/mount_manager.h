@@ -58,6 +58,14 @@ typedef struct {
 } FS_CLOUD_STAT_T;
 
 typedef struct {
+	struct fuse_chan *fuse_default;
+	struct fuse_chan *fuse_write;
+	struct fuse_chan *fuse_read;
+} MOUNT_T_GLOBAL;
+
+extern MOUNT_T_GLOBAL mount_global;
+
+typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
 #ifdef _ANDROID_ENV_

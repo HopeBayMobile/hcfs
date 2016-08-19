@@ -34,6 +34,8 @@
 #include "path_reconstruct.h"
 #endif
 
+MOUNT_T_GLOBAL mount_global = {0};
+
 /************************************************************************
 *
 * Function name: search_mount
@@ -507,6 +509,12 @@ int32_t do_mount_FS(char *mp, MOUNT_T *new_info)
 	gettimeofday(&(new_info->mt_time), NULL);
 	new_info->session_ptr = tmp_session;
 	new_info->chan_ptr = tmp_channel;
+	if(new_info->mp_mode == MP_DEFAULT)
+		mount_global.fuse_default = tmp_channel;
+	if(new_info->mp_mode == MP_READ)
+		mount_global.fuse_read = tmp_channel;
+	if(new_info->mp_mode == MP_WRITE)
+		mount_global.fuse_write = tmp_channel;
 	new_info->is_unmount = FALSE;
 	if (mt == TRUE)
 		pthread_create(&(new_info->mt_thread), NULL,

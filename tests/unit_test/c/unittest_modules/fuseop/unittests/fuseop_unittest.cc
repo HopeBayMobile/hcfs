@@ -37,6 +37,7 @@ extern "C" {
 SYSTEM_CONF_STRUCT *system_config;
 extern struct fuse_lowlevel_ops hfuse_ops;
 MOUNT_T unittest_mount;
+MOUNT_T_GLOBAL mount_global;
 
 static int do_delete (const char *fpath, const HCFS_STAT *sb,
 		int32_t tflag, struct FTW *ftwbuf)

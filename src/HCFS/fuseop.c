@@ -1260,18 +1260,28 @@ typedef struct {
 	fuse_ino_t child;
 	const char *name;
 } TTTT;
-void *test_notify_vfs(void *ptr)
+void *mp_notify_delete(void *ptr)
 {
 	TTTT t;
+
 	memcpy(&t, ptr, sizeof(TTTT));
 	free(ptr);
+
 	write_log(8, "Debug fuse_lowlevel_notify_delete: %s, %" PRIu64 "\n",
 		  t.name, (uint64_t)t.child);
-	fuse_lowlevel_notify_inval_entry(t.mount_ptr->chan_ptr, t.parent,
-					 t.name, strlen(t.name));
-	fuse_lowlevel_notify_inval_inode(t.mount_ptr->chan_ptr, t.child, 0, 0);
-	fuse_lowlevel_notify_delete(t.mount_ptr->chan_ptr, t.parent, t.child,
-				    t.name, strlen(t.name));
+	/* notify VFS for following 2 cases:
+	 * 1. File is deleted in different latter case
+	 * 2. Notify other mount points to trigger kernel to release
+	 * lookup on all volumns */
+	if (mount_global.fuse_default != NULL)
+		fuse_lowlevel_notify_delete(mount_global.fuse_default, t.parent,
+					    t.child, t.name, strlen(t.name));
+	if (mount_global.fuse_read != NULL)
+		fuse_lowlevel_notify_delete(mount_global.fuse_read, t.parent,
+					    t.child, t.name, strlen(t.name));
+	if (mount_global.fuse_write != NULL)
+		fuse_lowlevel_notify_delete(mount_global.fuse_write, t.parent,
+					    t.child, t.name, strlen(t.name));
 	return NULL;
 }
 /************************************************************************
@@ -1352,13 +1362,15 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	 * operation and don't call it with a lock held that can also be
 	 * held by a filesystem operation.
 	 */
-	pthread_t tmp_test_thread;
-	TTTT *t = (TTTT *)malloc(sizeof(TTTT));
-	t->mount_ptr = tmpptr;
-	t->parent = parent_inode;
-	t->child = temp_dentry.d_ino;
-	t->name = temp_dentry.d_name;
-	pthread_create(&tmp_test_thread, NULL, test_notify_vfs, (void *)t);
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)){
+		pthread_t tmp_thread;
+		TTTT *t = (TTTT *)malloc(sizeof(TTTT));
+		t->mount_ptr = tmpptr;
+		t->parent = parent_inode;
+		t->child = temp_dentry.d_ino;
+		t->name = temp_dentry.d_name;
+		pthread_create(&tmp_thread, NULL, mp_notify_delete, (void *)t);
+	}
 #ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
 #endif
