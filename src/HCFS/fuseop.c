@@ -6569,6 +6569,7 @@ fetch_xattr:
 		delta_meta_size = new_metasize - old_metasize;
 		delta_meta_size_blk = new_metasize_blk - old_metasize_blk;
 	} else {
+		delta_meta_size = 0;
 		delta_meta_size_blk = 0;
 	}
 
