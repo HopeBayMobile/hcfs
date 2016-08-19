@@ -4882,7 +4882,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
-	write_log(10, "Debug: system size: %lld, system quota",
+	write_log(10, "Debug: system size: %lld, system quota %lld",
 		hcfs_system->systemdata.system_size,
 		hcfs_system->systemdata.system_quota);
 	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);

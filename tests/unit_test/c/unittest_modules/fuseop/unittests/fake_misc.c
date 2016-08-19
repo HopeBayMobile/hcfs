@@ -1112,16 +1112,24 @@ int32_t do_fallocate(ino_t this_inode, HCFS_STAT *newstat, int32_t mode,
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metalocalsize)
-{
-	MOCK();
-	return 0;
-}
-
 int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr,
 		int64_t *metasize, int64_t *metalocalsize)
 {
+	struct stat tmpstat;
+	int64_t size, roundsize;
+
 	MOCK();
+	if (ptr->fptr) {
+		fstat(fileno(ptr->fptr), &tmpstat);
+		size = tmpstat.st_size;
+		roundsize = tmpstat.st_blocks * 512;
+	}
+
+	if (metasize)
+		*metasize = size;
+	if (metalocalsize)
+		*metalocalsize = roundsize;
+
 	return 0;
 }
 
