@@ -4347,6 +4347,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	if (hcfs_system->systemdata.system_size >
 			hcfs_system->systemdata.system_quota) {
 		*reterr = -ENOSPC;
+		write_log(4, "Warn: system no space?\n");
 		return 0;
 	}
 
