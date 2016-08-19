@@ -1492,6 +1492,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 0;
     fptr = NULL;
   }
 
@@ -1726,7 +1727,7 @@ TEST_F(hfuse_ll_writeTest, ReWritePagedOutLocal) {
   fread(tempbuf, tmp_len, 1, fptr);
   fclose(fptr);
   fptr = NULL;
-  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0) << tempbuf;
 }
 
 TEST_F(hfuse_ll_writeTest, ReWritePagedOut) {
