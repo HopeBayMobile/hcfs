@@ -89,10 +89,12 @@ typedef struct {
 	SUPER_BLOCK_HEAD head;
 	int32_t iofptr;
 	FILE *unclaimed_list_fptr;
+	FILE *temp_unclaimed_fptr;
 	sem_t exclusive_lock_sem;
 	sem_t share_lock_sem;
 	sem_t share_CR_lock_sem;
 	int32_t share_counter;
+	BOOL now_reclaim_fullscan;
 	BOOL sync_point_is_set; /* Indicate if need to sync all data */
 	struct SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
 } SUPER_BLOCK_CONTROL;
