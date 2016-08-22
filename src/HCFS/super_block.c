@@ -960,15 +960,6 @@ static int32_t _fullscan_reclaim_bundle(ino_t first_reclaimed_inode,
 		if (ret < 0)
 			goto error_handle;
 
-		/* Update first reclaimed inode */
-		ret = read_super_block_entry(first_reclaimed_inode, &sb_entry);
-		if (ret < 0)
-			goto error_handle;
-		sb_entry.util_ll_prev = sb_last_reclaim;
-		ret = write_super_block_entry(first_reclaimed_inode, &sb_entry);
-		if (ret < 0)
-			goto error_handle;
-
 		sys_super_block->head.last_reclaimed_inode =
 				last_reclaimed_inode;
 	}
@@ -994,7 +985,8 @@ error_handle:
 *        Inputs: None
 *       Summary: Recycle (reclaim) deleted inodes. This function will walk
 *                over all entries in the super block and collect the entries
-*                that should be reclaimed.
+*                that should be reclaimed. Now this function only get
+*                involked in last step of restoration.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/

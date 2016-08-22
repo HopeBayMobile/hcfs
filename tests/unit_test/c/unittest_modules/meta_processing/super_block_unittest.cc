@@ -1122,9 +1122,11 @@ TEST_F(super_block_reclaim_fullscanTest, ScanToBeReclaimedInodeSuccess)
 
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
 
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
+	ASSERT_EQ(0, now_reclaimed_inode); /* Next of last reclaimed inode */
 	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
 
 	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
@@ -1167,6 +1169,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
 
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
@@ -1204,6 +1207,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_Success)
 
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
 
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}

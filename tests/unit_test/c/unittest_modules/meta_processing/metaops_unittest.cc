@@ -1468,7 +1468,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	bool block_file_existed;
 	BLOCK_ENTRY_PAGE block_entry_page;
 	HCFS_STAT mock_stat;
-	struct stat meta_stat;
 	FILE_META_TYPE mock_meta;
 	FILE *tmp_fp;
 	ino_t mock_inode = INO_DELETE_FILE_BLOCK;
@@ -1515,7 +1514,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	fwrite(&mock_meta, sizeof(FILE_META_TYPE), 1, meta_fp);
 	fwrite(&block_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta_fp);
 	fclose(meta_fp);
-	stat(thismetapath, &meta_stat);
 
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG,
