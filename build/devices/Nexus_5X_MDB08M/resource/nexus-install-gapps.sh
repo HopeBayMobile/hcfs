@@ -15,12 +15,15 @@
 # History:
 #
 # $Log: nexus-install-gapps.sh,v $
-# Revision 1.16  2016/07/21 11:56:00  chingyi
-# Foolproof against flashing unexpected device when multiple devices are attached
+# Revision 1.17  2016/08/22 19:45:00  wyliang
+# Fix some bugs for the -gp options; Minor code and messages refinement
 #
-# Revision 1.15  2016/07/13 17:17:00  wyliang
+# Revision 1.16  2016/08/19 17:17:00  wyliang
 # Support -keepdata to keep the data partition; Support -rom-only for debug purpose; 
 # Improve -boot4perm to avoid flashing twice for the first-time unlocked device
+#
+# Revision 1.15  2016/07/21 11:56:00  chingyi
+# Foolproof against flashing unexpected device when multiple devices are attached
 #
 # Revision 1.14  2016/07/20 11:48:35  jethro
 # Make script independent from CI env and reduece platform related code
@@ -494,9 +497,8 @@ CheckParams() {
       FORCE_DOWNLOAD=1
       ;;
     -gp)
-      # FORCE_GRANT_PERM=1
-      GrantPermissions only
-      exit 0
+      FORCE_GRANT_PERM=1
+      # GrantPermissions only
       ;;
     -rom)
       CheckDir "$2"
@@ -545,11 +547,11 @@ CheckParams() {
       shift
       ;;
     -keepdata)
-        KEEP_DATA=1
-        ;;
+      KEEP_DATA=1
+      ;;
     -rom-only)
-        ROM_ONLY=1
-        ;;
+      ROM_ONLY=1
+      ;;
     *)
       Usage 1
     esac
@@ -566,6 +568,12 @@ CheckParams() {
     else
       Error "the '-boot4perm' option requires either the '-rom' or '-fr' option is also specified and the file boot.img exists in the rom directory"
     fi
+  fi
+
+  # short cut for special commands
+  if [ "$FORCE_GRANT_PERM" -eq 1 ]; then 
+    GrantPermissions only 
+    exit 0
   fi
 }
 
@@ -598,7 +606,9 @@ Boot2Fastboot() {
       ;;
     esac
   done
-  fastboot -s $TARGET_DEVICE oem unlock > /dev/null 2>&1 || :
+
+  echo ">> Check to see if the device needs to be unlocked... "
+  fastboot -s $TARGET_DEVICE oem unlock > /dev/null 2>&1 || : # continue script on failure
 
   echo " done"
 }
@@ -707,7 +717,7 @@ InstallOpenGapps() {
   GetFile "$GAPPS_URL" "$GAPPS_FILE"
 
   # wait for the sideload mode until timeout
-  printf ">> Wait for ADB on the device to get ready"
+  echo ">> Wait for ADB on the device to get ready" && ToConfirm
 
   # Check to see if the device is able to enter the sideload mode
   while true; do
@@ -750,7 +760,7 @@ GrantPermissions() {
 
   if [ "$_gp_only" = "only" -a "$DO_BOOT4PERM" -eq 1 ]; then
     echo ">> Replace the boot image with the specified '$BOOT4PERM_IMG'"
-    adb -s $TARGET_DEVICE reboot bootloader
+    Boot2Fastboot
     fastboot -s $TARGET_DEVICE flash boot "$BOOT4PERM_IMG"
     fastboot -s $TARGET_DEVICE reboot
   else
