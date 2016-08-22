@@ -429,6 +429,7 @@ int32_t init_mount_mgr(void)
 {
 	memset(&mount_mgr, 0, sizeof(MOUNT_MGR_T));
 	sem_init(&(mount_mgr.mount_lock), 0, 1);
+	sem_init(&mount_global.sem, 0, 0);
 	return 0;
 }
 

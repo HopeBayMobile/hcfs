@@ -1259,30 +1259,43 @@ typedef struct {
 	fuse_ino_t parent;
 	fuse_ino_t child;
 	const char *name;
-} TTTT;
-void *mp_notify_delete(void *ptr)
+} hfuse_ll_notify_delete_args;
+
+void *hfuse_ll_notify_delete(void *ptr)
 {
-	TTTT t;
+#define MSG_NOTIFY_DELETE "fuse_lowlevel_notify_delete"
+	hfuse_ll_notify_delete_args args;
+	int thread_num;
 
-	memcpy(&t, ptr, sizeof(TTTT));
+	memcpy(&args, ptr, sizeof(hfuse_ll_notify_delete_args));
 	free(ptr);
+	/* Tracing concurrent thread number */
+	sem_post(&mount_global.sem);
+	sem_getvalue(&mount_global.sem, &thread_num);
+	write_log(10, "Debug " MSG_NOTIFY_DELETE " Running %d thread(s)\n",
+		  thread_num);
+	write_log(10, "Debug " MSG_NOTIFY_DELETE " %s, %" PRIu64 "\n",
+		  args.name, (uint64_t)args.child);
 
-	write_log(8, "Debug fuse_lowlevel_notify_delete: %s, %" PRIu64 "\n",
-		  t.name, (uint64_t)t.child);
 	/* notify VFS for following 2 cases:
 	 * 1. File is deleted in different latter case
 	 * 2. Notify other mount points to trigger kernel to release
 	 * lookup on all volumns */
-	if (mount_global.fuse_default != NULL)
-		fuse_lowlevel_notify_delete(mount_global.fuse_default, t.parent,
-					    t.child, t.name, strlen(t.name));
-	if (mount_global.fuse_read != NULL)
-		fuse_lowlevel_notify_delete(mount_global.fuse_read, t.parent,
-					    t.child, t.name, strlen(t.name));
-	if (mount_global.fuse_write != NULL)
-		fuse_lowlevel_notify_delete(mount_global.fuse_write, t.parent,
-					    t.child, t.name, strlen(t.name));
+	if (mount_global.fuse_default != NULL) {
+		fuse_lowlevel_notify_delete(mount_global.fuse_default, args.parent,
+					    args.child, args.name, strlen(args.name));
+	}
+	if (mount_global.fuse_read != NULL) {
+		fuse_lowlevel_notify_delete(mount_global.fuse_read, args.parent,
+					    args.child, args.name, strlen(args.name));
+	}
+	if (mount_global.fuse_write != NULL) {
+		fuse_lowlevel_notify_delete(mount_global.fuse_write, args.parent,
+					    args.child, args.name, strlen(args.name));
+	}
+	sem_trywait(&mount_global.sem);
 	return NULL;
+#undef MSG_NOTIFY_DELETE
 }
 /************************************************************************
 *
@@ -1362,14 +1375,19 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	 * operation and don't call it with a lock held that can also be
 	 * held by a filesystem operation.
 	 */
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)){
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		pthread_t tmp_thread;
-		TTTT *t = (TTTT *)malloc(sizeof(TTTT));
-		t->mount_ptr = tmpptr;
-		t->parent = parent_inode;
-		t->child = temp_dentry.d_ino;
-		t->name = temp_dentry.d_name;
-		pthread_create(&tmp_thread, NULL, mp_notify_delete, (void *)t);
+		hfuse_ll_notify_delete_args *args =
+		    (hfuse_ll_notify_delete_args *)malloc(
+			sizeof(hfuse_ll_notify_delete_args));
+		args->mount_ptr = tmpptr;
+		args->parent = parent_inode;
+		args->child = temp_dentry.d_ino;
+		args->name = strndup(temp_dentry.d_name, MAX_FILENAME_LEN);
+		if (args->name != NULL) {
+			pthread_create(&tmp_thread, NULL,
+				       hfuse_ll_notify_delete, (void *)args);
+		}
 	}
 #ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;

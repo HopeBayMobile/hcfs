@@ -61,6 +61,7 @@ typedef struct {
 	struct fuse_chan *fuse_default;
 	struct fuse_chan *fuse_write;
 	struct fuse_chan *fuse_read;
+	sem_t sem;
 } MOUNT_T_GLOBAL;
 
 extern MOUNT_T_GLOBAL mount_global;
