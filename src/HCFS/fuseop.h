@@ -148,12 +148,12 @@ SYSTEM_DATA_HEAD *hcfs_system;
 	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ?\
 	meta_nospc_log(__func__, __LINE__) : 0)
 
-typedef enum { FUSE_LL_NOTIFY_DELETE } FUSE_LL_NOTIFY_TYPE;
+typedef enum { FUSE_NOTIFY_DELETE } FUSE_NOTIFY_TYPE;
 
-typedef struct _FUSE_LL_NOTIFY_TASK{
+typedef struct _FUSE_NOTIFY{
 	FUSE_LL_NOTIFY_TYPE type;
 	void* args;
-} FUSE_LL_NOTIFY_TASK;
+} FUSE_LL_NOTIFY;
 
 int32_t global_argc;
 char **global_argv;

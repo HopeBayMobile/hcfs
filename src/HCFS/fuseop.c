@@ -106,11 +106,6 @@
 #include <attr/xattr.h>
 #endif
 
-FUSE_LL_NOTIFY_TASK *fuse_notify_buf = NULL;
-int32_t fuse_notify_blen;
-int32_t fuse_notify_bstart;
-int32_t fuse_notify_bend;
-
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
 	1. in lookup_count, add a field "to_delete". rmdir, unlink
@@ -1260,98 +1255,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 }
 
-typedef struct {
-	MOUNT_T *mount_ptr;
-	fuse_ino_t parent;
-	fuse_ino_t child;
-	const char *name;
-} hfuse_ll_notify_delete_args;
-FUSE_LL_NOTIFY_TASK *_hfuse_ll_notify_dequeue(void) {
-}
-void _hfuse_ll_notify_enqueue(FUSE_LL_NOTIFY_TYPE type, void *args)
-{
-	if (fuse_notify_buf == NULL) {
-		fuse_notify_blen = 2;
-		fuse_notify_buf = malloc(sizeof(FUSE_LL_NOTIFY_TASK));
-		fuse_notify_bstart = 0;
-		fuse_notify_bend = 0;
-	}
-	if ((fuse_notify_bend + 1) % fuse_notify_blen == fuse_notify_bstart)
-	{
-	}
-		if (task == NULL)
-			return;
-
-	if (fuse_global_notify_queue.enqueue != NULL) {
-		fuse_global_notify_queue.enqueue->next = task;
-		task->next = NULL;
-	}
-	fuse_global_notify_queue.enqueue = task;
-
-	if(fuse_global_notify_queue.dequeue == NULL){
-		fuse_global_notify_queue.dequeue = task;
-	}
-}
-void *hfuse_ll_notify_delete(void *ptr)
-{
-	sem_wait(&(hcfs_system->fuse_nofify_thread_sem));
-
-	if (hcfs_system->fuse_nofify_thread_running == FALSE) {
-	}
-	sme_post(&(hcfs_system->fuse_nofify_thread_sem));
-
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		pthread_t tmp_thread;
-		pthread_attr_t ptattr;
-		pthread_attr_init(&ptattr);
-		pthread_attr_setdetachstate(&ptattr, PTHREAD_CREATE_DETACHED);
-		hfuse_ll_notify_delete_args *args =
-		    (hfuse_ll_notify_delete_args *)malloc(
-			sizeof(hfuse_ll_notify_delete_args));
-		args->mount_ptr = tmpptr;
-		args->parent = parent_inode;
-		args->child = temp_dentry.d_ino;
-		args->name = strndup(temp_dentry.d_name, MAX_FILENAME_LEN);
-		hfuse_ll_notify_delete(args);
-		if (args->name != NULL) {
-			pthread_create(&tmp_thread, &ptattr,
-				       hfuse_ll_notify_delete, (void *)args);
-		}
-	}
-#define MSG_NOTIFY_DELETE "fuse_lowlevel_notify_delete"
-	hfuse_ll_notify_delete_args args;
-	int thread_num;
-
-	memcpy(&args, ptr, sizeof(hfuse_ll_notify_delete_args));
-	free(ptr);
-	/* Tracing concurrent thread number */
-	sem_post(&mount_global.sem);
-	sem_getvalue(&mount_global.sem, &thread_num);
-	write_log(10, "Debug " MSG_NOTIFY_DELETE " Running %d thread(s)\n",
-		  thread_num);
-	write_log(10, "Debug " MSG_NOTIFY_DELETE " %s, %" PRIu64 "\n",
-		  args.name, (uint64_t)args.child);
-
-	/* notify VFS for following 2 cases:
-	 * 1. File is deleted in different latter case
-	 * 2. Notify other mount points to trigger kernel to release
-	 * lookup on all volumns */
-	if (mount_global.fuse_default != NULL) {
-		fuse_lowlevel_notify_delete(mount_global.fuse_default, args.parent,
-					    args.child, args.name, strlen(args.name));
-	}
-	if (mount_global.fuse_read != NULL) {
-		fuse_lowlevel_notify_delete(mount_global.fuse_read, args.parent,
-					    args.child, args.name, strlen(args.name));
-	}
-	if (mount_global.fuse_write != NULL) {
-		fuse_lowlevel_notify_delete(mount_global.fuse_write, args.parent,
-					    args.child, args.name, strlen(args.name));
-	}
-	sem_trywait(&mount_global.sem);
-	return NULL;
-#undef MSG_NOTIFY_DELETE
-}
 /************************************************************************
 *
 * Function name: hfuse_ll_unlink
