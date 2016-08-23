@@ -595,7 +595,8 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	if (strcmp(nowpath, "/data/data") == 0)
 		return 1;
 
-	/* Expand only /storage/emulated/Android */
+	/* Expand /storage/emulated/Android */
+	/* Expand /storage/emulated/<x>/Android, where x is a natural number */
 	if (strcmp(nowpath, "/storage/emulated") == 0)
 		return 2;
 
@@ -604,9 +605,22 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	    (depth == 1))
 		return 3;
 
-	if ((strncmp(nowpath, "/storage/emulated", strlen("/storage/emulated")) == 0) &&
+	if ((strncmp(nowpath, "/storage/emulated/Android",
+	     strlen("/storage/emulated/Android")) == 0) &&
 	    ((depth == 1) || (depth == 2)))
 		return 1;
+
+	/* If this is /storage/emulated/<x>/Android */
+	if ((strncmp(nowpath, "/storage/emulated",
+	     strlen("/storage/emulated")) == 0) &&
+	    ((depth == 2) || (depth == 3)))
+		return 1;
+
+	/* If this is /storage/emulated/<x> */
+	if ((strncmp(nowpath, "/storage/emulated",
+	     strlen("/storage/emulated")) == 0) &&
+	    (depth == 1))
+		return 4;
 
 	return 0;
 }
@@ -667,6 +681,13 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			skip_this = FALSE;
 			switch (expand_val) {
 			case 2:
+				if (strcmp(tmpptr->d_name, "Android") == 0)
+					break;
+				if (is_natural_number(tmpptr->d_name) == TRUE)
+					break;
+				skip_this = TRUE;
+				break;
+			case 4:
 				if (strcmp(tmpptr->d_name, "Android") != 0)
 					skip_this = TRUE;
 				break;
