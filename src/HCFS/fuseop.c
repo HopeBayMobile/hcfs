@@ -106,6 +106,11 @@
 #include <attr/xattr.h>
 #endif
 
+FUSE_LL_NOTIFY_TASK *fuse_notify_buf = NULL;
+int32_t fuse_notify_blen;
+int32_t fuse_notify_bstart;
+int32_t fuse_notify_bend;
+
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
 	1. in lookup_count, add a field "to_delete". rmdir, unlink
@@ -849,7 +854,7 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 errcode_handle:
 	return errcode;
 }
-#endif
+#endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -1254,15 +1259,65 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	write_log(10, "mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 }
+
 typedef struct {
 	MOUNT_T *mount_ptr;
 	fuse_ino_t parent;
 	fuse_ino_t child;
 	const char *name;
 } hfuse_ll_notify_delete_args;
+FUSE_LL_NOTIFY_TASK *_hfuse_ll_notify_dequeue(void) {
+}
+void _hfuse_ll_notify_enqueue(FUSE_LL_NOTIFY_TYPE type, void *args)
+{
+	if (fuse_notify_buf == NULL) {
+		fuse_notify_blen = 2;
+		fuse_notify_buf = malloc(sizeof(FUSE_LL_NOTIFY_TASK));
+		fuse_notify_bstart = 0;
+		fuse_notify_bend = 0;
+	}
+	if ((fuse_notify_bend + 1) % fuse_notify_blen == fuse_notify_bstart)
+	{
+	}
+		if (task == NULL)
+			return;
 
+	if (fuse_global_notify_queue.enqueue != NULL) {
+		fuse_global_notify_queue.enqueue->next = task;
+		task->next = NULL;
+	}
+	fuse_global_notify_queue.enqueue = task;
+
+	if(fuse_global_notify_queue.dequeue == NULL){
+		fuse_global_notify_queue.dequeue = task;
+	}
+}
 void *hfuse_ll_notify_delete(void *ptr)
 {
+	sem_wait(&(hcfs_system->fuse_nofify_thread_sem));
+
+	if (hcfs_system->fuse_nofify_thread_running == FALSE) {
+	}
+	sme_post(&(hcfs_system->fuse_nofify_thread_sem));
+
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		pthread_t tmp_thread;
+		pthread_attr_t ptattr;
+		pthread_attr_init(&ptattr);
+		pthread_attr_setdetachstate(&ptattr, PTHREAD_CREATE_DETACHED);
+		hfuse_ll_notify_delete_args *args =
+		    (hfuse_ll_notify_delete_args *)malloc(
+			sizeof(hfuse_ll_notify_delete_args));
+		args->mount_ptr = tmpptr;
+		args->parent = parent_inode;
+		args->child = temp_dentry.d_ino;
+		args->name = strndup(temp_dentry.d_name, MAX_FILENAME_LEN);
+		hfuse_ll_notify_delete(args);
+		if (args->name != NULL) {
+			pthread_create(&tmp_thread, &ptattr,
+				       hfuse_ll_notify_delete, (void *)args);
+		}
+	}
 #define MSG_NOTIFY_DELETE "fuse_lowlevel_notify_delete"
 	hfuse_ll_notify_delete_args args;
 	int thread_num;
@@ -1367,16 +1422,13 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	/* When a filename is deleted with different cases, upper level
-	 * VFS does not know the actual file is deleted. HCFS need to
-	 * notify VFS to invalidate the actually deleted file.
-	 *
-	 * To avoid a deadlock don't call this function from a filesystem
-	 * operation and don't call it with a lock held that can also be
-	 * held by a filesystem operation.
-	 */
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		pthread_t tmp_thread;
+#ifdef _ANDROID_ENV_
+	this_inode = temp_dentry.d_ino;
+
+	/* notify VFS to handle file deletion with different case or
+	 * be deleted from multiple mount path */
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) ||
+	    strcmp(selfname, temp_dentry.d_name) != 0) {
 		hfuse_ll_notify_delete_args *args =
 		    (hfuse_ll_notify_delete_args *)malloc(
 			sizeof(hfuse_ll_notify_delete_args));
@@ -1384,13 +1436,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		args->parent = parent_inode;
 		args->child = temp_dentry.d_ino;
 		args->name = strndup(temp_dentry.d_name, MAX_FILENAME_LEN);
-		if (args->name != NULL) {
-			pthread_create(&tmp_thread, NULL,
-				       hfuse_ll_notify_delete, (void *)args);
-		}
+		hfuse_ll_notify_delete(args);
 	}
-#ifdef _ANDROID_ENV_
-	this_inode = temp_dentry.d_ino;
 #endif
 
 	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry,
@@ -7704,7 +7751,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
-#ifndef _ANDROID_ENV_
+#ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
 	init_api_interface();
@@ -7725,7 +7772,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	release_meta_cache_headers();
 	destroy_download_control();
 	destroy_pin_scheduler();
-#ifndef _ANDROID_ENV_
+#ifndef _ANDROID_ENV_ /* Not in Android */
 	destroy_fuse_proc_communication(communicate_tid, socket_fd);
 #endif
 	sync();
