@@ -5,5 +5,7 @@ repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..
 python3 -m easy_install $repo/dist/*
 
 cd $repo/tests/functional_test
-pip install overrides
-python pi_tester.py -d debug -s TestSuites/TestMetaParser.csv
+
+pip install -r requirements.txt
+
+python pi_tester.py -s TestSuites/TestMetaParser.csv

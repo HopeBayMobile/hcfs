@@ -1,15 +1,15 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,TestMetaParser_00,Setup environment and BVT,,1,Pass,,148
-,TestMetaParser_01,test_hcfs_parse_fsmgr_NormalFsmgr,,1,Pass,,0
-,TestMetaParser_02,test_hcfs_parse_fsmgr_NonexistFsmgr,,1,Fail,"Non-existed path shouldn't return result, input = ['/no'], output = [[(1, 'first inode'), (22, 'second inode'), (123, '/no')]]",0
-,TestMetaParser_03,test_hcfs_parse_fsmgr_EmptyFsmgr,,1,Fail,"Empty path shouldn't return result, input = [''], output = [[(1, 'first inode'), (22, 'second inode'), (123, '')]]",0
-,TestMetaParser_04,test_hcfs_parse_meta_NormalMetapath,,1,Pass,dummy,0
-,TestMetaParser_05,test_hcfs_parse_meta_NonexistMetapath,,1,Pass,dummy,0
-,TestMetaParser_06,test_hcfs_parse_meta_EmptypathMetapath,,1,Pass,dummy,0
-,TestMetaParser_07,test_hcfs_query_dir_list_NormalValues,,1,Pass,dummy,0
-,TestMetaParser_08,test_hcfs_query_dir_list_NormalMetapathLimit_NonexistIndex,,1,Pass,dummy,0
-,TestMetaParser_09,test_hcfs_query_dir_list_NormalMetapathIndex_NonexistLimit,,1,Pass,dummy,0
-,TestMetaParser_10,test_hcfs_query_dir_list_NormalMetapath_NonexistIndexLimit,,1,Pass,dummy,0
-,TestMetaParser_11,test_hcfs_query_dir_list_NonexistlMetapath,,1,Pass,dummy,0
-,TestMetaParser_12,test_hcfs_query_dir_list_EmptyMetapath,,1,Pass,dummy,0
+,TestMetaParser_117001,test_hcfs_parse_fsmgr_NormalFsmgr,,1,Pass,,0
+,TestMetaParser_117002,test_hcfs_parse_fsmgr_NonexistFsmgr,,1,Fail,"Non-existed path shouldn't return result, input = ['/no'], output = [[(1, 'first inode'), (22, 'second inode'), (123, '/no')]]",0
+,TestMetaParser_117003,test_hcfs_parse_fsmgr_EmptyFsmgr,,1,Fail,"Empty path shouldn't return result, input = [''], output = [[(1, 'first inode'), (22, 'second inode'), (123, '')]]",0
+,TestMetaParser_117004,test_hcfs_parse_meta_NormalMetapath,,1,Pass,dummy,0
+,TestMetaParser_117005,test_hcfs_parse_meta_NonexistMetapath,,1,Pass,dummy,0
+,TestMetaParser_117006,test_hcfs_parse_meta_EmptypathMetapath,,1,Pass,dummy,0
+,TestMetaParser_117007,test_hcfs_query_dir_list_NormalValues,,1,Pass,dummy,0
+,TestMetaParser_117008,test_hcfs_query_dir_list_NormalMetapathLimit_NonexistIndex,,1,Pass,dummy,0
+,TestMetaParser_117009,test_hcfs_query_dir_list_NormalMetapathIndex_NonexistLimit,,1,Pass,dummy,0
+,TestMetaParser_117010,test_hcfs_query_dir_list_NormalMetapath_NonexistIndexLimit,,1,Pass,dummy,0
+,TestMetaParser_117011,test_hcfs_query_dir_list_NonexistlMetapath,,1,Pass,dummy,0
+,TestMetaParser_117012,test_hcfs_query_dir_list_EmptyMetapath,,1,Pass,dummy,0
 ,TestMetaParser_99,Clear environment,,1,Pass,,72
