@@ -1174,15 +1174,15 @@ int32_t meta_nospc_log(const char *func_name, int32_t lines)
 	MOCK();
 	return 1;
 }
-int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
+int32_t notify_restoration_result(int8_t stage, int32_t result)
 {
+	MOCK();
 	return 0;
 }
-void destroy_rebuild_sb(BOOL destroy_queue_file)
+int32_t fetch_restore_stat_path(char *pathname)
 {
-	return;
+	snprintf(pathname, METAPATHLEN, "%s/system_restoring_status",
+	         METAPATH);
+	return 0;
 }
-void init_backend_related_module()
-{
-	return;
-}
+

@@ -89,7 +89,8 @@ class uploadEnvironment : public ::testing::Environment {
 //    free(hcfs_system);
     nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     unlink("/tmp/testHCFS");
-    nftw(tmppath, do_delete, 20, FTW_DEPTH);
+    if (tmppath != NULL)
+      nftw(tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)

@@ -211,3 +211,13 @@ int32_t set_event_notify_server(char *path)
 	else
 		return -1;
 }
+
+int32_t initiate_restoration(void)
+{
+	return 0;
+}
+
+int32_t check_restoration_status(void)
+{
+	return 0;
+}

@@ -667,7 +667,7 @@ TEST_F(fetch_quota_from_cloudTest, UsermetaNotFoundOnCloud)
 {
 	usermeta_notfound = TRUE;
 	download_usermeta_ctl.active = TRUE;
-	fetch_quota_from_cloud(NULL);
+	fetch_quota_from_cloud(NULL, TRUE);
 
 	EXPECT_EQ(-1, access(download_path, F_OK));
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
@@ -678,7 +678,7 @@ TEST_F(fetch_quota_from_cloudTest, FetchSuccess)
 {
 	usermeta_notfound = FALSE;
 	download_usermeta_ctl.active = TRUE;
-	fetch_quota_from_cloud(NULL);
+	fetch_quota_from_cloud(NULL, TRUE);
 
 	EXPECT_EQ(-1, access(download_path, F_OK));
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
@@ -689,7 +689,7 @@ TEST_F(fetch_quota_from_cloudTest, SystemGoingDown)
 {
 	hcfs_system->system_going_down = TRUE;
 	download_usermeta_ctl.active = TRUE;
-	fetch_quota_from_cloud(NULL);
+	fetch_quota_from_cloud(NULL, TRUE);
 
 	EXPECT_EQ(-1, access(download_path, F_OK));
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
