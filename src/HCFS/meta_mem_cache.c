@@ -1558,8 +1558,12 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		/* Try fetching meta file from backend if in restoring mode */
 		if (hcfs_system->system_restoring == RESTORING_STAGE2) {
 			ret = restore_meta_super_block_entry(this_inode, NULL);
-			if (ret < 0)
+			if (ret < 0) {
+				write_log(2, "Unable to rebuild meta for %"
+				          PRIu64 "\n", (uint64_t) this_inode);
+				sem_post(&(meta_mem_cache[index].header_sem));
 				return NULL;
+			}
 		}
 
 		ret_val = super_block_read(this_inode, &tempentry);

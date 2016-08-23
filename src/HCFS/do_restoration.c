@@ -226,13 +226,13 @@ int32_t notify_restoration_result(int8_t stage, int32_t result)
 	switch (stage) {
 	case 1:
 		/* Restoration stage 1 */
-		snprintf(msgstr, 100, "{\\”result\\”:%d}", result);
+		snprintf(msgstr, 100, "{\"result\":%d}", result);
 		ret = add_notify_event(RESTORATION_STAGE1_CALLBACK,
 		                       msgstr, TRUE);
 		break;
 	case 2:
 		/* Restoration stage 2 */
-		snprintf(msgstr, 100, "{\\”result\\”:%d}", result);
+		snprintf(msgstr, 100, "{\"result\":%d}", result);
 		ret = add_notify_event(RESTORATION_STAGE2_CALLBACK,
 		                       msgstr, TRUE);
 		break;
