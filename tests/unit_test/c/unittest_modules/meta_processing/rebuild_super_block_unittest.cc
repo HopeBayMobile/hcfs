@@ -763,6 +763,7 @@ TEST_F(create_sb_rebuilderTest, RootInQueueFile_BackendFromOfflineToOnline)
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->system_restoring = RESTORING_STAGE2;
 	sys_super_block->head.now_rebuild = TRUE;
 	EXPECT_EQ(0, create_sb_rebuilder());
 
@@ -828,7 +829,6 @@ TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 {
 	ino_t inode;
 	HCFS_STAT tmpstat;
-	struct stat teststat;
 	SUPER_BLOCK_ENTRY exp_entry, test_entry;
 
 	inode = 15;
@@ -844,10 +844,10 @@ TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 	teststat.st_mode = tmpstat.mode;
 	teststat.st_size = tmpstat.size;
 	/* Verify */
-	EXPECT_EQ(0, memcmp(&exp_stat, &teststat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&exp_stat, &tmpstat, sizeof(HCFS_STAT)));
 
 	memset(&exp_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	memcpy(&(exp_entry.inode_stat), &exp_stat, sizeof(struct stat));
+	memcpy(&(exp_entry.inode_stat), &exp_stat, sizeof(HCFS_STAT));
 	exp_entry.this_index = inode;
 	exp_entry.generation = 1;
 	exp_entry.status = NO_LL;
