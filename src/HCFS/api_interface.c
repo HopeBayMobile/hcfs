@@ -1522,21 +1522,25 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case INITIATE_RESTORATION:
-			uint32_ret = initiate_restoration();
-			ret_len = sizeof(uint32_ret);
-			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
-			uint32_ret = 0;
+			retcode = initiate_restoration();
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case CHECK_RESTORATION_STATUS:
-			uint32_ret = check_restoration_status();
-			ret_len = sizeof(uint32_ret);
-			send(fd1, &ret_len, sizeof(ret_len), MSG_NOSIGNAL);
-			send(fd1, &uint32_ret, sizeof(uint32_ret), MSG_NOSIGNAL);
-			uint32_ret = 0;
+			retcode = check_restoration_status();
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case SETSWIFTTOKEN:
 			retcode = set_swift_token(arg_len, largebuf);
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
+		case NOTIFY_APPLIST_CHANGE:
+			retcode = backup_package_list();
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);

@@ -1002,3 +1002,11 @@ void cleanup_stage1_data(void)
 		nftw(todelete_blockpath, _delete_node, 10,
 		     FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
 }
+
+int32_t backup_package_list(void)
+{
+/* FEATURE TODO: backup packages.xml */
+	write_log(4, "Backing up package list\n");
+	return 0;
+}
+
