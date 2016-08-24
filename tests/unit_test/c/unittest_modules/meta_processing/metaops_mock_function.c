@@ -471,7 +471,7 @@ int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
 		int64_t dirty_cache_delta, int64_t unpin_dirty_data_size,
 		BOOL need_sync)
 {
-	hcfs_system->systemdata.cache_size += (cache_size_delta + meta_size_delta);
+	hcfs_system->systemdata.cache_size += (cache_size_delta);
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_data_size;

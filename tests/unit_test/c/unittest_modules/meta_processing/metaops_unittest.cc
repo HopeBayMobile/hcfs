@@ -1768,7 +1768,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 		mknod(pathname, S_IFREG | 0700, 0);
 
 		fetch_meta_path(pathname, i);
-		mknod(pathname, S_IFREG, 0); // This mock metafile which will be renamed later
+		mknod(pathname, S_IFREG | 0700, 0); // This mock metafile which will be renamed later
 	}
 
 	/* Run */
