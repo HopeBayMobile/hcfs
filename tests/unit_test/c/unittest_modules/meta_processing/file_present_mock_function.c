@@ -10,6 +10,7 @@
 #include "params.h"
 #include "global.h"
 #include "dir_statistics.h"
+#include "mount_manager.h"
 
 extern SYSTEM_CONF_STRUCT *system_config;
 
@@ -317,7 +318,7 @@ int fetch_toupload_meta_path(char *pathname, ino_t inode)
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metaroundsize)
 {
 	return 0;
 }
@@ -345,7 +346,7 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	return 0;
 }
 
-int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize)
+int32_t meta_cache_get_meta_size(META_CACHE_ENTRY_STRUCT *ptr, int64_t *metasize, int64_t *metaroundsize)
 {
 	int32_t ret;
 	int32_t errcode;
@@ -370,3 +371,35 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
+
+
+int32_t change_system_meta(int64_t system_data_size_delta,
+		int64_t meta_size_delta, int64_t cache_data_size_delta,
+		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
+		int64_t unpin_dirty_delta, BOOL need_sync)
+{
+	return 0;
+}
+
+int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
+		int64_t meta_size_delta, int64_t num_inodes_delta)
+{
+	return 0;
+}
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

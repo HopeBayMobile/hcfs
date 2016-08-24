@@ -1081,7 +1081,7 @@ off_t check_file_size(const char *path)
 
 	errcode = stat(path, &block_stat);
 	if (errcode == 0)
-		return block_stat.st_size;
+		return block_stat.st_blocks * 512;
 	errcode = errno;
 	write_log(0, "Error when checking file size. Code %d, %s\n",
 			errcode, strerror(errcode));
@@ -1109,8 +1109,7 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 
 	sem_wait(&(hcfs_system->access_sem));
 	/* System size includes meta size */
-	hcfs_system->systemdata.system_size +=
-		(system_data_size_delta + meta_size_delta);
+	hcfs_system->systemdata.system_size += (system_data_size_delta);
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
 
@@ -1119,7 +1118,8 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 		hcfs_system->systemdata.system_meta_size = 0;
 
 	/* Cached size includes meta size */
-	hcfs_system->systemdata.cache_size += cache_data_size_delta;
+	hcfs_system->systemdata.cache_size +=
+				cache_data_size_delta;
 	if (hcfs_system->systemdata.cache_size < 0)
 		hcfs_system->systemdata.cache_size = 0;
 
@@ -1296,7 +1296,8 @@ int32_t update_sb_size()
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
 
-	hcfs_system->systemdata.system_meta_size += (new_size - old_size);
+	hcfs_system->systemdata.system_meta_size +=
+			(round_size(new_size) - round_size(old_size));
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
 
@@ -2053,23 +2054,28 @@ BOOL is_natural_number(char const *str)
  * @return 0 on success, otherwise negative error code.
  *
  */ 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metalocalsize)
 {
 	char metapath[300];
 	struct stat metastat; /* raw file ops */
 	int32_t ret, ret_code;
 
 	fetch_meta_path(metapath, inode);
-	/* TODO: reduce duplicate code with check_file_size */
 	ret = stat(metapath, &metastat);
 	if (ret < 0) {
 		ret_code = errno;
 		write_log(0, "Error on get stat of meta %"PRIu64
 				". Code %d\n", (uint64_t)inode, ret_code);
-		*metasize = 0;
+		if (metasize)
+			*metasize = 0;
+		if (metalocalsize)
+			*metalocalsize = 0;
 		return -ret_code;
 	}
-	*metasize = metastat.st_size;
+	if (metasize)
+		*metasize = metastat.st_size;
+	if (metalocalsize)
+		*metalocalsize = metastat.st_blocks * 512;
 
 	return 0;
 }
@@ -2127,3 +2133,20 @@ int32_t get_quota_from_backup(int64_t *quota)
 	json_delete(json_data);
 	return 0;
 }
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

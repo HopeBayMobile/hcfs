@@ -14,7 +14,6 @@
 #include "xattr_ops.h"
 #include "global.h"
 
-
 /* Global vars*/
 int32_t DELETE_DIR_ENTRY_BTREE_RESULT = 1;
 
@@ -282,7 +281,7 @@ int32_t sync_hcfs_system_data(char need_lock)
 /* mock functions - utils.c*/
 off_t check_file_size(const char *path)
 {
-	return MAX_BLOCK_SIZE;
+	return round_size(MAX_BLOCK_SIZE);
 }
 
 
@@ -476,13 +475,17 @@ int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_data_size;
-	hcfs_system->systemdata.system_size += (system_size_delta + meta_size_delta);
+	hcfs_system->systemdata.system_size += system_size_delta;
+	hcfs_system->systemdata.system_meta_size += meta_size_delta;
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metaroundsize)
 {
-	*metasize = MOCK_META_SIZE;
+	if (metasize)
+		*metasize = MOCK_META_SIZE;
+	if (metaroundsize)
+		*metaroundsize = round_size(MOCK_META_SIZE);
 	return 0;
 }
 
@@ -509,10 +512,12 @@ int32_t super_block_enqueue_delete(ino_t this_inode)
 {
 	return 0;
 }
+
 int32_t change_pin_size(int64_t delta_pin_size)
 {
 	return 0;
 }
+
 void fetch_restored_meta_path(char *pathname, ino_t this_inode)
 {
 	sprintf(pathname, "restore_meta_fileTestPath/restore_meta_%"PRIu64,
@@ -523,3 +528,20 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
 	return 0;
 }
+
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

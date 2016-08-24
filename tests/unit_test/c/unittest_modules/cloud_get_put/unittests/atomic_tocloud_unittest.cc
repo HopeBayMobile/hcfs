@@ -895,7 +895,7 @@ TEST_F(check_and_copy_fileTest, TargetFileExist_CopySuccess)
 		ASSERT_EQ(0, strcmp(src_buf, tar_buf));
 	}
 	EXPECT_EQ(0, hcfs_system->systemdata.system_size);
-	EXPECT_EQ(filesize, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(round_size(filesize), hcfs_system->systemdata.cache_size);
 
 	/* Recycle */
 	fclose(src);

@@ -1346,7 +1346,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	char meta_deleted;
-	int64_t metasize, dirty_delta, unpin_dirty_delta;
+	int64_t metasize, metasize_blk, dirty_delta, unpin_dirty_delta;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1366,7 +1366,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
-	get_meta_size(this_inode, &metasize);
+	get_meta_size(this_inode, &metasize, &metasize_blk);
 
 	gettimeofday(&start_time, NULL);
 	switch (d_type) {
@@ -1553,7 +1553,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		sem_wait(&(hcfs_system->access_sem));
 		if (P_IS_PIN(file_meta.local_pin)) {
 			hcfs_system->systemdata.pinned_size -=
-						this_inode_stat.size;
+					round_size(this_inode_stat.size);
 			if (hcfs_system->systemdata.pinned_size < 0)
 				hcfs_system->systemdata.pinned_size = 0;
 		}
@@ -1604,7 +1604,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		break;
 	}
 
-	change_system_meta(0, -metasize, 0, 0, 0, 0, TRUE);
+	change_system_meta(-metasize, -metasize_blk, 0, 0, 0, 0, TRUE);
 
 	if (mptr == NULL) {
 		FSEEK(fptr, 0, SEEK_SET);

@@ -1,3 +1,8 @@
+# Usage of common.mk:
+#
+# * To stop re-run failed unittest with valgrind:
+#   make test VALGRIND=false
+
 # mentioning default target first, finalizing it at end of file.
 all :
 
@@ -71,7 +76,8 @@ test:
 ifndef GEN_TEST
 	@MAKEFLAGS=${MAKEFLAGS//B} $(MAKE) test
 else
-	gcovr -p -k --root=$(realpath $(HCFS_ROOT)/src/HCFS) .
+	@find . -name "*.gcov" -delete
+	gcovr -p -k --root=$(realpath $(HCFS_ROOT)/src) .
 endif
 
 define COMPILE
@@ -140,8 +146,11 @@ define ADDCASE
   $(CASE_PASS): $(MD_PATH)/$(T)
 	@echo $$< --gtest_filter=$(C)
 	@cd $(MD_PATH) && \
-	  $$< --gtest_filter=$(C) --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T)-$(C).xml \
-	  || { if [ -f cleanup.sh ]; then ./cleanup.sh;fi; valgrind $$< --gtest_filter=$(C); }
+	  $$< --gtest_filter=$(C) \
+	  --gtest_output=xml:$(OBJ_DIR)/test_detail_$(T)-$(C).xml \
+	  || { if [ -f cleanup.sh ]; then ./cleanup.sh;fi; \
+	  $$$${VALGRIND:=valgrind} $$< --gtest_filter=$(C); }
+	@mkdir -p $(dir $(CASE_PASS))
 	@touch $(CASE_PASS)
   endif
 endef

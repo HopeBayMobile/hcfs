@@ -7,6 +7,44 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.2.1412
+=====
+## New Features
+ - [HCFS] Change the value of st_blksize to 4096 (!497)
+ - [HCFS] Calculate cache size and meta size in 4K unit (!514)
+ - [HCFS] Feature/pyhcfs lib - Added 2 new APIs: 
+  1. get_vol_usage - Show usage of single volume from FSstat file; To get system total volume usage you need to get_vol_usage  of each FSstat file and add them up.
+  2. list_file_blocks - list object name of all blocks of the file `NOTICE: Some file has sparse data blocks, which means some of data blocks may not listed in list. MyTera need to provide empty data chunk for those blocks when server file data!` (!482)
+
+## Fixes 
+ - [HCFS] Hotfix/add missing padding. metafile now actually have 64byte padding between header and content, preserved for later use. (!486)
+ - [HCFS] Hotfix/make emulated case insensitive. Emulated volume (sdcard) is now case-insensitive, so that some apps (such as Asphalt 8) can work correctly. (Fixed bug #12284) (!483)
+ - [HCFS] bugfix/delete meta while no backend. Modify timing of pushing inode into delete queue.
+  1. Handle deletion of meta when backend is not set.
+  2. Defer to enqueue to delete list in order to avoid to remove meta when cloud deletion is faster than local deletion. (!485)
+ - [HCFS] Hotfix/backup pin size (!480)
+ - [HCFS] bugfix/init_retry_sync_list (!481)
+ - [HCFS] hotfix/tocloud_unittest (!479)
+ - [HCFS] optimize longpow by table lookup. Typically, longpow is used for 1K base, and we can speed up by table  lookup as fastpath. In addition, slow path can be slightly improved. (!488)
+ - [HCFS] exclude core dump file. After the failure of certain unit test iteration, core dump file might  be generated, and we should not track them in GIT repository. (!491)
+ - [HCFS] fix bug #12281
+ - [Tera-App] Error handling when getDirStatus api failed to get status [!68](gateway-2-0-android-management-app!68)
+ - [Tera-App] Show system status bar after login Tera app [!69](gateway-2-0-android-management-app!69)
+ - [Tera-App] Redefine storage usage scope [!67](gateway-2-0-android-management-app!67)
+ - [Tera-App] Replace the pin/unpin failed message with revised version [!65](gateway-2-0-android-management-app!65)
+ - [Nexus-5x] fix Bug #11930:ota app can reshow the download alertdialog after re-launch ota app [!27](gateway-2-0/nexus-5x!27)
+ - [Nexus-5x] fix Bug #11948:OTA package did not delete after OTA finished [!28](gateway-2-0/nexus-5x!28)
+ - [Nexus-5x] Get Tera storage usage from mgmt api service [!25](gateway-2-0/nexus-5x!25)
+ - [Nexus-5x] remove the ota package file name from the notification [!26](gateway-2-0/nexus-5x!26)
+ - [Tera-Launcher] Fix service leak issue    1. Synchronize bind service function  2. Handle exception in TeraApiService class [!10](gateway-2-0/tera-launcher!10)
+
+## CI / Refactoring / Other
+ - [HCFS] Update CI setup, fix ccm report error (!477)
+ - [HCFS] Update README.md (!490)
+ - [HCFS] Update README.md (!487)
+ - [HCFS] build: fix typo (!492)
+ - [HCFS] Fix #12461 Missing jansson dependency while building hcfs (!505)
+
 v 2.2.2.1262
 =====
 
@@ -71,7 +109,6 @@ v 2.2.2.1262
 ## CI / Refactoring
 - [Tera-Launcher] Push tag to launcher repo with current version number (!471)
 - [HCFS] Ci/update flash script (!430)
-
 
 v 2.2.2.1128
 =====

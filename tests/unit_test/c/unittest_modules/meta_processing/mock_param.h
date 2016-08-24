@@ -10,6 +10,7 @@
 
 /* System statistics */
 #define MOCK_SYSTEM_SIZE 1048576
+#define MOCK_SYSTEM_META_SIZE 104857
 #define MOCK_CACHE_SIZE 1048576
 #define MOCK_CACHE_BLOCKS 100
 
@@ -44,6 +45,7 @@ HCFS_STAT to_verified_stat;
 #define INO_DELETE_LNK 13142
 #define TRUNC_SIZE 65536
 #define MOCK_META_SIZE 123
+
 char pathlookup_write_parent_success;
 char delete_pathcache_node_success;
 

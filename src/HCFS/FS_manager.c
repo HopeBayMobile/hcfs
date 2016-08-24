@@ -398,7 +398,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	ino_t new_FS_ino;
 	ssize_t ret_ssize;
-	int64_t metasize;
+	int64_t metasize, metasize_blk;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -464,13 +464,13 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	}
 
 	/* Update meta size */
-	ret = get_meta_size(new_FS_ino, &metasize);
+	ret = get_meta_size(new_FS_ino, &metasize, &metasize_blk);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to get meta size\n");
 		errcode = ret;
 		goto errcode_handle;
 	}
-	change_system_meta(0, metasize, 0, 0, 0, 0, TRUE);
+	change_system_meta(metasize, metasize_blk, 0, 0, 0, 0, TRUE);
 
 	temp_entry.d_ino = new_FS_ino;
 #ifdef _ANDROID_ENV_
@@ -638,7 +638,7 @@ int32_t delete_filesystem(char *fsname)
 	FILE *metafptr;
 	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
 	int64_t temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
-	int64_t metasize;
+	int64_t metasize, metasize_blk;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
@@ -726,13 +726,13 @@ int32_t delete_filesystem(char *fsname)
 	}
 
 	/* Update meta size */
-	ret = get_meta_size(FS_root, &metasize);
+	ret = get_meta_size(FS_root, &metasize, &metasize_blk);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to get meta size\n");
 		errcode = ret;
 		goto errcode_handle;
 	}
-	change_system_meta(0, -metasize, 0, 0, 0, 0, TRUE);
+	change_system_meta(-metasize, -metasize_blk, 0, 0, 0, 0, TRUE);
 
 	/* Delete root inode (follow ll_rmdir) */
 	ret = delete_inode_meta(FS_root);

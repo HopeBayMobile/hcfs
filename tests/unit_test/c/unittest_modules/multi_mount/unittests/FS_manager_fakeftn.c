@@ -167,7 +167,7 @@ int32_t reset_dirstat_lookup(ino_t thisinode)
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize)
+int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metaroundsize)
 {
 	return 0;
 }

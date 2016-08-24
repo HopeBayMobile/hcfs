@@ -447,7 +447,7 @@ int32_t process_request(void *arg)
 	char buf[512], resbuf[512];
 	char *largebuf;
 
-	thread_idx = (int)arg;
+	thread_idx = (intptr_t)arg;
 
 	fd = thread_pool[thread_idx].fd;
 	write_log(8, "Process a new request with socket fd %d and thread_id %d",
@@ -635,7 +635,7 @@ int32_t init_server()
 					    PTHREAD_CREATE_DETACHED);
 				pthread_create(&(thread_pool[new_thread_idx].thread),
 					       &(thread_pool[new_thread_idx].attr),
-					       (void *)process_request, (void *)new_thread_idx);
+					       (void *)process_request, (void*)(intptr_t)new_thread_idx);
 				break;
 			}
 		}

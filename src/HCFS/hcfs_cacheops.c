@@ -68,6 +68,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	FILE *metafptr;
 	int64_t current_block;
 	int64_t total_blocks;
+	int64_t block_size_blk;
 	HCFS_STAT temphead_stat;
 	struct stat block_stat; /* block ops */
 	FILE_META_TYPE temphead;
@@ -213,10 +214,9 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					errcode = -errcode;
 					goto errcode_handle;
 				}
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_size -=
-							block_stat.st_size;
-				hcfs_system->systemdata.cache_blocks--;
+				block_size_blk = block_stat.st_blocks * 512;
+				change_system_meta(0, 0, -block_size_blk,
+						-1, 0, 0, TRUE);
 				ret = unlink(thisblockpath);
 				if (ret < 0) {
 					errcode = errno;
@@ -225,19 +225,15 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 						__func__, errcode,
 						strerror(errcode));
 					errcode = -errcode;
-					sem_post(&(hcfs_system->access_sem));
 					goto errcode_handle;
 				}
-				sync_hcfs_system_data(FALSE);
 				ret = update_file_stats(metafptr, 0, -1,
-							-(block_stat.st_size),
+							-block_size_blk,
 							0, this_inode);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
-
-				sem_post(&(hcfs_system->access_sem));
 
 				/* Do not sync the block status change
 				due to paging out */

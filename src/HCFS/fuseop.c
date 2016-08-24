@@ -1050,7 +1050,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation, tmpptr->f_ino,
+			&this_stat, this_generation, tmpptr,
 			&delta_meta_size, ispin, is_external);
 
 	/* TODO: May need to delete from super block and parent if failed. */
@@ -1080,7 +1080,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1209,7 +1209,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	delta_meta_size = 0;
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat, this_gen,
-			tmpptr->f_ino, &delta_meta_size, ispin,
+			tmpptr, &delta_meta_size, ispin,
 			is_external);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -1231,7 +1231,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -1653,7 +1653,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	DIR_STATS_TYPE tmpstat;
 	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
+	int64_t old_metasize1_blk, old_metasize2_blk;
+	int64_t new_metasize1_blk, new_metasize2_blk;
 	int64_t delta_meta_size1, delta_meta_size2;
+	int64_t delta_meta_size1_blk, delta_meta_size2_blk;
 	BOOL is_external = FALSE;
 
 	parent_inode1 = real_ino(req, parent);
@@ -1758,7 +1761,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-	meta_cache_get_meta_size(parent1_ptr, &old_metasize1);
+	meta_cache_get_meta_size(parent1_ptr, &old_metasize1,
+			&old_metasize1_blk);
 
 	if (parent_inode1 != parent_inode2) {
 		parent2_ptr = meta_cache_lock_entry(parent_inode2);
@@ -1776,7 +1780,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
-		meta_cache_get_meta_size(parent2_ptr, &old_metasize2);
+		meta_cache_get_meta_size(parent2_ptr, &old_metasize2,
+				&old_metasize2_blk);
 	} else {
 		parent2_ptr = parent1_ptr;
 		old_metasize2 = old_metasize1;
@@ -2178,23 +2183,32 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 #endif
 	}
 
-	meta_cache_get_meta_size(parent1_ptr, &new_metasize1);
-	meta_cache_get_meta_size(parent2_ptr, &new_metasize2);
+	meta_cache_get_meta_size(parent1_ptr, &new_metasize1,
+			&new_metasize1_blk);
+	meta_cache_get_meta_size(parent2_ptr, &new_metasize2,
+			&new_metasize2_blk);
 
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
 
-	if (new_metasize1 > 0 && old_metasize1 > 0)
+	if (new_metasize1 > 0 && old_metasize1 > 0) {
 		delta_meta_size1 = new_metasize1 - old_metasize1;
-	else
+		delta_meta_size1_blk = new_metasize1_blk - old_metasize1_blk;
+	} else {
 		delta_meta_size1 = 0;
-	if (new_metasize2 > 0 && old_metasize2 > 0)
+		delta_meta_size1_blk = 0;
+	}
+	if (new_metasize2 > 0 && old_metasize2 > 0) {
 		delta_meta_size2 = new_metasize2 - old_metasize2;
-	else
+		delta_meta_size2_blk = new_metasize2_blk - old_metasize2_blk;
+	} else {
 		delta_meta_size2 = 0;
+		delta_meta_size2_blk = 0;
+	}
 
 	if (delta_meta_size1 + delta_meta_size2 != 0) {
-		change_system_meta(0, delta_meta_size1 + delta_meta_size2,
+		change_system_meta(delta_meta_size1 + delta_meta_size2,
+				delta_meta_size1_blk + delta_meta_size2_blk,
 				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0,
 				delta_meta_size1 + delta_meta_size2 , 0);
@@ -2637,6 +2651,8 @@ int32_t truncate_truncate(ino_t this_inode,
 			}
 
 			if (stat(thisblockpath, &tempstat) == 0) {
+				int64_t block_size_blk;
+
 				last_block_entry->status = ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
@@ -2658,9 +2674,10 @@ int32_t truncate_truncate(ino_t this_inode,
 					return ret;
 				}
 
-				change_system_meta(0, 0, tempstat.st_size, 1,
-						   tempstat.st_size, 0, TRUE);
-				cache_delta += tempstat.st_size;
+				block_size_blk = tempstat.st_blocks * 512;
+				change_system_meta(0, 0, block_size_blk, 1,
+						   block_size_blk, 0, TRUE);
+				cache_delta += block_size_blk;
 				cache_block_delta += 1;
 			}
 		} else {
@@ -2697,7 +2714,7 @@ int32_t truncate_truncate(ino_t this_inode,
 			delta_dirty_size = new_block_size - old_block_size;
 
 		unpin_dirty_size = (P_IS_UNPIN(tempfilemeta->local_pin) ?
-				delta_dirty_size: 0);
+				delta_dirty_size : 0);
 		change_system_meta(0, 0, new_block_size - old_block_size,
 				0, delta_dirty_size, unpin_dirty_size, TRUE);
 
@@ -2888,7 +2905,11 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 	}
 
 	if (filestat->size < offset) {
+		int64_t pin_sizediff;
+
 		sizediff = (int64_t) offset - filestat->size;
+		pin_sizediff = round_size((int64_t)offset) -
+					round_size(filestat->size);
 		sem_wait(&(hcfs_system->access_sem));
 		/* Check system size and reject if exceeding quota */
 		if (hcfs_system->systemdata.system_size + sizediff >
@@ -2908,12 +2929,12 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 				sem_post(&(hcfs_system->access_sem));
 				return -EIO;
 			}
-			if ((hcfs_system->systemdata.pinned_size + sizediff)
+			if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 					> max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				return -ENOSPC;
 			}
-			hcfs_system->systemdata.pinned_size += sizediff;
+			hcfs_system->systemdata.pinned_size += pin_sizediff;
 		}
 		sem_post(&(hcfs_system->access_sem));
 	}
@@ -3186,7 +3207,7 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 	    (offset < filestat->size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size +=
-			(int64_t)(offset - filestat->size);
+			(round_size(offset) - round_size(filestat->size));
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -3211,7 +3232,7 @@ errcode_handle:
 	    (offset > filestat->size)) {
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.pinned_size -=
-			(int64_t)(offset - filestat->size);
+			(round_size(offset) - round_size(filestat->size));
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -3564,6 +3585,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		}
 
 		if (stat(thisblockpath, &tempstat2) == 0) {
+			int64_t block_size_blk;
+
 			if ((tpage->block_entries[eindex]).status == ST_CtoL) {
 				(tpage->block_entries[eindex]).status = ST_BOTH;
 				tmpptr = fh_ptr->meta_cache_ptr;
@@ -3588,7 +3611,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 					goto error_handling;
 			}
 			/* Update system meta to reflect correct cache size */
-			change_system_meta(0, 0, tempstat2.st_size,
+			block_size_blk = tempstat2.st_blocks * 512;
+			change_system_meta(0, 0, block_size_blk,
 					1, 0, 0, TRUE);
 
 			/* Signal cache management that something can be paged
@@ -3603,7 +3627,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			if (ret < 0)
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
-						1, tempstat2.st_size,
+						1, block_size_blk,
 						0, fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
@@ -4224,6 +4248,8 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		}
 
 		if (stat(thisblockpath, &tempstat2) == 0) {
+			int64_t block_size_blk;
+
 			(tpage->block_entries[eindex]).status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
@@ -4245,18 +4271,19 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 				}
 				return ret;
 			}
+			block_size_blk = tempstat2.st_blocks * 512;
 			unpin_dirty_size = (P_IS_UNPIN(ispin) ?
-					tempstat2.st_size : 0);
-			change_system_meta(0, 0, tempstat2.st_size, 1,
-					tempstat2.st_size,
+					block_size_blk : 0);
+			change_system_meta(0, 0, block_size_blk, 1,
+					block_size_blk,
 					unpin_dirty_size, TRUE);
 			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
-						1, tempstat2.st_size,
-						tempstat2.st_size,
+						1, block_size_blk,
+						block_size_blk,
 						fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
@@ -4317,11 +4344,13 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	int64_t max_cache_size;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 	ssize_t ret_ssize;
+	BOOL block_dirty;
 
 	/* Check system size before writing */
 	if (hcfs_system->systemdata.system_size >
 			hcfs_system->systemdata.system_quota) {
 		*reterr = -ENOSPC;
+		write_log(4, "Warn: system no space?\n");
 		return 0;
 	}
 
@@ -4439,6 +4468,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		break;
 	}
 
+	block_dirty = FALSE;
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		int64_t seq;
@@ -4503,6 +4533,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				}
 				break;
 			case ST_LDISK:
+				block_dirty = TRUE;
 				ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4518,6 +4549,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			case ST_LtoC:
 				if ((temppage).block_entries[entry_index].status ==
 						ST_LtoC) {
+					block_dirty = TRUE;
 					ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4587,6 +4619,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			/* Check if there is a need for status change */
 			switch ((temppage).block_entries[entry_index].status) {
 			case ST_LDISK:
+				block_dirty = TRUE;
 				ret = _check_sync_wait_full_cache(
 					&(fh_ptr->meta_cache_ptr),
 					this_inode, bindex, seq,
@@ -4602,6 +4635,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			case ST_LtoC:
 				if ((temppage).block_entries[entry_index].status
 						== ST_LtoC) {
+					block_dirty = TRUE;
 					ret = _check_sync_wait_full_cache(
 						&(fh_ptr->meta_cache_ptr),
 						this_inode, bindex, seq,
@@ -4658,19 +4692,22 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 	PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
 	//FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
-
 	//FWRITE(buf, sizeof(char), size, fh_ptr->blockfptr);
 
 	this_bytes_written = (size_t) ret_ssize;
-
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size) {
-		unpin_dirty_size = (P_IS_UNPIN(ispin) ?
-				new_cache_size - old_cache_size : 0);
+	if (this_bytes_written != 0) {
+		int64_t dirty_delta;
+
+		if (block_dirty == TRUE)
+			dirty_delta = new_cache_size - old_cache_size;
+		else
+			dirty_delta = new_cache_size;
+
+		unpin_dirty_size = (P_IS_UNPIN(ispin) ? dirty_delta : 0);
 		change_system_meta(0, 0, new_cache_size - old_cache_size, 0,
-				new_cache_size - old_cache_size,
-				unpin_dirty_size, TRUE);
+				dirty_delta, unpin_dirty_size, TRUE);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
@@ -4680,8 +4717,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 		ret = update_file_stats(tmpptr->fptr, 0,
 				0, new_cache_size - old_cache_size,
-				new_cache_size - old_cache_size,
-				fh_ptr->thisinode);
+				dirty_delta, fh_ptr->thisinode);
 		if (ret < 0) {
 			*reterr = ret;
 			return 0;
@@ -4731,8 +4767,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
-	int64_t sizediff, amount_preallocated;
+	int64_t pin_sizediff, amount_preallocated;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	int64_t now_seq;
 	int64_t max_pinned_size;
 
@@ -4806,7 +4843,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 	fh_ptr->meta_cache_locked = TRUE;
 
-	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize);
+	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &old_metasize,
+			&old_metasize_blk);
 
 	/* Move update_meta_seq() here so that avoid race condition
 	 * caused from write by multi-threads */
@@ -4847,6 +4885,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	write_log(10, "Debug: system size: %lld, system quota %lld",
+		hcfs_system->systemdata.system_size,
+		hcfs_system->systemdata.system_quota);
 	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
 	          offset, size);
@@ -4856,11 +4897,11 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if (P_IS_PIN(thisfilemeta.local_pin) &&
 	    ((offset + (off_t)size) > temp_stat.size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		sizediff =
-		    (int64_t)((offset + (off_t)size) - temp_stat.size);
-		write_log(10, "Write details: %lld, %lld\n", sizediff,
+		pin_sizediff = round_size(offset + (off_t)size) -
+					round_size(temp_stat.size);
+		write_log(10, "Write details: %lld, %lld\n", pin_sizediff,
 		          (off_t) size);
-		if ((hcfs_system->systemdata.pinned_size + sizediff)
+		if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 			> max_pinned_size) {
 			sem_post(&(hcfs_system->access_sem));
 			fh_ptr->meta_cache_locked = FALSE;
@@ -4871,8 +4912,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			return;
 		}
 
-		hcfs_system->systemdata.pinned_size += sizediff;
-		amount_preallocated = sizediff;
+		hcfs_system->systemdata.pinned_size += pin_sizediff;
+		amount_preallocated = pin_sizediff;
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -4908,11 +4949,15 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			break;
 	}
 
-	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &new_metasize);
-	if (old_metasize > 0 && new_metasize > 0)
+	meta_cache_get_meta_size(fh_ptr->meta_cache_ptr, &new_metasize,
+			&new_metasize_blk);
+	if (old_metasize > 0 && new_metasize > 0) {
 		delta_meta_size = (new_metasize - old_metasize);
-	else
+		delta_meta_size_blk = (new_metasize_blk - old_metasize_blk);
+	} else {
 		delta_meta_size = 0;
+		delta_meta_size_blk = 0;
+	}
 
 	/*Update and flush file meta*/
 	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
@@ -4933,11 +4978,13 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		/* If offset + total_bytes_written < st_size, substract
 		the difference between size and st_size */
 		if (offset + total_bytes_written < temp_stat.size)
-			sizediff = (offset + (off_t) size) - temp_stat.size;
+			pin_sizediff = round_size(offset + (off_t) size) -
+				round_size(temp_stat.size);
 		else
-			sizediff = ((off_t)size) - total_bytes_written;
+			pin_sizediff = round_size(offset + (off_t)size) -
+				round_size(offset + total_bytes_written);
 		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size -= sizediff;
+		hcfs_system->systemdata.pinned_size -= pin_sizediff;
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
@@ -4945,7 +4992,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	if (temp_stat.size < (offset + total_bytes_written)) {
 		change_system_meta((int64_t) ((offset + total_bytes_written)
-				- temp_stat.size), delta_meta_size,
+				- temp_stat.size + delta_meta_size),
+				delta_meta_size_blk,
 				0, 0, 0, 0, TRUE);
 		ret = change_mount_stat(tmpptr,
 			(int64_t) ((offset + total_bytes_written)
@@ -4963,7 +5011,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		temp_stat.blocks = (temp_stat.size+511) / 512;
 	} else {
 		if (delta_meta_size != 0) {
-			change_system_meta(0, delta_meta_size,
+			change_system_meta(delta_meta_size, delta_meta_size_blk,
 					0, 0, 0, 0, TRUE);
 			ret = change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 			if (ret < 0) {
@@ -6220,7 +6268,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
-			link, this_generation, name, tmpptr->f_ino,
+			link, this_generation, name, tmpptr,
 			&delta_meta_size, local_pin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -6260,7 +6308,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -6420,6 +6468,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
         MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	FILE_META_TYPE this_filemeta;
 
         tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -6507,7 +6556,8 @@ fetch_xattr:
 		goto error_handle;
 	}
 
-	meta_cache_get_meta_size(meta_cache_entry, &old_metasize);
+	meta_cache_get_meta_size(meta_cache_entry, &old_metasize,
+			&old_metasize_blk);
 
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos, TRUE);
@@ -6522,20 +6572,25 @@ fetch_xattr:
 	if (retcode < 0)
 		goto error_handle;
 
-	meta_cache_get_meta_size(meta_cache_entry, &new_metasize);
+	meta_cache_get_meta_size(meta_cache_entry, &new_metasize,
+			&new_metasize_blk);
 
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
 
-	if (new_metasize > 0 && old_metasize > 0)
+	if (new_metasize > 0 && old_metasize > 0) {
 		delta_meta_size = new_metasize - old_metasize;
-	else
+		delta_meta_size_blk = new_metasize_blk - old_metasize_blk;
+	} else {
 		delta_meta_size = 0;
+		delta_meta_size_blk = 0;
+	}
 
 	if (delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, delta_meta_size_blk,
+				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -7053,6 +7108,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
 	int64_t old_metasize, new_metasize, delta_meta_size;
+	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	char local_pin;
 	BOOL is_external = FALSE;
 
@@ -7108,7 +7164,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &old_metasize,
+			&old_metasize_blk);
 
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
 		&result_index, newname, parent_meta_cache_entry,
@@ -7137,10 +7194,13 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		errcode = ret_val;
 		goto error_handle;
 	}
-	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize);
+	meta_cache_get_meta_size(parent_meta_cache_entry, &new_metasize,
+			&new_metasize_blk);
 	delta_meta_size = new_metasize - old_metasize;
+	delta_meta_size_blk = new_metasize_blk - old_metasize_blk;
 	if (new_metasize > 0 && old_metasize > 0 && delta_meta_size != 0) {
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, delta_meta_size_blk,
+				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0, delta_meta_size, 0);
 	}
 
@@ -7315,7 +7375,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_stat.ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
-			&this_stat, this_generation, tmpptr->f_ino,
+			&this_stat, this_generation, tmpptr,
 			&delta_meta_size, ispin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -7342,7 +7402,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
 
 	if (delta_meta_size != 0)
-		change_system_meta(0, delta_meta_size, 0, 0, 0, 0, TRUE);
+		change_system_meta(delta_meta_size, 0, 0, 0, 0, 0, TRUE);
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);

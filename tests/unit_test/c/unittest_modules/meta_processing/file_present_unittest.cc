@@ -145,11 +145,13 @@ TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
  */
 class mknod_update_metaTest : public ::testing::Test {
 protected:
+	MOUNT_T mptr;
 	void SetUp()
 	{
 		sem_init(&(pathlookup_data_lock), 0, 1);
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
+		mptr.f_ino = 1;
 	}
 
 	void TearDown()
@@ -169,7 +171,7 @@ TEST_F(mknod_update_metaTest, FailTo_dir_add_entry)
 	tmp_stat.mode = S_IFREG;
 
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+		"\0", &tmp_stat, 0, &mptr, &delta_metasize, TRUE, FALSE));
 }
 
 TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
@@ -181,7 +183,7 @@ TEST_F(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 
 	tmp_stat.mode = S_IFREG;
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+		"\0", &tmp_stat, 0, &mptr, &delta_metasize, TRUE, FALSE));
 }
 
 TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
@@ -195,7 +197,7 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
 	tmp_stat.mode = S_IFREG;
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
-		"not_used", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+		"not_used", &tmp_stat, 0, &mptr, &delta_metasize, TRUE, FALSE));
 	EXPECT_EQ(delta_metasize, sizeof(FILE_META_HEADER));
 }
 
@@ -208,43 +210,49 @@ TEST_F(mknod_update_metaTest, FunctionWorkSuccess)
  */
 TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 {
+	MOUNT_T mptr;
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_FAIL;
 	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
+	mptr.f_ino = 1;
 	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+		"\0", &tmp_stat, 0, &mptr, &delta_metasize, TRUE, FALSE));
 }
 
 TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 {
+	MOUNT_T mptr;
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
 	ino_t parent_inode = 1;
 	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
+	mptr.f_ino = 1;
 	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+		"\0", &tmp_stat, 0, &mptr, &delta_metasize, TRUE, FALSE));
 }
 
 TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 {
+	MOUNT_T mptr;
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
 	ino_t parent_inode = INO_DIR_ADD_ENTRY_SUCCESS;
 	HCFS_STAT tmp_stat;
 	int64_t delta_metasize;
 
+	mptr.f_ino = 1;
 	tmp_stat.mode = S_IFDIR;
 	sem_init(&(pathlookup_data_lock), 0, 1);
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0, 1, &delta_metasize, TRUE, FALSE));
+		"\0", &tmp_stat, 0, &mptr, &delta_metasize, TRUE, FALSE));
 	EXPECT_EQ(delta_metasize, sizeof(DIR_META_HEADER));
 }
 
@@ -580,6 +588,7 @@ TEST_F(fetch_xattr_pageTest, FetchExistSymlinkXattrSuccess)
  */
 class symlink_update_metaTest : public ::testing::Test {
 protected:
+	MOUNT_T mptr;
 	META_CACHE_ENTRY_STRUCT *mock_parent_entry;
 	void SetUp()
 	{
@@ -587,6 +596,7 @@ protected:
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(mock_parent_entry, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 		sem_init(&(pathlookup_data_lock), 0, 1);
+		mptr.f_ino = 1;
 	}
 
 	void TearDown()
@@ -607,7 +617,7 @@ TEST_F(symlink_update_metaTest, AddDirEntryFail)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"link_not_used", 12, "name_not_used", 1, &delta_metasize,
+		"link_not_used", 12, "name_not_used", &mptr, &delta_metasize,
 		TRUE, FALSE));
 }
 
@@ -620,7 +630,7 @@ TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"update_symlink_data_fail", 12, "name_not_used", 1,
+		"update_symlink_data_fail", 12, "name_not_used", &mptr,
 		&delta_metasize, TRUE, FALSE));
 }
 
@@ -633,7 +643,7 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"link_not_used", 12, "name_not_used", 1,
+		"link_not_used", 12, "name_not_used", &mptr,
 		&delta_metasize, TRUE, FALSE));
 	EXPECT_EQ(delta_metasize, sizeof(SYMLINK_META_HEADER));
 }

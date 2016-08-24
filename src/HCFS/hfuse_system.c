@@ -497,6 +497,10 @@ int32_t main(int32_t argc, char **argv)
 	/* Move log opening earlier for android to log low battery events */
 #ifdef _ANDROID_ENV_
 	open_log("hcfs_android_log");
+#ifdef VERSION_NUM
+	write_log(2, "\nVersion: %s", VERSION_NUM);
+#endif
+	write_log(2, "\nStart logging hcfs_android_log\n");
 #endif
 
 	/* Check if battery level is low. If so, shutdown */
@@ -568,10 +572,6 @@ int32_t main(int32_t argc, char **argv)
 	ret_val = init_pkg_cache();
 	if (ret_val < 0)
 		exit(ret_val);
-
-#ifdef VERSION_NUM
-	write_log(2, "\nVersion: %s\nStart logging\n", VERSION_NUM);
-#endif
 
 	/* Init event notify service */
 	ret_val = init_event_notify_module();

@@ -6,6 +6,7 @@ all: _pyhcfs.so demo_pyhcfs
 
 _pyhcfs.so: parser.c parser.h
 	python3 pyhcfs_build.py
+	mv -vf _pyhcfs.*.so _pyhcfs.so || :
 
 parser.o demo_pyhcfs: CFLAGS+=-g -I../HCFS
 demo_pyhcfs: demo_pyhcfs.c parser.h parser.o
@@ -21,7 +22,6 @@ check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
 
 demo: all
-	mv -vf _pyhcfs.*.so _pyhcfs.so || :
 	@echo ====== start demo ======
 	python3 demo_pyhcfs.py
 

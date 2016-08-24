@@ -1703,11 +1703,12 @@ TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
 			<< sb_entry.status << ", need IS_DIRTY";
 		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = "
 			<< expected_inode << ", now_inode = " << now_inode;
-		ASSERT_EQ(5566, sb_entry.dirty_meta_size);
+		ASSERT_EQ(8192, sb_entry.dirty_meta_size); /* Round size */
 		now_inode = sb_entry.util_ll_next; // Go to next dirty inode
 	}
 
-	EXPECT_EQ(5566 * num_inode, hcfs_system->systemdata.dirty_cache_size);
+	/* Round size */
+	EXPECT_EQ(8192 * num_inode, hcfs_system->systemdata.dirty_cache_size);
 }
 
 TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)

@@ -89,7 +89,7 @@ int32_t unlink_upload_file(char *filename)
 
 	ret = stat(filename, &filestat);
 	if (ret == 0) {
-		filesize = filestat.st_size;
+		filesize = filestat.st_blocks * 512;
 		UNLINK(filename);
 		old_cachesize = hcfs_system->systemdata.cache_size;
 		change_system_meta(0, 0, -filesize,
@@ -1738,7 +1738,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	filesize = 0;
 	ret = stat(thread_ptr->tempfilename, &filestat);
 	if (ret == 0) {
-		filesize = filestat.st_size;
+		filesize = filestat.st_blocks * 512;
 	} else {
 		errcode = errno;
 		write_log(0, "Error: Fail to stat file in %s. Code %d\n",
@@ -1830,6 +1830,10 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 					thread_ptr->seq,
 					&(upload_curl_handles[which_curl]));
 #endif
+	} else {
+		ret = 0;
+		write_log(4, "Warn: Try to delete meta in %s? Skip it.",
+				__func__);
 	}
 
 	/* Do not care about object not found on cloud. */
