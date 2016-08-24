@@ -54,6 +54,8 @@ int32_t run_download_minimal(void);
 int32_t fetch_restore_meta_path(char *pathname, ino_t this_inode);
 int32_t fetch_restore_block_path(char *pathname, ino_t this_inode, int64_t block_num);
 
+int32_t backup_package_list(void);
+
 void cleanup_stage1_data(void);
 
 #endif  /* GW20_DO_RESTORATION_H_ */
