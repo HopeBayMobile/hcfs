@@ -117,7 +117,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	EXPECT_EQ(sizeof(SUPER_BLOCK_HEAD) + 5 * sizeof(SUPER_BLOCK_ENTRY),
 			hcfs_system->systemdata.super_block_size);
 
-	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+	EXPECT_EQ(RESTORING_STAGE2, hcfs_system->system_restoring);
 }
 
 TEST_F(init_rebuild_sbTest, NoRoot_DoNeedRebuild)
@@ -150,7 +150,7 @@ TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileExist)
 	close(rebuild_sb_jobs->queue_fh);
 	unlink(queuefile_path);
 
-	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+	EXPECT_EQ(RESTORING_STAGE2, hcfs_system->system_restoring);
 }
 
 TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileNotExist)
@@ -169,7 +169,7 @@ TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileNotExist)
 	close(rebuild_sb_jobs->queue_fh);
 	unlink(queuefile_path);
 
-	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+	EXPECT_EQ(RESTORING_STAGE2, hcfs_system->system_restoring);
 }
 /**
  * End unittest of init_rebuild_sb()

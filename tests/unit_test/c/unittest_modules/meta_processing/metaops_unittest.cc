@@ -1797,7 +1797,7 @@ protected:
 		fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 		fwrite(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
 		fwrite(&tmpstats, sizeof(FILE_STATS_TYPE), 1, fptr);
-		if(fptr)
+		if (fptr)
 			fclose(fptr);
 		test_change_pin_flag = TRUE;
 		sem_init(&(hcfs_system->access_sem), 0, 1);
@@ -1810,14 +1810,18 @@ protected:
 	{
 		unlink("test_meta_file");
 		test_change_pin_flag = FALSE;
+		sem_destroy(&(hcfs_system->access_sem));
 	}
 };
 
 TEST_F(change_pin_flagTest, MetaCacheLockFail)
 {
+	int32_t ret;
+
 	ino_t inode = INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL;
 
-	EXPECT_EQ(-ENOMEM, change_pin_flag(inode, S_IFREG, TRUE));
+	ret = change_pin_flag(inode, S_IFREG, TRUE);
+	EXPECT_EQ(-ENOMEM, ret);
 }
 
 TEST_F(change_pin_flagTest, RegfileHadBeenPinned)
