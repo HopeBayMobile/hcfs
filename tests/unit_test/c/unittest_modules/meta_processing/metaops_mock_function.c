@@ -105,12 +105,15 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *bptr;
 
 	if (this_inode != INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL) {
-		bptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		bptr = (META_CACHE_ENTRY_STRUCT *)
+				malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(bptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 		return bptr;
 	} else {
-		return 0;
+		return NULL;
 	}
+
+	return NULL;
 }
 
 

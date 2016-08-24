@@ -873,7 +873,7 @@ protected:
 			int32_t level_index = tmp_target_page / pointers_per_page[deep - level];
 			fread(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 			fseek(body_ptr->fptr, ptr_entry_page.ptr[level_index], SEEK_SET);
-			printf("Test: level %d: ptr_page_index = %d, next_filepos = %" PRId64 "\n",
+			printf("Test: level %d: ptr_page_index = %d, next_filepos = %lld\n",
 				level, level_index, ptr_entry_page.ptr[level_index]);
 			tmp_target_page = tmp_target_page % pointers_per_page[deep - level];
 		}
@@ -1468,7 +1468,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	bool block_file_existed;
 	BLOCK_ENTRY_PAGE block_entry_page;
 	HCFS_STAT mock_stat;
-	struct stat meta_stat;
 	FILE_META_TYPE mock_meta;
 	FILE *tmp_fp;
 	ino_t mock_inode = INO_DELETE_FILE_BLOCK;
@@ -1515,7 +1514,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	fwrite(&mock_meta, sizeof(FILE_META_TYPE), 1, meta_fp);
 	fwrite(&block_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta_fp);
 	fclose(meta_fp);
-	stat(thismetapath, &meta_stat);
 
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG,
@@ -1799,7 +1797,7 @@ protected:
 		fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 		fwrite(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
 		fwrite(&tmpstats, sizeof(FILE_STATS_TYPE), 1, fptr);
-		if(fptr)
+		if (fptr)
 			fclose(fptr);
 		test_change_pin_flag = TRUE;
 		sem_init(&(hcfs_system->access_sem), 0, 1);
@@ -1812,14 +1810,18 @@ protected:
 	{
 		unlink("test_meta_file");
 		test_change_pin_flag = FALSE;
+		sem_destroy(&(hcfs_system->access_sem));
 	}
 };
 
 TEST_F(change_pin_flagTest, MetaCacheLockFail)
 {
+	int32_t ret;
+
 	ino_t inode = INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL;
 
-	EXPECT_EQ(-ENOMEM, change_pin_flag(inode, S_IFREG, TRUE));
+	ret = change_pin_flag(inode, S_IFREG, TRUE);
+	EXPECT_EQ(-ENOMEM, ret);
 }
 
 TEST_F(change_pin_flagTest, RegfileHadBeenPinned)
