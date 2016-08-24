@@ -701,10 +701,10 @@ error_handle:
 *************************************************************************/
 int32_t super_block_delete(ino_t this_inode)
 {
-	int32_t ret_val, errcode;
+	int32_t ret_val, errcode, ret;
 	SUPER_BLOCK_ENTRY tempentry;
 	ino_t temp;
-	size_t retsize;
+	size_t ret_size;
 
 	super_block_exclusive_locking();
 
@@ -723,7 +723,9 @@ int32_t super_block_delete(ino_t this_inode)
 			}
 
 			/* If superblock do not fully scan, just set
-			 * to-be-reclaim */
+			 * to-be-reclaim. Otherwise, let status be NO_LL
+			 * because it will be recorded as TO_BE_RECLAIMED
+			 * inode later. */
 			if (sys_super_block->now_reclaim_fullscan == FALSE)
 				tempentry.status = TO_BE_RECLAIMED;
 		}
@@ -739,7 +741,9 @@ int32_t super_block_delete(ino_t this_inode)
 			sys_super_block->head.num_active_inodes);
 	}
 
-	/* Write to temp file if superblock is fully scanning */
+	/* Write to temp file if superblock is fully scanning.
+	 * At the same time, do not increase num_to_be_reclaimed. These inodes
+	 * will be handled later. */
 	if (sys_super_block->now_reclaim_fullscan == TRUE) {
 		if (sys_super_block->temp_unclaimed_fptr == NULL) {
 			char temp_unclaimed_list[METAPATHLEN];
@@ -756,17 +760,11 @@ int32_t super_block_delete(ino_t this_inode)
 			}
 			setbuf(sys_super_block->temp_unclaimed_fptr, NULL);
 		}
-		ret_val = fseek(sys_super_block->temp_unclaimed_fptr,
-				0, SEEK_END);
-		retsize = fwrite(&this_inode, sizeof(ino_t), 1,
+		FSEEK(sys_super_block->temp_unclaimed_fptr, 0, SEEK_END);
+		FWRITE(&this_inode, sizeof(ino_t), 1,
 				sys_super_block->temp_unclaimed_fptr);
-		if (retsize < 1) {
-			write_log(0, "Fail to write in %s. Code %d",
-					__func__, errno);
-			ret_val = -errno;
-		}
 		super_block_exclusive_release();
-		return ret_val;
+		return 0;
 	}
 
 	/* Add to unclaimed_list file */
@@ -781,9 +779,9 @@ int32_t super_block_delete(ino_t this_inode)
 		return -errcode;
 	}
 
-	retsize = fwrite(&temp, sizeof(ino_t), 1,
+	ret_size = fwrite(&temp, sizeof(ino_t), 1,
 				sys_super_block->unclaimed_list_fptr);
-	if ((retsize < 1) && (ferror(sys_super_block->unclaimed_list_fptr))) {
+	if ((ret_size < 1) && (ferror(sys_super_block->unclaimed_list_fptr))) {
 		clearerr(sys_super_block->unclaimed_list_fptr);
 		write_log(0, "IO Error in writing to unclaimed list.\n");
 		super_block_exclusive_release();
@@ -794,8 +792,11 @@ int32_t super_block_delete(ino_t this_inode)
 	ret_val = write_super_block_head();
 
 	super_block_exclusive_release();
-
 	return ret_val;
+
+errcode_handle:
+	super_block_exclusive_release();
+	return errcode;
 }
 
 /* Helper function for sorting entries in the super block */
@@ -1009,7 +1010,6 @@ static int32_t _fullscan_reclaim_bundle(ino_t first_reclaimed_inode,
 				last_reclaimed_inode;
 	}
 	sys_super_block->head.num_inode_reclaimed += num_reclaim;
-	//sys_super_block->head.num_to_be_reclaimed -= num_relcaim;
 	ret = write_super_block_head();
 	if (ret < 0)
 		goto error_handle;
@@ -1031,9 +1031,10 @@ static int32_t _handle_temp_unclaimed_file()
 {
 	char temp_unclaimed_list[METAPATHLEN];
 	int32_t errcode, ret, idx;
-	int64_t ret_ssize, ret_pos, num_inodes;
+	int64_t ret_ssize, now_pos;
+	int64_t num_inodes, total_inode;
 	SUPER_BLOCK_ENTRY tempentry;
-	ino_t *unclaimed_inodes;
+	ino_t unclaimed_inodes[4096];
 	ino_t now_ino;
 
 	sprintf(temp_unclaimed_list, "%s/temp_unclaimed_list",
@@ -1044,62 +1045,70 @@ static int32_t _handle_temp_unclaimed_file()
 			sys_super_block->temp_unclaimed_fptr =
 					fopen(temp_unclaimed_list, "r");
 			if (sys_super_block->temp_unclaimed_fptr == NULL) {
+				errcode = errno;
+				write_log(0, "Error: Fail to open "
+					"temp_unclaimed_list file in %s."
+					" Code %d", __func__, errcode);
 				unlink(temp_unclaimed_list);
-				return -errno;
+				return -errcode;
 			}
 		} else {
 			return 0;
 		}
 	}
 
-	LSEEK(fileno(sys_super_block->temp_unclaimed_fptr), 0, SEEK_END);
-	num_inodes = ret_pos / sizeof(ino_t);
-	unclaimed_inodes = (ino_t *) calloc(num_inodes, sizeof(ino_t));
-	if (!unclaimed_inodes) {
-		errcode = -errno;
-		goto errcode_handle;
-	}
-	PREAD(fileno(sys_super_block->temp_unclaimed_fptr),
-			unclaimed_inodes, ret_pos, 0);
-	for (idx = 0; idx < num_inodes; idx++) {
-		now_ino = unclaimed_inodes[idx];
+	now_pos = 0;
+	num_inodes = 0;
+	total_inode = 0;
+	while (!feof(sys_super_block->temp_unclaimed_fptr)) {
+		/* Read some inodes */
+		PREAD(fileno(sys_super_block->temp_unclaimed_fptr),
+			unclaimed_inodes, sizeof(ino_t) * 4096, now_pos);
+		if (ret_ssize == 0)
+			break;
 
-		ret = read_super_block_entry(now_ino, &tempentry);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
-		}
-		if (tempentry.pin_status == ST_PINNING)
-			pin_ll_dequeue(now_ino, &tempentry);
-		/* Dequeue and reclaim it. */
-		if (tempentry.status != TO_BE_RECLAIMED) {
-			ret = ll_dequeue(now_ino, &tempentry);
+		num_inodes = ret_ssize / sizeof(ino_t);
+		for (idx = 0; idx < num_inodes; idx++) {
+			now_ino = unclaimed_inodes[idx];
+
+			ret = read_super_block_entry(now_ino, &tempentry);
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
 			}
-			tempentry.status = TO_BE_RECLAIMED;
+			if (tempentry.pin_status == ST_PINNING)
+				pin_ll_dequeue(now_ino, &tempentry);
+			/* Dequeue and reclaim it. */
+			if (tempentry.status != NO_LL) {
+				ret = ll_dequeue(now_ino, &tempentry);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				tempentry.status = TO_BE_RECLAIMED;
+			}
+			tempentry.in_transit = FALSE;
+			tempentry.pin_status = ST_DEL;
+			ret = write_super_block_entry(now_ino, &tempentry);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 		}
-		tempentry.in_transit = FALSE;
-		tempentry.pin_status = ST_DEL;
-		ret = write_super_block_entry(now_ino, &tempentry);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
-		}
+		PWRITE(fileno(sys_super_block->unclaimed_list_fptr),
+			unclaimed_inodes, num_inodes * sizeof(ino_t), now_pos);
+		now_pos += ret_ssize;
+		total_inode += num_inodes;
 	}
 
-	PWRITE(fileno(sys_super_block->unclaimed_list_fptr), unclaimed_inodes,
-			num_inodes * sizeof(ino_t), 0);
 	/* Update num to-be-reclaim */
-	sys_super_block->head.num_to_be_reclaimed = num_inodes;
+	sys_super_block->head.num_to_be_reclaimed = total_inode;
 	ret = write_super_block_head();
 	errcode = ret;
 
 errcode_handle:
 	fclose(sys_super_block->temp_unclaimed_fptr);
 	sys_super_block->temp_unclaimed_fptr = NULL;
-	free(unclaimed_inodes);
 	unlink(temp_unclaimed_list);
 	return errcode;
 }

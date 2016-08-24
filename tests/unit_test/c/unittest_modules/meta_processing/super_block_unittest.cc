@@ -1124,6 +1124,8 @@ protected:
 		METAPATH = "super_block_reclaim_fullscan_Folder";
 		if (access(METAPATH, F_OK) == 0)
 			system("rm -rf super_block_reclaim_fullscan_Folder");
+		sys_super_block->head.num_inode_reclaimed = 0;
+		sys_super_block->head.num_to_be_reclaimed = 0;
 		mkdir(METAPATH, 0700);
 	}
 
@@ -1339,7 +1341,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_And_Reclaim_T
 	EXPECT_EQ(0, super_block_reclaim_fullscan());
 
 	/* Verify */
-	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode; // first entry
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode;
 	for (ino_t inode = 2 ; inode < num_inode / 2 ; inode++) {
 		uint64_t file_pos;
 		SUPER_BLOCK_ENTRY now_entry;
