@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 #include "b64encode.h"
 #include "params.h"

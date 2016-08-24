@@ -14,6 +14,8 @@ CPPFLAGS = -DDEDUP_ENABLE=0 \
 	   -DCOMPRESS_ENABLE=0 \
 	   -D_FILE_OFFSET_BITS=64 \
 	   -D_ANDROID_ENV_ \
+	   -D_XOPEN_SOURCE=700 \
+	   -D_BSD_SOURCE \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\"
 
 CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror

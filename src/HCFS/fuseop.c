@@ -7585,10 +7585,10 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();
-	/* TODO: Move FS database backup from init_FS to here, and need
-	to first sleep a few seconds and then check if network is up,
-	before actually trying to upload. Will need to backup the FS
-	database at least once after the network is enabled */
+
+	/* Check and cleanup meta / data no longer in use from content
+	before restoration */
+	cleanup_stage1_data();
 
 	/* Wait on the fuse semaphore, until waked up by api_interface */
 	while (!hcfs_system->system_going_down) {

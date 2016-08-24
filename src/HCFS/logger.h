@@ -15,6 +15,7 @@
 
 #include <semaphore.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 #include "global.h"
 #include "pthread.h"

@@ -32,6 +32,8 @@
 #include <sys/xattr.h>
 #include <inttypes.h>
 #include <jansson.h>
+#include <strings.h>
+#include <string.h>
 
 #include "global.h"
 #include "fuseop.h"
