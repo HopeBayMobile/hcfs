@@ -104,11 +104,10 @@ int32_t init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	sem_init(&(hcfs_system->monitor_sem), 1, 0);
-	sem_init(&(hcfs_system->fuse_nofify_thread_sem), 1, 1);
+	sem_init(&(hcfs_system->fuse_nofify_sem), 1, 1);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
-	hcfs_system->fuse_nofify_thread_running = FALSE;
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
 

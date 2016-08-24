@@ -101,6 +101,7 @@
 #include "do_fallocate.h"
 #include "pkg_cache.h"
 #include "meta.h"
+#include "fuse_notify.h"
 #ifndef _ANDROID_ENV_
 #include "fuseproc_comm.h"
 #include <attr/xattr.h>
@@ -1275,6 +1276,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	HCFS_STAT parent_stat;
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 	BOOL is_external = FALSE;
+	BOOL notified_delete = FALSE;
 
 	parent_inode = real_ino(req, parent);
         write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1328,23 +1330,21 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 #ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
 
-	/* notify VFS to handle file deletion with different case or
-	 * be deleted from multiple mount path */
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) ||
-	    strcmp(selfname, temp_dentry.d_name) != 0) {
-		hfuse_ll_notify_delete_args *args =
-		    (hfuse_ll_notify_delete_args *)malloc(
-			sizeof(hfuse_ll_notify_delete_args));
-		args->mount_ptr = tmpptr;
-		args->parent = parent_inode;
-		args->child = temp_dentry.d_ino;
-		args->name = strndup(temp_dentry.d_name, MAX_FILENAME_LEN);
-		hfuse_ll_notify_delete(args);
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
+					  temp_dentry.d_ino, temp_dentry.d_name,
+					  strlen(temp_dentry.d_name), selfname);
+		notified_delete = TRUE;
 	}
 #endif
+	if (notified_delete == FALSE &&
+	    strcmp(temp_dentry.d_name, selfname) != 0)
+		hfuse_ll_notify_delete(tmpptr->chan_ptr, parent_inode,
+				       temp_dentry.d_ino, temp_dentry.d_name,
+				       strlen(temp_dentry.d_name));
 
-	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry,
-				     is_external);
+	ret_val =
+	    unlink_update_meta(req, parent_inode, &temp_dentry, is_external);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;

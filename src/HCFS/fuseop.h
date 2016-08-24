@@ -120,7 +120,7 @@ typedef struct {
 	sem_t check_next_sem;
 	sem_t check_cache_replace_status_sem;
 	sem_t monitor_sem;
-	sem_t fuse_nofify_thread_sem;
+	sem_t fuse_nofify_sem;
 
 	/* Semaphore for controlling cache management */
 	sem_t something_to_replace;
@@ -132,7 +132,6 @@ typedef struct {
 	BOOL sync_paused;
 	BOOL xfer_upload_in_progress;
 	BOOL writing_sys_data;
-	BOOL fuse_nofify_thread_running;
 
 	/* Lots of functions will invoke download directly */
 	sem_t xfer_download_in_progress_sem;
@@ -147,13 +146,6 @@ SYSTEM_DATA_HEAD *hcfs_system;
 #define NO_META_SPACE()\
 	((hcfs_system->systemdata.system_meta_size > META_SPACE_LIMIT) ?\
 	meta_nospc_log(__func__, __LINE__) : 0)
-
-typedef enum { FUSE_NOTIFY_DELETE } FUSE_NOTIFY_TYPE;
-
-typedef struct _FUSE_NOTIFY{
-	FUSE_LL_NOTIFY_TYPE type;
-	void* args;
-} FUSE_LL_NOTIFY;
 
 int32_t global_argc;
 char **global_argv;
