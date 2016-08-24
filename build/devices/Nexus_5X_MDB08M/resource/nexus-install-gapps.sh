@@ -15,6 +15,9 @@
 # History:
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.18  2016/08/24 14:11:00  wyliang
+# Add missed "-s $TARGET_DEVICE" in FlashImages()
+#
 # Revision 1.17  2016/08/22 19:45:00  wyliang
 # Fix some bugs for the -gp options; Minor code and messages refinement
 #
@@ -586,7 +589,7 @@ Boot2Fastboot() {
   echo "   4. Use 'adb reboot bootloader', or Power off then press the key combo 'volume-down & power'"
   ToConfirm
 
-  printf ">> Try to boot the device into the fastboot mode and unlock if it's not done..."
+  echo ">> Try to boot the device into the fastboot mode and unlock if it's not done..."
 
   while true; do
     local mode=`GetMode`
@@ -661,9 +664,9 @@ FlashImages() {
 
     if [ "$DO_BOOT4PERM" -eq 1 ]; then
       echo ">> Use '$BOOT4PERM_IMG' for permission grant. $ROM_DIR/boot.img will be flashed later."
-      fastboot flash boot "$BOOT4PERM_IMG"
+      fastboot -s $TARGET_DEVICE flash boot "$BOOT4PERM_IMG"
     else
-      CheckFile "$ROM_DIR"/boot.img probe-only && fastboot flash boot "$ROM_DIR"/boot.img
+      CheckFile "$ROM_DIR"/boot.img probe-only && fastboot -s $TARGET_DEVICE flash boot "$ROM_DIR"/boot.img
     fi
 
     CheckDir "$ROM_DIR"
@@ -679,7 +682,7 @@ FlashImages() {
     if [ "$KEEP_DATA" -eq 1 ]; then 
       echo ">> The data partition will be kept."
     else
-      CheckFile userdata.img probe-only && fastboot flash userdata userdata.img || fastboot erase userdata
+      CheckFile userdata.img probe-only && fastboot -s $TARGET_DEVICE flash userdata userdata.img || fastboot -s $TARGET_DEVICE erase userdata
     fi
 
     echo "done"
