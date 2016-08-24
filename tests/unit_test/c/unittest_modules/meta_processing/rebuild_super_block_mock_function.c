@@ -169,7 +169,7 @@ int32_t restore_meta_file(ino_t this_inode)
 	fetch_meta_path(path, this_inode);
 	fptr = fopen(path, "w+");
 	fseek(fptr, 0, SEEK_SET);
-	fwrite(&exp_stat, sizeof(struct stat), 1, fptr);
+	fwrite(&exp_stat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&exp_filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fclose(fptr);	
 

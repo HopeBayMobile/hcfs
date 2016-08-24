@@ -117,7 +117,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	EXPECT_EQ(sizeof(SUPER_BLOCK_HEAD) + 5 * sizeof(SUPER_BLOCK_ENTRY),
 			hcfs_system->systemdata.super_block_size);
 
-	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+	EXPECT_EQ(RESTORING_STAGE2, hcfs_system->system_restoring);
 }
 
 TEST_F(init_rebuild_sbTest, NoRoot_DoNeedRebuild)
@@ -150,7 +150,7 @@ TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileExist)
 	close(rebuild_sb_jobs->queue_fh);
 	unlink(queuefile_path);
 
-	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+	EXPECT_EQ(RESTORING_STAGE2, hcfs_system->system_restoring);
 }
 
 TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileNotExist)
@@ -169,7 +169,7 @@ TEST_F(init_rebuild_sbTest, KeepRebuildSuperBlock_QueueFileNotExist)
 	close(rebuild_sb_jobs->queue_fh);
 	unlink(queuefile_path);
 
-	EXPECT_EQ(TRUE, hcfs_system->system_restoring);
+	EXPECT_EQ(RESTORING_STAGE2, hcfs_system->system_restoring);
 }
 /**
  * End unittest of init_rebuild_sb()
@@ -763,6 +763,7 @@ TEST_F(create_sb_rebuilderTest, RootInQueueFile_BackendFromOfflineToOnline)
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->system_restoring = RESTORING_STAGE2;
 	sys_super_block->head.now_rebuild = TRUE;
 	EXPECT_EQ(0, create_sb_rebuilder());
 
@@ -827,13 +828,12 @@ protected:
 TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 {
 	ino_t inode;
-	HCFS_STAT tmpstat;
-	struct stat teststat;
+	HCFS_STAT tmpstat, teststat;
 	SUPER_BLOCK_ENTRY exp_entry, test_entry;
 
 	inode = 15;
-	memset(&exp_stat, 0, sizeof(struct stat));
-	memset(&teststat, 0, sizeof(struct stat));
+	memset(&exp_stat, 0, sizeof(HCFS_STAT));
+	memset(&teststat, 0, sizeof(HCFS_STAT));
 	memset(&exp_filemeta, 0, sizeof(FILE_META_TYPE));
 	exp_stat.st_mode = S_IFREG;
 	exp_stat.st_size = 5566;
@@ -841,13 +841,13 @@ TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 
 	EXPECT_EQ(0, restore_meta_super_block_entry(inode, &tmpstat));
 
-	teststat.st_mode = tmpstat.mode;
-	teststat.st_size = tmpstat.size;
+	teststat.mode = tmpstat.mode;
+	teststat.size = tmpstat.size;
 	/* Verify */
-	EXPECT_EQ(0, memcmp(&exp_stat, &teststat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&exp_stat, &tmpstat, sizeof(HCFS_STAT)));
 
 	memset(&exp_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
-	memcpy(&(exp_entry.inode_stat), &exp_stat, sizeof(struct stat));
+	memcpy(&(exp_entry.inode_stat), &exp_stat, sizeof(HCFS_STAT));
 	exp_entry.this_index = inode;
 	exp_entry.generation = 1;
 	exp_entry.status = NO_LL;

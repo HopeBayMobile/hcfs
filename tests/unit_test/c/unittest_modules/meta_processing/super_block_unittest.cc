@@ -877,6 +877,22 @@ TEST_F(super_block_to_deleteTest, MarkToDelete_DeferEnqueueSuccess)
  */
 
 class super_block_deleteTest : public InitSuperBlockBaseClass {
+protected:
+	void SetUp()
+	{
+		InitSuperBlockBaseClass::SetUp();
+		METAPATH = "super_block_delete_Folder";
+		if (access(METAPATH, F_OK) == 0)
+			system("rm -rf super_block_delete_Folder");
+		mkdir(METAPATH, 0700);
+	}
+
+	void TearDown()
+	{
+		if (access(METAPATH, F_OK) == 0)
+			system("rm -rf super_block_delete_Folder");
+		InitSuperBlockBaseClass::TearDown();
+	}
 };
 
 TEST_F(super_block_deleteTest, ReadEntryFail)
@@ -924,6 +940,50 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 	EXPECT_EQ(ST_DEL, sb_entry.pin_status);
 	EXPECT_EQ(1, sb_head.num_to_be_reclaimed);
 	EXPECT_EQ(inode, result_inode);
+}
+
+TEST_F(super_block_deleteTest, NowFullScan_WriteToTempReclaimedFile)
+{
+	ino_t inode = 7;
+	ino_t result_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+	SUPER_BLOCK_HEAD sb_head;
+	char path[300];
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+
+	/* Mock data. Write a entry */
+	sys_super_block->now_reclaim_fullscan = TRUE;
+	sprintf(path, "%s/temp_unclaimed_list", METAPATH);
+	ASSERT_EQ(-1, access(path, F_OK));
+	ASSERT_EQ(ENOENT, errno);
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * inode);
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = TO_BE_DELETED;
+	sb_entry.in_transit = TRUE;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_delete(inode));
+
+	/* Verify */
+	ASSERT_EQ(0, access(path, F_OK)) << errno;
+
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos); // Read entry
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	pread(fileno(sys_super_block->temp_unclaimed_fptr), &result_inode,
+		sizeof(ino_t), 0); // Read temp_unclaimed_list from file
+
+	EXPECT_EQ(NO_LL, sb_entry.status);
+	EXPECT_EQ(FALSE, sb_entry.in_transit);
+	EXPECT_EQ(ST_DEL, sb_entry.pin_status);
+	EXPECT_EQ(0, sb_head.num_to_be_reclaimed);
+	EXPECT_EQ(inode, result_inode);
+	fclose(sys_super_block->temp_unclaimed_fptr);
+	unlink(path);
 }
 
 /*
@@ -1057,6 +1117,25 @@ TEST_F(super_block_reclaimTest, UnclaimedFileCorrupt_SkipInode)
  */
 
 class super_block_reclaim_fullscanTest : public InitSuperBlockBaseClass {
+protected:
+	void SetUp()
+	{
+		InitSuperBlockBaseClass::SetUp();
+		METAPATH = "super_block_reclaim_fullscan_Folder";
+		if (access(METAPATH, F_OK) == 0)
+			system("rm -rf super_block_reclaim_fullscan_Folder");
+		sys_super_block->head.num_inode_reclaimed = 0;
+		sys_super_block->head.num_to_be_reclaimed = 0;
+		mkdir(METAPATH, 0700);
+	}
+
+	void TearDown()
+	{
+		if (access(METAPATH, F_OK) == 0)
+			system("rm -rf super_block_reclaim_fullscan_Folder");
+		InitSuperBlockBaseClass::TearDown();
+	}
+
 };
 
 TEST_F(super_block_reclaim_fullscanTest, ReadEntryFail)
@@ -1122,9 +1201,11 @@ TEST_F(super_block_reclaim_fullscanTest, ScanToBeReclaimedInodeSuccess)
 
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
 
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
+	ASSERT_EQ(0, now_reclaimed_inode); /* Next of last reclaimed inode */
 	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
 
 	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
@@ -1167,6 +1248,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
 
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
 
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
@@ -1204,6 +1286,7 @@ TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_Success)
 
 		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
 		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
 
 		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
 	}
@@ -1213,6 +1296,92 @@ TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_Success)
 	EXPECT_EQ(num_inode - 1, sys_super_block->head.num_inode_reclaimed);
 }
 
+TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_And_Reclaim_ToBeDeleteInode)
+{
+	ino_t now_reclaimed_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+	uint64_t num_inode = 20000;
+	int64_t ret_ssize;
+	char temp_path[300], path[300];
+	ino_t unclaimed_inode[num_inode / 2 + 1];
+	ino_t verify_unclaimed_inode[num_inode / 2 + 1];
+	int32_t i = 0;
+
+	/* Just truncate superblock */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		num_inode * sizeof(SUPER_BLOCK_ENTRY));
+
+	sprintf(temp_path, "%s/temp_unclaimed_list", METAPATH);
+	sys_super_block->temp_unclaimed_fptr = fopen(temp_path, "w+");
+	setbuf(sys_super_block->temp_unclaimed_fptr, NULL);
+
+	sprintf(path, "%s/unclaimed_list", METAPATH);
+	sys_super_block->unclaimed_list_fptr = fopen(path, "w+");
+	setbuf(sys_super_block->unclaimed_list_fptr, NULL);
+
+	/* Write mock entries to be reclaimed */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = TO_BE_DELETED;
+	for (ino_t inode = num_inode / 2 ; inode <= num_inode ; inode++) {
+		sb_entry.this_index = inode;
+		pwrite(sys_super_block->iofptr, &sb_entry,
+			sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+			(inode - 1));
+		fwrite(&inode, sizeof(ino_t), 1,
+			sys_super_block->temp_unclaimed_fptr);
+		unclaimed_inode[i] = inode;
+		i++;
+	}
+	fclose(sys_super_block->temp_unclaimed_fptr);
+	sys_super_block->temp_unclaimed_fptr = NULL;
+	sys_super_block->head.num_total_inodes = num_inode;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim_fullscan());
+
+	/* Verify */
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode;
+	for (ino_t inode = 2 ; inode < num_inode / 2 ; inode++) {
+		uint64_t file_pos;
+		SUPER_BLOCK_ENTRY now_entry;
+
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+			(now_reclaimed_inode - 1);
+		pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
+		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		ASSERT_EQ(0, now_entry.util_ll_prev);
+		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
+	}
+
+	/* Check to-be-reclaimed inode */
+	for (ino_t inode = num_inode / 2 ; inode <= num_inode ; inode++) {
+		uint64_t file_pos;
+		SUPER_BLOCK_ENTRY now_entry;
+
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) *
+				(inode - 1);
+		pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+		ASSERT_EQ(TO_BE_RECLAIMED, now_entry.status);
+	}
+
+	EXPECT_EQ(num_inode / 2 - 1, sys_super_block->head.last_reclaimed_inode);
+	EXPECT_EQ(num_inode - num_inode / 2 + 1,
+			sys_super_block->head.num_to_be_reclaimed);
+	EXPECT_EQ(num_inode / 2 - 2, sys_super_block->head.num_inode_reclaimed);
+	ret_ssize = lseek(fileno(sys_super_block->unclaimed_list_fptr),
+			0, SEEK_END);
+	EXPECT_EQ((num_inode - num_inode / 2 + 1) * sizeof(ino_t), ret_ssize);
+
+	pread(fileno(sys_super_block->unclaimed_list_fptr),
+			verify_unclaimed_inode, ret_ssize, 0);
+	EXPECT_EQ(0, memcmp(verify_unclaimed_inode, unclaimed_inode, ret_ssize));
+	EXPECT_EQ(-1, access(temp_path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
+}
 /*
 	End of unittest of super_block_reclaim_fullscan()
  */
@@ -1220,7 +1389,6 @@ TEST_F(super_block_reclaim_fullscanTest, ScanAndReclaim_EmptyInode_Success)
 /*
 	Unittest of super_block_new_inode()
  */
-
 class super_block_new_inodeTest : public InitSuperBlockBaseClass {
 protected:
 	HCFS_STAT expected_stat;
