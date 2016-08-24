@@ -1467,7 +1467,8 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	char todel_metapath[100];
 	bool block_file_existed;
 	BLOCK_ENTRY_PAGE block_entry_page;
-	HCFS_STAT mock_stat, meta_stat;
+	HCFS_STAT mock_stat;
+	struct stat meta_stat;
 	FILE_META_TYPE mock_meta;
 	FILE *tmp_fp;
 	ino_t mock_inode = INO_DELETE_FILE_BLOCK;

@@ -2055,7 +2055,7 @@ class hfuse_ll_readdirTest : public ::testing::Test {
     snprintf(readdir_metapath, 100, "/tmp/readdir_meta");
     before_update_file_data = TRUE;
     root_updated = FALSE;
-    hcfs_system->system_restoring = FALSE;
+    hcfs_system->system_restoring = NOT_RESTORING;
   }
 
   virtual void TearDown() {
@@ -2174,19 +2174,19 @@ TEST_F(hfuse_ll_readdirTest, SingleEntryWithRebuild) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int32_t ret_val;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
 
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = 1;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = 3;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2204,7 +2204,7 @@ TEST_F(hfuse_ll_readdirTest, SingleEntryWithRebuild) {
   fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
   fclose(fptr);
 
-  hcfs_system->system_restoring = TRUE;
+  hcfs_system->system_restoring = RESTORING_STAGE2;
   num_stat_rebuilt = 0;
   dptr = opendir("/tmp/test_fuse/testlistdir");
   ASSERT_NE(0, dptr != NULL);
@@ -2297,20 +2297,20 @@ TEST_F(hfuse_ll_readdirTest, OneMaxPageEntriesWithRebuild) {
   DIR *dptr;
   struct dirent tmp_dirent, *tmp_dirptr;
   int32_t ret_val, count;
-  struct stat tempstat;
+  HCFS_STAT tempstat;
   char filename[100];
 
   fptr = fopen(readdir_metapath, "w");
   setbuf(fptr, NULL);
-  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  fwrite(&tempstat, sizeof(HCFS_STAT), 1, fptr);
   temphead.total_children = MAX_DIR_ENTRIES_PER_PAGE - 2;
-  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.root_entry_page = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
   temphead.next_xattr_page = 0;
   temphead.entry_page_gc_list = 0;
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
+  ASSERT_EQ(sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -2330,7 +2330,7 @@ TEST_F(hfuse_ll_readdirTest, OneMaxPageEntriesWithRebuild) {
   fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
   fclose(fptr);
 
-  hcfs_system->system_restoring = TRUE;
+  hcfs_system->system_restoring = RESTORING_STAGE2;
   num_stat_rebuilt = 0;
 
   dptr = opendir("/tmp/test_fuse/testlistdir");

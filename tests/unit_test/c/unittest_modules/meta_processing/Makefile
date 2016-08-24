@@ -56,24 +56,3 @@ $(eval $(call ADDTEST, rebuild_super_block_unittest, \
     rebuild_super_block_mock_function.o \
     rebuild_super_block.o \
     rebuild_super_block_unittest.o ))
-
-RUN_TESTS := $(TESTS:%=test-%)
-.PHONY : setup $(RUN_TESTS)
-
-# finalizing the default targets
-all : setup $(TESTS)
-
-clean :
-	rm -rf $(TESTS) *.gcda *.gcov $(OBJ_DIR)/*
-
-setup :
-	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
-
-test : all $(RUN_TESTS)
-ifndef NOGCOVR
-	gcovr -p -k -r $(USER_DIR) .
-endif
-
-$(RUN_TESTS) :
-	./$(@:test-%=%) --gtest_output=xml:$(OBJ_DIR)/$(@:test-%=%).xml || \
-	    ( if [ -f core ]; then { gdb -ex "set pagination 0" -ex "thread apply all bt" -batch ./$(@:test-%=%) ./core; mv core $(@:test-%=%).core; } fi; exit 1)

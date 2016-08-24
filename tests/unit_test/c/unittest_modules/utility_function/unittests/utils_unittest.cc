@@ -695,7 +695,8 @@ class validate_system_configTest : public ::testing::Test {
 
   virtual void TearDown() {
     unlink("/tmp/testHCFS");
-    nftw(tmppath, do_delete, 20, FTW_DEPTH);
+    if (tmppath != NULL)
+      nftw(tmppath, do_delete, 20, FTW_DEPTH);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
@@ -913,6 +914,11 @@ protected:
 	char *workpath, *tmppath;
 	void SetUp()
 	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		hcfs_system->system_restoring = NOT_RESTORING;
 		workpath = NULL;
 		tmppath = NULL;
 		if (access("/tmp/testHCFS", F_OK) != 0) {
@@ -933,8 +939,10 @@ protected:
 
 	void TearDown()
 	{
+		free(hcfs_system);
 		unlink("/tmp/testHCFS");
-		nftw(tmppath, do_delete, 20, FTW_DEPTH);
+		if (tmppath != NULL)
+			nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		if (workpath != NULL)
 			free(workpath);
 		if (tmppath != NULL)
@@ -1066,7 +1074,6 @@ protected:
 
 	void TearDown()
 	{
-		free(sys_super_block);
 		fclose(fptr);
 		nftw("utils_unittest_folder", do_delete, 20, FTW_DEPTH);
 		free(sys_super_block);

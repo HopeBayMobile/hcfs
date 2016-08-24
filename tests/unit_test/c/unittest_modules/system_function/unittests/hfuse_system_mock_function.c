@@ -256,3 +256,30 @@ int32_t check_init_super_block()
 {
 	return 0;
 }
+void init_restore_path(void)
+{
+	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore",
+	         METAPATH);
+	snprintf(RESTORE_BLOCKPATH, BLOCKPATHLEN, "%s_restore",
+	         BLOCKPATH);
+	sem_init(&(restore_sem), 0, 1);
+}
+
+int32_t check_restoration_status(void)
+{
+	return NOT_RESTORING;
+}
+
+int32_t restore_stage1_reduce_cache(void)
+{
+	return 0;
+}
+int32_t notify_restoration_result(int8_t stage, int32_t result)
+{
+	return 0;
+}
+void start_download_minimal(void)
+{
+	return;
+}
+

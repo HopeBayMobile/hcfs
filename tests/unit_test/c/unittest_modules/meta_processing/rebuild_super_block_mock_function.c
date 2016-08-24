@@ -45,7 +45,7 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 		return 0;
 	} else {
 		inode_ptr->this_index = this_inode;
-		inode_ptr->inode_stat.st_mode =
+		inode_ptr->inode_stat.mode =
 			this_inode % 2 ? S_IFDIR : S_IFREG;
 	}
 

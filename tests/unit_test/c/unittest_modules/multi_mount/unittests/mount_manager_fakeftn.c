@@ -127,3 +127,10 @@ int32_t lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 {
 	return 0;
 }
+
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+		HCFS_STAT *ret_stat)
+{
+	return 0;
+}
+

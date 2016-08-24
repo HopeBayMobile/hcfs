@@ -1631,7 +1631,7 @@ class meta_cache_seek_dir_entryTest : public ::testing::Test {
 			test_dir_entry_page2 = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 			test_dir_entry_page2->num_entries = 1;
 			test_dir_entry_page2->dir_entries[0] = test_dir_entry2;
-			hcfs_system->system_restoring = FALSE;
+			hcfs_system->system_restoring = NOT_RESTORING;
 		}
 
 		virtual void TearDown()
@@ -1697,9 +1697,9 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_CacheWithRebuild)
 	body_ptr->dir_entry_cache[1] = NULL;
 	/* Test for successing found in cache[0] */
 	num_stat_rebuilt = 0;
-	hcfs_system->system_restoring = TRUE;
+	hcfs_system->system_restoring = RESTORING_STAGE2;
 	sem_wait(&(body_ptr->access_sem));
-	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name", body_ptr, FALSE));
 	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_NE(0, memcmp(verified_dir_entry_page, test_dir_entry_page2, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, verified_index);
@@ -1708,7 +1708,7 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_CacheWithRebuild)
 	verified_index = -1;
 	body_ptr->dir_entry_cache[1] = test_dir_entry_page2;
 	/* Test for successing found in cache[0] */
-	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name2", body_ptr));
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name2", body_ptr, FALSE));
 	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page2, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_NE(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
 	EXPECT_EQ(0, verified_index);
@@ -1770,11 +1770,11 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_RootpageWithRebuild)
 	DIR_META_TYPE dir_meta;
 	int32_t verified_index;
 	int32_t root_entry_pos;
-	root_entry_pos = sizeof(struct stat) + sizeof(DIR_META_TYPE) + 1234;
+	root_entry_pos = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE) + 1234;
 	ino_t inode = INO__FETCH_META_PATH_SUCCESS;
 
 	num_stat_rebuilt = 0;
-	hcfs_system->system_restoring = TRUE;
+	hcfs_system->system_restoring = RESTORING_STAGE2;
 
 	mkdir(TMP_META_DIR, 0700);
 	mknod(TMP_META_FILE_PATH, 0700, S_IFREG);
@@ -1785,7 +1785,7 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_RootpageWithRebuild)
 	fwrite(test_dir_entry_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	/* Write meta data */
 	dir_meta.root_entry_page = root_entry_pos;
-	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fseek(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 	fwrite(&dir_meta, sizeof(DIR_META_TYPE), 1, body_ptr->fptr);
 	body_ptr->dir_meta = NULL;
 	/* Let cache fail */
@@ -1800,7 +1800,7 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_RootpageWithRebuild)
 
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
-	EXPECT_EQ(0, meta_cache_seek_dir_entry(inode, verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	EXPECT_EQ(0, meta_cache_seek_dir_entry(inode, verified_dir_entry_page, &verified_index, "test_name", body_ptr, FALSE));
 	sem_post(&(body_ptr->access_sem));
 
 	/* Verify & Free resource */

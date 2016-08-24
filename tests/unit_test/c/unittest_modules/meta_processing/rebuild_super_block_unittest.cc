@@ -827,11 +827,13 @@ protected:
 TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 {
 	ino_t inode;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
+	struct stat teststat;
 	SUPER_BLOCK_ENTRY exp_entry, test_entry;
 
 	inode = 15;
 	memset(&exp_stat, 0, sizeof(struct stat));
+	memset(&teststat, 0, sizeof(struct stat));
 	memset(&exp_filemeta, 0, sizeof(FILE_META_TYPE));
 	exp_stat.st_mode = S_IFREG;
 	exp_stat.st_size = 5566;
@@ -839,8 +841,10 @@ TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 
 	EXPECT_EQ(0, restore_meta_super_block_entry(inode, &tmpstat));
 
+	teststat.st_mode = tmpstat.mode;
+	teststat.st_size = tmpstat.size;
 	/* Verify */
-	EXPECT_EQ(0, memcmp(&exp_stat, &tmpstat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&exp_stat, &teststat, sizeof(struct stat)));
 
 	memset(&exp_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	memcpy(&(exp_entry.inode_stat), &exp_stat, sizeof(struct stat));

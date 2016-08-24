@@ -29,7 +29,7 @@ class rebuild_parent_statTest : public ::testing::Test {
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
-    hcfs_system->system_restoring = TRUE;
+    hcfs_system->system_restoring = RESTORING_STAGE2;
     sem_init(&(hcfs_system->fuse_sem), 0, 0);
     sem_init(&(hcfs_system->something_to_replace), 0, 0);
     sem_init(&(pathlookup_data_lock), 0, 1);
@@ -73,10 +73,10 @@ class rebuild_parent_statTest : public ::testing::Test {
 /* Test the case when system not restoring */
 TEST_F(rebuild_parent_statTest, NotRestoring) {
   int32_t ret;
-  hcfs_system->system_restoring = FALSE;
+  hcfs_system->system_restoring = NOT_RESTORING;
   ret = rebuild_parent_stat(3, 2, D_ISDIR);
   ASSERT_EQ(0, ret);
-  ASSERT_EQ(FALSE, hcfs_system->system_restoring);
+  ASSERT_EQ(NOT_RESTORING, hcfs_system->system_restoring);
  }
 
 /* Test the case when inode number is zero */
@@ -197,7 +197,7 @@ TEST_F(rebuild_parent_statTest, FileObjectHaveMetaCloud) {
   tmpmetastat.num_blocks = 10;
   tmpmetastat.num_cached_blocks = 0;
   pwrite(fileno(fptr), &tmpmetastat, sizeof(FILE_STATS_TYPE),
-         sizeof(struct stat) + sizeof(FILE_META_TYPE));
+         sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
   fclose(fptr);
 
   memset(&tmpstat, 0, sizeof(DIR_STATS_TYPE));
@@ -263,7 +263,7 @@ TEST_F(rebuild_parent_statTest, FileObjectHaveMetaLocal) {
   tmpmetastat.num_blocks = 10;
   tmpmetastat.num_cached_blocks = 10;
   pwrite(fileno(fptr), &tmpmetastat, sizeof(FILE_STATS_TYPE),
-         sizeof(struct stat) + sizeof(FILE_META_TYPE));
+         sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
   fclose(fptr);
 
   memset(&tmpstat, 0, sizeof(DIR_STATS_TYPE));
@@ -329,7 +329,7 @@ TEST_F(rebuild_parent_statTest, FileObjectHaveMetaHybrid) {
   tmpmetastat.num_blocks = 10;
   tmpmetastat.num_cached_blocks = 5;
   pwrite(fileno(fptr), &tmpmetastat, sizeof(FILE_STATS_TYPE),
-         sizeof(struct stat) + sizeof(FILE_META_TYPE));
+         sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
   fclose(fptr);
 
   memset(&tmpstat, 0, sizeof(DIR_STATS_TYPE));
