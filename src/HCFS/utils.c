@@ -1262,7 +1262,7 @@ int32_t update_sb_size()
 		return -ret_code;
 	}
 
-	new_size = sbstat.st_size;
+	new_size = sbstat.st_blocks * 512;
 	if (new_size == old_size) {
 		sem_post(&(hcfs_system->access_sem));
 		return 0;
@@ -1270,12 +1270,7 @@ int32_t update_sb_size()
 
 	/* Now both the pinned space and cache space do not include
 	 * meta and sb size */
-	hcfs_system->systemdata.system_size += (new_size - old_size);
-	if (hcfs_system->systemdata.system_size < 0)
-		hcfs_system->systemdata.system_size = 0;
-
-	hcfs_system->systemdata.system_meta_size +=
-			(round_size(new_size) - round_size(old_size));
+	hcfs_system->systemdata.system_meta_size += (new_size - old_size);
 	if (hcfs_system->systemdata.system_meta_size < 0)
 		hcfs_system->systemdata.system_meta_size = 0;
 
