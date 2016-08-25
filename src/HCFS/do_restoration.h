@@ -22,6 +22,15 @@
 #include "params.h"
 #include "fuseop.h"
 
+typedef struct {
+	int64_t delta_system_size;
+	int64_t delta_meta_size;
+	int64_t delta_pinned_size;
+	int64_t delta_backend_size;
+	int64_t delta_backend_meta_size;
+	int64_t delta_backend_inodes;
+} DELTA_SYSTEM_META;
+
 char restore_metapath[METAPATHLEN];
 char restore_blockpath[BLOCKPATHLEN];
 
@@ -31,7 +40,20 @@ pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;
 
 /* Structure for rebuilding system meta */
-SYSTEM_DATA_TYPE restored_system_meta;
+typedef struct {
+	sem_t sysmeta_sem;
+	SYSTEM_DATA_TYPE restored_system_meta;
+	SYSTEM_DATA_TYPE estimated_system_meta;
+} HCFS_RESTORED_SYSTEM_META;
+
+HCFS_RESTORED_SYSTEM_META hcfs_restored_system_meta;
+
+#define LOCK_RESTORED_SYSMETA() \
+	sem_wait(&(hcfs_restored_system_meta.sysmeta_sem));
+#define UNLOCK_RESTORED_SYSMETA() \
+	sem_post(&(hcfs_restored_system_meta.sysmeta_sem));
+#define UPDATE_EST_SYSMETA(...) \
+	update_estimated_system_meta((DELTA_SYSTEM_META) {__VA_ARGS__})
 
 #define RESTORE_METAPATH restore_metapath
 #define RESTORE_BLOCKPATH restore_blockpath
@@ -61,4 +83,7 @@ int32_t backup_package_list(void);
 
 void cleanup_stage1_data(void);
 
+void update_estimated_system_meta(DELTA_SYSTEM_META delta_system_meta);
+void update_restored_cache_usage(int64_t delta_cache_size,
+		int64_t delta_cache_blocks);
 #endif  /* GW20_DO_RESTORATION_H_ */

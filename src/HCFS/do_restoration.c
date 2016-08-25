@@ -393,12 +393,14 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 {
 	FILE *fptr;
 	int32_t ret;
+	struct stat block_stat;
 
 	fptr = fopen(despath, "w+");
 	if (fptr == NULL) {
 		write_log(0, "Unable to open file for writing\n");
 		return -EIO;
 	}
+	setbuf(fptr, NULL);
 
 	ret = fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname);
 	if (ret < 0) {
@@ -412,9 +414,15 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 		return ret;
 	}
 
-	if (is_meta == TRUE)
+	if (is_meta == TRUE) {
 		/* Reset block status to ST_CLOUD */
 		ret = restore_meta_structure(fptr);
+	} else {
+		ret = fstat(fileno(fptr), &block_stat);
+		if (ret == 0)
+			update_restored_cache_usage(
+				block_stat.st_blocks * 512, 1);
+	}
 	fclose(fptr);
 	return ret;
 }
@@ -476,6 +484,7 @@ int32_t _update_FS_stat(ino_t rootinode)
 	FILE *fptr;
 	FS_CLOUD_STAT_T tmpFSstat;
 	size_t ret_size;
+	SYSTEM_DATA_TYPE *restored_system_meta, *estimated_system_meta;
 
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync",
 	         RESTORE_METAPATH);
@@ -492,12 +501,26 @@ int32_t _update_FS_stat(ino_t rootinode)
 	FREAD(&tmpFSstat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	fclose(fptr);
 
-	restored_system_meta.system_size += tmpFSstat.backend_system_size;
-	restored_system_meta.system_meta_size += tmpFSstat.backend_meta_size;
-	restored_system_meta.pinned_size += tmpFSstat.pinned_size;
-	restored_system_meta.backend_size += tmpFSstat.backend_system_size;
-	restored_system_meta.backend_meta_size += tmpFSstat.backend_meta_size;
-	restored_system_meta.backend_inodes += tmpFSstat.backend_num_inodes;
+	LOCK_RESTORED_SYSMETA();
+	restored_system_meta =
+			&(hcfs_restored_system_meta.restored_system_meta);
+	restored_system_meta->system_size += tmpFSstat.backend_system_size;
+	restored_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
+	restored_system_meta->pinned_size += tmpFSstat.pinned_size;
+	restored_system_meta->backend_size += tmpFSstat.backend_system_size;
+	restored_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
+	restored_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
+
+	/* Estimated space usage */
+	estimated_system_meta =
+			&(hcfs_restored_system_meta.estimated_system_meta);
+	estimated_system_meta->system_size += tmpFSstat.backend_system_size;
+	estimated_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
+	estimated_system_meta->pinned_size += tmpFSstat.pinned_size;
+	estimated_system_meta->backend_size += tmpFSstat.backend_system_size;
+	estimated_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
+	estimated_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
+	UNLOCK_RESTORED_SYSMETA();
 
 	return 0;
 
@@ -794,6 +817,7 @@ int32_t _rebuild_system_meta(void)
 	int32_t errcode;
 	size_t ret_size;
 
+	LOCK_RESTORED_SYSMETA();
 	snprintf(restored_sysmeta, METAPATHLEN, "%s/hcfssystemfile",
 	         RESTORE_METAPATH);
 	fptr = fopen(restored_sysmeta, "w");
@@ -803,8 +827,26 @@ int32_t _rebuild_system_meta(void)
 		          -errcode);
 		return errcode;
 	}
-	FWRITE(&restored_system_meta, sizeof(SYSTEM_DATA_TYPE), 1, fptr);
+	FWRITE(&hcfs_restored_system_meta.restored_system_meta,
+			sizeof(SYSTEM_DATA_TYPE), 1, fptr);
 	fclose(fptr);
+
+	/* Backup estimated space usage, which is used to re-compute
+	 * system usage in restoration stage 2. */
+	snprintf(restored_sysmeta, METAPATHLEN, "%s/hcfssystemfile.estimate",
+	         RESTORE_METAPATH);
+	fptr = fopen(restored_sysmeta, "w");
+	if (fptr == NULL) {
+		errcode = -errno;
+		write_log(0, "Unable to open sys file for restoration (%d)\n",
+		          -errcode);
+		return errcode;
+	}
+	FWRITE(&hcfs_restored_system_meta.estimated_system_meta,
+			sizeof(SYSTEM_DATA_TYPE), 1, fptr);
+	fclose(fptr);
+	UNLOCK_RESTORED_SYSMETA();
+
 	return 0;
 
 errcode_handle:
@@ -901,7 +943,9 @@ int32_t run_download_minimal(void)
 		goto errcode_handle;
 	}
 
-	memset(&restored_system_meta, 0, sizeof(SYSTEM_DATA_TYPE));
+	memset(&hcfs_restored_system_meta, 0,
+			sizeof(HCFS_RESTORED_SYSTEM_META));
+	sem_init(&(hcfs_restored_system_meta.sysmeta_sem), 0, 1);
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
 	ret = restore_fetch_obj("FSmgr_backup", despath, FALSE);
 
@@ -1083,3 +1127,56 @@ int32_t backup_package_list(void)
 	return 0;
 }
 
+/**
+ * Update estimated system meta when restoring.
+ *
+ * @param delta_system_meta Structure of delta system space usage.
+ *
+ * @return none.
+ */
+void update_estimated_system_meta(DELTA_SYSTEM_META delta_system_meta)
+{
+	SYSTEM_DATA_TYPE *estimated_system_meta;
+
+	estimated_system_meta =
+			&(hcfs_restored_system_meta.estimated_system_meta);
+
+	LOCK_RESTORED_SYSMETA();
+	/* Update estimated space usage */
+	estimated_system_meta->system_size +=
+			delta_system_meta.delta_system_size;
+	estimated_system_meta->system_meta_size +=
+			delta_system_meta.delta_meta_size;
+	estimated_system_meta->pinned_size +=
+			delta_system_meta.delta_pinned_size;
+	estimated_system_meta->backend_size +=
+			delta_system_meta.delta_backend_size;
+	estimated_system_meta->backend_meta_size +=
+			delta_system_meta.delta_backend_meta_size;
+	estimated_system_meta->backend_inodes +=
+			delta_system_meta.delta_backend_inodes;
+	UNLOCK_RESTORED_SYSMETA();
+
+	return;
+}
+
+void update_restored_cache_usage(int64_t delta_cache_size,
+		int64_t delta_cache_blocks)
+{
+	SYSTEM_DATA_TYPE *restored_system_meta;
+
+	restored_system_meta =
+			&(hcfs_restored_system_meta.restored_system_meta);
+
+	LOCK_RESTORED_SYSMETA();
+	restored_system_meta->cache_size += delta_cache_size;
+	if (restored_system_meta->cache_size < 0)
+		restored_system_meta->cache_size = 0;
+
+	restored_system_meta->cache_blocks += delta_cache_blocks;
+	if (restored_system_meta->cache_blocks < 0)
+		restored_system_meta->cache_blocks = 0;
+	UNLOCK_RESTORED_SYSMETA();
+
+	return;
+}

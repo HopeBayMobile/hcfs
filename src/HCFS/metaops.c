@@ -55,6 +55,7 @@
 #include "FS_manager.h"
 #endif
 #include "rebuild_super_block.h"
+#include "do_restoration.h"
 
 static inline void logerr(int32_t errcode, char *msg)
 {
@@ -2645,13 +2646,16 @@ correctness of restored system meta here */
 	BLOCK_ENTRY_PAGE tmppage;
 	int64_t page_pos, current_page, which_page;
 	int64_t total_blocks, count;
+	int64_t pin_size, metasize, metasize_blk;
 	int32_t e_index;
 	BOOL block_status;
 	BOOL write_page;
+	BOOL just_meta;
 	size_t ret_size;
 	FILE_STATS_TYPE file_stats;
 	CLOUD_RELATED_DATA cloud_data;
 
+	just_meta = FALSE;
 	FSEEK(fptr, 0, SEEK_SET);
 	fstat(fileno(fptr), &meta_stat);
 	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
@@ -2666,10 +2670,7 @@ correctness of restored system meta here */
 		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-
-		/* Update statistics */
-//		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
-		return 0;
+		just_meta = TRUE;
 
 	} else if (S_ISLNK(this_stat.mode)) {
 		/* Restore cloud related data */
@@ -2682,9 +2683,20 @@ correctness of restored system meta here */
 		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		just_meta = TRUE;
+	}
 
+	/* Re-compute space usage and return when file is dir and symlink */
+	if (just_meta) {
 		/* Update statistics */
-//		change_system_meta(0, meta_stat.st_size, 0, 0, 0, 0, TRUE);
+		metasize = meta_stat.st_size;
+		metasize_blk = meta_stat.st_blocks * 512;
+		UPDATE_EST_SYSMETA(.delta_system_size = -metasize,
+				   .delta_meta_size = -metasize_blk,
+				   .delta_pinned_size = 0,
+				   .delta_backend_size = -metasize,
+				   .delta_backend_meta_size = -metasize,
+				   .delta_backend_inodes = -1);
 		return 0;
 	}
 
@@ -2765,6 +2777,19 @@ correctness of restored system meta here */
 	FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 	/* Update statistics */
+	if (P_IS_PIN(file_meta.local_pin))
+		pin_size = round_size(this_stat.size);
+	else
+		pin_size = 0;
+	metasize = meta_stat.st_size;
+	metasize_blk = meta_stat.st_blocks * 512;
+	UPDATE_EST_SYSMETA(.delta_system_size = -(metasize + this_stat.size),
+			   .delta_meta_size = -metasize_blk,
+			   .delta_pinned_size = -pin_size,
+			   .delta_backend_size = -(metasize + this_stat.size),
+			   .delta_backend_meta_size = -metasize,
+			   .delta_backend_inodes = -1);
+
 //	change_system_meta(this_stat.size, meta_stat.st_size,
 //			0, 0, 0, 0, TRUE);
 //	if (P_IS_PIN(file_meta.local_pin)) {
