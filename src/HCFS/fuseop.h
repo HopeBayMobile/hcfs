@@ -120,7 +120,6 @@ typedef struct {
 	sem_t check_next_sem;
 	sem_t check_cache_replace_status_sem;
 	sem_t monitor_sem;
-	sem_t fuse_nofify_sem;
 
 	/* Semaphore for controlling cache management */
 	sem_t something_to_replace;

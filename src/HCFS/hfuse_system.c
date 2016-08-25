@@ -104,7 +104,6 @@ int32_t init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	sem_init(&(hcfs_system->monitor_sem), 1, 0);
-	sem_init(&(hcfs_system->fuse_nofify_sem), 1, 1);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
@@ -543,7 +542,7 @@ int32_t main(int32_t argc, char **argv)
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();
-#else
+#else /* ! _ANDROID_ENV_ */
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
 		exit(ret_val);
