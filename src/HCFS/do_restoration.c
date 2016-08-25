@@ -960,6 +960,9 @@ int32_t run_download_minimal(void)
 	stopped for a few seconds */
 	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
 	rename(despath, PACKAGE_XML);
+	chown(PACKAGE_XML, SYSTEM_UID, SYSTEM_GID);
+	chmod(PACKAGE_XML, 0660);
+	
 	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
 
 	notify_restoration_result(1, 0);

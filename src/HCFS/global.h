@@ -93,4 +93,7 @@
 #define GID_EVERYBODY 9997
 #endif
 
+#define SYSTEM_UID 1000
+#define SYSTEM_GID 1000
+
 #endif  /* GW20_SRC_GLOBAL_H_ */
