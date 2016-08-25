@@ -14,7 +14,7 @@ tests/functional_test/TestCases/TestMetaParser/start_test_in_docker.sh
 3. 執行 tests/functional_test/pi_tester.py
 
 測試資料
--	靜態測試資料（來源：事先從手機抓下來資料）
+-	靜態測試資料（來源：事先從手機抓下來資料,先清除 TestCases/test_data 並於 test_meta_generator 內執行 python testMetaDataGenerator.py）
 -	test_data 下以資料夾區隔每一資料夾內包含兩個檔案 如：690,meta_690
 -	檔案 property 為手機上以 stat 指令取得的資料
 
