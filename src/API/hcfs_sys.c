@@ -685,3 +685,37 @@ int32_t check_restore_status()
 
 	return ret_code;
 }
+
+/************************************************************************
+ * *
+ * * Function name: notify_applist_change
+ * *        Inputs:
+ * *       Summary: To inform HCFS that package lists in packages.xml
+ * *	            has changed and needs to be backed-up.
+ * *
+ * *  Return value: 0 if successful.
+ * *                Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
+int32_t notify_applist_change()
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = NOTIFY_APPLIST_CHANGE;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}

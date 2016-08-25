@@ -403,6 +403,25 @@ int32_t do_check_restore_status(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_notify_applist_change(char *largebuf, int32_t arg_len,
+				 char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start notify applist change\n");
+	ret_code = notify_applist_change();
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End notify applist change\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -501,6 +520,7 @@ int32_t process_request(void *arg)
 		{CANCELSYNCPOINT,	do_clear_sync_point},
 		{INITIATE_RESTORATION,	do_trigger_restore},
 		{CHECK_RESTORATION_STATUS,	do_check_restore_status},
+		{NOTIFY_APPLIST_CHANGE,	do_notify_applist_change},
 	};
 
 	uint32_t n;
