@@ -359,4 +359,21 @@ void HCFS_trigger_restore(char **json_res);
  * | False | Linux errors.|
  */
 void HCFS_check_restore_status(char **json_res);
+
+/*Notify Applist Change
+ * @json_res result string in json format.
+ *
+ * To inform HCFS that package lists in packages.xml
+ * has changed and needs to be backed-up.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if not being restored|
+ * | | 1 if in stage 1 of restoration process|
+ * | | 2 if in stage 2 of restoration process|
+ * | False | Linux errors.|
+ */
+void HCFS_notify_applist_change(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */

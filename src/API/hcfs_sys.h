@@ -39,4 +39,6 @@ int32_t trigger_restore();
 
 int32_t check_restore_status();
 
+int32_t notify_applist_change();
+
 #endif  /* GW20_HCFSAPI_SYS_H_ */

@@ -125,12 +125,17 @@ int32_t main()
 
 	char *res18;
 	HCFS_trigger_restore(&res18);
-	printf("Trigger restore - %s\n", res18);
+	printf("trigger restore - %s\n", res18);
 	free(res18);
 
 	char *res19;
 	HCFS_check_restore_status(&res19);
 	printf("check restore status - %s\n", res19);
 	free(res19);
+
+	char *res20;
+	HCFS_notify_applist_change(&res20);
+	printf("notify applist change - %s\n", res20);
+	free(res20);
 }
 
