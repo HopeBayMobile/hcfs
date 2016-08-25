@@ -955,6 +955,9 @@ int32_t run_download_minimal(void)
 
 	/* FEATURE TODO: Move the renaming to the start of stage 2 */
 	/* Renaming package list backup to the original location */
+	/* FEATURE TODO: If need to make sure that package list is backed up,
+	perhaps should delay upload sync to after package data creation has
+	stopped for a few seconds */
 	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
 	rename(despath, PACKAGE_XML);
 	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
