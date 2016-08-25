@@ -36,6 +36,7 @@ SYSTEM_DATA_TYPE restored_system_meta;
 #define RESTORE_METAPATH restore_metapath
 #define RESTORE_BLOCKPATH restore_blockpath
 #define PACKAGE_XML "/data/system/packages.xml"
+#define PACKAGE_LIST "/data/system/packages.list"
 
 void init_restore_path(void);
 

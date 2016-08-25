@@ -844,11 +844,19 @@ int32_t run_download_minimal(void)
 		goto errcode_handle;
 	}
 
+	write_log(4, "Downloading package list backup\n");
+	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
+	ret = restore_fetch_obj("backup_pkg", despath, FALSE);
+
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	memset(&restored_system_meta, 0, sizeof(SYSTEM_DATA_TYPE));
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
 	ret = restore_fetch_obj("FSmgr_backup", despath, FALSE);
 
-	if (ret < 0)
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -944,6 +952,12 @@ int32_t run_download_minimal(void)
 	sync();
 
 	sem_post(&restore_sem);
+
+	/* FEATURE TODO: Move the renaming to the start of stage 2 */
+	/* Renaming package list backup to the original location */
+	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
+	rename(despath, PACKAGE_XML);
+	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
 
 	notify_restoration_result(1, 0);
 

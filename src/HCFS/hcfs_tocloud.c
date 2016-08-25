@@ -2268,7 +2268,6 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 	have_new_pkgbackup = FALSE;
 	sem_post(&backup_pkg_sem);
 
-/* FEATURE TODO: backup packages.xml */
 	write_log(4, "Backing up package list\n");
 	snprintf(backup_xml, METAPATHLEN, "%s/backup_pkg", METAPATH);
 
