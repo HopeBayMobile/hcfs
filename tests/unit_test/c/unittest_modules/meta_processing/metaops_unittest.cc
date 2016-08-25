@@ -150,7 +150,7 @@ class dir_add_entryTest : public ::testing::Test {
 
 TEST_F(dir_add_entryTest, NoLockError)
 {
-	EXPECT_EQ(-1, dir_add_entry(parent_inode, self_inode, 
+	EXPECT_EQ(-1, dir_add_entry(parent_inode, self_inode,
 		self_name, S_IFMT, body_ptr, FALSE));
 }
 
@@ -178,8 +178,8 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
 	sem_wait(&body_ptr->access_sem);
 
 	/* Run */
-	EXPECT_EQ(0, dir_add_entry(parent_inode, 
-		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
+	EXPECT_EQ(0, dir_add_entry(parent_inode,
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING,
 		self_name, S_IFREG, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
@@ -196,8 +196,8 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
 	sem_wait(&body_ptr->access_sem);
 
 	/* Run */
-	EXPECT_EQ(0, dir_add_entry(parent_inode, 
-		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
+	EXPECT_EQ(0, dir_add_entry(parent_inode,
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING,
 		self_name, S_IFDIR, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.nlink);
@@ -217,8 +217,8 @@ TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
 	sem_wait(&body_ptr->access_sem);
 
 	/* Run */
-	EXPECT_EQ(0, dir_add_entry(parent_inode, 
-		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
+	EXPECT_EQ(0, dir_add_entry(parent_inode,
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING,
 		self_name, S_IFREG, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
@@ -238,8 +238,8 @@ TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
 	sem_wait(&body_ptr->access_sem);
 
 	/* Run */
-	EXPECT_EQ(0, dir_add_entry(parent_inode, 
-		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
+	EXPECT_EQ(0, dir_add_entry(parent_inode,
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING,
 		self_name, S_IFDIR, body_ptr, FALSE));
 	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.nlink);
@@ -309,7 +309,7 @@ TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail)
 	/* Run tested function */
 	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr,
 		  FALSE));
-		
+
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM, to_verified_meta.total_children);
 	EXPECT_EQ(LINK_NUM, to_verified_stat.nlink);
@@ -387,19 +387,19 @@ class change_parent_inodeTest : public ::testing::Test {
 
 TEST_F(change_parent_inodeTest, ChangeOK)
 {
-	EXPECT_EQ(0, change_parent_inode(INO_SEEK_DIR_ENTRY_OK, parent_inode, 
+	EXPECT_EQ(0, change_parent_inode(INO_SEEK_DIR_ENTRY_OK, parent_inode,
 		parent_inode2, body_ptr, FALSE));
 }
 
 TEST_F(change_parent_inodeTest, DirEntryNotFound)
 {
-	EXPECT_EQ(-ENOENT, change_parent_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
+	EXPECT_EQ(-ENOENT, change_parent_inode(INO_SEEK_DIR_ENTRY_NOTFOUND,
 		parent_inode, parent_inode2, body_ptr, FALSE));
 }
 
 TEST_F(change_parent_inodeTest, ChangeFail)
 {
-	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_FAIL, parent_inode, 
+	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_FAIL, parent_inode,
 		parent_inode2, body_ptr, FALSE));
 }
 /*
@@ -426,39 +426,39 @@ protected:
 	}
 };
 
-TEST_F(change_dir_entry_inodeTest, ChangeREGOK) 
-{	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+TEST_F(change_dir_entry_inodeTest, ChangeREGOK)
+{
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK,
 		"/mock/target/name", new_inode, S_IFREG, body_ptr, FALSE));
 }
 
-TEST_F(change_dir_entry_inodeTest, ChangeFIFOOK) 
-{	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+TEST_F(change_dir_entry_inodeTest, ChangeFIFOOK)
+{
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK,
 		"/mock/target/name", new_inode, S_IFIFO, body_ptr, FALSE));
 }
 
-TEST_F(change_dir_entry_inodeTest, ChangeLNKOK) 
-{	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+TEST_F(change_dir_entry_inodeTest, ChangeLNKOK)
+{
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK,
 		"/mock/target/name", new_inode, S_IFLNK, body_ptr, FALSE));
 }
 
-TEST_F(change_dir_entry_inodeTest, ChangeDIROK) 
-{	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+TEST_F(change_dir_entry_inodeTest, ChangeDIROK)
+{
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK,
 		"/mock/target/name", new_inode, S_IFDIR, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, DirEntryNotFound)
 {
-	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
+	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND,
 		"/mock/target/name", new_inode, S_IFDIR, body_ptr, FALSE));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeFail)
 {
-	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, 
+	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL,
 		"/mock/target/name", new_inode, S_IFREG, body_ptr, FALSE));
 }
 /*
@@ -1155,13 +1155,12 @@ protected:
 
 		METAPATH = "testpatterns";
 		CURRENT_BACKEND = NONE;
-		hcfs_system = (SYSTEM_DATA_HEAD*)
-				malloc(sizeof(SYSTEM_DATA_HEAD));
+		//hcfs_system = (SYSTEM_DATA_HEAD*)
+		//		malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
-		
-		/* Make a mock markdelete-inode because disk_cleardelete will 
-		   unlink the file. */	
+		/* Make a mock markdelete-inode because disk_cleardelete will
+		   unlink the file. */
 		if (access("testpatterns/markdelete", F_OK) < 0)
 			mkdir("testpatterns/markdelete", 0700);
 
@@ -1210,7 +1209,7 @@ protected:
 		if (!access(thismetapath, F_OK))
 			unlink(thismetapath);
 
-		free(hcfs_system);
+		//free(hcfs_system);
 	}
 };
 
@@ -2167,15 +2166,15 @@ protected:
 			system("rm -rf ./restore_meta_fileTestPath");
 		mkdir(work_path, 0700);
 		hcfs_system->backend_is_online = TRUE;
-		hcfs_system = (SYSTEM_DATA_HEAD*)
-				malloc(sizeof(SYSTEM_DATA_HEAD));
+		//hcfs_system = (SYSTEM_DATA_HEAD*)
+		//		malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
 	}
 
 	void TearDown()
 	{
-		free(hcfs_system);
+		//free(hcfs_system);
 		if (!access(work_path, F_OK))
 			system("rm -rf ./restore_meta_fileTestPath");
 	}
@@ -2211,7 +2210,8 @@ TEST_F(restore_meta_fileTest, RestoreDir_Success)
 	ino_t inode;
 	char mock_metapath[400], mock_restore_path[400];
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
+	struct stat thisstat;
 	DIR_META_TYPE dirmeta;
 	CLOUD_RELATED_DATA cloud_data, exp_cloud_data;
 	int64_t meta_size;
@@ -2221,24 +2221,24 @@ TEST_F(restore_meta_fileTest, RestoreDir_Success)
 	fetch_restored_meta_path(mock_restore_path, inode);
 	fptr = fopen(mock_restore_path, "w+");
 	setbuf(fptr, NULL);
-	memset(&tmpstat, 0, sizeof(struct stat));
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&dirmeta, 0, sizeof(DIR_META_TYPE));
 	memset(&cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
-	tmpstat.st_mode = S_IFDIR;
+	tmpstat.mode = S_IFDIR;
 
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
 	fwrite(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-	fstat(fileno(fptr), &tmpstat);
+	fstat(fileno(fptr), &thisstat);
 	fclose(fptr);
-	
+
 	memset(&exp_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
-	exp_cloud_data.size_last_upload = tmpstat.st_size;
-	exp_cloud_data.meta_last_upload = tmpstat.st_size;
+	exp_cloud_data.size_last_upload = thisstat.st_size;
+	exp_cloud_data.meta_last_upload = thisstat.st_size;
 	exp_cloud_data.upload_seq = 1;
 
 	hcfs_system->backend_is_online = TRUE;
-	
+
 	/* Run */
 	EXPECT_EQ(0, restore_meta_file(inode));
 
@@ -2246,14 +2246,14 @@ TEST_F(restore_meta_fileTest, RestoreDir_Success)
 	fetch_meta_path(mock_metapath, inode);
 	ASSERT_EQ(0, access(mock_metapath, F_OK));
 	fptr = fopen(mock_metapath, "r");
-	fseek(fptr, sizeof(struct stat) + sizeof(DIR_META_TYPE), SEEK_SET);
+	fseek(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE), SEEK_SET);
 	fread(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 	fclose(fptr);
 	EXPECT_EQ(0, memcmp(&exp_cloud_data, &cloud_data,
 			sizeof(CLOUD_RELATED_DATA)));
 	unlink(mock_metapath);
 
-	EXPECT_EQ(tmpstat.st_size, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(thisstat.st_size, hcfs_system->systemdata.system_size);
 }
 
 TEST_F(restore_meta_fileTest, RestoreSymlink_Success)
@@ -2261,7 +2261,8 @@ TEST_F(restore_meta_fileTest, RestoreSymlink_Success)
 	ino_t inode;
 	char mock_metapath[400], mock_restore_path[400];
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
+	struct stat thisstat;
 	SYMLINK_META_TYPE symmeta;
 	CLOUD_RELATED_DATA cloud_data, exp_cloud_data;
 	int64_t meta_size;
@@ -2271,24 +2272,24 @@ TEST_F(restore_meta_fileTest, RestoreSymlink_Success)
 	fetch_restored_meta_path(mock_restore_path, inode);
 	fptr = fopen(mock_restore_path, "w+");
 	setbuf(fptr, NULL);
-	memset(&tmpstat, 0, sizeof(struct stat));
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&symmeta, 0, sizeof(SYMLINK_META_TYPE));
 	memset(&cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
-	tmpstat.st_mode = S_IFLNK;
+	tmpstat.mode = S_IFLNK;
 
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&symmeta, sizeof(SYMLINK_META_TYPE), 1, fptr);
 	fwrite(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-	fstat(fileno(fptr), &tmpstat);
+	fstat(fileno(fptr), &thisstat);
 	fclose(fptr);
-	
+
 	memset(&exp_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
-	exp_cloud_data.size_last_upload = tmpstat.st_size;
-	exp_cloud_data.meta_last_upload = tmpstat.st_size;
+	exp_cloud_data.size_last_upload = thisstat.st_size;
+	exp_cloud_data.meta_last_upload = thisstat.st_size;
 	exp_cloud_data.upload_seq = 1;
 
 	hcfs_system->backend_is_online = TRUE;
-	
+
 	/* Run */
 	EXPECT_EQ(0, restore_meta_file(inode));
 
@@ -2296,14 +2297,14 @@ TEST_F(restore_meta_fileTest, RestoreSymlink_Success)
 	fetch_meta_path(mock_metapath, inode);
 	ASSERT_EQ(0, access(mock_metapath, F_OK));
 	fptr = fopen(mock_metapath, "r");
-	fseek(fptr, sizeof(struct stat) + sizeof(SYMLINK_META_TYPE), SEEK_SET);
+	fseek(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE), SEEK_SET);
 	fread(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 	fclose(fptr);
 	EXPECT_EQ(0, memcmp(&exp_cloud_data, &cloud_data,
 			sizeof(CLOUD_RELATED_DATA)));
 	unlink(mock_metapath);
 
-	EXPECT_EQ(tmpstat.st_size, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(thisstat.st_size, hcfs_system->systemdata.system_size);
 }
 
 TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
@@ -2311,7 +2312,8 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 	ino_t inode;
 	char mock_metapath[400], mock_restore_path[400];
 	FILE *fptr;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
+	struct stat thisstat;
 	FILE_META_TYPE filemeta;
 	FILE_STATS_TYPE stats, verified_stats, exp_stats;
 	CLOUD_RELATED_DATA cloud_data, exp_cloud_data;
@@ -2327,16 +2329,16 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 	fetch_restored_meta_path(mock_restore_path, inode);
 	fptr = fopen(mock_restore_path, "w+");
 	setbuf(fptr, NULL);
-	memset(&tmpstat, 0, sizeof(struct stat));
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 	memset(&stats, 1, sizeof(FILE_STATS_TYPE));
 	stats.num_blocks = 7;
 	memset(&cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
 	memset(&block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 
-	tmpstat.st_mode = S_IFREG;
-	tmpstat.st_size = MAX_BLOCK_SIZE * 7;
-	filemeta.direct = sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+	tmpstat.mode = S_IFREG;
+	tmpstat.size = MAX_BLOCK_SIZE * 7;
+	filemeta.direct = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
 			sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA);
 	filemeta.local_pin = P_HIGH_PRI_PIN;
 	block_page.num_entries = 7;
@@ -2345,24 +2347,24 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 		block_page.block_entries[i].seqnum = seq_list[i];
 	}
 
-	fwrite(&tmpstat, sizeof(struct stat), 1, fptr);
+	fwrite(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	fwrite(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	fwrite(&stats, sizeof(FILE_STATS_TYPE), 1, fptr);
 	fwrite(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 	fwrite(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
-	fstat(fileno(fptr), &tmpstat);
+	fstat(fileno(fptr), &thisstat);
 	fclose(fptr);
 
 	/* Expected result */
 	memset(&exp_stats, 0, sizeof(FILE_STATS_TYPE));
 	exp_stats.num_blocks = 7;
 	memset(&exp_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
-	exp_cloud_data.size_last_upload = MAX_BLOCK_SIZE * 7 + tmpstat.st_size;
-	exp_cloud_data.meta_last_upload = tmpstat.st_size;
+	exp_cloud_data.size_last_upload = MAX_BLOCK_SIZE * 7 + thisstat.st_size;
+	exp_cloud_data.meta_last_upload = thisstat.st_size;
 	exp_cloud_data.upload_seq = 1;
 
 	hcfs_system->backend_is_online = TRUE;
-	
+
 	/* Run */
 	EXPECT_EQ(0, restore_meta_file(inode));
 
@@ -2370,7 +2372,7 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 	fetch_meta_path(mock_metapath, inode);
 	ASSERT_EQ(0, access(mock_metapath, F_OK));
 	fptr = fopen(mock_metapath, "r");
-	fseek(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
+	fseek(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), SEEK_SET);
 	fread(&verified_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
 	fread(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 	fread(&verified_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
@@ -2381,10 +2383,12 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 		if (status_list[i] == ST_NONE ||
 				status_list[i] == ST_TODELETE)
 			ASSERT_EQ(ST_NONE,
-				verified_block_page.block_entries[i].status);
+				verified_block_page.block_entries[i].status)
+				<< "block index = " << i;
 		else
 			ASSERT_EQ(ST_CLOUD,
-				verified_block_page.block_entries[i].status);
+				verified_block_page.block_entries[i].status)
+				<< "block index = " << i;
 	}
 
 	EXPECT_EQ(0, memcmp(&exp_stats, &verified_stats,
@@ -2393,7 +2397,7 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 			sizeof(CLOUD_RELATED_DATA)));
 	unlink(mock_metapath);
 
-	EXPECT_EQ(tmpstat.st_size + MAX_BLOCK_SIZE * 7,
+	EXPECT_EQ(thisstat.st_size + MAX_BLOCK_SIZE * 7,
 			hcfs_system->systemdata.system_size);
 }
 
