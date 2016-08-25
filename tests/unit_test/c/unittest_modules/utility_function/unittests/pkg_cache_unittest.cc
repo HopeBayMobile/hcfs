@@ -15,11 +15,10 @@ int32_t hash_pkg(const char *input)
 
 	index = 0;
 	while (input[index]) {
-		hash = (((hash << 5) + hash + input[index]) &
-				(PKG_HASH_SIZE - 1));
-		index++;
+		hash = ((hash << 5) + hash ^ input[index++]);
 	}
 
+	hash &= PKG_HASH_SIZE - 1;
 	return hash;
 }
 
