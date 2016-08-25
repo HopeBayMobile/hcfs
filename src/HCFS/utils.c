@@ -2150,3 +2150,73 @@ int64_t round_size(int64_t size)
 	return ret_size;
 }
 
+/**
+ * A lite version of check_and_copy_file.
+ *
+ * This function simply copy the source file to the target.
+ *
+ * @return 0 if succeed in copy, or negation of error code.
+ */
+int32_t copy_file(const char *srcpath, const char *tarpath)
+{
+	int32_t errcode;
+	int32_t ret;
+	size_t read_size, total_size;
+	size_t ret_size;
+	FILE *src_ptr = NULL, *tar_ptr = NULL;
+	char filebuf[4100];
+
+	src_ptr = fopen(srcpath, "r");
+	if (src_ptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -errcode;
+	}
+
+	tar_ptr = fopen(tarpath, "w");
+	if (tar_ptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		if (src_ptr != NULL) {
+			fclose(src_ptr);
+			src_ptr = NULL;
+		}
+		return -errcode;
+	}
+
+	flock(fileno(src_ptr), LOCK_EX);
+	/* Begin to copy */
+	FSEEK(src_ptr, 0, SEEK_SET);
+	FSEEK(tar_ptr, 0, SEEK_SET);
+	total_size = 0;
+	while (!feof(src_ptr)) {
+		FREAD(filebuf, 1, 4096, src_ptr);
+		read_size = ret_size;
+		if (read_size > 0) {
+			FWRITE(filebuf, 1, read_size, tar_ptr);
+			total_size += read_size;
+		} else {
+			break;
+		}
+	}
+	flock(fileno(src_ptr), LOCK_UN);
+	fclose(src_ptr);
+	fclose(tar_ptr);
+
+	return 0;
+
+errcode_handle:
+	if (src_ptr != NULL) {
+		flock(fileno(src_ptr), LOCK_UN);
+		fclose(src_ptr);
+		src_ptr = NULL;
+	}
+	if (tar_ptr != NULL) {
+		fclose(tar_ptr);
+		tar_ptr = NULL;
+	}
+	return errcode;
+}
+

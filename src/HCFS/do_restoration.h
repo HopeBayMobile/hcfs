@@ -25,7 +25,8 @@
 char restore_metapath[METAPATHLEN];
 char restore_blockpath[BLOCKPATHLEN];
 
-sem_t restore_sem;
+sem_t restore_sem, backup_pkg_sem;
+BOOL have_new_pkgbackup;
 pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;
 
@@ -34,6 +35,7 @@ SYSTEM_DATA_TYPE restored_system_meta;
 
 #define RESTORE_METAPATH restore_metapath
 #define RESTORE_BLOCKPATH restore_blockpath
+#define PACKAGE_XML "/data/system/packages.xml"
 
 void init_restore_path(void);
 

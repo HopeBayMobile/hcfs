@@ -45,6 +45,8 @@ void init_restore_path(void)
 	snprintf(RESTORE_BLOCKPATH, BLOCKPATHLEN, "%s_restore",
 	         BLOCKPATH);
 	sem_init(&(restore_sem), 0, 1);
+	sem_init(&(backup_pkg_sem), 0, 1);
+	have_new_pkgbackup = TRUE;
 }
 
 int32_t fetch_restore_stat_path(char *pathname)
@@ -1003,10 +1005,12 @@ void cleanup_stage1_data(void)
 		     FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
 }
 
+/* Function for backing up package list (packages.xml) */
 int32_t backup_package_list(void)
 {
-/* FEATURE TODO: backup packages.xml */
-	write_log(4, "Backing up package list\n");
+	sem_wait(&backup_pkg_sem);
+	have_new_pkgbackup = TRUE;
+	sem_post(&backup_pkg_sem);
 	return 0;
 }
 

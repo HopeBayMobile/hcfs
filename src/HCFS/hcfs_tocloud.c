@@ -67,6 +67,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "utils.h"
 #include "hcfs_cacheops.h"
 #include "rebuild_super_block.h"
+#include "do_restoration.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -2250,6 +2251,69 @@ void upload_loop(void)
 #endif
 }
 
+/* Helper function for backing up package list if needed */
+void _try_backup_package_list(CURL_HANDLE *thiscurl)
+{
+	int32_t errcode, ret;
+	char backup_xml[METAPATHLEN];
+	FILE *fptr = NULL;
+
+	sem_wait(&backup_pkg_sem);
+
+	/* Return immediately if no new package list */
+	if (have_new_pkgbackup == FALSE) {
+		sem_post(&backup_pkg_sem);
+		return;
+	}
+	have_new_pkgbackup = FALSE;
+	sem_post(&backup_pkg_sem);
+
+/* FEATURE TODO: backup packages.xml */
+	write_log(4, "Backing up package list\n");
+	snprintf(backup_xml, METAPATHLEN, "%s/backup_pkg", METAPATH);
+
+	if (access(PACKAGE_XML, F_OK) != 0) {
+		write_log(0, "Unable to locate package list\n");
+		sem_post(&backup_pkg_sem);
+		return;
+	}
+
+	ret = copy_file(PACKAGE_XML, backup_xml);
+	if (ret < 0) {
+		if (access(backup_xml, F_OK) == 0)
+			unlink(backup_xml);
+		sem_post(&backup_pkg_sem);
+		return;
+	}
+
+	fptr = fopen(backup_xml, "r");
+	if (fptr == NULL) {
+		write_log(0, "Unable to open backed-up pkg list\n");
+		return;
+	}
+
+	setbuf(fptr, NULL);
+
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL);
+	if ((ret < 200) || (ret > 299)) {
+		errcode = -EIO;
+		goto errcode_handle;
+	}
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	fptr = NULL;
+
+	return;
+errcode_handle:
+	if (fptr != NULL) {
+		fclose(fptr);
+		fptr = NULL;
+	}
+}
+
+
 /************************************************************************
 *
 * Function name: update_backend_stat
@@ -2340,6 +2404,10 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		goto errcode_handle;
 	}
 	flock(fileno(fptr), LOCK_UN);
+
+	/* Also backup package list if any */
+	_try_backup_package_list(&(sync_stat_ctl.statcurl));
+
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	fclose(fptr);
 	is_fopen = FALSE;
