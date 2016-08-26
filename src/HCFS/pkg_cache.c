@@ -20,30 +20,7 @@
 
 #include "logger.h"
 #include "params.h"
-
-/* deterministic version of djb2 hash */
-static inline
-uint32_t djb_hash(const char *const key, size_t keylen)
-{
-	uint32_t hash = (uint32_t) 5381U;
-	const unsigned char *ukey = (const unsigned char *) key;
-	size_t i = (size_t) 0U;
-	if (keylen >= (size_t) 8U) {
-		const size_t keylen_chunk = keylen - 8U;
-		while (i <= keylen_chunk) {
-			const unsigned char *const p = ukey + i;
-			i += (size_t) 8U;
-			hash = hash * 33U ^ p[0]; hash = hash * 33U ^ p[1];
-			hash = hash * 33U ^ p[2]; hash = hash * 33U ^ p[3];
-			hash = hash * 33U ^ p[4]; hash = hash * 33U ^ p[5];
-			hash = hash * 33U ^ p[6]; hash = hash * 33U ^ p[7];
-		}
-	}
-	while (i < keylen)
-		hash = hash * 33U ^ ukey[i++];
-
-	return hash;
-}
+#include "utils.h"
 
 /**
  * Hash package name.
