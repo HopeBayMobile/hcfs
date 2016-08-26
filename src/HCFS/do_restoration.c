@@ -962,6 +962,7 @@ int32_t run_download_minimal(void)
 	rename(despath, PACKAGE_XML);
 	chown(PACKAGE_XML, SYSTEM_UID, SYSTEM_GID);
 	chmod(PACKAGE_XML, 0660);
+	system("restorecon /data/system/packages.xml");
 	
 	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
 
