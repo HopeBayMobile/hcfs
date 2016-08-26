@@ -1,0 +1,1 @@
+{'file_type': 1, 'stat': {'size': 10485760, 'blocks': 20480, 'ctime': 1471941227, 'uid': 0, 'mtime_nsec': 0, 'rdev': 0, 'dev': 21, '__pad1': 0, 'nlink': 1, 'mode': 33152, 'atime_nsec': 0, 'mtime': 1471941227, 'ctime_nsec': 0, 'gid': 0, 'atime': 1471941227, 'ino': 2714, 'blksize': 4096}, 'child_number': 0, 'result': 0, 'location': 'local'}

@@ -34,7 +34,9 @@ class Swift(object):
         if self._cmd_type == "swift":
             cmd += " download " + self._bucket + " " + name + " -o " + new_path
         elif self._cmd_type == "token":
-            cmd += "/" + name + " -o " + new_path
+            if name:
+                cmd += "/" + name
+            cmd += " -o " + new_path
         pipe = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
         out, err = pipe.communicate()
         self.logger.debug("download_file" + repr((cmd, out, err)))

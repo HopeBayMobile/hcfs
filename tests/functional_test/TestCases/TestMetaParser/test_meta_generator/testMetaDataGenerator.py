@@ -24,6 +24,8 @@ class TestMetaDataGenerator(object):
     def get_data(self):
         if not self.isAvailable():
             return False
+        self.get_swift_list()
+        self.get_fsstat()
         self.get_fsmgr()
         self.get_test_data_stat()
         self.get_test_data_meta()
@@ -36,10 +38,33 @@ class TestMetaDataGenerator(object):
         self.logger.info("Check if the USB-connected phone is Ted phone")
         return False if not adb.isAvailable(self.phone_id) else True
 
+    def get_swift_list(self):
+        self.logger.info("Get swift list")
+        path = os.path.join(self.test_data_dir, "swift_list")
+        out, err = self.swift.download_file(None, path)
+
+    def get_fsstat(self):
+        self.logger.info("Get FSstat")
+        path = os.path.join(self.test_data_dir, "swift_list")
+        with open(path, "rt") as fin:
+            for file in fin:
+                if file.startswith("FSstat"):
+                    file = file.replace("\n", "")
+                    self.logger.info("<" + file + ">")
+                    fsstat_path = os.path.join(self.test_data_dir, file)
+                    self.swift.download_file(file, fsstat_path)
+
     def get_fsmgr(self):
         self.logger.info("Get fsmgr")
         src = "/data/hcfs/metastorage/fsmgr"
         adb.get_file("fsmgr", src, self.fsmgr, self.phone_id)
+        self.logger.info("Get fsmgr stat")
+        # TODO multiple external volume???
+        fsmgr_stat = os.path.join(self.test_data_dir, "fsmgr_stat")
+        with open(fsmgr_stat, "wt") as fout:
+            data = self.get_file_stat("/storage/emulated")
+            self.logger.debug("fetch" + repr((data, fsmgr_stat)))
+            fout.write(repr(data))
 
     def get_test_data_meta(self):
         self.logger.info("Get metas")
@@ -69,33 +94,34 @@ class TestMetaDataGenerator(object):
             assert os.path.isfile(new_prop), "Fail to get stat"
 
     def get_file_stat(self, path):
-        result = {"file_type": self.stat_file_type(path),
-                  "child_number": self.stat_child(path),
-                  "result": 0}
+        result = {}
+        result["file_type"] = self.stat_file_type(path)
+        if result["file_type"] == 0:  # directory
+            result["child_number"] = self.stat_child(path)
+        else:
+            result["child_number"] = 0
+        result["result"] = 0
+        if path.startswith("/sdcard/") or path.startswith("/storage/emulated/"):
+            result["location"] = "sdcard"
+        else:
+            result["location"] = "local"
         stat = {}
-
         stat["blocks"] = self.stat_blocks(path)
         stat["ctime"] = self.stat_ctime(path)
-        stat["mtime_nsec"] = 0  # TODO: why this one is not type of long???
-        # TODO: why this one is not type of long???
-        stat["rdev"] = self.stat_rdev(path)
-        stat["dev"] = 0  # ??? TODO: why this one is not type of long??
-        stat["mode"] = self.stat_mode(path)  # not sure
-        stat["__pad1"] = 0  # ??? about irq
-        stat["ctime_nsec"] = 0  # TODO: why this one is not type of long???
-        # TODO: why this one is not type of long???
+        stat["mtime_nsec"] = 0
+        stat["rdev"] = 0  # TODO: how to get this value???
+        stat["dev"] = self.stat_dev(path)  # TODO: how to get this value???
+        stat["mode"] = self.stat_mode(path)
+        stat["__pad1"] = 0
+        stat["ctime_nsec"] = 0
         stat["nlink"] = self.stat_nlink(path)
         stat["gid"] = self.stat_gid(path)
-        # TODO: why this one is not type of long???
         stat["ino"] = self.stat_inode(path)
         stat["blksize"] = self.stat_blksize(path)
-        stat["atime_nsec"] = 0  # TODO: why this one is not type of long???
+        stat["atime_nsec"] = 0
         stat["mtime"] = self.stat_mtime(path)
         stat["uid"] = self.stat_uid(path)
-        # change when access, disabled it
         stat["atime"] = self.stat_atime(path)
-        stat["__unused5"] = 0  # ???
-        stat["__unused4"] = 0  # ???
         stat["size"] = self.stat_size(path)  # byte
         result["stat"] = stat
         return result
@@ -116,7 +142,7 @@ class TestMetaDataGenerator(object):
         out, err = adb.exec_cmd(cmd, self.phone_id)
         assert not err, "Stat <" + path + "> error"
         assert out.rstrip().isdigit(), "Stat error child number is not a integer"
-        return int(out.rstrip())
+        return int(out.rstrip()) + 2  # . and ..
 
     def stat_inode(self, path): return int(self.stat("i", path))
 
@@ -136,7 +162,7 @@ class TestMetaDataGenerator(object):
 
     def stat_nlink(self, path): return int(self.stat("h", path))
 
-    def stat_rdev(self, path): return int(self.stat("d", path)[:-1])
+    def stat_dev(self, path): return int(self.stat("d", path)[:-1])
 
     def stat_mode(self, path): return int(self.stat("f", path), 16)
 
@@ -172,11 +198,11 @@ if __name__ == '__main__':
     HCFSConf.cleanup()
 
     this_dir = os.path.abspath(os.path.dirname(__file__))
-    test_data_dir = os.path.join(this_dir, "..", "TestCases", "test_data")
+    test_data_dir = os.path.join(this_dir, "..", "TestCases", "test_data_v2")
     phone_id = "00f28ec4cb50a4f2"
     fsmgr = os.path.join(test_data_dir, "fsmgr")
-    inodes = ["/sdcard/DCIM", "/sdcard/Download/1", "/data/data/2",
-              "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock", "/data/data/com.hopebaytech.hcfsmgmt/databases"]
+    inodes = ["/sdcard/DCIM/", "/sdcard/Download/1", "/data/data/2",
+              "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock", "/data/data/com.hopebaytech.hcfsmgmt/databases/"]
     param = (phone_id, fsmgr, test_data_dir, inodes, swift)
 
     testDataGener = TestMetaDataGenerator(*param)
