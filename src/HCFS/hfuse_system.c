@@ -454,10 +454,6 @@ int32_t main(int32_t argc, char **argv)
 	/* Move log opening earlier for android to log low battery events */
 #ifdef _ANDROID_ENV_
 	open_log("hcfs_android_log");
-#ifdef VERSION_NUM
-	write_log(2, "\nVersion: %s", VERSION_NUM);
-#endif
-	write_log(2, "\nStart logging hcfs_android_log\n");
 #endif
 
 	/* Check if battery level is low. If so, shutdown */
@@ -568,7 +564,6 @@ int32_t main(int32_t argc, char **argv)
 	case 0:
 		/* main process */
 		open_log("fuse.log");
-		write_log(2, "\nStart logging fuse\n");
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		sem_init(&download_curl_control_sem, 0, 1);
@@ -599,14 +594,12 @@ int32_t main(int32_t argc, char **argv)
 	/* children processed begin */
 	case 1:
 		open_log("cache_maintain.log");
-		write_log(2, "\nStart logging cache cleanup\n");
 		run_cache_loop();
 		write_log(4, "HCFS (cache) shutting down normally\n");
 		close_log();
 		break;
 	case 2:
 		open_log("backend_upload.log");
-		write_log(2, "\nStart logging backend upload\n");
 
 		/* Init curl handle */
 		sem_init(&download_curl_sem, 0,
