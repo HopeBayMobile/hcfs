@@ -234,27 +234,32 @@ errcode_handle:
 *************************************************************************/
 int32_t init_hfuse(void)
 {
-	int32_t ret_val;
+	int32_t ret_val = 0;
 
-	ret_val = init_hcfs_system_data();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = super_block_init();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = init_system_fh_table();
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val == 0)
+		ret_val = init_hcfs_system_data();
+	if (ret_val == 0)
+		ret_val = super_block_init();
+	if (ret_val == 0)
+		ret_val = init_system_fh_table();
+	if (ret_val == 0)
+		ret_val = init_fs_manager();
+	if (ret_val == 0)
+		ret_val = init_mount_mgr();
 
-	ret_val = init_fs_manager();
-	if (ret_val < 0)
-		return ret_val;
+	/* TODO: error handling for log files */
+	init_sync_stat_control();
 
-	ret_val = init_mount_mgr();
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val == 0)
+		ret_val = check_and_create_metapaths();
+	if (ret_val == 0)
+		ret_val = check_and_create_blockpaths();
+	if (ret_val == 0)
+		ret_val = init_pathlookup();
+	if (ret_val == 0)
+		ret_val = init_dirstat_lookup();
 
-	return 0;
+	return ret_val;
 }
 
 /* Helper function to initialize curl handles for downloading objects */
@@ -473,26 +478,9 @@ int32_t main(int32_t argc, char **argv)
 
 	ret_val = init_hfuse();
 	if (ret_val < 0)
-		exit(-1);
-
-	/* TODO: error handling for log files */
-	init_sync_stat_control();
-
-	ret_val = check_and_create_metapaths();
-	if (ret_val < 0)
-		exit(ret_val);
-
-	ret_val = check_and_create_blockpaths();
-	if (ret_val < 0)
 		exit(ret_val);
 
 #ifdef _ANDROID_ENV_
-	ret_val = init_pathlookup();
-	if (ret_val < 0)
-		exit(ret_val);
-	ret_val = init_dirstat_lookup();
-	if (ret_val < 0)
-		exit(ret_val);
 	ret_val = init_pkg_cache();
 	if (ret_val < 0)
 		exit(ret_val);
@@ -535,13 +523,6 @@ int32_t main(int32_t argc, char **argv)
 	destroy_pathlookup();
 	destroy_pkg_cache();
 #else /* ! _ANDROID_ENV_ */
-	ret_val = init_pathlookup();
-	if (ret_val < 0)
-		exit(ret_val);
-	ret_val = init_dirstat_lookup();
-	if (ret_val < 0)
-		exit(ret_val);
-
 	/* Start up children */
 	proc_idx = 0;
 	if (CURRENT_BACKEND != NONE) {
