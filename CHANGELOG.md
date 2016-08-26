@@ -7,6 +7,36 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.2.1445
+=====
+## New Features
+ - [Tera-App] Add a feedback button onto settings page ([!45] (gateway-2-0/android-management-app!45))
+ - [Nexus-5x] Feature/factory reset alertdialog [!33](gateway-2-0/nexus-5x!33)
+ - [Nexus-5x] Support auto download OTA package    code is reviewed, it's ok! [!31](gateway-2-0/nexus-5x!31)
+
+## Fixes 
+ - [HCFS] bugfix/remove_sb_size_from_system_size (!521)
+ - [Tera-App] (#12550) Process new json format and fixed change account related problems [!81](gateway-2-0-android-management-app!81)
+ - [Tera-App] (#12595) Replace cs@tera.mobi with cs@hbmobile.com [!80](gateway-2-0-android-management-app!80)
+ - [Tera-App] Feature/share preference [!78](gateway-2-0-android-management-app!78)
+ - [Tera-App] Change the method of calculating tera storage usage [!83](gateway-2-0-android-management-app!83)
+ - [Tera-App] Add missing status code [!79](gateway-2-0-android-management-app!79)
+ - [Tera-App] bug fix #12430 [!75](gateway-2-0-android-management-app!75)
+ - [Tera-App] 當 pin 一個檔案失敗後, 再 pin 同一個檔案會顯示 "Unpinning successful" [!75]
+ - [Nexus-5x] Fix exception while launch storage & USB settings [!35](gateway-2-0/nexus-5x!35)
+ - [Nexus-5x] Fix/download dialog not display [!32](gateway-2-0/nexus-5x!32)
+ - [Nexus-5x] Fix/#12457 [!30](gateway-2-0/nexus-5x!30)
+ - [Nexus-5x] fix bug#12362:/storage/emulated/0/hbtupdater/ would be seen by the user and bug#11942:download complete alertdialog did not re-show if the user leave the ota download page when downloading [!29](gateway-2-0/nexus-5x!29)
+ - [Tera-Launcher] Add predefined color set [!11](gateway-2-0/tera-launcher!11)
+ - [Bug #12430](https://redmine.hopebaytech.com/issues/12430): 當 pin 一個檔案失敗後, 再 pin 同一個檔案會顯示 "Unpinning successful"
+ - [Bug #12544](https://redmine.hopebaytech.com/issues/12544): 沒有登入Tera情況下,開啟Storage&USB會不斷出現Settings exception訊息.
+ - [Bug #12550](https://redmine.hopebaytech.com/issues/12550): Change account會顯示失敗,但是確認mgmt server帳號已被轉換到新的google account
+ - [Bug #12595](https://redmine.hopebaytech.com/issues/12595): Feedback email 應變更為cs@hbmobile.com
+ - [Tera-App] Get Cloud storage total from quota and adjust the sequence [!85](gateway-2-0-android-management-app!85)
+
+## CI / Refactoring / Other
+ - [HCFS] Ci/update flash script    Add some missed '-s \$TARGET_DEVICE' in FlashImages() (!519)
+
 v 2.2.2.1412
 =====
 ## New Features
