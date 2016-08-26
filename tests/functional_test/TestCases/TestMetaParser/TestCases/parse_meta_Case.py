@@ -38,6 +38,7 @@ class NormalMetaPathCase(Case):
     def test(self):
         for expected_stat, meta_path in self.get_stat_and_meta_path_pairs():
             result = parse_meta(meta_path)
+            self.log_file.recordFunc("parse_meta", meta_path, result)
             # RD said there aren't some fields stored in the meta file
             self.ignore_fields(expected_stat, result)
             isPass, msg = self.parse_meta_spec.check_onNormal(
@@ -92,7 +93,7 @@ class NormalMetaPathCase(Case):
 
     def ignore_fields(self, expected, result):
         # HCFS additional fields
-        expected["stat"]["magic"] = result["stat"]["magic"]
+        expected["stat"]["magic"] = result["stat"]["magic"]  # TODO ???
         expected["stat"]["metaver"] = result["stat"]["metaver"]
         # change when access, disabled it
         expected["stat"]["atime"] = result["stat"]["atime"]
@@ -124,6 +125,7 @@ class NonexistMetaPathCase(NormalMetaPathCase):
         nonexisted_path = ["/no", "/such/", "/no/such/meta", "/and/directory"]
         for path in nonexisted_path:
             result = parse_meta(path)
+            self.log_file.recordFunc("parse_meta", path, result)
             isPass, msg = self.parse_meta_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
@@ -145,6 +147,7 @@ class EmptyMetaPathCase(NormalMetaPathCase):
 
     def test(self):
         result = parse_meta("")
+        self.log_file.recordFunc("parse_meta", "", result)
         isPass, msg = self.parse_meta_spec.check_onNormal([""], [result])
         if not isPass:
             return False, msg
