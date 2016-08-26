@@ -2,6 +2,9 @@ import os
 import subprocess
 from subprocess import Popen, PIPE
 import time
+import shutil
+import string
+import random
 
 import config
 from swift import Swift
@@ -25,7 +28,9 @@ class TestMetaDataGenerator(object):
         if not self.isAvailable():
             return False
         self.get_swift_list()
+        self.get_partition_stat()
         self.get_fsstat()
+        self.get_random_data()
         self.get_fsmgr()
         self.get_test_data_stat()
         self.get_test_data_meta()
@@ -43,6 +48,27 @@ class TestMetaDataGenerator(object):
         path = os.path.join(self.test_data_dir, "swift_list")
         out, err = self.swift.download_file(None, path)
 
+    def get_partition_stat(self):
+        self.logger.info("Get /sdcard stat")
+        # TODO multiple external volume???
+        fsmgr_stat = os.path.join(self.test_data_dir, "fsmgr_stat")
+        with open(fsmgr_stat, "wt") as fout:
+            data = self.get_file_stat("/storage/emulated")
+            self.logger.debug("fetch" + repr((data, fsmgr_stat)))
+            fout.write(repr(data))
+        self.logger.info("Get /data/data stat")
+        data_stat = os.path.join(self.test_data_dir, "data_stat")
+        with open(data_stat, "wt") as fout:
+            data = self.get_file_stat("/data/data")
+            self.logger.debug("fetch" + repr((data, data_stat)))
+            fout.write(repr(data))
+        self.logger.info("Get /data/app stat")
+        app_stat = os.path.join(self.test_data_dir, "app_stat")
+        with open(app_stat, "wt") as fout:
+            data = self.get_file_stat("/data/app")
+            self.logger.debug("fetch" + repr((data, app_stat)))
+            fout.write(repr(data))
+
     def get_fsstat(self):
         self.logger.info("Get FSstat")
         path = os.path.join(self.test_data_dir, "swift_list")
@@ -54,17 +80,34 @@ class TestMetaDataGenerator(object):
                     fsstat_path = os.path.join(self.test_data_dir, file)
                     self.swift.download_file(file, fsstat_path)
 
+    def get_random_data(self):
+        random_dir = os.path.join(self.test_data_dir, "random")
+        if os.path.exists(random_dir):
+            shutil.rmtree(random_dir)
+        os.makedirs(random_dir)
+        self.logger.info("Get empty content file")
+        empty_file_path = os.path.join(random_dir, "empty")
+        with open(empty_file_path, "wt") as fout:
+            pass
+        self.logger.info("Get random content file")
+        random_file_path = os.path.join(random_dir, "random")
+        with open(random_file_path, "wt") as fout:
+            fout.write(self.get_random_string(30))
+        self.logger.info("Get data block file")
+        swift_list_path = os.path.join(self.test_data_dir, "swift_list")
+        with open(swift_list_path, "rt") as fin:
+            for file in fin:
+                if file.startswith("data"):
+                    file = file.replace("\n", "")
+                    self.logger.info("<" + file + ">")
+                    fsstat_path = os.path.join(random_dir, file)
+                    self.swift.download_file(file, fsstat_path)
+                    break
+
     def get_fsmgr(self):
         self.logger.info("Get fsmgr")
         src = "/data/hcfs/metastorage/fsmgr"
         adb.get_file("fsmgr", src, self.fsmgr, self.phone_id)
-        self.logger.info("Get fsmgr stat")
-        # TODO multiple external volume???
-        fsmgr_stat = os.path.join(self.test_data_dir, "fsmgr_stat")
-        with open(fsmgr_stat, "wt") as fout:
-            data = self.get_file_stat("/storage/emulated")
-            self.logger.debug("fetch" + repr((data, fsmgr_stat)))
-            fout.write(repr(data))
 
     def get_test_data_meta(self):
         self.logger.info("Get metas")
@@ -174,6 +217,9 @@ class TestMetaDataGenerator(object):
         assert not err, "Stat <" + path + "> error"
         assert out, "Stat <" + path + "> inode is empty"
         return out.rstrip()
+
+    def get_random_string(self, size=6, chars=string.ascii_uppercase + string.digits):
+        return ''.join(random.choice(chars) for _ in range(size))
 
 if __name__ == '__main__':
     socketToMgmtApp.setup()
