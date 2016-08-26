@@ -31,6 +31,7 @@ void destory_notify_cb(void)
 		if (i == notify_cb.max_len)
 			i = 0;
 		data = (FUSE_NOTIFY_PROTO *)CB_OFFSET(i);
+		/* call it's function with itself */
 		data->func(&data, DESTROY_CB);
 	}
 	/* free notify_cb member */
@@ -45,7 +46,7 @@ BOOL notify_cb_realloc(void)
 {
 	void *newbuf = NULL;
 	size_t newsize;
-	BOOL ok = FALSE;
+	BOOL good = FALSE;
 
 	if (notify_cb.max_len == 0) {
 		init_notify_cb();
@@ -55,9 +56,9 @@ BOOL notify_cb_realloc(void)
 	/* enlarge buffer */
 	newsize = notify_cb.max_len * 2;
 	newbuf = realloc(notify_cb.elems, newsize * notify_cb.elemsize);
-	ok = (newbuf != NULL);
+	good = (newbuf != NULL);
 
-	if (ok) {
+	if (good) {
 		notify_cb.elems = newbuf;
 		/* Concatenate wrapped segments after enlarge buffer
 		 * +------------------------+
@@ -79,7 +80,7 @@ BOOL notify_cb_realloc(void)
 		return EXIT_SUCCESS;
 	}
 
-	/* !ok */
+	/* !good */
 	write_log(4, "Error %s failed\n", __func__);
 	return EXIT_FAILURE;
 }
@@ -94,14 +95,14 @@ static inline BOOL notify_cb_isempty(void) { return (notify_cb.len == 0); }
 void notify_cb_enqueue(const void *const notify, size_t size)
 {
 	size_t next;
-	BOOL ok = TRUE;
+	BOOL good = TRUE;
 
 	sem_wait(&notify_cb.access_sem);
 
 	if (notify_cb_isfull())
-		ok = (notify_cb_realloc() == EXIT_SUCCESS);
+		good = (notify_cb_realloc() == EXIT_SUCCESS);
 
-	if (ok) {
+	if (good) {
 		next = notify_cb.in + 1;
 		if (next == notify_cb.max_len)
 			next = 0;
@@ -123,7 +124,7 @@ FUSE_NOTIFY_PROTO *notify_cb_dequeue()
 {
 	void *data = NULL;
 	size_t data_size;
-	BOOL ok = FALSE;
+	BOOL good = FALSE;
 
 	sem_wait(&notify_cb.access_sem);
 
@@ -133,9 +134,9 @@ FUSE_NOTIFY_PROTO *notify_cb_dequeue()
 	}
 
 	data_size = ((FUSE_NOTIFY_PROTO *)CB_OFFSET(notify_cb.out))->data_size;
-	ok = ((data = malloc(data_size)) != NULL);
+	good = ((data = malloc(data_size)) != NULL);
 
-	if (ok) {
+	if (good) {
 		memcpy(data, CB_OFFSET(notify_cb.out), data_size);
 		notify_cb.out++;
 		if (notify_cb.out == notify_cb.max_len)
@@ -145,7 +146,7 @@ FUSE_NOTIFY_PROTO *notify_cb_dequeue()
 
 	sem_post(&notify_cb.access_sem);
 
-	if (!ok)
+	if (!good)
 		write_log(4, "Error %s: failed\n", __func__);
 
 	return data;
