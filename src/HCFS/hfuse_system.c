@@ -169,12 +169,11 @@ errcode_handle:
 	return errcode;
 }
 
-void* _write_sys(void *fakeptr)
+void *_write_sys(__attribute__((unused)) void *fakeptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
 
-	UNUSED(fakeptr);
 	sleep(2);
 	sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
@@ -261,7 +260,6 @@ int32_t init_hfuse(void)
 /* Helper function to initialize curl handles for downloading objects */
 int32_t _init_download_curl(int32_t count)
 {
-	int32_t ret_val;
 
 	snprintf(download_curl_handles[count].id,
 		 sizeof(((CURL_HANDLE *)0)->id) - 1, "download_thread_%d",
@@ -270,20 +268,20 @@ int32_t _init_download_curl(int32_t count)
 	curl_handle_mask[count] = FALSE;
 	download_curl_handles[count].curl_backend = NONE;
 	download_curl_handles[count].curl = NULL;
-	UNUSED(ret_val);
 	/* Do not init backend until actually needed */
 	/*
-		ret_val = hcfs_init_backend(&(download_curl_handles[count]));
+	int32_t ret_val;
+	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 
-		while ((ret_val < 200) || (ret_val > 299)) {
-			write_log(0, "error in connecting to backend\n");
-			if (download_curl_handles[count].curl != NULL)
-				hcfs_destroy_backend(
-					download_curl_handles[count].curl);
-			ret_val = hcfs_init_backend(
-					&(download_curl_handles[count])
-				);
-		}
+	while ((ret_val < 200) || (ret_val > 299)) {
+		write_log(0, "error in connecting to backend\n");
+		if (download_curl_handles[count].curl != NULL)
+			hcfs_destroy_backend(
+				download_curl_handles[count].curl);
+		ret_val = hcfs_init_backend(
+				&(download_curl_handles[count])
+			);
+	}
 	*/
 	return 0;
 }
@@ -413,7 +411,6 @@ int32_t _is_battery_low()
 /*TODO: Error handling after validating system config*/
 int32_t main(int32_t argc, char **argv)
 {
-	CURL_HANDLE curl_handle;
 	int32_t ret_val;
 	struct rlimit nofile_limit;
 #ifndef _ANDROID_ENV_
@@ -474,7 +471,6 @@ int32_t main(int32_t argc, char **argv)
 		/* exit(-1); */
 	}
 
-	UNUSED(curl_handle);
 	ret_val = init_hfuse();
 	if (ret_val < 0)
 		exit(-1);

@@ -631,9 +631,6 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 	int32_t ret_size;
 	int32_t name_space = name_space_c;
 
-#ifdef _ANDROID_ENV_
-	UNUSED(flag);
-#endif
 	/* Used to record value block pos when replacing */
 	int64_t replace_value_block_pos;
 

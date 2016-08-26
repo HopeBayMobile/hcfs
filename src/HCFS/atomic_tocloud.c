@@ -759,14 +759,15 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
-	int64_t block_no, int64_t seq)
+int32_t fetch_toupload_block_path(char *pathname,
+				  ino_t inode,
+				  int64_t block_no,
+				  __attribute__((unused)) int64_t seq)
 {
 	char path[200];
 	int32_t errcode;
 	int32_t ret;
 
-	UNUSED(seq);
 	sprintf(path, "%s/upload_temp_block", BLOCKPATH);
 
 	if (access(path, F_OK) == -1)
