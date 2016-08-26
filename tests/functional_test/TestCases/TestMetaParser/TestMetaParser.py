@@ -1,12 +1,12 @@
 import os
-import time
-import ast
-from itertools import product
+import shutil
 
 import config
 from TestCases import *
 
 logger = config.get_logger().getChild(__name__)
+
+THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
 class TestMetaParser_00(object):
@@ -17,7 +17,11 @@ class TestMetaParser_00(object):
 
     def run(self):
         logger.info("Global setup")
-        return True, "Do nothing"
+        path = os.path.join(THIS_DIR, "report")
+        logger.info("Remove report directory")
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        return True, ""
 
 
 class TestMetaParser_99(object):

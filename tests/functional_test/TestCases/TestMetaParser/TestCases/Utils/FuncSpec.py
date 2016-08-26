@@ -26,6 +26,8 @@ class FuncSpec(object):
     # for every possible input with optional argument
     type_handler_pair = {int: None, long: None, float: None, str: None, bool: None,
                          unicode: None, tuple: tuple_yield, list: list_yield, dict: dict_yield}
+    TYPE_GEN_HANDLERS = {int: None, long: None, float: None, str: None, bool: None,
+                         unicode: None}
 
     def __init__(self, in_spec_str, out_spec_str, err_spec_str=[]):
         # spec string : [int, ...] or [[(str, int)], (str, str), ...]
@@ -40,6 +42,9 @@ class FuncSpec(object):
         self.input_specs = in_spec_str
         self.output_specs = out_spec_str
         self.err_specs = err_spec_str
+        self.TYPE_GEN_HANDLERS[tuple] = self.gen_by_spec
+        self.TYPE_GEN_HANDLERS[list] = self.gen_by_spec
+        self.TYPE_GEN_HANDLERS[dict] = self.gen_dict_by_spec
 
     def check_onNormal(self, inputs, outputs):
         try:
@@ -48,7 +53,7 @@ class FuncSpec(object):
             self.match_all(outputs, self.output_specs)
             return True, ""
         except AssertionError as ae:
-            ae.args += repr((inputs, outputs))
+            ae.args += (inputs, outputs)
             return False, ae.args
 
     def check_onErr(self, inputs, outputs):
@@ -58,8 +63,11 @@ class FuncSpec(object):
             self.match_all(outputs, self.err_specs)
             return True, ""
         except AssertionError as ae:
-            ae.args += repr((inputs, outputs))
+            ae.args += (inputs, outputs)
             return False, ae.args
+
+    def gen_zero_instance_by_output_spec(self):
+        return self.gen_by_spec(list, self.output_specs)
 
     def match_all(self, values, specs):
         self.logger.debug("match_all" + repr((values, specs)))
@@ -78,11 +86,33 @@ class FuncSpec(object):
             for sub_val, sub_spec in detail_yield(value, spec):
                 self.match(sub_val, sub_spec)
 
+    def gen_by_spec(self, change_type, specs):
+        init_instance = []
+        for spec in specs:
+            def_type = get_spec_type(spec)
+            detail_yield = self.TYPE_GEN_HANDLERS[def_type]
+            instance = detail_yield(
+                def_type, spec) if detail_yield else def_type()
+            init_instance.append(instance)
+        return change_type(init_instance)
+
+    def gen_dict_by_spec(self, _, specs):
+        init_instance = {}
+        for key, spec in specs.iteritems():
+            def_type = get_spec_type(spec)
+            detail_yield = self.TYPE_GEN_HANDLERS[def_type]
+            instance = detail_yield(
+                def_type, spec) if detail_yield else def_type()
+            init_instance[key] = instance
+        return init_instance
+
 
 def get_spec_type(spec):
     return spec if isinstance(spec, type) else spec.__class__
 
 if __name__ == "__main__":
-    spec = FuncSpec([str], [[(int, str)], int])
+    spec = FuncSpec([str], [[(int, str)], int,
+                            ([int, int, int], {"a": int, "c": str})])
     print spec.check_onNormal(["s"], [[(2222, "asd"), (123, "zxc")], 123])
+    print repr(spec.gen_zero_instance_by_output_spec())
     print spec.check_onErr(["sasdasd"], [212])

@@ -12,7 +12,6 @@ def list_external_volume(path):
     pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     out, err = pipe.communicate()
     logger.debug("list_external_volume" + repr((cmd, out, err)))
-    assert not err, "Failed to call list_external_volume via python3:" + err
     return ast.literal_eval(out)
 
 
@@ -21,7 +20,6 @@ def parse_meta(path):
     pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     out, err = pipe.communicate()
     logger.debug("parse_meta" + repr((cmd, out, err)))
-    assert not err, "Failed to call parse_meta via python3:" + err
     return ast.literal_eval(out)
 
 
@@ -31,19 +29,43 @@ def list_dir_inorder(path, offset=(0, 0), limit=1000):
     pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     out, err = pipe.communicate()
     logger.debug("list_dir_inorder" + repr((cmd, out, err)))
-    assert not err, "Failed to call list_dir_inorder via python3:" + err
+    return ast.literal_eval(out)
+
+
+def get_vol_usage(path):
+    cmd = "python3 -c 'from pyhcfs.parser import *;import sys;sys.stdout.write(repr(get_vol_usage(b\"" + path + "\")))'"
+    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    out, err = pipe.communicate()
+    logger.debug("get_vol_usage" + repr((cmd, out, err)))
+    return ast.literal_eval(out)
+
+
+def list_file_blocks(path):
+    cmd = "python3 -c 'from pyhcfs.parser import *;import sys;sys.stdout.write(repr(list_file_blocks(b\"" + path + "\")))'"
+    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    out, err = pipe.communicate()
+    logger.debug("list_file_blocks" + repr((cmd, out, err)))
     return ast.literal_eval(out)
 
 if __name__ == '__main__':
-    result = list_external_volume("test_data/fsmgr")
-    assert isinstance(result, list), "Not a list result = <" + \
-        repr(result) + ">"
+    path = "../test_data_v2/FSstat0"
+    result = get_vol_usage(path)
+    print "path:" + path
     print repr(result)
-    result = parse_meta("test_data/641/meta_641")
-    assert isinstance(result, dict), "Not a dict result = <" + \
-        repr(result) + ">"
+    path = "../test_data_v2/FSstat2"
+    result = get_vol_usage(path)
+    print "path:" + path
     print repr(result)
-    result = list_dir_inorder("test_data/641/meta_641", offset=(2, 3, 4))
-    assert isinstance(result, dict), "Not a dict result = <" + \
-        repr(result) + ">"
+    path = "../test_data_v2/FSstat3"
+    result = get_vol_usage(path)
+    print "path:" + path
     print repr(result)
+    path = "../test_data_v2/FSstat147"
+    result = get_vol_usage(path)
+    print "path:" + path
+    print repr(result)
+
+    # result = list_file_blocks("../test_data_v2/10465/meta_10465")
+    # assert isinstance(result, dict), "Not a dict result = <" + \
+    #     repr(result) + ">"
+    # print repr(result)
