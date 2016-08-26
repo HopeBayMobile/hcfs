@@ -43,7 +43,8 @@ pthread_t download_minimal_thread;
 typedef struct {
 	sem_t sysmeta_sem;
 	SYSTEM_DATA_TYPE restored_system_meta;
-	SYSTEM_DATA_TYPE estimated_system_meta;
+	SYSTEM_DATA_TYPE rectified_system_meta;
+	FILE *rect_fptr;
 } HCFS_RESTORED_SYSTEM_META;
 
 HCFS_RESTORED_SYSTEM_META hcfs_restored_system_meta;
@@ -52,8 +53,9 @@ HCFS_RESTORED_SYSTEM_META hcfs_restored_system_meta;
 	sem_wait(&(hcfs_restored_system_meta.sysmeta_sem));
 #define UNLOCK_RESTORED_SYSMETA() \
 	sem_post(&(hcfs_restored_system_meta.sysmeta_sem));
+
 #define UPDATE_EST_SYSMETA(...) \
-	update_estimated_system_meta((DELTA_SYSTEM_META) {__VA_ARGS__})
+	update_rectified_system_meta((DELTA_SYSTEM_META) {__VA_ARGS__})
 
 #define RESTORE_METAPATH restore_metapath
 #define RESTORE_BLOCKPATH restore_blockpath
@@ -83,7 +85,9 @@ int32_t backup_package_list(void);
 
 void cleanup_stage1_data(void);
 
-void update_estimated_system_meta(DELTA_SYSTEM_META delta_system_meta);
+void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta);
 void update_restored_cache_usage(int64_t delta_cache_size,
 		int64_t delta_cache_blocks);
+int32_t rectify_space_usage();
+int32_t init_rectified_system_meta(char restoration_stage);
 #endif  /* GW20_DO_RESTORATION_H_ */

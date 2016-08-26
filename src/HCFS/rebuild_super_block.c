@@ -21,9 +21,11 @@
 #include "utils.h"
 #include "metaops.h"
 #include "macro.h"
+#include "global.h"
 #include "hcfs_fromcloud.h"
 #include "hfuse_system.h"
 #include "rebuild_parent_dirstat.h"
+#include "do_restoration.h"
 
 #define LOCK_QUEUE_FILE() sem_wait(&(rebuild_sb_jobs->queue_file_sem))
 #define UNLOCK_QUEUE_FILE() sem_post(&(rebuild_sb_jobs->queue_file_sem))
@@ -351,6 +353,11 @@ int32_t init_rebuild_sb(char rebuild_action)
 	ret = super_block_init();
 	if (ret < 0)
 		return ret;
+
+	/* load the rectified system meta */
+	ret = init_rectified_system_meta(RESTORING_STAGE2);
+	if (ret < 0)
+		write_log(0, "Error: Fail to open rectified sys meta\n");
 
 	/* FEATURE TODO: Add more error handling here as this is
 	not the normal case for entering super block rebuild */
@@ -823,8 +830,11 @@ void rebuild_sb_worker(void *t_idx)
 	sys_super_block->head.now_rebuild = FALSE;
 	write_super_block_head();
 	super_block_exclusive_release();
-
 	write_log(10, "Debug: Rebuilding superblock completed.");
+
+	ret = rectify_space_usage();
+	if (ret < 0)
+		write_log(0, "Error: Error in rectifying. Code %d\n", -ret);
 	sem_wait(&(rebuild_sb_tpool->tpool_access_sem));
 	rebuild_sb_tpool->thread[tidx].active = FALSE;
 	rebuild_sb_tpool->num_active--;

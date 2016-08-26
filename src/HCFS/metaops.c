@@ -2686,7 +2686,8 @@ correctness of restored system meta here */
 		just_meta = TRUE;
 	}
 
-	/* Re-compute space usage and return when file is dir and symlink */
+	/* Re-compute space usage and return when file is either
+	 * dir or symlink */
 	if (just_meta) {
 		/* Update statistics */
 		metasize = meta_stat.st_size;
