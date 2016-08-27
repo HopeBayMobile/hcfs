@@ -47,7 +47,7 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DCOMPRESS_ENABLE=0 \
 	    -D_ANDROID_ENV_ \
 
-LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
+LDFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
 # Support  gcc4.9 color output
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
@@ -171,7 +171,7 @@ define ADDTEST
   $(MD_PATH)/$(T): CPPFLAGS+=-iquote $(MD_PATH)/unittests
   $(MD_PATH)/$(T): VPATH+=$(MD_PATH)/unittests
   $(MD_PATH)/$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LNFLAGS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LDFLAGS)
   
   # Clean UT
   .PHONY: clean-ut-$(T)
