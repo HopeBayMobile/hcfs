@@ -72,7 +72,6 @@ int32_t init_fs_manager(void)
 
 	sem_init(&(fs_mgr_head->op_lock), 0, 1);
 
-	errcode = 0;
 	if (access(fs_mgr_path, F_OK) != 0) {
 		errcode = errno;
 		if (errcode != ENOENT) {
@@ -84,7 +83,6 @@ int32_t init_fs_manager(void)
 		write_log(2, "Cannot find FS manager. Creating one\n");
 
 		/* Initialize header for FS manager on disk and in memory */
-		errcode = 0;
 		fs_mgr_head->FS_list_fh =
 		    open(fs_mgr_path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 		if (fs_mgr_head->FS_list_fh < 0) {
@@ -204,7 +202,6 @@ int32_t _init_backend_stat(ino_t root_inode)
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&cloud_fs_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);	
 	fclose(fptr);
-	is_fopen = FALSE;
 
 	return 0;
 errcode_handle:
@@ -364,6 +361,7 @@ errcode_handle:
 		fclose(metafptr);
 	if (statfptr != NULL)
 		fclose(statfptr);
+	UNUSED(errcode);
 	return 0;
 }
 
@@ -700,6 +698,11 @@ int32_t delete_filesystem(char *fsname)
 	FS_root = temp_entry.d_ino;
 
 	ret = fetch_meta_path(thismetapath, FS_root);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	metafptr = NULL;
 	metafptr = fopen(thismetapath, "r");
 	if (metafptr == NULL) {
@@ -960,7 +963,6 @@ int32_t prepare_FS_database_backup(void)
 	FTRUNCATE(fileno(fptr), 0);
 
 	curpos = 0;
-	ret_ssize = 0;
 	while (!feof(fptr)) {
 		PREAD(fs_mgr_head->FS_list_fh, buf, 4096, curpos);
 		if (ret_ssize <= 0)

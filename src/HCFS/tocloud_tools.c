@@ -472,6 +472,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			inode, block_count, block_seq,
 			page_pos, e_index, progress_fd, delete_which_one);
 #else
+/* FIXME: page_pos is not initiated if not DEL_TOUPLOAD_BLOCKS */
 		which_curl = select_upload_thread(TRUE, FALSE,
 			inode, block_count, block_seq,
 			page_pos, e_index, progress_fd, delete_which_one);
