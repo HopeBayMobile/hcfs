@@ -229,9 +229,21 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 
 void update_sync_state(void)
 {
+	int32_t num_replace;
+
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == FALSE) {
-		hcfs_system->sync_paused = TRUE;
+		/* Change from online to offline */
+		if (hcfs_system->sync_paused == FALSE) {
+			hcfs_system->sync_paused = TRUE;
+			/* Wake up cache manager so that it will wake
+			 * all other sleeping threads up */
+			sem_getvalue(&(hcfs_system->something_to_replace),
+					&num_replace);
+			if (num_replace == 0)
+				sem_post(&(hcfs_system->something_to_replace));
+		}
+
 	} else {
 		hcfs_system->sync_paused = FALSE;
 		/* Threads can sleep on cache full now */

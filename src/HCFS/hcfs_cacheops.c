@@ -604,9 +604,8 @@ int32_t sleep_on_cache_full(void)
 		 * ask cache manager to traverse all blocks one more time
 		 * and set cache status again. */
 		if (hcfs_system->sync_paused == TRUE &&
-				num_replace == 0) {
+				num_replace == 0)
 			sem_post(&(hcfs_system->something_to_replace));
-		}
 	}
 
 	sem_post(&(hcfs_system->num_cache_sleep_sem)); /* Count++ */
