@@ -225,7 +225,7 @@ ino_t _create_root_inode()
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	mode_t self_mode;
-	FILE *metafptr, *statfptr;
+	FILE *metafptr = NULL, *statfptr = NULL;
 	char metapath[METAPATHLEN];
 	char temppath[METAPATHLEN];
 	int32_t ret, errcode;
@@ -993,7 +993,7 @@ errcode_handle:
 int32_t backup_FS_database(void)
 {
 	char tmppath[METAPATHLEN];
-	FILE *fptr, *tmpdbfptr;
+	FILE *fptr = NULL, *tmpdbfptr = NULL;
 	int32_t ret, errcode;
 	CURL_HANDLE upload_handle;
 	char buf[4096];
@@ -1101,7 +1101,7 @@ errcode_handle:
 *************************************************************************/
 int32_t restore_FS_database(void)
 {
-	FILE *fptr;
+	FILE *fptr = NULL;
 	int32_t ret, errcode;
 	CURL_HANDLE download_handle;
 

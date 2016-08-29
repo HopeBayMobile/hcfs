@@ -415,7 +415,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			 * to recover status to ST_LDISK. TODO: Maybe do not
 			 * need this action? */
 			if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
-				page_pos = 0;
 				if (local_metafptr != NULL) {
 					flock(fileno(local_metafptr), LOCK_EX);
 					ret_size = pread(fileno(local_metafptr),

@@ -316,12 +316,19 @@ void pinning_loop()
 			(uint64_t)now_inode);
 		rest_times = 0;
 
+		t_idx = -1;
 		sem_wait(&(pinning_scheduler.ctl_op_sem));
 		for (i = 0; i < MAX_PINNING_FILE_CONCURRENCY; i++) {
 			if (pinning_scheduler.thread_active[i] == FALSE) {
 				t_idx = i;
 				break;
 			}
+		}
+		if ((t_idx < 0) || (t_idx >= MAX_PINNING_FILE_CONCURRENCY)) {
+			/* Actually there is no empty slot. Go back and wait */
+			write_log(0, "Unexpected error of no pin slot\n");
+			sem_post(&(pinning_scheduler.ctl_op_sem));
+			continue;
 		}
 		pinning_scheduler.pinning_info[t_idx].this_inode = now_inode;
 		pinning_scheduler.pinning_info[t_idx].t_idx = t_idx;

@@ -341,6 +341,11 @@ int32_t build_cache_usage(void)
 				write_log(10, "Not found. Alloc a new one\n");
 				tmp_size = sizeof(CACHE_USAGE_NODE);
 				tempnode = malloc(tmp_size);
+				if (tempnode == NULL) {
+					write_log(0, "Out of memory (cache)\n");
+					errcode = -ENOMEM;
+					break;
+				}
 				memset(tempnode, 0, tmp_size);
 			}
 			if (tempnode->last_access_time < tempstat.st_atime)
@@ -355,6 +360,7 @@ int32_t build_cache_usage(void)
 					&is_dirty);
 			if (ret < 0) {
 				errcode = errno;
+				free(tempnode);
 				break;
 			}
 			/*If this is dirty cache entry*/
@@ -367,6 +373,7 @@ int32_t build_cache_usage(void)
 			write_log(10, "Inserting the node\n");
 //			write_log(10, "count is now %d\n", count);
 			insert_cache_usage_node(this_inode, tempnode);
+			tempnode = NULL;
 			errno = 0; de = readdir(dirptr);
 			if (de == NULL && errno) {
 				errcode = errno;

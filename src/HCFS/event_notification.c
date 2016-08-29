@@ -344,6 +344,7 @@ int32_t send_event_to_server(int32_t fd, char *events_in_json)
 		return -errno;
 
 	r_size = recv(fd, &ret_val, sizeof(int32_t), MSG_NOSIGNAL);
+	UNUSED(r_size);
 	if (ret_val == SERVERREPLYOK)
 		return 0;
 	else

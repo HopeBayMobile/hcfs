@@ -387,7 +387,7 @@ errcode_handle:
 int32_t construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 		int32_t bufsize)
 {
-	char *current_path, *tmpptr;
+	char *current_path = NULL, *tmpptr;
 	PATH_LOOKUP cachenode;
 	ino_t parent_inode;
 	int32_t ret, pathlen, errcode;
@@ -395,6 +395,7 @@ int32_t construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **res
 	write_log(10, "Debug path iterate %" PRIu64 "\n",
 		  (uint64_t) thisinode);
 
+	memset(&cachenode, 0, sizeof(PATH_LOOKUP));
 	ret = lookup_name(cacheptr, thisinode, &cachenode);
 
 	if (ret < 0) {
@@ -415,6 +416,7 @@ int32_t construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **res
 	if (pathlen > PATH_MAX) {
 		errcode = -ENAMETOOLONG;
 		write_log(0, "Unexpected error %d\n", ENAMETOOLONG);
+		free(current_path);
 		goto errcode_handle;
 	}
 

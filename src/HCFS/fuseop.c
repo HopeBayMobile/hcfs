@@ -151,7 +151,7 @@ BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 {
 	struct fuse_ctx *temp_context;
-	gid_t *tmp_list, tmp1_list[10];
+	gid_t *tmp_list = NULL, tmp1_list[10];
 	int32_t num_groups, count;
 	char is_in_group;
 
@@ -228,6 +228,9 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 		}
 	}
 
+	if (tmp_list != tmp1_list)
+		free(tmp_list);
+
 	if (is_in_group == TRUE) {
 		if (mode & 4)
 			if (!(thisstat->mode & S_IRGRP))
@@ -261,7 +264,7 @@ int32_t check_permission_access(fuse_req_t req,
 				int32_t mode)
 {
 	struct fuse_ctx *temp_context;
-	gid_t *tmp_list, tmp1_list[10];
+	gid_t *tmp_list = NULL, tmp1_list[10];
 	int32_t num_groups, count;
 	char is_in_group;
 
@@ -339,6 +342,9 @@ int32_t check_permission_access(fuse_req_t req,
 			break;
 		}
 	}
+
+	if (tmp_list != tmp1_list)
+		free(tmp_list);
 
 	if (is_in_group == TRUE) {
 		if (mode & R_OK)
@@ -681,7 +687,6 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 			(int32_t)volume_type, (int32_t)mp_mode);
 
 	/* For android 6.0, first check folders/files under root. */
-	keep_check = TRUE;
 	if (volume_type == ANDROID_MULTIEXTERNAL) {
 		tmptok = strtok_r(tmppath, "/", &tmptoksave);
 		/* Root in android 6.0 */
@@ -1650,7 +1655,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 	DIR_STATS_TYPE tmpstat;
 	int64_t old_metasize1, old_metasize2, new_metasize1, new_metasize2;
-	int64_t old_metasize1_blk, old_metasize2_blk;
+	int64_t old_metasize1_blk, old_metasize2_blk = 0;
 	int64_t new_metasize1_blk, new_metasize2_blk;
 	int64_t delta_meta_size1, delta_meta_size2;
 	int64_t delta_meta_size1_blk, delta_meta_size2_blk;
@@ -1782,6 +1787,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	} else {
 		parent2_ptr = parent1_ptr;
 		old_metasize2 = old_metasize1;
+		old_metasize2_blk = old_metasize1_blk;
 	}
 
 	/* Check if oldpath and newpath exists already */
@@ -1923,6 +1929,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		if (S_ISDIR(old_target_mode)) {
 			ret_val = meta_cache_lookup_dir_data(old_target_inode,
 				NULL, &tempmeta, NULL, old_target_ptr);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
 			if (tempmeta.total_children > 0) {
 				_cleanup_rename(body_ptr, old_target_ptr,
 						parent1_ptr, parent2_ptr);
@@ -2036,9 +2048,16 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 #ifdef _ANDROID_ENV_
 		/* Clear path cache entry if needed */
-		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
+		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 						old_target_inode);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
 #endif
 
 		old_target_ptr = NULL;
@@ -3431,7 +3450,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 	char objname[1000];
 	struct stat tempstat2; /* block ops */
 	int32_t ret, errcode, semval;
-	META_CACHE_ENTRY_STRUCT *tmpptr;
+	META_CACHE_ENTRY_STRUCT *tmpptr = NULL;
 
 	/* Check network status */
 	if (hcfs_system->sync_paused)
@@ -3620,6 +3639,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			if ((ret == 0) && (semval == 0))
 				sem_post(&(hcfs_system->something_to_replace));
 
+			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -3645,8 +3665,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 	return 0;
 error_handling:
 	fh_ptr->meta_cache_locked = FALSE;
-	meta_cache_close_file(tmpptr);
-	meta_cache_unlock_entry(tmpptr);
+	meta_cache_close_file(fh_ptr->meta_cache_ptr);
+	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 	if (fh_ptr->blockfptr != NULL) {
 		fclose(fh_ptr->blockfptr);
 		fh_ptr->blockfptr = NULL;
@@ -5471,6 +5491,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				meta_cache_close_file(body_ptr);
 				meta_cache_unlock_entry(body_ptr);
 				fuse_reply_err(req, -ret);
+				free(buf);
 				return;
 			}
 		} else {
@@ -5517,6 +5538,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				write_log(10, "file pos %lld, entry %d\n",
 					temp_page.this_page_pos, (count+1));
 				fuse_reply_buf(req, buf, buf_pos);
+				free(buf);
 				return;
 			}
 			buf_pos += entry_size;
@@ -5536,6 +5558,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	meta_cache_unlock_entry(body_ptr);
 	if (ret < 0) {
 		fuse_reply_err(req, -ret);
+		free(buf);
 		return;
 	}
 	gettimeofday(&tmp_time2, NULL);
@@ -5557,8 +5580,7 @@ errcode_handle:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	fuse_reply_err(req, -errcode);
-	if (buf != NULL)
-		free(buf);
+	free(buf);
 	if (use_snap == TRUE)
 		sem_trywait(&(dirh_ptr->snap_ref_sem));
 }
@@ -5645,6 +5667,8 @@ uint64_t str_to_mask(char *input)
         tempout = 0;
 
         /* First compute the length of the mask */
+	if (strlen(input) < 16)
+		return 0;
         for (count = 0; count < 16; count++) {
                 if ((input[count] <= 'f') && (input[count] >= 'a')) {
                         tempout = tempout << 4;
@@ -5656,6 +5680,7 @@ uint64_t str_to_mask(char *input)
                         tempout += (input[count] - '0');
                         continue;
                 }
+		tempout = 0;
                 break;
         }
 
@@ -5695,6 +5720,11 @@ BOOL _check_capability(pid_t thispid, int32_t cap_to_check)
         } while (!feof(fptr));
         fclose(fptr);
 	/* Convert string to 64bit bitmask */
+	if (strlen(outstr) < 16) {
+		write_log(4, "Length of bitmask is shorter than expected\n");
+		return FALSE;
+	}
+
 	cap_mask = str_to_mask(outstr);
 	write_log(10, "Cap mask is %" PRIu64 "\n", cap_mask);
 
@@ -6138,7 +6168,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		is_external = TRUE;
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}
@@ -7101,7 +7130,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		is_external = TRUE;
 		fuse_reply_err(req, ENOTSUP);
 		return;
 	}

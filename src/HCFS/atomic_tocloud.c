@@ -841,7 +841,7 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	int32_t ret;
 	size_t read_size, total_size;
 	size_t ret_size;
-	FILE *src_ptr, *tar_ptr;
+	FILE *src_ptr = NULL, *tar_ptr = NULL;
 	char filebuf[4100];
 	int64_t ret_pos;
 	struct stat tar_stat;
@@ -1027,7 +1027,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 		int64_t *backend_size, int64_t *total_backend_blocks,
 		int64_t upload_seq, uint8_t *last_pin_status)
 {
-	FILE *backend_metafptr;
+	FILE *backend_metafptr = NULL;
 	char backend_metapath[400];
 	char objname[400];
 	HCFS_STAT tempfilestat;
@@ -1158,7 +1158,7 @@ errcode_handle:
  */ 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 {
-	char toupload_meta_exist, backend_meta_exist;
+	char toupload_meta_exist = FALSE, backend_meta_exist = FALSE;
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
 	int32_t errcode;
