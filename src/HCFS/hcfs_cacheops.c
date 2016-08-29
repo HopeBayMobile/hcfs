@@ -591,11 +591,23 @@ void run_cache_loop(void)
 int32_t sleep_on_cache_full(void)
 {
 	int32_t cache_replace_status;
+	int32_t num_replace;
 
 	/* Check cache replacement status */
 	cache_replace_status = hcfs_system->systemdata.cache_replace_status;
-	if (cache_replace_status < 0)
+	if (cache_replace_status < 0) {
 		return cache_replace_status;
+	} else {
+		sem_getvalue(&(hcfs_system->something_to_replace),
+				&num_replace);
+		/* In case of network disconn and nothing can be replaced,
+		 * ask cache manager to traverse all blocks one more time
+		 * and set cache status again. */
+		if (hcfs_system->sync_paused == TRUE &&
+				num_replace == 0) {
+			sem_post(&(hcfs_system->something_to_replace));
+		}
+	}
 
 	sem_post(&(hcfs_system->num_cache_sleep_sem)); /* Count++ */
 	sem_wait(&(hcfs_system->check_cache_sem)); /* Sleep a while */
