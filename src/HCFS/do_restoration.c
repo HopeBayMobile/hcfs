@@ -60,7 +60,7 @@ int32_t tag_restoration(char *content)
 {
 	char restore_stat_path[METAPATHLEN];
 	char restore_stat_path2[METAPATHLEN];
-	FILE *fptr;
+	FILE *fptr = NULL;
 	int32_t ret, errcode;
 	size_t ret_size;
 	char is_open;
@@ -330,6 +330,9 @@ void* _download_minimal_worker(void *ptr)
 			download_curl_handles[count].curl_backend = NONE;
 			download_curl_handles[count].curl = NULL;
 		}
+	} else {
+		notify_restoration_result(1, -EINVAL);
+		return NULL;
 	}
 
 	run_download_minimal();
@@ -384,12 +387,13 @@ int32_t fetch_restore_block_path(char *pathname, ino_t this_inode, int64_t block
 	return 0;
 }
 
+/* FEATURE TODO: How to retry stage 1 without downloading the same
+files again, but also need to ensure the correctness of downloaded files */
 int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 {
 	FILE *fptr;
 	int32_t ret;
 
-	ret = 0;
 	fptr = fopen(despath, "w+");
 	if (fptr == NULL) {
 		write_log(0, "Unable to open file for writing\n");
@@ -398,6 +402,11 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 
 	ret = fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname);
 	if (ret < 0) {
+		if (ret == -ENOENT) {
+			write_log(0,
+				"Critical object not found in restoration\n");
+			write_log(0, "Missing obj name: %s\n", objname);
+		}
 		fclose(fptr);
 		unlink(despath);
 		return ret;
@@ -561,6 +570,12 @@ int32_t _fetch_pinned(ino_t thisinode)
 			lastpage = nowpage;
 		}
 
+		/* Terminate pin blocks downloading if system is going down */
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
+
 		/* Skip if block does not exist */
 		if (temppage.block_entries[nowindex].status == ST_CLOUD) {
 			seq = temppage.block_entries[nowindex].seqnum;
@@ -584,7 +599,8 @@ int32_t _fetch_pinned(ino_t thisinode)
 	return 0;
 errcode_handle:
 	fclose(fptr);
-	write_log(0, "Restore Error: Error in %s. Code %d\n", __func__, -errcode);
+	write_log(0, "Restore Error: Code %d\n", -errcode);
+	write_log(10, "Error in %s.\n", __func__);
 	return errcode;
 }
 
@@ -666,6 +682,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	filepos = dirmeta.tree_walk_list_head;
 
 	while (filepos != 0) {
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
 		FSEEK(fptr, filepos, SEEK_SET);
 		FREAD(&tmppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 		write_log(10, "Filepos %lld, entries %d\n", filepos,
@@ -708,13 +728,22 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			write_log(10, "Processing %s/%s\n", nowpath,
 			          tmpptr->d_name);
 
+			/* FEATURE TODO: For high-priority pin dirs in
+			/data/app and in emulated, if missing, could
+			just prune the app out (will need to verify
+			though). Check the HL design */
+			/* FEATURE TODO: Will need to handle ENOENT
+			errors here. Some can be fixed and the restoration
+			can continue (such as broken user apps), others
+			not */
 			/* First fetch the meta */
 			tmpino = tmpptr->d_ino;
 			ret = _fetch_meta(tmpino);
 			if (ret < 0) {
 				/* FEATURE TODO: error handling,
 				such as shutdown */
-				continue;
+				errcode = ret;
+				goto errcode_handle;
 			}
 
 			switch (tmpptr->d_type) {
@@ -725,13 +754,22 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			case D_ISFIFO:
 			case D_ISSOCK:
 				/* Fetch all blocks if pinned */
-				_fetch_pinned(tmpino);
+				ret = _fetch_pinned(tmpino);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 				break;
 			case D_ISDIR:
 				/* Need to expand */
 				snprintf(tmppath, METAPATHLEN, "%s/%s",
 				         nowpath, tmpptr->d_name);
-				_expand_and_fetch(tmpino, tmppath, depth + 1);
+				ret = _expand_and_fetch(tmpino, tmppath,
+				                        depth + 1);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 				break;
 			default:
 				break;
@@ -821,7 +859,7 @@ void _init_quota_restore()
 	sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
 }
 
-/* FEATURE TODO: Verify if downloaded objects are enough for restoration */
+/* FEATURE TODO: Need a notify and retry mechanism if network is down */
 int32_t run_download_minimal(void)
 {
 	ino_t rootino;
@@ -836,6 +874,16 @@ int32_t run_download_minimal(void)
 
 
 	/* Fetch quota value from backend and store in the restoration path */
+
+	/* First make sure that network connection is turned on */
+	while (hcfs_system->sync_paused == TRUE) {
+		write_log(4, "Connection is not available now\n");
+		write_log(4, "Sleep for 5 seconds before retrying\n");
+		notify_restoration_result(1, -ENETDOWN);
+		sleep(5);
+		if (hcfs_system->system_going_down == TRUE)
+			return -ESHUTDOWN;
+	}
 
 	_init_quota_restore();
 	ret = _restore_system_quota();
