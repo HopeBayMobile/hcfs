@@ -89,7 +89,7 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 
 /* Defining the system meta resources */
 typedef struct {
-	int64_t system_size; /* data + meta + sb (all real size) */
+	int64_t system_size; /* data + meta (all real size) */
 	int64_t system_meta_size; /* meta + sb (both block unit size) */
 	int64_t super_block_size; /* sb (block unit size) */
 	int64_t cache_size; /* data (local, block unit size) */
