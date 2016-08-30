@@ -7,6 +7,20 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.2.1465
+=====
+
+## Fixes 
+ - [HCFS] Fixed #12713: hotfix/returnEIO_when_cache_full_and_nothing_replace (!527)
+ - [Nexus-5x] Fix/issue 12529 [!36](gateway-2-0/nexus-5x!36)
+ - [Nexus-5x] Save the storage usage in Preference to improve user experience [!37](gateway-2-0/nexus-5x!37)
+ - [Tera-App] add startForeground [!89](gateway-2-0/android-management-app!89)
+ - [Tera-App] Add query connection status interface [!84](gateway-2-0/android-management-app!84)
+ - Bug #12746: 從背景移除Tera app, "com.hopebaytech.hcfsmgmt: server" 就掉了
+
+## CI / Refactoring / test / other
+ - [HCFS] tests: specify canonical LDFLAGS (!523)
+
 v 2.2.2.1445
 =====
 ## New Features
