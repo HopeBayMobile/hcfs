@@ -9,18 +9,15 @@
 FUSE_NOTIFY_CYCLE_BUF notify_cb = {0};
 fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_delete};
 
-static inline BOOL notify_cb_isempty(void) { return (notify_cb.len == 0); }
-
-static inline BOOL notify_cb_isfull(void)
-{
-	return (notify_cb.len == notify_cb.max_len);
-}
-
-static inline void inc_cb_idx(size_t *x, size_t cb_size) {
-	(*x)++;
-	if (*x == cb_size)
-		*x = 0;
-}
+/* Helper functions */
+#define notify_cb_isempty() (notify_cb.len == 0)
+#define notify_cb_isfull() (notify_cb.len == notify_cb.max_len)
+#define inc_cb_idx(x, cb_size)                                                 \
+	do {                                                                   \
+		(x)++;                                                         \
+		if ((x) == cb_size)                                            \
+			(x) = 0;                                               \
+	} while (0)
 
 int32_t init_notify_cb(void)
 {
@@ -54,10 +51,11 @@ int32_t init_notify_cb(void)
 		write_log(4, "Debug %s: succeed. max %lu\n", __func__,
 			  notify_cb.max_len);
 	} else {
+		notify_cb.is_initialized = FALSE;
 		free(notify_cb.elems);
 		notify_cb.elems = NULL;
-		write_log(4, "Debug %s: failed: %s\n", __func__,
-			  strerror(errno));
+		write_log(4, "Debug %s: failed. %s\n", __func__,
+			  errno ? strerror(errno) : "");
 	}
 	return good ? 0 : -1;
 }
@@ -73,12 +71,12 @@ void destory_notify_cb(void)
 	sem_wait(&notify_cb.access_sem);
 
 	/* call _do_hfuse_ll_notify_XXX to free nested member */
-	for (len = 1; len <= notify_cb.len;
-	     inc_cb_idx(&notify_cb.out, notify_cb.max_len), len++) {
+	for (len = 1; len <= notify_cb.len; len++) {
 
 		data = (FUSE_NOTIFY_PROTO *)&notify_cb.elems[notify_cb.out];
 		/* call destroy action of each data */
 		notify_fn[data->func]((FUSE_NOTIFY_DATA **)&data, DESTROY_CB);
+		inc_cb_idx(notify_cb.out, notify_cb.max_len);
 	}
 	/* free notify_cb member */
 	free(notify_cb.elems);
@@ -164,7 +162,7 @@ void notify_cb_enqueue(const void *const notify)
 	if (good) {
 		memcpy(&notify_cb.elems[notify_cb.in + 1], notify,
 		       sizeof(FUSE_NOTIFY_DATA));
-		inc_cb_idx(&notify_cb.in, notify_cb.max_len);
+		inc_cb_idx(notify_cb.in, notify_cb.max_len);
 		notify_cb.len++;
 	}
 
@@ -206,7 +204,7 @@ FUSE_NOTIFY_DATA *notify_cb_dequeue()
 		memcpy(data, &notify_cb.elems[notify_cb.out],
 		       sizeof(FUSE_NOTIFY_DATA));
 		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
-		inc_cb_idx(&notify_cb.out, notify_cb.max_len);
+		inc_cb_idx(notify_cb.out, notify_cb.max_len);
 		notify_cb.len--;
 	}
 

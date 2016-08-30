@@ -59,6 +59,7 @@ typedef struct {
 typedef void (fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
 fuse_notify_fn _do_hfuse_ll_notify_delete;
 
+int32_t init_notify_cb(void);
 int32_t init_hfuse_ll_notify_loop(void);
 void destory_hfuse_ll_notify_loop(void);
 void *hfuse_ll_notify_loop(void *ptr);
