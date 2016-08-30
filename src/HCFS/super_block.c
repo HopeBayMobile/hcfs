@@ -2378,9 +2378,9 @@ int32_t check_init_super_block()
 			/* Create rebuild sb mgr */
 			ret = create_sb_rebuilder();
 		} else {
-			if ((head.now_rebuild) ||
-			    (hcfs_system->system_restoring ==
-			     RESTORING_STAGE2)) {
+			//if ((head.now_rebuild) ||
+			if (hcfs_system->system_restoring ==
+			     RESTORING_STAGE2) {
 				/* Keep rebuilding SB */
 				_ASSERT_BACKEND_EXIST_();
 				ret = init_rebuild_sb(KEEP_REBUILD_SB);

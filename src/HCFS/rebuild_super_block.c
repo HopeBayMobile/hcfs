@@ -237,7 +237,7 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		return -errno;
 	memset(&head, 0, sizeof(SUPER_BLOCK_HEAD));
 	head.num_total_inodes = max_inode;
-	head.now_rebuild = TRUE;
+	//head.now_rebuild = TRUE;
 	FSEEK(sb_fptr, 0, SEEK_SET);
 	FWRITE(&head, sizeof(SUPER_BLOCK_HEAD), 1, sb_fptr);
 	FTRUNCATE(fileno(sb_fptr), sizeof(SUPER_BLOCK_HEAD) +
@@ -827,7 +827,7 @@ void rebuild_sb_worker(void *t_idx)
 
 	/* Rebuild completed. Set flag now_rebuild = FALSE */
 	super_block_exclusive_locking();
-	sys_super_block->head.now_rebuild = FALSE;
+	//sys_super_block->head.now_rebuild = FALSE;
 	write_super_block_head();
 	super_block_exclusive_release();
 	write_log(10, "Debug: Rebuilding superblock completed.");
