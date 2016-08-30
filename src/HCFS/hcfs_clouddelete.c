@@ -720,6 +720,7 @@ errcode_handle:
 	}
 
 	/* Update FS stat in the backend if updated previously */
+	/* TODO FIXME: backend_pin_st is not initialized if not reg file */
 	if (meta_on_cloud == TRUE) {
 		if (P_IS_PIN(backend_pin_st))
 			update_backend_stat(root_inode, -backend_size_change,

@@ -123,8 +123,6 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 			return -errcode;
 		}
 
-		current_block = 0;
-
 		FREAD(&temphead_stat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
 

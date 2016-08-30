@@ -192,7 +192,7 @@ int32_t parse_swift_list_header(FILE *fptr)
 
 		if (!strncmp(temp_string, "X-Container-Object-Count",
 			     sizeof("X-Container-Object-Count") - 1)) {
-			ret_val = sscanf(temp_string,
+			sscanf(temp_string,
 					 "X-Container-Object-Count: %s\n",
 					 temp_string2);
 			ATOL(temp_string2);

@@ -816,8 +816,10 @@ int32_t check_page_level(int64_t page_index)
 
 	tmp_index = tmp_index - (longpow(POINTERS_PER_PAGE, 3));
 
-	/* TODO: boundary handling for quadruple indirect */
-	return 4;
+	if (tmp_index < (longpow(POINTERS_PER_PAGE, 4)))
+		return 4;
+
+	return -EINVAL;
 }
 
 int64_t _load_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,

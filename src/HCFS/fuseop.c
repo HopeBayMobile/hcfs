@@ -5659,7 +5659,7 @@ void hfuse_ll_destroy(void *userdata)
 }
 
 /* Helper for converting string to 64-bit mask */
-uint64_t str_to_mask(char *input)
+uint64_t str_to_mask(const char *input)
 {
         int32_t count;
         uint64_t tempout;
@@ -5670,6 +5670,8 @@ uint64_t str_to_mask(char *input)
 	if (strlen(input) < 16)
 		return 0;
         for (count = 0; count < 16; count++) {
+		/* Not sure why ccc-analyzer reports input[count]
+		as garbage input */
                 if ((input[count] <= 'f') && (input[count] >= 'a')) {
                         tempout = tempout << 4;
                         tempout += (10 + (input[count] - 'a'));

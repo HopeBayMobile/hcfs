@@ -710,7 +710,6 @@ char *dec_backup_usermeta(char *path)
 	int64_t ret_pos;
 	size_t ret_size;
 
-	errcode = 0;
 	if (access(path, F_OK) < 0)
 		return NULL;
 
