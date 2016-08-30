@@ -394,7 +394,6 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 {
 	FILE *fptr;
 	int32_t ret;
-	struct stat block_stat;
 
 	fptr = fopen(despath, "w+");
 	if (fptr == NULL) {
@@ -418,7 +417,8 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 	if (is_meta == TRUE) {
 		/* Reset block status to ST_CLOUD */
 		ret = restore_meta_structure(fptr);
-	} else {
+	}
+	/*else {
 		ret = fstat(fileno(fptr), &block_stat);
 		if (ret == 0) {
 			update_restored_cache_usage(
@@ -428,7 +428,7 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 			write_log(0, "Error: Fail to fstat in %s. Code %d",
 					__func__, -ret);
 		}
-	}
+	}*/
 	fclose(fptr);
 	return ret;
 }
@@ -647,6 +647,9 @@ int32_t _fetch_pinned(ino_t thisinode)
 	FSEEK(fptr, file_stats_pos, SEEK_SET);
 	FWRITE(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
 	fclose(fptr);
+
+	/* Update cache statistics */
+	update_restored_cache_usage(cached_size, num_cached_block);
 
 	return 0;
 errcode_handle:
