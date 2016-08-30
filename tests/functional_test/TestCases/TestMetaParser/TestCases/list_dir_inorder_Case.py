@@ -30,7 +30,7 @@ INVALID_LIMIT = [0, -1, -10, 1001, 1100]
 # TODO child list element attribute d_type???
 
 
-class NormalMetaPathCase(Case):
+class NormalCase(Case):
     """
     test_hcfs_list_dir_inorder_NormalMetaPath:
           1.Call API with normal meta file path, valid offset and valid limit
@@ -106,7 +106,7 @@ class NormalMetaPathCase(Case):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NormalMetaPathLimitInvalidOffsetCase(NormalMetaPathCase):
+class NormalMetaPathLimitInvalidOffsetCase(NormalCase):
     """
     test_hcfs_query_dir_list_NormalMetapathLimit_InvalidOffset:
           1.Call API with normal meta file path, invalid offset and valid limit
@@ -137,7 +137,7 @@ class NormalMetaPathLimitInvalidOffsetCase(NormalMetaPathCase):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NormalMetaPathOffsetInvalidLimitCase(NormalMetaPathCase):
+class NormalMetaPathOffsetInvalidLimitCase(NormalCase):
     """
     test_hcfs_query_dir_list_NormalMetaPathOffset_InvalidLimit:
           1.Call API with normal meta file path, valid offset and invalid limit
@@ -168,7 +168,7 @@ class NormalMetaPathOffsetInvalidLimitCase(NormalMetaPathCase):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NormalMetaPathInvalidOffsetLimitCase(NormalMetaPathCase):
+class NormalMetaPathInvalidOffsetLimitCase(NormalCase):
     """
     test_hcfs_query_dir_list_NormalMetaPath_InvalidOffsetLimit:
           1.Call API with normal meta file path, invalid offset and invalid limit
@@ -199,10 +199,10 @@ class NormalMetaPathInvalidOffsetLimitCase(NormalMetaPathCase):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NonexistMetaPathCase(NormalMetaPathCase):
+class NonexistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NonexistlMetaPath:
-          1.Call API with non-existed meta file path, any offset and any limit
+    test_hcfs_query_dir_list_NonexistedAndEmptyPath:
+          1.Call API with non-existed adn empty file path, any offset and any limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
           4.(Expected) Result code must be less than 0
@@ -210,7 +210,7 @@ class NonexistMetaPathCase(NormalMetaPathCase):
     """
 
     def test(self):
-        normal_meta_path = ["/no", "/such", "/file/and/directory"]
+        normal_meta_path = ["/no", "/such", "/file/and/directory", ""]
         any_offset = VALID_OFFSET + INVALID_OFFSET
         any_limit = VALID_LIMIT + INVALID_LIMIT
         for args in product(normal_meta_path, any_offset, any_limit):
@@ -226,36 +226,6 @@ class NonexistMetaPathCase(NormalMetaPathCase):
                 return False, "Result must be less than 0"
             if result["num_child_walked"] != 0:
                 return False, "'num_child_walked' must be 0"
-            if len(result["child_list"]) != 0:
-                return False, "Result child list must be empty"
-        return True, ""
-
-
-# inheritance NormalMetaPathCase(setUp, tearDown)
-class EmptyMetaPathCase(NormalMetaPathCase):
-    """
-    test_hcfs_query_dir_list_EmptyMetaPath:
-          1.Call API with empty meta file path, any offset and any limit
-          2.(Expected) Result matched with API input and normal output spec
-          3.(Expected) Result offset must be (0, 0)
-          4.(Expected) Result code must be less than 0
-          5.(Expected) Result child list must be empty
-    """
-
-    def test(self):
-        any_offset = VALID_OFFSET + INVALID_OFFSET
-        any_limit = VALID_LIMIT + INVALID_LIMIT
-        for args in product([""], any_offset, any_limit):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
-            if not isPass:
-                return False, msg
-            if result["offset"] != (0, 0):
-                return False, "Offset must be (0, 0)"
-            if result["result"] >= 0:
-                return False, "Result must be less than 0"
             if len(result["child_list"]) != 0:
                 return False, "Result child list must be empty"
         return True, ""

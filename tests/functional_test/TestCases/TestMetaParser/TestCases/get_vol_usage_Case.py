@@ -81,16 +81,16 @@ class RandomFileContentCase(NormalCase):
 
 
 # inheritance NormalCase(setUp, tearDown)
-class NonExistedPathCase(NormalCase):
+class NonExistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_get_vol_usage_NonexistedPath:
-        1.Call API with non-existed file path.
+    test_hcfs_get_vol_usage_NonexistedAndEmptyPath:
+        1.Call API with non-existed and empty file path.
         2.(Expected) Result matches with API input and normal output spec
         3.(Expected) Result code must be -1
     """
 
     def test(self):
-        nonexisted_path = ["/no", "/such/", "/no/such/file", "/and/directory"]
+        nonexisted_path = ["/no/such/", "/no/such/file", "/and/directory", ""]
         for path in nonexisted_path:
             result = get_vol_usage(path)
             self.log_file.recordFunc("get_vol_usage", path, result)
@@ -100,24 +100,4 @@ class NonExistedPathCase(NormalCase):
                 return False, msg
             if result["result"] != -1:
                 return False, "Result should be -1" + str(result)
-        return True, ""
-
-
-# inheritance NormalCase(setUp, tearDown)
-class EmptyPathCase(NormalCase):
-    """
-    test_hcfs_get_vol_usage_EmptyPath:
-        1.Call API with empty sfile path.
-        2.(Expected) Result matches with API input and normal output spec
-        3.(Expected) Result code must be -1
-    """
-
-    def test(self):
-        result = get_vol_usage("")
-        self.log_file.recordFunc("get_vol_usage", "", result)
-        isPass, msg = self.get_vol_usage_spec.check_onNormal([""], [result])
-        if not isPass:
-            return False, msg
-        if result["result"] != -1:
-            return False, "Result should be -1" + str(result)
         return True, ""

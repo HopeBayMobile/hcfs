@@ -16,7 +16,7 @@ REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
 # TODO random meta file content
 
 
-class NormalMetaPathCase(Case):
+class NormalCase(Case):
     """
     test_hcfs_parse_meta_NormalMetaPath:
           1.Call API with normal meta file path
@@ -113,16 +113,16 @@ class NormalMetaPathCase(Case):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NonexistMetaPathCase(NormalMetaPathCase):
+class NonexistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_parse_meta_NonexistMetaPath:
-          1.Call API with non-existed meta file path
+    test_hcfs_parse_meta_NonexistedAndEmptyPath:
+          1.Call API with non-existed and empty file path
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result must be the same as definition error return
     """
 
     def test(self):
-        nonexisted_path = ["/no", "/such/", "/no/such/meta", "/and/directory"]
+        nonexisted_path = ["/no/such/", "/no/such/meta", "/and/directory", ""]
         for path in nonexisted_path:
             result = parse_meta(path)
             self.log_file.recordFunc("parse_meta", path, result)
@@ -133,26 +133,4 @@ class NonexistMetaPathCase(NormalMetaPathCase):
                 self.ERR_RESULT["error_msg"] = result["error_msg"]
             if result != self.ERR_RESULT:
                 return False, "Result doesn't match with expected err" + repr((result, self.ERR_RESULT))
-        return True, ""
-
-
-# inheritance NormalMetaPathCase(setUp, tearDown)
-class EmptyMetaPathCase(NormalMetaPathCase):
-    """
-    test_hcfs_parse_meta_EmptypathMetapath:
-        1.Call API with empty meta file path
-        2.(Expected) Result matched with API input and normal output spec
-        3.(Expected) Result must be the same as definition error return
-    """
-
-    def test(self):
-        result = parse_meta("")
-        self.log_file.recordFunc("parse_meta", "", result)
-        isPass, msg = self.parse_meta_spec.check_onNormal([""], [result])
-        if not isPass:
-            return False, msg
-        if "error_msg" in result:
-            self.ERR_RESULT["error_msg"] = result["error_msg"]
-        if result != self.ERR_RESULT:
-            return False, "Result doesn't match with expected err" + repr((result, self.ERR_RESULT))
         return True, ""

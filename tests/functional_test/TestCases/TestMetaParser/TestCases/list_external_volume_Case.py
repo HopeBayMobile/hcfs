@@ -18,7 +18,7 @@ REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
 # TODO random fsmgr file content
 
 
-class NormalFsmgrCase(Case):
+class NormalCase(Case):
     """
     test_hcfs_parse_fsmgr_NormalFsmgr:
           1.Call API with normal fsmgr file
@@ -58,16 +58,16 @@ class NormalFsmgrCase(Case):
 
 
 # inheritance NormalFsmgrCase(setUp, tearDown)
-class NonexistFsmgrPathCase(NormalFsmgrCase):
+class NonexistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_parse_fsmgr_NonexistFsmgrPath:
-          1.Call API with non-existed fsmgr file path
+    test_hcfs_parse_fsmgr_NonexistedAndEmptyPath:
+          1.Call API with non-existed and empty file path
           2.(Expected) Result matches  with API input and error output spec
           3.(Expected) Result code must be -1
     """
 
     def test(self):
-        nonexisted_path = ["/no", "/such/", "/no/such/fsmgr", "/and/directory"]
+        nonexisted_path = ["/no/such/", "/no/such/fsmgr", "/and/directory", ""]
         for path in nonexisted_path:
             result = list_external_volume(path)
             self.log_file.recordFunc("list_external_volume", path, result)
@@ -77,25 +77,4 @@ class NonexistFsmgrPathCase(NormalFsmgrCase):
                 return False, msg
             if result >= 0:
                 return False, "Result must be less than 0"
-        return True, ""
-
-
-# inheritance NormalFsmgrCase(setUp, tearDown)
-class EmptyFsmgrPathCase(NormalFsmgrCase):
-    """
-    test_hcfs_parse_fsmgr_EmptyFsmgrPath:
-        1.Call API with empty fsmgr file path
-        2.(Expected) Result matches  with API input and error output spec
-        3.(Expected) Result code must be -1
-    """
-
-    def test(self):
-        result = list_external_volume("")
-        self.log_file.recordFunc("list_external_volume", "", result)
-        isPass, msg = self.list_external_volume_spec.check_onErr([""], [
-                                                                 result])
-        if not isPass:
-            return False, msg
-        if result >= 0:
-            return False, "Result must be less than 0"
         return True, ""

@@ -98,16 +98,16 @@ class RandomFileContentCase(NormalCase):
 
 
 # inheritance NormalCase(setUp, tearDown)
-class NonExistedPathCase(NormalCase):
+class NonExistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_list_file_blocks_NonexistlFSstatPath:
-        1.Call API with non-existed file path.
+    test_hcfs_list_file_blocks_NonexistedAndEmptyPath:
+        1.Call API with non-existed and empty file path.
         2.(Expected) Result matched with API input and normal output spec
         3.(Expected) Result code must be -1
     """
 
     def test(self):
-        nonexisted_path = ["/no", "/such/", "/no/such/file", "/and/directory"]
+        nonexisted_path = ["/no/such/", "/no/such/file", "/and/directory", ""]
         for path in nonexisted_path:
             result = list_file_blocks(path)
             self.log_file.recordFunc("list_file_blocks", path, result)
@@ -117,24 +117,4 @@ class NonExistedPathCase(NormalCase):
                 return False, msg
             if result["result"] != -1:
                 return False, "Result should be -1:" + str(result)
-        return True, ""
-
-
-# inheritance NormalCase(setUp, tearDown)
-class EmptyPathCase(NormalCase):
-    """
-    test_hcfs_list_file_blocks_EmptyFSstatPath:
-        1.Call API with empty file path
-        2.(Expected) Result matched with API input and normal output spec
-        3.(Expected) Result code must be -1
-    """
-
-    def test(self):
-        result = list_file_blocks("")
-        self.log_file.recordFunc("list_file_blocks", "", result)
-        isPass, msg = self.list_file_blocks_spec.check_onNormal([""], [result])
-        if not isPass:
-            return False, msg
-        if result["result"] != -1:
-            return False, "Result should be -1:" + str(result)
         return True, ""
