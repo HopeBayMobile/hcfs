@@ -67,7 +67,7 @@ class RandomFileContentCase(NormalCase):
 
     def test(self):
         random_data_dir = os.path.join(TEST_DATA_DIR, "random")
-        for file_name in os.listdir(random_data_dir):
+        for file_name in (x for x in os.listdir(random_data_dir) if not x.startswith("FSstat")):
             test_file_path = os.path.join(random_data_dir, file_name)
             result = get_vol_usage(test_file_path)
             self.log_file.recordFunc("get_vol_usage", test_file_path, result)

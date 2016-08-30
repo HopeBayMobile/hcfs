@@ -83,8 +83,10 @@ class RandomFileContentCase(NormalCase):
 
     def test(self):
         random_data_dir = os.path.join(TEST_DATA_DIR, "random")
-        for file_name in os.listdir(random_data_dir):
-            test_file_path = os.path.join(random_data_dir, file_name)
+        test_file_pathes = [os.path.join(random_data_dir, x) for x in os.listdir(
+            random_data_dir) if not x.startswith("meta")]
+        test_file_pathes.extend([x for x in self.get_non_file_meta_pathes()])
+        for test_file_path in test_file_pathes:
             result = list_file_blocks(test_file_path)
             self.log_file.recordFunc(
                 "list_file_blocks", test_file_path, result)
@@ -95,6 +97,16 @@ class RandomFileContentCase(NormalCase):
             if result["result"] >= 0:
                 return False, "Result should be less than 0:" + str(result)
         return True, ""
+
+    def get_non_file_meta_pathes(self):
+        # test_data
+        #  |  12/meta_12   (meta)
+        #  |  12/12             (stat)
+        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
+            for name in (x for x in dir_names if x.isdigit()):
+                stat = self.get_stat(os.path.join(dir_path, name, name))
+                if stat["file_type"] != 1:
+                    yield os.path.abspath(os.path.join(dir_path, name, "meta_" + name))
 
 
 # inheritance NormalCase(setUp, tearDown)
