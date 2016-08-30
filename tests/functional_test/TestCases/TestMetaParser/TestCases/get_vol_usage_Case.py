@@ -28,6 +28,8 @@ class NormalCase(Case):
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup get_vol_usage spec")
+        # get_vol_usage(b"test_data/v1/android/FSstat")
+        # {'result': 0, 'usage': 1373381904}
         self.get_vol_usage_spec = FuncSpec(
             [str], [{"result": int, "usage": int}])
 
@@ -55,7 +57,7 @@ class NormalCase(Case):
 
 
 # inheritance NormalCase(setUp, tearDown)
-class RandomFSstatContentCase(NormalCase):
+class RandomFileContentCase(NormalCase):
     """
     test_hcfs_get_vol_usage_random_content_file:
           1.Call API with random content file path(fsmgr, meta, data block, empty, random content)

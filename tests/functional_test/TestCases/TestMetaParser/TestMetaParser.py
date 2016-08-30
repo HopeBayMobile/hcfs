@@ -87,7 +87,7 @@ class TestMetaParser_117013(get_vol_usage_Case.NormalCase):
     pass
 
 
-class TestMetaParser_117014(get_vol_usage_Case.RandomFSstatContentCase):
+class TestMetaParser_117014(get_vol_usage_Case.RandomFileContentCase):
     pass
 
 
@@ -96,6 +96,22 @@ class TestMetaParser_117015(get_vol_usage_Case.NonExistedPathCase):
 
 
 class TestMetaParser_117016(get_vol_usage_Case.EmptyPathCase):
+    pass
+
+
+class TestMetaParser_117017(list_file_blocks_Case.NormalCase):
+    pass
+
+
+class TestMetaParser_117018(list_file_blocks_Case.RandomFileContentCase):
+    pass
+
+
+class TestMetaParser_117019(list_file_blocks_Case.NonExistedPathCase):
+    pass
+
+
+class TestMetaParser_117020(list_file_blocks_Case.EmptyPathCase):
     pass
 
 
