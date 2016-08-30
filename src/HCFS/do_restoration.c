@@ -1231,6 +1231,13 @@ int32_t rectify_space_usage()
 	rectified_system_meta =
 			&(hcfs_restored_system_meta.rectified_system_meta);
 
+	write_log(4, "Test: rectified_system_size = %lld", rectified_system_meta->system_size);
+	write_log(4, "Test: rectified_system_meta_size = %lld", rectified_system_meta->system_meta_size);
+	write_log(4, "Test: rectified_backend_size = %lld", rectified_system_meta->backend_size);
+	write_log(4, "Test: rectified_beckend_meta_size = %lld", rectified_system_meta->backend_meta_size);
+	write_log(4, "Test: rectified_backend_inodes = %lld", rectified_system_meta->backend_inodes);
+	write_log(4, "Test: rectified_pinned_size = %lld", rectified_system_meta->pinned_size);
+
 	/* Rectify the statistics. When restoration is complete, decrease
 	 * hcfs space usage statistics by error value recorded in
 	 * rectified_system_meta */
