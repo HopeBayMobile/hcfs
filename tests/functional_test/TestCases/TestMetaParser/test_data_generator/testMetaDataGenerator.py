@@ -95,14 +95,28 @@ class TestMetaDataGenerator(object):
             fout.write(self.get_random_string(30))
         self.logger.info("Get data block file")
         swift_list_path = os.path.join(self.test_data_dir, "swift_list")
+        isGetFSmgr = False
+        isGetFSstat = False
+        isGetData = False
+        isGetMeta = False
         with open(swift_list_path, "rt") as fin:
-            for file in fin:
-                if file.startswith("data"):
-                    file = file.replace("\n", "")
-                    self.logger.info("<" + file + ">")
-                    fsstat_path = os.path.join(random_dir, file)
-                    self.swift.download_file(file, fsstat_path)
-                    break
+            for file in (x.replace("\n", "") for x in fin):
+                if file == "FSmgr_backup" and not isGetFSmgr:
+                    self.swift.download_file(
+                        file, os.path.join(random_dir, file))
+                    isGetFSmgr = True
+                if file.startswith("FSstat") and not isGetFSstat:
+                    self.swift.download_file(
+                        file, os.path.join(random_dir, file))
+                    isGetFSstat = True
+                if file.startswith("data") and not isGetData:
+                    self.swift.download_file(
+                        file, os.path.join(random_dir, file))
+                    isGetData = True
+                if file.startswith("meta") and not isGetMeta:
+                    self.swift.download_file(
+                        file, os.path.join(random_dir, file))
+                    isGetMeta = True
 
     def get_fsmgr(self):
         self.logger.info("Get fsmgr")
