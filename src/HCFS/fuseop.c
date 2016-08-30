@@ -1276,7 +1276,6 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	HCFS_STAT parent_stat;
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 	BOOL is_external = FALSE;
-	BOOL notified_delete = FALSE;
 
 	parent_inode = real_ino(req, parent);
         write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1329,19 +1328,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 
 #ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
-
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
-					  temp_dentry.d_ino, temp_dentry.d_name,
-					  strlen(temp_dentry.d_name), selfname);
-		notified_delete = TRUE;
-	}
 #endif
-	if (notified_delete == FALSE &&
-	    strcmp(temp_dentry.d_name, selfname) != 0)
-		hfuse_ll_notify_delete(tmpptr->chan_ptr, parent_inode,
-				       temp_dentry.d_ino, temp_dentry.d_name,
-				       strlen(temp_dentry.d_name));
 
 	ret_val =
 	    unlink_update_meta(req, parent_inode, &temp_dentry, is_external);
@@ -1349,12 +1336,17 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-#ifdef _ANDROID_ENV_
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
-		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-						this_inode);
-#endif
 
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		ret_val =
+		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
+
+		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
+					  temp_dentry.d_ino, temp_dentry.d_name,
+					  strlen(selfname), selfname);
+	}
+#endif
 	fuse_reply_err(req, -ret_val);
 }
 
@@ -7658,10 +7650,12 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
 	init_api_interface();
+
 	init_meta_cache_headers();
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();
+	init_hfuse_ll_notify_loop();
 	/* TODO: Move FS database backup from init_FS to here, and need
 	to first sleep a few seconds and then check if network is up,
 	before actually trying to upload. Will need to backup the FS
@@ -7670,6 +7664,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	/* Wait on the fuse semaphore, until waked up by api_interface */
 	sem_wait(&(hcfs_system->fuse_sem));
 
+	destory_hfuse_ll_notify_loop();
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();

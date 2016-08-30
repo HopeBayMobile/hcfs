@@ -1,153 +1,224 @@
+#include "fuse_notify.h"
+
+#include "hfuse_system.h"
+#include "mount_manager.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include "fuse_notify.h"
-#include "mount_manager.h"
-#include "hfuse_system.h"
 
 FUSE_NOTIFY_CYCLE_BUF notify_cb = {0};
-#define CB_OFFSET(index) (notify_cb.elems + index * notify_cb.elemsize)
+fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_delete};
 
-int32_t init_notify_cb(void)
-{
-	/* May change to largest arg size when using miltiple types */
-	notify_cb.elemsize = sizeof(FUSE_NOTIFY_DELETE_DATA);
-	notify_cb.max_len = FUSE_NOTIFY_CB_DEFAULT_LEN;
-	notify_cb.elems =
-	    (void *)malloc(notify_cb.max_len * notify_cb.elemsize);
-	sem_init(&notify_cb.tasks_sem, 1, 0);
-	sem_init(&notify_cb.access_sem, 1, 1);
-
-	return (notify_cb.elems != NULL) ? 0 : -1;
-}
-
-void destory_notify_cb(void)
-{
-	size_t i, len;
-	FUSE_NOTIFY_PROTO *data;
-
-	/* call _do_hfuse_ll_notify_XXX to free nested member */
-	for (i = notify_cb.out, len = 1; len <= notify_cb.len; i++, len++) {
-		if (i == notify_cb.max_len)
-			i = 0;
-		data = (FUSE_NOTIFY_PROTO *)CB_OFFSET(i);
-		/* call it's function with itself */
-		data->func(&data, DESTROY_CB);
-	}
-	/* free notify_cb member */
-	free(notify_cb.elems);
-	notify_cb.elems = NULL;
-
-	/* Reset notify_cb in case it's accessed again after been freed */
-	memset(&notify_cb, 0, sizeof(FUSE_NOTIFY_CYCLE_BUF));
-}
-
-BOOL notify_cb_realloc(void)
-{
-	void *newbuf = NULL;
-	size_t newsize;
-	BOOL good = FALSE;
-
-	if (notify_cb.max_len == 0) {
-		init_notify_cb();
-		return EXIT_SUCCESS;
-	}
-
-	/* enlarge buffer */
-	newsize = notify_cb.max_len * 2;
-	newbuf = realloc(notify_cb.elems, newsize * notify_cb.elemsize);
-	good = (newbuf != NULL);
-
-	if (good) {
-		notify_cb.elems = newbuf;
-		/* Concatenate wrapped segments after enlarge buffer
-		 * +------------------------+
-		 * |---->|    |<-data-------|
-		 * +------------------------+-----------------------+
-		 * |          |<-data----------->|                  |
-		 * +------------------------------------------------+
-		 *       ^    ^                  ^
-		 *       |    |                  |
-		 *       in   out                in after enlarge buf
-		 */
-		if (notify_cb.in < notify_cb.out) {
-			memcpy(CB_OFFSET(notify_cb.max_len), notify_cb.elems,
-			       (notify_cb.in + 1) * notify_cb.elemsize);
-			notify_cb.in += notify_cb.max_len;
-		}
-
-		notify_cb.max_len = newsize;
-		return EXIT_SUCCESS;
-	}
-
-	/* !good */
-	write_log(4, "Error %s failed\n", __func__);
-	return EXIT_FAILURE;
-}
+static inline BOOL notify_cb_isempty(void) { return (notify_cb.len == 0); }
 
 static inline BOOL notify_cb_isfull(void)
 {
 	return (notify_cb.len == notify_cb.max_len);
 }
 
-static inline BOOL notify_cb_isempty(void) { return (notify_cb.len == 0); }
+static inline void inc_cb_idx(size_t *x, size_t cb_size) {
+	(*x)++;
+	if (*x == cb_size)
+		*x = 0;
+}
 
-void notify_cb_enqueue(const void *const notify, size_t size)
+int32_t init_notify_cb(void)
 {
-	size_t next;
 	BOOL good = TRUE;
+	errno = 0;
+
+#define check_cb_elem_size(X)                                                  \
+	_Static_assert(FUSE_NOTIFY_CB_ELEMSIZE >= sizeof(X),                   \
+		       "FUSE_NOTIFY_CB_ELEMSIZE is not enough for " #X)
+
+	check_cb_elem_size(FUSE_NOTIFY_DELETE_DATA);
+#undef check_cb_elem_size
+
+	notify_cb.max_len = FUSE_NOTIFY_CB_DEFAULT_LEN;
+	notify_cb.in = notify_cb.max_len - 1;
+	notify_cb.out = 0;
+
+	if (good) {
+		notify_cb.elems = (void *)malloc(notify_cb.max_len *
+						 sizeof(FUSE_NOTIFY_DATA));
+		good = (notify_cb.elems != NULL);
+	}
+	if (good)
+		good = (0 == sem_init(&notify_cb.tasks_sem, 1, 0));
+	if (good)
+		good = (0 == sem_init(&notify_cb.access_sem, 1, 1));
+
+
+	if (good) {
+		notify_cb.is_initialized = TRUE;
+		write_log(4, "Debug %s: succeed. max %lu\n", __func__,
+			  notify_cb.max_len);
+	} else {
+		free(notify_cb.elems);
+		notify_cb.elems = NULL;
+		write_log(4, "Debug %s: failed: %s\n", __func__,
+			  strerror(errno));
+	}
+	return good ? 0 : -1;
+}
+
+void destory_notify_cb(void)
+{
+	size_t len;
+	FUSE_NOTIFY_PROTO *data;
+
+	if (notify_cb.is_initialized == FALSE)
+		return;
 
 	sem_wait(&notify_cb.access_sem);
 
-	if (notify_cb_isfull())
-		good = (notify_cb_realloc() == EXIT_SUCCESS);
+	/* call _do_hfuse_ll_notify_XXX to free nested member */
+	for (len = 1; len <= notify_cb.len;
+	     inc_cb_idx(&notify_cb.out, notify_cb.max_len), len++) {
+
+		data = (FUSE_NOTIFY_PROTO *)&notify_cb.elems[notify_cb.out];
+		/* call destroy action of each data */
+		notify_fn[data->func]((FUSE_NOTIFY_DATA **)&data, DESTROY_CB);
+	}
+	/* free notify_cb member */
+	free(notify_cb.elems);
+	notify_cb.elems = NULL;
+
+	notify_cb.is_initialized = FALSE;
+
+	sem_post(&notify_cb.access_sem);
+
+	write_log(4, "Debug %s: freed notify_cb.elems\n", __func__);
+}
+
+BOOL notify_cb_realloc(void)
+{
+	void *newbuf = NULL;
+	size_t newsize;
+	BOOL good = notify_cb.is_initialized;
+
+	/* enlarge buffer */
+	if (good) {
+		newsize = notify_cb.max_len * 2;
+		newbuf = realloc(notify_cb.elems,
+				 newsize * sizeof(FUSE_NOTIFY_DATA));
+		good = (newbuf != NULL);
+	}
 
 	if (good) {
-		next = notify_cb.in + 1;
-		if (next == notify_cb.max_len)
-			next = 0;
-		memcpy(CB_OFFSET(next), notify, size);
-		notify_cb.in = next;
+		notify_cb.elems = newbuf;
+
+		/* Concatenate wrapped segments after enlarge buffer
+		 * +------------------------+
+		 * |---->|    |<-data-------|
+		 * +------------------------+
+		 *       ^    ^
+		 *       |    |
+		 *       in   out
+		 *
+		 * +------------------------+-----------------------+
+		 * |          |<-data----------->|                  |
+		 * +------------------------------------------------+
+		 *            ^                  ^
+		 *            |                  |
+		 *            out                in
+		 */
+		if (notify_cb.in < notify_cb.out) {
+			memcpy(&notify_cb.elems[notify_cb.max_len],
+			       notify_cb.elems,
+			       (notify_cb.in + 1) * sizeof(FUSE_NOTIFY_DATA));
+			notify_cb.in += notify_cb.max_len;
+		}
+		notify_cb.max_len = newsize;
+	}
+
+	if (good) {
+		write_log(4, "Debug %s: done. resize to %lu\n", __func__,
+			  notify_cb.max_len);
+	} else {
+		write_log(4, "Debug %s: failed\n", __func__);
+	}
+
+	return good ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+
+void notify_cb_enqueue(const void *const notify)
+{
+	BOOL good = notify_cb.is_initialized;
+
+	if (!good) {
+		write_log(4, "Debug %s: notify buffer is not initialized\n",
+			  __func__);
+		return;
+	}
+
+	sem_wait(&notify_cb.access_sem);
+
+	if (notify_cb_isfull()) {
+		write_log(4, "Debug %s: queue is full with %lu notify\n",
+			  __func__, notify_cb.len);
+		good = (notify_cb_realloc() == EXIT_SUCCESS);
+	}
+
+	if (good) {
+		memcpy(&notify_cb.elems[notify_cb.in + 1], notify,
+		       sizeof(FUSE_NOTIFY_DATA));
+		inc_cb_idx(&notify_cb.in, notify_cb.max_len);
 		notify_cb.len++;
 	}
 
 	sem_post(&notify_cb.access_sem);
+
+	if (good)
+		write_log(4, "Debug %s: Add %lu\n", __func__, notify_cb.in);
+	else
+		write_log(4, "Debug %s: failed\n", __func__);
 }
 
 /* Dequeue the notify cycle buffer, return NULL with errno if no data or
- * other error happened
+ * other ret_val happened
  *
  * @return Pointer to FUSE_NOTIFY_PROTO on success, NULL on fail with
  * errno been set.
  */
-FUSE_NOTIFY_PROTO *notify_cb_dequeue()
+FUSE_NOTIFY_DATA *notify_cb_dequeue()
 {
-	void *data = NULL;
-	size_t data_size;
-	BOOL good = FALSE;
+	FUSE_NOTIFY_DATA *data = NULL;
+	BOOL cb_isempty;
+	BOOL good = notify_cb.is_initialized;
 
-	sem_wait(&notify_cb.access_sem);
-
-	if (notify_cb_isempty()) {
-		errno = ENODATA;
+	if (!good) {
+		write_log(4, "Debug %s: notify buffer is not initialized\n",
+			  __func__);
 		return NULL;
 	}
 
-	data_size = ((FUSE_NOTIFY_PROTO *)CB_OFFSET(notify_cb.out))->data_size;
-	good = ((data = malloc(data_size)) != NULL);
+	sem_wait(&notify_cb.access_sem);
+
+	good = ((cb_isempty = notify_cb_isempty()) == 0);
 
 	if (good) {
-		memcpy(data, CB_OFFSET(notify_cb.out), data_size);
-		notify_cb.out++;
-		if (notify_cb.out == notify_cb.max_len)
-			notify_cb.out = 0;
+		good = ((data = calloc(1, sizeof(FUSE_NOTIFY_DATA))) != NULL);
+	}
+
+	if (good) {
+		memcpy(data, &notify_cb.elems[notify_cb.out],
+		       sizeof(FUSE_NOTIFY_DATA));
+		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
+		inc_cb_idx(&notify_cb.out, notify_cb.max_len);
 		notify_cb.len--;
 	}
 
 	sem_post(&notify_cb.access_sem);
 
-	if (!good)
-		write_log(4, "Error %s: failed\n", __func__);
+	if (!good) {
+		if (cb_isempty)
+			write_log(4, "Debug: %s failed, empty queue \n",
+				  __func__);
+		else
+			write_log(4, "Debug: %s failed\n", __func__);
+	}
 
 	return data;
 }
@@ -156,25 +227,28 @@ int32_t init_hfuse_ll_notify_loop(void)
 {
 	pthread_attr_t ptattr;
 	BOOL good = TRUE;
-	int32_t error = 0;
+	int32_t ret_val = 0;
 
 	/* init enviroments */
-	if (notify_cb.max_len == 0)
-		good = (0 == init_notify_cb());
+	if (notify_cb.max_len == 0) {
+		ret_val = init_notify_cb();
+		good = (0 == ret_val);
+	}
 
 	if (good) {
 		pthread_attr_init(&ptattr);
 		pthread_attr_setdetachstate(&ptattr, PTHREAD_CREATE_DETACHED);
-		error = pthread_create(&fuse_nofify_thread, &ptattr,
-				       hfuse_ll_notify_loop, NULL);
-		good = (0 == error);
+		ret_val = -pthread_create(&fuse_nofify_thread, &ptattr,
+					  hfuse_ll_notify_loop, NULL);
+		good = (0 == ret_val);
 	}
 
-	if (good) {
-		write_log(1, "%s: done.\n", __func__);
-	}
+	if (good)
+		write_log(10, "Debug %s succeed\n", __func__);
+	else
+		write_log(1, "%s failed\n", __func__);
 
-	return good ? 0 : -error;
+	return ret_val;
 }
 
 void destory_hfuse_ll_notify_loop(void)
@@ -190,26 +264,32 @@ void destory_hfuse_ll_notify_loop(void)
 
 void *hfuse_ll_notify_loop(void *ptr)
 {
-	FUSE_NOTIFY_PROTO *data;
+	FUSE_NOTIFY_DATA *data;
+	int32_t func_num;
 
 	UNUSED(ptr);
-	write_log(4, "%s: start.\n", __func__);
+	write_log(4, "Debug %s: start\n", __func__);
 
 	while (TRUE) {
 		sem_wait(&notify_cb.tasks_sem);
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 		data = notify_cb_dequeue();
-		if (data != NULL)
-			data->func(&data, RUN);
+		if (data != NULL) {
+			func_num = ((FUSE_NOTIFY_PROTO *)data)->func;
+			notify_fn[func_num](&data, RUN);
+			write_log(10, "Debug %s: notified\n", __func__);
+		} else {
+			write_log(1, "Debug %s: error\n", __func__);
+		}
 	}
 
-	write_log(1, "%s: end.\n", __func__);
+	write_log(1, "Debug %s: loop end\n", __func__);
 	return NULL;
 }
 
 /* START -- Functions running in notify thread */
-void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_PROTO **data_ptr,
+void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_DATA **data_ptr,
 				enum NOTIFY_ACTION action)
 {
 	FUSE_NOTIFY_DELETE_DATA *data = *((FUSE_NOTIFY_DELETE_DATA **)data_ptr);
@@ -217,17 +297,20 @@ void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_PROTO **data_ptr,
 	if (action == RUN) {
 		fuse_lowlevel_notify_delete(data->ch, data->parent, data->child,
 					    data->name, data->namelen);
+		write_log(10, "Debug %s: called\n", __func__);
 	}
 
 	/* free nested member */
 	free(data->name);
 	data->name = NULL;
+	/* struct fuse_chan is shared, should not be freed here */
 
 	/* If it's not recycling notify_cb, ptr is copied in
 	 * notify_cb_dequeue. It need to be destroyed. */
 	if (action != DESTROY_CB) {
-		free(data);
+		free(*data_ptr);
 		*data_ptr = NULL;
+		write_log(10, "Debug %s: free notify data\n", __func__);
 	}
 }
 /* END -- Functions running in notify thread */
@@ -239,16 +322,20 @@ void hfuse_ll_notify_delete(struct fuse_chan *ch,
 			    const char *name,
 			    size_t namelen)
 {
-	FUSE_NOTIFY_DELETE_DATA event = {
-	    .proto.func = _do_hfuse_ll_notify_delete,
-	    .proto.data_size = sizeof(FUSE_NOTIFY_DELETE_DATA),
-	    .ch = ch,
-	    .parent = parent,
-	    .child = child,
-	    .name = strdup(name),
-	    .namelen = namelen};
-
-	notify_cb_enqueue((void *)&event, sizeof(FUSE_NOTIFY_DELETE_DATA));
+	BOOL good = TRUE;
+	FUSE_NOTIFY_DELETE_DATA event = {.func = DELETE,
+					 .ch = ch,
+					 .parent = parent,
+					 .child = child,
+					 .name = strdup(name),
+					 .namelen = namelen};
+	good = (event.name = strndup(name, namelen)) != NULL;
+	if (good) {
+		notify_cb_enqueue((void *)&event);
+		write_log(4, "Debug %s: notify queued\n", __func__);
+	} else {
+		write_log(4, "Debug %s: failed, strndup error\n", __func__);
+	}
 
 	/* wake notify thread up */
 	sem_post(&notify_cb.tasks_sem);
@@ -263,6 +350,7 @@ void hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 {
 	BOOL diffcase = (strcmp(name, selfname) != 0);
 
+	write_log(4, "Debug %s: called\n", __func__);
 	if (mount_global.fuse_default != NULL &&
 	    (diffcase || mount_global.fuse_default != ch)) {
 		hfuse_ll_notify_delete(mount_global.fuse_default, parent, child,

@@ -16,18 +16,39 @@
 #include "mount_manager.h"
 #include <semaphore.h>
 
-#define FUSE_NOTIFY_CB_DEFAULT_LEN 2
+#define FUSE_NOTIFY_CB_DEFAULT_LEN 8
+#define FUSE_NOTIFY_CB_ELEMSIZE 52
 
+
+enum NOTIFY_FUNCTION { DELETE };
 enum NOTIFY_ACTION { RUN, DESTROY_CB };
-/* Use FUSE_NOTIFY to determin notify type before load args */
-typedef struct _notify_proto {
-	/* notify prototype */
-	void (*func)(struct _notify_proto **, enum NOTIFY_ACTION);
-	size_t data_size;
+
+#define FUSE_NOTIFY_PROTO_MEMBER                                               \
+	enum NOTIFY_FUNCTION func;                                             \
+
+/* Cycle buffer and it's data slots */
+typedef struct {
+	uint8_t padding[FUSE_NOTIFY_CB_ELEMSIZE];
+} _PACKED FUSE_NOTIFY_DATA;
+typedef struct {
+	FUSE_NOTIFY_DATA *elems;
+	size_t max_len;
+	size_t len;
+	size_t in;
+	size_t out;
+	sem_t tasks_sem;
+	sem_t access_sem;
+	BOOL is_initialized;
+} FUSE_NOTIFY_CYCLE_BUF;
+
+
+/* Actual notify data defenition */
+typedef struct {
+	FUSE_NOTIFY_PROTO_MEMBER
 } _PACKED FUSE_NOTIFY_PROTO;
 
 typedef struct {
-	FUSE_NOTIFY_PROTO proto;
+	FUSE_NOTIFY_PROTO_MEMBER
 	struct fuse_chan *ch;
 	fuse_ino_t parent;
 	fuse_ino_t child;
@@ -35,20 +56,10 @@ typedef struct {
 	size_t namelen;
 } _PACKED FUSE_NOTIFY_DELETE_DATA;
 
-void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_PROTO **data, enum NOTIFY_ACTION);
+typedef void (fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
+fuse_notify_fn _do_hfuse_ll_notify_delete;
 
-typedef struct {
-	void *elems;
-	size_t max_len;
-	size_t len;
-	size_t in;
-	size_t out;
-	size_t elemsize;
-	sem_t tasks_sem;
-	sem_t access_sem;
-} FUSE_NOTIFY_CYCLE_BUF;
-
-void init_hfuse_ll_notify_loop(void);
+int32_t init_hfuse_ll_notify_loop(void);
 void destory_hfuse_ll_notify_loop(void);
 void *hfuse_ll_notify_loop(void *ptr);
 void hfuse_ll_notify_delete(struct fuse_chan *ch,
