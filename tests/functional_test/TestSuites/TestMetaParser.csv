@@ -12,4 +12,11 @@ Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,TestMetaParser_117010,test_hcfs_query_dir_list_NormalMetapath_NonexistIndexLimit,,1,Pass,dummy,0
 ,TestMetaParser_117011,test_hcfs_query_dir_list_NonexistlMetapath,,1,Pass,dummy,0
 ,TestMetaParser_117012,test_hcfs_query_dir_list_EmptyMetapath,,1,Pass,dummy,0
+,TestMetaParser_117013,test_hcfs_get_vol_usage_normal_FSstat,,1,,,
+,TestMetaParser_117014,test_hcfs_get_vol_usage_random_content_file,,1,,,
+,TestMetaParser_117015,test_hcfs_get_vol_usage_NonexistedPath,,1,,,
+,TestMetaParser_117016,test_hcfs_get_vol_usage_EmptyPath,,1,,,
+,TestMetaParser_117021,test_hcfs_behavior_external_vol_has_FSstat,,1,,,
+,TestMetaParser_117022,test_hcfs_behavior_list_file_blocks_exists,,1,,,
+,TestMetaParser_117023,test_hcfs_behavior_FSstat_exists,,1,,,
 ,TestMetaParser_99,Clear environment,,1,Pass,,72

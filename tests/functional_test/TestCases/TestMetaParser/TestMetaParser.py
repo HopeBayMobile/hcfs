@@ -82,6 +82,34 @@ class TestMetaParser_117011(list_dir_inorder_Case.NonexistMetaPathCase):
 class TestMetaParser_117012(list_dir_inorder_Case.EmptyMetaPathCase):
     pass
 
+
+class TestMetaParser_117013(get_vol_usage_Case.NormalCase):
+    pass
+
+
+class TestMetaParser_117014(get_vol_usage_Case.RandomFSstatContentCase):
+    pass
+
+
+class TestMetaParser_117015(get_vol_usage_Case.NonExistedPathCase):
+    pass
+
+
+class TestMetaParser_117016(get_vol_usage_Case.EmptyPathCase):
+    pass
+
+
+class TestMetaParser_117021(behaviorCase.ExternalVolHasFSstatCase):
+    pass
+
+
+class TestMetaParser_117022(behaviorCase.NonexistMetaPathCase):
+    pass
+
+
+class TestMetaParser_117023(behaviorCase.test_hcfs_behavior_FSstat_exists):
+    pass
+
 if __name__ == '__main__':
     TestMetaParser_00().run()
     TestMetaParser_01().run()
