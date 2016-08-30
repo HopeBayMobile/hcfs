@@ -2692,12 +2692,12 @@ correctness of restored system meta here */
 		/* Update statistics */
 		metasize = meta_stat.st_size;
 		metasize_blk = meta_stat.st_blocks * 512;
-		UPDATE_EST_SYSMETA(.delta_system_size = -metasize,
-				   .delta_meta_size = -metasize_blk,
-				   .delta_pinned_size = 0,
-				   .delta_backend_size = -metasize,
-				   .delta_backend_meta_size = -metasize,
-				   .delta_backend_inodes = -1);
+		UPDATE_RECT_SYSMETA(.delta_system_size = -metasize,
+				    .delta_meta_size = -metasize_blk,
+				    .delta_pinned_size = 0,
+				    .delta_backend_size = -metasize,
+				    .delta_backend_meta_size = -metasize,
+				    .delta_backend_inodes = -1);
 		return 0;
 	}
 
@@ -2784,12 +2784,12 @@ correctness of restored system meta here */
 		pin_size = 0;
 	metasize = meta_stat.st_size;
 	metasize_blk = meta_stat.st_blocks * 512;
-	UPDATE_EST_SYSMETA(.delta_system_size = -(metasize + this_stat.size),
-			   .delta_meta_size = -metasize_blk,
-			   .delta_pinned_size = -pin_size,
-			   .delta_backend_size = -(metasize + this_stat.size),
-			   .delta_backend_meta_size = -metasize,
-			   .delta_backend_inodes = -1);
+	UPDATE_RECT_SYSMETA(.delta_system_size = -(metasize + this_stat.size),
+			    .delta_meta_size = -metasize_blk,
+			    .delta_pinned_size = -pin_size,
+			    .delta_backend_size = -(metasize + this_stat.size),
+			    .delta_backend_meta_size = -metasize,
+			    .delta_backend_inodes = -1);
 
 //	change_system_meta(this_stat.size, meta_stat.st_size,
 //			0, 0, 0, 0, TRUE);

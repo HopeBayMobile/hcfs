@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -419,10 +420,10 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 		ret = restore_meta_structure(fptr);
 	} else {
 		ret = fstat(fileno(fptr), &block_stat);
-		if (ret == 0)
+		if (ret == 0) {
 			update_restored_cache_usage(
 				block_stat.st_blocks * 512, 1);
-		else {
+		} else {
 			ret = -errno;
 			write_log(0, "Error: Fail to fstat in %s. Code %d",
 					__func__, -ret);
@@ -542,10 +543,15 @@ int32_t _fetch_pinned(ino_t thisinode)
 	char metapath[METAPATHLEN];
 	int64_t count, totalblocks, tmpsize, seq;
 	int64_t nowpage, lastpage, filepos, nowindex;
+	int64_t num_cached_block = 0, cached_size = 0;
 	int32_t errcode, ret;
 	size_t ret_size;
+	struct stat blockstat;
 	BLOCK_ENTRY_PAGE temppage;
+	FILE_STATS_TYPE file_stats_type;
 	BOOL write_page;
+	char blockpath[BLOCKPATHLEN];
+	int64_t file_stats_pos;
 
 	fetch_restore_meta_path(metapath, thisinode);
 	fptr = fopen(metapath, "r+");
@@ -615,6 +621,16 @@ int32_t _fetch_pinned(ino_t thisinode)
 			/* Change block status in meta */
 			temppage.block_entries[nowindex].status = ST_BOTH;
 			write_page = TRUE;
+			/* Update file stats */
+			fetch_restore_block_path(blockpath, thisinode, count);
+			ret = stat(blockpath, &blockstat);
+			if (ret == 0) {
+				cached_size += blockstat.st_blocks * 512;
+				num_cached_block += 1;
+			} else {
+				write_log(0, "Error: Fail to stat block in %s."
+					" Code %d", __func__, errno);
+			}
 		}
 	}
 	if (write_page == TRUE) {
@@ -622,8 +638,16 @@ int32_t _fetch_pinned(ino_t thisinode)
 		FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
 		write_page = FALSE;
 	}
-
+	/* Update file stats */
+	file_stats_pos = offsetof(FILE_META_HEADER, fst);
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FREAD(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+	file_stats_type.num_cached_blocks = num_cached_block;
+	file_stats_type.cached_size = cached_size;
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FWRITE(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
 	fclose(fptr);
+
 	return 0;
 errcode_handle:
 	fclose(fptr);
@@ -1158,7 +1182,7 @@ void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 	rectified_system_meta->backend_inodes +=
 			delta_system_meta.delta_backend_inodes;
 	UNLOCK_RESTORED_SYSMETA();
-
+/* TODO: Write to disk every 2~3 seconds */
 	return;
 }
 
@@ -1234,6 +1258,15 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Init the system meta used to rectify space usage. Create the rectified
+ * system meta file if it does not exist. Otherwise open it and load to memory.
+ *
+ * @param restoration_stage Restoration stage tag used to find the rectified
+ *                          system meta file.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t init_rectified_system_meta(char restoration_stage)
 {
 	char rectified_usage_path[METAPATHLEN];
@@ -1249,7 +1282,7 @@ int32_t init_rectified_system_meta(char restoration_stage)
 	if (restoration_stage == RESTORING_STAGE1) /* Stage 1 */
 		snprintf(rectified_usage_path, METAPATHLEN,
 			"%s/hcfssystemfile.rectified", RESTORE_METAPATH);
-	else if (restoration_stage == RESTORING_STAGE2) /* Stage 1 */
+	else if (restoration_stage == RESTORING_STAGE2) /* Stage 2 */
 		snprintf(rectified_usage_path, METAPATHLEN,
 			"%s/hcfssystemfile.rectified", METAPATH);
 	else
