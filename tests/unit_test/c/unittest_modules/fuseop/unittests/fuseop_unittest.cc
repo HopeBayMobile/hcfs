@@ -39,7 +39,7 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 MOUNT_T unittest_mount;
 MOUNT_T_GLOBAL mount_global;
 
-static int do_delete (const char *fpath, const HCFS_STAT *sb,
+static int do_delete (const char *fpath, const struct stat *sb,
 		int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {
@@ -490,7 +490,6 @@ TEST_F(hfuse_unlinkTest, DeleteSuccess) {
   ASSERT_EQ(ret_val, -1);
   EXPECT_EQ(tmp_err, ENOENT);
 }
-
 
 /* End of the test case for the function hfuse_unlink */
 
@@ -2634,7 +2633,7 @@ TEST_F(hfuse_ll_getxattrTest, GetValueSuccess)
 	int32_t ret;
 	int32_t errcode;
 	char buf[100];
-	const char *ans = "hello!getxattr:)";
+	char const *ans = "hello!getxattr:)";
 	
 	ret = getxattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa", buf, 100);
@@ -2931,7 +2930,7 @@ TEST_F(hfuse_ll_readlinkTest, FileNotExist)
 TEST_F(hfuse_ll_readlinkTest, ReadLinkSuccess)
 {
 	char buf[100];
-	char *ans = "I_am_target_link";
+	char const *ans = "I_am_target_link";
 	int32_t ret;
 	int32_t errcode;
 
@@ -3101,7 +3100,7 @@ TEST_F(hfuse_ll_createTest, NameTooLong)
 
 TEST_F(hfuse_ll_createTest, ParentIsNotDir)
 {
-	char *name = "/tmp/test_fuse/testfile/creat_test";
+	const char *name = "/tmp/test_fuse/testfile/creat_test";
 	int32_t errcode;
 
 
@@ -3114,7 +3113,7 @@ TEST_F(hfuse_ll_createTest, ParentIsNotDir)
 
 TEST_F(hfuse_ll_createTest, ParentPermissionDenied)
 {
-	char *name = "/tmp/test_fuse/testlink_dir_perm_denied/creat_test";
+	const char *name = "/tmp/test_fuse/testlink_dir_perm_denied/creat_test";
 	int32_t errcode;
 
 	fd = creat(name, 0777);
@@ -3126,7 +3125,7 @@ TEST_F(hfuse_ll_createTest, ParentPermissionDenied)
 
 TEST_F(hfuse_ll_createTest, super_block_new_inodeFail)
 {
-	char *name = "/tmp/test_fuse/creat_test";
+	const char *name = "/tmp/test_fuse/creat_test";
 	int32_t errcode;
 
 	fail_super_block_new_inode = TRUE;
@@ -3141,7 +3140,7 @@ TEST_F(hfuse_ll_createTest, super_block_new_inodeFail)
 
 TEST_F(hfuse_ll_createTest, mknod_update_metaFail)
 {
-	char *name = "/tmp/test_fuse/creat_test";
+	const char *name = "/tmp/test_fuse/creat_test";
 	int32_t errcode;
 
 	fail_mknod_update_meta = TRUE;
@@ -3155,7 +3154,7 @@ TEST_F(hfuse_ll_createTest, mknod_update_metaFail)
 
 TEST_F(hfuse_ll_createTest, open_fhFail)
 {
-	char *name = "/tmp/test_fuse/creat_test";
+	const char *name = "/tmp/test_fuse/creat_test";
 	int32_t errcode;
 
 	fail_open_files = TRUE;
@@ -3169,18 +3168,16 @@ TEST_F(hfuse_ll_createTest, open_fhFail)
 
 TEST_F(hfuse_ll_createTest, CreateSuccess)
 {
-	char *name = "/tmp/test_fuse/creat_test";
-	int32_t errcode;
+	const char *name = "/tmp/test_fuse/creat_test";
 
 	fd = creat(name, 0777);
-	errcode = errno;
 
 	EXPECT_GT(fd, 0);
 }
 
 TEST_F(hfuse_ll_createTest, Create_NoSpace)
 {
-	char *name = "/tmp/test_fuse/creat_test";
+	const char *name = "/tmp/test_fuse/creat_test";
 	int32_t errcode;
 
   	hcfs_system->systemdata.system_meta_size = META_SPACE_LIMIT + 1;
@@ -3223,14 +3220,12 @@ class hfuse_ll_fallocateTest : public ::testing::Test {
 };
 TEST_F(hfuse_ll_fallocateTest, ExtendSize) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 
   fptr = fopen("/tmp/test_fuse/testfile2", "r+");
   ASSERT_NE(0, (fptr != NULL));
   ret_val = fallocate(fileno(fptr), 0, 0, 102400);
-  tmp_err = errno;
   fclose(fptr);
 
   ASSERT_EQ(ret_val, 0);
@@ -3240,14 +3235,12 @@ TEST_F(hfuse_ll_fallocateTest, ExtendSize) {
 }
 TEST_F(hfuse_ll_fallocateTest, ExtendSize2) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 
   fptr = fopen("/tmp/test_fuse/testfile2", "r+");
   ASSERT_NE(0, (fptr != NULL));
   ret_val = fallocate(fileno(fptr), 0, 1024, 102400);
-  tmp_err = errno;
   fclose(fptr);
 
   ASSERT_EQ(ret_val, 0);
@@ -3271,14 +3264,12 @@ TEST_F(hfuse_ll_fallocateTest, ModeNotSupported) {
 }
 TEST_F(hfuse_ll_fallocateTest, NoExtend) {
   int32_t ret_val;
-  int32_t tmp_err;
   struct stat tempstat;
   FILE *fptr;
 
   fptr = fopen("/tmp/test_fuse/testfile2", "r+");
   ASSERT_NE(0, (fptr != NULL));
   ret_val = fallocate(fileno(fptr), 0, 0, 10);
-  tmp_err = errno;
   fclose(fptr);
 
   ASSERT_EQ(ret_val, 0);
