@@ -22,7 +22,8 @@ class NormalFsmgrCase(Case):
     """
     test_hcfs_parse_fsmgr_NormalFsmgr:
           1.Call API with normal fsmgr file
-          2.(Expected) Result matched with API input and normal output spec
+          2.(Expected) Result matches  with API input and normal output spec
+          3.(Expected) Inode should match with stat inode
     """
 
     def setUp(self):
@@ -41,11 +42,11 @@ class NormalFsmgrCase(Case):
         result = list_external_volume(FSMGR_FILE)
         self.log_file.recordFunc("list_external_volume", FSMGR_FILE, result)
         expected = self.get_fsmgr_stat()
-        if result[0][0] != expected["stat"]["ino"]:
-            return False, "External volume doesn't match with expected in inode number"
         isPass, msg = self.list_external_volume_spec.check_onNormal([FSMGR_FILE], [
             result])
         return isPass, msg
+        if result[0][0] != expected["stat"]["ino"]:
+            return False, "External volume doesn't match with expected in inode number"
 
     def tearDown(self):
         self.logger.info("Teardown")
@@ -61,7 +62,7 @@ class NonexistFsmgrPathCase(NormalFsmgrCase):
     """
     test_hcfs_parse_fsmgr_NonexistFsmgrPath:
           1.Call API with non-existed fsmgr file path
-          2.(Expected) Result matched with API input and error output spec
+          2.(Expected) Result matches  with API input and error output spec
           3.(Expected) Result code must be -1
     """
 
@@ -84,7 +85,7 @@ class EmptyFsmgrPathCase(NormalFsmgrCase):
     """
     test_hcfs_parse_fsmgr_EmptyFsmgrPath:
         1.Call API with empty fsmgr file path
-        2.(Expected) Result matched with API input and error output spec
+        2.(Expected) Result matches  with API input and error output spec
         3.(Expected) Result code must be -1
     """
 
