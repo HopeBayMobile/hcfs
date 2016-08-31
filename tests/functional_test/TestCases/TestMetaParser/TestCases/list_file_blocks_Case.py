@@ -85,8 +85,7 @@ class RandomFileContentCase(NormalCase):
         random_data_dir = os.path.join(TEST_DATA_DIR, "random")
         test_file_pathes = [os.path.join(random_data_dir, x) for x in os.listdir(
             random_data_dir) if not x.startswith("meta")]
-        test_file_pathes.extend([x for x in self.get_non_file_meta_pathes()])
-        for test_file_path in test_file_pathes:
+        for test_file_path in (test_file_pathes + [x for x in self.get_non_file_meta_pathes()]):
             result = list_file_blocks(test_file_path)
             self.log_file.recordFunc(
                 "list_file_blocks", test_file_path, result)

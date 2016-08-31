@@ -106,9 +106,52 @@ class NormalCase(Case):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
+class RandomFileContentCase(NormalCase):
+    """
+    test_hcfs_list_dir_inorder_random_content_file:
+          1.Call API with random content file path(fsmgr, FSstat, file meta, data block, empty, random content)
+          2.(Expected) Result matched with API input and normal output spec
+          3.(Expected) Result offset must be (0, 0)
+          4.(Expected) Result code must be less than 0
+          5.(Expected) Result child list must be empty
+    """
+
+    def test(self):
+        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
+        test_file_pathes = [os.path.join(random_data_dir, x) for x in os.listdir(
+            random_data_dir) if not x.startswith("meta")]
+        for args in product(test_file_pathes + [x for x in self.get_non_file_meta_pathes()], VALID_OFFSET, VALID_LIMIT):
+            result = list_dir_inorder(*args)
+            self.log_file.recordFunc("list_dir_inorder", args, result)
+            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
+                result])
+            if not isPass:
+                return False, msg
+            if result["offset"] != (0, 0):
+                return False, "Offset must be (0, 0)"
+            if result["result"] >= 0:
+                return False, "Result must be less than 0"
+            if result["num_child_walked"] != 0:
+                return False, "'num_child_walked' must be 0"
+            if len(result["child_list"]) != 0:
+                return False, "Result child list must be empty"
+        return True, ""
+
+    def get_non_file_meta_pathes(self):
+        # test_data
+        #  |  12/meta_12   (meta)
+        #  |  12/12             (stat)
+        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
+            for name in (x for x in dir_names if x.isdigit()):
+                stat = self.get_stat(os.path.join(dir_path, name, name))
+                if stat["file_type"] == 1:
+                    yield os.path.abspath(os.path.join(dir_path, name, "meta_" + name))
+
+
+# inheritance NormalMetaPathCase(setUp, tearDown)
 class NormalMetaPathLimitInvalidOffsetCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NormalMetapathLimit_InvalidOffset:
+    test_hcfs_list_dir_inorder_NormalMetaPathLimit_InvalidOffset:
           1.Call API with normal meta file path, invalid offset and valid limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
@@ -139,7 +182,7 @@ class NormalMetaPathLimitInvalidOffsetCase(NormalCase):
 # inheritance NormalMetaPathCase(setUp, tearDown)
 class NormalMetaPathOffsetInvalidLimitCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NormalMetaPathOffset_InvalidLimit:
+    test_hcfs_list_dir_inorder_NormalMetaPathOffset_InvalidLimit:
           1.Call API with normal meta file path, valid offset and invalid limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
@@ -170,7 +213,7 @@ class NormalMetaPathOffsetInvalidLimitCase(NormalCase):
 # inheritance NormalMetaPathCase(setUp, tearDown)
 class NormalMetaPathInvalidOffsetLimitCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NormalMetaPath_InvalidOffsetLimit:
+    test_hcfs_list_dir_inorder_NormalMetaPath_InvalidOffsetLimit:
           1.Call API with normal meta file path, invalid offset and invalid limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
@@ -201,7 +244,7 @@ class NormalMetaPathInvalidOffsetLimitCase(NormalCase):
 # inheritance NormalMetaPathCase(setUp, tearDown)
 class NonexistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NonexistedAndEmptyPath:
+    test_hcfs_list_dir_inorder_NonexistedAndEmptyPath:
           1.Call API with non-existed adn empty file path, any offset and any limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)

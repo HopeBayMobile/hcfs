@@ -20,7 +20,7 @@ REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
 
 class NormalCase(Case):
     """
-    test_hcfs_parse_fsmgr_NormalFsmgr:
+    test_hcfs_list_external_volume_NormalFsmgr:
           1.Call API with normal fsmgr file
           2.(Expected) Result matches  with API input and normal output spec
           3.(Expected) Inode should match with stat inode
@@ -55,6 +55,29 @@ class NormalCase(Case):
     def get_fsmgr_stat(self):
         with open(FSMGR_STAT, "rt") as fin:
             return ast.literal_eval(fin.read())
+
+
+# inheritance NormalFsmgrCase(setUp, tearDown)
+class RandomFileContentCase(NormalCase):
+    """
+    test_hcfs_list_external_volume_random_content_file:
+          1.Call API with random content file path(FSstat, meta, data block, empty, random content)
+          2.(Expected) Result matches  with API input and error output spec
+          3.(Expected) Result code must be -1
+    """
+
+    def test(self):
+        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
+        for path in (os.path.join(random_data_dir, x) for x in os.listdir(random_data_dir) if not x.startswith("FSmgr")):
+            result = list_external_volume(path)
+            self.log_file.recordFunc("list_external_volume", path, result)
+            isPass, msg = self.list_external_volume_spec.check_onErr([path], [
+                result])
+            if not isPass:
+                return False, msg
+            if result >= 0:
+                return False, "Result must be less than 0"
+        return True, ""
 
 
 # inheritance NormalFsmgrCase(setUp, tearDown)

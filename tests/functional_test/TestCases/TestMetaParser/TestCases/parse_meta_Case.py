@@ -113,6 +113,28 @@ class NormalCase(Case):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
+class RandomFileContentCase(NormalCase):
+    """
+    test_hcfs_parse_meta_random_content_file:
+          1.Call API with random content file path(fsmgr, FSstat, data block, empty, random content)
+          2.(Expected) Result matched with API input and normal output spec
+          3.(Expected) Result code must be less than 0
+    """
+
+    def test(self):
+        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
+        for path in (os.path.join(random_data_dir, x) for x in os.listdir(random_data_dir) if not x.startswith("meta")):
+            result = parse_meta(path)
+            self.log_file.recordFunc("parse_meta", path, result)
+            isPass, msg = self.parse_meta_spec.check_onNormal([path], [result])
+            if not isPass:
+                return False, msg
+            if result["result"] >= 0:
+                return False, "Result code must be less than 0:" + repr(result)
+        return True, ""
+
+
+# inheritance NormalMetaPathCase(setUp, tearDown)
 class NonexistedAndEmptyPathCase(NormalCase):
     """
     test_hcfs_parse_meta_NonexistedAndEmptyPath:
