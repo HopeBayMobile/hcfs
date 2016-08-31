@@ -10,4 +10,3 @@ void hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 }
 int32_t init_hfuse_ll_notify_loop(void) { return 0; }
 void destory_hfuse_ll_notify_loop(void) {}
-

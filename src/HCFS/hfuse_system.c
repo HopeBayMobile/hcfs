@@ -522,7 +522,7 @@ int32_t main(int32_t argc, char **argv)
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();
-#else /* ! _ANDROID_ENV_ */
+#else  /* ! _ANDROID_ENV_ */
 	/* Start up children */
 	proc_idx = 0;
 	if (CURRENT_BACKEND != NONE) {

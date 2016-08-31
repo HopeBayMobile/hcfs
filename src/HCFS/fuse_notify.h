@@ -19,12 +19,10 @@
 #define FUSE_NOTIFY_CB_DEFAULT_LEN 8
 #define FUSE_NOTIFY_CB_ELEMSIZE 52
 
-
-enum NOTIFY_FUNCTION { DELETE };
+enum NOTIFY_FUNCTION { NOOP, DELETE };
 enum NOTIFY_ACTION { RUN, DESTROY_CB };
 
-#define FUSE_NOTIFY_PROTO_MEMBER                                               \
-	enum NOTIFY_FUNCTION func;                                             \
+#define FUSE_NOTIFY_PROTO_MEMBER enum NOTIFY_FUNCTION func;
 
 /* Cycle buffer and it's data slots */
 typedef struct {
@@ -41,7 +39,6 @@ typedef struct {
 	BOOL is_initialized;
 } FUSE_NOTIFY_CYCLE_BUF;
 
-
 /* Actual notify data defenition */
 typedef struct {
 	FUSE_NOTIFY_PROTO_MEMBER
@@ -56,10 +53,16 @@ typedef struct {
 	size_t namelen;
 } _PACKED FUSE_NOTIFY_DELETE_DATA;
 
-typedef void (fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
+typedef void(fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
+fuse_notify_fn _do_hfuse_ll_notify_noop;
 fuse_notify_fn _do_hfuse_ll_notify_delete;
 
 int32_t init_notify_cb(void);
+void destory_notify_cb(void);
+BOOL notify_cb_realloc(void);
+void notify_cb_enqueue(const void *const notify);
+FUSE_NOTIFY_DATA *notify_cb_dequeue();
+
 int32_t init_hfuse_ll_notify_loop(void);
 void destory_hfuse_ll_notify_loop(void);
 void *hfuse_ll_notify_loop(void *ptr);

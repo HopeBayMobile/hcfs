@@ -39,8 +39,10 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 MOUNT_T unittest_mount;
 MOUNT_T_GLOBAL mount_global;
 
-static int do_delete (const char *fpath, const struct stat *sb,
-		int32_t tflag, struct FTW *ftwbuf)
+static int do_delete(const char *fpath,
+		     const struct stat *sb,
+		     int32_t tflag,
+		     struct FTW *ftwbuf)
 {
 	switch (tflag) {
 		case FTW_D:
@@ -72,8 +74,8 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   snprintf(argv[1],90,"/tmp/test_fuse");
   snprintf(argv[2],90,"-d");
   ret_val = mkdir("/tmp/test_fuse",0777);
-  printf("create /tmp/test_fuse return %d\n",ret_val);
-//  hook_fuse(3, argv);
+  printf("create /tmp/test_fuse return %d\n", ret_val);
+  //  hook_fuse(3, argv);
   struct fuse_args tmp_args = FUSE_ARGS_INIT(3, argv);
 
   memset(tmpmount, 0, sizeof(MOUNT_T));
@@ -172,7 +174,7 @@ class fuseopEnvironment : public ::testing::Environment {
     }
     puts("unmount fuse... done");
     ret_val = nftw("/tmp/test_fuse", do_delete, 20, FTW_DEPTH);
-    printf("delete return %d\n",ret_val);
+    printf("delete return %d\n", ret_val);
     ASSERT_EQ(exit_status, 0);
     pthread_join(unittest_mount.mt_thread, NULL);
     fuse_session_remove_chan(unittest_mount.chan_ptr);
@@ -2634,7 +2636,7 @@ TEST_F(hfuse_ll_getxattrTest, GetValueSuccess)
 	int32_t errcode;
 	char buf[100];
 	char const *ans = "hello!getxattr:)";
-	
+
 	ret = getxattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa", buf, 100);
 	buf[ret] = '\0';

@@ -7,44 +7,45 @@
 #include <string.h>
 
 FUSE_NOTIFY_CYCLE_BUF notify_cb = {0};
-fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_delete};
+fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
+			       _do_hfuse_ll_notify_delete};
 
 /* Helper functions */
-#define notify_cb_isempty() (notify_cb.len == 0)
-#define notify_cb_isfull() (notify_cb.len == notify_cb.max_len)
-#define inc_cb_idx(x, cb_size)                                                 \
-	do {                                                                   \
-		(x)++;                                                         \
-		if ((x) == cb_size)                                            \
-			(x) = 0;                                               \
-	} while (0)
+
+#define check_cb_elem_size(X)                                                  \
+	_Static_assert(FUSE_NOTIFY_CB_ELEMSIZE >= sizeof(X),                   \
+		       "FUSE_NOTIFY_CB_ELEMSIZE is not enough for " #X)
+
+static inline BOOL notify_cb_isempty() { return notify_cb.len == 0; }
+static inline BOOL notify_cb_isfull()
+{
+	return notify_cb.len == notify_cb.max_len;
+}
+static inline void inc_cb_idx(size_t *x, size_t cb_size)
+{
+	(*x)++;
+	if ((*x) == cb_size)
+		(*x) = 0;
+}
 
 int32_t init_notify_cb(void)
 {
 	BOOL good = TRUE;
 	errno = 0;
 
-#define check_cb_elem_size(X)                                                  \
-	_Static_assert(FUSE_NOTIFY_CB_ELEMSIZE >= sizeof(X),                   \
-		       "FUSE_NOTIFY_CB_ELEMSIZE is not enough for " #X)
-
 	check_cb_elem_size(FUSE_NOTIFY_DELETE_DATA);
-#undef check_cb_elem_size
 
 	notify_cb.max_len = FUSE_NOTIFY_CB_DEFAULT_LEN;
 	notify_cb.in = notify_cb.max_len - 1;
-	notify_cb.out = 0;
 
-	if (good) {
-		notify_cb.elems = (void *)malloc(notify_cb.max_len *
-						 sizeof(FUSE_NOTIFY_DATA));
-		good = (notify_cb.elems != NULL);
-	}
+	notify_cb.elems =
+	    (void *)malloc(notify_cb.max_len * sizeof(FUSE_NOTIFY_DATA));
+	good = (notify_cb.elems != NULL);
+
 	if (good)
 		good = (0 == sem_init(&notify_cb.tasks_sem, 1, 0));
 	if (good)
 		good = (0 == sem_init(&notify_cb.access_sem, 1, 1));
-
 
 	if (good) {
 		notify_cb.is_initialized = TRUE;
@@ -55,7 +56,7 @@ int32_t init_notify_cb(void)
 		free(notify_cb.elems);
 		notify_cb.elems = NULL;
 		write_log(4, "Debug %s: failed. %s\n", __func__,
-			  errno ? strerror(errno) : "");
+			  strerror(errno));
 	}
 	return good ? 0 : -1;
 }
@@ -76,7 +77,7 @@ void destory_notify_cb(void)
 		data = (FUSE_NOTIFY_PROTO *)&notify_cb.elems[notify_cb.out];
 		/* call destroy action of each data */
 		notify_fn[data->func]((FUSE_NOTIFY_DATA **)&data, DESTROY_CB);
-		inc_cb_idx(notify_cb.out, notify_cb.max_len);
+		inc_cb_idx(&notify_cb.out, notify_cb.max_len);
 	}
 	/* free notify_cb member */
 	free(notify_cb.elems);
@@ -128,9 +129,6 @@ BOOL notify_cb_realloc(void)
 			notify_cb.in += notify_cb.max_len;
 		}
 		notify_cb.max_len = newsize;
-	}
-
-	if (good) {
 		write_log(4, "Debug %s: done. resize to %lu\n", __func__,
 			  notify_cb.max_len);
 	} else {
@@ -139,7 +137,6 @@ BOOL notify_cb_realloc(void)
 
 	return good ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
 
 void notify_cb_enqueue(const void *const notify)
 {
@@ -160,9 +157,9 @@ void notify_cb_enqueue(const void *const notify)
 	}
 
 	if (good) {
-		memcpy(&notify_cb.elems[notify_cb.in + 1], notify,
+		inc_cb_idx(&notify_cb.in, notify_cb.max_len);
+		memcpy(&notify_cb.elems[notify_cb.in], notify,
 		       sizeof(FUSE_NOTIFY_DATA));
-		inc_cb_idx(notify_cb.in, notify_cb.max_len);
 		notify_cb.len++;
 	}
 
@@ -186,32 +183,30 @@ FUSE_NOTIFY_DATA *notify_cb_dequeue()
 	BOOL cb_isempty;
 	BOOL good = notify_cb.is_initialized;
 
-	if (!good) {
-		write_log(4, "Debug %s: notify buffer is not initialized\n",
-			  __func__);
-		return NULL;
-	}
-
 	sem_wait(&notify_cb.access_sem);
 
-	good = ((cb_isempty = notify_cb_isempty()) == 0);
+	if(good)
+		good = ((cb_isempty = notify_cb_isempty()) == 0);
 
 	if (good) {
-		good = ((data = calloc(1, sizeof(FUSE_NOTIFY_DATA))) != NULL);
+		good = ((data = malloc(sizeof(FUSE_NOTIFY_DATA))) != NULL);
 	}
 
 	if (good) {
 		memcpy(data, &notify_cb.elems[notify_cb.out],
 		       sizeof(FUSE_NOTIFY_DATA));
 		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
-		inc_cb_idx(notify_cb.out, notify_cb.max_len);
+		inc_cb_idx(&notify_cb.out, notify_cb.max_len);
 		notify_cb.len--;
 	}
 
 	sem_post(&notify_cb.access_sem);
 
 	if (!good) {
-		if (cb_isempty)
+		if (notify_cb.is_initialized == NULL)
+			write_log(4, "Debug %s: buffer is not initialized\n",
+				  __func__);
+		else if (cb_isempty)
 			write_log(4, "Debug: %s failed, empty queue \n",
 				  __func__);
 		else
@@ -287,6 +282,11 @@ void *hfuse_ll_notify_loop(void *ptr)
 }
 
 /* START -- Functions running in notify thread */
+void _do_hfuse_ll_notify_noop(__attribute__((unused)) FUSE_NOTIFY_DATA **a,
+			      __attribute__((unused)) enum NOTIFY_ACTION b)
+{
+}
+
 void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_DATA **data_ptr,
 				enum NOTIFY_ACTION action)
 {
