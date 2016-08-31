@@ -1,9 +1,11 @@
+
 #!/bin/bash
 # vim:set tabstop=4 shiftwidth=4 softtabstop=0 expandtab:
 set -e
 # Usage Info
 
 NDK_PATH=/opt/android-ndk-r12b
+TARGET_ARCH=64
 
 ErrorReport() {
   local script="$1"
@@ -25,7 +27,7 @@ Usage() {
     local _prog=$(basename $0)
     echo "Usage: $_prog [option]..."
     echo "option:"
-    echo "  -push: push gdb version hcfs to device and open gdb console"
+    echo "  -push: set the SDK path (Default: $SDK_PATH)"
     echo "  -sdk <sdk path>: set the SDK path (Default: $SDK_PATH)"
     echo "  -h: show this usage"
     [ "$1" = 0 ] && exit 0 || exit 1
@@ -68,36 +70,34 @@ CheckTools() {
         echo "gdb doesn't include ndk data, please use -ndk pass android-ndk-r12+ path"
         _ret=1
     fi
+    if which cgdb > /dev/null 2>&1; then
+        GDB=cgdb
+    else
+        GDB=gdb
+    fi
 
     return $_ret
 }
 
-# Check parameters
-CheckParams "$@"
+PullGDBFiles() {
+    adb wait-for-device
+    SRC=system/bin
+    for i in linker${TARGET_ARCH};
+    do
+        [ ! -f ./$SRC/$i ] && adb pull /$SRC/$i ./$SRC/ || :
+    done
 
-# Check to see if tools (adb, fastboot) can be found
-CheckTools
+    SRC=system/lib${TARGET_ARCH}
+    for i in libcurl.so libcrypto.so libsqlite.so libfuse.so libjansson.so \
+        libstdc++.so libm.so libc.so libssl.so libz.so libc++.so liblog.so \
+        libicuuc.so libicui18n.so libutils.so libbacktrace.so libcutils.so \
+        libbase.so libunwind.so libnetd_client.so;
+    do
+        [ ! -f ./$SRC/$i ] && adb pull /$SRC/$i ./$SRC/ || :
+    done
+}
 
-adb kill-server
-adb wait-for-device
-
-SRC=system/bin
-for i in linker64;
-do
-    [ ! -f ./$SRC/$i ] && adb pull /$SRC/$i ./$SRC/
-done
-
-SRC=system/lib64
-for i in libcurl.so libcrypto.so libsqlite.so libfuse.so libjansson.so \
-    libstdc++.so libm.so libc.so libssl.so libz.so libc++.so liblog.so \
-    libicuuc.so libicui18n.so libutils.so libbacktrace.so libcutils.so \
-    libbase.so libunwind.so libnetd_client.so;
-do
-    [ ! -f ./$SRC/$i ] && adb pull /$SRC/$i ./$SRC/
-done
-
-set -x
-if [[ $PUSH ]]; then
+PushGDBbinary() {
     adb wait-for-device
     adb root
     if ! (adb disable-verity | grep -q already); then
@@ -107,15 +107,34 @@ if [[ $PUSH ]]; then
     fi
     adb remount
     adb push system/bin/hcfs /system/bin/
-    adb push system/lib64/libfuse.so /system/lib64/
+    adb push system/lib${TARGET_ARCH}/libfuse.so /system/lib${TARGET_ARCH}/
     adb shell 'set `ps | grep /system/bin/hcfs`; su root kill $2'&
     adb reboot
     sleep 40
+}
+
+StartGDB() {
+    adb wait-for-device
+    adb shell 'set `ps | grep /system/bin/hcfs`; su root gdbserver'${TARGET_ARCH}' --attach :5678 $2'&
+    gdbserverpid=$!
+    sleep 1
+    adb forward tcp:5678 tcp:5678
+    $GDB -x gdb.setup
+    kill $gdbserverpid
+}
+
+# Check parameters
+CheckParams "$@"
+
+# Check to see if tools (adb, fastboot) can be found
+CheckTools
+
+# Main scripts
+
+PullGDBFiles
+
+if [[ $PUSH ]]; then
+    PushGDBbinary
 fi
-set +x
-X64=64
-adb wait-for-device
-adb shell 'set `ps | grep /system/bin/hcfs`; su root gdbserver64 --attach :5678 $2'&
-sleep 1
-adb forward tcp:5678 tcp:5678
-cgdb -x gdb.setup
+
+StartGDB
