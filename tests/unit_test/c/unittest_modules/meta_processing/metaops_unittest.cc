@@ -2171,13 +2171,15 @@ protected:
 		//		malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
-		memset(&hcfs_restored_system_meta, 0,
-				sizeof(HCFS_RESTORED_SYSTEM_META));
+		hcfs_restored_system_meta = (HCFS_RESTORED_SYSTEM_META *)
+				calloc(sizeof(HCFS_RESTORED_SYSTEM_META), 1);
 	}
 
 	void TearDown()
 	{
 		//free(hcfs_system);
+		free(hcfs_restored_system_meta);
+		hcfs_restored_system_meta = NULL;
 		if (!access(work_path, F_OK))
 			system("rm -rf ./restore_meta_fileTestPath");
 	}
@@ -2256,7 +2258,18 @@ TEST_F(restore_meta_fileTest, RestoreDir_Success)
 			sizeof(CLOUD_RELATED_DATA)));
 	unlink(mock_metapath);
 
-	EXPECT_EQ(thisstat.st_size, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.system_size);
+	EXPECT_EQ(-thisstat.st_blocks * 512,
+		hcfs_restored_system_meta->rectified_system_meta.system_meta_size);
+	EXPECT_EQ(0,
+		hcfs_restored_system_meta->rectified_system_meta.pinned_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.backend_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.backend_meta_size);
+	EXPECT_EQ(-1,
+		hcfs_restored_system_meta->rectified_system_meta.backend_inodes);
 }
 
 TEST_F(restore_meta_fileTest, RestoreSymlink_Success)

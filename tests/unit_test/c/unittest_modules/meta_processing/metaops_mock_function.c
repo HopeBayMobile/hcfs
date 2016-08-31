@@ -548,5 +548,24 @@ int64_t round_size(int64_t size)
 
 void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 {
+	SYSTEM_DATA_TYPE *rectified_system_meta;
+
+	rectified_system_meta =
+			&(hcfs_restored_system_meta->rectified_system_meta);
+
+	/* Update rectified space usage */
+	rectified_system_meta->system_size +=
+			delta_system_meta.delta_system_size;
+	rectified_system_meta->system_meta_size +=
+			delta_system_meta.delta_meta_size;
+	rectified_system_meta->pinned_size +=
+			delta_system_meta.delta_pinned_size;
+	rectified_system_meta->backend_size +=
+			delta_system_meta.delta_backend_size;
+	rectified_system_meta->backend_meta_size +=
+			delta_system_meta.delta_backend_meta_size;
+	rectified_system_meta->backend_inodes +=
+			delta_system_meta.delta_backend_inodes;
+
 	return;
 }

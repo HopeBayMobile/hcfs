@@ -512,7 +512,8 @@ int32_t _update_FS_stat(ino_t rootinode)
 			&(hcfs_restored_system_meta->restored_system_meta);
 	restored_system_meta->system_size += tmpFSstat.backend_system_size;
 	restored_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
-	restored_system_meta->pinned_size += tmpFSstat.pinned_size;
+	restored_system_meta->pinned_size +=
+		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
 	restored_system_meta->backend_size += tmpFSstat.backend_system_size;
 	restored_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
 	restored_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
@@ -522,7 +523,8 @@ int32_t _update_FS_stat(ino_t rootinode)
 			&(hcfs_restored_system_meta->rectified_system_meta);
 	rectified_system_meta->system_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
-	rectified_system_meta->pinned_size += tmpFSstat.pinned_size;
+	rectified_system_meta->pinned_size +=
+		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
 	rectified_system_meta->backend_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
 	rectified_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
@@ -1166,6 +1168,8 @@ int32_t backup_package_list(void)
 void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 {
 	SYSTEM_DATA_TYPE *rectified_system_meta;
+	int64_t ret_ssize;
+	int32_t errcode;
 
 	rectified_system_meta =
 			&(hcfs_restored_system_meta->rectified_system_meta);
@@ -1184,8 +1188,14 @@ void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 			delta_system_meta.delta_backend_meta_size;
 	rectified_system_meta->backend_inodes +=
 			delta_system_meta.delta_backend_inodes;
+	if (hcfs_restored_system_meta->rect_fptr)
+		PWRITE(fileno(hcfs_restored_system_meta->rect_fptr),
+			rectified_system_meta, sizeof(SYSTEM_DATA_TYPE), 0);
 	UNLOCK_RESTORED_SYSMETA();
 /* TODO: Write to disk every 2~3 seconds */
+	return;
+
+errcode_handle:
 	return;
 }
 
