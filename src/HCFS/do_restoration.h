@@ -64,6 +64,11 @@ HCFS_RESTORED_SYSTEM_META *hcfs_restored_system_meta;
 #define PACKAGE_XML "/data/system/packages.xml"
 #define PACKAGE_LIST "/data/system/packages.list"
 
+typedef struct {
+	ino_t inode;
+	char name[MAX_FILENAME_LEN+1];
+} PRUNE_T;
+
 void init_restore_path(void);
 
 /* Returns path to status file on system restoring */

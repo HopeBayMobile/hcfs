@@ -713,6 +713,51 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 
 	return 0;
 }
+
+/* Helper function for pruning dead files / apps from FS */
+void _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
+                            int32_t prune_num)
+{
+	int32_t count;
+	char fetchedmeta[METAPATHLEN];
+	char tmppath[METAPATHLEN];
+	DIR_META_TYPE dirmeta;
+
+	fetch_restore_meta_path(fetchedmeta, thisinode);
+	fptr = fopen(fetchedmeta, "r");
+	if (fptr == NULL) {
+		write_log(0, "Error when fetching file to restore\n");
+		errcode = -errno;
+		return errcode;
+	}
+
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
+
+	for (count = 0; count < prune_num; count++) {
+		/* FEATURE TODO: write pruned inodes to disk so that
+		backend objects can be recycled later */
+		fetch_restore_meta_path(tmppath, prune_list[count].inode);
+		if (access(tmppath, F_OK) == 0) {
+			/* Delete everything inside recursively */
+			_recursive_prune(prune_list[count].inode);
+			unlink(tmppath);
+		}
+		/* Need to remove entry from meta */
+		
+
+static inline void _realloc_prune(PRUNE_T **prune_list, int32_t *max_prunes)
+{
+	PRUNE_T *tmp_prune_ptr;
+
+	tmp_prune_ptr = (PRUNE_T *) realloc(*prune_list,
+				(*max_prunes + 10) * sizeof(PRUNE_T));
+	if (tmp_prune_ptr == NULL)
+		return;
+	*prune_list = tmp_prune_ptr;
+	*max_prunes += 10;
+}
+
 int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 {
 	FILE *fptr;
@@ -725,9 +770,11 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	ino_t tmpino;
 	DIR_ENTRY *tmpptr;
 	int32_t expand_val;
-	BOOL skip_this;
+	BOOL skip_this, can_prune = FALSE;
 	int32_t ret, errcode;
 	size_t ret_size;
+	PRUNE_T *prune_list = NULL;
+	int32_t prune_index = 0, max_prunes = 0;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	fptr = fopen(fetchedmeta, "r");
@@ -746,6 +793,9 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		expand_val = _check_expand(thisinode, nowpath, depth);
 		if (expand_val == 0)
 			return 0;
+	} else {
+		if (strncmp(nowpath, "/data/app", strlen("/data/app") == 0))
+			can_prune = TRUE;
 	}
 
 	/* Fetch first page */
@@ -798,20 +848,48 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			write_log(10, "Processing %s/%s\n", nowpath,
 			          tmpptr->d_name);
 
-			/* FEATURE TODO: For high-priority pin dirs in
-			/data/app and in emulated, if missing, could
-			just prune the app out (will need to verify
-			though). Check the HL design */
-			/* FEATURE TODO: Will need to handle ENOENT
-			errors here. Some can be fixed and the restoration
-			can continue (such as broken user apps), others
-			not */
+			/* For high-priority pin dirs in /data/app, if missing,
+			could just prune the app out (will need to verify
+			though). */
 			/* First fetch the meta */
 			tmpino = tmpptr->d_ino;
 			ret = _fetch_meta(tmpino);
+			if ((ret == -ENOENT) && (can_prune == TRUE)) {
+				/* Handle app pruning for missing files
+				in /data/app here */
+				/* First check for the type of missing
+				element */
+				if ((depth != 1) ||
+				    (strcmp("base.apk", tmpptr->d_name) != 0)) {
+					/* Just remove the element */
+					if (prune_index >= max_prunes)
+						_realloc_prune(&prune_list,
+						               &max_prunes);
+					if (prune_index >= max_prunes)
+						errcode = -ENOMEM;
+						free(prune_list);
+						goto errcode_handle;
+					}
+					snprintf(prune_list[prune_index].name,
+					         MAX_FILENAME_LEN+1, "%s",
+					         tmpptr->d_name);
+					prune_list[prune_index].inode =
+					         tmpptr->d_ino;
+					prune_index++;
+					write_log(4, "%s gone from %s."
+					          " Removing.\n",
+					          tmpptr->d_name, nowpath);
+				} else {
+					/* Remove the entire app folder */
+					/* Raise the error and catch
+					it later at /data/app level */
+					errcode = ret;
+					goto errcode_handle;
+				}
+
+				continue;
+			}
 			if (ret < 0) {
-				/* FEATURE TODO: error handling,
-				such as shutdown */
 				errcode = ret;
 				goto errcode_handle;
 			}
@@ -836,7 +914,27 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 				         nowpath, tmpptr->d_name);
 				ret = _expand_and_fetch(tmpino, tmppath,
 				                        depth + 1);
-				if (ret < 0) {
+				if ((ret == -ENOENT) &&
+				    (strcmp(nowpath, "/data/app") == 0)) {
+					/* Need to prune the package */
+					if (prune_index >= max_prunes)
+						_realloc_prune(&prune_list,
+						               &max_prunes);
+					if (prune_index >= max_prunes)
+						errcode = -ENOMEM;
+						free(prune_list);
+						goto errcode_handle;
+					}
+					snprintf(prune_list[prune_index].name,
+					         MAX_FILENAME_LEN+1, "%s",
+					         tmpptr->d_name);
+					prune_list[prune_index].inode =
+					         tmpptr->d_ino;
+					prune_index++;
+					write_log(4, "%s gone from %s."
+					          " Removing.\n",
+					          tmpptr->d_name, nowpath);
+				} else if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
@@ -849,6 +947,11 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		filepos = tmppage.tree_walk_next;
 	}
 	fclose(fptr);
+	if (prune_index > 0)
+		_prune_missing_entries(thisinode, prune_list, prune_index);
+	/* FEATURE TODO: If deleting app folders from /data/app, will need to
+	set version to zero in packages.xml */
+
 	return 0;
 errcode_handle:
 	fclose(fptr);
