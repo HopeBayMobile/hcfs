@@ -13,6 +13,7 @@
 #include "mount_manager.h"
 #include "xattr_ops.h"
 #include "global.h"
+#include "do_restoration.h"
 
 /* Global vars*/
 int32_t DELETE_DIR_ENTRY_BTREE_RESULT = 1;
@@ -545,3 +546,7 @@ int64_t round_size(int64_t size)
 	return ret_size;
 }
 
+void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
+{
+	return;
+}

@@ -22,6 +22,7 @@ extern "C" {
 #include "metaops.h"
 #include "FS_manager.h"
 #include "xattr_ops.h"
+#include "do_restoration.h"
 }
 #include "gtest/gtest.h"
 
@@ -2170,6 +2171,8 @@ protected:
 		//		malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
+		memset(&hcfs_restored_system_meta, 0,
+				sizeof(HCFS_RESTORED_SYSTEM_META));
 	}
 
 	void TearDown()

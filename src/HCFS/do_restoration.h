@@ -47,12 +47,12 @@ typedef struct {
 	FILE *rect_fptr;
 } HCFS_RESTORED_SYSTEM_META;
 
-HCFS_RESTORED_SYSTEM_META hcfs_restored_system_meta;
+HCFS_RESTORED_SYSTEM_META *hcfs_restored_system_meta;
 
 #define LOCK_RESTORED_SYSMETA() \
-	sem_wait(&(hcfs_restored_system_meta.sysmeta_sem));
+	sem_wait(&(hcfs_restored_system_meta->sysmeta_sem));
 #define UNLOCK_RESTORED_SYSMETA() \
-	sem_post(&(hcfs_restored_system_meta.sysmeta_sem));
+	sem_post(&(hcfs_restored_system_meta->sysmeta_sem));
 
 #define UPDATE_RECT_SYSMETA(...) \
 	update_rectified_system_meta((DELTA_SYSTEM_META) {__VA_ARGS__})

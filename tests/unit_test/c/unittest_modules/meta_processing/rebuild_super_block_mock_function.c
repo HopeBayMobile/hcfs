@@ -196,3 +196,13 @@ int32_t update_sb_size()
 	hcfs_system->systemdata.super_block_size = tmpstat.st_size;
 	return 0;
 }
+
+int32_t init_rectified_system_meta(char restoration_stage)
+{
+	return 0;
+}
+
+int32_t rectify_space_usage()
+{
+	return 0;
+}
