@@ -1,6 +1,15 @@
 #!/bin/bash
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$here"/..
+
+# Append gdb.setup
+cat >> gdb.setup <<EOF
+set sysroot .
+target remote :5678
+cont
+EOF
+
+# Copy dependent source
 set `cat gdb.setup | grep ^directory`
 shift
 for i in $@

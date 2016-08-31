@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 all :
+
 build_dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 include $(build_dir)/ccache.mk
 include $(build_dir)/ndk-build.mk
@@ -72,17 +73,19 @@ $(ALL_OUTS): third_party/jansson force
 $(foreach t,$(TARGETS),$(eval $(t): out/$(t)-hcfs out/$(t)-hcfs-gdb))
 
 out/%-hcfs:
+	@rm -rf $@
 	ndk-build $(NDK_ARG)
 	@mkdir -p $@/system/{bin,lib64}
 	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -I{} -0r mv {} $@/system/lib64
 	@find $@/$(APP_ABI) -maxdepth 1 ! -name '*.so' -type f -print0 | xargs -I{} -0r mv {} $@/system/bin
 	@for i in $$(\ls $(build_dir)/prebuilt/$*/system/); \
-		do if [ -f $@/system/lib64/$$i ]; then rm -f $@/system/lib64/$$i; fi done
-	@ln -s $(build_dir)/internal_testing_resource/* $@/
+	  do if [ -f $@/system/lib64/$$i ]; then rm -f $@/system/lib64/$$i; fi done
+	@ln -sf $(build_dir)/internal_testing_resource/* $@/
 	@rm -rf $@/gdb.* $@/$(APP_ABI)
 
 
 out/%-hcfs-gdb:
+	@rm -rf $@ $@.zip
 	ndk-build $(NDK_ARG)
 	# Setup system folder, mapping to /system on device
 	@mkdir -p $@/system/{bin,lib64}
@@ -91,20 +94,16 @@ out/%-hcfs-gdb:
 	@find $@/$(APP_ABI) -maxdepth 1 ! -name '*.so' ! -name 'gdb.setup' -type f -print0 | xargs -I{} -0r cp {} $@/system/bin
 	# remove .so files already in device
 	@for i in $$(\ls $(build_dir)/prebuilt/$*/system/); \
-		do if [ -f $@/system/lib64/$$i ]; then rm -f $@/system/lib64/$$i; fi done
+	  do if [ -f $@/system/lib64/$$i ]; then rm -f $@/system/lib64/$$i; fi done
 	@# copy resources
-	ln -s $(build_dir)/internal_testing_resource/* $@/
+	ln -sf $(build_dir)/internal_testing_resource/* $@/
 	sed -e "s#$(build_dir)/$(@:out/%=obj/%)/local/##g" \
-		-e "s#$(build_dir)/##g" \
-		-e "\$$afile $(APP_ABI)/hcfs" \
-		-e "\$$aset sysroot ." \
-		-e "\$$atarget remote :5678" \
-		-e "\$$acont" \
-		$@/$(APP_ABI)/gdb.setup > $@/gdb.setup
+	  -e "s#$(build_dir)/##g" \
+	  -e "\$$afile $(APP_ABI)/hcfs" \
+	  $@/$(APP_ABI)/gdb.setup > $@/gdb.setup
 	$@/utils/prepare_gdb.setup.sh
-
 ifneq "$(PASSWORD)" ""
-	zip -P "$(PASSWORD)" -1 -r $@.zip $@
+	cd out && zip -P "$(PASSWORD)" -1 -r $(@:out/%=%).zip $(@:out/%=%)
 	@rm -rf $@
 endif
 

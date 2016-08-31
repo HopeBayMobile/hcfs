@@ -120,7 +120,7 @@ StartGDB() {
     sleep 1
     adb forward tcp:5678 tcp:5678
     $GDB -x gdb.setup
-    kill $gdbserverpid
+    kill $gdbserverpid || :
 }
 
 # Check parameters
