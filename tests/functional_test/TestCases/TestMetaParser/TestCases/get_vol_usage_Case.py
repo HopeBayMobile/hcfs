@@ -4,14 +4,8 @@ from Case import Case
 import config
 from Utils.metaParserAdapter import *
 from Utils.FuncSpec import FuncSpec
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
-################## test config ##################
+from Utils.tedUtils import listdir_full, listdir_path, negate
+from constant import Path
 
 
 class NormalCase(Case):
@@ -24,22 +18,17 @@ class NormalCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "get_vol_usage")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup get_vol_usage spec")
         # get_vol_usage(b"test_data/v1/android/FSstat")
         # {'result': 0, 'usage': 1373381904}
-        self.get_vol_usage_spec = FuncSpec(
-            [str], [{"result": int, "usage": int}])
+        self.func_spec = FuncSpec([str], [{"result": int, "usage": int}])
 
     def test(self):
-        for fsstat_path in self.get_fsstat():
-            result = get_vol_usage(fsstat_path)
-            self.log_file.recordFunc("get_vol_usage", fsstat_path, result)
-
-            isPass, msg = self.get_vol_usage_spec.check_onNormal(
-                [fsstat_path], [result])
+        for path in listdir_path(Path.TEST_DATA_DIR, str.startswith, ("FSstat",)):
+            result = get_vol_usage(path)
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result["result"] != 0:
@@ -49,11 +38,6 @@ class NormalCase(Case):
     def tearDown(self):
         self.logger.info("Teardown")
         self.logger.info("Do nothing")
-
-    def get_fsstat(self):
-        for root_dir, names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in names if x.startswith("FSstat")):
-                yield os.path.join(root_dir, name)
 
 
 # inheritance NormalCase(setUp, tearDown)
@@ -66,13 +50,10 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
-        for file_name in (x for x in os.listdir(random_data_dir) if not x.startswith("FSstat")):
-            test_file_path = os.path.join(random_data_dir, file_name)
-            result = get_vol_usage(test_file_path)
-            self.log_file.recordFunc("get_vol_usage", test_file_path, result)
-            isPass, msg = self.get_vol_usage_spec.check_onNormal(
-                [test_file_path], [result])
+        notstartswith = negate(str.startswith)
+        for path in listdir_path(Path.TEST_RANDOM_DIR, notstartswith, ("FSstat",)):
+            result = get_vol_usage(path)
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result["result"] != -1:
@@ -93,9 +74,7 @@ class NonExistedAndEmptyPathCase(NormalCase):
         nonexisted_path = ["/no/such/", "/no/such/file", "/and/directory", ""]
         for path in nonexisted_path:
             result = get_vol_usage(path)
-            self.log_file.recordFunc("get_vol_usage", path, result)
-            isPass, msg = self.get_vol_usage_spec.check_onNormal([path], [
-                                                                 result])
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result["result"] != -1:

@@ -4,16 +4,8 @@ from Case import Case
 import config
 from Utils.metaParserAdapter import *
 from Utils.FuncSpec import FuncSpec
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
-################## test config ##################
-# TODO empty meta file content
-# TODO random meta file content
+from Utils.tedUtils import listdir_full, listdir_path, negate
+from constant import Path
 
 
 class NormalCase(Case):
@@ -26,23 +18,20 @@ class NormalCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "meta_parser")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup parse_meta spec")
         self.set_spec()
-        instances = self.parse_meta_spec.gen_zero_instance_by_output_spec()
+        instances = self.func_spec.gen_zero_instance_by_output_spec()
         self.ERR_RESULT = instances[0]
         self.ERR_RESULT["result"] = -1
 
     def test(self):
-        for expected_stat, meta_path in self.get_stat_and_meta_path_pairs():
-            result = parse_meta(meta_path)
-            self.log_file.recordFunc("parse_meta", meta_path, result)
+        for expected_stat, path in self.get_stat_and_meta_path_pairs():
+            result = parse_meta(path)
             # RD said there aren't some fields stored in the meta file
             self.ignore_fields(expected_stat, result)
-            isPass, msg = self.parse_meta_spec.check_onNormal(
-                [meta_path], [result])
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result != expected_stat:
@@ -75,25 +64,23 @@ class NormalCase(Case):
                          "mtime": int, "mtime_nsec": int, "nlink": int,
                          "rdev": int, "size": int, "uid": int}
         output_spec_str["stat"] = stat_spec_str
-        self.parse_meta_spec = FuncSpec([str], [output_spec_str])
+        self.func_spec = FuncSpec([str], [output_spec_str])
 
     def get_stat_and_meta_path_pairs(self):
-        # test_data
-        #  |  12/meta_12   (meta)
-        #  |  12/12             (stat)
-        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in dir_names if x.isdigit()):
-                stat = self.get_stat(os.path.join(dir_path, name, name))
-                meta_path = os.path.join(dir_path, name, "meta_" + name)
-                yield (stat, os.path.abspath(meta_path))
+        for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
+            stat = self.get_stat(path, ino)
+            meta_path = os.path.join(path, "meta_" + ino)
+            yield (stat, meta_path)
 
-    def get_stat(self, path):
-        with open(path, "rt") as fin:
+    def get_stat(self, path, ino):
+        stat_path = os.path.join(path, ino)
+        with open(stat_path, "rt") as fin:
             return ast.literal_eval(fin.read())
 
     def ignore_fields(self, expected, result):
         # HCFS additional fields
-        expected["stat"]["magic"] = result["stat"]["magic"]  # TODO ???
+        # 'magic' used as meta version check
+        expected["stat"]["magic"] = result["stat"]["magic"]
         expected["stat"]["metaver"] = result["stat"]["metaver"]
         # change when access, disabled it
         expected["stat"]["atime"] = result["stat"]["atime"]
@@ -122,11 +109,10 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
-        for path in (os.path.join(random_data_dir, x) for x in os.listdir(random_data_dir) if not x.startswith("meta")):
+        notstartswith = negate(str.startswith)
+        for path in listdir_path(Path.TEST_RANDOM_DIR, notstartswith, ("meta",)):
             result = parse_meta(path)
-            self.log_file.recordFunc("parse_meta", path, result)
-            isPass, msg = self.parse_meta_spec.check_onNormal([path], [result])
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result["result"] >= 0:
@@ -147,8 +133,7 @@ class NonexistedAndEmptyPathCase(NormalCase):
         nonexisted_path = ["/no/such/", "/no/such/meta", "/and/directory", ""]
         for path in nonexisted_path:
             result = parse_meta(path)
-            self.log_file.recordFunc("parse_meta", path, result)
-            isPass, msg = self.parse_meta_spec.check_onNormal([path], [result])
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if "error_msg" in result:

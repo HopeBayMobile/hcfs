@@ -3,14 +3,8 @@ import os
 from Case import Case
 import config
 from Utils.metaParserAdapter import *
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
-################## test config ##################
+from Utils.tedUtils import listdir_full
+from constant import FileType, Path
 
 
 class ExternalVolHasFSstatCase(Case):
@@ -22,27 +16,27 @@ class ExternalVolHasFSstatCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "behavior")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Do nothing")
 
     def test(self):
-        fsmgr_path = os.path.join(TEST_DATA_DIR, "fsmgr")
+        fsmgr_path = os.path.join(Path.TEST_DATA_DIR, "fsmgr")
         result = list_external_volume(fsmgr_path)
-        self.log_file.recordFunc("list_external_volume", fsmgr_path, result)
-        swift_list_path = os.path.join(TEST_DATA_DIR, "swift_list")
-        with open(swift_list_path, "rt") as fin:
-            fsstat_inode_list = [int(line.replace("FSstat", ""))
-                                 for line in fin if line.startswith("FSstat")]
         for inode, name in result:
-            if inode not in fsstat_inode_list:
+            if inode not in self.get_swift_fsstat_inodes():
                 return False, "Missing FSstat file of (inode, name)" + repr((inode, name))
         return True, ""
 
     def tearDown(self):
         self.logger.info("Teardown")
         self.logger.info("Do nothing")
+
+    def get_swift_fsstat_inodes(self):
+        swift_list_path = os.path.join(Path.TEST_DATA_DIR, "swift_list")
+        with open(swift_list_path, "rt") as swift_list:
+            fsstat_files = [x for x in swift_list if x.startswith("FSstat")]
+            return [int(x.replace("\n", "").replace("FSstat", "")) for x in fsstat_files]
 
 
 # inheritance ExternalVolHasFSstatCase(setUp, tearDown)
@@ -54,33 +48,31 @@ class NonexistMetaPathCase(ExternalVolHasFSstatCase):
     """
 
     def test(self):
+        swift_data_list = self.get_swift_data_list()
         for meta_path in self.get_file_meta_pathes():
             result = list_file_blocks(meta_path)
-            self.log_file.recordFunc("list_file_blocks", meta_path, result)
-            swift_list_path = os.path.join(TEST_DATA_DIR, "swift_list")
-            with open(swift_list_path, "rt") as fin:
-                data_list = [line.replace("\n", "")
-                             for line in fin if line.startswith("data")]
             if result["result"] != 0:
                 return False, "Fail to call list_file_blocks" + repr((meta_path, result))
             for data_name in result["block_list"]:
-                if data_name not in data_list:
+                if data_name not in swift_data_list:
                     return False, "Data block not found in swift" + repr((data_name))
         return True, ""
 
-    def get_file_meta_pathes(self):
-        # test_data
-        #  |  12/meta_12   (meta)
-        #  |  12/12             (stat)
-        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in dir_names if x.isdigit()):
-                stat = self.get_stat(os.path.join(dir_path, name, name))
-                if stat["file_type"] == 1:  # file or TODO socket???
-                    yield os.path.abspath(os.path.join(dir_path, name, "meta_" + name))
+    def get_swift_data_list(self):
+        swift_list_path = os.path.join(Path.TEST_DATA_DIR, "swift_list")
+        with open(swift_list_path, "rt") as swift_list:
+            return [x.replace("\n", "") for x in swift_list if x.startswith("data")]
 
-    def get_stat(self, path):
-        with open(path, "rt") as fin:
-            return ast.literal_eval(fin.read())
+    def get_file_meta_pathes(self):
+        for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
+            if self.get_file_type(path, ino) == FileType.FILE:
+                yield os.path.join(path, "meta_" + ino)
+
+    def get_file_type(self, path, ino):
+        stat_path = os.path.join(path, ino)
+        with open(stat_path, "rt") as file:
+            stat = ast.literal_eval(file.read())
+            return stat["file_type"]
 
 
 # inheritance ExternalVolHasFSstatCase(setUp, tearDown)
@@ -91,22 +83,24 @@ class test_hcfs_behavior_FSstat_exists(ExternalVolHasFSstatCase):
     """
 
     def test(self):
-        swift_list_path = os.path.join(TEST_DATA_DIR, "swift_list")
-        with open(swift_list_path, "rt") as fin:
-            fsstat_inode_list = [int(line.replace("FSstat", ""))
-                                 for line in fin if line.startswith("FSstat")]
-        if self.get_data_data_inode() not in fsstat_inode_list:
+        data_FSstat, app_FSstat = self.get_data_and_app_FSstat_name()
+        swift_file_list = self.get_swift_file_list()
+        if data_FSstat not in swift_file_list:
             return False, "Missing /data/data FSstat file in swift"
-        if self.get_data_app_inode() not in fsstat_inode_list:
+        if app_FSstat not in swift_file_list:
             return False, "Missing /data/app FSstat file in swift"
         return True, ""
 
-    def get_data_data_inode(self):
-        path = os.path.join(TEST_DATA_DIR, "data_stat")
-        with open(path, "rt") as fin:
-            return ast.literal_eval(fin.read())["stat"]["ino"]
+    def get_swift_file_list(self):
+        swift_list_path = os.path.join(Path.TEST_DATA_DIR, "swift_list")
+        with open(swift_list_path, "rt") as swift_list:
+            return [x.replace("\n", "") for x in swift_list]
 
-    def get_data_app_inode(self):
-        path = os.path.join(TEST_DATA_DIR, "app_stat")
-        with open(path, "rt") as fin:
-            return ast.literal_eval(fin.read())["stat"]["ino"]
+    def get_data_and_app_FSstat_name(self):
+        with open(os.path.join(Path.TEST_DATA_DIR, "data_stat"), "rt") as data_stat_file:
+            with open(os.path.join(Path.TEST_DATA_DIR, "app_stat"), "rt") as app_stat_file:
+                data_stat = ast.literal_eval(data_stat_file.read())
+                app_stat = ast.literal_eval(app_stat_file.read())
+                data_ino = str(data_stat["stat"]["ino"])
+                app_ino = str(app_stat["stat"]["ino"])
+                return "FSstat" + data_ino, "FSstat" + app_ino

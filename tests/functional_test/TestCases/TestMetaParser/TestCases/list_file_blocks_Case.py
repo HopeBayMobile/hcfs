@@ -4,14 +4,8 @@ from Case import Case
 import config
 from Utils.metaParserAdapter import *
 from Utils.FuncSpec import FuncSpec
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
-################## test config ##################
+from Utils.tedUtils import listdir_full, listdir_path, negate
+from constant import FileType, Path
 
 
 class NormalCase(Case):
@@ -25,7 +19,6 @@ class NormalCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "list_file_blocks")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup list_file_blocks spec")
@@ -36,15 +29,13 @@ class NormalCase(Case):
         #                   'data_6086_10243_1'],
         #   'result': 0,
         #   'ret_num': 4}
-        self.list_file_blocks_spec = FuncSpec(
+        self.func_spec = FuncSpec(
             [str], [{"block_list": [str], "result":int, "ret_num":int}])
 
     def test(self):
         for meta_path in self.get_file_meta_pathes():
             result = list_file_blocks(meta_path)
-            self.log_file.recordFunc("list_file_blocks", meta_path, result)
-            isPass, msg = self.list_file_blocks_spec.check_onNormal(
-                [meta_path], [result])
+            isPass, msg = self.func_spec.check_onNormal([meta_path], [result])
             if not isPass:
                 return False, msg
             if result["result"] != 0:
@@ -58,18 +49,15 @@ class NormalCase(Case):
         self.logger.info("Do nothing")
 
     def get_file_meta_pathes(self):
-        # test_data
-        #  |  12/meta_12   (meta)
-        #  |  12/12             (stat)
-        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in dir_names if x.isdigit()):
-                stat = self.get_stat(os.path.join(dir_path, name, name))
-                if stat["file_type"] == 1:  # file or TODO socket???
-                    yield os.path.abspath(os.path.join(dir_path, name, "meta_" + name))
+        for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
+            if self.get_file_type(path, ino) == FileType.FILE:  # file or TODO socket???
+                yield os.path.join(path, "meta_" + ino)
 
-    def get_stat(self, path):
-        with open(path, "rt") as fin:
-            return ast.literal_eval(fin.read())
+    def get_file_type(self, path, ino):
+        stat_path = os.path.join(path, ino)
+        with open(stat_path, "rt") as file:
+            stat = ast.literal_eval(file.read())
+            return stat["file_type"]
 
 
 # inheritance NormalCase(setUp, tearDown)
@@ -82,30 +70,25 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
-        test_file_pathes = [os.path.join(random_data_dir, x) for x in os.listdir(
-            random_data_dir) if not x.startswith("meta")]
-        for test_file_path in (test_file_pathes + [x for x in self.get_non_file_meta_pathes()]):
-            result = list_file_blocks(test_file_path)
-            self.log_file.recordFunc(
-                "list_file_blocks", test_file_path, result)
-            isPass, msg = self.list_file_blocks_spec.check_onNormal(
-                [test_file_path], [result])
+        for path in self.get_random_test_data():
+            result = list_file_blocks(path)
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result["result"] >= 0:
                 return False, "Result should be less than 0:" + str(result)
         return True, ""
 
+    def get_random_test_data(self):
+        notstartswith = negate(str.startswith)
+        random_data_pathes = listdir_path(
+            Path.TEST_RANDOM_DIR, notstartswith, ("meta",))
+        return list(random_data_pathes) + self.get_non_file_meta_pathes()
+
     def get_non_file_meta_pathes(self):
-        # test_data
-        #  |  12/meta_12   (meta)
-        #  |  12/12             (stat)
-        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in dir_names if x.isdigit()):
-                stat = self.get_stat(os.path.join(dir_path, name, name))
-                if stat["file_type"] != 1:
-                    yield os.path.abspath(os.path.join(dir_path, name, "meta_" + name))
+        path_ino_pairs = [(path, ino)
+                          for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit)]
+        return [os.path.join(path, "meta_" + ino) for path, ino in path_ino_pairs if self.get_file_type(path, ino) != FileType.FILE]
 
 
 # inheritance NormalCase(setUp, tearDown)
@@ -121,9 +104,7 @@ class NonExistedAndEmptyPathCase(NormalCase):
         nonexisted_path = ["/no/such/", "/no/such/file", "/and/directory", ""]
         for path in nonexisted_path:
             result = list_file_blocks(path)
-            self.log_file.recordFunc("list_file_blocks", path, result)
-            isPass, msg = self.list_file_blocks_spec.check_onNormal([path], [
-                                                                    result])
+            isPass, msg = self.func_spec.check_onNormal([path], [result])
             if not isPass:
                 return False, msg
             if result["result"] != -1:

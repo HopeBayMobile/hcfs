@@ -4,18 +4,8 @@ from Case import Case
 import config
 from Utils.metaParserAdapter import *
 from Utils.FuncSpec import FuncSpec
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-FSMGR_FILE = os.path.join(TEST_DATA_DIR, "fsmgr")
-FSMGR_STAT = os.path.join(TEST_DATA_DIR, "fsmgr_stat")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
-################## test config ##################
-# TODO empty fsmgr file content
-# TODO random fsmgr file content
+from Utils.tedUtils import listdir_full, negate
+from constant import Path
 
 
 class NormalCase(Case):
@@ -28,7 +18,6 @@ class NormalCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "list_external_volume")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup list_external_volume spec")
@@ -39,10 +28,9 @@ class NormalCase(Case):
         self.list_external_volume_spec = FuncSpec([str], [[(int, str)]], [int])
 
     def test(self):
-        result = list_external_volume(FSMGR_FILE)
-        self.log_file.recordFunc("list_external_volume", FSMGR_FILE, result)
+        result = list_external_volume(Path.FSMGR_FILE)
         expected = self.get_fsmgr_stat()
-        isPass, msg = self.list_external_volume_spec.check_onNormal([FSMGR_FILE], [
+        isPass, msg = self.list_external_volume_spec.check_onNormal([Path.FSMGR_FILE], [
             result])
         return isPass, msg
         if result[0][0] != expected["stat"]["ino"]:
@@ -52,8 +40,8 @@ class NormalCase(Case):
         self.logger.info("Teardown")
         self.logger.info("Do nothing")
 
-    def get_fsmgr_stat(self):
-        with open(FSMGR_STAT, "rt") as fin:
+    def get_fsmgr_stat(self):  # TODO : multiple external volume
+        with open(Path.FSMGR_STAT, "rt") as fin:
             return ast.literal_eval(fin.read())
 
 
@@ -67,10 +55,9 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        random_data_dir = os.path.join(TEST_DATA_DIR, "random")
-        for path in (os.path.join(random_data_dir, x) for x in os.listdir(random_data_dir) if not x.startswith("FSmgr")):
+        notstartswith = negate(str.startswith)
+        for path, _ in listdir_full(Path.TEST_RANDOM_DIR, notstartswith, ("FSmgr",)):
             result = list_external_volume(path)
-            self.log_file.recordFunc("list_external_volume", path, result)
             isPass, msg = self.list_external_volume_spec.check_onErr([path], [
                 result])
             if not isPass:
@@ -93,7 +80,6 @@ class NonexistedAndEmptyPathCase(NormalCase):
         nonexisted_path = ["/no/such/", "/no/such/fsmgr", "/and/directory", ""]
         for path in nonexisted_path:
             result = list_external_volume(path)
-            self.log_file.recordFunc("list_external_volume", path, result)
             isPass, msg = self.list_external_volume_spec.check_onErr([path], [
                 result])
             if not isPass:
