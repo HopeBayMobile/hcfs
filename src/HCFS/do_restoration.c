@@ -30,6 +30,7 @@
 #include "hcfs_fromcloud.h"
 #include "metaops.h"
 #include "mount_manager.h"
+#include "dir_entry_btree.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -714,37 +715,287 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	return 0;
 }
 
-/* Helper function for pruning dead files / apps from FS */
-void _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
-                            int32_t prune_num)
+int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 {
-	int32_t count;
 	char fetchedmeta[METAPATHLEN];
-	char tmppath[METAPATHLEN];
-	DIR_META_TYPE dirmeta;
+	char thisblockpath[BLOCKPATHLEN];
+	int32_t ret, errcode;
+	FILE *metafptr = NULL;
+	HCFS_STAT this_inode_stat;
+        FILE_META_TYPE file_meta;
+        BLOCK_ENTRY_PAGE tmppage;
+        size_t ret_size;
+	int64_t total_blocks;
+	int64_t current_page;
+	int64_t count;
+        int64_t e_index, which_page;
+	int64_t page_pos;
+        char block_status;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
+	if (access(fetchedmeta, F_OK) != 0)
+		return -ENOENT;
+	if (delete_block == FALSE)
+		UNLINK(fetchedmeta);
+
+	metafptr = fopen(fetchedmeta, "r");
+	if (metafptr == NULL) {
+		errcode = -errno;
+		write_log(4, "Cannot read meta for block deletion.\n");
+		unlink(fetchedmeta);
+		return errcode;
+	}
+
+	FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
+	if (ret_size < 1) {
+		write_log(2, "Skipping block deletion (meta gone)\n");
+		fclose(metafptr);
+		return -EIO;
+	}
+
+	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
+	if (ret_size < 1) {
+		write_log(2, "Skipping block deletion (meta gone)\n");
+		fclose(metafptr);
+		return -EIO;
+	}
+
+	if (this_inode_stat.size == 0)
+		total_blocks = 0;
+	else
+		total_blocks = ((this_inode_stat.size - 1) /
+			MAX_BLOCK_SIZE) + 1;
+
+	current_page = -1;
+	for (count = 0; count < total_blocks; count++) {
+		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+		if (current_page != which_page) {
+			page_pos = seek_page2(&file_meta, metafptr,
+					which_page, 0);
+			if (page_pos <= 0) {
+				count += (MAX_BLOCK_ENTRIES_PER_PAGE
+					- 1);
+				continue;
+			}
+			current_page = which_page;
+			FSEEK(metafptr, page_pos, SEEK_SET);
+			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+				1, metafptr);
+		}
+
+		/* Skip if block does not exist */
+		block_status = tmppage.block_entries[e_index].status;
+		if ((block_status == ST_NONE) ||
+			(block_status == ST_CLOUD))
+			continue;
+
+		ret = fetch_restore_block_path(thisblockpath, thisinode,
+				count);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
+		if (access(thisblockpath, F_OK) == 0)
+			UNLINK(thisblockpath);
+	}
+	fclose(metafptr);
+	metafptr = NULL;
+
+	if (access(fetchedmeta, F_OK) == 0)
+		UNLINK(fetchedmeta);
+	return 0;
+errcode_handle:
+	if (metafptr != NULL)
+		fclose(metafptr);
+	return errcode;
+}
+
+/* Helper for pruning meta and data files of missing
+or deleted folders */
+int32_t _recursive_prune(ino_t thisinode)
+{
+	FILE *fptr;
+	char fetchedmeta[METAPATHLEN];
+	DIR_META_TYPE dirmeta;
+	DIR_ENTRY_PAGE tmppage;
+	int64_t filepos;
+	int32_t count;
+	ino_t tmpino;
+	DIR_ENTRY *tmpptr;
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	fetch_restore_meta_path(fetchedmeta, thisinode);
+	if (access(fetchedmeta, F_OK) != 0)
+		return 0;
 	fptr = fopen(fetchedmeta, "r");
+	if (fptr == NULL) {
+		write_log(0, "Error when reading files to prune\n");
+		errcode = -errno;
+		return errcode;
+	}
+
+	setbuf(fptr, NULL);
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
+
+	/* Fetch first page */
+	filepos = dirmeta.tree_walk_list_head;
+
+	while (filepos != 0) {
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
+		FSEEK(fptr, filepos, SEEK_SET);
+		FREAD(&tmppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+		write_log(10, "Filepos %lld, entries %d\n", filepos,
+		       tmppage.num_entries);
+		for (count = 0; count < tmppage.num_entries; count++) {
+			tmpptr = &(tmppage.dir_entries[count]);
+			
+			if (tmpptr->d_ino == 0)
+				continue;
+			/* Skip "." and ".." */
+			if (strcmp(tmpptr->d_name, ".") == 0)
+				continue;
+			if (strcmp(tmpptr->d_name, "..") == 0)
+				continue;
+
+			tmpino = tmpptr->d_ino;
+			switch (tmpptr->d_type) {
+			case D_ISLNK:
+				/* Just delete the meta */
+				delete_meta_blocks(tmpino, FALSE);
+				break;
+			case D_ISREG:
+			case D_ISFIFO:
+			case D_ISSOCK:
+				/* Delete the blocks and meta */
+				delete_meta_blocks(tmpino, TRUE);
+				break;
+			case D_ISDIR:
+				/* Need to expand */
+				ret = _recursive_prune(tmpino);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				break;
+			default:
+				break;
+			}
+		}
+		/* Continue to the next page */
+		filepos = tmppage.tree_walk_next;
+	}
+	fclose(fptr);
+	unlink(fetchedmeta);
+	return 0;
+errcode_handle:
+	fclose(fptr);
+	return errcode;
+}
+/* Helper function for pruning dead files / apps from FS */
+int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
+                            int32_t prune_num)
+{
+	int32_t count, ret, errcode;
+	char fetchedmeta[METAPATHLEN];
+	char tmppath[METAPATHLEN];
+	DIR_META_TYPE parent_meta;
+	DIR_ENTRY tmpentry;
+	HCFS_STAT parent_stat;
+	DIR_ENTRY_PAGE tpage;
+	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
+	int64_t temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	FILE *fptr = NULL;
+	size_t ret_size;
+
+	fetch_restore_meta_path(fetchedmeta, thisinode);
+	fptr = fopen(fetchedmeta, "r+");
 	if (fptr == NULL) {
 		write_log(0, "Error when fetching file to restore\n");
 		errcode = -errno;
 		return errcode;
 	}
+	setbuf(fptr, NULL);
 
-	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
-	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&parent_stat, sizeof(HCFS_STAT), 1, fptr);
+	FREAD(&parent_meta, sizeof(DIR_META_TYPE), 1, fptr);
 
 	for (count = 0; count < prune_num; count++) {
 		/* FEATURE TODO: write pruned inodes to disk so that
 		backend objects can be recycled later */
-		fetch_restore_meta_path(tmppath, prune_list[count].inode);
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
+		fetch_restore_meta_path(tmppath, prune_list[count].entry.d_ino);
 		if (access(tmppath, F_OK) == 0) {
 			/* Delete everything inside recursively */
-			_recursive_prune(prune_list[count].inode);
-			unlink(tmppath);
+			ret = _recursive_prune(prune_list[count].entry.d_ino);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 		}
 		/* Need to remove entry from meta */
-		
+		memcpy(&tmpentry, &(prune_list[count].entry),
+		       sizeof(DIR_ENTRY));
+
+		/* Initialize B-tree deletion by first loading the
+		root of B-tree */
+		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
+		memset(temp_dir_entries, 0,
+		       sizeof(DIR_ENTRY) * (2*(MAX_DIR_ENTRIES_PER_PAGE+2)));
+		memset(temp_child_page_pos, 0,
+		       sizeof(int64_t) * (2*(MAX_DIR_ENTRIES_PER_PAGE+3)));
+		tpage.this_page_pos = parent_meta.root_entry_page;
+
+		/* Read root node */
+		FSEEK(fptr, parent_meta.root_entry_page, SEEK_SET);
+		FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+		/* Recursive B-tree deletion routine*/
+		ret = delete_dir_entry_btree(&tmpentry, &tpage,
+			fileno(fptr), &parent_meta, temp_dir_entries,
+			temp_child_page_pos, FALSE);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
+		write_log(10, "delete dir entry returns %d\n", ret);
+
+		/* If the entry is a subdir, decrease the hard link of
+		*  the parent*/
+
+		if (tmpentry.d_type == D_ISDIR)
+			parent_stat.nlink--;
+
+		parent_meta.total_children--;
+		write_log(10, "TOTAL CHILDREN is now %lld\n",
+					parent_meta.total_children);
+		set_timestamp_now(&parent_stat, MTIME | CTIME);
+
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&parent_stat, sizeof(HCFS_STAT), 1, fptr);
+		FWRITE(&parent_meta, sizeof(DIR_META_TYPE), 1, fptr);
+	}
+
+	return 0;
+errcode_handle:
+	write_log(0, "Unable to prune missing entries in restoration. (%"
+	          PRIu64 "\n", thisinode);
+	fclose(fptr);
+	return errcode;
+}
 
 static inline void _realloc_prune(PRUNE_T **prune_list, int32_t *max_prunes)
 {
@@ -784,6 +1035,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		return errcode;
 	}
 
+	setbuf(fptr, NULL);
 	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
 
@@ -865,16 +1117,13 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 					if (prune_index >= max_prunes)
 						_realloc_prune(&prune_list,
 						               &max_prunes);
-					if (prune_index >= max_prunes)
+					if (prune_index >= max_prunes) {
 						errcode = -ENOMEM;
 						free(prune_list);
 						goto errcode_handle;
 					}
-					snprintf(prune_list[prune_index].name,
-					         MAX_FILENAME_LEN+1, "%s",
-					         tmpptr->d_name);
-					prune_list[prune_index].inode =
-					         tmpptr->d_ino;
+					memcpy(&(prune_list[prune_index].entry),
+					       tmpptr, sizeof(DIR_ENTRY));
 					prune_index++;
 					write_log(4, "%s gone from %s."
 					          " Removing.\n",
@@ -920,16 +1169,13 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 					if (prune_index >= max_prunes)
 						_realloc_prune(&prune_list,
 						               &max_prunes);
-					if (prune_index >= max_prunes)
+					if (prune_index >= max_prunes) {
 						errcode = -ENOMEM;
 						free(prune_list);
 						goto errcode_handle;
 					}
-					snprintf(prune_list[prune_index].name,
-					         MAX_FILENAME_LEN+1, "%s",
-					         tmpptr->d_name);
-					prune_list[prune_index].inode =
-					         tmpptr->d_ino;
+					memcpy(&(prune_list[prune_index].entry),
+					       tmpptr, sizeof(DIR_ENTRY));
 					prune_index++;
 					write_log(4, "%s gone from %s."
 					          " Removing.\n",
@@ -952,9 +1198,12 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	/* FEATURE TODO: If deleting app folders from /data/app, will need to
 	set version to zero in packages.xml */
 
+	free(prune_list);
 	return 0;
+
 errcode_handle:
 	fclose(fptr);
+	free(prune_list);
 	return errcode;
 }
 
@@ -1005,14 +1254,14 @@ int32_t _restore_system_quota(void)
 	int32_t ret, errcode;
 
 
-        sem_wait(&(download_usermeta_ctl.access_sem));
-        if (download_usermeta_ctl.active == TRUE) {
-                sem_post(&(download_usermeta_ctl.access_sem));
-                write_log(0, "Quota download is already in progress?\n");
-                return -EBUSY;
-        } else {
-                download_usermeta_ctl.active = TRUE;
-        }
+	sem_wait(&(download_usermeta_ctl.access_sem));
+	if (download_usermeta_ctl.active == TRUE) {
+		sem_post(&(download_usermeta_ctl.access_sem));
+		write_log(0, "Quota download is already in progress?\n");
+		return -EBUSY;
+	} else {
+		download_usermeta_ctl.active = TRUE;
+	}
 	sem_post(&(download_usermeta_ctl.access_sem));
 
 	fetch_quota_from_cloud(NULL, FALSE);
