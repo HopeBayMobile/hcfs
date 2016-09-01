@@ -97,17 +97,8 @@ int32_t parse_xattr_namespace(const char *name, char *name_space, char *key)
  */
 static uint32_t hash(const char *input)
 {
-	uint32_t hash = 5381;
-	int32_t index;
-
-	index = 0;
-	while (input[index]) {
-		hash = (((hash << 5) + hash + input[index])
-				% MAX_KEY_HASH_ENTRY);
-		index++;
-	}
-
-	return hash;
+	/* FIXME: the string length can be calculated in advance. */
+	return djb_hash(input, strlen(input)) % MAX_KEY_HASH_ENTRY;
 }
 
 /**

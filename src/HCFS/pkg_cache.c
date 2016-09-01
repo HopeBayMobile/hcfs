@@ -20,6 +20,7 @@
 
 #include "logger.h"
 #include "params.h"
+#include "utils.h"
 
 /**
  * Hash package name.
@@ -28,17 +29,8 @@
  */
 static inline int32_t _pkg_hash(const char *input)
 {
-	int32_t hash = 5381;
-	int32_t index;
-
-	index = 0;
-	while (input[index]) {
-		hash = (((hash << 5) + hash + input[index]) &
-				(PKG_HASH_SIZE - 1));
-		index++;
-	}
-
-	return hash;
+	/* FIXME: the string length can be calculated in advance. */
+	return djb_hash(input, strlen(input)) & (PKG_HASH_SIZE - 1);
 }
 
 /**
