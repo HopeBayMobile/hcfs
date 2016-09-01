@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "hfuse_system.h"
 #include "mount_manager.h"
 
@@ -188,50 +189,46 @@ FUSE_NOTIFY_DATA *notify_cb_dequeue()
 	if(good)
 		good = ((cb_isempty = notify_cb_isempty()) == 0);
 
-	if (good) {
+	if (good)
 		good = ((data = malloc(sizeof(FUSE_NOTIFY_DATA))) != NULL);
-	}
 
 	if (good) {
 		memcpy(data, &notify_cb.elems[notify_cb.out],
 		       sizeof(FUSE_NOTIFY_DATA));
-		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
 		inc_cb_idx(&notify_cb.out, notify_cb.max_len);
 		notify_cb.len--;
 	}
 
 	sem_post(&notify_cb.access_sem);
 
-	if (!good) {
-		if (notify_cb.is_initialized == NULL)
-			write_log(4, "Debug %s: buffer is not initialized\n",
-				  __func__);
-		else if (cb_isempty)
-			write_log(4, "Debug: %s failed, empty queue \n",
-				  __func__);
-		else
-			write_log(4, "Debug: %s failed\n", __func__);
-	}
+	if (good)
+		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
+	else if (notify_cb.is_initialized == 0)
+		write_log(4, "Debug %s: failed. %s\n", __func__,
+			  "Buffer is not initialized.");
+	else if (cb_isempty)
+		write_log(4, "Debug %s: failed. %s\n", __func__,
+			  "Trying to dequeue an empty queue.");
+	else
+		write_log(4, "Debug %s: failed. %s\n", __func__,
+			  "malloc failed.");
 
 	return data;
 }
 
 int32_t init_hfuse_ll_notify_loop(void)
 {
-	pthread_attr_t ptattr;
 	BOOL good = TRUE;
 	int32_t ret_val = 0;
 
 	/* init enviroments */
-	if (notify_cb.max_len == 0) {
+	if (notify_cb.is_initialized == FALSE) {
 		ret_val = init_notify_cb();
 		good = (0 == ret_val);
 	}
 
 	if (good) {
-		pthread_attr_init(&ptattr);
-		pthread_attr_setdetachstate(&ptattr, PTHREAD_CREATE_DETACHED);
-		ret_val = -pthread_create(&fuse_nofify_thread, &ptattr,
+		ret_val = -pthread_create(&fuse_nofify_thread, NULL,
 					  hfuse_ll_notify_loop, NULL);
 		good = (0 == ret_val);
 	}
@@ -246,13 +243,19 @@ int32_t init_hfuse_ll_notify_loop(void)
 
 void destory_hfuse_ll_notify_loop(void)
 {
+	BOOL good = TRUE;
+	int32_t ret = 0;
 	/* let loop handle destory tasks itself */
 	sem_post(&notify_cb.tasks_sem);
 
-	pthread_join(event_loop_thread, NULL);
+	good = (ret = pthread_join(fuse_nofify_thread, NULL)) == 0;
+	if (!good)
+		write_log(1, "Error %s: join nofify_thread failed. %s\n",
+			  __func__, strerror(ret));
 
 	/* destory enviroments */
-	destory_notify_cb();
+	if (good)
+		destory_notify_cb();
 }
 
 void *hfuse_ll_notify_loop(void *ptr)
