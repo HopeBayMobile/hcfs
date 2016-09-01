@@ -21,10 +21,10 @@ def setup():
     cleanup()
 
     cmd = "make"
-    with open(os.devnull, 'w') as shutup:
-        pipe = subprocess.Popen(
-            cmd, shell=True, stdout=shutup, stderr=shutup, cwd=THIS_DIR)
-        pipe.communicate()
+    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE,
+                            stderr=PIPE, cwd=THIS_DIR)
+    out, err = pipe.communicate()
+    logger.debug("setup" + repr((out, err)))
     assert os.path.isfile(BIN_LOCAL_PATH), "Fail to make " + BIN_NAME
 
     adb.push_as_root(BIN_LOCAL_PATH, BIN_PHONE_PATH, BIN_NAME)
@@ -45,10 +45,9 @@ def cleanup():
             BIN_PHONE_PATH), "Fail to clean bin file."
 
     cmd = "make clean"
-    with open(os.devnull, 'w') as shutup:
-        pipe = subprocess.Popen(
-            cmd, shell=True, stdout=shutup, stderr=shutup, cwd=THIS_DIR)
-        pipe.communicate()
+    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE,
+                            stderr=PIPE, cwd=THIS_DIR)
+    pipe.communicate()
     assert not os.path.isfile(BIN_LOCAL_PATH), "Fail to make clean."
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ def setup():
     assert adb.isAvailable(), "Adb device not found."
 
     cmd = "cd " + HCFSCONF_BIN_DIR + " && make hcfsconf"
-    pipe = subprocess.Popen(cmd, shell=True)
+    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     pipe.communicate()
     assert os.path.isfile(HCFSCONF_BIN), "Fail to make hcfsconf."
 
@@ -59,7 +59,7 @@ def get_by_key(key):
 def cleanup():
     logger.info("hcfsconf cleanup")
     cmd = "cd " + HCFSCONF_BIN_DIR + " && make clean"
-    pipe = subprocess.Popen(cmd, shell=True)
+    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     pipe.communicate()
     assert not os.path.isfile(HCFSCONF_BIN), "Fail to make clean hcfsconf."
 
