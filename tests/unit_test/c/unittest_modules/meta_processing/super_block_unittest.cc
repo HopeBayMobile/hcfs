@@ -3115,7 +3115,8 @@ TEST_F(check_init_super_blockTest, SuperblockExist_JustOpenIt)
 	SUPER_BLOCK_HEAD sb_head;
 
 	memset(&sb_head, 0, sizeof(SUPER_BLOCK_HEAD));
-	sb_head.now_rebuild = FALSE;
+	hcfs_system->system_restoring = NOT_RESTORING;
+	//sb_head.now_rebuild = FALSE;
 	sprintf(sb_path, "%s/superblock", METAPATH);
 	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
 
@@ -3147,7 +3148,8 @@ TEST_F(check_init_super_blockTest, SuperblockExist_KeepRebuilding)
 	SUPER_BLOCK_HEAD sb_head;
 
 	memset(&sb_head, 0, sizeof(SUPER_BLOCK_HEAD));
-	sb_head.now_rebuild = TRUE;
+	hcfs_system->system_restoring = RESTORING_STAGE2;
+	//sb_head.now_rebuild = TRUE;
 	sprintf(sb_path, "%s/superblock", METAPATH);
 	sprintf(unclaimedfile_path, "%s/unclaimedfile_path", METAPATH);
 

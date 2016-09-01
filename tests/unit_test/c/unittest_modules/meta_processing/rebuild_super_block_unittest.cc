@@ -63,6 +63,7 @@ protected:
 		sys_super_block = (SUPER_BLOCK_CONTROL *)
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
 		NOW_NO_ROOTS = FALSE;
+		hcfs_system->system_restoring = RESTORING_STAGE2;
 	}
 	void TearDown()
 	{
@@ -70,6 +71,7 @@ protected:
 		free(queuefile_path);
 		free(sys_super_block);
 		system("rm -rf ./rebuild_sb_running_folder/*");
+		hcfs_system->system_restoring = NOT_RESTORING;
 	}
 };
 
@@ -88,7 +90,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	fread(&sb_head, sizeof(SUPER_BLOCK_HEAD), 1, fptr);
 	memset(&exp_sb_head, 0, sizeof(SUPER_BLOCK_HEAD));
 	exp_sb_head.num_total_inodes = 5; /* Mock number is set in mock function */
-	exp_sb_head.now_rebuild = TRUE;
+	//exp_sb_head.now_rebuild = TRUE;
 
 	EXPECT_EQ(0, memcmp(&exp_sb_head, &sb_head, sizeof(SUPER_BLOCK_HEAD)));
 	fclose(fptr);
@@ -713,6 +715,7 @@ protected:
 			free(rebuild_sb_tpool);
 		unlink(queuefile_path);
 		system("rm -rf ./rebuild_sb_running_folder/*");
+		hcfs_system->system_restoring = NOT_RESTORING;
 	}
 };
 
@@ -726,11 +729,14 @@ TEST_F(create_sb_rebuilderTest, NoBackendInfo)
 
 TEST_F(create_sb_rebuilderTest, EmptyQueueFile_RebuildSuccess)
 {
+	int32_t val;
+
 	CURRENT_BACKEND = SWIFT;
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = TRUE;
-	sys_super_block->head.now_rebuild = TRUE;
+	hcfs_system->system_restoring = RESTORING_STAGE2;
+	//sys_super_block->head.now_rebuild = TRUE;
 	EXPECT_EQ(0, create_sb_rebuilder());
 
 	/* Wait */
@@ -741,7 +747,7 @@ TEST_F(create_sb_rebuilderTest, EmptyQueueFile_RebuildSuccess)
 	EXPECT_EQ(0, rebuild_sb_tpool->num_active);
 	for (int i = 0; i < NUM_THREADS_IN_POOL; i++)
 		EXPECT_EQ(FALSE, rebuild_sb_tpool->thread[i].active);
-	EXPECT_EQ(FALSE, sys_super_block->head.now_rebuild);
+	//EXPECT_EQ(FALSE, sys_super_block->head.now_rebuild);
 	destroy_rebuild_sb(FALSE);
 }
 
@@ -764,7 +770,7 @@ TEST_F(create_sb_rebuilderTest, RootInQueueFile_BackendFromOfflineToOnline)
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->system_restoring = RESTORING_STAGE2;
-	sys_super_block->head.now_rebuild = TRUE;
+	//sys_super_block->head.now_rebuild = TRUE;
 	EXPECT_EQ(0, create_sb_rebuilder());
 
 	nanosleep(&sleep_time, NULL);
@@ -779,7 +785,7 @@ TEST_F(create_sb_rebuilderTest, RootInQueueFile_BackendFromOfflineToOnline)
 	EXPECT_EQ(0, rebuild_sb_tpool->num_active);
 	for (int i = 0; i < NUM_THREADS_IN_POOL; i++)
 		EXPECT_EQ(FALSE, rebuild_sb_tpool->thread[i].active);
-	EXPECT_EQ(FALSE, sys_super_block->head.now_rebuild);
+	//EXPECT_EQ(FALSE, sys_super_block->head.now_rebuild);
 	destroy_rebuild_sb(FALSE);
 
 	for (int i = 1; i <= max_record_inode ; i++)
