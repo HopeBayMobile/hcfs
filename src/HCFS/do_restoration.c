@@ -805,6 +805,7 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 	fclose(metafptr);
 	metafptr = NULL;
 
+	/* FEATURE TODO: Need to adjust statistics after deletion */
 	if (access(fetchedmeta, F_OK) == 0)
 		UNLINK(fetchedmeta);
 	return 0;
