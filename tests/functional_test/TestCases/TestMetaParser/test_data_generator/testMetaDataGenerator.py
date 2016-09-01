@@ -16,12 +16,17 @@ import adb
 
 class TestMetaDataGenerator(object):
 
-    def __init__(self, phone_id, fsmgr, test_data_dir, inodes, swift):
+    def __init__(self, phone_id, fsmgr, test_data_dir, pathes, swift):
         self.logger = config.get_logger().getChild(__name__)
         self.phone_id = phone_id
         self.fsmgr = fsmgr
         self.test_data_dir = test_data_dir
-        self.inodes = inodes
+        if os.path.exists(self.test_data_dir):
+            shutil.rmtree(self.test_data_dir)
+        os.makedirs(self.test_data_dir)
+        self.random_dir = os.path.join(self.test_data_dir, "random")
+        os.makedirs(self.random_dir)
+        self.stats = [self.get_file_stat(path) for path in pathes]
         self.swift = swift
 
     def get_data(self):
@@ -45,78 +50,60 @@ class TestMetaDataGenerator(object):
 
     def get_swift_list(self):
         self.logger.info("Get swift list")
-        path = os.path.join(self.test_data_dir, "swift_list")
-        out, err = self.swift.download_file(None, path)
+        swift_list_path = os.path.join(self.test_data_dir, "swift_list")
+        tmp_path = os.path.join(self.test_data_dir, "tmp")
+        with open(swift_list_path, "wt") as swift_list:
+            self.swift.download_file(None, tmp_path)
+            marker = ""
+            while True:
+                with open(tmp_path, "rt") as fin:
+                    files = fin.readlines()
+                    if files[-1] == marker + "\n":
+                        os.remove(tmp_path)
+                        return
+                    swift_list.write("".join(files))
+                    marker = files[-1].replace("\n", "")
+                self.swift.download_list_from_marker(tmp_path, marker)
 
     def get_partition_stat(self):
-        self.logger.info("Get /sdcard stat")
         # TODO multiple external volume???
-        fsmgr_stat = os.path.join(self.test_data_dir, "fsmgr_stat")
-        with open(fsmgr_stat, "wt") as fout:
-            data = self.get_file_stat("/storage/emulated")
-            self.logger.debug("fetch" + repr((data, fsmgr_stat)))
-            fout.write(repr(data))
-        self.logger.info("Get /data/data stat")
-        data_stat = os.path.join(self.test_data_dir, "data_stat")
-        with open(data_stat, "wt") as fout:
-            data = self.get_file_stat("/data/data")
-            self.logger.debug("fetch" + repr((data, data_stat)))
-            fout.write(repr(data))
-        self.logger.info("Get /data/app stat")
-        app_stat = os.path.join(self.test_data_dir, "app_stat")
-        with open(app_stat, "wt") as fout:
-            data = self.get_file_stat("/data/app")
-            self.logger.debug("fetch" + repr((data, app_stat)))
-            fout.write(repr(data))
+        with open(os.path.join(self.test_data_dir, "fsmgr_stat"), "wt") as fsmgr_stat:
+            self.logger.info("Get /sdcard stat")
+            fsmgr_stat.write(repr(self.get_file_stat("/storage/emulated")))
+        with open(os.path.join(self.test_data_dir, "data_stat"), "wt") as data_stat:
+            self.logger.info("Get /data/data stat")
+            data_stat.write(repr(self.get_file_stat("/data/data")))
+        with open(os.path.join(self.test_data_dir, "app_stat"), "wt") as app_stat:
+            self.logger.info("Get /data/app stat")
+            app_stat.write(repr(self.get_file_stat("/data/app")))
 
     def get_fsstat(self):
         self.logger.info("Get FSstat")
-        path = os.path.join(self.test_data_dir, "swift_list")
-        with open(path, "rt") as fin:
-            for file in fin:
+        with open(os.path.join(self.test_data_dir, "swift_list"), "rt") as swift_list:
+            for file in (x.replace("\n", "") for x in swift_list):
                 if file.startswith("FSstat"):
-                    file = file.replace("\n", "")
                     self.logger.info("<" + file + ">")
                     fsstat_path = os.path.join(self.test_data_dir, file)
                     self.swift.download_file(file, fsstat_path)
 
     def get_random_data(self):
-        random_dir = os.path.join(self.test_data_dir, "random")
-        if os.path.exists(random_dir):
-            shutil.rmtree(random_dir)
-        os.makedirs(random_dir)
-        self.logger.info("Get empty content file")
-        empty_file_path = os.path.join(random_dir, "empty")
-        with open(empty_file_path, "wt") as fout:
-            pass
-        self.logger.info("Get random content file")
-        random_file_path = os.path.join(random_dir, "random")
-        with open(random_file_path, "wt") as fout:
-            fout.write(self.get_random_string(30))
-        self.logger.info("Get data block file")
-        swift_list_path = os.path.join(self.test_data_dir, "swift_list")
-        isGetFSmgr = False
-        isGetFSstat = False
-        isGetData = False
-        isGetMeta = False
-        with open(swift_list_path, "rt") as fin:
-            for file in (x.replace("\n", "") for x in fin):
-                if file == "FSmgr_backup" and not isGetFSmgr:
-                    self.swift.download_file(
-                        file, os.path.join(random_dir, file))
-                    isGetFSmgr = True
-                if file.startswith("FSstat") and not isGetFSstat:
-                    self.swift.download_file(
-                        file, os.path.join(random_dir, file))
-                    isGetFSstat = True
-                if file.startswith("data") and not isGetData:
-                    self.swift.download_file(
-                        file, os.path.join(random_dir, file))
-                    isGetData = True
-                if file.startswith("meta") and not isGetMeta:
-                    self.swift.download_file(
-                        file, os.path.join(random_dir, file))
-                    isGetMeta = True
+        with open(os.path.join(self.random_dir, "empty"), "wt") as empty:
+            self.logger.info("Get empty content file")
+        with open(os.path.join(self.random_dir, "random"), "wt") as random:
+            self.logger.info("Get random content file")
+            random.write(self.get_random_string(30))
+        with open(os.path.join(self.test_data_dir, "swift_list"), "rt") as swift_list:
+            self.logger.info("Get data block file")
+            files = [x.replace("\n", "") for x in swift_list]
+
+            def download(prefix):
+                file = [x for x in files if x.startswith(prefix)][0]
+                new_path = os.path.join(self.random_dir, file)
+                self.swift.download_file(file, new_path)
+            download("FSmgr")
+            download("FSstat")
+            download("data")
+            download("meta")
 
     def get_fsmgr(self):
         self.logger.info("Get fsmgr")
@@ -125,30 +112,21 @@ class TestMetaDataGenerator(object):
 
     def get_test_data_meta(self):
         self.logger.info("Get metas")
-        for inode in [str(self.stat_inode(path)) for path in self.inodes]:
+        for stat in self.stats:
+            inode = str(stat["stat"]["ino"])
             meta_name = "meta_" + inode
             new_path = os.path.join(self.test_data_dir, inode, meta_name)
-            out, err = self.swift.download_file(meta_name, new_path)
+            self.swift.download_file(meta_name, new_path)
 
     def get_test_data_stat(self):
         self.logger.info("Get stats")
-        for path in self.inodes:
+        for stat in self.stats:
             self.logger.info("Create directory to store test data")
-            inode = self.stat_inode(path)
-            new_dir = os.path.join(self.test_data_dir, str(inode))
-            isExisted = os.path.exists(new_dir)
-            self.logger.debug("fetch" + repr((isExisted, new_dir)))
-            if isExisted:
-                continue
+            inode = str(stat["stat"]["ino"])
+            new_dir = os.path.join(self.test_data_dir, inode)
             os.makedirs(new_dir)
-
-            self.logger.info("Get stat test data")
-            new_prop = os.path.join(new_dir, str(inode))
-            with open(new_prop, "wt") as fout:
-                data = self.get_file_stat(path)
-                self.logger.debug("fetch" + repr((data, new_prop)))
-                fout.write(repr(data))
-            assert os.path.isfile(new_prop), "Fail to get stat"
+            with open(os.path.join(new_dir, inode), "wt") as stat_file:
+                stat_file.write(repr(stat))
 
     def get_file_stat(self, path):
         result = {}
@@ -173,7 +151,7 @@ class TestMetaDataGenerator(object):
         stat["ctime_nsec"] = 0
         stat["nlink"] = self.stat_nlink(path)
         stat["gid"] = self.stat_gid(path)
-        stat["ino"] = self.stat_inode(path)
+        stat["ino"] = int(self.stat_inode(path))
         stat["blksize"] = self.stat_blksize(path)
         stat["atime_nsec"] = 0
         stat["mtime"] = self.stat_mtime(path)
@@ -201,7 +179,7 @@ class TestMetaDataGenerator(object):
         assert out.rstrip().isdigit(), "Stat error child number is not a integer"
         return int(out.rstrip()) + 2  # . and ..
 
-    def stat_inode(self, path): return int(self.stat("i", path))
+    def stat_inode(self, path): return self.stat("i", path)
 
     def stat_blocks(self, path): return int(self.stat("b", path))
 
@@ -233,7 +211,7 @@ class TestMetaDataGenerator(object):
         return out.rstrip()
 
     def get_random_string(self, size=6, chars=string.ascii_uppercase + string.digits):
-        return ''.join(random.choice(chars) for _ in range(size))
+        return "".join(random.choice(chars) for _ in range(size))
 
 if __name__ == '__main__':
     socketToMgmtApp.setup()

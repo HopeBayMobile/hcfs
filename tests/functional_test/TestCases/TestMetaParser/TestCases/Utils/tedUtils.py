@@ -25,6 +25,15 @@ def negate(func):
             return not func(obj)
     return new
 
+
+def run_once(f):
+    def wrapper(*args, **kwargs):
+        if not wrapper.has_run:
+            wrapper.has_run = True
+            return f(*args, **kwargs)
+    wrapper.has_run = False
+    return wrapper
+
 if __name__ == '__main__':
     notstartswith = negate(str.startswith)
     path = "/home/test/workspace/python"
@@ -37,3 +46,11 @@ if __name__ == '__main__':
     print listdir_full(path, notdigit)
     print listdir_full(path, str.isdigit)
     print listdir_full(path)
+
+    @run_once
+    def pprint(i):
+        print "times:" + str(i)
+
+    for i in range(10):
+        pprint(i)
+    pprint(213123)

@@ -42,6 +42,19 @@ class Swift(object):
         self.logger.debug("download_file" + repr((cmd, out, err)))
         return out, err
 
+    def download_list_from_marker(self, new_path, marker):
+        self.logger.info("Download list from marker")
+        cmd = self._cmd_prefix()
+        if self._cmd_type == "swift":
+            raise Exception("Unsupported.")
+        elif self._cmd_type == "token":
+            cmd += "/?marker=" + marker
+            cmd += " -o " + new_path
+        pipe = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+        out, err = pipe.communicate()
+        self.logger.debug("download_file" + repr((cmd, out, err)))
+        return out, err
+
     def _cmd_prefix(self):
         if self._cmd_type == "swift":
             return "swift --insecure -A " + self._url + " -U " + self._user + ":" + self._user + " -K " + self._pwd
