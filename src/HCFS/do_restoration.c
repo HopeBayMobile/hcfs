@@ -512,7 +512,7 @@ int32_t _update_FS_stat(ino_t rootinode)
 			&(hcfs_restored_system_meta->restored_system_meta);
 	restored_system_meta->system_size += tmpFSstat.backend_system_size;
 	restored_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
-	restored_system_meta->pinned_size +=
+	restored_system_meta->pinned_size += /* Estimated pinned size */
 		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
 	restored_system_meta->backend_size += tmpFSstat.backend_system_size;
 	restored_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
@@ -523,7 +523,7 @@ int32_t _update_FS_stat(ino_t rootinode)
 			&(hcfs_restored_system_meta->rectified_system_meta);
 	rectified_system_meta->system_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
-	rectified_system_meta->pinned_size +=
+	rectified_system_meta->pinned_size += /* Estimated pinned size */
 		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
 	rectified_system_meta->backend_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
@@ -575,7 +575,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 	/* Assuming fixed block size now */
 	write_page = FALSE;
 	tmpsize = tmpstat.size;
-	totalblocks = ((tmpsize - 1) / 1048576) + 1;
+	totalblocks = ((tmpsize - 1) / MAX_BLOCK_SIZE) + 1;
 	lastpage = -1;
 	for (count = 0; count < totalblocks; count++) {
 		nowpage = count / MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -1244,12 +1244,18 @@ int32_t rectify_space_usage()
 	rectified_system_meta =
 			&(hcfs_restored_system_meta->rectified_system_meta);
 
-	write_log(4, "Test: rectified_system_size = %lld", rectified_system_meta->system_size);
-	write_log(4, "Test: rectified_system_meta_size = %lld", rectified_system_meta->system_meta_size);
-	write_log(4, "Test: rectified_backend_size = %lld", rectified_system_meta->backend_size);
-	write_log(4, "Test: rectified_beckend_meta_size = %lld", rectified_system_meta->backend_meta_size);
-	write_log(4, "Test: rectified_backend_inodes = %lld", rectified_system_meta->backend_inodes);
-	write_log(4, "Test: rectified_pinned_size = %lld", rectified_system_meta->pinned_size);
+	write_log(4, "Info: rectified_system_size = %lld",
+			rectified_system_meta->system_size);
+	write_log(4, "Info: rectified_system_meta_size = %lld",
+			rectified_system_meta->system_meta_size);
+	write_log(4, "Info: rectified_backend_size = %lld",
+			rectified_system_meta->backend_size);
+	write_log(4, "Info: rectified_beckend_meta_size = %lld",
+			rectified_system_meta->backend_meta_size);
+	write_log(4, "Info: rectified_backend_inodes = %lld",
+			rectified_system_meta->backend_inodes);
+	write_log(4, "Info: rectified_pinned_size = %lld",
+			rectified_system_meta->pinned_size);
 
 	/* Rectify the statistics. When restoration is complete, decrease
 	 * hcfs space usage statistics by error value recorded in

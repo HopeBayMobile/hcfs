@@ -2173,6 +2173,7 @@ protected:
 		sem_init(&(hcfs_system->access_sem), 0, 1);
 		hcfs_restored_system_meta = (HCFS_RESTORED_SYSTEM_META *)
 				calloc(sizeof(HCFS_RESTORED_SYSTEM_META), 1);
+		MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
 	}
 
 	void TearDown()
@@ -2320,7 +2321,18 @@ TEST_F(restore_meta_fileTest, RestoreSymlink_Success)
 			sizeof(CLOUD_RELATED_DATA)));
 	unlink(mock_metapath);
 
-	EXPECT_EQ(thisstat.st_size, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.system_size);
+	EXPECT_EQ(-thisstat.st_blocks * 512,
+		hcfs_restored_system_meta->rectified_system_meta.system_meta_size);
+	EXPECT_EQ(0,
+		hcfs_restored_system_meta->rectified_system_meta.pinned_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.backend_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.backend_meta_size);
+	EXPECT_EQ(-1,
+		hcfs_restored_system_meta->rectified_system_meta.backend_inodes);
 }
 
 TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
@@ -2413,8 +2425,21 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 			sizeof(CLOUD_RELATED_DATA)));
 	unlink(mock_metapath);
 
-	EXPECT_EQ(thisstat.st_size + MAX_BLOCK_SIZE * 7,
-			hcfs_system->systemdata.system_size);
+	EXPECT_EQ(-thisstat.st_size - MAX_BLOCK_SIZE * 7,
+		hcfs_restored_system_meta->rectified_system_meta.system_size);
+	EXPECT_EQ(-thisstat.st_blocks * 512,
+		hcfs_restored_system_meta->rectified_system_meta.system_meta_size);
+	EXPECT_EQ(-round_size(MAX_BLOCK_SIZE * 7),
+		hcfs_restored_system_meta->rectified_system_meta.pinned_size);
+	EXPECT_EQ(-thisstat.st_size - MAX_BLOCK_SIZE * 7,
+		hcfs_restored_system_meta->rectified_system_meta.backend_size);
+	EXPECT_EQ(-thisstat.st_size,
+		hcfs_restored_system_meta->rectified_system_meta.backend_meta_size);
+	EXPECT_EQ(-1,
+		hcfs_restored_system_meta->rectified_system_meta.backend_inodes);
+
+	//EXPECT_EQ(thisstat.st_size + MAX_BLOCK_SIZE * 7,
+	//		hcfs_system->systemdata.system_size);
 }
 
 /**

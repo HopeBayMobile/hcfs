@@ -2709,7 +2709,7 @@ correctness of restored system meta here */
 	current_page = -1;
 	write_page = FALSE;
 	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
-	
+
 	for (count = 0; count < total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
 		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
