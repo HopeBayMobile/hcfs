@@ -13,6 +13,9 @@
 #include "hcfs_sys.h"
 
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -616,4 +619,81 @@ int32_t toggle_sync_point(int32_t api_code)
 	close(fd);
 
 	return ret_code;
+}
+
+/************************************************************************
+ * *
+ * * Function name: collect_sys_logs
+ * *        Inputs:
+ * *       Summary: To copy/dump logs to "/sdcard/TeraLog/logs".
+ * *
+ * *  Return value: 0 if successful.
+ * *                Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
+int32_t collect_sys_logs()
+{
+	int32_t sys_ret, ret_code;
+	int64_t hcfslog_size;
+	char *log_dir = "/sdcard/TeraLog";
+	char line[512];
+	FILE *hcfslog_fptr, *new_hcfslog_fptr;
+
+	ret_code = access(log_dir, F_OK);
+	if (ret_code < 0) {
+		if (errno == ENOENT)
+			mkdir(log_dir, 0777);
+		else
+			return -errno;
+	}
+
+	/* hcfslog */
+	hcfslog_fptr = fopen("/data/hcfs_android_log", "r");
+	if (hcfslog_fptr == NULL)
+		return -errno;
+
+	fseek(hcfslog_fptr, 0, SEEK_END);
+	hcfslog_size = ftell(hcfslog_fptr);
+	if (hcfslog_size <= 0)
+		return -EIO;
+	else
+		rewind(hcfslog_fptr);
+
+	new_hcfslog_fptr = fopen("/sdcard/TeraLog/hcfs_android_log", "w");
+	if (new_hcfslog_fptr == NULL) {
+		fclose(hcfslog_fptr);
+		return -errno;
+	}
+
+	while (fgets(line, sizeof(line), hcfslog_fptr) != NULL
+			&& ftell(hcfslog_fptr) <= hcfslog_size) {
+		if (fprintf(new_hcfslog_fptr, "%s", line) < 0) {
+			fclose(hcfslog_fptr);
+			fclose(new_hcfslog_fptr);
+			return -errno;
+		}
+	}
+
+	fclose(hcfslog_fptr);
+	fclose(new_hcfslog_fptr);
+
+	/* logcat */
+	sys_ret = system("logcat -d > /sdcard/TeraLog/logcat");
+	if (sys_ret == -1)
+		return -errno;
+	if (WIFSIGNALED(sys_ret))
+		return -WTERMSIG(sys_ret);
+	if (WEXITSTATUS(sys_ret) != 0)
+		return -WEXITSTATUS(sys_ret);
+
+	/* dmesg */
+	sys_ret = system("dmesg > /sdcard/TeraLog/dmesg");
+	if (sys_ret == -1)
+		return -errno;
+	if (WIFSIGNALED(sys_ret))
+		return -WTERMSIG(sys_ret);
+	if (WEXITSTATUS(sys_ret) != 0)
+		return -WEXITSTATUS(sys_ret);
+
+	return 0;
 }

@@ -365,6 +365,25 @@ int32_t do_clear_sync_point(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_collect_sys_logs(char *largebuf, int32_t arg_len,
+			    char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start collect sys logs\n");
+	ret_code = collect_sys_logs();
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End collect sys logs\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -461,6 +480,7 @@ int32_t process_request(void *arg)
 		{SETSWIFTTOKEN,	do_set_swift_token},
 		{SETSYNCPOINT,	do_set_sync_point},
 		{CANCELSYNCPOINT,	do_clear_sync_point},
+		{COLLECTSYSLOGS,	do_collect_sys_logs}
 	};
 
 	uint32_t n;
