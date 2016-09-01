@@ -1,10 +1,10 @@
 #include "fuse_notify.h"
 
-#include "hfuse_system.h"
-#include "mount_manager.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include "hfuse_system.h"
+#include "mount_manager.h"
 
 FUSE_NOTIFY_CYCLE_BUF notify_cb = {0};
 fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
