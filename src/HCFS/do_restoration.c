@@ -490,6 +490,10 @@ int32_t _update_FS_stat(ino_t rootinode)
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 RESTORE_METAPATH, (uint64_t)rootinode);
 
+	/* FEATURE TODO: maintain two structures for FS_CLOUD_STAT_T, one
+	old and one new. If downloaded cloud stat object is the same length
+	as the new one, then don't need to over-estimate */
+
 	fptr = fopen(despath, "r");
 	if (fptr == NULL) {
 		errcode = -errno;

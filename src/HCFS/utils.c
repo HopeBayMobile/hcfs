@@ -1358,6 +1358,11 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
+	/* FEATURE TODO: maintain two types of FS_CLOUD_STAT_T. If
+	current fs_cloud_stat is old type, do not add on-disk size
+	for meta and pinned. Otherwise need to add two fields:
+	on-disk size for meta and on-disk size for pinned */
+
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
