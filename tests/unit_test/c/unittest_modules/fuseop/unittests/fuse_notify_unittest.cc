@@ -8,6 +8,7 @@ extern "C" {
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "fuse_notify.h"
 #include "mount_manager.h"
@@ -17,6 +18,8 @@ extern "C" {
 MOUNT_T_GLOBAL mount_global = {0};
 extern FUSE_NOTIFY_CYCLE_BUF notify_cb;
 extern fuse_notify_fn *notify_fn[];
+#define PD(x) printf(#x " %d\n", x)
+
 
 /* 
  * Definition for fake functions
@@ -32,7 +35,7 @@ sem_init_f *sem_init_real = (sem_init_f *)dlsym(RTLD_NEXT, "sem_init");
 uint32_t sem_init_error_on = -1;
 int32_t sem_init_cnt(sem_t *sem, int pshared, unsigned int value)
 {
-	printf("sem_init_fake.call_count %d\n", sem_init_fake.call_count);
+	PD(sem_init_fake.call_count);
 	if (sem_init_fake.call_count != sem_init_error_on)
 		return sem_init_real(sem, pshared, value);
 	else
@@ -64,7 +67,15 @@ void *malloc_cnt(size_t size)
 		return NULL;
 }
 
-char log[1024];
+FAKE_VALUE_FUNC(int,
+		fuse_lowlevel_notify_delete,
+		struct fuse_chan *,
+		fuse_ino_t,
+		fuse_ino_t,
+		const char *,
+		size_t);
+
+char log[5][1024];
 int32_t write_log_call = 0;
 int32_t write_log(int32_t level, char *format, ...)
 {
@@ -76,7 +87,7 @@ int32_t write_log(int32_t level, char *format, ...)
 	va_end(alist);
 
 	va_start(alist, format);
-	vsprintf(log, format, alist);
+	vsprintf(log[write_log_call % 5], format, alist);
 	va_end(alist);
 	return 0;
 }
@@ -98,6 +109,7 @@ void ut_enqueue(size_t n)
 		printf("Fill with %lu\n", seq);
 		memset(&data[ut_enqueue_call % 20], seq,
 		       sizeof(FUSE_NOTIFY_DATA));
+		((FUSE_NOTIFY_PROTO *)&data[ut_enqueue_call % 20])->func = NOOP;
 		notify_cb_enqueue((void *)&data[ut_enqueue_call % 20]);
 		in = notify_cb.in + 1;
 		ut_enqueue_call++;
@@ -128,6 +140,8 @@ void reset_fake_functions(void)
 	malloc_error_on = -1;
 	malloc_fake.custom_fake = malloc_cnt;
 
+	RESET_FAKE(fuse_lowlevel_notify_delete);
+
 	FFF_RESET_HISTORY();
 
 	write_log_call = 0;
@@ -136,6 +150,13 @@ void reset_fake_functions(void)
 
 void reset_unittest_env(void)
 {
+	if (fuse_nofify_thread != 0 &&
+	    pthread_kill(fuse_nofify_thread, 0) == 0) {
+		hcfs_system->system_going_down = TRUE;
+		destory_hfuse_ll_notify_loop();
+		fuse_nofify_thread = 0;
+	}
+	hcfs_system->system_going_down = FALSE;
 	free(notify_cb.elems);
 	memset(&notify_cb, 0, sizeof(FUSE_NOTIFY_CYCLE_BUF));
 	memset(&data, 0, sizeof(data));
@@ -264,7 +285,7 @@ TEST_F(NotifyBuffer_Initialized, DequeueSkiped)
 
 TEST_F(NotifyBuffer_Initialized, DequeueAnEmptyQueue) {
 	notify_cb_dequeue();
-	EXPECT_STREQ(log, "Debug notify_cb_dequeue: failed. Trying to dequeue "
+	EXPECT_STREQ(log[write_log_call % 5], "Debug notify_cb_dequeue: failed. Trying to dequeue "
 			  "an empty queue.\n");
 	EXPECT_EQ(malloc_fake.call_count, 0);
 }
@@ -273,7 +294,7 @@ TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
 	ut_enqueue(1);
 	malloc_error_on = 1;
 	notify_cb_dequeue();
-	EXPECT_STREQ(log, "Debug notify_cb_dequeue: failed. malloc failed.\n");
+	EXPECT_STREQ(log[write_log_call % 5], "Debug notify_cb_dequeue: failed. malloc failed.\n");
 }
 
 TEST_F(NotifyBuffer_Initialized, ReallocSuccess)
@@ -347,12 +368,14 @@ TEST_F(NotifyBuffer_Initialized, initLoopWithInitBuffer)
 	ASSERT_NE(notify_cb.elems, NULL);
 	ASSERT_EQ(notify_cb.is_initialized, 1);
 }
+
 TEST_F(NotifyBuffer_Initialized, initLoopFail)
 {
 	malloc_error_on = 1;
 	reset_unittest_env();
 	ASSERT_EQ(init_hfuse_ll_notify_loop(), -1);
 }
+
 TEST_F(NotifyBuffer_Initialized, destoryLoop)
 {
 	init_hfuse_ll_notify_loop();
@@ -361,6 +384,7 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop)
 	/* Test thread is running */
 	ASSERT_EQ(pthread_kill(fuse_nofify_thread, 0), 3);
 }
+
 TEST_F(NotifyBuffer_Initialized, destoryLoop_PthreadJoinFail)
 {
 	init_hfuse_ll_notify_loop();
@@ -368,6 +392,79 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop_PthreadJoinFail)
 	sem_post(&notify_cb.tasks_sem);
 	pthread_join(fuse_nofify_thread, NULL);
 	destory_hfuse_ll_notify_loop();
-	EXPECT_STREQ(log, "Error destory_hfuse_ll_notify_loop: join "
+	EXPECT_STREQ(log[write_log_call % 5], "Error destory_hfuse_ll_notify_loop: join "
 			  "nofify_thread failed. No such process\n");
+}
+
+TEST_F(NotifyBuffer_Initialized, loopCallNotify)
+{
+	int32_t task;
+	struct timespec wait = {0, 100000};
+	init_hfuse_ll_notify_loop();
+	ut_enqueue(5);
+	sem_post(&notify_cb.tasks_sem);
+	sem_post(&notify_cb.tasks_sem);
+	sem_post(&notify_cb.tasks_sem);
+	sem_post(&notify_cb.tasks_sem);
+	sem_post(&notify_cb.tasks_sem);
+	while (1) {
+		sem_wait(&notify_cb.access_sem);
+		sem_getvalue(&notify_cb.tasks_sem, &task);
+		sem_post(&notify_cb.access_sem);
+		if(task == 0)
+			break;
+		/* waiting loop to finish */
+		nanosleep(&wait, NULL);
+	}
+	hcfs_system->system_going_down = TRUE;
+	sem_post(&notify_cb.tasks_sem);
+	pthread_join(fuse_nofify_thread, NULL);
+	EXPECT_STREQ(log[(write_log_call + 5 - 1) % 5],
+		     "Debug hfuse_ll_notify_loop: notified\n");
+}
+
+TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
+{
+	int32_t task;
+	struct timespec wait = {0, 100000};
+	init_hfuse_ll_notify_loop();
+	ut_enqueue(1);
+	malloc_error_on = 1;
+	sem_post(&notify_cb.tasks_sem);
+	while (1) {
+		sem_wait(&notify_cb.access_sem);
+		sem_getvalue(&notify_cb.tasks_sem, &task);
+		sem_post(&notify_cb.access_sem);
+		if(task == 0)
+			break;
+		/* waiting loop to finish */
+		nanosleep(&wait, NULL);
+	}
+	hcfs_system->system_going_down = TRUE;
+	sem_post(&notify_cb.tasks_sem);
+	pthread_join(fuse_nofify_thread, NULL);
+	EXPECT_STREQ(log[(write_log_call + 5 - 1) % 5],
+		     "Debug hfuse_ll_notify_loop: error\n");
+}
+
+TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
+{
+	FUSE_NOTIFY_DATA *data =
+	    (FUSE_NOTIFY_DATA *)calloc(1, sizeof(FUSE_NOTIFY_DATA));
+	((FUSE_NOTIFY_DELETE_DATA *)data)->func = DELETE;
+	((FUSE_NOTIFY_DELETE_DATA *)data)->name = (char *)malloc(1);
+	_do_hfuse_ll_notify_delete(&data, RUN);
+	free(data);
+	EXPECT_EQ(fuse_lowlevel_notify_delete_fake.call_count, 1);
+}
+
+
+TEST_F(NotifyBuffer_Initialized, hfuse_ll_notify_delete)
+{
+	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
+	char *name = strdup("a");
+	hfuse_ll_notify_delete(ch, 0, 0, name, 1);
+	free(ch);
+	free(name);
+	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_cb.elems[notify_cb.out])->name);
 }

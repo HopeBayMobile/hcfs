@@ -195,6 +195,7 @@ FUSE_NOTIFY_DATA *notify_cb_dequeue()
 	if (good) {
 		memcpy(data, &notify_cb.elems[notify_cb.out],
 		       sizeof(FUSE_NOTIFY_DATA));
+		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
 		inc_cb_idx(&notify_cb.out, notify_cb.max_len);
 		notify_cb.len--;
 	}
@@ -202,8 +203,9 @@ FUSE_NOTIFY_DATA *notify_cb_dequeue()
 	sem_post(&notify_cb.access_sem);
 
 	if (good)
-		write_log(4, "Debug %s: Get %lu\n", __func__, notify_cb.out);
-	else if (notify_cb.is_initialized == 0)
+		return data;
+
+	if (notify_cb.is_initialized == 0)
 		write_log(4, "Debug %s: failed. %s\n", __func__,
 			  "Buffer is not initialized.");
 	else if (cb_isempty)
@@ -234,7 +236,7 @@ int32_t init_hfuse_ll_notify_loop(void)
 	}
 
 	if (good)
-		write_log(10, "Debug %s succeed\n", __func__);
+		write_log(10, "Debug %s: succeed\n", __func__);
 	else
 		write_log(1, "%s failed\n", __func__);
 
@@ -245,6 +247,8 @@ void destory_hfuse_ll_notify_loop(void)
 {
 	BOOL good = TRUE;
 	int32_t ret = 0;
+
+	write_log(10, "Debug %s: start.\n", __func__);
 	/* let loop handle destory tasks itself */
 	sem_post(&notify_cb.tasks_sem);
 
@@ -285,9 +289,14 @@ void *hfuse_ll_notify_loop(void *ptr)
 }
 
 /* START -- Functions running in notify thread */
-void _do_hfuse_ll_notify_noop(__attribute__((unused)) FUSE_NOTIFY_DATA **a,
-			      __attribute__((unused)) enum NOTIFY_ACTION b)
+void _do_hfuse_ll_notify_noop(FUSE_NOTIFY_DATA **data_ptr,
+			      enum NOTIFY_ACTION action)
 {
+	if (action != DESTROY_CB) {
+		free(*data_ptr);
+		*data_ptr = NULL;
+		write_log(10, "Debug %s: free notify data\n", __func__);
+	}
 }
 
 void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_DATA **data_ptr,
@@ -328,7 +337,7 @@ void hfuse_ll_notify_delete(struct fuse_chan *ch,
 					 .ch = ch,
 					 .parent = parent,
 					 .child = child,
-					 .name = strdup(name),
+					 .name = NULL,
 					 .namelen = namelen};
 	good = (event.name = strndup(name, namelen)) != NULL;
 	if (good) {
