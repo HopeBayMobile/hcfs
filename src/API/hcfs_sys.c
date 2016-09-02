@@ -621,6 +621,17 @@ int32_t toggle_sync_point(int32_t api_code)
 	return ret_code;
 }
 
+/* helper function for system() result checking */
+#define check_system_result()\
+	do {\
+		if (sys_ret == -1)\
+			return -errno;\
+		if (WIFSIGNALED(sys_ret))\
+			return -WTERMSIG(sys_ret);\
+		if (WEXITSTATUS(sys_ret) != 0)\
+			return -WEXITSTATUS(sys_ret);\
+	} while (0)
+
 /************************************************************************
  * *
  * * Function name: collect_sys_logs
@@ -635,11 +646,19 @@ int32_t collect_sys_logs()
 {
 	int32_t sys_ret, ret_code;
 	int64_t hcfslog_size;
-	char *log_dir = "/sdcard/TeraLog";
-	char line[512];
-	FILE *hcfslog_fptr, *new_hcfslog_fptr;
+	uint64_t read_size, total_read = 0;
+	char buf[4096];
+	FILE *hcfslog_fptr = NULL, *new_hcfslog_fptr = NULL;
+	struct stat tmpstat;
 
-	ret_code = access(log_dir, F_OK);
+	char *log_dir = "/sdcard/TeraLog";
+	char *hcfslog_path = "/data/hcfs_android_log";
+	char *hcfslog_path2 = "/data/hcfs_android_log.1";
+	char *cmd_cp_hcfslog = "cp /data/hcfs_android_log.1 /sdcard/TeraLog/.";
+	char *cmd_dump_logcat = "logcat -d > /sdcard/TeraLog/logcat";
+	char *cmd_dump_dmesg = "dmesg > /sdcard/TeraLog/dmesg";
+
+	ret_code = stat(log_dir, &tmpstat);
 	if (ret_code < 0) {
 		if (errno == ENOENT)
 			mkdir(log_dir, 0777);
@@ -647,17 +666,15 @@ int32_t collect_sys_logs()
 			return -errno;
 	}
 
+	ret_code = stat(hcfslog_path, &tmpstat);
+	if (ret_code < 0)
+		return -EIO;
+	hcfslog_size = tmpstat.st_size;
+
 	/* hcfslog */
-	hcfslog_fptr = fopen("/data/hcfs_android_log", "r");
+	hcfslog_fptr = fopen(hcfslog_path, "r");
 	if (hcfslog_fptr == NULL)
 		return -errno;
-
-	fseek(hcfslog_fptr, 0, SEEK_END);
-	hcfslog_size = ftell(hcfslog_fptr);
-	if (hcfslog_size <= 0)
-		return -EIO;
-	else
-		rewind(hcfslog_fptr);
 
 	new_hcfslog_fptr = fopen("/sdcard/TeraLog/hcfs_android_log", "w");
 	if (new_hcfslog_fptr == NULL) {
@@ -665,9 +682,9 @@ int32_t collect_sys_logs()
 		return -errno;
 	}
 
-	while (fgets(line, sizeof(line), hcfslog_fptr) != NULL
+	while (fgets(buf, sizeof(buf), hcfslog_fptr) != NULL
 			&& ftell(hcfslog_fptr) <= hcfslog_size) {
-		if (fprintf(new_hcfslog_fptr, "%s", line) < 0) {
+		if (fprintf(new_hcfslog_fptr, "%s", buf) < 0) {
 			fclose(hcfslog_fptr);
 			fclose(new_hcfslog_fptr);
 			return -errno;
@@ -677,23 +694,18 @@ int32_t collect_sys_logs()
 	fclose(hcfslog_fptr);
 	fclose(new_hcfslog_fptr);
 
+	if (access(hcfslog_path2, F_OK|R_OK) != -1) {
+		sys_ret = system(cmd_cp_hcfslog);
+		check_system_result();
+	}
+
 	/* logcat */
-	sys_ret = system("logcat -d > /sdcard/TeraLog/logcat");
-	if (sys_ret == -1)
-		return -errno;
-	if (WIFSIGNALED(sys_ret))
-		return -WTERMSIG(sys_ret);
-	if (WEXITSTATUS(sys_ret) != 0)
-		return -WEXITSTATUS(sys_ret);
+	sys_ret = system(cmd_dump_logcat);
+	check_system_result();
 
 	/* dmesg */
-	sys_ret = system("dmesg > /sdcard/TeraLog/dmesg");
-	if (sys_ret == -1)
-		return -errno;
-	if (WIFSIGNALED(sys_ret))
-		return -WTERMSIG(sys_ret);
-	if (WEXITSTATUS(sys_ret) != 0)
-		return -WEXITSTATUS(sys_ret);
+	sys_ret = system(cmd_dump_dmesg);
+	check_system_result();
 
 	return 0;
 }
