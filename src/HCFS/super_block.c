@@ -1135,11 +1135,6 @@ int32_t super_block_reclaim_fullscan(void)
 	ssize_t retsize;
 	int32_t num_reclaim;
 	int32_t ret;
-/* FEATURE TODO: Be able to release the exclusive lock after a number
-of inodes are scanned, and then reclaim the lock. Should be able to
-integrate this process with other super block ops (perhaps should let
-super_block_reclaim return immediately if fullscan is in progress, but
-also add the list of to_reclaim to the reclaimed list here) */
 
 	last_reclaimed = 0;
 	first_reclaimed = 0;
@@ -2378,7 +2373,6 @@ int32_t check_init_super_block()
 			/* Create rebuild sb mgr */
 			ret = create_sb_rebuilder();
 		} else {
-			//if ((head.now_rebuild) ||
 			if (hcfs_system->system_restoring ==
 			     RESTORING_STAGE2) {
 				/* Keep rebuilding SB */

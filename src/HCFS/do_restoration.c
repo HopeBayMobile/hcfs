@@ -418,17 +418,7 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 		/* Reset block status to ST_CLOUD */
 		ret = restore_meta_structure(fptr);
 	}
-	/*else {
-		ret = fstat(fileno(fptr), &block_stat);
-		if (ret == 0) {
-			update_restored_cache_usage(
-				block_stat.st_blocks * 512, 1);
-		} else {
-			ret = -errno;
-			write_log(0, "Error: Fail to fstat in %s. Code %d",
-					__func__, -ret);
-		}
-	}*/
+
 	fclose(fptr);
 	return ret;
 }
@@ -490,6 +480,8 @@ int32_t _update_FS_stat(ino_t rootinode)
 	FILE *fptr;
 	FS_CLOUD_STAT_T tmpFSstat;
 	size_t ret_size;
+	int64_t after_add_pinsize, delta_pin_size;
+	int64_t restored_meta_limit, after_add_metasize, delta_meta_size;
 	SYSTEM_DATA_TYPE *restored_system_meta, *rectified_system_meta;
 
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync",
@@ -510,10 +502,32 @@ int32_t _update_FS_stat(ino_t rootinode)
 	LOCK_RESTORED_SYSMETA();
 	restored_system_meta =
 			&(hcfs_restored_system_meta->restored_system_meta);
-	restored_system_meta->system_size += tmpFSstat.backend_system_size;
-	restored_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
-	restored_system_meta->pinned_size += /* Estimated pinned size */
+	/* Estimate pre-allocated pinned size */
+	after_add_pinsize = restored_system_meta->pinned_size +
 		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
+	if (after_add_pinsize > MAX_PINNED_LIMIT)
+		delta_pin_size =
+			MAX_PINNED_LIMIT - restored_system_meta->pinned_size;
+	else
+		delta_pin_size =
+			after_add_pinsize - restored_system_meta->pinned_size;
+	/* Estimate pre-allocated meta size. */
+	restored_meta_limit = META_SPACE_LIMIT - RESERVED_META_MARGIN;
+	after_add_metasize = restored_system_meta->system_meta_size +
+		(tmpFSstat.backend_meta_size + 4096 * tmpFSstat.backend_num_inodes);
+
+	if (after_add_metasize > restored_meta_limit)
+		delta_meta_size =
+			restored_meta_limit - restored_system_meta->system_meta_size;
+	else
+		delta_meta_size =
+			after_add_metasize - restored_system_meta->system_meta_size;
+
+	/* Restored system space usage. it will be rectified after
+	 * restoration completed */
+	restored_system_meta->system_size += tmpFSstat.backend_system_size;
+	restored_system_meta->system_meta_size += delta_meta_size;
+	restored_system_meta->pinned_size += delta_pin_size; /* Estimated pinned size */
 	restored_system_meta->backend_size += tmpFSstat.backend_system_size;
 	restored_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
 	restored_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
@@ -522,9 +536,8 @@ int32_t _update_FS_stat(ino_t rootinode)
 	rectified_system_meta =
 			&(hcfs_restored_system_meta->rectified_system_meta);
 	rectified_system_meta->system_size += tmpFSstat.backend_system_size;
-	rectified_system_meta->system_meta_size += tmpFSstat.backend_meta_size;
-	rectified_system_meta->pinned_size += /* Estimated pinned size */
-		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
+	rectified_system_meta->system_meta_size += delta_meta_size;
+	rectified_system_meta->pinned_size += delta_pin_size; /* Estimated pinned size */
 	rectified_system_meta->backend_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
 	rectified_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
@@ -1192,7 +1205,6 @@ void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 		PWRITE(fileno(hcfs_restored_system_meta->rect_fptr),
 			rectified_system_meta, sizeof(SYSTEM_DATA_TYPE), 0);
 	UNLOCK_RESTORED_SYSMETA();
-/* TODO: Write to disk every 2~3 seconds */
 	return;
 
 errcode_handle:
@@ -1320,7 +1332,8 @@ int32_t init_rectified_system_meta(char restoration_stage)
 	else
 		return -EINVAL;
 
-	if (!access(rectified_usage_path, F_OK)) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2 &&
+			access(rectified_usage_path, F_OK) == 0) {
 		/* Open the rectified system meta and load it. */
 		hcfs_restored_system_meta->rect_fptr =
 				fopen(rectified_usage_path, "r+");
@@ -1337,6 +1350,13 @@ int32_t init_rectified_system_meta(char restoration_stage)
 			sizeof(SYSTEM_DATA_TYPE), 0);
 
 	} else {
+		/* In restoration stage 1, always create a new rectified file
+		 * and re-estimate the system meta. */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1)
+			write_log(8, "Create a rectified system meta file.");
+		else
+			write_log(2, "Warn: Rectified system meta file"
+				" not found in stage 2. Create an empty one.");
 		/* Create a new one */
 		hcfs_restored_system_meta->rect_fptr =
 				fopen(rectified_usage_path, "w+");

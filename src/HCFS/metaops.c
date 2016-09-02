@@ -2637,8 +2637,6 @@ errcode_handle:
  */
 int32_t restore_meta_structure(FILE *fptr)
 {
-/* FEATURE TODO: system size change should be only for verifying
-correctness of restored system meta here */
 	int32_t errcode, ret;
 	HCFS_STAT this_stat;
 	struct stat meta_stat; /* Meta file system stat */
@@ -2790,22 +2788,6 @@ correctness of restored system meta here */
 			    .delta_backend_size = -(metasize + this_stat.size),
 			    .delta_backend_meta_size = -metasize,
 			    .delta_backend_inodes = -1);
-
-//	change_system_meta(this_stat.size, meta_stat.st_size,
-//			0, 0, 0, 0, TRUE);
-//	if (P_IS_PIN(file_meta.local_pin)) {
-/* FEATURE TODO: Pin size will be restored, so change_pin_size
-should only be for verifying the correctness. */
-//		ret = change_pin_size(this_stat.size);
-//		if (ret < 0) {
-			/* If no space, change pin status? */
-//			file_meta.local_pin = P_UNPIN;
-//			FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
-//			FWRITE(&file_meta,
-//				sizeof(FILE_META_TYPE), 1, fptr);
-//		}
-//	}
-
 	return 0;
 
 errcode_handle:

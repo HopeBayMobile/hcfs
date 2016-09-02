@@ -22,6 +22,8 @@
 #include "params.h"
 #include "fuseop.h"
 
+#define RESERVED_META_MARGIN 20971520 /* 20M */
+
 typedef struct {
 	int64_t delta_system_size;
 	int64_t delta_meta_size;
