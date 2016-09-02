@@ -1332,7 +1332,8 @@ int32_t init_rectified_system_meta(char restoration_stage)
 	else
 		return -EINVAL;
 
-	if (!access(rectified_usage_path, F_OK)) {
+	if (hcfs_system->system_restoring == RESTORING_STAGE2 &&
+			access(rectified_usage_path, F_OK) == 0) {
 		/* Open the rectified system meta and load it. */
 		hcfs_restored_system_meta->rect_fptr =
 				fopen(rectified_usage_path, "r+");
@@ -1349,6 +1350,13 @@ int32_t init_rectified_system_meta(char restoration_stage)
 			sizeof(SYSTEM_DATA_TYPE), 0);
 
 	} else {
+		/* In restoration stage 1, always create a new rectified file
+		 * and re-estimate the system meta. */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1)
+			write_log(8, "Create a rectified system meta file.");
+		else
+			write_log(2, "Warn: Rectified system meta file"
+				" not found in stage 2. Create an empty one.");
 		/* Create a new one */
 		hcfs_restored_system_meta->rect_fptr =
 				fopen(rectified_usage_path, "w+");
