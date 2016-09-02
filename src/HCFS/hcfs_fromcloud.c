@@ -80,6 +80,15 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 			break;
 		}
 	}
+	/* Error handling for the case if no download resource is available */
+	if (which_curl_handle >= MAX_DOWNLOAD_CURL_HANDLE) {
+		write_log(2, "All download resource busy now (unexpectedly)\n");
+		sem_post(&download_curl_sem);
+		if (action_from == PIN_BLOCK || action_from == FETCH_FILE_META)
+			sem_post(&pin_download_curl_sem);
+		sem_post(&download_curl_control_sem);
+		return -EBUSY;
+	}
 	sem_post(&download_curl_control_sem);
 	write_log(10, "Debug: downloading using curl handle %d\n",
 		  which_curl_handle);
