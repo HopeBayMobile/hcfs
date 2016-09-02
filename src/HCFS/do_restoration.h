@@ -41,6 +41,9 @@ BOOL have_new_pkgbackup;
 pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;
 
+FILE *to_delete_fptr;
+FILE *to_sync_fptr;
+
 /* Structure for rebuilding system meta */
 typedef struct {
 	sem_t sysmeta_sem;
@@ -59,6 +62,9 @@ HCFS_RESTORED_SYSTEM_META *hcfs_restored_system_meta;
 #define UPDATE_RECT_SYSMETA(...) \
 	update_rectified_system_meta((DELTA_SYSTEM_META) {__VA_ARGS__})
 
+#define UPDATE_RESTORE_SYSMETA(...) \
+	update_restored_system_meta((DELTA_SYSTEM_META) {__VA_ARGS__})
+
 #define RESTORE_METAPATH restore_metapath
 #define RESTORE_BLOCKPATH restore_blockpath
 #define PACKAGE_XML "/data/system/packages.xml"
@@ -72,6 +78,7 @@ void init_restore_path(void);
 
 /* Returns path to status file on system restoring */
 int32_t fetch_restore_stat_path(char *pathname);
+int32_t fetch_restore_todelete_path(char *pathname, ino_t this_inode);
 
 int32_t tag_restoration(char *content);
 
@@ -92,6 +99,7 @@ int32_t backup_package_list(void);
 void cleanup_stage1_data(void);
 
 void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta);
+void update_restored_system_meta(DELTA_SYSTEM_META delta_system_meta);
 void update_restored_cache_usage(int64_t delta_cache_size,
 		int64_t delta_cache_blocks);
 int32_t rectify_space_usage();

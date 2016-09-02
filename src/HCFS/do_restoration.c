@@ -34,12 +34,6 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
-/* FEATURE TODO: How to verify that the meta / data stored on cloud
-is enough for restoration (what if important system app / files cannot
-be restored?) */
-/* FEATURE TODO: How to purge files that cannot be restored correctly
-from the directory structure */
-
 void init_restore_path(void)
 {
 	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore",
@@ -56,6 +50,57 @@ int32_t fetch_restore_stat_path(char *pathname)
 	snprintf(pathname, METAPATHLEN, "%s/system_restoring_status",
 	         METAPATH);
 	return 0;
+}
+
+/************************************************************************
+*
+* Function name: fetch_restore_todelete_path
+*        Inputs: char *pathname, ino_t this_inode
+*        Output: Integer
+*       Summary: Given the inode number this_inode,
+*                copy the filename to the meta file in todelete folder
+*                to the space pointed by pathname for restoration stage 1.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int32_t fetch_restore_todelete_path(char *pathname, ino_t this_inode)
+{
+	char tempname[METAPATHLEN];
+	int32_t sub_dir;
+	int32_t errcode, ret;
+
+	if (RESTORE_METAPATH == NULL)
+		return -EPERM;
+
+	sub_dir = this_inode % NUMSUBDIR;
+	snprintf(tempname, METAPATHLEN, "%s/todelete", RESTORE_METAPATH);
+	if (access(tempname, F_OK) == -1) {
+		ret = mkdir(tempname, 0700);
+		if (ret < 0){
+			errcode = -errno;
+			if (errcode != -EEXIST)
+				goto errcode_handle;
+		}
+	}
+
+	snprintf(tempname, METAPATHLEN, "%s/todelete/sub_%d",
+				RESTORE_METAPATH, sub_dir);
+	if (access(tempname, F_OK) == -1) {
+		ret = mkdir(tempname, 0700);
+		if (ret < 0){
+			errcode = -errno;
+			if (errcode != -EEXIST)
+				goto errcode_handle;
+		}
+
+	}
+
+	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%" PRIu64 "",
+			RESTORE_METAPATH, sub_dir, (uint64_t)this_inode);
+	return 0;
+errcode_handle:
+	return errcode;
 }
 
 int32_t tag_restoration(char *content)
@@ -719,6 +764,39 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	return 0;
 }
 
+/* Helper function for moving meta files that are deleted
+to to_delete folder, and append the inode number to a list
+so that in stage 2, the inodes will be entered into the
+to-delete list */
+int32_t _mark_delete(ino_t thisinode)
+{
+	char oldpath[METAPATHLEN];
+	char newpath[METAPATHLEN];
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	ret = fetch_restore_meta_path(oldpath, thisinode);
+	if (ret < 0)
+		return ret;
+
+	ret = fetch_restore_todelete_path(newpath, thisinode);
+	if (ret < 0)
+		return ret;
+
+	ret = rename(oldpath, newpath);
+	if (ret < 0) {
+		ret = -errno;
+		write_log(0, "Error when renaming meta to to_delete\n");
+		return ret;
+	}
+
+	FWRITE(&thisinode, sizeof(ino_t), 1, to_delete_fptr);
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
 int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 {
 	char fetchedmeta[METAPATHLEN];
@@ -735,18 +813,59 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
         int64_t e_index, which_page;
 	int64_t page_pos;
         char block_status;
+	int64_t total_removed_cache_size = 0;
+	int64_t total_removed_cache_blks = 0;
+	struct stat cache_stat;
+	struct stat meta_stat;
+	int64_t metasize, metasize_blk;
+	int64_t est_pin_size, real_pin_size;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	if (access(fetchedmeta, F_OK) != 0)
 		return -ENOENT;
-	if (delete_block == FALSE)
-		UNLINK(fetchedmeta);
+
+	if (delete_block == FALSE) {
+		ret = stat(fetchedmeta, &meta_stat);
+		if (ret < 0) {
+			errcode = -errno;
+			write_log(0, "Unable to stat restored meta\n");
+			goto errcode_handle;
+		}
+		metasize = meta_stat.st_size;
+		metasize_blk = meta_stat.st_blocks * 512;
+
+		/* Backend statistics won't be adjusted here,
+		as they will be updated when backend objects are deleted */
+
+		UPDATE_RECT_SYSMETA(.delta_system_size = 0,
+				    .delta_meta_size = metasize_blk -
+							(metasize + 4096),
+				    .delta_pinned_size = 0,
+				    .delta_backend_size = 0,
+				    .delta_backend_meta_size = 0,
+				    .delta_backend_inodes = 0);
+
+		UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
+				    .delta_meta_size = -(metasize + 4096),
+				    .delta_pinned_size = 0,
+				    .delta_backend_size = 0,
+				    .delta_backend_meta_size = 0,
+				    .delta_backend_inodes = 0);
+		/* FEATURE TODO: Now file meta size will be substracted
+		from total meta size as soon as the file is deleted, but
+		before the meta is actually deleted in to_delete folder.
+		The computation here will follow the current implementation,
+		but this should be changed later to reflect the actual
+		meta size */
+		/* Mark this inode as to delete */
+		ret = _mark_delete(thisinode);
+		return ret;
+	}
 
 	metafptr = fopen(fetchedmeta, "r");
 	if (metafptr == NULL) {
 		errcode = -errno;
 		write_log(4, "Cannot read meta for block deletion.\n");
-		unlink(fetchedmeta);
 		return errcode;
 	}
 
@@ -763,6 +882,48 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 		fclose(metafptr);
 		return -EIO;
 	}
+
+	if (P_IS_PIN(file_meta.local_pin)) {
+		real_pin_size = round_size(this_inode_stat.size);
+		est_pin_size = (this_inode_stat.size + 4096);
+	} else {
+		real_pin_size = 0;
+		est_pin_size = 0;
+	}
+
+	ret = stat(fetchedmeta, &meta_stat);
+	if (ret < 0) {
+		errcode = -errno;
+		write_log(0, "Unable to stat restored meta\n");
+		goto errcode_handle;
+	}
+	metasize = meta_stat.st_size;
+	metasize_blk = meta_stat.st_blocks * 512;
+
+	/* Backend statistics won't be adjusted here,
+	as they will be updated when backend objects are deleted */
+
+	UPDATE_RECT_SYSMETA(.delta_system_size = 0,
+			    .delta_meta_size = metasize_blk -
+						(metasize + 4096),
+			    .delta_pinned_size = real_pin_size - est_pin_size,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
+
+	UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
+			    .delta_meta_size = -(metasize + 4096),
+			    .delta_pinned_size = -est_pin_size,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
+
+		/* FEATURE TODO: Now file meta size will be substracted
+		from total meta size as soon as the file is deleted, but
+		before the meta is actually deleted in to_delete folder.
+		The computation here will follow the current implementation,
+		but this should be changed later to reflect the actual
+		meta size */
 
 	if (this_inode_stat.size == 0)
 		total_blocks = 0;
@@ -803,16 +964,25 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 			goto errcode_handle;
 		}
 
-		if (access(thisblockpath, F_OK) == 0)
+		if (access(thisblockpath, F_OK) == 0) {
+			ret = stat(thisblockpath, &cache_stat);
+			if (ret == 0)
+				total_removed_cache_size +=
+					cache_stat.st_blocks * 512;
+			total_removed_cache_blks += 1;
 			UNLINK(thisblockpath);
+		}
 	}
 	fclose(metafptr);
 	metafptr = NULL;
 
-	/* FEATURE TODO: Need to adjust statistics after deletion */
-	if (access(fetchedmeta, F_OK) == 0)
-		UNLINK(fetchedmeta);
-	return 0;
+	update_restored_cache_usage(-total_removed_cache_size,
+		-total_removed_cache_blks);
+
+	/* Mark this inode as to delete */
+	ret = _mark_delete(thisinode);
+
+	return ret;
 errcode_handle:
 	if (metafptr != NULL)
 		fclose(metafptr);
@@ -875,13 +1045,21 @@ int32_t _recursive_prune(ino_t thisinode)
 			switch (tmpptr->d_type) {
 			case D_ISLNK:
 				/* Just delete the meta */
-				delete_meta_blocks(tmpino, FALSE);
+				ret = delete_meta_blocks(tmpino, FALSE);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 				break;
 			case D_ISREG:
 			case D_ISFIFO:
 			case D_ISSOCK:
 				/* Delete the blocks and meta */
-				delete_meta_blocks(tmpino, TRUE);
+				ret = delete_meta_blocks(tmpino, TRUE);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 				break;
 			case D_ISDIR:
 				/* Need to expand */
@@ -920,6 +1098,9 @@ int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
 	int64_t temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
 	FILE *fptr = NULL;
 	size_t ret_size;
+	struct stat tmpmeta_struct;
+	int64_t old_metasize, new_metasize;
+	int64_t old_metasize_blk, new_metasize_blk;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	fptr = fopen(fetchedmeta, "r+");
@@ -930,13 +1111,15 @@ int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
 	}
 	setbuf(fptr, NULL);
 
+	fstat(fileno(fptr), &tmpmeta_struct);
+	old_metasize = (int64_t) tmpmeta_struct.st_size;
+	old_metasize_blk = (int64_t) tmpmeta_struct.st_blocks * 512;
+
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&parent_stat, sizeof(HCFS_STAT), 1, fptr);
 	FREAD(&parent_meta, sizeof(DIR_META_TYPE), 1, fptr);
 
 	for (count = 0; count < prune_num; count++) {
-		/* FEATURE TODO: write pruned inodes to disk so that
-		backend objects can be recycled later */
 		if (hcfs_system->system_going_down == TRUE) {
 			errcode = -ESHUTDOWN;
 			goto errcode_handle;
@@ -994,6 +1177,25 @@ int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
 		FWRITE(&parent_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	}
 
+	/* FEATURE TODO: In stage 2, need to queue inodes marked in
+	todelete and tosync to the to_delete list and dirty list in
+	super block */
+	fstat(fileno(fptr), &tmpmeta_struct);
+	new_metasize = (int64_t) tmpmeta_struct.st_size;
+	new_metasize_blk = (int64_t) tmpmeta_struct.st_blocks * 512;
+
+	fclose(fptr);
+
+	UPDATE_RESTORE_SYSMETA(.delta_system_size = new_metasize - old_metasize,
+			    .delta_meta_size = new_metasize_blk -
+				               old_metasize_blk,
+			    .delta_pinned_size = 0,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
+
+	/* Mark this inode to to_sync */
+	FWRITE(&thisinode, sizeof(ino_t), 1, to_sync_fptr);
 	return 0;
 errcode_handle:
 	write_log(0, "Unable to prune missing entries in restoration. (%"
@@ -1304,6 +1506,8 @@ int32_t run_download_minimal(void)
 {
 	ino_t rootino;
 	char despath[METAPATHLEN];
+	char restore_todelete_list[METAPATHLEN];
+	char restore_tosync_list[METAPATHLEN];
 	DIR_META_TYPE tmp_head;
 	DIR_ENTRY_PAGE tmppage;
 	FILE *fptr;
@@ -1328,6 +1532,26 @@ int32_t run_download_minimal(void)
 	ret = _restore_system_quota();
 	if (ret < 0) {
 		errcode = ret;
+		goto errcode_handle;
+	}
+
+	snprintf(restore_todelete_list, METAPATHLEN, "%s/todelete_list",
+	         RESTORE_METAPATH);
+	snprintf(restore_tosync_list, METAPATHLEN, "%s/tosync_list",
+	         RESTORE_METAPATH);
+	/* FEATURE TODO: If download in stage1 can be resumed in the middle,
+	then will need to open these two lists with "a+" */
+	to_delete_fptr = fopen(restore_todelete_list, "w+");
+	if (to_delete_fptr == NULL) {
+		write_log(0, "Unable to open todelete list\n");
+		errcode = -errno;
+		goto errcode_handle;
+	}
+
+	to_sync_fptr = fopen(restore_tosync_list, "w+");
+	if (to_sync_fptr == NULL) {
+		write_log(0, "Unable to open tosync list\n");
+		errcode = -errno;
 		goto errcode_handle;
 	}
 
@@ -1459,6 +1683,8 @@ int32_t run_download_minimal(void)
 	
 	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
 
+	fclose(to_delete_fptr);
+	fclose(to_sync_fptr);
 	notify_restoration_result(1, 0);
 
 	return 0;
@@ -1526,6 +1752,38 @@ int32_t backup_package_list(void)
 	have_new_pkgbackup = TRUE;
 	sem_post(&backup_pkg_sem);
 	return 0;
+}
+
+/**
+ * Update restored system meta when restoring.
+ *
+ * @param delta_system_meta Structure of delta system space usage.
+ *
+ * @return none.
+ */
+void update_restored_system_meta(DELTA_SYSTEM_META delta_system_meta)
+{
+	SYSTEM_DATA_TYPE *restored_system_meta;
+
+	restored_system_meta =
+			&(hcfs_restored_system_meta->restored_system_meta);
+
+	LOCK_RESTORED_SYSMETA();
+	/* Update restored space usage */
+	restored_system_meta->system_size +=
+			delta_system_meta.delta_system_size;
+	restored_system_meta->system_meta_size +=
+			delta_system_meta.delta_meta_size;
+	restored_system_meta->pinned_size +=
+			delta_system_meta.delta_pinned_size;
+	restored_system_meta->backend_size +=
+			delta_system_meta.delta_backend_size;
+	restored_system_meta->backend_meta_size +=
+			delta_system_meta.delta_backend_meta_size;
+	restored_system_meta->backend_inodes +=
+			delta_system_meta.delta_backend_inodes;
+	UNLOCK_RESTORED_SYSMETA();
+	return;
 }
 
 /**
