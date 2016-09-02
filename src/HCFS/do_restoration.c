@@ -508,7 +508,7 @@ int32_t _update_FS_stat(ino_t rootinode)
 	delta_pin_size = after_add_pinsize > MAX_PINNED_LIMIT ?
 		MAX_PINNED_LIMIT - restored_system_meta->pinned_size :
 		after_add_pinsize - restored_system_meta->pinned_size;
-	/* Estimated pre-allocated meta size */
+	/* Estimate pre-allocated meta size. */
 	restored_meta_limit = META_SPACE_LIMIT - RESERVED_META_MARGIN;
 	after_add_metasize = restored_system_meta->system_meta_size +
 		(tmpFSstat.backend_meta_size + 4096 * tmpFSstat.backend_num_inodes);
@@ -521,7 +521,6 @@ int32_t _update_FS_stat(ino_t rootinode)
 	restored_system_meta->system_size += tmpFSstat.backend_system_size;
 	restored_system_meta->system_meta_size += delta_meta_size;
 	restored_system_meta->pinned_size += delta_pin_size; /* Estimated pinned size */
-		//(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
 	restored_system_meta->backend_size += tmpFSstat.backend_system_size;
 	restored_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
 	restored_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
@@ -532,7 +531,6 @@ int32_t _update_FS_stat(ino_t rootinode)
 	rectified_system_meta->system_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->system_meta_size += delta_meta_size;
 	rectified_system_meta->pinned_size += delta_pin_size; /* Estimated pinned size */
-		//(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
 	rectified_system_meta->backend_size += tmpFSstat.backend_system_size;
 	rectified_system_meta->backend_meta_size += tmpFSstat.backend_meta_size;
 	rectified_system_meta->backend_inodes += tmpFSstat.backend_num_inodes;
@@ -1200,7 +1198,6 @@ void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 		PWRITE(fileno(hcfs_restored_system_meta->rect_fptr),
 			rectified_system_meta, sizeof(SYSTEM_DATA_TYPE), 0);
 	UNLOCK_RESTORED_SYSMETA();
-/* TODO: Write to disk every 2~3 seconds */
 	return;
 
 errcode_handle:
