@@ -505,16 +505,23 @@ int32_t _update_FS_stat(ino_t rootinode)
 	/* Estimate pre-allocated pinned size */
 	after_add_pinsize = restored_system_meta->pinned_size +
 		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
-	delta_pin_size = after_add_pinsize > MAX_PINNED_LIMIT ?
-		MAX_PINNED_LIMIT - restored_system_meta->pinned_size :
-		after_add_pinsize - restored_system_meta->pinned_size;
+	if (after_add_pinsize > MAX_PINNED_LIMIT)
+		delta_pin_size =
+			MAX_PINNED_LIMIT - restored_system_meta->pinned_size;
+	else
+		delta_pin_size =
+			after_add_pinsize - restored_system_meta->pinned_size;
 	/* Estimate pre-allocated meta size. */
 	restored_meta_limit = META_SPACE_LIMIT - RESERVED_META_MARGIN;
 	after_add_metasize = restored_system_meta->system_meta_size +
 		(tmpFSstat.backend_meta_size + 4096 * tmpFSstat.backend_num_inodes);
-	delta_meta_size = after_add_metasize > restored_meta_limit ?
-		restored_meta_limit - restored_system_meta->system_meta_size :
-		after_add_metasize - restored_system_meta->system_meta_size;
+
+	if (after_add_metasize > restored_meta_limit)
+		delta_meta_size =
+			restored_meta_limit - restored_system_meta->system_meta_size;
+	else
+		delta_meta_size =
+			after_add_metasize - restored_system_meta->system_meta_size;
 
 	/* Restored system space usage. it will be rectified after
 	 * restoration completed */
