@@ -16,17 +16,17 @@
 #include "mount_manager.h"
 #include <semaphore.h>
 
-#define FUSE_NOTIFY_CB_DEFAULT_LEN 8
-#define FUSE_NOTIFY_CB_ELEMSIZE 52
+#define FUSE_NOTIFY_BUF_DEFAULT_LEN 8
+#define FUSE_NOTIFY_BUF_ELEMSIZE 52
 
 enum NOTIFY_FUNCTION { NOOP, DELETE };
-enum NOTIFY_ACTION { RUN, DESTROY_CB };
+enum NOTIFY_ACTION { RUN, DESTROY_BUF };
 
 #define FUSE_NOTIFY_PROTO_MEMBER enum NOTIFY_FUNCTION func;
 
 /* Cycle buffer and it's data slots */
 typedef struct {
-	uint8_t padding[FUSE_NOTIFY_CB_ELEMSIZE];
+	uint8_t padding[FUSE_NOTIFY_BUF_ELEMSIZE];
 } _PACKED FUSE_NOTIFY_DATA;
 typedef struct {
 	FUSE_NOTIFY_DATA *elems;
@@ -37,7 +37,7 @@ typedef struct {
 	sem_t tasks_sem;
 	sem_t access_sem;
 	BOOL is_initialized;
-} FUSE_NOTIFY_CYCLE_BUF;
+} FUSE_NOTIFY_RING_BUF;
 
 /* Actual notify data defenition */
 typedef struct {
@@ -57,11 +57,11 @@ typedef void(fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
 fuse_notify_fn _do_hfuse_ll_notify_noop;
 fuse_notify_fn _do_hfuse_ll_notify_delete;
 
-int32_t init_notify_cb(void);
-void destory_notify_cb(void);
-BOOL notify_cb_realloc(void);
-int32_t notify_cb_enqueue(const void *const notify);
-FUSE_NOTIFY_DATA *notify_cb_dequeue();
+int32_t init_notify_buf(void);
+void destory_notify_buf(void);
+int32_t notify_buf_realloc(void);
+int32_t notify_buf_enqueue(const void *const notify);
+FUSE_NOTIFY_DATA *notify_buf_dequeue();
 
 int32_t init_hfuse_ll_notify_loop(void);
 void destory_hfuse_ll_notify_loop(void);
