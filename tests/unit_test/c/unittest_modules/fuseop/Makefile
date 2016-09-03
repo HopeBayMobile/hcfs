@@ -21,20 +21,15 @@ $(eval $(call ADDMODULE))
 # All tests produced by this Makefile.
 
 RERUN_TIMEOUT := 5
-#$(eval $(call ADDTEST, fuseop_unittest, \
-#  fuseop.o \
-#  fake_meta_mem_cache.o \
-#  fake_misc.o \
-#  fake_fuse_notify.o \
-#  fuseop_unittest.o \
-#  meta.o ))
-#
-#$(eval $(call ADDTEST, do_fallocate_unittest, \
-#  do_fallocate.o \
-#  fake_meta_mem_cache.o \
-#  fake_misc_do_fallocate.o \
-#  do_fallocate_unittest.o ))
+$(eval $(call ADDTEST, fuseop_unittest, \
+  fuseop.o \
+  fake_meta_mem_cache.o \
+  fake_misc.o \
+  fuseop_unittest.o \
+  meta.o ))
 
-$(eval $(call ADDTEST, fuse_notify_unittest, \
-  fuse_notify.o \
-  fuse_notify_unittest.o ))
+$(eval $(call ADDTEST, do_fallocate_unittest, \
+  do_fallocate.o \
+  fake_meta_mem_cache.o \
+  fake_misc_do_fallocate.o \
+  do_fallocate_unittest.o ))

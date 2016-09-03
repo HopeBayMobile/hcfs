@@ -60,7 +60,7 @@ fuse_notify_fn _do_hfuse_ll_notify_delete;
 int32_t init_notify_cb(void);
 void destory_notify_cb(void);
 BOOL notify_cb_realloc(void);
-void notify_cb_enqueue(const void *const notify);
+int32_t notify_cb_enqueue(const void *const notify);
 FUSE_NOTIFY_DATA *notify_cb_dequeue();
 
 int32_t init_hfuse_ll_notify_loop(void);

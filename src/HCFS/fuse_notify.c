@@ -130,8 +130,9 @@ BOOL notify_cb_realloc(void)
 			notify_cb.in += notify_cb.max_len;
 		}
 		notify_cb.max_len = newsize;
-		write_log(4, "Debug %s: done. resize to %lu\n", __func__,
-			  notify_cb.max_len);
+		write_log(4,
+			  "Debug %s: queue with %lu notify is realloc to %lu\n",
+			  __func__, notify_cb.len, notify_cb.max_len);
 	} else {
 		write_log(4, "Debug %s: failed\n", __func__);
 	}
@@ -139,21 +140,20 @@ BOOL notify_cb_realloc(void)
 	return good ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-void notify_cb_enqueue(const void *const notify)
+int32_t notify_cb_enqueue(const void *const notify)
 {
 	BOOL good = notify_cb.is_initialized;
 
 	if (!good) {
 		write_log(4, "Debug %s: notify buffer is not initialized\n",
 			  __func__);
-		return;
+		return -1;
 	}
 
-	sem_wait(&notify_cb.access_sem);
+	if (good)
+		good = (sem_wait(&notify_cb.access_sem) == 0);
 
-	if (notify_cb_isfull()) {
-		write_log(4, "Debug %s: queue is full with %lu notify\n",
-			  __func__, notify_cb.len);
+	if (good && notify_cb_isfull()) {
 		good = (notify_cb_realloc() == EXIT_SUCCESS);
 	}
 
@@ -164,12 +164,16 @@ void notify_cb_enqueue(const void *const notify)
 		notify_cb.len++;
 	}
 
-	sem_post(&notify_cb.access_sem);
-
 	if (good)
+		good = (sem_post(&notify_cb.access_sem) == 0);
+
+	if (good) {
 		write_log(4, "Debug %s: Add %lu\n", __func__, notify_cb.in);
-	else
-		write_log(4, "Debug %s: failed\n", __func__);
+		return 0;
+	} else {
+		write_log(4, "Debug %s: Failed\n", __func__);
+		return -1;
+	}
 }
 
 /* Dequeue the notify cycle buffer, return NULL with errno if no data or
@@ -340,15 +344,19 @@ void hfuse_ll_notify_delete(struct fuse_chan *ch,
 					 .name = NULL,
 					 .namelen = namelen};
 	good = (event.name = strndup(name, namelen)) != NULL;
+
+	if (good)
+		good = (notify_cb_enqueue((void *)&event) == 0);
+
+	if (good)
+		/* wake notify thread up */
+		good = (sem_post(&notify_cb.tasks_sem) == 0);
+
 	if (good) {
-		notify_cb_enqueue((void *)&event);
 		write_log(4, "Debug %s: notify queued\n", __func__);
 	} else {
 		write_log(4, "Debug %s: failed, strndup error\n", __func__);
 	}
-
-	/* wake notify thread up */
-	sem_post(&notify_cb.tasks_sem);
 }
 
 void hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
