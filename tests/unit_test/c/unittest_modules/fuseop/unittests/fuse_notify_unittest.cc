@@ -304,7 +304,7 @@ TEST_F(NotifyBuffer_Initialized, ReallocSuccess)
 	notify_buf_realloc();
 	notify_buf_realloc();
 	EXPECT_NE(notify_buf.elems, NULL);
-	EXPECT_EQ(notify_buf.max_len, FUSE_NOTIFY_CB_DEFAULT_LEN * 8);
+	EXPECT_EQ(notify_buf.max_len, FUSE_NOTIFY_BUF_DEFAULT_LEN * 8);
 }
 
 TEST_F(NotifyBuffer_Initialized, ReallocSkiped)

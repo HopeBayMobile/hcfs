@@ -52,9 +52,9 @@ SOFTWARE.
         FUNCNAME##_fake.custom_fake =                                          \
             (FUNCNAME##_Type *)dlsym(RTLD_NEXT, #FUNCNAME);                    \
         FUNCNAME##_mask_init = 1;                                              \
-    };
+    }
 #else
-#define DECLARE_MASK_INIT
+#define DECLARE_MASK_INIT(FUNCNAME)
 #define INIT_MASK(FUNCNAME)
 #endif
 
@@ -1461,10 +1461,10 @@ FFF_END_EXTERN_C \
 
 #define DEFINE_FAKE_VALUE_FUNC1(RETURN_TYPE, FUNCNAME, ARG0_TYPE) \
     FFF_EXTERN_C \
-    DECLARE_MASK_INIT(FUNCNAME) \
+        DECLARE_MASK_INIT(FUNCNAME) \
         FUNCNAME##_Fake FUNCNAME##_fake;\
         RETURN_TYPE FUNCNAME(ARG0_TYPE arg0){ \
-        INIT_MASK(FUNCNAME) \
+            INIT_MASK(FUNCNAME) \
             SAVE_ARG(FUNCNAME, 0); \
             if(ROOM_FOR_MORE_HISTORY(FUNCNAME)){\
                 SAVE_ARG_HISTORY(FUNCNAME, 0); \
