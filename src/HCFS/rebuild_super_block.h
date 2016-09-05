@@ -73,6 +73,12 @@ typedef struct SB_THREAD_POOL {
 SB_THREAD_POOL *rebuild_sb_tpool;
 REBUILD_SB_JOBS *rebuild_sb_jobs;
 
+typedef struct {
+	ino_t *roots;
+	int64_t num_roots;
+} ROOT_INFO_T;
+ROOT_INFO_T ROOT_INFO;
+
 int32_t rebuild_super_block_entry(ino_t this_inode,
 		HCFS_STAT *this_stat, char pin_status);
 int32_t restore_meta_super_block_entry(ino_t this_inode,
@@ -86,3 +92,4 @@ void wake_sb_rebuilder(void);
 int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job);
 int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes);
 int32_t erase_inode_job(INODE_JOB_HANDLE *inode_job);
+

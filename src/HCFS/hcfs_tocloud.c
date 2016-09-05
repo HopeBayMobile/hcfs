@@ -2050,6 +2050,48 @@ static inline void _write_upload_loop_status_log(char *sync_paused_status)
 	}
 }
 
+/* Mark the inodes in dirty list from restoration as dirty if needed */
+void _update_restore_dirty_list()
+{
+	int64_t count2, num_tosync;
+	ino_t tosync_inode;
+	char restore_tosync_list[METAPATHLEN];
+	FILE *to_sync_fptr = NULL;
+	struct stat tmpstat;
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	snprintf(restore_tosync_list, METAPATHLEN, "%s/tosync_list",
+	         METAPATH);
+	/* Skip the tosync list if does not exist or cannot access */
+	if (access(restore_tosync_list, F_OK) < 0)
+		return;
+	ret = stat(restore_tosync_list, &tmpstat);
+	if (ret < 0)
+		return;
+	if (tmpstat.st_size == 0) {
+		unlink(restore_tosync_list);
+		return;
+	}
+	num_tosync = (int64_t) (tmpstat.st_size / sizeof(ino_t));
+	to_sync_fptr = fopen(restore_tosync_list, "r");
+	if (to_sync_fptr == NULL)
+		return;
+
+	/* Mark as dirty inodes in the list */
+	for (count2 = 0; count2 < num_tosync; count2++) {
+		FREAD(&tosync_inode, sizeof(ino_t), 1,
+		      to_sync_fptr);
+		super_block_mark_dirty(tosync_inode);
+		write_log(10, "Marked %" PRIu64 " as to sync\n",
+		          (uint64_t) tosync_inode);
+errcode_handle:
+		/* If error occurs, just continue */
+		continue;
+	}
+	fclose(to_sync_fptr);
+	unlink(restore_tosync_list);
+}
 #ifdef _ANDROID_ENV_
 void *upload_loop(void *ptr)
 #else
@@ -2076,6 +2118,9 @@ void upload_loop(void)
 	is_start_check = TRUE;
 
 	write_log(2, "Start upload loop\n");
+
+	/* If dirty list from restoration exists, need to mark them as dirty */
+	_update_restore_dirty_list();
 
 	need_retry_backup = FALSE;
 	while (hcfs_system->system_going_down == FALSE) {

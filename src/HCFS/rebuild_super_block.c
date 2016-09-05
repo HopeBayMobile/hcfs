@@ -151,9 +151,11 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	char fstatpath[400], fs_sync_path[400];
 	char sb_path[300];
 	char objname[300];
+	char restore_todelete_list[METAPATHLEN];
 	FILE *fptr, *sb_fptr;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 	SUPER_BLOCK_HEAD head;
+	struct stat tmpstat;
 
 	sprintf(fs_sync_path, "%s/FS_sync", METAPATH);
 	if (access(fs_sync_path, F_OK) < 0)
@@ -224,6 +226,19 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 			fs_stat.system_size = fs_cloud_stat.backend_system_size;
 			fs_stat.meta_size = fs_cloud_stat.backend_meta_size;
 			fs_stat.num_inodes = fs_cloud_stat.backend_num_inodes;
+			/* Need to check how many
+			inodes are deleted in stage 1 already */
+			snprintf(restore_todelete_list, METAPATHLEN,
+				"%s/todelete_list_%" PRIu64,
+			         METAPATH, (uint64_t) root_inode);
+			if (access(restore_todelete_list, F_OK) == 0) {
+				ret = stat(restore_todelete_list,
+				           &tmpstat);
+				if (ret == 0)
+					fs_stat.num_inodes -=
+						tmpstat.st_size /
+						(sizeof(ino_t));
+			}
 			FWRITE(&fs_stat, sizeof(FS_STAT_T), 1, fptr);
 			fclose(fptr);
 		}
@@ -303,6 +318,10 @@ int32_t init_rebuild_sb(char rebuild_action)
 	sem_init(&(rebuild_sb_tpool->tpool_access_sem), 0, 1);
 
 	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
+
+	ret = _get_root_inodes(&(ROOT_INFO.roots), &(ROOT_INFO.num_roots));
+	if (ret < 0)
+		return ret;
 
 	/* Rebuild superblock */
 	if (rebuild_action == START_REBUILD_SB) {

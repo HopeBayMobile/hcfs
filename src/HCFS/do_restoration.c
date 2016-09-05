@@ -1177,9 +1177,6 @@ int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
 		FWRITE(&parent_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	}
 
-	/* FEATURE TODO: In stage 2, need to queue inodes marked in
-	todelete and tosync to the to_delete list and dirty list in
-	super block */
 	fstat(fileno(fptr), &tmpmeta_struct);
 	new_metasize = (int64_t) tmpmeta_struct.st_size;
 	new_metasize_blk = (int64_t) tmpmeta_struct.st_blocks * 512;
@@ -1215,6 +1212,8 @@ static inline void _realloc_prune(PRUNE_T **prune_list, int32_t *max_prunes)
 	*prune_list = tmp_prune_ptr;
 	*max_prunes += 10;
 }
+
+int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
 
 int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 {
@@ -1404,6 +1403,14 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		_prune_missing_entries(thisinode, prune_list, prune_index);
 	/* FEATURE TODO: If deleting app folders from /data/app, will need to
 	set version to zero in packages.xml */
+	if ((prune_index > 0) &&
+	    (strcmp(nowpath, "/data/app", strlen("/data/app") == 0)) {
+		errcode = _update_packages_list(prune_list, prune_index);
+		if (errcode < 0) {
+			free(prune_list)
+			return errcode;
+		}
+	}
 
 	free(prune_list);
 	return 0;
@@ -1501,6 +1508,79 @@ void _init_quota_restore()
 	sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
 }
 
+int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes)
+{
+	char plistpath[METAPATHLEN];
+	char plistmod[METAPATHLEN];
+	FILE *src = NULL, *dst = NULL;
+	int32_t ret, errcode, count;
+	char fbuf[4100], *sptr;
+
+	snprintf(plistpath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
+	snprintf(plistmod, METAPATHLEN, "%s/backup_pkg.mod", RESTORE_METAPATH);
+
+	src = fopen(plistpath, "r");
+	if (src == NULL) {
+		errcode = -errno;
+		write_log(0, "Error when opening src package list. (%s)\n",
+		          strerror(-errcode));
+		goto errcode_handle;
+	}
+	dst = fopen(plistmod, "w");
+	if (dst == NULL) {
+		errcode = -errno;
+		write_log(0, "Error when opening dst package list. (%s)\n",
+		          strerror(-errcode));
+		goto errcode_handle;
+	}
+
+	clearerr(src);
+	clearerr(dst);
+	while (!feof(src)) {
+		sptr = fgets(fbuf, 4096, src);
+		if (sptr == NULL)
+			break;
+
+		if (strlen(fbuf) < (5 + strlen("package name"))) {
+			/* Cannot be the package info, write directly */
+			sprintf(dst, "%s", fbuf);
+			continue;
+		}
+		if (strncmp(&(fbuf[5]), "package name",
+		    sizeof("package name")) != 0) {
+			/* Not the package info, write directly */
+			sprintf(dst, "%s", fbuf);
+			continue;
+		}
+		/* Find the version field and replace it with zero */
+		/* TODO: finish this function */
+	}
+	if (ferror(src) && !feof(src)) {
+		write_log(0, "Package list update terminated unexpectedly\n");
+		errcode = ferror(src);
+		goto errcode_handle;
+	}
+
+	fclose(src);
+	src = NULL;
+	fclose(dst);
+	dst = NULL;
+	ret = rename(plistmod, plistpath);
+	if (ret < 0) {
+		errcode = -errno;
+		write_log(0, "Error when renaming in stage 1. (%s)\n",
+		          strerror(-errcode));
+		goto errcode_handle;
+	}
+
+	return 0;
+errcode_handle:
+	if (src != NULL)
+		fclose(src);
+	if (dst != NULL)
+		fclose(dst);
+	return errcode;
+}
 /* FEATURE TODO: Need a notify and retry mechanism if network is down */
 int32_t run_download_minimal(void)
 {
@@ -1535,19 +1615,11 @@ int32_t run_download_minimal(void)
 		goto errcode_handle;
 	}
 
-	snprintf(restore_todelete_list, METAPATHLEN, "%s/todelete_list",
-	         RESTORE_METAPATH);
 	snprintf(restore_tosync_list, METAPATHLEN, "%s/tosync_list",
 	         RESTORE_METAPATH);
 	/* FEATURE TODO: If download in stage1 can be resumed in the middle,
-	then will need to open these two lists with "a+" */
-	to_delete_fptr = fopen(restore_todelete_list, "w+");
-	if (to_delete_fptr == NULL) {
-		write_log(0, "Unable to open todelete list\n");
-		errcode = -errno;
-		goto errcode_handle;
-	}
-
+	then will need to open this list with "a+" */
+	to_delete_fptr = NULL;
 	to_sync_fptr = fopen(restore_tosync_list, "w+");
 	if (to_sync_fptr == NULL) {
 		write_log(0, "Unable to open tosync list\n");
@@ -1603,6 +1675,20 @@ int32_t run_download_minimal(void)
 		          tmpentry->d_name);
 		if (!strcmp("hcfs_app", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
+			snprintf(restore_todelete_list, METAPATHLEN,
+				"%s/todelete_list_%" PRIu64,
+			         RESTORE_METAPATH, (uint64_t) rootino);
+			/* FEATURE TODO: If download in stage1 can be
+			resumed in the middle, then will need to open
+			this list with "a+" */
+			if (to_delete_fptr != NULL)
+				fclose(to_delete_fptr);
+			to_delete_fptr = fopen(restore_todelete_list, "w+");
+			if (to_delete_fptr == NULL) {
+				write_log(0, "Unable to open todelete list\n");
+				errcode = -errno;
+				goto errcode_handle;
+			}
 			ret = _fetch_meta(rootino);
 			if (ret == 0)
 				ret = _fetch_FSstat(rootino);
@@ -1619,6 +1705,20 @@ int32_t run_download_minimal(void)
 		}
 		if (!strcmp("hcfs_data", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
+			snprintf(restore_todelete_list, METAPATHLEN,
+				"%s/todelete_list_%" PRIu64,
+			         RESTORE_METAPATH, (uint64_t) rootino);
+			/* FEATURE TODO: If download in stage1 can be
+			resumed in the middle, then will need to open
+			this list with "a+" */
+			if (to_delete_fptr != NULL)
+				fclose(to_delete_fptr);
+			to_delete_fptr = fopen(restore_todelete_list, "w+");
+			if (to_delete_fptr == NULL) {
+				write_log(0, "Unable to open todelete list\n");
+				errcode = -errno;
+				goto errcode_handle;
+			}
 			ret = _fetch_meta(rootino);
 			if (ret == 0)
 				ret = _fetch_FSstat(rootino);
@@ -1635,6 +1735,20 @@ int32_t run_download_minimal(void)
 		}
 		if (!strcmp("hcfs_external", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
+			snprintf(restore_todelete_list, METAPATHLEN,
+				"%s/todelete_list_%" PRIu64,
+			         RESTORE_METAPATH, (uint64_t) rootino);
+			/* FEATURE TODO: If download in stage1 can be
+			resumed in the middle, then will need to open
+			this list with "a+" */
+			if (to_delete_fptr != NULL)
+				fclose(to_delete_fptr);
+			to_delete_fptr = fopen(restore_todelete_list, "w+");
+			if (to_delete_fptr == NULL) {
+				write_log(0, "Unable to open todelete list\n");
+				errcode = -errno;
+				goto errcode_handle;
+			}
 			ret = _fetch_meta(rootino);
 			if (ret == 0)
 				ret = _fetch_FSstat(rootino);
@@ -1683,7 +1797,8 @@ int32_t run_download_minimal(void)
 	
 	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
 
-	fclose(to_delete_fptr);
+	if (to_delete_fptr != NULL)
+		fclose(to_delete_fptr);
 	fclose(to_sync_fptr);
 	notify_restoration_result(1, 0);
 
