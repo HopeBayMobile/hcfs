@@ -22,12 +22,30 @@
 enum NOTIFY_FUNCTION { NOOP, DELETE };
 enum NOTIFY_ACTION { RUN, DESTROY_BUF };
 
-#define FUSE_NOTIFY_PROTO_MEMBER enum NOTIFY_FUNCTION func;
+/* Ring Buffer elements */
 
-/* Cycle buffer and it's data slots */
+/* Data chunk */
 typedef struct {
 	uint8_t padding[FUSE_NOTIFY_BUF_ELEMSIZE];
 } _PACKED FUSE_NOTIFY_DATA;
+
+/* Common header among data chunks */
+#define FUSE_NOTIFY_PROTO_MEMBER enum NOTIFY_FUNCTION func;
+typedef struct {
+	FUSE_NOTIFY_PROTO_MEMBER
+} _PACKED FUSE_NOTIFY_PROTO;
+
+/* Actual notify data defenitions */
+typedef struct {
+	FUSE_NOTIFY_PROTO_MEMBER
+	struct fuse_chan *ch;
+	fuse_ino_t parent;
+	fuse_ino_t child;
+	char *name;
+	size_t namelen;
+} _PACKED FUSE_NOTIFY_DELETE_DATA;
+
+/* Ring Buffer */
 typedef struct {
 	FUSE_NOTIFY_DATA *elems;
 	size_t max_len;
@@ -39,20 +57,7 @@ typedef struct {
 	BOOL is_initialized;
 } FUSE_NOTIFY_RING_BUF;
 
-/* Actual notify data defenition */
-typedef struct {
-	FUSE_NOTIFY_PROTO_MEMBER
-} _PACKED FUSE_NOTIFY_PROTO;
-
-typedef struct {
-	FUSE_NOTIFY_PROTO_MEMBER
-	struct fuse_chan *ch;
-	fuse_ino_t parent;
-	fuse_ino_t child;
-	char *name;
-	size_t namelen;
-} _PACKED FUSE_NOTIFY_DELETE_DATA;
-
+/* notify functions */
 typedef void(fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
 fuse_notify_fn _do_hfuse_ll_notify_noop;
 fuse_notify_fn _do_hfuse_ll_notify_delete;

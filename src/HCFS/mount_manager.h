@@ -57,6 +57,8 @@ typedef struct {
 	int64_t pinned_size;
 } FS_CLOUD_STAT_T;
 
+/* TODO: If we have multiple mount volumns with mp mode, MOUNT_T_GLOBAL need be
+ * privatized and shared between views of same volumn */
 typedef struct {
 	struct fuse_chan *fuse_default;
 	struct fuse_chan *fuse_write;

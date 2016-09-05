@@ -1272,12 +1272,12 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 {
 #ifdef _ANDROID_ENV_
 	ino_t this_inode;
+	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
 	ino_t parent_inode;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
-	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
