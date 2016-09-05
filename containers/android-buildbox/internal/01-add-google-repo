@@ -1,4 +1,0 @@
-#!/bin/bash
-mkdir -p /root/bin
-curl https://storage.googleapis.com/git-repo-downloads/repo > /root/bin/repo
-chmod a+x ~/bin/repo
