@@ -5670,8 +5670,6 @@ uint64_t str_to_mask(const char *input)
 	if (strlen(input) < 16)
 		return 0;
         for (count = 0; count < 16; count++) {
-		/* Not sure why ccc-analyzer reports input[count]
-		as garbage input */
                 if ((input[count] <= 'f') && (input[count] >= 'a')) {
                         tempout = tempout << 4;
                         tempout += (10 + (input[count] - 'a'));
