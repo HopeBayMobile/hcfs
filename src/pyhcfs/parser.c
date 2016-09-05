@@ -26,16 +26,16 @@
 
 /************************************************************************
 *
-* Function name: list_external_volume
+* Function name: list_volume
 *        Inputs: int32_t buf_num,
 *                DIR_ENTRY *ret_entry,
 *                int32_t *ret_num
-*       Summary: load fsmgr file and return all external volume
+*       Summary: load fsmgr file and return all volume
 *
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t list_external_volume(const char *fs_mgr_path,
+int32_t list_volume(const char *fs_mgr_path,
 			     PORTABLE_DIR_ENTRY **entry_array_ptr,
 			     uint64_t *ret_num)
 {
@@ -86,11 +86,15 @@ int32_t list_external_volume(const char *fs_mgr_path,
 		if (ret_val == -1)
 			goto errcode_handle;
 		for (count = 0; count < tpage.num_entries; count++) {
+
 			switch (tpage.dir_entries[count].d_type) {
+			case ANDROID_INTERNAL:
 			case ANDROID_EXTERNAL:
 			case ANDROID_MULTIEXTERNAL:
 				ret_entry[num_walked].inode =
-				    tpage.dir_entries[count].d_ino;
+					tpage.dir_entries[count].d_ino;
+				ret_entry[num_walked].d_type =
+					tpage.dir_entries[count].d_type;
 				strncpy(ret_entry[num_walked].d_name,
 					tpage.dir_entries[count].d_name,
 					sizeof(ret_entry[num_walked].d_name));
