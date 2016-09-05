@@ -328,6 +328,7 @@ void pinning_loop()
 			/* Actually there is no empty slot. Go back and wait */
 			write_log(0, "Unexpected error of no pin slot\n");
 			sem_post(&(pinning_scheduler.ctl_op_sem));
+			sem_post(&(pinning_scheduler.pinning_sem));
 			continue;
 		}
 		pinning_scheduler.pinning_info[t_idx].this_inode = now_inode;
