@@ -31,7 +31,7 @@ class Docker(object):
         self.volume.extend([vol])
 
     def get_run_cmd(self):
-        cmd = ["docker run --rm --privileged"]
+        cmd = ["docker run --rm "]
         cmd.extend(["-t" if self.tty else ""])
         cmd.extend(["--name=" + self.name])
         for (hsrc, dsrc, opt) in self.volume:
