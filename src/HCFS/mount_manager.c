@@ -860,8 +860,8 @@ static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 int32_t unmount_FS(char *fsname, char *mp)
 {
 	int32_t ret, errcode;
-	MOUNT_T *ret_info;
-	MOUNT_NODE_T *ret_node;
+	MOUNT_T *ret_info = NULL;
+	MOUNT_NODE_T *ret_node = NULL;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 	sem_wait(&(mount_mgr.mount_lock));
@@ -890,14 +890,18 @@ int32_t unmount_FS(char *fsname, char *mp)
 	_check_destroy_vol_shared_data(ret_info);
 #endif
 
-	free((ret_node->mt_entry)->f_mp);
-	free(ret_node->mt_entry);
-	free(ret_node);
+	if (ret_node != NULL) {
+		if (ret_node->mt_entry != NULL) {
+			free((ret_node->mt_entry)->f_mp);
+			free(ret_node->mt_entry);
+		}
+		free(ret_node);
+	}
 
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
 
-	return 0;
+	return ret;
 
 errcode_handle:
 	sem_post(&(mount_mgr.mount_lock));
@@ -919,8 +923,8 @@ errcode_handle:
 int32_t unmount_event(char *fsname, char *mp)
 {
 	int32_t ret, errcode;
-	MOUNT_T *ret_info;
-	MOUNT_NODE_T *ret_node;
+	MOUNT_T *ret_info = NULL;
+	MOUNT_NODE_T *ret_node = NULL;
 
 	write_log(10, "Unmounting FS %s\n", fsname);
 
@@ -944,9 +948,13 @@ int32_t unmount_event(char *fsname, char *mp)
 	_check_destroy_vol_shared_data(ret_info);
 #endif
 
-	free((ret_node->mt_entry)->f_mp);
-	free(ret_node->mt_entry);
-	free(ret_node);
+	if (ret_node != NULL) {
+		if (ret_node->mt_entry != NULL) {
+			free((ret_node->mt_entry)->f_mp);
+			free(ret_node->mt_entry);
+		}
+		free(ret_node);
+	}
 
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
@@ -993,9 +1001,10 @@ int32_t mount_status(char *fsname)
 int32_t unmount_all(void)
 {
 	/* TODO: errcode_handle */
-	MOUNT_T *ret_info;
-	MOUNT_NODE_T *ret_node;
+	MOUNT_T *ret_info = NULL;
+	MOUNT_NODE_T *ret_node = NULL;
 	char fsname[MAX_FILENAME_LEN+1];
+	int32_t ret = 0;
 
 	sem_wait(&(fs_mgr_head->op_lock));
 	sem_wait(&(mount_mgr.mount_lock));
@@ -1014,21 +1023,27 @@ int32_t unmount_all(void)
 		/* TODO: check return value */
 		write_log(5, "Unmounted filesystem %s at mountpoint %s\n",
 				fsname, ret_info->f_mp);
-		delete_mount(fsname, ret_info->f_mp, &ret_node);
+		ret = delete_mount(fsname, ret_info->f_mp, &ret_node);
 #ifdef _ANDROID_ENV_
 		_check_destroy_vol_shared_data(ret_info);
 #endif
 
-		if ((ret_node->mt_entry)->f_mp != NULL)
-			free((ret_node->mt_entry)->f_mp);
-		free(ret_node->mt_entry);
-		free(ret_node);
+		if (ret_node != NULL) {
+			if (ret_node->mt_entry != NULL) {
+				free((ret_node->mt_entry)->f_mp);
+				free(ret_node->mt_entry);
+			}
+			free(ret_node);
+			ret_node = NULL;
+		}
+		if (ret < 0)
+			break;
 	}
 
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
 
-	return 0;
+	return ret;
 }
 
 void _write_volstat(void *mptr1)

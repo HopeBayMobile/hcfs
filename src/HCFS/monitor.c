@@ -221,9 +221,10 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 	if(status_changed)
 		sem_post(&(hcfs_system->monitor_sem));
 
+/* TODO FIXME: status_time is not used actually */
+	UNUSED(status_time);
 	if (status_time == NULL) {
 		clock_gettime(CLOCK_REALTIME, &current_time);
-		status_time = &current_time;
 	}
 }
 

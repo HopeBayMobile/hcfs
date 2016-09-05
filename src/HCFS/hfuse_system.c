@@ -464,7 +464,7 @@ int32_t main(int32_t argc, char **argv)
 	ret_val = _is_battery_low();
 	if (ret_val == TRUE) {
 		close_log();
-		ret_val = execlp("setprop", "setprop", "sys.powerctl",
+		execlp("setprop", "setprop", "sys.powerctl",
 		                 "shutdown", NULL);
 		exit(-1);
 	}

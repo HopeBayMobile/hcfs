@@ -816,8 +816,10 @@ int32_t check_page_level(int64_t page_index)
 
 	tmp_index = tmp_index - (longpow(POINTERS_PER_PAGE, 3));
 
-	/* TODO: boundary handling for quadruple indirect */
-	return 4;
+	if (tmp_index < (longpow(POINTERS_PER_PAGE, 4)))
+		return 4;
+
+	return -EINVAL;
 }
 
 int64_t _load_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
@@ -902,7 +904,7 @@ int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 		  int64_t target_page,
 		  int64_t hint_page)
 {
-	off_t filepos;
+	off_t filepos = 0;
 	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
 	int32_t which_indirect;
@@ -974,6 +976,7 @@ int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 						body_ptr->fptr, 4);
 		break;
 	default:
+		filepos = -EINVAL;
 		break;
 	}
 
@@ -1146,7 +1149,7 @@ errcode_handle:
 *************************************************************************/
 int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 {
-	off_t filepos;
+	off_t filepos = 0;
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
@@ -1219,6 +1222,7 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 						body_ptr, 4);
 		break;
 	default:
+		filepos = -EINVAL;
 		break;
 	}
 
@@ -1249,7 +1253,7 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta,
 		   int64_t target_page,
 		   int64_t hint_page)
 {
-	off_t filepos;
+	off_t filepos = 0;
 	int32_t which_indirect;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
@@ -1296,6 +1300,7 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta,
 						fptr, 4);
 		break;
 	default:
+		filepos = -EINVAL;
 		break;
 	}
 
@@ -1328,7 +1333,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	HCFS_STAT this_inode_stat;
         FILE_META_TYPE file_meta;
         BLOCK_ENTRY_PAGE tmppage;
-        FILE *metafptr;
+        FILE *metafptr = NULL;
         int64_t e_index, which_page;
         size_t ret_size;
         struct timeval start_time, end_time;

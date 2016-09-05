@@ -315,7 +315,6 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	int32_t ret_val;
 
-	ret_val = 0;
 	super_block_share_locking();
 	ret_val = read_super_block_entry(this_inode, inode_ptr);
 	super_block_share_release();
@@ -338,7 +337,6 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	int32_t ret_val;
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 	if (inode_ptr->status != IS_DIRTY) { /* Add to dirty node list */
 		ret_val = ll_dequeue(this_inode, inode_ptr);
@@ -439,7 +437,6 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 	int64_t now_meta_size, dirty_delta_meta_size;
 
 	need_write = FALSE;
-	ret_val = 0;
 	super_block_exclusive_locking();
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
@@ -504,7 +501,6 @@ int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
 	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
@@ -578,7 +574,6 @@ int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
 	SUPER_BLOCK_ENTRY tempentry;
 	mode_t tempmode;
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
@@ -639,7 +634,6 @@ int32_t super_block_enqueue_delete(ino_t this_inode)
 	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
@@ -1788,6 +1782,8 @@ int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 		if (S_ISREG(this_mode)) {
 			/* Enqueue and set as ST_PINNING */
 			ret = pin_ll_enqueue(this_inode, &this_entry);
+			if (ret < 0)
+				break;
 			this_entry.pin_status = ST_PINNING;
 		} else {
 			this_entry.pin_status = ST_PIN;
@@ -1892,6 +1888,8 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 
 		ret = read_super_block_entry(
 			sys_super_block->head.last_pin_inode, &last_entry);
+		if (ret < 0)
+			goto error_handling;
 		last_entry.pin_ll_next = this_inode;
 		ret = write_super_block_entry(
 			sys_super_block->head.last_pin_inode, &last_entry);

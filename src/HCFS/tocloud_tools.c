@@ -396,6 +396,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		setbuf(local_metafptr, NULL);
 
 	current_page = -1;
+	page_pos = 0;
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 		which_page = block_count / BLK_INCREMENTS;
 
@@ -415,7 +416,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			 * to recover status to ST_LDISK. TODO: Maybe do not
 			 * need this action? */
 			if (delete_which_one == DEL_TOUPLOAD_BLOCKS) {
-				page_pos = 0;
 				if (local_metafptr != NULL) {
 					flock(fileno(local_metafptr), LOCK_EX);
 					ret_size = pread(fileno(local_metafptr),
@@ -473,6 +473,9 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			inode, block_count, block_seq,
 			page_pos, e_index, progress_fd, delete_which_one);
 #else
+		/* page_pos is not initiated if not DEL_TOUPLOAD_BLOCKS. That
+		 * is because we do not need value of page_pos after deleting
+		 * old blocks on cloud.*/
 		which_curl = select_upload_thread(TRUE, FALSE,
 			inode, block_count, block_seq,
 			page_pos, e_index, progress_fd, delete_which_one);

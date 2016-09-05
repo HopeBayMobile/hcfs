@@ -200,11 +200,6 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	char block, mlock, bopen, mopen;
 	int64_t block_size_blk;
 
-	block = FALSE;
-	mlock = FALSE;
-	bopen = FALSE;
-	mopen = FALSE;
-
 	entry_index = ptr->entry_index;
 	/*Download from backend */
 	fetch_meta_path(thismetapath, ptr->this_inode);
@@ -335,6 +330,7 @@ errcode_handle:
 		flock(fileno(metafptr), LOCK_UN);
 	if (mopen == TRUE)
 		fclose(metafptr);
+	UNUSED(errcode);
 	free(ptr);
 }
 

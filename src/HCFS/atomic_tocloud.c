@@ -172,6 +172,10 @@ int64_t query_status_page(int32_t fd, int64_t block_index)
 		break;
 	case 4:
 		ret_pos = progress_meta.quadruple_indirect;
+		break;
+	default:
+		ret_pos = 0;
+		break;
 	}
 	if (ret_pos == 0)
 		return ret_pos;
@@ -347,7 +351,6 @@ int32_t get_progress_info(int32_t fd, int64_t block_index,
 	int32_t entry_index;
 	BLOCK_UPLOADING_PAGE block_page;
 
-	ret_ssize = 0;
 	entry_index = block_index % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	flock(fd, LOCK_EX);
@@ -685,7 +688,6 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 	if (write_status_page) {
 		PWRITE(fd, &status_page,
 				sizeof(BLOCK_UPLOADING_PAGE), offset);
-		write_status_page = FALSE;
 	}
 
 	/* Finally write meta */
@@ -841,7 +843,7 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	int32_t ret;
 	size_t read_size, total_size;
 	size_t ret_size;
-	FILE *src_ptr, *tar_ptr;
+	FILE *src_ptr = NULL, *tar_ptr = NULL;
 	char filebuf[4100];
 	int64_t ret_pos;
 	struct stat tar_stat;
@@ -936,7 +938,6 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	if (ret == 0) {
 		total_size = tar_stat.st_blocks * 512;
 	} else {
-		total_size = 0;
 		errcode = -errno;
 		goto errcode_handle;
 	}
@@ -982,6 +983,7 @@ char block_finish_uploading(int32_t fd, int64_t blockno)
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 	PROGRESS_META progress_meta;
 
+	memset(&block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
 	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	if (blockno + 1 > progress_meta.total_toupload_blocks) {
 		write_log(10, "Debug: Do not care about block %lld because #"
@@ -1027,7 +1029,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 		int64_t *backend_size, int64_t *total_backend_blocks,
 		int64_t upload_seq, uint8_t *last_pin_status)
 {
-	FILE *backend_metafptr;
+	FILE *backend_metafptr = NULL;
 	char backend_metapath[400];
 	char objname[400];
 	HCFS_STAT tempfilestat;
@@ -1064,7 +1066,7 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 						 last_pin_status);
 			*backend_size = 0;
 			*total_backend_blocks = 0;
-			return 0;
+			return ret;
 		}
 
 		/* Try to download backend meta */
@@ -1158,7 +1160,7 @@ errcode_handle:
  */ 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 {
-	char toupload_meta_exist, backend_meta_exist;
+	char toupload_meta_exist = FALSE, backend_meta_exist = FALSE;
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
 	int32_t errcode;
