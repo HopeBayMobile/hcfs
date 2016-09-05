@@ -5693,7 +5693,7 @@ uint64_t str_to_mask(const char *input)
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check)
 {
 	char proc_status_path[100];
-        char tmpstr[100], outstr[20];
+        char tmpstr[100], outstr[20] = {0};
         char *saveptr, *outptr;
         FILE *fptr;
 	uint64_t cap_mask, op_mask, result_mask;

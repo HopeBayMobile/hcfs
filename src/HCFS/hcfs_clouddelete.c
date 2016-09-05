@@ -466,7 +466,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
-	uint8_t backend_pin_st;
+	uint8_t backend_pin_st = P_UNPIN;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
