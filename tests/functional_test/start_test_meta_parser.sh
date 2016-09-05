@@ -7,7 +7,7 @@ source $repo/utils/common_header.bash
 cd $repo
 
 echo "########## Setup Test Env"
-$repo/utils/setup_dev_env.sh -m functional_test,docker_host
+$repo/utils/setup_dev_env.sh -m docker_host
 . $repo/utils/env_config.sh
 
 echo "########## pi_tester.py"
