@@ -474,8 +474,8 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			page_pos, e_index, progress_fd, delete_which_one);
 #else
 		/* page_pos is not initiated if not DEL_TOUPLOAD_BLOCKS. That
-		 * is because we do not need page_pos after deleting backend old
-		 * blocks.*/
+		 * is because we do not need value of page_pos after deleting
+		 * old blocks on cloud.*/
 		which_curl = select_upload_thread(TRUE, FALSE,
 			inode, block_count, block_seq,
 			page_pos, e_index, progress_fd, delete_which_one);
