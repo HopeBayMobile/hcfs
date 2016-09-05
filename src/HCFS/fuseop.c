@@ -1344,6 +1344,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
 
+		/* Tell all other views that node is gone; if filename
+		 * has different case then tell all views */
 		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
 					  temp_dentry.d_ino, temp_dentry.d_name,
 					  strlen(selfname), selfname);
@@ -1443,10 +1445,16 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
-		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-						this_inode);
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		ret_val =
+		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
 
+		/* Tell all other views that node is gone; if filename
+		 * has different case then tell all views */
+		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
+					  temp_dentry.d_ino, temp_dentry.d_name,
+					  strlen(selfname), selfname);
+	}
 	/* TODO: Check if this still works for app to sdcard */
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
