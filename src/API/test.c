@@ -122,5 +122,10 @@ int32_t main()
 	HCFS_clear_sync_point(&res17);
 	printf("clear sync point - %s\n", res17);
 	free(res17);
+
+	char *res18;
+	HCFS_collect_sys_logs(&res18);
+	printf("collect sys logs - %s\n", res18);
+	free(res18);
 }
 

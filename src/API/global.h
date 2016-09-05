@@ -73,5 +73,6 @@
 #define GETSTAT 50
 #define SYSREBOOT 51
 #define QUERYPKGUID 52
+#define COLLECTSYSLOGS 53
 
 #endif  /* GW20_HCFSAPI_GLOBAL_H_ */

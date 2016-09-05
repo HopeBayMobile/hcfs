@@ -329,4 +329,20 @@ void HCFS_set_sync_point(char **json_res);
  * | False | Linux errors.|
  */
 void HCFS_clear_sync_point(char **json_res);
+
+/*Collect System logs
+ * @json_res result string in json format.
+ *
+ * To collect system logs (hcfs log, logcat and dmesg)
+ * for user feedback. This API will copy/dump all logs
+ * to the dir "/sdcard/TeraLog/logs".
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if successful|
+ * | False | Linux errors.|
+ */
+void HCFS_collect_sys_logs(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */
