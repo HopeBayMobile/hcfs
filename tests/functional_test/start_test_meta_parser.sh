@@ -19,4 +19,5 @@ $repo/build.sh pyhcfs
 
 echo "########## pi_tester.py"
 cd $repo/tests/functional_test/TestCases/TestMetaParser/docker
+umask 000
 python startMetaParserDockerTest.py
