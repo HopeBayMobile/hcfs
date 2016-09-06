@@ -3,25 +3,16 @@ from subprocess import Popen, PIPE
 import os
 import time
 
-import config
-
-logger = config.get_logger().getChild(__name__)
-
 
 def isAvailable(serialno=""):
-    logger.info("Check if phone <" + serialno + "> is adb available.")
-    if serialno:
-        cmd = "adb get-serialno | grep " + serialno
-        pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-        out, err = pipe.communicate()
-        logger.debug("isAvailable" + repr((cmd, out, err)))
-        return True if out else False
-    else:
-        cmd = "adb get-serialno | grep unknown"
-        pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-        out, err = pipe.communicate()
-        logger.debug("isAvailable" + repr((cmd, out, err)))
-        return False if out else True
+    cmd = "adb get-serialno"
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    out, err = process.communicate()
+    if "no devices" in out:
+        return False
+    if serialno and serialno not in out:
+        return False
+    return True
 
 
 def isAvailable_and_sys_ready_until(timeout, serialno=""):
@@ -35,29 +26,22 @@ def isAvailable_and_sys_ready_until(timeout, serialno=""):
 
 
 def pull(src, dest, serialno=""):
-    logger.info("Pull file from phone <" + serialno + ">.")
     assert is_file_available(src, serialno), "No such file or dir"
     cmd = __get_cmd_prefix(serialno) + " pull " + src + " " + dest
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    out, err = pipe.communicate()
-    logger.debug("pull" + repr((cmd, out, err)))
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    return process.communicate()
 
 
 def push_as_root(src, dest, name, serialno=""):
     push(src, "/data/local/tmp", serialno)
     cmd = "mv /data/local/tmp/" + name + " " + dest
-    out, err = exec_cmd(cmd, serialno)
-    logger.debug("push_as_root" + repr((cmd, out, err)))
-    assert not err, err
+    return exec_cmd(cmd, serialno)
 
 
 def push(src, dest, serialno=""):
-    logger.info("Push file to phone <" + serialno + ">.")
     cmd = __get_cmd_prefix(serialno) + " push " + src + " " + dest
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    out, err = pipe.communicate()
-    logger.debug("push" + repr((cmd, out, err)))
-    assert not err, err
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    return process.communicate()
 
 
 def get_logcat(path, tag="HopeBay", serialno=""):
@@ -68,23 +52,20 @@ def get_logcat(path, tag="HopeBay", serialno=""):
 
 def exec_cmd(cmd, serialno=""):
     prefix = __get_cmd_prefix(serialno) + " shell su 0 "
-    pipe = subprocess.Popen(prefix + cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    out, err = pipe.communicate()
-    logger.debug("exec_cmd" + repr((cmd, out, err)))
-    return out, err
+    process = Popen(prefix + cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    return process.communicate()
 
 
 def get_file(name, src, dest, serialno=""):
     cmd = "cp " + src + " /sdcard/Download/"
     exec_cmd(cmd, serialno)
-    # cmd = "cat  /data/local/tmp/" + name + " > " + dest
-    # exec_cmd(cmd)
-    pull("/sdcard/Download/" + name, dest)
+    out, err = pull("/sdcard/Download/" + name, dest)
     rm_file("/sdcard/Download/" + name)
+    return out, err
 
 
 def get_hcfs_log(path):
-    get_file("hcfs_android_log", "/data/hcfs_android_log", path)
+    return get_file("hcfs_android_log", "/data/hcfs_android_log", path)
 
 
 def get_file_size(path, serialno=""):
@@ -93,26 +74,28 @@ def get_file_size(path, serialno=""):
 
 
 def reboot(timeout=120, serialno=""):
-    cmd = "reboot"
-    out, err = exec_cmd(cmd, serialno)
+    cmd = __get_cmd_prefix(serialno) + " reboot"
+    pipe = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    out, err = pipe.communicate()
     assert not out and not err, "Should not output anything."
     time.sleep(60)
-    assert isAvailable_and_sys_ready_until(
-        timeout, serialno), "Timeout when wait device bootup"
+    if not isAvailable_and_sys_ready_until(timeout, serialno):
+        raise TimeoutError("Timeout when wait device bootup")
+
+
+def reboot_async(serialno=""):
+    cmd = __get_cmd_prefix(serialno) + " reboot"
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
 
 
 def gen_dir(path, serialno=""):
     cmd = "mkdir " + path
-    out, err = exec_cmd(cmd, serialno)
-    assert not out and not err, repr((out, err))
-
-
-# Remove recursively when path target is a directory
+    return exec_cmd(cmd, serialno)
 
 
 def rm_file(path, serialno=""):
     cmd = "rm -rf " + path
-    out, err = exec_cmd(cmd, serialno)
+    return exec_cmd(cmd, serialno)
 
 
 def enable_wifi(serialno=""):
@@ -133,11 +116,6 @@ def is_file_available(path, serialno=""):
     out, err = exec_cmd(cmd, serialno)
     return True if not out else False
 
-# adb wait-for-device shell ...
-# adb wait-for-device
-
 
 def __get_cmd_prefix(serialno=""):
-    cmd_list = ["adb"]
-    cmd_list.extend(["-s", serialno] if serialno else [])
-    return " ".join(cmd_list)
+    return "adb {0}".format("-s" + serialno if serialno else "")

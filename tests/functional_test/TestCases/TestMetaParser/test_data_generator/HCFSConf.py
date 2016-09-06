@@ -1,6 +1,6 @@
 import os
 import subprocess
-from subprocess import Popen, PIPE
+from subprocess import PIPE
 import tempfile
 
 import adb
@@ -24,8 +24,7 @@ def setup():
     assert adb.isAvailable(), "Adb device not found."
 
     cmd = "cd " + HCFSCONF_BIN_DIR + " && make hcfsconf"
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    pipe.communicate()
+    subprocess.call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     assert os.path.isfile(HCFSCONF_BIN), "Fail to make hcfsconf."
 
     adb.get_file(HCFSCONF_ENC_FILE, HCFSCONF_ENC_FILE_PATH, THIS_DIR, serialno)
@@ -33,9 +32,7 @@ def setup():
     enc_path = os.path.join(THIS_DIR, HCFSCONF_ENC_FILE)
     plain_path = os.path.join(THIS_DIR, HCFSCONF_FILE)
     cmd = "cd " + HCFSCONF_BIN_DIR + " && ./hcfsconf dec " + enc_path + " " + plain_path
-    pipe = subprocess.Popen(cmd, shell=True)
-    out, err = pipe.communicate()
-    logger.debug(repr((out, err)))
+    subprocess.call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     assert os.path.isfile(plain_path), "Fail to dec hcfs.conf."
 
 
@@ -59,8 +56,7 @@ def get_by_key(key):
 def cleanup():
     logger.info("hcfsconf cleanup")
     cmd = "cd " + HCFSCONF_BIN_DIR + " && make clean"
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    pipe.communicate()
+    subprocess.call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
     assert not os.path.isfile(HCFSCONF_BIN), "Fail to make clean hcfsconf."
 
     try:

@@ -1,4 +1,3 @@
-import subprocess
 from subprocess import Popen, PIPE
 import ast
 import os
@@ -45,8 +44,8 @@ def _python3_call(func, args):
     write_stdout = "sys.stdout.write(repr({0}))".format(func_call)
     cmd = "python3 -c '{0}{1}'".format(imports, write_stdout)
 
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    out, err = pipe.communicate()
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    out, err = process.communicate()
     _log_cmd(func, cmd, out, err)
     result = ast.literal_eval(out)
     _log_fun(func, args, result)
@@ -77,22 +76,22 @@ def _log_cmd(file_name, cmd, out, err):
         log_file.write(msg)
 
 if __name__ == '__main__':
-    path = "../test_data_v2/FSstat0"
-    result = get_vol_usage(path)
-    print "path:" + path
-    print repr(result)
-    path = "../test_data_v2/FSstat2"
-    result = get_vol_usage(path)
-    print "path:" + path
-    print repr(result)
-    path = "../test_data_v2/248/meta_248"
+    # path = "../test_data_v2/FSstat0"
+    # result = get_vol_usage(path)
+    # print "path:" + path
+    # print repr(result)
+    # path = "../test_data_v2/FSstat2"
+    # result = get_vol_usage(path)
+    # print "path:" + path
+    # print repr(result)
+    path = "meta_203"
     result = list_dir_inorder(path)
     print "path:" + path
     print repr(result)
-    path = "../test_data_v2/FSstat147"
-    result = get_vol_usage(path)
-    print "path:" + path
-    print repr(result)
+    # path = "../test_data_v2/FSstat147"
+    # result = get_vol_usage(path)
+    # print "path:" + path
+    # print repr(result)
 
     # result = list_file_blocks("../test_data_v2/10465/meta_10465")
     # assert isinstance(result, dict), "Not a dict result = <" + \

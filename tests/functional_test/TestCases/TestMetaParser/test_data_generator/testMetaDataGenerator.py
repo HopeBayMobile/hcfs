@@ -1,7 +1,4 @@
 import os
-import subprocess
-from subprocess import Popen, PIPE
-import time
 import shutil
 import string
 import random
@@ -214,6 +211,7 @@ class TestMetaDataGenerator(object):
         return "".join(random.choice(chars) for _ in range(size))
 
 if __name__ == '__main__':
+    import time
     socketToMgmtApp.setup()
     socketToMgmtApp.refresh_token()
     socketToMgmtApp.cleanup()

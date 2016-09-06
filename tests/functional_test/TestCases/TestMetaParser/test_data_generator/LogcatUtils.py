@@ -1,5 +1,4 @@
 from datetime import datetime
-import subprocess
 from subprocess import Popen, PIPE
 import time
 
@@ -66,8 +65,8 @@ class Logcat(object):
 
     def get_raw_logcat(self):
         cmd = "adb logcat -d -s " + self.tag
-        pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-        out, err = pipe.communicate()
+        process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+        out, err = process.communicate()
         assert not err, "Error when get raw log string"
         return out
 

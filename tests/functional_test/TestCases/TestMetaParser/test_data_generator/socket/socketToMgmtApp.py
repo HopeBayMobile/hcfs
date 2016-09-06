@@ -1,5 +1,4 @@
 import os
-import subprocess
 from subprocess import Popen, PIPE
 
 import config
@@ -21,9 +20,8 @@ def setup():
     cleanup()
 
     cmd = "make"
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE,
-                            stderr=PIPE, cwd=THIS_DIR)
-    out, err = pipe.communicate()
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, cwd=THIS_DIR)
+    out, err = process.communicate()
     logger.debug("setup" + repr((out, err)))
     assert os.path.isfile(BIN_LOCAL_PATH), "Fail to make " + BIN_NAME
 
@@ -45,9 +43,8 @@ def cleanup():
             BIN_PHONE_PATH), "Fail to clean bin file."
 
     cmd = "make clean"
-    pipe = subprocess.Popen(cmd, shell=True, stdout=PIPE,
-                            stderr=PIPE, cwd=THIS_DIR)
-    pipe.communicate()
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, cwd=THIS_DIR)
+    process.communicate()
     assert not os.path.isfile(BIN_LOCAL_PATH), "Fail to make clean."
 
 if __name__ == '__main__':

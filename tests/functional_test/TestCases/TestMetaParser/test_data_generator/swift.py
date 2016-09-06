@@ -1,4 +1,3 @@
-import subprocess
 from subprocess import Popen, PIPE
 
 import config
@@ -32,13 +31,12 @@ class Swift(object):
         self.logger.info("Download file")
         cmd = self._cmd_prefix()
         if self._cmd_type == "swift":
-            cmd += " download " + self._bucket + " " + name + " -o " + new_path
-        elif self._cmd_type == "token":
-            if name:
-                cmd += "/" + name
-            cmd += " -o " + new_path
-        pipe = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
-        out, err = pipe.communicate()
+            cmd += " download {0} {1}".format(self._bucket, name)
+        elif self._cmd_type == "token" and name:
+            cmd += "/{0}".format(name)
+        cmd += " -o {0}".format(new_path)
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+        out, err = process.communicate()
         self.logger.debug("download_file" + repr((cmd, out, err)))
         return out, err
 
@@ -48,16 +46,16 @@ class Swift(object):
         if self._cmd_type == "swift":
             raise Exception("Unsupported.")
         elif self._cmd_type == "token":
-            cmd += "/?marker=" + marker
-            cmd += " -o " + new_path
-        pipe = subprocess.Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
-        out, err = pipe.communicate()
+            cmd += "/?marker={0}".format(marker)
+            cmd += " -o {0}".format(new_path)
+        process = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+        out, err = process.communicate()
         self.logger.debug("download_file" + repr((cmd, out, err)))
         return out, err
 
     def _cmd_prefix(self):
         if self._cmd_type == "swift":
-            return "swift --insecure -A " + self._url + " -U " + self._user + ":" + self._user + " -K " + self._pwd
+            return "swift --insecure -A {0} -U {1}:{1} -K {2}".format(self._url, self._user, self._pwd)
         elif self._cmd_type == "token":
-            return "curl --insecure -X GET -H \"X-Auth-Token:" + self._token + "\" " + self._url + "/" + self._bucket
+            return "curl --insecure -X GET -H \"X-Auth-Token:{0}\" {1}/{2}".format(self._token, self._url, self._bucket)
         raise Exception("Unsupport command type.")
