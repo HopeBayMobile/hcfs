@@ -1,4 +1,5 @@
 #!/bin/bash
+# keyword=test-max-pin
 
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
