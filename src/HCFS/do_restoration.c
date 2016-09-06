@@ -1402,6 +1402,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	if (prune_index > 0)
 		_prune_missing_entries(thisinode, prune_list, prune_index);
 
+	/* FEATURE TODO: Log deletion of apps / files */
 	/* If deleting app folders from /data/app, need to
 	set version to zero in packages.xml */
 	if ((prune_index > 0) &&
