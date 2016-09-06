@@ -42,37 +42,37 @@
 
 #include "fuseop.h"
 
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <math.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <sqlite3.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/capability.h>
-#include <sys/file.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/xattr.h>
 #include <time.h>
-#include <unistd.h>
-/* Headers from the other libraries */
-#include <fuse/fuse_lowlevel.h>
-#include <fuse/fuse_common.h>
-#include <fuse/fuse_opt.h>
+#include <math.h>
+
 #ifdef STAT_VFS_H
 #include STAT_VFS_H
 #else
 #include <sys/statvfs.h>
 #endif
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
+
+#include <unistd.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <sys/mman.h>
+#include <sys/file.h>
+#include <fcntl.h>
+#include <sys/xattr.h>
+#include <inttypes.h>
+#include <sqlite3.h>
+#include <sys/capability.h>
+
+/* Headers from the other libraries */
+#include <fuse/fuse_lowlevel.h>
+#include <fuse/fuse_common.h>
+#include <fuse/fuse_opt.h>
 
 #include "FS_manager.h"
 #include "api_interface.h"
@@ -104,6 +104,7 @@
 #include "xattr_ops.h"
 #ifndef _ANDROID_ENV_
 #include "fuseproc_comm.h"
+#include <attr/xattr.h>
 #endif
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
