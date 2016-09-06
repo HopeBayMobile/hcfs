@@ -1041,6 +1041,8 @@ int32_t _recursive_prune(ino_t thisinode)
 			if (strcmp(tmpptr->d_name, "..") == 0)
 				continue;
 
+			write_log(10, "Pruning %s\n", tmpptr->d_name);
+
 			tmpino = tmpptr->d_ino;
 			switch (tmpptr->d_type) {
 			case D_ISLNK:
@@ -1125,6 +1127,8 @@ int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
 			goto errcode_handle;
 		}
 		fetch_restore_meta_path(tmppath, prune_list[count].entry.d_ino);
+		write_log(10, "Processing removal of entry %s\n",
+		          prune_list[count].entry.d_name);
 		if (access(tmppath, F_OK) == 0) {
 			/* Delete everything inside recursively */
 			ret = _recursive_prune(prune_list[count].entry.d_ino);
@@ -1402,11 +1406,11 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	if (prune_index > 0)
 		_prune_missing_entries(thisinode, prune_list, prune_index);
 
-	/* FEATURE TODO: Log deletion of apps / files */
 	/* If deleting app folders from /data/app, need to
 	set version to zero in packages.xml */
 	if ((prune_index > 0) &&
 	    (strcmp(nowpath, "/data/app") == 0)) {
+		write_log(2, "Some apps are missing binaries. Removing.\n");
 		errcode = _update_packages_list(prune_list, prune_index);
 		if (errcode < 0) {
 			free(prune_list);
@@ -1634,14 +1638,18 @@ int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes)
 		strncpy(packagename, &(fbuf[startpos]), (endpos - startpos));
 		packagename[endpos - startpos] = 0;
 
+		write_log(10, "Restore processing app %s\n", packagename);
+
 		/* Check if this package needs to be reset */
 		/* If so, find the version field and replace it with zero */
-		for (pkgcount = 0; pkgcount < num_prunes; pkgcount++) {
+		for (pkgcount = 0; pkgcount < num_prunes; pkgcount++)
 			if (!strncmp(packagename,
 			             prune_list[pkgcount].entry.d_name,
-			             strlen(packagename)))
+			             strlen(packagename))) {
+				write_log(4, "Cleaning-up package %s in list",
+				          packagename);
 				_replace_version(fbuf, endpos, fbuflen);
-		}
+			}
 		fprintf(dst, "%s", fbuf);
 	}
 	if (ferror(src) && !feof(src)) {
@@ -1668,6 +1676,7 @@ errcode_handle:
 		fclose(src);
 	if (dst != NULL)
 		fclose(dst);
+	unlink(plistmod);
 	return errcode;
 }
 /* FEATURE TODO: Need a notify and retry mechanism if network is down */
