@@ -11,9 +11,11 @@
 *
 **************************************************************************/
 
+#define _GNU_SOURCE
 #include "fuse_notify.h"
 
 #include <errno.h>
+#include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,10 +26,23 @@ FUSE_NOTIFY_RING_BUF notify_buf = {0};
 fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
 			       _do_hfuse_ll_notify_delete};
 
+/* Unittest helper functions */
+#ifdef UNITTEST
+#include <dlfcn.h>
+sem_wait_f *sem_wait_ptr;
+sem_post_f *sem_post_ptr;
+/* This will always run before main() */
+void __attribute__((constructor)) Init(void)
+{
+	sem_wait_ptr = (sem_wait_f *)dlsym(RTLD_NEXT, "sem_wait");
+	sem_post_ptr = (sem_post_f *)dlsym(RTLD_NEXT, "sem_post");
+}
+#endif
+
 /* Helper functions */
 
-static inline BOOL notify_buf_isempty() { return notify_buf.len == 0; }
-static inline BOOL notify_buf_isfull()
+static inline BOOL notify_buf_isempty(void) { return (notify_buf.len == 0); }
+static inline BOOL notify_buf_isfull(void)
 {
 	return notify_buf.len == notify_buf.max_len;
 }
@@ -43,6 +58,12 @@ static inline void inc_buf_idx(size_t *x, size_t buf_size)
 	if ((*x) == buf_size)
 		(*x) = 0;
 }
+static inline BOOL check_buf_init_state(const char *func)
+{
+	if (notify_buf.is_initialized == 0)
+		write_log(1, "Debug %s: notify_buf is uninitialized\n", func);
+	return notify_buf.is_initialized;
+}
 
 /* Initialize fuse notify ring buffer
  *
@@ -50,19 +71,19 @@ static inline void inc_buf_idx(size_t *x, size_t buf_size)
  */
 int32_t init_notify_buf(void)
 {
-	BOOL good = FALSE;
-	errno = 0;
+	BOOL good = 0;
 
+	errno = 0;
 #define STATIC_CHECK_BUF_SIZE(X)                                               \
-	_Static_assert(FUSE_NOTIFY_BUF_ELEMSIZE >= sizeof(X),                  \
+	_Static_assert(sizeof(X) <= FUSE_NOTIFY_BUF_ELEMSIZE,                  \
 		       "FUSE_NOTIFY_BUF_ELEMSFIZE is not enough for " #X)
 	STATIC_CHECK_BUF_SIZE(FUSE_NOTIFY_DELETE_DATA);
 
-	notify_buf.max_len = FUSE_NOTIFY_BUF_DEFAULT_LEN;
-	notify_buf.in = notify_buf.max_len - 1;
-	notify_buf.is_initialized = FALSE;
-
+	if (notify_buf.is_initialized == 1)
+		return 0;
 	do {
+		notify_buf.max_len = FUSE_NOTIFY_BUF_DEFAULT_LEN;
+		notify_buf.in = notify_buf.max_len - 1;
 		notify_buf.elems = (void *)malloc(notify_buf.max_len *
 						  sizeof(FUSE_NOTIFY_DATA));
 		if (notify_buf.elems == NULL)
@@ -75,15 +96,15 @@ int32_t init_notify_buf(void)
 			break;
 
 		notify_buf.is_initialized = TRUE;
-		good = TRUE;
-		write_log(4, "Debug %s: succeed. max %lu\n", __func__,
+		good = 1;
+		write_log(10, "Debug %s: succeed. max %lu\n", __func__,
 			  notify_buf.max_len);
 	} while (0);
 
 	if (!good) {
 		free(notify_buf.elems);
 		notify_buf.elems = NULL;
-		write_log(4, "Debug %s: failed. %s\n", __func__,
+		write_log(1, "Debug %s: failed. %s\n", __func__,
 			  strerror(errno));
 	}
 	return good ? 0 : -1;
@@ -94,7 +115,7 @@ void destory_notify_buf(void)
 	size_t len;
 	FUSE_NOTIFY_PROTO *data;
 
-	if (notify_buf.is_initialized == FALSE)
+	if (notify_buf.is_initialized == 0)
 		return;
 
 	sem_wait(&notify_buf.access_sem);
@@ -115,7 +136,7 @@ void destory_notify_buf(void)
 
 	sem_post(&notify_buf.access_sem);
 
-	write_log(4, "Debug %s: freed notify_buf.elems\n", __func__);
+	write_log(10, "Debug %s: freed notify_buf.elems\n", __func__);
 }
 
 /* Concatenate wrapped segments after enlarge buffer
@@ -139,62 +160,69 @@ int32_t notify_buf_realloc(void)
 {
 	void *newbuf = NULL;
 	size_t newsize;
-	BOOL good = notify_buf.is_initialized;
+	BOOL good = 0;
 
-	/* enlarge buffer */
-	if (good) {
+	do {
+		if (check_buf_init_state(__func__) == 0)
+			break;
+
+		/* enlarge buffer */
 		newsize = notify_buf.max_len * 2;
 		newbuf = realloc(notify_buf.elems,
 				 newsize * sizeof(FUSE_NOTIFY_DATA));
-		good = (newbuf != NULL);
-	}
-
-	if (good) {
+		if (newbuf == NULL)
+			break;
 		notify_buf.elems = newbuf;
 
+		/* Concatenate wrapped segments */
 		if (notify_buf.in < notify_buf.out) {
 			memcpy(&notify_buf.elems[notify_buf.max_len],
 			       notify_buf.elems,
 			       (notify_buf.in + 1) * sizeof(FUSE_NOTIFY_DATA));
 			notify_buf.in += notify_buf.max_len;
 		}
+
 		notify_buf.max_len = newsize;
-		write_log(4,
+		good = 1;
+		write_log(10,
 			  "Debug %s: queue with %lu notify is realloc to %lu\n",
 			  __func__, notify_buf.len, notify_buf.max_len);
-	} else {
-		write_log(4, "Debug %s: failed\n", __func__);
-	}
+	} while (0);
+
+	if (!good)
+		write_log(1, "Debug %s: failed\n", __func__);
 
 	return good ? 0 : -1;
 }
 
 int32_t notify_buf_enqueue(const void *const notify)
 {
-	BOOL good = notify_buf.is_initialized;
+	BOOL good = 0;
 
-	if (!good) {
-		write_log(4, "Debug %s: notify buffer is not initialized\n",
-			  __func__);
-		return -1;
-	}
-	if (good)
-		good = (sem_wait(&notify_buf.access_sem) == 0);
+	do {
+		if (check_buf_init_state(__func__) == 0)
+			break;
 
-	if (good && notify_buf_isfull())
-		good = (notify_buf_realloc() == EXIT_SUCCESS);
-	if (good) {
+		if (sem_wait(&notify_buf.access_sem) == -1)
+			break;
+		printf("sem_wait %d\n", good);
+
+		if (notify_buf_isfull() == 1 && notify_buf_realloc() == -1)
+			break;
 		inc_buf_idx(&notify_buf.in, notify_buf.max_len);
 		memcpy(&notify_buf.elems[notify_buf.in], notify,
 		       sizeof(FUSE_NOTIFY_DATA));
 		notify_buf.len++;
-	}
-	if (good)
-		good = (sem_post(&notify_buf.access_sem) == 0);
-	if (good)
-		write_log(4, "Debug %s: Add %lu\n", __func__, notify_buf.in);
-	else
-		write_log(4, "Debug %s: Failed\n", __func__);
+
+		if (sem_post(&notify_buf.access_sem) == -1)
+			break;
+
+		good = 1;
+		write_log(10, "Debug %s: Add %lu\n", __func__, notify_buf.in);
+	} while (0);
+
+	if (!good)
+		write_log(1, "Error %s: Failed\n", __func__);
 	return good ? 0 : -1;
 }
 
@@ -206,38 +234,34 @@ FUSE_NOTIFY_DATA *notify_buf_dequeue()
 {
 	FUSE_NOTIFY_DATA *data = NULL;
 	BOOL buf_isempty;
-	BOOL good = notify_buf.is_initialized;
 
-	sem_wait(&notify_buf.access_sem);
+	do {
+		if (check_buf_init_state(__func__) == 0)
+			break;
+		if (sem_wait(&notify_buf.access_sem) == -1)
+			break;
 
-	if (good)
-		good = ((buf_isempty = notify_buf_isempty()) == 0);
+		buf_isempty = notify_buf_isempty();
+		if (buf_isempty == 1) {
+			write_log(1, "Error %s: queue is empty.\n", __func__);
+			break;
+		}
 
-	if (good)
-		good = ((data = malloc(sizeof(FUSE_NOTIFY_DATA))) != NULL);
+		data = malloc(sizeof(FUSE_NOTIFY_DATA));
+		if (data == NULL) {
+			write_log(1, "Error %s: malloc failed.\n", __func__);
+			break;
+		}
 
-	if (good) {
 		memcpy(data, &notify_buf.elems[notify_buf.out],
 		       sizeof(FUSE_NOTIFY_DATA));
-		write_log(4, "Debug %s: Get %lu\n", __func__, notify_buf.out);
 		inc_buf_idx(&notify_buf.out, notify_buf.max_len);
 		notify_buf.len--;
-	}
 
-	sem_post(&notify_buf.access_sem);
-
-	if (good)
-		return data;
-
-	if (notify_buf.is_initialized == 0)
-		write_log(4, "Debug %s: failed. %s\n", __func__,
-			  "Buffer is not initialized.");
-	else if (buf_isempty)
-		write_log(4, "Debug %s: failed. %s\n", __func__,
-			  "Trying to dequeue an empty queue.");
-	else
-		write_log(4, "Debug %s: failed. %s\n", __func__,
-			  "malloc failed.");
+		if (sem_post(&notify_buf.access_sem) == -1)
+			break;
+		write_log(10, "Debug %s: Get %lu\n", __func__, notify_buf.out);
+	} while (0);
 
 	return data;
 }
@@ -246,49 +270,54 @@ FUSE_NOTIFY_DATA *notify_buf_dequeue()
  * send notify to VFS.
  *
  * @return 0 on success, otherwise negative error code.
- * */
+ */
 int32_t init_hfuse_ll_notify_loop(void)
 {
-	BOOL good = TRUE;
-	int32_t ret_val = 0;
+	BOOL good = 0;
+	int32_t save_errno = 0;
 
 	/* init enviroments */
-	if (notify_buf.is_initialized == FALSE) {
-		ret_val = init_notify_buf();
-		good = (0 == ret_val);
-	}
+	do {
+		if (init_notify_buf() == -1)
+			break;
 
-	if (good) {
-		ret_val = -pthread_create(&fuse_nofify_thread, NULL,
-					  hfuse_ll_notify_loop, NULL);
-		good = (0 == ret_val);
-	}
-
-	if (good)
+		save_errno = pthread_create(&fuse_nofify_thread, NULL,
+					    hfuse_ll_notify_loop, NULL);
+		if (save_errno != 0)
+			break;
+		good = 1;
 		write_log(10, "Debug %s: succeed\n", __func__);
-	else
-		write_log(1, "%s failed\n", __func__);
+	} while (0);
 
-	return ret_val;
+	if (!good) {
+		write_log(1, "%s failed\n", __func__);
+		errno = save_errno;
+	}
+
+	return good ? 0 : -1;
 }
 
 /* Wake notify loop and wait the thread end */
 void destory_hfuse_ll_notify_loop(void)
 {
-	BOOL good = TRUE;
-	int32_t ret = 0;
+	int32_t save_errno = 0;
 
 	write_log(10, "Debug %s: start.\n", __func__);
 	/* let loop handle destory tasks itself */
-	sem_post(&notify_buf.tasks_sem);
-
-	good = (ret = pthread_join(fuse_nofify_thread, NULL)) == 0;
-	if (!good)
+	if (sem_post(&notify_buf.tasks_sem) == -1) {
+		write_log(1, "Error %s: sem_post failed. %s\n",
+			  __func__, strerror(save_errno));
+		return;
+	}
+	save_errno = pthread_join(fuse_nofify_thread, NULL);
+	if (save_errno != 0) {
 		write_log(1, "Error %s: join nofify_thread failed. %s\n",
-			  __func__, strerror(ret));
+			  __func__, strerror(save_errno));
+		return;
+	}
 
 	/* destory enviroments */
-	if (good) destory_notify_buf();
+	destory_notify_buf();
 }
 
 void *hfuse_ll_notify_loop(void *ptr)
@@ -297,7 +326,7 @@ void *hfuse_ll_notify_loop(void *ptr)
 	int32_t func_num;
 
 	UNUSED(ptr);
-	write_log(4, "Debug %s: start\n", __func__);
+	write_log(10, "Debug %s: start\n", __func__);
 
 	while (TRUE) {
 		sem_wait(&notify_buf.tasks_sem);
@@ -361,7 +390,8 @@ void _do_hfuse_ll_notify_delete(FUSE_NOTIFY_DATA **data_ptr,
 	/* struct fuse_chan is shared, should not be freed here */
 
 	/* If it's not recycling notify_buf, ptr is copied in
-	 * notify_buf_dequeue. It need to be destroyed. */
+	 * notify_buf_dequeue. It need to be destroyed.
+	 */
 	if (action != DESTROY_BUF) {
 		free(*data_ptr);
 		*data_ptr = NULL;
@@ -386,26 +416,29 @@ void hfuse_ll_notify_delete(struct fuse_chan *ch,
 			    const char *name,
 			    size_t namelen)
 {
-	BOOL good = TRUE;
+	BOOL good = 0;
 	FUSE_NOTIFY_DELETE_DATA event = {.func = DELETE,
 					 .ch = ch,
 					 .parent = parent,
 					 .child = child,
 					 .name = NULL,
 					 .namelen = namelen};
-	good = (event.name = strndup(name, namelen)) != NULL;
+	do {
+		event.name = strndup(name, namelen);
+		if (event.name == NULL)
+			break;
+		if (notify_buf_enqueue((void *)&event) == -1)
+			break;
 
-	if (good)
-		good = (notify_buf_enqueue((void *)&event) == 0);
-
-	if (good)
 		/* wake notify thread up */
-		good = (sem_post(&notify_buf.tasks_sem) == 0);
+		if (sem_post(&notify_buf.tasks_sem) == -1)
+			break;
+		good = 1;
+		write_log(10, "Debug %s: Notify queued\n", __func__);
+	} while (0);
 
-	if (good) {
-		write_log(4, "Debug %s: Notify queued\n", __func__);
-	} else {
-		write_log(4, "Debug %s: Failed\n", __func__);
+	if (!good) {
+		write_log(1, "Error %s: Failed\n", __func__);
 		if (event.name != NULL)
 			free(event.name);
 	}
@@ -431,7 +464,7 @@ void hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 {
 	BOOL diffcase = (strcmp(name, selfname) != 0);
 
-	write_log(4, "Debug %s: called\n", __func__);
+	write_log(10, "Debug %s: called\n", __func__);
 	if (mount_global.fuse_default != NULL &&
 	    (diffcase || mount_global.fuse_default != ch)) {
 		hfuse_ll_notify_delete(mount_global.fuse_default, parent, child,

@@ -42,6 +42,34 @@ int32_t sem_init_cnt(sem_t *sem, int pshared, unsigned int value)
 		return -1;
 }
 
+typedef int(sem_post_f)(sem_t *);
+sem_post_f *sem_post_real = (sem_post_f *)dlsym(RTLD_NEXT, "sem_post");
+uint32_t sem_post_error_on = -1;
+uint32_t sem_post_call_count = 0;
+int32_t sem_post_cnt(sem_t *sem)
+{
+	sem_post_call_count++;
+	PD(sem_post_call_count);
+	if (sem_post_call_count != sem_post_error_on)
+		return sem_post_real(sem);
+	else
+		return -1;
+}
+
+typedef int(sem_wait_f)(sem_t *);
+sem_wait_f *sem_wait_real = (sem_wait_f *)dlsym(RTLD_NEXT, "sem_wait");
+uint32_t sem_wait_error_on = -1;
+uint32_t sem_wait_call_count = 0;
+int32_t sem_wait_cnt(sem_t *sem)
+{
+	sem_wait_call_count++;
+	PD(sem_wait_call_count);
+	if (sem_wait_call_count != sem_wait_error_on)
+		return sem_wait_real(sem);
+	else
+		return -1;
+}
+
 FAKE_VALUE_FUNC(void *, realloc, void *, size_t);
 typedef void *(realloc_f)(void *, size_t);
 realloc_f *realloc_real = (realloc_f *)dlsym(RTLD_NEXT, "realloc");
@@ -126,11 +154,21 @@ void ut_dequeue(int32_t n)
 	}
 }
 
+extern sem_wait_f *sem_wait_ptr;
+extern sem_post_f *sem_post_ptr;
 void reset_fake_functions(void)
 {
 	RESET_FAKE(sem_init);
 	sem_init_error_on = -1;
 	sem_init_fake.custom_fake = sem_init_cnt;
+
+	sem_wait_call_count = 0;
+	sem_wait_error_on = -1;
+	sem_wait_ptr = sem_wait_cnt;
+
+	sem_post_call_count = 0;
+	sem_post_error_on = -1;
+	sem_post_ptr = sem_post_cnt;
 
 	RESET_FAKE(realloc);
 	realloc_error_on = -1;
@@ -275,6 +313,20 @@ TEST_F(NotifyBuffer_Initialized, EnqueueSkiped)
 	EXPECT_EQ(notify_buf.len, 0);
 }
 
+TEST_F(NotifyBuffer_Initialized, EnqueueSemWaitFail)
+{
+	sem_wait_error_on = 1;
+	ut_enqueue(1);
+	EXPECT_EQ(notify_buf.len, 0);
+}
+
+TEST_F(NotifyBuffer_Initialized, EnqueueSemPostFail)
+{
+	sem_post_error_on = 1;
+	ut_enqueue(1);
+	EXPECT_EQ(notify_buf.len, 1);
+}
+
 TEST_F(NotifyBuffer_Initialized, Dequeue)
 {
 	FUSE_NOTIFY_DATA *d = NULL;
@@ -295,8 +347,8 @@ TEST_F(NotifyBuffer_Initialized, DequeueSkiped)
 
 TEST_F(NotifyBuffer_Initialized, DequeueAnEmptyQueue) {
 	notify_buf_dequeue();
-	EXPECT_STREQ(log[write_log_call % 5], "Debug notify_buf_dequeue: failed. Trying to dequeue "
-			  "an empty queue.\n");
+	EXPECT_STREQ(log[write_log_call % 5],
+		     "Error notify_buf_dequeue: queue is empty.\n");
 	EXPECT_EQ(malloc_fake.call_count, 0);
 }
 
@@ -304,7 +356,8 @@ TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
 	ut_enqueue(1);
 	malloc_error_on = 1;
 	notify_buf_dequeue();
-	EXPECT_STREQ(log[write_log_call % 5], "Debug notify_buf_dequeue: failed. malloc failed.\n");
+	EXPECT_STREQ(log[write_log_call % 5],
+		     "Error notify_buf_dequeue: malloc failed.\n");
 }
 
 TEST_F(NotifyBuffer_Initialized, ReallocSuccess)
@@ -442,9 +495,7 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 	malloc_error_on = 1;
 	sem_post(&notify_buf.tasks_sem);
 	while (1) {
-		sem_wait(&notify_buf.access_sem);
 		sem_getvalue(&notify_buf.tasks_sem, &task);
-		sem_post(&notify_buf.access_sem);
 		if(task == 0)
 			break;
 		/* waiting loop to finish */
@@ -502,6 +553,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp)
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 	free(ch);
 	free(name);
+	free(fake_mp);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[2])->name);
@@ -519,6 +571,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mpFakeAll)
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 	free(ch);
 	free(name);
+	free(fake_mp);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[2])->name);
@@ -536,6 +589,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mpNormal)
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 	free(ch);
 	free(name);
+	free(fake_mp);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
 	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
 	EXPECT_EQ(notify_buf.len, 2);

@@ -12,9 +12,10 @@
 #ifndef SRC_HCFS_FUSE_NOTIFY_H_
 #define SRC_HCFS_FUSE_NOTIFY_H_
 
+#include <semaphore.h>
+
 #include "macro.h"
 #include "mount_manager.h"
-#include <semaphore.h>
 
 #define FUSE_NOTIFY_BUF_DEFAULT_LEN 8
 #define FUSE_NOTIFY_BUF_ELEMSIZE 52
@@ -82,4 +83,13 @@ void hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 			       const char *name,
 			       size_t namelen,
 			       const char *selfname);
+
+/* Fake some function in unittest */
+#ifdef UNITTEST
+typedef int(sem_wait_f)(sem_t *);
+typedef int(sem_post_f)(sem_t *);
+#define sem_wait(x) sem_wait_ptr(x)
+#define sem_post(x) sem_post_ptr(x)
+#endif
+
 #endif /* SRC_HCFS_FUSE_NOTIFY_H_ */

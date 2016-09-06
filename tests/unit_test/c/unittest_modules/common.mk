@@ -46,6 +46,7 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DENCRYPT_ENABLE=1 \
 	    -DCOMPRESS_ENABLE=0 \
 	    -D_ANDROID_ENV_ \
+	    -DUNITTEST \
 
 LDFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
