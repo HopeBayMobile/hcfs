@@ -118,10 +118,10 @@ void test_parse_meta()
 
 	asprintf(&s, "%s/FSstat", test_target);
 
-	printf("\n\nDemo list_external_volume(\"%s\", &ret_entry, &ret_num);\n",
+	printf("\n\nDemo list_volume(\"%s\", &ret_entry, &ret_num);\n",
 	       TEST_FILE(fsmgr));
 	puts("============================================");
-	list_external_volume(TEST_FILE(fsmgr), &ret_entry, &ret_num);
+	list_volume(TEST_FILE(fsmgr), &ret_entry, &ret_num);
 	for (i = 0; i < ret_num; i++)
 		printf("%lu %s\n", ret_entry[i].inode, ret_entry[i].d_name);
 
