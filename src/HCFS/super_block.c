@@ -894,8 +894,6 @@ int32_t super_block_reclaim(void)
 	*  from that in superblock head */
 
 	/* Sort the list of unclaimed inodes. */
-/* FEATURE TODO: rebuild unclaimed list or reclaimed list at the end
-of restoration */
 	qsort(unclaimed_list, num_unclaimed, sizeof(ino_t), compino);
 
 	last_reclaimed = sys_super_block->head.first_reclaimed_inode;
@@ -1279,9 +1277,6 @@ ino_t super_block_new_inode(HCFS_STAT *in_stat,
 
 	super_block_exclusive_locking();
 
-/* FEATURE TODO: (need to integrate with Kewei's code) in restore mode, need
-to allocate new inode from inode number larger than the current ones,
-not reclaimed ones used before */
 	if (sys_super_block->head.num_inode_reclaimed > 0) {
 		this_inode = sys_super_block->head.first_reclaimed_inode;
 		retsize = pread(sys_super_block->iofptr, &tempentry,

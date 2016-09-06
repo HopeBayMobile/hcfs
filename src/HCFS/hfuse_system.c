@@ -596,8 +596,6 @@ int32_t main(int32_t argc, char **argv)
 	restoring_status = NOT_RESTORING;
 	init_restore_path();
 	ret_val = check_restoration_status();
-	/* FEATURE TODO: handling for stage 1 and 2 if reboot when stage
-	unfinished */
 	if (ret_val == 1) {
 		restoring_status = RESTORING_STAGE1;
 	} else if (ret_val == 2) {
@@ -608,9 +606,6 @@ int32_t main(int32_t argc, char **argv)
 		write_log(10, "Checking if need to switch storage paths\n");
 		_check_partial_storage();
 	}
-
-	/* FEATURE TODO: If the old meta/block storage
-	exists here, delete them */
 
 	ret_val = init_hfuse(restoring_status);
 	if (ret_val < 0)
