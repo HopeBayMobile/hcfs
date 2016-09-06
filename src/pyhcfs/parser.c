@@ -121,7 +121,7 @@ int32_t list_volume(const char *fs_mgr_path,
 				num_walked++;
 				break;
 			default:
-				// undefined d_ype
+				/* undefined d_ype */
 				errno = EINVAL;
 				goto errcode_handle;
 			}
