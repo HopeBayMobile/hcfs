@@ -36,5 +36,8 @@ demo('list_dir_inorder(b"'+test_target+'/meta_isdir", ret["offset"], limit=100)'
 demo_title("get_vol_usage")
 demo('get_vol_usage(b"'+test_target+'/FSstat")')
 
+demo_title("get_vol_usage (Failure)")
+demo('get_vol_usage(b"'+test_target+'/FSstat_rand")')
+
 demo_title("list_file_blocks")
 demo('list_file_blocks(b"'+test_target+'/meta_isreg")')
