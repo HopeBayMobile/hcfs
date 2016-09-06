@@ -1200,7 +1200,7 @@ int32_t _prune_missing_entries(ino_t thisinode, PRUNE_T *prune_list,
 	return 0;
 errcode_handle:
 	write_log(0, "Unable to prune missing entries in restoration. (%"
-	          PRIu64 "\n", thisinode);
+	          PRIu64 ")\n", thisinode);
 	fclose(fptr);
 	return errcode;
 }
@@ -1347,8 +1347,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 				}
 
 				continue;
-			}
-			if (ret < 0) {
+			} else if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
 			}
