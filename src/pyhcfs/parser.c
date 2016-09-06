@@ -55,10 +55,8 @@ int32_t list_external_volume(const char *fs_mgr_path,
 		return ERROR_SYSCALL;
 
 	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (ret_val == -1) {
-
+	if (ret_val == -1)
 		goto errcode_handle;
-	}
 
 	/* Initialize B-tree walk by first loading the first node of the
 	 * tree walk.
@@ -358,7 +356,7 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1)
-		 return ERROR_SYSCALL;
+		return ERROR_SYSCALL;
 
 	ret_ssize = pread(meta_fd, &meta_stat, sizeof(HCFS_STAT_v1), 0);
 	if (ret_ssize < 0) {
@@ -431,16 +429,22 @@ end:
 *************************************************************************/
 int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage)
 {
-	int32_t meta_fd, tmp_errno, ret_val;
+	int32_t meta_fd, tmp_errno, ret_val, stat_ret_val;
+	int64_t vol_meta;
+	int64_t num_backend_inodes;
+	int64_t max_inode;
+	int64_t vol_pinned;
 	ssize_t ret_ssize;
+	struct stat buf;
 	FS_CLOUD_STAT_T meta_stat;
 
 	tmp_errno = 0;
 	ret_val = 0;
+	stat_ret_val = 0;
 
 	meta_fd = open(meta_path, O_RDONLY);
 	if (meta_fd == -1)
-		 return ERROR_SYSCALL;
+		return ERROR_SYSCALL;
 
 	ret_ssize = pread(meta_fd, &meta_stat, sizeof(FS_CLOUD_STAT_T), 0);
 	if (ret_ssize < 0) {
@@ -448,8 +452,31 @@ int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage)
 		goto errcode_handle;
 	}
 
+	stat_ret_val = fstat(meta_fd, &buf);
+	if (stat_ret_val < 0) {
+		ret_val = ERROR_SYSCALL;
+	       	goto errcode_handle;
+	}
+	if (buf.st_size != sizeof(FS_CLOUD_STAT_T)) {
+		ret_val = ERROR_SYSCALL;
+		errno = EINVAL;
+	        goto errcode_handle;
+	}
+
 	*vol_usage = meta_stat.backend_system_size;
-	goto end;
+	vol_meta = meta_stat.backend_meta_size;
+	num_backend_inodes = meta_stat.backend_num_inodes;
+	max_inode = meta_stat.max_inode;
+	vol_pinned = meta_stat.pinned_size;
+
+	if (*vol_usage < 0 || *vol_usage < vol_meta || *vol_usage < vol_pinned
+			   || max_inode < num_backend_inodes) {
+		ret_val = ERROR_SYSCALL;
+		errno = EINVAL;
+		goto errcode_handle;
+	} else {
+		goto end;
+	}
 
 errcode_handle:
 	tmp_errno = errno;
