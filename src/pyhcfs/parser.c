@@ -449,7 +449,19 @@ int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage)
 	}
 
 	*vol_usage = meta_stat.backend_system_size;
-	goto end;
+	vol_meta = meta_stat.backend_meta_size;
+	num_backend_inodes = meta_stat.backend_num_inodes;
+	max_inode = meta_stat.max_inode;
+	vol_pinned = meta_stat.pinned_size;
+
+	if (*vol_usage < 0 || *vol_usage < vol_meta || *vol_usage < vol_pinned
+			   || max_inode < num_backend_inodes) {
+		ret_val = ERROR_SYSCALL;
+		errno = EINVAL;
+		goto errcode_handle;
+	} else {
+		goto end;
+	}
 
 errcode_handle:
 	tmp_errno = errno;
