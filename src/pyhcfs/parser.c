@@ -107,7 +107,9 @@ int32_t list_volume(const char *fs_mgr_path,
 				num_walked++;
 				break;
 			default:
-				break;
+				// undefined d_ype
+				errno = EINVAL;
+				goto errcode_handle;
 			}
 		}
 		next_node_pos = tpage.tree_walk_next;
