@@ -1401,13 +1401,14 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	fclose(fptr);
 	if (prune_index > 0)
 		_prune_missing_entries(thisinode, prune_list, prune_index);
-	/* FEATURE TODO: If deleting app folders from /data/app, will need to
+
+	/* If deleting app folders from /data/app, need to
 	set version to zero in packages.xml */
 	if ((prune_index > 0) &&
-	    (strcmp(nowpath, "/data/app", strlen("/data/app") == 0)) {
+	    (strcmp(nowpath, "/data/app") == 0)) {
 		errcode = _update_packages_list(prune_list, prune_index);
 		if (errcode < 0) {
-			free(prune_list)
+			free(prune_list);
 			return errcode;
 		}
 	}
@@ -1508,13 +1509,67 @@ void _init_quota_restore()
 	sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
 }
 
+static void _replace_version(char *fbuf, int32_t initpos, int32_t fbuflen)
+{
+	int32_t startpos, endpos;
+
+	startpos = initpos;
+	while (startpos < fbuflen) {
+		while ((fbuf[startpos] != ' ') && (startpos < fbuflen))
+			startpos++;
+		if (startpos >= fbuflen)
+			break;
+		/* Start of another field */
+		startpos++;
+		endpos = startpos;
+		while (((fbuf[endpos] != '=') && (fbuf[endpos] != ' '))
+		       && (endpos < fbuflen))
+			endpos++;
+		if ((endpos >= fbuflen) || ((endpos - startpos) > 255))
+			break;
+		if (fbuf[endpos] == ' ') { /* This might be the startpos */
+			startpos = endpos;
+			continue;
+		}
+		/* Check if this is the version field */
+		if (strncmp(&(fbuf[startpos]), "version",
+		            (endpos - startpos)) != 0) {
+			/* Not the field, continue */
+			startpos = endpos;
+			continue;
+		}
+		/* Mark the start and the end of the value */
+		startpos = endpos;
+		while ((fbuf[startpos] != '"') && (startpos < fbuflen))
+			startpos++;
+		if (startpos >= fbuflen)
+			break;
+		startpos++;
+		endpos = startpos;
+		while ((fbuf[endpos] != '"') && (endpos < fbuflen))
+			startpos++;
+		/* terminate if no value or no valid value */
+		if ((endpos >= fbuflen) || (endpos == startpos))
+			break;
+		/* Now need to put an zero to startpos and copy
+		everything from endpos to startpos+1 */
+		fbuf[startpos] = '0';
+		memmove(&(fbuf[startpos+1]), &(fbuf[endpos]),
+		        (fbuflen - endpos));
+		fbuf[(fbuflen - endpos)] = 0;
+		break;
+	}
+}
 int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes)
 {
 	char plistpath[METAPATHLEN];
 	char plistmod[METAPATHLEN];
 	FILE *src = NULL, *dst = NULL;
-	int32_t ret, errcode, count;
+	int32_t ret, errcode;
 	char fbuf[4100], *sptr;
+	char packagename[MAX_FILENAME_LEN + 1]; /* Longest name the FS allows */
+	int32_t startpos, endpos, fbuflen;
+	int32_t pkgcount;
 
 	snprintf(plistpath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
 	snprintf(plistmod, METAPATHLEN, "%s/backup_pkg.mod", RESTORE_METAPATH);
@@ -1540,20 +1595,53 @@ int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes)
 		sptr = fgets(fbuf, 4096, src);
 		if (sptr == NULL)
 			break;
-
-		if (strlen(fbuf) < (5 + strlen("package name"))) {
+		fbuflen = strlen(fbuf);
+		if (fbuflen < (int32_t)(5 + strlen("package name"))) {
 			/* Cannot be the package info, write directly */
-			sprintf(dst, "%s", fbuf);
+			fprintf(dst, "%s", fbuf);
 			continue;
 		}
 		if (strncmp(&(fbuf[5]), "package name",
 		    sizeof("package name")) != 0) {
 			/* Not the package info, write directly */
-			sprintf(dst, "%s", fbuf);
+			fprintf(dst, "%s", fbuf);
 			continue;
 		}
-		/* Find the version field and replace it with zero */
-		/* TODO: finish this function */
+		/* First parse the name */
+		for (startpos = 5; startpos < fbuflen; startpos++)
+			if (fbuf[startpos] == '"')
+				break;
+		if (startpos >= fbuflen) {
+			/* Not the package info, write directly */
+			fprintf(dst, "%s", fbuf);
+			continue;
+		}
+		startpos++;
+		for (endpos = startpos; endpos < fbuflen; endpos++)
+			if (fbuf[endpos] == '"')
+				break;
+		if ((endpos >= fbuflen) || (endpos == startpos)) {
+			/* Not the package info, write directly */
+			fprintf(dst, "%s", fbuf);
+			continue;
+		}
+		/* Limit the length of package to compare to max of
+		folder name */
+		if (endpos > (startpos + MAX_FILENAME_LEN))
+			endpos = startpos + MAX_FILENAME_LEN;
+
+		strncpy(packagename, &(fbuf[startpos]), (endpos - startpos));
+		packagename[endpos - startpos] = 0;
+
+		/* Check if this package needs to be reset */
+		/* If so, find the version field and replace it with zero */
+		for (pkgcount = 0; pkgcount < num_prunes; pkgcount++) {
+			if (!strncmp(packagename,
+			             prune_list[pkgcount].entry.d_name,
+			             strlen(packagename)))
+				_replace_version(fbuf, endpos, fbuflen);
+		}
+		fprintf(dst, "%s", fbuf);
 	}
 	if (ferror(src) && !feof(src)) {
 		write_log(0, "Package list update terminated unexpectedly\n");
