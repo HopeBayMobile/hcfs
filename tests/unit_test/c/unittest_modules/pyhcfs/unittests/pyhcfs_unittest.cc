@@ -93,15 +93,15 @@ class pyhcfsEnvironment : public ::testing::Environment
 ::testing::Environment *const pyhcfs_env =
     ::testing::AddGlobalTestEnvironment(new pyhcfsEnvironment);
 
-/* Unittest for list_external_volume */
-class list_external_volumeTest : public ::testing::TestWithParam<const char*>
+/* Unittest for list_volume */
+class list_volumeTest : public ::testing::TestWithParam<const char*>
 {
 	public:
 	void SetUp() { reset_fake_functions(); }
 	void TearDown() {}
 };
 
-TEST_P(list_external_volumeTest, ListExternalVolume)
+TEST_P(list_volumeTest, ListExternalVolume)
 {
 	int32_t ret;
 	uint64_t i, number;
@@ -109,34 +109,34 @@ TEST_P(list_external_volumeTest, ListExternalVolume)
 	CONCAT_TEST_META_PATH("fsmgr");
 
 	ret =
-	    list_external_volume(meta_path, &list, &number);
+	    list_volume(meta_path, &list, &number);
 	ASSERT_EQ(ret, 0);
 	ASSERT_EQ(number, 1);
 	for (i = 0; i < number; i++) {
 		puts(list[i].d_name);
 	}
 }
-TEST_F(list_external_volumeTest, ListExternalVolumeNoFile)
+TEST_F(list_volumeTest, ListExternalVolumeNoFile)
 {
 	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
-	ret_code = list_external_volume("test_nexus_5x/....", &list, &number);
+	ret_code = list_volume("test_nexus_5x/....", &list, &number);
 	EXPECT_LT(ret_code, 0);
 }
 
-TEST_F(list_external_volumeTest, ListExternalVolumeEIO)
+TEST_F(list_volumeTest, ListExternalVolumeEIO)
 {
 	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
-	ret_code = list_external_volume("/proc/self/mem", &list, &number);
+	ret_code = list_volume("/proc/self/mem", &list, &number);
 	EXPECT_LT(ret_code, 0);
 }
 
-TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
+TEST_F(list_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -146,12 +146,12 @@ TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
 	pread_cnt_error_on_call_count = 2;
 
 	ret_code =
-	    list_external_volume("test_data/v1/android/fsmgr", &list, &number);
+	    list_volume("test_data/v1/android/fsmgr", &list, &number);
 	printf("%d\n", ret_code);
 	printf("number %lu\n", number);
 	EXPECT_LT(ret_code, 0);
 }
-TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
+TEST_F(list_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -161,12 +161,12 @@ TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
 	pread_cnt_error_on_call_count = 3;
 
 	ret_code =
-	    list_external_volume("test_data/v1/android/fsmgr", &list, &number);
+	    list_volume("test_data/v1/android/fsmgr", &list, &number);
 	EXPECT_LT(ret_code, 0);
 }
 
-INSTANTIATE_TEST_CASE_P(ListExternalVolume, list_external_volumeTest, ValuesIn(paths));
-/* End unittest for list_external_volume */
+INSTANTIATE_TEST_CASE_P(ListExternalVolume, list_volumeTest, ValuesIn(paths));
+/* End unittest for list_volume */
 
 /* Unittest for parse_meta */
 class parse_metaTest : public ::testing::TestWithParam<const char*>
