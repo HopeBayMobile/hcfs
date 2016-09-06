@@ -20,7 +20,7 @@ Demo list_volume
 
     list_volume(b"test_data/v1/android/fsmgr")
 
-    [(128, b'hcfs_external')]
+    [(3, 1, b'hcfs_app'), (2, 1, b'hcfs_data'), (130, 3, b'hcfs_external')]
 
 Demo list_volume (Failure)
 ==============================
