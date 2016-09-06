@@ -646,7 +646,6 @@ int32_t collect_sys_logs()
 {
 	int32_t sys_ret, ret_code;
 	int64_t hcfslog_size;
-	uint64_t read_size, total_read = 0;
 	char buf[4096];
 	FILE *hcfslog_fptr = NULL, *new_hcfslog_fptr = NULL;
 	struct stat tmpstat;

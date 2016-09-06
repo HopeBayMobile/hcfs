@@ -13,6 +13,7 @@
 #ifndef GW20_HCFSAPI_GLOBAL_H_
 #define GW20_HCFSAPI_GLOBAL_H_
 
+#define BOOL uint8_t
 #define TRUE 1
 #define FALSE 0
 
