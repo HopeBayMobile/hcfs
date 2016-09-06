@@ -55,8 +55,10 @@ int32_t list_volume(const char *fs_mgr_path,
 		return ERROR_SYSCALL;
 
 	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (ret_val == -1)
+	if (ret_val < sizeof(DIR_META_TYPE)) {
+		errno = (ret_val < 0)?errno:EINVAL;
 		goto errcode_handle;
+	}
 
 	/* Initialize B-tree walk by first loading the first node of the
 	 * tree walk.
@@ -67,8 +69,10 @@ int32_t list_volume(const char *fs_mgr_path,
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
 		/*printf("ret_val %zu\n", ret_val);*/
-		if (ret_val == -1)
+		if (ret_val < sizeof(DIR_ENTRY_PAGE)) {
+			errno = (ret_val < 0)?errno:EINVAL;
 			goto errcode_handle;
+		}
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
 	}
@@ -83,8 +87,10 @@ int32_t list_volume(const char *fs_mgr_path,
 	while (next_node_pos != 0) {
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (ret_val == -1)
+		if (ret_val < sizeof(DIR_ENTRY_PAGE)) {
+			errno = (ret_val < 0)?errno:EINVAL;
 			goto errcode_handle;
+		}
 		for (count = 0; count < tpage.num_entries; count++) {
 
 			switch (tpage.dir_entries[count].d_type) {
@@ -115,7 +121,7 @@ errcode_handle:
 end:
 	close(meta_fd);
 	errno = tmp_errno;
-	return (ret_val >= 0) ? 0 : ERROR_SYSCALL;
+	return (errno == 0) ? 0 : ERROR_SYSCALL;
 }
 
 int32_t check_meta_ver(HCFS_STAT_v1 const *meta_stat)
