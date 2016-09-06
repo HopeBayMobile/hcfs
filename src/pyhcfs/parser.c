@@ -47,6 +47,8 @@ int32_t list_volume(const char *fs_mgr_path,
 	int32_t meta_fd;
 	ssize_t ret_val;
 	int32_t tmp_errno = 0;
+	struct stat st;
+	off_t remain_size;
 	PORTABLE_DIR_ENTRY *ret_entry;
 
 	ret_val = 0;
@@ -57,6 +59,18 @@ int32_t list_volume(const char *fs_mgr_path,
 	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
 	if (ret_val < sizeof(DIR_META_TYPE)) {
 		errno = (ret_val < 0)?errno:EINVAL;
+		goto errcode_handle;
+	}
+
+	/* check remain size of fsmgr file is mutiple of
+	 *  sizeof(DIR_ENTRY_PAGE)
+	 */
+	ret_val = stat(fs_mgr_path, &st);
+	if (ret_val == -1)
+		goto errcode_handle;
+	remain_size = st.st_size - sizeof(DIR_META_TYPE) - 16;
+	if (remain_size % sizeof(DIR_ENTRY_PAGE) != 0) {
+		errno = EINVAL;
 		goto errcode_handle;
 	}
 
