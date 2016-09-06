@@ -204,7 +204,17 @@ TEST_F(NotifyBufferSetUpAndTearDown, InitSuccess)
 	notify_buf.elems = NULL;
 }
 
-TEST_F(NotifyBufferSetUpAndTearDown, InitFail)
+TEST_F(NotifyBufferSetUpAndTearDown, InitFail1)
+{
+
+	sem_init_fake.custom_fake = sem_init_cnt;
+	sem_init_error_on = 1;
+	init_notify_buf();
+	EXPECT_EQ(notify_buf.elems, NULL);
+	EXPECT_EQ(notify_buf.is_initialized, 0);
+}
+
+TEST_F(NotifyBufferSetUpAndTearDown, InitFail2)
 {
 
 	sem_init_fake.custom_fake = sem_init_cnt;

@@ -26,9 +26,6 @@ fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
 
 /* Helper functions */
 
-#define check_buf_elem_size(X)                                                 \
-	_Static_assert(FUSE_NOTIFY_BUF_ELEMSIZE >= sizeof(X),                  \
-		       "FUSE_NOTIFY_BUF_ELEMSFIZE is not enough for " #X)
 static inline BOOL notify_buf_isempty() { return notify_buf.len == 0; }
 static inline BOOL notify_buf_isfull()
 {
@@ -53,29 +50,37 @@ static inline void inc_buf_idx(size_t *x, size_t buf_size)
  */
 int32_t init_notify_buf(void)
 {
-	BOOL good = TRUE;
+	BOOL good = FALSE;
 	errno = 0;
 
-	check_buf_elem_size(FUSE_NOTIFY_DELETE_DATA);
+#define STATIC_CHECK_BUF_SIZE(X)                                               \
+	_Static_assert(FUSE_NOTIFY_BUF_ELEMSIZE >= sizeof(X),                  \
+		       "FUSE_NOTIFY_BUF_ELEMSFIZE is not enough for " #X)
+	STATIC_CHECK_BUF_SIZE(FUSE_NOTIFY_DELETE_DATA);
 
 	notify_buf.max_len = FUSE_NOTIFY_BUF_DEFAULT_LEN;
 	notify_buf.in = notify_buf.max_len - 1;
+	notify_buf.is_initialized = FALSE;
 
-	notify_buf.elems =
-	    (void *)malloc(notify_buf.max_len * sizeof(FUSE_NOTIFY_DATA));
-	good = (notify_buf.elems != NULL);
+	do {
+		notify_buf.elems = (void *)malloc(notify_buf.max_len *
+						  sizeof(FUSE_NOTIFY_DATA));
+		if (notify_buf.elems == NULL)
+			break;
 
-	if (good)
-		good = (0 == sem_init(&notify_buf.tasks_sem, 1, 0));
-	if (good)
-		good = (0 == sem_init(&notify_buf.access_sem, 1, 1));
+		if (sem_init(&notify_buf.tasks_sem, 1, 0) == -1)
+			break;
 
-	if (good) {
+		if (sem_init(&notify_buf.access_sem, 1, 1) == -1)
+			break;
+
 		notify_buf.is_initialized = TRUE;
+		good = TRUE;
 		write_log(4, "Debug %s: succeed. max %lu\n", __func__,
 			  notify_buf.max_len);
-	} else {
-		notify_buf.is_initialized = FALSE;
+	} while (0);
+
+	if (!good) {
 		free(notify_buf.elems);
 		notify_buf.elems = NULL;
 		write_log(4, "Debug %s: failed. %s\n", __func__,
