@@ -1,5 +1,5 @@
 # Check result of this function
-* `list_external_volume`
+* `list_volume`
   * Return a list on success. 
   * If an error is encountered, a negative value is returned.
 
@@ -15,19 +15,19 @@
 
 ## [- NOTICE: Some file has sparse data block, the missing data block from list need to be supplied by MyTera! -]
 
-Demo list_external_volume
+Demo list_volume
 ==============================
 
-    list_external_volume(b"test_data/v1/android/fsmgr")
+    list_volume(b"test_data/v1/android/fsmgr")
 
     [(128, b'hcfs_external')]
 
-Demo list_external_volume (Failure)
+Demo list_volume (Failure)
 ==============================
 
-    list_external_volume(b"")
+    list_volume(b"")
 
-    Error: list_external_volume: No such file or directory
+    Error: list_volume: No such file or directory
     -1
 
 Demo parse_meta
