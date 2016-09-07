@@ -101,7 +101,7 @@ class list_volumeTest : public ::testing::TestWithParam<const char*>
 	void TearDown() {}
 };
 
-TEST_P(list_volumeTest, ListExternalVolume)
+TEST_P(list_volumeTest, ListVolume)
 {
 	int32_t ret;
 	uint64_t i, number;
@@ -116,7 +116,7 @@ TEST_P(list_volumeTest, ListExternalVolume)
 		puts(list[i].d_name);
 	}
 }
-TEST_F(list_volumeTest, ListExternalVolumeNoFile)
+TEST_F(list_volumeTest, ListVolumeNoFile)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -126,7 +126,7 @@ TEST_F(list_volumeTest, ListExternalVolumeNoFile)
 	EXPECT_LT(ret_code, 0);
 }
 
-TEST_F(list_volumeTest, ListExternalVolumeEIO)
+TEST_F(list_volumeTest, ListVolumeEIO)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -136,7 +136,7 @@ TEST_F(list_volumeTest, ListExternalVolumeEIO)
 	EXPECT_LT(ret_code, 0);
 }
 
-TEST_F(list_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
+TEST_F(list_volumeTest, ListVolumeErrorOnPread2ndCall)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -151,7 +151,7 @@ TEST_F(list_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
 	printf("number %lu\n", number);
 	EXPECT_LT(ret_code, 0);
 }
-TEST_F(list_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
+TEST_F(list_volumeTest, ListVolumeErrorOnPread3rdCall)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -165,7 +165,7 @@ TEST_F(list_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
 	EXPECT_LT(ret_code, 0);
 }
 
-INSTANTIATE_TEST_CASE_P(ListExternalVolume, list_volumeTest, ValuesIn(paths));
+INSTANTIATE_TEST_CASE_P(ListVolume, list_volumeTest, ValuesIn(paths));
 /* End unittest for list_volume */
 
 /* Unittest for parse_meta */
