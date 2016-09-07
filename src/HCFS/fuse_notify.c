@@ -153,7 +153,7 @@ int32_t notify_buf_realloc(void)
 	BOOL good = 0;
 	int32_t save_errno;
 	void *newbuf = NULL;
-	size_t newsize;
+	size_t newsize = 0;
 
 	do {
 		if (check_buf_init_state(__func__) == 0)
@@ -488,7 +488,7 @@ int32_t hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 
 	write_log(10, "Debug %s: Called\n", __func__);
 	good = 1;
-	for (i = 0; i < MP_TYPE_NUM && good == 1; i++) {
+	for (i = 1; i <= MP_TYPE_NUM && good == 1; i++) {
 		if (mount_global.ch[i] == NULL)
 			continue;
 		/* no need to notify if filename in same case, same view */

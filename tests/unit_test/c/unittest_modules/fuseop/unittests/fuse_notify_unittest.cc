@@ -525,8 +525,8 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_Normal)
 	char *name = strdup("a");
 	int32_t i;
 
-	mount_global.ch[0] = ch;
-	for (i = 1; i < MP_TYPE_NUM; i++)
+	mount_global.ch[1] = ch;
+	for (i = 2; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 	free(ch);
@@ -544,7 +544,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_FakeAll)
 	char *name = strdup("a");
 	int32_t i;
 
-	for (i = 0; i < MP_TYPE_NUM; i++)
+	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 	free(ch);
@@ -563,7 +563,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_BufferOverflow)
 	int32_t i;
 	int32_t ret;
 
-	for (i = 0; i < MP_TYPE_NUM; i++)
+	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	write_log_hide = 10;
 	for (i = 0; i < 1024 / 3; i++) {
@@ -588,8 +588,8 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_DiffCaseNameTriggerAllNotify)
 	char *name2 = strdup("B");
 	int32_t i;
 
-	mount_global.ch[0] = ch;
-	for (i = 1; i < MP_TYPE_NUM; i++)
+	mount_global.ch[1] = ch;
+	for (i = 2; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name2);
 	free(ch);

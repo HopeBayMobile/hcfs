@@ -29,11 +29,12 @@
 #endif
 
 enum MP_TYPE {
-	MP_DEFAULT,
+	MP_DEFAULT = 1,
 	MP_READ,
 	MP_WRITE,
-	MP_TYPE_NUM /* MP_TYPE_NUM must be last in enum */
+	__MP_TYPE_END /* Set total mp type number. Keep this at end of list */
 };
+#define MP_TYPE_NUM (__MP_TYPE_END - MP_DEFAULT)
 
 /*
 Binary search tree
@@ -64,8 +65,7 @@ typedef struct {
  * privatized and shared between views of same volumn */
 enum MP_CHAN_TYPE { FUSE_DEFAULT, FUSE_WRITE, FUSE_READ };
 typedef struct {
-	struct fuse_chan *ch[3];
-	sem_t sem;
+	struct fuse_chan *ch[MP_TYPE_NUM + 1];
 } MOUNT_T_GLOBAL;
 
 extern MOUNT_T_GLOBAL mount_global;
