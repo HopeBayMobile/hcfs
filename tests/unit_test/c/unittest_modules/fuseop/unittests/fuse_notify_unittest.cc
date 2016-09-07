@@ -572,6 +572,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_BufferOverflow)
 	}
 	write_log_hide = 11;
 	EXPECT_EQ(hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name), -1);
+	EXPECT_EQ(errno, ENOMEM);
 	EXPECT_EQ(notify_buf.len, 1024);
 	free(ch);
 	free(name);
