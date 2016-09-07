@@ -138,7 +138,7 @@ errcode_handle:
 }
 
 /**
- * Helper of init_rebuild_sb(). Download FS backend statistics file "FSstat<x>"
+ * Helper of init_rebuild_sb(). Read from FS backend statistics file "FSstat<x>"
  * and find the maximum inode number. Finally create superblock and initialize
  * the superblock head.
  */
@@ -150,7 +150,6 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	size_t ret_size;
 	char fstatpath[400], fs_sync_path[400];
 	char sb_path[300];
-	char objname[300];
 	char restore_todelete_list[METAPATHLEN];
 	FILE *fptr, *sb_fptr;
 	FS_CLOUD_STAT_T fs_cloud_stat;
@@ -170,29 +169,10 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		snprintf(fstatpath, METAPATHLEN - 1,
 				"%s/FS_sync/FSstat%" PRIu64 "",
 				METAPATH, (uint64_t)root_inode);
+		/* FSstat should be downloaded in stage 1 already */
 		if (access(fstatpath, F_OK) < 0) {
 			errcode = errno;
-			if (errcode == ENOENT) {
-				/* Get FSstat from cloud */
-				write_log(2, "Warning: FSstat not exist\n");
-				sprintf(objname, "FSstat%"PRIu64,
-					(uint64_t)root_inode);
-				fptr = fopen(fstatpath, "w+");
-				if (!fptr) {
-					errcode = errno;
-					return -errcode;
-				}
-				setbuf(fptr, NULL);
-				ret = fetch_object_busywait_conn(fptr,
-						RESTORE_FETCH_OBJ, objname);
-				fclose(fptr);
-				if (ret < 0) {
-					unlink(fstatpath);
-					return ret;
-				}
-			} else {
-				return -errcode;
-			}
+			return -errcode;
 		}
 		/* Get max inode number from FS cloud stat */
 		fptr = fopen(fstatpath, "r");

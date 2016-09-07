@@ -725,10 +725,14 @@ errcode_handle:
 		if (P_IS_PIN(backend_pin_st))
 			update_backend_stat(root_inode, -backend_size_change,
 				-meta_size_change, -1,
-				-backend_size_change + meta_size_change);
+				-backend_size_change + meta_size_change,
+				-round_size(backend_size_change) +
+				 round_size(meta_size_change),
+				-round_size(meta_size_change));
 		else
 			update_backend_stat(root_inode, -backend_size_change,
-				-meta_size_change, -1, 0);
+				-meta_size_change, -1, 0, 0,
+				-round_size(meta_size_change));
 	}
 
 	_check_del_progress_file(this_inode);

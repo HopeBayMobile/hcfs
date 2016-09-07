@@ -67,7 +67,8 @@ int32_t change_xfer_meta(int64_t xfer_size_upload,
 
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
-		int64_t fs_pin_size_delta);
+		int64_t fs_pin_size_delta, int64_t disk_pin_size_delta,
+		int64_t disk_meta_size_delta);
 
 int32_t update_backend_usage(int64_t total_backend_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta);

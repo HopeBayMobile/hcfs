@@ -508,6 +508,55 @@ errcode_handle:
 	}
 }
 
+void process_upgrade_meta_changes(void)
+{
+	DIR *dstream;
+	struct dirent *tmpentry;
+	FS_CLOUD_STAT_T_V1 oldstruct;
+	FS_CLOUD_STAT_T newstruct;
+	char tmppath[METAPATHLEN];
+	char tmppath1[METAPATHLEN];
+	struct stat tmpstruct;
+	FILE *fptr;
+	int32_t errcode, ret;
+	size_t ret_size;
+
+	/* Handle changes in FS_CLOUD_STAT_T */
+	snprintf(tmppath, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
+
+	dstream = opendir(tmppath);
+	if (dstream == NULL)
+		return;
+
+	while ((tmpentry = readdir(dstream)) != NULL) {
+		snprintf(tmppath1, METAPATHLEN - 1, "%s/%s", tmppath,
+		         tmpentry->d_name);
+		if (stat(tmppath1, &tmpstruct) != 0)
+			goto end;
+		if (tmpstruct.st_size != sizeof(FS_CLOUD_STAT_T_V1))
+			continue;
+		/* Found a cloud stat with old format. Converting */
+		fptr = fopen(tmppath1, "r+");
+		if (fptr == NULL)
+			continue;
+		FREAD(&oldstruct, sizeof(FS_CLOUD_STAT_T_V1), 1, fptr);
+		newstruct.backend_system_size = oldstruct.backend_system_size;
+		newstruct.backend_meta_size = oldstruct.backend_meta_size;
+		newstruct.backend_num_inodes = oldstruct.backend_num_inodes;
+		newstruct.max_inode = oldstruct.max_inode;
+		newstruct.pinned_size = oldstruct.pinned_size;
+		newstruct.disk_pinned_size = -1;
+		newstruct.disk_meta_size = -1;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&newstruct, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+errcode_handle:
+		fclose(fptr);
+	}
+
+end:
+	closedir(dstream);
+	return;
+}
 /************************************************************************
 *
 * Function name: main
@@ -539,11 +588,6 @@ int32_t main(int32_t argc, char **argv)
 	ENGINE_load_builtin_engines();
 	ENGINE_register_all_complete();
 #endif
-
-	/*TODO: Error handling after reading system config*/
-	/*TODO: Allow reading system config path from program arg */
-
-	/* TODO: Selection of backend type via configuration */
 
 	/* skip malloc if already did (in unittest) */
 	if (system_config == NULL) {
@@ -587,6 +631,9 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	UNUSED(curl_handle);
+
+	/* Convert meta changes if needed */
+	process_upgrade_meta_changes();
 
 	/* Check if the system is being restored (and in stage 2) */
 	/* FEATURE TODO: Check if the backend setting is correct before
