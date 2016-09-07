@@ -822,7 +822,7 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	if (access(fetchedmeta, F_OK) != 0)
-		return -ENOENT;
+		return 0;
 
 	if (delete_block == FALSE) {
 		ret = stat(fetchedmeta, &meta_stat);
@@ -1256,7 +1256,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		if (expand_val == 0)
 			return 0;
 	} else {
-		if (strncmp(nowpath, "/data/app", strlen("/data/app") == 0))
+		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;
 	}
 
@@ -1551,7 +1551,7 @@ static void _replace_version(char *fbuf, int32_t initpos, int32_t fbuflen)
 		startpos++;
 		endpos = startpos;
 		while ((fbuf[endpos] != '"') && (endpos < fbuflen))
-			startpos++;
+			endpos++;
 		/* terminate if no value or no valid value */
 		if ((endpos >= fbuflen) || (endpos == startpos))
 			break;
@@ -1560,7 +1560,7 @@ static void _replace_version(char *fbuf, int32_t initpos, int32_t fbuflen)
 		fbuf[startpos] = '0';
 		memmove(&(fbuf[startpos+1]), &(fbuf[endpos]),
 		        (fbuflen - endpos));
-		fbuf[(fbuflen - endpos)] = 0;
+		fbuf[(fbuflen - endpos) + (startpos + 1)] = 0;
 		break;
 	}
 }
@@ -1606,7 +1606,7 @@ int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes)
 			continue;
 		}
 		if (strncmp(&(fbuf[5]), "package name",
-		    sizeof("package name")) != 0) {
+		    strlen("package name")) != 0) {
 			/* Not the package info, write directly */
 			fprintf(dst, "%s", fbuf);
 			continue;
@@ -1648,6 +1648,7 @@ int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes)
 				write_log(4, "Cleaning-up package %s in list",
 				          packagename);
 				_replace_version(fbuf, endpos, fbuflen);
+				break;
 			}
 		fprintf(dst, "%s", fbuf);
 	}
@@ -1692,6 +1693,7 @@ int32_t run_download_minimal(void)
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 	BOOL is_fopen = FALSE;
+	int32_t retries_since_last_notify = 60;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -1699,7 +1701,13 @@ int32_t run_download_minimal(void)
 	while (hcfs_system->sync_paused == TRUE) {
 		write_log(4, "Connection is not available now\n");
 		write_log(4, "Sleep for 5 seconds before retrying\n");
-		notify_restoration_result(1, -ENETDOWN);
+		/* Now will notify once every 5 minutes */
+		if (retries_since_last_notify >= 60) {
+			notify_restoration_result(1, -ENETDOWN);
+			retries_since_last_notify = 0;
+		} else {
+			retries_since_last_notify++;
+		}
 		sleep(5);
 		if (hcfs_system->system_going_down == TRUE)
 			return -ESHUTDOWN;
