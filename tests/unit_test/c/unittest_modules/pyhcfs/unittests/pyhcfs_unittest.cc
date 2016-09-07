@@ -111,7 +111,7 @@ TEST_P(list_volumeTest, ListVolume)
 	ret =
 	    list_volume(meta_path, &list, &number);
 	ASSERT_EQ(ret, 0);
-	ASSERT_EQ(number, 1);
+	ASSERT_EQ(number, 3);
 	for (i = 0; i < number; i++) {
 		puts(list[i].d_name);
 	}
