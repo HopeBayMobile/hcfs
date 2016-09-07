@@ -13,7 +13,7 @@ int32_t disk_checkdelete(ino_t this_inode)
 	return 1;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	return 0;
 }

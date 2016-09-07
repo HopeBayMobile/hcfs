@@ -286,7 +286,7 @@ void log_sweeper(void)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 	struct timeval tmptime;

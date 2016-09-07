@@ -37,4 +37,5 @@ $(eval $(call ADDTEST, do_fallocate_unittest, \
 
 $(eval $(call ADDTEST, fuse_notify_unittest, \
   fuse_notify.o \
-  fuse_notify_unittest.o ))
+  fuse_notify_unittest.o \
+  ut_helper.o ))

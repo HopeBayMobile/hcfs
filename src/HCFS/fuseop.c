@@ -1343,12 +1343,20 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
 
 		/* Tell all other views that node is gone; if filename
 		 * has different case then tell all views */
-		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
-					  temp_dentry.d_ino, temp_dentry.d_name,
-					  strlen(selfname), selfname);
+		ret_val = hfuse_ll_notify_delete_mp(
+		    tmpptr->chan_ptr, parent_inode, temp_dentry.d_ino,
+		    temp_dentry.d_name, strlen(selfname), selfname);
+		if (ret_val == -1) {
+			fuse_reply_err(req, errno);
+			return;
+		}
 	}
 #endif
 	fuse_reply_err(req, -ret_val);

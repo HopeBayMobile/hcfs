@@ -117,7 +117,7 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	return ret_page_pos;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 #ifdef UT_DEBUG
 	va_list args;

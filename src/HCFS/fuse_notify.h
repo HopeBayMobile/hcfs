@@ -18,6 +18,7 @@
 #include "mount_manager.h"
 
 #define FUSE_NOTIFY_BUF_DEFAULT_LEN 8
+#define FUSE_NOTIFY_BUF_MAX_LEN 1024
 #define FUSE_NOTIFY_BUF_ELEMSIZE 52
 
 enum NOTIFY_FUNCTION { NOOP, DELETE };
@@ -72,24 +73,16 @@ FUSE_NOTIFY_DATA *notify_buf_dequeue();
 int32_t init_hfuse_ll_notify_loop(void);
 void destory_hfuse_ll_notify_loop(void);
 void *hfuse_ll_notify_loop(void *ptr);
-void hfuse_ll_notify_delete(struct fuse_chan *ch,
+int32_t hfuse_ll_notify_delete(struct fuse_chan *ch,
 			    fuse_ino_t parent,
 			    fuse_ino_t child,
 			    const char *name,
 			    size_t namelen);
-void hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
+int32_t hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 			       fuse_ino_t parent,
 			       fuse_ino_t child,
 			       const char *name,
 			       size_t namelen,
 			       const char *selfname);
-
-/* Fake some function in unittest */
-#ifdef UNITTEST
-typedef int(sem_wait_f)(sem_t *);
-typedef int(sem_post_f)(sem_t *);
-#define sem_wait(x) sem_wait_ptr(x)
-#define sem_post(x) sem_post_ptr(x)
-#endif
 
 #endif /* SRC_HCFS_FUSE_NOTIFY_H_ */

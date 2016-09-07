@@ -28,9 +28,12 @@
 #include "path_reconstruct.h"
 #endif
 
-#define MP_DEFAULT 1
-#define MP_READ 2
-#define MP_WRITE 3
+enum MP_TYPE {
+	MP_DEFAULT,
+	MP_READ,
+	MP_WRITE,
+	MP_TYPE_NUM /* MP_TYPE_NUM must be last in enum */
+};
 
 /*
 Binary search tree
@@ -59,10 +62,9 @@ typedef struct {
 
 /* TODO: If we have multiple mount volumns with mp mode, MOUNT_T_GLOBAL need be
  * privatized and shared between views of same volumn */
+enum MP_CHAN_TYPE { FUSE_DEFAULT, FUSE_WRITE, FUSE_READ };
 typedef struct {
-	struct fuse_chan *fuse_default;
-	struct fuse_chan *fuse_write;
-	struct fuse_chan *fuse_read;
+	struct fuse_chan *ch[3];
 	sem_t sem;
 } MOUNT_T_GLOBAL;
 

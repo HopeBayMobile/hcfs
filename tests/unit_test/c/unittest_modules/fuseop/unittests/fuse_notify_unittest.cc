@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: fuse_notify_unittest.cc
+* Abstract: The unittest code for fuse notification related FUSE
+*           operation.
+*
+* Revision History
+* 2016/9/1 Jethro Add unittest for delete notification.
+*
+**************************************************************************/
 #include <gtest/gtest.h>
 
 extern "C" {
@@ -5,21 +17,23 @@ extern "C" {
 #include <errno.h>
 #include <fuse/fuse_lowlevel.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 #include "fuse_notify.h"
-#include "mount_manager.h"
 #include "hfuse_system.h"
+#include "mount_manager.h"
+#include "ut_helper.h"
 }
+#ifdef PD
+#undef PD
+#define PD(x) write_log(10, #x " %d\n", ##x)
+#endif
 
 MOUNT_T_GLOBAL mount_global = {0};
 extern FUSE_NOTIFY_RING_BUF notify_buf;
 extern fuse_notify_fn *notify_fn[];
-#define PD(x) printf(#x " %d\n", x)
-
 
 /* 
  * Definition for fake functions
@@ -35,37 +49,10 @@ sem_init_f *sem_init_real = (sem_init_f *)dlsym(RTLD_NEXT, "sem_init");
 uint32_t sem_init_error_on = -1;
 int32_t sem_init_cnt(sem_t *sem, int pshared, unsigned int value)
 {
-	PD(sem_init_fake.call_count);
+	//PD(sem_init_fake.call_count);
+	write_log(10, "sem_init_fake.call_count %d\n", sem_init_fake.call_count);
 	if (sem_init_fake.call_count != sem_init_error_on)
 		return sem_init_real(sem, pshared, value);
-	else
-		return -1;
-}
-
-typedef int(sem_post_f)(sem_t *);
-sem_post_f *sem_post_real = (sem_post_f *)dlsym(RTLD_NEXT, "sem_post");
-uint32_t sem_post_error_on = -1;
-uint32_t sem_post_call_count = 0;
-int32_t sem_post_cnt(sem_t *sem)
-{
-	sem_post_call_count++;
-	PD(sem_post_call_count);
-	if (sem_post_call_count != sem_post_error_on)
-		return sem_post_real(sem);
-	else
-		return -1;
-}
-
-typedef int(sem_wait_f)(sem_t *);
-sem_wait_f *sem_wait_real = (sem_wait_f *)dlsym(RTLD_NEXT, "sem_wait");
-uint32_t sem_wait_error_on = -1;
-uint32_t sem_wait_call_count = 0;
-int32_t sem_wait_cnt(sem_t *sem)
-{
-	sem_wait_call_count++;
-	PD(sem_wait_call_count);
-	if (sem_wait_call_count != sem_wait_error_on)
-		return sem_wait_real(sem);
 	else
 		return -1;
 }
@@ -103,23 +90,6 @@ FAKE_VALUE_FUNC(int,
 		const char *,
 		size_t);
 
-char log[5][1024];
-int32_t write_log_call = 0;
-int32_t write_log(int32_t level, char *format, ...)
-{
-	va_list alist;
-
-	write_log_call++;
-	va_start(alist, format);
-	vprintf(format, alist);
-	va_end(alist);
-
-	va_start(alist, format);
-	vsprintf(log[write_log_call % 5], format, alist);
-	va_end(alist);
-	return 0;
-}
-
 /*
  * Helper functions
  */
@@ -154,21 +124,12 @@ void ut_dequeue(int32_t n)
 	}
 }
 
-extern sem_wait_f *sem_wait_ptr;
-extern sem_post_f *sem_post_ptr;
 void reset_fake_functions(void)
 {
+	reset_ut_helper();
 	RESET_FAKE(sem_init);
 	sem_init_error_on = -1;
 	sem_init_fake.custom_fake = sem_init_cnt;
-
-	sem_wait_call_count = 0;
-	sem_wait_error_on = -1;
-	sem_wait_ptr = sem_wait_cnt;
-
-	sem_post_call_count = 0;
-	sem_post_error_on = -1;
-	sem_post_ptr = sem_post_cnt;
 
 	RESET_FAKE(realloc);
 	realloc_error_on = -1;
@@ -182,7 +143,6 @@ void reset_fake_functions(void)
 
 	FFF_RESET_HISTORY();
 
-	write_log_call = 0;
 	ut_enqueue_call = 0;
 }
 
@@ -266,7 +226,7 @@ TEST_F(NotifyBufferSetUpAndTearDown, DestroySkip)
 {
 	memset(&notify_buf, 0, sizeof(FUSE_NOTIFY_RING_BUF));
 	destory_notify_buf();
-	EXPECT_EQ(write_log_call, 0);
+	EXPECT_EQ(write_log_call_count, 0);
 }
 TEST_F(NotifyBufferSetUpAndTearDown, DestroySuccess)
 {
@@ -313,20 +273,6 @@ TEST_F(NotifyBuffer_Initialized, EnqueueSkiped)
 	EXPECT_EQ(notify_buf.len, 0);
 }
 
-TEST_F(NotifyBuffer_Initialized, EnqueueSemWaitFail)
-{
-	sem_wait_error_on = 1;
-	ut_enqueue(1);
-	EXPECT_EQ(notify_buf.len, 0);
-}
-
-TEST_F(NotifyBuffer_Initialized, EnqueueSemPostFail)
-{
-	sem_post_error_on = 1;
-	ut_enqueue(1);
-	EXPECT_EQ(notify_buf.len, 1);
-}
-
 TEST_F(NotifyBuffer_Initialized, Dequeue)
 {
 	FUSE_NOTIFY_DATA *d = NULL;
@@ -347,16 +293,16 @@ TEST_F(NotifyBuffer_Initialized, DequeueSkiped)
 
 TEST_F(NotifyBuffer_Initialized, DequeueAnEmptyQueue) {
 	notify_buf_dequeue();
-	EXPECT_STREQ(log[write_log_call % 5],
-		     "Error notify_buf_dequeue: queue is empty.\n");
+	EXPECT_STREQ(log_data[write_log_call_count % 5],
+		     "Error notify_buf_dequeue: Queue is empty.\n");
 	EXPECT_EQ(malloc_fake.call_count, 0);
 }
 
 TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
 	ut_enqueue(1);
 	malloc_error_on = 1;
-	notify_buf_dequeue();
-	EXPECT_STREQ(log[write_log_call % 5],
+	EXPECT_EQ(notify_buf_dequeue(), NULL);
+	EXPECT_STREQ(log_data[write_log_call_count % 5],
 		     "Error notify_buf_dequeue: malloc failed.\n");
 }
 
@@ -375,6 +321,21 @@ TEST_F(NotifyBuffer_Initialized, ReallocSkiped)
 	notify_buf.is_initialized = 0;
 	notify_buf_realloc();
 	EXPECT_EQ(realloc_fake.call_count, 0);
+}
+
+TEST_F(NotifyBuffer_Initialized, ReallocFailed_Limitation)
+{
+	notify_buf_realloc();
+	notify_buf_realloc();
+	notify_buf_realloc();
+	notify_buf_realloc();
+	notify_buf_realloc();
+	notify_buf_realloc();
+	notify_buf_realloc();
+	EXPECT_EQ(notify_buf_realloc(), -1);
+	EXPECT_EQ(errno, ENOMEM);
+	EXPECT_NE(notify_buf.elems, NULL);
+	EXPECT_LE(notify_buf.max_len, FUSE_NOTIFY_BUF_MAX_LEN);
 }
 
 TEST_F(NotifyBuffer_Initialized, ReallocByEnqueue)
@@ -448,6 +409,18 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop)
 	ASSERT_EQ(pthread_kill(fuse_nofify_thread, 0), 3);
 }
 
+TEST_F(NotifyBuffer_Initialized, destoryLoop_SemPostFail)
+{
+	init_hfuse_ll_notify_loop();
+	hcfs_system->system_going_down = TRUE;
+	sem_post_error_on = 1;
+	destory_hfuse_ll_notify_loop();
+	/* Test thread is running */
+	ASSERT_EQ(pthread_kill(fuse_nofify_thread, 0), 0);
+	sem_post_error_on = -1;
+	destory_hfuse_ll_notify_loop();
+}
+
 TEST_F(NotifyBuffer_Initialized, destoryLoop_PthreadJoinFail)
 {
 	init_hfuse_ll_notify_loop();
@@ -455,8 +428,9 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop_PthreadJoinFail)
 	sem_post(&notify_buf.tasks_sem);
 	pthread_join(fuse_nofify_thread, NULL);
 	destory_hfuse_ll_notify_loop();
-	EXPECT_STREQ(log[write_log_call % 5], "Error destory_hfuse_ll_notify_loop: join "
-			  "nofify_thread failed. No such process\n");
+	EXPECT_STREQ(log_data[write_log_call_count % 5],
+		     "Error destory_hfuse_ll_notify_loop: Failed to join "
+		     "nofify_thread. No such process\n");
 }
 
 TEST_F(NotifyBuffer_Initialized, loopCallNotify)
@@ -482,8 +456,8 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotify)
 	hcfs_system->system_going_down = TRUE;
 	sem_post(&notify_buf.tasks_sem);
 	pthread_join(fuse_nofify_thread, NULL);
-	EXPECT_STREQ(log[(write_log_call + 5 - 1) % 5],
-		     "Debug hfuse_ll_notify_loop: notified\n");
+	EXPECT_STREQ(log_data[(write_log_call_count + 5 - 1) % 5],
+		     "Debug hfuse_ll_notify_loop: Notified\n");
 }
 
 TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
@@ -504,8 +478,8 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 	hcfs_system->system_going_down = TRUE;
 	sem_post(&notify_buf.tasks_sem);
 	pthread_join(fuse_nofify_thread, NULL);
-	EXPECT_STREQ(log[(write_log_call + 5 - 1) % 5],
-		     "Debug hfuse_ll_notify_loop: error\n");
+	EXPECT_STREQ(log_data[(write_log_call_count + 5 - 1) % 5],
+		     "Error hfuse_ll_notify_loop: Dequeue failed\n");
 }
 
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
@@ -535,81 +509,93 @@ TEST_F(NotifyBuffer_Initialized, notify_deleteFail)
 {
 	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
 	char *name = strdup("a");
+	int32_t ret;
 	notify_buf.is_initialized = 0;
-	hfuse_ll_notify_delete(ch, 0, 0, name, 1);
+	ret = hfuse_ll_notify_delete(ch, 0, 0, name, 1);
 	free(ch);
 	free(name);
 	EXPECT_EQ(notify_buf.len, 0);
+	EXPECT_EQ(ret, -1);
 }
 
-TEST_F(NotifyBuffer_Initialized, notify_delete_mp)
+TEST_F(NotifyBuffer_Initialized, notify_delete_mp_Normal)
 {
 	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
 	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
 	char *name = strdup("a");
+	int32_t i;
 
-	mount_global.fuse_default = mount_global.fuse_write =
-	    mount_global.fuse_read = fake_mp;
+	mount_global.ch[0] = ch;
+	for (i = 1; i < MP_TYPE_NUM; i++)
+		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 	free(ch);
 	free(name);
 	free(fake_mp);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[2])->name);
-	EXPECT_EQ(notify_buf.len, 3);
-}
-
-TEST_F(NotifyBuffer_Initialized, notify_delete_mpFakeAll)
-{
-	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
-	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
-	char *name = strdup("a");
-
-	mount_global.fuse_default = mount_global.fuse_write =
-	    mount_global.fuse_read = fake_mp;
-	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
-	free(ch);
-	free(name);
-	free(fake_mp);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[2])->name);
-	EXPECT_EQ(notify_buf.len, 3);
-}
-
-TEST_F(NotifyBuffer_Initialized, notify_delete_mpNormal)
-{
-	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
-	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
-	char *name = strdup("a");
-
-	mount_global.fuse_default = ch;
-	mount_global.fuse_write = mount_global.fuse_read = fake_mp;
-	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
-	free(ch);
-	free(name);
-	free(fake_mp);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
+	for (i = 0; i < MP_TYPE_NUM - 1; i++)
+		free(((FUSE_NOTIFY_DELETE_DATA *)&notify_buf.elems[i])->name);
 	EXPECT_EQ(notify_buf.len, 2);
 }
 
-TEST_F(NotifyBuffer_Initialized, notify_delete_mpDiffCaseNameTriggerAllNotify)
+TEST_F(NotifyBuffer_Initialized, notify_delete_mp_FakeAll)
+{
+	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
+	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
+	char *name = strdup("a");
+	int32_t i;
+
+	for (i = 0; i < MP_TYPE_NUM; i++)
+		mount_global.ch[i] = fake_mp;
+	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
+	free(ch);
+	free(name);
+	free(fake_mp);
+	for (i = 0; i < MP_TYPE_NUM; i++)
+		free(((FUSE_NOTIFY_DELETE_DATA *)&notify_buf.elems[i])->name);
+	EXPECT_EQ(notify_buf.len, 3);
+}
+
+TEST_F(NotifyBuffer_Initialized, notify_delete_mp_BufferOverflow)
+{
+	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
+	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
+	char *name = strdup("a");
+	int32_t i;
+	int32_t ret;
+
+	for (i = 0; i < MP_TYPE_NUM; i++)
+		mount_global.ch[i] = fake_mp;
+	write_log_hide = 10;
+	for (i = 0; i < 1024 / 3; i++) {
+		ret = hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
+		EXPECT_EQ(ret, 0);
+	}
+	write_log_hide = 11;
+	EXPECT_EQ(hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name), -1);
+	EXPECT_EQ(notify_buf.len, 1024);
+	free(ch);
+	free(name);
+	free(fake_mp);
+	for (i = 0; i < 1024; i++)
+		free(((FUSE_NOTIFY_DELETE_DATA *)&notify_buf.elems[i])->name);
+}
+
+TEST_F(NotifyBuffer_Initialized, notify_delete_mp_DiffCaseNameTriggerAllNotify)
 {
 	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
 	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
 	char *name = strdup("a");
 	char *name2 = strdup("B");
+	int32_t i;
 
-	mount_global.fuse_default = ch;
-	mount_global.fuse_write = mount_global.fuse_read = fake_mp;
+	mount_global.ch[0] = ch;
+	for (i = 1; i < MP_TYPE_NUM; i++)
+		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name2);
 	free(ch);
 	free(name);
 	free(name2);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[0])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[1])->name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify_buf.elems[2])->name);
+	for (i = 0; i < MP_TYPE_NUM; i++)
+		free(((FUSE_NOTIFY_DELETE_DATA *)&notify_buf.elems[i])->name);
 	EXPECT_EQ(notify_buf.len, 3);
 }
