@@ -16,21 +16,38 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-# Install dependencies
-$repo/utils/setup_dev_env.sh -vm unit_test
-. $repo/utils/env_config.sh
-
-# Unit test
-cd $here
-
+ulimit -c unlimited
 export TERM=xterm-color
 export GTEST_COLOR=yes
 export NOGCOVR=1
 
-ulimit -c unlimited
-make clean
-ulimit -c unlimited 
-make
-make test
+# Install dependencies
+$repo/utils/setup_dev_env.sh -vm unit_test
 
-gcovr -r $repo/src .
+# Clean up temporary files
+if [ "${CI:-0}" -eq 1 ]; then
+	sudo git clean -dxf
+	pushd /tmp
+	fusermount -u -z test_fuse || :
+	rm -rf dir_* directory_creation FSmgr_upload here_is_obj markdelete \
+		mock_* readdir_meta root_meta_path test* this_* tmp_dir_meta \
+		tmp_meta_dir tmpdir tmpout to_delete_meta xattr_mock_meta || :
+	popd
+fi
+
+# Trigger Report processing on Exit
+unittest_report() {
+	set -x
+	find $repo/tests/unit_test/c/unittest_modules -name "test_detail_*.xml" | xargs sed -i "s@$repo/@@g"
+	# coverage.xml
+	cd $repo/tests/unit_test
+	gcovr -x -r $repo/src . > $repo/coverage.xml
+	sed -i "s@$repo/@@g" $repo/coverage.xml
+	gcovr -r $repo/src .
+}
+trap unittest_report ERR EXIT
+cd $here
+
+# Unit test
+make clean
+make test

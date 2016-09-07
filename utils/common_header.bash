@@ -1,4 +1,7 @@
-umask 000 # fix CI error
+# fix CI error
+if [ `id -u` -eq 0 ]; then
+	umask 000
+fi
 
 function script_error_report() {
 	set +x
@@ -37,9 +40,12 @@ function install_pkg (){
 	eval set $flag_x
 	for i in $post_pkg_install
 	do
-		echo === $i
+		echo Running post-install tasks: $i
 		$i
 	done
+	if [ "${CI:-0}" -eq 1 ]; then
+		sudo rm -rf /tmp/* /var/tmp/*
+	fi
 }
 
 function check_script_changes()

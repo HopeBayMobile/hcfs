@@ -17,9 +17,11 @@ source $repo/utils/common_header.bash
 cd $here
 
 $repo/utils/setup_dev_env.sh -v -m docker_host
-sudo git clean -dXf $repo
 
-rsync -avz --delete $repo/utils/ $here/utils/
+# Prepare Docker build resources
+sudo git clean -dXf $repo
+rsync -av --delete $repo/utils/ $here/utils/
 cp -f $repo/tests/functional_test/requirements.txt $here/utils/
-docker build -t docker:5000/docker_hcfs_test_slave .
-docker push docker:5000/docker_hcfs_test_slave
+
+docker build -t docker:5000/hcfs-buildbox .
+docker push docker:5000/hcfs-buildbox

@@ -82,9 +82,9 @@ function unittest()
 }
 function ci-test()
 {
+	export CI=1
 	export CI_VERBOSE=true
-	export UNITTEST_MAKE_FLAG=-k
-	$repo/containers/hcfs-test-slave/ci-test.sh
+	$repo/tests/unit_test/run_unittests
 }
 
 function lib()
@@ -107,11 +107,6 @@ function pyhcfs ()
 {
 	$repo/utils/setup_dev_env.sh -m docker_host
 	$repo/utils/setup_dev_env.sh
-	if ! groups $USER | grep  -q "\(docker\|root\)"; then
-		echo To run docker with user, please add your username into docker group and re-login session:
-		echo "sudo usermod -aG docker <user_name>"
-		exit 1
-	fi
 	docker pull docker:5000/docker_hcfs_test_slave
 	set -x
 
@@ -122,7 +117,7 @@ function pyhcfs ()
 	fi
 
 	if [ -e /.docker* ]; then
-		umask 000
+		$repo/utils/setup_dev_env.sh -m docker_host
 		python3 setup.py $PYHCFS_TARGET
 	else
 		docker run --rm -v "$repo":/hcfs docker:5000/docker_hcfs_test_slave \

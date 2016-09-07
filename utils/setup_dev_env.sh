@@ -16,7 +16,7 @@ CI_VERBOSE=false source $repo/utils/common_header.bash
 cd $repo
 
 configfile="$repo/utils/env_config.sh"
-if [[ -f /.dockerinit && "$USER" = jenkins ]]; then
+if [[ ${CI:-0} = 1 || -f /.dockerinit && "$USER" = jenkins ]]; then
 	sudo chown -R jenkins:jenkins $repo/utils
 fi
 touch "$configfile"
@@ -56,8 +56,8 @@ else
 	set -x;
 fi
 
-function ci
-{
+static_report() {
+	export post_pkg_install+=" post_static_report"
 	packages+=" cmake git build-essential" # Required by oclint / bear
 	packages+=" wget unzip"                # Required by PMD for CPD(duplicate code)
 	if lsb_release -r | grep -q 16.04; then
@@ -71,24 +71,50 @@ function ci
 	packages+=" colormake"                 # colorful logs
 	packages+=" parallel"                  # parallel check source code style
 }
+post_static_report() {
+	sudo mkdir -p /ci-tools
+	sudo chmod 777 /ci-tools
+	pushd /ci-tools
 
-function unit_test
-{
+	#### Oclint
+	if ! bear 2>&1 >/dev/null; then
+		git clone --depth 1 https://github.com/rizsotto/Bear.git
+		pushd Bear
+		cmake .
+		make all
+		sudo make install
+		popd
+	fi
+	if [ ! -f oclint-0.8.1/bin/oclint ]; then
+		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		tar -zxf oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		rm -f oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+	fi
+
+	#### Install PMD for CPD(duplicate code)
+	if [ ! -d pmd-bin-5.2.2 ]; then
+		wget http://downloads.sourceforge.net/project/pmd/pmd/5.2.2/pmd-bin-5.2.2.zip
+		unzip pmd-bin-5.2.2.zip
+		rm -f pmd-bin-5.2.2.zip
+	fi
+
+	#### Install mono and CCM for complexity
+	if [ ! -f CCM.exe ]; then
+		https_proxy="http://10.0.1.5:8000" \
+			wget https://github.com/jonasblunck/ccm/releases/download/v1.1.11/ccm.1.1.11.zip
+		unzip ccm.1.1.11.zip
+		rm -f ccm.1.1.11.zip
+	fi
+
+	popd
+}
+
+unit_test() {
 	packages+=" gcovr"
 	packages+=" valgrind"
 }
 
-function post_install_pip_packages
-{
-	file=`\ls $here/requirements.txt \
-		$repo/tests/functional_test/requirements.txt \
-		2>/dev/null ||:`
-
-	sudo -H pip install -q -r $file
-}
-
-function functional_test
-{
+functional_test() {
 	$here/nopasswd_sudoer.bash
 	packages+=" python-pip python-dev python-swiftclient"
 	export post_pkg_install+=" post_install_pip_packages"
@@ -99,25 +125,46 @@ function functional_test
 	if sudo grep "#user_allow_other" /etc/fuse.conf; then
 		sudo sed -ir -e "s/#user_allow_other/user_allow_other/" /etc/fuse.conf
 	fi
-	if [[ -n "$USER" && "$USER" != root && `groups $USER` != *fuse* ]]; then
-		sudo addgroup "$USER" fuse
+	if ! grep -q "^fuse:" /etc/group; then
+		sudo addgroup fuse
 	fi
-	if [[ `groups jenkins` != *fuse* ]]; then
-		sudo addgroup jenkins fuse || :
+	U=${SUDO_USER:-$USER}
+	if [[ -n "$U" && "$U" != root && `groups $U` != *fuse* ]]; then
+		sudo adduser $U fuse 
+	fi
+}
+post_install_pip_packages() {
+	file=`\ls $here/requirements.txt \
+		$repo/tests/functional_test/requirements.txt \
+		2>/dev/null ||:`
+
+	sudo -H pip install -q -r $file
+}
+
+install_ccache() {
+	source /etc/lsb-release
+	if ! expr `ccache -V 2>&1 | sed -r -n -e "s/.* ([0-9.]+)$/\1/p"` \>= 3.2 2>/dev/null; then
+		force_install="$force_install ccache"
+	fi
+	if [ "$DISTRIB_RELEASE" = "14.04" ] && \
+		! expr `apt-cache policy ccache 2>&1 | sed -r -n -e "/Candidate/s/.* ([0-9.]+).*/\1/p"` \>= 3.2 2>/dev/null; then
+		echo "deb http://ppa.launchpad.net/comet-jc/ppa/ubuntu $DISTRIB_CODENAME main" \
+			| sudo tee /etc/apt/sources.list.d/comet-jc-ppa-trusty.list
+		sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 32EF5841642ADD17
 	fi
 }
 
-function post_install_docker
-{
+docker_host() {
+	packages+=" wget"
+	export post_pkg_install+=" post_install_docker"
+}
+post_install_docker() {
 	# skip is docker version is qualified
 	if hash docker && \
-		docker_ver=$(docker version | grep ersion | grep -v API | head -1 | sed s/[^.0-9]//g) && \
-		dpkg --compare-versions $docker_ver ge 1.11.2; then
+		expr `docker version | sed -n -r -e "/Client/{N;s/[^0-9]*(.*)/\1/p}"` \>= 1.11.2 2>/dev/null; then
 		return
 	fi
 
-	echo "Install Docker"
-	install_pkg
 	sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 	wget -qO- https://get.docker.com/ > /tmp/install_docker
 	sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
@@ -130,21 +177,40 @@ function post_install_docker
 			| sudo tee -a /etc/default/docker
 		sudo service docker restart ||:
 	fi
+
+	U=${SUDO_USER:-$USER}
+	if [[ -n "$U" && "$U" != root && `groups $U` != *docker* ]]; then
+		sudo adduser $U docker
+		echo To run docker with user, please re-login session
+	fi
 }
 
-function docker_host
-{
-	packages+=" wget"
-	export post_pkg_install+=" post_install_docker"
+pyhcfs() {
+	packages+=" python3-pip"
+	export post_pkg_install+=" post_pyhcfs"
+}
+post_pyhcfs() {
+	sudo -H pip3 install --upgrade pip
+	sudo -H pip3 install cffi pytest py
 }
 
+all() {
+	static_report
+	unit_test
+	functional_test
+	docker_host
+	install_ccache
+	pyhcfs
+}
+
+# init for each mode
 for i in $(echo $setup_dev_env_mode | sed "s/,/ /g")
 do
-	echo "[[[$i]]]"
+	echo "Setup for $i mode"
 	$i
-	source $here/require_compile_deps.bash
-	install_pkg
 done
+source $here/require_compile_deps.bash
+install_pkg
 
 # cleanup config file
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
