@@ -57,15 +57,15 @@ int32_t list_volume(const char *fs_mgr_path,
 		return ERROR_SYSCALL;
 
 	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (ret_val < sizeof(DIR_META_TYPE)) {
-		errno = (ret_val < 0)?errno:EINVAL;
+	if (ret_val == -1 || ret_val < sizeof(DIR_META_TYPE)) {
+		errno = (ret_val == -1)?errno:EINVAL;
 		goto errcode_handle;
 	}
 
 	/* check remain size of fsmgr file is mutiple of
 	 *  sizeof(DIR_ENTRY_PAGE)
 	 */
-	ret_val = stat(fs_mgr_path, &st);
+	ret_val = fstat(meta_fd, &st);
 	if (ret_val == -1)
 		goto errcode_handle;
 	remain_size = st.st_size - sizeof(DIR_META_TYPE) - 16;
@@ -83,8 +83,8 @@ int32_t list_volume(const char *fs_mgr_path,
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
 		/*printf("ret_val %zu\n", ret_val);*/
-		if (ret_val < sizeof(DIR_ENTRY_PAGE)) {
-			errno = (ret_val < 0)?errno:EINVAL;
+		if (ret_val == -1 || ret_val < sizeof(DIR_ENTRY_PAGE)) {
+			errno = (ret_val == -1)?errno:EINVAL;
 			goto errcode_handle;
 		}
 		num_walked += tpage.num_entries;
@@ -101,8 +101,8 @@ int32_t list_volume(const char *fs_mgr_path,
 	while (next_node_pos != 0) {
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (ret_val < sizeof(DIR_ENTRY_PAGE)) {
-			errno = (ret_val < 0)?errno:EINVAL;
+		if (ret_val == -1 || ret_val < sizeof(DIR_ENTRY_PAGE)) {
+			errno = (ret_val == -1)?errno:EINVAL;
 			goto errcode_handle;
 		}
 		for (count = 0; count < tpage.num_entries; count++) {
