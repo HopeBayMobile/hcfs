@@ -3,8 +3,7 @@ set -x
 HCFSVOL=../CLI_utils/HCFSvol
 
 COPY_TO=sample
-# MPATH=/data/hcfs/metastorage
-MPATH=/home/jack482653/testHCFS/metastorage
+MPATH=/data/hcfs/metastorage
 MOUNT_APP=/data/app
 MOUNT_DIR=/data/data
 MOUND_EXT=/storage/emulated
