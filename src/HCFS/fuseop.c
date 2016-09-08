@@ -1353,8 +1353,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		ret_val = hfuse_ll_notify_delete_mp(
 		    tmpptr->chan_ptr, parent_inode, temp_dentry.d_ino,
 		    temp_dentry.d_name, strlen(selfname), selfname);
-		if (ret_val == -1) {
-			fuse_reply_err(req, errno);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
 			return;
 		}
 	}
@@ -1459,9 +1459,13 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 
 		/* Tell all other views that node is gone; if filename
 		 * has different case then tell all views */
-		hfuse_ll_notify_delete_mp(tmpptr->chan_ptr, parent_inode,
-					  temp_dentry.d_ino, temp_dentry.d_name,
-					  strlen(selfname), selfname);
+		ret_val = hfuse_ll_notify_delete_mp(
+		    tmpptr->chan_ptr, parent_inode, temp_dentry.d_ino,
+		    temp_dentry.d_name, strlen(selfname), selfname);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
 	}
 	/* TODO: Check if this still works for app to sdcard */
 	if (parent_inode == data_data_root) {
@@ -7668,7 +7672,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();
-	init_hfuse_ll_notify_loop();
 	/* TODO: Move FS database backup from init_FS to here, and need
 	to first sleep a few seconds and then check if network is up,
 	before actually trying to upload. Will need to backup the FS
@@ -7677,7 +7680,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	/* Wait on the fuse semaphore, until waked up by api_interface */
 	sem_wait(&(hcfs_system->fuse_sem));
 
-	destory_hfuse_ll_notify_loop();
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();

@@ -3,19 +3,20 @@
 **************************************************************************/
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 
 #include "ut_helper.h"
 
-/* 
- * Template for fake functions 
+/*
+ * Template for fake functions
  */
 #define DEFINE_FAKE_SET(func)                                                  \
 	func##_f(*func##_ptr);                                                 \
 	func##_f(*func##_real);                                                \
 	uint32_t func##_error_on = -1;                                         \
-	uint32_t func##_call_count;
+	uint32_t func##_call_count
 
 #define X(func) DEFINE_FAKE_SET(func)
 FKAE_FUNC_LIST
@@ -35,7 +36,7 @@ void reset_ut_helper(void)
 #define X(func)                                                                \
 	func##_call_count = 0;                                                 \
 	func##_error_on = -1;                                                  \
-	func##_ptr = func##_cnt;
+	func##_ptr = func##_cnt
 	FKAE_FUNC_LIST
 #undef X
 }
@@ -69,9 +70,9 @@ int32_t write_log_hide = 11;
 int32_t write_log_cnt(int32_t level, const char *format, ...)
 {
 	va_list alist;
+
 	if (level >= write_log_hide)
 		return 0;
-
 	write_log_call_count++;
 	va_start(alist, format);
 	vprintf(format, alist);
@@ -82,3 +83,32 @@ int32_t write_log_cnt(int32_t level, const char *format, ...)
 	va_end(alist);
 	return 0;
 }
+
+int pthread_create_cnt(pthread_t *thread,
+		       const pthread_attr_t *attr,
+		       void *(*start_routine)(void *),
+		       void *arg)
+{
+	pthread_create_call_count++;
+	PD(pthread_create_call_count);
+	if (pthread_create_call_count != pthread_create_error_on) {
+		return pthread_create_real(thread, attr, start_routine, arg);
+	} else {
+		return EAGAIN;
+	}
+
+	return 0;
+}
+
+char *strndup_cnt(const char *s, size_t n)
+{
+	strndup_call_count++;
+	PD(strndup_call_count);
+	if (strndup_call_count != strndup_error_on) {
+		return strndup_real(s, n);
+	} else {
+		errno = ENOMEM;
+		return NULL;
+	}
+}
+

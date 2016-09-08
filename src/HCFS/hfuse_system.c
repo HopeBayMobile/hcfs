@@ -33,6 +33,7 @@
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
 
+#include "fuse_notify.h"
 #include "fuseop.h"
 #include "meta_mem_cache.h"
 #include "global.h"
@@ -485,6 +486,10 @@ int32_t main(int32_t argc, char **argv)
 	if (ret_val < 0)
 		exit(ret_val);
 
+	ret_val = init_hfuse_ll_notify_loop();
+	if (ret_val < 0)
+		exit(ret_val);
+
 	/* Init event notify service */
 	ret_val = init_event_notify_module();
 	if (ret_val < 0)
@@ -497,9 +502,6 @@ int32_t main(int32_t argc, char **argv)
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
-
-	destroy_event_worker_loop_thread();
-	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
 		if (CURRENT_BACKEND == SWIFTTOKEN) {
@@ -515,13 +517,20 @@ int32_t main(int32_t argc, char **argv)
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
 	}
+
+	destroy_event_worker_loop_thread();
+	pthread_join(event_loop_thread, NULL);
+
+	destory_hfuse_ll_notify_loop();
+
 	sync_hcfs_system_data(TRUE);
-	write_log(4, "HCFS shutting down normally\n");
-	close_log();
-	sync();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();
+
+	write_log(4, "HCFS shutting down normally\n");
+	close_log();
+	sync();
 #else  /* ! _ANDROID_ENV_ */
 	/* Start up children */
 	proc_idx = 0;

@@ -17,7 +17,6 @@
 #include "macro.h"
 #include "mount_manager.h"
 
-#define FUSE_NOTIFY_BUF_DEFAULT_LEN 8
 #define FUSE_NOTIFY_BUF_MAX_LEN 1024
 #define FUSE_NOTIFY_BUF_ELEMSIZE 52
 
@@ -49,24 +48,22 @@ typedef struct {
 
 /* Ring Buffer */
 typedef struct {
-	FUSE_NOTIFY_DATA *elems;
-	size_t max_len;
+	FUSE_NOTIFY_DATA elems[FUSE_NOTIFY_BUF_MAX_LEN];
 	size_t len;
 	size_t in;
 	size_t out;
-	sem_t tasks_sem;
+	sem_t not_empty;
+	sem_t not_full;
 	sem_t access_sem;
-	BOOL is_initialized;
 } FUSE_NOTIFY_RING_BUF;
 
 /* notify functions */
-typedef void(fuse_notify_fn)(FUSE_NOTIFY_DATA **, enum NOTIFY_ACTION);
+typedef int32_t(fuse_notify_fn)(FUSE_NOTIFY_DATA *, enum NOTIFY_ACTION);
 fuse_notify_fn _do_hfuse_ll_notify_noop;
 fuse_notify_fn _do_hfuse_ll_notify_delete;
 
 int32_t init_notify_buf(void);
 void destory_notify_buf(void);
-int32_t notify_buf_realloc(void);
 int32_t notify_buf_enqueue(const void *const notify);
 FUSE_NOTIFY_DATA *notify_buf_dequeue();
 

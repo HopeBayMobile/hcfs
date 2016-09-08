@@ -85,13 +85,11 @@ define COMPILE
   $(eval SRC_DIR := $1)
   $(eval INC_DIR := $(addprefix -iquote,$(USER_DIR)))
 
-  $(OBJ_DIR)/%.o.d: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CC) -MM -MT $$(@:.o.d=.o) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) $$< > $$@
   $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@
+	$(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@ -MMD -MF $$@.d
 
   $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
-	$(CXX) $(CPPFLAGS) $(INC_DIR) $(CXXFLAGS) -c $$< -o $$@
+	$(CXX) $(CPPFLAGS) $(INC_DIR) $(CXXFLAGS) -c $$< -o $$@ -MMD -MF $$@.d
 endef
 
 define ADDMODULE
