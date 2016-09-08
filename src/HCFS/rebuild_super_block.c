@@ -1039,15 +1039,21 @@ int32_t _prune_this_entry(ino_t this_inode)
 		write_log(0, "Error: Fail to fetch parent in %s. Code %d",
 			__func__, -ret);
 	if (parentnum == 0) {
-		write_log(4, "Info: inode %"PRIu64" has no parents",
+		/* No parent, it may be removed by others. Just do nothing. */
+		write_log(6, "Info: inode %"PRIu64" has no parents",
 				(uint64_t)this_inode);
 		return 0;
+	} else {
+		for (idx = 0; idx < parentnum; idx++)
+			write_log(6, "Info: inode %"PRIu64" has parent inode %"
+				PRIu64, (uint64_t)this_inode,
+				(uint64_t)parentlist[idx]);
 	}
 
 	for (idx = 0; idx < parentnum; idx++) {
 		parent_inode = parentlist[idx];
 		/* If this parent is found in list, then the parent meta
-		 * had been downloaded. */
+		 * had been downloaded. Hence we can lock its meta cache. */
 		body_ptr = meta_cache_lock_entry(parent_inode);
 		if (body_ptr == NULL) {
 			write_log(0, "Error: Fail to lock parent inode %"
@@ -1103,7 +1109,6 @@ int32_t _prune_this_entry(ino_t this_inode)
 			write_log(0, "Error: Fail to delete parent. Code %d",
 					-ret);
 		sem_post(&(pathlookup_data_lock));
-		/* TODO: How about statistics/dir_stats? */
 	}
 
 	return 0;
@@ -1148,8 +1153,11 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 	if (ret < 0) {
 		/* Exception handling when meta is not
 		 * found on cloud */
-		if (ret == -ENOENT)
+		if (ret == -ENOENT) {
+			write_log(4, "Warn: Begin to remove inode %"PRIu64
+				" from parent", (uint64_t)this_inode);
 			_prune_this_entry(this_inode);
+		}
 		write_log(2, "Warn: Fail to restore meta%"PRIu64". Code %d",
 			(uint64_t)this_inode, -ret);
 		return ret;
