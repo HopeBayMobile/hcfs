@@ -97,6 +97,13 @@ void destory_notify_buf(void)
 		inc_buf_idx(&idx);
 	}
 
+	notify_buf.in = 0;
+	notify_buf.out = 0;
+	notify_buf.len = 0;
+	sem_destroy(&notify_buf.access_sem);
+	sem_destroy(&notify_buf.not_empty);
+	sem_destroy(&notify_buf.not_full);
+
 	write_log(10, "Debug %s: Done\n", __func__);
 }
 
