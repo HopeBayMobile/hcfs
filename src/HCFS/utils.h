@@ -120,4 +120,6 @@ int64_t round_size(int64_t size);
 
 int32_t copy_file(const char *srcpath, const char *tarpath);
 
+int32_t convert_cloud_stat_struct(char *path);
+
 #endif  /* SRC_HCFS_UTILS_H_ */

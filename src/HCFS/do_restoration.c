@@ -43,6 +43,7 @@ void init_restore_path(void)
 	sem_init(&(restore_sem), 0, 1);
 	sem_init(&(backup_pkg_sem), 0, 1);
 	have_new_pkgbackup = TRUE;
+	use_old_cloud_stat = FALSE;
 }
 
 int32_t fetch_restore_stat_path(char *pathname)
@@ -535,9 +536,9 @@ int32_t _update_FS_stat(ino_t rootinode)
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 RESTORE_METAPATH, (uint64_t)rootinode);
 
-	/* FEATURE TODO: maintain two structures for FS_CLOUD_STAT_T, one
-	old and one new. If downloaded cloud stat object is the same length
-	as the new one, then don't need to over-estimate */
+	errcode = convert_cloud_stat_struct(despath);
+	if (errcode < 0)
+		return errcode;
 
 	fptr = fopen(despath, "r");
 	if (fptr == NULL) {
@@ -549,22 +550,39 @@ int32_t _update_FS_stat(ino_t rootinode)
 	FREAD(&tmpFSstat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	fclose(fptr);
 
+	/* FEATURE TODO: Will need to check if cloud stat is converted from
+	old struct (V1) if can resume download in stage 1 */
+	if (tmpFSstat.disk_pinned_size < 0)
+		use_old_cloud_stat = TRUE;
+
 	LOCK_RESTORED_SYSMETA();
 	restored_system_meta =
 			&(hcfs_restored_system_meta->restored_system_meta);
-	/* Estimate pre-allocated pinned size */
-	after_add_pinsize = restored_system_meta->pinned_size +
-		(tmpFSstat.pinned_size + 4096 * tmpFSstat.backend_num_inodes);
+	/* Estimate pre-allocated pinned size if use old cloud stat struct */
+	if (tmpFSstat.disk_pinned_size < 0)
+		after_add_pinsize = restored_system_meta->pinned_size +
+			(tmpFSstat.pinned_size +
+			 4096 * tmpFSstat.backend_num_inodes);
+	else
+		after_add_pinsize = restored_system_meta->pinned_size +
+			tmpFSstat.disk_pinned_size;
+
 	if (after_add_pinsize > MAX_PINNED_LIMIT)
 		delta_pin_size =
 			MAX_PINNED_LIMIT - restored_system_meta->pinned_size;
 	else
 		delta_pin_size =
 			after_add_pinsize - restored_system_meta->pinned_size;
-	/* Estimate pre-allocated meta size. */
+	/* Estimate pre-allocated meta size if use old cloud stat struct. */
 	restored_meta_limit = META_SPACE_LIMIT - RESERVED_META_MARGIN;
-	after_add_metasize = restored_system_meta->system_meta_size +
-		(tmpFSstat.backend_meta_size + 4096 * tmpFSstat.backend_num_inodes);
+
+	if (tmpFSstat.disk_meta_size < 0)
+		after_add_metasize = restored_system_meta->system_meta_size +
+			(tmpFSstat.backend_meta_size +
+			 4096 * tmpFSstat.backend_num_inodes);
+	else
+		after_add_metasize = restored_system_meta->system_meta_size +
+			tmpFSstat.disk_meta_size;
 
 	if (after_add_metasize > restored_meta_limit)
 		delta_meta_size =
@@ -837,7 +855,8 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 		/* Backend statistics won't be adjusted here,
 		as they will be updated when backend objects are deleted */
 
-		UPDATE_RECT_SYSMETA(.delta_system_size = 0,
+		if (use_old_cloud_stat == TRUE) {
+			UPDATE_RECT_SYSMETA(.delta_system_size = 0,
 				    .delta_meta_size = metasize_blk -
 							(metasize + 4096),
 				    .delta_pinned_size = 0,
@@ -845,12 +864,21 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 				    .delta_backend_meta_size = 0,
 				    .delta_backend_inodes = 0);
 
-		UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
+			UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
 				    .delta_meta_size = -(metasize + 4096),
 				    .delta_pinned_size = 0,
 				    .delta_backend_size = 0,
 				    .delta_backend_meta_size = 0,
 				    .delta_backend_inodes = 0);
+		} else {
+			UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
+				    .delta_meta_size = -metasize_blk,
+				    .delta_pinned_size = 0,
+				    .delta_backend_size = 0,
+				    .delta_backend_meta_size = 0,
+				    .delta_backend_inodes = 0);
+		}
+
 		/* FEATURE TODO: Now file meta size will be substracted
 		from total meta size as soon as the file is deleted, but
 		before the meta is actually deleted in to_delete folder.
@@ -885,7 +913,10 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 
 	if (P_IS_PIN(file_meta.local_pin)) {
 		real_pin_size = round_size(this_inode_stat.size);
-		est_pin_size = (this_inode_stat.size + 4096);
+		if (use_old_cloud_stat == TRUE)
+			est_pin_size = (this_inode_stat.size + 4096);
+		else
+			est_pin_size = real_pin_size;
 	} else {
 		real_pin_size = 0;
 		est_pin_size = 0;
@@ -903,7 +934,8 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 	/* Backend statistics won't be adjusted here,
 	as they will be updated when backend objects are deleted */
 
-	UPDATE_RECT_SYSMETA(.delta_system_size = 0,
+	if (use_old_cloud_stat == TRUE) {
+		UPDATE_RECT_SYSMETA(.delta_system_size = 0,
 			    .delta_meta_size = metasize_blk -
 						(metasize + 4096),
 			    .delta_pinned_size = real_pin_size - est_pin_size,
@@ -911,13 +943,20 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 			    .delta_backend_meta_size = 0,
 			    .delta_backend_inodes = 0);
 
-	UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
+		UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
 			    .delta_meta_size = -(metasize + 4096),
 			    .delta_pinned_size = -est_pin_size,
 			    .delta_backend_size = 0,
 			    .delta_backend_meta_size = 0,
 			    .delta_backend_inodes = 0);
-
+	} else {
+		UPDATE_RESTORE_SYSMETA(.delta_system_size = -metasize,
+			    .delta_meta_size = -metasize_blk,
+			    .delta_pinned_size = -real_pin_size,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
+	}
 		/* FEATURE TODO: Now file meta size will be substracted
 		from total meta size as soon as the file is deleted, but
 		before the meta is actually deleted in to_delete folder.
@@ -1679,25 +1718,12 @@ errcode_handle:
 	unlink(plistmod);
 	return errcode;
 }
-/* FEATURE TODO: Need a notify and retry mechanism if network is down */
-int32_t run_download_minimal(void)
+
+/* Function for blocking execution until network is available again */
+int32_t check_network_connection(void)
 {
-	ino_t rootino;
-	char despath[METAPATHLEN];
-	char restore_todelete_list[METAPATHLEN];
-	char restore_tosync_list[METAPATHLEN];
-	DIR_META_TYPE tmp_head;
-	DIR_ENTRY_PAGE tmppage;
-	FILE *fptr;
-	int32_t errcode, count, ret;
-	ssize_t ret_ssize;
-	DIR_ENTRY *tmpentry;
-	BOOL is_fopen = FALSE;
-	int32_t retries_since_last_notify = 60;
+	int32_t retries_since_last_notify = 0;
 
-	/* Fetch quota value from backend and store in the restoration path */
-
-	/* First make sure that network connection is turned on */
 	while (hcfs_system->sync_paused == TRUE) {
 		write_log(4, "Connection is not available now\n");
 		write_log(4, "Sleep for 5 seconds before retrying\n");
@@ -1712,6 +1738,30 @@ int32_t run_download_minimal(void)
 		if (hcfs_system->system_going_down == TRUE)
 			return -ESHUTDOWN;
 	}
+
+	return 0;
+}
+
+int32_t run_download_minimal(void)
+{
+	ino_t rootino;
+	char despath[METAPATHLEN];
+	char restore_todelete_list[METAPATHLEN];
+	char restore_tosync_list[METAPATHLEN];
+	DIR_META_TYPE tmp_head;
+	DIR_ENTRY_PAGE tmppage;
+	FILE *fptr;
+	int32_t errcode, count, ret;
+	ssize_t ret_ssize;
+	DIR_ENTRY *tmpentry;
+	BOOL is_fopen = FALSE;
+
+	/* Fetch quota value from backend and store in the restoration path */
+
+	/* First make sure that network connection is turned on */
+	ret = check_network_connection();
+	if (ret < 0)
+		return ret;
 
 	_init_quota_restore();
 	ret = _restore_system_quota();

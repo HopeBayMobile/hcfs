@@ -1361,11 +1361,6 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
-	/* FEATURE TODO: maintain two types of FS_CLOUD_STAT_T. If
-	current fs_cloud_stat is old type, do not add on-disk size
-	for meta and pinned. Otherwise need to add two fields:
-	on-disk size for meta and on-disk size for pinned */
-
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
@@ -1387,6 +1382,8 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	if (fs_cloud_stat.pinned_size < 0)
 		fs_cloud_stat.pinned_size = 0;
 
+	/* If disk_pinned_size and disk_meta_size are -1, then the cloud stat
+	was converted from an old format */
 	if (fs_cloud_stat.disk_pinned_size >= 0) {
 		fs_cloud_stat.disk_pinned_size += disk_pin_size_delta;
 		if (fs_cloud_stat.disk_pinned_size < 0)
@@ -2232,6 +2229,50 @@ errcode_handle:
 		fclose(tar_ptr);
 		tar_ptr = NULL;
 	}
+	return errcode;
+}
+
+/* Function for converting cloud stat file at "path"
+to a newer version */
+int32_t convert_cloud_stat_struct(char *path)
+{
+	FS_CLOUD_STAT_T_V1 oldstruct;
+	FS_CLOUD_STAT_T newstruct;
+	struct stat tmpstruct;
+	FILE *fptr;
+	int32_t errcode, ret;
+	size_t ret_size;
+
+	if (stat(path, &tmpstruct) != 0) {
+		errcode = -errno;
+		return errcode;
+	}
+	if (tmpstruct.st_size != sizeof(FS_CLOUD_STAT_T_V1))
+		return 0;
+	/* Found a cloud stat with old format. Converting */
+	fptr = fopen(path, "r+");
+	if (fptr == NULL) {
+		errcode = -errno;
+		return errcode;
+	}
+
+	use_old_cloud_stat = TRUE;
+	FREAD(&oldstruct, sizeof(FS_CLOUD_STAT_T_V1), 1, fptr);
+	newstruct.backend_system_size = oldstruct.backend_system_size;
+	newstruct.backend_meta_size = oldstruct.backend_meta_size;
+	newstruct.backend_num_inodes = oldstruct.backend_num_inodes;
+	newstruct.max_inode = oldstruct.max_inode;
+	newstruct.pinned_size = oldstruct.pinned_size;
+	newstruct.disk_pinned_size = -1;
+	newstruct.disk_meta_size = -1;
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&newstruct, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fclose(fptr);
+	return 0;
+errcode_handle:
+	write_log(2, "Error when trying to convert cloud stat. (%d)\n",
+	          errcode);
+	fclose(fptr);
 	return errcode;
 }
 

@@ -512,14 +512,8 @@ void process_upgrade_meta_changes(void)
 {
 	DIR *dstream;
 	struct dirent *tmpentry;
-	FS_CLOUD_STAT_T_V1 oldstruct;
-	FS_CLOUD_STAT_T newstruct;
 	char tmppath[METAPATHLEN];
 	char tmppath1[METAPATHLEN];
-	struct stat tmpstruct;
-	FILE *fptr;
-	int32_t errcode, ret;
-	size_t ret_size;
 
 	/* Handle changes in FS_CLOUD_STAT_T */
 	snprintf(tmppath, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
@@ -531,29 +525,9 @@ void process_upgrade_meta_changes(void)
 	while ((tmpentry = readdir(dstream)) != NULL) {
 		snprintf(tmppath1, METAPATHLEN - 1, "%s/%s", tmppath,
 		         tmpentry->d_name);
-		if (stat(tmppath1, &tmpstruct) != 0)
-			goto end;
-		if (tmpstruct.st_size != sizeof(FS_CLOUD_STAT_T_V1))
-			continue;
-		/* Found a cloud stat with old format. Converting */
-		fptr = fopen(tmppath1, "r+");
-		if (fptr == NULL)
-			continue;
-		FREAD(&oldstruct, sizeof(FS_CLOUD_STAT_T_V1), 1, fptr);
-		newstruct.backend_system_size = oldstruct.backend_system_size;
-		newstruct.backend_meta_size = oldstruct.backend_meta_size;
-		newstruct.backend_num_inodes = oldstruct.backend_num_inodes;
-		newstruct.max_inode = oldstruct.max_inode;
-		newstruct.pinned_size = oldstruct.pinned_size;
-		newstruct.disk_pinned_size = -1;
-		newstruct.disk_meta_size = -1;
-		FSEEK(fptr, 0, SEEK_SET);
-		FWRITE(&newstruct, sizeof(FS_CLOUD_STAT_T), 1, fptr);
-errcode_handle:
-		fclose(fptr);
+		convert_cloud_stat_struct(tmppath1);
 	}
 
-end:
 	closedir(dstream);
 	return;
 }

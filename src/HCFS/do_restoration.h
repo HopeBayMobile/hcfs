@@ -38,6 +38,7 @@ char restore_blockpath[BLOCKPATHLEN];
 
 sem_t restore_sem, backup_pkg_sem;
 BOOL have_new_pkgbackup;
+BOOL use_old_cloud_stat;
 pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;
 
@@ -104,4 +105,5 @@ void update_restored_cache_usage(int64_t delta_cache_size,
 		int64_t delta_cache_blocks);
 int32_t rectify_space_usage();
 int32_t init_rectified_system_meta(char restoration_stage);
+int32_t check_network_connection(void);
 #endif  /* GW20_DO_RESTORATION_H_ */

@@ -41,6 +41,7 @@
 #include "metaops.h"
 #include "super_block.h"
 #include "rebuild_super_block.h"
+#include "do_restoration.h"
 
 /************************************************************************
 *
@@ -1140,16 +1141,25 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 {
 	int32_t ret, errcode;
 	struct timespec time_to_sleep;
+	int32_t retries_since_last_notify = 0;
+	int8_t flag;
 
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
+	time_to_sleep.tv_sec = 5;
+	time_to_sleep.tv_nsec = 0; /*5 sec sleep*/
 
+	flag = 0;
+	if (hcfs_system->system_restoring == RESTORING_STAGE1)
+		flag = 1;
+	if (hcfs_system->system_restoring == RESTORING_STAGE2)
+		flag = 2;
+	
 	if (CURRENT_BACKEND == NONE)
 		return -ENOTCONN;
 
 	ret = 0;
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->backend_is_online) {
+			retries_since_last_notify = 0;
 			flock(fileno(fptr), LOCK_EX);
 			FTRUNCATE(fileno(fptr), 0);
 			ret = fetch_from_cloud(fptr,
@@ -1164,6 +1174,18 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 
 			break;
 		} else {
+			write_log(4, "Connection is not available now\n");
+			write_log(4, "Sleep for 5 seconds before retrying\n");
+			/* Now will notify once every 5 minutes */
+			if (retries_since_last_notify >= 60) {
+				if (flag > 0)
+					notify_restoration_result(flag,
+					                          -ENETDOWN);
+				retries_since_last_notify = 0;
+			} else {
+				retries_since_last_notify++;
+			}
+
 			nanosleep(&time_to_sleep, NULL);
 		}
 	}
