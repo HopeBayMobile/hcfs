@@ -508,6 +508,29 @@ errcode_handle:
 	}
 }
 
+void process_upgrade_meta_changes(void)
+{
+	DIR *dstream;
+	struct dirent *tmpentry;
+	char tmppath[METAPATHLEN];
+	char tmppath1[METAPATHLEN];
+
+	/* Handle changes in FS_CLOUD_STAT_T */
+	snprintf(tmppath, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
+
+	dstream = opendir(tmppath);
+	if (dstream == NULL)
+		return;
+
+	while ((tmpentry = readdir(dstream)) != NULL) {
+		snprintf(tmppath1, METAPATHLEN - 1, "%s/%s", tmppath,
+		         tmpentry->d_name);
+		convert_cloud_stat_struct(tmppath1);
+	}
+
+	closedir(dstream);
+	return;
+}
 /************************************************************************
 *
 * Function name: main
@@ -539,11 +562,6 @@ int32_t main(int32_t argc, char **argv)
 	ENGINE_load_builtin_engines();
 	ENGINE_register_all_complete();
 #endif
-
-	/*TODO: Error handling after reading system config*/
-	/*TODO: Allow reading system config path from program arg */
-
-	/* TODO: Selection of backend type via configuration */
 
 	/* skip malloc if already did (in unittest) */
 	if (system_config == NULL) {
@@ -587,6 +605,9 @@ int32_t main(int32_t argc, char **argv)
 	}
 
 	UNUSED(curl_handle);
+
+	/* Convert meta changes if needed */
+	process_upgrade_meta_changes();
 
 	/* Check if the system is being restored (and in stage 2) */
 	/* FEATURE TODO: Check if the backend setting is correct before
