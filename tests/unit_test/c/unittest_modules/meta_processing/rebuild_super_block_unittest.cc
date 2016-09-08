@@ -10,6 +10,7 @@ extern "C" {
 #include "super_block.h"
 #include "global.h"
 #include "fuseop.h"
+#include "path_reconstruct.h"
 }
 #include <cstdlib>
 #include "rebuild_super_block_params.h"
@@ -343,7 +344,7 @@ TEST_F(wake_sb_rebuilderTest, WakeUpAllThreads)
 
 	nanosleep(&sleep_time, NULL);
 	wake_sb_rebuilder();
-	
+
 	/* Verify */
 	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
 		EXPECT_EQ(FALSE, rebuild_sb_tpool->thread[idx].active);
@@ -418,7 +419,7 @@ TEST_F(push_inode_jobTest, PushInodesInto_EmptyQueue)
 	pread(rebuild_sb_jobs->queue_fh, &verified_inodes,
 			sizeof(ino_t) * 5, 0);
 	EXPECT_EQ(0, memcmp(inodes, verified_inodes, sizeof(ino_t) * 5));
-	
+
 	close(rebuild_sb_jobs->queue_fh);
 }
 
@@ -819,15 +820,19 @@ protected:
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
 		sys_super_block->iofptr = open(sb_path, O_CREAT | O_RDWR, 0600);
 		NOW_TEST_RESTORE_META = TRUE;
+		NO_PARENTS = TRUE;
+		sem_init(&pathlookup_data_lock, 0, 1);
 	}
 	void TearDown()
 	{
 		NOW_TEST_RESTORE_META = FALSE;
+		NO_PARENTS = FALSE;
 		close(sys_super_block->iofptr);
 		free(sb_path);
 		free(sys_super_block);
 		unlink(sb_path);
 		system("rm -rf ./rebuild_sb_running_folder/*");
+		sem_destroy(&pathlookup_data_lock);
 	}
 };
 
@@ -864,6 +869,87 @@ TEST_F(restore_meta_super_block_entryTest, RestoreSuccess)
 	EXPECT_EQ(0, memcmp(&exp_entry, &test_entry,
 				sizeof(SUPER_BLOCK_ENTRY)));
 }
+
+TEST_F(restore_meta_super_block_entryTest, RestoreNoEntry_ModifySuperBlockStatus)
+{
+	ino_t inode;
+	SUPER_BLOCK_ENTRY exp_entry, test_entry;
+
+	/* Set flag */
+	RESTORED_META_NOT_FOUND = TRUE;
+
+	inode = 15;
+	memset(&exp_filemeta, 0, sizeof(FILE_META_TYPE));
+	exp_filemeta.local_pin = P_PIN;
+
+	/* Run */
+	EXPECT_EQ(-ENOENT, restore_meta_super_block_entry(inode, NULL));
+
+	/* Verify */
+	memset(&exp_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	exp_entry.status = TO_BE_RECLAIMED;
+	pread(sys_super_block->iofptr, &test_entry, sizeof(SUPER_BLOCK_ENTRY),
+			sizeof(SUPER_BLOCK_HEAD) + (inode - 1) *
+			sizeof(SUPER_BLOCK_ENTRY));
+	EXPECT_EQ(0, memcmp(&exp_entry, &test_entry,
+				sizeof(SUPER_BLOCK_ENTRY)));
+
+	/* Recovery */
+	RESTORED_META_NOT_FOUND = TRUE;
+}
+
 /**
  * End unittest of rebuild_super_block_entry()
+ */
+
+/**
+ * Unittest of prune_this_entry()
+ */
+class prune_this_entryTest: public ::testing::Test {
+protected:
+
+	void SetUp()
+	{
+		NO_PARENTS = FALSE;
+		sem_init(&pathlookup_data_lock, 0, 1);
+		remove_count = 0;
+	}
+
+	void TearDown()
+	{
+		for (int i = 0; i < remove_count; i++) {
+			free(remove_list[i]);
+			remove_list[i] = NULL;
+		}
+		sem_destroy(&pathlookup_data_lock);
+		remove_count = 0;
+	}
+};
+
+TEST_F(prune_this_entryTest, NoParents)
+{
+	ino_t this_inode = 10;
+
+	NO_PARENTS = TRUE;
+	EXPECT_EQ(0, prune_this_entry(this_inode));
+
+	NO_PARENTS = FALSE;
+}
+
+TEST_F(prune_this_entryTest, RemoveEntrySuccess)
+{
+	ino_t this_inode = 10;
+	char exp_name[200];
+
+	EXPECT_EQ(0, prune_this_entry(this_inode));
+
+	for (int i = 0; i < remove_count; i++) {
+		/* Entry name are recorded in dir_remove_entry() */
+		sprintf(exp_name, "test%d", i * 2 + 1);
+		ASSERT_EQ(exp_name, remove_list[i]);
+	}
+}
+
+/**
+ * End of unittest of prune_this_entry()
  */

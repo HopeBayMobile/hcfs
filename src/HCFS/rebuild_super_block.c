@@ -1020,7 +1020,7 @@ errcode_handle:
  * Given an inode number "this_inode", remove all entries in parent folders
  * and delete parent lookup table.
  */
-int32_t _prune_this_entry(ino_t this_inode)
+int32_t prune_this_entry(ino_t this_inode)
 {
 	ino_t *parentlist = NULL;
 	ino_t parent_inode;
@@ -1147,6 +1147,9 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 					sizeof(HCFS_STAT));
 		return 0;
 	}
+	if (sb_entry.status == TO_BE_RECLAIMED)
+		/* This file had been removed since object not found */
+		return -ENOENT;
 
 	/* Restore meta file */
 	ret = restore_meta_file(this_inode);
@@ -1156,7 +1159,16 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 		if (ret == -ENOENT) {
 			write_log(4, "Warn: Begin to remove inode %"PRIu64
 				" from parent", (uint64_t)this_inode);
-			_prune_this_entry(this_inode);
+			prune_this_entry(this_inode);
+			super_block_exclusive_locking();
+			read_super_block_entry(this_inode, &sb_entry);
+			if (sb_entry.status != TO_BE_RECLAIMED) {
+				/* Set status so that it will not be fetched
+				 * from backend again */
+				sb_entry.status = TO_BE_RECLAIMED;
+				write_super_block_entry(this_inode, &sb_entry);
+			}
+			super_block_exclusive_release();
 		}
 		write_log(2, "Warn: Fail to restore meta%"PRIu64". Code %d",
 			(uint64_t)this_inode, -ret);
