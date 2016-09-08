@@ -1,4 +1,4 @@
-set -x
+set -ex
 
 HCFSVOL=../CLI_utils/HCFSvol
 
@@ -14,9 +14,7 @@ dir=$MOUNT_DIR/tmp.dir
 reg=$MOUND_EXT/0/tmp.reg
 
 # check if using linux or not
-HCFSvol
-if [ $? -ne 0 ]; then
-	echo "NOOOOOOOOO"
+if ! HCFSvol; then
 	USERNAME=$(whoami)
 	GROUP=$(id -gn)
 	$HCFSVOL create app internal
