@@ -20,8 +20,8 @@ $repo/utils/setup_dev_env.sh -v -m docker_host
 
 # Prepare Docker build resources
 sudo git clean -dXf $repo
-rsync -av --delete $repo/utils/ $here/utils/
-cp -f $repo/tests/functional_test/requirements.txt $here/utils/
+rsync -av --delete $repo/utils/ $here/internal/build/utils/
+cp -f $repo/tests/functional_test/requirements.txt $here/internal/build/utils/
 
 docker build -t docker:5000/hcfs-buildbox .
 docker push docker:5000/hcfs-buildbox
