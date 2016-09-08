@@ -1147,9 +1147,13 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 					sizeof(HCFS_STAT));
 		return 0;
 	}
-	if (sb_entry.status == TO_BE_RECLAIMED)
-		/* This file had been removed since object not found */
+	if (sb_entry.status == TO_BE_RECLAIMED) {
+		/* This file had been removed since object not found, but
+		 * still need to try to prune entries for those parent relation
+		 * established after last pruning */
+		prune_this_entry(this_inode);
 		return -ENOENT;
+	}
 
 	/* Restore meta file */
 	ret = restore_meta_file(this_inode);
