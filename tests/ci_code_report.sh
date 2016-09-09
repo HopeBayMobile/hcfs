@@ -17,11 +17,6 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-if [ "${CI:-0}" -eq 1 ]; then
-	sudo git clean -dxf
-	pwd
-fi
-
 srcdir="$repo/src/HCFS $repo/src/pyhcfs"
 
 # Install dependencies
@@ -94,7 +89,6 @@ Report_clang_scan_build() {
 
 Style_Checking_With_hb_clint() {
 	hint ${FUNCNAME[0]}
-	set -x
 	cd $repo
 	find src -iregex '.*\.\(c\|h\|cpp\|cc\)' |\
 		xargs tests/code_checking/hb_clint.py \
