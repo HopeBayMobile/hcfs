@@ -80,11 +80,13 @@ function unittest()
 {
 	$repo/tests/unit_test/run_unittests
 }
+
 function ci-test()
 {
 	export CI=1
 	export CI_VERBOSE=true
 	$repo/tests/unit_test/run_unittests
+	$repo/tests/ci_code_report.sh
 }
 
 function lib()

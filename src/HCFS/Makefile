@@ -89,7 +89,7 @@ hcfs: $(OBJS)
 
 # compile and generate dependency info
 $(OBJS_DIR)/%.o: %.c | $(OBJS_DIR)
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@ -MMD -MF $@.d
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(realpath $<) -o $@ -MMD -MF $@.d
 
 $(OBJS_DIR):
 	mkdir -p $@

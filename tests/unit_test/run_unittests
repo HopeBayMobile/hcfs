@@ -43,7 +43,6 @@ unittest_report() {
 	cd $repo/tests/unit_test
 	gcovr -x -r $repo/src . > $repo/coverage.xml
 	sed -i "s@$repo/@@g" $repo/coverage.xml
-	gcovr -r $repo/src .
 }
 trap unittest_report ERR EXIT
 cd $here

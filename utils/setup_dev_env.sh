@@ -67,11 +67,33 @@ static_report() {
 	fi
 	packages+=" cloc"                      # Install cloc for check code of line
 	packages+=" mono-complete"             # Required mono and CCM for complexity
-	packages+=" clang-3.5"                 # clang Scan Build Reports
 	packages+=" colormake"                 # colorful logs
 	packages+=" parallel"                  # parallel check source code style
+	local CLANG_V=4.0
+	packages+=" clang-${CLANG_V}"
+
+	# Add repo for Clang Scan Build
+	if ! dpkg -s clang-${CLANG_V} >/dev/null 2>&1; then
+		source /etc/lsb-release
+		DIST=$DISTRIB_CODENAME
+		cat <<-EOF |
+		deb http://apt.llvm.org/${DIST}/ llvm-toolchain-${DIST} main
+		deb-src http://apt.llvm.org/${DIST}/ llvm-toolchain-${DIST} main
+		EOF
+		sudo tee /etc/apt/sources.list.d/llvm.list
+		curl http://apt.llvm.org/llvm-snapshot.gpg.key |\
+			sudo apt-key add -
+	fi
 }
 post_static_report() {
+
+	# Patch clang-format
+	if ! grep -q sys.setdefaultencoding \
+		/usr/share/vim/addons/syntax/clang-format-4.0.py; then
+		cd / && sudo patch -N -p0 < $here/clang-format.patch
+	fi
+
+	# Setup ci-tools
 	sudo mkdir -p /ci-tools
 	sudo chmod 777 /ci-tools
 	pushd /ci-tools
@@ -86,22 +108,25 @@ post_static_report() {
 		popd
 	fi
 	if [ ! -f oclint-0.8.1/bin/oclint ]; then
+		export https_proxy="http://10.0.1.5:8000"
 		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		unset https_proxy
 		tar -zxf oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 		rm -f oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 	fi
 
 	#### Install PMD for CPD(duplicate code)
-	if [ ! -d pmd-bin-5.2.2 ]; then
-		wget http://downloads.sourceforge.net/project/pmd/pmd/5.2.2/pmd-bin-5.2.2.zip
-		unzip pmd-bin-5.2.2.zip
-		rm -f pmd-bin-5.2.2.zip
+	if [ ! -d pmd-bin-5.5.1 ]; then
+		export https_proxy="http://10.0.1.5:8000"
+		wget http://nchc.dl.sourceforge.net/project/pmd/pmd/5.5.1/pmd-bin-5.5.1.zip
+		unset https_proxy
+		unzip pmd-bin-5.5.1.zip
+		rm -f pmd-bin-5.5.1.zip
 	fi
 
 	#### Install mono and CCM for complexity
 	if [ ! -f CCM.exe ]; then
-		https_proxy="http://10.0.1.5:8000" \
-			wget https://github.com/jonasblunck/ccm/releases/download/v1.1.11/ccm.1.1.11.zip
+		wget https://github.com/jonasblunck/ccm/releases/download/v1.1.11/ccm.1.1.11.zip
 		unzip ccm.1.1.11.zip
 		rm -f ccm.1.1.11.zip
 	fi
@@ -142,12 +167,15 @@ post_install_pip_packages() {
 }
 
 install_ccache() {
-	source /etc/lsb-release
-	if ! expr `ccache -V 2>&1 | sed -r -n -e "s/.* ([0-9.]+)$/\1/p"` \>= 3.2 2>/dev/null; then
+	local VER=`ccache -V 2>&1 | sed -r -n -e "s/.* ([0-9.]+)$/\1/p"`
+	if ! expr $VER \>= 3.2 2>/dev/null; then
 		force_install="$force_install ccache"
 	fi
+	local APT_VER=`apt-cache policy ccache 2>&1 | \
+		sed -r -n -e "/Candidate/s/.* ([0-9.]+).*/\1/p"`
 	if [ "$DISTRIB_RELEASE" = "14.04" ] && \
-		! expr `apt-cache policy ccache 2>&1 | sed -r -n -e "/Candidate/s/.* ([0-9.]+).*/\1/p"` \>= 3.2 2>/dev/null; then
+		! expr $APT_VER \>= 3.2 2>/dev/null; then
+		source /etc/lsb-release
 		echo "deb http://ppa.launchpad.net/comet-jc/ppa/ubuntu $DISTRIB_CODENAME main" \
 			| sudo tee /etc/apt/sources.list.d/comet-jc-ppa-trusty.list
 		sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 32EF5841642ADD17

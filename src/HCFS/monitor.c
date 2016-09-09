@@ -32,7 +32,7 @@
 
 CURL_HANDLE monitor_curl_handle;
 
-int32_t backoff_exponent = 0;
+int32_t backoff_exponent;
 
 void _write_monitor_loop_status_log(double duration)
 {
@@ -92,7 +92,7 @@ void *monitor_loop(void *ptr)
 	UNUSED(ptr);
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	srand( ts.tv_sec * 1000 * 1000 + ts.tv_nsec);
+	srand(ts.tv_sec * 1000 * 1000 + ts.tv_nsec);
 
 	monitor_curl_handle.curl_backend = NONE;
 	monitor_curl_handle.curl = NULL;
@@ -136,11 +136,12 @@ void *monitor_loop(void *ptr)
  *
  * Function name: check_backend_status
  *        Inputs: none
- *       Summary: 
+ *       Summary:
  *  Return value: none
  *
  *************************************************************************/
-int32_t check_backend_status(void) {
+int32_t check_backend_status(void)
+{
 	double test_duration = 0.0;
 	struct timespec test_stop, test_start;
 	BOOL status;
@@ -183,15 +184,15 @@ void destroy_monitor_loop_thread(void)
  *  Return value: double, duration between [start] and [end]
  *
  *************************************************************************/
-inline double diff_time(const struct timespec *start, const struct timespec *end)
+inline double diff_time(const struct timespec *start,
+			const struct timespec *end)
 {
 	struct timespec now;
 
-	if(end) {
+	if (end)
 		now = *end;
-	} else {
+	else
 		clock_gettime(CLOCK_REALTIME, &now);
-	}
 	return now.tv_sec - start->tv_sec +
 	       0.000000001 * (now.tv_nsec - start->tv_nsec);
 }
@@ -218,14 +219,13 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 
 	hcfs_system->backend_is_online = status;
 	update_sync_state();
-	if(status_changed)
+	if (status_changed)
 		sem_post(&(hcfs_system->monitor_sem));
 
 /* TODO FIXME: status_time is not used actually */
 	UNUSED(status_time);
-	if (status_time == NULL) {
+	if (status_time == NULL)
 		clock_gettime(CLOCK_REALTIME, &current_time);
-	}
 }
 
 void update_sync_state(void)
@@ -238,7 +238,8 @@ void update_sync_state(void)
 		if (hcfs_system->sync_paused == FALSE) {
 			hcfs_system->sync_paused = TRUE;
 			/* Wake up cache manager so that it will wake
-			 * all other sleeping threads up */
+			 * all other sleeping threads up
+			 */
 			sem_getvalue(&(hcfs_system->something_to_replace),
 					&num_replace);
 			if (num_replace == 0)

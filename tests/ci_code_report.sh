@@ -11,52 +11,60 @@
 ##########################################################################
 
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
-repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"
+repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && \
+		while [ ! -d .git ] ; do cd ..; done; pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-sudo git clean -dxf
-pwd
-whoami
-ls -la
+if [ "${CI:-0}" -eq 1 ]; then
+	sudo git clean -dxf
+	pwd
+fi
 
 srcdir="$repo/src/HCFS $repo/src/pyhcfs"
-testdir=$repo/tests
 
 # Install dependencies
-$repo/utils/setup_dev_env.sh -vm static_report
+$repo/utils/setup_dev_env.sh -m static_report
 
 hint () {
 	echo ==============================
 	echo ==============================
+	echo ==== $1
 	echo ==============================
-	echo $1
+	echo ==============================
 }
 
 Report_Oclint() {
 	hint ${FUNCNAME[0]}
-	PATH=$PATH:/ci-tools/oclint-0.8.1/bin:/usr/local/bin
-	for dir in $srcdir; do
-		bear make -j4 -C $dir
-		oclint-json-compilation-database . -- -report-type pmd -o $dir/oclint-report.xml || :
-		sed -i "s@$repo/@@g" $dir/oclint-report.xml
-	done
+	cd $repo
+	PATH=/ci-tools/oclint-0.8.1/bin:$PATH
+	bear make -s -B -l 2.5 -C src
+	maxPriority=9999
+	oclint-json-compilation-database . -- \
+		-max-priority-1=$maxPriority \
+		-max-priority-2=$maxPriority \
+		-max-priority-3=$maxPriority &
+	oclint-json-compilation-database . -- \
+		-max-priority-1=$maxPriority \
+		-max-priority-2=$maxPriority \
+		-max-priority-3=$maxPriority \
+		-report-type pmd \
+		-o oclint-report.xml 2>/dev/null &
+	wait
+	sed -i "s@$repo/@@g" oclint-report.xml
 }
 
 Report_CPD() {
 	hint ${FUNCNAME[0]}
-	for dir in $srcdir; do
-		LIB_DIR="" /ci-tools/pmd-bin-5.2.2/bin/run.sh cpd \
-			--minimum-tokens 100 --encoding UTF-8 --files $dir \
-			--format xml --language cpp \
-			> $dir/cpd-result.xml || return_code=$?
-		if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
-			echo pmd returns unknown error code $return_code
-			false
-		fi
-		sed -i "s@$repo/@@g" $repo/cpd-result.xml
-	done
+	cd $repo
+	LIB_DIR="" /ci-tools/pmd-bin-5.5.1/bin/run.sh cpd \
+		--files src \
+		--minimum-tokens 100 \
+		--encoding UTF-8 --language cpp \
+		--failOnViolation false \
+		--format xml \
+		| sed "s@$repo/@@g" > cpd-result.xml
 }
 
 Report_CLOC()
@@ -68,42 +76,43 @@ Report_CLOC()
 
 Report_CCM() {
 	hint ${FUNCNAME[0]}
-	mono /ci-tools/CCM.exe $repo/src /xml > $repo/ccm-result.xml
-	sed -i -e "s@<file>/@<file>src/HCFS/@g" \
+	cd $repo
+	mono /ci-tools/CCM.exe ./src /xml > ccm-result.xml
+	sed -i -e "s@<file>@<file>src@g" \
 		-e "/^WARNING:/d" \
 		-e "/^Using default runtime:/d" \
 		$repo/ccm-result.xml
 }
 
+Report_clang_scan_build() {
+	hint ${FUNCNAME[0]}
+	rm -rf $repo/clangScanBuildReports
+	scan-build-4.0 -o $repo/clangScanBuildReports \
+		make -B -l 2.5 -C $repo/src
+	find $repo/clangScanBuildReports -type f | xargs sed -i "s@$repo/@@g"
+}
+
 Style_Checking_With_hb_clint() {
 	hint ${FUNCNAME[0]}
-	find $srcdir -name "*.c" -or -name "*.cpp" |\
-		parallel --jobs 4 $testdir/code_checking/Style_Checking_With_hb_clint.py \
-		{} > $repo/Style_Checking_With_hb_clint.xml 2>&1 || :
-	sed -i "s@$repo/@@g" $repo/Style_Checking_With_hb_clint.xml
+	set -x
+	cd $repo
+	find src -iregex '.*\.\(c\|h\|cpp\|cc\)' |\
+		xargs tests/code_checking/hb_clint.py \
+		--counting=detailed --extensions=c,h,cpp,cc\
+		| tee hb_clint.xml 2>&1 || :
 }
 
 Style_Checking_With_checkpatch() {
 	hint ${FUNCNAME[0]}
-	find $srcdir -name "*.c" -or -name "*.cpp" |\
-		parallel --jobs 4 $testdir/code_checking/Style_Checking_With_checkpatch.pl \
-		--terse --no-tree --no-signoff -f {} || :
-}
-
-Report_clang_scan_build() {
-	hint ${FUNCNAME[0]}
-	for dir in $srcdir; do
-		rm -rf $repo/clangScanBuildReports
-		cd $dir
-		make clean
-		scan-build-3.5 -o $repo/clangScanBuildReports make -j4
-	done
+	find $srcdir -iregex '.*\.\(c\|h\|cpp\|cc\)' |\
+		xargs $repo/tests/code_checking/checkpatch.pl \
+		--terse --no-tree --no-signoff -f || :
 }
 
 Report_Oclint
-Report_clang_scan_build
 Report_CPD
 Report_CLOC
 Report_CCM
+Report_clang_scan_build
 Style_Checking_With_hb_clint
 Style_Checking_With_checkpatch
