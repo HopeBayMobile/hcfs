@@ -70,7 +70,7 @@ static_report() {
 	packages+=" colormake"                 # colorful logs
 	packages+=" parallel"                  # parallel check source code style
 	local CLANG_V=4.0
-	packages+=" clang-${CLANG_V}"
+	packages+=" clang-${CLANG_V} clang-format-${CLANG_V}"
 
 	# Add repo for Clang Scan Build
 	if ! dpkg -s clang-${CLANG_V} >/dev/null 2>&1; then
@@ -88,9 +88,11 @@ static_report() {
 post_static_report() {
 
 	# Patch clang-format
-	if ! grep -q sys.setdefaultencoding \
-		/usr/share/vim/addons/syntax/clang-format-4.0.py; then
-		cd / && sudo patch -N -p0 < $here/clang-format.patch
+	clang_format_py=/usr/share/vim/addons/syntax/clang-format-4.0.py
+	if [ -f $clang_format_py ] && \
+		! grep -q sys.setdefaultencoding $clang_format_py;
+	then
+		(cd / && sudo patch -N -p0 < $here/clang-format.patch)
 	fi
 
 	# Setup ci-tools
