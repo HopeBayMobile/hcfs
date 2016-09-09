@@ -30,6 +30,8 @@ class file_presentEnvironment : public ::testing::Environment {
 		}
 		void TearDown()
 		{
+			free(system_config->max_cache_limit);
+			free(system_config->max_pinned_limit);
 			free(system_config);
 		}
 };
