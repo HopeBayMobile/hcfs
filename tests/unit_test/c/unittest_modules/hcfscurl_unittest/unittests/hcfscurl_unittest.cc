@@ -20,6 +20,7 @@ void *set_swift_token(void *)
 	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
 	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
 	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+	return NULL;
 }
 
 class hcfscurlEnvironment : public ::testing::Environment {
