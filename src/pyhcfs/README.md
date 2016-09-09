@@ -1,6 +1,6 @@
 # Check result of this function
 * `list_volume`
-  * Return a list on success. 
+  * If success, it will return a list of tuples (**inode**, **volume type**, **volume name**).
   * If an error is encountered, a negative value is returned.
 
 * `parse_meta`, `list_dir_inorder`, `get_vol_usage`, `list_file_blocks`
