@@ -37,12 +37,11 @@ fi
 
 # Trigger Report processing on Exit
 unittest_report() {
-	set -x
-	find $repo/tests/unit_test/c/unittest_modules -name "test_detail_*.xml" | xargs sed -i "s@$repo/@@g"
+	find $repo/tests/unit_test -name "test_detail_*.xml" \
+		| xargs sed -i "s@$repo/@@g"
 	# coverage.xml
-	cd $repo/tests/unit_test
-	gcovr -x -r $repo/src . > $repo/coverage.xml
-	sed -i "s@$repo/@@g" $repo/coverage.xml
+	gcovr -x --root=$repo/src $repo/tests/unit_test \
+		| sed "s@$repo/@@g" > $repo/coverage.xml
 }
 trap unittest_report ERR EXIT
 cd $here
