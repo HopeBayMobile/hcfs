@@ -67,6 +67,7 @@ void convert_hcfsstat_to_sysstat(struct stat *ret_stat, HCFS_STAT *tmp_stat)
 }
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+// LCOV_EXCL_START
 void static_assert_test(void) {
 	_Static_assert(sizeof(HCFS_STAT)
 			+ sizeof(DIR_META_TYPE)
@@ -96,6 +97,7 @@ void static_assert_test(void) {
 	_Static_assert(sizeof(FILE_META_HEADER_v1) == 329, GUARDIAN_MSG);
 	_Static_assert(sizeof(SYMLINK_META_HEADER_v1) == 4357, GUARDIAN_MSG);
 }
+// LCOV_EXCL_STOP
 #pragma GCC diagnostic pop
 
 /* Helper function for setting timestamp(s) to the current time, in

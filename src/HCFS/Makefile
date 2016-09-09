@@ -68,6 +68,7 @@ OBJS_F := \
 	event_filter.o \
 	meta.o \
 	params.o \
+	fuse_notify.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

@@ -33,7 +33,7 @@
 * 2016/4/20 Jiahong adding dir handle operations to opendir / closedir
 * 2016/6/27 Jiahong adding file size limitation
 * 2016/8/1  Jethro moved init_hcfs_stat to meta.c
-*                  moved convert_hcfsstat_to_sysstat to meta.c 
+*                  moved convert_hcfsstat_to_sysstat to meta.c
 *
 **************************************************************************/
 
@@ -74,54 +74,59 @@
 #include <fuse/fuse_common.h>
 #include <fuse/fuse_opt.h>
 
-#include "global.h"
+#include "FS_manager.h"
+#include "api_interface.h"
+#include "atomic_tocloud.h"
+#include "dir_statistics.h"
+#include "do_fallocate.h"
 #include "file_present.h"
-#include "utils.h"
-#include "super_block.h"
-#include "params.h"
-#include "hcfscurl.h"
-#include "hcfs_tocloud.h"
-#include "meta_mem_cache.h"
 #include "filetables.h"
+#include "fuse_notify.h"
+#include "global.h"
 #include "hcfs_cacheops.h"
 #include "hcfs_fromcloud.h"
+#include "hcfs_tocloud.h"
+#include "hcfscurl.h"
 #include "logger.h"
-#include "macro.h"
-#include "xattr_ops.h"
-#include "mount_manager.h"
-#include "api_interface.h"
-#include "metaops.h"
 #include "lookup_count.h"
-#include "FS_manager.h"
-#include "atomic_tocloud.h"
+#include "macro.h"
+#include "meta.h"
+#include "meta_mem_cache.h"
+#include "metaops.h"
+#include "mount_manager.h"
+#include "params.h"
+#include "parent_lookup.h"
 #include "path_reconstruct.h"
 #include "pin_scheduling.h"
-#include "dir_statistics.h"
-#include "parent_lookup.h"
-#include "do_fallocate.h"
 #include "pkg_cache.h"
-#include "meta.h"
+#include "super_block.h"
+#include "utils.h"
+#include "xattr_ops.h"
 #ifndef _ANDROID_ENV_
 #include "fuseproc_comm.h"
 #include <attr/xattr.h>
 #endif
 
 /* Steps for allowing opened files / dirs to be accessed after deletion
-
-	1. in lookup_count, add a field "to_delete". rmdir, unlink
-will first mark this as true and if in forget() the count is dropped
-to zero, the inode is deleted.
-	2. to allow inode deletion fixes due to system crashing, a subfolder
-will be created so that the inode number of inodes to be deleted can be
-touched here, and removed when actually deleted.
-	3. in lookup_decrease, should delete nodes when lookup drops
-to zero (to save space in the int64_t run).
-	4. in unmount, can pick either scanning lookup table for inodes
-to delete or list the folder.
-*/
+ *
+ *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
+ *     mark this as true and if in forget() the count is dropped to zero,
+ *     the inode is deleted.
+ *
+ *  2. to allow inode deletion fixes due to system crashing, a subfolder
+ *     will be created so that the inode number of inodes to be deleted
+ *     can be touched here, and removed when actually deleted.
+ *
+ *  3. in lookup_decrease, should delete nodes when lookup drops to zero
+ *     (to save space in the int64_t run).
+ *
+ *  4. in unmount, can pick either scanning lookup table for inodes to
+ *     delete or list the folder.
+ */
 /* TODO: for mechanisms that needs timer, use per-process or per-thread
-cpu clock instead of using current time to avoid time changes due to
-ntpdate / ntpd or manual changes*/
+ * cpu clock instead of using current time to avoid time changes due to
+ * ntpdate / ntpd or manual changes
+ */
 
 /* TODO: Go over the details involving S_ISUID, S_ISGID, and linux capability
 	problems (involving chmod, chown, etc) */
@@ -274,8 +279,7 @@ int32_t check_permission_access(fuse_req_t req,
 
 	/*If this is the root check if exec is set for any for reg files*/
 	if ((temp_context->uid == 0) ||
-	    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE)
-	                == TRUE)) {
+	    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE) == TRUE)) {
 		if ((S_ISREG(thisstat->mode)) && (mode & X_OK)) {
 			if (!(thisstat->mode &
 				(S_IXUSR | S_IXGRP | S_IXOTH)))
@@ -445,7 +449,7 @@ static int32_t _lookup_pkg_cb(void *data, int32_t argc, char **argv, char **azCo
 {
 
 	size_t uid_len;
-	char **uid = (char**)data;
+	char **uid = (char **)data;
 
 	UNUSED(argc);
 	UNUSED(azColName);
@@ -461,7 +465,7 @@ static int32_t _lookup_pkg_cb(void *data, int32_t argc, char **argv, char **azCo
 static int32_t _lookup_pkg_status_cb(void *data, int32_t argc, char **argv, char **azColName)
 {
 
-	int32_t *res = (int32_t*)data;
+	int32_t *res = (int32_t *)data;
 
 	UNUSED(argc);
 	UNUSED(azColName);
@@ -518,9 +522,9 @@ int32_t lookup_pkg(char *pkgname, uid_t *uid)
 	}
 
 	/* Sql statement */
-	ret_code = sqlite3_exec(db, sql, _lookup_pkg_cb,
-	                        (void *)&data, &sql_err);
-	if( ret_code != SQLITE_OK ){
+	ret_code =
+	    sqlite3_exec(db, sql, _lookup_pkg_cb, (void *)&data, &sql_err);
+	if (ret_code != SQLITE_OK) {
 		write_log(4, "Query pkg uid err (sql statement) - %s\n", sql_err);
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
@@ -582,8 +586,8 @@ int32_t lookup_pkg_status(const char *pkgname, BOOL *ispin, BOOL *issys)
 
 	/* Sql statement */
 	ret_code = sqlite3_exec(db, sql, _lookup_pkg_status_cb,
-	                        (void *)status_code, &sql_err);
-	if( ret_code != SQLITE_OK ){
+				(void *)status_code, &sql_err);
+	if (ret_code != SQLITE_OK) {
 		write_log(4, "Query pkg status err (sql statement) - %s\n", sql_err);
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
@@ -670,7 +674,7 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 	tmptok = NULL;
 	tmptoksave = NULL;
 	write_log(10, "Debug rewrite stat inode %" PRIu64,
-	          (uint64_t) thisstat->ino);
+		  (uint64_t)thisstat->ino);
 	ret = construct_path(tmpptr->vol_path_cache, thisstat->ino,
 				&tmppath, tmpptr->f_ino);
 	if (ret < 0) {
@@ -849,7 +853,7 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 errcode_handle:
 	return errcode;
 }
-#endif
+#endif /* _ANDROID_ENV_ */
 
 /************************************************************************
 *
@@ -972,8 +976,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-        write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
-                        (uint64_t)parent_inode);
+	write_log(8, "Debug mknod: name %s, parent %" PRIu64 "\n", selfname,
+		  (uint64_t)parent_inode);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -1135,8 +1139,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-        write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
-                        (uint64_t)parent_inode);
+	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
+		  (uint64_t)parent_inode);
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
@@ -1266,19 +1270,19 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
+#ifdef _ANDROID_ENV_
+	ino_t this_inode;
+	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
+#endif
 	ino_t parent_inode;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
-#ifdef _ANDROID_ENV_
-	MOUNT_T *tmpptr;
-	ino_t this_inode;
-#endif
 	BOOL is_external = FALSE;
 
 	parent_inode = real_ino(req, parent);
-        write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
-                        (uint64_t)parent_inode);
+	write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
+		  (uint64_t)parent_inode);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1295,7 +1299,6 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 
 
 #ifdef _ANDROID_ENV_
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
@@ -1319,28 +1322,43 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
-		             is_external);
+	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry, is_external);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
 #ifdef _ANDROID_ENV_
 	this_inode = temp_dentry.d_ino;
 #endif
 
-	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry,
-				     is_external);
+	ret_val =
+	    unlink_update_meta(req, parent_inode, &temp_dentry, is_external);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-#ifdef _ANDROID_ENV_
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
-		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-						this_inode);
-#endif
 
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		ret_val =
+		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
+		/* Tell all other views that node is gone; if filename
+		 * has different case then tell all views */
+		ret_val = hfuse_ll_notify_delete_mp(
+		    tmpptr->chan_ptr, parent_inode, temp_dentry.d_ino,
+		    temp_dentry.d_name, strlen(selfname), selfname);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
+#endif
 	fuse_reply_err(req, -ret_val);
 }
 
@@ -1435,10 +1453,20 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type))
-		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-						this_inode);
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		ret_val =
+		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
 
+		/* Tell all other views that node is gone; if filename
+		 * has different case then tell all views */
+		ret_val = hfuse_ll_notify_delete_mp(
+		    tmpptr->chan_ptr, parent_inode, temp_dentry.d_ino,
+		    temp_dentry.d_name, strlen(selfname), selfname);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
 	/* TODO: Check if this still works for app to sdcard */
 	if (parent_inode == data_data_root) {
 		/*Check if need to cleanup package lookup cache */
@@ -1664,11 +1692,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
 
-        write_log(8, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
-                        (uint64_t)parent_inode1);
-        write_log(8, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
-                        (uint64_t)parent_inode2);
-
+	write_log(8, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
+		  (uint64_t)parent_inode1);
+	write_log(8, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
+		  (uint64_t)parent_inode2);
 
 	/* Reject if name too long */
 	if (strlen(selfname1) > MAX_FILENAME_LEN) {
@@ -2227,7 +2254,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				delta_meta_size1_blk + delta_meta_size2_blk,
 				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0,
-				delta_meta_size1 + delta_meta_size2 , 0);
+				  delta_meta_size1 + delta_meta_size2, 0);
 	}
 
 	fuse_reply_err(req, 0);
@@ -2817,8 +2844,9 @@ int32_t truncate_truncate(ino_t this_inode,
 		 * block. Otherwise it is an old dirty block */
 		block_dirty_size = (tmpstatus == ST_BOTH ? new_block_size :
 				new_block_size - old_block_size);
-		unpin_dirty_size = (P_IS_UNPIN(tempfilemeta->local_pin) ?
-				block_dirty_size: 0);
+		unpin_dirty_size =
+		    (P_IS_UNPIN(tempfilemeta->local_pin) ? block_dirty_size
+							 : 0);
 		change_system_meta(0, 0, new_block_size - old_block_size,
 				0, block_dirty_size, unpin_dirty_size, TRUE);
 
@@ -3635,7 +3663,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			out */
 			semval = 0;
 			ret = sem_getvalue(&(hcfs_system->something_to_replace),
-		              	     &semval);
+					   &semval);
 			if ((ret == 0) && (semval == 0))
 				sem_post(&(hcfs_system->something_to_replace));
 
@@ -3747,7 +3775,7 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 		return 0;
 	}
 	write_log(10, "Debug read status %d\n",
-	          (temppage).block_entries[entry_index].status);
+		  (temppage).block_entries[entry_index].status);
 
 	/* If status of the current block indicates the block file
 	may not exist locally, close the opened block file */
@@ -3757,8 +3785,9 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 	case ST_TODELETE:
 	case ST_CLOUD:
 	case ST_CtoL:
-		write_log(10, "Debug opened block %" PRIu64 ", bindex %"
-		          PRIu64 "\n", fh_ptr->opened_block, bindex);
+		write_log(10, "Debug opened block %" PRIu64 ", bindex %" PRIu64
+			      "\n",
+			  fh_ptr->opened_block, bindex);
 		if (fh_ptr->opened_block == bindex) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
@@ -3767,8 +3796,8 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 	default:
 		/* Close the cached file if paged out previously */
 		if (((temppage).block_entries[entry_index].paged_out_count !=
-		    fh_ptr->cached_paged_out_count) &&
-		    (fh_ptr->opened_block != -1)) { 
+		     fh_ptr->cached_paged_out_count) &&
+		    (fh_ptr->opened_block != -1)) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
 		}
@@ -3875,9 +3904,6 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 		}
 		PREAD(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size,
 		      offset);
-		//FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
-
-		//FREAD(buf, sizeof(char), size, fh_ptr->blockfptr);
 
 		this_bytes_read = (size_t) ret_ssize;
 		if (this_bytes_read < size) {
@@ -3987,7 +4013,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	/* Decide the true maximum bytes to read */
 	/* If read request will exceed the size of the file, need to
 	*  reduce the size of request */
-	if (temp_stat.size < (offset+ (off_t)size_org)) {
+	if (temp_stat.size < (offset + (off_t)size_org)) {
 		if (temp_stat.size > offset)
 			size = (size_t) (temp_stat.size - offset);
 		else
@@ -4009,7 +4035,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	*  the read */
 	/* Block indexing starts at zero */
 	start_block = (offset / MAX_BLOCK_SIZE);
-	end_block = ((offset+ ((off_t)size) -1) / MAX_BLOCK_SIZE);
+	end_block = ((offset + ((off_t)size) - 1) / MAX_BLOCK_SIZE);
 
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
@@ -4073,8 +4099,8 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		set_timestamp_now(&temp_stat, ATIME);
 
 		/* Write changes to disk but do not sync to backend */
-		ret = meta_cache_update_stat_nosync(fh_ptr->thisinode,
-		                       &temp_stat, fh_ptr->meta_cache_ptr);
+		ret = meta_cache_update_stat_nosync(
+		    fh_ptr->thisinode, &temp_stat, fh_ptr->meta_cache_ptr);
 		if (ret < 0) {
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -4477,8 +4503,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	default:
 		/* Close the cached file if paged out previously */
 		if (((temppage).block_entries[entry_index].paged_out_count !=
-		    fh_ptr->cached_paged_out_count) &&
-		    (fh_ptr->opened_block != -1)) { 
+		     fh_ptr->cached_paged_out_count) &&
+		    (fh_ptr->opened_block != -1)) {
 			fclose(fh_ptr->blockfptr);
 			fh_ptr->opened_block = -1;
 		}
@@ -4575,7 +4601,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 						*reterr = ret;
 						return 0;
 					/* Check status again */
-					} else if (ret > 0) { 
+					} else if (ret > 0) {
 						continue;
 					}
 				}
@@ -4708,8 +4734,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	}
 
 	PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
-	//FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
-	//FWRITE(buf, sizeof(char), size, fh_ptr->blockfptr);
 
 	this_bytes_written = (size_t) ret_ssize;
 	new_cache_size = check_file_size(thisblockpath);
@@ -4790,8 +4814,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	int64_t now_seq;
 	int64_t max_pinned_size;
 
-	write_log(10, "Debug write: size %zu, offset %lld\n", size,
-	          offset);
+	write_log(10, "Debug write: size %zu, offset %lld\n", size, offset);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -4907,9 +4930,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		hcfs_system->systemdata.system_quota);
 	write_log(10, "Write details: seq %lld\n", thisfilemeta.finished_seq);
 	write_log(10, "Write details: %d, %lld, %zu\n", thisfilemeta.local_pin,
-	          offset, size);
+		  offset, size);
 	write_log(10, "Write details: %lld, %lld, %f\n", temp_stat.size,
-	          hcfs_system->systemdata.pinned_size, max_pinned_size);
+		  hcfs_system->systemdata.pinned_size, max_pinned_size);
 	amount_preallocated = 0;
 	if (P_IS_PIN(thisfilemeta.local_pin) &&
 	    ((offset + (off_t)size) > temp_stat.size)) {
@@ -4917,7 +4940,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		pin_sizediff = round_size(offset + (off_t)size) -
 					round_size(temp_stat.size);
 		write_log(10, "Write details: %lld, %lld\n", pin_sizediff,
-		          (off_t) size);
+			  (off_t)size);
 		if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 			> max_pinned_size) {
 			sem_post(&(hcfs_system->access_sem));
@@ -5404,11 +5427,11 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			/* Need to wait for threads using this snapshot
 			to finish */
 			sem_getvalue(&(dirh_ptr->snap_ref_sem),
-			             &snap_access_val);
+				     &snap_access_val);
 			while (snap_access_val > 0) {
 				nanosleep(&snap_sleep, NULL);
 				sem_getvalue(&(dirh_ptr->snap_ref_sem),
-				             &snap_access_val);
+					     &snap_access_val);
 			}
 
 			sem_wait(&(system_fh_table.fh_table_sem));
@@ -5483,8 +5506,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			FREAD(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
 			      dirh_ptr->snapshot_ptr);
 		} else if ((tempmeta.total_children <=
-			                        (MAX_DIR_ENTRIES_PER_PAGE-2))
-		           && (page_start == 0)) {
+			    (MAX_DIR_ENTRIES_PER_PAGE - 2)) &&
+			   (page_start == 0)) {
 			ret = meta_cache_lookup_dir_data(this_inode, NULL,
 						NULL, &temp_page, body_ptr);
 			if (ret < 0) {
@@ -5552,7 +5575,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		/* Do not sync atime change to backend */
 		set_timestamp_now(&thisstat, ATIME);
 		ret = meta_cache_update_stat_nosync(this_inode, &thisstat,
-		                                     body_ptr);
+						    body_ptr);
 	}
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
@@ -5661,10 +5684,10 @@ void hfuse_ll_destroy(void *userdata)
 /* Helper for converting string to 64-bit mask */
 uint64_t str_to_mask(const char *input)
 {
-        int32_t count;
-        uint64_t tempout;
+	int32_t count;
+	uint64_t tempout;
 
-        tempout = 0;
+	tempout = 0;
 
         /* First compute the length of the mask */
 	if (strlen(input) < 16)
@@ -5684,7 +5707,7 @@ uint64_t str_to_mask(const char *input)
                 break;
         }
 
-        return tempout;
+	return tempout;
 }
 
 /* Helper for checking chown capability */
@@ -5698,27 +5721,27 @@ BOOL _check_capability(pid_t thispid, int32_t cap_to_check)
 	int32_t errcode;
 
 	snprintf(proc_status_path, sizeof(proc_status_path), "/proc/%d/status",
-	         thispid);
-        fptr = fopen(proc_status_path, "r");
+		 thispid);
+	fptr = fopen(proc_status_path, "r");
 	if (!fptr) {
 		errcode = errno;
-		write_log(4, "Cannot open %s. Code %d\n",
-				proc_status_path, errcode);
+		write_log(4, "Cannot open %s. Code %d\n", proc_status_path,
+			  errcode);
 		return FALSE;
 	}
 
-        do {
-                fgets(tmpstr, 80, fptr);
-                outptr = strtok_r(tmpstr, "\t", &saveptr);
-                if (strcmp(outptr, "CapEff:") == 0) {
-                        outptr = strtok_r(NULL, "\t", &saveptr);
+	do {
+		fgets(tmpstr, 80, fptr);
+		outptr = strtok_r(tmpstr, "\t", &saveptr);
+		if (strcmp(outptr, "CapEff:") == 0) {
+			outptr = strtok_r(NULL, "\t", &saveptr);
 			snprintf(outstr, sizeof(outstr), "%s", outptr);
-                        break;
-                } else {
-                        continue;
-                }
-        } while (!feof(fptr));
-        fclose(fptr);
+			break;
+		} else {
+			continue;
+		}
+	} while (!feof(fptr));
+	fclose(fptr);
 	/* Convert string to 64bit bitmask */
 	if (strlen(outstr) < 16) {
 		write_log(4, "Length of bitmask is shorter than expected\n");
@@ -6479,13 +6502,13 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	int32_t retcode;
 	HCFS_STAT stat_data;
 	ino_t this_inode;
-        MOUNT_T *tmpptr;
+	MOUNT_T *tmpptr;
 	struct fuse_ctx *temp_context;
 	int64_t old_metasize, new_metasize, delta_meta_size;
 	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	FILE_META_TYPE this_filemeta;
 
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+	tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 
 	this_inode = real_ino(req, ino);
 	xattr_page = NULL;
@@ -6538,20 +6561,20 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-                if (tmpptr->vol_path_cache == NULL) {
-                        fuse_reply_err(req, EIO);
-                        return;
-                }
-                _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
-        }
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &stat_data, NULL, NULL);
+	}
 #endif
 
-        temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
-        if (temp_context == NULL) {
-                fuse_reply_err(req, ENOMEM);
-                return;
-        }
+	temp_context = (struct fuse_ctx *)fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
 
 	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
 			WRITE_XATTR) < 0) {
@@ -6643,7 +6666,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	char *value;
 	struct fuse_ctx *temp_context;
 #ifdef _ANDROID_ENV_
-        MOUNT_T *tmpptr;
+	MOUNT_T *tmpptr;
 #endif
 
 	write_log(10, "hfuse_ll_getxattr %d\n", __LINE__);
@@ -6707,14 +6730,14 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-                if (tmpptr->vol_path_cache == NULL) {
-                        fuse_reply_err(req, EIO);
-                        return;
-                }
-                _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
-        }
+	tmpptr = (MOUNT_T *)fuse_req_userdata(req);
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &stat_data, NULL, NULL);
+	}
 #endif
 
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
@@ -6979,8 +7002,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 	HCFS_STAT stat_data;
 	struct fuse_ctx *temp_context;
 #ifdef _ANDROID_ENV_
-        MOUNT_T *tmpptr;
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+	MOUNT_T *tmpptr;
+	tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
 
 	this_inode = real_ino(req, ino);
@@ -7028,20 +7051,20 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		goto error_handle;
 
 #ifdef _ANDROID_ENV_
-        if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-                if (tmpptr->vol_path_cache == NULL) {
-                        fuse_reply_err(req, EIO);
-                        return;
-                }
-                _rewrite_stat(tmpptr, &stat_data, NULL, NULL);
-        }
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &stat_data, NULL, NULL);
+	}
 #endif
 
-        temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
-        if (temp_context == NULL) {
-                fuse_reply_err(req, ENOMEM);
-                return;
-        }
+	temp_context = (struct fuse_ctx *)fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
 
 	if (_xattr_permission(name_space, temp_context->pid, req, &stat_data,
 			WRITE_XATTR) < 0) {
@@ -7509,7 +7532,7 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int32_t mode,
 
 	old_file_size = newstat.size;
 	ret_val = do_fallocate(this_inode, &newstat, mode, offset, length,
-	                       &body_ptr, req);
+			       &body_ptr, req);
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
@@ -7640,10 +7663,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
-#ifndef _ANDROID_ENV_
+#ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
 	init_api_interface();
+
 	init_meta_cache_headers();
 	startup_finish_delete();
 	init_download_control();
@@ -7661,7 +7685,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	release_meta_cache_headers();
 	destroy_download_control();
 	destroy_pin_scheduler();
-#ifndef _ANDROID_ENV_
+#ifndef _ANDROID_ENV_ /* Not in Android */
 	destroy_fuse_proc_communication(communicate_tid, socket_fd);
 #endif
 	sync();

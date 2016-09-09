@@ -585,8 +585,10 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
-			const DIR_ENTRY *this_entry, BOOL is_external)
+int32_t unlink_update_meta(fuse_req_t req,
+			   ino_t parent_inode,
+			   const DIR_ENTRY *const this_entry,
+			   BOOL is_external)
 {
 	int32_t ret_val;
 	ino_t this_inode;

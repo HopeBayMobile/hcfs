@@ -654,7 +654,7 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t checkpin_handle(int32_t arg_len, char *largebuf)
+int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 {
 	ino_t target_inode;
 	int32_t retcode;
@@ -666,7 +666,6 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 	SYMLINK_META_TYPE linkmeta;
 	char is_local_pin = P_UNPIN;
 
-	UNUSED(arg_len);
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
 		  (uint64_t)target_inode);

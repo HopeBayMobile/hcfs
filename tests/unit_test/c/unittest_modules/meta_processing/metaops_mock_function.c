@@ -334,7 +334,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 	return;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 

@@ -778,7 +778,7 @@ int64_t longpow(int64_t base, int32_t power)
 	return r;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	UNUSED(level);
 	return 0;

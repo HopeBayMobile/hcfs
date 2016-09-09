@@ -2,7 +2,7 @@
 #include "mock_params.h"
 #include <inttypes.h>
 
-int write_log(int level, char *format, ...)
+int write_log(int level, const char *format, ...)
 {
 	return 0;
 }
