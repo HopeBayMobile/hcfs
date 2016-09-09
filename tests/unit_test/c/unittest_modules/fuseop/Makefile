@@ -22,6 +22,7 @@ $(eval $(call ADDMODULE))
 
 RERUN_TIMEOUT := 5
 $(eval $(call ADDTEST, fuseop_unittest, \
+  alias.o \
   fuseop.o \
   fake_meta_mem_cache.o \
   fake_misc.o \
