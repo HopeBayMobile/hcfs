@@ -90,10 +90,13 @@ Report_clang_scan_build() {
 Style_Checking_With_hb_clint() {
 	hint ${FUNCNAME[0]}
 	cd $repo
-	find src -iregex '.*\.\(c\|h\|cpp\|cc\)' |\
-		xargs tests/code_checking/hb_clint.py \
-		--counting=detailed --extensions=c,h,cpp,cc\
-		| tee hb_clint.xml 2>&1 || :
+	find src -iregex '.*\.\(c\|h\|cpp\|cc\)' \
+		| xargs tests/code_checking/hb_clint.py \
+		--counting=detailed \
+		--extensions=c,h,cpp,cc \
+		>hb_clint.xml 2>&1 &
+	echo Writing report to hb_clint.xml ...
+	wait
 }
 
 Style_Checking_With_checkpatch() {
