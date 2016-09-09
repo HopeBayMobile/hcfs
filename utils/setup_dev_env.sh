@@ -109,12 +109,11 @@ post_static_report() {
 		sudo make install
 		popd
 	fi
-	if [ ! -f oclint-0.8.1/bin/oclint ]; then
-		export https_proxy="http://10.0.1.5:8000"
-		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
-		unset https_proxy
-		tar -zxf oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
-		rm -f oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+	if [ ! -f oclint-0.10.3/bin/oclint ]; then
+		URL=https://github.com/oclint/oclint/releases/download/v0.10.3/oclint-0.10.3-x86_64-linux-3.13.0-74-generic.tar.gz
+		wget $URL
+		tar -zxf ${URL##*/}
+		rm -f ${URL##*/}
 	fi
 
 	#### Install PMD for CPD(duplicate code)

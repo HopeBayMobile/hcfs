@@ -33,7 +33,7 @@ hint () {
 Report_Oclint() {
 	hint ${FUNCNAME[0]}
 	cd $repo
-	PATH=/ci-tools/oclint-0.8.1/bin:$PATH
+	PATH=/ci-tools/oclint-0.10.3/bin:$PATH
 	bear make -s -B -l 2.5 -C src
 	maxPriority=9999
 	oclint-json-compilation-database . -- \
