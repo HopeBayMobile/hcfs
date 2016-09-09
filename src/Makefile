@@ -1,5 +1,5 @@
 
-TARGETS = API CLI_utils pyhcfs #HCFS
+TARGETS = API CLI_utils pyhcfs HCFS
 BUILD_TARGETS = $(addprefix build-,$(TARGETS))
 CLEAN_TARGETS = $(addprefix clean-,$(TARGETS))
 .PHONY: $(BUILD_TARGETS) $(CLEAN_TARGETS)
