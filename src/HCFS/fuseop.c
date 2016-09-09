@@ -1456,6 +1456,10 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
 
 		/* Tell all other views that node is gone; if filename
 		 * has different case then tell all views */

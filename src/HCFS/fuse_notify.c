@@ -243,7 +243,7 @@ void destory_hfuse_ll_notify_loop(void)
 
 void *hfuse_ll_notify_loop(void *ptr)
 {
-	FUSE_NOTIFY_DATA *data;
+	FUSE_NOTIFY_DATA *data = NULL;
 	int32_t func_num;
 
 	UNUSED(ptr);
@@ -258,12 +258,15 @@ void *hfuse_ll_notify_loop(void *ptr)
 			notify_fn[func_num](data, RUN);
 			write_log(10, "Debug %s: Notification is sent.\n",
 				  __func__);
+			free(data);
 		} else {
 			write_log(1, "Error %s: Dequeue failed\n", __func__);
 		}
 	}
 
-	write_log(1, "Debug %s: Loop end\n", __func__);
+	free(data);
+
+	write_log(10, "Debug %s: Loop end\n", __func__);
 	return NULL;
 }
 
