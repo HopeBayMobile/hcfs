@@ -7,8 +7,7 @@ export CCACHE_BASEDIR=/data
 export CCACHE_DIR=/ccache
 export CCACHE_UMASK=000
 export CCACHE_TEMPDIR=/ccache_tmp
-_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
-export PARALLEL_JOBS="-j`expr $_nr_cpu + $_nr_cpu`"
+export PARALLEL_JOBS="-l `nproc`.5"
 export USER=$(whoami)
 
 cd /data; source build/envsetup.sh

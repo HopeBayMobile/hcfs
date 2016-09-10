@@ -72,8 +72,12 @@ function parse_options()
 
 function set_PARALLEL_JOBS()
 {
-	_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
-	PARALLEL_JOBS=-j`expr $_nr_cpu + $_nr_cpu`
+	if hash nproc; then
+		_nr_cpu=`nproc`
+	else
+		_nr_cpu=`cat /proc/cpuinfo | grep processor | wc -l`
+	fi
+	export PARALLEL_JOBS="-l ${_nr_cpu}.5"
 }
 
 function unittest()

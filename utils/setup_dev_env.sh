@@ -16,7 +16,7 @@ CI_VERBOSE=false source $repo/utils/common_header.bash
 cd $repo
 
 configfile="$repo/utils/env_config.sh"
-if [[ ${CI:-0} = 1 || -f /.dockerinit && "$USER" = jenkins ]]; then
+if [[ ${CI:-0} = 1 && -f /.dockerinit && "$USER" = jenkins ]]; then
 	sudo chown -R jenkins:jenkins $repo/utils
 fi
 touch "$configfile"
@@ -101,7 +101,7 @@ post_static_report() {
 	pushd /ci-tools
 
 	#### Oclint
-	if ! bear 2>&1 >/dev/null; then
+	if ! hash bear; then
 		git clone --depth 1 https://github.com/rizsotto/Bear.git
 		pushd Bear
 		cmake .

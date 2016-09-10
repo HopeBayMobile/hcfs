@@ -3,12 +3,12 @@ include ../../build/ccache.mk
 CFLAGS=-D_ANDROID_ENV_ -D_FILE_OFFSET_BITS=64 -g -I../HCFS
 
 TARGET = demo_pyhcfs _pyhcfs.so
-all: $(TARGET)
+all: check_pkgs $(TARGET)
 
 _pyhcfs.so: | parser.c parser.h pyhcfs_build.py
-	python3 pyhcfs_build.py
-	mv -vf _pyhcfs.*.so _pyhcfs.so || :
-	rm -f _pyhcfs.c
+	@python3 pyhcfs_build.py
+	@mv -vf _pyhcfs.*.so _pyhcfs.so || :
+	@rm -f _pyhcfs.c
 
 demo_pyhcfs: demo_pyhcfs.o parser.o
 	cc $(CFLAGS) $^ -o $@
