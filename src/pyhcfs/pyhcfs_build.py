@@ -23,7 +23,7 @@ ffi.set_source( '_pyhcfs',
     #include "parser.h"
     """,
     include_dirs=[relpath("."), relpath("../HCFS")],
-    sources=[os.path.realpath("parser.c")],
+    sources=[relpath("parser.c")],
     extra_compile_args=['-D_ANDROID_ENV_', '-D_FILE_OFFSET_BITS=64'])
 
 # declare the functions, variables, etc. from the stuff in set_source
