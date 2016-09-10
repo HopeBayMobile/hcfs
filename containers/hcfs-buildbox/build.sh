@@ -16,12 +16,29 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $here
 
-$repo/utils/setup_dev_env.sh -v -m docker_host
+$repo/utils/setup_dev_env.sh -m docker_host
 
 # Prepare Docker build resources
 sudo git clean -dXf $repo
-rsync -av --delete $repo/utils/ $here/internal/build/utils/
-cp -f $repo/tests/functional_test/requirements.txt $here/internal/build/utils/
+
+if [ -f internal.tgz ]; then
+	rm -rf internal_last
+	mkdir -p internal_last && pushd internal_last
+	tar zxvf ../internal.tgz
+	popd
+fi
+
+rsync -ra -t --delete $repo/utils/ internal/utils/
+cp -f $repo/tests/functional_test/requirements.txt internal/utils/
+
+if ! diff -aru internal/ internal_last/; then
+	rm -f internal.tgz
+fi
+
+if [ ! -f internal.tgz ]; then
+	( cd internal/; tar zcvf ../internal.tgz * )
+fi
+
 
 docker build -t docker:5000/hcfs-buildbox .
 docker push docker:5000/hcfs-buildbox

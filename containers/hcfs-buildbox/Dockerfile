@@ -27,31 +27,27 @@ ENV TERM=xterm \
 RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	echo "jenkins:qwert1234" | chpasswd && \
 	echo "jenkins ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-ADD internal/home/jenkins/.ssh /home/jenkins/.ssh
-ADD internal/build /build
-RUN chown -R jenkins. /build /home/jenkins &&\
-	chmod -R a+rwX /home/jenkins && \
+ADD internal.tgz /
+RUN chown -R jenkins. /utils /home/jenkins && \
 	chmod 600 /home/jenkins/.ssh/*
 
 USER jenkins
-RUN CI=1 /build/utils/setup_dev_env.sh -m static_report
-RUN CI=1 /build/utils/setup_dev_env.sh -m unit_test
-RUN CI=1 /build/utils/setup_dev_env.sh -m functional_test
-RUN CI=1 /build/utils/setup_dev_env.sh -m docker_host
-RUN CI=1 /build/utils/setup_dev_env.sh -m install_ccache
+RUN CI=1 /utils/setup_dev_env.sh -m static_report
+RUN CI=1 /utils/setup_dev_env.sh -m unit_test
+RUN CI=1 /utils/setup_dev_env.sh -m functional_test
+RUN CI=1 /utils/setup_dev_env.sh -m docker_host
+RUN CI=1 /utils/setup_dev_env.sh -m install_ccache
 ENV USE_CCACHE=1 PATH="/usr/lib/ccache:$PATH"
-RUN CI=1 /build/utils/setup_dev_env.sh -m pyhcfs
+RUN CI=1 /utils/setup_dev_env.sh -m pyhcfs
 RUN sudo apt upgrade -y && sudo rm -rf /tmp/* /var/tmp/*
 
 # Setup NDK
 USER root
 WORKDIR /opt
 RUN umask 000 &&\
-	wget -N ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/android-ndk-r12b-linux-x86_64.zip &&\
-	unzip android-ndk-r12b-linux-x86_64.zip &&\
-	rm android-ndk-r12b-linux-x86_64.zip
+	URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/android-ndk-r12b-linux-x86_64.zip && \
+	wget -N $URL && unzip "${URL##*/}" && rm "${URL##*/}"
 ENV PATH=/opt/android-ndk-r12b/:$PATH
 
-USER  jenkins
 WORKDIR /home/jenkins
 EXPOSE 22

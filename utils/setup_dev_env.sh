@@ -16,9 +16,6 @@ CI_VERBOSE=false source $repo/utils/common_header.bash
 cd $repo
 
 configfile="$repo/utils/env_config.sh"
-if [[ ${CI:-0} = 1 && -f /.dockerinit && "$USER" = jenkins ]]; then
-	sudo chown -R jenkins:jenkins $repo/utils
-fi
 touch "$configfile"
 
 # A POSIX variable
@@ -110,26 +107,20 @@ post_static_report() {
 		popd
 	fi
 	if [ ! -f oclint-0.10.3/bin/oclint ]; then
-		URL=https://github.com/oclint/oclint/releases/download/v0.10.3/oclint-0.10.3-x86_64-linux-3.13.0-74-generic.tar.gz
-		wget $URL
-		tar -zxf ${URL##*/}
-		rm -f ${URL##*/}
+		URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/oclint-0.10.3-x86_64-linux-3.13.0-74-generic.tar.gz
+		wget $URL && tar -zxf ${URL##*/} && rm -f ${URL##*/}
 	fi
 
 	#### Install PMD for CPD(duplicate code)
 	if [ ! -d pmd-bin-5.5.1 ]; then
-		export https_proxy="http://10.0.1.5:8000"
-		wget http://nchc.dl.sourceforge.net/project/pmd/pmd/5.5.1/pmd-bin-5.5.1.zip
-		unset https_proxy
-		unzip pmd-bin-5.5.1.zip
-		rm -f pmd-bin-5.5.1.zip
+		URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/pmd-bin-5.5.1.zip
+		wget $URL && unzip ${URL##*/} && rm -f ${URL##*/}
 	fi
 
 	#### Install mono and CCM for complexity
 	if [ ! -f CCM.exe ]; then
-		wget https://github.com/jonasblunck/ccm/releases/download/v1.1.11/ccm.1.1.11.zip
-		unzip ccm.1.1.11.zip
-		rm -f ccm.1.1.11.zip
+		URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/ccm.1.1.11.zip
+		wget $URL && unzip ${URL##*/} && rm -f ${URL##*/}
 	fi
 
 	popd
@@ -190,7 +181,7 @@ docker_host() {
 post_install_docker() {
 	# skip is docker version is qualified
 	if hash docker && \
-		expr `docker version | sed -n -r -e "/Client/{N;s/[^0-9]*(.*)/\1/p}"` \>= 1.11.2 2>/dev/null; then
+		expr `docker version | sed -n -r -e "/Client/{N;s/[^0-9]*(.*)/\1/p}"` \>= 1.11.2 >&/dev/null; then
 		return
 	fi
 
