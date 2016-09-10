@@ -48,7 +48,10 @@ USER root
 WORKDIR /opt
 RUN umask 000 &&\
 	URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/android-ndk-r12b-linux-x86_64.zip && \
-	wget -N $URL && unzip "${URL##*/}" && rm "${URL##*/}"
+	wget -N $URL && \
+	unzip "${URL##*/}" && \
+	rm "${URL##*/}" && \
+	chmod -R a+rwX /opt/android-ndk-r12b
 ENV PATH=/opt/android-ndk-r12b/:$PATH
 
 WORKDIR /home/jenkins
