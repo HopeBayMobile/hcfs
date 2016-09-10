@@ -18,9 +18,7 @@ cd $here
 
 $repo/utils/setup_dev_env.sh -m docker_host
 
-# Prepare Docker build resources
-sudo git clean -dXf $repo
-
+set -x
 if [ -f internal.tgz ]; then
 	rm -rf internal_last
 	mkdir -p internal_last && pushd internal_last
@@ -32,6 +30,7 @@ rsync -ra -t --delete $repo/utils/ internal/utils/
 cp -f $repo/tests/functional_test/requirements.txt internal/utils/
 
 if ! diff -aru internal/ internal_last/; then
+	echo Update internal.tgz
 	rm -f internal.tgz
 fi
 
@@ -39,6 +38,10 @@ if [ ! -f internal.tgz ]; then
 	( cd internal/; tar zcvf ../internal.tgz * )
 fi
 
+# id_rsa
+if [ ! -f id_rsa ]; then
+	unzip id_rsa.zip
+fi
 
 docker build -t docker:5000/hcfs-buildbox .
 docker push docker:5000/hcfs-buildbox

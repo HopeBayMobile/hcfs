@@ -28,6 +28,8 @@ RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	echo "jenkins:qwert1234" | chpasswd && \
 	echo "jenkins ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 ADD internal.tgz /
+# For submodule pulling from gitlab
+COPY id_rsa /home/jenkins/.ssh/
 RUN chown -R jenkins. /utils /home/jenkins && \
 	chmod 600 /home/jenkins/.ssh/*
 
