@@ -13,11 +13,9 @@ RUN rm /etc/service/sshd/down
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 # APT Speedup
 RUN sed -i 's/archive.ubuntu.com/10.0.1.5:8001/g' /etc/apt/sources.list
+ENV TZ=Asia/Taipei TERM=xterm DEBIAN_FRONTEND=noninteractive
 # Time zone setup
-ENV TZ=Asia/Taipei
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-ENV TERM=xterm \
-	DEBIAN_FRONTEND=noninteractive
 
 #
 # Main image content
@@ -34,6 +32,8 @@ RUN chown -R jenkins. /utils /home/jenkins && \
 	chmod 600 /home/jenkins/.ssh/*
 
 USER jenkins
+RUN sudo apt upgrade -y && sudo rm -rf /tmp/* /var/tmp/*
+RUN CI=1 /utils/setup_dev_env.sh -m buildbox
 RUN CI=1 /utils/setup_dev_env.sh -m static_report
 RUN CI=1 /utils/setup_dev_env.sh -m unit_test
 RUN CI=1 /utils/setup_dev_env.sh -m functional_test
@@ -41,7 +41,6 @@ RUN CI=1 /utils/setup_dev_env.sh -m docker_host
 RUN CI=1 /utils/setup_dev_env.sh -m install_ccache
 ENV USE_CCACHE=1 PATH="/usr/lib/ccache:$PATH"
 RUN CI=1 /utils/setup_dev_env.sh -m pyhcfs
-RUN sudo apt upgrade -y && sudo rm -rf /tmp/* /var/tmp/*
 
 # Setup NDK
 USER root
@@ -53,6 +52,15 @@ RUN umask 000 &&\
 	rm "${URL##*/}" && \
 	chmod -R a+rwX /opt/android-ndk-r12b
 ENV PATH=/opt/android-ndk-r12b/:$PATH
+
+
+RUN { echo export \
+	TERM=xterm \
+	DEBIAN_FRONTEND=noninteractive \
+	USE_CCACHE=1 \
+	NDK_DIR=/opt/android-ndk-r12b \
+	PATH=/usr/lib/ccache:/opt/android-ndk-r12b:$PATH \
+	; } >> /etc/bash.bashrc
 
 WORKDIR /home/jenkins
 EXPOSE 22

@@ -214,13 +214,8 @@ post_pyhcfs() {
 	sudo -H pip3 install cffi pytest py
 }
 
-all() {
-	static_report
-	unit_test
-	functional_test
-	docker_host
-	install_ccache
-	pyhcfs
+buildbox() {
+	packages+=" rpcbind"
 }
 
 # init for each mode
