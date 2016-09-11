@@ -49,15 +49,13 @@ Report_Oclint() {
 	PATH=/ci-tools/oclint-0.10.3/bin:$PATH
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Writing report to ccm-result.xml at background ..."
-		{
-			bear make -s -B $PARALLEL_JOBS -C src
-			oclint-json-compilation-database . -- \
-				-max-priority-1=$threshold \
-				-max-priority-2=$threshold \
-				-max-priority-3=$threshold \
-				-report-type pmd \
-				| sed "s@$repo/@@g" > oclint-report.xml
-		} && echo ${FUNCNAME[0]} Done. || echo ${FUNCNAME[0]} Fail. &
+		bear make -B $PARALLEL_JOBS -C src
+		oclint-json-compilation-database . -- \
+			-max-priority-1=$threshold \
+			-max-priority-2=$threshold \
+			-max-priority-3=$threshold \
+			-report-type pmd \
+			| sed "s@$repo/@@g"
 	else
 		bear make -s -B $PARALLEL_JOBS -C src
 		oclint-json-compilation-database . -- \
@@ -125,7 +123,7 @@ Report_clang_scan_build() {
 	}
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Eunning clang_scan_build at background ..."
-		do_clang_scan &>/dev/null \
+		do_clang_scan \
 			&& echo ${FUNCNAME[0]} Done. \
 			|| echo ${FUNCNAME[0]} Fail. &
 	else

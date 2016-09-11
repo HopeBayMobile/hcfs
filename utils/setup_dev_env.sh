@@ -101,6 +101,7 @@ post_static_report() {
 	if ! hash bear; then
 		git clone --depth 1 https://github.com/rizsotto/Bear.git || :
 		pushd Bear
+		rm -f CMakeCache.txt
 		cmake .
 		make all
 		sudo make install
