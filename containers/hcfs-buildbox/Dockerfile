@@ -28,6 +28,16 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Main image content
 #
 
+# Setup NDK
+WORKDIR /opt
+RUN apt-get update && apt-get install unzip wget && \
+	URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/android-ndk-r12b-linux-x86_64.zip && \
+	wget -N $URL && \
+	unzip "${URL##*/}" && \
+	rm "${URL##*/}" && \
+	chmod -R a+rwX /opt/android-ndk-r12b
+ENV PATH=/opt/android-ndk-r12b/:$PATH
+
 # Jenkins slave user
 RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	echo "jenkins:qwert1234" | chpasswd && \
@@ -39,6 +49,8 @@ RUN chown -R jenkins. /utils /home/jenkins && \
 	chmod 600 /home/jenkins/.ssh/*
 
 USER jenkins
+ENV DOCKER_BUILD=1
+
 RUN sudo apt upgrade -y && sudo rm -rf /tmp/* /var/tmp/*
 RUN CI=1 /utils/setup_dev_env.sh -m buildbox
 RUN CI=1 /utils/setup_dev_env.sh -m static_report
@@ -48,17 +60,10 @@ RUN CI=1 /utils/setup_dev_env.sh -m docker_host
 RUN CI=1 /utils/setup_dev_env.sh -m install_ccache
 ENV USE_CCACHE=1 PATH="/usr/lib/ccache:$PATH"
 RUN CI=1 /utils/setup_dev_env.sh -m pyhcfs
+
+ENV DOCKER_BUILD=
 USER root
 
-# Setup NDK
-WORKDIR /opt
-RUN umask 000 &&\
-	URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/android-ndk-r12b-linux-x86_64.zip && \
-	wget -N $URL && \
-	unzip "${URL##*/}" && \
-	rm "${URL##*/}" && \
-	chmod -R a+rwX /opt/android-ndk-r12b
-ENV PATH=/opt/android-ndk-r12b/:$PATH
 WORKDIR /
 
 

@@ -43,7 +43,7 @@ function install_pkg (){
 		echo Running post-install tasks: $i
 		$i
 	done
-	if [ "${CI:-0}" -eq 1 ]; then
+	if [ "${DOCKER_BUILD:-0}" -eq 1 ]; then
 		sudo rm -rf /tmp/* /var/tmp/*
 	fi
 }
