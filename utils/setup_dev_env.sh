@@ -147,7 +147,7 @@ functional_test() {
 	fi
 	U=${SUDO_USER:-$USER}
 	if [[ -n "$U" && "$U" != root && `groups $U` != *fuse* ]]; then
-		sudo adduser $U fuse 
+		sudo adduser $U fuse
 	fi
 }
 post_install_pip_packages() {
@@ -215,7 +215,8 @@ post_pyhcfs() {
 }
 
 buildbox() {
-	packages+=" rpcbind"
+	packages+=" rpcbind nfs-common"
+	packages+=" zip"
 }
 
 # init for each mode

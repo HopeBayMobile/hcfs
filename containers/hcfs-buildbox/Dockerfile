@@ -2,7 +2,11 @@ FROM phusion/baseimage:0.9.18
 MAINTAINER Jethro Yu <jethro.yu@hopebaytech.com>
 
 # Use baseimage-docker's init system.
+# Export docker env to let jenkins docker salve to load them
+ENTRYPOINT ["/sbin/my_init", "--"]
 CMD ["/sbin/my_init"]
+RUN chmod 644 /etc/container_environment.sh
+EXPOSE 22
 
 #
 # Common settings
@@ -13,7 +17,10 @@ RUN rm /etc/service/sshd/down
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 # APT Speedup
 RUN sed -i 's/archive.ubuntu.com/10.0.1.5:8001/g' /etc/apt/sources.list
-ENV TZ=Asia/Taipei TERM=xterm DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Taipei \
+	TERM=xterm \
+	DEBIAN_FRONTEND=noninteractive
+
 # Time zone setup
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
@@ -41,9 +48,9 @@ RUN CI=1 /utils/setup_dev_env.sh -m docker_host
 RUN CI=1 /utils/setup_dev_env.sh -m install_ccache
 ENV USE_CCACHE=1 PATH="/usr/lib/ccache:$PATH"
 RUN CI=1 /utils/setup_dev_env.sh -m pyhcfs
+USER root
 
 # Setup NDK
-USER root
 WORKDIR /opt
 RUN umask 000 &&\
 	URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/android-ndk-r12b-linux-x86_64.zip && \
@@ -52,15 +59,6 @@ RUN umask 000 &&\
 	rm "${URL##*/}" && \
 	chmod -R a+rwX /opt/android-ndk-r12b
 ENV PATH=/opt/android-ndk-r12b/:$PATH
+WORKDIR /
 
 
-RUN { echo export \
-	TERM=xterm \
-	DEBIAN_FRONTEND=noninteractive \
-	USE_CCACHE=1 \
-	NDK_DIR=/opt/android-ndk-r12b \
-	PATH=/usr/lib/ccache:/opt/android-ndk-r12b:$PATH \
-	; } >> /etc/bash.bashrc
-
-WORKDIR /home/jenkins
-EXPOSE 22
