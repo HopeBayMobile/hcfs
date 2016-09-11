@@ -85,6 +85,22 @@ errcode_handle:
 
 /************************************************************************
 *
+* Function name: noop_write_file_function
+*        Inputs: void *ptr, size_t size, size_t nmemb, void *fstream
+*       Summary: Do nothing.
+*  Return value: Return 0.
+*
+*************************************************************************/
+size_t noop_write_file_function(_UNUSED void *ptr,
+				_UNUSED size_t size,
+				_UNUSED size_t nmemb,
+				_UNUSED void *fstream)
+{
+	return 0;
+}
+
+/************************************************************************
+*
 * Function name: parse_swift_auth_header
 *        Inputs: FILE *fptr
 *       Summary: Parse the HTTP header for auth requests and return HTTP
@@ -772,21 +788,22 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 
 	chunk = curl_slist_append(chunk, swift_auth_string);
 
-	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
-	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "HEAD");
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, noop_write_file_function);
+	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); /* do a HEAD request */
 
 	res = curl_easy_perform(curl);
 
