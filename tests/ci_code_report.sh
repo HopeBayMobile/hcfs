@@ -20,7 +20,7 @@ cd $repo
 srcdir="$repo/src/HCFS $repo/src/pyhcfs"
 
 # Install dependencies
-$repo/utils/setup_dev_env.sh -m static_report
+$repo/utils/setup_dev_env.sh -m static_report,pyhcfs
 
 hint () {
 	cat <<-EOF
@@ -49,7 +49,7 @@ Report_Oclint() {
 	PATH=/ci-tools/oclint-0.10.3/bin:$PATH
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Writing report to ccm-result.xml at background ..."
-		bear make -B $PARALLEL_JOBS -C src
+		bear make -B -C src
 		oclint-json-compilation-database . -- \
 			-max-priority-1=$threshold \
 			-max-priority-2=$threshold \
@@ -57,7 +57,7 @@ Report_Oclint() {
 			-report-type pmd \
 			| sed "s@$repo/@@g"
 	else
-		bear make -s -B $PARALLEL_JOBS -C src
+		bear make -s -B -C src
 		oclint-json-compilation-database . -- \
 			-max-priority-1=$threshold \
 			-max-priority-2=$threshold \
