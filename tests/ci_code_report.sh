@@ -57,7 +57,7 @@ Report_Oclint() {
 				-max-priority-3=$threshold \
 				-report-type pmd \
 				| sed "s@$repo/@@g" > oclint-report.xml
-		}&
+		} && echo ${FUNCNAME[0]} Done. || echo ${FUNCNAME[0]} Fail. &
 	else
 		bear make -s -B $PARALLEL_JOBS -C src
 		oclint-json-compilation-database . -- \
@@ -72,14 +72,16 @@ Report_CPD() {
 	if [[ ${CI:-0} = 1 ]]; then
 		hint ${FUNCNAME[0]}
 		echo "Writing report to cpd-result.xml at background ..."
-		cd $repo
-		LIB_DIR="" /ci-tools/pmd-bin-5.5.1/bin/run.sh cpd \
-			--files src \
-			--minimum-tokens 100 \
-			--encoding UTF-8 --language cpp \
-			--failOnViolation false \
-			--format xml \
-			| sed "s@$repo/@@g" >cpd-result.xml
+		{
+			cd $repo
+			LIB_DIR="" /ci-tools/pmd-bin-5.5.1/bin/run.sh cpd \
+				--files src \
+				--minimum-tokens 100 \
+				--encoding UTF-8 --language cpp \
+				--failOnViolation false \
+				--format xml \
+				| sed "s@$repo/@@g" >cpd-result.xml
+		} && echo ${FUNCNAME[0]} Done. || echo ${FUNCNAME[0]} Fail. &
 	fi
 }
 
@@ -87,10 +89,12 @@ Report_CLOC()
 {
 	if [[ ${CI:-0} = 1 ]]; then
 		hint ${FUNCNAME[0]}
-		cd $repo
-		echo "Writing report to cloc-result.xml at background ..."
-		cloc --by-file --xml src \
-		| sed "s@$repo/@@g" > cloc-result.xml
+		{
+			cd $repo
+			echo "Writing report to cloc-result.xml at background ..."
+			cloc --by-file --xml src \
+				| sed "s@$repo/@@g" > cloc-result.xml
+		} && echo ${FUNCNAME[0]} Done. || echo ${FUNCNAME[0]} Fail. &
 	fi
 }
 
@@ -98,12 +102,14 @@ Report_CCM() {
 	if [[ ${CI:-0} = 1 ]]; then
 		hint ${FUNCNAME[0]}
 		echo "Writing report to ccm-result.xml at background ..."
-		cd $repo
-		mono /ci-tools/CCM.exe ./src /xml \
-			| sed -e "s@<file>@<file>src@g" \
-			-e "/^WARNING:/d" \
-			-e "/^Using default runtime:/d" \
-			> ccm-result.xml
+		{
+			cd $repo
+			mono /ci-tools/CCM.exe ./src /xml \
+				| sed -e "s@<file>@<file>src@g" \
+				-e "/^WARNING:/d" \
+				-e "/^Using default runtime:/d" \
+				> ccm-result.xml
+		} && echo ${FUNCNAME[0]} Done. || echo ${FUNCNAME[0]} Fail. &
 	fi
 }
 
@@ -118,8 +124,10 @@ Report_clang_scan_build() {
 			| xargs sed -i "s@$repo/@@g"
 	}
 	if [[ ${CI:-0} = 1 ]]; then
-		echo "Writing report to hb_clint.xml at background ..."
-		do_clang_scan &>/dev/null
+		echo "Eunning clang_scan_build at background ..."
+		do_clang_scan &>/dev/null \
+			&& echo ${FUNCNAME[0]} Done. \
+			|| echo ${FUNCNAME[0]} Fail. &
 	else
 		do_clang_scan
 	fi
@@ -133,11 +141,13 @@ Style_Checking_With_hb_clint() {
 		find src -iregex '.*\.\(c\|h\|cpp\|cc\)' \
 			| xargs tests/code_checking/hb_clint.py \
 			--counting=detailed \
-			--extensions=c,h,cpp,cc
+			--extensions=c,h,cpp,cc || :
 	}
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Writing report to hb_clint.xml at background ..."
-		do_hb_clint > hb_clint.xml 2>&1
+		do_hb_clint > hb_clint.xml \
+			&& echo ${FUNCNAME[0]} Done. \
+			|| echo ${FUNCNAME[0]} Fail. &
 	else
 		do_hb_clint || :
 	fi
