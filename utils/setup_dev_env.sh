@@ -99,7 +99,7 @@ post_static_report() {
 
 	#### Oclint
 	if ! hash bear; then
-		git clone --depth 1 https://github.com/rizsotto/Bear.git
+		git clone --depth 1 https://github.com/rizsotto/Bear.git || :
 		pushd Bear
 		cmake .
 		make all
@@ -220,6 +220,7 @@ buildbox() {
 }
 
 # init for each mode
+packages=""
 for i in $(echo $setup_dev_env_mode | sed "s/,/ /g")
 do
 	echo "Setup for $i mode"

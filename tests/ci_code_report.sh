@@ -23,11 +23,13 @@ srcdir="$repo/src/HCFS $repo/src/pyhcfs"
 $repo/utils/setup_dev_env.sh -m static_report
 
 hint () {
-	echo ""
-	echo "=============================="
-	echo "==== $1"
-	echo "=============================="
-	echo ""
+	cat <<-EOF
+
+	==============================
+	==== $1
+	==============================
+
+	EOF
 }
 
 set_PARALLEL_JOBS()
@@ -48,13 +50,12 @@ Report_Oclint() {
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Writing report to ccm-result.xml at background ..."
 		{
-			bear make -s -B $PARALLEL_JOBS -C src &>/dev/null
+			bear make -s -B $PARALLEL_JOBS -C src
 			oclint-json-compilation-database . -- \
 				-max-priority-1=$threshold \
 				-max-priority-2=$threshold \
 				-max-priority-3=$threshold \
 				-report-type pmd \
-				2>/dev/null \
 				| sed "s@$repo/@@g" > oclint-report.xml
 		}&
 	else
@@ -77,8 +78,8 @@ Report_CPD() {
 			--minimum-tokens 100 \
 			--encoding UTF-8 --language cpp \
 			--failOnViolation false \
-			--format xml 2>/dev/null \
-			| sed "s@$repo/@@g" >cpd-result.xml &
+			--format xml
+			| sed "s@$repo/@@g" >cpd-result.xml
 	fi
 }
 
@@ -89,7 +90,7 @@ Report_CLOC()
 		cd $repo
 		echo "Writing report to cloc-result.xml at background ..."
 		cloc --by-file --xml src \
-		| sed "s@$repo/@@g" > cloc-result.xml &
+		| sed "s@$repo/@@g" > cloc-result.xml
 	fi
 }
 
@@ -102,7 +103,7 @@ Report_CCM() {
 			| sed -e "s@<file>@<file>src@g" \
 			-e "/^WARNING:/d" \
 			-e "/^Using default runtime:/d" \
-			> ccm-result.xml &
+			> ccm-result.xml
 	fi
 }
 
@@ -118,7 +119,7 @@ Report_clang_scan_build() {
 	}
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Writing report to hb_clint.xml at background ..."
-		do_clang_scan &>/dev/null &
+		do_clang_scan &>/dev/null
 	else
 		do_clang_scan
 	fi
@@ -136,7 +137,7 @@ Style_Checking_With_hb_clint() {
 	}
 	if [[ ${CI:-0} = 1 ]]; then
 		echo "Writing report to hb_clint.xml at background ..."
-		do_hb_clint > hb_clint.xml 2>&1 &
+		do_hb_clint > hb_clint.xml 2>&1
 	else
 		do_hb_clint || :
 	fi
