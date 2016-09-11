@@ -78,7 +78,7 @@ Report_CPD() {
 			--minimum-tokens 100 \
 			--encoding UTF-8 --language cpp \
 			--failOnViolation false \
-			--format xml
+			--format xml \
 			| sed "s@$repo/@@g" >cpd-result.xml
 	fi
 }
