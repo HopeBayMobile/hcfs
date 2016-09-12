@@ -52,9 +52,9 @@ clean:
 
 # compile and generate dependency info
 $(OBJS_DIR)%.o: %.c | $(OBJS_DIR)
-	$(CC) -c $(CFLAGS) $< -o $@ -MMD -MF $@.d
+	$(CC) -c $(CFLAGS) $(realpath $<) -o $@ -MMD -MF $@.d
 
 $(OBJS_DIR):
-	mkdir $@
+	mkdir -p $@
 
 -include $(deps)
