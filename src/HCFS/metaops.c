@@ -1311,7 +1311,8 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta,
 
 /* Helper function to check if this inode had been synced to cloud. */
 static inline int32_t _check_meta_on_cloud(ino_t this_inode,
-		char d_type, BOOL *meta_on_cloud)
+		char d_type, BOOL *meta_on_cloud,
+		int64_t *metasize, int64_t *metalocalsize)
 {
 	char thismetapath[400];
 	char thisprofilepath[400];
@@ -1320,6 +1321,7 @@ static inline int32_t _check_meta_on_cloud(ino_t this_inode,
 	CLOUD_RELATED_DATA this_clouddata;
 	off_t offset;
 	ssize_t ret_ssize;
+	struct stat tmpstat;
 
 	if (CURRENT_BACKEND == NONE) {
 		*meta_on_cloud = FALSE;
@@ -1333,15 +1335,21 @@ static inline int32_t _check_meta_on_cloud(ino_t this_inode,
 	if (ret < 0)
 		return ret;
 
+	ret = stat(thismetapath, &tmpstat);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		return -errcode;
+	}
+	*metasize = tmpstat.st_size;
+	*metalocalsize = tmpstat.st_blocks * 512;
+
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
 		errcode = errno;
-		if (errcode == ENOENT)
-			write_log(0, "In %s. Meta file %s had been removed.",
-				__func__, thismetapath);
-		else
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
 
@@ -1445,9 +1453,6 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
-	/* TODO - also check todelete dir */
-	get_meta_size(this_inode, &metasize, &metasize_blk);
-
 	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
@@ -1457,9 +1462,16 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			return ret;
 
 		ret = _check_meta_on_cloud(this_inode, d_type,
-				&meta_on_cloud);
-		if (ret < 0)
-				return ret;
+				&meta_on_cloud, &metasize, &metasize_blk);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(0, "Inode %"PRIu64"%s. %s",
+					"marked delete but meta file wasn't existed.",
+					"Remove it from markdelete folder.");
+				ret = disk_cleardelete(this_inode, root_inode);
+			}
+			return ret;
+		}
 		if (!meta_on_cloud) {
 			/* Remove it and reclaim inode */
 			ret = directly_delete_inode_meta(this_inode);
@@ -1512,8 +1524,15 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+			if (errno == ENOENT) {
+				write_log(0, "Inode %"PRIu64"%s. %s",
+					"marked delete but meta file wasn't existed.",
+					"Remove it from markdelete folder.");
+				ret = disk_cleardelete(this_inode, root_inode);
+			} else {
+				write_log(0, "IO error in %s. Code %d, %s\n",
+					__func__, errcode, strerror(errcode));
+			}
 			return -errcode;
 		}
 
@@ -1623,26 +1642,22 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			hcfs_system->systemdata.system_size = 0;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
-		if (mptr != NULL) {
-			change_mount_stat(mptr, -this_inode_stat.size,
-					-metasize, -1);
-		} else {
-			tmpstat.num_inodes--;
-			tmpstat.system_size -=
-				(this_inode_stat.size + metasize);
-			tmpstat.meta_size -= metasize;
-			tmpstat.num_inodes -= 1;
-		}
-
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 
 		/* Remove to-delete meta if no backend or
 		 * this inode hadn't been synced */
 		ret = _check_meta_on_cloud(this_inode, d_type,
-				&meta_on_cloud);
-		if (ret < 0)
+				&meta_on_cloud, &metasize, &metasize_blk);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(0, "Inode %"PRIu64"%s. %s",
+					"marked delete but meta file wasn't existed.",
+					"Remove it from markdelete folder.");
+				ret = disk_cleardelete(this_inode, root_inode);
+			}
 			return ret;
+		}
 		if (!meta_on_cloud) {
 			fetch_todelete_path(targetmetapath, this_inode);
 			ret = unlink(targetmetapath);
@@ -1672,6 +1687,17 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 						(uint64_t)this_inode, errno);
 				return ret;
 			}
+		}
+
+		if (mptr != NULL) {
+			change_mount_stat(mptr, -this_inode_stat.size,
+					-metasize, -1);
+		} else {
+			tmpstat.num_inodes--;
+			tmpstat.system_size -=
+				(this_inode_stat.size + metasize);
+			tmpstat.meta_size -= metasize;
+			tmpstat.num_inodes -= 1;
 		}
 		break;
 

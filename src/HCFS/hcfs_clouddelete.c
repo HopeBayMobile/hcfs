@@ -464,6 +464,8 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempfilemeta.root_inode;
+		*meta_size_change = tempstat.st_size;
+		*backend_size_change = temphcfsstat.size + *meta_size_change;
 
 	} else if (S_ISDIR(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
@@ -471,6 +473,8 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempdirmeta.root_inode;
+		*meta_size_change = tempstat.st_size;
+		*backend_size_change = temphcfsstat.size + *meta_size_change;
 
 	} else if (S_ISLNK(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
@@ -478,6 +482,8 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempsymmeta.root_inode;
+		*meta_size_change = tempstat.st_size;
+		*backend_size_change = *meta_size_change;
 
 	} else {
 		write_log(0, "Error: Unknown type %d\n", this_mode);
@@ -486,8 +492,6 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 	}
 
 	fclose(metafptr);
-	*meta_size_change = tempstat.st_size;
-	*backend_size_change = temphcfsstat.size + *meta_size_change;
 
 	return 0;
 
@@ -508,7 +512,6 @@ errcode_handle:
 *************************************************************************/
 void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
-	char thismetapath[400];
 	char backend_metapath[400];
 	char objname[500];
 	ino_t this_inode;
@@ -572,7 +575,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 					" inode_%"PRIu64"\n",
 					(uint64_t)this_inode);
 			_check_del_progress_file(this_inode);
-			unlink(thismetapath);
 			super_block_delete(this_inode);
 			super_block_reclaim();
 		}
@@ -588,9 +590,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			&meta_size_change);
 	if (ret < 0) {
 		write_log(0, "Error: Meta %s cannot be read. Code %d\n",
-				thismetapath, -ret);
+				backend_metapath, -ret);
 		_check_del_progress_file(this_inode);
-		unlink(thismetapath);
+		fclose(backend_metafptr);
+		unlink(backend_metapath);
 		super_block_delete(this_inode);
 		super_block_reclaim();
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
@@ -783,7 +786,6 @@ errcode_handle:
 			-meta_size_change, -1, pin_size_delta);
 
 	_check_del_progress_file(this_inode);
-	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
 	dsync_ctl.threads_finished[which_dsync_index] = TRUE;
