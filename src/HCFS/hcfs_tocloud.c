@@ -2302,6 +2302,8 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 			FSEEK(fptr, 0, SEEK_SET);
 			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 		}
+		/* TODO: How to validate cloud statistics if this
+		happens */
 		fsync(fileno(fptr));
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
