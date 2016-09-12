@@ -1347,12 +1347,15 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
  * @param fs_meta_size_delta Amount of meta size change in backend spsace.
  * @param fs_num_inodes_delta Delta of # of inodes in backend space.
  * @param fs_pin_size_delta Amount of pin size change in backend space.
+ * @param disk_pin_size_delta Amount of pin size change stored locally.
+ * @param disk_meta_size_delta Amount of meta size change stored locally.
  *
  * @return 0 on success, otherwise negative error code.
  */
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
-		int64_t fs_pin_size_delta)
+		int64_t fs_pin_size_delta, int64_t disk_pin_size_delta,
+		int64_t disk_meta_size_delta)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -1378,6 +1381,20 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.pinned_size += fs_pin_size_delta;
 	if (fs_cloud_stat.pinned_size < 0)
 		fs_cloud_stat.pinned_size = 0;
+
+	/* If disk_pinned_size and disk_meta_size are -1, then the cloud stat
+	was converted from an old format */
+	if (fs_cloud_stat.disk_pinned_size >= 0) {
+		fs_cloud_stat.disk_pinned_size += disk_pin_size_delta;
+		if (fs_cloud_stat.disk_pinned_size < 0)
+			fs_cloud_stat.disk_pinned_size = 0;
+	}
+
+	if (fs_cloud_stat.disk_meta_size >= 0) {
+		fs_cloud_stat.disk_meta_size += disk_meta_size_delta;
+		if (fs_cloud_stat.disk_meta_size < 0)
+			fs_cloud_stat.disk_meta_size = 0;
+	}
 
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
@@ -2212,6 +2229,50 @@ errcode_handle:
 		fclose(tar_ptr);
 		tar_ptr = NULL;
 	}
+	return errcode;
+}
+
+/* Function for converting cloud stat file at "path"
+to a newer version */
+int32_t convert_cloud_stat_struct(char *path)
+{
+	FS_CLOUD_STAT_T_V1 oldstruct;
+	FS_CLOUD_STAT_T newstruct;
+	struct stat tmpstruct;
+	FILE *fptr;
+	int32_t errcode, ret;
+	size_t ret_size;
+
+	if (stat(path, &tmpstruct) != 0) {
+		errcode = -errno;
+		return errcode;
+	}
+	if (tmpstruct.st_size != sizeof(FS_CLOUD_STAT_T_V1))
+		return 0;
+	/* Found a cloud stat with old format. Converting */
+	fptr = fopen(path, "r+");
+	if (fptr == NULL) {
+		errcode = -errno;
+		return errcode;
+	}
+
+	use_old_cloud_stat = TRUE;
+	FREAD(&oldstruct, sizeof(FS_CLOUD_STAT_T_V1), 1, fptr);
+	newstruct.backend_system_size = oldstruct.backend_system_size;
+	newstruct.backend_meta_size = oldstruct.backend_meta_size;
+	newstruct.backend_num_inodes = oldstruct.backend_num_inodes;
+	newstruct.max_inode = oldstruct.max_inode;
+	newstruct.pinned_size = oldstruct.pinned_size;
+	newstruct.disk_pinned_size = -1;
+	newstruct.disk_meta_size = -1;
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&newstruct, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fclose(fptr);
+	return 0;
+errcode_handle:
+	write_log(2, "Error when trying to convert cloud stat. (%d)\n",
+	          errcode);
+	fclose(fptr);
 	return errcode;
 }
 

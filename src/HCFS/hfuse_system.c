@@ -57,6 +57,7 @@
 #include "event_notification.h"
 #include "syncpoint_control.h"
 #include "do_restoration.h"
+#include "rebuild_super_block.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -444,6 +445,92 @@ and then create a new blockpath */
 	return 0;
 }
 
+/* Function for queueing inodes marked as todelete in restoration stage 1
+to the to_delete list in super block in stage 2. */
+void _mark_sb_to_delete(void)
+{
+	int64_t count, count2, num_todelete;
+	ino_t rootino, todelete_inode;
+	char restore_todelete_list[METAPATHLEN];
+	char todelete_metapath[METAPATHLEN];
+	FILE *to_delete_fptr = NULL, *metafptr = NULL;
+	struct stat tmpstat;
+	int32_t ret, errcode;
+	size_t ret_size;
+	HCFS_STAT tmphcfsstat;
+
+	if (ROOT_INFO.num_roots <= 0)
+		return;
+	for (count = 0; count < ROOT_INFO.num_roots; count++) {
+		rootino = ROOT_INFO.roots[count];
+
+		snprintf(restore_todelete_list, METAPATHLEN,
+			"%s/todelete_list_%" PRIu64,
+		         METAPATH, (uint64_t) rootino);
+		/* Skip the todelete list if does not exist or
+		cannot access */
+		if (access(restore_todelete_list, F_OK) < 0)
+			continue;
+		ret = stat(restore_todelete_list, &tmpstat);
+		if (ret < 0)
+			continue;
+		if (tmpstat.st_size == 0) {
+			unlink(restore_todelete_list);
+			continue;
+		}
+		num_todelete = (int64_t) (tmpstat.st_size / sizeof(ino_t));
+		to_delete_fptr = fopen(restore_todelete_list, "r");
+		if (to_delete_fptr == NULL)
+			continue;
+		/* Mark as todelete inodes in the list */
+		for (count2 = 0; count2 < num_todelete; count2++) {
+			FREAD(&todelete_inode, sizeof(ino_t), 1,
+			      to_delete_fptr);
+			fetch_todelete_path(todelete_metapath, todelete_inode);
+			metafptr = fopen(todelete_metapath, "r");
+			if (metafptr == NULL)
+				continue;
+			FREAD(&tmphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
+			rebuild_super_block_entry(todelete_inode, &tmphcfsstat,
+			                          UNPIN);
+			super_block_to_delete(todelete_inode, TRUE);
+			write_log(10, "Marked %" PRIu64 " as to delete\n",
+			          (uint64_t) todelete_inode);
+errcode_handle:
+			/* If error occurs, just close this meta and continue */
+			fclose(metafptr);
+			metafptr = NULL;
+		}
+
+		fclose(to_delete_fptr);
+		to_delete_fptr = NULL;
+		unlink(restore_todelete_list);
+	}
+}
+
+void process_upgrade_meta_changes(void)
+{
+	DIR *dstream;
+	struct dirent *tmpentry;
+	char tmppath[METAPATHLEN];
+	char tmppath1[METAPATHLEN];
+
+	/* Handle changes in FS_CLOUD_STAT_T */
+	snprintf(tmppath, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
+
+	dstream = opendir(tmppath);
+	if (dstream == NULL)
+		return;
+
+	while ((tmpentry = readdir(dstream)) != NULL) {
+		snprintf(tmppath1, METAPATHLEN - 1, "%s/%s", tmppath,
+		         tmpentry->d_name);
+		convert_cloud_stat_struct(tmppath1);
+	}
+
+	closedir(dstream);
+	return;
+}
 /************************************************************************
 *
 * Function name: main
@@ -469,16 +556,12 @@ int32_t main(int32_t argc, char **argv)
                 exit(-ret_val);
 
 	logptr = NULL;
+	memset(&ROOT_INFO, 0, sizeof(ROOT_INFO_T));
 
 #ifndef OPENSSL_IS_BORINGSSL
 	ENGINE_load_builtin_engines();
 	ENGINE_register_all_complete();
 #endif
-
-	/*TODO: Error handling after reading system config*/
-	/*TODO: Allow reading system config path from program arg */
-
-	/* TODO: Selection of backend type via configuration */
 
 	/* skip malloc if already did (in unittest) */
 	if (system_config == NULL) {
@@ -523,6 +606,9 @@ int32_t main(int32_t argc, char **argv)
 
 	UNUSED(curl_handle);
 
+	/* Convert meta changes if needed */
+	process_upgrade_meta_changes();
+
 	/* Check if the system is being restored (and in stage 2) */
 	/* FEATURE TODO: Check if the backend setting is correct before
 	switching metastorage / blockstorage */
@@ -531,8 +617,6 @@ int32_t main(int32_t argc, char **argv)
 	restoring_status = NOT_RESTORING;
 	init_restore_path();
 	ret_val = check_restoration_status();
-	/* FEATURE TODO: handling for stage 1 and 2 if reboot when stage
-	unfinished */
 	if (ret_val == 1) {
 		restoring_status = RESTORING_STAGE1;
 	} else if (ret_val == 2) {
@@ -543,9 +627,6 @@ int32_t main(int32_t argc, char **argv)
 		write_log(10, "Checking if need to switch storage paths\n");
 		_check_partial_storage();
 	}
-
-	/* FEATURE TODO: If the old meta/block storage
-	exists here, delete them */
 
 	ret_val = init_hfuse(restoring_status);
 	if (ret_val < 0)
@@ -591,8 +672,13 @@ int32_t main(int32_t argc, char **argv)
 		} else {
 			write_log(4, "Rebuild superblock.\n");
 			/* Rebuild superblock.
-			 * Do NOT init upload/delete/cache mgmt */
+			 * Do NOT init upload/delete mgmt */
+
+			/* Check if need to mark inodes deleted in stage 1
+			in super block */
+			_mark_sb_to_delete();
 		}
+
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 	} else if ((CURRENT_BACKEND != NONE) &&
