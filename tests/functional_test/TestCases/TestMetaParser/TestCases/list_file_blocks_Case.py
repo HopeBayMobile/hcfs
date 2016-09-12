@@ -1,8 +1,9 @@
 import os
+import ast
 
 from Case import Case
 import config
-from Utils.metaParserAdapter import *
+from Utils.metaParserAdapter import pyhcfs
 from Utils.FuncSpec import FuncSpec
 from Utils.tedUtils import listdir_full, listdir_path, negate
 from constant import FileType, Path
@@ -29,13 +30,14 @@ class NormalCase(Case):
         #                   'data_6086_10243_1'],
         #   'result': 0,
         #   'ret_num': 4}
-        self.func_spec = FuncSpec(
+        self.func_spec_verifier = FuncSpec(
             [str], [{"block_list": [str], "result":int, "ret_num":int}])
 
     def test(self):
         for meta_path in self.get_file_meta_pathes():
-            result = list_file_blocks(meta_path)
-            isPass, msg = self.func_spec.check_onNormal([meta_path], [result])
+            result = pyhcfs.list_file_blocks(meta_path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([meta_path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] != 0:
@@ -71,8 +73,9 @@ class RandomFileContentCase(NormalCase):
 
     def test(self):
         for path in self.get_random_test_data():
-            result = list_file_blocks(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.list_file_blocks(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] >= 0:
@@ -103,8 +106,9 @@ class NonExistedAndEmptyPathCase(NormalCase):
     def test(self):
         nonexisted_path = ["/no/such/", "/no/such/file", "/and/directory", ""]
         for path in nonexisted_path:
-            result = list_file_blocks(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.list_file_blocks(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] != -1:

@@ -36,9 +36,8 @@ class FuncSpec(object):
         self.logger = config.get_logger().getChild(__name__)
         self.logger.debug(
             "__init__" + repr((in_spec_str, out_spec_str, err_spec_str)))
-        assert isinstance(in_spec_str, list), "Spec string should be list"
-        assert isinstance(out_spec_str, list), "Spec string should be list"
-        assert isinstance(err_spec_str, list), "Spec string should be list"
+        if not isinstance(in_spec_str, list) or not isinstance(in_spec_str, list) or not isinstance(in_spec_str, list):
+            raise TypeError("Spec string should be list")
         self.input_specs = in_spec_str
         self.output_specs = out_spec_str
         self.err_specs = err_spec_str

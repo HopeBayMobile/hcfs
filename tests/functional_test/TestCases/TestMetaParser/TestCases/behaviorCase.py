@@ -1,8 +1,9 @@
 import os
+import ast
 
 from Case import Case
 import config
-from Utils.metaParserAdapter import *
+from Utils.metaParserAdapter import pyhcfs
 from Utils.tedUtils import listdir_full
 from constant import FileType, Path
 
@@ -22,7 +23,7 @@ class ExternalVolHasFSstatCase(Case):
 
     def test(self):
         fsmgr_path = os.path.join(Path.TEST_DATA_DIR, "fsmgr")
-        result = list_external_volume(fsmgr_path)
+        result = pyhcfs.list_external_volume(fsmgr_path)
         for inode, name in result:
             if inode not in self.get_swift_fsstat_inodes():
                 return False, "Missing FSstat file of (inode, name)" + repr((inode, name))
@@ -50,7 +51,7 @@ class NonexistMetaPathCase(ExternalVolHasFSstatCase):
     def test(self):
         swift_data_list = self.get_swift_data_list()
         for meta_path in self.get_file_meta_pathes():
-            result = list_file_blocks(meta_path)
+            result = pyhcfs.list_file_blocks(meta_path)
             if result["result"] != 0:
                 return False, "Fail to call list_file_blocks" + repr((meta_path, result))
             for data_name in result["block_list"]:

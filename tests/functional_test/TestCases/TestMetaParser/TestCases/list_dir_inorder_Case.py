@@ -1,9 +1,10 @@
 import os
+import ast
 from itertools import product
 
 from Case import Case
 import config
-from Utils.metaParserAdapter import *
+from Utils.metaParserAdapter import pyhcfs
 from Utils.FuncSpec import FuncSpec
 from Utils.tedUtils import listdir_full, listdir_path, negate
 from constant import FileType, Path
@@ -40,13 +41,15 @@ class NormalCase(Case):
         output_spec_str = {"result": int, "offset": (int, int),
                            "child_list": [{"d_name": str, "inode": int, "d_type": int}],
                            "num_child_walked": int}
-        self.func_spec = FuncSpec([str, (int, int), int], [output_spec_str])
+        self.func_spec_verifier = FuncSpec(
+            [str, (int, int), int], [output_spec_str])
 
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, VALID_OFFSET, VALID_LIMIT):
-            result = list_dir_inorder(*args)
-            isPass, msg = self.func_spec.check_onNormal(list(args), [result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] < (0, 0):
@@ -99,8 +102,9 @@ class RandomFileContentCase(NormalCase):
     def test(self):
         rand_test_data_pathes = self.get_random_test_data_pathes()
         for args in product(rand_test_data_pathes, VALID_OFFSET, VALID_LIMIT):
-            result = list_dir_inorder(*args)
-            isPass, msg = self.func_spec.check_onNormal(list(args), [result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -139,8 +143,9 @@ class NormalMetaPathLimitInvalidOffsetCase(NormalCase):
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, INVALID_OFFSET, VALID_LIMIT):
-            result = list_dir_inorder(*args)
-            isPass, msg = self.func_spec.check_onNormal(list(args), [result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -168,8 +173,9 @@ class NormalMetaPathOffsetInvalidLimitCase(NormalCase):
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, VALID_OFFSET, INVALID_LIMIT):
-            result = list_dir_inorder(*args)
-            isPass, msg = self.func_spec.check_onNormal(list(args), [result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -197,8 +203,9 @@ class NormalMetaPathInvalidOffsetLimitCase(NormalCase):
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, INVALID_OFFSET, INVALID_LIMIT):
-            result = list_dir_inorder(*args)
-            isPass, msg = self.func_spec.check_onNormal(list(args), [result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -228,8 +235,9 @@ class NonexistedAndEmptyPathCase(NormalCase):
         any_offset = VALID_OFFSET + INVALID_OFFSET
         any_limit = VALID_LIMIT + INVALID_LIMIT
         for args in product(normal_meta_path, any_offset, any_limit):
-            result = list_dir_inorder(*args)
-            isPass, msg = self.func_spec.check_onNormal(list(args), [result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):

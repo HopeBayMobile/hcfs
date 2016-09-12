@@ -10,24 +10,27 @@ if os.path.exists(REPORT_DIR):
 os.makedirs(REPORT_DIR)
 
 
-def list_external_volume(path):
-    return _python3_call("list_external_volume", (path,))
+class pyhcfs(object):
 
+    @staticmethod
+    def list_external_volume(path):
+        return _python3_call("list_external_volume", (path,))
 
-def parse_meta(path):
-    return _python3_call("parse_meta", (path,))
+    @staticmethod
+    def parse_meta(path):
+        return _python3_call("parse_meta", (path,))
 
+    @staticmethod
+    def list_dir_inorder(path, offset=(0, 0), limit=1000):
+        return _python3_call("list_dir_inorder", (path, offset, limit))
 
-def list_dir_inorder(path, offset=(0, 0), limit=1000):
-    return _python3_call("list_dir_inorder", (path, offset, limit))
+    @staticmethod
+    def get_vol_usage(path):
+        return _python3_call("get_vol_usage", (path,))
 
-
-def get_vol_usage(path):
-    return _python3_call("get_vol_usage", (path,))
-
-
-def list_file_blocks(path):
-    return _python3_call("list_file_blocks", (path,))
+    @staticmethod
+    def list_file_blocks(path):
+        return _python3_call("list_file_blocks", (path,))
 
 ################################## private ####################################
 

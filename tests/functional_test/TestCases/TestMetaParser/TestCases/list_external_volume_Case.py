@@ -1,8 +1,9 @@
 import os
+import ast
 
 from Case import Case
 import config
-from Utils.metaParserAdapter import *
+from Utils.metaParserAdapter import pyhcfs
 from Utils.FuncSpec import FuncSpec
 from Utils.tedUtils import listdir_full, negate
 from constant import Path
@@ -25,13 +26,13 @@ class NormalCase(Case):
         # normal : [(128, b'hcfs_external')]
         # error : -1
         # stderr : Error: list_external_volume: No such file or directory
-        self.list_external_volume_spec = FuncSpec([str], [[(int, str)]], [int])
+        self.func_spec_verifier = FuncSpec([str], [[(int, str)]], [int])
 
     def test(self):
-        result = list_external_volume(Path.FSMGR_FILE)
+        result = pyhcfs.list_external_volume(Path.FSMGR_FILE)
         expected = self.get_fsmgr_stat()
-        isPass, msg = self.list_external_volume_spec.check_onNormal([Path.FSMGR_FILE], [
-            result])
+        isPass, msg = self.func_spec_verifier.check_onNormal(
+            [Path.FSMGR_FILE], [result])
         return isPass, msg
         if result[0][0] != expected["stat"]["ino"]:
             return False, "External volume doesn't match with expected in inode number"
@@ -57,9 +58,8 @@ class RandomFileContentCase(NormalCase):
     def test(self):
         notstartswith = negate(str.startswith)
         for path, _ in listdir_full(Path.TEST_RANDOM_DIR, notstartswith, ("FSmgr",)):
-            result = list_external_volume(path)
-            isPass, msg = self.list_external_volume_spec.check_onErr([path], [
-                result])
+            result = pyhcfs.list_external_volume(path)
+            isPass, msg = self.func_spec_verifier.check_onErr([path], [result])
             if not isPass:
                 return False, msg
             if result >= 0:
@@ -79,9 +79,8 @@ class NonexistedAndEmptyPathCase(NormalCase):
     def test(self):
         nonexisted_path = ["/no/such/", "/no/such/fsmgr", "/and/directory", ""]
         for path in nonexisted_path:
-            result = list_external_volume(path)
-            isPass, msg = self.list_external_volume_spec.check_onErr([path], [
-                result])
+            result = pyhcfs.list_external_volume(path)
+            isPass, msg = self.func_spec_verifier.check_onErr([path], [result])
             if not isPass:
                 return False, msg
             if result >= 0:

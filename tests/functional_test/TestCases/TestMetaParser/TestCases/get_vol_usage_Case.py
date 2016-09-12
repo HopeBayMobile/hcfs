@@ -2,7 +2,7 @@ import os
 
 from Case import Case
 import config
-from Utils.metaParserAdapter import *
+from Utils.metaParserAdapter import pyhcfs
 from Utils.FuncSpec import FuncSpec
 from Utils.tedUtils import listdir_full, listdir_path, negate
 from constant import Path
@@ -23,12 +23,14 @@ class NormalCase(Case):
         self.logger.info("Setup get_vol_usage spec")
         # get_vol_usage(b"test_data/v1/android/FSstat")
         # {'result': 0, 'usage': 1373381904}
-        self.func_spec = FuncSpec([str], [{"result": int, "usage": int}])
+        self.func_spec_verifier = FuncSpec(
+            [str], [{"result": int, "usage": int}])
 
     def test(self):
         for path in listdir_path(Path.TEST_DATA_DIR, str.startswith, ("FSstat",)):
-            result = get_vol_usage(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.get_vol_usage(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] != 0:
@@ -52,8 +54,9 @@ class RandomFileContentCase(NormalCase):
     def test(self):
         notstartswith = negate(str.startswith)
         for path in listdir_path(Path.TEST_RANDOM_DIR, notstartswith, ("FSstat",)):
-            result = get_vol_usage(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.get_vol_usage(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] != -1:
@@ -73,8 +76,9 @@ class NonExistedAndEmptyPathCase(NormalCase):
     def test(self):
         nonexisted_path = ["/no/such/", "/no/such/file", "/and/directory", ""]
         for path in nonexisted_path:
-            result = get_vol_usage(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.get_vol_usage(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] != -1:

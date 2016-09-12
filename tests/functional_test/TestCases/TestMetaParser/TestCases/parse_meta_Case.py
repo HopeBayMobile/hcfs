@@ -1,8 +1,9 @@
 import os
+import ast
 
 from Case import Case
 import config
-from Utils.metaParserAdapter import *
+from Utils.metaParserAdapter import pyhcfs
 from Utils.FuncSpec import FuncSpec
 from Utils.tedUtils import listdir_full, listdir_path, negate
 from constant import Path
@@ -22,16 +23,17 @@ class NormalCase(Case):
         self.logger.info("Setup")
         self.logger.info("Setup parse_meta spec")
         self.set_spec()
-        instances = self.func_spec.gen_zero_instance_by_output_spec()
+        instances = self.func_spec_verifier.gen_zero_instance_by_output_spec()
         self.ERR_RESULT = instances[0]
         self.ERR_RESULT["result"] = -1
 
     def test(self):
         for expected_stat, path in self.get_stat_and_meta_path_pairs():
-            result = parse_meta(path)
+            result = pyhcfs.parse_meta(path)
             # RD said there aren't some fields stored in the meta file
             self.ignore_fields(expected_stat, result)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result != expected_stat:
@@ -64,7 +66,7 @@ class NormalCase(Case):
                          "mtime": int, "mtime_nsec": int, "nlink": int,
                          "rdev": int, "size": int, "uid": int}
         output_spec_str["stat"] = stat_spec_str
-        self.func_spec = FuncSpec([str], [output_spec_str])
+        self.func_spec_verifier = FuncSpec([str], [output_spec_str])
 
     def get_stat_and_meta_path_pairs(self):
         for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
@@ -111,8 +113,9 @@ class RandomFileContentCase(NormalCase):
     def test(self):
         notstartswith = negate(str.startswith)
         for path in listdir_path(Path.TEST_RANDOM_DIR, notstartswith, ("meta",)):
-            result = parse_meta(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.parse_meta(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["result"] >= 0:
@@ -132,8 +135,9 @@ class NonexistedAndEmptyPathCase(NormalCase):
     def test(self):
         nonexisted_path = ["/no/such/", "/no/such/meta", "/and/directory", ""]
         for path in nonexisted_path:
-            result = parse_meta(path)
-            isPass, msg = self.func_spec.check_onNormal([path], [result])
+            result = pyhcfs.parse_meta(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if "error_msg" in result:
