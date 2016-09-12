@@ -124,24 +124,23 @@ int32_t main()
 	free(res17);
 
 	char *res18;
-<<<<<<< HEAD
-	HCFS_trigger_restore(&res18);
-	printf("trigger restore - %s\n", res18);
-	free(res18);
-
-	char *res19;
-	HCFS_check_restore_status(&res19);
-	printf("check restore status - %s\n", res19);
-	free(res19);
-
-	char *res20;
-	HCFS_notify_applist_change(&res20);
-	printf("notify applist change - %s\n", res20);
-	free(res20);
-=======
 	HCFS_collect_sys_logs(&res18);
 	printf("collect sys logs - %s\n", res18);
 	free(res18);
->>>>>>> android-dev
+
+	char *res19;
+	HCFS_trigger_restore(&res19);
+	printf("trigger restore - %s\n", res19);
+	free(res19);
+
+	char *res20;
+	HCFS_check_restore_status(&res20);
+	printf("check restore status - %s\n", res20);
+	free(res20);
+
+	char *res21;
+	HCFS_notify_applist_change(&res21);
+	printf("notify applist change - %s\n", res21);
+	free(res21);
 }
 

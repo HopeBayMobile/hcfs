@@ -330,19 +330,12 @@ void HCFS_set_sync_point(char **json_res);
  */
 void HCFS_clear_sync_point(char **json_res);
 
-<<<<<<< HEAD
-/*Init Restoration
- * @json_res result string in json format.
- *
- * To initiate a restoration process.
-=======
 /*Collect System logs
  * @json_res result string in json format.
  *
  * To collect system logs (hcfs log, logcat and dmesg)
  * for user feedback. This API will copy/dump all logs
  * to the dir "/sdcard/TeraLog/logs".
->>>>>>> android-dev
  *
  * Return code -
  *
@@ -351,7 +344,20 @@ void HCFS_clear_sync_point(char **json_res);
  * | True | 0 if successful|
  * | False | Linux errors.|
  */
-<<<<<<< HEAD
+void HCFS_collect_sys_logs(char **json_res);
+
+/*Init Restoration
+ * @json_res result string in json format.
+ *
+ * To initiate a restoration process.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if successful|
+ * | False | Linux errors.|
+ */
 void HCFS_trigger_restore(char **json_res);
 
 /*Check Restoration Status
@@ -386,7 +392,4 @@ void HCFS_check_restore_status(char **json_res);
  * | False | Linux errors.|
  */
 void HCFS_notify_applist_change(char **json_res);
-=======
-void HCFS_collect_sys_logs(char **json_res);
->>>>>>> android-dev
 #endif  /* GW20_HCFS_API_H_ */

@@ -35,14 +35,12 @@ int32_t set_swift_access_token(char *arg_buf, uint32_t arg_len);
 
 int32_t toggle_sync_point(int32_t api_code);
 
-<<<<<<< HEAD
 int32_t trigger_restore();
 
 int32_t check_restore_status();
 
 int32_t notify_applist_change();
-=======
+
 int32_t collect_sys_logs();
->>>>>>> android-dev
 
 #endif  /* GW20_HCFSAPI_SYS_H_ */

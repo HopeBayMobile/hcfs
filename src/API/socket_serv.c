@@ -365,13 +365,8 @@ int32_t do_clear_sync_point(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
-<<<<<<< HEAD
-int32_t do_trigger_restore(char *largebuf, int32_t arg_len,
-			   char *resbuf, int32_t *res_size)
-=======
 int32_t do_collect_sys_logs(char *largebuf, int32_t arg_len,
 			    char *resbuf, int32_t *res_size)
->>>>>>> android-dev
 {
 	int32_t ret_code;
 	uint32_t ret_len = 0;
@@ -379,18 +374,31 @@ int32_t do_collect_sys_logs(char *largebuf, int32_t arg_len,
 	UNUSED(largebuf);
 	UNUSED(arg_len);
 
-<<<<<<< HEAD
-	write_log(8, "Start trigger restore\n");
-	ret_code = trigger_restore();
-=======
 	write_log(8, "Start collect sys logs\n");
 	ret_code = collect_sys_logs();
->>>>>>> android-dev
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
-<<<<<<< HEAD
+	write_log(8, "End collect sys logs\n");
+	return ret_code;
+}
+
+int32_t do_trigger_restore(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start trigger restore\n");
+	ret_code = trigger_restore();
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
 	write_log(8, "End trigger restore\n");
 	return ret_code;
 }
@@ -430,9 +438,6 @@ int32_t do_notify_applist_change(char *largebuf, int32_t arg_len,
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
 	write_log(8, "End notify applist change\n");
-=======
-	write_log(8, "End collect sys logs\n");
->>>>>>> android-dev
 	return ret_code;
 }
 
@@ -532,13 +537,10 @@ int32_t process_request(void *arg)
 		{SETSWIFTTOKEN,		do_set_swift_token},
 		{SETSYNCPOINT,		do_set_sync_point},
 		{CANCELSYNCPOINT,	do_clear_sync_point},
-<<<<<<< HEAD
 		{INITIATE_RESTORATION,	do_trigger_restore},
 		{CHECK_RESTORATION_STATUS,	do_check_restore_status},
 		{NOTIFY_APPLIST_CHANGE,	do_notify_applist_change},
-=======
 		{COLLECTSYSLOGS,	do_collect_sys_logs}
->>>>>>> android-dev
 	};
 
 	uint32_t n;
