@@ -107,7 +107,10 @@ PushGDBbinary() {
     fi
     adb remount
     adb push system/bin/hcfs /system/bin/
-    adb push system/lib${TARGET_ARCH}/libfuse.so /system/lib${TARGET_ARCH}/
+    for so in `find system/lib${TARGET_ARCH} -type f -perm 755`;
+    do
+        adb push $so /system/lib${TARGET_ARCH}/
+    done
     adb shell 'set `ps | grep /system/bin/hcfs`; su root kill $2'&
     adb reboot
     sleep 40
@@ -131,10 +134,8 @@ CheckTools
 
 # Main scripts
 
-PullGDBFiles
-
 if [[ $PUSH ]]; then
     PushGDBbinary
 fi
-
+PullGDBFiles
 StartGDB
