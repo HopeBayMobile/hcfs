@@ -772,21 +772,20 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 
 	chunk = curl_slist_append(chunk, swift_auth_string);
 
-	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
-	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "HEAD");
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+
+	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 
 	res = curl_easy_perform(curl);
 
