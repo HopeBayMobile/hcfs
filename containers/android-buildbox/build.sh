@@ -22,7 +22,7 @@ sudo apt-get install pv wget
 IMG=docker:5000/android-buildbox
 TAG=`date +%Y%m%d`
 echo $IMG
-docker build -t $IMG .
+docker build --pull -t $IMG .
 docker rmi $IMG:$TAG || :
 docker tag $IMG $IMG:$TAG
 docker push $IMG:$TAG

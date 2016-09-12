@@ -33,6 +33,7 @@ void init_download_module(void);
 pthread_t delete_loop_thread;
 pthread_t monitor_loop_thread;
 pthread_t event_loop_thread;
+pthread_t fuse_nofify_thread;
 #ifdef _ANDROID_ENV_
 pthread_t upload_loop_thread;
 pthread_t cache_loop_thread;

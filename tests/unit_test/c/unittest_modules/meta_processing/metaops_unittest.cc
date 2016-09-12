@@ -75,6 +75,8 @@ class metaopsEnvironment : public ::testing::Environment {
 		}
 		void TearDown()
 		{
+			free(system_config->max_cache_limit);
+			free(system_config->max_pinned_limit);
 			free(system_config);
 			free(hcfs_system);
 		}
@@ -2030,6 +2032,10 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 		EXPECT_EQ(child_inode, nondir_node_list[i]);
 		EXPECT_EQ(D_ISREG, nondir_type_list[i]);
 	}
+
+	/* FIXME: deallocation must be placed in the last test. */
+	free(dir_node_list);
+	free(nondir_node_list);
 
 	unlink(metapath);
 

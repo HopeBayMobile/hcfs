@@ -1,22 +1,23 @@
 include ../../build/ccache.mk
 
-CFLAGS=-D_ANDROID_ENV_
+CFLAGS=-D_ANDROID_ENV_ -D_FILE_OFFSET_BITS=64 -g -I../HCFS
 
-all: _pyhcfs.so demo_pyhcfs
+TARGET = demo_pyhcfs _pyhcfs.so
+all: check_pkgs $(TARGET)
 
-_pyhcfs.so: parser.c parser.h
-	python3 pyhcfs_build.py
-	mv -vf _pyhcfs.*.so _pyhcfs.so || :
+_pyhcfs.so: | parser.c parser.h pyhcfs_build.py
+	@python3 pyhcfs_build.py
+	@mv -vf _pyhcfs.*.so _pyhcfs.so || :
+	@rm -f _pyhcfs.c
 
-parser.o demo_pyhcfs: CFLAGS+=-g -I../HCFS
-demo_pyhcfs: demo_pyhcfs.c parser.h parser.o
-	cc $(CFLAGS) $< parser.o -o $@
+demo_pyhcfs: demo_pyhcfs.o parser.o
+	cc $(CFLAGS) $^ -o $@
 
-parser.o: parser.c parser.h
-	cc $(CFLAGS) $< -c
+%.o: %.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $(realpath $<)
 
 clean:
-	rm -rf _pyhcfs.c _pyhcfs.o _pyhcfs.so _pyhcfs.*.so parser parser.o __pycache__/
+	rm -rf $(TARGET) *.o
 
 check_pkgs:
 	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
@@ -24,5 +25,3 @@ check_pkgs:
 demo: all
 	@echo ====== start demo ======
 	python3 demo_pyhcfs.py
-
-.PHONY: _pyhcfs.so parser

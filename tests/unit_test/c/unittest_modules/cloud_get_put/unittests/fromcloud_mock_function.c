@@ -68,7 +68,7 @@ int32_t sync_hcfs_system_data(char need_lock)
 	MOCK();
 	return 0;
 }
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	MOCK();
 	return 0;

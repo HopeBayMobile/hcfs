@@ -695,12 +695,10 @@ class validate_system_configTest : public ::testing::Test {
 
   virtual void TearDown() {
     unlink("/tmp/testHCFS");
-    if (tmppath != NULL)
-      nftw(tmppath, do_delete, 20, FTW_DEPTH);
-    if (workpath != NULL)
-      free(workpath);
-    if (tmppath != NULL)
-      free(tmppath);
+    if (tmppath)
+        nftw(tmppath, do_delete, 20, FTW_DEPTH);
+    free(workpath);
+    free(tmppath);
     free(system_config);
    }
  };

@@ -70,6 +70,7 @@ OBJS_F := \
 	event_filter.o \
 	meta.o \
 	params.o \
+	fuse_notify.o \
 	rebuild_super_block.o \
 	rebuild_parent_dirstat.o \
 	do_restoration.o
@@ -93,7 +94,7 @@ hcfs: $(OBJS)
 
 # compile and generate dependency info
 $(OBJS_DIR)/%.o: %.c | $(OBJS_DIR)
-	$(CC) -c $(CPPFLAGS) $(CFLAGS) $< -o $@ -MMD -MF $@.d
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(realpath $<) -o $@ -MMD -MF $@.d
 
 $(OBJS_DIR):
 	mkdir -p $@

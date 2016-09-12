@@ -464,10 +464,11 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	off_t tmp_size;
 	char backend_mlock;
 	int64_t backend_size_change, meta_size_change;
+	int64_t pin_size_delta;
+	int64_t pin_size_delta_blk;
 	int64_t block_seq;
 	ino_t root_inode;
 	BOOL meta_on_cloud;
-	uint8_t backend_pin_st;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -476,6 +477,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	this_inode = ptr->inode;
 	which_dsync_index = ptr->which_index;
 	backend_size_change = 0;
+	pin_size_delta = 0;
+	pin_size_delta_blk = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
 	ret = _read_meta(thismetapath, ptr->this_mode,
@@ -550,7 +553,15 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilestat, sizeof(HCFS_STAT), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 							backend_metafptr);
-		backend_pin_st = tempfilemeta.local_pin;
+		if (P_IS_PIN(tempfilemeta.local_pin)) {
+			pin_size_delta = -backend_size_change +
+			                  meta_size_change;
+			pin_size_delta_blk = -round_size(backend_size_change) +
+			                     round_size(meta_size_change);
+		} else {
+			pin_size_delta = 0;
+			pin_size_delta_blk = 0;
+		}
 		tmp_size = tempfilestat.size;
 
 		/* Check if need to sync past the current size */
@@ -721,19 +732,11 @@ errcode_handle:
 	}
 
 	/* Update FS stat in the backend if updated previously */
-	if (meta_on_cloud == TRUE) {
-		if (P_IS_PIN(backend_pin_st))
-			update_backend_stat(root_inode, -backend_size_change,
-				-meta_size_change, -1,
-				-backend_size_change + meta_size_change,
-				-round_size(backend_size_change) +
-				 round_size(meta_size_change),
+	if (meta_on_cloud == TRUE)
+		update_backend_stat(root_inode, -backend_size_change,
+				-meta_size_change, -1, pin_size_delta,
+				pin_size_delta_blk,
 				-round_size(meta_size_change));
-		else
-			update_backend_stat(root_inode, -backend_size_change,
-				-meta_size_change, -1, 0, 0,
-				-round_size(meta_size_change));
-	}
 
 	_check_del_progress_file(this_inode);
 	unlink(thismetapath);

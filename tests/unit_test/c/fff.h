@@ -1,4 +1,4 @@
-/*
+/* vim:softtabstop=0 shiftwidth=4 tabstop=4 expandtab:
 LICENSE
 
 The MIT License (MIT)
@@ -44,6 +44,19 @@ SOFTWARE.
     FUNCNAME##_reset(); \
 } \
 
+#ifdef FFF_MASK_ON_FAKE
+#include <dlfcn.h>
+#define DECLARE_MASK_INIT(FUNCNAME) unsigned int FUNCNAME##_mask_init;
+#define INIT_MASK(FUNCNAME)                                                    \
+    if (FUNCNAME##_mask_init != 1) {                                           \
+        FUNCNAME##_fake.custom_fake =                                          \
+            (FUNCNAME##_Type *)dlsym(RTLD_NEXT, #FUNCNAME);                    \
+        FUNCNAME##_mask_init = 1;                                              \
+    }
+#else
+#define DECLARE_MASK_INIT(FUNCNAME)
+#define INIT_MASK(FUNCNAME)
+#endif
 
 #define DECLARE_ARG(type, n, FUNCNAME) \
     type arg##n##_val; \
@@ -1435,11 +1448,12 @@ FFF_END_EXTERN_C \
 
 #define DECLARE_FAKE_VALUE_FUNC1(RETURN_TYPE, FUNCNAME, ARG0_TYPE) \
     FFF_EXTERN_C \
+        typedef RETURN_TYPE (FUNCNAME##_Type)(ARG0_TYPE);  \
         typedef struct FUNCNAME##_Fake { \
             DECLARE_ARG(ARG0_TYPE, 0, FUNCNAME) \
             DECLARE_ALL_FUNC_COMMON \
             DECLARE_VALUE_FUNCTION_VARIABLES(RETURN_TYPE) \
-            RETURN_TYPE(*custom_fake)(ARG0_TYPE arg0); \
+            FUNCNAME##_Type *custom_fake; \
         } FUNCNAME##_Fake;\
         extern FUNCNAME##_Fake FUNCNAME##_fake;\
         void FUNCNAME##_reset(); \
@@ -1447,8 +1461,10 @@ FFF_END_EXTERN_C \
 
 #define DEFINE_FAKE_VALUE_FUNC1(RETURN_TYPE, FUNCNAME, ARG0_TYPE) \
     FFF_EXTERN_C \
+        DECLARE_MASK_INIT(FUNCNAME) \
         FUNCNAME##_Fake FUNCNAME##_fake;\
         RETURN_TYPE FUNCNAME(ARG0_TYPE arg0){ \
+            INIT_MASK(FUNCNAME) \
             SAVE_ARG(FUNCNAME, 0); \
             if(ROOM_FOR_MORE_HISTORY(FUNCNAME)){\
                 SAVE_ARG_HISTORY(FUNCNAME, 0); \

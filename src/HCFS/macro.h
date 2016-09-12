@@ -19,8 +19,10 @@
 
 #if defined(__GNUC__)
 #define _PACKED __attribute__((packed))
+#define _UNUSED __attribute__((unused))
 #else
 #define _PACKED
+#define _UNUSED
 #endif
 
 #define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode) || S_ISSOCK(mode))

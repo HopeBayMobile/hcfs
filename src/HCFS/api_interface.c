@@ -631,6 +631,8 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 
 	if (S_ISREG(thisstat.mode)) {
 		errcode = meta_cache_open_file(thisptr);
+		if (errcode < 0)
+			goto errcode_handle;
 		PREAD(fileno(thisptr->fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
 		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
 		if ((tmpstats.num_blocks == 0) ||
@@ -654,7 +656,7 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t checkpin_handle(int32_t arg_len, char *largebuf)
+int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 {
 	ino_t target_inode;
 	int32_t retcode;
@@ -664,9 +666,8 @@ int32_t checkpin_handle(int32_t arg_len, char *largebuf)
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
 	SYMLINK_META_TYPE linkmeta;
-	char is_local_pin;
+	char is_local_pin = P_UNPIN;
 
-	UNUSED(arg_len);
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
 		  (uint64_t)target_inode);
@@ -1558,7 +1559,6 @@ return_message:
 		if ((largebuf != NULL) && (buf_reused == FALSE))
 			free(largebuf);
 		largebuf = NULL;
-		buf_reused = FALSE;
 		close(fd1);
 
 		/* Compute process time and update statistics */

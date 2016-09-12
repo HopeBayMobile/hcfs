@@ -1,5 +1,6 @@
 #!/bin/bash
-function CLEAN_FUSE
+exec 2>/dev/null
+CLEAN_FUSE()
 {
 	for i in `\ls /sys/fs/fuse/connections/`; 
 	do
@@ -8,15 +9,9 @@ function CLEAN_FUSE
 }
 
 
-CLEAN_FUSE
+echo "Unittest will abort fuse session to avoid stucking."
+
 {
 	sleep $RERUN_TIMEOUT;
-	echo "==="
-	echo "==="
-	echo "==="
-	echo "=== Clean fuse mount to avoid stucking ==="
-	echo "==="
-	echo "==="
-	echo "==="
 	CLEAN_FUSE;
 } &

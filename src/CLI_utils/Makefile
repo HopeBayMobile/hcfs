@@ -9,5 +9,8 @@ all: $(EXEC)
 CC = gcc
 CFLAGS = -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -Wall -Wextra -g
 
+%: %.c
+	$(LINK.c) $(realpath $^) $(LOADLIBES) $(LDLIBS) -o $@
+
 clean:
-	rm -rf *.o $(EXEC)
+	rm -rf *.o *.d $(EXEC)

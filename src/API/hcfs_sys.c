@@ -13,6 +13,9 @@
 #include "hcfs_sys.h"
 
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -618,6 +621,7 @@ int32_t toggle_sync_point(int32_t api_code)
 	return ret_code;
 }
 
+<<<<<<< HEAD
 /************************************************************************
  * *
  * * Function name: trigger_restore
@@ -692,11 +696,30 @@ int32_t check_restore_status()
  * *        Inputs:
  * *       Summary: To inform HCFS that package lists in packages.xml
  * *	            has changed and needs to be backed-up.
+=======
+/* helper function for system() result checking */
+#define check_system_result()\
+	do {\
+		if (sys_ret == -1)\
+			return -errno;\
+		if (WIFSIGNALED(sys_ret))\
+			return -WTERMSIG(sys_ret);\
+		if (WEXITSTATUS(sys_ret) != 0)\
+			return -WEXITSTATUS(sys_ret);\
+	} while (0)
+
+/************************************************************************
+ * *
+ * * Function name: collect_sys_logs
+ * *        Inputs:
+ * *       Summary: To copy/dump logs to "/sdcard/TeraLog/logs".
+>>>>>>> android-dev
  * *
  * *  Return value: 0 if successful.
  * *                Otherwise returns negation of error code.
  * *
  * *************************************************************************/
+<<<<<<< HEAD
 int32_t notify_applist_change()
 {
 	int32_t fd, ret_code;
@@ -718,4 +741,71 @@ int32_t notify_applist_change()
 	close(fd);
 
 	return ret_code;
+=======
+int32_t collect_sys_logs()
+{
+	int32_t sys_ret, ret_code;
+	int64_t hcfslog_size;
+	char buf[4096];
+	FILE *hcfslog_fptr = NULL, *new_hcfslog_fptr = NULL;
+	struct stat tmpstat;
+
+	char *log_dir = "/sdcard/TeraLog";
+	char *hcfslog_path = "/data/hcfs_android_log";
+	char *hcfslog_path2 = "/data/hcfs_android_log.1";
+	char *cmd_cp_hcfslog = "cp /data/hcfs_android_log.1 /sdcard/TeraLog/.";
+	char *cmd_dump_logcat = "logcat -d > /sdcard/TeraLog/logcat";
+	char *cmd_dump_dmesg = "dmesg > /sdcard/TeraLog/dmesg";
+
+	ret_code = stat(log_dir, &tmpstat);
+	if (ret_code < 0) {
+		if (errno == ENOENT)
+			mkdir(log_dir, 0777);
+		else
+			return -errno;
+	}
+
+	ret_code = stat(hcfslog_path, &tmpstat);
+	if (ret_code < 0)
+		return -EIO;
+	hcfslog_size = tmpstat.st_size;
+
+	/* hcfslog */
+	hcfslog_fptr = fopen(hcfslog_path, "r");
+	if (hcfslog_fptr == NULL)
+		return -errno;
+
+	new_hcfslog_fptr = fopen("/sdcard/TeraLog/hcfs_android_log", "w");
+	if (new_hcfslog_fptr == NULL) {
+		fclose(hcfslog_fptr);
+		return -errno;
+	}
+
+	while (fgets(buf, sizeof(buf), hcfslog_fptr) != NULL
+			&& ftell(hcfslog_fptr) <= hcfslog_size) {
+		if (fprintf(new_hcfslog_fptr, "%s", buf) < 0) {
+			fclose(hcfslog_fptr);
+			fclose(new_hcfslog_fptr);
+			return -errno;
+		}
+	}
+
+	fclose(hcfslog_fptr);
+	fclose(new_hcfslog_fptr);
+
+	if (access(hcfslog_path2, F_OK|R_OK) != -1) {
+		sys_ret = system(cmd_cp_hcfslog);
+		check_system_result();
+	}
+
+	/* logcat */
+	sys_ret = system(cmd_dump_logcat);
+	check_system_result();
+
+	/* dmesg */
+	sys_ret = system(cmd_dump_dmesg);
+	check_system_result();
+
+	return 0;
+>>>>>>> android-dev
 }

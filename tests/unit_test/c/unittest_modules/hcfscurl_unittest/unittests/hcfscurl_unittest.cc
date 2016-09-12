@@ -20,6 +20,7 @@ void *set_swift_token(void *)
 	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
 	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
 	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+	return NULL;
 }
 
 class hcfscurlEnvironment : public ::testing::Environment {
@@ -41,6 +42,7 @@ class hcfscurlEnvironment : public ::testing::Environment {
 		void TearDown()
 		{
 			free(system_config);
+			sem_destroy(&(hcfs_system->access_sem));
 			free(hcfs_system);
 		}
 };
@@ -66,7 +68,8 @@ TEST_F(parse_http_header, Parse_Header){
     EXPECT_EQ(object_meta->comp_alg, 1);
     EXPECT_EQ(object_meta->enc_alg, 1);
     EXPECT_EQ(ret, 0);
-
+    free(object_meta->enc_session_key);
+    free(object_meta);
 }
 
 /*
@@ -93,8 +96,8 @@ protected:
 
 	void TearDown()
 	{
-		if (curl_handle)
-			 free(curl_handle);
+		free(curl_handle);
+		curl_handle = NULL;
 	}
 };
 
@@ -223,8 +226,8 @@ protected:
 
 	void TearDown()
 	{
-		if (curl_handle)
-			free(curl_handle);
+		free(curl_handle);
+		curl_handle = NULL;
 	}
 
 };
@@ -382,8 +385,8 @@ protected:
 
 	void TearDown()
 	{
-		if (curl_handle)
-			free(curl_handle);
+		free(curl_handle);
+		curl_handle = NULL;
 
 		fclose(fptr);
 		if (!access(objpath, F_OK));
@@ -530,8 +533,8 @@ protected:
 
 	void TearDown()
 	{
-		if (curl_handle)
-			free(curl_handle);
+		free(curl_handle);
+		curl_handle = NULL;
 
 		fclose(fptr);
 		if (!access(objpath, F_OK));
@@ -665,13 +668,12 @@ protected:
 		let_retry = FALSE;
 
 		objname = "here_is_obj";
-		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 	}
 
 	void TearDown()
 	{
-		if (curl_handle)
-			free(curl_handle);
+		free(curl_handle);
+		curl_handle = NULL;
 	}
 };
 

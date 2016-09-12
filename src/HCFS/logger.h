@@ -43,7 +43,7 @@ typedef struct {
 LOG_STRUCT *logptr;   /* Pointer to log structure */
 
 int32_t open_log(char *filename);
-int32_t write_log(int32_t level, char *format, ...);
+int32_t write_log(int32_t level, const char *format, ...);
 int32_t close_log(void);
 
 #endif  /* GW20_HCFS_LOGGER_H_ */

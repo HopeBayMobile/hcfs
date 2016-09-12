@@ -124,6 +124,7 @@ int32_t main()
 	free(res17);
 
 	char *res18;
+<<<<<<< HEAD
 	HCFS_trigger_restore(&res18);
 	printf("trigger restore - %s\n", res18);
 	free(res18);
@@ -137,5 +138,10 @@ int32_t main()
 	HCFS_notify_applist_change(&res20);
 	printf("notify applist change - %s\n", res20);
 	free(res20);
+=======
+	HCFS_collect_sys_logs(&res18);
+	printf("collect sys logs - %s\n", res18);
+	free(res18);
+>>>>>>> android-dev
 }
 

@@ -62,8 +62,7 @@ protected:
 			inode_cache_usage_hash[index] = NULL;
 		}
 
-		if (hcfs_system)
-			free(hcfs_system);
+		free(hcfs_system);
 	}
 	
 	void generate_mock_cache_node(const int32_t num_node)
@@ -157,6 +156,7 @@ TEST_F(return_cache_usage_nodeTest, GetNodeSuccess)
 		tmp_node = return_cache_usage_node(node_id);
 		ASSERT_TRUE(tmp_node != NULL) << "node_id = " << node_id << std::endl;
 		ASSERT_EQ(tmp_node->this_inode, node_id);
+		free(tmp_node);
 	}
 }
 
@@ -251,6 +251,7 @@ protected:
 		for (i = 0 ; i < answer_node_list.size() ; i++)
 			free(answer_node_list[i]);
 		nftw(BLOCKPATH, do_delete, 20, FTW_DEPTH);
+		free(system_config->blockpath);
 		free(system_config);
 
 		BaseClassForCacheUsageArray::TearDown();

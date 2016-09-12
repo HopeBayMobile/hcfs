@@ -1672,7 +1672,7 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 *************************************************************************/
 int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
-	int32_t ret_val;
+	int32_t ret_val = 0;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
@@ -1683,7 +1683,6 @@ int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 	if (target_ptr->fptr == NULL)
 		return 0;
 
-	ret_val = 0;
 	if (META_CACHE_FLUSH_NOW == TRUE)
 		ret_val = flush_single_entry(target_ptr);
 

@@ -29,6 +29,8 @@
 #include "macro.h"
 #include "logger.h"
 
+#define DEFAULT_NOTIFY_SERVER "mgmt.api.sock"
+
 char *notify_server_path = NULL;
 EVENT_QUEUE *event_queue;
 
@@ -78,6 +80,15 @@ int32_t init_event_queue()
 		free(event_queue);
 		return -ret_code;
 	}
+
+	/* Set default notify server loc */
+	notify_server_path = malloc(strlen(DEFAULT_NOTIFY_SERVER) + 1);
+	if (notify_server_path == NULL) {
+		write_log(4, "%s, errno - %d\n"
+			"Failed to set default notify server", errno);
+		return -errno;
+	}
+	strcpy(notify_server_path, DEFAULT_NOTIFY_SERVER);
 
 	return 0;
 }
@@ -344,6 +355,7 @@ int32_t send_event_to_server(int32_t fd, char *events_in_json)
 		return -errno;
 
 	r_size = recv(fd, &ret_val, sizeof(int32_t), MSG_NOSIGNAL);
+	UNUSED(r_size);
 	if (ret_val == SERVERREPLYOK)
 		return 0;
 	else

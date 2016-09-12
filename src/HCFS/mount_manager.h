@@ -28,9 +28,13 @@
 #include "path_reconstruct.h"
 #endif
 
-#define MP_DEFAULT 1
-#define MP_READ 2
-#define MP_WRITE 3
+enum MP_TYPE {
+	MP_DEFAULT = 1,
+	MP_READ,
+	MP_WRITE,
+	__MP_TYPE_END /* Set total mp type number. Keep this at end of list */
+};
+#define MP_TYPE_NUM (__MP_TYPE_END - MP_DEFAULT)
 
 /*
 Binary search tree
@@ -68,6 +72,15 @@ typedef struct {
 } FS_CLOUD_STAT_T_V1;
 
 #define FS_CLOUD_STAT_T FS_CLOUD_STAT_T_V2
+
+/* TODO: If we have multiple mount volumns with mp mode, MOUNT_T_GLOBAL need be
+ * privatized and shared between views of same volumn */
+enum MP_CHAN_TYPE { FUSE_DEFAULT, FUSE_WRITE, FUSE_READ };
+typedef struct {
+	struct fuse_chan *ch[MP_TYPE_NUM + 1];
+} MOUNT_T_GLOBAL;
+
+extern MOUNT_T_GLOBAL mount_global;
 
 typedef struct {
 	ino_t f_ino;

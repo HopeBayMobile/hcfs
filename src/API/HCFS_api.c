@@ -758,7 +758,7 @@ void HCFS_check_restore_status(char **json_res)
 	close(fd);
 }
 
-void HCFS_notify_applist_change(char **json_res)
+void HCFS_collect_sys_logs(char **json_res)
 {
 	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
@@ -769,7 +769,7 @@ void HCFS_notify_applist_change(char **json_res)
 		return;
 	}
 
-	code = NOTIFY_APPLIST_CHANGE;
+	code = COLLECTSYSLOGS;
 	cmd_len = 0;
 
 	send(fd, &code, sizeof(uint32_t), 0);
