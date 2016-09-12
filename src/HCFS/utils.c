@@ -1868,6 +1868,7 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 	free(name->swift_user); \
 	free(name->swift_pass); \
 	free(name->swift_url); \
+	free(name->swift_container); \
 	free(name->swift_protocol); \
 	free(name->s3_access); \
 	free(name->s3_secret); \
