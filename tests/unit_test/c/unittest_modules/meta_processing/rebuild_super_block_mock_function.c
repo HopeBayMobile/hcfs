@@ -3,6 +3,9 @@
 #include "fuseop.h"
 #include "mount_manager.h"
 #include "rebuild_super_block_params.h"
+#include "meta_mem_cache.h"
+
+#include <errno.h>
 
 extern SYSTEM_CONF_STRUCT *system_config;
 
@@ -13,6 +16,7 @@ int32_t write_log(int32_t level, char *format, ...)
 
 int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	memset(inode_ptr, 0, sizeof(SUPER_BLOCK_ENTRY));
 	if (NOW_TEST_RESTORE_META == TRUE)
 		inode_ptr->this_index = 0;
 	return 0;
@@ -165,7 +169,10 @@ int32_t restore_meta_file(ino_t this_inode)
 {
 	char path[300];
 	FILE *fptr;
-	
+
+	if (RESTORED_META_NOT_FOUND == TRUE)
+		return -ENOENT;
+
 	fetch_meta_path(path, this_inode);
 	fptr = fopen(path, "w+");
 	fseek(fptr, 0, SEEK_SET);
@@ -204,5 +211,75 @@ int32_t init_rectified_system_meta(char restoration_stage)
 
 int32_t rectify_space_usage()
 {
+	return 0;
+}
+
+int32_t fetch_all_parents(ino_t self_inode, int32_t *parentnum,
+		ino_t **parentlist)
+{
+	if (NO_PARENTS == TRUE) {
+		*parentnum = 0;
+		*parentlist = NULL;
+	}
+
+	*parentnum = 1;
+	*parentlist = (ino_t *)malloc(sizeof(ino_t));
+	(*parentlist)[0] = 2;
+	return 0;
+}
+
+int32_t meta_cache_lookup_dir_data(ino_t this_inode,
+				   HCFS_STAT *inode_stat,
+				   DIR_META_TYPE *dir_meta_ptr,
+				   DIR_ENTRY_PAGE *dir_page,
+				   META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	char name[200];
+	int32_t idx;
+
+	if (dir_meta_ptr) {
+		memset(dir_meta_ptr, 0, sizeof(DIR_META_TYPE));
+		dir_meta_ptr->tree_walk_list_head = 1234;
+	}
+
+	if (dir_page) {
+		dir_page->num_entries = 50;
+		memset(dir_page, 0, sizeof(DIR_ENTRY_PAGE));
+		for (idx = 0; idx < dir_page->num_entries; idx++) {
+			if (idx % 2)
+				dir_page->dir_entries[idx].d_ino = 10;
+			else
+				dir_page->dir_entries[idx].d_ino = 20;
+			sprintf(name, "test%d", idx);
+			strcpy(dir_page->dir_entries[idx].d_name, name);
+			dir_page->dir_entries[idx].d_type = D_ISREG;
+		}
+	}
+	return 0;
+}
+
+META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
+{
+	return 0;
+}
+
+int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+{
+	return 0;
+}
+
+int32_t lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+
+int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
+			const char *childname,
+			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
+			BOOL is_external)
+{
+	remove_list[remove_count] = malloc(strlen(childname));
+	strcpy(remove_list[remove_count++], childname);
+
 	return 0;
 }

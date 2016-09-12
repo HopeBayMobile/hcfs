@@ -26,6 +26,7 @@
 #include "hfuse_system.h"
 #include "rebuild_parent_dirstat.h"
 #include "do_restoration.h"
+#include "parent_lookup.h"
 
 #define LOCK_QUEUE_FILE() sem_wait(&(rebuild_sb_jobs->queue_file_sem))
 #define UNLOCK_QUEUE_FILE() sem_post(&(rebuild_sb_jobs->queue_file_sem))
@@ -941,6 +942,179 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 }
 
 /**
+ * Find out all entries with inode number "this_inode" in parent folder
+ * pointed by parent_ptr.
+ */
+int32_t _dir_find_all_inodes(ino_t this_inode, int32_t *num_entries,
+	DIR_ENTRY **entry_list, META_CACHE_ENTRY_STRUCT *parent_ptr,
+	BOOL *is_external)
+{
+	DIR_META_TYPE tempmeta;
+	DIR_ENTRY_PAGE temp_page;
+	int32_t ret, errcode;
+	int32_t count;
+	int32_t now_size, max_size;
+	DIR_ENTRY *tmpptr;
+
+	*is_external = FALSE;
+	max_size = 5;
+	now_size = 0;
+	*entry_list = (DIR_ENTRY *) malloc(sizeof(DIR_ENTRY) * max_size);
+	if (*entry_list == NULL)
+		return -ENOMEM;
+
+	ret = meta_cache_lookup_dir_data(parent_ptr->inode_num, NULL, &tempmeta,
+						NULL, parent_ptr);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	/* Find out all entries */
+	memset(&temp_page, 0, sizeof(DIR_ENTRY_PAGE));
+	temp_page.this_page_pos = tempmeta.tree_walk_list_head;
+	while (temp_page.this_page_pos != 0) {
+		ret = meta_cache_lookup_dir_data(parent_ptr->inode_num, NULL,
+						NULL, &temp_page, parent_ptr);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
+		for (count = 0; count < temp_page.num_entries; count++) {
+			if (temp_page.dir_entries[count].d_ino != this_inode)
+				continue;
+			memcpy(&((*entry_list)[now_size]),
+					&(temp_page.dir_entries[count]),
+					sizeof(DIR_ENTRY));
+			now_size++;
+			if (now_size >= max_size) {
+				max_size += 10;
+				tmpptr = (DIR_ENTRY *) realloc(*entry_list,
+						max_size * sizeof(DIR_ENTRY));
+				if (tmpptr == NULL) {
+					errcode = -ENOMEM;
+					goto errcode_handle;
+				}
+				*entry_list = tmpptr;
+			}
+		}
+		temp_page.this_page_pos = temp_page.tree_walk_next;
+	}
+
+	*num_entries = now_size;
+	if (now_size == 0) {
+		errcode = -ENOENT;
+		goto errcode_handle;
+	}
+
+	return 0;
+
+errcode_handle:
+	FREE(*entry_list);
+	*num_entries = 0;
+	return errcode;
+}
+
+/**
+ * Given an inode number "this_inode", remove all entries in parent folders
+ * and delete parent lookup table.
+ */
+int32_t prune_this_entry(ino_t this_inode)
+{
+	ino_t *parentlist = NULL;
+	ino_t parent_inode;
+	int32_t parentnum;
+	int32_t ret, idx;
+	DIR_ENTRY *entry_list = NULL;
+	int32_t count, num_entries;
+	META_CACHE_ENTRY_STRUCT *body_ptr = NULL;
+	BOOL is_external;
+	mode_t this_mode;
+
+	sem_wait(&pathlookup_data_lock);
+	ret = fetch_all_parents(this_inode, &parentnum, &parentlist);
+	sem_post(&pathlookup_data_lock);
+	if (ret < 0)
+		write_log(0, "Error: Fail to fetch parent in %s. Code %d",
+			__func__, -ret);
+	if (parentnum == 0) {
+		/* No parent, it may be removed by others. Just do nothing. */
+		write_log(6, "Info: inode %"PRIu64" has no parents",
+				(uint64_t)this_inode);
+		return 0;
+	} else {
+		for (idx = 0; idx < parentnum; idx++)
+			write_log(6, "Info: inode %"PRIu64" has parent inode %"
+				PRIu64, (uint64_t)this_inode,
+				(uint64_t)parentlist[idx]);
+	}
+
+	for (idx = 0; idx < parentnum; idx++) {
+		parent_inode = parentlist[idx];
+		/* If this parent is found in list, then the parent meta
+		 * had been downloaded. Hence we can lock its meta cache. */
+		body_ptr = meta_cache_lock_entry(parent_inode);
+		if (body_ptr == NULL) {
+			write_log(0, "Error: Fail to lock parent inode %"
+				PRIu64" in %s. Skip to prune.", __func__);
+			continue;
+		}
+		ret = _dir_find_all_inodes(this_inode, &num_entries,
+				&entry_list, body_ptr, &is_external);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(4, "Warn: inode %"PRIu64" not exist"
+					" in parent inode %"PRIu64, (uint64_t)
+					this_inode, (uint64_t)parent_inode);
+			} else {
+				write_log(0, "Error: Fail to fetch inode in %s."
+					" Code %d", __func__, -ret);
+			}
+			meta_cache_unlock_entry(body_ptr);
+			continue;
+		}
+		/* Each entry ahs the same type and inode num */
+		switch (entry_list[0].d_type) {
+		case D_ISREG: this_mode = S_IFREG; break;
+		case D_ISDIR: this_mode = S_IFDIR; break;
+		case D_ISLNK: this_mode = S_IFLNK; break;
+		case D_ISFIFO: this_mode = S_IFIFO; break;
+		case D_ISSOCK: this_mode = S_IFSOCK; break;
+		default:
+			write_log(0, "Error: Type is %d",
+				entry_list[0].d_type);
+			FREE(entry_list);
+			meta_cache_unlock_entry(body_ptr);
+			continue;
+		}
+		/* Remove all entries */
+		for (count = 0; count < num_entries; count++) {
+			ret = dir_remove_entry(parent_inode, this_inode,
+				entry_list[count].d_name, this_mode,
+				body_ptr, is_external);
+			if (ret < 0 && ret != ENOENT) /* Do not care ENOENT */
+				write_log(0, "Error: Fail to remove entry %s."
+					" Code %d", entry_list[count].d_name,
+					-ret);
+		}
+
+		FREE(entry_list);
+		meta_cache_unlock_entry(body_ptr);
+
+		/* Delete parent lookup entry */
+		sem_wait(&(pathlookup_data_lock));
+		ret = lookup_delete_parent(this_inode, parent_inode);
+		if (ret < 0 && ret != ENOENT)
+			write_log(0, "Error: Fail to delete parent. Code %d",
+					-ret);
+		sem_post(&(pathlookup_data_lock));
+	}
+
+	return 0;
+}
+
+/**
  * Given an inode number, restore meta and then rebuild super block entry.
  * This function first check super block entry so that ensure whether this
  * meta and super block entry had been restored. If it inode numebr field is
@@ -973,10 +1147,33 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 					sizeof(HCFS_STAT));
 		return 0;
 	}
+	if (sb_entry.status == TO_BE_RECLAIMED) {
+		/* This file had been removed since object not found, but
+		 * still need to try to prune entries for those parent relation
+		 * established after last pruning */
+		prune_this_entry(this_inode);
+		return -ENOENT;
+	}
 
 	/* Restore meta file */
 	ret = restore_meta_file(this_inode);
 	if (ret < 0) {
+		/* Exception handling when meta is not
+		 * found on cloud */
+		if (ret == -ENOENT) {
+			write_log(4, "Warn: Begin to remove inode %"PRIu64
+				" from parent", (uint64_t)this_inode);
+			prune_this_entry(this_inode);
+			super_block_exclusive_locking();
+			read_super_block_entry(this_inode, &sb_entry);
+			if (sb_entry.status != TO_BE_RECLAIMED) {
+				/* Set status so that it will not be fetched
+				 * from backend again */
+				sb_entry.status = TO_BE_RECLAIMED;
+				write_super_block_entry(this_inode, &sb_entry);
+			}
+			super_block_exclusive_release();
+		}
 		write_log(2, "Warn: Fail to restore meta%"PRIu64". Code %d",
 			(uint64_t)this_inode, -ret);
 		return ret;
