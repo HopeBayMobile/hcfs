@@ -8,9 +8,14 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
  6. Case-only renaming in emulated volume (sdcard) is not working now. This will be resolved in a later release.
 
+v 2.2.2.1655
+=====
+## Bug Fixed
+- [HCFS] hotfix/curl_NOSIGNAL (!558)
+- [HCFS] fix/graceful_umount_hcfs (!540)
+
 v 2.2.2.1465
 =====
-
 ## Fixes 
  - [HCFS] Fixed #12713: hotfix/returnEIO_when_cache_full_and_nothing_replace (!527)
  - [Nexus-5x] Fix/issue 12529 [!36](gateway-2-0/nexus-5x!36)
