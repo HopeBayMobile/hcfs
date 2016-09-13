@@ -243,7 +243,6 @@ int32_t check_restoration_status(void)
 		is_open = TRUE;
 		FREAD(restore_stat, 1, 90, fptr);
 		fclose(fptr);
-		is_open = FALSE;
 
 		if (strncmp(restore_stat, "downloading_minimal",
 		            strlen("downloading_minimal")) == 0) {
@@ -262,7 +261,6 @@ int32_t check_restoration_status(void)
 errcode_handle:
 	if (is_open) {
 		fclose(fptr);
-		is_open = FALSE;
 	}
 	sem_post(&restore_sem);
 
@@ -719,7 +717,6 @@ int32_t _fetch_pinned(ino_t thisinode)
 	if (write_page == TRUE) {
 		FSEEK(fptr, filepos, SEEK_SET);
 		FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
-		write_page = FALSE;
 	}
 	/* Update file stats */
 	file_stats_pos = offsetof(FILE_META_HEADER, fst);
@@ -748,6 +745,11 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 
 	if (strcmp(nowpath, "/data/app") == 0)
 		return 1;
+
+	/* If in /data/app, need to pull down everything now */
+	/* App could be installed but not pinned by management app */
+	if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
+		return 5;
 
 	if (strcmp(nowpath, "/data/data") == 0)
 		return 1;
@@ -1294,6 +1296,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		expand_val = _check_expand(thisinode, nowpath, depth);
 		if (expand_val == 0)
 			return 0;
+		if (expand_val == 5)
+			can_prune = TRUE;
 	} else {
 		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;
@@ -1939,19 +1943,6 @@ int32_t run_download_minimal(void)
 
 	sem_post(&restore_sem);
 
-	/* FEATURE TODO: Move the renaming to the start of stage 2 */
-	/* Renaming package list backup to the original location */
-	/* FEATURE TODO: If need to make sure that package list is backed up,
-	perhaps should delay upload sync to after package data creation has
-	stopped for a few seconds */
-	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
-	rename(despath, PACKAGE_XML);
-	chown(PACKAGE_XML, SYSTEM_UID, SYSTEM_GID);
-	chmod(PACKAGE_XML, 0660);
-	system("restorecon /data/system/packages.xml");
-	
-	unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
-
 	if (to_delete_fptr != NULL)
 		fclose(to_delete_fptr);
 	fclose(to_sync_fptr);
@@ -1968,11 +1959,10 @@ errcode_handle:
 int _delete_node(const char *thispath, const struct stat *thisstat,
 		int flag, struct FTW *buf)
 {
-	int ret, errcode;
+	int ret, errcode = 0;
 
 	UNUSED(buf);
 	UNUSED(thisstat);
-	errcode = 0;
 	switch (flag) {
 	case FTW_F:
 		UNLINK(thispath);
