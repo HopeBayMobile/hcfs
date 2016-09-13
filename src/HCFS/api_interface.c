@@ -1516,12 +1516,16 @@ void api_module(void *index)
 			break;
 		case SETNOTIFYSERVER:
 			retcode = set_notify_server_loc(arg_len, largebuf);
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case SETSWIFTTOKEN:
 			retcode = set_swift_token(arg_len, largebuf);
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
