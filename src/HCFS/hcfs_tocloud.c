@@ -1052,7 +1052,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	uint8_t now_pin_status = NUM_PIN_TYPES + 1;
 	uint8_t last_pin_status = NUM_PIN_TYPES + 1;
 	int64_t pin_size_delta = 0, last_file_size = 0;
-	int64_t size_diff_blk, meta_size_diff_blk;
+	int64_t size_diff_blk = 0, meta_size_diff_blk = 0;
 	int64_t disk_pin_size_delta = 0;
 
 	progress_fd = ptr->progress_fd;
@@ -2355,10 +2355,8 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
 	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL);
-	if ((ret < 200) || (ret > 299)) {
-		errcode = -EIO;
+	if ((ret < 200) || (ret > 299))
 		goto errcode_handle;
-	}
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 	fptr = NULL;
@@ -2366,6 +2364,7 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 	return;
 errcode_handle:
 	if (fptr != NULL) {
+		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		fptr = NULL;
 	}
@@ -2482,4 +2481,15 @@ errcode_handle:
 	}
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	return errcode;
+}
+
+void force_backup_package(void)
+{
+	/* Do not backup now if network is down */
+	if (hcfs_system->sync_paused == TRUE)
+		return;
+
+	sem_wait(&(sync_stat_ctl.stat_op_sem));
+	_try_backup_package_list(&(sync_stat_ctl.statcurl));
+	sem_post(&(sync_stat_ctl.stat_op_sem));
 }

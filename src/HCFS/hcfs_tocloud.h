@@ -160,4 +160,6 @@ int32_t select_upload_thread(char is_block, char is_delete,
 		int64_t e_index, int32_t progress_fd,
 		char backend_delete_type);
 int32_t unlink_upload_file(char *filename);
+
+void force_backup_package(void);
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

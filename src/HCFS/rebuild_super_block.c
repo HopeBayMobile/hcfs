@@ -46,6 +46,8 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	int64_t num_dir, num_nondir;
 	ino_t *dir_nodes, *nondir_nodes;
 
+	*roots = NULL;
+	*num_inodes = 0;
 	sprintf(fsmgr_path, "%s/fsmgr", METAPATH);
 	if (access(fsmgr_path, F_OK) < 0) {
 		errcode = errno;
@@ -267,8 +269,8 @@ int32_t init_rebuild_sb(char rebuild_action)
 {
 	char queue_filepath[200];
 	int32_t ret, errcode;
-	ino_t *roots;
-	int64_t num_roots;
+	ino_t *roots = NULL;
+	int64_t num_roots = 0;
 	int64_t ret_pos;
 
 	write_log(10, "Initing sb rebuilding\n");
@@ -312,12 +314,16 @@ int32_t init_rebuild_sb(char rebuild_action)
 			return ret;
 		/* Init queue file */
 		ret = _init_rebuild_queue_file(roots, num_roots);
-		if (ret < 0)
+		if (ret < 0) {
+			free(roots);
 			return ret;
+		}
 		/* Init sb header */
 		ret = _init_sb_head(roots, num_roots);
-		if (ret < 0)
+		if (ret < 0) {
+			free(roots);
 			return ret;
+		}
 		free(roots);
 
 	} else if (rebuild_action == KEEP_REBUILD_SB){
@@ -341,8 +347,10 @@ int32_t init_rebuild_sb(char rebuild_action)
 			if (ret < 0)
 				return ret;
 			ret = _init_rebuild_queue_file(roots, num_roots);
-			if (ret < 0)
+			if (ret < 0) {
+				free(roots);
 				return ret;
+			}
 			free(roots);
 		}
 	} else {
@@ -586,7 +594,6 @@ static int32_t _worker_get_job(int32_t tidx, INODE_JOB_HANDLE *inode_job)
 {
 	int32_t ret;
 
-	ret = 0;
 	pthread_mutex_lock(&(rebuild_sb_jobs->job_mutex));
 	while (1) {
 		memset(inode_job, 0, sizeof(INODE_JOB_HANDLE));
@@ -924,6 +931,10 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 		if (S_ISREG(this_stat->mode)) {
 			/* Enqueue and set as ST_PINNING */
 			ret = pin_ll_enqueue(this_inode, &sb_entry);
+			if (ret < 0) {
+				super_block_exclusive_release();
+				return ret;
+			}
 			sb_entry.pin_status = ST_PINNING;
 		} else {
 			sb_entry.pin_status = ST_PIN;
