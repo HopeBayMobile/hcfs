@@ -73,7 +73,7 @@ typedef struct {
 	HCFS_STAT_v1 stat;
 } RET_META;
 
-int32_t list_external_volume(char *meta_path,
+int32_t list_volume(char *meta_path,
 			     PORTABLE_DIR_ENTRY **ptr_ret_entry,
 			     uint64_t *ret_num);
 

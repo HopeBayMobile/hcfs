@@ -26,16 +26,16 @@
 
 /************************************************************************
 *
-* Function name: list_external_volume
+* Function name: list_volume
 *        Inputs: int32_t buf_num,
 *                DIR_ENTRY *ret_entry,
 *                int32_t *ret_num
-*       Summary: load fsmgr file and return all external volume
+*       Summary: load fsmgr file and return all volume
 *
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t list_external_volume(const char *fs_mgr_path,
+int32_t list_volume(const char *fs_mgr_path,
 			     PORTABLE_DIR_ENTRY **entry_array_ptr,
 			     uint64_t *ret_num)
 {
@@ -47,6 +47,8 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	int32_t meta_fd;
 	ssize_t ret_val;
 	int32_t tmp_errno = 0;
+	struct stat st;
+	off_t remain_size;
 	PORTABLE_DIR_ENTRY *ret_entry;
 
 	ret_val = 0;
@@ -55,8 +57,22 @@ int32_t list_external_volume(const char *fs_mgr_path,
 		return ERROR_SYSCALL;
 
 	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	if (ret_val == -1 || ret_val < sizeof(DIR_META_TYPE)) {
+		errno = (ret_val == -1)?errno:EINVAL;
+		goto errcode_handle;
+	}
+
+	/* check remain size of fsmgr file is mutiple of
+	 *  sizeof(DIR_ENTRY_PAGE)
+	 */
+	ret_val = fstat(meta_fd, &st);
 	if (ret_val == -1)
 		goto errcode_handle;
+	remain_size = st.st_size - sizeof(DIR_META_TYPE) - 16;
+	if (remain_size % sizeof(DIR_ENTRY_PAGE) != 0) {
+		errno = EINVAL;
+		goto errcode_handle;
+	}
 
 	/* Initialize B-tree walk by first loading the first node of the
 	 * tree walk.
@@ -67,8 +83,10 @@ int32_t list_external_volume(const char *fs_mgr_path,
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
 		/*printf("ret_val %zu\n", ret_val);*/
-		if (ret_val == -1)
+		if (ret_val == -1 || ret_val < sizeof(DIR_ENTRY_PAGE)) {
+			errno = (ret_val == -1)?errno:EINVAL;
 			goto errcode_handle;
+		}
 		num_walked += tpage.num_entries;
 		next_node_pos = tpage.tree_walk_next;
 	}
@@ -83,21 +101,29 @@ int32_t list_external_volume(const char *fs_mgr_path,
 	while (next_node_pos != 0) {
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
 				    next_node_pos);
-		if (ret_val == -1)
+		if (ret_val == -1 || ret_val < sizeof(DIR_ENTRY_PAGE)) {
+			errno = (ret_val == -1)?errno:EINVAL;
 			goto errcode_handle;
+		}
 		for (count = 0; count < tpage.num_entries; count++) {
+
 			switch (tpage.dir_entries[count].d_type) {
+			case ANDROID_INTERNAL:
 			case ANDROID_EXTERNAL:
 			case ANDROID_MULTIEXTERNAL:
 				ret_entry[num_walked].inode =
-				    tpage.dir_entries[count].d_ino;
+					tpage.dir_entries[count].d_ino;
+				ret_entry[num_walked].d_type =
+					tpage.dir_entries[count].d_type;
 				strncpy(ret_entry[num_walked].d_name,
 					tpage.dir_entries[count].d_name,
 					sizeof(ret_entry[num_walked].d_name));
 				num_walked++;
 				break;
 			default:
-				break;
+				/* undefined d_ype */
+				errno = EINVAL;
+				goto errcode_handle;
 			}
 		}
 		next_node_pos = tpage.tree_walk_next;
@@ -111,7 +137,7 @@ errcode_handle:
 end:
 	close(meta_fd);
 	errno = tmp_errno;
-	return (ret_val >= 0) ? 0 : ERROR_SYSCALL;
+	return (errno == 0) ? 0 : ERROR_SYSCALL;
 }
 
 int32_t check_meta_ver(HCFS_STAT_v1 const *meta_stat)
