@@ -2276,7 +2276,6 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
-		/* Write a new one to disk */
 		fptr = fopen(fname, "w");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -2288,15 +2287,28 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		setbuf(fptr, NULL);
 		flock(fileno(fptr), LOCK_EX);
 		is_fopen = TRUE;
-		write_log(4, "Writing a new cloud stat\n");
-		memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
-		FTRUNCATE(fileno(fptr), 0);
-		FSEEK(fptr, 0, SEEK_SET);
-		FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		/* First try to download one */
+		ret = hcfs_get_object(fptr, objname,
+		                      &(sync_stat_ctl.statcurl), NULL);
+		if ((ret < 200) || (ret > 299)) {
+			if (ret != 404) {
+				errcode = -EIO;
+				goto errcode_handle;
+			}
+			/* Write a new one to disk if not found */
+			write_log(4, "Writing a new cloud stat\n");
+			memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
+			FTRUNCATE(fileno(fptr), 0);
+			FSEEK(fptr, 0, SEEK_SET);
+			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		}
+		/* TODO: How to validate cloud statistics if this
+		happens */
 		fsync(fileno(fptr));
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
+			
 	}
 
 	fptr = fopen(fname, "r+");
