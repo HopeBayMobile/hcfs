@@ -95,6 +95,9 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   tmpmount->is_unmount = FALSE;
   pthread_create(&(tmpmount->mt_thread), NULL,
 			mount_multi_thread, (void *) tmpmount);
+
+  free(argv[0]); free(argv[1]); free(argv[2]);
+  free(argv);
   return;
 }
 
@@ -188,6 +191,8 @@ class fuseopEnvironment : public ::testing::Environment {
     free(system_fh_table.direntry_table);
     free(sys_super_block);
     free(hcfs_system);
+    free(system_config->max_cache_limit);
+    free(system_config->max_pinned_limit);
     free(system_config);
 
     unlink("/tmp/testHCFS");
