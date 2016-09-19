@@ -512,10 +512,11 @@ errcode_handle:
 *************************************************************************/
 void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
+	char todel_metapath[400];
 	char backend_metapath[400];
 	char objname[500];
 	ino_t this_inode;
-	FILE *backend_metafptr;
+	FILE *backend_metafptr = NULL;
 	HCFS_STAT tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
@@ -547,9 +548,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_size_change = 0;
 	pin_size_delta = 0;
 
+	ret = fetch_todelete_path(todel_metapath, this_inode);
+	if (ret < 0) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		return;
+	}
+
 	/* Since there are no more todelete meta files, should download
 	 * backend meta for all d_type */
-	backend_metafptr = NULL;
 	fetch_del_backend_meta_path(backend_metapath, this_inode);
 	backend_metafptr = fopen(backend_metapath, "w+");
 	if (backend_metafptr == NULL) {
@@ -581,6 +587,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
+		/* todelete meta file may existed if system had been upgraded */
+		unlink(todel_metapath);
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 		return;
 	}
@@ -594,6 +602,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		_check_del_progress_file(this_inode);
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
+		/* todelete meta file may existed if system had been upgraded */
+		unlink(todel_metapath);
 		super_block_delete(this_inode);
 		super_block_reclaim();
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
@@ -725,6 +735,8 @@ errcode_handle:
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
 	}
+	/* todelete meta file may existed if system had been upgraded */
+	unlink(todel_metapath);
 
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {

@@ -1310,9 +1310,9 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta,
 }
 
 /* Helper function to check if this inode had been synced to cloud. */
-static inline int32_t _check_meta_on_cloud(ino_t this_inode,
-		char d_type, BOOL *meta_on_cloud,
-		int64_t *metasize, int64_t *metalocalsize)
+int32_t check_meta_on_cloud(ino_t this_inode,
+			char d_type, BOOL *meta_on_cloud,
+			int64_t *metasize, int64_t *metalocalsize)
 {
 	char thismetapath[400];
 	char thisprofilepath[400];
@@ -1322,11 +1322,6 @@ static inline int32_t _check_meta_on_cloud(ino_t this_inode,
 	off_t offset;
 	ssize_t ret_ssize;
 	struct stat tmpstat;
-
-	if (CURRENT_BACKEND == NONE) {
-		*meta_on_cloud = FALSE;
-		return 0;
-	}
 
 	if (d_type == D_ISREG)
 		ret = fetch_todelete_path(thismetapath, this_inode);
@@ -1344,6 +1339,11 @@ static inline int32_t _check_meta_on_cloud(ino_t this_inode,
 	}
 	*metasize = tmpstat.st_size;
 	*metalocalsize = tmpstat.st_blocks * 512;
+
+	if (CURRENT_BACKEND == NONE) {
+		*meta_on_cloud = FALSE;
+		return 0;
+	}
 
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
@@ -1381,7 +1381,6 @@ static inline int32_t _check_meta_on_cloud(ino_t this_inode,
 	fclose(metafptr);
 
 	fetch_progress_file_path(thisprofilepath, this_inode);
-
 	if ((access(thisprofilepath, F_OK) == -1) &&
 			(this_clouddata.upload_seq == 0))
 		*meta_on_cloud = FALSE;
@@ -1391,6 +1390,7 @@ static inline int32_t _check_meta_on_cloud(ino_t this_inode,
 	return 0;
 
 errcode_handle:
+	flock(fileno(metafptr), LOCK_UN);
 	fclose(metafptr);
 	errcode = errno;
 	return -errcode;
@@ -1461,7 +1461,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
-		ret = _check_meta_on_cloud(this_inode, d_type,
+		ret = check_meta_on_cloud(this_inode, d_type,
 				&meta_on_cloud, &metasize, &metasize_blk);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
@@ -1647,7 +1647,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		/* Remove to-delete meta if no backend or
 		 * this inode hadn't been synced */
-		ret = _check_meta_on_cloud(this_inode, d_type,
+		ret = check_meta_on_cloud(this_inode, d_type,
 				&meta_on_cloud, &metasize, &metasize_blk);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
@@ -2394,7 +2394,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 			goto error_handling;
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, dirmeta.finished_seq);
-	
+
 	} else if (S_ISLNK(bptr->this_stat.mode)) {
 		ret = meta_cache_lookup_symlink_data(this_inode, NULL, &symmeta,
 				bptr);
@@ -2407,7 +2407,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 			goto error_handling;
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, symmeta.finished_seq);
-	
+
 	} else {
 		ret = -EINVAL;
 		goto error_handling;
@@ -2454,7 +2454,7 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 
 	return 0;
 }
-	
+
 static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
 {
 	if (namespace == SECURITY) {
@@ -2477,7 +2477,7 @@ static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
  * @param selbody_ptr Self meta cache entry, which had been locked.
  *
  * @return 0 on success, otherwise negative errcode.
- */ 
+ */
 int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr)
 {
@@ -2505,7 +2505,7 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	/* Lock parent */
 	pbody_ptr = meta_cache_lock_entry(parent_inode);
 	if (!pbody_ptr) {
-		return -ENOMEM;		
+		return -ENOMEM;
 	}
 	ret = meta_cache_open_file(pbody_ptr);
 	if (ret < 0) {
@@ -2621,7 +2621,7 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 				}
 				value_buf_size = value_size + 100;
 				continue;
-			
+
 			} else { /* ok */
 				value_buf[value_size] = 0;
 			}
