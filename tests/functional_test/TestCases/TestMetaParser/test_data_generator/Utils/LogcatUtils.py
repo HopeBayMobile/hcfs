@@ -9,7 +9,8 @@ class Logcat(object):
     08-15 08:36:43.657  4394  5658 W HopeBay : TeraAPIServer->MgmtApiUtils(run): eventID=1
     08-15 08:36:43.729  4394  4394 D HopeBay : GoogleSignInApiClient(onConnected):
 
-    We parse to [(datetime, type, log), ...] and store it to Logcat object.
+    We parse to [(datetime, level, log), ...] and store it to Logcat object.
+    ex:  [(datetime, "W", "loglog"), ...] 
     time format : "%m-%d %H:%M:%S.%f"
     """
 
@@ -20,8 +21,11 @@ class Logcat(object):
 
     def refresh(self, line_num=100):
         new_logs = self.parse(self.get_raw_logcat())
+        if not self.logs:
+            self.logs = new_logs
+            return
         last_time, _, last_log = self.logs[-1]
-        for i, timestamp, _, log in enumerate(new_logs):
+        for i, (timestamp, _, log) in enumerate(new_logs):
             if timestamp == last_time and log == last_log:
                 self.logs = new_logs[i:]
                 return
@@ -31,8 +35,8 @@ class Logcat(object):
             self.logs = new_logs
 
     def find_until(self, pattern, timeout_sec=300, interval=10):
-        for cur_time in [x * interval for x in range(1, timeout_sec / interval)]:
-            for timestamp, _, log in reversed(self.logs):
+        for _ in range(1, timeout_sec / interval):
+            for timestamp, _, log in self.logs:
                 if pattern in log:
                     return True, timestamp, log
             time.sleep(interval)
@@ -48,26 +52,25 @@ class Logcat(object):
         result = []
         for previous, log in [pair for pair in lines if len(pair) == 2]:
             # 08-15 08:36:43.657  4394  5658 W HopeBay
-            pieces = previous.split("  ")  # double space
-            if len(pieces) != 3:
+            pieces = filter(None, previous.split(" "))
+            if len(pieces) != 6:
                 continue
-            previous_pieces = [pieces[0], pieces[2]]
-            if not self.validate_date(previous_pieces[0]):
+            timestamp = pieces[0] + " " + pieces[1]
+            level = pieces[4]
+            if not self.validate_date(timestamp):
                 continue
-            # 5658 W HopeBay
-            pieces = previous_pieces[1].split(" ")  # single space
-            if len(pieces) != 3:
-                continue
-            one_log = (datetime.strptime(previous_pieces[0], self.TIME_FMT),)
-            one_log += (pieces[1], log)
+            one_log = (datetime.strptime(timestamp, self.TIME_FMT), level, log)
             result += [one_log]
         return result
 
     def get_raw_logcat(self):
-        cmd = "adb logcat -d -s " + self.tag
+        cmd = "adb logcat -d"
+        if self.tag:
+            cmd += " -s " + self.tag
         process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
         out, err = process.communicate()
-        assert not err, "Error when get raw log string"
+        if err:
+            raise Exception(err)
         return out
 
     def validate_date(self, date_text):
@@ -78,13 +81,20 @@ class Logcat(object):
             return False
 
 
+def clear_logcat():
+    cmd = "adb logcat -c "
+    process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    out, err = process.communicate()
+    return out, err
+
+
 def create_logcat_obj(tag):
     # Initial Logs object from this method
     return Logcat(tag)
 
 if __name__ == '__main__':
     import time
-    SYNC_FINISH_PATTERN = "TeraAPIServer->MgmtApiUtils(run): eventID=2"
+    SYNC_FINISH_PATTERN = "connect"
     logs = create_logcat_obj("HopeBay")
     print "len = " + repr(len(logs.logs))
     print logs.find_until(SYNC_FINISH_PATTERN)

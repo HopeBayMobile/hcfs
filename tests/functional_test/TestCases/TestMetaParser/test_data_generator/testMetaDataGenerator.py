@@ -1,14 +1,15 @@
 import os
+import time
 import shutil
 import string
 import random
 
-import config
-from swift import Swift
-import LogcatUtils
-from socket import socketToMgmtApp
-import HCFSConf
-import adb
+from Utils import config
+from Utils.swift import Swift
+from Utils import LogcatUtils
+from Utils.socket import socketToMgmtApp
+from Utils import HCFSConf
+from Utils import adb
 
 
 class TestMetaDataGenerator(object):
@@ -27,7 +28,7 @@ class TestMetaDataGenerator(object):
         self.swift = swift
 
     def get_data(self):
-        if not self.isAvailable():
+        if not self.is_available():
             return False
         self.get_swift_list()
         self.get_partition_stat()
@@ -38,12 +39,12 @@ class TestMetaDataGenerator(object):
         self.get_test_data_meta()
         return True
 
-    def isAvailable(self):
+    def is_available(self):
         # TODO: swift server binds account, maybe we can change checking rule...
         # TODO: adb in docker, need 1.debug bridge, 2.devices
         # access to usb
         self.logger.info("Check if the USB-connected phone is Ted phone")
-        return False if not adb.isAvailable(self.phone_id) else True
+        return False if not adb.is_available(self.phone_id) else True
 
     def get_swift_list(self):
         self.logger.info("Get swift list")
@@ -172,8 +173,10 @@ class TestMetaDataGenerator(object):
     def stat_child(self, path):
         cmd = "find " + path + " -mindepth 1 -maxdepth 1 | wc -l"
         out, err = adb.exec_cmd(cmd, self.phone_id)
-        assert not err, "Stat <" + path + "> error"
-        assert out.rstrip().isdigit(), "Stat error child number is not a integer"
+        if err:
+            raise Exception("Stat <" + path + "> error")
+        if not out.rstrip().isdigit():
+            raise Exception("Stat error child number is not a integer")
         return int(out.rstrip()) + 2  # . and ..
 
     def stat_inode(self, path): return self.stat("i", path)
@@ -203,15 +206,16 @@ class TestMetaDataGenerator(object):
     def stat(self, opt, path):
         cmd = "stat -c%" + opt + " " + path
         out, err = adb.exec_cmd(cmd, self.phone_id)
-        assert not err, "Stat <" + path + "> error"
-        assert out, "Stat <" + path + "> inode is empty"
+        if err:
+            raise Exception("Stat <" + path + "> error")
+        if not out:
+            raise Exception("Stat <" + path + "> result is empty")
         return out.rstrip()
 
     def get_random_string(self, size=6, chars=string.ascii_uppercase + string.digits):
         return "".join(random.choice(chars) for _ in range(size))
 
 if __name__ == '__main__':
-    import time
     socketToMgmtApp.setup()
     socketToMgmtApp.refresh_token()
     socketToMgmtApp.cleanup()
@@ -221,7 +225,9 @@ if __name__ == '__main__':
 
     logcat = LogcatUtils.create_logcat_obj("HopeBay")
     isFound, timestamp, log = logcat.find_until("setSwiftToken")
-    assert isFound, "Timeout while finding setSwiftToken API log in logcat"
+    if not isFound:
+        raise Exception(
+            "Timeout while finding setSwiftToken API log in logcat")
     # HCFSMgmtUtils(setSwiftToken): what we need
     content = log.split(":", 1)[1].strip()
     # url=https://61.219.202.83:8080/swift/v1, token=XXXX,
@@ -237,7 +243,7 @@ if __name__ == '__main__':
     test_data_dir = os.path.join(this_dir, "..", "TestCases", "test_data_v2")
     phone_id = "00f28ec4cb50a4f2"
     fsmgr = os.path.join(test_data_dir, "fsmgr")
-    inodes = ["/sdcard/DCIM/", "/sdcard/Download/1", "/data/data/2",
+    inodes = ["/sdcard/DCIM/", "/sdcard/1.f", "/data/data/2.f",
               "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock", "/data/data/com.hopebaytech.hcfsmgmt/databases/"]
     param = (phone_id, fsmgr, test_data_dir, inodes, swift)
 

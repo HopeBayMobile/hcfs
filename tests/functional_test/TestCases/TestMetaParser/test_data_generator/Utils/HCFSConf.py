@@ -21,11 +21,12 @@ logger = config.get_logger().getChild(__name__)
 def setup():
     logger.info("hcfsconf setup")
     cleanup()
-    assert adb.isAvailable(), "Adb device not found."
+    adb.check_availability()
 
     cmd = "cd " + HCFSCONF_BIN_DIR + " && make hcfsconf"
     subprocess.call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    assert os.path.isfile(HCFSCONF_BIN), "Fail to make hcfsconf."
+    if not os.path.isfile(HCFSCONF_BIN):
+        raise Exception("Fail to make hcfsconf.")
 
     adb.get_file(HCFSCONF_ENC_FILE, HCFSCONF_ENC_FILE_PATH, THIS_DIR, serialno)
 
@@ -33,13 +34,12 @@ def setup():
     plain_path = os.path.join(THIS_DIR, HCFSCONF_FILE)
     cmd = "cd " + HCFSCONF_BIN_DIR + " && ./hcfsconf dec " + enc_path + " " + plain_path
     subprocess.call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    assert os.path.isfile(plain_path), "Fail to dec hcfs.conf."
+    if not os.path.isfile(plain_path):
+        raise Exception("Fail to dec hcfs.conf.")
 
 
 def get_container():
-    value = get_by_key("SWIFT_CONTAINER")
-    assert value, "Fail to parse 'container' from dec hcfs.conf file"
-    return value
+    return get_by_key("SWIFT_CONTAINER")
 
 
 def get_by_key(key):
@@ -50,14 +50,15 @@ def get_by_key(key):
             cur_key = line.split(" = ", 2)[0]
             if cur_key == key:
                 return line.split(" = ", 2)[1].replace("\n", "")
-    return ""
+    raise Exception("Fail to find key(" + key + ") from hcfs.conf file")
 
 
 def cleanup():
     logger.info("hcfsconf cleanup")
     cmd = "cd " + HCFSCONF_BIN_DIR + " && make clean"
     subprocess.call(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-    assert not os.path.isfile(HCFSCONF_BIN), "Fail to make clean hcfsconf."
+    if os.path.isfile(HCFSCONF_BIN):
+        raise Exception("Fail to make clean hcfsconf.")
 
     try:
         os.remove(os.path.join(THIS_DIR, HCFSCONF_ENC_FILE))

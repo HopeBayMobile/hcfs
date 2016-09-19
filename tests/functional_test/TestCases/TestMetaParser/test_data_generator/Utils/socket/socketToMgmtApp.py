@@ -1,8 +1,8 @@
 import os
 from subprocess import Popen, PIPE
 
-import config
-import adb
+from .. import config
+from .. import adb
 
 logger = config.get_logger().getChild(__name__)
 
@@ -15,18 +15,21 @@ BIN_PHONE_PATH = "/data/socketToMgmtApp"
 
 def setup():
     logger.info("socket setup")
-    assert os.environ['ANDROID_NDK'], "ANDROID_NDK environment var not found."
-    assert adb.isAvailable(), "Adb device not found."
+    if not os.environ['ANDROID_NDK']:
+        raise EnvironmentError("ANDROID_NDK environment var not found.")
+    adb.check_availability()
     cleanup()
 
     cmd = "make"
     process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, cwd=THIS_DIR)
     out, err = process.communicate()
     logger.debug("setup" + repr((out, err)))
-    assert os.path.isfile(BIN_LOCAL_PATH), "Fail to make " + BIN_NAME
+    if not os.path.isfile(BIN_LOCAL_PATH):
+        raise Exception("Fail to make " + BIN_NAME)
 
     adb.push_as_root(BIN_LOCAL_PATH, BIN_PHONE_PATH, BIN_NAME)
-    assert adb.is_file_available(BIN_PHONE_PATH), "Fail to adb push bin file."
+    if not adb.is_file_available(BIN_PHONE_PATH):
+        raise Exception("Fail to adb push bin file.")
 
 
 def refresh_token():
@@ -39,13 +42,14 @@ def cleanup():
     logger.info("socket cleanup")
     if adb.is_file_available(BIN_PHONE_PATH):
         adb.rm_file(BIN_PHONE_PATH)
-        assert not adb.is_file_available(
-            BIN_PHONE_PATH), "Fail to clean bin file."
+        if adb.is_file_available(BIN_PHONE_PATH):
+            raise Exception("Fail to adb clean bin file.")
 
     cmd = "make clean"
     process = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE, cwd=THIS_DIR)
     process.communicate()
-    assert not os.path.isfile(BIN_LOCAL_PATH), "Fail to make clean."
+    if os.path.isfile(BIN_LOCAL_PATH):
+        raise Exception("Fail to make clean " + BIN_NAME)
 
 if __name__ == '__main__':
     setup()
