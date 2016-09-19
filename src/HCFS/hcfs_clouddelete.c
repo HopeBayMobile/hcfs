@@ -1006,6 +1006,9 @@ anything can be deleted */
 		}
 		super_block_share_release();
 
+		write_log(6, "Inode to delete is %" PRIu64 "\n",
+		          (uint64_t) inode_to_dsync);
+
 		/* Delete the meta/block of inode_to_dsync if it
 			finish dsynced. */
 		if (inode_to_dsync != 0) {

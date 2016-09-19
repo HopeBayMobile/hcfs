@@ -1058,6 +1058,10 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.ino = self_inode;
 
+	write_log(6, "Mknod: parent %" PRIu64 ", self %" PRIu64
+	          ", name %s\n", (uint64_t) parent_inode, (uint64_t) self_inode,
+	          selfname);
+
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
 			&this_stat, this_generation, tmpptr,
 			&delta_meta_size, ispin, is_external);
@@ -1214,6 +1218,10 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_stat.ino = self_inode;
+
+	write_log(6, "Mkdir: parent %" PRIu64 ", self %" PRIu64
+	          ", name %s\n", (uint64_t) parent_inode, (uint64_t) self_inode,
+	          selfname);
 
 	delta_meta_size = 0;
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
@@ -1699,9 +1707,9 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
 
-	write_log(8, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
+	write_log(6, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
 		  (uint64_t)parent_inode1);
-	write_log(8, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
+	write_log(6, "Rename target: name %s, parent %" PRIu64 "\n", selfname2,
 		  (uint64_t)parent_inode2);
 
 	/* Reject if name too long */

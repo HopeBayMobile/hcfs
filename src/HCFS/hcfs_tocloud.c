@@ -2259,7 +2259,7 @@ void upload_loop(void)
 			}
 		}
 		super_block_exclusive_release();
-		write_log(10, "Inode to sync is %" PRIu64 "\n",
+		write_log(6, "Inode to sync is %" PRIu64 "\n",
 			  (uint64_t)ino_sync);
 		/* Begin to sync the inode */
 		if (ino_sync != 0) {
