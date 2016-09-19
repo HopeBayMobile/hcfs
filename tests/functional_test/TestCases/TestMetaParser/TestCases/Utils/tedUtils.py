@@ -1,56 +1,50 @@
 import os
 
 
-def listdir_full(directory, filter_func=None, args=None):
-    if filter_func:
-        if args:
-            return [(os.path.join(directory, x), x) for x in os.listdir(directory) if filter_func(x, args)]
-        else:
-            return [(os.path.join(directory, x), x) for x in os.listdir(directory) if filter_func(x)]
-    else:
-        return [(os.path.join(directory, x), x) for x in os.listdir(directory)]
+def list_abspathes_filter_name(directory, filter_func):
+    return [os.path.join(directory, x) for x in os.listdir(directory) if filter_func(x)]
+    # return [(os.path.join(directory, x), x) for x in os.listdir(directory)]
 
 
-def listdir_path(directory, filter_func=None, args=None):
-    path_name_pairs = listdir_full(directory, filter_func, args)
-    pathes, names = zip(*path_name_pairs)
-    return pathes
+def file_name(path):
+    return path.split("/")[-1]
 
 
-def negate(func):
-    def new(obj, args=None):
-        if args:
-            return not func(obj, *args)
-        else:
-            return not func(obj)
-    return new
+# filter function
+def not_startswith(word):
+    def filter_func(check_one):
+        return not check_one.startswith(word)
+    return filter_func
 
 
-def run_once(f):
-    def wrapper(*args, **kwargs):
-        if not wrapper.has_run:
-            wrapper.has_run = True
-            return f(*args, **kwargs)
-    wrapper.has_run = False
-    return wrapper
+# filter function
+def startswith(word):
+    def filter_func(check_one):
+        return check_one.startswith(word)
+    return filter_func
+
+
+# filter function
+def not_digit():
+    def filter_func(check_one):
+        return not check_one.isdigit()
+    return filter_func
 
 if __name__ == '__main__':
-    notstartswith = negate(str.startswith)
-    path = "/home/test/workspace/python"
-    print listdir_full(path, notstartswith, ("con",))
-    print listdir_full(path, str.startswith, ("con",))
-    print listdir_full(path)
+    path = "/home/test/workspace/python/Utils/Adapter"
+    print list_abspathes_filter_name(path, not_startswith("M"))
+    from functools import partial
+    print list_abspathes_filter_name(path, startswith("M"))
     print "-" * 40
-    notdigit = negate(str.isdigit)
-    path = "/home/test/workspace/python"
-    print listdir_full(path, notdigit)
-    print listdir_full(path, str.isdigit)
-    print listdir_full(path)
+    print list_abspathes_filter_name(path, not_digit())
+    print list_abspathes_filter_name(path, str.isdigit)
 
-    @run_once
-    def pprint(i):
-        print "times:" + str(i)
+    def filter_paths(paths, filter_func, *args):
+        print args
+        if len(args) == 1:
+            return filter(filter_func(args[0]), paths)
+        elif len(args) == 2:
+            return filter(filter_func(args[0], args[1]), paths)
 
-    for i in range(10):
-        pprint(i)
-    pprint(213123)
+    a = ["asd", "dddd", "aasssssssssss", "as"]
+    print filter(not_startswith("as"), a)

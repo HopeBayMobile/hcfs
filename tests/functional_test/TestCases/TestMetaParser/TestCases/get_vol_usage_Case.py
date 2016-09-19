@@ -1,10 +1,10 @@
 import os
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import pyhcfs
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
 from Utils.FuncSpec import FuncSpec
-from Utils.tedUtils import listdir_full, listdir_path, negate
+from Utils.tedUtils import list_abspathes_filter_name, not_startswith, startswith, file_name
 from constant import Path
 
 
@@ -27,7 +27,7 @@ class NormalCase(Case):
             [str], [{"result": int, "usage": int}])
 
     def test(self):
-        for path in listdir_path(Path.TEST_DATA_DIR, str.startswith, ("FSstat",)):
+        for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, startswith("FSstat")):
             result = pyhcfs.get_vol_usage(path)
             isPass, msg = self.func_spec_verifier.check_onNormal([path], [
                                                                  result])
@@ -52,8 +52,7 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        notstartswith = negate(str.startswith)
-        for path in listdir_path(Path.TEST_RANDOM_DIR, notstartswith, ("FSstat",)):
+        for path in list_abspathes_filter_name(Path.TEST_RANDOM_DIR, not_startswith("FSstat")):
             result = pyhcfs.get_vol_usage(path)
             isPass, msg = self.func_spec_verifier.check_onNormal([path], [
                                                                  result])

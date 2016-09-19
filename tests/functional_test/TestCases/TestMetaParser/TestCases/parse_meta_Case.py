@@ -2,10 +2,10 @@ import os
 import ast
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import pyhcfs
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
 from Utils.FuncSpec import FuncSpec
-from Utils.tedUtils import listdir_full, listdir_path, negate
+from Utils.tedUtils import list_abspathes_filter_name, not_startswith, file_name
 from constant import Path
 
 
@@ -69,7 +69,8 @@ class NormalCase(Case):
         self.func_spec_verifier = FuncSpec([str], [output_spec_str])
 
     def get_stat_and_meta_path_pairs(self):
-        for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
+        for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit):
+            ino = file_name(path)
             stat = self.get_stat(path, ino)
             meta_path = os.path.join(path, "meta_" + ino)
             yield (stat, meta_path)
@@ -111,8 +112,7 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        notstartswith = negate(str.startswith)
-        for path in listdir_path(Path.TEST_RANDOM_DIR, notstartswith, ("meta",)):
+        for path in list_abspathes_filter_name(Path.TEST_RANDOM_DIR, not_startswith("meta")):
             result = pyhcfs.parse_meta(path)
             isPass, msg = self.func_spec_verifier.check_onNormal([path], [
                                                                  result])

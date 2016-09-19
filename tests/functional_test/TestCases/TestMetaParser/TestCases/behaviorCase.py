@@ -2,9 +2,9 @@ import os
 import ast
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import pyhcfs
-from Utils.tedUtils import listdir_full
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
+from Utils.tedUtils import list_abspathes_filter_name, file_name
 from constant import FileType, Path
 
 
@@ -65,7 +65,8 @@ class NonexistMetaPathCase(ExternalVolHasFSstatCase):
             return [x.replace("\n", "") for x in swift_list if x.startswith("data")]
 
     def get_file_meta_pathes(self):
-        for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
+        for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit):
+            ino = file_name(path)
             if self.get_file_type(path, ino) == FileType.FILE:
                 yield os.path.join(path, "meta_" + ino)
 

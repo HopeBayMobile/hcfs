@@ -2,10 +2,10 @@ import os
 import ast
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import pyhcfs
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
 from Utils.FuncSpec import FuncSpec
-from Utils.tedUtils import listdir_full, negate
+from Utils.tedUtils import list_abspathes_filter_name, not_startswith
 from constant import Path
 
 
@@ -56,8 +56,7 @@ class RandomFileContentCase(NormalCase):
     """
 
     def test(self):
-        notstartswith = negate(str.startswith)
-        for path, _ in listdir_full(Path.TEST_RANDOM_DIR, notstartswith, ("FSmgr",)):
+        for path in list_abspathes_filter_name(Path.TEST_RANDOM_DIR, not_startswith("FSmgr")):
             result = pyhcfs.list_external_volume(path)
             isPass, msg = self.func_spec_verifier.check_onErr([path], [result])
             if not isPass:

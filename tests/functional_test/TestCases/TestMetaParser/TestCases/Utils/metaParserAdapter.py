@@ -10,7 +10,7 @@ if os.path.exists(REPORT_DIR):
 os.makedirs(REPORT_DIR)
 
 
-class pyhcfs(object):
+class PyhcfsAdapter(object):
 
     @staticmethod
     def list_external_volume(path):

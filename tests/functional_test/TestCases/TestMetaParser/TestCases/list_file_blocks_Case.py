@@ -2,10 +2,10 @@ import os
 import ast
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import pyhcfs
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
 from Utils.FuncSpec import FuncSpec
-from Utils.tedUtils import listdir_full, listdir_path, negate
+from Utils.tedUtils import list_abspathes_filter_name, not_startswith, file_name
 from constant import FileType, Path
 
 
@@ -51,7 +51,8 @@ class NormalCase(Case):
         self.logger.info("Do nothing")
 
     def get_file_meta_pathes(self):
-        for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit):
+        for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit):
+            ino = file_name(path)
             if self.get_file_type(path, ino) == FileType.FILE:  # file or TODO socket???
                 yield os.path.join(path, "meta_" + ino)
 
@@ -83,14 +84,13 @@ class RandomFileContentCase(NormalCase):
         return True, ""
 
     def get_random_test_data(self):
-        notstartswith = negate(str.startswith)
-        random_data_pathes = listdir_path(
-            Path.TEST_RANDOM_DIR, notstartswith, ("meta",))
+        random_data_pathes = list_abspathes_filter_name(
+            Path.TEST_RANDOM_DIR, not_startswith("meta"))
         return list(random_data_pathes) + self.get_non_file_meta_pathes()
 
     def get_non_file_meta_pathes(self):
-        path_ino_pairs = [(path, ino)
-                          for path, ino in listdir_full(Path.TEST_DATA_DIR, str.isdigit)]
+        path_ino_pairs = [(path, path.split("/")[-1])
+                          for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit)]
         return [os.path.join(path, "meta_" + ino) for path, ino in path_ino_pairs if self.get_file_type(path, ino) != FileType.FILE]
 
 
