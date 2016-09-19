@@ -1215,4 +1215,7 @@ int64_t round_size(int64_t size)
 
 	return ret_size;
 }
-
+void cleanup_stage1_data(void)
+{
+	return;
+}

@@ -18,6 +18,7 @@ extern "C" {
 #include "super_block.h"
 #include "atomic_tocloud.h"
 #include "mount_manager.h"
+#include "do_restoration.h"
 }
 
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -180,7 +181,7 @@ TEST_F(init_sync_stat_controlTest, InitCleanup) {
   ASSERT_NE(0, ret);
  }
 
-/* End of the test case for the function update_backend_stat */
+/* End of the test case for the function init_sync_stat_control */
 
 
 /*
@@ -1285,6 +1286,7 @@ class update_backend_statTest : public ::testing::Test {
     hcfs_system->system_going_down = FALSE;
     if (access(METAPATH, F_OK) < 0)
 	    mkdir(METAPATH, 0744);
+    sem_init(&backup_pkg_sem, 0, 1);
    }
 
   virtual void TearDown() {
@@ -1313,7 +1315,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, 5566, 101, 0);
+  ret = update_backend_stat(14, 1024768, 5566, 101, 0, 0, 5566);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1369,7 +1371,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  ret = update_backend_stat(14, 1024768, 123, -101, 0);
+  ret = update_backend_stat(14, 1024768, 123, -101, 0, 0, 123);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);

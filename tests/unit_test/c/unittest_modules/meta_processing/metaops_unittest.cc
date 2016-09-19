@@ -2034,9 +2034,6 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	}
 
 	/* FIXME: deallocation must be placed in the last test. */
-	free(dir_node_list);
-	free(nondir_node_list);
-
 	unlink(metapath);
 
 	free(dir_node_list);

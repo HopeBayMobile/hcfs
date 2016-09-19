@@ -83,7 +83,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	ino_t exp_roots[5] = {234, 345, 456, 567, 678};
 	ino_t roots[5];
 
-	EXPECT_EQ(0, init_rebuild_sb(START_REBUILD_SB));
+	ASSERT_EQ(0, init_rebuild_sb(START_REBUILD_SB));
 
 	/* Verify superblock */
 	fptr = fopen(sb_path, "r");
