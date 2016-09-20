@@ -359,75 +359,6 @@ static inline void _check_del_progress_file(ino_t inode)
 	}
 }
 
-static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
-		ino_t *root_inode, BOOL *meta_on_cloud,
-		int64_t *backend_size_change, int64_t *meta_size_change)
-{
-	FILE *metafptr;
-	FILE_META_TYPE tempfilemeta;
-	DIR_META_TYPE tempdirmeta;
-	SYMLINK_META_TYPE tempsymmeta;
-	CLOUD_RELATED_DATA cloud_related_data;
-	int32_t ret, errcode;
-	size_t ret_size;
-
-	metafptr = fopen(todel_metapath, "r+");
-	if (metafptr == NULL) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
-		return -errcode;
-	}
-	setbuf(metafptr, NULL);
-
-	if (S_ISFILE(this_mode)) {
-		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
-		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
-				sizeof(FILE_STATS_TYPE), SEEK_SET);
-		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
-				metafptr);
-		flock(fileno(metafptr), LOCK_UN);
-		*root_inode = tempfilemeta.root_inode;
-
-	} else if (S_ISDIR(this_mode)) {
-		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
-		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
-		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
-				metafptr);
-		flock(fileno(metafptr), LOCK_UN);
-		*root_inode = tempdirmeta.root_inode;
-
-	} else if (S_ISLNK(this_mode)) {
-		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
-		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
-		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
-				metafptr);
-		flock(fileno(metafptr), LOCK_UN);
-		*root_inode = tempsymmeta.root_inode;
-
-	} else {
-		write_log(0, "Error: Unknown type %d\n", this_mode);
-		fclose(metafptr);
-		return -EPERM;
-	}
-
-	fclose(metafptr);
-	*meta_on_cloud = cloud_related_data.upload_seq > 0 ? TRUE : FALSE;
-	*backend_size_change = cloud_related_data.size_last_upload;
-	*meta_size_change = cloud_related_data.meta_last_upload;
-
-	return 0;
-
-errcode_handle:
-	flock(fileno(metafptr), LOCK_UN);
-	fclose(metafptr);
-	return errcode;
-}
-
 static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mode,
 		ino_t *root_inode, int64_t *backend_size_change,
 		int64_t *meta_size_change)
@@ -500,6 +431,7 @@ errcode_handle:
 	fclose(metafptr);
 	return errcode;
 }
+
 /************************************************************************
 *
 * Function name: dsync_single_inode
