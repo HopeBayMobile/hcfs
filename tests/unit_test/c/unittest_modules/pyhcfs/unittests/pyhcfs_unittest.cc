@@ -48,10 +48,12 @@ ssize_t pread_cnt(int fd, void *buf, size_t count, off_t offset)
 	pread_cnt_call_count += 1;
 	printf("pread_cnt_call_count %d\n", pread_cnt_call_count);
 	ret = real_pread(fd, buf, count, offset);
-	if (pread_cnt_call_count == pread_cnt_error_on_call_count)
+	if (pread_cnt_call_count == pread_cnt_error_on_call_count) {
+		errno = EIO;
 		return -1;
-	else
+	} else {
 		return ret;
+	}
 }
 
 int32_t read_cnt_call_count = 0;
@@ -63,10 +65,12 @@ ssize_t read_cnt(int fd, void *buf, size_t count)
 	read_cnt_call_count += 1;
 	printf("read_cnt_call_count %d\n", read_cnt_call_count);
 	ret = real_read(fd, buf, count);
-	if (read_cnt_call_count == read_cnt_error_on_call_count)
+	if (read_cnt_call_count == read_cnt_error_on_call_count) {
+		errno = EIO;
 		return -1;
-	else
+	} else {
 		return ret;
+	}
 }
 
 void reset_fake_functions(void)
@@ -97,7 +101,11 @@ class pyhcfsEnvironment : public ::testing::Environment
 class list_volumeTest : public ::testing::TestWithParam<const char*>
 {
 	public:
-	void SetUp() { reset_fake_functions(); }
+	void SetUp()
+	{
+		reset_fake_functions();
+		errno = 0;
+	}
 	void TearDown() {}
 };
 
@@ -147,8 +155,7 @@ TEST_F(list_volumeTest, ListVolumeErrorOnPread2ndCall)
 
 	ret_code =
 	    list_volume("test_data/v1/android/fsmgr", &list, &number);
-	printf("%d\n", ret_code);
-	printf("number %lu\n", number);
+
 	EXPECT_LT(ret_code, 0);
 }
 TEST_F(list_volumeTest, ListVolumeErrorOnPread3rdCall)
@@ -172,7 +179,11 @@ INSTANTIATE_TEST_CASE_P(ListVolume, list_volumeTest, ValuesIn(paths));
 class parse_metaTest : public ::testing::TestWithParam<const char*>
 {
 	public:
-	void SetUp() { reset_fake_functions(); }
+	void SetUp()
+	{
+		reset_fake_functions();
+		errno = 0;
+	}
 	void TearDown() {}
 };
 
@@ -268,6 +279,7 @@ class list_dir_inorderTest : public ::testing::TestWithParam<const char*>
 		limit = 500;
 		num_children = end_page_pos = end_el_no = 0;
 		memset(file_list, 0, sizeof(PORTABLE_DIR_ENTRY) * limit);
+		errno = 0;
 	}
 
 	void TearDown() {}
@@ -410,6 +422,7 @@ class list_file_blocksTest : public ::testing::TestWithParam<const char*>
 	{
 		reset_fake_functions();
 		total_num = 4;
+		errno = 0;
 	}
 	void TearDown() {}
 };
@@ -484,7 +497,11 @@ class get_vol_usageTest : public ::testing::TestWithParam<const char*>
 	int64_t ret_num, total_num;
 	int64_t inode_num;
 
-	void SetUp() { reset_fake_functions(); }
+	void SetUp()
+	{
+		reset_fake_functions();
+		errno = 0;
+	}
 	void TearDown() {}
 };
 

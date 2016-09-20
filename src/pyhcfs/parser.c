@@ -84,7 +84,7 @@ int32_t list_volume(const char *fs_mgr_path,
 				    next_node_pos);
 		/*printf("ret_val %zu\n", ret_val);*/
 		if (ret_val == -1 || ret_val < sizeof(DIR_ENTRY_PAGE)) {
-			errno = (ret_val == -1)?errno:EINVAL;
+			errno = (ret_val == -1) ? errno : EINVAL;
 			goto errcode_handle;
 		}
 		num_walked += tpage.num_entries;
