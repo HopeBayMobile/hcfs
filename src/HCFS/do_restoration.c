@@ -622,7 +622,7 @@ int32_t _fetch_pinned(ino_t thisinode)
 	HCFS_STAT tmpstat;
 	FILE *fptr;
 	char metapath[METAPATHLEN];
-	int64_t count, totalblocks, tmpsize, seq;
+	int64_t count = 0, totalblocks, tmpsize, seq, blkcount;
 	int64_t nowpage, lastpage, filepos, nowindex;
 	int64_t num_cached_block = 0, cached_size = 0;
 	int32_t errcode, ret;
@@ -734,6 +734,15 @@ int32_t _fetch_pinned(ino_t thisinode)
 	return 0;
 errcode_handle:
 	fclose(fptr);
+	if (errcode == -ENOENT) {
+		write_log(4, "Cleaning up blocks of broken file\n");
+		for (blkcount = 0; blkcount <= count; blkcount++) {
+			fetch_restore_block_path(blockpath, thisinode,
+			                         blkcount);
+			unlink(blockpath);
+		}
+	}
+
 	write_log(0, "Restore Error: Code %d\n", -errcode);
 	write_log(10, "Error in %s.\n", __func__);
 	return errcode;
@@ -1260,11 +1269,194 @@ static inline void _realloc_prune(PRUNE_T **prune_list, int32_t *max_prunes)
 
 int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
 
+int32_t _replace_missing_pinned(ino_t srcinode, ino_t thisinode)
+{
+	FILE_META_TYPE tmpmeta;
+	HCFS_STAT tmpstat;
+	FILE *fptr;
+	char metapath[METAPATHLEN];
+	int64_t count = 0, totalblocks, tmpsize, blkcount;
+	int64_t nowpage, lastpage, filepos, nowindex;
+	int64_t num_cached_block = 0, cached_size = 0;
+	int32_t errcode, ret;
+	size_t ret_size;
+	struct stat blockstat;
+	BLOCK_ENTRY_PAGE temppage;
+	FILE_STATS_TYPE file_stats_type;
+	BOOL write_page;
+	char blockpath[BLOCKPATHLEN];
+	char srcblockpath[BLOCKPATHLEN];
+	int64_t file_stats_pos;
+
+	fetch_restore_meta_path(metapath, thisinode);
+	fptr = fopen(metapath, "r+");
+	if (fptr == NULL) {
+		write_log(0, "Error when fetching file to restore\n");
+		errcode = -errno;
+		return errcode;
+	}
+	setbuf(fptr, NULL);
+
+	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+	FREAD(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
+	if (P_IS_UNPIN(tmpmeta.local_pin)) {
+		/* Don't fetch blocks */
+		fclose(fptr);
+		return 0;
+	}
+
+	/* Assuming fixed block size now */
+	write_page = FALSE;
+	tmpsize = tmpstat.size;
+	totalblocks = ((tmpsize - 1) / MAX_BLOCK_SIZE) + 1;
+	lastpage = -1;
+	for (count = 0; count < totalblocks; count++) {
+		nowpage = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+		nowindex = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+		if (lastpage != nowpage) {
+			if (write_page == TRUE) {
+				FSEEK(fptr, filepos, SEEK_SET);
+				FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE),
+						1, fptr);
+				write_page = FALSE;
+			}
+			/* Reload page pos */
+			filepos = seek_page2(&tmpmeta, fptr, nowpage, 0);
+			if (filepos < 0) {
+				errcode = (int32_t) filepos;
+				goto errcode_handle;
+			}
+			if (filepos == 0) {
+				/* No page to be found */
+				count += (BLK_INCREMENTS - 1);
+				continue;
+			}
+			write_log(10, "Debug fetch: %" PRId64 ", %" PRId64 "\n",
+			          filepos, nowpage);
+			FSEEK(fptr, filepos, SEEK_SET);
+			memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+			lastpage = nowpage;
+		}
+
+		/* Terminate pin blocks downloading if system is going down */
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
+
+		/* Skip if block does not exist */
+		if (temppage.block_entries[nowindex].status == ST_CLOUD) {
+			fetch_restore_block_path(blockpath, thisinode, count);
+			fetch_block_path(srcblockpath, srcinode, count);
+			/* Copy block from source */
+			ret = copy_file(srcblockpath, blockpath);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			/* Change block status in meta */
+			temppage.block_entries[nowindex].status = ST_LDISK;
+			write_page = TRUE;
+			/* Update file stats */
+			ret = stat(blockpath, &blockstat);
+			if (ret == 0) {
+				cached_size += blockstat.st_blocks * 512;
+				num_cached_block += 1;
+			} else {
+				write_log(0, "Error: Fail to stat block in %s."
+					" Code %d", __func__, errno);
+			}
+		}
+	}
+	if (write_page == TRUE) {
+		FSEEK(fptr, filepos, SEEK_SET);
+		FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	}
+	/* Update file stats */
+	file_stats_pos = offsetof(FILE_META_HEADER, fst);
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FREAD(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+	file_stats_type.num_cached_blocks = num_cached_block;
+	file_stats_type.cached_size = cached_size;
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FWRITE(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+	fclose(fptr);
+
+	/* Update cache statistics */
+	update_restored_cache_usage(cached_size, num_cached_block);
+
+	return 0;
+errcode_handle:
+	fclose(fptr);
+	if (errcode == -ENOENT) {
+		write_log(4, "Cleaning up blocks of broken file\n");
+		for (blkcount = 0; blkcount <= count; blkcount++) {
+			fetch_restore_block_path(blockpath, thisinode,
+			                         blkcount);
+			unlink(blockpath);
+		}
+	}
+
+	write_log(0, "Restore Error: Code %d\n", -errcode);
+	write_log(10, "Error in %s.\n", __func__);
+	return errcode;
+}
+int32_t replace_missing(const char *nowpath, DIR_ENTRY *tmpptr)
+{
+	char targetfile[METAPATHLEN];
+	char srcfile[METAPATHLEN];
+	char tmppath[PATH_MAX];
+	struct stat tmpstat;
+	ino_t srcino, targetino;
+	FILE *fptr;
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
+
+	/* Check the system to be replaced for the missing item */
+	ret = stat(tmppath, &tmpstat);
+
+	if (ret < 0)
+		return -ENOENT;
+
+	write_log(4, "Replacing %s with the copy on the device\n", nowpath);
+	/* Found the corresponding path. Proceed to copy meta and block */
+	targetino = tmpptr->d_ino;
+	srcino = tmpstat.st_ino;
+
+	fetch_meta_path(srcfile, srcino);
+	fetch_restore_meta_path(targetfile, targetino);
+	ret = copy_file(srcfile, targetfile);
+	if (ret < 0)
+		return ret;
+	fptr = fopen(targetfile, "r+");
+	if (fptr == NULL) {
+		ret = errno;
+		return ret;
+	}
+	ret = restore_meta_structure(fptr);
+	fclose(fptr);
+	if (ret < 0)
+		return ret;
+
+	ret = _replace_missing_pinned(srcino, targetino);
+	if (ret < 0)
+		return ret;
+	/* Mark this inode to to_sync */
+	FWRITE(&targetino, sizeof(ino_t), 1, to_sync_fptr);
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
 int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 {
 	FILE *fptr;
 	char fetchedmeta[METAPATHLEN];
-	char tmppath[METAPATHLEN];
+	char tmppath[PATH_MAX];
 	DIR_META_TYPE dirmeta;
 	DIR_ENTRY_PAGE tmppage;
 	int64_t filepos;
@@ -1391,8 +1583,15 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 
 				continue;
 			} else if (ret < 0) {
-				errcode = ret;
-				goto errcode_handle;
+				if (((ret == -ENOENT) && (expand_val == 1)) &&
+				    ((tmpptr->d_type == D_ISREG) &&
+				     (strncmp(nowpath, "/data/data",
+				              strlen("/data/data")) == 0)))
+					ret = replace_missing(nowpath, tmpptr);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 
 			switch (tmpptr->d_type) {
@@ -1404,6 +1603,11 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			case D_ISSOCK:
 				/* Fetch all blocks if pinned */
 				ret = _fetch_pinned(tmpino);
+				if (((ret == -ENOENT) && (expand_val == 1)) &&
+				    ((tmpptr->d_type == D_ISREG) &&
+				     (strncmp(nowpath, "/data/data",
+				              strlen("/data/data")) == 0)))
+					ret = replace_missing(nowpath, tmpptr);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
@@ -1411,7 +1615,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 				break;
 			case D_ISDIR:
 				/* Need to expand */
-				snprintf(tmppath, METAPATHLEN, "%s/%s",
+				snprintf(tmppath, PATH_MAX, "%s/%s",
 				         nowpath, tmpptr->d_name);
 				ret = _expand_and_fetch(tmpino, tmppath,
 				                        depth + 1);
