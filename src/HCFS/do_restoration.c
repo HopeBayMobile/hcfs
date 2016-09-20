@@ -1583,12 +1583,31 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 
 				continue;
 			} else if (ret < 0) {
+				can_prune = FALSE;
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    ((tmpptr->d_type == D_ISREG) &&
 				     (strncmp(nowpath, "/data/data",
-				              strlen("/data/data")) == 0)))
+				              strlen("/data/data")) == 0))) {
 					ret = replace_missing(nowpath, tmpptr);
-				if (ret < 0) {
+					if (ret < 0)
+						can_prune = TRUE;
+				}
+				if (can_prune == TRUE) {
+					if (prune_index >= max_prunes)
+						_realloc_prune(&prune_list,
+						               &max_prunes);
+					if (prune_index >= max_prunes) {
+						errcode = -ENOMEM;
+						free(prune_list);
+						goto errcode_handle;
+					}
+					memcpy(&(prune_list[prune_index].entry),
+					       tmpptr, sizeof(DIR_ENTRY));
+					prune_index++;
+					write_log(4, "%s gone from %s."
+					          " Removing.\n",
+					          tmpptr->d_name, nowpath);
+				} else if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
@@ -1602,13 +1621,32 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			case D_ISFIFO:
 			case D_ISSOCK:
 				/* Fetch all blocks if pinned */
+				can_prune = FALSE;
 				ret = _fetch_pinned(tmpino);
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    ((tmpptr->d_type == D_ISREG) &&
 				     (strncmp(nowpath, "/data/data",
-				              strlen("/data/data")) == 0)))
+				              strlen("/data/data")) == 0))) {
 					ret = replace_missing(nowpath, tmpptr);
-				if (ret < 0) {
+					if (ret < 0)
+						can_prune = TRUE;
+				}
+				if (can_prune == TRUE) {
+					if (prune_index >= max_prunes)
+						_realloc_prune(&prune_list,
+						               &max_prunes);
+					if (prune_index >= max_prunes) {
+						errcode = -ENOMEM;
+						free(prune_list);
+						goto errcode_handle;
+					}
+					memcpy(&(prune_list[prune_index].entry),
+					       tmpptr, sizeof(DIR_ENTRY));
+					prune_index++;
+					write_log(4, "%s gone from %s."
+					          " Removing.\n",
+					          tmpptr->d_name, nowpath);
+				} else if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
