@@ -155,9 +155,7 @@ TEST_F(list_volumeTest, ListVolumeErrorOnPread2ndCall)
 
 	ret_code =
 	    list_volume("test_data/v1/android/fsmgr", &list, &number);
-	printf("%d\n", ret_code);
-	if (ret_code != -1)
-		printf("number %lu\n", number);
+
 	EXPECT_LT(ret_code, 0);
 }
 TEST_F(list_volumeTest, ListVolumeErrorOnPread3rdCall)
