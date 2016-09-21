@@ -56,7 +56,7 @@ int32_t init_notify_buf(void)
 	STATIC_CHECK_BUF_SIZE(FUSE_NOTIFY_DELETE_DATA);
 
 	errno = 0;
-	do {
+	while (TRUE) {
 		memset(&notify_buf, 0, sizeof(FUSE_NOTIFY_RING_BUF));
 		notify_buf.in = FUSE_NOTIFY_BUF_MAX_LEN - 1;
 		notify_buf.out = 0;
@@ -71,7 +71,8 @@ int32_t init_notify_buf(void)
 
 		ret = 0;
 		write_log(10, "Debug %s: Succeed.\n", __func__);
-	} while (0);
+		break;
+	}
 	if (ret < 0 && errno != 0)
 		ret = -errno;
 
@@ -115,7 +116,7 @@ int32_t notify_buf_enqueue(const void *const notify)
 {
 	int32_t ret = -1;
 
-	do {
+	while (TRUE) {
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 		/* Fuse has multiple threads. Enqueue need to be thread safe */
@@ -134,13 +135,14 @@ int32_t notify_buf_enqueue(const void *const notify)
 
 		sem_post(&notify_buf.access_sem);
 
+		ret = 0;
+		write_log(10, "Debug %s: Add %lu\n", __func__, notify_buf.in);
+
 		/* wake notify thread up */
 		if (notify_buf.len == 1)
 			sem_post(&notify_buf.not_empty);
-
-		ret = 0;
-		write_log(10, "Debug %s: Add %lu\n", __func__, notify_buf.in);
-	} while (0);
+		break;
+	};
 
 	if (ret < 0)
 		write_log(1, "Error %s: Failed. %s\n", __func__,
@@ -158,7 +160,7 @@ FUSE_NOTIFY_DATA *notify_buf_dequeue()
 	FUSE_NOTIFY_DATA *data = NULL;
 
 	errno = 0;
-	do {
+	while (TRUE) {
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 		if (notify_buf.len == 0) {
@@ -179,11 +181,9 @@ FUSE_NOTIFY_DATA *notify_buf_dequeue()
 		/* wake fuse IO thread up */
 		if (notify_buf.len == (FUSE_NOTIFY_BUF_MAX_LEN - 1))
 			sem_post(&notify_buf.not_full);
-	} while (0);
+		break;
+	}
 
-	if (data == NULL && hcfs_system->system_going_down == FALSE)
-		write_log(1, "Error %s: Failed. %s\n", __func__,
-			  strerror(errno));
 	return data;
 }
 
@@ -197,7 +197,7 @@ int32_t init_hfuse_ll_notify_loop(void)
 	int32_t ret;
 
 	/* init enviroments */
-	do {
+	while (TRUE) {
 		ret = init_notify_buf();
 		if (ret < 0)
 			break;
@@ -208,7 +208,8 @@ int32_t init_hfuse_ll_notify_loop(void)
 			break;
 		ret = 0;
 		write_log(10, "Debug %s: Succeed\n", __func__);
-	} while (0);
+		break;
+	}
 
 	if (ret < 0)
 		write_log(1, "Error %s: Failed. %s\n", __func__,
@@ -243,10 +244,12 @@ void *hfuse_ll_notify_loop(void *ptr)
 {
 	FUSE_NOTIFY_DATA *data = NULL;
 	int32_t func_num;
+	int32_t save_errno = 0;
 
 	UNUSED(ptr);
 	write_log(10, "Debug %s: Start\n", __func__);
 
+	errno = 0;
 	while (TRUE) {
 		data = notify_buf_dequeue();
 		if (hcfs_system->system_going_down == TRUE)
@@ -258,7 +261,9 @@ void *hfuse_ll_notify_loop(void *ptr)
 				  __func__);
 			free(data);
 		} else {
-			write_log(1, "Error %s: Dequeue failed\n", __func__);
+			save_errno = errno;
+			write_log(1, "Error %s: Dequeue failed. %s\n", __func__,
+				  strerror(save_errno));
 		}
 	}
 
@@ -342,7 +347,7 @@ int32_t hfuse_ll_notify_delete(struct fuse_chan *ch,
 					 .child = child,
 					 .name = NULL,
 					 .namelen = namelen};
-	do {
+	while (TRUE) {
 		event.name = strndup(name, namelen);
 		if (event.name == NULL) {
 			ret = -errno;
@@ -352,7 +357,8 @@ int32_t hfuse_ll_notify_delete(struct fuse_chan *ch,
 		if (ret < 0)
 			break;
 		write_log(10, "Debug %s: New notify is queued\n", __func__);
-	} while (0);
+		break;
+	}
 
 	if (ret < 0) {
 		write_log(1, "Error %s: %s\n", __func__, strerror(-ret));
