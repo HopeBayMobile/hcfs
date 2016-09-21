@@ -208,6 +208,8 @@ public:
 		free(system_config);
 		if (!access(backend_meta, F_OK))
 			unlink(backend_meta);
+		free(dsync_ctl.retry_list.retry_inode);
+		dsync_ctl.retry_list.retry_inode = NULL;
 	}
 	void init_objname_buffer(uint32_t num_objname)
 	{
