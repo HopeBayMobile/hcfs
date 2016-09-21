@@ -50,6 +50,7 @@ typedef struct {
 	sem_t sysmeta_sem;
 	SYSTEM_DATA_TYPE restored_system_meta;
 	SYSTEM_DATA_TYPE rectified_system_meta;
+	ino_t system_max_inode;
 	FILE *rect_fptr;
 } HCFS_RESTORED_SYSTEM_META;
 
@@ -76,6 +77,8 @@ typedef struct {
 } PRUNE_T;
 
 void init_restore_path(void);
+int32_t write_system_max_inode(ino_t ino_num);
+int32_t read_system_max_inode(ino_t *ino_num);
 
 /* Returns path to status file on system restoring */
 int32_t fetch_restore_stat_path(char *pathname);

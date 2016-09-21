@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/file.h>
 #include <ftw.h>
 
 #include "utils.h"
@@ -518,7 +519,7 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t _update_FS_stat(ino_t rootinode)
+int32_t _update_FS_stat(ino_t rootinode, ino_t *max_inode)
 {
 	char despath[METAPATHLEN];
 	int32_t errcode;
@@ -547,6 +548,8 @@ int32_t _update_FS_stat(ino_t rootinode)
 	}
 	FREAD(&tmpFSstat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	fclose(fptr);
+
+	*max_inode = tmpFSstat.max_inode;
 
 	/* FEATURE TODO: Will need to check if cloud stat is converted from
 	old struct (V1) if can resume download in stage 1 */
@@ -1082,7 +1085,7 @@ int32_t _recursive_prune(ino_t thisinode)
 		       tmppage.num_entries);
 		for (count = 0; count < tmppage.num_entries; count++) {
 			tmpptr = &(tmppage.dir_entries[count]);
-			
+
 			if (tmpptr->d_ino == 0)
 				continue;
 			/* Skip "." and ".." */
@@ -1402,6 +1405,169 @@ errcode_handle:
 	write_log(10, "Error in %s.\n", __func__);
 	return errcode;
 }
+
+ino_t _stage1_get_new_inode()
+{
+	ino_t ret_ino;
+
+	LOCK_RESTORED_SYSMETA();
+	ret_ino = hcfs_restored_system_meta->system_max_inode + 1;
+	hcfs_restored_system_meta->system_max_inode += 1;
+	UNLOCK_RESTORED_SYSMETA();
+
+	return ret_ino;
+}
+
+/**
+ * Replace missing object under restored folder /data/data. Object can
+ * be any type. "src_inode" is the inode number corresponding to now system.
+ * The file meta_<target_inode> under restored metastorage will be replaced
+ * with file meta_<src_inode> under now system metastorage.
+ *
+ * @param src_inode Source inode number whose meta file will be copied.
+ * @param target_inode Target inode number whose meta file is copied
+ *                     from meta of src_inode.
+ * @param type Type of target meta file.
+ *
+ * @return 0 on success. Otherwise return negation of error number.
+ */
+int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
+{
+	FILE *fptr;
+	char srcpath[METAPATHLEN], targetpath[METAPATHLEN];
+	int32_t ret, errcode, idx;
+	int32_t list_counter, list_size;
+	int64_t now_page_pos;
+	int64_t ret_size;
+	ino_t child_src_inode, child_target_inode;
+	DIR_META_TYPE dirmeta;
+	DIR_ENTRY_PAGE dir_page;
+	DIR_ENTRY *removed_list;
+	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
+	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	HCFS_STAT dirstat;
+
+	/* Skip socket and fifo? */
+	if (type == D_ISSOCK || type == D_ISFIFO)
+		return -ENOENT;
+
+	fetch_meta_path(srcpath, src_inode);
+	fetch_restore_meta_path(targetpath, target_inode);
+
+	/* Copy from now system */
+	ret = copy_file(srcpath, targetpath);
+	if (ret < 0)
+		return ret;
+	fptr = fopen(targetpath, "r+");
+	if (fptr == NULL) {
+		ret = -errno;
+		write_log(0, "Error: Fail to open file. Code %d", -ret);
+		return ret;
+	}
+	setbuf(fptr, NULL);
+	ret = restore_meta_structure(fptr);
+	if (ret < 0)
+		return ret;
+
+	/* Case regular file */
+	if (type == D_ISREG) {
+		fclose(fptr);
+		ret = _replace_missing_pinned(src_inode, target_inode);
+		if (ret < 0)
+			return ret;
+		/* Mark this inode to to_sync */
+		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
+		return 0;
+	} else if (type == D_ISLNK) {
+		fclose(fptr);
+		/* Mark this inode to to_sync */
+		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
+		return 0;
+	}
+
+	/* Recursively copy dir */
+	removed_list = malloc(sizeof(DIR_ENTRY) * 5);
+	list_counter = 0;
+	list_size = 5;
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
+	now_page_pos = dirmeta.tree_walk_list_head;
+	while (now_page_pos) {
+		DIR_ENTRY *now_entry;
+
+		FSEEK(fptr, now_page_pos, SEEK_SET);
+		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+		for (idx = 0; idx < dir_page.num_entries; idx++) {
+			now_entry = &(dir_page.dir_entries[idx]);
+			child_src_inode = now_entry->d_ino;
+			child_target_inode = _stage1_get_new_inode();
+
+			/* Recursively replace all entries */
+			ret = replace_missing_object(child_src_inode,
+				child_target_inode, now_entry->d_type);
+			if (ret < 0) {
+				/* Add to removed entry */
+				memcpy(&(removed_list[list_counter]),
+					now_entry, sizeof(DIR_ENTRY));
+				list_counter++;
+				if (list_counter >= list_size) {
+					removed_list = realloc(removed_list,
+						list_size + 20);
+					if (removed_list == NULL) {
+						errcode = -errno;
+						goto errcode_handle;
+					}
+					list_size += 20;
+				}
+			}
+			now_entry->d_ino = child_target_inode;
+		}
+		FSEEK(fptr, now_page_pos, SEEK_SET);
+		FWRITE(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+		now_page_pos = dir_page.tree_walk_next;
+	}
+
+	/* Remove missing entries */
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&dirstat, sizeof(HCFS_STAT), 1, fptr);
+	for (idx = 0; idx < list_counter; idx++) {
+		memset(temp_dir_entries, 0,
+		       sizeof(DIR_ENTRY) * (2*(MAX_DIR_ENTRIES_PER_PAGE+2)));
+		memset(temp_child_page_pos, 0,
+		       sizeof(int64_t) * (2*(MAX_DIR_ENTRIES_PER_PAGE+3)));
+
+		FSEEK(fptr, dirmeta.root_entry_page, SEEK_SET);
+		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+		ret = delete_dir_entry_btree(&(removed_list[idx]),
+			&dir_page, fileno(fptr), &dirmeta,
+			temp_dir_entries, temp_child_page_pos, FALSE);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+
+		/* If the entry is a subdir, decrease the hard link of
+		*  the parent*/
+		if (removed_list[idx].d_type == D_ISDIR)
+			dirstat.nlink--;
+		dirmeta.total_children--;
+		set_timestamp_now(&dirstat, MTIME | CTIME);
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&dirstat, sizeof(HCFS_STAT), 1, fptr);
+		FWRITE(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
+	}
+	fclose(fptr);
+
+	/* Mark this inode to to_sync */
+	FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
+
+	return 0;
+
+errcode_handle:
+	fclose(fptr);
+	return errcode;
+}
+
 int32_t replace_missing(const char *nowpath, DIR_ENTRY *tmpptr)
 {
 	char targetfile[METAPATHLEN];
@@ -1440,10 +1606,10 @@ int32_t replace_missing(const char *nowpath, DIR_ENTRY *tmpptr)
 	fclose(fptr);
 	if (ret < 0)
 		return ret;
-
 	ret = _replace_missing_pinned(srcino, targetino);
 	if (ret < 0)
 		return ret;
+
 	/* Mark this inode to to_sync */
 	FWRITE(&targetino, sizeof(ino_t), 1, to_sync_fptr);
 
@@ -1469,6 +1635,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 	size_t ret_size;
 	PRUNE_T *prune_list = NULL;
 	int32_t prune_index = 0, max_prunes = 0;
+	struct stat tmpstat;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	fptr = fopen(fetchedmeta, "r");
@@ -1509,7 +1676,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 		       tmppage.num_entries);
 		for (count = 0; count < tmppage.num_entries; count++) {
 			tmpptr = &(tmppage.dir_entries[count]);
-			
+
 			if (tmpptr->d_ino == 0)
 				continue;
 			/* Skip "." and ".." */
@@ -1585,12 +1752,22 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 			} else if (ret < 0) {
 				can_prune = FALSE;
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
-				    ((tmpptr->d_type == D_ISREG) &&
-				     (strncmp(nowpath, "/data/data",
-				              strlen("/data/data")) == 0))) {
-					ret = replace_missing(nowpath, tmpptr);
-					if (ret < 0)
+				    (strncmp(nowpath, "/data/data",
+				              strlen("/data/data")) == 0)) {
+					snprintf(tmppath, PATH_MAX,
+							"%s/%s", nowpath,
+							tmpptr->d_name);
+					ret = stat(tmppath, &tmpstat);
+					if (ret < 0) {
 						can_prune = TRUE;
+					} else {
+						ret = replace_missing_object(
+								tmpstat.st_ino,
+								tmpptr->d_ino,
+								tmpptr->d_type);
+						if (ret < 0)
+							can_prune = TRUE;
+					}
 				}
 				if (can_prune == TRUE) {
 					if (prune_index >= max_prunes)
@@ -1988,6 +2165,58 @@ int32_t check_network_connection(void)
 	return 0;
 }
 
+int32_t read_system_max_inode(ino_t *ino_num)
+{
+	char despath[METAPATHLEN];
+	FILE *fptr;
+	int32_t errcode;
+	int64_t ret_ssize;
+
+	snprintf(despath, METAPATHLEN, "%s/system_max_inode", RESTORE_METAPATH);
+	fptr = fopen(despath, "r");
+	if (fptr == NULL) {
+		write_log(0, "Error when parsing volumes to restore\n");
+		return -errno;
+	}
+	flock(fileno(fptr), LOCK_EX);
+	PREAD(fileno(fptr), ino_num, sizeof(ino_t), 0);
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
+
+int32_t write_system_max_inode(ino_t ino_num)
+{
+	char despath[METAPATHLEN];
+	FILE *fptr;
+	int32_t errcode;
+	int64_t ret_ssize;
+
+	/* Write to file */
+	snprintf(despath, METAPATHLEN, "%s/system_max_inode", RESTORE_METAPATH);
+	fptr = fopen(despath, "w+");
+	if (fptr == NULL) {
+		write_log(0, "Error when parsing volumes to restore\n");
+		return -errno;
+	}
+	setbuf(fptr, NULL);
+	flock(fileno(fptr), LOCK_EX);
+	PWRITE(fileno(fptr), &ino_num, sizeof(ino_t), 0);
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
+
 int32_t run_download_minimal(void)
 {
 	ino_t rootino;
@@ -2001,6 +2230,7 @@ int32_t run_download_minimal(void)
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 	BOOL is_fopen = FALSE;
+	ino_t vol_max_inode, sys_max_inode;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -2057,12 +2287,10 @@ int32_t run_download_minimal(void)
 	if (fptr == NULL) {
 		write_log(0, "Error when parsing volumes to restore\n");
 		errcode = -errno;
-		return errcode;
+		goto errcode_handle;
 	}
 	is_fopen = TRUE;
-
 	setbuf(fptr, NULL);
-
 	PREAD(fileno(fptr), &tmp_head, sizeof(DIR_META_TYPE),
 	      16);
 	PREAD(fileno(fptr), &tmppage, sizeof(DIR_ENTRY_PAGE),
@@ -2070,6 +2298,35 @@ int32_t run_download_minimal(void)
 	fclose(fptr);
 	is_fopen = FALSE;
 
+	/* Fetch FSstat first */
+	sys_max_inode = -1;
+	for (count = 0; count < tmppage.num_entries; count++) {
+		tmpentry = &(tmppage.dir_entries[count]);
+		if (!strcmp("hcfs_app", tmpentry->d_name) ||
+			!strcmp("hcfs_data", tmpentry->d_name) ||
+			!strcmp("hcfs_external", tmpentry->d_name))
+		rootino = tmpentry->d_ino;
+		ret = _fetch_FSstat(rootino);
+		if (ret == 0)
+			ret = _update_FS_stat(rootino, &vol_max_inode);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+		sys_max_inode = (vol_max_inode > sys_max_inode ?
+				vol_max_inode : sys_max_inode);
+	}
+	/* Write max inode number to file "system_max_inode" */
+	LOCK_RESTORED_SYSMETA();
+	hcfs_restored_system_meta->system_max_inode = sys_max_inode;
+	UNLOCK_RESTORED_SYSMETA();
+	ret = write_system_max_inode(sys_max_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	/* Fetch data from root */
 	for (count = 0; count < tmppage.num_entries; count++) {
 		tmpentry = &(tmppage.dir_entries[count]);
 		write_log(4, "Processing minimal for %s\n",
@@ -2091,10 +2348,6 @@ int32_t run_download_minimal(void)
 				goto errcode_handle;
 			}
 			ret = _fetch_meta(rootino);
-			if (ret == 0)
-				ret = _fetch_FSstat(rootino);
-			if (ret == 0)
-				ret = _update_FS_stat(rootino);
 			if (ret == 0)
 				ret = _expand_and_fetch(rootino,
 						"/data/app", 0);
@@ -2122,10 +2375,6 @@ int32_t run_download_minimal(void)
 			}
 			ret = _fetch_meta(rootino);
 			if (ret == 0)
-				ret = _fetch_FSstat(rootino);
-			if (ret == 0)
-				ret = _update_FS_stat(rootino);
-			if (ret == 0)
 				ret = _expand_and_fetch(rootino,
 						"/data/data", 0);
 			if (ret < 0) {
@@ -2152,10 +2401,6 @@ int32_t run_download_minimal(void)
 			}
 			ret = _fetch_meta(rootino);
 			if (ret == 0)
-				ret = _fetch_FSstat(rootino);
-			if (ret == 0)
-				ret = _update_FS_stat(rootino);
-			if (ret == 0)
 				ret = _expand_and_fetch(rootino,
 						"/storage/emulated", 0);
 			if (ret < 0) {
@@ -2164,6 +2409,14 @@ int32_t run_download_minimal(void)
 			}
 			continue;
 		}
+	}
+
+	/* Write max inode number */
+	ret = write_system_max_inode(
+		hcfs_restored_system_meta->system_max_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
 	}
 
 	/* Rebuild hcfssystemmeta in the restoration path */
