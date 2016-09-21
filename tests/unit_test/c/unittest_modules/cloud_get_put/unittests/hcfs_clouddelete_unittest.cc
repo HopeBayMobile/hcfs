@@ -281,7 +281,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	cloud_related.upload_seq = 1;
 
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
-	ASSERT_NE(meta, NULL);
+	ASSERT_NE(0, (meta != NULL));
 	setbuf(meta, NULL);
 	fseek(meta, 0, SEEK_SET);
 	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
@@ -357,7 +357,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Check answer */
 	EXPECT_EQ(1, objname_counter); // Check # of object name.
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%"PRIu64, (uint64_t)mock_thread_info->inode);
+	sprintf(expected_objname, "meta_%" PRIu64, (uint64_t) mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[0]); // Check meta was recorded.
 
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));

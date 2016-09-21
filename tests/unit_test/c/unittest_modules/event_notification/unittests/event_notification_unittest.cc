@@ -18,7 +18,7 @@ extern "C" {
 }
 
 extern "C" {
-int32_t init_mock_server();
+void* init_mock_server(void *);
 }
 
 extern char *notify_server_path;

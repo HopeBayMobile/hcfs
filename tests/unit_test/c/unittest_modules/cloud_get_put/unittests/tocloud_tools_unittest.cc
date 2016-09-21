@@ -134,7 +134,7 @@ TEST_F(change_block_status_to_BOTHTest, ChangeStatusSuccess)
 	int64_t seqnum = 123;
 	int32_t val;
 
-	sprintf(path, "tocloud_tools_test_folder/mock_meta_%"PRIu64,
+	sprintf(path, "tocloud_tools_test_folder/mock_meta_%" PRIu64,
 			(uint64_t)inode);
 	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
@@ -182,7 +182,7 @@ TEST_F(change_block_status_to_BOTHTest, StatusIsNot_LtoC)
 	int64_t seqnum = 123;
 	int32_t val;
 
-	sprintf(path, "tocloud_tools_test_folder/mock_meta_%"PRIu64,
+	sprintf(path, "tocloud_tools_test_folder/mock_meta_%" PRIu64,
 			(uint64_t)inode);
 	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
@@ -231,7 +231,7 @@ TEST_F(change_block_status_to_BOTHTest, StatusIs_NONE)
 	int64_t seqnum = 123;
 	int32_t val;
 
-	sprintf(path, "tocloud_tools_test_folder/mock_meta_%"PRIu64,
+	sprintf(path, "tocloud_tools_test_folder/mock_meta_%" PRIu64,
 			(uint64_t)inode);
 	memset(&tmpstat, 0, sizeof(HCFS_STAT));
 	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
