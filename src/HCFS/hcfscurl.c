@@ -778,6 +778,7 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 
 	chunk = NULL;
 	chunk = curl_slist_append(chunk, swift_auth_string);
+	chunk = curl_slist_append(chunk, "Expect:");
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
