@@ -180,10 +180,8 @@ FUSE_NOTIFY_DATA *notify_buf_dequeue()
 		if (notify_buf.len == (FUSE_NOTIFY_BUF_MAX_LEN - 1))
 			sem_post(&notify_buf.not_full);
 	} while (0);
-	if (data == NULL && errno == 0)
-		errno = EPERM;
 
-	if (data == NULL)
+	if (data == NULL && hcfs_system->system_going_down == FALSE)
 		write_log(1, "Error %s: Failed. %s\n", __func__,
 			  strerror(errno));
 	return data;
@@ -406,9 +404,8 @@ int32_t hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 			break;
 	}
 
-	if (ret < 0) {
+	if (ret < 0)
 		write_log(1, "Error %s: %s\n", __func__, strerror(-ret));
-	}
 	return ret;
 }
 /* END -- Functions running in fuse operation */
