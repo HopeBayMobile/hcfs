@@ -1559,7 +1559,7 @@ class EqHelper<true> {
 template <typename T1, typename T2>\
 AssertionResult CmpHelper##op_name(const char* expr1, const char* expr2, \
                                    const T1& val1, const T2& val2) {\
-  if (val1 op val2) {\
+  if (val1 op (typeof val1) val2) {\
     return AssertionSuccess();\
   } else {\
     return AssertionFailure() \
