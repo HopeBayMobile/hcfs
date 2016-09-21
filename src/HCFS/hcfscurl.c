@@ -12,7 +12,8 @@
 **************************************************************************/
 
 /* Implemented routines to parse http return code to distinguish errors
-	from normal ops*/
+ * from normal ops
+ */
 
 #include "hcfscurl.h"
 
@@ -55,11 +56,12 @@ char swift_url_string[1024] = {0};
 /* Marco to compute data transfer throughput.
  * If object size < 32KB, for this computation the size is rounded up to 32KB.
  */
-#define COMPUTE_THROUGHPUT()\
-	off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;\
-	time_spent = (time_spent <= 0) ? 0.001 : time_spent;\
-	xfer_thpt = (int64_t)(objsize_kb / time_spent);
-
+#define COMPUTE_THROUGHPUT()                                                   \
+	do {                                                                   \
+		off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;   \
+		time_spent = (time_spent <= 0) ? 0.001 : time_spent;           \
+		xfer_thpt = (int64_t)(objsize_kb / time_spent);                \
+	} while (0)
 
 /************************************************************************
 *
@@ -166,6 +168,7 @@ int32_t parse_swift_list_header(FILE *fptr)
 	int32_t ret, errcode;
 	int64_t ret_num;
 	char *endptr, *tmpptr;
+	const char HEADERSTR_OBJCOUNT[] = "X-Container-Object-Count";
 
 	FSEEK(fptr, 0, SEEK_SET);
 	ret_val = fscanf(fptr, "%19s %19s", httpcode, retcode);
@@ -190,11 +193,13 @@ int32_t parse_swift_list_header(FILE *fptr)
 			return retcodenum;
 		}
 
-		if (!strncmp(temp_string, "X-Container-Object-Count",
-			     sizeof("X-Container-Object-Count") - 1)) {
-			sscanf(temp_string,
+		if (!strncmp(temp_string, HEADERSTR_OBJCOUNT,
+			     sizeof(HEADERSTR_OBJCOUNT) - 1)) {
+			ret_val = sscanf(temp_string,
 					 "X-Container-Object-Count: %s\n",
 					 temp_string2);
+			if (ret_val != 1)
+				return -1;
 			ATOL(temp_string2);
 			total_objs = (int32_t)ret_num;
 
@@ -501,7 +506,7 @@ errcode_handle:
 *  Return value: Return 200 if event is sent, or -1 if error.
 *
 *************************************************************************/
-int32_t hcfs_get_auth_swifttoken()
+int32_t hcfs_get_auth_swifttoken(void)
 {
 
 	int32_t ret_code;
@@ -525,7 +530,8 @@ int32_t hcfs_get_auth_swifttoken()
 				&timeout);
 		pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
 		/* If system is shutting down, do not attempt followup
-		operations */
+		 * operations
+		 */
 		if (hcfs_system->system_going_down == TRUE)
 			return -ESHUTDOWN;
 
@@ -622,8 +628,9 @@ int32_t hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 			sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
 				SWIFT_USER);
 
-			ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
-						       SWIFT_URL, curl_handle);
+			ret_code =
+			    hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
+						SWIFT_URL, curl_handle);
 
 			return ret_code;
 		}
@@ -643,13 +650,13 @@ int32_t hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 				memset(swift_auth_string,
 						0, sizeof(swift_auth_string));
 				pthread_mutex_unlock(
-						&(swifttoken_control.access_lock));
+				    &(swifttoken_control.access_lock));
 			}
 		}
 
-		if (curl_handle->curl) {
+		if (curl_handle->curl)
 			return hcfs_get_auth_swifttoken();
-		}
+
 		return -1;
 	default:
 		return -1;
@@ -707,7 +714,8 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 			  void *put_control1)
 {
 	/*TODO: Consider if it is possible for the actual file size to be
-		smaller than object size due to truncating*/
+	 * smaller than object size due to truncating
+	 */
 	FILE *fptr;
 	size_t actual_to_read;
 	object_put_control *put_control;
@@ -769,7 +777,6 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	}
 
 	chunk = NULL;
-
 	chunk = curl_slist_append(chunk, swift_auth_string);
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -786,11 +793,12 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	res = curl_easy_perform(curl);
 
 	if (res == CURLE_OK)
-		curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &ret_val);
+		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &ret_val);
 	else
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 
@@ -913,8 +921,10 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-			  HTTP_meta *object_meta)
+int32_t hcfs_swift_put_object(FILE *fptr,
+			      char *objname,
+			      CURL_HANDLE *curl_handle,
+			      HTTP_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
 	off_t objsize;
@@ -957,6 +967,7 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	chunk = curl_slist_append(chunk, "Expect:");
 	if (object_meta != NULL) {
 		int32_t i;
+
 		for (i = 0; i < object_meta->count; i++) {
 			sprintf(object_string, "X-OBJECT-META-%s: %s",
 				object_meta->data[2 * i],
@@ -969,7 +980,7 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	FTELL(fptr);
 	objsize = ret_pos;
 	FSEEK(fptr, 0, SEEK_SET);
-	//write_log(10, "object size: %d, objname: %s\n", objsize, objname);
+	/* write_log(10, "object size: %d, objname: %s\n", objsize, objname); */
 
 	if (objsize < 0) {
 		fclose(swift_header_fptr);
@@ -1033,11 +1044,12 @@ int32_t hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 
 	if (_http_is_success(ret_val)) {
 		/* Record xfer throughput */
-		COMPUTE_THROUGHPUT()
+		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
-		write_log(10, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
-					objname, objsize, time_spent, xfer_thpt);
+		write_log(10,
+			  "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+			  objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
@@ -1065,8 +1077,10 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-			  HCFS_encode_object_meta *object_meta)
+int32_t hcfs_swift_get_object(FILE *fptr,
+			      char *objname,
+			      CURL_HANDLE *curl_handle,
+			      HCFS_encode_object_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
@@ -1144,6 +1158,7 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	ret_val = parse_http_header_retcode(swift_header_fptr);
 	if (ret_val < 0) {
 		char header[1024] = {0};
+
 		fseek(swift_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, swift_header_fptr);
 		write_log(5, "Warn: Fail to parse %s header:\n%s", objname,
@@ -1162,6 +1177,7 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 	/* get object meta data */
 	if (_http_is_success(ret_val) && object_meta) {
 		char header[1024] = {0};
+
 		FSEEK(swift_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, swift_header_fptr);
 		write_log(10, "download object %s header:\n%s", objname,
@@ -1175,11 +1191,12 @@ int32_t hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handl
 		FTELL(fptr);
 		objsize = ret_pos;
 		FSEEK(fptr, 0, SEEK_SET);
-		COMPUTE_THROUGHPUT()
+		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
-		write_log(10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
-					objname, objsize, time_spent, xfer_thpt);
+		write_log(
+		    10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+		    objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
@@ -1195,7 +1212,7 @@ errcode_handle:
 	if (swift_header_fptr != NULL) {
 		fclose(swift_header_fptr);
 		unlink(header_filename);
-		//curl_slist_free_all(chunk);
+		/* curl_slist_free_all(chunk); */
 	}
 
 	return -1;
@@ -1304,6 +1321,7 @@ errcode_handle:
 *************************************************************************/
 void convert_currenttime(char *date_string)
 {
+	int32_t ret_val;
 	char current_time[100];
 	char wday[5];
 	char month[5];
@@ -1319,11 +1337,13 @@ void convert_currenttime(char *date_string)
 
 	write_log(10, "current time %s\n", current_time);
 
-	sscanf(current_time, "%s %s %s %s %s\n", wday, month, mday, timestr,
-	       year);
+	ret_val = sscanf(current_time, "%s %s %s %s %s\n", wday, month, mday,
+			 timestr, year);
+	if (ret_val != 5)
+		write_log(1, "Error: convert string %s\n", date_string);
 
-	sprintf((char *)date_string, "%s, %s %s %s %s GMT", wday, mday, month, year,
-		timestr);
+	sprintf((char *)date_string, "%s, %s %s %s %s GMT", wday, mday, month,
+		year, timestr);
 
 	write_log(10, "converted string %s\n", date_string);
 }
@@ -1347,11 +1367,12 @@ void compute_hmac_sha1(uint8_t *input_str, uint8_t *output_str,
 
 	write_log(10, "key: %s\n", key);
 	write_log(10, "input: %s\n", input_str);
-	write_log(10, "%d, %d\n", strlen((char*)key), strlen((char*)input_str));
+	write_log(10, "%d, %d\n", strlen((char *)key),
+		  strlen((char *)input_str));
 	HMAC_CTX_init(&myctx);
 
-	HMAC_Init_ex(&myctx, key, strlen((char*)key), EVP_sha1(), NULL);
-	HMAC_Update(&myctx, input_str, strlen((char*)input_str));
+	HMAC_Init_ex(&myctx, key, strlen((char *)key), EVP_sha1(), NULL);
+	HMAC_Update(&myctx, input_str, strlen((char *)input_str));
 	HMAC_Final(&myctx, finalhash, &len_finalhash);
 	HMAC_CTX_cleanup(&myctx);
 
@@ -1385,8 +1406,10 @@ void generate_S3_sig(char *method, char *date_string,
 
 	if (object_meta != NULL) {
 		int32_t i;
+
 		for (i = 0; i < object_meta->count; i++) {
 			char tmp[1024] = {0};
+
 			sprintf(tmp, "x-amz-meta-%s:%s\n",
 				object_meta->data[2 * i],
 				object_meta->data[2 * i + 1]);
@@ -1421,8 +1444,9 @@ void generate_S3_sig(char *method, char *date_string,
 *************************************************************************/
 int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 {
-	/*TODO: How to actually export the list of objects
-		to other functions*/
+	/* TODO: How to actually export the list of objects
+	 * to other functions
+	 */
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
 	FILE *S3_list_header_fptr, *S3_list_body_fptr;
@@ -1598,12 +1622,13 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	int32_t ret_val, num_retries;
 
-        ret_val = ignore_sigpipe();
-        if (ret_val < 0)
-                return ret_val;
+	ret_val = ignore_sigpipe();
+	if (ret_val < 0)
+		return ret_val;
 
 	/* If init is successful, curl_backend is set to the current
-	backend setting. Otherwise, it is set to NONE. */
+	 * backend setting. Otherwise, it is set to NONE.
+	 */
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 	case SWIFTTOKEN:
@@ -1693,9 +1718,9 @@ int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 {
 	int32_t ret_val;
 
-        ret_val = ignore_sigpipe();
-        if (ret_val < 0)
-                return ret_val;
+	ret_val = ignore_sigpipe();
+	if (ret_val < 0)
+		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1748,9 +1773,9 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 {
 	int32_t ret_val, num_retries;
 
-        ret_val = ignore_sigpipe();
-        if (ret_val < 0)
-                return ret_val;
+	ret_val = ignore_sigpipe();
+	if (ret_val < 0)
+		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1898,9 +1923,9 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	int32_t ret_val, num_retries;
 	int32_t ret, errcode;
 
-        ret_val = ignore_sigpipe();
-        if (ret_val < 0)
-                return ret_val;
+	ret_val = ignore_sigpipe();
+	if (ret_val < 0)
+		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1956,9 +1981,8 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		break;
 	}
 	/* Truncate output if not successful */
-	if (!_http_is_success(ret_val)) {
+	if (!_http_is_success(ret_val))
 		FTRUNCATE(fileno(fptr), 0);
-	}
 
 	return ret_val;
 
@@ -1977,15 +2001,16 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-/* TODO: Fix handling in reauthing in SWIFT.
-	Now will try to reauth for any HTTP error*/
+/* TODO: Fix handling in reauthing in SWIFT.  Now will try to reauth for
+ * any HTTP error
+ */
 int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	int32_t ret_val, num_retries;
 
-        ret_val = ignore_sigpipe();
-        if (ret_val < 0)
-                return ret_val;
+	ret_val = ignore_sigpipe();
+	if (ret_val < 0)
+		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -2103,6 +2128,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 	if (object_meta != NULL) {
 		int32_t i;
+
 		for (i = 0; i < object_meta->count; i++) {
 			sprintf(object_string, "x-amz-meta-%s: %s",
 				object_meta->data[2 * i],
@@ -2178,11 +2204,12 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	UNLINK(header_filename);
 	if (_http_is_success(ret_val)) {
 		/* Record xfer throughput */
-		COMPUTE_THROUGHPUT()
+		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
-		write_log(10, "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
-					objname, objsize, time_spent, xfer_thpt);
+		write_log(10,
+			  "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+			  objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
@@ -2191,7 +2218,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	return ret_val;
 
 errcode_handle:
-	write_log(9, "Something wrong in curl \n");
+	write_log(9, "Something wrong in curl\n");
 	if (S3_header_fptr == NULL) {
 		fclose(S3_header_fptr);
 		unlink(header_filename);
@@ -2310,6 +2337,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	/* get object meta data */
 	if (_http_is_success(ret_val) && object_meta) {
 		char header[1024] = {0};
+
 		FSEEK(S3_header_fptr, 0, SEEK_SET);
 		fread(header, sizeof(char), 1000, S3_header_fptr);
 		write_log(10, "download object %s header:\n%s", objname,
@@ -2322,11 +2350,12 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		FTELL(fptr);
 		objsize = ret_pos;
 		FSEEK(fptr, 0, SEEK_SET);
-		COMPUTE_THROUGHPUT()
+		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
-		write_log(10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
-					objname, objsize, time_spent, xfer_thpt);
+		write_log(
+		    10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+		    objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
@@ -2412,7 +2441,7 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
