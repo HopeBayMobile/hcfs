@@ -414,7 +414,7 @@ TEST(delete_loopTest, DeleteSuccess)
 
 	/* Check answer */
 	EXPECT_EQ(test_data.num_inode, to_verified_data.record_inode_counter);
-	qsort(&(to_verified_data.record_handle_inode), to_verified_data.record_inode_counter, sizeof(int32_t), inode_cmp);
+	qsort(to_verified_data.record_handle_inode, to_verified_data.record_inode_counter, sizeof(int32_t), inode_cmp);
 	for (int32_t i = 0 ; i < to_verified_data.record_inode_counter ; i++)
 		ASSERT_EQ(test_data.to_handle_inode[i], to_verified_data.record_handle_inode[i]);
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);
