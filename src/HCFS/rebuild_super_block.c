@@ -1067,7 +1067,8 @@ int32_t prune_this_entry(ino_t this_inode)
 		body_ptr = meta_cache_lock_entry(parent_inode);
 		if (body_ptr == NULL) {
 			write_log(0, "Error: Fail to lock parent inode %"
-				PRIu64" in %s. Skip to prune.", __func__);
+				PRIu64" in %s. Skip to prune.", parent_inode,
+				__func__);
 			continue;
 		}
 		ret = _dir_find_all_inodes(this_inode, &num_entries,

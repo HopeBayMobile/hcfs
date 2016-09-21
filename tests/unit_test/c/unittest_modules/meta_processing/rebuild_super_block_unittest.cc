@@ -11,6 +11,7 @@ extern "C" {
 #include "global.h"
 #include "fuseop.h"
 #include "path_reconstruct.h"
+#include "mount_manager.h"
 }
 #include <cstdlib>
 #include "rebuild_super_block_params.h"
@@ -65,6 +66,12 @@ protected:
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
 		NOW_NO_ROOTS = FALSE;
 		hcfs_system->system_restoring = RESTORING_STAGE2;
+		char fsstat_path[100];
+		sprintf(fsstat_path, "%s/FS_sync", METAPATH);
+		int ret = mkdir(fsstat_path, 0700);
+		if (ret < 0) {
+			printf("Error in mkdir\n");
+		}
 	}
 	void TearDown()
 	{
@@ -73,6 +80,29 @@ protected:
 		free(sys_super_block);
 		system("rm -rf ./rebuild_sb_running_folder/*");
 		hcfs_system->system_restoring = NOT_RESTORING;
+	}
+	void create_stat_files(ino_t *rootlist, int32_t num_roots)
+	{
+		FILE *fptr;
+		int32_t count;
+		static int counter = 0;
+		FS_CLOUD_STAT_T fs_stat;
+
+		for (count = 0; count < num_roots; count++) {
+			char fsstat_path[100];
+			sprintf(fsstat_path, "%s/FS_sync/FSstat%"PRIu64,
+				METAPATH, (uint64_t)rootlist[count]);
+			fptr = fopen(fsstat_path, "w");
+			if (fptr == NULL) {
+				printf("Error creating test file\n");
+				return;
+			}
+			fseek(fptr, 0, SEEK_SET);
+			counter++;
+			fs_stat.max_inode = counter;
+			fwrite(&fs_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+			fclose(fptr);
+		}
 	}
 };
 
@@ -83,6 +113,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	ino_t exp_roots[5] = {234, 345, 456, 567, 678};
 	ino_t roots[5];
 
+	create_stat_files(exp_roots, 5);
 	ASSERT_EQ(0, init_rebuild_sb(START_REBUILD_SB));
 
 	/* Verify superblock */
