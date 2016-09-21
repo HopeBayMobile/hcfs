@@ -793,6 +793,7 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 	res = curl_easy_perform(curl);
 
