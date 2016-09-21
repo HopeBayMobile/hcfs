@@ -52,13 +52,10 @@ class deleteEnvironment : public ::testing::Environment {
   }
 
   virtual void TearDown() {
-    free(hcfs_system);
     nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
-    if (workpath != NULL)
-      free(workpath);
-    if (tmppath != NULL)
-      free(tmppath);
-
+    free(workpath);
+    free(tmppath);
+    free(hcfs_system);
   }
 };
 
