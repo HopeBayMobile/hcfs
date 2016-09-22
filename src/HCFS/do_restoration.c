@@ -1570,6 +1570,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	else
 		ret = -ENOENT;
 	if (ret < 0) {
+		write_log(0, "Error: Type does not match");
 		errcode = ret;
 		goto errcode_handle;
 	}
@@ -2364,11 +2365,9 @@ int32_t _init_package_uid_list(void)
 			  ebuff);
 		goto errcode_handle;
 	}
+	snprintf(plistpath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
 
-	/*
-	 * snprintf(plistpath, METAPATHLEN, "%s/backup_pkg",* RESTORE_METAPATH);
-	 */
-	snprintf(plistpath, METAPATHLEN, "packages.xml");
+	/*snprintf(plistpath, METAPATHLEN, "packages.xml");*/
 
 	src = fopen(plistpath, "r");
 	if (src == NULL) {
@@ -2613,7 +2612,7 @@ int32_t run_download_minimal(void)
 	}
 
 	snprintf(restore_tosync_list, METAPATHLEN, "%s/tosync_list",
-		 RESTORE_METAPATH);
+			RESTORE_METAPATH);
 	/*
 	 * FEATURE TODO: If download in stage1 can be resumed in the
 	 * middle, then will need to open this list with "a+"
@@ -2629,7 +2628,13 @@ int32_t run_download_minimal(void)
 	write_log(4, "Downloading package list backup\n");
 	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
 	ret = restore_fetch_obj("backup_pkg", despath, FALSE);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
+	/* Init package-uid lookup table */
+	ret = _init_package_uid_list();
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -2804,6 +2809,8 @@ int32_t run_download_minimal(void)
 			continue;
 		}
 	}
+
+	_destroy_package_uid_list();
 
 	/* Write max inode number */
 	ret = write_system_max_inode(
