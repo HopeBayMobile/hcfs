@@ -622,7 +622,7 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 
 	thisptr = meta_cache_lock_entry(target_inode);
 	if (thisptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	errcode = meta_cache_lookup_file_data(target_inode, &thisstat,
 						NULL, NULL, 0, thisptr);
@@ -680,7 +680,7 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 
 	thisptr = meta_cache_lock_entry(target_inode);
 	if (thisptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	retcode = meta_cache_lookup_file_data(target_inode, &thisstat,
 						NULL, NULL, 0, thisptr);

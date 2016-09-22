@@ -476,9 +476,8 @@ static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	e_index = block_info->block_no % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	meta_cache_entry = meta_cache_lock_entry(block_info->this_inode);
-	if (meta_cache_entry == NULL) {
-		return -ENOMEM;
-	}
+	if (meta_cache_entry == NULL)
+		return -errno;
 
 	/* Check whether meta exists or not. Stop to update block status
 	if meta is removed. */

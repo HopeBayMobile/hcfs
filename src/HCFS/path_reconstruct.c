@@ -230,7 +230,7 @@ int32_t search_inode(ino_t parent, ino_t child, DIR_ENTRY *dentry)
 
 	cache_entry = meta_cache_lock_entry(parent);
 	if (cache_entry == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	ret = meta_cache_lookup_dir_data(parent, NULL, &tempmeta,
 						NULL, cache_entry);

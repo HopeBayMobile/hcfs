@@ -110,9 +110,11 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		memset(bptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 		return bptr;
 	} else {
+		errno = ENOMEM;
 		return NULL;
 	}
 
+	errno = EINVAL;
 	return NULL;
 }
 

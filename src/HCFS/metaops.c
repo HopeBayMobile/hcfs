@@ -760,7 +760,7 @@ int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 	/* Only fetch inode stat here. Can be replaced by
 		meta_cache_lookup_file_data() */
 	if (body_ptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,
 							NULL, NULL, body_ptr);
@@ -1860,7 +1860,7 @@ int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
 
 	cache_entry = meta_cache_lock_entry(parent);
 	if (cache_entry == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	ret_val = meta_cache_seek_dir_entry(parent, &temp_page,
 			&temp_index, childname, cache_entry, is_external);
@@ -1944,9 +1944,8 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 	char old_pin_status;
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL) {
-		return -ENOMEM;
-	}
+	if (meta_cache_entry == NULL)
+		return -errno;
 
 	ret_code = 0;
 	/* Case regfile & fifo file */
@@ -2468,9 +2467,8 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 
 	/* Lock parent */
 	pbody_ptr = meta_cache_lock_entry(parent_inode);
-	if (!pbody_ptr) {
-		return -ENOMEM;		
-	}
+	if (!pbody_ptr)
+		return -errno;
 	ret = meta_cache_open_file(pbody_ptr);
 	if (ret < 0) {
 		meta_cache_unlock_entry(pbody_ptr);
