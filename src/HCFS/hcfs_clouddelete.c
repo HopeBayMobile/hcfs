@@ -359,19 +359,28 @@ static inline void _check_del_progress_file(ino_t inode)
 	}
 }
 
-static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
-		ino_t *root_inode, BOOL *meta_on_cloud,
-		int64_t *backend_size_change, int64_t *meta_size_change)
+static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mode,
+		ino_t *root_inode, int64_t *backend_size_change,
+		int64_t *meta_size_change)
 {
 	FILE *metafptr;
 	FILE_META_TYPE tempfilemeta;
 	DIR_META_TYPE tempdirmeta;
 	SYMLINK_META_TYPE tempsymmeta;
-	CLOUD_RELATED_DATA cloud_related_data;
+	HCFS_STAT temphcfsstat;
 	int32_t ret, errcode;
 	size_t ret_size;
+	struct stat tempstat;
 
-	metafptr = fopen(todel_metapath, "r+");
+	ret = stat(backend_metapath, &tempstat);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+		return -errcode;
+	}
+
+	metafptr = fopen(backend_metapath, "r+");
 	if (metafptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
@@ -382,32 +391,30 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 
 	if (S_ISFILE(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
+		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
-				sizeof(FILE_STATS_TYPE), SEEK_SET);
-		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
-				metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempfilemeta.root_inode;
+		*meta_size_change = tempstat.st_size;
+		*backend_size_change = temphcfsstat.size + *meta_size_change;
 
 	} else if (S_ISDIR(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
+		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
-		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
-				metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempdirmeta.root_inode;
+		*meta_size_change = tempstat.st_size;
+		*backend_size_change = temphcfsstat.size + *meta_size_change;
 
 	} else if (S_ISLNK(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
-		FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
+		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
-		FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
-				metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempsymmeta.root_inode;
+		*meta_size_change = tempstat.st_size;
+		*backend_size_change = *meta_size_change;
 
 	} else {
 		write_log(0, "Error: Unknown type %d\n", this_mode);
@@ -416,9 +423,6 @@ static inline int32_t _read_meta(char *todel_metapath, mode_t this_mode,
 	}
 
 	fclose(metafptr);
-	*meta_on_cloud = cloud_related_data.upload_seq > 0 ? TRUE : FALSE;
-	*backend_size_change = cloud_related_data.size_last_upload;
-	*meta_size_change = cloud_related_data.meta_last_upload;
 
 	return 0;
 
@@ -440,11 +444,11 @@ errcode_handle:
 *************************************************************************/
 void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
-	char thismetapath[400];
+	char todel_metapath[400];
 	char backend_metapath[400];
 	char objname[500];
 	ino_t this_inode;
-	FILE *backend_metafptr;
+	FILE *backend_metafptr = NULL;
 	HCFS_STAT tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
@@ -466,7 +470,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t pin_size_delta;
 	int64_t block_seq;
 	ino_t root_inode;
-	BOOL meta_on_cloud;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -477,72 +480,69 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_size_change = 0;
 	pin_size_delta = 0;
 
-	fetch_todelete_path(thismetapath, this_inode);
-	ret = _read_meta(thismetapath, ptr->this_mode,
-			&root_inode, &meta_on_cloud,
-			&backend_size_change, &meta_size_change);
+	ret = fetch_todelete_path(todel_metapath, this_inode);
+	if (ret < 0) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		return;
+	}
+
+	/* Since there are no more todelete meta files, should download
+	 * backend meta for all d_type */
+	fetch_del_backend_meta_path(backend_metapath, this_inode);
+	backend_metafptr = fopen(backend_metapath, "w+");
+	if (backend_metafptr == NULL) {
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		unlink(backend_metapath);
+		return;
+	}
+	setbuf(backend_metafptr, NULL);
+
+	fetch_backend_meta_objname(objname, this_inode);
+	ret = fetch_from_cloud(backend_metafptr,
+			FETCH_FILE_META, objname);
+	if (ret < 0) {
+		if (ret == -EIO) {
+			write_log(5, "Error: Fail to download "
+					"backend meta_%"PRIu64". "
+					"Delete next time.\n",
+					(uint64_t)this_inode);
+
+		} else if (ret == -ENOENT) {
+			write_log(10, "Debug: Nothing on"
+					" cloud to be deleted for"
+					" inode_%"PRIu64"\n",
+					(uint64_t)this_inode);
+			_check_del_progress_file(this_inode);
+			super_block_delete(this_inode);
+			super_block_reclaim();
+		}
+
+		fclose(backend_metafptr);
+		unlink(backend_metapath);
+		/* todelete meta file may existed if system had been upgraded */
+		unlink(todel_metapath);
+		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		return;
+	}
+
+	ret = _read_backend_meta(backend_metapath, ptr->this_mode,
+			&root_inode, &backend_size_change,
+			&meta_size_change);
 	if (ret < 0) {
 		write_log(0, "Error: Meta %s cannot be read. Code %d\n",
-				thismetapath, -ret);
+				backend_metapath, -ret);
 		_check_del_progress_file(this_inode);
-		unlink(thismetapath);
+		fclose(backend_metafptr);
+		unlink(backend_metapath);
+		/* todelete meta file may existed if system had been upgraded */
+		unlink(todel_metapath);
 		super_block_delete(this_inode);
 		super_block_reclaim();
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 		return;
 	}
 
-	/* Do nothing and return if meta is not on cloud */
-	if (meta_on_cloud == FALSE) {
-		write_log(10, "Debug:meta_%"PRIu64" is not on cloud.\n",
-				(uint64_t)this_inode);
-		_check_del_progress_file(this_inode);
-		unlink(thismetapath);
-		super_block_delete(this_inode);
-		super_block_reclaim();
-		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		return;
-	}
-
-	/* Download backend meta and read it if it is regfile */
-	backend_metafptr = NULL;
 	if (S_ISREG(ptr->this_mode)) {
-		fetch_del_backend_meta_path(backend_metapath, this_inode);
-		backend_metafptr = fopen(backend_metapath, "w+");
-		if (backend_metafptr == NULL) {
-			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-			unlink(backend_metapath);
-			return;
-		}
-		setbuf(backend_metafptr, NULL);
-
-		fetch_backend_meta_objname(objname, this_inode);
-		ret = fetch_from_cloud(backend_metafptr,
-				FETCH_FILE_META, objname);
-		if (ret < 0) {
-			if (ret == -EIO) {
-				write_log(5, "Error: Fail to download "
-						"backend meta_%"PRIu64". "
-						"Delete next time.\n",
-						(uint64_t)this_inode);
-
-			} else if (ret == -ENOENT) {
-				write_log(10, "Debug: Nothing on"
-						" cloud to be deleted for"
-						" inode_%"PRIu64"\n",
-						(uint64_t)this_inode);
-				_check_del_progress_file(this_inode);
-				unlink(thismetapath);
-				super_block_delete(this_inode);
-				super_block_reclaim();
-			}
-
-			fclose(backend_metafptr);
-			unlink(backend_metapath);
-			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-			return;
-		}
-
 		/* Delete blocks */
 		flock(fileno(backend_metafptr), LOCK_EX);
 		backend_mlock = TRUE;
@@ -667,6 +667,8 @@ errcode_handle:
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
 	}
+	/* todelete meta file may existed if system had been upgraded */
+	unlink(todel_metapath);
 
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
@@ -723,14 +725,11 @@ errcode_handle:
 		return;
 	}
 
-	/* Update FS stat in the backend if updated previously */
-	if (meta_on_cloud == TRUE) {
-		update_backend_stat(root_inode, -backend_size_change,
-				-meta_size_change, -1, pin_size_delta);
-	}
+	/* Update FS stat in the backend */
+	update_backend_stat(root_inode, -backend_size_change,
+			-meta_size_change, -1, pin_size_delta);
 
 	_check_del_progress_file(this_inode);
-	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
 	dsync_ctl.threads_finished[which_dsync_index] = TRUE;

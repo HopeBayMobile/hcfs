@@ -474,15 +474,6 @@ int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
 	return 0;
 }
 
-int32_t get_meta_size(ino_t inode, int64_t *metasize, int64_t *metaroundsize)
-{
-	if (metasize)
-		*metasize = MOCK_META_SIZE;
-	if (metaroundsize)
-		*metaroundsize = round_size(MOCK_META_SIZE);
-	return 0;
-}
-
 int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 {
 	return 0;
@@ -524,3 +515,8 @@ int64_t round_size(int64_t size)
 	return ret_size;
 }
 
+void fetch_progress_file_path(char *pathname, ino_t inode)
+{
+	sprintf(pathname, "testpatterns/mock_progress_file");
+	return;
+}
