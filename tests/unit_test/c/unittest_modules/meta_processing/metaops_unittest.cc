@@ -2177,6 +2177,9 @@ protected:
 		hcfs_restored_system_meta = (HCFS_RESTORED_SYSTEM_META *)
 				calloc(sizeof(HCFS_RESTORED_SYSTEM_META), 1);
 		MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
+		if (!access(MOCK_META_PATH, F_OK))
+			nftw(MOCK_META_PATH, do_delete, 20, FTW_DEPTH);
+		mkdir(MOCK_META_PATH, 0700);
 	}
 
 	void TearDown()
@@ -2186,6 +2189,8 @@ protected:
 		hcfs_restored_system_meta = NULL;
 		if (!access(work_path, F_OK))
 			system("rm -rf ./restore_meta_fileTestPath");
+		if (!access(MOCK_META_PATH, F_OK))
+			nftw(MOCK_META_PATH, do_delete, 20, FTW_DEPTH);
 	}
 };
 
