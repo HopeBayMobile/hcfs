@@ -291,11 +291,13 @@ public:
 	}
 private:
 	InitUploadControlTool() {}
-	~InitUploadControlTool()
+	static InitUploadControlTool *tool;
+public:
+	static void Destruct()
 	{
 		delete tool;
+		tool = NULL;
 	}
-	static InitUploadControlTool *tool;
 };
 
 
@@ -328,6 +330,8 @@ protected:
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		close(InitUploadControlTool::Tool()->fd);
 		unlink(InitUploadControlTool::Tool()->progress_path);
+
+		InitUploadControlTool::Destruct();
 
 		unlink(MOCK_META_PATH);
 	}
