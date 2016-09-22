@@ -52,13 +52,10 @@ class deleteEnvironment : public ::testing::Environment {
   }
 
   virtual void TearDown() {
-    free(hcfs_system);
     nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
-    if (workpath != NULL)
-      free(workpath);
-    if (tmppath != NULL)
-      free(tmppath);
-
+    free(workpath);
+    free(tmppath);
+    free(hcfs_system);
   }
 };
 
@@ -211,6 +208,8 @@ public:
 		free(system_config);
 		if (!access(backend_meta, F_OK))
 			unlink(backend_meta);
+		free(dsync_ctl.retry_list.retry_inode);
+		dsync_ctl.retry_list.retry_inode = NULL;
 	}
 	void init_objname_buffer(uint32_t num_objname)
 	{
@@ -282,7 +281,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	cloud_related.upload_seq = 1;
 
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
-	ASSERT_NE(meta, NULL);
+	ASSERT_NE(0, (meta != NULL));
 	setbuf(meta, NULL);
 	fseek(meta, 0, SEEK_SET);
 	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
@@ -358,7 +357,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Check answer */
 	EXPECT_EQ(1, objname_counter); // Check # of object name.
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%"PRIu64, (uint64_t)mock_thread_info->inode);
+	sprintf(expected_objname, "meta_%" PRIu64, (uint64_t) mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[0]); // Check meta was recorded.
 
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
@@ -414,7 +413,7 @@ TEST(delete_loopTest, DeleteSuccess)
 
 	/* Check answer */
 	EXPECT_EQ(test_data.num_inode, to_verified_data.record_inode_counter);
-	qsort(&(to_verified_data.record_handle_inode), to_verified_data.record_inode_counter, sizeof(int32_t), inode_cmp);
+	qsort(to_verified_data.record_handle_inode, to_verified_data.record_inode_counter, sizeof(int32_t), inode_cmp);
 	for (int32_t i = 0 ; i < to_verified_data.record_inode_counter ; i++)
 		ASSERT_EQ(test_data.to_handle_inode[i], to_verified_data.record_handle_inode[i]);
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);

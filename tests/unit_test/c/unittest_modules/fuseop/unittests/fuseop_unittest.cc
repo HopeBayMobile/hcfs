@@ -85,7 +85,7 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
   sem_init((tmpmount->stat_lock), 0, 1);
   fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
   tmp_channel = fuse_mount(mount, &tmp_args);
-  ASSERT_NE(tmp_channel, NULL);
+  ASSERT_NE(0, (tmp_channel != NULL));
   tmp_session = fuse_lowlevel_new(&tmp_args,
 			&hfuse_ops, sizeof(hfuse_ops), (void *) tmpmount);
   fuse_set_signal_handlers(tmp_session);
@@ -1160,7 +1160,7 @@ TEST_F(hfuse_openTest, OpenFileOK) {
   fptr = fopen("/tmp/test_fuse/testfile1", "r");
   tmp_err = errno;
   
-  EXPECT_NE(fptr, NULL);
+  EXPECT_NE(0, (fptr != NULL));
   EXPECT_EQ(tmp_err, 0);
   fclose(fptr);
   fptr = NULL;
@@ -1551,7 +1551,7 @@ TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
 
   EXPECT_EQ(0, access("/tmp/test_fuse/testwrite", F_OK));
   fptr = fopen("/tmp/test_fuse/testwrite", "r+");
-  ASSERT_NE(fptr, NULL);
+  ASSERT_NE(0, (fptr != NULL));
   setbuf(fptr, NULL);
 
   snprintf(tempbuf, 10, "test");

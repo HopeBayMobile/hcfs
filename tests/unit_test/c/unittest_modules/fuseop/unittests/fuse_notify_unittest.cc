@@ -250,7 +250,7 @@ TEST_F(NotifyBufferSetUpAndTearDown, DestroyBufSuccess)
 
 	for (i = 0; i < MP_TYPE_NUM - 1; i++) {
 		name3 = ((FUSE_NOTIFY_DELETE_DATA *)&notify_buf.elems[i])->name;
-		EXPECT_EQ(name3, NULL);
+		EXPECT_NE(0, (name3 == NULL));
 	}
 	free(ch);
 	free(name);
@@ -285,7 +285,7 @@ TEST_F(NotifyBuffer_Initialized, Dequeue)
 
 	ut_enqueue(1);
 	d = notify_buf_dequeue();
-	ASSERT_NE(d, NULL);
+	ASSERT_NE(0, (d != NULL));
 	EXPECT_EQ(0, memcmp(d, notify_buf.elems, sizeof(FUSE_NOTIFY_DATA)));
 	free(d);
 }
@@ -304,7 +304,8 @@ TEST_F(NotifyBuffer_Initialized, DequeueOnFullWillPostNotFull)
 TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
 	ut_enqueue(1);
 	malloc_error_on = 1;
-	EXPECT_EQ(notify_buf_dequeue(), NULL);
+	EXPECT_NE(0, (notify_buf_dequeue() == NULL));
+	EXPECT_EQ(ENOMEM, errno);
 }
 
 TEST_F(NotifyBuffer_Initialized, initLoop)

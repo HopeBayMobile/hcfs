@@ -199,7 +199,7 @@ TEST_F(init_progress_infoTest, Init_backend_fptr_Is_NULL)
 {
 	int fd;
 	int ret;
-	long long size;
+	int64_t size;
 	PROGRESS_META progress_meta;
 
 	fd = open(mock_progress_path, O_CREAT | O_RDWR);
@@ -225,7 +225,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 {
 	int fd;
 	int ret;
-	long long size;
+	int64_t size;
 	PROGRESS_META progress_meta;
 	FILE_META_TYPE tmp_file_meta;
 	BLOCK_ENTRY_PAGE tmp_entry_page;
@@ -281,7 +281,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 {
 	int fd;
 	int ret;
-	long long size;
+	int64_t size;
 	PROGRESS_META progress_meta;
 	FILE_META_TYPE tmp_file_meta;
 	BLOCK_ENTRY_PAGE tmp_entry_page;
@@ -353,7 +353,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 {
 	int fd;
 	int ret;
-	long long size;
+	int64_t size;
 	PROGRESS_META progress_meta;
 	FILE_META_TYPE tmp_file_meta;
 	BLOCK_ENTRY_PAGE tmp_entry_page;
@@ -456,7 +456,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 	int fd;
 	int ret;
 	ssize_t tmp_size;
-	long long num_blocks;
+	int64_t num_blocks;
 	BLOCK_UPLOADING_STATUS ans_status, empty_status;
 	PROGRESS_META tmp_meta;
 
@@ -472,7 +472,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 	memset(toupload_objid, 'K', OBJID_LENGTH);
 	memset(backend_objid, 'W', OBJID_LENGTH);
 #else
-	long long toupload_seq, backend_seq;
+	int64_t toupload_seq, backend_seq;
 
 	toupload_seq = 123;
 	backend_seq = 456;
@@ -534,7 +534,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 	int fd;
 	int ret;
 	ssize_t tmp_size;
-	long long block_index[5];
+	int64_t block_index[5];
 	BLOCK_UPLOADING_STATUS ans_status, empty_status;
 	PROGRESS_META tmp_meta;
 
@@ -569,7 +569,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 	memset(toupload_objid, 'K', OBJID_LENGTH);
 	memset(backend_objid, 'W', OBJID_LENGTH);
 #else
-	long long toupload_seq, backend_seq;
+	int64_t toupload_seq, backend_seq;
 
 	toupload_seq = 123;
 	backend_seq = 456;
@@ -1366,7 +1366,7 @@ protected:
 
 TEST_F(init_backend_file_infoTest, NotRevert_FirstUpload)
 {
-	long long backend_size, total_backend_blocks;
+	int64_t backend_size, total_backend_blocks;
 	SYNC_THREAD_TYPE sync_type;
 	PROGRESS_META tmp_meta;
 	int ret;
@@ -1403,7 +1403,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FirstUpload)
 
 TEST_F(init_backend_file_infoTest, NotRevert_FailToFetchFromCloud)
 {
-	long long backend_size, total_backend_blocks;
+	int64_t backend_size, total_backend_blocks;
 	SYNC_THREAD_TYPE sync_type;
 	PROGRESS_META tmp_meta;
 	int ret;
@@ -1438,7 +1438,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FailToFetchFromCloud)
 
 TEST_F(init_backend_file_infoTest, NotRevert_NotFirstUpload)
 {
-	long long backend_size, total_backend_blocks;
+	int64_t backend_size, total_backend_blocks;
 	SYNC_THREAD_TYPE sync_type;
 	PROGRESS_META tmp_meta;
 	int ret;
@@ -1475,7 +1475,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_NotFirstUpload)
 
 TEST_F(init_backend_file_infoTest, RevertMode_FinishInit)
 {
-	long long backend_size, total_backend_blocks;
+	int64_t backend_size, total_backend_blocks;
 	SYNC_THREAD_TYPE sync_type;
 	PROGRESS_META tmp_meta;
 	int ret;
@@ -1515,10 +1515,10 @@ TEST_F(init_backend_file_infoTest, RevertMode_FinishInit)
 
 TEST_F(init_backend_file_infoTest, RevertMode_NotFinishInit)
 {
-	long long backend_size, total_backend_blocks;
+	int64_t backend_size, total_backend_blocks;
 	SYNC_THREAD_TYPE sync_type;
 	PROGRESS_META tmp_meta;
-	int ret;
+	int32_t ret;
 	int inode;
 
 	inode = 3;
