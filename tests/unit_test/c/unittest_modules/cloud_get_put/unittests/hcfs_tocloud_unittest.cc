@@ -546,6 +546,8 @@ TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+
+	free(retry_list.retry_inode);
 }
 
 TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
