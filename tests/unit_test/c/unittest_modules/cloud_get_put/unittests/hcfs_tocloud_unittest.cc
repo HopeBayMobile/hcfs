@@ -61,6 +61,7 @@ class uploadEnvironment : public ::testing::Environment {
     hcfs_system->sync_paused = OFF;
     sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
     sem_init(&(hcfs_system->access_sem), 0, 1);
+    sem_init(&backup_pkg_sem, 0, 1);
 
     workpath = NULL;
     tmppath = NULL;
@@ -779,6 +780,7 @@ protected:
 		init_sync_stat_control();
 		max_objname_num = 4000;
 		sem_init(&objname_counter_sem, 0, 1);
+		sem_init(&backup_pkg_sem, 0, 1);
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
 		for (int32_t i = 0 ; i < max_objname_num ; i++)
@@ -1163,6 +1165,7 @@ protected:
 		}
 
 		sem_init(&objname_counter_sem, 0, 1);
+		sem_init(&backup_pkg_sem, 0, 1);
 
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_paused = FALSE;

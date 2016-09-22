@@ -56,6 +56,7 @@ class BaseClassWithMetaCacheEntry : public ::testing::Test {
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
+    hcfs_system->system_restoring = NOT_RESTORING;
   }
 
   virtual void TearDown() {
@@ -309,48 +310,55 @@ TEST_F(meta_cache_drop_pagesTest, SuccessDropAllPages)
 	Unit testing for meta_cache_push_dir_page()
  */
 class meta_cache_push_dir_pageTest : public ::testing::Test {
-	protected:
-		const char *dir_meta_path;
+ protected:
+  const char *dir_meta_path;
 
-		virtual void SetUp()
-		{
-			dir_meta_path = "/tmp/tmp_dir_meta";
+  virtual void SetUp()
+  {
+    dir_meta_path = "/tmp/tmp_dir_meta";
 
-			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-			test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-			reserved_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-			for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
-				char tmp_type;
-				char tmp_name[10];
-				tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
-				sprintf(tmp_name, "mytest%d", i);
-				test_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
-				strcpy(test_dir_entry_page->dir_entries[i].d_name, tmp_name);
-			}
-			for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
-				char tmp_type;
-				char tmp_name[20];
-				tmp_type = (i+1) % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
-				sprintf(tmp_name, "reserved_test%d", i);
-				reserved_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
-				strcpy(reserved_dir_entry_page->dir_entries[i].d_name, tmp_name);
-			}
+    body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+    test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+    reserved_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+    for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
+      char tmp_type;
+      char tmp_name[10];
+      tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
+      sprintf(tmp_name, "mytest%d", i);
+      test_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
+      strcpy(test_dir_entry_page->dir_entries[i].d_name, tmp_name);
+    }
+    for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
+      char tmp_type;
+      char tmp_name[20];
+      tmp_type = (i+1) % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
+      sprintf(tmp_name, "reserved_test%d", i);
+      reserved_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
+      strcpy(reserved_dir_entry_page->dir_entries[i].d_name, tmp_name);
+    }
 
-			body_ptr->meta_opened = TRUE;
-			body_ptr->fptr = fopen(dir_meta_path, "w+");
-		}
-		virtual void TearDown()
-		{
-			fclose(body_ptr->fptr);
-			unlink(dir_meta_path);
+    body_ptr->meta_opened = TRUE;
+    body_ptr->fptr = fopen(dir_meta_path, "w+");
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
+    hcfs_system->system_restoring = NOT_RESTORING;
+  }
+  virtual void TearDown()
+  {
+    fclose(body_ptr->fptr);
+    unlink(dir_meta_path);
 
-			free(body_ptr);
-			free(test_dir_entry_page);
-			free(reserved_dir_entry_page);
-		}
-		META_CACHE_ENTRY_STRUCT *body_ptr;
-		DIR_ENTRY_PAGE *test_dir_entry_page;
-		DIR_ENTRY_PAGE *reserved_dir_entry_page;
+    free(body_ptr);
+    free(test_dir_entry_page);
+    free(reserved_dir_entry_page);
+    free(hcfs_system);
+  }
+  META_CACHE_ENTRY_STRUCT *body_ptr;
+  DIR_ENTRY_PAGE *test_dir_entry_page;
+  DIR_ENTRY_PAGE *reserved_dir_entry_page;
 };
 
 TEST_F(meta_cache_push_dir_pageTest, BothEntryCacheNull)
@@ -424,15 +432,22 @@ TEST_F(meta_cache_push_dir_pageTest, BothNonempty)
 
 class meta_cache_lock_entryTest : public ::testing::Test {
 protected:
-	void SetUp()
-	{
-		init_meta_cache_headers();
-	}
+  void SetUp()
+  {
+    init_meta_cache_headers();
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
+    hcfs_system->system_restoring = NOT_RESTORING;
+  }
 
-	void TearDown()
-	{
-		free(meta_mem_cache);
-	}
+  void TearDown()
+  {
+    free(hcfs_system);
+    free(meta_mem_cache);
+  }
 };
 
 TEST_F(meta_cache_lock_entryTest, InsertAndLockSuccess)
@@ -1616,34 +1631,40 @@ TEST_F(expire_meta_mem_cache_entryTest, ExpireEntrySuccess)
 	Unit testing for meta_cache_seek_dir_entry()
  */
 class meta_cache_seek_dir_entryTest : public ::testing::Test {
-	protected:
-		virtual void SetUp()
-		{
-			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-			sem_init(&(body_ptr->access_sem), 0, 1);
-			/* Mock dir_entry_page */
-			test_dir_entry = DIR_ENTRY{10, "test_name", 0};
-			test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-			test_dir_entry_page->num_entries = 1;
-			test_dir_entry_page->dir_entries[0] = test_dir_entry;
+ protected:
+  virtual void SetUp()
+  {
+    body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+    sem_init(&(body_ptr->access_sem), 0, 1);
+    /* Mock dir_entry_page */
+    test_dir_entry = DIR_ENTRY{10, "test_name", 0};
+    test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+    test_dir_entry_page->num_entries = 1;
+    test_dir_entry_page->dir_entries[0] = test_dir_entry;
 
-			test_dir_entry2 = DIR_ENTRY{20, "test_name2", 0};
-			test_dir_entry_page2 = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-			test_dir_entry_page2->num_entries = 1;
-			test_dir_entry_page2->dir_entries[0] = test_dir_entry2;
-			hcfs_system->system_restoring = NOT_RESTORING;
-		}
+    test_dir_entry2 = DIR_ENTRY{20, "test_name2", 0};
+    test_dir_entry_page2 = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+    test_dir_entry_page2->num_entries = 1;
+    test_dir_entry_page2->dir_entries[0] = test_dir_entry2;
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+    hcfs_system->backend_is_online = TRUE;
+    hcfs_system->sync_manual_switch = ON;
+    hcfs_system->sync_paused = OFF;
+    hcfs_system->system_restoring = NOT_RESTORING;
+  }
 
-		virtual void TearDown()
-		{
-			free(test_dir_entry_page);
-			free(test_dir_entry_page2);
-			free(body_ptr);
-		}
+  virtual void TearDown()
+  {
+    free(test_dir_entry_page);
+    free(test_dir_entry_page2);
+    free(body_ptr);
+    free(hcfs_system);
+  }
 
-		META_CACHE_ENTRY_STRUCT *body_ptr;
-		DIR_ENTRY_PAGE *test_dir_entry_page, *test_dir_entry_page2;
-		DIR_ENTRY test_dir_entry, test_dir_entry2;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
+  DIR_ENTRY_PAGE *test_dir_entry_page, *test_dir_entry_page2;
+  DIR_ENTRY test_dir_entry, test_dir_entry2;
 };
 
 TEST_F(meta_cache_seek_dir_entryTest, CacheNotLocked)

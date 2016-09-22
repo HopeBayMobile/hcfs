@@ -799,6 +799,9 @@ protected:
 
 		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
 
 		/* global var to control UT */
 		usermeta_notfound = FALSE;
