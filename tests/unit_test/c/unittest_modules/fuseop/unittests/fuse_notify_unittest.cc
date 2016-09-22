@@ -108,14 +108,14 @@ int32_t ut_enqueue(size_t n)
 	if (n > 50)
 		write_log_hide = 10;
 	for (i = 0; i < n; i++) {
-		if (in == FUSE_NOTIFY_BUF_MAX_LEN)
-			in = 0;
 		printf("Fill with %lu\n", seq);
 		memset(&data[ut_enqueue_call % 20], seq,
 		       sizeof(FUSE_NOTIFY_DATA));
 		((FUSE_NOTIFY_PROTO *)&data[ut_enqueue_call % 20])->func = NOOP;
 		ret = notify_buf_enqueue((void *)&data[ut_enqueue_call % 20]);
 		in = notify_buf.in + 1;
+		if (in == FUSE_NOTIFY_BUF_MAX_LEN)
+			in = 0;
 		ut_enqueue_call++;
 		seq++;
 	}
@@ -392,9 +392,8 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 	int32_t task;
 	struct timespec wait = {0, 100000};
 	init_hfuse_ll_notify_loop();
-	ut_enqueue(1);
 	malloc_error_on = 1;
-	sem_post(&notify_buf.not_empty);
+	ut_enqueue(1);
 	while (1) {
 		sem_getvalue(&notify_buf.not_empty, &task);
 		if(task == 0)
@@ -402,12 +401,14 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 		/* waiting loop to finish */
 		nanosleep(&wait, NULL);
 	}
+	puts("UT: system_going_down");
 	hcfs_system->system_going_down = TRUE;
 	sem_post(&notify_buf.not_empty);
 	pthread_join(fuse_nofify_thread, NULL);
-	EXPECT_STREQ(
-	    log_data[(write_log_call_count + 5 - 1) % 5],
-	    "Error notify_buf_dequeue: Failed. Operation not permitted\n");
+#define msg \
+	"Error hfuse_ll_notify_loop: Dequeue failed. Cannot allocate memory\n"
+	EXPECT_STREQ(log_data[(write_log_call_count + 5 - 4) % 5], msg);
+#undef msg
 }
 
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
