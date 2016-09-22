@@ -10,8 +10,8 @@
 *
 **************************************************************************/
 
-#ifndef GW20_DO_RESTORATION_H_
-#define GW20_DO_RESTORATION_H_
+#ifndef SRC_HCFS_DO_RESTORATION_H_
+#define SRC_HCFS_DO_RESTORATION_H_
 
 #include <inttypes.h>
 #include <semaphore.h>
@@ -76,6 +76,18 @@ typedef struct {
 	DIR_ENTRY entry;
 } PRUNE_T;
 
+typedef struct _PKG_LINKLIST_NODE {
+	char name[MAX_FILENAME_LEN + 1];
+	int32_t uid;
+	struct _PKG_LINKLIST_NODE *next;
+} PKG_NODE;
+
+typedef struct {
+	PKG_NODE **sarray;
+	uint32_t count;
+} PKG_INFO;
+
+
 void init_restore_path(void);
 int32_t write_system_max_inode(ino_t ino_num);
 int32_t read_system_max_inode(ino_t *ino_num);
@@ -109,4 +121,4 @@ void update_restored_cache_usage(int64_t delta_cache_size,
 int32_t rectify_space_usage();
 int32_t init_rectified_system_meta(char restoration_stage);
 int32_t check_network_connection(void);
-#endif  /* GW20_DO_RESTORATION_H_ */
+#endif  /* SRC_HCFS_DO_RESTORATION_H_ */
