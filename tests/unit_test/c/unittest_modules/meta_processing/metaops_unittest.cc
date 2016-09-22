@@ -13,7 +13,6 @@
 
 extern "C" {
 #include "mock_param.h"
-
 #include "utils.h"
 #include "global.h"
 #include "hfuse_system.h"
@@ -137,7 +136,7 @@ class dir_add_entryTest : public ::testing::Test {
 			sem_init(&(body_ptr->access_sem), 0, 1);
 			body_ptr->fptr = fopen(mock_metaname, "w+");
 			/* Init meta & stat to be verified */
-			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_meta, 0, sizeof(DIR_META_TYPE));
 			memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
                 }
 
@@ -282,7 +281,7 @@ class dir_remove_entryTest : public ::testing::Test {
 			body_ptr->meta_opened = TRUE;
 			/* to_verified_meta & to_verified_stat will be modify in dir_remove_entry().
 			   Use the global vars to verify result. */
-			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_meta, 0, sizeof(DIR_META_TYPE));
 			memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
 			to_verified_meta.total_children = TOTAL_CHILDREN_NUM;
 			to_verified_stat.nlink = LINK_NUM;
@@ -420,7 +419,7 @@ protected:
 
 		body_ptr = (META_CACHE_ENTRY_STRUCT*)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-		memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+		memset(&to_verified_meta, 0, sizeof(DIR_META_TYPE));
 		memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
 	}
 	virtual void TearDown() {

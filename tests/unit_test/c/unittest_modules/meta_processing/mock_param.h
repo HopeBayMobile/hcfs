@@ -1,6 +1,7 @@
 #include "sys/stat.h"
 #include "fuseop.h"
 #include "params.h"
+#include "meta.h"
 
 #ifndef META_PROCESSING_MOCK_PARAMS_H_
 #define META_PROCESSING_MOCK_PARAMS_H_

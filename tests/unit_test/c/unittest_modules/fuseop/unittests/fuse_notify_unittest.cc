@@ -305,9 +305,7 @@ TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
 	ut_enqueue(1);
 	malloc_error_on = 1;
 	EXPECT_NE(0, (notify_buf_dequeue() == NULL));
-	EXPECT_STREQ(
-	    log_data[write_log_call_count % 5],
-	    "Error notify_buf_dequeue: Failed. Cannot allocate memory\n");
+	EXPECT_EQ(ENOMEM, errno);
 }
 
 TEST_F(NotifyBuffer_Initialized, initLoop)
