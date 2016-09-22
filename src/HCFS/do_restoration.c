@@ -33,6 +33,7 @@
 #include "metaops.h"
 #include "mount_manager.h"
 #include "utils.h"
+#include "restoration_utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -1318,6 +1319,9 @@ int32_t _replace_missing_pinned(ino_t srcinode, ino_t thisinode)
 	setbuf(fptr, NULL);
 
 	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+	/* Let link number be 1 */
+	tmpstat.nlink = 1;
+	FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	FREAD(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (P_IS_UNPIN(tmpmeta.local_pin)) {
 		/* Don't fetch blocks */
@@ -1436,6 +1440,73 @@ ino_t _stage1_get_new_inode(void)
 	return ret_ino;
 }
 
+
+int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
+		BOOL *need_copy, INODE_PAIR_LIST *hardln_mapping)
+{
+	char srcpath[METAPATHLEN], targetpath[METAPATHLEN];
+	int32_t ret, errcode;
+	HCFS_STAT tmpstat;
+	int64_t ret_size;
+	FILE *fptr;
+
+	if (hardln_mapping == NULL)
+		return -ENOMEM;
+
+	fetch_meta_path(srcpath, src_inode);
+	fptr = fopen(srcpath, "r");
+	if (!fptr) {
+		errcode = -errno;
+		return errcode;
+	}
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	if (tmpstat.nlink < 1) {
+		return -ENOENT;
+	} else if (tmpstat.nlink == 1) {
+		*target_inode = _stage1_get_new_inode();
+		*need_copy = TRUE;
+	} else {
+		/* Find hardlink target inode */
+		ret = find_target_inode(hardln_mapping, src_inode,
+				target_inode);
+		if (ret < 0) {
+			/* If not found, get a new inode number */
+			*target_inode = _stage1_get_new_inode();
+			insert_inode_pair(hardln_mapping,
+				src_inode, *target_inode);
+			*need_copy = TRUE;
+		} else {
+			/* Otherwise, use the hardlink inode number and
+			 * increase nlink */
+			fetch_restore_meta_path(targetpath, *target_inode);
+			fptr = fopen(targetpath, "r");
+			if (!fptr) {
+				errcode = -errno;
+				return errcode;
+			}
+			flock(fileno(fptr), LOCK_EX);
+			FSEEK(fptr, 0, SEEK_SET);
+			FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+			tmpstat.nlink += 1;
+			FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			*need_copy = FALSE;
+		}
+	}
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
+}
+
 /**
  * Replace missing object under restored folder /data/data. Object can
  * be any type. "src_inode" is the inode number corresponding to now system.
@@ -1449,7 +1520,8 @@ ino_t _stage1_get_new_inode(void)
  *
  * @return 0 on success. Otherwise return negation of error number.
  */
-int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
+int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
+		INODE_PAIR_LIST *hardln_mapping)
 {
 	FILE *fptr;
 	char srcpath[METAPATHLEN], targetpath[METAPATHLEN];
@@ -1463,7 +1535,10 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 	DIR_ENTRY *removed_list;
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
-	HCFS_STAT dirstat;
+	HCFS_STAT dirstat, tmpstat;
+	BOOL meta_open = FALSE;
+	BOOL need_copy;
+	char now_type;
 
 	/* Skip socket and fifo? */
 	if (type == D_ISSOCK || type == D_ISFIFO)
@@ -1482,26 +1557,53 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 		write_log(0, "Error: Fail to open file. Code %d", -ret);
 		return ret;
 	}
+	meta_open = TRUE;
+	/* Check type */
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+	if (S_ISREG(tmpstat.mode) && type == D_ISREG)
+		ret = 0;
+	else if (S_ISDIR(tmpstat.mode) && type == D_ISDIR)
+		ret = 0;
+	else if (S_ISLNK(tmpstat.mode) && type == D_ISLNK)
+		ret = 0;
+	else
+		ret = -ENOENT;
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 	setbuf(fptr, NULL);
-	ret = restore_meta_structure(fptr);
-	if (ret < 0)
-		return ret;
 
 	/* Case regular file */
 	if (type == D_ISREG) {
+		errcode = restore_meta_structure(fptr);
+		if (errcode < 0)
+			goto errcode_handle;
 		fclose(fptr);
-		ret = _replace_missing_pinned(src_inode, target_inode);
-		if (ret < 0)
-			return ret;
+		meta_open = FALSE;
+		errcode = _replace_missing_pinned(src_inode, target_inode);
+		if (errcode < 0)
+			goto errcode_handle;
 		/* Mark this inode to to_sync */
 		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
 		return 0;
 	} else if (type == D_ISLNK) {
+		errcode = restore_borrowed_meta_structure(fptr);
+		if (errcode < 0)
+			goto errcode_handle;
 		fclose(fptr);
+		meta_open = FALSE;
 		/* Mark this inode to to_sync */
 		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
 		return 0;
 	}
+
+	errcode = restore_borrowed_meta_structure(fptr);
+	if (errcode < 0)
+		goto errcode_handle;
+	fclose(fptr);
+	meta_open = FALSE;
 
 	/* Recursively copy dir */
 	removed_list = malloc(sizeof(DIR_ENTRY) * 5);
@@ -1518,11 +1620,39 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 		for (idx = 0; idx < dir_page.num_entries; idx++) {
 			now_entry = &(dir_page.dir_entries[idx]);
 			child_src_inode = now_entry->d_ino;
-			child_target_inode = _stage1_get_new_inode();
+			now_type = now_entry->d_type;
+			if (now_type == D_ISREG || now_type == D_ISLNK) {
+				/* Check if it is a hardlink, and then
+				 * get a target inode */
+				need_copy = TRUE;
+				ret = _check_hardlink(child_src_inode,
+					&child_target_inode, &need_copy,
+					hardln_mapping);
+				if (ret == 0) {
+					if (need_copy == FALSE) {
+						/* Hardlink exists */
+						now_entry->d_ino =
+							child_target_inode;
+						continue;
+					}
+					ret = replace_missing_object(
+						child_src_inode,
+						child_target_inode,
+						now_entry->d_type,
+						hardln_mapping);
+				}
 
-			/* Recursively replace all entries */
-			ret = replace_missing_object(child_src_inode,
-				child_target_inode, now_entry->d_type);
+			} else if (now_entry == D_ISDIR) {
+				child_target_inode = _stage1_get_new_inode();
+				/* Recursively replace all entries */
+				ret = replace_missing_object(child_src_inode,
+					child_target_inode, now_entry->d_type,
+					hardln_mapping);
+
+			} else {
+				ret = -ENOENT;
+			}
+
 			if (ret < 0) {
 				/* Add to removed entry */
 				memcpy(&(removed_list[list_counter]),
@@ -1537,8 +1667,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 					}
 					list_size += 20;
 				}
+			} else {
+				now_entry->d_ino = child_target_inode;
 			}
-			now_entry->d_ino = child_target_inode;
 		}
 		FSEEK(fptr, now_page_pos, SEEK_SET);
 		FWRITE(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
@@ -1566,7 +1697,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 
 		/*
 		 * If the entry is a subdir, decrease the hard link of
-		 * the parent
+		 * the parent.
 		 */
 		if (removed_list[idx].d_type == D_ISDIR)
 			dirstat.nlink--;
@@ -1577,6 +1708,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 		FWRITE(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
 	}
 	fclose(fptr);
+	meta_open = FALSE;
 
 	/* Mark this inode to to_sync */
 	FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
@@ -1584,7 +1716,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type)
 	return 0;
 
 errcode_handle:
-	fclose(fptr);
+	if (meta_open)
+		fclose(fptr);
+	unlink(targetpath);
 	return errcode;
 }
 
@@ -1639,7 +1773,8 @@ errcode_handle:
 }
 
 static int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
-int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
+int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
+		INODE_PAIR_LIST *hardln_mapping)
 {
 	FILE *fptr;
 	char fetchedmeta[METAPATHLEN];
@@ -1785,14 +1920,17 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 							"%s/%s", nowpath,
 							tmpptr->d_name);
 					ret = stat(tmppath, &tmpstat);
-					if (ret < 0)
+					if (ret < 0) {
 						can_prune = TRUE;
-					else
+					} else {
 						ret = replace_missing_object(
 						    tmpstat.st_ino,
 						    tmpptr->d_ino,
-						    tmpptr->d_type);
-
+						    tmpptr->d_type,
+						    hardln_mapping);
+					}
+					/* Socket and fifo file will be
+					 * pruned */
 					if (ret < 0)
 						can_prune = TRUE;
 				}
@@ -1860,7 +1998,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth)
 				snprintf(tmppath, PATH_MAX, "%s/%s", nowpath,
 					 tmpptr->d_name);
 				ret = _expand_and_fetch(tmpino, tmppath,
-							depth + 1);
+						depth + 1, hardln_mapping);
 				if ((ret == -ENOENT) &&
 				    (strcmp(nowpath, "/data/app") == 0)) {
 					/* Need to prune the package */
@@ -2458,6 +2596,7 @@ int32_t run_download_minimal(void)
 	DIR_ENTRY *tmpentry;
 	BOOL is_fopen = FALSE;
 	ino_t vol_max_inode, sys_max_inode;
+	INODE_PAIR_LIST *hardln_mapping;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -2578,9 +2717,16 @@ int32_t run_download_minimal(void)
 				goto errcode_handle;
 			}
 			ret = _fetch_meta(rootino);
-			if (ret == 0)
+			if (ret == 0) {
+				hardln_mapping = new_inode_pair_list();
+				if (hardln_mapping == NULL) {
+					errcode = -ENOMEM;
+					goto errcode_handle;
+				}
 				ret = _expand_and_fetch(rootino,
-						"/data/app", 0);
+					"/data/app", 0, hardln_mapping);
+				destroy_inode_pair_list(hardln_mapping);
+			}
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
@@ -2606,9 +2752,16 @@ int32_t run_download_minimal(void)
 				goto errcode_handle;
 			}
 			ret = _fetch_meta(rootino);
-			if (ret == 0)
+			if (ret == 0) {
+				hardln_mapping = new_inode_pair_list();
+				if (hardln_mapping == NULL) {
+					errcode = -ENOMEM;
+					goto errcode_handle;
+				}
 				ret = _expand_and_fetch(rootino,
-						"/data/data", 0);
+					"/data/data", 0, hardln_mapping);
+				destroy_inode_pair_list(hardln_mapping);
+			}
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
@@ -2634,9 +2787,16 @@ int32_t run_download_minimal(void)
 				goto errcode_handle;
 			}
 			ret = _fetch_meta(rootino);
-			if (ret == 0)
+			if (ret == 0) {
+				hardln_mapping = new_inode_pair_list();
+				if (hardln_mapping == NULL) {
+					errcode = -ENOMEM;
+					goto errcode_handle;
+				}
 				ret = _expand_and_fetch(rootino,
-							"/storage/emulated", 0);
+					"/storage/emulated", 0, hardln_mapping);
+				destroy_inode_pair_list(hardln_mapping);
+			}
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;

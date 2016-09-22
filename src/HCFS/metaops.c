@@ -2905,6 +2905,64 @@ errcode_handle:
 	return errcode;
 }
 
+int32_t restore_borrowed_meta_structure(FILE *fptr)
+{
+	int32_t errcode, ret;
+	HCFS_STAT this_stat;
+	struct stat meta_stat; /* Meta file system stat */
+	int64_t metasize, metasize_blk;
+	size_t ret_size;
+	CLOUD_RELATED_DATA cloud_data;
+
+	FSEEK(fptr, 0, SEEK_SET);
+	fstat(fileno(fptr), &meta_stat);
+	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+	this_stat.nlink = 1;
+	FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+
+	if (S_ISDIR(this_stat.mode)) {
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		cloud_data.size_last_upload = 0;
+		cloud_data.meta_last_upload = 0;
+		cloud_data.upload_seq = 0;
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+	} else if (S_ISLNK(this_stat.mode)) {
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+		cloud_data.size_last_upload = 0;
+		cloud_data.meta_last_upload = 0;
+		cloud_data.upload_seq = 0;
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+	} else {
+		return -EINVAL;
+	}
+
+	/* Re-compute space usage and return when file is either
+	 * dir or symlink */
+	metasize = meta_stat.st_size;
+	metasize_blk = meta_stat.st_blocks * 512;
+	UPDATE_RECT_SYSMETA(.delta_system_size = -metasize,
+			.delta_meta_size = -metasize_blk,
+			.delta_pinned_size = 0,
+			.delta_backend_size = 0,
+			.delta_backend_meta_size = 0,
+			.delta_backend_inodes = 0);
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
 /**
  * Restore a meta file from cloud. Downlaod the meta file
  * to a temp file, and rename to the correct meta file path.
