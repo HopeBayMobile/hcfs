@@ -23,11 +23,11 @@
 #define MP_READ 2
 #define MP_WRITE 3
 #endif
-
+/*
 typedef struct {
 	ino_t d_ino;
 	char d_name[MAX_FILENAME_LEN+1];
 	char d_type;
 } DIR_ENTRY;
-
+*/
 #endif  /* GW20_SRC_HCFSVOL_H_ */
