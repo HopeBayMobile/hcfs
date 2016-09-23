@@ -31,6 +31,7 @@ class file_presentEnvironment : public ::testing::Environment {
 		void TearDown()
 		{
 			free(system_config);
+			unlink(MOCK_META_PATH);
 		}
 };
 
@@ -47,6 +48,7 @@ TEST(meta_forget_inodeTest, RemoveMetaSucces)
 	EXPECT_EQ(0, meta_forget_inode(5));
 
 	EXPECT_EQ(-1, access(MOCK_META_PATH, F_OK));
+	unlink(MOCK_META_PATH);
 }
 /*
 	End of unittest of meta_forget_inode()
