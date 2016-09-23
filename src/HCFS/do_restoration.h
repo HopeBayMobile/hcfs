@@ -76,17 +76,6 @@ typedef struct {
 	DIR_ENTRY entry;
 } PRUNE_T;
 
-typedef struct _PKG_LINKLIST_NODE {
-	char name[MAX_FILENAME_LEN + 1];
-	int32_t uid;
-	struct _PKG_LINKLIST_NODE *next;
-} PKG_NODE;
-
-typedef struct {
-	PKG_NODE **sarray;
-	uint32_t count;
-} PKG_INFO;
-
 
 void init_restore_path(void);
 int32_t write_system_max_inode(ino_t ino_num);

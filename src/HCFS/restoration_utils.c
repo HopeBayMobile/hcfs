@@ -14,6 +14,9 @@
 
 #include <errno.h>
 #include <string.h>
+#include <ftw.h>
+#include <regex.h>
+#include <stddef.h>
 
 int32_t _inode_bsearch(INODE_PAIR_LIST *list, ino_t src_inode, int32_t *index)
 {
@@ -148,3 +151,170 @@ void destroy_inode_pair_list(INODE_PAIR_LIST *list)
 	FREE(list->inode_pair);
 	FREE(list);
 }
+
+int _compare_pkg_entry_ptr(const void *a, const void *b)
+{
+	PKG_NODE *A = *(PKG_NODE **)a, *B = *(PKG_NODE **)b;
+
+	return strcmp(A->name, B->name);
+}
+
+/*
+ * Read packages xml to build a sorted array for uid lookup
+ *
+ * 1. Parse package.xml and build a link list.
+ * 2. fill list into an array of pointer.
+ * 3. qsort the array for bsearch later.
+ *
+ * @return 0 on success, -errno on error.
+ */
+int32_t init_package_uid_list(char *plistpath)
+{
+	FILE *src = NULL;
+	int32_t errcode = 0, ret_num;
+	char fbuf[4100], *sptr;
+	regex_t re = {0};
+	regmatch_t pm[10];
+	const size_t nmatch = 10;
+	char ebuff[1024];
+	char *endptr;
+	PKG_NODE *last_node = NULL, *tmp_pkg = NULL, *tmp_cur;
+	size_t pkg_cnt = 0;
+	size_t i;
+
+#define namepat " name=\"([^\"]+)\""
+#define uidpat " (sharedUserId|userId)=\"([[:digit:]]+)\""
+	puts("exec");
+	errcode =
+	    regcomp(&re, "^[[:space:]]*<package.*" namepat ".*" uidpat ".*$",
+		    REG_EXTENDED | REG_NEWLINE);
+	if (errcode != 0) {
+		regerror(errcode, &re, ebuff, 1024);
+		errcode = -errcode;
+		write_log(0, "Error when compiling regex pattern. (%s)\n",
+			  ebuff);
+		goto errcode_handle;
+	}
+	//snprintf(plistpath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
+
+	/*snprintf(plistpath, METAPATHLEN, "packages.xml");*/
+
+	src = fopen(plistpath, "r");
+	if (src == NULL) {
+		errcode = -errno;
+		write_log(0, "Error when opening src package list. (%s)\n",
+			  strerror(-errcode));
+		goto errcode_handle;
+	}
+	clearerr(src);
+	while (!feof(src)) {
+		sptr = fgets(fbuf, 4096, src);
+		if (sptr == NULL)
+			break;
+		errcode = regexec(&re, sptr, nmatch, pm, 0);
+		if (errcode != 0) { /* not match */
+			errcode = 0;
+			continue;
+		}
+		pkg_cnt++;
+		write_log(10, "%s [%zu]: %.*s %.*s\n", __func__, pkg_cnt,
+			  (pm[1].rm_eo - pm[1].rm_so), &sptr[pm[1].rm_so],
+			  (pm[3].rm_eo - pm[3].rm_so), &sptr[pm[3].rm_so]);
+
+		tmp_pkg = (PKG_NODE *)calloc(1, sizeof(PKG_NODE));
+		if (tmp_pkg == NULL) {
+			errcode = -errno;
+			goto errcode_handle;
+		}
+		/* Append package node to list */
+		if (pkg_info_list_head == NULL) {
+			pkg_info_list_head = tmp_pkg;
+			last_node = tmp_pkg;
+		}
+		if (last_node != tmp_pkg) {
+			last_node->next = tmp_pkg;
+			last_node = tmp_pkg;
+		}
+
+		/* Set name */
+		strncpy(tmp_pkg->name, &sptr[pm[1].rm_so],
+			pm[1].rm_eo - pm[1].rm_so);
+		tmp_pkg->name[pm[1].rm_eo - pm[1].rm_so] = '\0';
+		/* Set uid */
+		sptr[pm[3].rm_eo] = '\0';
+		ATOL(&sptr[pm[3].rm_so]);
+		tmp_pkg->uid = ret_num;
+
+	}
+	if (ferror(src) && !feof(src)) {
+		write_log(0, "Package list update terminated unexpectedly\n");
+		errcode = -ferror(src);
+		goto errcode_handle;
+	}
+
+	/* Build & sort array */
+	restore_pkg_info.sarray =
+	    (PKG_NODE **)malloc(pkg_cnt * sizeof(PKG_NODE *));
+	if (restore_pkg_info.sarray == NULL) {
+		errcode = -errno;
+		goto errcode_handle;
+	}
+	restore_pkg_info.count = pkg_cnt;
+
+
+	i = 0;
+	tmp_cur = pkg_info_list_head;
+	while (i < pkg_cnt && tmp_cur != NULL) {
+		restore_pkg_info.sarray[i] = tmp_cur;
+		i++;
+		tmp_cur = tmp_cur->next;
+	}
+	qsort(restore_pkg_info.sarray, pkg_cnt, sizeof(PKG_NODE **),
+	      _compare_pkg_entry_ptr);
+
+errcode_handle:
+	regfree(&re);
+	if (src != NULL)
+		fclose(src);
+	if (errcode != 0)
+		destroy_package_uid_list();
+
+	return errcode;
+}
+
+void destroy_package_uid_list(void)
+{
+	PKG_NODE *tmp_cur, *tmp_next;
+
+	tmp_cur = pkg_info_list_head;
+	while (tmp_cur != NULL) {
+		tmp_next = tmp_cur->next;
+		free(tmp_cur);
+		tmp_cur = tmp_next;
+	}
+	free(restore_pkg_info.sarray);
+
+	pkg_info_list_head = NULL;
+	restore_pkg_info.sarray = NULL;
+}
+
+/*
+ * lookup package uid bt name
+ *
+ * @return uid if found entry, -1 if not found, -errno on other error
+ */
+int32_t lookup_package_uid_list(const char *pkgname)
+{
+	PKG_NODE *key = (PKG_NODE *)malloc(sizeof(PKG_NODE)), **ret;
+
+	if (key == NULL)
+		return -errno;
+
+	strncpy(key->name, pkgname, sizeof(key->name));
+	ret = bsearch(&key, restore_pkg_info.sarray,
+				   restore_pkg_info.count, sizeof(PKG_NODE **),
+				   _compare_pkg_entry_ptr);
+	free(key);
+	return (ret != NULL) ? (*ret)->uid : -1;
+}
+

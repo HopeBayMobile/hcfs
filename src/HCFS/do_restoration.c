@@ -1318,10 +1318,13 @@ int32_t _replace_missing_pinned(ino_t srcinode, ino_t thisinode)
 	}
 	setbuf(fptr, NULL);
 
+	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 	/* Let link number be 1 */
 	tmpstat.nlink = 1;
+	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&tmpmeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (P_IS_UNPIN(tmpmeta.local_pin)) {
 		/* Don't fetch blocks */
@@ -1440,7 +1443,6 @@ ino_t _stage1_get_new_inode(void)
 	return ret_ino;
 }
 
-
 int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 		BOOL *need_copy, INODE_PAIR_LIST *hardln_mapping)
 {
@@ -1483,7 +1485,7 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 			/* Otherwise, use the hardlink inode number and
 			 * increase nlink */
 			fetch_restore_meta_path(targetpath, *target_inode);
-			fptr = fopen(targetpath, "r");
+			fptr = fopen(targetpath, "r+");
 			if (!fptr) {
 				errcode = -errno;
 				return errcode;
@@ -1492,6 +1494,7 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 			FSEEK(fptr, 0, SEEK_SET);
 			FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 			tmpstat.nlink += 1;
+			FSEEK(fptr, 0, SEEK_SET);
 			FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
@@ -1521,7 +1524,7 @@ errcode_handle:
  * @return 0 on success. Otherwise return negation of error number.
  */
 int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
-		INODE_PAIR_LIST *hardln_mapping)
+		int32_t uid, INODE_PAIR_LIST *hardln_mapping)
 {
 	FILE *fptr;
 	char srcpath[METAPATHLEN], targetpath[METAPATHLEN];
@@ -1532,7 +1535,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	ino_t child_src_inode, child_target_inode;
 	DIR_META_TYPE dirmeta;
 	DIR_ENTRY_PAGE dir_page;
-	DIR_ENTRY *removed_list;
+	DIR_ENTRY *removed_list = NULL;
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
 	HCFS_STAT dirstat, tmpstat;
@@ -1581,8 +1584,18 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		errcode = restore_meta_structure(fptr);
 		if (errcode < 0)
 			goto errcode_handle;
+		FSEEK(fptr, 0, SEEK_SET);
+		FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+		tmpstat.uid = uid;
+		tmpstat.gid = uid;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 		fclose(fptr);
 		meta_open = FALSE;
+		/* TODO: Integrate _replace_missing_pinned() with
+		 * restore_borrowed_meta_structure(), and replace
+		 * restore_meta_structure() with
+		 * restore_borrowed_meta_structure() */
 		errcode = _replace_missing_pinned(src_inode, target_inode);
 		if (errcode < 0)
 			goto errcode_handle;
@@ -1593,6 +1606,12 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		errcode = restore_borrowed_meta_structure(fptr);
 		if (errcode < 0)
 			goto errcode_handle;
+		FSEEK(fptr, 0, SEEK_SET);
+		FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
+		tmpstat.uid = uid;
+		tmpstat.gid = uid;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 		fclose(fptr);
 		meta_open = FALSE;
 		/* Mark this inode to to_sync */
@@ -1607,9 +1626,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	meta_open = FALSE;
 
 	/* Recursively copy dir */
-	removed_list = malloc(sizeof(DIR_ENTRY) * 5);
 	list_counter = 0;
-	list_size = 5;
+	list_size = 20;
+	removed_list = malloc(sizeof(DIR_ENTRY) * list_size);
 	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
 	now_page_pos = dirmeta.tree_walk_list_head;
@@ -1640,7 +1659,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 						child_src_inode,
 						child_target_inode,
 						now_entry->d_type,
-						hardln_mapping);
+						uid, hardln_mapping);
 				}
 
 			} else if (now_entry == D_ISDIR) {
@@ -1648,7 +1667,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 				/* Recursively replace all entries */
 				ret = replace_missing_object(child_src_inode,
 					child_target_inode, now_entry->d_type,
-					hardln_mapping);
+					uid, hardln_mapping);
 
 			} else {
 				ret = -ENOENT;
@@ -1660,13 +1679,13 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 					now_entry, sizeof(DIR_ENTRY));
 				list_counter++;
 				if (list_counter >= list_size) {
+					list_size += 20;
 					removed_list = realloc(removed_list,
-						list_size + 20);
+						list_size);
 					if (removed_list == NULL) {
 						errcode = -errno;
 						goto errcode_handle;
 					}
-					list_size += 20;
 				}
 			} else {
 				now_entry->d_ino = child_target_inode;
@@ -1710,6 +1729,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	}
 	fclose(fptr);
 	meta_open = FALSE;
+	FREE(removed_list);
 
 	/* Mark this inode to to_sync */
 	FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
@@ -1720,6 +1740,7 @@ errcode_handle:
 	if (meta_open)
 		fclose(fptr);
 	unlink(targetpath);
+	FREE(removed_list);
 	return errcode;
 }
 
@@ -1771,6 +1792,42 @@ int32_t replace_missing(const char *nowpath, DIR_ENTRY *tmpptr)
 	return 0;
 errcode_handle:
 	return errcode;
+}
+/*
+int32_t _replace_missing(const char *nowpath, DIR_ENTRY *tmpptr,
+		INODE_PAIR_LIST *hardln_mapping)
+{
+	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
+	ret = stat(tmppath, &tmpstat);
+	if (ret < 0)
+		return -ENOENT;
+
+	if (tmpptr->d_type != D_ISDIR) {
+		ret = _check_hardlink(tmpstat.st_ino, &target_inode,
+				&need_copy, hardln_mapping);
+		if (ret < 0)
+			return -ENOENT;
+		if (need_copy == TRUE)
+
+	}
+	ret = replace_missing_object(
+			tmpstat.st_ino,
+			tmpptr->d_ino,
+			tmpptr->d_type,
+			hardln_mapping);
+
+}
+*/
+
+
+void _extract_pkg_name(const char *srcpath, char *pkgname)
+{
+	while (*srcpath != '/' && *srcpath != '\0') {
+		*pkgname = *srcpath;
+		srcpath++;
+		pkgname++;
+	}
+	*pkgname = '\0';
 }
 
 static int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
@@ -1917,6 +1974,17 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    (strncmp(nowpath, "/data/data",
 					     strlen("/data/data")) == 0)) {
+					char pkg[MAX_FILENAME_LEN + 1];
+					int32_t uid;
+
+					if (strlen(nowpath) ==
+							strlen("/data/data"))
+						strcpy(pkg, tmpptr->d_name);
+					else
+						_extract_pkg_name(nowpath +
+							strlen("/data/data/"),
+							pkg);
+					uid = lookup_package_uid_list(pkg);
 					snprintf(tmppath, PATH_MAX,
 							"%s/%s", nowpath,
 							tmpptr->d_name);
@@ -1925,10 +1993,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 						can_prune = TRUE;
 					} else {
 						ret = replace_missing_object(
-						    tmpstat.st_ino,
-						    tmpptr->d_ino,
-						    tmpptr->d_type,
-						    hardln_mapping);
+							tmpstat.st_ino,
+							tmpptr->d_ino,
+							tmpptr->d_type,
+							uid, hardln_mapping);
 					}
 					/* Socket and fifo file will be
 					 * pruned */
@@ -2316,183 +2384,13 @@ errcode_handle:
 	return errcode;
 }
 
-/* Start of package_uid_list code */
-PKG_INFO restore_pkg_info;
-PKG_NODE *pkg_info_list_head;
 
-int _compare_pkg_entry_ptr(const void *a, const void *b)
-{
-	PKG_NODE *A = *(PKG_NODE **)a, *B = *(PKG_NODE **)b;
-
-	return strcmp(A->name, B->name);
-}
-
-static void _destroy_package_uid_list(void);
-/*
- * Read packages xml to build a sorted array for uid lookup
- *
- * 1. Parse package.xml and build a link list.
- * 2. fill list into an array of pointer.
- * 3. qsort the array for bsearch later.
- *
- * @return 0 on success, -errno on error.
- */
-int32_t _init_package_uid_list(void)
-{
-	char plistpath[METAPATHLEN];
-	FILE *src = NULL;
-	int32_t errcode = 0, ret_num;
-	char fbuf[4100], *sptr;
-	regex_t re = {0};
-	regmatch_t pm[10];
-	const size_t nmatch = 10;
-	char ebuff[1024];
-	char *endptr;
-	PKG_NODE *last_node = NULL, *tmp_pkg = NULL, *tmp_cur;
-	size_t pkg_cnt = 0;
-	size_t i;
-
-#define namepat " name=\"([^\"]+)\""
-#define uidpat " (sharedUserId|userId)=\"([[:digit:]]+)\""
-	puts("exec");
-	errcode =
-	    regcomp(&re, "^[[:space:]]*<package.*" namepat ".*" uidpat ".*$",
-		    REG_EXTENDED | REG_NEWLINE);
-	if (errcode != 0) {
-		regerror(errcode, &re, ebuff, 1024);
-		errcode = -errcode;
-		write_log(0, "Error when compiling regex pattern. (%s)\n",
-			  ebuff);
-		goto errcode_handle;
-	}
-	snprintf(plistpath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
-
-	/*snprintf(plistpath, METAPATHLEN, "packages.xml");*/
-
-	src = fopen(plistpath, "r");
-	if (src == NULL) {
-		errcode = -errno;
-		write_log(0, "Error when opening src package list. (%s)\n",
-			  strerror(-errcode));
-		goto errcode_handle;
-	}
-	clearerr(src);
-	while (!feof(src)) {
-		sptr = fgets(fbuf, 4096, src);
-		if (sptr == NULL)
-			break;
-		errcode = regexec(&re, sptr, nmatch, pm, 0);
-		if (errcode != 0) { /* not match */
-			errcode = 0;
-			continue;
-		}
-		pkg_cnt++;
-		write_log(10, "%s [%zu]: %.*s %.*s\n", __func__, pkg_cnt,
-			  (pm[1].rm_eo - pm[1].rm_so), &sptr[pm[1].rm_so],
-			  (pm[3].rm_eo - pm[3].rm_so), &sptr[pm[3].rm_so]);
-
-		tmp_pkg = (PKG_NODE *)calloc(1, sizeof(PKG_NODE));
-		if (tmp_pkg == NULL) {
-			errcode = -errno;
-			goto errcode_handle;
-		}
-		/* Append package node to list */
-		if (pkg_info_list_head == NULL) {
-			pkg_info_list_head = tmp_pkg;
-			last_node = tmp_pkg;
-		}
-		if (last_node != tmp_pkg) {
-			last_node->next = tmp_pkg;
-			last_node = tmp_pkg;
-		}
-
-		/* Set name */
-		strncpy(tmp_pkg->name, &sptr[pm[1].rm_so],
-			pm[1].rm_eo - pm[1].rm_so);
-		tmp_pkg->name[pm[1].rm_eo - pm[1].rm_so] = '\0';
-		/* Set uid */
-		sptr[pm[3].rm_eo] = '\0';
-		ATOL(&sptr[pm[3].rm_so]);
-		tmp_pkg->uid = ret_num;
-
-	}
-	if (ferror(src) && !feof(src)) {
-		write_log(0, "Package list update terminated unexpectedly\n");
-		errcode = -ferror(src);
-		goto errcode_handle;
-	}
-
-	/* Build & sort array */
-	restore_pkg_info.sarray =
-	    (PKG_NODE **)malloc(pkg_cnt * sizeof(PKG_NODE *));
-	if (restore_pkg_info.sarray == NULL) {
-		errcode = -errno;
-		goto errcode_handle;
-	}
-	restore_pkg_info.count = pkg_cnt;
-
-
-	i = 0;
-	tmp_cur = pkg_info_list_head;
-	while (i < pkg_cnt && tmp_cur != NULL) {
-		restore_pkg_info.sarray[i] = tmp_cur;
-		i++;
-		tmp_cur = tmp_cur->next;
-	}
-	qsort(restore_pkg_info.sarray, pkg_cnt, sizeof(PKG_NODE **),
-	      _compare_pkg_entry_ptr);
-
-errcode_handle:
-	regfree(&re);
-	if (src != NULL)
-		fclose(src);
-	if (errcode != 0)
-		_destroy_package_uid_list();
-
-	return errcode;
-}
-
-void _destroy_package_uid_list(void)
-{
-	PKG_NODE *tmp_cur, *tmp_next;
-
-	tmp_cur = pkg_info_list_head;
-	while (tmp_cur != NULL) {
-		tmp_next = tmp_cur->next;
-		free(tmp_cur);
-		tmp_cur = tmp_next;
-	}
-	free(restore_pkg_info.sarray);
-
-	pkg_info_list_head = NULL;
-	restore_pkg_info.sarray = NULL;
-}
-
-/*
- * lookup package uid bt name
- *
- * @return uid if found entry, -1 if not found, -errno on other error
- */
-int32_t _lookup_package_uid_list(const char *pkgname)
-{
-	PKG_NODE *key = (PKG_NODE *)malloc(sizeof(PKG_NODE)), **ret;
-
-	if (key == NULL)
-		return -errno;
-
-	strncpy(key->name, pkgname, sizeof(key->name));
-	ret = bsearch(&key, restore_pkg_info.sarray,
-				   restore_pkg_info.count, sizeof(PKG_NODE **),
-				   _compare_pkg_entry_ptr);
-	free(key);
-	return (ret != NULL) ? (*ret)->uid : -1;
-}
 
 /*
  * A test function running before main and exit at end.
  * DELETE this function when development finished!!
  */
-void __attribute__((constructor)) dev_test(void)
+/*void __attribute__((constructor)) dev_test(void)
 {
 	int32_t uid;
 	const char pkg[] = "com.android.captiveportallogin";
@@ -2503,7 +2401,7 @@ void __attribute__((constructor)) dev_test(void)
 	_destroy_package_uid_list();
 	printf("\nRestore hcfs code at %s %d\n\n", __FILE__, __LINE__);
 	exit(0);
-}
+}*/
 /* End of package_uid_list code */
 
 /* Function for blocking execution until network is available again */
@@ -2634,7 +2532,7 @@ int32_t run_download_minimal(void)
 	}
 
 	/* Init package-uid lookup table */
-	ret = _init_package_uid_list();
+	ret = init_package_uid_list(despath);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -2810,7 +2708,7 @@ int32_t run_download_minimal(void)
 		}
 	}
 
-	_destroy_package_uid_list();
+	destroy_package_uid_list();
 
 	/* Write max inode number */
 	ret = write_system_max_inode(

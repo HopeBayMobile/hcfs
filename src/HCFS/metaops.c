@@ -2914,11 +2914,9 @@ int32_t restore_borrowed_meta_structure(FILE *fptr)
 	size_t ret_size;
 	CLOUD_RELATED_DATA cloud_data;
 
-	FSEEK(fptr, 0, SEEK_SET);
 	fstat(fileno(fptr), &meta_stat);
+	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
-	this_stat.nlink = 1;
-	FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
 
 	if (S_ISDIR(this_stat.mode)) {
 		/* Restore cloud related data */
@@ -2933,6 +2931,9 @@ int32_t restore_borrowed_meta_structure(FILE *fptr)
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 	} else if (S_ISLNK(this_stat.mode)) {
+		this_stat.nlink = 1;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
 		/* Restore cloud related data */
 		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
 				SEEK_SET);
