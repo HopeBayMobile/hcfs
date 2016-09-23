@@ -18,7 +18,7 @@ extern "C" {
 }
 
 extern "C" {
-int32_t init_mock_server();
+void* init_mock_server(void *);
 }
 
 extern char *notify_server_path;
@@ -31,13 +31,14 @@ FAKE_VALUE_FUNC(time_t, time, time_t *);
 
 /* Fake functions of hcfs */
 FAKE_VALUE_FUNC(int32_t, check_event_filter, int32_t);
-FAKE_VALUE_FUNC_VARARG(int32_t, write_log, int32_t, char *, ...);
+FAKE_VALUE_FUNC_VARARG(int32_t, write_log, int32_t, const char *, ...);
 
 
 EVENT_FILTER event_filters[] = {
 	/* name, last_send_timestamp, send_interval */
 	{TESTSERVER,    0,      0},
-	{TOKENEXPIRED,  0,      120}
+	{TOKENEXPIRED,  0,      120},
+	{SYNCDATACOMPLETE, 0,     0},
 };
 
 
@@ -416,6 +417,7 @@ TEST_F(add_notify_eventTest, AddOK)
 	notify_server_path = "fake.server";
 
 	for (idx = 0; idx < NUM_EVENTS; idx++) {
+		printf("%d\n", idx);
 		ret_code = add_notify_event(idx, NULL, FALSE);
 		EXPECT_EQ(ret_code, 0);
 	}

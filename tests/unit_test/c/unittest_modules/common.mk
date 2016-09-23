@@ -46,8 +46,9 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -DENCRYPT_ENABLE=1 \
 	    -DCOMPRESS_ENABLE=0 \
 	    -D_ANDROID_ENV_ \
+	    -DUNITTEST \
 
-LNFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
+LDFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
 # Support  gcc4.9 color output
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
@@ -81,15 +82,14 @@ else
 endif
 
 define COMPILE
+  $(eval SRC_DIR := $1)
   $(eval INC_DIR := $(addprefix -iquote,$(USER_DIR)))
 
-  $(OBJ_DIR)/%.o.d: $1/%.c | $(OBJ_DIR)
-	$(CC) -MM -MT $$(@:.o.d=.o) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) $$< > $$@
-  $(OBJ_DIR)/%.o: $1/%.c | $(OBJ_DIR)
-	$(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@
+  $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(INC_DIR) $(CFLAGS) -c $$< -o $$@ -MMD -MF $$@.d
 
-  $(OBJ_DIR)/%.o: $1/%.cc | $(OBJ_DIR)
-	$(CXX) $(CPPFLAGS) $(INC_DIR) $(CXXFLAGS) -c $$< -o $$@
+  $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
+	$(CXX) $(CPPFLAGS) $(INC_DIR) $(CXXFLAGS) -c $$< -o $$@ -MMD -MF $$@.d
 endef
 
 define ADDMODULE
@@ -171,7 +171,7 @@ define ADDTEST
   $(MD_PATH)/$(T): CPPFLAGS+=-iquote $(MD_PATH)/unittests
   $(MD_PATH)/$(T): VPATH+=$(MD_PATH)/unittests
   $(MD_PATH)/$(T): $(OBJS) $(OBJ_DIR)/gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LNFLAGS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $$^ -o $$@ $(LDFLAGS)
   
   # Clean UT
   .PHONY: clean-ut-$(T)

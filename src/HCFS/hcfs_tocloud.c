@@ -119,26 +119,6 @@ errcode_handle:
 	return errcode;
 }
 
-static inline int32_t _get_inode_sync_error(ino_t inode, BOOL *sync_error)
-{
-	int32_t count1;
-
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == inode)
-			break;
-	}
-
-	if (count1 < MAX_SYNC_CONCURRENCY) {
-		*sync_error = sync_ctl.threads_error[count1];
-		sem_post(&(sync_ctl.sync_op_sem));
-		return 0;
-	} else {
-		sem_post(&(sync_ctl.sync_op_sem));
-		return -1;
-	}
-}
-
 static inline int32_t _set_inode_sync_error(ino_t inode)
 {
 	int32_t count1;
@@ -733,6 +713,7 @@ errcode_handle:
 	/* TODO: better error handling here if init failed */
 	free(FS_stat_path);
 	free(fname);
+	UNUSED(errcode);
 }
 
 /**
@@ -1042,20 +1023,20 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	BLOCK_ENTRY_PAGE toupload_temppage;
 	int32_t which_curl;
 	int64_t page_pos, current_page;
-	int64_t total_blocks, total_backend_blocks;
+	int64_t total_blocks = 0, total_backend_blocks;
 	int64_t block_count;
 	int32_t ret, errcode;
 	off_t toupload_size;
 	size_t ret_size;
 	BOOL sync_error;
-	ino_t root_inode;
+	ino_t root_inode = 0;
 	int64_t backend_size;
-	int64_t size_diff;
+	int64_t size_diff = 0;
 	int32_t progress_fd;
 	BOOL is_local_meta_deleted;
 	char is_revert;
-	int64_t meta_size_diff;
-	int64_t upload_seq;
+	int64_t meta_size_diff = 0;
+	int64_t upload_seq = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
 	int64_t pos;
 	int64_t temp_trunc_size;
@@ -1119,6 +1100,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 	setbuf(local_metafptr, NULL);
 
+	memset(&tempfilestat, 0, sizeof(HCFS_STAT));
+
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
 		/* First download backend meta and init backend block info in
@@ -1157,7 +1140,9 @@ store in some other file */
 #ifdef _ANDROID_ENV_
 		ret = fetch_trunc_path(truncpath, this_inode);
 
-		truncfptr = fopen(truncpath, "r+");
+		truncfptr = NULL;
+		if (ret >= 0)
+			truncfptr = fopen(truncpath, "r+");
 		if (truncfptr != NULL) {
 			setbuf(truncfptr, NULL);
 			flock(fileno(truncfptr), LOCK_EX);
@@ -1511,6 +1496,7 @@ errcode_handle:
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	UNUSED(errcode);
 	return;
 }
 
@@ -1729,7 +1715,7 @@ int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 /* TODO: use pthread_exit to pass error code here. */
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int32_t which_curl, ret, errcode, which_index;
+	int32_t which_curl, ret, errcode, which_index = 0;
 	char local_metapath[300];
 	struct stat filestat; /* raw file ops */
 	int64_t filesize;
@@ -2220,7 +2206,6 @@ void upload_loop(void)
 					ret = super_block_update_transit(
 						ino_sync, FALSE, TRUE);
 					if (ret < 0) {
-						ino_sync = 0;
 						ino_check = 0;
 					}
 					sem_post(&(sync_ctl.sync_queue_sem));
@@ -2291,7 +2276,6 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
-		/* Write a new one to disk */
 		fptr = fopen(fname, "w");
 		if (fptr == NULL) {
 			errcode = errno;
@@ -2303,15 +2287,28 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		setbuf(fptr, NULL);
 		flock(fileno(fptr), LOCK_EX);
 		is_fopen = TRUE;
-		write_log(4, "Writing a new cloud stat\n");
-		memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
-		FTRUNCATE(fileno(fptr), 0);
-		FSEEK(fptr, 0, SEEK_SET);
-		FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		/* First try to download one */
+		ret = hcfs_get_object(fptr, objname,
+		                      &(sync_stat_ctl.statcurl), NULL);
+		if ((ret < 200) || (ret > 299)) {
+			if (ret != 404) {
+				errcode = -EIO;
+				goto errcode_handle;
+			}
+			/* Write a new one to disk if not found */
+			write_log(4, "Writing a new cloud stat\n");
+			memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
+			FTRUNCATE(fileno(fptr), 0);
+			FSEEK(fptr, 0, SEEK_SET);
+			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		}
+		/* TODO: How to validate cloud statistics if this
+		happens */
 		fsync(fileno(fptr));
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		is_fopen = FALSE;
+			
 	}
 
 	fptr = fopen(fname, "r+");
@@ -2327,8 +2324,10 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	/* File lock is in update_fs_backend_usage() */
 	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
 			num_inodes_delta, pin_size_delta);
-	if (ret < 0)
+	if (ret < 0) {
+		errcode = ret;
 		goto errcode_handle;
+	}
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
@@ -2340,7 +2339,6 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	flock(fileno(fptr), LOCK_UN);
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	fclose(fptr);
-	is_fopen = FALSE;
 
 	return 0;
 

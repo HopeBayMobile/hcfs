@@ -30,6 +30,8 @@ class file_presentEnvironment : public ::testing::Environment {
 		}
 		void TearDown()
 		{
+			free(system_config->max_cache_limit);
+			free(system_config->max_pinned_limit);
 			free(system_config);
 		}
 };
@@ -409,7 +411,7 @@ protected:
 			unlink(mock_meta_path);
 
 		mock_meta_entry->fptr = fopen(mock_meta_path, "wr+");
-		ASSERT_NE(mock_meta_entry->fptr, NULL);
+		ASSERT_NE(0, (mock_meta_entry->fptr != NULL));
 		mock_meta_entry->meta_opened = TRUE;
 		fseek(mock_meta_entry->fptr, 0, SEEK_SET);
 		fwrite(&mock_xattr_page, sizeof(XATTR_PAGE),

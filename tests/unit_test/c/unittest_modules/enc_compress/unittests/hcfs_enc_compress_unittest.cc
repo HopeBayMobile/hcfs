@@ -419,8 +419,8 @@ TEST_F(enc_backup_usermetaTest, CreateUsermeta)
 	EXPECT_EQ(0, access(usermeta_path, F_OK));
 
 	ret_str = dec_backup_usermeta(usermeta_path);
-	ASSERT_NE((char *)NULL, ret_str);
-	EXPECT_EQ(0, strcmp("alohaaloha", ret_str)) << ret_str;
+	ASSERT_NE(0, (ret_str != NULL));
+	EXPECT_EQ(0, strncmp("alohaaloha", ret_str, sizeof(ret_str))) << ret_str;
 
 	free(ret_str);
 	unlink(usermeta_path);
@@ -435,7 +435,7 @@ TEST_F(enc_backup_usermetaTest, ReCreateNewUsermeta)
 
 	ret_str = dec_backup_usermeta(usermeta_path);
 	ASSERT_NE((char *)NULL, ret_str);
-	EXPECT_EQ(0, strcmp("alohaaloha", ret_str)) << ret_str;
+	EXPECT_EQ(0, strncmp("alohaaloha", ret_str, sizeof(ret_str))) << ret_str;
 
 	free(ret_str);
 	unlink(usermeta_path);

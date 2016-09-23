@@ -188,7 +188,7 @@ int32_t mark_inode_delete(ino_t this_inode)
 	return 0;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	return 0;
 }

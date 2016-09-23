@@ -48,10 +48,12 @@ ssize_t pread_cnt(int fd, void *buf, size_t count, off_t offset)
 	pread_cnt_call_count += 1;
 	printf("pread_cnt_call_count %d\n", pread_cnt_call_count);
 	ret = real_pread(fd, buf, count, offset);
-	if (pread_cnt_call_count == pread_cnt_error_on_call_count)
+	if (pread_cnt_call_count == pread_cnt_error_on_call_count) {
+		errno = EIO;
 		return -1;
-	else
+	} else {
 		return ret;
+	}
 }
 
 int32_t read_cnt_call_count = 0;
@@ -63,10 +65,12 @@ ssize_t read_cnt(int fd, void *buf, size_t count)
 	read_cnt_call_count += 1;
 	printf("read_cnt_call_count %d\n", read_cnt_call_count);
 	ret = real_read(fd, buf, count);
-	if (read_cnt_call_count == read_cnt_error_on_call_count)
+	if (read_cnt_call_count == read_cnt_error_on_call_count) {
+		errno = EIO;
 		return -1;
-	else
+	} else {
 		return ret;
+	}
 }
 
 void reset_fake_functions(void)
@@ -93,15 +97,19 @@ class pyhcfsEnvironment : public ::testing::Environment
 ::testing::Environment *const pyhcfs_env =
     ::testing::AddGlobalTestEnvironment(new pyhcfsEnvironment);
 
-/* Unittest for list_external_volume */
-class list_external_volumeTest : public ::testing::TestWithParam<const char*>
+/* Unittest for list_volume */
+class list_volumeTest : public ::testing::TestWithParam<const char*>
 {
 	public:
-	void SetUp() { reset_fake_functions(); }
+	void SetUp()
+	{
+		reset_fake_functions();
+		errno = 0;
+	}
 	void TearDown() {}
 };
 
-TEST_P(list_external_volumeTest, ListExternalVolume)
+TEST_P(list_volumeTest, ListVolume)
 {
 	int32_t ret;
 	uint64_t i, number;
@@ -109,34 +117,34 @@ TEST_P(list_external_volumeTest, ListExternalVolume)
 	CONCAT_TEST_META_PATH("fsmgr");
 
 	ret =
-	    list_external_volume(meta_path, &list, &number);
+	    list_volume(meta_path, &list, &number);
 	ASSERT_EQ(ret, 0);
-	ASSERT_EQ(number, 1);
+	ASSERT_EQ(number, 3);
 	for (i = 0; i < number; i++) {
 		puts(list[i].d_name);
 	}
 }
-TEST_F(list_external_volumeTest, ListExternalVolumeNoFile)
+TEST_F(list_volumeTest, ListVolumeNoFile)
 {
 	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
-	ret_code = list_external_volume("test_nexus_5x/....", &list, &number);
+	ret_code = list_volume("test_nexus_5x/....", &list, &number);
 	EXPECT_LT(ret_code, 0);
 }
 
-TEST_F(list_external_volumeTest, ListExternalVolumeEIO)
+TEST_F(list_volumeTest, ListVolumeEIO)
 {
 	int32_t ret_code;
 	uint64_t number;
 	PORTABLE_DIR_ENTRY *list;
 
-	ret_code = list_external_volume("/proc/self/mem", &list, &number);
+	ret_code = list_volume("/proc/self/mem", &list, &number);
 	EXPECT_LT(ret_code, 0);
 }
 
-TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
+TEST_F(list_volumeTest, ListVolumeErrorOnPread2ndCall)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -146,12 +154,11 @@ TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread2ndCall)
 	pread_cnt_error_on_call_count = 2;
 
 	ret_code =
-	    list_external_volume("test_data/v1/android/fsmgr", &list, &number);
-	printf("%d\n", ret_code);
-	printf("number %lu\n", number);
+	    list_volume("test_data/v1/android/fsmgr", &list, &number);
+
 	EXPECT_LT(ret_code, 0);
 }
-TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
+TEST_F(list_volumeTest, ListVolumeErrorOnPread3rdCall)
 {
 	int32_t ret_code;
 	uint64_t number;
@@ -161,18 +168,22 @@ TEST_F(list_external_volumeTest, ListExternalVolumeErrorOnPread3rdCall)
 	pread_cnt_error_on_call_count = 3;
 
 	ret_code =
-	    list_external_volume("test_data/v1/android/fsmgr", &list, &number);
+	    list_volume("test_data/v1/android/fsmgr", &list, &number);
 	EXPECT_LT(ret_code, 0);
 }
 
-INSTANTIATE_TEST_CASE_P(ListExternalVolume, list_external_volumeTest, ValuesIn(paths));
-/* End unittest for list_external_volume */
+INSTANTIATE_TEST_CASE_P(ListVolume, list_volumeTest, ValuesIn(paths));
+/* End unittest for list_volume */
 
 /* Unittest for parse_meta */
 class parse_metaTest : public ::testing::TestWithParam<const char*>
 {
 	public:
-	void SetUp() { reset_fake_functions(); }
+	void SetUp()
+	{
+		reset_fake_functions();
+		errno = 0;
+	}
 	void TearDown() {}
 };
 
@@ -268,6 +279,7 @@ class list_dir_inorderTest : public ::testing::TestWithParam<const char*>
 		limit = 500;
 		num_children = end_page_pos = end_el_no = 0;
 		memset(file_list, 0, sizeof(PORTABLE_DIR_ENTRY) * limit);
+		errno = 0;
 	}
 
 	void TearDown() {}
@@ -410,6 +422,7 @@ class list_file_blocksTest : public ::testing::TestWithParam<const char*>
 	{
 		reset_fake_functions();
 		total_num = 4;
+		errno = 0;
 	}
 	void TearDown() {}
 };
@@ -484,7 +497,11 @@ class get_vol_usageTest : public ::testing::TestWithParam<const char*>
 	int64_t ret_num, total_num;
 	int64_t inode_num;
 
-	void SetUp() { reset_fake_functions(); }
+	void SetUp()
+	{
+		reset_fake_functions();
+		errno = 0;
+	}
 	void TearDown() {}
 };
 

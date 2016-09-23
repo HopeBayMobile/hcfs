@@ -232,7 +232,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS;
 	body_ptr->dir_entry_cache[eindex] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-	for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
+	for (uint64_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 		char tmp_type;
 		char tmp_name[10];
 		tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
@@ -315,7 +315,7 @@ class meta_cache_push_dir_pageTest : public ::testing::Test {
 			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 			test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 			reserved_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-			for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
+			for (uint64_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 				char tmp_type;
 				char tmp_name[10];
 				tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
@@ -323,7 +323,7 @@ class meta_cache_push_dir_pageTest : public ::testing::Test {
 				test_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
 				strcpy(test_dir_entry_page->dir_entries[i].d_name, tmp_name);
 			}
-			for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
+			for (uint64_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 				char tmp_type;
 				char tmp_name[20];
 				tmp_type = (i+1) % 3; /* D_ISDIR, D_ISREG, D_ISLNK */

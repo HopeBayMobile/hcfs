@@ -1,0 +1,12 @@
+--- /usr/share/vim/addons/syntax/clang-format-4.0.py	2016-09-09 12:36:15.658682744 +0800
++++ /usr/share/vim/addons/syntax/clang-format-4.0.py	2016-09-09 12:28:59.172976944 +0800
+@@ -84,6 +84,9 @@
+   p = subprocess.Popen(command,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        stdin=subprocess.PIPE, startupinfo=startupinfo)
++  if encoding == 'utf-8':
++    reload(sys)
++    sys.setdefaultencoding('utf8')
+   stdout, stderr = p.communicate(input=text.encode(encoding))
+ 
+   # If successful, replace buffer contents.

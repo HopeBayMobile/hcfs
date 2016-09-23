@@ -97,17 +97,8 @@ int32_t parse_xattr_namespace(const char *name, char *name_space, char *key)
  */
 static uint32_t hash(const char *input)
 {
-	uint32_t hash = 5381;
-	int32_t index;
-
-	index = 0;
-	while (input[index]) {
-		hash = (((hash << 5) + hash + input[index])
-				% MAX_KEY_HASH_ENTRY);
-		index++;
-	}
-
-	return hash;
+	/* FIXME: the string length can be calculated in advance. */
+	return djb_hash(input, strlen(input)) % MAX_KEY_HASH_ENTRY;
 }
 
 /**
@@ -441,7 +432,7 @@ int32_t write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *
 {
 	size_t index;
 	VALUE_BLOCK tmp_value_block;
-	int64_t now_pos, next_pos;
+	int64_t now_pos, next_pos = 0;
 	int32_t ret_code;
 	int32_t errcode;
 	int32_t ret, ret_size;
@@ -633,16 +624,13 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 	int32_t ret_code;
 	int32_t key_index;
 	int64_t first_key_list_pos;
-	int64_t target_key_list_pos;
-	int64_t value_pos; /* Record position of first value block */
+	int64_t target_key_list_pos = 0;
+	int64_t value_pos = 0; /* Record position of first value block */
 	int32_t errcode;
 	int32_t ret;
 	int32_t ret_size;
 	int32_t name_space = name_space_c;
 
-#ifdef _ANDROID_ENV_
-	UNUSED(flag);
-#endif
 	/* Used to record value block pos when replacing */
 	int64_t replace_value_block_pos;
 
@@ -703,7 +691,7 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 			}
 
 			if (key_index < 0) { /* All key_list are full, allocate new one */
-				int64_t usable_pos;
+				int64_t usable_pos = 0;
 
 				ret_code = get_usable_key_list_filepos(meta_cache_entry,
 						xattr_page, &usable_pos);
@@ -1048,16 +1036,18 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	KEY_LIST_PAGE target_key_list_page;
 	KEY_LIST_PAGE prev_key_list_page;
 	KEY_ENTRY tmp_key_buf[MAX_KEY_SIZE];
-	int64_t target_key_list_pos;
+	int64_t target_key_list_pos = 0;
 	int64_t first_key_list_pos;
-	int64_t prev_key_list_pos;
+	int64_t prev_key_list_pos = 0;
 	int64_t first_value_pos;
-	int32_t key_index;
+	int32_t key_index = 0;
 	int32_t hash_index;
 	int32_t ret_code;
 	int32_t num_remaining;
 	int32_t errcode, ret, ret_size;
 	int32_t name_space = name_space_c;
+
+	memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE));
 
 	hash_index = hash(key); /* Hash the key */
 	namespace_page = &(xattr_page->namespace_page[name_space]);

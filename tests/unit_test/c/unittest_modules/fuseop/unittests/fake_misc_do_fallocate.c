@@ -227,8 +227,8 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	if (access("/tmp/testHCFS/testblock", F_OK) != 0)
 		mkdir("/tmp/testHCFS/testblock", 0700);
-	snprintf(pathname, 100, "/tmp/testHCFS/testblock/block_%lld_%lld",
-		this_inode, block_num);
+	snprintf(pathname, 100, "/tmp/testHCFS/testblock/block_%lu_%lu",
+		 this_inode, block_num);
 	return 0;
 }
 
@@ -266,7 +266,8 @@ int32_t parse_parent_self(const char *pathname, char *parentname, char *selfname
 	 return -1;
 
 	for (count = strlen(pathname)-1; count >= 0; count--) {
-		if ((pathname[count] == '/') && (count < (strlen(pathname)-1)))
+		if ((pathname[count] == '/') &&
+		    (count < ((int32_t)strlen(pathname) - 1)))
 			break;
 	}
 
@@ -664,7 +665,7 @@ int32_t lookup_destroy(void)
 	return 0;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 

@@ -349,10 +349,12 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
-			const char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
-			BOOL is_external)
+int32_t dir_remove_entry(ino_t parent_inode,
+			 ino_t child_inode,
+			 const char *childname,
+			 mode_t child_mode,
+			 META_CACHE_ENTRY_STRUCT *body_ptr,
+			 BOOL is_external)
 {
 	HCFS_STAT parent_stat;
 	DIR_META_TYPE parent_meta;
@@ -816,8 +818,10 @@ int32_t check_page_level(int64_t page_index)
 
 	tmp_index = tmp_index - (longpow(POINTERS_PER_PAGE, 3));
 
-	/* TODO: boundary handling for quadruple indirect */
-	return 4;
+	if (tmp_index < (longpow(POINTERS_PER_PAGE, 4)))
+		return 4;
+
+	return -EINVAL;
 }
 
 int64_t _load_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
@@ -902,7 +906,7 @@ int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 		  int64_t target_page,
 		  int64_t hint_page)
 {
-	off_t filepos;
+	off_t filepos = 0;
 	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
 	int32_t which_indirect;
@@ -974,6 +978,7 @@ int64_t seek_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 						body_ptr->fptr, 4);
 		break;
 	default:
+		filepos = -EINVAL;
 		break;
 	}
 
@@ -1146,7 +1151,7 @@ errcode_handle:
 *************************************************************************/
 int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 {
-	off_t filepos;
+	off_t filepos = 0;
 	BLOCK_ENTRY_PAGE temppage;
 	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
@@ -1219,6 +1224,7 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 						body_ptr, 4);
 		break;
 	default:
+		filepos = -EINVAL;
 		break;
 	}
 
@@ -1249,7 +1255,7 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta,
 		   int64_t target_page,
 		   int64_t hint_page)
 {
-	off_t filepos;
+	off_t filepos = 0;
 	int32_t which_indirect;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
@@ -1296,10 +1302,98 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta,
 						fptr, 4);
 		break;
 	default:
+		filepos = -EINVAL;
 		break;
 	}
 
 	return filepos;
+}
+
+/* Helper function to check if this inode had been synced to cloud. */
+int32_t check_meta_on_cloud(ino_t this_inode,
+			char d_type, BOOL *meta_on_cloud,
+			int64_t *metasize, int64_t *metalocalsize)
+{
+	char thismetapath[400];
+	char thisprofilepath[400];
+	int32_t ret, errcode;
+	FILE *metafptr = NULL;
+	CLOUD_RELATED_DATA this_clouddata;
+	off_t offset;
+	ssize_t ret_ssize;
+	struct stat tmpstat;
+
+	if (d_type == D_ISREG)
+		ret = fetch_todelete_path(thismetapath, this_inode);
+	else
+		ret = fetch_meta_path(thismetapath, this_inode);
+	if (ret < 0)
+		return ret;
+
+	ret = stat(thismetapath, &tmpstat);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		return -errcode;
+	}
+	*metasize = tmpstat.st_size;
+	*metalocalsize = tmpstat.st_blocks * 512;
+
+	if (CURRENT_BACKEND == NONE) {
+		*meta_on_cloud = FALSE;
+		return 0;
+	}
+
+	metafptr = fopen(thismetapath, "r+");
+	if (metafptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		return -errcode;
+	}
+
+	flock(fileno(metafptr), LOCK_EX);
+	switch (d_type) {
+	case D_ISDIR:
+		offset = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
+		PREAD(fileno(metafptr), &this_clouddata,
+				sizeof(CLOUD_RELATED_DATA), offset);
+		break;
+	case D_ISLNK:
+		offset = sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE);
+		PREAD(fileno(metafptr), &this_clouddata,
+				sizeof(CLOUD_RELATED_DATA), offset);
+		break;
+	case D_ISREG:
+		offset = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE)
+				+ sizeof(FILE_STATS_TYPE);
+		PREAD(fileno(metafptr), &this_clouddata,
+				sizeof(CLOUD_RELATED_DATA), offset);
+		break;
+	default:
+		fclose(metafptr);
+		write_log(0, "Error in %s. Unknown type of inode "PRIu64"\n",
+				__func__, (uint64_t)this_inode);
+		return -EPERM;
+	}
+	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
+
+	fetch_progress_file_path(thisprofilepath, this_inode);
+	if ((access(thisprofilepath, F_OK) == -1) &&
+			(this_clouddata.upload_seq == 0))
+		*meta_on_cloud = FALSE;
+	else
+		*meta_on_cloud = TRUE;
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
+	errcode = errno;
+	return -errcode;
 }
 
 /************************************************************************
@@ -1319,6 +1413,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 {
 	char thisblockpath[400];
 	char thismetapath[400];
+	char targetmetapath[400];
 	int32_t ret, errcode;
 	int64_t count;
 	int64_t total_blocks;
@@ -1328,7 +1423,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	HCFS_STAT this_inode_stat;
         FILE_META_TYPE file_meta;
         BLOCK_ENTRY_PAGE tmppage;
-        FILE *metafptr;
+        FILE *metafptr = NULL;
         int64_t e_index, which_page;
         size_t ret_size;
         struct timeval start_time, end_time;
@@ -1339,6 +1434,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FS_STAT_T tmpstat;
 	char meta_deleted;
 	int64_t metasize, metasize_blk, dirty_delta, unpin_dirty_delta;
+	BOOL meta_on_cloud;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1357,57 +1453,45 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
-	get_meta_size(this_inode, &metasize, &metasize_blk);
-
 	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
-		ret = meta_cache_remove(this_inode);
-		if (ret < 0)
-			return ret;
-
-		if (CURRENT_BACKEND == NONE) {
-			/* Remove it and reclaim inode */
-			ret = directly_delete_inode_meta(this_inode);
-		} else {
-			/* Need to delete the inode by moving it to
-			 * "todelete" path*/
-			ret = delete_inode_meta(this_inode);
-			if (ret < 0)
-				return ret;
-			/* Push to to-delete queue */
-			ret = super_block_to_delete(this_inode, TRUE);
-		}
-
-		if (ret < 0)
-			return ret;
-
-		if (mptr == NULL)
-			tmpstat.num_inodes--;
-		else
-			change_mount_stat(mptr, 0, -metasize, -1);
-		break;
-
 	case D_ISLNK:
 		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
 			return ret;
 
-		if (CURRENT_BACKEND == NONE) {
+		ret = check_meta_on_cloud(this_inode, d_type,
+				&meta_on_cloud, &metasize, &metasize_blk);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(0, "Inode %"PRIu64"%s. %s",
+					"marked delete but meta file wasn't existed.",
+					"Remove it from markdelete folder.");
+				ret = disk_cleardelete(this_inode, root_inode);
+			}
+			return ret;
+		}
+		if (!meta_on_cloud) {
 			/* Remove it and reclaim inode */
 			ret = directly_delete_inode_meta(this_inode);
-		} else {
-			/* Need to delete the inode by moving it to
-			 * "todelete" path*/
-			ret = delete_inode_meta(this_inode);
 			if (ret < 0)
 				return ret;
+		} else {
 			/* Push to to-delete queue */
 			ret = super_block_to_delete(this_inode, TRUE);
+			if (ret < 0)
+				return ret;
+			/* Remove meta file directly */
+			fetch_meta_path(targetmetapath, this_inode);
+			ret = unlink(targetmetapath);
+			if (ret < 0) {
+				write_log(0, "Error: Fail to remove meta %"
+						PRIu64". Code %d\n",
+						(uint64_t)this_inode, errno);
+				return ret;
+			}
 		}
-
-		if (ret < 0)
-			return ret;
 
 		if (mptr == NULL)
 			tmpstat.num_inodes--;
@@ -1440,8 +1524,15 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		metafptr = fopen(thismetapath, "r+");
 		if (metafptr == NULL) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+			if (errno == ENOENT) {
+				write_log(0, "Inode %"PRIu64"%s. %s",
+					"marked delete but meta file wasn't existed.",
+					"Remove it from markdelete folder.");
+				ret = disk_cleardelete(this_inode, root_inode);
+			} else {
+				write_log(0, "IO error in %s. Code %d, %s\n",
+					__func__, errcode, strerror(errcode));
+			}
 			return -errcode;
 		}
 
@@ -1551,26 +1642,25 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			hcfs_system->systemdata.system_size = 0;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
-		if (mptr != NULL) {
-			change_mount_stat(mptr, -this_inode_stat.size,
-					-metasize, -1);
-		} else {
-			tmpstat.num_inodes--;
-			tmpstat.system_size -=
-				(this_inode_stat.size + metasize);
-			tmpstat.meta_size -= metasize;
-			tmpstat.num_inodes -= 1;
-		}
-
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 
-		/* Remove to-delete meta if no backend */
-		if (CURRENT_BACKEND == NONE) {
-			char todelete_metapath[METAPATHLEN];
-
-			fetch_todelete_path(todelete_metapath, this_inode);
-			ret = unlink(todelete_metapath);
+		/* Remove to-delete meta if no backend or
+		 * this inode hadn't been synced */
+		ret = check_meta_on_cloud(this_inode, d_type,
+				&meta_on_cloud, &metasize, &metasize_blk);
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(0, "Inode %"PRIu64"%s. %s",
+					"marked delete but meta file wasn't existed.",
+					"Remove it from markdelete folder.");
+				ret = disk_cleardelete(this_inode, root_inode);
+			}
+			return ret;
+		}
+		if (!meta_on_cloud) {
+			fetch_todelete_path(targetmetapath, this_inode);
+			ret = unlink(targetmetapath);
 			if (ret < 0) {
 				errcode = errno;
 				write_log(0, "Error: Fail to remove meta %"
@@ -1582,9 +1672,32 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		} else {
 			/* Push to clouddelete queue */
 			ret = super_block_enqueue_delete(this_inode);
-			if (ret < 0)
+			if (ret < 0) {
 				write_log(0, "Error: Fail to delete meta"
 					" in %s. Code %d", __func__, -ret);
+				return ret;
+			}
+
+			/* Remove meta file directly */
+			fetch_todelete_path(targetmetapath, this_inode);
+			ret = unlink(targetmetapath);
+			if (ret < 0) {
+				write_log(0, "Error: Fail to remove meta %"
+						PRIu64". Code %d\n",
+						(uint64_t)this_inode, errno);
+				return ret;
+			}
+		}
+
+		if (mptr != NULL) {
+			change_mount_stat(mptr, -this_inode_stat.size,
+					-metasize, -1);
+		} else {
+			tmpstat.num_inodes--;
+			tmpstat.system_size -=
+				(this_inode_stat.size + metasize);
+			tmpstat.meta_size -= metasize;
+			tmpstat.num_inodes -= 1;
 		}
 		break;
 
@@ -2281,7 +2394,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 			goto error_handling;
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, dirmeta.finished_seq);
-	
+
 	} else if (S_ISLNK(bptr->this_stat.mode)) {
 		ret = meta_cache_lookup_symlink_data(this_inode, NULL, &symmeta,
 				bptr);
@@ -2294,7 +2407,7 @@ int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr)
 			goto error_handling;
 		write_log(10, "Debug: inode %"PRIu64" now seq is %lld\n",
 				this_inode, symmeta.finished_seq);
-	
+
 	} else {
 		ret = -EINVAL;
 		goto error_handling;
@@ -2341,7 +2454,7 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 
 	return 0;
 }
-	
+
 static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
 {
 	if (namespace == SECURITY) {
@@ -2364,7 +2477,7 @@ static BOOL _skip_inherit_key(char namespace, char *key) /* Only SECURITY now */
  * @param selbody_ptr Self meta cache entry, which had been locked.
  *
  * @return 0 on success, otherwise negative errcode.
- */ 
+ */
 int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 		META_CACHE_ENTRY_STRUCT *selbody_ptr)
 {
@@ -2392,7 +2505,7 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	/* Lock parent */
 	pbody_ptr = meta_cache_lock_entry(parent_inode);
 	if (!pbody_ptr) {
-		return -ENOMEM;		
+		return -ENOMEM;
 	}
 	ret = meta_cache_open_file(pbody_ptr);
 	if (ret < 0) {
@@ -2508,7 +2621,7 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 				}
 				value_buf_size = value_size + 100;
 				continue;
-			
+
 			} else { /* ok */
 				value_buf[value_size] = 0;
 			}

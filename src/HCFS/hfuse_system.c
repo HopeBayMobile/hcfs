@@ -33,6 +33,7 @@
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
 
+#include "fuse_notify.h"
 #include "fuseop.h"
 #include "meta_mem_cache.h"
 #include "global.h"
@@ -169,12 +170,11 @@ errcode_handle:
 	return errcode;
 }
 
-void* _write_sys(void *fakeptr)
+void *_write_sys(__attribute__((unused)) void *fakeptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
 
-	UNUSED(fakeptr);
 	sleep(2);
 	sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
@@ -235,33 +235,37 @@ errcode_handle:
 *************************************************************************/
 int32_t init_hfuse(void)
 {
-	int32_t ret_val;
+	int32_t ret_val = 0;
 
-	ret_val = init_hcfs_system_data();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = super_block_init();
-	if (ret_val < 0)
-		return ret_val;
-	ret_val = init_system_fh_table();
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val == 0)
+		ret_val = init_hcfs_system_data();
+	if (ret_val == 0)
+		ret_val = super_block_init();
+	if (ret_val == 0)
+		ret_val = init_system_fh_table();
+	if (ret_val == 0)
+		ret_val = init_fs_manager();
+	if (ret_val == 0)
+		ret_val = init_mount_mgr();
 
-	ret_val = init_fs_manager();
-	if (ret_val < 0)
-		return ret_val;
+	/* TODO: error handling for log files */
+	init_sync_stat_control();
 
-	ret_val = init_mount_mgr();
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val == 0)
+		ret_val = check_and_create_metapaths();
+	if (ret_val == 0)
+		ret_val = check_and_create_blockpaths();
+	if (ret_val == 0)
+		ret_val = init_pathlookup();
+	if (ret_val == 0)
+		ret_val = init_dirstat_lookup();
 
-	return 0;
+	return ret_val;
 }
 
 /* Helper function to initialize curl handles for downloading objects */
 int32_t _init_download_curl(int32_t count)
 {
-	int32_t ret_val;
 
 	snprintf(download_curl_handles[count].id,
 		 sizeof(((CURL_HANDLE *)0)->id) - 1, "download_thread_%d",
@@ -270,20 +274,20 @@ int32_t _init_download_curl(int32_t count)
 	curl_handle_mask[count] = FALSE;
 	download_curl_handles[count].curl_backend = NONE;
 	download_curl_handles[count].curl = NULL;
-	UNUSED(ret_val);
 	/* Do not init backend until actually needed */
 	/*
-		ret_val = hcfs_init_backend(&(download_curl_handles[count]));
+	int32_t ret_val;
+	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 
-		while ((ret_val < 200) || (ret_val > 299)) {
-			write_log(0, "error in connecting to backend\n");
-			if (download_curl_handles[count].curl != NULL)
-				hcfs_destroy_backend(
-					download_curl_handles[count].curl);
-			ret_val = hcfs_init_backend(
-					&(download_curl_handles[count])
-				);
-		}
+	while ((ret_val < 200) || (ret_val > 299)) {
+		write_log(0, "error in connecting to backend\n");
+		if (download_curl_handles[count].curl != NULL)
+			hcfs_destroy_backend(
+				download_curl_handles[count].curl);
+		ret_val = hcfs_init_backend(
+				&(download_curl_handles[count])
+			);
+	}
 	*/
 	return 0;
 }
@@ -413,7 +417,6 @@ int32_t _is_battery_low()
 /*TODO: Error handling after validating system config*/
 int32_t main(int32_t argc, char **argv)
 {
-	CURL_HANDLE curl_handle;
 	int32_t ret_val;
 	struct rlimit nofile_limit;
 #ifndef _ANDROID_ENV_
@@ -454,17 +457,13 @@ int32_t main(int32_t argc, char **argv)
 	/* Move log opening earlier for android to log low battery events */
 #ifdef _ANDROID_ENV_
 	open_log("hcfs_android_log");
-#ifdef VERSION_NUM
-	write_log(2, "\nVersion: %s", VERSION_NUM);
-#endif
-	write_log(2, "\nStart logging hcfs_android_log\n");
 #endif
 
 	/* Check if battery level is low. If so, shutdown */
 	ret_val = _is_battery_low();
 	if (ret_val == TRUE) {
 		close_log();
-		ret_val = execlp("setprop", "setprop", "sys.powerctl",
+		execlp("setprop", "setprop", "sys.powerctl",
 		                 "shutdown", NULL);
 		exit(-1);
 	}
@@ -478,30 +477,16 @@ int32_t main(int32_t argc, char **argv)
 		/* exit(-1); */
 	}
 
-	UNUSED(curl_handle);
 	ret_val = init_hfuse();
-	if (ret_val < 0)
-		exit(-1);
-
-	/* TODO: error handling for log files */
-	init_sync_stat_control();
-
-	ret_val = check_and_create_metapaths();
-	if (ret_val < 0)
-		exit(ret_val);
-
-	ret_val = check_and_create_blockpaths();
 	if (ret_val < 0)
 		exit(ret_val);
 
 #ifdef _ANDROID_ENV_
-	ret_val = init_pathlookup();
-	if (ret_val < 0)
-		exit(ret_val);
-	ret_val = init_dirstat_lookup();
-	if (ret_val < 0)
-		exit(ret_val);
 	ret_val = init_pkg_cache();
+	if (ret_val < 0)
+		exit(ret_val);
+
+	ret_val = init_hfuse_ll_notify_loop();
 	if (ret_val < 0)
 		exit(ret_val);
 
@@ -514,13 +499,9 @@ int32_t main(int32_t argc, char **argv)
 	if (CURRENT_BACKEND != NONE) {
 		init_backend_related_module();
 	}
-
 	hook_fuse(argc, argv);
 	/* TODO: modify this so that backend config can be turned on
 	even when volumes are mounted */
-
-	destroy_event_worker_loop_thread();
-	pthread_join(event_loop_thread, NULL);
 
 	if (CURRENT_BACKEND != NONE) {
 		if (CURRENT_BACKEND == SWIFTTOKEN) {
@@ -536,21 +517,21 @@ int32_t main(int32_t argc, char **argv)
 		pthread_join(monitor_loop_thread, NULL);
 		write_log(10, "Debug: All threads terminated\n");
 	}
+
+	destroy_event_worker_loop_thread();
+	pthread_join(event_loop_thread, NULL);
+
+	destory_hfuse_ll_notify_loop();
+
 	sync_hcfs_system_data(TRUE);
-	write_log(4, "HCFS shutting down normally\n");
-	close_log();
-	sync();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();
-#else
-	ret_val = init_pathlookup();
-	if (ret_val < 0)
-		exit(ret_val);
-	ret_val = init_dirstat_lookup();
-	if (ret_val < 0)
-		exit(ret_val);
 
+	write_log(4, "HCFS shutting down normally\n");
+	close_log();
+	sync();
+#else  /* ! _ANDROID_ENV_ */
 	/* Start up children */
 	proc_idx = 0;
 	if (CURRENT_BACKEND != NONE) {
@@ -569,7 +550,6 @@ int32_t main(int32_t argc, char **argv)
 	case 0:
 		/* main process */
 		open_log("fuse.log");
-		write_log(2, "\nStart logging fuse\n");
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&pin_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
 		sem_init(&download_curl_control_sem, 0, 1);
@@ -600,14 +580,12 @@ int32_t main(int32_t argc, char **argv)
 	/* children processed begin */
 	case 1:
 		open_log("cache_maintain.log");
-		write_log(2, "\nStart logging cache cleanup\n");
 		run_cache_loop();
 		write_log(4, "HCFS (cache) shutting down normally\n");
 		close_log();
 		break;
 	case 2:
 		open_log("backend_upload.log");
-		write_log(2, "\nStart logging backend upload\n");
 
 		/* Init curl handle */
 		sem_init(&download_curl_sem, 0,

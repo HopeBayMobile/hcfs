@@ -25,6 +25,7 @@ class monitorTest : public ::testing::Test {
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->something_to_replace), 0, 0);
 		sem_init(&(hcfs_system->monitor_sem), 1, 0);
 		sem_init(&(hcfs_system->access_sem), 1, 1);
 
@@ -151,9 +152,11 @@ TEST_F(monitorTest, Monitor_Log) {
 	_write_monitor_loop_status_log(1.2345);
 	fflush(stdout);
 }
+
 TEST_F(monitorTest, destroy_monitor_loop_thread) {
 	destroy_monitor_loop_thread();
 }
+
 TEST_F(monitorTest, diff_time_With_No_Endtime) {
 	double test_duration = 0.0;
 	struct timespec test_start;
@@ -161,12 +164,46 @@ TEST_F(monitorTest, diff_time_With_No_Endtime) {
 	test_duration = diff_time(&test_start, NULL);
 	ASSERT_GT(test_duration, 0);
 }
+
 TEST_F(monitorTest, UpdateSyncStateTest) {
-  hcfs_system->backend_is_online = FALSE;
-  update_sync_state();
-  EXPECT_EQ(TRUE, hcfs_system->sync_paused);
-  hcfs_system->backend_is_online = TRUE;
-  update_sync_state();
-  EXPECT_EQ(FALSE, hcfs_system->sync_paused);
-  EXPECT_EQ(0, hcfs_system->systemdata.cache_replace_status);
+	hcfs_system->backend_is_online = FALSE;
+	update_sync_state();
+	EXPECT_EQ(TRUE, hcfs_system->sync_paused);
+	hcfs_system->backend_is_online = TRUE;
+	update_sync_state();
+	EXPECT_EQ(FALSE, hcfs_system->sync_paused);
+	EXPECT_EQ(0, hcfs_system->systemdata.cache_replace_status);
+}
+
+TEST_F(monitorTest, UpdateSyncStateTest_FromOnlineToOffline)
+{
+	int32_t num_replace;
+
+	hcfs_system->backend_is_online = FALSE;
+	sem_getvalue(&(hcfs_system->something_to_replace), &num_replace);
+	EXPECT_EQ(0, num_replace);
+
+	/* Run */
+	update_sync_state();
+
+	EXPECT_EQ(TRUE, hcfs_system->sync_paused);
+	sem_getvalue(&(hcfs_system->something_to_replace), &num_replace);
+	EXPECT_EQ(1, num_replace);
+}
+
+TEST_F(monitorTest, UpdateSyncStateTest_FromOnlineToOffline_AlreadyNeedReplace)
+{
+	int32_t num_replace;
+
+	hcfs_system->backend_is_online = FALSE;
+	sem_post(&(hcfs_system->something_to_replace));
+	sem_getvalue(&(hcfs_system->something_to_replace), &num_replace);
+	EXPECT_EQ(1, num_replace);
+
+	/* Run */
+	update_sync_state();
+
+	EXPECT_EQ(TRUE, hcfs_system->sync_paused);
+	sem_getvalue(&(hcfs_system->something_to_replace), &num_replace);
+	EXPECT_EQ(1, num_replace);
 }

@@ -256,7 +256,7 @@ class api_moduleTest : public ::testing::Test
 	}
 
 	static int32_t do_delete(const char *fpath,
-				 const HCFS_STAT *sb,
+				 const struct stat *sb,
 				 int32_t tflag,
 				 struct FTW *ftwbuf)
 	{

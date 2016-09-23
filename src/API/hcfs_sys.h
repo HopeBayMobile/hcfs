@@ -35,4 +35,6 @@ int32_t set_swift_access_token(char *arg_buf, uint32_t arg_len);
 
 int32_t toggle_sync_point(int32_t api_code);
 
+int32_t collect_sys_logs();
+
 #endif  /* GW20_HCFSAPI_SYS_H_ */

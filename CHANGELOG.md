@@ -6,33 +6,53 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  3. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
+ 6. Case-only renaming in emulated volume (sdcard) is not working now. This will be resolved in a later release.
+
+v 2.2.2.1655
+=====
+## Bug Fixed
+- [HCFS] hotfix/curl_NOSIGNAL (!558)
+- [HCFS] fix/graceful_umount_hcfs (!540)
+
+v 2.2.2.1465
+=====
+## Fixes 
+ - [HCFS] Fixed #12713: hotfix/returnEIO_when_cache_full_and_nothing_replace (!527)
+ - [Nexus-5x] Fix/issue 12529 [!36](gateway-2-0/nexus-5x!36)
+ - [Nexus-5x] Save the storage usage in Preference to improve user experience [!37](gateway-2-0/nexus-5x!37)
+ - [Tera-App] add startForeground [!89](gateway-2-0/android-management-app!89)
+ - [Tera-App] Add query connection status interface [!84](gateway-2-0/android-management-app!84)
+ - Bug #12746: 從背景移除Tera app, "com.hopebaytech.hcfsmgmt: server" 就掉了
+
+## CI / Refactoring / test / other
+ - [HCFS] tests: specify canonical LDFLAGS (!523)
 
 v 2.2.2.1445
 =====
 ## New Features
  - [Tera-App] Add a feedback button onto settings page ([!45] (gateway-2-0/android-management-app!45))
- - [Nexus-5x] Feature/factory reset alertdialog [!33](gateway-2-0/nexus-5x!33)
- - [Nexus-5x] Support auto download OTA package    code is reviewed, it's ok! [!31](gateway-2-0/nexus-5x!31)
+ - [Nexus-5x] Feature/factory reset alertdialog ([!33](gateway-2-0/nexus-5x!33))
+ - [Nexus-5x] Support auto download OTA package    code is reviewed, it's ok! ([!31](gateway-2-0/nexus-5x!31))
 
 ## Fixes 
  - [HCFS] bugfix/remove_sb_size_from_system_size (!521)
- - [Tera-App] (#12550) Process new json format and fixed change account related problems [!81](gateway-2-0-android-management-app!81)
- - [Tera-App] (#12595) Replace cs@tera.mobi with cs@hbmobile.com [!80](gateway-2-0-android-management-app!80)
- - [Tera-App] Feature/share preference [!78](gateway-2-0-android-management-app!78)
- - [Tera-App] Change the method of calculating tera storage usage [!83](gateway-2-0-android-management-app!83)
- - [Tera-App] Add missing status code [!79](gateway-2-0-android-management-app!79)
- - [Tera-App] bug fix #12430 [!75](gateway-2-0-android-management-app!75)
- - [Tera-App] 當 pin 一個檔案失敗後, 再 pin 同一個檔案會顯示 "Unpinning successful" [!75]
- - [Nexus-5x] Fix exception while launch storage & USB settings [!35](gateway-2-0/nexus-5x!35)
- - [Nexus-5x] Fix/download dialog not display [!32](gateway-2-0/nexus-5x!32)
- - [Nexus-5x] Fix/#12457 [!30](gateway-2-0/nexus-5x!30)
- - [Nexus-5x] fix bug#12362:/storage/emulated/0/hbtupdater/ would be seen by the user and bug#11942:download complete alertdialog did not re-show if the user leave the ota download page when downloading [!29](gateway-2-0/nexus-5x!29)
- - [Tera-Launcher] Add predefined color set [!11](gateway-2-0/tera-launcher!11)
- - [Bug #12430](https://redmine.hopebaytech.com/issues/12430): 當 pin 一個檔案失敗後, 再 pin 同一個檔案會顯示 "Unpinning successful"
- - [Bug #12544](https://redmine.hopebaytech.com/issues/12544): 沒有登入Tera情況下,開啟Storage&USB會不斷出現Settings exception訊息.
- - [Bug #12550](https://redmine.hopebaytech.com/issues/12550): Change account會顯示失敗,但是確認mgmt server帳號已被轉換到新的google account
- - [Bug #12595](https://redmine.hopebaytech.com/issues/12595): Feedback email 應變更為cs@hbmobile.com
- - [Tera-App] Get Cloud storage total from quota and adjust the sequence [!85](gateway-2-0-android-management-app!85)
+ - [Tera-App] Process new json format and fixed change account related problems ([!81](gateway-2-0/android-management-app!81)), (#12550)
+ - [Tera-App] Replace cs@tera.mobi with cs@hbmobile.com ([!80](gateway-2-0/android-management-app!80)), (#12595)
+ - [Tera-App] Feature/share preference ([!78](gateway-2-0/android-management-app!78))
+ - [Tera-App] Change the method of calculating tera storage usage ([!83](gateway-2-0/android-management-app!83))
+ - [Tera-App] Add missing status code ([!79](gateway-2-0/android-management-app!79))
+ - [Tera-App] bug fix #12430 ([!75](gateway-2-0/android-management-app!75))
+ - [Tera-App] 當 pin 一個檔案失敗後, 再 pin 同一個檔案會顯示 "Unpinning successful" ([!75](gateway-2-0/android-management-app!75))
+ - [Nexus-5x] Fix exception while launch storage & USB settings ([!35](gateway-2-0/nexus-5x!35))
+ - [Nexus-5x] Fix/download dialog not display ([!32](gateway-2-0/nexus-5x!32))
+ - [Nexus-5x] Fix/#12457 ([!30](gateway-2-0/nexus-5x!30))
+ - [Nexus-5x] fix bug#12362:/storage/emulated/0/hbtupdater/ would be seen by the user and bug#11942:download complete alertdialog did not re-show if the user leave the ota download page when downloading ([!29](gateway-2-0/nexus-5x!29))
+ - [Tera-Launcher] Add predefined color set ([!11](gateway-2-0/tera-launcher!11))
+ - [Bug #12430] 當 pin 一個檔案失敗後, 再 pin 同一個檔案會顯示 "Unpinning successful"
+ - [Bug #12544] 沒有登入Tera情況下,開啟Storage&USB會不斷出現Settings exception訊息.
+ - [Bug #12550] Change account會顯示失敗,但是確認mgmt server帳號已被轉換到新的google account
+ - [Bug #12595] Feedback email 應變更為cs@hbmobile.com
+ - [Tera-App] Get Cloud storage total from quota and adjust the sequence ([!85](gateway-2-0/android-management-app!85))
 
 ## CI / Refactoring / Other
  - [HCFS] Ci/update flash script    Add some missed '-s \$TARGET_DEVICE' in FlashImages() (!519)
@@ -58,10 +78,10 @@ v 2.2.2.1412
  - [HCFS] optimize longpow by table lookup. Typically, longpow is used for 1K base, and we can speed up by table  lookup as fastpath. In addition, slow path can be slightly improved. (!488)
  - [HCFS] exclude core dump file. After the failure of certain unit test iteration, core dump file might  be generated, and we should not track them in GIT repository. (!491)
  - [HCFS] fix bug #12281
- - [Tera-App] Error handling when getDirStatus api failed to get status [!68](gateway-2-0-android-management-app!68)
- - [Tera-App] Show system status bar after login Tera app [!69](gateway-2-0-android-management-app!69)
- - [Tera-App] Redefine storage usage scope [!67](gateway-2-0-android-management-app!67)
- - [Tera-App] Replace the pin/unpin failed message with revised version [!65](gateway-2-0-android-management-app!65)
+ - [Tera-App] Error handling when getDirStatus api failed to get status [!68](gateway-2-0/android-management-app!68)
+ - [Tera-App] Show system status bar after login Tera app [!69](gateway-2-0/android-management-app!69)
+ - [Tera-App] Redefine storage usage scope [!67](gateway-2-0/android-management-app!67)
+ - [Tera-App] Replace the pin/unpin failed message with revised version [!65](gateway-2-0/android-management-app!65)
  - [Nexus-5x] fix Bug #11930:ota app can reshow the download alertdialog after re-launch ota app [!27](gateway-2-0/nexus-5x!27)
  - [Nexus-5x] fix Bug #11948:OTA package did not delete after OTA finished [!28](gateway-2-0/nexus-5x!28)
  - [Nexus-5x] Get Tera storage usage from mgmt api service [!25](gateway-2-0/nexus-5x!25)

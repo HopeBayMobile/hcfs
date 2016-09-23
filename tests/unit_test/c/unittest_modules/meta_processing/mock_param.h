@@ -1,6 +1,7 @@
 #include "sys/stat.h"
 #include "fuseop.h"
 #include "params.h"
+#include "meta.h"
 
 #ifndef META_PROCESSING_MOCK_PARAMS_H_
 #define META_PROCESSING_MOCK_PARAMS_H_
@@ -44,7 +45,6 @@ HCFS_STAT to_verified_stat;
 #define INO_DELETE_DIR 12345
 #define INO_DELETE_LNK 13142
 #define TRUNC_SIZE 65536
-#define MOCK_META_SIZE 123
 
 char pathlookup_write_parent_success;
 char delete_pathcache_node_success;

@@ -269,7 +269,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 	}
 
-	ret_val = meta_cache_unlock_entry(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
 
 	/* Init file meta */
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
@@ -585,8 +585,10 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t unlink_update_meta(fuse_req_t req, ino_t parent_inode,
-			const DIR_ENTRY *this_entry, BOOL is_external)
+int32_t unlink_update_meta(fuse_req_t req,
+			   ino_t parent_inode,
+			   const DIR_ENTRY *const this_entry,
+			   BOOL is_external)
 {
 	int32_t ret_val;
 	ino_t this_inode;
@@ -793,6 +795,8 @@ int32_t rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 
 	/* Deferring actual deletion to forget */
 	ret_val = mark_inode_delete(req, this_inode);
+	if (ret_val < 0)
+		return ret_val;
 
 	/* Delete parent lookup entry */
 	ret_val = sem_wait(&(pathlookup_data_lock));
@@ -1318,6 +1322,7 @@ int32_t pin_inode(ino_t this_inode,
 	ino_t *dir_node_list, *nondir_node_list;
 	int64_t count, num_dir_node, num_nondir_node;
 
+	memset(&tempstat, 0, sizeof(HCFS_STAT));
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;
@@ -1454,6 +1459,7 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 	ino_t *dir_node_list, *nondir_node_list;
 	int64_t count, num_dir_node, num_nondir_node;
 
+	memset(&tempstat, 0, sizeof(HCFS_STAT));
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;

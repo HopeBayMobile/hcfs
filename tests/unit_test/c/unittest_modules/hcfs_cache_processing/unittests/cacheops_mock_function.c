@@ -78,7 +78,7 @@ int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	return ret;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list ap;
 

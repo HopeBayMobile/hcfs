@@ -9,7 +9,7 @@
 
 int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	printf("Debug inode is %lld\n", body_ptr->inode_num);
+	printf("Debug inode is %lu\n", body_ptr->inode_num);
 	switch(body_ptr->inode_num) {
 	case 14:
 		body_ptr->fptr = fopen("/tmp/testHCFS/hcfs_unittest_truncate",

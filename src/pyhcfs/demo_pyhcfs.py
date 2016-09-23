@@ -17,11 +17,11 @@ def demo(cmd):
 
 test_target='test_data/v1/android'
 
-demo_title("list_external_volume")
-demo('list_external_volume(b"'+test_target+'/fsmgr")')
+demo_title("list_volume")
+demo('list_volume(b"'+test_target+'/fsmgr")')
 
-demo_title("list_external_volume (Failure)")
-demo('list_external_volume(b"")')
+demo_title("list_volume (Failure)")
+demo('list_volume(b"")')
 
 demo_title("parse_meta")
 demo('parse_meta(b"'+test_target+'/meta_isdir")')

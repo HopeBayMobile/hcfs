@@ -87,6 +87,7 @@ static void *fuse_do_work(void *data)
 	/* added by seth */
 	struct sigaction actions;
 	int rc;
+	sigset_t sigset;
 
 	memset(&actions, 0, sizeof(actions));
 	sigemptyset(&actions.sa_mask);
@@ -94,6 +95,11 @@ static void *fuse_do_work(void *data)
 	actions.sa_handler = thread_exit_handler;
 	rc = sigaction(SIGUSR1,&actions,NULL);
 	/**/
+
+	/* Need to block SIGUSR1 when processing fs operations
+	 * to guarantee data/statistics consistency */
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGUSR1);
 
 	while (!fuse_session_exited(mt->se)) {
 		int isforget = 0;
@@ -105,7 +111,9 @@ static void *fuse_do_work(void *data)
 		int res;
 
 		//pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+		pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 		res = fuse_session_receive_buf(mt->se, &fbuf, &ch);
+		pthread_sigmask(SIG_BLOCK, &sigset, NULL);
 		//pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		if (res == -EINTR)
 			continue;

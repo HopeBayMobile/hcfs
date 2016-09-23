@@ -13,7 +13,6 @@
 
 extern "C" {
 #include "mock_param.h"
-
 #include "utils.h"
 #include "global.h"
 #include "hfuse_system.h"
@@ -74,6 +73,8 @@ class metaopsEnvironment : public ::testing::Environment {
 		}
 		void TearDown()
 		{
+			free(system_config->max_cache_limit);
+			free(system_config->max_pinned_limit);
 			free(system_config);
 			free(hcfs_system);
 		}
@@ -135,7 +136,7 @@ class dir_add_entryTest : public ::testing::Test {
 			sem_init(&(body_ptr->access_sem), 0, 1);
 			body_ptr->fptr = fopen(mock_metaname, "w+");
 			/* Init meta & stat to be verified */
-			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_meta, 0, sizeof(DIR_META_TYPE));
 			memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
                 }
 
@@ -280,7 +281,7 @@ class dir_remove_entryTest : public ::testing::Test {
 			body_ptr->meta_opened = TRUE;
 			/* to_verified_meta & to_verified_stat will be modify in dir_remove_entry().
 			   Use the global vars to verify result. */
-			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_meta, 0, sizeof(DIR_META_TYPE));
 			memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
 			to_verified_meta.total_children = TOTAL_CHILDREN_NUM;
 			to_verified_stat.nlink = LINK_NUM;
@@ -418,7 +419,7 @@ protected:
 
 		body_ptr = (META_CACHE_ENTRY_STRUCT*)
 			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-		memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+		memset(&to_verified_meta, 0, sizeof(DIR_META_TYPE));
 		memset(&to_verified_stat, 0, sizeof(HCFS_STAT));
 	}
 	virtual void TearDown() {
@@ -1142,6 +1143,13 @@ TEST_F(seek_page2Test, QuadrupleIndirectPageSuccess)
 	Unittest of actual_delete_inode()
  */
 
+static int64_t _get_meta_size(char *pathname)
+{
+	struct stat tmpstat;
+	stat(pathname, &tmpstat);
+	return tmpstat.st_size;
+}
+
 class actual_delete_inodeTest : public ::testing::Test {
 protected:
 	FILE *meta_fp;
@@ -1254,7 +1262,6 @@ TEST_F(actual_delete_inodeTest, DeleteDirSuccess_NoBackend)
 	EXPECT_EQ(ENOENT, errno);
 
 	unlink(meta_path);
-	unlink(todelete_path);
 }
 
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess_BackendConn)
@@ -1272,10 +1279,10 @@ TEST_F(actual_delete_inodeTest, DeleteDirSuccess_BackendConn)
 	EXPECT_EQ(0, actual_delete_inode(INO_DELETE_DIR, D_ISDIR,
 		ROOT_INODE, &mount_t));
 	EXPECT_EQ(-1, access(meta_path, F_OK));
-	EXPECT_EQ(0, access(todelete_path, F_OK));
+	EXPECT_EQ(-1, access(todelete_path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
 
 	unlink(meta_path);
-	unlink(todelete_path);
 }
 
 TEST_F(actual_delete_inodeTest, mptr_is_null_DeleteDirSuccess_BackendConn)
@@ -1293,10 +1300,10 @@ TEST_F(actual_delete_inodeTest, mptr_is_null_DeleteDirSuccess_BackendConn)
 	EXPECT_EQ(0, actual_delete_inode(INO_DELETE_DIR, D_ISDIR,
 		ROOT_INODE, NULL));
 	EXPECT_EQ(-1, access(meta_path, F_OK));
-	EXPECT_EQ(0, access(todelete_path, F_OK));
+	EXPECT_EQ(-1, access(todelete_path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
 
 	unlink(meta_path);
-	unlink(todelete_path);
 }
 
 TEST_F(actual_delete_inodeTest, DeleteSymlinkSuccess_NoBackend)
@@ -1319,7 +1326,6 @@ TEST_F(actual_delete_inodeTest, DeleteSymlinkSuccess_NoBackend)
 	EXPECT_EQ(ENOENT, errno);
 
 	unlink(meta_path);
-	unlink(todelete_path);
 }
 
 TEST_F(actual_delete_inodeTest, DeleteSymlinkSuccess_BackendConn)
@@ -1337,10 +1343,10 @@ TEST_F(actual_delete_inodeTest, DeleteSymlinkSuccess_BackendConn)
 	EXPECT_EQ(0, actual_delete_inode(INO_DELETE_LNK, D_ISLNK,
 		ROOT_INODE, &mount_t));
 	EXPECT_EQ(-1, access(meta_path, F_OK));
-	EXPECT_EQ(0, access(todelete_path, F_OK));
+	EXPECT_EQ(-1, access(todelete_path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
 
 	unlink(meta_path);
-	unlink(todelete_path);
 }
 
 TEST_F(actual_delete_inodeTest, mptr_is_null_DeleteSymlinkSuccess_BackendConn)
@@ -1358,10 +1364,10 @@ TEST_F(actual_delete_inodeTest, mptr_is_null_DeleteSymlinkSuccess_BackendConn)
 	EXPECT_EQ(0, actual_delete_inode(INO_DELETE_LNK, D_ISLNK,
 		ROOT_INODE, NULL));
 	EXPECT_EQ(-1, access(meta_path, F_OK));
-	EXPECT_EQ(0, access(todelete_path, F_OK));
+	EXPECT_EQ(-1, access(todelete_path, F_OK));
+	EXPECT_EQ(ENOENT, errno);
 
 	unlink(meta_path);
-	unlink(todelete_path);
 }
 
 TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess_NoBackend)
@@ -1370,6 +1376,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess_NoBackend)
 	char thismetapath[100];
 	char todel_metapath[100];
 	bool block_file_existed;
+	int64_t meta_file_size;
 	BLOCK_ENTRY_PAGE block_entry_page;
 	HCFS_STAT mock_stat;
 	FILE_META_TYPE mock_meta;
@@ -1418,14 +1425,17 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess_NoBackend)
 	fwrite(&block_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta_fp);
 	fclose(meta_fp);
 
+	/* To read real size of meta file */
+	meta_file_size = _get_meta_size(thismetapath);
+
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG,
 		mock_root, &mount_t));
 
 	/* Verify if block files are removed correctly */
-	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE - MOCK_META_SIZE,
+	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE - meta_file_size,
 		hcfs_system->systemdata.system_size);
-	EXPECT_EQ(MOCK_SYSTEM_META_SIZE - round_size(MOCK_META_SIZE),
+	EXPECT_EQ(MOCK_SYSTEM_META_SIZE - round_size(meta_file_size),
 		hcfs_system->systemdata.system_meta_size);
 	EXPECT_EQ(MOCK_CACHE_SIZE - round_size(MOCK_BLOCK_SIZE) * NUM_BLOCKS,
 		hcfs_system->systemdata.cache_size);
@@ -1449,8 +1459,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess_NoBackend)
 
 	EXPECT_EQ(-1, access(thismetapath, F_OK));
 	EXPECT_EQ(ENOENT, errno);
-	EXPECT_EQ(-1, access(todel_metapath, F_OK));
-	EXPECT_EQ(ENOENT, errno);
 
 	/* Free resource */
 	unlink(thismetapath);
@@ -1463,6 +1471,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	char thismetapath[100];
 	char todel_metapath[100];
 	bool block_file_existed;
+	int64_t meta_file_size;
 	BLOCK_ENTRY_PAGE block_entry_page;
 	HCFS_STAT mock_stat;
 	FILE_META_TYPE mock_meta;
@@ -1511,14 +1520,17 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	fwrite(&block_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta_fp);
 	fclose(meta_fp);
 
+	/* To read real size of meta file */
+	meta_file_size = _get_meta_size(thismetapath);
+
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG,
 		mock_root, &mount_t));
 
 	/* Verify if block files are removed correctly */
-	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE - MOCK_META_SIZE,
+	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE - meta_file_size,
 		hcfs_system->systemdata.system_size);
-	EXPECT_EQ(MOCK_SYSTEM_META_SIZE - round_size(MOCK_META_SIZE),
+	EXPECT_EQ(MOCK_SYSTEM_META_SIZE - round_size(meta_file_size),
 		hcfs_system->systemdata.system_meta_size);
 	EXPECT_EQ(MOCK_CACHE_SIZE - round_size(MOCK_BLOCK_SIZE) * NUM_BLOCKS,
 		hcfs_system->systemdata.cache_size);
@@ -1541,7 +1553,6 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	EXPECT_EQ(false, block_file_existed);
 
 	EXPECT_EQ(-1, access(thismetapath, F_OK));
-	EXPECT_EQ(0, access(todel_metapath, F_OK));
 
 	/* Free resource */
 	unlink(thismetapath);
@@ -2011,6 +2022,10 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	for (int32_t i = 0; i < num_nondir_node; i++, child_inode += 2)
 		EXPECT_EQ(child_inode, nondir_node_list[i]);
 
+	/* FIXME: deallocation must be placed in the last test. */
+	free(dir_node_list);
+	free(nondir_node_list);
+
 	unlink(metapath);
 }
 
@@ -2129,3 +2144,198 @@ TEST_F(inherit_xattrTest, NameSpace_SYSTEM_NOT_Pass)
  * End of unittest of inherit_xattr()
  */
 
+/*
+ * Unittest of check_meta_on_cloud()
+ */
+
+static inline void _gen_meta_file(char *pathname, char d_type,
+			     int32_t upload_seq)
+{
+	HCFS_STAT this_stat = {0};
+	DIR_META_TYPE this_dir_meta = {0};
+	SYMLINK_META_TYPE this_lnk_meta = {0};
+	FILE_META_TYPE this_reg_meta = {0};
+	FILE_STATS_TYPE this_file_stat = {0};
+	CLOUD_RELATED_DATA this_cloud_data = {0};
+
+	this_cloud_data.upload_seq = upload_seq;
+
+	FILE *tmpfptr = fopen(pathname, "wb");
+	switch (d_type) {
+	case D_ISDIR:
+		fwrite(&this_stat, sizeof(this_stat), 1, tmpfptr);
+		fwrite(&this_dir_meta, sizeof(this_dir_meta), 1, tmpfptr);
+		fwrite(&this_cloud_data, sizeof(this_cloud_data), 1, tmpfptr);
+		break;
+	case D_ISLNK:
+		fwrite(&this_stat, sizeof(this_stat), 1, tmpfptr);
+		fwrite(&this_lnk_meta, sizeof(this_lnk_meta), 1, tmpfptr);
+		fwrite(&this_cloud_data, sizeof(this_cloud_data), 1, tmpfptr);
+		break;
+	case D_ISREG:
+		fwrite(&this_stat, sizeof(this_stat), 1, tmpfptr);
+		fwrite(&this_reg_meta, sizeof(this_reg_meta), 1, tmpfptr);
+		fwrite(&this_file_stat, sizeof(this_file_stat), 1, tmpfptr);
+		fwrite(&this_cloud_data, sizeof(this_cloud_data), 1, tmpfptr);
+		break;
+	default:
+		break;
+	}
+
+	fclose(tmpfptr);
+	return;
+}
+
+class check_meta_on_cloudTest : public ::testing::Test {
+protected:
+	char meta_path[100] = {0};
+	char d_type;
+	BOOL meta_on_cloud;
+	int64_t metasize, metalocalsize, meta_file_size;
+	int32_t ret;
+	ino_t this_inode = 999;
+
+	void SetUp() {
+		CURRENT_BACKEND = SWIFT;
+		meta_file_size = 0;
+	}
+
+	void TearDown() {
+		unlink(meta_path);
+		memset(meta_path, 0, sizeof(meta_path));
+	}
+};
+
+TEST_F(check_meta_on_cloudTest, MetaFileNotExisted)
+{
+	ret = check_meta_on_cloud(999, D_ISDIR, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, -ENOENT);
+}
+
+TEST_F(check_meta_on_cloudTest, InvalidDType)
+{
+	d_type = 6; /* invalid type */
+
+	fetch_meta_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 0);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, -EPERM);
+}
+
+TEST_F(check_meta_on_cloudTest, BackendIsNone)
+{
+	CURRENT_BACKEND = NONE;
+	d_type = D_ISDIR;
+
+	fetch_meta_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 0);
+
+	meta_file_size = sizeof(HCFS_STAT) +
+		sizeof(DIR_META_TYPE) + sizeof(CLOUD_RELATED_DATA);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(meta_on_cloud, FALSE);
+	EXPECT_EQ(metasize, meta_file_size);
+	EXPECT_EQ(metalocalsize, round_size(meta_file_size));
+}
+
+TEST_F(check_meta_on_cloudTest, ProgressFileExisted)
+{
+	char progressf_path[100] = "testpatterns/mock_progress_file";
+
+	d_type = D_ISDIR;
+
+	fetch_meta_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 0);
+
+	/* Generate mock progress file */
+	FILE *progressfptr = fopen(progressf_path, "w");
+	fclose(progressfptr);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(meta_on_cloud, TRUE);
+
+	unlink(progressf_path);
+}
+
+TEST_F(check_meta_on_cloudTest, DTypeIsDirMetaNotOnCloud)
+{
+	d_type = D_ISDIR;
+
+	fetch_meta_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 0);
+
+	meta_file_size = sizeof(HCFS_STAT) +
+		sizeof(DIR_META_TYPE) + sizeof(CLOUD_RELATED_DATA);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(meta_on_cloud, FALSE);
+	EXPECT_EQ(metasize, meta_file_size);
+	EXPECT_EQ(metalocalsize, round_size(meta_file_size));
+}
+
+TEST_F(check_meta_on_cloudTest, DTypeIsDirMetaOnCloud)
+{
+	d_type = D_ISDIR;
+
+	fetch_meta_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 1);
+
+	meta_file_size = sizeof(HCFS_STAT) +
+		sizeof(DIR_META_TYPE) + sizeof(CLOUD_RELATED_DATA);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(meta_on_cloud, TRUE);
+	EXPECT_EQ(metasize, meta_file_size);
+	EXPECT_EQ(metalocalsize, round_size(meta_file_size));
+}
+
+TEST_F(check_meta_on_cloudTest, DTypeIsLinkMetaOnCloud)
+{
+	d_type = D_ISLNK;
+
+	fetch_meta_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 1);
+
+	meta_file_size = sizeof(HCFS_STAT) +
+		sizeof(SYMLINK_META_TYPE) + sizeof(CLOUD_RELATED_DATA);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(meta_on_cloud, TRUE);
+	EXPECT_EQ(metasize, meta_file_size);
+	EXPECT_EQ(metalocalsize, round_size(meta_file_size));
+}
+
+TEST_F(check_meta_on_cloudTest, DTypeIsRegMetaOnCloud)
+{
+	d_type = D_ISREG;
+
+	fetch_todelete_path(meta_path, this_inode);
+	_gen_meta_file(meta_path, d_type, 1);
+
+	meta_file_size = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+		sizeof(FILE_STATS_TYPE) + sizeof(CLOUD_RELATED_DATA);
+
+	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
+			&metasize, &metalocalsize);
+	EXPECT_EQ(ret, 0);
+	EXPECT_EQ(meta_on_cloud, TRUE);
+	EXPECT_EQ(metasize, meta_file_size);
+	EXPECT_EQ(metalocalsize, round_size(meta_file_size));
+}
+/*
+ * End of unittest of check_meta_on_cloud()
+ */

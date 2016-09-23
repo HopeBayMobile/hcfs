@@ -1855,6 +1855,32 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 	return 0;
 }
 
+/* FIXME: we should introduce structure specific destructor(s) to deallocate
+ * the following members.
+ */
+#define FREE_SYSTEM_CONFIG_MEMBER(name) \
+	free(name->max_cache_limit); \
+	free(name->max_pinned_limit); \
+	free(name->log_path); \
+	free(name->metapath); \
+	free(name->blockpath); \
+	free(name->swift_account); \
+	free(name->swift_user); \
+	free(name->swift_pass); \
+	free(name->swift_url); \
+	free(name->swift_container); \
+	free(name->swift_protocol); \
+	free(name->s3_access); \
+	free(name->s3_secret); \
+	free(name->s3_url); \
+	free(name->s3_bucket); \
+	free(name->s3_protocol); \
+	free(name->s3_bucket_url); \
+	free(name->superblock_name); \
+	free(name->unclaimed_name); \
+	free(name->hcfssystem_name); \
+	free(name->hcfspausesync_name);
+
 /**
  * reload_system_config
  *
@@ -1886,8 +1912,7 @@ int32_t reload_system_config(const char *config_path)
 	/* Compare old config and new config*/
 	ret = _check_config(new_config);
 	if (ret < 0) {
-		free(new_config->max_cache_limit);
-		free(new_config->max_pinned_limit);
+		FREE_SYSTEM_CONFIG_MEMBER(new_config)
 		free(new_config);
 		return ret;
 	}
@@ -1900,8 +1925,7 @@ int32_t reload_system_config(const char *config_path)
 
 	temp_config = system_config;
 	system_config = new_config;
-	free(temp_config->max_cache_limit);
-	free(temp_config->max_pinned_limit);
+	FREE_SYSTEM_CONFIG_MEMBER(temp_config)
 	free(temp_config);
 
 	/* Init backend related threads */

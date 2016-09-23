@@ -89,11 +89,14 @@ int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *)malloc(sizeof(SUPER_BLOCK_ENTRY));
 
-	memcpy(&(inode_ptr->inode_stat), generate_mock_stat(this_inode), sizeof(HCFS_STAT));
+	HCFS_STAT *mock_ptr = generate_mock_stat(this_inode);
+	memcpy(&(inode_ptr->inode_stat), mock_ptr, sizeof(HCFS_STAT));
+	free(mock_ptr);
+
 	return 0;
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	return 0;
 }

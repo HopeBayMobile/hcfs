@@ -13,6 +13,7 @@
 #ifndef GW20_HCFSAPI_GLOBAL_H_
 #define GW20_HCFSAPI_GLOBAL_H_
 
+#define BOOL uint8_t
 #define TRUE 1
 #define FALSE 0
 
@@ -73,5 +74,6 @@
 #define GETSTAT 50
 #define SYSREBOOT 51
 #define QUERYPKGUID 52
+#define COLLECTSYSLOGS 53
 
 #endif  /* GW20_HCFSAPI_GLOBAL_H_ */

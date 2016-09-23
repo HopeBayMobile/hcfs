@@ -16,9 +16,6 @@ CI_VERBOSE=false source $repo/utils/common_header.bash
 cd $repo
 
 configfile="$repo/utils/env_config.sh"
-if [[ -f /.dockerinit && "$USER" = jenkins ]]; then
-	sudo chown -R jenkins:jenkins $repo/utils
-fi
 touch "$configfile"
 
 # A POSIX variable
@@ -56,8 +53,8 @@ else
 	set -x;
 fi
 
-function ci
-{
+static_report() {
+	export post_pkg_install+=" post_static_report"
 	packages+=" cmake git build-essential" # Required by oclint / bear
 	packages+=" wget unzip"                # Required by PMD for CPD(duplicate code)
 	if lsb_release -r | grep -q 16.04; then
@@ -67,28 +64,75 @@ function ci
 	fi
 	packages+=" cloc"                      # Install cloc for check code of line
 	packages+=" mono-complete"             # Required mono and CCM for complexity
-	packages+=" clang-3.5"                 # clang Scan Build Reports
 	packages+=" colormake"                 # colorful logs
 	packages+=" parallel"                  # parallel check source code style
+	local CLANG_V=4.0
+	packages+=" clang-${CLANG_V} clang-format-${CLANG_V}"
+
+	# Add repo for Clang Scan Build
+	if ! dpkg -s clang-${CLANG_V} >/dev/null 2>&1; then
+		source /etc/lsb-release
+		DIST=$DISTRIB_CODENAME
+		cat <<-EOF |
+		deb http://apt.llvm.org/${DIST}/ llvm-toolchain-${DIST} main
+		deb-src http://apt.llvm.org/${DIST}/ llvm-toolchain-${DIST} main
+		EOF
+		sudo tee /etc/apt/sources.list.d/llvm.list
+		curl http://apt.llvm.org/llvm-snapshot.gpg.key |\
+			sudo apt-key add -
+	fi
+}
+post_static_report() {
+
+	# Patch clang-format
+	clang_format_py=/usr/share/vim/addons/syntax/clang-format-4.0.py
+	if [ -f $clang_format_py ] && \
+		! grep -q sys.setdefaultencoding $clang_format_py;
+	then
+		(cd / && sudo patch -N -p0 < $here/clang-format.patch)
+	fi
+
+	# Setup ci-tools
+	sudo mkdir -p /ci-tools
+	sudo chmod 777 /ci-tools
+	pushd /ci-tools
+
+	#### Oclint
+	if ! hash bear; then
+		git clone --depth 1 https://github.com/rizsotto/Bear.git || :
+		pushd Bear
+		rm -f CMakeCache.txt
+		cmake .
+		make all
+		sudo make install
+		popd
+	fi
+	if [ ! -f oclint-0.10.3/bin/oclint ]; then
+		URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/oclint-0.10.3-x86_64-linux-3.13.0-74-generic.tar.gz
+		wget $URL && tar -zxf ${URL##*/} && rm -f ${URL##*/}
+	fi
+
+	#### Install PMD for CPD(duplicate code)
+	if [ ! -d pmd-bin-5.5.1 ]; then
+		URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/pmd-bin-5.5.1.zip
+		wget $URL && unzip ${URL##*/} && rm -f ${URL##*/}
+	fi
+
+	#### Install mono and CCM for complexity
+	if [ ! -f CCM.exe ]; then
+		URL=ftp://172.16.10.200/ubuntu/CloudDataSolution/HCFS_android/resources/ccm.1.1.11.zip
+		wget $URL && unzip ${URL##*/} && rm -f ${URL##*/}
+	fi
+
+	popd
 }
 
-function unit_test
-{
+unit_test() {
 	packages+=" gcovr"
 	packages+=" valgrind"
 }
 
-function post_install_pip_packages
-{
-	file=`\ls $here/requirements.txt \
-		$repo/tests/functional_test/requirements.txt \
-		2>/dev/null ||:`
-
-	sudo -H pip install -q -r $file
-}
-
-function functional_test
-{
+functional_test() {
 	$here/nopasswd_sudoer.bash
 	packages+=" python-pip python-dev python-swiftclient"
 	export post_pkg_install+=" post_install_pip_packages"
@@ -99,25 +143,49 @@ function functional_test
 	if sudo grep "#user_allow_other" /etc/fuse.conf; then
 		sudo sed -ir -e "s/#user_allow_other/user_allow_other/" /etc/fuse.conf
 	fi
-	if [[ -n "$USER" && "$USER" != root && `groups $USER` != *fuse* ]]; then
-		sudo addgroup "$USER" fuse
+	if ! grep -q "^fuse:" /etc/group; then
+		sudo addgroup fuse
 	fi
-	if [[ `groups jenkins` != *fuse* ]]; then
-		sudo addgroup jenkins fuse || :
+	U=${SUDO_USER:-$USER}
+	if [[ -n "$U" && "$U" != root && `groups $U` != *fuse* ]]; then
+		sudo adduser $U fuse
+	fi
+}
+post_install_pip_packages() {
+	file=`\ls $here/requirements.txt \
+		$repo/tests/functional_test/requirements.txt \
+		2>/dev/null ||:`
+
+	sudo -H pip install -q -r $file
+}
+
+install_ccache() {
+	local VER=`ccache -V 2>&1 | sed -r -n -e "s/.* ([0-9.]+)$/\1/p"`
+	if ! expr $VER \>= 3.2 2>/dev/null; then
+		force_install="$force_install ccache"
+	fi
+	local APT_VER=`apt-cache policy ccache 2>&1 | \
+		sed -r -n -e "/Candidate/s/.* ([0-9.]+).*/\1/p"`
+	if [ "$DISTRIB_RELEASE" = "14.04" ] && \
+		! expr $APT_VER \>= 3.2 2>/dev/null; then
+		source /etc/lsb-release
+		echo "deb http://ppa.launchpad.net/comet-jc/ppa/ubuntu $DISTRIB_CODENAME main" \
+			| sudo tee /etc/apt/sources.list.d/comet-jc-ppa-trusty.list
+		sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 32EF5841642ADD17
 	fi
 }
 
-function post_install_docker
-{
+docker_host() {
+	packages+=" wget"
+	export post_pkg_install+=" post_install_docker"
+}
+post_install_docker() {
 	# skip is docker version is qualified
 	if hash docker && \
-		docker_ver=$(docker version | grep ersion | grep -v API | head -1 | sed s/[^.0-9]//g) && \
-		dpkg --compare-versions $docker_ver ge 1.11.2; then
+		expr `docker version | sed -n -r -e "/Client/{N;s/[^0-9]*(.*)/\1/p}"` \>= 1.11.2 >&/dev/null; then
 		return
 	fi
 
-	echo "Install Docker"
-	install_pkg
 	sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 	wget -qO- https://get.docker.com/ > /tmp/install_docker
 	sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
@@ -130,21 +198,37 @@ function post_install_docker
 			| sudo tee -a /etc/default/docker
 		sudo service docker restart ||:
 	fi
+
+	U=${SUDO_USER:-$USER}
+	if [[ -n "$U" && "$U" != root && `groups $U` != *docker* ]]; then
+		sudo adduser $U docker
+		echo To run docker with user, please re-login session
+	fi
 }
 
-function docker_host
-{
-	packages+=" wget"
-	export post_pkg_install+=" post_install_docker"
+pyhcfs() {
+	packages+=" python3-pip"
+	export post_pkg_install+=" post_pyhcfs"
+}
+post_pyhcfs() {
+	sudo -H pip3 install --upgrade pip
+	sudo -H pip3 install cffi pytest py
 }
 
+buildbox() {
+	packages+=" rpcbind nfs-common"
+	packages+=" zip"
+}
+
+# init for each mode
+packages=""
 for i in $(echo $setup_dev_env_mode | sed "s/,/ /g")
 do
-	echo "[[[$i]]]"
+	echo "Setup for $i mode"
 	$i
-	source $here/require_compile_deps.bash
-	install_pkg
 done
+source $here/require_compile_deps.bash
+install_pkg
 
 # cleanup config file
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > /tmp/awk_tmp
