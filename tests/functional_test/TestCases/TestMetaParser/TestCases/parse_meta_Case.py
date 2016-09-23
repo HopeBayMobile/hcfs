@@ -1,22 +1,15 @@
 import os
+import ast
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import *
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
 from Utils.FuncSpec import FuncSpec
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
-################## test config ##################
-# TODO empty meta file content
-# TODO random meta file content
+from Utils.tedUtils import list_abspathes_filter_name, not_startswith, file_name
+from constant import Path
 
 
-class NormalMetaPathCase(Case):
+class NormalCase(Case):
     """
     test_hcfs_parse_meta_NormalMetaPath:
           1.Call API with normal meta file path
@@ -26,22 +19,21 @@ class NormalMetaPathCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "meta_parser")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup parse_meta spec")
         self.set_spec()
-        instances = self.parse_meta_spec.gen_zero_instance_by_output_spec()
+        instances = self.func_spec_verifier.gen_zero_instance_by_output_spec()
         self.ERR_RESULT = instances[0]
         self.ERR_RESULT["result"] = -1
 
     def test(self):
-        for expected_stat, meta_path in self.get_stat_and_meta_path_pairs():
-            result = parse_meta(meta_path)
+        for expected_stat, path in self.get_stat_and_meta_path_pairs():
+            result = pyhcfs.parse_meta(path)
             # RD said there aren't some fields stored in the meta file
             self.ignore_fields(expected_stat, result)
-            isPass, msg = self.parse_meta_spec.check_onNormal(
-                [meta_path], [result])
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result != expected_stat:
@@ -74,24 +66,23 @@ class NormalMetaPathCase(Case):
                          "mtime": int, "mtime_nsec": int, "nlink": int,
                          "rdev": int, "size": int, "uid": int}
         output_spec_str["stat"] = stat_spec_str
-        self.parse_meta_spec = FuncSpec([str], [output_spec_str])
+        self.func_spec_verifier = FuncSpec([str], [output_spec_str])
 
     def get_stat_and_meta_path_pairs(self):
-        # test_data
-        #  |  12/meta_12   (meta)
-        #  |  12/12             (stat)
-        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in dir_names if x.isdigit()):
-                stat = self.get_stat(os.path.join(dir_path, name, name))
-                meta_path = os.path.join(dir_path, name, "meta_" + name)
-                yield (stat, os.path.abspath(meta_path))
+        for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit):
+            ino = file_name(path)
+            stat = self.get_stat(path, ino)
+            meta_path = os.path.join(path, "meta_" + ino)
+            yield (stat, meta_path)
 
-    def get_stat(self, path):
-        with open(path, "rt") as fin:
+    def get_stat(self, path, ino):
+        stat_path = os.path.join(path, ino)
+        with open(stat_path, "rt") as fin:
             return ast.literal_eval(fin.read())
 
     def ignore_fields(self, expected, result):
         # HCFS additional fields
+        # 'magic' used as meta version check
         expected["stat"]["magic"] = result["stat"]["magic"]
         expected["stat"]["metaver"] = result["stat"]["metaver"]
         # change when access, disabled it
@@ -112,44 +103,45 @@ class NormalMetaPathCase(Case):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NonexistMetaPathCase(NormalMetaPathCase):
+class RandomFileContentCase(NormalCase):
     """
-    test_hcfs_parse_meta_NonexistMetaPath:
-          1.Call API with non-existed meta file path
+    test_hcfs_parse_meta_random_content_file:
+          1.Call API with random content file path(fsmgr, FSstat, data block, empty, random content)
+          2.(Expected) Result matched with API input and normal output spec
+          3.(Expected) Result code must be less than 0
+    """
+
+    def test(self):
+        for path in list_abspathes_filter_name(Path.TEST_RANDOM_DIR, not_startswith("meta")):
+            result = pyhcfs.parse_meta(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
+            if not isPass:
+                return False, msg
+            if result["result"] >= 0:
+                return False, "Result code must be less than 0:" + repr(result)
+        return True, ""
+
+
+# inheritance NormalMetaPathCase(setUp, tearDown)
+class NonexistedAndEmptyPathCase(NormalCase):
+    """
+    test_hcfs_parse_meta_NonexistedAndEmptyPath:
+          1.Call API with non-existed and empty file path
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result must be the same as definition error return
     """
 
     def test(self):
-        nonexisted_path = ["/no", "/such/", "/no/such/meta", "/and/directory"]
+        nonexisted_path = ["/no/such/", "/no/such/meta", "/and/directory", ""]
         for path in nonexisted_path:
-            result = parse_meta(path)
-            isPass, msg = self.parse_meta_spec.check_onNormal([path], [result])
+            result = pyhcfs.parse_meta(path)
+            isPass, msg = self.func_spec_verifier.check_onNormal([path], [
+                                                                 result])
             if not isPass:
                 return False, msg
             if "error_msg" in result:
                 self.ERR_RESULT["error_msg"] = result["error_msg"]
             if result != self.ERR_RESULT:
                 return False, "Result doesn't match with expected err" + repr((result, self.ERR_RESULT))
-        return True, ""
-
-
-# inheritance NormalMetaPathCase(setUp, tearDown)
-class EmptyMetaPathCase(NormalMetaPathCase):
-    """
-    test_hcfs_parse_meta_EmptypathMetapath:
-        1.Call API with empty meta file path
-        2.(Expected) Result matched with API input and normal output spec
-        3.(Expected) Result must be the same as definition error return
-    """
-
-    def test(self):
-        result = parse_meta("")
-        isPass, msg = self.parse_meta_spec.check_onNormal([""], [result])
-        if not isPass:
-            return False, msg
-        if "error_msg" in result:
-            self.ERR_RESULT["error_msg"] = result["error_msg"]
-        if result != self.ERR_RESULT:
-            return False, "Result doesn't match with expected err" + repr((result, self.ERR_RESULT))
         return True, ""

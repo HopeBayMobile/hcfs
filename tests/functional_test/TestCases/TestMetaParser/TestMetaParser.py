@@ -35,51 +35,87 @@ class TestMetaParser_99(object):
         return True, "Do nothing"
 
 
-class TestMetaParser_117001(list_external_volume_Case.NormalFsmgrCase):
+class TestMetaParser_117001(list_external_volume_Case.NormalCase):
     pass
 
 
-class TestMetaParser_117002(list_external_volume_Case.NonexistFsmgrPathCase):
+class TestMetaParser_117002(list_external_volume_Case.RandomFileContentCase):
     pass
 
 
-class TestMetaParser_117003(list_external_volume_Case.EmptyFsmgrPathCase):
+class TestMetaParser_117003(list_external_volume_Case.NonexistedAndEmptyPathCase):
     pass
 
 
-class TestMetaParser_117004(parse_meta_Case.NormalMetaPathCase):
+class TestMetaParser_117004(parse_meta_Case.NormalCase):
     pass
 
 
-class TestMetaParser_117005(parse_meta_Case.NonexistMetaPathCase):
+class TestMetaParser_117005(parse_meta_Case.RandomFileContentCase):
     pass
 
 
-class TestMetaParser_117006(parse_meta_Case.EmptyMetaPathCase):
+class TestMetaParser_117006(parse_meta_Case.NonexistedAndEmptyPathCase):
     pass
 
 
-class TestMetaParser_117007(list_dir_inorder_Case.NormalMetaPathCase):
+class TestMetaParser_117007(list_dir_inorder_Case.NormalCase):
     pass
 
 
-class TestMetaParser_117008(list_dir_inorder_Case.NormalMetaPathLimitInvalidOffsetCase):
+class TestMetaParser_117008(list_dir_inorder_Case.RandomFileContentCase):
     pass
 
 
-class TestMetaParser_117009(list_dir_inorder_Case.NormalMetaPathOffsetInvalidLimitCase):
+class TestMetaParser_117009(list_dir_inorder_Case.NormalMetaPathLimitInvalidOffsetCase):
     pass
 
 
-class TestMetaParser_117010(list_dir_inorder_Case.NormalMetaPathInvalidOffsetLimitCase):
+class TestMetaParser_117010(list_dir_inorder_Case.NormalMetaPathOffsetInvalidLimitCase):
     pass
 
 
-class TestMetaParser_117011(list_dir_inorder_Case.NonexistMetaPathCase):
+class TestMetaParser_117011(list_dir_inorder_Case.NormalMetaPathInvalidOffsetLimitCase):
     pass
 
 
-class TestMetaParser_117012(list_dir_inorder_Case.EmptyMetaPathCase):
+class TestMetaParser_117012(list_dir_inorder_Case.NonexistedAndEmptyPathCase):
+    pass
+
+
+class TestMetaParser_117013(get_vol_usage_Case.NormalCase):
+    pass
+
+
+class TestMetaParser_117014(get_vol_usage_Case.RandomFileContentCase):
+    pass
+
+
+class TestMetaParser_117015(get_vol_usage_Case.NonExistedAndEmptyPathCase):
+    pass
+
+
+class TestMetaParser_117016(list_file_blocks_Case.NormalCase):
+    pass
+
+
+class TestMetaParser_117017(list_file_blocks_Case.RandomFileContentCase):
+    pass
+
+
+class TestMetaParser_117018(list_file_blocks_Case.NonExistedAndEmptyPathCase):
+    pass
+
+
+class TestMetaParser_117019(behaviorCase.ExternalVolHasFSstatCase):
+    pass
+
+
+class TestMetaParser_117020(behaviorCase.NonexistMetaPathCase):
+    pass
+
+
+class TestMetaParser_117021(behaviorCase.test_hcfs_behavior_FSstat_exists):
     pass
 
 if __name__ == '__main__':

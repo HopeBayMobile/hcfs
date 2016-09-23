@@ -12,7 +12,8 @@ class Docker(object):
 
     # volume:[(str,str,str) ...] =>(host src), dest, (options)
     def __init__(self, name, image, cmd, args):
-        assert os.path.exists("/var/run/docker.sock"), "Need installed docker."
+        if not os.path.exists("/var/run/docker.sock"):
+            raise EnvironmentError("Need installed docker.")
         self.name = name
         self.volume = [("/etc/localtime", "/etc/localtime", "ro")]
         self.image = image
@@ -25,13 +26,17 @@ class Docker(object):
     def add_volume(self, vol):
         self.logger.info("Add volume")
         self.logger.debug("add_volume" + repr((vol)))
-        assert isinstance(vol, tuple), "Input need 'tuple'"
-        assert len(vol) == 3, "Input need '3 element' tuple"
-        assert vol[1], "second ele (destnation source) shouldn't be empty"
+        if not isinstance(vol, tuple):
+            raise TypeError("Input need 'tuple")
+        if len(vol) != 3:
+            raise ValueError("Input need '3 element' tuple")
+        if not vol[1]:
+            raise ValueError(
+                "second element (destnation source) shouldn't be empty")
         self.volume.extend([vol])
 
     def get_run_cmd(self):
-        cmd = ["docker run --rm --privileged"]
+        cmd = ["docker run --rm "]
         cmd.extend(["-t" if self.tty else ""])
         cmd.extend(["--name=" + self.name])
         for (hsrc, dsrc, opt) in self.volume:

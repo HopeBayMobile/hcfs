@@ -2,7 +2,8 @@ import config
 
 
 def tuple_yield(values, specs):
-    assert len(values) == len(specs), "Values length doesn't match specs"
+    if len(values) != len(specs):
+        raise ValueError("Values length doesn't match specs.")
     for i, spec in enumerate(specs):
         yield values[i], spec  # yield for out function (match)  as args
 
@@ -17,7 +18,8 @@ def list_yield(values, specs):
 
 def dict_yield(value, spec):
     for key, value_spec in spec.items():
-        assert key in value, "Value doesn't contain spec defined key "
+        if key not in value:
+            raise ValueError("Value doesn't contain spec defined key ")
         yield value[key], value_spec  # yield for out function (match)  as args
 
 
@@ -36,9 +38,8 @@ class FuncSpec(object):
         self.logger = config.get_logger().getChild(__name__)
         self.logger.debug(
             "__init__" + repr((in_spec_str, out_spec_str, err_spec_str)))
-        assert isinstance(in_spec_str, list), "Spec string should be list"
-        assert isinstance(out_spec_str, list), "Spec string should be list"
-        assert isinstance(err_spec_str, list), "Spec string should be list"
+        if not isinstance(in_spec_str, list) or not isinstance(in_spec_str, list) or not isinstance(in_spec_str, list):
+            raise TypeError("Spec string should be list")
         self.input_specs = in_spec_str
         self.output_specs = out_spec_str
         self.err_specs = err_spec_str
@@ -52,9 +53,9 @@ class FuncSpec(object):
             self.match_all(inputs, self.input_specs)
             self.match_all(outputs, self.output_specs)
             return True, ""
-        except AssertionError as ae:
-            ae.args += (inputs, outputs)
-            return False, ae.args
+        except (ValueError, TypeError) as err:
+            err.args += (inputs, outputs)
+            return False, err.args
 
     def check_onErr(self, inputs, outputs):
         try:
@@ -62,25 +63,30 @@ class FuncSpec(object):
             self.match_all(inputs, self.input_specs)
             self.match_all(outputs, self.err_specs)
             return True, ""
-        except AssertionError as ae:
-            ae.args += (inputs, outputs)
-            return False, ae.args
+        except (ValueError, TypeError) as err:
+            err.args += (inputs, outputs)
+            return False, err.args
 
     def gen_zero_instance_by_output_spec(self):
         return self.gen_by_spec(list, self.output_specs)
 
     def match_all(self, values, specs):
         self.logger.debug("match_all" + repr((values, specs)))
-        assert isinstance(values, list), "Need to put values to list"
-        assert len(values) == len(specs), "Values length doesn't match specs"
+        if not isinstance(values, list):
+            raise TypeError("Need to put values to list")
+        if len(values) != len(specs):
+            raise ValueError("Values length doesn't match specs.")
         for i, spec in enumerate(specs):
             self.match(values[i], spec)
 
     def match(self, value, spec):
         self.logger.debug("check_spec" + repr((value, spec)))
         def_type = get_spec_type(spec)
-        assert isinstance(value, def_type), "Value doesn't match with spec"
-        assert def_type in self.type_handler_pair, "Unknown type in defined spec"
+        if not isinstance(value, def_type):
+            raise TypeError(
+                "Value(" + str(value) + ") doesn't match with spec(" + str(def_type) + ")")
+        if def_type not in self.type_handler_pair:
+            raise TypeError("Unknown type in defined spec")
         detail_yield = self.type_handler_pair[def_type]
         if detail_yield:
             for sub_val, sub_spec in detail_yield(value, spec):

@@ -1,23 +1,15 @@
-import logging
 import os
+import logging
+import ConfigParser
 
 
 class Config(object):
 
     def __init__(self):
-        self.init_from_config_file()
-
-    def init_from_config_file(self):
+        config = ConfigParser.ConfigParser()
         this_dir = os.path.abspath(os.path.dirname(__file__))
-        with open(this_dir + "/config.ini", "rt") as fin:
-            for line in fin:
-                line = line.strip()
-                if line.startswith("#"):
-                    continue
-                key = line.split("=")[0]
-                value = line.split("=")[1]
-                if key == "log_level":
-                    self.log_level = int(value)
+        config.read(os.path.join(this_dir, "config.ini"))
+        self.log_level = int(config.get("Global", "log_level"))
 
 
 def get_logger():
@@ -25,3 +17,6 @@ def get_logger():
     logger = logging.getLogger()
     logger.setLevel(Config().log_level)
     return logger
+
+if __name__ == '__main__':
+    print Config().log_level

@@ -1,36 +1,26 @@
 import os
+import ast
 from itertools import product
 
 from Case import Case
-import config
-from Utils.metaParserAdapter import *
+from .. import config
+from Utils.metaParserAdapter import PyhcfsAdapter as pyhcfs
 from Utils.FuncSpec import FuncSpec
-from Utils.log import LogFile
-
-# Test config, do not change these value during program.
-# These vars are final in term of Java.
-THIS_DIR = os.path.abspath(os.path.dirname(__file__))
-TEST_DATA_DIR = os.path.join(THIS_DIR, "test_data_v2")
-REPORT_DIR = os.path.join(THIS_DIR, "..", "report")
+from Utils.tedUtils import list_abspathes_filter_name, not_startswith, file_name
+from constant import FileType, Path
 
 # (0,0)
 # TODO find valid offset
 VALID_OFFSET = [(0, 0)]
-INVALID_OFFSET = [(0, -1), (0, -101), (-1, 0), (1, -1),
-                  (23, -1), (-1, 101), (-23, -101)]
-# TODO: rand number
-# TODO: 0 case
+INVALID_OFFSET = [(0, -1), (-1, 0), (-23, -101)]
 # 1~1000
 VALID_LIMIT = [1, 10, 100, 1000]
 INVALID_LIMIT = [0, -1, -10, 1001, 1100]
 ################## test config ##################
-# TODO valid file meta path should be failed
-# TODO empty meta file content
-# TODO random meta file content
 # TODO child list element attribute d_type???
 
 
-class NormalMetaPathCase(Case):
+class NormalCase(Case):
     """
     test_hcfs_list_dir_inorder_NormalMetaPath:
           1.Call API with normal meta file path, valid offset and valid limit
@@ -42,7 +32,6 @@ class NormalMetaPathCase(Case):
 
     def setUp(self):
         self.logger = config.get_logger().getChild(self.__class__.__name__)
-        self.log_file = LogFile(REPORT_DIR, "list_dir_inorder")
         self.logger.info(self.__class__.__name__)
         self.logger.info("Setup")
         self.logger.info("Setup list_dir_inorder spec")
@@ -52,16 +41,15 @@ class NormalMetaPathCase(Case):
         output_spec_str = {"result": int, "offset": (int, int),
                            "child_list": [{"d_name": str, "inode": int, "d_type": int}],
                            "num_child_walked": int}
-        self.list_dir_inorder_spec = FuncSpec(
+        self.func_spec_verifier = FuncSpec(
             [str, (int, int), int], [output_spec_str])
 
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, VALID_OFFSET, VALID_LIMIT):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] < (0, 0):
@@ -79,36 +67,72 @@ class NormalMetaPathCase(Case):
         self.logger.info("Do nothing")
 
     def get_dir_meta_pathes(self):
-        # test_data
-        #  |  12/meta_12   (meta)
-        #  |  12/12             (stat)
-        for dir_path, dir_names, _ in os.walk(TEST_DATA_DIR):
-            for name in (x for x in dir_names if x.isdigit()):
-                stat = self.get_stat(os.path.join(dir_path, name, name))
-                if stat["file_type"] == 0:
-                    yield os.path.abspath(os.path.join(dir_path, name, "meta_" + name))
+        for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit):
+            ino = file_name(path)
+            if self.get_file_type(path, ino) == FileType.DIR:
+                yield os.path.join(path, "meta_" + ino)
 
-    def get_stat(self, path):
-        with open(path, "rt") as fin:
-            return ast.literal_eval(fin.read())
+    def get_file_type(self, path, ino):
+        stat_path = os.path.join(path, ino)
+        with open(stat_path, "rt") as file:
+            stat = ast.literal_eval(file.read())
+            return stat["file_type"]
 
     def expect_children_in_name_order(self, child_list):
-        if len(child_list) == 0:
-            return True
-        self.isOrder = True
-        reduce(self.name_order_checker, child_list)
-        return self.isOrder
+        isOrder = True
 
-    def name_order_checker(self, pre_one, one):
-        if pre_one["d_name"] > one["d_name"]:
-            self.isOrder = False
-        return one
+        def name_order_checker(pre_one, one):
+            if pre_one["d_name"] > one["d_name"]:
+                isOrder = False
+            return one
+        reduce(name_order_checker, child_list)
+        return isOrder
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NormalMetaPathLimitInvalidOffsetCase(NormalMetaPathCase):
+class RandomFileContentCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NormalMetapathLimit_InvalidOffset:
+    test_hcfs_list_dir_inorder_random_content_file:
+          1.Call API with random content file path(fsmgr, FSstat, file meta, data block, empty, random content)
+          2.(Expected) Result matched with API input and normal output spec
+          3.(Expected) Result offset must be (0, 0)
+          4.(Expected) Result code must be less than 0
+          5.(Expected) Result child list must be empty
+    """
+
+    def test(self):
+        rand_test_data_pathes = self.get_random_test_data_pathes()
+        for args in product(rand_test_data_pathes, VALID_OFFSET, VALID_LIMIT):
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
+            if not isPass:
+                return False, msg
+            if result["offset"] != (0, 0):
+                return False, "Offset must be (0, 0)"
+            if result["result"] >= 0:
+                return False, "Result must be less than 0"
+            if result["num_child_walked"] != 0:
+                return False, "'num_child_walked' must be 0"
+            if len(result["child_list"]) != 0:
+                return False, "Result child list must be empty"
+        return True, ""
+
+    def get_random_test_data_pathes(self):
+        random_data_pathes = list_abspathes_filter_name(
+            Path.TEST_RANDOM_DIR, not_startswith("meta"))
+        return list(random_data_pathes) + self.get_file_meta_pathes()
+
+    def get_file_meta_pathes(self):
+        path_ino_pairs = [(path, path.split("/")[-1])
+                          for path in list_abspathes_filter_name(Path.TEST_DATA_DIR, str.isdigit)]
+        return [os.path.join(path, "meta_" + ino) for path, ino in path_ino_pairs if self.get_file_type(path, ino) == FileType.FILE]
+
+
+# inheritance NormalMetaPathCase(setUp, tearDown)
+class NormalMetaPathLimitInvalidOffsetCase(NormalCase):
+    """
+    test_hcfs_list_dir_inorder_NormalMetaPathLimit_InvalidOffset:
           1.Call API with normal meta file path, invalid offset and valid limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
@@ -119,10 +143,9 @@ class NormalMetaPathLimitInvalidOffsetCase(NormalMetaPathCase):
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, INVALID_OFFSET, VALID_LIMIT):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -137,9 +160,9 @@ class NormalMetaPathLimitInvalidOffsetCase(NormalMetaPathCase):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NormalMetaPathOffsetInvalidLimitCase(NormalMetaPathCase):
+class NormalMetaPathOffsetInvalidLimitCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NormalMetaPathOffset_InvalidLimit:
+    test_hcfs_list_dir_inorder_NormalMetaPathOffset_InvalidLimit:
           1.Call API with normal meta file path, valid offset and invalid limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
@@ -150,10 +173,9 @@ class NormalMetaPathOffsetInvalidLimitCase(NormalMetaPathCase):
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, VALID_OFFSET, INVALID_LIMIT):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -168,9 +190,9 @@ class NormalMetaPathOffsetInvalidLimitCase(NormalMetaPathCase):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NormalMetaPathInvalidOffsetLimitCase(NormalMetaPathCase):
+class NormalMetaPathInvalidOffsetLimitCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NormalMetaPath_InvalidOffsetLimit:
+    test_hcfs_list_dir_inorder_NormalMetaPath_InvalidOffsetLimit:
           1.Call API with normal meta file path, invalid offset and invalid limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
@@ -181,10 +203,9 @@ class NormalMetaPathInvalidOffsetLimitCase(NormalMetaPathCase):
     def test(self):
         normal_meta_path = self.get_dir_meta_pathes()
         for args in product(normal_meta_path, INVALID_OFFSET, INVALID_LIMIT):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -199,10 +220,10 @@ class NormalMetaPathInvalidOffsetLimitCase(NormalMetaPathCase):
 
 
 # inheritance NormalMetaPathCase(setUp, tearDown)
-class NonexistMetaPathCase(NormalMetaPathCase):
+class NonexistedAndEmptyPathCase(NormalCase):
     """
-    test_hcfs_query_dir_list_NonexistlMetaPath:
-          1.Call API with non-existed meta file path, any offset and any limit
+    test_hcfs_list_dir_inorder_NonexistedAndEmptyPath:
+          1.Call API with non-existed adn empty file path, any offset and any limit
           2.(Expected) Result matched with API input and normal output spec
           3.(Expected) Result offset must be (0, 0)
           4.(Expected) Result code must be less than 0
@@ -210,14 +231,13 @@ class NonexistMetaPathCase(NormalMetaPathCase):
     """
 
     def test(self):
-        normal_meta_path = ["/no", "/such", "/file/and/directory"]
+        normal_meta_path = ["/no", "/such", "/file/and/directory", ""]
         any_offset = VALID_OFFSET + INVALID_OFFSET
         any_limit = VALID_LIMIT + INVALID_LIMIT
         for args in product(normal_meta_path, any_offset, any_limit):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
+            result = pyhcfs.list_dir_inorder(*args)
+            isPass, msg = self.func_spec_verifier.check_onNormal(list(args), [
+                                                                 result])
             if not isPass:
                 return False, msg
             if result["offset"] != (0, 0):
@@ -226,36 +246,6 @@ class NonexistMetaPathCase(NormalMetaPathCase):
                 return False, "Result must be less than 0"
             if result["num_child_walked"] != 0:
                 return False, "'num_child_walked' must be 0"
-            if len(result["child_list"]) != 0:
-                return False, "Result child list must be empty"
-        return True, ""
-
-
-# inheritance NormalMetaPathCase(setUp, tearDown)
-class EmptyMetaPathCase(NormalMetaPathCase):
-    """
-    test_hcfs_query_dir_list_EmptyMetaPath:
-          1.Call API with empty meta file path, any offset and any limit
-          2.(Expected) Result matched with API input and normal output spec
-          3.(Expected) Result offset must be (0, 0)
-          4.(Expected) Result code must be less than 0
-          5.(Expected) Result child list must be empty
-    """
-
-    def test(self):
-        any_offset = VALID_OFFSET + INVALID_OFFSET
-        any_limit = VALID_LIMIT + INVALID_LIMIT
-        for args in product([""], any_offset, any_limit):
-            result = list_dir_inorder(*args)
-            self.log_file.recordFunc("list_dir_inorder", args, result)
-            isPass, msg = self.list_dir_inorder_spec.check_onNormal(list(args), [
-                result])
-            if not isPass:
-                return False, msg
-            if result["offset"] != (0, 0):
-                return False, "Offset must be (0, 0)"
-            if result["result"] >= 0:
-                return False, "Result must be less than 0"
             if len(result["child_list"]) != 0:
                 return False, "Result child list must be empty"
         return True, ""
