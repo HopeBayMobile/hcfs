@@ -1984,14 +1984,20 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 						_extract_pkg_name(nowpath +
 							strlen("/data/data/"),
 							pkg);
+					write_log(0, "Test: Pkg name %s", pkg);
 					uid = lookup_package_uid_list(pkg);
 					snprintf(tmppath, PATH_MAX,
 							"%s/%s", nowpath,
 							tmpptr->d_name);
 					ret = stat(tmppath, &tmpstat);
-					if (ret < 0) {
+					if (ret < 0 || uid < 0) {
+						write_log(0, "Error: Cannot use"
+							" %s meta. Uid %d",
+							tmppath, uid);
 						can_prune = TRUE;
 					} else {
+						write_log(0, "Test: Pkg name %s"
+							". Uid %d", pkg, uid);
 						ret = replace_missing_object(
 							tmpstat.st_ino,
 							tmpptr->d_ino,
