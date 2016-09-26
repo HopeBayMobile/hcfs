@@ -1577,11 +1577,11 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 	ret = 1;
 #endif
 
+#if (DEDUP_ENABLE)
 	if (ret == 0) {
 		/* Find a same object in cloud
 		 * Just increase the refcount of the origin block
 		 */
-#if (DEDUP_ENABLE)
 		write_log(10,
 			"Debug datasync: find same obj %s - Aborted to upload",
 			objname);
@@ -1597,9 +1597,10 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		}
 
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
-#endif
 
-	} else {
+	} else
+#endif
+	{
 		write_log(10, "Debug datasync: start to sync obj %s\n", objname);
 
 		uint8_t *data = NULL;

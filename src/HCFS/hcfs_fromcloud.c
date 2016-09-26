@@ -97,10 +97,11 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 	FTRUNCATE(fileno(fptr), 0);
 
 	char *get_fptr_data = NULL;
-	size_t len = 0;
+	size_t len;
 
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	FILE *get_fptr = tmpfile();
+	UNUSED(len);
 #else
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
 #endif
@@ -139,21 +140,22 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 #endif
 
 	fclose(get_fptr);
-	uint8_t *object_key = NULL;
 #if ENCRYPT_ENABLE
 	uint8_t *key = get_key("this is hopebay testing");
-	object_key = calloc(KEY_SIZE, sizeof(uint8_t));
+	uint8_t *object_key = calloc(KEY_SIZE, sizeof(uint8_t));
 	decrypt_session_key(object_key, object_meta->enc_session_key, key);
 	OPENSSL_free(key);
-#endif
 
 	decode_to_fd(fptr, object_key, (uint8_t *)get_fptr_data, len,
 		     object_meta->enc_alg, object_meta->comp_alg);
+#endif
 
 	free_object_meta(object_meta);
 	free(get_fptr_data);
+#if ENCRYPT_ENABLE
 	if (object_key != NULL)
 		OPENSSL_free(object_key);
+#endif
 	fflush(fptr);
 
 	/* Finally free download sem */

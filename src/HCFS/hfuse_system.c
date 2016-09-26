@@ -235,10 +235,9 @@ errcode_handle:
 *************************************************************************/
 int32_t init_hfuse(void)
 {
-	int32_t ret_val = 0;
+	int32_t ret_val;
 
-	if (ret_val == 0)
-		ret_val = init_hcfs_system_data();
+	ret_val = init_hcfs_system_data();
 	if (ret_val == 0)
 		ret_val = super_block_init();
 	if (ret_val == 0)
