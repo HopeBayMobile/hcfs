@@ -1622,8 +1622,6 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	errcode = restore_borrowed_meta_structure(fptr);
 	if (errcode < 0)
 		goto errcode_handle;
-	fclose(fptr);
-	meta_open = FALSE;
 
 	/* Recursively copy dir */
 	list_counter = 0;
@@ -1793,32 +1791,6 @@ int32_t replace_missing(const char *nowpath, DIR_ENTRY *tmpptr)
 errcode_handle:
 	return errcode;
 }
-/*
-int32_t _replace_missing(const char *nowpath, DIR_ENTRY *tmpptr,
-		INODE_PAIR_LIST *hardln_mapping)
-{
-	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
-	ret = stat(tmppath, &tmpstat);
-	if (ret < 0)
-		return -ENOENT;
-
-	if (tmpptr->d_type != D_ISDIR) {
-		ret = _check_hardlink(tmpstat.st_ino, &target_inode,
-				&need_copy, hardln_mapping);
-		if (ret < 0)
-			return -ENOENT;
-		if (need_copy == TRUE)
-
-	}
-	ret = replace_missing_object(
-			tmpstat.st_ino,
-			tmpptr->d_ino,
-			tmpptr->d_type,
-			hardln_mapping);
-
-}
-*/
-
 
 void _extract_pkg_name(const char *srcpath, char *pkgname)
 {
@@ -1828,6 +1800,105 @@ void _extract_pkg_name(const char *srcpath, char *pkgname)
 		pkgname++;
 	}
 	*pkgname = '\0';
+}
+
+int32_t _replace_missing(const char *nowpath, DIR_ENTRY *tmpptr,
+		INODE_PAIR_LIST *hardln_mapping)
+{
+	char pkg[MAX_FILENAME_LEN + 1];
+	char tmppath[PATH_MAX];
+	int32_t uid, ret, errcode;
+	ino_t src_inode;
+	struct stat tmpstat;
+	FILE *fptr;
+	int64_t ret_size;
+
+	/* Skip to copy socket and fifo */
+	if (tmpptr->d_type == D_ISSOCK || tmpptr->d_type == D_ISFIFO)
+		return -ENOENT;
+
+	if (strlen(nowpath) == strlen("/data/data"))
+		strcpy(pkg, tmpptr->d_name);
+	else
+		_extract_pkg_name(nowpath + strlen("/data/data/"), pkg);
+	write_log(0, "Test: Pkg name %s", pkg);
+	uid = lookup_package_uid_list(pkg);
+
+	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
+	ret = stat(tmppath, &tmpstat);
+	if (ret < 0 || uid < 0) {
+		write_log(0, "Error: Cannot use %s meta. Uid %d",
+				tmppath, uid);
+		return -ENOENT;
+	}
+	src_inode = tmpstat.st_ino;
+
+	if (hardln_mapping == NULL)
+		return -ENOMEM;
+
+	/* Do not need to check hardlink for folder */
+	if (tmpptr->d_type == D_ISDIR) {
+		ret = replace_missing_object(src_inode, tmpptr->d_ino,
+				tmpptr->d_type, uid, hardln_mapping);
+		return ret;
+	}
+
+	/* Check link number for regfile and symlink */
+	if (tmpstat.st_nlink < 1) {
+		return -ENOENT;
+	} else if (tmpstat.st_nlink == 1) {
+		ret = replace_missing_object(src_inode, tmpptr->d_ino,
+				tmpptr->d_type, uid, hardln_mapping);
+		if (ret < 0)
+			return ret;
+	} else {
+		ino_t target_inode;
+		char targetpath[MAX_FILENAME_LEN];
+		HCFS_STAT hcfsstat;
+
+		write_log(4, "Warn: Detect missing hardlink %s", tmppath);
+		/* Find hardlink target inode */
+		ret = find_target_inode(hardln_mapping, src_inode,
+				&target_inode);
+		if (ret < 0) {
+			/* If not found, create the hardlink mapping */
+			ret = replace_missing_object(src_inode, tmpptr->d_ino,
+					tmpptr->d_type, uid, hardln_mapping);
+			if (ret < 0)
+				return ret;
+			insert_inode_pair(hardln_mapping,
+				src_inode, tmpptr->d_ino);
+		} else {
+			/* Otherwise, use the hardlink inode number and
+			 * increase nlink */
+			fetch_restore_meta_path(targetpath, target_inode);
+			fptr = fopen(targetpath, "r+");
+			if (!fptr) {
+				errcode = -errno;
+				write_log(0, "Error: Fail to open file in %s."
+					" Code %d", __func__, -errcode);
+				return errcode;
+			}
+			flock(fileno(fptr), LOCK_EX);
+			FSEEK(fptr, 0, SEEK_SET);
+			FREAD(&hcfsstat, sizeof(HCFS_STAT), 1, fptr);
+			hcfsstat.nlink += 1;
+			FSEEK(fptr, 0, SEEK_SET);
+			FWRITE(&hcfsstat, sizeof(HCFS_STAT), 1, fptr);
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			/* Remember to modify the inode number in
+			 * parent folder */
+			tmpptr->d_ino = target_inode;
+		}
+	}
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	return errcode;
 }
 
 static int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
