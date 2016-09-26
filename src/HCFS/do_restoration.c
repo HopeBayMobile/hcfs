@@ -2524,7 +2524,7 @@ int32_t read_system_max_inode(ino_t *ino_num)
 	int32_t errcode;
 	int64_t ret_ssize;
 
-	snprintf(despath, METAPATHLEN, "%s/system_max_inode", RESTORE_METAPATH);
+	snprintf(despath, METAPATHLEN, "%s/system_max_inode", METAPATH);
 	fptr = fopen(despath, "r");
 	if (fptr == NULL) {
 		write_log(0, "Error when parsing volumes to restore\n");
