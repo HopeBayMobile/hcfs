@@ -1686,6 +1686,8 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 					}
 				}
 			} else {
+				write_log(0, "Test: Replacing with %s is"
+					" successful", now_entry->d_name);
 				now_entry->d_ino = child_target_inode;
 			}
 		}
@@ -1921,6 +1923,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	PRUNE_T *prune_list = NULL;
 	int32_t prune_index = 0, max_prunes = 0;
 	struct stat tmpstat;
+	BOOL object_replace;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	fptr = fopen(fetchedmeta, "r");
@@ -1960,6 +1963,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 		write_log(10, "Filepos %lld, entries %d\n", filepos,
 			  tmppage.num_entries);
 		for (count = 0; count < tmppage.num_entries; count++) {
+			object_replace = FALSE;
 			tmpptr = &(tmppage.dir_entries[count]);
 
 			if (tmpptr->d_ino == 0)
@@ -2063,8 +2067,9 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					ret = stat(tmppath, &tmpstat);
 					if (ret < 0 || uid < 0) {
 						write_log(0, "Error: Cannot use"
-							" %s meta. Uid %d",
-							tmppath, uid);
+							" %s meta. Uid %d."
+							" errno %d", tmppath,
+							uid, errno);
 						can_prune = TRUE;
 					} else {
 						write_log(0, "Test: Pkg name %s"
@@ -2079,6 +2084,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					 * pruned */
 					if (ret < 0)
 						can_prune = TRUE;
+					else
+						object_replace = TRUE;
 				}
 				if (can_prune == TRUE) {
 					if (prune_index >= max_prunes)
@@ -2095,12 +2102,14 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					write_log(
 					    4, "%s gone from %s. Removing.\n",
 					    tmpptr->d_name, nowpath);
+					continue;
 				} else if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
 			}
 
+			/* If meta exist, fetch data or expand dir */
 			switch (tmpptr->d_type) {
 			case D_ISLNK:
 				/* Just fetch the meta */
@@ -2108,6 +2117,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			case D_ISREG:
 			case D_ISFIFO:
 			case D_ISSOCK:
+				/* Skip to fetch data from cloud if file is
+				 * replaced with local data */
+				if (object_replace == TRUE)
+					break;
 				/* Fetch all blocks if pinned */
 				can_prune = FALSE;
 				ret = _fetch_pinned(tmpino);
