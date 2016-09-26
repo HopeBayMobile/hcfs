@@ -1637,6 +1637,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 		for (idx = 0; idx < dir_page.num_entries; idx++) {
 			now_entry = &(dir_page.dir_entries[idx]);
+			if (strcmp(now_entry->d_name, ".") == 0 ||
+					strcmp(now_entry->d_name, "..") == 0)
+				continue;
 			child_src_inode = now_entry->d_ino;
 			now_type = now_entry->d_type;
 			if (now_type == D_ISREG || now_type == D_ISLNK) {
@@ -1658,14 +1661,18 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 						child_target_inode,
 						now_entry->d_type,
 						uid, hardln_mapping);
+					write_log(0, "Test: Replacing with %s"
+						, now_entry->d_name);
 				}
 
-			} else if (now_entry == D_ISDIR) {
+			} else if (now_type == D_ISDIR) {
 				child_target_inode = _stage1_get_new_inode();
 				/* Recursively replace all entries */
 				ret = replace_missing_object(child_src_inode,
 					child_target_inode, now_entry->d_type,
 					uid, hardln_mapping);
+				write_log(0, "Test: Replacing with %s"
+						, now_entry->d_name);
 
 			} else {
 				ret = -ENOENT;
