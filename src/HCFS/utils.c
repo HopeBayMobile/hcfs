@@ -2090,7 +2090,6 @@ int32_t get_quota_from_backup(int64_t *quota)
 	if (!json_result)
 		return -ENOENT;
 	
-	json_data = NULL;
 	json_data = json_loads(json_result, 0, &jerror);
 	if (!json_data) {
 		free(json_result);

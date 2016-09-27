@@ -656,7 +656,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 
 		/* Self data */
 		new_info->mp_mode = mp_mode;
-		new_info->f_mp = NULL;
 		new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 		if (new_info->f_mp == NULL) {
 			errcode = -ENOMEM;
@@ -707,7 +706,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 	strcpy((new_info->f_name), fsname);
-	new_info->f_mp = NULL;
 	new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 	if (new_info->f_mp == NULL) {
 		errcode = -ENOMEM;
@@ -739,7 +737,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	memset(new_info->FS_stat, 0, sizeof(FS_STAT_T));
 	
 	/* init sem of stat lock */
-	new_info->stat_lock = NULL;
 	new_info->stat_lock = malloc(sizeof(sem_t));
 	if (new_info->stat_lock == NULL) {
 		errcode = -ENOMEM;

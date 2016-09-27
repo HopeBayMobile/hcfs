@@ -1003,7 +1003,6 @@ void fetch_quota_from_cloud(void *ptr)
 
 	/* Parse json file */
 	FSEEK(fptr, 0, SEEK_SET);
-	json_data = NULL;
 	json_data = json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
 	if (!json_data) {
 		write_log(0, "Error: Fail to parse json file\n");
