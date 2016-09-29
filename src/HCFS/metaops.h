@@ -99,6 +99,6 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 
 int32_t restore_meta_file(ino_t this_inode);
 int32_t restore_meta_structure(FILE *fptr);
-int32_t restore_borrowed_meta_structure(FILE *fptr);
+int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid);
 
 #endif /* GW20_HCFS_METAOPS_H_ */

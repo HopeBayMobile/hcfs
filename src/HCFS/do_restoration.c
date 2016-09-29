@@ -1605,15 +1605,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
 		return 0;
 	} else if (type == D_ISLNK) {
-		errcode = restore_borrowed_meta_structure(fptr);
+		errcode = restore_borrowed_meta_structure(fptr, uid);
 		if (errcode < 0)
 			goto errcode_handle;
-		FSEEK(fptr, 0, SEEK_SET);
-		FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
-		tmpstat.uid = uid;
-		tmpstat.gid = uid;
-		FSEEK(fptr, 0, SEEK_SET);
-		FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
 		fclose(fptr);
 		meta_open = FALSE;
 		/* Mark this inode to to_sync */
@@ -1621,7 +1615,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		return 0;
 	}
 
-	errcode = restore_borrowed_meta_structure(fptr);
+	errcode = restore_borrowed_meta_structure(fptr, uid);
 	if (errcode < 0)
 		goto errcode_handle;
 
