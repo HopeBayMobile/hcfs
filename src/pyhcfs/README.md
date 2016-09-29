@@ -222,11 +222,6 @@ get_vol_usage(b"test_data/v1/android/FSstat")
 list_file_blocks
 ==============================
 * `ret['result'] = 0` on success, or a negative `ret['result']` is returned on error.
-
-* **Pitfall of list_file_blocks**
-    * Some file has sparse data block, the missing data block from list need to be supplied by MyTera. 
-    * e.g. In this demo, the block from 0 to 10239 are missing. While accessing those blocks, reader process should assume they are zero-filled blocks without reading actual block data.
-
 * Example of list_file_blocks (Success)
 
 ```
@@ -239,3 +234,7 @@ list_file_blocks(b"test_data/v1/android/meta_isreg")
   'result': 0,
   'ret_num': 4}
 ```
+
+## **Pitfall of list_file_blocks**
+1. In this example, the block from 0 to 10239 are missing. While accessing those missing blocks, reader should assume they are zero-filled blocks to avoid reading data file which are not existed.
+2. If the missing block is the last one in list, it is assumed to be a zero-filled block with size `file_size % 1048576`. File size can be read from `parse_meta` function.
