@@ -2905,7 +2905,8 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid)
+int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid,
+		ino_t target_ino)
 {
 	int32_t errcode, ret;
 	HCFS_STAT this_stat;
@@ -2919,6 +2920,7 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid)
 	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
 	this_stat.uid = uid;
 	this_stat.gid = uid;
+	this_stat.ino = target_ino;
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
 
