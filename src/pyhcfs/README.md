@@ -1,6 +1,12 @@
 # Check result of this function
 * `list_volume`
   * If success, it will return a list of tuples (**inode**, **volume type**, **volume name**).
+  * The volume type may be one of the following three kinds of value:
+  <code>
+  ANDROID_INTERNAL =1
+  ANDROID_EXTERNAL =2
+  ANDROID_MULTIEXTERNAL =3
+  </code>
   * If an error is encountered, a negative value is returned.
 
 * `parse_meta`, `list_dir_inorder`, `get_vol_usage`, `list_file_blocks`
@@ -14,11 +20,15 @@
 # Pitfall of list_file_blocks
 
 ## [- NOTICE: Some file has sparse data block, the missing data block from list need to be supplied by MyTera! -]
+  * Pitfall Description
+    *  sparse data block example:
+    *  { 'block_list': [ 'data_6086_10240_1', 'data_6086_10241_1', 'data_6086_10242_1', 'data_6086_10243_1'], 'result': 0, 'ret_num': 4} 
 
 Demo list_volume
 ==============================
-
-    list_volume(b"test_data/v1/android/fsmgr")
+  * The list_volume's result may include internal, external or multiexternal volume.
+    
+    (b"test_data/v1/android/fsmgr")
 
     [(3, 1, b'hcfs_app'), (2, 1, b'hcfs_data'), (130, 3, b'hcfs_external')]
 
