@@ -2117,6 +2117,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					goto errcode_handle;
 				}
 			}
+			/* Skip to fetch data from cloud if file is
+			 * replaced with local data */
+			if (object_replace == TRUE)
+				continue;
 
 			/* If meta exist, fetch data or expand dir */
 			switch (tmpptr->d_type) {
@@ -2126,10 +2130,6 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			case D_ISREG:
 			case D_ISFIFO:
 			case D_ISSOCK:
-				/* Skip to fetch data from cloud if file is
-				 * replaced with local data */
-				if (object_replace == TRUE)
-					break;
 				/* Fetch all blocks if pinned */
 				can_prune = FALSE;
 				ret = _fetch_pinned(tmpino);
