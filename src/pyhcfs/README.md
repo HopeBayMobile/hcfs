@@ -1,12 +1,13 @@
 # Check result of this function
 * `list_volume`
   * If success, it will return a list of tuples (**inode**, **volume type**, **volume name**).
-  * The volume type may be one of the following three kinds of value:
-  <code>
-  ANDROID_INTERNAL =1
-  ANDROID_EXTERNAL =2
-  ANDROID_MULTIEXTERNAL =3
-  </code>
+     * The volume type may be one of the following three kinds of value:
+
+              ```
+              ANDROID_INTERNAL =1
+              ANDROID_EXTERNAL =2
+              ANDROID_MULTIEXTERNAL =3
+              ```
   * If an error is encountered, a negative value is returned.
 
 * `parse_meta`, `list_dir_inorder`, `get_vol_usage`, `list_file_blocks`
