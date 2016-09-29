@@ -1501,6 +1501,8 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 			*need_copy = FALSE;
 		}
 	}
+	write_log(0, "Test: inode mapping: src %"PRIu64", target %"PRIu64,
+			(uint64_t)src_inode, (uint64_t)(*target_inode));
 
 	return 0;
 
