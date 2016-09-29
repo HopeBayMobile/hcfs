@@ -1,37 +1,20 @@
-# Result of functions
-## `list_volume`
-* If success, it will return a list of tuples (**inode**, **volume type**, **volume name**).
-    * The volume type may be one of the following three kinds of value:
+## Error codes
 
-        | Volume type           | Number in API | Description                       |         
-        | --------------------- | ------------- | --------------------------------- |         
-        | ANDROID_INTERNAL      | 1             | This volume is an internal volume |         
-        | ANDROID_EXTERNAL      | 2             | This volume is an external volume |         
-        | ANDROID_MULTIEXTERNAL | 3             | This volume is an external volume, which is multi-mounted to support [Android 6.0's Runtime permissions](https://source.android.com/devices/storage/#runtime_permissions) |
-
-* If an error is encountered, a negative value is returned.
-
-## `parse_meta`, `list_dir_inorder`, `get_vol_usage`, `list_file_blocks`
-* `ret['result'] = 0` on success.
-* If an error is encountered, a negative `ret['result']` is returned. 
-
-### **Pitfall of list_file_blocks**
-
-Some file has sparse data block, the missing data block from list need to be supplied by MyTera. 
-
-e.g. following is a sparse data block example, where the block from 0 to 10239 are missing in the list, those missing blocks should be accessed as zero-filled data blocks while reading.
-
-```
-{ 'block_list': [ 'data_6086_10240_1', 'data_6086_10241_1', 'data_6086_10242_1', 'data_6086_10243_1'], 'result': 0, 'ret_num': 4}
-```
-
-# ERRORS
 * **-1** : System call error, error message will print to stderr and leave a copy in `ret['error_msg']`.
 * **-2** : Unsupported meta version. File's meta version is not supported by pyhcfs.
 
-Demo list_volume
+list_volume
 ==============================
-* The list_volume's result may include internal, external or multiexternal volume.
+* If success, it will return a list of tuples (**inode**, **volume type**, **volume name**), or a negative value is returned on error.
+* The volume type may be one of the following three kinds of value:
+
+    | Volume type           | Number in API | Description                       |         
+    | --------------------- | ------------- | --------------------------------- |         
+    | ANDROID_INTERNAL      | 1             | This volume is an internal volume |         
+    | ANDROID_EXTERNAL      | 2             | This volume is an external volume |         
+    | ANDROID_MULTIEXTERNAL | 3             | This volume is an external volume, which is multi-mounted to support [Android 6.0's Runtime permissions](https://source.android.com/devices/storage/#runtime_permissions) |
+
+* Example of list_volume (Success)
 
 ```
 (b"test_data/v1/android/fsmgr")
@@ -39,16 +22,21 @@ Demo list_volume
 [(3, 1, b'hcfs_app'), (2, 1, b'hcfs_data'), (130, 3, b'hcfs_external')]
 ```
 
-Demo list_volume (Failure)
-==============================
+* Example of list_volume (Failure)
+
 ```
 list_volume(b"")
 
 Error: list_volume: No such file or directory
 -1
 ```
-Demo parse_meta
+
+parse_meta
 ==============================
+* `ret['result'] = 0` on success, or a negative `ret['result']` is returned on error.
+
+* Example of parse_meta (Success)
+
 ```
 parse_meta(b"test_data/v1/android/meta_isdir")
 
@@ -75,8 +63,9 @@ parse_meta(b"test_data/v1/android/meta_isdir")
             'size': 0,
             'uid': 0}}
 ```
-Demo parse_meta (Failure)
-==============================
+
+* Example of parse_meta (Failure)
+
 ```
 parse_meta(b"test_data/v0/android/meta_isreg")
 
@@ -105,8 +94,12 @@ Error: parse_meta: Unsupported meta version
             'size': 0,
             'uid': 0}}
 ```
-Demo list_dir_inorder
+
+list_dir_inorder
 ==============================
+* `ret['result'] = 0` on success, or a negative `ret['result']` is returned on error.
+* Example of list_dir_inorder (Success)
+
 ```
 list_dir_inorder(b"test_data/v1/android/meta_isdir", ret["offset"], limit=100)
 
@@ -214,15 +207,28 @@ list_dir_inorder(b"test_data/v1/android/meta_isdir", ret["offset"], limit=100)
   'offset': (83560, 9),
   'result': 0}
 ```
-Demo get_vol_usage
+
+get_vol_usage
 ==============================
+* `ret['result'] = 0` on success, or a negative `ret['result']` is returned on error.
+* Example of get_vol_usage (Success)
+
 ```
 get_vol_usage(b"test_data/v1/android/FSstat")
 
 {'result': 0, 'usage': 1373381904}
 ```
-Demo list_file_blocks
+
+list_file_blocks
 ==============================
+* `ret['result'] = 0` on success, or a negative `ret['result']` is returned on error.
+
+* **Pitfall of list_file_blocks**
+    * Some file has sparse data block, the missing data block from list need to be supplied by MyTera. 
+    * e.g. In this demo, the block from 0 to 10239 are missing. While accessing those blocks, reader process should assume they are zero-filled blocks without reading actual block data.
+
+* Example of list_file_blocks (Success)
+
 ```
 list_file_blocks(b"test_data/v1/android/meta_isreg")
 
