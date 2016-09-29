@@ -1,29 +1,31 @@
-# Check result of this function
-* `list_volume`
-  * If success, it will return a list of tuples (**inode**, **volume type**, **volume name**).
-     * The volume type may be one of the following three kinds of value:
+# Result of functions
+## `list_volume`
+* If success, it will return a list of tuples (**inode**, **volume type**, **volume name**).
+    * The volume type may be one of the following three kinds of value:
 
-              ```
-              ANDROID_INTERNAL =1
-              ANDROID_EXTERNAL =2
-              ANDROID_MULTIEXTERNAL =3
-              ```
-  * If an error is encountered, a negative value is returned.
+        ```
+        ANDROID_INTERNAL =1
+        ANDROID_EXTERNAL =2
+        ANDROID_MULTIEXTERNAL =3
+        ```
+* If an error is encountered, a negative value is returned.
+* **[- Pitfall of list_file_blocks-]**
 
-* `parse_meta`, `list_dir_inorder`, `get_vol_usage`, `list_file_blocks`
-  * `ret['result'] = 0` on success.
-  * If an error is encountered, a negative `ret['result']` is returned. 
+    Some file has sparse data block, the missing data block from list need to be supplied by MyTera. 
+
+    e.g. following is a sparse data block example, where the block from 0 to 10239 are missing in the list, those missing blocks should be accessed as zero-filled data blocks while reading.
+
+    ```
+    { 'block_list': [ 'data_6086_10240_1', 'data_6086_10241_1', 'data_6086_10242_1', 'data_6086_10243_1'], 'result': 0, 'ret_num': 4}
+    ```
+
+## `parse_meta`, `list_dir_inorder`, `get_vol_usage`, `list_file_blocks`
+* `ret['result'] = 0` on success.
+* If an error is encountered, a negative `ret['result']` is returned. 
 
 # ERRORS
-  * **-1** : System call error, error message will print to stderr and leave a copy in `ret['error_msg']`.
-  * **-2** : Unsupported meta version. File's meta version is not supported by pyhcfs.
-  
-# Pitfall of list_file_blocks
-
-## [- NOTICE: Some file has sparse data block, the missing data block from list need to be supplied by MyTera! -]
-  * Pitfall Description
-    *  sparse data block example:
-    *  { 'block_list': [ 'data_6086_10240_1', 'data_6086_10241_1', 'data_6086_10242_1', 'data_6086_10243_1'], 'result': 0, 'ret_num': 4} 
+* **-1** : System call error, error message will print to stderr and leave a copy in `ret['error_msg']`.
+* **-2** : Unsupported meta version. File's meta version is not supported by pyhcfs.
 
 Demo list_volume
 ==============================
