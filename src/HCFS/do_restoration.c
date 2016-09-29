@@ -2669,22 +2669,23 @@ int32_t run_download_minimal(void)
 	is_fopen = FALSE;
 
 	/* Fetch FSstat first */
-	sys_max_inode = -1;
+	sys_max_inode = 0;
 	for (count = 0; count < tmppage.num_entries; count++) {
 		tmpentry = &(tmppage.dir_entries[count]);
 		if (!strcmp("hcfs_app", tmpentry->d_name) ||
-			!strcmp("hcfs_data", tmpentry->d_name) ||
-			!strcmp("hcfs_external", tmpentry->d_name))
-		rootino = tmpentry->d_ino;
-		ret = _fetch_FSstat(rootino);
-		if (ret == 0)
-			ret = _update_FS_stat(rootino, &vol_max_inode);
-		if (ret < 0) {
-			errcode = ret;
-			goto errcode_handle;
+		    !strcmp("hcfs_data", tmpentry->d_name) ||
+		    !strcmp("hcfs_external", tmpentry->d_name)) {
+			rootino = tmpentry->d_ino;
+			ret = _fetch_FSstat(rootino);
+			if (ret == 0)
+				ret = _update_FS_stat(rootino, &vol_max_inode);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			sys_max_inode = (vol_max_inode > sys_max_inode ?
+					vol_max_inode : sys_max_inode);
 		}
-		sys_max_inode = (vol_max_inode > sys_max_inode ?
-				vol_max_inode : sys_max_inode);
 	}
 	/* Write max inode number to file "system_max_inode" */
 	LOCK_RESTORED_SYSMETA();
@@ -2811,7 +2812,7 @@ int32_t run_download_minimal(void)
 
 	/* Write max inode number */
 	ret = write_system_max_inode(
-		hcfs_restored_system_meta->system_max_inode);
+			hcfs_restored_system_meta->system_max_inode);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
