@@ -38,9 +38,9 @@ function require_var (){
 }
 
 if [ -z "$2" ]; then
-	NEXUS5X_BRANCH=master
+	export NEXUS5X_BRANCH=master
 else
-	NEXUS5X_BRANCH=$2
+	export NEXUS5X_BRANCH=$2
 fi
 
 DEVICE=Nexus_5X_MDB08M
@@ -67,14 +67,14 @@ function main()
 {
 	$UNTRACE
 	IMAGE_TYPE=$1
-	5X_BRANCH=${NEXUS5X_BRANCH}
+	BRANCH_IN_5X=${NEXUS5X_BRANCH}
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	#DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
 	DOCKER_IMAGE="docker:5000/${BOXNAME}:source-only-6.0.0_r26_MDB08M_20160623"
 	echo ================================================================================
 	echo $IMAGE_TYPE
-	echo ${5X_BRANCH}
+	echo $BRANCH_IN_5X
 	echo $IMG_DIR
 	echo $DOCKER_IMAGE
 	echo ================================================================================
@@ -160,7 +160,7 @@ RSYNC_SETTING="-arcv --no-owner --no-group --no-times"
 function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
-	git pull origin '${5X_BRANCH}' && \
+	git pull origin '${BRANCH_IN_5X}' && \
 	git submodule foreach git pull origin master"'
 }
 function pull_hcfs_binaay() {
