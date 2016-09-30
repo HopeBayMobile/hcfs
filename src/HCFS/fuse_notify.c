@@ -308,9 +308,11 @@ int32_t _do_hfuse_ll_notify_delete(FUSE_NOTIFY_DATA *data,
 	if (action == RUN)
 		ret = fuse_lowlevel_notify_delete(
 		    del->ch, del->parent, del->child, del->name, del->namelen);
-	/* free member data. struct fuse_chan is shared, should not be
-	 * freed here
-	 */
+	/* Don't error if notify_delete non-existed entries */
+	if (ret == -ENOENT)
+		ret = 0;
+
+	/* Free members. Don't free fuse_chan since it's shared */
 	free(del->name);
 	del->name = NULL;
 
