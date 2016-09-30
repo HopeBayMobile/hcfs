@@ -2905,15 +2905,27 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid,
+int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 		ino_t target_ino)
 {
 	int32_t errcode, ret;
 	HCFS_STAT this_stat;
 	struct stat meta_stat; /* Meta file system stat */
+	struct stat blockstat;
+	int64_t file_stats_pos;
 	int64_t metasize, metasize_blk;
+	int64_t total_blocks, current_page, page_pos;
+	int64_t cached_size, num_cached_block, count, e_index, which_page;
+	int64_t blkcount, pin_size;
 	size_t ret_size;
 	CLOUD_RELATED_DATA cloud_data;
+	FILE_META_TYPE filemeta;
+	FILE_STATS_TYPE file_stats_type;
+	BLOCK_ENTRY_PAGE tmppage;
+	char srcblockpath[METAPATHLEN], blockpath[METAPATHLEN];
+	char block_status;
+	BOOL write_page;
+	BOOL just_meta = TRUE;
 
 	fstat(fileno(fptr), &meta_stat);
 	FSEEK(fptr, 0, SEEK_SET);
@@ -2924,49 +2936,173 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid,
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
 
+	/* size_last_upload = 0, meta_last_upload = 0, upload_seq = 0 */
+	memset(&cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+
 	if (S_ISDIR(this_stat.mode)) {
+		just_meta = TRUE;
 		/* Restore cloud related data */
-		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
-				SEEK_SET);
-		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-		cloud_data.size_last_upload = 0;
-		cloud_data.meta_last_upload = 0;
-		cloud_data.upload_seq = 0;
 		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
 				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
 
 	} else if (S_ISLNK(this_stat.mode)) {
+		just_meta = TRUE;
 		this_stat.nlink = 1;
 		FSEEK(fptr, 0, SEEK_SET);
 		FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
 		/* Restore cloud related data */
 		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
 				SEEK_SET);
-		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-		cloud_data.size_last_upload = 0;
-		cloud_data.meta_last_upload = 0;
-		cloud_data.upload_seq = 0;
-		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
-				SEEK_SET);
 		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
-	} else {
+
+	} else if (S_ISREG(this_stat.mode)) {
+		just_meta = FALSE;
+		this_stat.nlink = 1;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+				sizeof(FILE_STATS_TYPE), SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+	}
+	/* Re-compute space usage and return when file is either
+	 * dir or symlink */
+	if (just_meta) {
+		metasize = meta_stat.st_size;
+		metasize_blk = meta_stat.st_blocks * 512;
+		UPDATE_RECT_SYSMETA(.delta_system_size = -metasize,
+				.delta_meta_size = -metasize_blk,
+				.delta_pinned_size = 0,
+				.delta_backend_size = 0,
+				.delta_backend_meta_size = 0,
+				.delta_backend_inodes = 0);
+		return 0;
+	}
+
+	/* Begin to copy regular file */
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	if (P_IS_UNPIN(filemeta.local_pin)) {
+		/* Don't fetch blocks */
 		return -EINVAL;
 	}
 
-	/* Re-compute space usage and return when file is either
-	 * dir or symlink */
+	total_blocks = (this_stat.size == 0) ? 0 :
+		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
+	current_page = -1;
+	write_page = FALSE;
+	cached_size = 0;
+	num_cached_block = 0;
+	page_pos = 0;
+	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+
+	for (count = 0; count < total_blocks; count++) {
+		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+		if (current_page != which_page) {
+			if (write_page == TRUE) {
+				FSEEK(fptr, page_pos, SEEK_SET);
+				FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+						1, fptr);
+				write_page = FALSE;
+			}
+			page_pos = seek_page2(&filemeta, fptr,
+					which_page, 0);
+			if (page_pos <= 0) {
+				count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
+				continue;
+			}
+			current_page = which_page;
+			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+
+			FSEEK(fptr, page_pos, SEEK_SET);
+			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, fptr);
+		}
+
+		/* Terminate pin blocks downloading if system is going down */
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
+
+		block_status = tmppage.block_entries[e_index].status;
+		switch (block_status) {
+		case ST_TODELETE:
+			tmppage.block_entries[e_index].status = ST_NONE;
+			write_page = TRUE;
+			break;
+		case ST_LDISK:
+		case ST_LtoC:
+		case ST_CtoL:
+		case ST_BOTH:
+			fetch_block_path(srcblockpath, src_ino, count);
+			fetch_restore_block_path(blockpath, target_ino, count);
+			/* Copy block from source */
+			ret = copy_file(srcblockpath, blockpath);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			tmppage.block_entries[e_index].status = ST_LDISK;
+			write_page = TRUE;
+			/* Update file stats */
+			ret = stat(blockpath, &blockstat);
+			if (ret == 0) {
+				cached_size += blockstat.st_blocks * 512;
+				num_cached_block += 1;
+			} else {
+				write_log(0, "%s %s. Code %d",
+					  "Error: Fail to stat block in",
+					  __func__, errno);
+			}
+			break;
+		default: /* Do nothing when st is ST_CLOUD / ST_NONE */
+			break;
+		}
+	}
+	if (write_page == TRUE) {
+		FSEEK(fptr, page_pos, SEEK_SET);
+		FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	}
+
+	/* Update file stats */
+	file_stats_pos = offsetof(FILE_META_HEADER, fst);
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FREAD(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+	file_stats_type.num_cached_blocks = num_cached_block;
+	file_stats_type.cached_size = cached_size;
+	file_stats_type.dirty_data_size = cached_size;
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FWRITE(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+
+	/* Update rectified statistics */
+	pin_size = round_size(this_stat.size);
 	metasize = meta_stat.st_size;
 	metasize_blk = meta_stat.st_blocks * 512;
-	UPDATE_RECT_SYSMETA(.delta_system_size = -metasize,
-			.delta_meta_size = -metasize_blk,
-			.delta_pinned_size = 0,
-			.delta_backend_size = 0,
-			.delta_backend_meta_size = 0,
-			.delta_backend_inodes = 0);
-	return 0;
+	UPDATE_RECT_SYSMETA(.delta_system_size = -(metasize + this_stat.size),
+			    .delta_meta_size = -metasize_blk,
+			    .delta_pinned_size = -pin_size,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
 
+	/* Update cache statistics */
+	update_restored_cache_usage(cached_size, num_cached_block);
+
+	return 0;
 errcode_handle:
+	if (just_meta == FALSE) {
+		write_log(4, "Cleaning up blocks of broken file\n");
+		for (blkcount = 0; blkcount <= count; blkcount++) {
+			fetch_restore_block_path(blockpath, target_ino,
+						 blkcount);
+			unlink(blockpath);
+		}
+	}
+	write_log(0, "Restore Error: Code %d\n", -errcode);
 	return errcode;
 }
 

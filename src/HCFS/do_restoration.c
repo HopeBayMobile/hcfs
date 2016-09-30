@@ -1582,32 +1582,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	setbuf(fptr, NULL);
 
 	/* Case regular file */
-	if (type == D_ISREG) {
-		errcode = restore_meta_structure(fptr);
-		if (errcode < 0)
-			goto errcode_handle;
-		FSEEK(fptr, 0, SEEK_SET);
-		FREAD(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
-		tmpstat.uid = uid;
-		tmpstat.gid = uid;
-		tmpstat.ino = target_inode;
-		FSEEK(fptr, 0, SEEK_SET);
-		FWRITE(&tmpstat, sizeof(HCFS_STAT), 1, fptr);
-		fclose(fptr);
-		meta_open = FALSE;
-		/* TODO: Integrate _replace_missing_pinned() with
-		 * restore_borrowed_meta_structure(), and replace
-		 * restore_meta_structure() with
-		 * restore_borrowed_meta_structure() */
-		errcode = _replace_missing_pinned(src_inode, target_inode);
-		if (errcode < 0)
-			goto errcode_handle;
-		/* Mark this inode to to_sync */
-		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
-		return 0;
-	} else if (type == D_ISLNK) {
+	if (type == D_ISREG || type == D_ISLNK) {
 		errcode = restore_borrowed_meta_structure(fptr,
-				uid, target_inode);
+				uid, src_inode, target_inode);
 		if (errcode < 0)
 			goto errcode_handle;
 		fclose(fptr);
@@ -1617,7 +1594,8 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		return 0;
 	}
 
-	errcode = restore_borrowed_meta_structure(fptr, uid, target_inode);
+	errcode = restore_borrowed_meta_structure(fptr, uid,
+			src_inode, target_inode);
 	if (errcode < 0)
 		goto errcode_handle;
 
@@ -1749,56 +1727,6 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t replace_missing(const char *nowpath, DIR_ENTRY *tmpptr)
-{
-	char targetfile[METAPATHLEN];
-	char srcfile[METAPATHLEN];
-	char tmppath[PATH_MAX];
-	struct stat tmpstat;
-	ino_t srcino, targetino;
-	FILE *fptr;
-	int32_t ret, errcode;
-	size_t ret_size;
-
-	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
-
-	/* Check the system to be replaced for the missing item */
-	ret = stat(tmppath, &tmpstat);
-
-	if (ret < 0)
-		return -ENOENT;
-
-	write_log(4, "Replacing %s with the copy on the device\n", nowpath);
-	/* Found the corresponding path. Proceed to copy meta and block */
-	targetino = tmpptr->d_ino;
-	srcino = tmpstat.st_ino;
-
-	fetch_meta_path(srcfile, srcino);
-	fetch_restore_meta_path(targetfile, targetino);
-	ret = copy_file(srcfile, targetfile);
-	if (ret < 0)
-		return ret;
-	fptr = fopen(targetfile, "r+");
-	if (fptr == NULL) {
-		ret = errno;
-		return ret;
-	}
-	ret = restore_meta_structure(fptr);
-	fclose(fptr);
-	if (ret < 0)
-		return ret;
-	ret = _replace_missing_pinned(srcino, targetino);
-	if (ret < 0)
-		return ret;
-
-	/* Mark this inode to to_sync */
-	FWRITE(&targetino, sizeof(ino_t), 1, to_sync_fptr);
-
-	return 0;
-errcode_handle:
-	return errcode;
-}
-
 void _extract_pkg_name(const char *srcpath, char *pkgname)
 {
 	while (*srcpath != '/' && *srcpath != '\0') {
@@ -1809,7 +1737,7 @@ void _extract_pkg_name(const char *srcpath, char *pkgname)
 	*pkgname = '\0';
 }
 
-int32_t _replace_missing(const char *nowpath, DIR_ENTRY *tmpptr,
+int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 		INODE_PAIR_LIST *hardln_mapping)
 {
 	char pkg[MAX_FILENAME_LEN + 1];
@@ -1843,6 +1771,7 @@ int32_t _replace_missing(const char *nowpath, DIR_ENTRY *tmpptr,
 	if (hardln_mapping == NULL)
 		return -ENOMEM;
 
+	write_log(4, "Replacing %s with the copy on the device\n", nowpath);
 	/* Do not need to check hardlink for folder */
 	if (tmpptr->d_type == D_ISDIR) {
 		ret = replace_missing_object(src_inode, tmpptr->d_ino,
@@ -1927,7 +1856,6 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	size_t ret_size;
 	PRUNE_T *prune_list = NULL;
 	int32_t prune_index = 0, max_prunes = 0;
-	struct stat tmpstat;
 	BOOL object_replace;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
@@ -2054,37 +1982,9 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    (strncmp(nowpath, "/data/data",
 					     strlen("/data/data")) == 0)) {
-					char pkg[MAX_FILENAME_LEN + 1];
-					int32_t uid;
 
-					if (strlen(nowpath) ==
-							strlen("/data/data"))
-						strcpy(pkg, tmpptr->d_name);
-					else
-						_extract_pkg_name(nowpath +
-							strlen("/data/data/"),
-							pkg);
-					write_log(0, "Test: Pkg name %s", pkg);
-					uid = lookup_package_uid_list(pkg);
-					snprintf(tmppath, PATH_MAX,
-							"%s/%s", nowpath,
-							tmpptr->d_name);
-					ret = stat(tmppath, &tmpstat);
-					if (ret < 0 || uid < 0) {
-						write_log(0, "Error: Cannot use"
-							" %s meta. Uid %d."
-							" errno %d", tmppath,
-							uid, errno);
-						can_prune = TRUE;
-					} else {
-						write_log(0, "Test: Pkg name %s"
-							". Uid %d", pkg, uid);
-						ret = replace_missing_object(
-							tmpstat.st_ino,
-							tmpptr->d_ino,
-							tmpptr->d_type,
-							uid, hardln_mapping);
-					}
+					ret = replace_missing_meta(nowpath,
+						tmpptr, hardln_mapping);
 					/* Socket and fifo file will be
 					 * pruned */
 					if (ret < 0)
@@ -2133,7 +2033,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				    ((tmpptr->d_type == D_ISREG) &&
 				     (strncmp(nowpath, "/data/data",
 					      strlen("/data/data")) == 0))) {
-					ret = replace_missing(nowpath, tmpptr);
+					ret = replace_missing_meta(nowpath,
+						tmpptr, hardln_mapping);
 					if (ret < 0)
 						can_prune = TRUE;
 				}
