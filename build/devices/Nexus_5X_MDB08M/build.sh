@@ -37,12 +37,6 @@ function require_var (){
 	fi
 }
 
-if [ -z "$2" ]; then
-	export NEXUS5X_BRANCH=master
-else
-	export NEXUS5X_BRANCH=$2
-fi
-
 DEVICE=Nexus_5X_MDB08M
 BOXNAME=nexus-5x-buildbox
 BINARY_TARGET=nexus-5x-hcfs
@@ -67,7 +61,7 @@ function main()
 {
 	$UNTRACE
 	IMAGE_TYPE=$1
-	BRANCH_IN_5X=${NEXUS5X_BRANCH}
+	BRANCH_IN_5X=${BRANCH_IN_5X:-master}
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	#DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
