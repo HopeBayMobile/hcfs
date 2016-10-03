@@ -1272,8 +1272,7 @@ int32_t _prune_missing_entries(ino_t thisinode,
 	return 0;
 errcode_handle:
 	write_log(0, "Unable to prune missing entries in restoration. (%" PRIu64
-		     ")\n",
-		  thisinode);
+		     ")\n", thisinode);
 	fclose(fptr);
 	return errcode;
 }
@@ -1360,7 +1359,7 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 			*need_copy = FALSE;
 		}
 	}
-	write_log(0, "Test: inode mapping: src %"PRIu64", target %"PRIu64,
+	write_log(6, "Info: inode mapping: src %"PRIu64", target %"PRIu64,
 			(uint64_t)src_inode, (uint64_t)(*target_inode));
 
 	return 0;
@@ -1496,8 +1495,8 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 						child_target_inode,
 						now_entry->d_type,
 						uid, hardln_mapping);
-					write_log(0, "Test: Replacing with %s"
-						, now_entry->d_name);
+					write_log(8, "Restore debug: Replacing"
+						" with %s", now_entry->d_name);
 				}
 
 			} else if (now_type == D_ISDIR) {
@@ -1506,7 +1505,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 				ret = replace_missing_object(child_src_inode,
 					child_target_inode, now_entry->d_type,
 					uid, hardln_mapping);
-				write_log(0, "Test: Replacing with %s"
+				write_log(8, "Restore debug: Replacing with %s"
 						, now_entry->d_name);
 
 			} else {
@@ -1528,7 +1527,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 					}
 				}
 			} else {
-				write_log(0, "Test: Replacing with %s is"
+				write_log(6, "Info: Replacing with %s is"
 					" successful", now_entry->d_name);
 				now_entry->d_ino = child_target_inode;
 			}
@@ -1615,7 +1614,7 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 		strcpy(pkg, tmpptr->d_name);
 	else
 		_extract_pkg_name(nowpath + strlen("/data/data/"), pkg);
-	write_log(0, "Test: Pkg name %s", pkg);
+	write_log(6, "Info: Pkg name %s", pkg);
 	uid = lookup_package_uid_list(pkg);
 
 	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
@@ -2238,26 +2237,6 @@ errcode_handle:
 	unlink(plistmod);
 	return errcode;
 }
-
-
-
-/*
- * A test function running before main and exit at end.
- * DELETE this function when development finished!!
- */
-/*void __attribute__((constructor)) dev_test(void)
-{
-	int32_t uid;
-	const char pkg[] = "com.android.captiveportallogin";
-
-	_init_package_uid_list();
-	uid = _lookup_package_uid_list(pkg);
-	printf("%s %d\n", pkg, uid);
-	_destroy_package_uid_list();
-	printf("\nRestore hcfs code at %s %d\n\n", __FILE__, __LINE__);
-	exit(0);
-}*/
-/* End of package_uid_list code */
 
 /* Function for blocking execution until network is available again */
 int32_t check_network_connection(void)
