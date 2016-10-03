@@ -349,7 +349,6 @@ int32_t super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 			return ret_val;
 	}
 
-	ret_val = 0;
 	super_block_exclusive_locking();
 	if (inode_ptr->status != IS_DIRTY) { /* Add to dirty node list */
 		ret_val = ll_dequeue(this_inode, inode_ptr);
@@ -1051,7 +1050,6 @@ static int32_t _handle_temp_unclaimed_file()
 	}
 
 	now_pos = 0;
-	num_inodes = 0;
 	total_inode = 0;
 	while (!feof(sys_super_block->temp_unclaimed_fptr)) {
 		/* Read some inodes */

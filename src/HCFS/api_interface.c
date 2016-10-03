@@ -622,7 +622,7 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 
 	thisptr = meta_cache_lock_entry(target_inode);
 	if (thisptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	errcode = meta_cache_lookup_file_data(target_inode, &thisstat,
 						NULL, NULL, 0, thisptr);
@@ -680,7 +680,7 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 
 	thisptr = meta_cache_lock_entry(target_inode);
 	if (thisptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	retcode = meta_cache_lookup_file_data(target_inode, &thisstat,
 						NULL, NULL, 0, thisptr);
@@ -1373,6 +1373,8 @@ void api_module(void *index)
 			/*Echos the arguments back to the caller*/
 			entryarray = NULL;
 			retcode = list_FS_handle(&entryarray, &num_entries);
+			if (retcode < 0)
+				break;
 			tmpptr = (char *) entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;
 			write_log(10, "Debug listFS return size %d\n", ret_len);
@@ -1518,33 +1520,45 @@ void api_module(void *index)
 			break;
 		case SETNOTIFYSERVER:
 			retcode = set_notify_server_loc(arg_len, largebuf);
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case INITIATE_RESTORATION:
 			retcode = initiate_restoration();
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case CHECK_RESTORATION_STATUS:
 			retcode = check_restoration_status();
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case SETSWIFTTOKEN:
 			retcode = set_swift_token(arg_len, largebuf);
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case NOTIFY_APPLIST_CHANGE:
 			retcode = backup_package_list();
+			if (retcode < 0)
+				break;
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			/* Attempt package backup immediately */
+			force_backup_package();
 			break;
 		default:
 			retcode = ENOTSUP;

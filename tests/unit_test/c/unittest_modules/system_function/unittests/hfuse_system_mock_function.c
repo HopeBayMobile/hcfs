@@ -14,6 +14,7 @@
 #include "fuseop.h"
 #include "hcfscurl.h"
 #include "mock_params.h"
+#include "do_restoration.h"
 
 int32_t super_block_init(void)
 {
@@ -282,4 +283,20 @@ void start_download_minimal(void)
 {
 	return;
 }
-
+int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
+{
+	return 0;
+}
+int32_t rebuild_super_block_entry(ino_t this_inode,
+	HCFS_STAT *this_stat, char pin_status)
+{
+	return 0;
+}
+int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
+{
+	return 0;
+}
+int32_t convert_cloud_stat_struct(char *path)
+{
+	return 0;
+}

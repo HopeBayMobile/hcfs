@@ -110,9 +110,11 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		memset(bptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 		return bptr;
 	} else {
+		errno = ENOMEM;
 		return NULL;
 	}
 
+	errno = EINVAL;
 	return NULL;
 }
 
@@ -342,8 +344,10 @@ int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 
+	if (level > 8)
+		return 0;
 	va_start(alist, format);
-	//vprintf(format, alist);
+	vprintf(format, alist);
 	va_end(alist);
 	return 0;
 }

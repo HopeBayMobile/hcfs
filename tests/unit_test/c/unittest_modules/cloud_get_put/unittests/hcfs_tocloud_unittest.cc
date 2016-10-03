@@ -18,6 +18,7 @@ extern "C" {
 #include "super_block.h"
 #include "atomic_tocloud.h"
 #include "mount_manager.h"
+#include "do_restoration.h"
 }
 
 extern SYSTEM_CONF_STRUCT *system_config;
@@ -60,6 +61,7 @@ class uploadEnvironment : public ::testing::Environment {
     hcfs_system->sync_paused = OFF;
     sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
     sem_init(&(hcfs_system->access_sem), 0, 1);
+    sem_init(&backup_pkg_sem, 0, 1);
 
     workpath = NULL;
     tmppath = NULL;
@@ -180,7 +182,7 @@ TEST_F(init_sync_stat_controlTest, InitCleanup) {
   ASSERT_NE(0, ret);
  }
 
-/* End of the test case for the function update_backend_stat */
+/* End of the test case for the function init_sync_stat_control */
 
 
 /*
@@ -778,6 +780,7 @@ protected:
 		init_sync_stat_control();
 		max_objname_num = 4000;
 		sem_init(&objname_counter_sem, 0, 1);
+		sem_init(&backup_pkg_sem, 0, 1);
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
 		for (int32_t i = 0 ; i < max_objname_num ; i++)
@@ -1162,6 +1165,7 @@ protected:
 		}
 
 		sem_init(&objname_counter_sem, 0, 1);
+		sem_init(&backup_pkg_sem, 0, 1);
 
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_paused = FALSE;
@@ -1285,6 +1289,7 @@ class update_backend_statTest : public ::testing::Test {
     hcfs_system->system_going_down = FALSE;
     if (access(METAPATH, F_OK) < 0)
 	    mkdir(METAPATH, 0744);
+    sem_init(&backup_pkg_sem, 0, 1);
    }
 
   virtual void TearDown() {
@@ -1313,7 +1318,7 @@ TEST_F(update_backend_statTest, EmptyStat) {
   ret = access(tmppath2, F_OK);
   ASSERT_NE(0, ret);
 
-  ret = update_backend_stat(14, 1024768, 5566, 101, 0);
+  ret = update_backend_stat(14, 1024768, 5566, 101, 0, 0, 5566);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);
@@ -1369,7 +1374,7 @@ TEST_F(update_backend_statTest, UpdateExistingStat) {
   fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
   fclose(fptr);
 
-  ret = update_backend_stat(14, 1024768, 123, -101, 0);
+  ret = update_backend_stat(14, 1024768, 123, -101, 0, 0, 123);
 
   EXPECT_EQ(0, ret);
   ret = access(tmppath2, F_OK);

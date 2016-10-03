@@ -6,11 +6,20 @@
 #include "meta_mem_cache.h"
 
 #include <errno.h>
+#include <string.h>
+#include <stdarg.h>
 
 extern SYSTEM_CONF_STRUCT *system_config;
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
+	va_list alist;
+
+	if (level > 8)
+		return 0;
+	va_start(alist, format);
+	vprintf(format, alist);
+	va_end(alist);
 	return 0;
 }
 

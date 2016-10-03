@@ -234,3 +234,19 @@ void init_hcfs_stat(HCFS_STAT *this_stat)
 
 	return;
 }
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+

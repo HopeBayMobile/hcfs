@@ -199,7 +199,7 @@ int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 
 	ret = _update_stats(p_inode, &tmp_dirstat);
 	sem_post(&(pathlookup_data_lock));
-	return 0;
+	return ret;
 errcode_handle:
 	if (metafptr != NULL) {
 		flock(fileno(metafptr), LOCK_UN);

@@ -11,10 +11,3 @@ enum {
 	INO__META_CACHE_LOCK_ENTRY_SUCCESS
 };
 
-char restore_metapath[METAPATHLEN];
-char restore_blockpath[BLOCKPATHLEN];
-sem_t restore_sem;
-
-#define RESTORE_METAPATH restore_metapath
-#define RESTORE_BLOCKPATH restore_blockpath
-

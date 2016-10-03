@@ -624,6 +624,16 @@ int32_t main(int32_t argc, char **argv)
 		restoring_status = RESTORING_STAGE2;
 		write_log(10, "Checking if need to switch storage paths\n");
 		_check_partial_storage();
+
+		/* Renaming package list backup to the original location */
+		char despath[METAPATHLEN];
+		snprintf(despath, METAPATHLEN, "%s/backup_pkg", METAPATH);
+		rename(despath, PACKAGE_XML);
+		chown(PACKAGE_XML, SYSTEM_UID, SYSTEM_GID);
+		chmod(PACKAGE_XML, 0660);
+		system("restorecon /data/system/packages.xml");
+	
+		unlink(PACKAGE_LIST);  /* Need to regenerate packages.list */
 	}
 
 	ret_val = init_hfuse(restoring_status);

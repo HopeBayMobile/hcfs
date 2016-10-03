@@ -1498,7 +1498,7 @@ int32_t expire_meta_mem_cache_entry(void)
 *                If no entry is found, allocate a new entry for this inode,
 *                and proceed with the locking
 *  Return value: The pointer to the locked entry if successful. Otherwise
-*                returns NULL.
+*                returns NULL and set errno to corresponding error.
 *
 *************************************************************************/
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
@@ -1554,6 +1554,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 					if (errcount > 5) {
 						write_log(0,
 							"Lock meta cache err");
+						errno = -ret_val;
 						return NULL;
 					}
 					nanosleep(&time_to_sleep, NULL);
@@ -1576,6 +1577,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 				write_log(2, "Unable to rebuild meta for %"
 				          PRIu64 "\n", (uint64_t) this_inode);
 				sem_post(&(meta_mem_cache[index].header_sem));
+				errno = -ret;
 				return NULL;
 			}
 		}
@@ -1583,16 +1585,18 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		ret_val = super_block_read(this_inode, &tempentry);
 		if (ret_val < 0) {
 			sem_post(&(meta_mem_cache[index].header_sem));
+			errno = -ret_val;
 			return NULL;
 		}
 
+		errno = 0;
 		current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
 		if (current_ptr == NULL) {
 			sem_post(&(meta_mem_cache[index].header_sem));
+			if (errno == 0)
+				errno = ENOMEM;
 			return NULL;
 		}
-		/* TODO: Should return errno as well if needed */
-		/* return -EACCES; */
 
 		memset(current_ptr, 0, sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
 
@@ -1630,6 +1634,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	if ((current_ptr->body).meta_opened == TRUE)
 		flock(fileno((current_ptr->body).fptr), LOCK_EX);
 
+	errno = 0;
 	return result_ptr;
 }
 
@@ -1644,7 +1649,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	if (!target_ptr)
-		return -ENOMEM;
+		return -EINVAL;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
