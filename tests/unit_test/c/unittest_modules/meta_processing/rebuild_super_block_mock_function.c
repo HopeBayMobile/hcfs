@@ -292,3 +292,9 @@ int32_t dir_remove_entry(ino_t parent_inode, ino_t child_inode,
 
 	return 0;
 }
+
+int32_t read_system_max_inode(ino_t *ino_num)
+{
+	*ino_num = 1;
+	return 0;
+}
