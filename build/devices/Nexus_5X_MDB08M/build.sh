@@ -199,21 +199,25 @@ function publish_image() {
 		rm -rf ${IMG_DIR}
 	fi
 
-	CI_PATH=/mnt/nas/CloudDataSolution/TeraFonn_CI_build
+	CI_PATH=/mnt/nas/CloudDataSolution/TeraFonn_CI_build/release
+
 	record_tmp=${PUBLISH_DIR}/recode.tmp
 	if [ -e "$record_tmp" ]; then
 		last_version_path=`cat ${record_tmp}`
 	else
-		last_version_path=`ls ${CI_PATH} | grep android-dev | tail -2 | head -1`
+		last_version_path=`find ${CI_PATH} -maxdepth 1 -name \
+			"*-OTA-*" | tail -2 | head -1`
 	fi
 
-	last_version=`echo $last_version_path | awk -F- {'print $1'}`
-	last_target=`find ${CI_PATH}/${last_version_path} -path */${DEVICE_IMG}-${IMAGE_TYPE}/*-target_files-*.zip`
+	last_version=`echo $last_version_path | awk -F- {'print $3'}`
+	last_target=`find ${last_version_path} \
+		-path */${DEVICE_IMG}-${IMAGE_TYPE}/*-target_files-*.zip`
 
 	mkdir -p ${IMG_DIR}
 	rsync $RSYNC_SETTING -L $here/resource/* ${IMG_DIR}
 
-	if [ "$gitlabSourceBranch" = "android-dev" ]; then
+	if [ "$gitlabSourceBranch" = "android-dev" ] || \
+		[[ "$gitlabSourceBranch" = *-OTA* ]]; then
 		if [ -e "$last_target" ]; then
 			rsync $RSYNC_SETTING ${last_target} root@$DOCKER_IP:/data/old.zip
 

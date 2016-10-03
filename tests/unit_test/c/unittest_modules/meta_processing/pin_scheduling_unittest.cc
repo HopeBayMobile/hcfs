@@ -105,12 +105,12 @@ protected:
 	}
 };
 
-void mock_thread_fctnl(void *ptr)
+void* mock_thread_fctnl(void *ptr)
 {
 	PINNING_INFO *info = (PINNING_INFO *)ptr;
 
 	pinning_scheduler.thread_finish[info->t_idx] = TRUE;
-	return;
+	return NULL;
 }
 
 TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
@@ -133,7 +133,7 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 		}
 		pinning_scheduler.pinning_info[idx].t_idx = idx;
 		pthread_create(&pinning_scheduler.pinning_file_tid[idx], NULL,
-				(void *)&mock_thread_fctnl,
+				&mock_thread_fctnl,
 				(void *)&(pinning_scheduler.pinning_info[idx]));
 		pinning_scheduler.thread_active[idx] = TRUE;
 		pinning_scheduler.total_active_pinning++;

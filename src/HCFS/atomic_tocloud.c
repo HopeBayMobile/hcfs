@@ -1071,7 +1071,6 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 		}
 
 		/* Try to download backend meta */
-		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, ptr->inode);
 		backend_metafptr = fopen(backend_metapath, "w+");
 		if (backend_metafptr == NULL) {

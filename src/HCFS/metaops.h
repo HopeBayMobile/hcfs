@@ -60,6 +60,9 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page);
 int64_t seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		int64_t target_page, int64_t hint_page);
 
+int32_t check_meta_on_cloud(ino_t this_inode,
+		char d_type, BOOL *meta_on_cloud,
+		int64_t *metasize, int64_t *metalocalsize);
 int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			MOUNT_T *mptr);
 int32_t mark_inode_delete(fuse_req_t req, ino_t this_inode);

@@ -237,7 +237,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS;
 	body_ptr->dir_entry_cache[eindex] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-	for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
+	for (uint64_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 		char tmp_type;
 		char tmp_name[10];
 		tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */

@@ -8,9 +8,117 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
  6. Case-only renaming in emulated volume (sdcard) is not working now. This will be resolved in a later release.
 
+v 2.2.2.1743
+=====
+## New Features
+ - [HCFS] feature/collect_logs Add collect system log API (!534)
+ - [HCFS] feature/default_value_for_notify_server Add default notify server (!541)
+ - [HCFS] feature/HCFSAPID_LOG_ROTATE Update hcfsapid logger (!547)
+ - [HCFS] test/optimize_pkg_hash pkg_cache: replace with faster hash function     The deterministic version of djb2 hash is introduced to replace the original hash function in order to speed up. While compiled with gcc -O1, 10x speedup is measured. (!522)
+ - [HCFS] hotfix/missing_cloud_stat Try to download backed-up cloud stat if missing (!554)
+ - [HCFS] Feature/list volume (!546)
+ - [Tera-App] Feature/decrypt json string ([!99](gateway-2-0/android-management-app!99))
+ - [Tera-App] Feature/help page ([!91](gateway-2-0/android-management-app!91))
+ - [Nexus-5x] auto grant permissions ([!38](gateway-2-0/nexus-5x!38))
+ - [Nexus-5x] attach logs ([!38](gateway-2-0/nexus-5x!38))
+
+## Fixed
+ - [HCFS] Fix/handle todelete issues (!568)
+ - [HCFS] hotfix/api_error_handling Avoid sending multiple return codes when error occurs (!565)
+ - [HCFS] hotfix/fuse_notify_error_at_shutdown Fix: fuse notify log error at shutdown    Should not print error on shutdown (!571)
+ - [HCFS] hotfix/api_error_handling Added http header initiation in test backend (!566)
+ - [HCFS] Hotfix/fix curl auth token    Fix at 68da156b , also fix syntax warning of src/HCFS/hcfscurl.c (!570)
+ - [HCFS] Add missing CURLOPT_NOSIGNAL=1    * Add missing CURLOPT_NOSIGNAL=1  * Use same CURLOPT setting as other usage in swift related function.  * Use CURLOPT_NOBODY to perform HEAD request  * Use noop_write_file_function for empty body, since default func is fwrite. (!558)
+ - [HCFS] Bugfix/deleted file is not forgot    When unlink file, let hcfs calls fuse_lowlevel_notify_delete on all 3 mount point to force system release lookup count (opened by file count). (!516)
+ - [HCFS] Bugfix/modify error handling on pyhcfs (!545)
+ - [HCFS] Block SIGUSR1 when processing fs operations during unmount process (!540)
+ - [HCFS] Error handling for unavailable download resource (!537)
+ - [Tera-App] bugfix/interval_related_issue    Arrange all interval to Interval.java ([!113](gateway-2-0/android-management-app!113))
+ - [Tera-App] bugfix/#13065 Retry three times for download user icon if failed ([!112](gateway-2-0/android-management-app!112))
+ - [Tera-App] bugfix/#12580  Dismiss progress circle when user close dialog ([!110](gateway-2-0/android-management-app!110))
+ - [Tera-App] Bugfix/#11966 ([!109](gateway-2-0/android-management-app!109))
+ - [Tera-App] bug fix #12796 ([!97](gateway-2-0/android-management-app!97))
+ - [Tera-App] Bugfix/#12532 ([!96](gateway-2-0/android-management-app!96))
+ - [Tera-App] fix/issue_12787 Fix page will not transit to specific page ([!90](gateway-2-0/android-management-app!90))
+ - [Tera-App] fix/help_page_alignment Fix help page alignment ([!106](gateway-2-0/android-management-app!106))
+ - [Tera-App] fix/refine_app_availability Refine app availability ([!105](gateway-2-0/android-management-app!105))
+ - [Tera-App] bugfix/#13015 Move Snack.make(...) to onActivityCreated() ([!102](gateway-2-0/android-management-app!102))
+ - [Tera-App] bugfix/#12799 Only show calculating text once ([!103](gateway-2-0/android-management-app!103))
+ - [Tera-App] bugfix/enhance_terafonn_api_service Enhance TeraFonnApiService ([!94](gateway-2-0/android-management-app!94))
+ - [Tera-App] bugfix/#12743 Read preference from database instead of xml ([!95](gateway-2-0/android-management-app!95))
+ - [Tera-App] bugfix/#12586 Keep getActivity() instance and replace getActivit() with the kept instance ([!92](gateway-2-0/android-management-app!92))
+ - [Tera-App] bugfix/#12245 Handle upper case file extension ([!104](gateway-2-0/android-management-app!104))
+ - [Nexus-5x] Fix/issue 12763 ([!40](gateway-2-0/nexus-5x!40))
+ - [Nexus-5x] bug fix #12796 ([!41](gateway-2-0/nexus-5x!41))
+ - [Nexus-5x] bug fix #12854 ([!43](gateway-2-0/nexus-5x!43))
+ - [Nexus-5x] Fix/bug 13096    從狀態列點擊OTA更新後到更新頁面點選下載會出現 HopeBayTech Updater 停止運作訊息 ([!49](gateway-2-0/nexus-5x!49))
+ - [Nexus-5x] Fix bug 13112 ([!48](gateway-2-0/nexus-5x!48))
+ - [Nexus-5x] Fix bug 12676, 11948 ([!47](gateway-2-0/nexus-5x!47))
+ - [Nexus-5x] Fix/settings display ([!46](gateway-2-0/nexus-5x!46))
+ - [Nexus-5x] bug fix #13009 ([!45](gateway-2-0/nexus-5x!45))
+ - [Nexus-5x] bug fix #13127 ([!50](gateway-2-0/nexus-5x!50))
+ - [Nexus-5x] HBTUpdater refactor: replace tab by 4 spaces ([!51](gateway-2-0/nexus-5x!51))
+ - [Nexus-5x] Create notification to notify the factory reset is ready to start ()[!44](gateway-2-0/nexus-5x!44))
+ - [Nexus-5x] selinux for packages.xml ([!39](gateway-2-0/nexus-5x!39))
+ - [Tera-Launcher] Start and bind service again while DeadObjectException occurs ([!12](gateway-2-0/tera-launcher!12))
+
+## CI / Refactoring / Other
+ - [HCFS] Ci/hcfs buildbox    1. 整理靜態分析工具的部屬程式  2. 升級分析工具  3. 修復之前壞掉的report  4. 分析範圍從 src/HCFS 擴展到 src/ (!550)
+ - [HCFS] Change ota build process to fit path release\2.2-OTA-*    Change ota build process to fit path release\2.2-OTA-* (!561)
+ - [HCFS] use {Leak,Address}Sanitizer to resolve memory leaks / heap-use-after-free / global-buffer-overflow    To utilize LeakSanitizer and AddressSanitizer, we shall allow the full compilation with clang in advance.    There are various memory violations detected in hcfs_clouddelete. (!572)
+ - [HCFS] fix UT errno check    UT failed due to not set errno  on error.    in pyhcfs UT we use `pread_cnt_error_on_call_count` to control fake pread function return -1 but not set errno, however recent change returns -errno in some case, which leads to UT fail on return value checking. (!569)
+ - [HCFS] tests: hcfscurl: eliminate unpredictable mutex locks    From Open Group Base Specifications [1]:    > The pthread_cond_broadcast() or pthread_cond_signal() functions  > may be called by a thread whether or not it currently owns the  > mutex that threads calling pthread_cond_wait() or  > pthread_cond_timedwait() have associated with the condition  > variable during their waits.    We do not have to lock the specific mutex every time when calling  pthread_cond_broadcast(). Instead, it is straightforward to unblock  threads blocked on the condition variable of swift token control  without performing mutex locks inside test thread functions.    mutrace detects no mutex contended according to filtering parameters.    [1] http://pubs.opengroup.org/onlinepubs/009695399/functions/ \             pthread_cond_broadcast.html (!567)
+ - [HCFS] Use LeakSanitizer to eliminate memory leakage (!563)
+ - [HCFS] push all hcfs library to device to debug (!559)
+ - [HCFS] use undefined sanitizer to resolve memory violations (!556)
+ - [HCFS] Fixed warnings pointed by scan-build (!552)
+ - [HCFS] Fix errors scanned by ccc-analyzer    Fix errors scanned by ccc-analyzer and clang compiler (!525)
+ - [HCFS] Fix memory and resource leaks    Use clang's Address Sanitizer to figure out these leaks. (!531)
+ - [HCFS] fix signed integer overflow for expression 'UINT32_MAX - 10'    Take an example from 'INT02-C. Understand integer conversion rules',  CERT C Coding Standard:      signed char sc = SCHAR_MAX;      unsigned char uc = UCHAR_MAX;      signed long long sll = sc + uc;    The actual addition operation, due to integer promotion, takes place  between the two 32-bit int values. This operation is not influenced by  the resulting value being stored in a signed long long integer.    To ensure the expected subtraction two unsigned integers, we have to  cast in advance.    Reported-by-Cppcheck (!532)
+ - [Tera-App] Ci/adjust release file permission ([!100](gateway-2-0/android-management-app!100))
+
+## Redmine Issue Fixed
+ - Bug #10940: User need to drop down the notification bar to see pin file fail message. It is inconvenience for user.
+ - Bug #11065: Storage size did not release immediately after file was deleted on PC via MTP mode
+ - Bug #11836: 當 在切換 List View 到 Grid View 時, 會出現 Pin/Unpin fail
+ - Bug #11888: Pin/Unpin 時, 有機會跳回原本狀態
+ - Bug #11948: OTA package did not delete after OTA finished
+ - Bug #11966: Activation code fail reason is not clear for server problem.
+ - Bug #12245: 圖片及影片將副檔名改成大寫後在Tera會無法預覽及開啟
+ - Bug #12353: 在Switch account畫面如果停留超過15分鐘才開始轉換帳號, 轉換會失敗卡在"處理中,請稍後"
+ - Bug #12412: 初次登入 Tera 後, 打開系統設定使用回復原廠設定功能, 並無清除雲端資料選項
+ - Bug #12532: Transfer data, 在sync data時如果Tera app開啟wifi only但手機在4G狀態,會在transferring畫面一直轉圈圈
+ - Bug #12538: Transfer data時,如果網路中斷,會在transferring畫面持續轉圈圈,應出現錯誤訊息中斷transfer過程
+ - Bug #12541: Factory reset時,如果網路中斷,會在sync data畫面持續轉圈圈,應出現錯誤訊息中斷sync過程
+ - Bug #12580: Grid View app information 點擊 Pin/Unpin 後, 跳出 app information 轉圈圈 又再跑出一次
+ - Bug #12586: 在 Tera App 中長按檔案顯示詳細資料時太快關閉檔案明細小框框會使 Tear App crash
+ - Bug #12676: after restarting android framework , some mount points are deleted
+ - Bug #12743: 開啟Tera Notification settings後, 開啟/關閉網路不會跳出連線/斷線通知
+ - Bug #12752: 當app不在local時且關閉網路,app在launcher 沒有顯示灰階, 直到點選程式集才會改變顏色
+ - Bug #12760: Meta-parser API (get_vol_usage) 輸入錯誤內容的檔案，仍然可以parse出正確結果
+ - Bug #12763: Factory reset device only, mgmt server status did not change to "fully backup, waiting for transfer"
+ - Bug #12787: Tera app 設定wifi only 但Factory rest 時sync data只有4G網路, 選擇sync settings應該直接到Tera app的settings 頁面
+ - Bug #12796: 訊息欄會常駐預期外的Tera app狀態顯示,點選後會進到App info畫面, user可能會誤觸停用Tera app
+ - Bug #12799: 在APP/FILE page, Storage狀態每三秒會閃一次"Calculating"
+ - Bug #12834: 無網路的情況下,當刪除檔案過多時，有機會將手機空間吃光
+ - Bug #12854: 當登入多個google帳號, Factory reset頁面因為內容太長無法在第一頁看到"Erase Tera Cloud" 選項
+ - Bug #13009: 燒完image後(沒有Open Gapps), OTA folder不在mount point
+ - Bug #13015: 有時開啟Tera app會閃退,再開啟一次就會正常
+ - Bug #13018: 沒有登入Tera時, 做factory rest 不應該確認網路狀態與sync data設定.
+ - Bug #13065: 有時登入Tera後確認User profile會發現沒有顯示頭像圖片,從背景移掉Tera app再開啟即可顯示
+ - Bug #13083: 每次開機都會做最佳化,導致開機需要等很久
+ - Bug #13096: 從狀態列點擊OTA更新後到更新頁面點選下載會出現 HopeBayTech Updater 停止運作訊息
+ - Bug #13112: OTA package下載完成提示安裝訊息,在中文會出現"%s" 字串
+ - Bug #13127: 手機沒電關機之後重開機hcfs沒有正常啟動
+
+v 2.2.2.1655
+=====
+## Bug Fixed
+- [HCFS] hotfix/curl_NOSIGNAL (!558)
+- [HCFS] fix/graceful_umount_hcfs (!540)
+
 v 2.2.2.1465
 =====
-
 ## Fixes 
  - [HCFS] Fixed #12713: hotfix/returnEIO_when_cache_full_and_nothing_replace (!527)
  - [Nexus-5x] Fix/issue 12529 [!36](gateway-2-0/nexus-5x!36)

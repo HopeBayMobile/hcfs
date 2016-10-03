@@ -17,11 +17,11 @@ def demo(cmd):
 
 test_target='test_data/v1/android'
 
-demo_title("list_external_volume")
-demo('list_external_volume(b"'+test_target+'/fsmgr")')
+demo_title("list_volume")
+demo('list_volume(b"'+test_target+'/fsmgr")')
 
-demo_title("list_external_volume (Failure)")
-demo('list_external_volume(b"")')
+demo_title("list_volume (Failure)")
+demo('list_volume(b"")')
 
 demo_title("parse_meta")
 demo('parse_meta(b"'+test_target+'/meta_isdir")')
@@ -35,9 +35,6 @@ demo('list_dir_inorder(b"'+test_target+'/meta_isdir", ret["offset"], limit=100)'
 
 demo_title("get_vol_usage")
 demo('get_vol_usage(b"'+test_target+'/FSstat")')
-
-demo_title("get_vol_usage (Failure)")
-demo('get_vol_usage(b"'+test_target+'/FSstat_rand")')
 
 demo_title("list_file_blocks")
 demo('list_file_blocks(b"'+test_target+'/meta_isreg")')

@@ -17,9 +17,7 @@ void *set_swift_token(void *)
 	int sleep_time = 5;
 	printf("Set up swift token after %d seconds later\n", sleep_time);
 	sleep(sleep_time);
-	pthread_mutex_lock(&(swifttoken_control.waiting_lock));
 	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
-	pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
 	return NULL;
 }
 

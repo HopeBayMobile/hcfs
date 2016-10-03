@@ -146,7 +146,7 @@ void *monitor_loop(void *ptr)
  *
  *************************************************************************/
 int32_t check_backend_status(void) {
-	double test_duration = 0.0;
+	double test_duration;
 	struct timespec test_stop, test_start;
 	BOOL status;
 	int32_t ret_val;

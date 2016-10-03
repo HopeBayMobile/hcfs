@@ -1,15 +1,24 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,TestMetaParser_00,Setup environment and BVT,,1,Pass,,148
-,TestMetaParser_01,test_hcfs_parse_fsmgr_NormalFsmgr,,1,Pass,,0
-,TestMetaParser_02,test_hcfs_parse_fsmgr_NonexistFsmgr,,1,Fail,"Non-existed path shouldn't return result, input = ['/no'], output = [[(1, 'first inode'), (22, 'second inode'), (123, '/no')]]",0
-,TestMetaParser_03,test_hcfs_parse_fsmgr_EmptyFsmgr,,1,Fail,"Empty path shouldn't return result, input = [''], output = [[(1, 'first inode'), (22, 'second inode'), (123, '')]]",0
-,TestMetaParser_04,test_hcfs_parse_meta_NormalMetapath,,1,Pass,dummy,0
-,TestMetaParser_05,test_hcfs_parse_meta_NonexistMetapath,,1,Pass,dummy,0
-,TestMetaParser_06,test_hcfs_parse_meta_EmptypathMetapath,,1,Pass,dummy,0
-,TestMetaParser_07,test_hcfs_query_dir_list_NormalValues,,1,Pass,dummy,0
-,TestMetaParser_08,test_hcfs_query_dir_list_NormalMetapathLimit_NonexistIndex,,1,Pass,dummy,0
-,TestMetaParser_09,test_hcfs_query_dir_list_NormalMetapathIndex_NonexistLimit,,1,Pass,dummy,0
-,TestMetaParser_10,test_hcfs_query_dir_list_NormalMetapath_NonexistIndexLimit,,1,Pass,dummy,0
-,TestMetaParser_11,test_hcfs_query_dir_list_NonexistlMetapath,,1,Pass,dummy,0
-,TestMetaParser_12,test_hcfs_query_dir_list_EmptyMetapath,,1,Pass,dummy,0
+,TestMetaParser_117001,test_hcfs_list_external_volume_NormalFsmgr,,1,Pass,,0
+,TestMetaParser_117002,test_hcfs_list_external_volume_random_content_file,,1,Fail,"Non-existed path shouldn't return result, input = ['/no'], output = [[(1, 'first inode'), (22, 'second inode'), (123, '/no')]]",0
+,TestMetaParser_117003,test_hcfs_list_external_volume_NonexistedAndEmptyPath,,1,Fail,"Empty path shouldn't return result, input = [''], output = [[(1, 'first inode'), (22, 'second inode'), (123, '')]]",0
+,TestMetaParser_117004,test_hcfs_parse_meta_NormalMetaPath,,1,,,
+,TestMetaParser_117005,test_hcfs_parse_meta_random_content_file,,1,Pass,dummy,0
+,TestMetaParser_117006,test_hcfs_parse_meta_NonexistedAndEmptyPath,,1,Pass,dummy,0
+,TestMetaParser_117007,test_hcfs_list_dir_inorder_NormalMetaPath,,1,Pass,dummy,0
+,TestMetaParser_117008,test_hcfs_list_dir_inorder_random_content_file,,1,Pass,dummy,0
+,TestMetaParser_117009,test_hcfs_list_dir_inorder_NormalMetaPathLimit_InvalidOffset,,1,Pass,dummy,0
+,TestMetaParser_117010,test_hcfs_list_dir_inorder_NormalMetaPathOffset_InvalidLimit,,1,Pass,dummy,0
+,TestMetaParser_117011,test_hcfs_list_dir_inorder_NormalMetaPath_InvalidOffsetLimit,,1,Pass,dummy,0
+,TestMetaParser_117012,test_hcfs_list_dir_inorder_NonexistedAndEmptyPath,,1,Pass,dummy,0
+,TestMetaParser_117013,test_hcfs_get_vol_usage_normal_FSstat,,1,Pass,dummy,0
+,TestMetaParser_117014,test_hcfs_get_vol_usage_random_content_file,,1,,,
+,TestMetaParser_117015,test_hcfs_get_vol_usage_NonexistedAndEmptyPath,,1,,,
+,TestMetaParser_117016,test_hcfs_list_file_blocks_NormalMetaPath,,1,,,
+,TestMetaParser_117017,test_hcfs_list_file_blocks_random_content_file,,1,,,
+,TestMetaParser_117018,test_hcfs_list_file_blocks_NonexistedAndEmptyPath,,1,,,
+,TestMetaParser_117019,test_hcfs_behavior_external_vol_has_FSstat,,1,,,
+,TestMetaParser_117020,test_hcfs_behavior_list_file_blocks_exists,,1,,,
+,TestMetaParser_117021,test_hcfs_behavior_FSstat_exists,,1,,,
 ,TestMetaParser_99,Clear environment,,1,Pass,,72

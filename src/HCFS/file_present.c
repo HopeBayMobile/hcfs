@@ -1580,7 +1580,6 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 	ssize_t ret_ssize;
 	int64_t toupload_blocks;
 
-	meta_cache_entry = NULL;
 	meta_cache_entry = meta_cache_lock_entry(data->inode);
 	if (!meta_cache_entry) {
 		errcode = -errno;

@@ -123,6 +123,10 @@ int32_t open_log(char *filename)
 		return -errcode;
 	}
 
+#ifdef VERSION_NUM
+	write_log(2, "\nVersion: %s", VERSION_NUM);
+#endif
+	write_log(2, "\nStart logging %s\n", filename);
 	return 0;
 }
 

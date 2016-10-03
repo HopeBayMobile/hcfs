@@ -708,7 +708,6 @@ int32_t delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
-	metafptr = NULL;
 	metafptr = fopen(thismetapath, "r");
 	if (metafptr == NULL) {
 		errcode = errno;
@@ -1017,7 +1016,6 @@ int32_t backup_FS_database(void)
 	if (access(tmppath, F_OK) != 0)
 		return 0;
 
-	tmpdbfptr = NULL;
 	tmpdbfptr = fopen(tmppath, "r");
 	if (tmpdbfptr == NULL) {
 		errcode = errno;
@@ -1038,7 +1036,6 @@ int32_t backup_FS_database(void)
 	}
 	FSEEK(tmpdbfptr, 0, SEEK_SET);
 
-	fptr = NULL;
 	fptr = fopen("/tmp/FSmgr_upload", "w");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1057,7 +1054,6 @@ int32_t backup_FS_database(void)
 	fclose(tmpdbfptr);
 	fclose(fptr);
 
-	fptr = NULL;
 	snprintf(upload_handle.id, sizeof(upload_handle.id), "FSmgr_upload");
 	upload_handle.curl_backend = NONE;
 	upload_handle.curl = NULL;
@@ -1108,13 +1104,12 @@ errcode_handle:
 *************************************************************************/
 int32_t restore_FS_database(void)
 {
-	FILE *fptr = NULL;
+	FILE *fptr;
 	int32_t ret, errcode;
 	CURL_HANDLE download_handle;
 
 	/* Assume that FS manager is not started */
 
-	fptr = NULL;
 	memset(&download_handle, 0, sizeof(CURL_HANDLE));
 
 	snprintf(download_handle.id, sizeof(download_handle.id),

@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#include "../HCFS/meta.h"
 #include "global.h"
 #include "HCFSvol.h"
 #include "../HCFS/meta.h"

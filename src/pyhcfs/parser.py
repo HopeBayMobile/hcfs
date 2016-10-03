@@ -46,13 +46,13 @@ def convert_to_python(s):
         return s
 
 
-def list_external_volume(fsmgr_path):
+def list_volume(fsmgr_path):
     """
     Return list of hcfs external volumes
     """
     ptr_ret_entry = ffi.new("PORTABLE_DIR_ENTRY **")
     ret_num = ffi.new("uint64_t *")
-    ret = lib.list_external_volume(fsmgr_path, ptr_ret_entry, ret_num)
+    ret = lib.list_volume(fsmgr_path, ptr_ret_entry, ret_num)
     if ret < 0:
         print(
             'Error:',
@@ -65,7 +65,7 @@ def list_external_volume(fsmgr_path):
     response = []
     for x in range(ret_num[0]):
         entry = ptr_ret_entry[0][x]
-        response += [(entry.inode, ffi.string(entry.d_name))]
+        response += [(entry.inode, entry.d_type, ffi.string(entry.d_name))]
 
     return response
 

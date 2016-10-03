@@ -657,7 +657,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 
 		/* Self data */
 		new_info->mp_mode = mp_mode;
-		new_info->f_mp = NULL;
 		new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 		if (new_info->f_mp == NULL) {
 			errcode = -ENOMEM;
@@ -717,7 +716,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 	strcpy((new_info->f_name), fsname);
-	new_info->f_mp = NULL;
 	new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 	if (new_info->f_mp == NULL) {
 		errcode = -ENOMEM;
@@ -726,7 +724,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	}
 	strcpy((new_info->f_mp), mp);
 
-	new_info->lookup_table = NULL;
 	new_info->lookup_table = malloc(sizeof(LOOKUP_HEAD_TYPE)
 				* NUM_LOOKUP_ENTRIES);
 	if (new_info->lookup_table == NULL) {
@@ -750,7 +747,6 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	memset(new_info->FS_stat, 0, sizeof(FS_STAT_T));
 	
 	/* init sem of stat lock */
-	new_info->stat_lock = NULL;
 	new_info->stat_lock = malloc(sizeof(sem_t));
 	if (new_info->stat_lock == NULL) {
 		errcode = -ENOMEM;
@@ -807,10 +803,8 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 
 errcode_handle:
 	if (new_info != NULL) {
-		if (new_info->f_mp != NULL)
-			free(new_info->f_mp);
-		if (new_info->lookup_table != NULL)
-			free(new_info->lookup_table);
+		free(new_info->f_mp);
+		free(new_info->lookup_table);
 		if (new_info->stat_fptr != NULL)
 			fclose(new_info->stat_fptr);
 		free(new_info);
@@ -837,6 +831,8 @@ static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 			write_log(8, "Destroy shared data of volume %s\n",
 					mount_info->f_name);
 			lookup_destroy(mount_info->lookup_table, mount_info);
+			free(mount_info->lookup_table);
+			mount_info->lookup_table = NULL;
 			if (mount_info->stat_fptr != NULL)
 				fclose(mount_info->stat_fptr);
 			if (mount_info->FS_stat != NULL)
