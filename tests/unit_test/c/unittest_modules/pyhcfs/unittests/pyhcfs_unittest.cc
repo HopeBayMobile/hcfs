@@ -17,8 +17,8 @@ using ::testing::ValuesIn;
 
 /* Defiinition for multiple versions/platforms */
 const char* paths[] = {
-	"test_data/v2/android",
-	"test_data/v2/linux"
+	"test_data/v1/android",
+	"test_data/v1/linux"
 };
 
 #define CONCAT_TEST_META_PATH(A) \
