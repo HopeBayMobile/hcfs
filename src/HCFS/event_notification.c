@@ -596,12 +596,19 @@ int32_t add_notify_event(int32_t event_id,
  ***********************************************************************/
 int32_t add_notify_event_obj(int32_t event_id, json_t *event, char blocking)
 {
-	int32_t ret_code;
+	enum {
+		OP_SUCCESSFUL = 0,
+		ERR_SERVER_NOT_SET,
+		ERR_QUEUE_FULL,
+		ERR_DROP_BY_FILTER
+	};
+
+	int32_t ret_code = OP_SUCCESSFUL;
 
 	/* Server not set? */
 	if (notify_server_path == NULL) {
 		write_log(4, "Event is dropped because notify server not set.");
-		return 1;
+		return ERR_SERVER_NOT_SET;
 	}
 
 	if (!json_is_object(event)) {
@@ -617,16 +624,14 @@ int32_t add_notify_event_obj(int32_t event_id, json_t *event, char blocking)
 	ret_code = check_event_filter(event_id);
 	if (ret_code < 0) {
 		write_log(8, "Event is dropped by event filter.");
-		return 3;
+		return ERR_DROP_BY_FILTER;
 	}
 
 	ret_code = event_enqueue(event_id, event, blocking);
 
 	if (ret_code == -ENOSPC) {
-		/* Event queue is full */
 		write_log(4, "Event is dropped due to queue full error.");
-		ret_code = 2;
-		goto done;
+		ret_code = ERR_QUEUE_FULL;
 	} else if (ret_code < 0) {
 		return ret_code;
 	}

@@ -33,19 +33,8 @@ FAKE_VALUE_FUNC(time_t, time, time_t *);
 FAKE_VALUE_FUNC(int32_t, check_event_filter, int32_t);
 FAKE_VALUE_FUNC_VARARG(int32_t, write_log, int32_t, const char *, ...);
 
-
-EVENT_FILTER event_filters[] = {
-	/* name, last_send_timestamp, send_interval */
-	{TESTSERVER,                  0, 0},
-	{TOKEN_EXPIRED,               0, 120},
-	{SYNCDATACOMPLETE,            0, 0},
-	{RESTORATION_STAGE1_CALLBACK, 0, 0},
-	{RESTORATION_STAGE2_CALLBACK, 0, 0},
-	{EXCEED_PIN_MAX,              0, 0},
-	{SPACE_NOT_ENOUGH,            0, 0},
-	{CREATE_THUMBNAIL,            0, 0},
-};
-
+/* Register event filter here */
+REGISTER_EVENTS;
 
 TEST(init_event_queueTEST, InitializedOK)
 {

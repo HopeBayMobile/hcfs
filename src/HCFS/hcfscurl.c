@@ -509,7 +509,6 @@ errcode_handle:
 *************************************************************************/
 int32_t hcfs_get_auth_swifttoken(void)
 {
-
 	int32_t ret_code;
 	struct timespec timeout;
 
