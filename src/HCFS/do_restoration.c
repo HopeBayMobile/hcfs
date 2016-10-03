@@ -1340,8 +1340,10 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 				src_inode, *target_inode);
 			*need_copy = TRUE;
 		} else {
-			/* Otherwise, use the hardlink inode number and
-			 * increase nlink */
+			/*
+			 * Otherwise, use the hardlink inode number and
+			 * increase nlink
+			 */
 			fetch_restore_meta_path(targetpath, *target_inode);
 			fptr = fopen(targetpath, "r+");
 			if (!fptr) {
@@ -1477,8 +1479,10 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 			child_src_inode = now_entry->d_ino;
 			now_type = now_entry->d_type;
 			if (now_type == D_ISREG || now_type == D_ISLNK) {
-				/* Check if it is a hardlink, and then
-				 * get a target inode */
+				/*
+				 * Check if it is a hardlink, and then
+				 * get a target inode
+				 */
 				need_copy = TRUE;
 				ret = _check_hardlink(child_src_inode,
 					&child_target_inode, &need_copy,
@@ -1495,8 +1499,10 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 						child_target_inode,
 						now_entry->d_type,
 						uid, hardln_mapping);
-					write_log(8, "Restore debug: Replacing"
-						" with %s", now_entry->d_name);
+					write_log(
+					    8,
+					    "Restore debug: Replacing with %s",
+					    now_entry->d_name);
 				}
 
 			} else if (now_type == D_ISDIR) {
@@ -1527,8 +1533,9 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 					}
 				}
 			} else {
-				write_log(6, "Info: Replacing with %s is"
-					" successful", now_entry->d_name);
+				write_log(
+				    6, "Info: Replacing with %s is successful",
+				    now_entry->d_name);
 				now_entry->d_ino = child_target_inode;
 			}
 		}
@@ -1663,14 +1670,18 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 			insert_inode_pair(hardln_mapping,
 				src_inode, tmpptr->d_ino);
 		} else {
-			/* Otherwise, use the hardlink inode number and
-			 * increase nlink */
+			/*
+			 * Otherwise, use the hardlink inode number and
+			 * increase nlink
+			 */
 			fetch_restore_meta_path(targetpath, target_inode);
 			fptr = fopen(targetpath, "r+");
 			if (!fptr) {
 				errcode = -errno;
-				write_log(0, "Error: Fail to open file in %s."
-					" Code %d", __func__, -errcode);
+				write_log(
+				    0,
+				    "Error: Fail to open file in %s. Code %d",
+				    __func__, -errcode);
 				return errcode;
 			}
 			flock(fileno(fptr), LOCK_EX);
@@ -1681,8 +1692,10 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 			FWRITE(&hcfsstat, sizeof(HCFS_STAT), 1, fptr);
 			flock(fileno(fptr), LOCK_UN);
 			fclose(fptr);
-			/* Remember to modify the inode number in
-			 * parent folder */
+			/*
+			 * Remember to modify the inode number in parent
+			 * folder
+			 */
 			tmpptr->d_ino = target_inode;
 		}
 	}
@@ -1843,8 +1856,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 
 					ret = replace_missing_meta(nowpath,
 						tmpptr, hardln_mapping);
-					/* Socket and fifo file will be
-					 * pruned */
+					/*
+					 * Socket and fifo file will be
+					 * pruned
+					 */
 					if (ret < 0)
 						can_prune = TRUE;
 					else
@@ -1871,8 +1886,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					goto errcode_handle;
 				}
 			}
-			/* Skip to fetch data from cloud if file is
-			 * replaced with local data */
+			/*
+			 * Skip to fetch data from cloud if file is
+			 * replaced with local data
+			 */
 			if (object_replace == TRUE)
 				continue;
 

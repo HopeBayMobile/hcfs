@@ -195,9 +195,6 @@ int32_t init_package_uid_list(char *plistpath)
 			  ebuff);
 		goto errcode_handle;
 	}
-	//snprintf(plistpath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
-
-	/*snprintf(plistpath, METAPATHLEN, "packages.xml");*/
 
 	src = fopen(plistpath, "r");
 	if (src == NULL) {
