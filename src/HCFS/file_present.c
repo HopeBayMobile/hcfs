@@ -968,7 +968,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		ret_code = -errno;
 		meta_cache_close_file(self_meta_cache_entry);
 		meta_cache_unlock_entry(self_meta_cache_entry);
-		return errno;
+		return ret_code;
 	}
 #endif
 	meta_cache_get_meta_size(self_meta_cache_entry, &metasize,
