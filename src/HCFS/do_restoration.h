@@ -10,8 +10,8 @@
 *
 **************************************************************************/
 
-#ifndef GW20_DO_RESTORATION_H_
-#define GW20_DO_RESTORATION_H_
+#ifndef SRC_HCFS_DO_RESTORATION_H_
+#define SRC_HCFS_DO_RESTORATION_H_
 
 #include <inttypes.h>
 #include <semaphore.h>
@@ -50,6 +50,7 @@ typedef struct {
 	sem_t sysmeta_sem;
 	SYSTEM_DATA_TYPE restored_system_meta;
 	SYSTEM_DATA_TYPE rectified_system_meta;
+	ino_t system_max_inode;
 	FILE *rect_fptr;
 } HCFS_RESTORED_SYSTEM_META;
 
@@ -75,7 +76,10 @@ typedef struct {
 	DIR_ENTRY entry;
 } PRUNE_T;
 
+
 void init_restore_path(void);
+int32_t write_system_max_inode(ino_t ino_num);
+int32_t read_system_max_inode(ino_t *ino_num);
 
 /* Returns path to status file on system restoring */
 int32_t fetch_restore_stat_path(char *pathname);
@@ -106,4 +110,4 @@ void update_restored_cache_usage(int64_t delta_cache_size,
 int32_t rectify_space_usage();
 int32_t init_rectified_system_meta(char restoration_stage);
 int32_t check_network_connection(void);
-#endif  /* GW20_DO_RESTORATION_H_ */
+#endif  /* SRC_HCFS_DO_RESTORATION_H_ */

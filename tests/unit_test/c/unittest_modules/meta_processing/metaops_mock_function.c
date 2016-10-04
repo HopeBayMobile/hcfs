@@ -566,3 +566,20 @@ void fetch_progress_file_path(char *pathname, ino_t inode)
 	sprintf(pathname, "testpatterns/mock_progress_file");
 	return;
 }
+
+int32_t fetch_restore_block_path(char *pathname,
+		ino_t this_inode, int64_t block_num)
+{
+	return 0;
+}
+
+int32_t copy_file(const char *srcpath, const char *tarpath)
+{
+	return 0;
+}
+
+void update_restored_cache_usage(int64_t delta_cache_size,
+				 int64_t delta_cache_blocks)
+{
+	return;
+}

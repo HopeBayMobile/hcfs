@@ -300,7 +300,7 @@ int32_t write_log(int32_t level, const char *format, ...)
 	int32_t this_logsize, ret_size;
 	char *temp_ptr;
 
-	if (level > LOG_LEVEL)
+	if (system_config && level > LOG_LEVEL)
 		return 0;
 
 	va_start(alist, format);

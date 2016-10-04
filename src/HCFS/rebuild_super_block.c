@@ -147,7 +147,7 @@ errcode_handle:
  */
 int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 {
-	ino_t root_inode, max_inode;
+	ino_t root_inode, max_inode, tmp_ino;
 	int64_t idx;
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -226,6 +226,10 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 			fclose(fptr);
 		}
 	}
+	ret = read_system_max_inode(&tmp_ino);
+	if (ret < 0)
+		return ret;
+	max_inode = (max_inode > tmp_ino ? max_inode : tmp_ino);
 
 	write_log(0, "Now max inode number is %"PRIu64, (uint64_t)max_inode);
 	/* init head */
@@ -235,7 +239,6 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 		return -errno;
 	memset(&head, 0, sizeof(SUPER_BLOCK_HEAD));
 	head.num_total_inodes = max_inode;
-	//head.now_rebuild = TRUE;
 	FSEEK(sb_fptr, 0, SEEK_SET);
 	FWRITE(&head, sizeof(SUPER_BLOCK_HEAD), 1, sb_fptr);
 	FTRUNCATE(fileno(sb_fptr), sizeof(SUPER_BLOCK_HEAD) +

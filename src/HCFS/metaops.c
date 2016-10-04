@@ -106,9 +106,12 @@ int32_t init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 *                appropriate error code.
 *
 *************************************************************************/
-int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
-			BOOL is_external)
+int32_t dir_add_entry(ino_t parent_inode,
+		      ino_t child_inode,
+		      const char *childname,
+		      mode_t child_mode,
+		      META_CACHE_ENTRY_STRUCT *body_ptr,
+		      BOOL is_external)
 {
 	HCFS_STAT parent_stat;
 	DIR_META_TYPE parent_meta;
@@ -152,8 +155,10 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 	if (ret < 0)
 		return ret;
 
-	/* Initialize B-tree insertion by first loading the root of
-	*  the B-tree. */
+	/*
+	 * Initialize B-tree insertion by first loading the root of the
+	 * B-tree.
+	 */
 	tpage.this_page_pos = parent_meta.root_entry_page;
 
 	ret = meta_cache_open_file(body_ptr);
@@ -172,8 +177,10 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	/* Drop all cached pages first before inserting */
-	/* TODO: Future changes could remove this limitation if can update
-	*  cache with each node change in b-tree*/
+	/*
+	 * TODO: Future changes could remove this limitation if
+	 * can update cache with each node change in b-tree
+	 */
 	ret = meta_cache_drop_pages(body_ptr);
 	if (ret < 0) {
 		meta_cache_close_file(body_ptr);
@@ -194,10 +201,12 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 		return ret;
 	}
 
-	/* If return value is 1, we need to handle overflow by splitting
-	*  the old root node in two and create a new root page to point
-	*  to the two splitted nodes. Note that a new node has already been
-	*  created in this case and pointed by "overflow_new_page". */
+	/*
+	 * If return value is 1, we need to handle overflow by splitting
+	 * the old root node in two and create a new root page to point
+	 * to the two splitted nodes. Note that a new node has already been
+	 * created in this case and pointed by "overflow_new_page".
+	 */
 	if (ret == 1) {
 		/* Reload old root */
 		FSEEK(body_ptr->fptr, parent_meta.root_entry_page,
@@ -234,8 +243,10 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 			}
 		}
 
-		/* Insert the new root to the head of tree_walk_list. This list
-		*  is for listing nodes in the B-tree in readdir operation. */
+		/*
+		 * Insert the new root to the head of tree_walk_list. This list
+		 * is for listing nodes in the B-tree in readdir operation.
+		 */
 		new_root.gc_list_next = 0;
 		new_root.tree_walk_next = parent_meta.tree_walk_list_head;
 		new_root.tree_walk_prev = 0;
@@ -272,29 +283,37 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 		new_root.num_entries = 1;
 		memcpy(&(new_root.dir_entries[0]), &overflow_entry,
 							sizeof(DIR_ENTRY));
-		/* The two children of the new root is the old root and
-		*  the new node created by the overflow. */
+		/*
+		 * The two children of the new root is the old root and
+		 * the new node created by the overflow.
+		 */
 		new_root.child_page_pos[0] = parent_meta.root_entry_page;
 		new_root.child_page_pos[1] = overflow_new_page;
 
-		/* Set the root of B-tree to the new root, and write the
-		*  content of the new root the the meta file. */
+		/*
+		 * Set the root of B-tree to the new root, and write the
+		 * content of the new root the the meta file.
+		 */
 		parent_meta.root_entry_page = new_root.this_page_pos;
 		FSEEK(body_ptr->fptr, new_root.this_page_pos, SEEK_SET);
 
 		FWRITE(&new_root, sizeof(DIR_ENTRY_PAGE), 1,
 				body_ptr->fptr);
 
-		/* Change the parent of the old root to point to the new root.
-		*  Write to the meta file afterward. */
+		/*
+		 * Change the parent of the old root to point to the new
+		 * root.  Write to the meta file afterward.
+		 */
 		tpage.parent_page_pos = new_root.this_page_pos;
 		FSEEK(body_ptr->fptr, tpage.this_page_pos, SEEK_SET);
 		FWRITE(&tpage, sizeof(DIR_ENTRY_PAGE), 1,
 				body_ptr->fptr);
 
-		/* If no_need_rewrite is true, we have already write modified
-		*  content for the new node from the overflow. Otherwise we need
-		*  to write it to the meta file here. */
+		/*
+		 * If no_need_rewrite is true, we have already write
+		 * modified content for the new node from the overflow.
+		 * Otherwise we need to write it to the meta file here.
+		 */
 		if (no_need_rewrite == FALSE) {
 			FSEEK(body_ptr->fptr, overflow_new_page,
 					SEEK_SET);
@@ -312,8 +331,10 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 							body_ptr->fptr);
 		}
 
-		/* Complete the splitting by updating the meta of the
-		*  directory. */
+		/*
+		 * Complete the splitting by updating the meta of the
+		 * directory.
+		 */
 		FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
 		FWRITE(&parent_meta, sizeof(DIR_META_TYPE), 1,
 					body_ptr->fptr);
@@ -329,8 +350,10 @@ int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childna
 		"TOTAL CHILDREN is now %lld\n", parent_meta.total_children);
 
 	set_timestamp_now(&parent_stat, MTIME | CTIME);
-	/* Stat may be dirty after the operation so should write them back
-	*  to cache*/
+	/*
+	 * Stat may be dirty after the operation so should write them
+	 * back to cache
+	 */
 	ret = meta_cache_update_dir_data(parent_inode, &parent_stat,
 						&parent_meta, NULL, body_ptr);
 
@@ -412,8 +435,10 @@ int32_t dir_remove_entry(ino_t parent_inode,
 	}
 
 	/* Drop all cached pages first before deleting */
-	/* TODO: Future changes could remove this limitation if can update cache
-	*  with each node change in b-tree*/
+	/*
+	 * TODO: Future changes could remove this limitation if can
+	 * update cache with each node change in b-tree
+	 */
 
 	ret = meta_cache_drop_pages(body_ptr);
 	if (ret < 0) {
@@ -438,8 +463,10 @@ int32_t dir_remove_entry(ino_t parent_inode,
 	/* tpage might be invalid after calling delete_dir_entry_btree */
 
 	if (ret == 0) {
-		/* If the entry is a subdir, decrease the hard link of
-		*  the parent*/
+		/*
+		 * If the entry is a subdir, decrease the hard link of
+		 * the parent
+		 */
 
 		if (S_ISDIR(child_mode))
 			parent_stat.nlink--;
@@ -509,11 +536,14 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	return ret_val;
 }
 
-/* change_entry_name should only be called from a rename situation where
-the volume is "external" and if the old and the new name are the same if
-case insensitive */
-int32_t change_entry_name(ino_t parent_inode, const char *targetname,
-			META_CACHE_ENTRY_STRUCT *body_ptr)
+/*
+ * change_entry_name should only be called from a rename situation where
+ * the volume is "external" and if the old and the new name are the same
+ * if case insensitive
+ */
+int32_t change_entry_name(ino_t parent_inode,
+			  const char *targetname,
+			  META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
 	int32_t count;
@@ -531,7 +561,7 @@ int32_t change_entry_name(ino_t parent_inode, const char *targetname,
 			return ret_val;
 
 		snprintf(tpage.dir_entries[count].d_name, MAX_FILENAME_LEN + 1,
-		         "%s", targetname);
+			 "%s", targetname);
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
 		ret_val = meta_cache_update_dir_data(parent_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
@@ -597,7 +627,6 @@ int32_t change_dir_entry_inode(ino_t self_inode,
 		} else if (S_ISSOCK(new_mode)) {
 			write_log(10, "Debug: change to type SOCK\n");
 			tpage.dir_entries[count].d_type = D_ISSOCK;
-		
 		} else {
 			write_log(0, "Error: Invalid rename type in %s\n",
 					__func__);
@@ -677,8 +706,10 @@ int32_t delete_inode_meta(ino_t this_inode)
 	if (ret < 0)
 		return ret;
 
-	/* Meta file should be downloaded already in unlink, rmdir, or
-	rename ops */
+	/*
+	 * Meta file should be downloaded already in unlink, rmdir, or
+	 * rename ops
+	 */
 
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
@@ -757,8 +788,10 @@ int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	/* Only fetch inode stat here. Can be replaced by
-		meta_cache_lookup_file_data() */
+	/*
+	 * Only fetch inode stat here. Can be replaced by
+	 * meta_cache_lookup_file_data()
+	 */
 	if (body_ptr == NULL)
 		return -errno;
 
@@ -1430,14 +1463,14 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	int64_t page_pos;
 	off_t cache_block_size;
 	HCFS_STAT this_inode_stat;
-        FILE_META_TYPE file_meta;
-        BLOCK_ENTRY_PAGE tmppage;
-        FILE *metafptr = NULL;
-        int64_t e_index, which_page;
-        size_t ret_size;
-        struct timeval start_time, end_time;
-        float elapsed_time;
-        char block_status;
+	FILE_META_TYPE file_meta;
+	BLOCK_ENTRY_PAGE tmppage;
+	FILE *metafptr = NULL;
+	int64_t e_index, which_page;
+	size_t ret_size;
+	struct timeval start_time, end_time;
+	float elapsed_time;
+	char block_status;
 	char rootpath[METAPATHLEN];
 	FILE *fptr;
 	FS_STAT_T tmpstat;
@@ -1519,8 +1552,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 
-		/* Meta file should be downloaded already in unlink, rmdir, or
-		rename ops */
+		/*
+		 * Meta file should be downloaded already in unlink,
+		 * rmdir, or rename ops
+		 */
 
 		if (access(thismetapath, F_OK) != 0) {
 			errcode = errno;
@@ -1583,8 +1618,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		}
 
 		/*Need to delete blocks as well*/
-		/* TODO: Perhaps can move the actual block deletion to the
-		*  deletion loop as well*/
+		/*
+		 * TODO: Perhaps can move the actual block deletion to
+		 * the deletion loop as well
+		 */
 		if (this_inode_stat.size == 0)
 			total_blocks = 0;
 		else
@@ -1624,8 +1661,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				goto errcode_handle;
 			}
 
-			/* Do not need to change per-file statistics here
-			as the file is in the process of being deleted */
+			/*
+			 * Do not need to change per-file statistics here
+			 * as the file is in the process of being deleted
+			 */
 			if (access(thisblockpath, F_OK) == 0) {
 				cache_block_size =
 						check_file_size(thisblockpath);
@@ -1636,8 +1675,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				else
 					dirty_delta = 0;
 
-				unpin_dirty_delta = (P_IS_UNPIN(file_meta.local_pin)
-					? dirty_delta : 0);
+				unpin_dirty_delta =
+				    (P_IS_UNPIN(file_meta.local_pin)
+					 ? dirty_delta
+					 : 0);
 				change_system_meta(0, 0, -cache_block_size, -1,
 					dirty_delta, unpin_dirty_delta, FALSE);
 			}
@@ -1658,8 +1699,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 
-		/* Remove to-delete meta if no backend or
-		 * this inode hadn't been synced */
+		/*
+		 * Remove to-delete meta if no backend or this inode
+		 * hadn't been synced
+		 */
 		ret = check_meta_on_cloud(this_inode, d_type,
 				&meta_on_cloud, &metasize, &metasize_blk);
 		if (ret < 0) {
@@ -1686,8 +1729,10 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			/* Push to clouddelete queue */
 			ret = super_block_enqueue_delete(this_inode);
 			if (ret < 0) {
-				write_log(0, "Error: Fail to delete meta"
-					" in %s. Code %d", __func__, -ret);
+				write_log(
+				    0,
+				    "Error: Fail to delete meta in %s. Code %d",
+				    __func__, -ret);
 				return ret;
 			}
 
@@ -1774,10 +1819,12 @@ int32_t disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
 		MKDIR(pathname, 0700);
 
 	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
-	         METAPATH, (uint64_t)this_inode, (uint64_t)mptr->f_ino);
+		 METAPATH, (uint64_t)this_inode, (uint64_t)mptr->f_ino);
 
-	/* In Android env, if need to delete the inode, first remember
-	the path of the inode if needed */
+	/*
+	 * In Android env, if need to delete the inode, first remember
+	 * the path of the inode if needed
+	 */
 #ifdef _ANDROID_ENV_
 	if (access(pathname, F_OK) != 0) {
 		if (IS_ANDROID_EXTERNAL(mptr->volume_type)) {
@@ -1785,8 +1832,8 @@ int32_t disk_markdelete(ino_t this_inode, MOUNT_T *mptr)
 				MKNOD(pathname, S_IFREG | 0700, 0);
 			} else {
 				ret = construct_path(mptr->vol_path_cache,
-				                     this_inode, &tmppath,
-				                     mptr->f_ino);
+						     this_inode, &tmppath,
+						     mptr->f_ino);
 				if (ret < 0) {
 					if (tmppath != NULL)
 						free(tmppath);
@@ -1840,8 +1887,8 @@ int32_t disk_cleardelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
-			(uint64_t)this_inode, (uint64_t)root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
+		 METAPATH, (uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
@@ -1868,8 +1915,8 @@ int32_t disk_checkdelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
-			(uint64_t)this_inode, (uint64_t)root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "",
+		 METAPATH, (uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1877,8 +1924,10 @@ int32_t disk_checkdelete(ino_t this_inode, ino_t root_inode)
 	return 0;
 }
 
-/* At system startup, scan to delete markers on disk to determine if
-there are inodes to be deleted. */
+/*
+ * At system startup, scan to delete markers on disk to determine if
+ * there are inodes to be deleted.
+ */
 int32_t startup_finish_delete(void)
 {
 	DIR *dirp;
@@ -1954,9 +2003,11 @@ int32_t startup_finish_delete(void)
 	return 0;
 }
 
-/* Given parent "parent", search for "childname" in parent and return
-the directory entry in structure pointed by "dentry" if found. If not or
-if error, return the negation of error code. */
+/*
+ * Given parent "parent", search for "childname" in parent and return the
+ * directory entry in structure pointed by "dentry" if found. If not or
+ * if error, return the negation of error code.
+ */
 int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
 		   BOOL is_external)
 {
@@ -1993,10 +2044,11 @@ int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
  * @param ptr Meta cache entry pointer.
  * @param ispin New pinned status. TRUE means from unpin to pin, and FALSE
  *              means from pin to unpin
- * 
+ *
  * @return 0 on succes, otherwise negative error code.
  */
-static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin)
+static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
+					char ispin)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -2012,8 +2064,10 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr, char ispin
 		SEEK_SET);
 	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
 
-	/* when from unpin to pin, decrease unpin-dirty size,
-	 * otherwise increase unpin-dirty size */
+	/*
+	 * when from unpin to pin, decrease unpin-dirty size, otherwise
+	 * increase unpin-dirty size
+	 */
 	if (P_IS_PIN(ispin))
 		change_system_meta(0, 0, 0, 0, 0,
 				-filestats.dirty_data_size, FALSE);
@@ -2090,7 +2144,7 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 			}
 		}
 	/* Case dir */
-	} else if (S_ISDIR(this_mode)){
+	} else if (S_ISDIR(this_mode)) {
 		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dir_meta,
 				NULL, meta_cache_entry);
 		if (ret < 0) {
@@ -2602,16 +2656,14 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 			meta_cache_close_file(pbody_ptr);
 			meta_cache_unlock_entry(pbody_ptr);
 			return 0;
-		} else {
-			goto errcode_handle;
 		}
+		goto errcode_handle;
 	}
 
 	/* Fetch needed size of key buffer */
 	ret = list_xattr(pbody_ptr, &p_xattr_page, NULL, 0, &total_keysize);
-	if (ret < 0) {
+	if (ret < 0)
 		goto errcode_handle;
-	}
 	if (total_keysize <= 0) {
 		write_log(10, "Debug: parent inode %"PRIu64" has no xattrs.\n",
 				(uint64_t)parent_inode);
@@ -2630,9 +2682,8 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	/* Fetch all namespace.key */
 	ret = list_xattr(pbody_ptr, &p_xattr_page, key_buf, total_keysize,
 			&total_keysize2);
-	if (ret < 0) {
+	if (ret < 0)
 		goto errcode_handle;
-	}
 	key_buf[total_keysize] = 0;
 
 	/* Tmp value buffer size */
@@ -2646,16 +2697,17 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	/* Self xattr page */
 	ret = fetch_xattr_page(selbody_ptr, &sel_xattr_page,
 			&sel_xattr_pos, TRUE);
-	if (ret < 0) {
+	if (ret < 0)
 		goto errcode_handle;
-	}
 
-	/* Begin to insert.
+	/*
+	 * Begin to insert.
 	 * Step 1: Copy key to now_key and parse it
 	 * Step 2: Get value of now_key from parent
-	 * Step 3: Insert key-value pair to this inode */
+	 * Step 3: Insert key-value pair to this inode
+	 */
 	key_ptr = key_buf;
-	while(*key_ptr) {
+	while (*key_ptr) {
 		strncpy(now_key, key_ptr, 300);
 		key_ptr += (strlen(now_key) + 1);
 
@@ -2795,8 +2847,10 @@ int32_t restore_meta_structure(FILE *fptr)
 		just_meta = TRUE;
 	}
 
-	/* Re-compute space usage and return when file is either
-	 * dir or symlink */
+	/*
+	 * Re-compute space usage and return when file is either dir or
+	 * symlink
+	 */
 	if (just_meta) {
 		/* Update statistics */
 		metasize = meta_stat.st_size;
@@ -2905,6 +2959,209 @@ errcode_handle:
 	return errcode;
 }
 
+int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
+		ino_t target_ino)
+{
+	int32_t errcode, ret;
+	HCFS_STAT this_stat;
+	struct stat meta_stat; /* Meta file system stat */
+	struct stat blockstat;
+	int64_t file_stats_pos;
+	int64_t metasize, metasize_blk;
+	int64_t total_blocks, current_page, page_pos;
+	int64_t cached_size, num_cached_block, count, e_index, which_page;
+	int64_t blkcount, pin_size;
+	size_t ret_size;
+	CLOUD_RELATED_DATA cloud_data;
+	FILE_META_TYPE filemeta;
+	FILE_STATS_TYPE file_stats_type;
+	BLOCK_ENTRY_PAGE tmppage;
+	char srcblockpath[METAPATHLEN], blockpath[METAPATHLEN];
+	char block_status;
+	BOOL write_page;
+	BOOL just_meta = TRUE;
+
+	fstat(fileno(fptr), &meta_stat);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+	this_stat.uid = uid;
+	this_stat.gid = uid;
+	this_stat.ino = target_ino;
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+
+	/* size_last_upload = 0, meta_last_upload = 0, upload_seq = 0 */
+	memset(&cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+
+	if (S_ISDIR(this_stat.mode)) {
+		just_meta = TRUE;
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+	} else if (S_ISLNK(this_stat.mode)) {
+		just_meta = TRUE;
+		this_stat.nlink = 1;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE),
+				SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+
+	} else if (S_ISREG(this_stat.mode)) {
+		just_meta = FALSE;
+		this_stat.nlink = 1;
+		FSEEK(fptr, 0, SEEK_SET);
+		FWRITE(&this_stat, sizeof(HCFS_STAT), 1, fptr);
+		/* Restore cloud related data */
+		FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+				sizeof(FILE_STATS_TYPE), SEEK_SET);
+		FWRITE(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, fptr);
+	}
+	/*
+	 * Re-compute space usage and return when file is either dir or
+	 * symlink
+	 */
+	if (just_meta) {
+		metasize = meta_stat.st_size;
+		metasize_blk = meta_stat.st_blocks * 512;
+		UPDATE_RECT_SYSMETA(.delta_system_size = -metasize,
+				.delta_meta_size = -metasize_blk,
+				.delta_pinned_size = 0,
+				.delta_backend_size = 0,
+				.delta_backend_meta_size = 0,
+				.delta_backend_inodes = 0);
+		return 0;
+	}
+
+	/* Begin to copy regular file */
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	if (P_IS_UNPIN(filemeta.local_pin)) {
+		/* Don't fetch blocks */
+		return -EINVAL;
+	}
+
+	total_blocks = (this_stat.size == 0) ? 0 :
+		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
+	current_page = -1;
+	write_page = FALSE;
+	cached_size = 0;
+	num_cached_block = 0;
+	page_pos = 0;
+	memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+
+	for (count = 0; count < total_blocks; count++) {
+		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+		if (current_page != which_page) {
+			if (write_page == TRUE) {
+				FSEEK(fptr, page_pos, SEEK_SET);
+				FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+						1, fptr);
+				write_page = FALSE;
+			}
+			page_pos = seek_page2(&filemeta, fptr,
+					which_page, 0);
+			if (page_pos <= 0) {
+				count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
+				continue;
+			}
+			current_page = which_page;
+			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+
+			FSEEK(fptr, page_pos, SEEK_SET);
+			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
+					1, fptr);
+		}
+
+		/* Terminate pin blocks downloading if system is going down */
+		if (hcfs_system->system_going_down == TRUE) {
+			errcode = -ESHUTDOWN;
+			goto errcode_handle;
+		}
+
+		block_status = tmppage.block_entries[e_index].status;
+		switch (block_status) {
+		case ST_TODELETE:
+			tmppage.block_entries[e_index].status = ST_NONE;
+			write_page = TRUE;
+			break;
+		case ST_LDISK:
+		case ST_LtoC:
+		case ST_CtoL:
+		case ST_BOTH:
+			fetch_block_path(srcblockpath, src_ino, count);
+			fetch_restore_block_path(blockpath, target_ino, count);
+			/* Copy block from source */
+			ret = copy_file(srcblockpath, blockpath);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			tmppage.block_entries[e_index].status = ST_LDISK;
+			write_page = TRUE;
+			/* Update file stats */
+			ret = stat(blockpath, &blockstat);
+			if (ret == 0) {
+				cached_size += blockstat.st_blocks * 512;
+				num_cached_block += 1;
+			} else {
+				write_log(0, "%s %s. Code %d",
+					  "Error: Fail to stat block in",
+					  __func__, errno);
+			}
+			break;
+		default: /* Do nothing when st is ST_CLOUD / ST_NONE */
+			break;
+		}
+	}
+	if (write_page == TRUE) {
+		FSEEK(fptr, page_pos, SEEK_SET);
+		FWRITE(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	}
+
+	/* Update file stats */
+	file_stats_pos = offsetof(FILE_META_HEADER, fst);
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FREAD(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+	file_stats_type.num_cached_blocks = num_cached_block;
+	file_stats_type.cached_size = cached_size;
+	file_stats_type.dirty_data_size = cached_size;
+	FSEEK(fptr, file_stats_pos, SEEK_SET);
+	FWRITE(&file_stats_type, sizeof(FILE_STATS_TYPE), 1, fptr);
+
+	/* Update rectified statistics */
+	pin_size = round_size(this_stat.size);
+	metasize = meta_stat.st_size;
+	metasize_blk = meta_stat.st_blocks * 512;
+	UPDATE_RECT_SYSMETA(.delta_system_size = -(metasize + this_stat.size),
+			    .delta_meta_size = -metasize_blk,
+			    .delta_pinned_size = -pin_size,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
+
+	/* Update cache statistics */
+	update_restored_cache_usage(cached_size, num_cached_block);
+
+	return 0;
+errcode_handle:
+	if (just_meta == FALSE) {
+		write_log(4, "Cleaning up blocks of broken file\n");
+		for (blkcount = 0; blkcount <= count; blkcount++) {
+			fetch_restore_block_path(blockpath, target_ino,
+						 blkcount);
+			unlink(blockpath);
+		}
+	}
+	write_log(0, "Restore Error: Code %d\n", -errcode);
+	return errcode;
+}
+
 /**
  * Restore a meta file from cloud. Downlaod the meta file
  * to a temp file, and rename to the correct meta file path.
@@ -2971,22 +3228,25 @@ int32_t restore_meta_file(ino_t this_inode)
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
 	ret = fetch_from_cloud(fptr, RESTORE_FETCH_OBJ, objname);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to fetch meta from cloud in %s."
-			" Code %d", __func__, -ret);
+		write_log(0,
+			  "Error: Fail to fetch meta from cloud in %s. Code %d",
+			  __func__, -ret);
 		goto errcode_handle;
 	}
 
 	ret = restore_meta_structure(fptr);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to restore meta struct in %s."
-			" Code %d", __func__, -ret);
+		write_log(0,
+			  "Error: Fail to restore meta struct in %s. Code %d",
+			  __func__, -ret);
 		goto errcode_handle;
 	}
 
 	ret = rename(restored_metapath, metapath);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to rename to meta path in %s."
-			" Code %d", __func__, -ret);
+		write_log(0,
+			  "Error: Fail to rename to meta path in %s. Code %d",
+			  __func__, -ret);
 		goto errcode_handle;
 	}
 
