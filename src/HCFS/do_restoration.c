@@ -1347,8 +1347,13 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 			fetch_restore_meta_path(targetpath, *target_inode);
 			fptr = fopen(targetpath, "r+");
 			if (!fptr) {
-				errcode = -errno;
-				return errcode;
+				if (errno == ENOENT) {
+					/* Copy a new one */
+					*need_copy = TRUE;
+					return 0;
+				} else {
+					return -errno;
+				}
 			}
 			flock(fileno(fptr), LOCK_EX);
 			FSEEK(fptr, 0, SEEK_SET);
