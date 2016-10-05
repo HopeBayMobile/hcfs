@@ -2238,8 +2238,12 @@ void upload_loop(void)
 
 /* FEATURE TODO: double check that super block entry will be reconstructed here */
 			ret_val = read_super_block_entry(ino_sync, &tempentry);
-
 			if ((ret_val < 0) || (tempentry.status != IS_DIRTY)) {
+				if (ret_val == 0)
+					write_log(4, "Warn: Status of inode %"
+						PRIu64" is %d",
+						(uint64_t)ino_sync,
+						tempentry.status);
 				ino_sync = 0;
 				ino_check = 0;
 			} else {

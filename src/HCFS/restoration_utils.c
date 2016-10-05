@@ -2,7 +2,7 @@
 *
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: restoration_utils.h
+* File Name: restoration_utils.c
 * Abstract: The c source file for restore operations
 *
 * Revision History
