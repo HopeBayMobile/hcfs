@@ -291,11 +291,13 @@ public:
 	}
 private:
 	InitUploadControlTool() {}
-	~InitUploadControlTool()
+	static InitUploadControlTool *tool;
+public:
+	static void Destruct()
 	{
 		delete tool;
+		tool = NULL;
 	}
-	static InitUploadControlTool *tool;
 };
 
 
@@ -328,6 +330,8 @@ protected:
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		close(InitUploadControlTool::Tool()->fd);
 		unlink(InitUploadControlTool::Tool()->progress_path);
+
+		InitUploadControlTool::Destruct();
 
 		unlink(MOCK_META_PATH);
 	}
@@ -542,6 +546,8 @@ TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+
+	free(retry_list.retry_inode);
 }
 
 TEST_F(init_sync_controlTest, Multithread_ControlSuccess)

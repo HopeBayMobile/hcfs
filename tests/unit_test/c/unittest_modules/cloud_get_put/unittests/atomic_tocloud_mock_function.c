@@ -60,9 +60,6 @@ int check_page_level(long long page_index)
 		POINTERS_PER_PAGE))
 		return 3;
 
-	tmp_index = tmp_index - (POINTERS_PER_PAGE * POINTERS_PER_PAGE *
-		POINTERS_PER_PAGE); 
-
 	return 4;
 }
 
