@@ -8,6 +8,38 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
  6. Case-only renaming in emulated volume (sdcard) is not working now. This will be resolved in a later release.
 
+v 2.2.2.1795
+=====
+## New Features
+ - [Nexus-5X] When permission is granted, the OTA package can trigger download from the notification
+
+## Fixed
+ - [HCFS] fix/refine_hcfsapid_log: Refine log (!588)
+ - [HCFS] hotfix/add_version_log_back: add version number back to logger (!584)
+ - [HCFS] hotfix/extra_delete_notify_error: Don't error if notify_delete non-existed entries (!583)
+ - [HCFS] fix/reassigned-values: fix reassigned values, that is useless: Reported by cppcheck. (!577)
+ - [Tera-App] bugfix/#13262: repin-system-app-highpririty-pin: Fix/repin system app highpririty pin ([!119](gateway-2-0/android-management-app!119))
+ - [Tera-App] bugfix/#12840: Process the remaining user requests after user move to other page ([!107](gateway-2-0/android-management-app!107))
+ - [Tera-App] bugfix/#13244: 1. Only decrypt response content when http resonse code is 200.  2. Code refacotoring ([!117](gateway-2-0/android-management-app!117))
+ - [Tera-App] bugfix/#13300: Declare lost intent in AndroidManifest.xml ([!116](gateway-2-0/android-management-app!116))
+ - [Tera-App] bugfix/#12926: Sign out when change account failed in order to let user select account in login page ([!114](gateway-2-0/android-management-app!114))
+ - [Tera-App] bugfix/#13052: Show the installed app when user install the frist app from google play ([!111](gateway-2-0/android-management-app!111))
+ - [Tera-App] bugfix/#12640: Jump to APP/FILE page when user clicks on insufficient space notification ([!108](gateway-2-0/android-management-app!108))
+ - [Tera-App] bugfix/#12325: Show Tera ongoing notification on system boot-up ([!101](gateway-2-0/android-management-app!101))
+ - [Tera-App] bugfix/#13329: 在Tera App中, 說明中心頁面, 使用意見回饋功能, 寄出的信沒有附上log
+ - [Nexus-5x] refactor/HBTUpdater: remove some redundant variables and strings ([!52](gateway-2-0/nexus-5x!52))
+ - [Nexus-5x] bugfix: System Update AlertDialog will not show up when permission is not granted after permission grant dialog is dismissed after hit autodownload preference  ([!52](gateway-2-0/nexus-5x!52))
+ - [Nexus-5x] bugfix/shutdown_battery_level: Auto starts gracefully shutdown while battery level is lower than 3 ([!54](gateway-2-0/nexus-5x!54))
+ - [Nexus-5x] fix/bug-13265: fix bug#13265: ota folder could not bind successfully([!53](gateway-2-0/nexus-5x!53))
+ - [Tera-Launcher] bugfix/#13189: bugfix/#13189 Fix add shortcut crash: The shortcut item can't get package name using the same method as normal app  does ([!14](gateway-2-0/tera-launcher!14))
+ - [Tera-Launcher] bugfix/#13136: Bugfix/#13136 Some google app can't show app info and pin/unpin drop target if the shortcut was auto created by google play ([!13](gateway-2-0/tera-launcher!13))
+
+## CI / Refactoring / Other
+ - [HCFS] ci/switch_branch_for_nexus5x: Add argument for switching branch in nexus5x (!585)
+ - [HCFS] doc/update_pyhcfs_readme Update README.md (!582)
+ - [HCFS] patch-1: Update README.md (!580)
+ - [HCFS] test-meta-parser-2.2.2.1145: Test meta parser 2.2.2.1145    Merge to master for meta parser CI functional test (!575)
+
 v 2.2.2.1743
 =====
 ## New Features
