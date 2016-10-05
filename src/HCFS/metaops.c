@@ -3092,7 +3092,6 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 			break;
 		case ST_LDISK:
 		case ST_LtoC:
-		case ST_CtoL:
 		case ST_BOTH:
 			fetch_block_path(srcblockpath, src_ino, count);
 			fetch_restore_block_path(blockpath, target_ino, count);
@@ -3115,7 +3114,14 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 					  __func__, errno);
 			}
 			break;
-		default: /* Do nothing when st is ST_CLOUD / ST_NONE */
+		case ST_CtoL:
+		case ST_CLOUD:
+			write_log(4, "Warn: Block in high priority pin file"
+					" with status CtoL/Cloud\n");
+			errcode = -EINVAL;
+			goto errcode_handle;
+			break;
+		default: /* Do nothing when st is ST_NONE */
 			break;
 		}
 	}

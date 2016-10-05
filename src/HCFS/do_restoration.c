@@ -1347,8 +1347,13 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 			fetch_restore_meta_path(targetpath, *target_inode);
 			fptr = fopen(targetpath, "r+");
 			if (!fptr) {
-				errcode = -errno;
-				return errcode;
+				if (errno == ENOENT) {
+					/* Copy a new one */
+					*need_copy = TRUE;
+					return 0;
+				} else {
+					return -errno;
+				}
 			}
 			flock(fileno(fptr), LOCK_EX);
 			FSEEK(fptr, 0, SEEK_SET);
@@ -1373,8 +1378,8 @@ errcode_handle:
 }
 
 /**
- * Replace missing object under restored folder /data/data. Object can
- * be any type. "src_inode" is the inode number corresponding to now system.
+ * Replace missing object under restored folder /data/data. Object can be any
+ * type. "src_inode" is the inode number corresponding with now mounted HCFS.
  * The file meta_<target_inode> under restored metastorage will be replaced
  * with file meta_<src_inode> under now system metastorage.
  *
@@ -1441,23 +1446,19 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	}
 	setbuf(fptr, NULL);
 
+	errcode = restore_borrowed_meta_structure(fptr, uid,
+			src_inode, target_inode);
+	if (errcode < 0)
+		goto errcode_handle;
+
 	/* Case regular file */
 	if (type == D_ISREG || type == D_ISLNK) {
-		errcode = restore_borrowed_meta_structure(fptr,
-				uid, src_inode, target_inode);
-		if (errcode < 0)
-			goto errcode_handle;
 		fclose(fptr);
 		meta_open = FALSE;
 		/* Mark this inode to to_sync */
 		FWRITE(&target_inode, sizeof(ino_t), 1, to_sync_fptr);
 		return 0;
 	}
-
-	errcode = restore_borrowed_meta_structure(fptr, uid,
-			src_inode, target_inode);
-	if (errcode < 0)
-		goto errcode_handle;
 
 	/* Recursively copy dir */
 	list_counter = 0;
@@ -1627,8 +1628,10 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
 	ret = stat(tmppath, &tmpstat);
 	if (ret < 0 || uid < 0) {
-		write_log(0, "Error: Cannot use %s meta. Uid %d",
+		write_log(0, "Error: Cannot use %s meta. Uid %d.",
 				tmppath, uid);
+		if (ret < 0)
+			write_log(0, "Error code %d", errno);
 		return -ENOENT;
 	}
 	src_inode = tmpstat.st_ino;
