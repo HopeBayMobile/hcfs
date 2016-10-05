@@ -15,8 +15,16 @@
 #include "fuseop.h"
 #include "global.h"
 
+#ifdef METAPATH
+#undef METAPATH
 #define METAPATH "/data/hcfs/metastorage"
+#endif
+
+#ifdef BLOCKPATH
+#undef BLOCKPATH
 #define BLOCKPATH "/data/hcfs/blockstorage"
+#endif
+
 #define RESTORE_METAPATH "/data/hcfs/metastorage_restore"
 #define RESTORE_BLOCKPATH "/data/hcfs/blockstorage_restore"
 
@@ -96,7 +104,6 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	char tempname[BLOCKPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (BLOCKPATH == NULL)
 		return -EPERM;
@@ -113,16 +120,14 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 			BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
 
 	return 0;
-
-errcode_handle:
-	return errcode;
 }
 
-int32_t fetch_restore_block_path(char *pathname, ino_t this_inode, int64_t block_num)
+int32_t fetch_restore_block_path(char *pathname,
+				 ino_t this_inode,
+				 int64_t block_num)
 {
 	char tempname[BLOCKPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (RESTORE_BLOCKPATH == NULL)
 		return -EPERM;
@@ -131,17 +136,15 @@ int32_t fetch_restore_block_path(char *pathname, ino_t this_inode, int64_t block
 		mkdir(RESTORE_BLOCKPATH, 0700);
 
 	sub_dir = (this_inode + block_num) % NUMSUBDIR;
-	snprintf(tempname, BLOCKPATHLEN, "%s/sub_%d", RESTORE_BLOCKPATH, sub_dir);
+	snprintf(tempname, BLOCKPATHLEN, "%s/sub_%d", RESTORE_BLOCKPATH,
+		 sub_dir);
 	if (access(tempname, F_OK) == -1)
 		mkdir(tempname, 0700);
 
-	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 "_%"PRId64,
-			RESTORE_BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
+	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 "_%" PRId64,
+		 RESTORE_BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
 
 	return 0;
-
-errcode_handle:
-	return errcode;
 }
 
 void _copyfile(char *srcpath, char *despath)
@@ -220,7 +223,7 @@ void _copy_pinned(ino_t thisinode)
 	fclose(fptr);
 }
 
-int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
+int32_t _check_expand(_UNUSED ino_t thisinode, char *nowpath, int32_t depth)
 {
 	if (strcmp(nowpath, "/data/app") == 0)
 		return 1;
@@ -237,7 +240,8 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	    (depth == 1))
 		return 3;
 
-	if ((strncmp(nowpath, "/storage/emulated", strlen("/storage/emulated")) == 0) &&
+	if ((strncmp(nowpath, "/storage/emulated",
+		     strlen("/storage/emulated")) == 0) &&
 	    ((depth == 1) || (depth == 2)))
 		return 1;
 
@@ -277,11 +281,11 @@ void _expand_and_copy(ino_t thisinode, char *nowpath, int32_t depth)
 	while (filepos != 0) {
 		fseek(fptr1, filepos, SEEK_SET);
 		fread(&tmppage, sizeof(DIR_ENTRY_PAGE), 1, fptr1);
-		printf("Filepos %lld, entries %d\n", filepos,
+		printf("Filepos %ld, entries %d\n", filepos,
 		       tmppage.num_entries);
 		for (count = 0; count < tmppage.num_entries; count++) {
 			tmpptr = &(tmppage.dir_entries[count]);
-			
+
 			if (tmpptr->d_ino == 0)
 				continue;
 			/* Skip "." and ".." */
@@ -323,8 +327,8 @@ void _expand_and_copy(ino_t thisinode, char *nowpath, int32_t depth)
 				break;
 			case D_ISDIR:
 				/* Need to expand */
-				snprintf(tmppath, METAPATHLEN, "%s/%s",
-				         nowpath, tmpptr->d_name);
+				snprintf(tmppath, METAPATHLEN, "%s/%s", nowpath,
+					 tmpptr->d_name);
 				_expand_and_copy(tmpino, tmppath, depth + 1);
 				break;
 			default:

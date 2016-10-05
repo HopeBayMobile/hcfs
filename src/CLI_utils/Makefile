@@ -7,7 +7,7 @@ EXEC = \
 all: $(EXEC)
 
 CC = gcc
-CFLAGS = -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -Wall -Wextra -g
+CFLAGS = -D_FILE_OFFSET_BITS=64 -D_ANDROID_ENV_ -Wall -Wextra -g -I../HCFS
 
 %: %.c
 	$(LINK.c) $(realpath $^) $(LOADLIBES) $(LDLIBS) -o $@
