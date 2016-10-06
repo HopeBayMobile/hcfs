@@ -32,7 +32,7 @@ typeof(write_log) write_log_wrap;
 /*
  * List of All faked functions
  */
-#define FKAE_FUNC_LIST                                                         \
+#define FAKE_FUNC_LIST                                                         \
 	X(write_log);                                                          \
 	X(sem_init);                                                           \
 	X(sem_wait);                                                           \
@@ -67,7 +67,7 @@ typeof(write_log) write_log_wrap;
 	extern uint32_t func##_error_on;                                       \
 	extern uint32_t func##_call_count;                                     \
 	extern int32_t func##_errno;
-FKAE_FUNC_LIST
+FAKE_FUNC_LIST
 X(write_log);
 #undef X
 

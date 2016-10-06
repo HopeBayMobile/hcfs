@@ -18,7 +18,7 @@
 	uint32_t func##_error_on;                                              \
 	uint32_t func##_call_count;                                            \
 	int32_t func##_errno
-FKAE_FUNC_LIST
+FAKE_FUNC_LIST
 #undef X
 
 /* This will always run before main() */
@@ -32,7 +32,7 @@ void __attribute__((constructor)) Init(void)
 			func##_real = func;                                    \
 		printf(#func " %p\n", func##_real);                            \
 	} while (0)
-	FKAE_FUNC_LIST
+	FAKE_FUNC_LIST
 #undef X
 }
 
@@ -44,7 +44,7 @@ void reset_ut_helper(void)
 		func##_error_on = -1;                                          \
 		func##_errno = 0;                                              \
 	} while (0)
-	FKAE_FUNC_LIST
+	FAKE_FUNC_LIST
 #undef X
 	sem_init_errno = EINVAL;
 	strndup_errno = ENOMEM;
