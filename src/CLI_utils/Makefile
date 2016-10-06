@@ -1,7 +1,6 @@
 EXEC = \
 	HCFSvol \
 	pin_test \
-	fake_copy_minimal
 
 .PHONY: all
 all: $(EXEC)
