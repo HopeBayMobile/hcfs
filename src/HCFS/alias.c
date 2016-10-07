@@ -37,7 +37,7 @@ pthread_mutex_t tree_mutex[MAX_TREES];
  * Internal function proptotypes.
  */
 static ino_t new_alias_inode_num(void);
-static void bitmap_name(const char *this_name, uint64_t *bitmap);
+static void name_to_bitmap(const char *this_name, uint64_t *bitmap);
 static char *bitmap_to_name(const char *this_name, uint64_t *bitmap);
 
 static inline void avl_lock(int tree_type)
@@ -74,7 +74,10 @@ ALIAS_INODE *avl_insert(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 					CMP_TYPE cmp_type, int i, int h);
 ALIAS_INODE *avl_delete(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 					CMP_TYPE cmp_type, int i, int h);
-ALIAS_INODE *avl_delete_all(ALIAS_INODE *root_entry, int h);
+ALIAS_INODE *avl_delete_all(ALIAS_INODE *root_entry);
+void avl_remove_unused(ALIAS_INODE *curr_entry);
+void avl_free_unused(ALIAS_INODE **root_entry, ALIAS_INODE *curr_entry,
+					ino_t real_ino);
 
 
 /************************************************************************
@@ -124,7 +127,7 @@ ino_t get_real_ino_in_alias_group(ino_t this_ino)
 			return this_ino;
 	}
 
-	/* Return the root alias inode number. */
+	/* Return the real inode number. */
 	return curr_entry->family->ino;
 }
 
@@ -240,7 +243,7 @@ int32_t update_in_alias_group(ino_t real_ino, const char *this_name)
 	}
 
 	/* Update root alias inode's bitmap to new value. */
-	bitmap_name(this_name, parent->bitmap);
+	name_to_bitmap(this_name, parent->bitmap);
 
 	/* Find the alias inode position. */
 	child = avl_find(parent->family, (void *)this_name,
@@ -252,7 +255,13 @@ int32_t update_in_alias_group(ino_t real_ino, const char *this_name)
 		 * In this case, we must delete all alias inodes for this real inode.
 		 */
 		DD2("Remove all alias inodes from tree(I)\n");
-		parent->family = avl_delete_all(parent->family, 0);
+		parent->family = avl_delete_all(parent->family);
+
+		/* Free all alias inodes in the avltree[REMOVE]. */
+		avl_lock(REMOVE);
+		avl_free_unused(&avltree[REMOVE], avltree[REMOVE], real_ino);
+		avl_unlock(REMOVE);
+
 		DD1("-UPDATE: Done(%" PRIu64 ")\n", real_ino);
 		avl_unlock(ALIAS);
 		return 0;
@@ -262,20 +271,7 @@ int32_t update_in_alias_group(ino_t real_ino, const char *this_name)
 	DD2("Remove alias inode from tree(I)\n");
 	parent->family = avl_delete(parent->family, child,
 								CMP_INODE_BY_BITMAP, SEQ_BITMAP, 0);
-
-	/* Remove the child from the avltree[ORDER]. */
-	avl_lock(ORDER);
-	DD2("Remove alias inode from tree(O)\n");
-	avltree[ORDER] = avl_delete(avltree[ORDER], child,
-								CMP_INODE_BY_INO, SEQ_INO, 0);
-	avl_unlock(ORDER);
-
-	/* Insert the child to the avltree[REMOVE]. */
-	avl_lock(REMOVE);
-	DD2("Insert alias inode to tree(R)\n");
-	avltree[REMOVE] = avl_insert(avltree[REMOVE], child,
-								CMP_INODE_BY_INO, SEQ_INO, 0);
-	avl_unlock(REMOVE);
+	avl_remove_unused(child);
 
 	DD1("-UPDATE: Done(%" PRIu64 ")\n", real_ino);
 	avl_unlock(ALIAS);
@@ -313,52 +309,35 @@ int32_t delete_in_alias_group(ino_t this_ino)
 
 	if (IS_ALIAS_INODE(this_ino)) {
 		/*
-		 * We first check if the inode is in the avltree[REMOVE], if it's
-		 * already there, we should delete it. Otherwise, we should check
-		 * the avltree[ORDER]. If it's still there, we should delete it
-		 * directly and don't need to move it to the avltree[REMOVE] again.
-		 * If the inode is existed in neither of the trees, we should skip
-		 * this operation.
+		 * Check if the alias inode is existed in the avltree[ORDER]. If the
+		 * inode is found, move it to avltree[REMOVE] for later deletion.
+		 * If not found, it means the inode is either in the avltree[REMOVE]
+		 * or already removed. In this case, skip this operation.
 		 */
-		avl_lock(REMOVE);
-		child = avl_find(avltree[REMOVE], (void *)&this_ino,
+		avl_lock(ORDER);
+		child = avl_find(avltree[ORDER], (void *)&this_ino,
 						CMP_INO, SEQ_INO);
+		avl_unlock(ORDER);
 		if (child != NULL) {
-			/* Remove the child from the avltree[REMOVE]. */
-			DD2("Remove alias inode from tree(R)\n");
-			avltree[REMOVE] = avl_delete(avltree[REMOVE], child,
-										CMP_INODE_BY_INO, SEQ_INO, 0);
-		} else {
-			avl_lock(ORDER);
-			child = avl_find(avltree[ORDER], (void *)&this_ino,
-							CMP_INO, SEQ_INO);
-			if (child != NULL) {
-				/* Remove the child from the parent->family avltree. */
-				DD2("Remove alias inode from tree(I)\n");
-				parent->family = avl_delete(parent->family, child,
+			/* Remove the child from the parent->family avltree. */
+			DD2("Remove alias inode from tree(I)\n");
+			parent->family = avl_delete(parent->family, child,
 										CMP_INODE_BY_BITMAP, SEQ_BITMAP, 0);
-
-				/* Remove the child from the avltree[ORDER]. */
-				DD2("Remove alias inode from tree(O)\n");
-				avltree[ORDER] = avl_delete(avltree[ORDER], child,
-										CMP_INODE_BY_INO, SEQ_INO, 0);
-			} else {
-				DD1("-DELETE: Done(NULL)\n");
-				avl_unlock(ORDER);
-				avl_unlock(REMOVE);
-				avl_unlock(ALIAS);
-				return 0;
-			}
-			avl_unlock(ORDER);
+			avl_remove_unused(child);
+		} else {
+			DD1("-DELETE: Done(SKIP)\n");
+			avl_unlock(ALIAS);
+			return 0;
 		}
-		/* Free the child inode. */
-		DD2("Free alias inode %" PRIu64 "\n", this_ino);
-		free(child);
-		avl_unlock(REMOVE);
 	} else {
 		/* Delete all alias inodes in the alias group. */
 		DD2("Remove all alias inodes from tree(I)\n");
-		parent->family = avl_delete_all(parent->family, 0);
+		parent->family = avl_delete_all(parent->family);
+
+		/* Free all alias inodes in the avltree[REMOVE]. */
+		avl_lock(REMOVE);
+		avl_free_unused(&avltree[REMOVE], avltree[REMOVE], this_ino);
+		avl_unlock(REMOVE);
 
 		/* Remove the parent from the avltree[ALIAS]. */
 		DD2("Remove real inode from tree(A)\n");
@@ -392,13 +371,13 @@ char *get_alias_in_alias_group(ino_t real_ino, const char *this_name,
 
 	avl_lock(ALIAS);
 
-	DD1("+GETNAME: Inode %" PRIu64 ", name '%s'\n", real_ino, this_name);
+	DD1("+GETNAME: Inode %" PRIu64 " lowercase '%s'\n", real_ino, this_name);
 
 	/* Find the real inode position. */
 	parent = avl_find(avltree[ALIAS], (void *)&real_ino,
 					CMP_INO, SEQ_INO);
 	if (parent == NULL || ((child = parent->family) == NULL)) {
-		DD1("-GETNAME: Done(NULL)\n");
+		DD1("-GETNAME: Done(END)\n");
 		avl_unlock(ALIAS);
 		return NULL;
 	}
@@ -407,25 +386,12 @@ char *get_alias_in_alias_group(ino_t real_ino, const char *this_name,
 	DD2("Remove alias inode from tree(I)\n");
 	parent->family = avl_delete(parent->family, child,
 								CMP_INODE_BY_BITMAP, SEQ_BITMAP, 0);
-
-	/* Remove the child from the avltree[ORDER]. */
-	avl_lock(ORDER);
-	DD2("Remove alias inode from tree(O)\n");
-	avltree[ORDER] = avl_delete(avltree[ORDER], child,
-								CMP_INODE_BY_INO, SEQ_INO, 0);
-	avl_unlock(ORDER);
-
-	/* Insert the child to the avltree[REMOVE]. */
-	avl_lock(REMOVE);
-	DD2("Insert alias inode to tree(R)\n");
-	avltree[REMOVE] = avl_insert(avltree[REMOVE], child,
-								CMP_INODE_BY_INO, SEQ_INO, 0);
-	avl_unlock(REMOVE);
+	avl_remove_unused(child);
 
 	*alias_ino = child->ino;
 	alias_name = bitmap_to_name(this_name, child->bitmap);
 
-	DD1("-GETNAME: Done\n");
+	DD1("-GETNAME: Done('%s')\n", alias_name);
 	avl_unlock(ALIAS);
 
 	return alias_name;
@@ -444,19 +410,21 @@ static ino_t new_alias_inode_num(void)
 /*
  * Transfer an inode's name into a bitmap value.
  */
-static void bitmap_name(const char *this_name, uint64_t *bitmap)
+static void name_to_bitmap(const char *this_name, uint64_t *bitmap)
 {
-	int32_t length, index, group;
+	int32_t length, index = 0, group;
 
 	memset(bitmap, 0, sizeof(uint64_t) * MAX_NAME_MAP);
 	length = strlen(this_name);
 
-	for (index = 0; index < length; index++) {
-		group = index >> 6;
+	while (index < length) {
+		group = index / MAX_GROUP_LEN;
 		if ((this_name[index] >= 'A') && (this_name[index] <= 'Z')) {
 			bitmap[group] |= 1;
 		}
-		bitmap[group] <<= 1;
+		index = index + 1;
+		if ((index < length) && (index % MAX_GROUP_LEN > 0))
+			bitmap[group] <<= 1;
 	}
 }
 
@@ -465,8 +433,8 @@ static void bitmap_name(const char *this_name, uint64_t *bitmap)
  */
 static char *bitmap_to_name(const char *this_name, uint64_t *bitmap)
 {
-	int32_t length, index, group, remain;
-	int32_t i, j, len = sizeof(uint64_t);
+	int32_t length, index = 0, group, remain;
+	int32_t i, j;
 	char *actual_name;
 
 	length = strlen(this_name);
@@ -476,25 +444,24 @@ static char *bitmap_to_name(const char *this_name, uint64_t *bitmap)
 		return NULL;
 	}
 
-	group = length / len;
-	remain = length % len;
+	group = length / MAX_GROUP_LEN;
+	remain = length % MAX_GROUP_LEN;
 
-	for (i = 0, index = 0; i < group; i++) {
-		for (j = len; j > 0; j--, index++) {
+	for (i = 0; i < group; i++) {
+		for (j = MAX_GROUP_LEN; j > 0; j--, index++) {
 			actual_name[index] = this_name[index];
-			if (bitmap[i] & (1 << (j - 1)))
+			if (bitmap[i] & (1ull << (j - 1)))
 				actual_name[index] -= 32;
 		}
 	}
 
 	for (j = remain; j > 0; j--, index++) {
 		actual_name[index] = this_name[index];
-		if (bitmap[group] & (1 << (j - 1)))
+		if (bitmap[i] & (1ull << (j - 1)))
 			actual_name[index] -= 32;
 	}
 
 	actual_name[index] = '\0';
-	DD2("Restore actual name '%s'\n", actual_name);
 
 	return actual_name;
 }
@@ -522,7 +489,7 @@ int compare_name_by_bitmap(const void *item1, const void *item2)
 	uint64_t a[MAX_NAME_MAP];
 	const ALIAS_INODE *b = (const ALIAS_INODE *)item2;
 
-	bitmap_name(name, a);
+	name_to_bitmap(name, a);
 
 	return memcmp(a, b->bitmap, sizeof(uint64_t) * MAX_NAME_MAP);
 }
@@ -600,7 +567,7 @@ ALIAS_INODE *avl_create(ino_t this_ino, const char *this_name)
 	}
 
 	/* Fill data. */
-	bitmap_name(this_name, new_entry->bitmap);
+	name_to_bitmap(this_name, new_entry->bitmap);
 	new_entry->ino = this_ino;
 	new_entry->family = NULL;
 	reset_entry(new_entry, 0);
@@ -848,39 +815,72 @@ ALIAS_INODE *avl_delete(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 	return root_entry;
 }
 
-ALIAS_INODE *avl_delete_all(ALIAS_INODE *root_entry, int h)
+ALIAS_INODE *avl_delete_all(ALIAS_INODE *root_entry)
 {
 	if (root_entry == NULL)
 		return NULL;
 
-	DD2("Delete alias inode %" PRIu64 "(H:%d)\n", root_entry->ino, h);
+	DD2("Delete alias inode %" PRIu64 "\n", root_entry->ino);
 
 	/* Remove all left subtrees. */
 	root_entry->left[SEQ_BITMAP] =
-				avl_delete_all(root_entry->left[SEQ_BITMAP], h+1);
+				avl_delete_all(root_entry->left[SEQ_BITMAP]);
 
 	/* Remove all right subtrees. */
 	root_entry->right[SEQ_BITMAP] =
-				avl_delete_all(root_entry->right[SEQ_BITMAP], h+1);
+				avl_delete_all(root_entry->right[SEQ_BITMAP]);
 
 	/* Remove the inode in the avltree[ORDER]. */
 	avl_lock(ORDER);
-	DD2("Remove alias inode from tree(O)(H:%d)\n", h);
+	DD2("Remove alias inode from tree(O)\n");
 	avltree[ORDER] = avl_delete(avltree[ORDER], root_entry,
 								CMP_INODE_BY_INO, SEQ_INO, 0);
 	avl_unlock(ORDER);
 
-	/* Remove the inode in the avltree[REMOVE]. */
-	if (avltree[REMOVE] != NULL) {
-		avl_lock(REMOVE);
-		DD2("Remove alias inode from tree(R)(H:%d)\n", h);
-		avltree[REMOVE] = avl_delete(avltree[REMOVE], root_entry,
-									CMP_INODE_BY_INO, SEQ_INO, 0);
-		avl_unlock(REMOVE);
-	}
-
 	/* Free the inode. */
-	DD2("Free alias inode %" PRIu64 "(H:%d)\n", root_entry->ino, h);
+	DD2("Free alias inode %" PRIu64 "\n", root_entry->ino);
 	free(root_entry);
+
 	return NULL;
+}
+
+void avl_remove_unused(ALIAS_INODE *curr_entry)
+{
+	/* Remove the inode in the avltree[ORDER]. */
+	avl_lock(ORDER);
+	DD2("Remove alias inode from tree(O)\n");
+	avltree[ORDER] = avl_delete(avltree[ORDER], curr_entry,
+								CMP_INODE_BY_INO, SEQ_INO, 0);
+	avl_unlock(ORDER);
+
+	/* Insert the child to the avltree[REMOVE]. */
+	avl_lock(REMOVE);
+	DD2("Insert alias inode to tree(R)\n");
+	avltree[REMOVE] = avl_insert(avltree[REMOVE], curr_entry,
+								CMP_INODE_BY_INO, SEQ_INO, 0);
+	avl_unlock(REMOVE);
+}
+
+void avl_free_unused(ALIAS_INODE **root_entry, ALIAS_INODE *curr_entry,
+	ino_t real_ino)
+{
+	if (curr_entry == NULL)
+		return;
+
+	/* Search left subtrees and remove the real inode's family. */
+	avl_free_unused(&curr_entry->left[SEQ_INO],
+					curr_entry->left[SEQ_INO], real_ino);
+
+	/* Search right subtrees and remove the real inode's family. */
+	avl_free_unused(&curr_entry->right[SEQ_INO],
+					curr_entry->right[SEQ_INO], real_ino);
+
+	/* Delete and free the inode if it's the real inode's family. */
+	if (curr_entry->family->ino == real_ino) {
+		DD2("Remove alias inode from tree(R)\n");
+		*root_entry = avl_delete(*root_entry, curr_entry,
+								CMP_INODE_BY_INO, SEQ_INO, 0);
+		DD2("Free alias inode %" PRIu64 "\n", curr_entry->ino);
+		free(curr_entry);
+	}
 }

@@ -19,6 +19,7 @@
 #define SEQ_BITMAP          1           /* Tree is sorted with bitmap */
 
 #define MAX_NAME_MAP        4           /* (MAX_FILENAME_LEN + 1) >> 6 */
+#define MAX_GROUP_LEN       64
 #define MIN_ALIAS_VALUE     4611686018427387904     /* 2^62 */
 
 #define IS_ALIAS_INODE(x)   (x > MIN_ALIAS_VALUE ? 1 : 0)

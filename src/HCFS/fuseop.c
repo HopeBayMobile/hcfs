@@ -35,6 +35,7 @@
 * 2016/8/1  Jethro moved init_hcfs_stat to meta.c
 *                  moved convert_hcfsstat_to_sysstat to meta.c
 * 2016/8/24 Ripley add rename feature for external volume.
+* 2016/10/6 Ripley Support concurrent access on the alias inodes.
 *
 **************************************************************************/
 
@@ -43,6 +44,7 @@
 
 #include "fuseop.h"
 
+#include <ctype.h>
 #include <time.h>
 #include <math.h>
 
@@ -454,6 +456,18 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 #endif
 
 	return org_ino;
+}
+
+void to_lowercase(char *org_name, char *lower_case)
+{
+	int i;
+	if (!org_name || !lower_case)
+		return;
+
+	for (i = 0; org_name[i]; i++) {
+		lower_case[i] = tolower(org_name[i]);
+	}
+	lower_case[i] = '\0';
 }
 
 #ifdef _ANDROID_ENV_
@@ -1292,11 +1306,12 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	ino_t this_inode;
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
-	ino_t parent_inode;
+	ino_t parent_inode, alias_ino;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
-	BOOL is_external = FALSE;
+	BOOL is_external = FALSE, is_found = FALSE;
+	char lowercase[MAX_FILENAME_LEN], *alias_name;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1366,6 +1381,43 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 
+		/* Transfer the name to lower case. */
+		to_lowercase(temp_dentry.d_name, lowercase);
+
+		/* Notify to delete all alias inodes. */
+		while (1) {
+			alias_name = get_alias_in_alias_group(
+							temp_dentry.d_ino, lowercase, &alias_ino);
+			if (alias_name == NULL)
+				break;
+
+			/* Tell other views that the alias inode is gone. */
+			ret_val = hfuse_ll_notify_delete_mp(
+				tmpptr->chan_ptr, parent_inode, alias_ino,
+				alias_name, strlen(alias_name), alias_name);
+
+			/* Skip the original alias inode. */
+			if (!is_found) {
+				if (strcmp(selfname, alias_name) == 0) {
+					is_found = TRUE;
+					free(alias_name);
+					continue;
+				}
+			}
+
+			/* Tell current view that the alias inode is gone. */
+			ret_val |= hfuse_ll_notify_delete(
+				tmpptr->chan_ptr, parent_inode, alias_ino,
+				alias_name, strlen(alias_name));
+
+			free(alias_name);
+
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
 		/* Tell all other views that node is gone; if filename
 		 * has different case then tell all views */
 		ret_val = hfuse_ll_notify_delete_mp(
@@ -1391,14 +1443,15 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
-	ino_t this_inode, parent_inode;
+	ino_t this_inode, parent_inode, alias_ino;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
 #ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
 #endif
-	BOOL is_external = FALSE;
+	BOOL is_external = FALSE, is_found = FALSE;
+	char lowercase[MAX_FILENAME_LEN], *alias_name;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
@@ -1477,6 +1530,43 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
 			return;
+		}
+
+		/* Transfer the name to lower case. */
+		to_lowercase(temp_dentry.d_name, lowercase);
+
+		/* Notify to delete all alias inodes. */
+		while (1) {
+			alias_name = get_alias_in_alias_group(
+							temp_dentry.d_ino, lowercase, &alias_ino);
+			if (alias_name == NULL)
+				break;
+
+			/* Tell other views that the alias inode is gone. */
+			ret_val = hfuse_ll_notify_delete_mp(
+				tmpptr->chan_ptr, parent_inode, alias_ino,
+				alias_name, strlen(alias_name), alias_name);
+
+			/* Skip the original alias inode. */
+			if (!is_found) {
+				if (strcmp(selfname, alias_name) == 0) {
+					is_found = TRUE;
+					free(alias_name);
+					continue;
+				}
+			}
+
+			/* Tell current view that the alias inode is gone. */
+			ret_val |= hfuse_ll_notify_delete(
+				tmpptr->chan_ptr, parent_inode, alias_ino,
+				alias_name, strlen(alias_name));
+
+			free(alias_name);
+
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
 		}
 
 		/* Tell all other views that node is gone; if filename
@@ -1601,6 +1691,21 @@ a directory (for NFS) */
 	}
 #endif
 
+	if (S_ISFILE((output_param.attr).st_mode))
+		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+				1, D_ISREG);
+	if (S_ISDIR((output_param.attr).st_mode))
+		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+				1, D_ISDIR);
+	if (S_ISLNK((output_param.attr).st_mode))
+		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+				1, D_ISLNK);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	/* (Only for external volume) If the name "selfname" is case-insensitive,
 	 * let the non-existed inode be a duplicated of the original inode but just
 	 * the inode number is different. */
@@ -1619,26 +1724,6 @@ a directory (for NFS) */
 	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
 			(uint64_t)this_inode, this_gen);
 
-	/* Don't count the alias inode in the lookup table. */
-	if (this_inode != temp_dentry.d_ino) {
-		fuse_reply_entry(req, &output_param);
-		return;
-	}
-
-	if (S_ISFILE((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
-				1, D_ISREG);
-	if (S_ISDIR((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
-				1, D_ISDIR);
-	if (S_ISLNK((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
-				1, D_ISLNK);
-
-	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
-	}
 	fuse_reply_entry(req, &output_param);
 }
 
@@ -6215,11 +6300,6 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	thisinode = real_ino(req, ino);
 
 #ifdef _ANDROID_ENV_
-	/* If 'thisinode' is alias inode, meaning it's already deleted. */
-	if (IS_ALIAS_INODE(thisinode)) {
-		fuse_reply_none(req);
-		return;
-	}
 	if (IS_ALIAS_INODE(org_ino)) {
 		delete_in_alias_group(org_ino);
 	}
