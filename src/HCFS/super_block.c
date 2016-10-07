@@ -397,6 +397,14 @@ int32_t super_block_update_stat(ino_t this_inode,
 
 	/* Read the old content of super block entry first */
 	ret_val = read_super_block_entry(this_inode, &tempentry);
+	if (ret_val >= 0 && tempentry.inode_stat.ino == 0) {
+		/* Do nothing when inode not exist */
+		write_log(4, "Warn: Try to update stat of removed"
+				" inode %"PRIu64". Status is %d.",
+				(uint64_t)this_inode, tempentry.status);
+		super_block_exclusive_release();
+		return 0;
+	}
 	if ((ret_val >= 0) && (no_sync == FALSE)) {
 		if (tempentry.status != IS_DIRTY) {
 			ret_val = ll_dequeue(this_inode, &tempentry);
@@ -453,6 +461,14 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 	if (ret_val >= 0) {
+		if (tempentry.inode_stat.ino == 0) {
+			/* Do nothing when inode not exist */
+			write_log(4, "Warn: Try to mark dirty of removed"
+				" inode %"PRIu64". Status is %d.",
+				(uint64_t)this_inode, tempentry.status);
+			super_block_exclusive_release();
+			return 0;
+		}
 		if (tempentry.status == NO_LL) {
 			ret_val = ll_enqueue(this_inode, IS_DIRTY, &tempentry);
 			if (ret_val < 0) {
@@ -619,10 +635,15 @@ int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
 		if (ret_val >= 0) {
 			tempentry.in_transit = FALSE;
 			tempmode = tempentry.inode_stat.mode;
+			/* Once inode is going to delete, let
+			 * inode_stat.ino = 0. This can be used to
+			 * check whether an inode is in flow
+			 * of removal. */
 			init_hcfs_stat(&(tempentry.inode_stat));
 			tempentry.inode_stat.mode = tempmode;
 			tempentry.pin_status = ST_DEL;
-			ret_val = write_super_block_entry(this_inode, &tempentry);
+			ret_val = write_super_block_entry(this_inode,
+					&tempentry);
 		}
 	}
 	super_block_exclusive_release();
@@ -1171,6 +1192,13 @@ int32_t super_block_reclaim_fullscan(void)
 					(uint64_t)this_inode);
 				tempentry.this_index = this_inode;
 			}
+			if (tempentry.status == IS_DIRTY) {
+				write_log(2, "Critical: inode %"PRIu64
+						" in dirty queue?",
+						(uint64_t)this_inode);
+				ll_dequeue(this_inode, &tempentry);
+			}
+
 			tempentry.status = RECLAIMED;
 			tempentry.util_ll_next = 0;
 

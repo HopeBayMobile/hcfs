@@ -998,6 +998,10 @@ anything can be deleted */
 
 			if ((ret_val < 0) ||
 				(tempentry.status != TO_BE_DELETED)) {
+				write_log(4, "Warn: Delete backend inode %"
+						PRIu64" but status is %d",
+						(uint64_t)inode_to_dsync,
+						tempentry.status);
 				inode_to_dsync = 0;
 				inode_to_check = 0;
 			} else {

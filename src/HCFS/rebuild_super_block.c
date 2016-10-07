@@ -1156,6 +1156,16 @@ int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 	if (ret < 0)
 		return ret;
 	if (sb_entry.this_index > 0) {
+		if (sb_entry.status == TO_BE_RECLAIMED ||
+				sb_entry.status == RECLAIMED ||
+				sb_entry.status == TO_BE_DELETED ||
+				sb_entry.inode_stat.ino == 0) {
+			write_log(4, "Warn: Try to restore inode %"
+				PRIu64" with status %d", (uint64_t)this_inode,
+				sb_entry.status);
+			return -ENOENT;
+		}
+
 		if (ret_stat)
 			memcpy(ret_stat, &(sb_entry.inode_stat),
 					sizeof(HCFS_STAT));
