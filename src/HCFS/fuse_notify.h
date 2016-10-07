@@ -68,7 +68,7 @@ int32_t notify_buf_enqueue(const void *const notify);
 FUSE_NOTIFY_DATA *notify_buf_dequeue();
 
 int32_t init_hfuse_ll_notify_loop(void);
-void destory_hfuse_ll_notify_loop(void);
+int32_t destory_hfuse_ll_notify_loop(void);
 void *hfuse_ll_notify_loop(void *ptr);
 int32_t hfuse_ll_notify_delete(struct fuse_chan *ch,
 			    fuse_ino_t parent,
