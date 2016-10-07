@@ -1989,7 +1989,9 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	/* If both newpath and oldpath refer to the same file, do nothing */
 	/* But if in external volume, will rename if name is different */
 	if (self_inode == old_target_inode) {
-		if ((is_external == TRUE) && (strcmp(selfname1, selfname2) != 0)) {
+		if ((is_external == TRUE) && (strcmp(selfname1, selfname2) != 0)
+			/* Skip the case of the rename target is the original name. */
+			&& strcmp(temp_page.dir_entries[temp_index].d_name, selfname2)) {
 			old_target_inode = 0;
 			rename_self_external = TRUE;
 		} else {
