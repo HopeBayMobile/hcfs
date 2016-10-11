@@ -249,19 +249,6 @@ int32_t update_in_alias_group(ino_t real_ino, const char *this_name)
 	child = avl_find(parent->family, (void *)this_name,
 					CMP_NAME_BY_BITMAP, SEQ_BITMAP);
 	if (child == NULL) {
-		/*
-		 * If the alias inode is not found, that means the real inode's name
-		 * is changed to another different name instead of case-insensitive.
-		 * In this case, we must delete all alias inodes for this real inode.
-		 */
-		DD2("Remove all alias inodes from tree(I)\n");
-		parent->family = avl_delete_all(parent->family);
-
-		/* Free all alias inodes in the avltree[REMOVE]. */
-		avl_lock(REMOVE);
-		avl_free_unused(&avltree[REMOVE], avltree[REMOVE], real_ino);
-		avl_unlock(REMOVE);
-
 		DD1("-UPDATE: Done(%" PRIu64 ")\n", real_ino);
 		avl_unlock(ALIAS);
 		return 0;

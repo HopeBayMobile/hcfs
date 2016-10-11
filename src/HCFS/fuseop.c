@@ -458,7 +458,7 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 	return org_ino;
 }
 
-void to_lowercase(char *org_name, char *lower_case)
+void to_lowercase(const char *org_name, char *lower_case)
 {
 	int i;
 	if (!org_name || !lower_case)
@@ -1815,6 +1815,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	int64_t delta_meta_size1_blk, delta_meta_size2_blk;
 	BOOL is_external = FALSE;
 	BOOL rename_self_external = FALSE;
+	char lowercase[MAX_FILENAME_LEN], *alias_name;
+	ino_t alias_ino;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -2269,6 +2271,34 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	/* Update alias list. */
 	if (is_external == TRUE) {
 		update_in_alias_group(self_inode, selfname2);
+
+		/* Delete all alias inodes if not case-insensitive condition. */
+		if (rename_self_external == FALSE) {
+			to_lowercase(selfname1, lowercase);
+
+			while (1) {
+				alias_name = get_alias_in_alias_group(
+								self_inode, lowercase, &alias_ino);
+				if (alias_name == NULL)
+					break;
+
+				/* Tell all views that the alias inode is gone. This
+				 * can be done by passing selfname2 as a fake name. */
+				ret_val = hfuse_ll_notify_delete_mp(
+					tmpptr->chan_ptr, parent_inode1, alias_ino,
+					alias_name, strlen(alias_name), selfname2);
+
+				free(alias_name);
+
+				if (ret_val < 0) {
+					_cleanup_rename(body_ptr, old_target_ptr,
+							parent1_ptr, parent2_ptr);
+					meta_cache_remove(self_inode);
+					fuse_reply_err(req, -ret_val);
+					return;
+				}
+			}
+		}
 	}
 
 	write_log(10, "Debug: Finished updating dir entries\n");
