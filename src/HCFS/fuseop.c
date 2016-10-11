@@ -1310,8 +1310,8 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
-	BOOL is_external = FALSE, is_found = FALSE;
-	char lowercase[MAX_FILENAME_LEN], *alias_name;
+	BOOL is_external = FALSE;
+	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1391,24 +1391,11 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			if (alias_name == NULL)
 				break;
 
-			/* Tell other views that the alias inode is gone. */
+			/* Tell all views that the alias inode is gone. This
+			 * can be done by passing selfname as a fake name. */
 			ret_val = hfuse_ll_notify_delete_mp(
 				tmpptr->chan_ptr, parent_inode, alias_ino,
-				alias_name, strlen(alias_name), alias_name);
-
-			/* Skip the original alias inode. */
-			if (!is_found) {
-				if (strcmp(selfname, alias_name) == 0) {
-					is_found = TRUE;
-					free(alias_name);
-					continue;
-				}
-			}
-
-			/* Tell current view that the alias inode is gone. */
-			ret_val |= hfuse_ll_notify_delete(
-				tmpptr->chan_ptr, parent_inode, alias_ino,
-				alias_name, strlen(alias_name));
+				alias_name, strlen(alias_name), selfname);
 
 			free(alias_name);
 
@@ -1450,8 +1437,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 #ifdef _ANDROID_ENV_
 	MOUNT_T *tmpptr;
 #endif
-	BOOL is_external = FALSE, is_found = FALSE;
-	char lowercase[MAX_FILENAME_LEN], *alias_name;
+	BOOL is_external = FALSE;
+	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
@@ -1542,24 +1529,11 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			if (alias_name == NULL)
 				break;
 
-			/* Tell other views that the alias inode is gone. */
+			/* Tell all views that the alias inode is gone. This
+			 * can be done by passing selfname as a fake name. */
 			ret_val = hfuse_ll_notify_delete_mp(
 				tmpptr->chan_ptr, parent_inode, alias_ino,
-				alias_name, strlen(alias_name), alias_name);
-
-			/* Skip the original alias inode. */
-			if (!is_found) {
-				if (strcmp(selfname, alias_name) == 0) {
-					is_found = TRUE;
-					free(alias_name);
-					continue;
-				}
-			}
-
-			/* Tell current view that the alias inode is gone. */
-			ret_val |= hfuse_ll_notify_delete(
-				tmpptr->chan_ptr, parent_inode, alias_ino,
-				alias_name, strlen(alias_name));
+				alias_name, strlen(alias_name), selfname);
 
 			free(alias_name);
 
@@ -1815,7 +1789,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	int64_t delta_meta_size1_blk, delta_meta_size2_blk;
 	BOOL is_external = FALSE;
 	BOOL rename_self_external = FALSE;
-	char lowercase[MAX_FILENAME_LEN], *alias_name;
+	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
 	ino_t alias_ino;
 
 	parent_inode1 = real_ino(req, parent);
