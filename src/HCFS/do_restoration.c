@@ -760,10 +760,10 @@ errcode_handle:
 int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 {
 	UNUSED(thisinode);
-
+	/*
 	if (strcmp(nowpath, "/data/app") == 0)
 		return 1;
-
+	*/
 	/* If in /data/app, need to pull down everything now */
 	/* App could be installed but not pinned by management app */
 	if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
@@ -1610,7 +1610,7 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	char tmppath[PATH_MAX];
 	int32_t uid, ret, errcode;
 	ino_t src_inode;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE *fptr;
 	int64_t ret_size;
 
@@ -1626,15 +1626,15 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	uid = lookup_package_uid_list(pkg);
 
 	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
-	ret = stat(tmppath, &tmpstat);
+	ret = stat_device_path(tmppath, &tmpstat);
 	if (ret < 0 || uid < 0) {
 		write_log(0, "Error: Cannot use %s meta. Uid %d.",
 				tmppath, uid);
 		if (ret < 0)
-			write_log(0, "Error code %d", errno);
+			write_log(0, "Error code %d", -ret);
 		return -ENOENT;
 	}
-	src_inode = tmpstat.st_ino;
+	src_inode = tmpstat.ino;
 
 	if (hardln_mapping == NULL)
 		return -ENOMEM;
@@ -1648,9 +1648,9 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	}
 
 	/* Check link number for regfile and symlink */
-	if (tmpstat.st_nlink < 1) {
+	if (tmpstat.nlink < 1) {
 		return -ENOENT;
-	} else if (tmpstat.st_nlink == 1) {
+	} else if (tmpstat.nlink == 1) {
 		ret = replace_missing_object(src_inode, tmpptr->d_ino,
 				tmpptr->d_type, uid, hardln_mapping);
 		if (ret < 0)
@@ -1752,6 +1752,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			return 0;
 		if (expand_val == 5)
 			can_prune = TRUE;
+		write_log(0, "TEST: pin status is %d. path is %s. expand_val is %d", dirmeta.local_pin, nowpath, expand_val);
 	} else {
 		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;
@@ -1797,6 +1798,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			case 3:
 				if (strcmp(tmpptr->d_name, "lib") != 0)
 					skip_this = TRUE;
+				else /* Remove lib if no entry */
+					can_prune = TRUE;
 				break;
 			default:
 				break;
@@ -1822,8 +1825,9 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				 * in /data/app here. First check for the
 				 * type of missing element
 				 */
-				if ((depth != 1) ||
-				    (strcmp("base.apk", tmpptr->d_name) != 0)) {
+				if (((depth != 1) ||
+				    (strcmp("base.apk", tmpptr->d_name) != 0))
+				    || (expand_val == 3)) {
 					/* Just remove the element */
 					if (prune_index >= max_prunes)
 						_realloc_prune(&prune_list,
@@ -1992,6 +1996,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	return 0;
 
 errcode_handle:
+	write_log(0, "Error: Stop to restore %s, inode %"PRIu64". Code %d",
+			nowpath, (uint64_t)thisinode, -errcode);
 	fclose(fptr);
 	free(prune_list);
 	return errcode;
