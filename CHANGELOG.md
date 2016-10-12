@@ -8,6 +8,21 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
  6. Case-only renaming in emulated volume (sdcard) is not working now. This will be resolved in a later release.
 
+v 2.2.2.1820
+=====
+## New Features
+ - [Nexus-5x] feature/restoration_selinux_policy: add selinux rule for hcfs to stat com.google.android.gms ([!56](gateway-2-0/nexus-5x!56))
+
+## Fixed
+ - [Tera-App] bugfix/#13372: Accept the file name with white space and Chinese ([!121](gateway-2-0/android-management-app!121))
+ - [Tera-App] enhancement/tera_api_service: Enhance the performance of Tera api service ([!120](gateway-2-0/android-management-app!120))
+ - [Nexus-5x] bugfix/shutdown_battery_level: Start shutdown thread if using USB charging while battery low ([!57](gateway-2-0/nexus-5x!57))
+ - [Tera-Launcher] 'bugfix/launcher_performance': Launcher performance tuning    1. Divide app tracking list from whole workspace to each pages  2. Fix folder icon sometimes not be updated issue. ([!15](gateway-2-0/tera-launcher!15))
+
+## CI / Refactoring / Other
+ - [HCFS] refactor/fuse_notify_UT: Refactoring fuse_notify UT    define _ut_wrap, used as a general wrapper of masked functions.     `#define <func>(...) _ut_wrap(<func>, <error value>, __VA_ARGS__)` can do:    1. _ut_wrap calls original function as normal  2. Set `<func>_error_on` can specify which time to return the error value  3. set `<func>_errno` can specify what errno should be on error. (!592)
+ - [HCFS] fix/UT-cloud_get_put-scan-build: Use scan-build to fix UT error: cloud get put    * fix dead increment  * avoid double free  * fix memory leak (!573)
+
 v 2.2.2.1795
 =====
 ## New Features
