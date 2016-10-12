@@ -1639,7 +1639,7 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	if (hardln_mapping == NULL)
 		return -ENOMEM;
 
-	write_log(4, "Replacing %s with the copy on the device\n", nowpath);
+	write_log(4, "Replacing %s with the copy on the device\n", tmppath);
 	/* Do not need to check hardlink for folder */
 	if (tmpptr->d_type == D_ISDIR) {
 		ret = replace_missing_object(src_inode, tmpptr->d_ino,
@@ -1752,7 +1752,6 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			return 0;
 		if (expand_val == 5)
 			can_prune = TRUE;
-		write_log(0, "TEST: pin status is %d. path is %s. expand_val is %d", dirmeta.local_pin, nowpath, expand_val);
 	} else {
 		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;

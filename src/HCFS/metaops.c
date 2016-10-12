@@ -1542,6 +1542,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			change_mount_stat(mptr, 0, -metasize, -1);
 		break;
 
+	case D_ISFIFO:
+	case D_ISSOCK:
 	case D_ISREG:
 		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
