@@ -327,7 +327,7 @@ int fuse_session_loop_mt(struct fuse_session *se)
 			pthread_cancel(w->thread_id);
 #else
 		for (w = mt.main.next; w != &mt.main; w = w->next)
-			pthread_kill(w->thread_id);
+			pthread_kill(w->thread_id, SIGUSR1);
 #endif
 		mt.exit = 1;
 		pthread_mutex_unlock(&mt.lock);
