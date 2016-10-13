@@ -41,6 +41,8 @@ struct fuse_worker {
 	int8_t terminating;
 };
 
+static pthread_key_t sigkey;
+
 struct fuse_mt {
 	pthread_mutex_t lock;
 	int numworker;
@@ -78,16 +80,16 @@ static int fuse_loop_start_thread(struct fuse_mt *mt);
 /* ADDED by seth
  * SIGUSR1 handler.
  * */
-void thread_exit_handler(int sig, siginfo_t *siginfoptr,
-			__attribute__((unused)) void *tmpptr)
+/* Jiahong (2016/10/13) using pthread_getspecific to obtain thread-specific
+stat */
+void thread_exit_handler(int sig)
 {
 	struct fuse_worker *calling_ptr;
-	if (siginfoptr == NULL)
-		return;
-	if ((siginfoptr->si_value).sival_ptr == NULL)
-		return;
 
-	calling_ptr = (struct fuse_worker *) (siginfoptr->si_value).sival_ptr;
+	calling_ptr = (struct fuse_worker *) pthread_getspecific(sigkey);
+
+	if (calling_ptr == NULL)
+		return;
 
 	if (calling_ptr->cancelable != 0)
 		pthread_exit(0);
@@ -103,17 +105,21 @@ static void *fuse_do_work(void *data)
 	struct sigaction actions;
 	sigset_t sigset;
 
+	pthread_setspecific(sigkey, data);
 	memset(&actions, 0, sizeof(actions));
 	sigemptyset(&actions.sa_mask);
-	actions.sa_flags = SA_SIGINFO;
-	actions.sa_sigaction = thread_exit_handler;
+	actions.sa_flags = 0;
+	actions.sa_handler = thread_exit_handler;
 	sigaction(SIGUSR1,&actions,NULL);
 	/**/
 
-	/* Need to block SIGUSR1 when processing fs operations
-	 * to guarantee data/statistics consistency */
+	/* Now use flags in fuse_worker to control whether
+	the thread is cancelable, and whether the thread should
+	terminate after finishing actions */
+
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGUSR1);
+	pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 
 	while (!fuse_session_exited(mt->se)) {
 		int isforget = 0;
@@ -282,7 +288,6 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	int err;
 	struct fuse_mt mt;
 	struct fuse_worker *w;
-	union sigval input_sigval;
 
 	memset(&mt, 0, sizeof(struct fuse_mt));
 	mt.se = se;
@@ -298,6 +303,17 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	pthread_mutex_lock(&mt.lock);
 	err = fuse_loop_start_thread(&mt);
 	pthread_mutex_unlock(&mt.lock);
+
+	/* Init key sigkey */
+	pthread_key_create(&sigkey, NULL);
+
+	/* Won't allow threads to receive SIGUSR1 until
+	we have initialized sigkey for each thread */
+        sigset_t sigset;
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGUSR1);
+        pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+
 	if (!err) {
 		/* sem_wait() is interruptible */
 		/* 2/22/16 it seems that on Android sem_wait may
@@ -310,11 +326,8 @@ int fuse_session_loop_mt(struct fuse_session *se)
 		for (w = mt.main.next; w != &mt.main; w = w->next)
 			pthread_cancel(w->thread_id);
 #else
-		for (w = mt.main.next; w != &mt.main; w = w->next) {
-			input_sigval.sival_ptr = (void *) w;
-			pthread_sigqueue(w->thread_id, SIGUSR1,
-			                 input_sigval);
-		}
+		for (w = mt.main.next; w != &mt.main; w = w->next)
+			pthread_kill(w->thread_id);
 #endif
 		mt.exit = 1;
 		pthread_mutex_unlock(&mt.lock);
