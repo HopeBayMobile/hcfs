@@ -783,7 +783,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #endif
 {
 	char objname[400];
-	int32_t ret_val, ret, ddt_ret;
+	int32_t ret_val, ret;
 #if (DEDUP_ENABLE)
 	DDT_BTREE_NODE tree_root;
 	DDT_BTREE_META ddt_meta;
@@ -806,14 +806,17 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 	ddt_fd = fileno(ddt_fptr);
 
 	/* Update ddt */
-	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
+	int32_t ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
 #else
 	fetch_backend_block_objname(objname, this_inode, block_no, seq);
 	/* Force to delete */
-	ddt_ret = 0;
 #endif
 
-	if (ddt_ret == 0) {
+
+#if (DEDUP_ENABLE)
+	if (ddt_ret == 0)
+#endif
+	{
 		write_log(10,
 			"Debug delete object: objname %s, inode %" PRIu64 ", block %lld\n",
 			objname, (uint64_t)this_inode, block_no);
@@ -827,7 +830,9 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 			ret = -ENOENT;
 		else
 			ret = -EIO;
-	} else if (ddt_ret == 1) {
+	}
+#if (DEDUP_ENABLE)
+	else if (ddt_ret == 1) {
 		write_log(10, "Only decrease refcount of object - %s", objname);
 		ret = 0;
 	} else if (ddt_ret == 2) {
@@ -838,7 +843,6 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 		ret = -EIO;
 	}
 
-#if (DEDUP_ENABLE)
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
 #endif
