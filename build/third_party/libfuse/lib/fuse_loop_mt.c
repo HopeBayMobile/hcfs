@@ -311,7 +311,7 @@ int fuse_session_loop_mt(struct fuse_session *se)
 			pthread_cancel(w->thread_id);
 #else
 		for (w = mt.main.next; w != &mt.main; w = w->next) {
-			input_sigval.sigval_ptr = (void *) w;
+			input_sigval.sival_ptr = (void *) w;
 			pthread_sigqueue(w->thread_id, SIGUSR1,
 			                 input_sigval);
 		}
