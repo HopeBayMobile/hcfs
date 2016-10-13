@@ -23,6 +23,7 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 #ifdef __MULTI_THREAD
 
@@ -36,6 +37,8 @@ struct fuse_worker {
 	size_t bufsize;
 	char *buf;
 	struct fuse_mt *mt;
+	int8_t cancelable;
+	int8_t terminating;
 };
 
 struct fuse_mt {
@@ -75,9 +78,21 @@ static int fuse_loop_start_thread(struct fuse_mt *mt);
 /* ADDED by seth
  * SIGUSR1 handler.
  * */
-void thread_exit_handler(int sig)
+void thread_exit_handler(int sig, siginfo_t *siginfoptr,
+			__attribute__((unused)) void *tmpptr)
 {
-    pthread_exit(0);
+	struct fuse_worker *calling_ptr;
+	if (siginfoptr == NULL)
+		return;
+	if ((siginfoptr->si_value).sival_ptr == NULL)
+		return;
+
+	calling_ptr = (struct fuse_worker *) (siginfoptr->si_value).sival_ptr;
+
+	if (calling_ptr->cancelable != 0)
+		pthread_exit(0);
+	else
+		calling_ptr->terminating = 1;
 }
 
 static void *fuse_do_work(void *data)
@@ -86,14 +101,13 @@ static void *fuse_do_work(void *data)
 	struct fuse_mt *mt = w->mt;
 	/* added by seth */
 	struct sigaction actions;
-	int rc;
 	sigset_t sigset;
 
 	memset(&actions, 0, sizeof(actions));
 	sigemptyset(&actions.sa_mask);
-	actions.sa_flags = 0;
-	actions.sa_handler = thread_exit_handler;
-	rc = sigaction(SIGUSR1,&actions,NULL);
+	actions.sa_flags = SA_SIGINFO;
+	actions.sa_sigaction = thread_exit_handler;
+	sigaction(SIGUSR1,&actions,NULL);
 	/**/
 
 	/* Need to block SIGUSR1 when processing fs operations
@@ -111,9 +125,11 @@ static void *fuse_do_work(void *data)
 		int res;
 
 		//pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-		pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
+		w->cancelable = 1;
+		if (w->terminating == 1)
+			pthread_exit(0);
 		res = fuse_session_receive_buf(mt->se, &fbuf, &ch);
-		pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+		w->cancelable = 0;
 		//pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		if (res == -EINTR)
 			continue;
@@ -236,6 +252,8 @@ static int fuse_loop_start_thread(struct fuse_mt *mt)
 		return -1;
 	}
 
+	w->cancelable = 1;
+	w->terminating = 0;
 	res = fuse_start_thread(&w->thread_id, fuse_do_work, w);
 	if (res == -1) {
 		free(w->buf);
@@ -264,6 +282,7 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	int err;
 	struct fuse_mt mt;
 	struct fuse_worker *w;
+	union sigval input_sigval;
 
 	memset(&mt, 0, sizeof(struct fuse_mt));
 	mt.se = se;
@@ -291,8 +310,11 @@ int fuse_session_loop_mt(struct fuse_session *se)
 		for (w = mt.main.next; w != &mt.main; w = w->next)
 			pthread_cancel(w->thread_id);
 #else
-		for (w = mt.main.next; w != &mt.main; w = w->next)
-			pthread_kill(w->thread_id, SIGUSR1);
+		for (w = mt.main.next; w != &mt.main; w = w->next) {
+			input_sigval.sigval_ptr = (void *) w;
+			pthread_sigqueue(w->thread_id, SIGUSR1,
+			                 input_sigval);
+		}
 #endif
 		mt.exit = 1;
 		pthread_mutex_unlock(&mt.lock);
