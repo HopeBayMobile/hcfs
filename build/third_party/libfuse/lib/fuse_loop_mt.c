@@ -309,10 +309,10 @@ int fuse_session_loop_mt(struct fuse_session *se)
 
 	/* Won't allow threads to receive SIGUSR1 until
 	we have initialized sigkey for each thread */
-        sigset_t sigset;
-        sigemptyset(&sigset);
-        sigaddset(&sigset, SIGUSR1);
-        pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+	sigset_t sigset;
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGUSR1);
+	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
 
 	if (!err) {
 		/* sem_wait() is interruptible */
