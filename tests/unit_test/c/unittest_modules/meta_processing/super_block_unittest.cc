@@ -475,6 +475,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccess)
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
+	sb_entry.inode_stat.ino = inode;
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
@@ -510,6 +511,7 @@ TEST_F(super_block_update_statTest, UpdateStatSuccessNoSync)
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
+	sb_entry.inode_stat.ino = inode;
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * (inode - 1));
 
@@ -570,6 +572,7 @@ TEST_F(super_block_mark_dirtyTest, MarkDirtySuccess)
 	sb_entry.status = NO_LL;
 	sb_entry.in_transit = TRUE;
 	sb_entry.mod_after_in_transit = FALSE;
+	sb_entry.inode_stat.ino = inode;
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
 		entry_filepos);
 
@@ -585,6 +588,38 @@ TEST_F(super_block_mark_dirtyTest, MarkDirtySuccess)
 	EXPECT_EQ(TRUE, sb_entry.mod_after_in_transit);
 	EXPECT_EQ(1, sys_super_block->head.num_dirty);
 	EXPECT_EQ(1, sb_head.num_dirty);
+}
+
+TEST_F(super_block_mark_dirtyTest, CancelToMarkDirty_BecauseInodeRemoved)
+{
+	ino_t inode = 8;
+	SUPER_BLOCK_ENTRY sb_entry, sb_entry2;
+	SUPER_BLOCK_HEAD sb_head;
+	uint64_t entry_filepos = sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+
+	/* Mock data. Write a entry */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) +
+		sizeof(SUPER_BLOCK_ENTRY) * inode);
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = NO_LL;
+	sb_entry.in_transit = TRUE;
+	sb_entry.mod_after_in_transit = FALSE;
+	sb_entry.inode_stat.ino = 0;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+
+	/* Run */
+	EXPECT_EQ(0, super_block_mark_dirty(inode));
+
+	/* Verify */
+	pread(sys_super_block->iofptr, &sb_entry2, sizeof(SUPER_BLOCK_ENTRY),
+		entry_filepos);
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+
+	EXPECT_EQ(0, memcmp(&sb_entry2, &sb_entry, sizeof(SUPER_BLOCK_ENTRY)));
+	EXPECT_EQ(0, sys_super_block->head.num_dirty);
+	EXPECT_EQ(0, sb_head.num_dirty);
 }
 /*
 	End of unittest of super_block_mark_dirty()
