@@ -34,6 +34,7 @@
 #include "mount_manager.h"
 #include "utils.h"
 #include "restoration_utils.h"
+#include "hcfs_cacheops.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -738,7 +739,12 @@ int32_t _fetch_pinned(ino_t thisinode)
 	fclose(fptr);
 
 	/* Update cache statistics */
-	update_restored_cache_usage(cached_size, num_cached_block);
+	ret = update_restored_cache_usage(cached_size, num_cached_block,
+			tmpmeta.local_pin);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	return 0;
 errcode_handle:
@@ -1041,11 +1047,13 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 	fclose(metafptr);
 	metafptr = NULL;
 
-	update_restored_cache_usage(-total_removed_cache_size,
-				    -total_removed_cache_blks);
+	ret = update_restored_cache_usage(-total_removed_cache_size,
+					-total_removed_cache_blks,
+					file_meta.local_pin);
 
 	/* Mark this inode as to delete */
-	ret = _mark_delete(thisinode);
+	if (ret == 0)
+		ret = _mark_delete(thisinode);
 
 	return ret;
 errcode_handle:
@@ -2749,8 +2757,8 @@ errcode_handle:
  *
  * @return none.
  */
-void update_restored_cache_usage(int64_t delta_cache_size,
-				 int64_t delta_cache_blocks)
+int32_t update_restored_cache_usage(int64_t delta_cache_size,
+				 int64_t delta_cache_blocks, char pin_type)
 {
 	SYSTEM_DATA_TYPE *restored_system_meta;
 
@@ -2758,6 +2766,18 @@ void update_restored_cache_usage(int64_t delta_cache_size,
 	    &(hcfs_restored_system_meta->restored_system_meta);
 
 	LOCK_RESTORED_SYSMETA();
+	/* Check cache space usage */
+	if (hcfs_system->systemdata.cache_size +
+			restored_system_meta->cache_size + delta_cache_size >
+			get_pinned_limit(pin_type)) {
+		UNLOCK_RESTORED_SYSMETA();
+		write_log(0, "Error: No space when restoring. restored cache"
+			" size %lld. system cache size %lld",
+			hcfs_system->systemdata.cache_size,
+			restored_system_meta->cache_size);
+		return -ENOSPC;
+	}
+
 	restored_system_meta->cache_size += delta_cache_size;
 	if (restored_system_meta->cache_size < 0)
 		restored_system_meta->cache_size = 0;
@@ -2766,6 +2786,7 @@ void update_restored_cache_usage(int64_t delta_cache_size,
 	if (restored_system_meta->cache_blocks < 0)
 		restored_system_meta->cache_blocks = 0;
 	UNLOCK_RESTORED_SYSMETA();
+	return 0;
 }
 
 /**

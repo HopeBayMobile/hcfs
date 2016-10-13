@@ -677,7 +677,7 @@ int32_t super_block_enqueue_delete(ino_t this_inode)
 	if (tempentry.status != NO_LL) {
 		ret_val = -EINVAL;
 		write_log(2, "Critical: Status of inode %"PRIu64
-			" is not NO_LL", (uint64_t)this_inode);
+			" is %d", (uint64_t)this_inode, tempentry.status);
 		goto error_handle;
 	}
 

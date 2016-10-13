@@ -3154,7 +3154,12 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 			    .delta_backend_inodes = 0);
 
 	/* Update cache statistics */
-	update_restored_cache_usage(cached_size, num_cached_block);
+	ret = update_restored_cache_usage(cached_size, num_cached_block,
+			filemeta.local_pin);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	return 0;
 errcode_handle:

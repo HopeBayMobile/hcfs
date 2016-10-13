@@ -25,21 +25,6 @@
 #define _PACKED
 #define _UNUSED
 #endif
-typedef struct {
-	int64_t next_xattr_page;
-	int64_t direct;
-	int64_t single_indirect;
-	int64_t double_indirect;
-	int64_t triple_indirect;
-	int64_t quadruple_indirect;
-	uint64_t generation;
-	uint8_t source_arch;
-	uint64_t root_inode;
-	int64_t finished_seq;
-	uint8_t local_pin;
-	uint8_t padding[7]; // gcc auto pad to 8 byte even without this
-} _PACKED _FILE_META_TYPE;
-
 
 #define S_ISFILE(mode) (S_ISREG(mode) || S_ISFIFO(mode) || S_ISSOCK(mode))
 
@@ -203,13 +188,6 @@ typedef struct {
 
 #define FWRITE(A, B, C, D)\
 	do {\
-		if (B == sizeof(_FILE_META_TYPE) || C == sizeof(_FILE_META_TYPE)) {\
-			_FILE_META_TYPE filemeta;\
-			memset(&filemeta, 0, sizeof(_FILE_META_TYPE));\
-			filemeta.local_pin = 2;\
-			if (memcmp(&filemeta, A, sizeof(_FILE_META_TYPE)) == 0)\
-				write_log(0, "TEST: wow, found it in %s", __func__);\
-		}\
 		errcode = 0;\
 		ret_size = fwrite(A, B, C, D);\
 		if (((ssize_t)ret_size < (ssize_t)C) &&\
@@ -239,13 +217,6 @@ typedef struct {
 
 #define PWRITE(A, B, C, D)\
 	do {\
-		if (C == sizeof(_FILE_META_TYPE)) {\
-			_FILE_META_TYPE filemeta;\
-			memset(&filemeta, 0, sizeof(_FILE_META_TYPE));\
-			filemeta.local_pin = 2;\
-			if (memcmp(&filemeta, B, sizeof(_FILE_META_TYPE)) == 0)\
-				write_log(0, "TEST: wow, found it in %s", __func__);\
-		}\
 		errcode = 0;\
 		ret_ssize = pwrite(A, B, C, D);\
 		if (ret_ssize < 0) {\
