@@ -50,6 +50,7 @@ typedef struct {
 PKG_INFO restore_pkg_info;
 PKG_NODE *pkg_info_list_head;
 
+int32_t stat_device_path(char *path, HCFS_STAT *hcfsstat);
 int32_t insert_inode_pair(INODE_PAIR_LIST *list, ino_t src_inode,
 		ino_t target_inode);
 int32_t find_target_inode(INODE_PAIR_LIST *list, ino_t src_inode,

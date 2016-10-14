@@ -1219,3 +1219,7 @@ void cleanup_stage1_data(void)
 {
 	return;
 }
+void force_backup_package(void)
+{
+	return;
+}

@@ -2501,8 +2501,10 @@ errcode_handle:
 
 void force_backup_package(void)
 {
-	/* Do not backup now if network is down */
-	if (hcfs_system->sync_paused == TRUE)
+	/* Do not backup now if network is down or system restoring*/
+	if (hcfs_system->sync_paused == TRUE ||
+	    hcfs_system->system_restoring == RESTORING_STAGE1 ||
+	    hcfs_system->system_restoring == RESTORING_STAGE2)
 		return;
 
 	sem_wait(&(sync_stat_ctl.stat_op_sem));

@@ -105,8 +105,8 @@ void cleanup_stage1_data(void);
 
 void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta);
 void update_restored_system_meta(DELTA_SYSTEM_META delta_system_meta);
-void update_restored_cache_usage(int64_t delta_cache_size,
-		int64_t delta_cache_blocks);
+int32_t update_restored_cache_usage(int64_t delta_cache_size,
+		int64_t delta_cache_blocks, char pin_type);
 int32_t rectify_space_usage();
 int32_t init_rectified_system_meta(char restoration_stage);
 int32_t check_network_connection(void);

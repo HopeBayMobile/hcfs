@@ -18,6 +18,43 @@
 #include <regex.h>
 #include <stddef.h>
 
+#include "metaops.h"
+#include "file_present.h"
+
+/**
+ * Given a path, try to find stat in now mounted HCFS.
+ */
+int32_t stat_device_path(char *path, HCFS_STAT *hcfsstat)
+{
+	char *path_ptr, *rest_ptr, *token;
+	int32_t ret;
+	ino_t now_ino;
+	DIR_ENTRY dentry;
+
+	if (strncmp(path, "/data/data", strlen("/data/data")) != 0) {
+		write_log(4, "Warn: Try to stat path %s in %s",
+				path, __func__);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	now_ino = data_data_root;
+	path_ptr = path + strlen("/data/data");
+	token = strtok_r(path_ptr, "/", &rest_ptr);
+	while (token) {
+		ret = lookup_dir(now_ino, token, &dentry, FALSE);
+		if (ret < 0)
+			goto out;
+		now_ino = dentry.d_ino;
+		token = strtok_r(rest_ptr, "/", &rest_ptr);
+	}
+
+	ret = fetch_inode_stat(now_ino, hcfsstat, NULL, NULL);
+
+out:
+	return ret;
+}
+
 int32_t _inode_bsearch(INODE_PAIR_LIST *list, ino_t src_inode, int32_t *index)
 {
 	int32_t start_index, end_index, mid_index;

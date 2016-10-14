@@ -1542,6 +1542,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			change_mount_stat(mptr, 0, -metasize, -1);
 		break;
 
+	case D_ISFIFO:
+	case D_ISSOCK:
 	case D_ISREG:
 		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
@@ -3152,7 +3154,12 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 			    .delta_backend_inodes = 0);
 
 	/* Update cache statistics */
-	update_restored_cache_usage(cached_size, num_cached_block);
+	ret = update_restored_cache_usage(cached_size, num_cached_block,
+			filemeta.local_pin);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	return 0;
 errcode_handle:

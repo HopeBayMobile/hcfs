@@ -34,6 +34,7 @@
 #include "mount_manager.h"
 #include "utils.h"
 #include "restoration_utils.h"
+#include "hcfs_cacheops.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -738,7 +739,12 @@ int32_t _fetch_pinned(ino_t thisinode)
 	fclose(fptr);
 
 	/* Update cache statistics */
-	update_restored_cache_usage(cached_size, num_cached_block);
+	ret = update_restored_cache_usage(cached_size, num_cached_block,
+			tmpmeta.local_pin);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	return 0;
 errcode_handle:
@@ -760,10 +766,10 @@ errcode_handle:
 int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 {
 	UNUSED(thisinode);
-
+	/*
 	if (strcmp(nowpath, "/data/app") == 0)
 		return 1;
-
+	*/
 	/* If in /data/app, need to pull down everything now */
 	/* App could be installed but not pinned by management app */
 	if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
@@ -1041,11 +1047,13 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 	fclose(metafptr);
 	metafptr = NULL;
 
-	update_restored_cache_usage(-total_removed_cache_size,
-				    -total_removed_cache_blks);
+	ret = update_restored_cache_usage(-total_removed_cache_size,
+					-total_removed_cache_blks,
+					file_meta.local_pin);
 
 	/* Mark this inode as to delete */
-	ret = _mark_delete(thisinode);
+	if (ret == 0)
+		ret = _mark_delete(thisinode);
 
 	return ret;
 errcode_handle:
@@ -1610,7 +1618,7 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	char tmppath[PATH_MAX];
 	int32_t uid, ret, errcode;
 	ino_t src_inode;
-	struct stat tmpstat;
+	HCFS_STAT tmpstat;
 	FILE *fptr;
 	int64_t ret_size;
 
@@ -1626,20 +1634,20 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	uid = lookup_package_uid_list(pkg);
 
 	snprintf(tmppath, PATH_MAX, "%s/%s", nowpath, tmpptr->d_name);
-	ret = stat(tmppath, &tmpstat);
+	ret = stat_device_path(tmppath, &tmpstat);
 	if (ret < 0 || uid < 0) {
 		write_log(0, "Error: Cannot use %s meta. Uid %d.",
 				tmppath, uid);
 		if (ret < 0)
-			write_log(0, "Error code %d", errno);
+			write_log(0, "Error code %d", -ret);
 		return -ENOENT;
 	}
-	src_inode = tmpstat.st_ino;
+	src_inode = tmpstat.ino;
 
 	if (hardln_mapping == NULL)
 		return -ENOMEM;
 
-	write_log(4, "Replacing %s with the copy on the device\n", nowpath);
+	write_log(4, "Replacing %s with the copy on the device\n", tmppath);
 	/* Do not need to check hardlink for folder */
 	if (tmpptr->d_type == D_ISDIR) {
 		ret = replace_missing_object(src_inode, tmpptr->d_ino,
@@ -1648,9 +1656,9 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 	}
 
 	/* Check link number for regfile and symlink */
-	if (tmpstat.st_nlink < 1) {
+	if (tmpstat.nlink < 1) {
 		return -ENOENT;
-	} else if (tmpstat.st_nlink == 1) {
+	} else if (tmpstat.nlink == 1) {
 		ret = replace_missing_object(src_inode, tmpptr->d_ino,
 				tmpptr->d_type, uid, hardln_mapping);
 		if (ret < 0)
@@ -1797,6 +1805,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			case 3:
 				if (strcmp(tmpptr->d_name, "lib") != 0)
 					skip_this = TRUE;
+				else /* Remove lib if no entry */
+					can_prune = TRUE;
 				break;
 			default:
 				break;
@@ -1822,8 +1832,9 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				 * in /data/app here. First check for the
 				 * type of missing element
 				 */
-				if ((depth != 1) ||
-				    (strcmp("base.apk", tmpptr->d_name) != 0)) {
+				if (((depth != 1) ||
+				    (strcmp("base.apk", tmpptr->d_name) != 0))
+				    || (expand_val == 3)) {
 					/* Just remove the element */
 					if (prune_index >= max_prunes)
 						_realloc_prune(&prune_list,
@@ -1992,6 +2003,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	return 0;
 
 errcode_handle:
+	write_log(0, "Error: Stop to restore %s, inode %"PRIu64". Code %d",
+			nowpath, (uint64_t)thisinode, -errcode);
 	fclose(fptr);
 	free(prune_list);
 	return errcode;
@@ -2744,15 +2757,30 @@ errcode_handle:
  *
  * @return none.
  */
-void update_restored_cache_usage(int64_t delta_cache_size,
-				 int64_t delta_cache_blocks)
+int32_t update_restored_cache_usage(int64_t delta_cache_size,
+				 int64_t delta_cache_blocks, char pin_type)
 {
 	SYSTEM_DATA_TYPE *restored_system_meta;
+	int64_t cache_limit;
+
+	cache_limit = CACHE_HARD_LIMIT / REDUCED_RATIO;
+	if (pin_type == P_HIGH_PRI_PIN)
+		cache_limit = cache_limit + RESERVED_CACHE_SPACE;
 
 	restored_system_meta =
 	    &(hcfs_restored_system_meta->restored_system_meta);
 
 	LOCK_RESTORED_SYSMETA();
+	/* Check cache space usage */
+	if (hcfs_system->systemdata.cache_size +
+	    restored_system_meta->cache_size + delta_cache_size > cache_limit) {
+		UNLOCK_RESTORED_SYSMETA();
+		write_log(0, "Error: No space when restoring. restored cache"
+			" size %lld. system cache size %lld",
+			hcfs_system->systemdata.cache_size,
+			restored_system_meta->cache_size);
+		return -ENOSPC;
+	}
 	restored_system_meta->cache_size += delta_cache_size;
 	if (restored_system_meta->cache_size < 0)
 		restored_system_meta->cache_size = 0;
@@ -2761,6 +2789,7 @@ void update_restored_cache_usage(int64_t delta_cache_size,
 	if (restored_system_meta->cache_blocks < 0)
 		restored_system_meta->cache_blocks = 0;
 	UNLOCK_RESTORED_SYSMETA();
+	return 0;
 }
 
 /**

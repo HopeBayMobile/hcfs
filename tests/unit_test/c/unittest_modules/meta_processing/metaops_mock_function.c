@@ -578,8 +578,9 @@ int32_t copy_file(const char *srcpath, const char *tarpath)
 	return 0;
 }
 
-void update_restored_cache_usage(int64_t delta_cache_size,
-				 int64_t delta_cache_blocks)
+int32_t update_restored_cache_usage(int64_t delta_cache_size,
+				 int64_t delta_cache_blocks,
+				 char pin_type)
 {
 	return;
 }
