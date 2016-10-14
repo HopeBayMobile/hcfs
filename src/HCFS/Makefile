@@ -37,6 +37,7 @@ OBJS_F := \
 	file_present.o \
 	hfuse_system.o \
 	utils.o \
+	alias.o \
 	fuseop.o \
 	metaops.o \
 	filetables.o \

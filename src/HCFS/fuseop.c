@@ -34,6 +34,8 @@
 * 2016/6/27 Jiahong adding file size limitation
 * 2016/8/1  Jethro moved init_hcfs_stat to meta.c
 *                  moved convert_hcfsstat_to_sysstat to meta.c
+* 2016/8/24 Ripley add rename feature for external volume.
+* 2016/10/6 Ripley Support concurrent access on the alias inodes.
 *
 **************************************************************************/
 
@@ -42,6 +44,7 @@
 
 #include "fuseop.h"
 
+#include <ctype.h>
 #include <time.h>
 #include <math.h>
 
@@ -75,6 +78,7 @@
 #include <fuse/fuse_opt.h>
 
 #include "FS_manager.h"
+#include "alias.h"
 #include "api_interface.h"
 #include "atomic_tocloud.h"
 #include "dir_statistics.h"
@@ -425,8 +429,8 @@ int32_t is_member(fuse_req_t req, gid_t this_gid, gid_t target_gid)
 	return 0;
 }
 
-/* Helper function for translating from FUSE inode number to real one */
-ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
+/* Copy from real_ino(). Get the original inode number. */
+ino_t org_real_ino(fuse_req_t req, fuse_ino_t ino)
 {
 	MOUNT_T *tmpptr;
 
@@ -438,6 +442,32 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 		return tmpptr->f_ino;
 	else
 		return (ino_t) ino;
+}
+
+/* Helper function for translating from FUSE inode number to real one */
+ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
+{
+	ino_t org_ino = org_real_ino(req, ino);
+
+#ifdef _ANDROID_ENV_
+	/* Translating from alias inode number to real inode number. */
+	if (IS_ALIAS_INODE(org_ino))
+		org_ino = get_real_ino_in_alias_group(org_ino);
+#endif
+
+	return org_ino;
+}
+
+void to_lowercase(const char *org_name, char *lower_case)
+{
+	int i;
+	if (!org_name || !lower_case)
+		return;
+
+	for (i = 0; org_name[i]; i++) {
+		lower_case[i] = tolower(org_name[i]);
+	}
+	lower_case[i] = '\0';
 }
 
 #ifdef _ANDROID_ENV_
@@ -865,7 +895,7 @@ errcode_handle:
 static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 					struct fuse_file_info *fi)
 {
-	ino_t hit_inode;
+	ino_t hit_inode, org_ino;
 	int32_t ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	HCFS_STAT tmp_stat;
@@ -878,6 +908,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 
 	write_log(8, "Debug getattr inode %ld\n", ino);
 	gettimeofday(&tmp_time1, NULL);
+	org_ino = org_real_ino(req, ino);
 	hit_inode = real_ino(req, ino);
 
 	write_log(10, "Debug getattr hit inode %" PRIu64 "\n",
@@ -901,6 +932,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 				return;
 			}
 			_rewrite_stat(tmpptr, &tmp_stat, NULL, NULL);
+			tmp_stat.ino = org_ino;
 		}
 #endif
 
@@ -1274,11 +1306,12 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	ino_t this_inode;
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
-	ino_t parent_inode;
+	ino_t parent_inode, alias_ino;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
 	BOOL is_external = FALSE;
+	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug unlink: name %s, parent %" PRIu64 "\n", selfname,
@@ -1348,6 +1381,30 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 
+		/* Transfer the name to lower case. */
+		to_lowercase(temp_dentry.d_name, lowercase);
+
+		/* Notify to delete all alias inodes. */
+		while (1) {
+			alias_name = get_name_in_alias_group(
+							temp_dentry.d_ino, lowercase, &alias_ino);
+			if (alias_name == NULL)
+				break;
+
+			/* Tell all views that the alias inode is gone. This
+			 * can be done by passing selfname as a fake name. */
+			ret_val = hfuse_ll_notify_delete_mp(
+				tmpptr->chan_ptr, parent_inode, alias_ino,
+				alias_name, strlen(alias_name), selfname);
+
+			free(alias_name);
+
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
 		/* Tell all other views that node is gone; if filename
 		 * has different case then tell all views */
 		ret_val = hfuse_ll_notify_delete_mp(
@@ -1373,7 +1430,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
-	ino_t this_inode, parent_inode;
+	ino_t this_inode, parent_inode, alias_ino;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
@@ -1381,6 +1438,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 #endif
 	BOOL is_external = FALSE;
+	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
 
 	parent_inode = real_ino(req, parent);
 	write_log(8, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
@@ -1459,6 +1517,30 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
 			return;
+		}
+
+		/* Transfer the name to lower case. */
+		to_lowercase(temp_dentry.d_name, lowercase);
+
+		/* Notify to delete all alias inodes. */
+		while (1) {
+			alias_name = get_name_in_alias_group(
+							temp_dentry.d_ino, lowercase, &alias_ino);
+			if (alias_name == NULL)
+				break;
+
+			/* Tell all views that the alias inode is gone. This
+			 * can be done by passing selfname as a fake name. */
+			ret_val = hfuse_ll_notify_delete_mp(
+				tmpptr->chan_ptr, parent_inode, alias_ino,
+				alias_name, strlen(alias_name), selfname);
+
+			free(alias_name);
+
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
 		}
 
 		/* Tell all other views that node is gone; if filename
@@ -1566,7 +1648,6 @@ a directory (for NFS) */
 	}
 
 	this_inode = temp_dentry.d_ino;
-	output_param.ino = (fuse_ino_t) this_inode;
 	ret_val = fetch_inode_stat(this_inode, &this_stat, &this_gen, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1584,10 +1665,6 @@ a directory (for NFS) */
 	}
 #endif
 
-	output_param.generation = this_gen;
-	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
-			(uint64_t)this_inode, this_gen);
-
 	if (S_ISFILE((output_param.attr).st_mode))
 		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
 				1, D_ISREG);
@@ -1602,6 +1679,25 @@ a directory (for NFS) */
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	/* (Only for external volume) If the name "selfname" is case-insensitive,
+	 * let the non-existed inode be a duplicated of the original inode but just
+	 * the inode number is different. */
+	if (is_external && strcmp(selfname, temp_dentry.d_name)) {
+		/* Find if the alias inode is existed, and if not, create it. */
+		ret_val = seek_and_add_in_alias_group(temp_dentry.d_ino, &this_inode,
+											temp_dentry.d_name, selfname);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
+
+	output_param.ino = (fuse_ino_t) this_inode;
+	output_param.generation = this_gen;
+	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
+			(uint64_t)this_inode, this_gen);
+
 	fuse_reply_entry(req, &output_param);
 }
 
@@ -1692,6 +1788,9 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	int64_t delta_meta_size1, delta_meta_size2;
 	int64_t delta_meta_size1_blk, delta_meta_size2_blk;
 	BOOL is_external = FALSE;
+	BOOL rename_self_external = FALSE;
+	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
+	ino_t alias_ino;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -1841,6 +1940,19 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	/* It's not permitted to do 'mv TESTDIR testDIR' under the same directory
+	 * in the external volume. In this case, they share the same real inode
+	 * when calling ll_lookup(). So it becomes to move TESTDIR under testDIR.
+	 * That leads the ll_rename() to pass (parent1, name1, parent2, name2) with
+	 * values (TESTDIR's parent-ino, 'TESTDIR', TESTDIR-ino, 'TESTDIR'), which
+	 * are illegal parameters. */
+	if ((is_external == TRUE) && (parent_inode2 == self_inode)) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
+
 	ret_val = meta_cache_seek_dir_entry(parent_inode2, &temp_page,
 			&temp_index, selfname2, parent2_ptr,
 			is_external);
@@ -1851,11 +1963,19 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		old_target_inode = temp_page.dir_entries[temp_index].d_ino;
 
 	/* If both newpath and oldpath refer to the same file, do nothing */
+	/* But if in external volume, will rename if name is different */
 	if (self_inode == old_target_inode) {
-		_cleanup_rename(body_ptr, old_target_ptr,
-				parent1_ptr, parent2_ptr);
-		fuse_reply_err(req, 0);
-		return;
+		if ((is_external == TRUE) && (strcmp(selfname1, selfname2) != 0)
+			/* Skip the case of the rename target is the original name. */
+			&& strcmp(temp_page.dir_entries[temp_index].d_name, selfname2)) {
+			old_target_inode = 0;
+			rename_self_external = TRUE;
+		} else {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, 0);
+			return;
+		}
 	}
 
 	/* Invalidate pathname cache for oldpath and newpath */
@@ -2094,19 +2214,26 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		old_target_ptr = NULL;
 	} else {
 		/* If newpath does not exist, add the new entry */
-		ret_val = dir_add_entry(parent_inode2, self_inode,
-			selfname2, self_mode, parent2_ptr, is_external);
-		if (ret_val < 0) {
-			_cleanup_rename(body_ptr, old_target_ptr,
-					parent1_ptr, parent2_ptr);
-			meta_cache_remove(self_inode);
-			fuse_reply_err(req, -ret_val);
-			return;
+		/* But will not add new entry if rename self */
+		if (rename_self_external != TRUE) {
+			ret_val = dir_add_entry(parent_inode2, self_inode,
+				selfname2, self_mode, parent2_ptr, is_external);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
 		}
 	}
 
-	ret_val = dir_remove_entry(parent_inode1, self_inode,
-			selfname1, self_mode, parent1_ptr, is_external);
+	if (rename_self_external == TRUE) {
+		ret_val = change_entry_name(parent_inode1, selfname2, parent1_ptr);
+	} else {
+		ret_val = dir_remove_entry(parent_inode1, self_inode,
+				selfname1, self_mode, parent1_ptr, is_external);
+	}
 	if (ret_val < 0) {
 		_cleanup_rename(body_ptr, old_target_ptr,
 				parent1_ptr, parent2_ptr);
@@ -2114,6 +2241,40 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	/* Update alias list. */
+	if (is_external == TRUE) {
+		update_in_alias_group(self_inode, selfname2);
+
+		/* Delete all alias inodes if not case-insensitive condition. */
+		if (rename_self_external == FALSE) {
+			to_lowercase(selfname1, lowercase);
+
+			while (1) {
+				alias_name = get_name_in_alias_group(
+								self_inode, lowercase, &alias_ino);
+				if (alias_name == NULL)
+					break;
+
+				/* Tell all views that the alias inode is gone. This
+				 * can be done by passing selfname2 as a fake name. */
+				ret_val = hfuse_ll_notify_delete_mp(
+					tmpptr->chan_ptr, parent_inode1, alias_ino,
+					alias_name, strlen(alias_name), selfname2);
+
+				free(alias_name);
+
+				if (ret_val < 0) {
+					_cleanup_rename(body_ptr, old_target_ptr,
+							parent1_ptr, parent2_ptr);
+					meta_cache_remove(self_inode);
+					fuse_reply_err(req, -ret_val);
+					return;
+				}
+			}
+		}
+	}
+
 	write_log(10, "Debug: Finished updating dir entries\n");
 
 	if ((S_ISDIR(self_mode)) && (parent_inode1 != parent_inode2)) {
@@ -5783,7 +5944,7 @@ void hfuse_ll_setattr(fuse_req_t req,
 		      struct fuse_file_info *file_info)
 {
 	int32_t ret_val;
-	ino_t this_inode;
+	ino_t this_inode, org_ino;
 	BOOL attr_changed, only_atime_changed;
 	struct timespec timenow;
 	HCFS_STAT newstat;
@@ -5794,6 +5955,7 @@ void hfuse_ll_setattr(fuse_req_t req,
 
 	write_log(10, "Debug setattr, to_set %d\n", to_set);
 
+	org_ino = org_real_ino(req, ino);
 	this_inode = real_ino(req, ino);
 
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
@@ -6060,6 +6222,8 @@ allow_truncate:
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	newstat.ino = org_ino;
 	convert_hcfsstat_to_sysstat(&retstat, &newstat);
 	fuse_reply_attr(req, &retstat, 0);
 }
@@ -6133,12 +6297,19 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	int32_t current_val;
 	char to_delete;
 	char d_type;
-	ino_t thisinode;
+	ino_t thisinode, org_ino;
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
+	org_ino = org_real_ino(req, ino);
 	thisinode = real_ino(req, ino);
+
+#ifdef _ANDROID_ENV_
+	if (IS_ALIAS_INODE(org_ino)) {
+		delete_in_alias_group(org_ino);
+	}
+#endif
 
 	amount = (int32_t) nlookup;
 
@@ -6157,8 +6328,12 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if ((current_val == 0) && (to_delete == TRUE))
+	if ((current_val == 0) && (to_delete == TRUE)) {
+#ifdef _ANDROID_ENV_
+		delete_in_alias_group(thisinode);
+#endif
 		actual_delete_inode(thisinode, d_type, tmpptr->f_ino, tmpptr);
+	}
 
 	fuse_reply_none(req);
 }
@@ -7671,6 +7846,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
 	init_api_interface();
+	init_alias_group();
 
 	init_meta_cache_headers();
 	startup_finish_delete();
