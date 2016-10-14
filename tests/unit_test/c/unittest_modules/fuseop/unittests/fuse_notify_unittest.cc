@@ -26,72 +26,10 @@ extern "C" {
 #include "mount_manager.h"
 #include "ut_helper.h"
 }
-#ifdef PD
-#undef PD
-#define PD(x) write_log(10, #x " %d\n", x)
-#endif
 
-MOUNT_T_GLOBAL mount_global = {0};
+MOUNT_T_GLOBAL mount_global;
 extern FUSE_NOTIFY_RING_BUF notify_buf;
 extern fuse_notify_fn *notify_fn[];
-
-/* 
- * Definition for fake functions
- */
-
-#define FFF_MASK_ON_FAKE
-#include "../../fff.h"
-DEFINE_FFF_GLOBALS;
-
-FAKE_VALUE_FUNC(int, sem_init, sem_t *, int, unsigned int);
-typedef int(sem_init_f)(sem_t *, int, unsigned int);
-sem_init_f *sem_init_real = (sem_init_f *)dlsym(RTLD_NEXT, "sem_init");
-uint32_t sem_init_error_on = -1;
-int32_t sem_init_cnt(sem_t *sem, int pshared, unsigned int value)
-{
-	PD(sem_init_fake.call_count);
-	if (sem_init_fake.call_count != sem_init_error_on) {
-		return sem_init_real(sem, pshared, value);
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
-}
-
-FAKE_VALUE_FUNC(void *, realloc, void *, size_t);
-typedef void *(realloc_f)(void *, size_t);
-realloc_f *realloc_real = (realloc_f *)dlsym(RTLD_NEXT, "realloc");
-uint32_t realloc_error_on = -1;
-void *realloc_cnt(void *ptr, size_t size)
-{
-	printf("realloc_fake.call_count %d\n", realloc_fake.call_count);
-	if (realloc_fake.call_count != realloc_error_on)
-		return realloc_real(ptr, size);
-	else
-		return NULL;
-}
-
-FAKE_VALUE_FUNC(void *, malloc, size_t);
-typedef void *(malloc_f)(size_t);
-malloc_f *malloc_real = (malloc_f *)dlsym(RTLD_NEXT, "malloc");
-uint32_t malloc_error_on = -1;
-void *malloc_cnt(size_t size)
-{
-	if (malloc_fake.call_count != malloc_error_on) {
-		return malloc_real(size);
-	} else {
-		errno = ENOMEM;
-		return NULL;
-	}
-}
-
-FAKE_VALUE_FUNC(int,
-		fuse_lowlevel_notify_delete,
-		struct fuse_chan *,
-		fuse_ino_t,
-		fuse_ino_t,
-		const char *,
-		size_t);
 
 /*
  * Helper functions
@@ -136,22 +74,6 @@ void ut_dequeue(int32_t n)
 void reset_fake_functions(void)
 {
 	reset_ut_helper();
-	RESET_FAKE(sem_init);
-	sem_init_error_on = -1;
-	sem_init_fake.custom_fake = sem_init_cnt;
-
-	RESET_FAKE(realloc);
-	realloc_error_on = -1;
-	realloc_fake.custom_fake = realloc_cnt;
-
-	RESET_FAKE(malloc);
-	malloc_error_on = -1;
-	malloc_fake.custom_fake = malloc_cnt;
-
-	RESET_FAKE(fuse_lowlevel_notify_delete);
-
-	FFF_RESET_HISTORY();
-
 	ut_enqueue_call = 0;
 }
 
@@ -168,7 +90,7 @@ void reset_unittest_env(void)
 	memset(&data, 0, sizeof(data));
 }
 
-/* 
+/*
  * Google Tests
  */
 
@@ -209,7 +131,6 @@ TEST_F(NotifyBufferSetUpAndTearDown, InitSuccess)
 TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_1)
 {
 
-	sem_init_fake.custom_fake = sem_init_cnt;
 	sem_init_error_on = 1;
 	EXPECT_LT(init_notify_buf(), 0);
 }
@@ -217,7 +138,6 @@ TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_1)
 TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_2)
 {
 
-	sem_init_fake.custom_fake = sem_init_cnt;
 	sem_init_error_on = 2;
 	EXPECT_LT(init_notify_buf(), 0);
 }
@@ -225,7 +145,6 @@ TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_2)
 TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_3)
 {
 
-	sem_init_fake.custom_fake = sem_init_cnt;
 	sem_init_error_on = 3;
 	EXPECT_LT(init_notify_buf(), 0);
 }
@@ -349,9 +268,8 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop_SemPostFail)
 	init_hfuse_ll_notify_loop();
 	hcfs_system->system_going_down = TRUE;
 	sem_post_error_on = 1;
-	destory_hfuse_ll_notify_loop();
-	/* Test thread is running */
-	ASSERT_EQ(pthread_kill(fuse_nofify_thread, 0), 0);
+	sem_post_errno = 123;
+	ASSERT_EQ(destory_hfuse_ll_notify_loop(), -123);
 	sem_post_error_on = -1;
 	destory_hfuse_ll_notify_loop();
 }
@@ -363,7 +281,7 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop_PthreadJoinFail)
 	sem_post(&notify_buf.not_empty);
 	pthread_join(fuse_nofify_thread, NULL);
 	destory_hfuse_ll_notify_loop();
-	EXPECT_STREQ(log_data[write_log_call_count % 5],
+	EXPECT_STREQ(log_data[write_log_call_count % LOG_RECORD_SIZE],
 		     "Error destory_hfuse_ll_notify_loop: Failed to join "
 		     "nofify_thread. No such process\n");
 }
@@ -390,6 +308,7 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 	int32_t task;
 	struct timespec wait = {0, 100000};
 	init_hfuse_ll_notify_loop();
+	write_log_hide = 2;
 	malloc_error_on = 1;
 	ut_enqueue(1);
 	while (1) {
@@ -405,7 +324,7 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 	pthread_join(fuse_nofify_thread, NULL);
 #define msg \
 	"Error hfuse_ll_notify_loop: Dequeue failed. Cannot allocate memory\n"
-	EXPECT_STREQ(log_data[(write_log_call_count + 5 - 4) % 5], msg);
+	EXPECT_STREQ(log_data[write_log_call_count % LOG_RECORD_SIZE], msg);
 #undef msg
 }
 
@@ -417,7 +336,7 @@ TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
 	((FUSE_NOTIFY_DELETE_DATA *)data)->name = (char *)malloc(1);
 	_do_hfuse_ll_notify_delete(data, RUN);
 	free(data);
-	EXPECT_EQ(fuse_lowlevel_notify_delete_fake.call_count, 1);
+	EXPECT_EQ(fuse_lowlevel_notify_delete_call_count, 1);
 }
 
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN_Fail)
@@ -426,8 +345,8 @@ TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN_Fail)
 	    (FUSE_NOTIFY_DATA *)calloc(1, sizeof(FUSE_NOTIFY_DATA));
 	((FUSE_NOTIFY_DELETE_DATA *)data)->func = DELETE;
 	((FUSE_NOTIFY_DELETE_DATA *)data)->name = (char *)malloc(1);
-	fuse_lowlevel_notify_delete_fake.return_val = -1;
-	EXPECT_EQ(_do_hfuse_ll_notify_delete(data, RUN), -1);
+	fuse_lowlevel_notify_delete_error_on = 1;
+	EXPECT_EQ(_do_hfuse_ll_notify_delete(data, RUN), 0);
 	free(data);
 }
 

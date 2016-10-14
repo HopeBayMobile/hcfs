@@ -218,26 +218,28 @@ int32_t init_hfuse_ll_notify_loop(void)
 }
 
 /* Wake notify loop and wait the thread end */
-void destory_hfuse_ll_notify_loop(void)
+int32_t destory_hfuse_ll_notify_loop(void)
 {
 	int32_t save_errno = 0;
 
 	write_log(10, "Debug %s: Start.\n", __func__);
 	/* let loop handle destory tasks itself */
 	if (sem_post(&notify_buf.not_empty) == -1) {
+		save_errno = errno;
 		write_log(1, "Error %s: sem_post failed. %s\n",
 			  __func__, strerror(save_errno));
-		return;
+		return -save_errno;
 	}
 	save_errno = pthread_join(fuse_nofify_thread, NULL);
 	if (save_errno != 0) {
 		write_log(1, "Error %s: Failed to join nofify_thread. %s\n",
 			  __func__, strerror(save_errno));
-		return;
+		return -save_errno;
 	}
 
 	/* destory enviroments */
 	destory_notify_buf();
+	return save_errno;
 }
 
 void *hfuse_ll_notify_loop(void *ptr)

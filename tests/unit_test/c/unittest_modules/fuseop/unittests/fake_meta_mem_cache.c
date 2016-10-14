@@ -296,8 +296,6 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 			dir_meta_ptr->total_children = 2;
 			break;
 		case TEST_LISTDIR_INODE:
-			if (readdir_metapath == NULL)
-				break;
 			fptr = fopen(readdir_metapath, "r");
 			fseek(fptr, sizeof(HCFS_STAT), SEEK_SET);
 			fread(dir_meta_ptr, sizeof(DIR_META_TYPE), 1, fptr);
@@ -311,8 +309,6 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 	if (dir_page != NULL) {
 		switch (this_inode) {
 		case TEST_LISTDIR_INODE:
-			if (readdir_metapath == NULL)
-				break;
 			fptr = fopen(readdir_metapath, "r");
 			fseek(fptr, dir_page->this_page_pos, SEEK_SET);
 			fread(dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);

@@ -239,10 +239,9 @@ errcode_handle:
 *************************************************************************/
 int32_t init_hfuse(int8_t restoring_status)
 {
-	int32_t ret_val = 0;
+	int32_t ret_val;
 
-	if (ret_val == 0)
-		ret_val = init_hcfs_system_data(restoring_status);
+	ret_val = init_hcfs_system_data(restoring_status);
 	if (ret_val == 0)
 		ret_val = init_system_fh_table();
 	if (ret_val == 0)
