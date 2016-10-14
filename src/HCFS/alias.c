@@ -76,8 +76,7 @@ ALIAS_INODE *avl_delete(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 					CMP_TYPE cmp_type, int i, int h);
 ALIAS_INODE *avl_delete_all(ALIAS_INODE *root_entry);
 void avl_remove_unused(ALIAS_INODE *curr_entry);
-void avl_free_unused(ALIAS_INODE **root_entry, ALIAS_INODE *curr_entry,
-					ino_t real_ino);
+void avl_free_unused(ino_t real_ino);
 
 
 /************************************************************************
@@ -322,9 +321,8 @@ int32_t delete_in_alias_group(ino_t this_ino)
 		parent->family = avl_delete_all(parent->family);
 
 		/* Free all alias inodes in the avltree[REMOVE]. */
-		avl_lock(REMOVE);
-		avl_free_unused(&avltree[REMOVE], avltree[REMOVE], this_ino);
-		avl_unlock(REMOVE);
+		DD2("Free unused inode from tree(R)\n");
+		avl_free_unused(this_ino);
 
 		/* Remove the parent from the avltree[ALIAS]. */
 		DD2("Remove real inode from tree(A)\n");
@@ -343,18 +341,18 @@ int32_t delete_in_alias_group(ino_t this_ino)
 
 /************************************************************************
 *
-* Function name: get_alias_in_alias_group
+* Function name: get_name_in_alias_group
 *        Inputs: ino_t real_ino, const char *this_name, ino_t *alias_ino
-*       Summary: Get the available alias inode from the root of the tree.
-*                Return it's actual name and it's inode number.
-*  Return value: Return alias inode's name, or NULL if not found.
+*       Summary: Get the available inode from the root of the tree. For
+*                getting alias inode info, also return it's inode number.
+*  Return value: Return inode's name, or NULL if not found.
 *
 *************************************************************************/
-char *get_alias_in_alias_group(ino_t real_ino, const char *this_name,
+char *get_name_in_alias_group(ino_t real_ino, const char *this_name,
 	ino_t *alias_ino)
 {
 	ALIAS_INODE *parent, *child;
-	char *alias_name;
+	char *ret_name;
 
 	avl_lock(ALIAS);
 
@@ -363,25 +361,30 @@ char *get_alias_in_alias_group(ino_t real_ino, const char *this_name,
 	/* Find the real inode position. */
 	parent = avl_find(avltree[ALIAS], (void *)&real_ino,
 					CMP_INO, SEQ_INO);
-	if (parent == NULL || ((child = parent->family) == NULL)) {
+	if (parent == NULL || (alias_ino && (child = parent->family) == NULL)) {
 		DD1("-GETNAME: Done(END)\n");
 		avl_unlock(ALIAS);
 		return NULL;
 	}
 
 	/* Remove the child from the parent->family avltree. */
-	DD2("Remove alias inode from tree(I)\n");
-	parent->family = avl_delete(parent->family, child,
-								CMP_INODE_BY_BITMAP, SEQ_BITMAP, 0);
-	avl_remove_unused(child);
+	if (alias_ino) {
+		DD2("Remove alias inode from tree(I)\n");
+		parent->family = avl_delete(parent->family, child,
+									CMP_INODE_BY_BITMAP, SEQ_BITMAP, 0);
+		avl_remove_unused(child);
+		*alias_ino = child->ino;
+		/* Retrieve the alias inode's name. */
+		ret_name = bitmap_to_name(this_name, child->bitmap);
+	} else {
+		/* Retrieve the real inode's name. */
+		ret_name = bitmap_to_name(this_name, parent->bitmap);
+	}
 
-	*alias_ino = child->ino;
-	alias_name = bitmap_to_name(this_name, child->bitmap);
-
-	DD1("-GETNAME: Done('%s')\n", alias_name);
+	DD1("-GETNAME: Done('%s')\n", ret_name);
 	avl_unlock(ALIAS);
 
-	return alias_name;
+	return ret_name;
 }
 
 
@@ -436,16 +439,14 @@ static char *bitmap_to_name(const char *this_name, uint64_t *bitmap)
 
 	for (i = 0; i < group; i++) {
 		for (j = MAX_GROUP_LEN; j > 0; j--, index++) {
-			actual_name[index] = this_name[index];
-			if (bitmap[i] & (1ull << (j - 1)))
-				actual_name[index] -= 32;
+			actual_name[index] = this_name[index]
+				- 32 * ((bitmap[i] >> (j - 1)) & 1ull);
 		}
 	}
 
 	for (j = remain; j > 0; j--, index++) {
-		actual_name[index] = this_name[index];
-		if (bitmap[i] & (1ull << (j - 1)))
-			actual_name[index] -= 32;
+		actual_name[index] = this_name[index]
+			- 32 * ((bitmap[i] >> (j - 1)) & 1ull);
 	}
 
 	actual_name[index] = '\0';
@@ -518,9 +519,6 @@ static void update_height(ALIAS_INODE *curr_entry, int i)
 
 static int balanced_factor(ALIAS_INODE *curr_entry, int i)
 {
-	if (curr_entry == NULL)
-		return 0;
-
 	return height(curr_entry->left[i], i) - height(curr_entry->right[i], i);
 }
 
@@ -533,6 +531,27 @@ static ALIAS_INODE *get_min_alias_inode(ALIAS_INODE *root_entry, int i)
 		curr_entry = curr_entry->left[i];
 
 	return curr_entry;
+}
+
+static ALIAS_INODE *get_unused_alias(ALIAS_INODE *root_entry, ino_t real_ino)
+{
+	ALIAS_INODE* curr_entry;
+
+	if (root_entry == NULL)
+		return NULL;
+
+	if (root_entry->family->ino == real_ino)
+		return root_entry;
+
+	curr_entry = get_unused_alias(root_entry->left[SEQ_INO], real_ino);
+	if (curr_entry != NULL)
+		return curr_entry;
+
+	curr_entry = get_unused_alias(root_entry->right[SEQ_INO], real_ino);
+	if (curr_entry != NULL)
+		return curr_entry;
+
+	return NULL;
 }
 
 static void reset_entry(ALIAS_INODE *curr_entry, int i)
@@ -639,8 +658,6 @@ ALIAS_INODE *avl_balance(ALIAS_INODE *curr_entry, ROTATE_TYPE rt_type, int i)
 		curr_entry->right[i] = avl_right_rotate(curr_entry->right[i], i);
 		curr_entry = avl_left_rotate(curr_entry, i);
 		break;
-	default:
-		break;
 	}
 
 	return curr_entry;
@@ -650,7 +667,7 @@ ALIAS_INODE *avl_insert(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 	CMP_TYPE cmp_type, int i, int h)
 {
 	int cmp_result, level;
-	ROTATE_TYPE rotate_type = ROTATE_NONE;
+	ROTATE_TYPE rotate_type;
 
 	if (root_entry == NULL) {
 		DD3("Insert %s inode %" PRIu64 "(H:%d)\n", h ? "leaf" : "root",
@@ -686,6 +703,8 @@ ALIAS_INODE *avl_insert(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 			rotate_type = ROTATE_LL;
 		else
 			rotate_type = ROTATE_LR;
+
+		root_entry = avl_balance(root_entry, rotate_type, i);
 	/* Unbalanced condition: RR or RL case. */
 	} else if (level < -1) {
 		cmp_result = cmp_func[cmp_type]((void *)curr_entry,
@@ -694,10 +713,9 @@ ALIAS_INODE *avl_insert(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 			rotate_type = ROTATE_RR;
 		else
 			rotate_type = ROTATE_RL;
-	}
 
-	if (rotate_type != ROTATE_NONE)
 		root_entry = avl_balance(root_entry, rotate_type, i);
+	}
 
 	DD3("Link to inode %" PRIu64 "(H:%d)\n", root_entry->ino, h);
 	return root_entry;
@@ -708,7 +726,7 @@ ALIAS_INODE *avl_delete(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 {
 	int cmp_result, level;
 	ALIAS_INODE *child;
-	ROTATE_TYPE rotate_type = ROTATE_NONE;
+	ROTATE_TYPE rotate_type;
 
 	if (root_entry == NULL)
 		return NULL;
@@ -787,16 +805,17 @@ ALIAS_INODE *avl_delete(ALIAS_INODE *root_entry, ALIAS_INODE *curr_entry,
 			rotate_type = ROTATE_LL;
 		else
 			rotate_type = ROTATE_LR;
+
+		root_entry = avl_balance(root_entry, rotate_type, i);
 	/* Unbalanced condition: RR or RL case. */
 	} else if (level < -1) {
 		if (balanced_factor(root_entry->right[i], i) < 0)
 			rotate_type = ROTATE_RR;
 		else
 			rotate_type = ROTATE_RL;
-	}
 
-	if (rotate_type != ROTATE_NONE)
 		root_entry = avl_balance(root_entry, rotate_type, i);
+	}
 
 	DD3("Link to inode %" PRIu64 "(H:%d)\n", root_entry->ino, h);
 	return root_entry;
@@ -848,26 +867,23 @@ void avl_remove_unused(ALIAS_INODE *curr_entry)
 	avl_unlock(REMOVE);
 }
 
-void avl_free_unused(ALIAS_INODE **root_entry, ALIAS_INODE *curr_entry,
-	ino_t real_ino)
+void avl_free_unused(ino_t real_ino)
 {
-	if (curr_entry == NULL)
-		return;
+	ALIAS_INODE *curr_entry;
 
-	/* Search left subtrees and remove the real inode's family. */
-	avl_free_unused(&curr_entry->left[SEQ_INO],
-					curr_entry->left[SEQ_INO], real_ino);
+	avl_lock(REMOVE);
 
-	/* Search right subtrees and remove the real inode's family. */
-	avl_free_unused(&curr_entry->right[SEQ_INO],
-					curr_entry->right[SEQ_INO], real_ino);
-
-	/* Delete and free the inode if it's the real inode's family. */
-	if (curr_entry->family->ino == real_ino) {
+	while (TRUE) {
+		curr_entry = get_unused_alias(avltree[REMOVE], real_ino);
+		if (curr_entry == NULL) {
+			avl_unlock(REMOVE);
+			return;
+		}
 		DD2("Remove alias inode from tree(R)\n");
-		*root_entry = avl_delete(*root_entry, curr_entry,
+		avltree[REMOVE] = avl_delete(avltree[REMOVE], curr_entry,
 								CMP_INODE_BY_INO, SEQ_INO, 0);
 		DD2("Free alias inode %" PRIu64 "\n", curr_entry->ino);
 		free(curr_entry);
 	}
+	avl_unlock(REMOVE);
 }

@@ -1386,7 +1386,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 
 		/* Notify to delete all alias inodes. */
 		while (1) {
-			alias_name = get_alias_in_alias_group(
+			alias_name = get_name_in_alias_group(
 							temp_dentry.d_ino, lowercase, &alias_ino);
 			if (alias_name == NULL)
 				break;
@@ -1524,7 +1524,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 
 		/* Notify to delete all alias inodes. */
 		while (1) {
-			alias_name = get_alias_in_alias_group(
+			alias_name = get_name_in_alias_group(
 							temp_dentry.d_ino, lowercase, &alias_ino);
 			if (alias_name == NULL)
 				break;
@@ -2251,7 +2251,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			to_lowercase(selfname1, lowercase);
 
 			while (1) {
-				alias_name = get_alias_in_alias_group(
+				alias_name = get_name_in_alias_group(
 								self_inode, lowercase, &alias_ino);
 				if (alias_name == NULL)
 					break;

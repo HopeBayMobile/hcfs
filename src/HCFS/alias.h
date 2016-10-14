@@ -33,7 +33,6 @@ typedef enum {
 } TREE_TYPE;
 
 typedef enum {
-	ROTATE_NONE = 0,
 	ROTATE_LL,
 	ROTATE_LR,
 	ROTATE_RR,
@@ -71,7 +70,7 @@ int32_t seek_and_add_in_alias_group(ino_t real_ino, ino_t *new_inode,
 	const char *real_name, const char *alias_name);
 int32_t update_in_alias_group(ino_t real_ino, const char *this_name);
 int32_t delete_in_alias_group(ino_t this_ino);
-char *get_alias_in_alias_group(ino_t real_ino, const char *this_name,
+char *get_name_in_alias_group(ino_t real_ino, const char *this_name,
 	ino_t *alias_ino);
 
 #endif  // SRC_HCFS_ALIAS_H_
