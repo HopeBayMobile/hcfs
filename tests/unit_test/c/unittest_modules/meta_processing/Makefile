@@ -51,3 +51,9 @@ $(eval $(call ADDTEST, xattr_ops_unittest, \
     xattr_ops_mock_function.o \
     xattr_ops.o \
     xattr_ops_unittest.o ))
+
+$(eval $(call ADDTEST, rebuild_super_block_unittest, \
+    rebuild_super_block_mock_function.o \
+    rebuild_super_block.o \
+    rebuild_super_block_unittest.o ))
+

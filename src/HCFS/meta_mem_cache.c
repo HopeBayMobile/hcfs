@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/9 Jiahong added header for this file, and revising coding style.
 * 2015/7/8 Kewei added meta cache processing about symlink.
+* 2016/6/7 Jiahong changing code for recovering mode
 * 2016/6/20 Jiahong added the option of not sync to backend on meta change
 *
 **************************************************************************/
@@ -32,6 +33,8 @@
 #include "logger.h"
 #include "utils.h"
 #include "atomic_tocloud.h"
+#include "rebuild_parent_dirstat.h"
+#include "rebuild_super_block.h"
 
 /* If cache lock not locked, return -EINVAL*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
@@ -1129,6 +1132,8 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	DIR_ENTRY tmp_entry;
 	int32_t tmp_index;
 	int32_t cache_idx;
+	ino_t tmpino;
+	char this_type;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -1150,6 +1155,20 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			memcpy(result_page, tmp_page_ptr,
 				sizeof(DIR_ENTRY_PAGE));
 			gettimeofday(&(body_ptr->last_access_time), NULL);
+
+			/* Rebuild parent lookup / dir statistics here
+			(excluding . and ..), for every pair of (parent / child)
+			discovered here */
+			tmpino = result_page->dir_entries[ret].d_ino;
+			this_type = result_page->dir_entries[ret].d_type;
+			if (hcfs_system->system_restoring
+			    == RESTORING_STAGE2) {
+				if ((strcmp(childname, ".") != 0) &&
+				    (strcmp(childname, "..") != 0))
+					rebuild_parent_stat(tmpino,
+						this_inode, this_type);
+			}
+
 			return 0;
 		}
 	}
@@ -1242,6 +1261,18 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 	*result_index = tmp_index;
 	memcpy(result_page, &tmp_resultpage, sizeof(DIR_ENTRY_PAGE));
+
+	/* Rebuild parent lookup / dir statistics here
+	(excluding . and ..), for every pair of (parent / child)
+	discovered here */
+	tmpino = result_page->dir_entries[*result_index].d_ino;
+	this_type = result_page->dir_entries[*result_index].d_type;
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		if ((strcmp(childname, ".") != 0) &&
+		    (strcmp(childname, "..") != 0))
+			rebuild_parent_stat(tmpino,
+				this_inode, this_type);
+	}
 
 	return 0;
 
@@ -1467,12 +1498,12 @@ int32_t expire_meta_mem_cache_entry(void)
 *                If no entry is found, allocate a new entry for this inode,
 *                and proceed with the locking
 *  Return value: The pointer to the locked entry if successful. Otherwise
-*                returns NULL.
+*                returns NULL and set errno to corresponding error.
 *
 *************************************************************************/
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	int32_t index;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
 	char need_new, expire_done;
@@ -1523,6 +1554,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 					if (errcount > 5) {
 						write_log(0,
 							"Lock meta cache err");
+						errno = -ret_val;
 						return NULL;
 					}
 					nanosleep(&time_to_sleep, NULL);
@@ -1538,19 +1570,33 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 			sem_post(&num_entry_sem);
 		}
 
+		/* Try fetching meta file from backend if in restoring mode */
+		if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+			ret = restore_meta_super_block_entry(this_inode, NULL);
+			if (ret < 0) {
+				write_log(2, "Unable to rebuild meta for %"
+				          PRIu64 "\n", (uint64_t) this_inode);
+				sem_post(&(meta_mem_cache[index].header_sem));
+				errno = -ret;
+				return NULL;
+			}
+		}
+
 		ret_val = super_block_read(this_inode, &tempentry);
 		if (ret_val < 0) {
 			sem_post(&(meta_mem_cache[index].header_sem));
+			errno = -ret_val;
 			return NULL;
 		}
 
+		errno = 0;
 		current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
 		if (current_ptr == NULL) {
 			sem_post(&(meta_mem_cache[index].header_sem));
+			if (errno == 0)
+				errno = ENOMEM;
 			return NULL;
 		}
-		/* TODO: Should return errno as well if needed */
-		/* return -EACCES; */
 
 		memset(current_ptr, 0, sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
 
@@ -1588,6 +1634,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	if ((current_ptr->body).meta_opened == TRUE)
 		flock(fileno((current_ptr->body).fptr), LOCK_EX);
 
+	errno = 0;
 	return result_ptr;
 }
 
@@ -1602,7 +1649,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	if (!target_ptr)
-		return -ENOMEM;
+		return -EINVAL;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 

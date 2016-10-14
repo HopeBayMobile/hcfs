@@ -83,3 +83,31 @@ json_int_t json_integer_value(const json_t *integer)
 	free((void *)integer);
 	return 5566;
 }
+
+void *monitor_loop(void *ptr)
+{
+	return NULL;
+}
+
+void run_cache_loop(void)
+{
+	return;
+}
+
+void init_download_module(void)
+{
+	return;
+}
+int32_t restore_stage1_reduce_cache(void)
+{
+	return 0;
+}
+int32_t notify_restoration_result(int8_t stage, int32_t result)
+{
+	return 0;
+}
+void start_download_minimal(void)
+{
+	return;
+}
+

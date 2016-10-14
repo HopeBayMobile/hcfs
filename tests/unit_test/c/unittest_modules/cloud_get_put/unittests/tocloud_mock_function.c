@@ -194,6 +194,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCF
 	fs_cloud_stat.backend_system_size = 7687483;
 	fs_cloud_stat.backend_meta_size = 5566;
 	fs_cloud_stat.backend_num_inodes = 34334;
+	fs_cloud_stat.max_inode = 1;
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
@@ -459,7 +460,8 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
 
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
-		int64_t fs_pin_size_delta)
+		int64_t fs_pin_size_delta, int64_t disk_pin_size_delta,
+		int64_t disk_meta_size_delta)
 {
 	FS_CLOUD_STAT_T	fs_cloud_stat;
 
@@ -470,6 +472,12 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.backend_meta_size += fs_meta_size_delta;
 	fs_cloud_stat.backend_num_inodes += fs_num_inodes_delta;
 	fs_cloud_stat.pinned_size += fs_pin_size_delta;
+	fs_cloud_stat.max_inode = 1;
+	if (fs_cloud_stat.disk_pinned_size >= 0)
+		fs_cloud_stat.disk_pinned_size += disk_pin_size_delta;
+	if (fs_cloud_stat.disk_meta_size >= 0)
+		fs_cloud_stat.disk_meta_size += disk_meta_size_delta;
+
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
@@ -520,5 +528,30 @@ void push_retry_inode(IMMEDIATELY_RETRY_LIST *list, ino_t inode)
 
 int32_t super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	return 0;
+}
+int64_t round_size(int64_t size)
+{
+	int64_t blksize = 4096;
+	int64_t ret_size;
+
+	if (size >= 0) {
+		/* round up to filesystem block size */
+		ret_size = (size + blksize - 1) & (~(blksize - 1));
+	} else {
+		size = -size;
+		ret_size = -((size + blksize - 1) & (~(blksize - 1)));
+	}
+
+	return ret_size;
+}
+int32_t copy_file(const char *srcpath, const char *tarpath)
+{
+	mknod(tarpath, 0600, 0);
+	return 0;
+}
+int32_t super_block_mark_dirty(ino_t this_inode)
+{
+	MOCK();
 	return 0;
 }

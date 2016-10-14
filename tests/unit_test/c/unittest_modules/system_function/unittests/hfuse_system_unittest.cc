@@ -66,7 +66,7 @@ protected:
 TEST_F(init_hcfs_system_dataTest, Creat_and_Init_SystemDataSuccess)
 {
 	/* Run function */
-	ASSERT_EQ(0, init_hcfs_system_data());
+	ASSERT_EQ(0, init_hcfs_system_data(NOT_RESTORING));
 	
 	/* Check answer */
 	ASSERT_EQ(0, access(HCFSSYSTEM, F_OK));
@@ -93,7 +93,7 @@ TEST_F(init_hcfs_system_dataTest, ReadSystemDataSuccess)
 	fclose(fptr);
 	
 	/* Run function */
-	ASSERT_EQ(0, init_hcfs_system_data());
+	ASSERT_EQ(0, init_hcfs_system_data(NOT_RESTORING));
 	
 	/* Check answer */
 	ASSERT_EQ(0, access(HCFSSYSTEM, F_OK));
@@ -112,7 +112,7 @@ class sync_hcfs_system_dataTest : public BaseClassWithSystemPath {
 	protected:
 		void init_mock_data()
 		{
-			init_hcfs_system_data();
+			init_hcfs_system_data(NOT_RESTORING);
 			hcfs_system->systemdata.system_size = 54321;
 			hcfs_system->systemdata.cache_size = 98765;
 			hcfs_system->systemdata.cache_blocks = 11223344;
@@ -180,7 +180,7 @@ TEST_F(init_hfuseTest, RunTest)
 {
 
 	/* Run function */
-	EXPECT_EQ(0, init_hfuse());
+	EXPECT_EQ(0, init_hfuse(NOT_RESTORING));
 	
 	/* Remove */
 	unlink(HCFSSYSTEM);
@@ -240,6 +240,8 @@ TEST_F(mainTest, MainFunctionSuccess)
 
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = TRUE;
+	CURRENT_BACKEND = SWIFT;
+	
 	/* Test */
 	EXPECT_EQ(0, main(1, tmp_argv));
 	sleep(1); // Waiting for child process finishing their work

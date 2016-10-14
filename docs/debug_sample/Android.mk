@@ -125,7 +125,8 @@ LOCAL_SRC_FILES := mount_manager.c \
                    dir_statistics.c \
                    parent_lookup.c \
                    objmeta.c \
-                   dedup_table.c                  
+                   dedup_table.c \
+                   rebuild_parent_dirstat.c\ 
  
 #LOCAL_STATIC_LIBRARIES := libfuse libcurl libssl libcrypto liblz4
 #LOCAL_STATIC_LIBRARIES := libfuse

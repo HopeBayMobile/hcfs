@@ -88,6 +88,8 @@ extern SYSTEM_CONF_STRUCT *system_config;
 #define MAX_PINNED_RATIO 0.8
 #define MAX_PINNED_LIMIT (CACHE_HARD_LIMIT * MAX_PINNED_RATIO)
 
+#define REDUCED_RATIO 0.2
+
 #define MAX_BLOCK_SIZE system_config->max_block_size
 
 #define MAX_META_MEM_CACHE_ENTRIES 5000

@@ -15,6 +15,7 @@
 * 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
 * 2015/2/18, Kewei finish atomic upload.
 * 2016/5/23 Jiahong added control for cache mgmt
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -65,6 +66,8 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "tocloud_tools.h"
 #include "utils.h"
 #include "hcfs_cacheops.h"
+#include "rebuild_super_block.h"
+#include "do_restoration.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -1049,6 +1052,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	uint8_t now_pin_status = NUM_PIN_TYPES + 1;
 	uint8_t last_pin_status = NUM_PIN_TYPES + 1;
 	int64_t pin_size_delta = 0, last_file_size = 0;
+	int64_t size_diff_blk = 0, meta_size_diff_blk = 0;
+	int64_t disk_pin_size_delta = 0;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1291,7 +1296,7 @@ store in some other file */
 
 	if (!access(local_metapath, F_OK)) {
 		struct stat metastat; /* meta file ops */
-		int64_t now_meta_size;
+		int64_t now_meta_size, now_meta_size_blk, tmpval;
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
@@ -1301,6 +1306,7 @@ store in some other file */
 			goto errcode_handle;
 		}
 		now_meta_size = metastat.st_size;
+		now_meta_size_blk = metastat.st_blocks * 512;
 
 		if (S_ISFILE(ptr->this_mode)) {
 			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
@@ -1316,10 +1322,16 @@ store in some other file */
 			upload_seq = cloud_related_data.upload_seq;
 			size_diff = (tempfilestat.size + now_meta_size) -
 					cloud_related_data.size_last_upload;
-			meta_size_diff = now_meta_size -
-					cloud_related_data.meta_last_upload;
+			tmpval = cloud_related_data.meta_last_upload;
+			meta_size_diff = now_meta_size - tmpval;
 			last_file_size = cloud_related_data.size_last_upload -
-					 cloud_related_data.meta_last_upload;
+					 tmpval;
+			size_diff_blk = (round_size(tempfilestat.size) +
+			                 now_meta_size_blk) -
+					(round_size(last_file_size) +
+					 round_size(tmpval));
+			meta_size_diff_blk = now_meta_size_blk -
+			                     round_size(tmpval);
 			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload =
 					tempfilestat.size + now_meta_size;
@@ -1341,6 +1353,12 @@ store in some other file */
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
+			tmpval = cloud_related_data.size_last_upload;
+			size_diff_blk = now_meta_size_blk -
+					round_size(tmpval);
+			tmpval = cloud_related_data.meta_last_upload;
+			meta_size_diff_blk = now_meta_size_blk -
+					round_size(tmpval);
 			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
@@ -1362,6 +1380,12 @@ store in some other file */
 					cloud_related_data.size_last_upload;
 			meta_size_diff = now_meta_size -
 					cloud_related_data.meta_last_upload;
+			tmpval = cloud_related_data.size_last_upload;
+			size_diff_blk = now_meta_size_blk -
+					round_size(tmpval);
+			tmpval = cloud_related_data.meta_last_upload;
+			meta_size_diff_blk = now_meta_size_blk -
+					round_size(tmpval);
 			/* Update cloud related data to local meta */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
@@ -1391,7 +1415,6 @@ store in some other file */
 			write_log(10, "Checking for other error\n");
 			sync_error = sync_ctl.threads_error[ptr->which_index];
 		}
-
 	} else { /* meta is removed */
 		flock(fileno(local_metafptr), LOCK_UN);
 		fclose(local_metafptr);
@@ -1454,30 +1477,38 @@ store in some other file */
 	/* Upload successfully. Update FS stat in backend */
 	/* First check if pin status changed since the last upload */
 	pin_size_delta = 0;
-	if (P_IS_PIN(now_pin_status))
+	disk_pin_size_delta = 0;
+	if (P_IS_PIN(now_pin_status)) {
 		pin_size_delta = size_diff - meta_size_diff;
+		disk_pin_size_delta = size_diff_blk - meta_size_diff_blk;
+	}
 
 	if (P_IS_VALID_PIN(last_pin_status) && (S_ISREG(ptr->this_mode))) {
 		if (P_IS_UNPIN(last_pin_status) && P_IS_PIN(now_pin_status)) {
 			/* Change from unpin to pin, need to add file size
 			to pin size */
 			pin_size_delta = tempfilestat.size;
+			disk_pin_size_delta = round_size(tempfilestat.size);
 		}
 		if (P_IS_PIN(last_pin_status) && P_IS_UNPIN(now_pin_status)) {
 			/* Change from pin to unpin, need to substract file size
 			of the last upload from pin size */
 			pin_size_delta = -last_file_size;
+			disk_pin_size_delta = -round_size(last_file_size);
 		}
 	}
 
 	if (upload_seq <= 0)
 		update_backend_stat(root_inode, size_diff, meta_size_diff,
-		                    1, pin_size_delta);
+		                    1, pin_size_delta, disk_pin_size_delta,
+		                    meta_size_diff_blk);
 	else
 		if ((size_diff != 0) || (meta_size_diff != 0) ||
 		    (pin_size_delta != 0))
 			update_backend_stat(root_inode, size_diff,
-					meta_size_diff, 0, pin_size_delta);
+					meta_size_diff, 0, pin_size_delta,
+					disk_pin_size_delta,
+					meta_size_diff_blk);
 
 	/* Delete old block data on backend and wait for those threads */
 	if (S_ISREG(ptr->this_mode)) {
@@ -2035,6 +2066,48 @@ static inline void _write_upload_loop_status_log(char *sync_paused_status)
 	}
 }
 
+/* Mark the inodes in dirty list from restoration as dirty if needed */
+void _update_restore_dirty_list()
+{
+	int64_t count2, num_tosync;
+	ino_t tosync_inode;
+	char restore_tosync_list[METAPATHLEN];
+	FILE *to_sync_fptr = NULL;
+	struct stat tmpstat;
+	int32_t ret, errcode;
+	size_t ret_size;
+
+	snprintf(restore_tosync_list, METAPATHLEN, "%s/tosync_list",
+	         METAPATH);
+	/* Skip the tosync list if does not exist or cannot access */
+	if (access(restore_tosync_list, F_OK) < 0)
+		return;
+	ret = stat(restore_tosync_list, &tmpstat);
+	if (ret < 0)
+		return;
+	if (tmpstat.st_size == 0) {
+		unlink(restore_tosync_list);
+		return;
+	}
+	num_tosync = (int64_t) (tmpstat.st_size / sizeof(ino_t));
+	to_sync_fptr = fopen(restore_tosync_list, "r");
+	if (to_sync_fptr == NULL)
+		return;
+
+	/* Mark as dirty inodes in the list */
+	for (count2 = 0; count2 < num_tosync; count2++) {
+		FREAD(&tosync_inode, sizeof(ino_t), 1,
+		      to_sync_fptr);
+		super_block_mark_dirty(tosync_inode);
+		write_log(10, "Marked %" PRIu64 " as to sync\n",
+		          (uint64_t) tosync_inode);
+errcode_handle:
+		/* If error occurs, just continue */
+		continue;
+	}
+	fclose(to_sync_fptr);
+	unlink(restore_tosync_list);
+}
 #ifdef _ANDROID_ENV_
 void *upload_loop(void *ptr)
 #else
@@ -2061,6 +2134,9 @@ void upload_loop(void)
 	is_start_check = TRUE;
 
 	write_log(2, "Start upload loop\n");
+
+	/* If dirty list from restoration exists, need to mark them as dirty */
+	_update_restore_dirty_list();
 
 	need_retry_backup = FALSE;
 	while (hcfs_system->system_going_down == FALSE) {
@@ -2161,9 +2237,14 @@ void upload_loop(void)
 		if (ino_check != 0) {
 			ino_sync = ino_check;
 
+/* FEATURE TODO: double check that super block entry will be reconstructed here */
 			ret_val = read_super_block_entry(ino_sync, &tempentry);
-
 			if ((ret_val < 0) || (tempentry.status != IS_DIRTY)) {
+				if (ret_val == 0)
+					write_log(4, "Warn: Status of inode %"
+						PRIu64" is %d",
+						(uint64_t)ino_sync,
+						tempentry.status);
 				ino_sync = 0;
 				ino_check = 0;
 			} else {
@@ -2183,7 +2264,7 @@ void upload_loop(void)
 			}
 		}
 		super_block_exclusive_release();
-		write_log(10, "Inode to sync is %" PRIu64 "\n",
+		write_log(6, "Inode to sync is %" PRIu64 "\n",
 			  (uint64_t)ino_sync);
 		/* Begin to sync the inode */
 		if (ino_sync != 0) {
@@ -2234,6 +2315,67 @@ void upload_loop(void)
 #endif
 }
 
+/* Helper function for backing up package list if needed */
+void _try_backup_package_list(CURL_HANDLE *thiscurl)
+{
+	int32_t errcode, ret;
+	char backup_xml[METAPATHLEN];
+	FILE *fptr = NULL;
+
+	sem_wait(&backup_pkg_sem);
+
+	/* Return immediately if no new package list */
+	if (have_new_pkgbackup == FALSE) {
+		sem_post(&backup_pkg_sem);
+		return;
+	}
+	have_new_pkgbackup = FALSE;
+	sem_post(&backup_pkg_sem);
+
+	write_log(4, "Backing up package list\n");
+	snprintf(backup_xml, METAPATHLEN, "%s/backup_pkg", METAPATH);
+
+	if (access(PACKAGE_XML, F_OK) != 0) {
+		write_log(0, "Unable to locate package list\n");
+		sem_post(&backup_pkg_sem);
+		return;
+	}
+
+	ret = copy_file(PACKAGE_XML, backup_xml);
+	if (ret < 0) {
+		if (access(backup_xml, F_OK) == 0)
+			unlink(backup_xml);
+		sem_post(&backup_pkg_sem);
+		return;
+	}
+
+	fptr = fopen(backup_xml, "r");
+	if (fptr == NULL) {
+		write_log(0, "Unable to open backed-up pkg list\n");
+		return;
+	}
+
+	setbuf(fptr, NULL);
+
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL);
+	if ((ret < 200) || (ret > 299))
+		goto errcode_handle;
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	fptr = NULL;
+
+	return;
+errcode_handle:
+	if (fptr != NULL) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		fptr = NULL;
+	}
+}
+
+
 /************************************************************************
 *
 * Function name: update_backend_stat
@@ -2246,7 +2388,8 @@ void upload_loop(void)
 *************************************************************************/
 int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta,
-		int64_t pin_size_delta)
+		int64_t pin_size_delta, int64_t disk_pin_size_delta,
+		int64_t disk_meta_size_delta)
 {
 	int32_t ret, errcode;
 	char fname[METAPATHLEN];
@@ -2324,7 +2467,8 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	setbuf(fptr, NULL);
 	/* File lock is in update_fs_backend_usage() */
 	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
-			num_inodes_delta, pin_size_delta);
+			num_inodes_delta, pin_size_delta, disk_pin_size_delta,
+			disk_meta_size_delta);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -2338,6 +2482,10 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		goto errcode_handle;
 	}
 	flock(fileno(fptr), LOCK_UN);
+
+	/* Also backup package list if any */
+	_try_backup_package_list(&(sync_stat_ctl.statcurl));
+
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	fclose(fptr);
 
@@ -2350,4 +2498,17 @@ errcode_handle:
 	}
 	sem_post(&(sync_stat_ctl.stat_op_sem));
 	return errcode;
+}
+
+void force_backup_package(void)
+{
+	/* Do not backup now if network is down or system restoring*/
+	if (hcfs_system->sync_paused == TRUE ||
+	    hcfs_system->system_restoring == RESTORING_STAGE1 ||
+	    hcfs_system->system_restoring == RESTORING_STAGE2)
+		return;
+
+	sem_wait(&(sync_stat_ctl.stat_op_sem));
+	_try_backup_package_list(&(sync_stat_ctl.statcurl));
+	sem_post(&(sync_stat_ctl.stat_op_sem));
 }

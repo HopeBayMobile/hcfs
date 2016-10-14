@@ -127,3 +127,13 @@ int fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 {
 	return 0;
 }
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+                struct stat *ret_stat)
+{
+	return 0;
+}
+int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
+{
+	num_stat_rebuilt++;
+	return 0;
+}

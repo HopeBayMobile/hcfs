@@ -32,8 +32,8 @@ HCFS_STAT to_verified_stat;
 /* delete_inode_meta() */
 #define INO_RENAME_SUCCESS 3
 #define INO_RENAME_FAIL 4566789
-#define TO_DELETE_METAPATH "/tmp/to_delete_meta"
-#define MOCK_META_PATH "/tmp/this_meta"
+#define TO_DELETE_METAPATH "mock_to_delete_meta"
+#define MOCK_META_PATH "mock_this_meta"
 
 /* add_dir_entry() */
 #define INO_INSERT_DIR_ENTRY_FAIL 20

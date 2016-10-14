@@ -211,3 +211,21 @@ int32_t set_event_notify_server(char *path)
 	else
 		return -1;
 }
+
+int32_t initiate_restoration(void)
+{
+	return 0;
+}
+
+int32_t check_restoration_status(void)
+{
+	return 0;
+}
+void force_backup_package(void)
+{
+	return;
+}
+int32_t backup_package_list(void)
+{
+	return 0;
+}

@@ -24,6 +24,7 @@
 #include "../HCFS/meta.h"
 #include "global.h"
 #include "HCFSvol.h"
+#include "../HCFS/meta.h"
 
 int32_t main(int32_t argc, char **argv)
 {
@@ -125,6 +126,12 @@ int32_t main(int32_t argc, char **argv)
 		code = SETSYNCPOINT;
 	else if (strcasecmp(argv[1], "cancelsyncpoint") == 0)
 		code = CANCELSYNCPOINT;
+	else if (strcasecmp(argv[1], "initiate_restoration") == 0)
+		code = INITIATE_RESTORATION;
+	else if (strcasecmp(argv[1], "check_restoration_status") == 0)
+		code = CHECK_RESTORATION_STATUS;
+	else if (strcasecmp(argv[1], "notify_applist_change") == 0)
+		code = NOTIFY_APPLIST_CHANGE;
 	else
 		code = -1;
 	if (code < 0) {
@@ -143,6 +150,8 @@ int32_t main(int32_t argc, char **argv)
 	case RESETXFERSTAT:
 	case RELOADCONFIG:
 	case TRIGGERUPDATEQUOTA:
+	case INITIATE_RESTORATION:
+	case NOTIFY_APPLIST_CHANGE:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -197,6 +206,16 @@ int32_t main(int32_t argc, char **argv)
 			       uint32_ret ? "RUNNING(1)" : "PAUSED(0)");
 		else if (code == GETXFERSTATUS)
 			printf("Xfer status is %d\n", uint32_ret);
+		else if (code == CHECK_RESTORATION_STATUS)
+			printf("Restoration status is %d\n", uint32_ret);
+		break;
+	case CHECK_RESTORATION_STATUS:
+		cmd_len = 0;
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
+		printf("Restoration status is %d\n", retcode);
 		break;
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_

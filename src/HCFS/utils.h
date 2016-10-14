@@ -28,6 +28,7 @@ int32_t check_and_create_blockpaths(void);
 
 /*Will copy the filename of the meta file to pathname*/
 int32_t fetch_meta_path(char *pathname, ino_t this_inode);
+void fetch_restored_meta_path(char *pathname, ino_t this_inode);
 
 int32_t fetch_stat_path(char *pathname, ino_t this_inode);
 
@@ -66,7 +67,8 @@ int32_t change_xfer_meta(int64_t xfer_size_upload,
 
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
-		int64_t fs_pin_size_delta);
+		int64_t fs_pin_size_delta, int64_t disk_pin_size_delta,
+		int64_t disk_meta_size_delta);
 
 int32_t update_backend_usage(int64_t total_backend_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta);
@@ -91,6 +93,7 @@ int32_t fetch_error_download_path(char *path, ino_t inode);
 void get_system_size(int64_t *cache_size, int64_t *pinned_size);
 
 int32_t update_sb_size(void);
+int32_t change_pin_size(int64_t delta_pin_size);
 
 int32_t update_file_stats(FILE *metafptr,
 			  int64_t num_blocks_delta,
@@ -115,6 +118,9 @@ int32_t get_quota_from_backup(int64_t *quota);
 int32_t meta_nospc_log(const char *func_name, int32_t lines);
 int64_t round_size(int64_t size);
 
+int32_t copy_file(const char *srcpath, const char *tarpath);
+
+int32_t convert_cloud_stat_struct(char *path);
 /* deterministic version of djb2 hash */
 static inline
 uint32_t djb_hash(const char *const key, size_t keylen)

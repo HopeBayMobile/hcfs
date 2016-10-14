@@ -702,9 +702,64 @@ void HCFS_clear_sync_point(char **json_res)
 	close(fd);
 }
 
+void HCFS_trigger_restore(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = INITIATE_RESTORATION;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_check_restore_status(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CHECK_RESTORATION_STATUS;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
 void HCFS_collect_sys_logs(char **json_res)
 {
-
 	int32_t fd, ret_code;
 	uint32_t code, cmd_len, reply_len;
 
@@ -715,6 +770,34 @@ void HCFS_collect_sys_logs(char **json_res)
 	}
 
 	code = COLLECTSYSLOGS;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_notify_applist_change(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = NOTIFY_APPLIST_CHANGE;
 	cmd_len = 0;
 
 	send(fd, &code, sizeof(uint32_t), 0);

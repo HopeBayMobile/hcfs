@@ -13,6 +13,7 @@
 * 2015/6/5 Jiahong added error handling.
 * 2015/8/5 Jiahong added routines for updating FS statistics
 * 2016/2/18 Kewei finished changing flow of deleting file on cloud.
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -468,6 +469,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char backend_mlock;
 	int64_t backend_size_change, meta_size_change;
 	int64_t pin_size_delta;
+	int64_t pin_size_delta_blk;
 	int64_t block_seq;
 	ino_t root_inode;
 
@@ -479,6 +481,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	which_dsync_index = ptr->which_index;
 	backend_size_change = 0;
 	pin_size_delta = 0;
+	pin_size_delta_blk = 0;
 
 	ret = fetch_todelete_path(todel_metapath, this_inode);
 	if (ret < 0) {
@@ -550,10 +553,15 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilestat, sizeof(HCFS_STAT), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 							backend_metafptr);
-		if (P_IS_PIN(tempfilemeta.local_pin))
-			pin_size_delta = -backend_size_change + meta_size_change;
-		else
+		if (P_IS_PIN(tempfilemeta.local_pin)) {
+			pin_size_delta = -backend_size_change +
+			                  meta_size_change;
+			pin_size_delta_blk = -round_size(backend_size_change) +
+			                     round_size(meta_size_change);
+		} else {
 			pin_size_delta = 0;
+			pin_size_delta_blk = 0;
+		}
 		tmp_size = tempfilestat.size;
 
 		/* Check if need to sync past the current size */
@@ -725,9 +733,11 @@ errcode_handle:
 		return;
 	}
 
-	/* Update FS stat in the backend */
+	/* Update FS stat in the backend if updated previously */
 	update_backend_stat(root_inode, -backend_size_change,
-			-meta_size_change, -1, pin_size_delta);
+			-meta_size_change, -1, pin_size_delta,
+			pin_size_delta_blk,
+			-round_size(meta_size_change));
 
 	_check_del_progress_file(this_inode);
 	super_block_delete(this_inode);
@@ -985,12 +995,17 @@ void *delete_loop(void *ptr)
 		inode_to_dsync = 0;
 		if (inode_to_check != 0) {
 			inode_to_dsync = inode_to_check;
-
+/* FEATURE TODO: double check that super block rebuild will happen before
+anything can be deleted */
 			ret_val = read_super_block_entry(inode_to_dsync,
 								&tempentry);
 
 			if ((ret_val < 0) ||
 				(tempentry.status != TO_BE_DELETED)) {
+				write_log(4, "Warn: Delete backend inode %"
+						PRIu64" but status is %d",
+						(uint64_t)inode_to_dsync,
+						tempentry.status);
 				inode_to_dsync = 0;
 				inode_to_check = 0;
 			} else {
@@ -998,6 +1013,9 @@ void *delete_loop(void *ptr)
 			}
 		}
 		super_block_share_release();
+
+		write_log(6, "Inode to delete is %" PRIu64 "\n",
+		          (uint64_t) inode_to_dsync);
 
 		/* Delete the meta/block of inode_to_dsync if it
 			finish dsynced. */

@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "params.h"
 
+
 #if defined(__GNUC__)
 #define _PACKED __attribute__((packed))
 #define _UNUSED __attribute__((unused))
@@ -124,6 +125,19 @@
 	do {\
 		errcode = 0;\
 		ret = unlink(A);\
+		if (ret < 0) {\
+			errcode = errno;\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode));\
+			errcode = -errcode;\
+			goto errcode_handle;\
+		} \
+	} while (0)
+
+#define RMDIR(A)\
+	do {\
+		errcode = 0;\
+		ret = rmdir(A);\
 		if (ret < 0) {\
 			errcode = errno;\
 			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \

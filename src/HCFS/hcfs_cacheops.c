@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hfuse_cacheops.c
 * Abstract: The c source code file for cache management operations.
@@ -9,6 +9,7 @@
 * 2015/2/11~12 Jiahong added header for this file, and revising coding style.
 * 2015/6/3 Jiahong added error handling
 * 2015/10/22 Kewei added mechanism skipping pinned inodes.
+* 2016/6/7 Jiahong changing code for recovering mode
 *
 **************************************************************************/
 
@@ -40,6 +41,7 @@
 #include "macro.h"
 #include "metaops.h"
 #include "utils.h"
+#include "rebuild_super_block.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -84,10 +86,19 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	write_log(10, "Begin remove sync block inode %" PRIu64 "\n",
 	          (uint64_t)this_inode);
 
-	ret = super_block_read(this_inode, &tempentry);
+	/* Try fetching meta file from backend if in restoring mode */
+	if (hcfs_system->system_restoring == RESTORING_STAGE2) {
+		ret = restore_meta_super_block_entry(this_inode,
+		                                     &(tempentry.inode_stat));
+		if (ret < 0)
+			return ret;
+	} else {
 
-	if (ret < 0)
-		return ret;
+		ret = super_block_read(this_inode, &tempentry);
+
+		if (ret < 0)
+			return ret;
+	}
 
 	/* If inode is not dirty or in transit, or if cache is
 	already full, check if can replace uploaded blocks */
@@ -333,6 +344,8 @@ static int32_t _check_cache_replace_result(int64_t *num_removed_inode)
 			CACHE_HARD_LIMIT - CACHE_DELTA) &&
 			(hcfs_system->sync_paused)) {
 			/* Wake them up and tell them cannot do this action */
+			write_log(4, "Cache size exceeds threshold, "
+				"but nothing can be paged out\n");
 			notify_sleep_on_cache(-EIO);
 			sleep(2);
 			/* Try again after 2 seconds just in case some thread

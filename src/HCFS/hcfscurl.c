@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 #include "b64encode.h"
 #include "params.h"
@@ -793,6 +794,7 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 

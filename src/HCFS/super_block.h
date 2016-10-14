@@ -27,6 +27,8 @@
 #include "syncpoint_control.h"
 #include "meta.h"
 
+#define NUM_SCAN_RECLAIMED 512
+
 /* pin-status in super block */
 #define ST_DEL 0
 #define ST_UNPIN 1
@@ -86,10 +88,12 @@ typedef struct {
 	SUPER_BLOCK_HEAD head;
 	int32_t iofptr;
 	FILE *unclaimed_list_fptr;
+	FILE *temp_unclaimed_fptr;
 	sem_t exclusive_lock_sem;
 	sem_t share_lock_sem;
 	sem_t share_CR_lock_sem;
 	int32_t share_counter;
+	BOOL now_reclaim_fullscan;
 	BOOL sync_point_is_set; /* Indicate if need to sync all data */
 	struct SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
 } SUPER_BLOCK_CONTROL;
@@ -137,4 +141,5 @@ int32_t pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry);
 int32_t super_block_set_syncpoint();
 int32_t super_block_cancel_syncpoint();
 
-#endif /* GW20_HCFS_SUPER_BLOCK_H_ */
+int32_t check_init_super_block();
+#endif  /* GW20_HCFS_SUPER_BLOCK_H_ */

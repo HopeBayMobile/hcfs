@@ -32,6 +32,8 @@
 #include <sys/xattr.h>
 #include <inttypes.h>
 #include <jansson.h>
+#include <strings.h>
+#include <string.h>
 
 #include "global.h"
 #include "fuseop.h"
@@ -47,6 +49,7 @@
 #include "mount_manager.h"
 #include "enc.h"
 #include "super_block.h"
+#include "do_restoration.h"
 
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
@@ -109,6 +112,25 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 		METAPATH, sub_dir, (uint64_t)this_inode);
 
 	return 0;
+}
+
+void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+{
+	char restoring_meta_path[200];
+	int32_t errcode, ret;
+
+	sprintf(restoring_meta_path, "%s/restoring_meta", METAPATH);
+	if (access(restoring_meta_path, F_OK) < 0)
+		MKDIR(restoring_meta_path, 0700);
+
+	snprintf(pathname, METAPATHLEN, "%s/restored_meta_%" PRIu64 "",
+			restoring_meta_path, (uint64_t)this_inode);
+	return;
+
+errcode_handle:
+	snprintf(pathname, METAPATHLEN, "%s/restored_meta_%" PRIu64 "",
+			restoring_meta_path, (uint64_t)this_inode);
+	return;
 }
 
 /************************************************************************
@@ -1232,12 +1254,12 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 int32_t change_pin_size(int64_t delta_pin_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
-	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
+/*	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
 			MAX_PINNED_LIMIT) {
 		sem_post(&(hcfs_system->access_sem));
 		return -ENOSPC;
 	}
-
+*/
 	hcfs_system->systemdata.pinned_size += delta_pin_size;
 	if (hcfs_system->systemdata.pinned_size < 0)
 		hcfs_system->systemdata.pinned_size = 0;
@@ -1325,12 +1347,15 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
  * @param fs_meta_size_delta Amount of meta size change in backend spsace.
  * @param fs_num_inodes_delta Delta of # of inodes in backend space.
  * @param fs_pin_size_delta Amount of pin size change in backend space.
+ * @param disk_pin_size_delta Amount of pin size change stored locally.
+ * @param disk_meta_size_delta Amount of meta size change stored locally.
  *
  * @return 0 on success, otherwise negative error code.
  */
 int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_meta_size_delta, int64_t fs_num_inodes_delta,
-		int64_t fs_pin_size_delta)
+		int64_t fs_pin_size_delta, int64_t disk_pin_size_delta,
+		int64_t disk_meta_size_delta)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -1356,6 +1381,20 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 	fs_cloud_stat.pinned_size += fs_pin_size_delta;
 	if (fs_cloud_stat.pinned_size < 0)
 		fs_cloud_stat.pinned_size = 0;
+
+	/* If disk_pinned_size and disk_meta_size are -1, then the cloud stat
+	was converted from an old format */
+	if (fs_cloud_stat.disk_pinned_size >= 0) {
+		fs_cloud_stat.disk_pinned_size += disk_pin_size_delta;
+		if (fs_cloud_stat.disk_pinned_size < 0)
+			fs_cloud_stat.disk_pinned_size = 0;
+	}
+
+	if (fs_cloud_stat.disk_meta_size >= 0) {
+		fs_cloud_stat.disk_meta_size += disk_meta_size_delta;
+		if (fs_cloud_stat.disk_meta_size < 0)
+			fs_cloud_stat.disk_meta_size = 0;
+	}
 
 	FSEEK(fptr, 0, SEEK_SET);
 	FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
@@ -1581,7 +1620,7 @@ errcode_handle:
 *        Inputs: char *pathname, ino_t this_inode
 *        Output: Integer
 *       Summary: Given the inode number this_inode,
-*                copy the filename to the stat file
+*                copy the filename of the stat file
 *                to the space pointed by pathname.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
@@ -1920,6 +1959,7 @@ int32_t reload_system_config(const char *config_path)
 	/* Create backend related threads when backend status from
 	 * none to s3/swift */
 	enable_related_module = FALSE;
+	/* Do not enable related modules if going to restore */
 	if ((CURRENT_BACKEND == NONE) && (new_config->current_backend != NONE))
 		enable_related_module = TRUE;
 
@@ -1929,13 +1969,28 @@ int32_t reload_system_config(const char *config_path)
 	free(temp_config);
 
 	/* Init backend related threads */
-	if (enable_related_module == TRUE) {
+	if ((enable_related_module == TRUE)
+	    && (hcfs_system->system_restoring == NOT_RESTORING)) {
 		ret = prepare_FS_database_backup();
 		if (ret < 0) {
 			write_log(0, "Error: Fail to prepare FS backup."
 				" Code %d\n", -ret);
 		}
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		init_download_module();
 		init_backend_related_module();
+	} else if (enable_related_module == TRUE) {
+		/* Only bring up monitor thread if in restoration process */
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		/* Try to reduce cache size if now in stage 1 of restoration */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			ret = restore_stage1_reduce_cache();
+			if (ret == 0)
+				start_download_minimal();
+			else
+				notify_restoration_result(1, ret);
+		}
 	}
 
 	return 0;
@@ -2128,5 +2183,119 @@ int64_t round_size(int64_t size)
 	}
 
 	return ret_size;
+}
+
+/**
+ * A lite version of check_and_copy_file.
+ *
+ * This function simply copy the source file to the target.
+ *
+ * @return 0 if succeed in copy, or negation of error code.
+ */
+int32_t copy_file(const char *srcpath, const char *tarpath)
+{
+	int32_t errcode;
+	int32_t ret;
+	size_t read_size, total_size;
+	size_t ret_size;
+	FILE *src_ptr = NULL, *tar_ptr = NULL;
+	char filebuf[4100];
+
+	src_ptr = fopen(srcpath, "r");
+	if (src_ptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -errcode;
+	}
+
+	tar_ptr = fopen(tarpath, "w");
+	if (tar_ptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		if (src_ptr != NULL) {
+			fclose(src_ptr);
+			src_ptr = NULL;
+		}
+		return -errcode;
+	}
+
+	flock(fileno(src_ptr), LOCK_EX);
+	/* Begin to copy */
+	FSEEK(src_ptr, 0, SEEK_SET);
+	FSEEK(tar_ptr, 0, SEEK_SET);
+	total_size = 0;
+	while (!feof(src_ptr)) {
+		FREAD(filebuf, 1, 4096, src_ptr);
+		read_size = ret_size;
+		if (read_size > 0) {
+			FWRITE(filebuf, 1, read_size, tar_ptr);
+			total_size += read_size;
+		} else {
+			break;
+		}
+	}
+	flock(fileno(src_ptr), LOCK_UN);
+	fclose(src_ptr);
+	fclose(tar_ptr);
+
+	return 0;
+
+errcode_handle:
+	if (src_ptr != NULL) {
+		flock(fileno(src_ptr), LOCK_UN);
+		fclose(src_ptr);
+		src_ptr = NULL;
+	}
+	if (tar_ptr != NULL) {
+		fclose(tar_ptr);
+		tar_ptr = NULL;
+	}
+	return errcode;
+}
+
+/* Function for converting cloud stat file at "path"
+to a newer version */
+int32_t convert_cloud_stat_struct(char *path)
+{
+	FS_CLOUD_STAT_T_V1 oldstruct;
+	FS_CLOUD_STAT_T newstruct;
+	struct stat tmpstruct;
+	FILE *fptr;
+	int32_t errcode, ret;
+	size_t ret_size;
+
+	if (stat(path, &tmpstruct) != 0) {
+		errcode = -errno;
+		return errcode;
+	}
+	if (tmpstruct.st_size != sizeof(FS_CLOUD_STAT_T_V1))
+		return 0;
+	/* Found a cloud stat with old format. Converting */
+	fptr = fopen(path, "r+");
+	if (fptr == NULL) {
+		errcode = -errno;
+		return errcode;
+	}
+
+	use_old_cloud_stat = TRUE;
+	FREAD(&oldstruct, sizeof(FS_CLOUD_STAT_T_V1), 1, fptr);
+	newstruct.backend_system_size = oldstruct.backend_system_size;
+	newstruct.backend_meta_size = oldstruct.backend_meta_size;
+	newstruct.backend_num_inodes = oldstruct.backend_num_inodes;
+	newstruct.max_inode = oldstruct.max_inode;
+	newstruct.pinned_size = oldstruct.pinned_size;
+	newstruct.disk_pinned_size = -1;
+	newstruct.disk_meta_size = -1;
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&newstruct, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	fclose(fptr);
+	return 0;
+errcode_handle:
+	write_log(2, "Error when trying to convert cloud stat. (%d)\n",
+	          errcode);
+	fclose(fptr);
+	return errcode;
 }
 

@@ -29,6 +29,7 @@
 #include "params.h"
 #include "hcfs_cacheops.h"
 #include "utils.h"
+#include "rebuild_super_block.h"
 
 CURL_HANDLE monitor_curl_handle;
 
@@ -106,6 +107,8 @@ void *monitor_loop(void *ptr)
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->backend_is_online == TRUE) {
 			backoff_exponent = 0;
+			if (hcfs_system->system_restoring == RESTORING_STAGE2)
+				wake_sb_rebuilder();
 			sem_wait(&(hcfs_system->monitor_sem));
 			continue;
 		}
@@ -129,6 +132,8 @@ void *monitor_loop(void *ptr)
 			update_sync_state();
 		}
 	}
+	if (hcfs_system->system_restoring == RESTORING_STAGE2)
+		wake_sb_rebuilder();
 	return NULL;
 }
 

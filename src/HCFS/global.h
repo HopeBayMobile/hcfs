@@ -34,6 +34,11 @@
 
 #define ARCH_CODE ANDROID_64BIT
 
+/* Code for restoration stages */
+#define NOT_RESTORING 0
+#define RESTORING_STAGE1 1
+#define RESTORING_STAGE2 2
+
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
@@ -77,6 +82,9 @@
 #define SETSYNCPOINT 39
 #define CANCELSYNCPOINT 40
 #define GETMETASIZE 41
+#define INITIATE_RESTORATION 42
+#define CHECK_RESTORATION_STATUS 43
+#define NOTIFY_APPLIST_CHANGE 44
 
 #define DEFAULT_PIN FALSE
 
@@ -84,5 +92,8 @@
 #define GID_SDCARD_RW 1015
 #define GID_EVERYBODY 9997
 #endif
+
+#define SYSTEM_UID 1000
+#define SYSTEM_GID 1000
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

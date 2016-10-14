@@ -13,6 +13,7 @@
 #include "mount_manager.h"
 #include "xattr_ops.h"
 #include "global.h"
+#include "do_restoration.h"
 
 /* Global vars*/
 int32_t DELETE_DIR_ENTRY_BTREE_RESULT = 1;
@@ -104,12 +105,17 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *bptr;
 
 	if (this_inode != INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL) {
-		bptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		bptr = (META_CACHE_ENTRY_STRUCT *)
+				malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(bptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 		return bptr;
 	} else {
-		return 0;
+		errno = ENOMEM;
+		return NULL;
 	}
+
+	errno = EINVAL;
+	return NULL;
 }
 
 
@@ -338,8 +344,10 @@ int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 
+	if (level > 8)
+		return 0;
 	va_start(alist, format);
-	//vprintf(format, alist);
+	vprintf(format, alist);
 	va_end(alist);
 	return 0;
 }
@@ -465,7 +473,7 @@ int32_t change_system_meta(int64_t system_size_delta, int64_t meta_size_delta,
 		int64_t dirty_cache_delta, int64_t unpin_dirty_data_size,
 		BOOL need_sync)
 {
-	hcfs_system->systemdata.cache_size += cache_size_delta;
+	hcfs_system->systemdata.cache_size += (cache_size_delta);
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
 	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_data_size;
@@ -478,7 +486,6 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 {
 	return 0;
 }
-
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
 	return 1;
@@ -499,6 +506,22 @@ int32_t super_block_enqueue_delete(ino_t this_inode)
 	return 0;
 }
 
+int32_t change_pin_size(int64_t delta_pin_size)
+{
+	return 0;
+}
+
+void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+{
+	sprintf(pathname, "restore_meta_fileTestPath/restore_meta_%"PRIu64,
+			(uint64_t)this_inode);
+	return;
+}
+int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+{
+	return 0;
+}
+
 int64_t round_size(int64_t size)
 {
 	int64_t blksize = 4096;
@@ -515,8 +538,49 @@ int64_t round_size(int64_t size)
 	return ret_size;
 }
 
+void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
+{
+	SYSTEM_DATA_TYPE *rectified_system_meta;
+
+	rectified_system_meta =
+			&(hcfs_restored_system_meta->rectified_system_meta);
+
+	/* Update rectified space usage */
+	rectified_system_meta->system_size +=
+			delta_system_meta.delta_system_size;
+	rectified_system_meta->system_meta_size +=
+			delta_system_meta.delta_meta_size;
+	rectified_system_meta->pinned_size +=
+			delta_system_meta.delta_pinned_size;
+	rectified_system_meta->backend_size +=
+			delta_system_meta.delta_backend_size;
+	rectified_system_meta->backend_meta_size +=
+			delta_system_meta.delta_backend_meta_size;
+	rectified_system_meta->backend_inodes +=
+			delta_system_meta.delta_backend_inodes;
+	return;
+}
+
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
 	sprintf(pathname, "testpatterns/mock_progress_file");
+	return;
+}
+
+int32_t fetch_restore_block_path(char *pathname,
+		ino_t this_inode, int64_t block_num)
+{
+	return 0;
+}
+
+int32_t copy_file(const char *srcpath, const char *tarpath)
+{
+	return 0;
+}
+
+int32_t update_restored_cache_usage(int64_t delta_cache_size,
+				 int64_t delta_cache_blocks,
+				 char pin_type)
+{
 	return;
 }

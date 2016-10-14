@@ -266,7 +266,11 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
 	/* Unlock */
 	sem_post(&(event_queue->queue_access_sem));
 
-	write_log(8, "Event enqueue was successful.");
+	if (event_info_json_str == NULL)
+		write_log(8, "Event (id %d) enqueue was successful.", event_id);
+	else
+		write_log(8, "Event (id %d with parameter %s) enqueue was successful.",
+				event_id, event_info_json_str);
 
 	return 0;
 }
@@ -471,6 +475,9 @@ void *event_worker_loop(void *ptr)
 				write_log(4, "Failed to send event msg to server, errno - %d",
 						-ret_code);
 				goto error_handler;
+			} else {
+				write_log(8, "Send event to server, event str - %s",
+						msg_str_to_send);
 			}
 
 			/* These events are send, remove from queue */

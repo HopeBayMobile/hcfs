@@ -912,6 +912,11 @@ protected:
 	char *workpath, *tmppath;
 	void SetUp()
 	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		hcfs_system->system_restoring = NOT_RESTORING;
 		workpath = NULL;
 		tmppath = NULL;
 		if (access("/tmp/testHCFS", F_OK) != 0) {
@@ -932,8 +937,10 @@ protected:
 
 	void TearDown()
 	{
+		free(hcfs_system);
 		unlink("/tmp/testHCFS");
-		nftw(tmppath, do_delete, 20, FTW_DEPTH);
+		if (tmppath != NULL)
+			nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		if (workpath != NULL)
 			free(workpath);
 		if (tmppath != NULL)
@@ -1079,12 +1086,14 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess)
 	fs_cloud_stat.backend_meta_size = 456;
 	fs_cloud_stat.backend_num_inodes = 5566;
 	fs_cloud_stat.pinned_size = 0;
+	fs_cloud_stat.disk_meta_size = 456;
+	fs_cloud_stat.disk_pinned_size = 0;
 
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	/* Run */
-	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 0));
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 0, 0, 456));
 
 	/* Verify */
 	fseek(fptr, 0, SEEK_SET);
@@ -1093,6 +1102,8 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess)
 	EXPECT_EQ(456 + 456, fs_cloud_stat.backend_meta_size);
 	EXPECT_EQ(5566 + 789, fs_cloud_stat.backend_num_inodes);
 	EXPECT_EQ(0, fs_cloud_stat.pinned_size);
+	EXPECT_EQ(0, fs_cloud_stat.disk_pinned_size);
+	EXPECT_EQ(456 + 456, fs_cloud_stat.disk_meta_size);
 }
 
 TEST_F(update_fs_backend_usageTest, UpdateSuccessPin)
@@ -1103,12 +1114,14 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccessPin)
 	fs_cloud_stat.backend_meta_size = 456;
 	fs_cloud_stat.backend_num_inodes = 5566;
 	fs_cloud_stat.pinned_size = 56789;
+	fs_cloud_stat.disk_meta_size = 456;
+	fs_cloud_stat.disk_pinned_size = 56789;
 
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	/* Run */
-	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 123));
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 123, 123, 456));
 
 	/* Verify */
 	fseek(fptr, 0, SEEK_SET);
@@ -1117,6 +1130,8 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccessPin)
 	EXPECT_EQ(456 + 456, fs_cloud_stat.backend_meta_size);
 	EXPECT_EQ(5566 + 789, fs_cloud_stat.backend_num_inodes);
 	EXPECT_EQ(56789 + 123, fs_cloud_stat.pinned_size);
+	EXPECT_EQ(56789 + 123, fs_cloud_stat.disk_pinned_size);
+	EXPECT_EQ(456 + 456, fs_cloud_stat.disk_meta_size);
 }
 
 TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
@@ -1126,12 +1141,16 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
 	fs_cloud_stat.backend_system_size = 123456;
 	fs_cloud_stat.backend_meta_size = 456;
 	fs_cloud_stat.backend_num_inodes = 5566;
+	fs_cloud_stat.pinned_size = 0;
+	fs_cloud_stat.disk_meta_size = 456;
+	fs_cloud_stat.disk_pinned_size = 0;
 
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 
 	/* Run */
-	EXPECT_EQ(0, update_fs_backend_usage(fptr, -12345678, -456666, -789999, 0));
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, -12345678, -456666,
+		-789999, 0, 0, -456666));
 
 	/* Verify */
 	fseek(fptr, 0, SEEK_SET);
@@ -1139,6 +1158,37 @@ TEST_F(update_fs_backend_usageTest, UpdateSuccess_LessThanZero)
 	EXPECT_EQ(0, fs_cloud_stat.backend_system_size);
 	EXPECT_EQ(0, fs_cloud_stat.backend_meta_size);
 	EXPECT_EQ(0, fs_cloud_stat.backend_num_inodes);
+	EXPECT_EQ(0, fs_cloud_stat.pinned_size);
+	EXPECT_EQ(0, fs_cloud_stat.disk_pinned_size);
+	EXPECT_EQ(0, fs_cloud_stat.disk_meta_size);
+}
+
+TEST_F(update_fs_backend_usageTest, TestOldFormat)
+{
+	FS_CLOUD_STAT_T fs_cloud_stat;
+
+	fs_cloud_stat.backend_system_size = 123456;
+	fs_cloud_stat.backend_meta_size = 456;
+	fs_cloud_stat.backend_num_inodes = 5566;
+	fs_cloud_stat.pinned_size = 56789;
+	fs_cloud_stat.disk_meta_size = -1;
+	fs_cloud_stat.disk_pinned_size = -1;
+
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+
+	/* Run */
+	EXPECT_EQ(0, update_fs_backend_usage(fptr, 123, 456, 789, 123, 123, 456));
+
+	/* Verify */
+	fseek(fptr, 0, SEEK_SET);
+	fread(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+	EXPECT_EQ(123456 + 123, fs_cloud_stat.backend_system_size);
+	EXPECT_EQ(456 + 456, fs_cloud_stat.backend_meta_size);
+	EXPECT_EQ(5566 + 789, fs_cloud_stat.backend_num_inodes);
+	EXPECT_EQ(56789 + 123, fs_cloud_stat.pinned_size);
+	EXPECT_EQ(-1, fs_cloud_stat.disk_pinned_size);
+	EXPECT_EQ(-1, fs_cloud_stat.disk_meta_size);
 }
 
 /* End of unittest of update_backend_usage() */

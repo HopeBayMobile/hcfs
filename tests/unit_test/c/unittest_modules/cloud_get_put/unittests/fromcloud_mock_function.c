@@ -271,3 +271,14 @@ int32_t enc_backup_usermeta(char *json_str)
 	MOCK();
 	return 0;
 }
+int32_t restore_meta_super_block_entry(ino_t this_inode,
+                struct stat *ret_stat)
+{
+	MOCK();
+	return 0;
+}
+int32_t notify_restoration_result(int8_t stage, int32_t result)
+{
+	MOCK();
+	return 0;
+}

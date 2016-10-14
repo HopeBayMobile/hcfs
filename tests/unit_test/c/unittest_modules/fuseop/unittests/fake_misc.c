@@ -1152,6 +1152,19 @@ int32_t remove_cache_pkg(const char *pkgname)
 	return 0;
 }
 
+int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
+{
+	num_stat_rebuilt++;
+	return 0;
+}
+void destroy_rebuild_sb(BOOL destroy_queue_file)
+{
+	return;
+}
+void init_backend_related_module()
+{
+	return;
+}
 int64_t get_cache_limit(const char pin_type)
 {
 	MOCK();
@@ -1169,11 +1182,22 @@ int64_t get_pinned_limit(const char pin_type)
 	else
 		return -EINVAL;
 }
-
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
 	MOCK();
 	return 1;
+}
+
+int32_t notify_restoration_result(int8_t stage, int32_t result)
+{
+	MOCK();
+	return 0;
+}
+int32_t fetch_restore_stat_path(char *pathname)
+{
+	snprintf(pathname, METAPATHLEN, "%s/system_restoring_status",
+	         METAPATH);
+	return 0;
 }
 
 int64_t round_size(int64_t size)
@@ -1191,4 +1215,11 @@ int64_t round_size(int64_t size)
 
 	return ret_size;
 }
-
+void cleanup_stage1_data(void)
+{
+	return;
+}
+void force_backup_package(void)
+{
+	return;
+}

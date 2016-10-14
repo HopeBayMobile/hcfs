@@ -75,6 +75,7 @@ hcfs_android_log
 # Compiled outputs
 /src/CLI_utils/HCFSvol
 /src/CLI_utils/pin_test
+/src/CLI_utils/fake_copy_minimal
 /src/HCFS/hcfs
 /src/HCFS/hcfs.log
 /src/HCFS/obj

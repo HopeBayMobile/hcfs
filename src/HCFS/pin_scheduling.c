@@ -182,6 +182,9 @@ void pinning_worker(void *ptr)
 		return; /* Do not dequeue when failing in pinning */
 	}
 
+/* FEATURE TODO: double check the super block rebuild will already be done here
+before finish pinning */
+
 	ret = super_block_finish_pinning(this_inode);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to mark inode %"PRIu64" as"
@@ -279,6 +282,8 @@ void pinning_loop()
 			ret = super_block_read(now_inode, &sb_entry);
 			if (ret < 0) {
 				write_log(0, "Error: Fail to read sb "
+/* FEATURE TODO: double check that super block entry will be rebuilt
+already here*/
 						"entry. Code %d\n", -ret);
 				now_inode = 0;
 				break;

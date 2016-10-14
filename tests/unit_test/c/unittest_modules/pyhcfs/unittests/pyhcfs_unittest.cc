@@ -510,6 +510,10 @@ TEST_P(get_vol_usageTest, OPSuccessful)
 	int64_t vol_usage = 0;
 	CONCAT_TEST_META_PATH("FSstat");
 	ret_val = get_vol_usage(meta_path, &vol_usage);
+	if (ret_val < 0) {
+		int32_t errcode = errno;
+		printf("%s\n", strerror(errcode));
+	}
 	EXPECT_EQ(ret_val, 0);
 	EXPECT_GT(vol_usage, 10000000000);
 	EXPECT_LT(vol_usage, 20000000000);

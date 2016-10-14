@@ -48,6 +48,7 @@
 #include "hcfscurl.h"
 #include "event_notification.h"
 #include "meta_mem_cache.h"
+#include "do_restoration.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -362,7 +363,8 @@ int64_t get_vol_size(int32_t arg_len, char *largebuf)
 		llretval = (int64_t) ret;
 		goto error_handling;
 	}
-
+	/* FS_stat should exists even in restoration, as it will be
+	downloaded first before restoration begins. */
 	statfptr = fopen(temppath, "r+");
 	if (statfptr == NULL) {
 		ret = (int64_t) errno;
@@ -620,7 +622,7 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 
 	thisptr = meta_cache_lock_entry(target_inode);
 	if (thisptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	errcode = meta_cache_lookup_file_data(target_inode, &thisstat,
 						NULL, NULL, 0, thisptr);
@@ -678,7 +680,7 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 
 	thisptr = meta_cache_lock_entry(target_inode);
 	if (thisptr == NULL)
-		return -ENOMEM;
+		return -errno;
 
 	retcode = meta_cache_lookup_file_data(target_inode, &thisstat,
 						NULL, NULL, 0, thisptr);
@@ -1371,6 +1373,8 @@ void api_module(void *index)
 			/*Echos the arguments back to the caller*/
 			entryarray = NULL;
 			retcode = list_FS_handle(&entryarray, &num_entries);
+			if (retcode < 0)
+				break;
 			tmpptr = (char *) entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;
 			write_log(10, "Debug listFS return size %d\n", ret_len);
@@ -1522,6 +1526,22 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
+		case INITIATE_RESTORATION:
+			retcode = initiate_restoration();
+			if (retcode < 0)
+				break;
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
+		case CHECK_RESTORATION_STATUS:
+			retcode = check_restoration_status();
+			if (retcode < 0)
+				break;
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
 		case SETSWIFTTOKEN:
 			retcode = set_swift_token(arg_len, largebuf);
 			if (retcode < 0)
@@ -1529,6 +1549,16 @@ void api_module(void *index)
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
+		case NOTIFY_APPLIST_CHANGE:
+			retcode = backup_package_list();
+			if (retcode < 0)
+				break;
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			/* Attempt package backup immediately */
+			force_backup_package();
 			break;
 		default:
 			retcode = ENOTSUP;

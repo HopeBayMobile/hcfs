@@ -14,6 +14,7 @@
 #include "fuseop.h"
 #include "hcfscurl.h"
 #include "mock_params.h"
+#include "do_restoration.h"
 
 int32_t super_block_init(void)
 {
@@ -245,6 +246,57 @@ int32_t super_block_exclusive_locking(void)
 }
 
 int32_t super_block_exclusive_release(void)
+{
+	return 0;
+}
+int32_t fetch_restore_stat_path(char *pathname)
+{
+	return 0;
+}
+int32_t check_init_super_block()
+{
+	return 0;
+}
+void init_restore_path(void)
+{
+	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore",
+	         METAPATH);
+	snprintf(RESTORE_BLOCKPATH, BLOCKPATHLEN, "%s_restore",
+	         BLOCKPATH);
+	sem_init(&(restore_sem), 0, 1);
+}
+
+int32_t check_restoration_status(void)
+{
+	return NOT_RESTORING;
+}
+
+int32_t restore_stage1_reduce_cache(void)
+{
+	return 0;
+}
+int32_t notify_restoration_result(int8_t stage, int32_t result)
+{
+	return 0;
+}
+void start_download_minimal(void)
+{
+	return;
+}
+int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
+{
+	return 0;
+}
+int32_t rebuild_super_block_entry(ino_t this_inode,
+	HCFS_STAT *this_stat, char pin_status)
+{
+	return 0;
+}
+int32_t super_block_to_delete(ino_t this_inode, BOOL enqueue_now)
+{
+	return 0;
+}
+int32_t convert_cloud_stat_struct(char *path)
 {
 	return 0;
 }

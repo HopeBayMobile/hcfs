@@ -565,9 +565,10 @@ protected:
 		download_thread_ctl.block_info[0].dl_error = FALSE;
 
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&download_curl_control_sem, 0, 1); 
-		sem_init(&pin_download_curl_sem, 0,
-				MAX_DOWNLOAD_CURL_HANDLE / 2);
+		sem_init(&download_curl_control_sem, 0, 1);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		//sem_init(&pin_download_curl_sem, 0,
+		//		MAX_DOWNLOAD_CURL_HANDLE / 2);
 	}
 
 	void TearDown()
@@ -667,7 +668,7 @@ TEST_F(fetch_quota_from_cloudTest, UsermetaNotFoundOnCloud)
 {
 	usermeta_notfound = TRUE;
 	download_usermeta_ctl.active = TRUE;
-	fetch_quota_from_cloud(NULL);
+	fetch_quota_from_cloud(NULL, TRUE);
 
 	EXPECT_EQ(-1, access(download_path, F_OK));
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
@@ -678,7 +679,7 @@ TEST_F(fetch_quota_from_cloudTest, FetchSuccess)
 {
 	usermeta_notfound = FALSE;
 	download_usermeta_ctl.active = TRUE;
-	fetch_quota_from_cloud(NULL);
+	fetch_quota_from_cloud(NULL, TRUE);
 
 	EXPECT_EQ(-1, access(download_path, F_OK));
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
@@ -689,7 +690,7 @@ TEST_F(fetch_quota_from_cloudTest, SystemGoingDown)
 {
 	hcfs_system->system_going_down = TRUE;
 	download_usermeta_ctl.active = TRUE;
-	fetch_quota_from_cloud(NULL);
+	fetch_quota_from_cloud(NULL, TRUE);
 
 	EXPECT_EQ(-1, access(download_path, F_OK));
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
@@ -763,3 +764,112 @@ TEST_F(update_quotaTest, CreateThreadSuccess)
 }
 
 /* End of unittest for update_quota() */
+
+/**
+ * Unittest of fetch_object_busywait_conn()
+ */
+FILE *fptr;
+char action_from;
+char objname[200];
+int ret_val;
+
+class fetch_object_busywait_connTest : public ::testing::Test {
+public:
+	static void testEntry(void *ptr)
+	{
+		ret_val = fetch_object_busywait_conn(fptr,
+				action_from, objname);
+		return;
+	}
+
+protected:
+	pthread_t tid;
+
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *)
+				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->metapath = (char *)malloc(100);
+		strcpy(METAPATH, "fetch_object_busywait_connTest");
+		if (!access(METAPATH, F_OK))
+			rmdir(METAPATH);
+		mkdir(METAPATH, 0700);
+		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+
+		memset(&download_usermeta_ctl, 0, sizeof(DOWNLOAD_USERMETA_CTL));
+		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
+		sem_init(&nonread_download_curl_sem, 0, MAX_PIN_DL_CONCURRENCY);
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
+
+		/* global var to control UT */
+		usermeta_notfound = FALSE;
+		FETCH_BACKEND_BLOCK_TESTING = FALSE;
+	}
+
+	void TearDown()
+	{
+		rmdir(METAPATH);
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(fetch_object_busywait_connTest, BackendOffline_SystemShutdown)
+{
+	char objpath[200];
+
+	CURRENT_BACKEND = SWIFT;
+	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->system_going_down = FALSE;
+
+	sprintf(objpath,"%s/mock_object", METAPATH);
+	fptr = fopen(objpath, "w+");
+	action_from = RESTORE_FETCH_OBJ;
+	strcpy(objname, "mock_obj");
+
+	/* Run */
+	pthread_create(&tid, NULL,
+		(void *)&fetch_object_busywait_connTest::testEntry, NULL);
+	sleep(1);
+	hcfs_system->system_going_down = TRUE;
+	pthread_join(tid, NULL);
+
+	/* Verify */
+	EXPECT_EQ(-ESHUTDOWN, ret_val);
+
+	fclose(fptr);
+	unlink(objpath);
+}
+
+TEST_F(fetch_object_busywait_connTest, Backend_From_Offline_To_Online)
+{
+	char objpath[200];
+
+	CURRENT_BACKEND = SWIFT;
+	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->system_going_down = FALSE;
+	usermeta_notfound = TRUE;
+
+	sprintf(objpath,"%s/mock_object", METAPATH);
+	fptr = fopen(objpath, "w+");
+	action_from = RESTORE_FETCH_OBJ;
+	strcpy(objname, "user_mock_obj");
+
+	/* Run */
+	pthread_create(&tid, NULL,
+		(void *)&fetch_object_busywait_connTest::testEntry, NULL);
+	sleep(1);
+	hcfs_system->backend_is_online = TRUE;
+	pthread_join(tid, NULL);
+
+	/* Verify */
+	EXPECT_EQ(-ENOENT, ret_val);
+
+	fclose(fptr);
+	unlink(objpath);
+}
+/**
+ * End unittest of fetch_object_busywait_conn()
+ */
