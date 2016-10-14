@@ -1135,7 +1135,7 @@ int32_t update_FS_statistics(MOUNT_T *mptr)
 	if (tmpfd > 0)
 		PWRITE(tmpfd, (mptr->FS_stat), sizeof(FS_STAT_T), 0);
 	else
-		write_log(4, "Warn: Bad fd in %s. Skip to write", __func__);
+		write_log(4, "Warn: Bad fd in %s. Skip writing.", __func__);
 
 	/* Remove fsync for the purpose of write performance */
 	//FSYNC(tmpfd);

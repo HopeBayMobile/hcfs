@@ -7749,6 +7749,8 @@ int32_t hook_fuse(int32_t argc, char **argv)
 				init_backend_related_module();
 				write_log(10, "Debug: Finish rebuilding."
 					" Now Enable sync/upload/cache mgmt");
+				/* Backup package list */
+				force_backup_package();
 			}
 		}
 		sem_post(&(hcfs_system->access_sem));

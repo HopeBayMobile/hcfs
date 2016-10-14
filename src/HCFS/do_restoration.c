@@ -2761,6 +2761,11 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 				 int64_t delta_cache_blocks, char pin_type)
 {
 	SYSTEM_DATA_TYPE *restored_system_meta;
+	int64_t cache_limit;
+
+	cache_limit = CACHE_HARD_LIMIT / REDUCED_RATIO;
+	if (pin_type == P_HIGH_PRI_PIN)
+		cache_limit = cache_limit + RESERVED_CACHE_SPACE;
 
 	restored_system_meta =
 	    &(hcfs_restored_system_meta->restored_system_meta);
@@ -2768,8 +2773,7 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 	LOCK_RESTORED_SYSMETA();
 	/* Check cache space usage */
 	if (hcfs_system->systemdata.cache_size +
-			restored_system_meta->cache_size + delta_cache_size >
-			get_pinned_limit(pin_type)) {
+	    restored_system_meta->cache_size + delta_cache_size > cache_limit) {
 		UNLOCK_RESTORED_SYSMETA();
 		write_log(0, "Error: No space when restoring. restored cache"
 			" size %lld. system cache size %lld",
@@ -2777,7 +2781,6 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 			restored_system_meta->cache_size);
 		return -ENOSPC;
 	}
-
 	restored_system_meta->cache_size += delta_cache_size;
 	if (restored_system_meta->cache_size < 0)
 		restored_system_meta->cache_size = 0;
