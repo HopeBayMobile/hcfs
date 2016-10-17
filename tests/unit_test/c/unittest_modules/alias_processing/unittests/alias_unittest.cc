@@ -249,6 +249,17 @@ class AliasInodeOperationTest : public ::testing::Test
 		}
 		lower_case[i] = '\0';
 	}
+
+	/* Thread handle functions */
+	void handle_inodes(int32_t handle_type);
+
+	static void *handle_inode_thread(void *data)
+	{
+		static int32_t handle_type = 0;
+		handle_type = handle_type % 3 + 1;
+		((AliasInodeOperationTest *)data)->handle_inodes(handle_type);
+		return NULL;
+	}
 };
 
 /* Testing get_real_ino_in_alias_group function */
@@ -446,6 +457,54 @@ TEST_F(AliasInodeOperationTest, CreateOneMillionRandomAliasInodes)
 {
 	/* Random create One million alias inodes. */
 	create_alias_inodes(10000, 100, 0, NULL);
+}
+
+/* Testing random create, update, delete inodes */
+TEST_F(AliasInodeOperationTest, ConcurrentHandleInodesInMultiThreads)
+{
+	pthread_t tid[6];
+	int32_t index;
+
+	/* Create some threads to execute create, update, delete inodes. */
+	for (index = 0; index < 6; index++)
+		pthread_create(&tid[index], NULL, handle_inode_thread, this);
+
+	/* Wait all threads complete. */
+	for (index = 0; index < 6; index++)
+		pthread_join(tid[index], NULL);
+}
+
+void AliasInodeOperationTest::handle_inodes(int32_t handle_type)
+{
+	int32_t loop, index;
+	char alias_name[MAX_FILENAME_LEN+1];
+
+	switch (handle_type) {
+	/* Create random inodes. */
+	case 1:
+		for (loop = 0; loop < 1000; loop++) {
+			create_alias_inodes(10, 10, rand() % MAX_REAL_INODE, NULL);
+			usleep(10);
+		}
+		break;
+	/* Update inode's name. */
+	case 2:
+		for (loop = 0; loop < 1000; loop++) {
+			index = rand() % MAX_REAL_INODE;
+			any_alias_name(dir_entry[index].d_name, alias_name);
+			update_in_alias_group(dir_entry[index].d_ino, alias_name);
+			usleep(10);
+		}
+		break;
+	/* Delete random inode. */
+	case 3:
+		for (loop = 0; loop < 1000; loop++) {
+			index = rand() % MAX_REAL_INODE;
+			delete_in_alias_group(dir_entry[index].d_ino);
+			usleep(10);
+		}
+		break;
+	}
 }
 
 /* End of the test case for all alias operations */
