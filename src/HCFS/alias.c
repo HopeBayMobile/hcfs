@@ -884,5 +884,4 @@ void avl_free_unused(ino_t real_ino)
 		DD2("Free alias inode %" PRIu64 "\n", curr_entry->ino);
 		free(curr_entry);
 	}
-	avl_unlock(REMOVE);
 }
