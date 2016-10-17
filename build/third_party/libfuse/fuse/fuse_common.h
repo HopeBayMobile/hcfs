@@ -491,7 +491,7 @@ void fuse_remove_signal_handlers(struct fuse_session *se);
 handler for SIGUSR signals */
 static pthread_key_t sighandler_key;
 static pthread_once_t sighandler_key_once = PTHREAD_ONCE_INIT;
-void sighandler_init(void);
+void sighandler_init(void (*handler_ftn)(int));
 
 /* ----------------------------------------------------------- *
  * Compatibility stuff					       *
