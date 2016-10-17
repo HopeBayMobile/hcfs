@@ -72,7 +72,7 @@ void fuse_remove_signal_handlers(struct fuse_session *se)
 
 void sighandler_wrapper(int signum)
 {
-	void (*actual_routine)(void);
+	void (*actual_routine)(int);
 
 	actual_routine = (void *) pthread_getspecific(sighandler_key);
 	if (actual_routine == NULL) {
@@ -92,11 +92,11 @@ void sighandler_initonce(void)
 	memset(&actions, 0, sizeof(actions));
 	sigemptyset(&actions.sa_mask);
 	actions.sa_flags = 0;
-	actions.sa_handler = thread_exit_handler;
+	actions.sa_handler = sighandler_wrapper;
 	sigaction(SIGUSR2,&actions,NULL);
 }
 void sighandler_init(void (*handler_ftn)(int))
 {
 	(void) pthread_once(&sighandler_key_once, sighandler_initonce);
-	pthread_setspecific(&sighandler_key, (void *) handler_ftn);
+	pthread_setspecific(sighandler_key, (void *) handler_ftn);
 }
