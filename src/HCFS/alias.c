@@ -159,15 +159,15 @@ int32_t seek_and_add_in_alias_group(ino_t real_ino, ino_t *new_inode,
 	parent = avl_find(avltree[ALIAS], (void *)&real_ino,
 					CMP_INO, SEQ_INO);
 	if (parent == NULL) {
-		avl_unlock(ALIAS);
 		/* Create the root alias inode. */
 		DD2("Create real inode('%s', %" PRIu64 ")\n", real_name, real_ino);
 		parent = avl_create(real_ino, real_name);
-		if (parent == NULL)
+		if (parent == NULL) {
+			avl_unlock(ALIAS);
 			return -ENOMEM;
+		}
 
 		/* Add this root alias inode to avltree[ALIAS] */
-		avl_lock(ALIAS);
 		DD2("Insert real inode to tree(A)\n");
 		avltree[ALIAS] = avl_insert(avltree[ALIAS], parent,
 									CMP_INODE_BY_INO, SEQ_INO, 0);
@@ -177,7 +177,6 @@ int32_t seek_and_add_in_alias_group(ino_t real_ino, ino_t *new_inode,
 	child = avl_find(parent->family, (void *)alias_name,
 					CMP_NAME_BY_BITMAP, SEQ_BITMAP);
 	if (child == NULL) {
-		avl_unlock(ALIAS);
 		/* Given a virtual alias inode number. */
 		alias_ino = new_alias_inode_num();
 		/* Create the alias inode. */
@@ -185,11 +184,11 @@ int32_t seek_and_add_in_alias_group(ino_t real_ino, ino_t *new_inode,
 		child = avl_create(alias_ino, alias_name);
 		if (child == NULL) {
 			free(parent);
+			avl_unlock(ALIAS);
 			return -ENOMEM;
 		}
 
 		/* Add the child to the parent->family avltree. */
-		avl_lock(ALIAS);
 		DD2("Insert alias inode to tree(I)\n");
 		parent->family = avl_insert(parent->family, child,
 									CMP_INODE_BY_BITMAP, SEQ_BITMAP, 0);
