@@ -21,6 +21,7 @@
 #include "fuse_opt.h"
 #include <stdint.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 /** Major version of FUSE library interface */
 #define FUSE_MAJOR_VERSION 2
@@ -485,6 +486,12 @@ int fuse_set_signal_handlers(struct fuse_session *se);
  * @param se the same session as given in fuse_set_signal_handlers()
  */
 void fuse_remove_signal_handlers(struct fuse_session *se);
+
+/* 10/14/2016: Jiahong added pthread_key for specifying signal
+handler for SIGUSR signals */
+static pthread_key_t sighandler_key;
+static pthread_once_t sighandler_key_once = PTHREAD_ONCE_INIT;
+void sighandler_init(void);
 
 /* ----------------------------------------------------------- *
  * Compatibility stuff					       *

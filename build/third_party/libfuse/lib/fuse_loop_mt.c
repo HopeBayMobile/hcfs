@@ -106,6 +106,9 @@ static void *fuse_do_work(void *data)
 	every time this thread is called */
 	sigset_t sigset;
 
+	/* Set action handler for SIGUSR2 */
+	sighandler_init(&thread_exit_handler);
+
 	pthread_setspecific(sigkey, data);
 
 	/* Now use flags in fuse_worker to control whether
@@ -300,13 +303,7 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	pthread_mutex_unlock(&mt.lock);
 
 	/* Set action handler for SIGUSR2 */
-	struct sigaction actions;
-
-	memset(&actions, 0, sizeof(actions));
-	sigemptyset(&actions.sa_mask);
-	actions.sa_flags = 0;
-	actions.sa_handler = thread_exit_handler;
-	sigaction(SIGUSR2,&actions,NULL);
+	sighandler_init(&thread_exit_handler);
 
 	/* Init key sigkey */
 	pthread_key_create(&sigkey, NULL);
