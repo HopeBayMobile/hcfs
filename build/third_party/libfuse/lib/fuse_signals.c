@@ -81,8 +81,10 @@ void sighandler_wrapper(int signum)
 	}
 	actual_routine(signum);
 }
+
+/* 10/18/16 by Jiahong: Share SIGUSR1 */
 /* Initiate sighandler_key for signal handling, and hook
-the signal handler wrapper to SIGUSR2 */
+the signal handler wrapper to SIGUSR1 */
 void sighandler_initonce(void)
 {
 	struct sigaction actions;
@@ -93,7 +95,7 @@ void sighandler_initonce(void)
 	sigemptyset(&actions.sa_mask);
 	actions.sa_flags = 0;
 	actions.sa_handler = sighandler_wrapper;
-	sigaction(SIGUSR2,&actions,NULL);
+	sigaction(SIGUSR1,&actions,NULL);
 }
 void sighandler_init(void (*handler_ftn)(int))
 {

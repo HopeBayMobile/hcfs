@@ -80,8 +80,8 @@ static int fuse_loop_start_thread(struct fuse_mt *mt);
 /* ADDED by seth
  * SIGUSR1 handler.
  * */
-/* Jiahong (2016/10/13) using pthread_getspecific to obtain thread-specific
-stat, and change from SIGUSR1 to SIGUSR2 */
+/* Jiahong (2016/10/18) using pthread_getspecific to obtain thread-specific
+stat, and share SIGUSR1 */
 void thread_exit_handler(int sig)
 {
 	struct fuse_worker *calling_ptr;
@@ -106,7 +106,7 @@ static void *fuse_do_work(void *data)
 	every time this thread is called */
 	sigset_t sigset;
 
-	/* Set action handler for SIGUSR2 */
+	/* Set action handler for SIGUSR1 */
 	sighandler_init(&thread_exit_handler);
 
 	pthread_setspecific(sigkey, data);
@@ -116,7 +116,7 @@ static void *fuse_do_work(void *data)
 	terminate after finishing actions */
 
 	sigemptyset(&sigset);
-	sigaddset(&sigset, SIGUSR2);
+	sigaddset(&sigset, SIGUSR1);
 	pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 
 	while (!fuse_session_exited(mt->se)) {
@@ -302,17 +302,17 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	err = fuse_loop_start_thread(&mt);
 	pthread_mutex_unlock(&mt.lock);
 
-	/* Set action handler for SIGUSR2 */
+	/* Set action handler for SIGUSR1 */
 	sighandler_init(&thread_exit_handler);
 
 	/* Init key sigkey */
 	pthread_key_create(&sigkey, NULL);
 
-	/* Won't allow threads to receive SIGUSR2 until
+	/* Won't allow threads to receive SIGUSR1 until
 	we have initialized sigkey for each thread */
 	sigset_t sigset;
 	sigemptyset(&sigset);
-	sigaddset(&sigset, SIGUSR2);
+	sigaddset(&sigset, SIGUSR1);
 	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
 
 	if (!err) {
@@ -328,7 +328,7 @@ int fuse_session_loop_mt(struct fuse_session *se)
 			pthread_cancel(w->thread_id);
 #else
 		for (w = mt.main.next; w != &mt.main; w = w->next)
-			pthread_kill(w->thread_id, SIGUSR2);
+			pthread_kill(w->thread_id, SIGUSR1);
 #endif
 		mt.exit = 1;
 		pthread_mutex_unlock(&mt.lock);
