@@ -23,6 +23,7 @@
 
 #ifdef _ANDROID_ENV_
 #include <pthread.h>
+#include "pthread_control.h"
 #endif
 
 #include "global.h"
@@ -59,8 +60,8 @@ typedef struct {
 typedef struct {
 	SOCKET sock;
 	/* API thread (using local socket) */
-	pthread_t local_thread[MAX_API_THREADS];
-	pthread_t monitor_thread;
+	PTHREAD_T local_thread[MAX_API_THREADS];
+	PTHREAD_T monitor_thread;
 	int32_t num_threads;
 	int32_t job_count[PROCESS_WINDOW];
 	float job_totaltime[PROCESS_WINDOW];
@@ -74,7 +75,7 @@ API_SERVER_TYPE *api_server;
 
 int32_t init_api_interface(void);
 int32_t destroy_api_interface(void);
-void api_module(void *index);
+void api_module(void *index1);
 void api_server_monitor(void);
 
 #endif  /* GW20_API_INTERFACE_H_ */
