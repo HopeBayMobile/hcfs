@@ -7,7 +7,7 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
-v 2.2.2.1845
+v 2.2.3.1845
 =====
 ## New Features
  - [HCFS] integrate/stage1_integration: Integrate/stage1 integration (!598)
