@@ -12,6 +12,9 @@
 #include <string.h>
 #include <signal.h>
 
+static pthread_key_t sighandler_key;
+static pthread_once_t sighandler_key_once = PTHREAD_ONCE_INIT;
+
 static struct fuse_session *fuse_instance;
 
 static void exit_handler(int sig)

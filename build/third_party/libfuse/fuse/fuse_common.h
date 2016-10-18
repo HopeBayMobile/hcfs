@@ -489,8 +489,6 @@ void fuse_remove_signal_handlers(struct fuse_session *se);
 
 /* 10/14/2016: Jiahong added pthread_key for specifying signal
 handler for SIGUSR signals */
-static pthread_key_t sighandler_key;
-static pthread_once_t sighandler_key_once = PTHREAD_ONCE_INIT;
 void sighandler_init(void (*handler_ftn)(int));
 
 /* ----------------------------------------------------------- *
