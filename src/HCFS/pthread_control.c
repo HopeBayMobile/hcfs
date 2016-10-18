@@ -22,7 +22,6 @@
 #include "macro.h"
 
 static pthread_key_t PTHREAD_sighandler_key;
-pthread_key_t PTHREAD_status_key;
 static pthread_once_t PTHREAD_sighandler_key_once = PTHREAD_ONCE_INIT;
 
 void PTHREAD_sighandler_wrapper(int signum)
