@@ -1587,6 +1587,9 @@ no_return:
 		    (start_time.tv_sec + start_time.tv_usec * 0.000001);
 		if (elapsed_time < 0)
 			elapsed_time = 0;
+		thread_ptr->cancelable = 1;
+		if (thread_ptr->terminating == 1)
+			pthread_exit(0);
 		sem_wait(&(api_server->job_lock));
 		sel_index = end_time.tv_sec % PROCESS_WINDOW;
 		if (api_server->last_update < end_time.tv_sec) {
