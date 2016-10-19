@@ -203,12 +203,12 @@ int32_t destroy_api_interface(void)
 
 	/* Signal child threads */
  	for (count = 0; count < api_server->num_threads; count++)
- 		PTHREAD_kill(api_server->local_thread[count], SIGUSR2);
- 	PTHREAD_kill(api_server->monitor_thread, SIGUSR2);
+ 		PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+ 	PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
 
 	for (count = 0; count < api_server->num_threads; count++)
-		PTHREAD_join(api_server->local_thread[count], NULL);
-	PTHREAD_join(api_server->monitor_thread, NULL);
+		PTHREAD_join(&(api_server->local_thread[count]), NULL);
+	PTHREAD_join(&(api_server->monitor_thread), NULL);
 	sem_post(&(api_server->job_lock));
 	sem_destroy(&(api_server->job_lock));
 	UNLINK(api_server->sock.addr.sun_path);

@@ -72,6 +72,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "rebuild_super_block.h"
 #include "do_restoration.h"
 #include "recover_super_block.h"
+#include "pthread_control.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -254,7 +255,8 @@ static inline void _sync_terminate_thread(int32_t index)
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
 	     (sync_ctl.threads_created[index] == TRUE))) {
-		ret = pthread_join(sync_ctl.inode_sync_thread[index], NULL);
+		ret = 0;
+		PTHREAD_REUSE_join(&(sync_ctl.inode_sync_thread[index]));
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
 			this_mode = 0;
@@ -379,6 +381,8 @@ void collect_finished_sync_threads(void *ptr)
 		nanosleep(&time_to_sleep, NULL);
 		continue;
 	}
+	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(sync_ctl.inode_sync_thread[count]));
 }
 
 /* On error, need to alert thread that dispatch the block upload
@@ -653,6 +657,8 @@ void collect_finished_upload_threads(void *ptr)
 
 void init_sync_control(void)
 {
+	int count;
+
 	memset(&sync_ctl, 0, sizeof(SYNC_THREAD_CONTROL));
 	sem_init(&(sync_ctl.sync_op_sem), 0, 1);
 	sem_init(&(sync_ctl.sync_queue_sem), 0, MAX_SYNC_CONCURRENCY);
@@ -667,9 +673,14 @@ void init_sync_control(void)
 	sync_ctl.retry_list.num_retry = 0;
 	sync_ctl.retry_list.retry_inode = (ino_t *)
 			calloc(MAX_SYNC_CONCURRENCY, sizeof(ino_t));
+	PTHREAD_REUSE_set_exithandler();
 
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
 		       (void *)&collect_finished_sync_threads, NULL);
+
+	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(sync_ctl.inode_sync_thread[count]),
+		                     NULL);
 }
 
 void init_upload_control(void)
@@ -2133,14 +2144,14 @@ static inline int32_t _sync_mark(ino_t this_inode, mode_t this_mode,
 				  sync_threads[count].this_mode);
 
 			if (sync_ctl.is_revert[count] == TRUE)
-				pthread_create(
+				PTHREAD_REUSE_run(
 					&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&continue_inode_sync,
+					(void *)&continue_inode_sync,
 					(void *)&(sync_threads[count]));
 			else
-				pthread_create(
+				PTHREAD_REUSE_run(
 					&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&sync_single_inode,
+					(void *)&sync_single_inode,
 					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;

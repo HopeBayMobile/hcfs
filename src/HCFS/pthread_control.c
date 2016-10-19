@@ -112,17 +112,120 @@ void PTHREAD_exit_handler(_UNUSED int sig)
 		calling_ptr->terminating = 1;
 }
 
+void PTHREAD_REUSE_exit_handler(_UNUSED int sig)
+{
+	PTHREAD_REUSE_T *calling_ptr
+		= (PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
+
+	if (calling_ptr == NULL)
+		return;
+
+	if (calling_ptr->cancelable != 0)
+		pthread_exit(0);
+	else
+		calling_ptr->terminating = 1;
+}
+
 void PTHREAD_set_exithandler()
 {
 	PTHREAD_sighandler_init(&PTHREAD_exit_handler);
 }
 
-int PTHREAD_kill(PTHREAD_T thread, int sig)
+void PTHREAD_REUSE_set_exithandler()
 {
-	return pthread_kill(thread.self, sig);
-}
-int PTHREAD_join(PTHREAD_T thread, void **retval)
-{
-	return pthread_join(thread.self, retval);
+	PTHREAD_sighandler_init(&PTHREAD_REUSE_exit_handler);
 }
 
+int PTHREAD_kill(PTHREAD_T *thread, int sig)
+{
+	return pthread_kill(thread->self, sig);
+}
+int PTHREAD_join(PTHREAD_T *thread, void **retval)
+{
+	return pthread_join(thread->self, retval);
+}
+
+void *PTHREAD_REUSE_wrapper(void *thread_ptr)
+{
+	PTHREAD_REUSE_T *this_thread;
+	sigset_t sigset;
+
+	this_thread = (PTHREAD_REUSE_T *) thread_ptr;
+
+	PTHREAD_sighandler_init(this_thread->SIGUSR2_handler);
+	pthread_setspecific(PTHREAD_status_key, thread_ptr);
+
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGUSR2);
+	pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
+	while (this_thread->terminating == FALSE) {
+		this_thread->cancelable = 1;
+		if (this_thread->terminating == TRUE)
+			pthread_exit(0);
+		sem_wait(&(this_thread->run));
+		this_thread->thread_routine(this_thread->arg);
+		sem_post(&(this_thread->finish));
+	}
+	return NULL;
+}
+
+/* Routine for reusable threads */
+int PTHREAD_REUSE_create(PTHREAD_REUSE_T *thread, const pthread_attr_t *attr)
+{
+	sigset_t sigset, oldset;
+	int retval;
+
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGUSR2);
+	pthread_sigmask(SIG_BLOCK, &sigset, &oldset);
+	(void) pthread_once(&PTHREAD_sighandler_key_once,
+	                    PTHREAD_sighandler_initonce);
+
+	thread->SIGUSR2_handler = pthread_getspecific(PTHREAD_sighandler_key);
+
+	thread->thread_routine = NULL;
+	thread->cancelable = TRUE;
+	thread->terminating = FALSE;
+	thread->arg = NULL;
+	/* sem_wait(&run) if thread waiting for PTHREAD_REUSE_run */
+	sem_init(&(thread->run), 0, 0);
+	/* sem_post(&finish) if thread finished the current task */
+	sem_init(&(thread->finish), 0, 0);
+	/* sem_wait(&occupied) in REUSE_run, and sem_post(&occupied)
+	in REUSE_join */
+	sem_init(&(thread->occupied), 0, 1);
+
+	retval = pthread_create(&(thread->self), attr, PTHREAD_REUSE_wrapper,
+	                        (void *)thread);
+	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+
+	return retval;
+}
+
+/* REUSE_run will use sem_post(&run) to continue running the thread */
+int PTHREAD_REUSE_run(PTHREAD_REUSE_T *thread,
+                      void *(*start_routine) (void *), void *arg)
+{
+	int32_t ret_val;
+
+	ret_val = sem_trywait(&(thread->occupied));
+	if (ret_val < 0)
+		return ret_val;
+	thread->thread_routine = start_routine;
+	thread->arg = arg;
+	sem_post(&(thread->run));
+	return 0;
+}
+
+/* REUSE_join will use sem_wait(&finish) to wait for the thread to finish
+the current task */
+void PTHREAD_REUSE_join(PTHREAD_REUSE_T *thread)
+{
+	sem_wait(&(thread->finish));
+	sem_post(&(thread->occupied));
+}
+void PTHREAD_REUSE_terminate(PTHREAD_REUSE_T *thread)
+{
+	pthread_kill(thread->self, SIGUSR2);
+	pthread_join(thread->self, NULL);
+}
