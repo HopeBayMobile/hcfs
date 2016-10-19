@@ -421,20 +421,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	if (upload_ctl.threads_finished[index] != TRUE)
 		return 0;
 
-	ret = pthread_join(upload_ctl.upload_threads_no[index], NULL);
-
-	/* TODO: If thread join failed but not EBUSY, perhaps should try to
-	terminate the thread and mark fail? */
-	if (ret != 0) {
-		if (ret != EBUSY) {
-			/* Perhaps can't join. Mark the thread as not in use */
-			write_log(0, "Error in upload thread. Code %d, %s\n",
-				  ret, strerror(ret));
-			return -ret;
-		}
-		/* Thread is busy. Wait some more */
-		return ret;
-	}
+	PTHREAD_REUSE_join(&(upload_ctl.upload_threads_no[index]));
 
 	this_inode = upload_ctl.upload_threads[index].inode;
 	//is_delete = upload_ctl.upload_threads[index].is_delete;
@@ -653,6 +640,8 @@ void collect_finished_upload_threads(void *ptr)
 		nanosleep(&time_to_sleep, NULL);
 		continue;
 	}
+	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(upload_ctl.upload_threads_no[count]));
 }
 
 void init_sync_control(void)
@@ -714,9 +703,14 @@ void init_upload_control(void)
 	memset(&(upload_ctl.threads_finished), 0,
 	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	upload_ctl.total_active_upload_threads = 0;
+	PTHREAD_REUSE_set_exithandler();
 
 	pthread_create(&(upload_ctl.upload_handler_thread), NULL,
 		       (void *)&collect_finished_upload_threads, NULL);
+
+	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(upload_ctl.upload_threads_no[count]),
+	                     NULL);
 }
 
 void init_sync_stat_control(void)
@@ -1476,7 +1470,7 @@ store in some other file */
 			}
 		}
 		schedule_sync_meta(toupload_metapath, which_curl);
-		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
+		PTHREAD_REUSE_join(&(upload_ctl.upload_threads_no[which_curl]));
 		if (CURRENT_BACKEND == GOOGLEDRIVE &&
 		    cloud_related_data.metaID[0] == 0) {
 			/* Write file id to cloud related data */
@@ -1987,7 +1981,7 @@ int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl)
 	strncpy(upload_ctl.upload_threads[which_curl].tempfilename,
 		toupload_metapath,
 		sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
+	PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[which_curl]),
 		       (void *)&con_object_sync,
 		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
@@ -2045,8 +2039,8 @@ int32_t dispatch_upload_block(int32_t which_curl)
 	}
 
 	strcpy(upload_ptr->tempfilename, toupload_blockpath);
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]),
-		NULL, (void *)&con_object_sync,	(void *)upload_ptr);
+	PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[which_curl]),
+		(void *)&con_object_sync, (void *)upload_ptr);
 
 	upload_ctl.threads_created[which_curl] = TRUE;
 	return 0;
@@ -2067,7 +2061,7 @@ errcode_handle:
 
 void dispatch_delete_block(int32_t which_curl)
 {
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
+	PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[which_curl]),
 		       (void *)&delete_object_sync,
 		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;

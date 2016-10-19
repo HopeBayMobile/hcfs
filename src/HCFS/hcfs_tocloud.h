@@ -71,7 +71,7 @@ typedef struct {
 	sem_t upload_op_sem;
 	pthread_t upload_handler_thread;
 	UPLOAD_THREAD_TYPE upload_threads[MAX_UPLOAD_CONCURRENCY];
-	pthread_t upload_threads_no[MAX_UPLOAD_CONCURRENCY];
+	PTHREAD_REUSE_T upload_threads_no[MAX_UPLOAD_CONCURRENCY];
 	char threads_in_use[MAX_UPLOAD_CONCURRENCY];
 	char threads_created[MAX_UPLOAD_CONCURRENCY];
 	char threads_finished[MAX_UPLOAD_CONCURRENCY];
