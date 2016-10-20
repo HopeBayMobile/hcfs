@@ -40,7 +40,7 @@ char swift_url_string[1024] = {0};
 /* Begin of the test case for the function init_api_interface */
 
 class init_api_interfaceTest : public ::testing::Test {
-	protected:
+protected:
 	int32_t count;
 
 	virtual void SetUp() {
@@ -118,7 +118,7 @@ TEST_F(init_api_interfaceTest, TestPreCleanup)
 /* Begin of the test case for the function destroy_api_interface */
 
 class destroy_api_interfaceTest : public ::testing::Test {
-	protected:
+protected:
 	int32_t count;
 
 	virtual void SetUp() {
@@ -183,7 +183,7 @@ TEST_F(destroy_api_interfaceTest, TestIntegrity)
 /* Begin of the test case for the function api_module */
 
 class api_moduleTest : public ::testing::Test {
-	protected:
+protected:
 	int32_t count;
 	int32_t fd, status;
 	struct sockaddr_un addr;
@@ -220,8 +220,7 @@ class api_moduleTest : public ::testing::Test {
 		         "%s/hcfspausesync", METAPATH);
 	}
 
-	virtual void TearDown()
-	{
+	virtual void TearDown() {
 		if (fd != 0)
 			close(fd);
 		hcfs_system->system_going_down = TRUE;
@@ -245,8 +244,7 @@ class api_moduleTest : public ::testing::Test {
 		free(system_config);
 	}
 
-	int32_t connect_sock()
-	{
+	int32_t connect_sock() {
 		addr.sun_family = AF_UNIX;
 		strcpy(addr.sun_path, SOCK_PATH);
 		fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -257,8 +255,7 @@ class api_moduleTest : public ::testing::Test {
 	static int32_t do_delete(const char *fpath,
 	                         const struct stat *sb,
 	                         int32_t tflag,
-	                         struct FTW *ftwbuf)
-	{
+	                         struct FTW *ftwbuf) {
 		UNUSED(sb);
 		UNUSED(ftwbuf);
 		switch (tflag) {
@@ -1182,6 +1179,7 @@ TEST_F(api_moduleTest, SetSyncSwitchOn)
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(TRUE, hcfs_system->sync_manual_switch);
 }
+
 TEST_F(api_moduleTest, SetSyncSwitchOnFail)
 {
 	int32_t ret_val, retcode;
@@ -1391,7 +1389,6 @@ TEST_F(api_moduleTest, GetMetaSizeSuccess)
 	ASSERT_EQ(sizeof(int64_t), ret_val);
 	ASSERT_EQ(55667788, metasize);
 }
-
 
 TEST_F(api_moduleTest, UpdateQuotaSuccess)
 {
