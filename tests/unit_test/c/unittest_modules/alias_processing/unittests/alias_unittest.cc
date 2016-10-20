@@ -33,11 +33,13 @@ ino_t real_ino = 1000;
 
 /* Begin of the test case for the function seek_and_add_in_alias_group */
 
-class SeekAndAddTest : public ::testing::Test
-{
-	protected:
-	virtual void SetUp() {}
-	virtual void TearDown() {}
+class SeekAndAddTest : public ::testing::Test {
+protected:
+	virtual void SetUp() {
+	}
+
+	virtual void TearDown() {
+	}
 };
 
 TEST_F(SeekAndAddTest, SingleRealInode)
@@ -139,16 +141,14 @@ TEST_F(SeekAndAddTest, MultipleRealInodes)
 
 /* Begin of the test case for all alias operations */
 
-class AliasInodeOperationTest : public ::testing::Test
-{
-	protected:
+class AliasInodeOperationTest : public ::testing::Test {
+protected:
 	DIR_ENTRY dir_entry[MAX_REAL_INODE];
 	char selfname[MAX_FILENAME_LEN+1];
 	char lowercase[MAX_FILENAME_LEN+1];
 	int32_t count, ret_val, selected, total_inodes;
 
-	virtual void SetUp()
-	{
+	virtual void SetUp() {
 		ino_t alias_ino;
 
 		srand(time(NULL));
@@ -163,8 +163,7 @@ class AliasInodeOperationTest : public ::testing::Test
 		}
 	}
 
-	virtual void TearDown()
-	{
+	virtual void TearDown() {
 		/* Free all alias inodes. */
 		for (count = 0; count < MAX_REAL_INODE; count++) {
 			delete_in_alias_group(dir_entry[count].d_ino);
@@ -172,8 +171,7 @@ class AliasInodeOperationTest : public ::testing::Test
 	}
 
 	void create_alias_inodes(int32_t num1, int32_t num2,
-		int32_t min_selected, DIR_ENTRY *inode)
-	{
+	                         int32_t min_selected, DIR_ENTRY *inode) {
 		int32_t loop1, loop2, num_inodes = 0;
 		ino_t this_ino;
 
@@ -204,8 +202,7 @@ class AliasInodeOperationTest : public ::testing::Test
 		total_inodes = num_inodes;
 	}
 
-	void any_string(char *selfname, int32_t length)
-	{
+	void any_string(char *selfname, int32_t length) {
 		int index = 0;
 		static const char letter[] =
 			"0123456789"
@@ -222,8 +219,7 @@ class AliasInodeOperationTest : public ::testing::Test
 		selfname[length] = '\0';
 	}
 
-	void any_alias_name(char *real_name, char *alias_name)
-	{
+	void any_alias_name(char *real_name, char *alias_name) {
 		int32_t index, length;
 
 		length = strlen(real_name);
@@ -253,8 +249,7 @@ class AliasInodeOperationTest : public ::testing::Test
 	/* Thread handle functions */
 	void handle_inodes(int32_t handle_type);
 
-	static void *handle_inode_thread(void *data)
-	{
+	static void *handle_inode_thread(void *data) {
 		static int32_t handle_type = 0;
 		handle_type = handle_type % 3 + 1;
 		((AliasInodeOperationTest *)data)->handle_inodes(handle_type);
