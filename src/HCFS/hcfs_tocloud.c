@@ -343,11 +343,8 @@ static inline void _sync_terminate_thread(int32_t index)
 void collect_finished_sync_threads(void *ptr)
 {
 	int32_t count;
-	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 	       (sync_ctl.total_active_sync_threads > 0)) {
@@ -362,7 +359,9 @@ void collect_finished_sync_threads(void *ptr)
 				write_log(10, "Set upload in progress to FALSE\n");
 			}
 			sem_post(&(sync_ctl.sync_op_sem));
-			nanosleep(&time_to_sleep, NULL);
+			while ((sync_ctl.total_active_sync_threads <= 0) &&
+			       (hcfs_system->system_going_down == FALSE))
+				sem_wait(&(sync_ctl.sync_finished_sem));
 			continue;
 		}
 
@@ -378,8 +377,6 @@ void collect_finished_sync_threads(void *ptr)
 			_sync_terminate_thread(count);
 
 		sem_post(&(sync_ctl.sync_op_sem));
-		nanosleep(&time_to_sleep, NULL);
-		continue;
 	}
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
 		PTHREAD_REUSE_terminate(&(sync_ctl.inode_sync_thread[count]));
@@ -598,11 +595,8 @@ errcode_handle:
 void collect_finished_upload_threads(void *ptr)
 {
 	int32_t count, ret;
-	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 	       (upload_ctl.total_active_upload_threads > 0)) {
@@ -610,7 +604,9 @@ void collect_finished_upload_threads(void *ptr)
 
 		if (upload_ctl.total_active_upload_threads <= 0) {
 			sem_post(&(upload_ctl.upload_op_sem));
-			nanosleep(&time_to_sleep, NULL);
+			while ((upload_ctl.total_active_upload_threads <= 0) &&
+			       (hcfs_system->system_going_down == FALSE))
+				sem_wait(&(upload_ctl.upload_finished_sem));
 			continue;
 		}
 		for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
@@ -637,8 +633,6 @@ void collect_finished_upload_threads(void *ptr)
 		}
 
 		sem_post(&(upload_ctl.upload_op_sem));
-		nanosleep(&time_to_sleep, NULL);
-		continue;
 	}
 	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++)
 		PTHREAD_REUSE_terminate(&(upload_ctl.upload_threads_no[count]));
@@ -651,6 +645,7 @@ void init_sync_control(void)
 	memset(&sync_ctl, 0, sizeof(SYNC_THREAD_CONTROL));
 	sem_init(&(sync_ctl.sync_op_sem), 0, 1);
 	sem_init(&(sync_ctl.sync_queue_sem), 0, MAX_SYNC_CONCURRENCY);
+	sem_init(&(sync_ctl.sync_finished_sem), 0, 0);
 	memset(&(sync_ctl.threads_in_use), 0,
 	       sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
 	memset(&(sync_ctl.threads_created), 0,
@@ -696,6 +691,7 @@ void init_upload_control(void)
 
 	sem_init(&(upload_ctl.upload_op_sem), 0, 1);
 	sem_init(&(upload_ctl.upload_queue_sem), 0, MAX_UPLOAD_CONCURRENCY);
+	sem_init(&(upload_ctl.upload_finished_sem), 0, 0);
 	memset(&(upload_ctl.threads_in_use), 0,
 	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	memset(&(upload_ctl.threads_created), 0,
@@ -1133,6 +1129,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1143,6 +1140,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1154,6 +1152,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			__func__, errcode, strerror(errcode));
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1170,6 +1169,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		to sync this object anymore. */
 		fclose(toupload_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	setbuf(local_metafptr, NULL);
@@ -1196,6 +1196,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			fclose(local_metafptr);
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1298,6 +1299,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1315,6 +1317,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 	}
@@ -1327,6 +1330,7 @@ store in some other file */
 		fclose(local_metafptr);
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1513,6 +1517,7 @@ store in some other file */
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1532,6 +1537,7 @@ store in some other file */
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	fclose(toupload_metafptr);
@@ -1593,6 +1599,7 @@ store in some other file */
 				ptr->inode, DEL_BACKEND_BLOCKS);
 	}
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 
 errcode_handle:
@@ -1614,6 +1621,7 @@ errcode_handle:
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	UNUSED(errcode);
 	return;
 }
@@ -1902,6 +1910,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	UNLINK(thread_ptr->tempfilename);
 	change_system_meta(0, 0, -filesize, 0, 0, 0, FALSE);
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 
 errcode_handle:
@@ -1925,6 +1934,7 @@ errcode_handle:
 					0, 0, 0, FALSE);
 	}
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 }
 
@@ -1959,6 +1969,7 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 			goto errcode_handle;
 
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 
 errcode_handle:
@@ -1973,6 +1984,7 @@ errcode_handle:
 	}
 
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 }
 
@@ -2412,7 +2424,9 @@ void upload_loop(void)
 			is_start_check = TRUE;
 	}
 
+	sem_post(&(upload_ctl.upload_finished_sem));
 	pthread_join(upload_ctl.upload_handler_thread, NULL);
+	sem_post(&(sync_ctl.sync_finished_sem));
 	pthread_join(sync_ctl.sync_handler_thread, NULL);
 
 #ifdef _ANDROID_ENV_

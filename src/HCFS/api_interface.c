@@ -167,7 +167,7 @@ int32_t init_api_interface(void)
 		val = NULL;
 	}
 
-	/* TODO: fork a thread that monitor usage and control extra threads */
+	/* Fork a thread that monitor usage and control extra threads */
 	ret = PTHREAD_create(&(api_server->monitor_thread), NULL,
 			(void *)api_server_monitor, NULL);
 	if (ret != 0) {

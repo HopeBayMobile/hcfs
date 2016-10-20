@@ -69,6 +69,7 @@ typedef struct {
 	finished and is joined by the handler thread*/
 	sem_t upload_queue_sem;
 	sem_t upload_op_sem;
+	sem_t upload_finished_sem;
 	pthread_t upload_handler_thread;
 	UPLOAD_THREAD_TYPE upload_threads[MAX_UPLOAD_CONCURRENCY];
 	PTHREAD_REUSE_T upload_threads_no[MAX_UPLOAD_CONCURRENCY];
@@ -82,6 +83,7 @@ typedef struct {
 typedef struct {
 	sem_t sync_op_sem;
 	sem_t sync_queue_sem; /*similar to upload_queue_sem*/
+	sem_t sync_finished_sem;
 	IMMEDIATELY_RETRY_LIST retry_list;
 	pthread_t sync_handler_thread;
 	PTHREAD_REUSE_T inode_sync_thread[MAX_SYNC_CONCURRENCY];
