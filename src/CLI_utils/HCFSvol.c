@@ -197,13 +197,13 @@ int32_t main(int32_t argc, char **argv)
 		size_msg = recv(fd, &uint32_ret, sizeof(uint32_t), 0);
 		if (code == CLOUDSTAT)
 			printf("Backend is %s\n",
-			       uint32_ret ? "ONLINE (1)" : "OFFLINE (0)");
+			       uint32_ret ? "ONLINE" : "OFFLINE");
 		else if (code == GETSYNCSWITCH)
-			printf("Sync switch is %s\n",
-			       uint32_ret ? "ON(1)" : "OFF(0)");
+			printf("Sync controller is switched to %s\n",
+			       uint32_ret ? "ON" : "OFF");
 		else if (code == GETSYNCSTAT)
-			printf("Sync process is %s\n",
-			       uint32_ret ? "RUNNING(1)" : "PAUSED(0)");
+			printf("Sync to backend is %s\n",
+			       uint32_ret ? "AVAILABLE" : "PAUSED");
 		else if (code == GETXFERSTATUS)
 			printf("Xfer status is %d\n", uint32_ret);
 		else if (code == CHECK_RESTORATION_STATUS)
