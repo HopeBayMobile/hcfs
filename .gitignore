@@ -3,6 +3,7 @@
 *.swp
 *~
 *.orig
+*.bak
 
 # C extensions
 *.a
