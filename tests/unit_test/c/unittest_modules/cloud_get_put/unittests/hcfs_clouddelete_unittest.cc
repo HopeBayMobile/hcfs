@@ -12,59 +12,59 @@ extern "C" {
 #include "atomic_tocloud.h"
 }
 
-static int do_delete (const char *fpath, const struct stat *sb,
-		int32_t tflag, struct FTW *ftwbuf)
+static int do_delete(const char *fpath, const struct stat *sb,
+                     int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {
-		case FTW_D:
-		case FTW_DNR:
-		case FTW_DP:
-			rmdir (fpath);
-			break;
-		default:
-			unlink (fpath);
-			break;
+	case FTW_D:
+	case FTW_DNR:
+	case FTW_DP:
+		rmdir(fpath);
+		break;
+	default:
+		unlink(fpath);
+		break;
 	}
 	return (0);
 }
 
-class deleteEnvironment : public ::testing::Environment {
- public:
-  char *workpath, *tmppath;
+class deleteEnvironment : public ::testing::Environment
+{
+public:
+	char *workpath, *tmppath;
 
-  virtual void SetUp() {
-    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-    hcfs_system->system_going_down = FALSE;
-    hcfs_system->backend_is_online = TRUE;
-    hcfs_system->sync_manual_switch = ON;
-    hcfs_system->sync_paused = OFF;
+	virtual void SetUp() {
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+		              malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
 
-    workpath = NULL;
-    tmppath = NULL;
-    if (access("/tmp/testHCFS", F_OK) != 0) {
-      workpath = get_current_dir_name();
-      tmppath = (char *)malloc(strlen(workpath)+20);
-      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
-      if (access(tmppath, F_OK) != 0)
-        mkdir(tmppath, 0700);
-      symlink(tmppath, "/tmp/testHCFS");
-     }
-  }
+		workpath = NULL;
+		tmppath = NULL;
+		if (access("/tmp/testHCFS", F_OK) != 0) {
+			workpath = get_current_dir_name();
+			tmppath = (char *)malloc(strlen(workpath) + 20);
+			snprintf(tmppath, strlen(workpath) + 20, "%s/tmpdir", workpath);
+			if (access(tmppath, F_OK) != 0)
+				mkdir(tmppath, 0700);
+			symlink(tmppath, "/tmp/testHCFS");
+		}
+	}
 
-  virtual void TearDown() {
-    nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
-    free(workpath);
-    free(tmppath);
-    free(hcfs_system);
-  }
+	virtual void TearDown() {
+		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+		free(workpath);
+		free(tmppath);
+		free(hcfs_system);
+	}
 };
 
-::testing::Environment* const delete_env = ::testing::AddGlobalTestEnvironment(new deleteEnvironment);
+::testing::Environment* const delete_env =
+	::testing::AddGlobalTestEnvironment(new deleteEnvironment);
 
-
-/*
-	Unittest of init_dsync_control() & collect_finished_dsync_threads()
- */
+// Unittest of init_dsync_control() & collect_finished_dsync_threads()
 void *dsync_test_thread_fn(void *data)
 {
 	usleep(10000 * *(int32_t *)data);
@@ -83,7 +83,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 
 	/* Generate threads */
 	for (int32_t i = 0 ; i < num_threads ; i++) {
-		int32_t inode = i+1;
+		int32_t inode = i + 1;
 		int32_t t_index;
 
 		sem_wait(&dsync_ctl.dsync_queue_sem);
@@ -91,7 +91,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		t_index = -1;
 		for (int32_t idx = 0 ; idx < MAX_DSYNC_CONCURRENCY ; idx++) {
 			if ((dsync_ctl.threads_in_use[idx] == 0) &&
-				(dsync_ctl.threads_created[idx] == FALSE)) {
+			    (dsync_ctl.threads_created[idx] == FALSE)) {
 				t_index = idx;
 				break;
 			}
@@ -102,7 +102,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		dsync_ctl.retry_right_now[t_index] = FALSE;
 		dsync_ctl.total_active_dsync_threads++;
 		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL,
-			dsync_test_thread_fn, (void *)&i));
+		                            dsync_test_thread_fn, (void *)&i));
 		sem_post(&dsync_ctl.dsync_op_sem);
 	}
 	sleep(1);
@@ -117,13 +117,9 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		ASSERT_EQ(FALSE, dsync_ctl.threads_created[i]) << "thread_no = " << i;
 	}
 }
-/*
-	End of unittest init_dsync_control() & collect_finished_dsync_threads()
- */
+// End of unittest init_dsync_control() & collect_finished_dsync_threads()
 
-/*
-	Unittest of init_delete_control() & collect_finished_delete_threads()
- */
+// Unittest of init_delete_control() & collect_finished_delete_threads()
 void *delete_test_thread_fn(void *data)
 {
 	usleep(10000 * *(int32_t *)data);
@@ -148,8 +144,8 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 		sem_wait(&delete_ctl.delete_op_sem);
 		t_index = -1;
 		for (int32_t idx = 0 ; idx < MAX_DELETE_CONCURRENCY ; idx++) {
-			if((delete_ctl.threads_in_use[idx] == FALSE) &&
-				(delete_ctl.threads_created[idx] == FALSE)) {
+			if ((delete_ctl.threads_in_use[idx] == FALSE) &&
+			    (delete_ctl.threads_created[idx] == FALSE)) {
 				t_index = idx;
 				break;
 			}
@@ -159,8 +155,9 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 		delete_ctl.threads_finished[t_index] = TRUE;
 		delete_ctl.delete_threads[t_index].is_block = TRUE;
 		delete_ctl.total_active_delete_threads++;
-		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[t_index]), NULL,
-			delete_test_thread_fn, (void *)&i));
+		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[t_index]),
+		                            NULL,
+		                            delete_test_thread_fn, (void *)&i));
 		sem_post(&delete_ctl.delete_op_sem);
 	}
 	sleep(1);
@@ -176,13 +173,9 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 	}
 }
 
-/*
-	End of unittest init_delete_control() & collect_finished_delete_threads()
- */
+// End of unittest init_delete_control() & collect_finished_delete_threads()
 
-/*
-	Unittest of dsync_single_inode()
-*/
+// Unittest of dsync_single_inode()
 class dsync_single_inodeTest : public ::testing::Test {
 public:
 	DSYNC_THREAD_TYPE *mock_thread_info;
@@ -190,17 +183,16 @@ public:
 	unsigned size_objname;
 	char backend_meta[100];
 
-	virtual void SetUp()
-	{
+	virtual void SetUp() {
 		system_config = (SYSTEM_CONF_STRUCT *)
-			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		                malloc(sizeof(SYSTEM_CONF_STRUCT));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		mock_thread_info =
 		    (DSYNC_THREAD_TYPE *)calloc(1, sizeof(DSYNC_THREAD_TYPE));
 		backend_meta[0] = 0;
 	}
-	virtual void TearDown()
-	{
+
+	virtual void TearDown() {
 		sem_destroy(&objname_counter_sem);
 		sem_destroy(&(sync_ctl.sync_op_sem));
 		destroy_objname_buffer(expected_num_objname);
@@ -211,32 +203,33 @@ public:
 		free(dsync_ctl.retry_list.retry_inode);
 		dsync_ctl.retry_list.retry_inode = NULL;
 	}
-	void init_objname_buffer(uint32_t num_objname)
-	{
+
+	void init_objname_buffer(uint32_t num_objname) {
 		size_objname = 50;
 		objname_counter = 0;
 		objname_list = (char **)malloc(sizeof(char *) * num_objname);
 		for (uint32_t i = 0 ; i < num_objname ; i++)
-			objname_list[i] = (char *)calloc(size_objname, sizeof(char));
+			objname_list[i] = (char *)
+			                  calloc(size_objname, sizeof(char));
 		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
 	}
-	void destroy_objname_buffer(uint32_t num_objname)
-	{
+
+	void destroy_objname_buffer(uint32_t num_objname) {
 		uint32_t i;
 		for (i = 0 ; i < num_objname ; i++)
-			if(objname_list[i])
+			if (objname_list[i])
 				free(objname_list[i]);
 		if (objname_list)
 			free(objname_list);
 	}
-	void init_sync_ctl()
-	{
+
+	void init_sync_ctl() {
 		sem_init(&(sync_ctl.sync_op_sem), 0, 1);
 		for (int32_t i = 0 ; i < MAX_SYNC_CONCURRENCY ; i++)
 			sync_ctl.threads_in_use[i] = 0;
 	}
-	static int32_t objname_cmp(const void *s1, const void *s2)
-	{
+
+	static int32_t objname_cmp(const void *s1, const void *s2) {
 		char *name1 = *(char **)s1;
 		char *name2 = *(char **)s2;
 		if (name1[0] == 'm') {
@@ -276,7 +269,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	mock_thread_info->this_mode = S_IFREG;
 	mock_thread_info->which_index = 0;
 	meta_stat.size = 1000000; // Let total_blocks = 1000000/100 = 10000
-	meta_stat.mode = S_IFREG; 
+	meta_stat.mode = S_IFREG;
 	MAX_BLOCK_SIZE = 100;
 	cloud_related.upload_seq = 1;
 
@@ -309,12 +302,12 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	/* Check answer */
 	ASSERT_EQ(expected_num_objname, objname_counter); // Check # of object name.
 	qsort(objname_list, expected_num_objname, sizeof(char *),
-			dsync_single_inodeTest::objname_cmp);
+	      dsync_single_inodeTest::objname_cmp);
 	uint32_t block;
 	for (block = 0 ; block < expected_num_objname - 1 ; block++) {
 		char expected_objname[size_objname];
 		sprintf(expected_objname, "data_%" PRIu64 "_%d",
-				(uint64_t)mock_thread_info->inode, block);
+		        (uint64_t)mock_thread_info->inode, block);
 		ASSERT_STREQ(expected_objname, objname_list[block]); // Check all obj was recorded.
 	}
 	char expected_objname[size_objname];
@@ -365,13 +358,9 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	EXPECT_EQ(PTHREAD_CANCELED, res);
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
 }
-/*
-	End of unittest of dsync_single_inode()
-*/
+// End of unittest of dsync_single_inode()
 
-/*
-	Unittest of delete_loop()
- */
+// Unittest of delete_loop()
 int32_t inode_cmp(const void *a, const void *b)
 {
 	return *(int32_t *)a - *(int32_t *)b;
@@ -384,7 +373,7 @@ TEST(delete_loopTest, DeleteSuccess)
 	int32_t size_objname;
 
 	system_config = (SYSTEM_CONF_STRUCT *)
-		malloc(sizeof(SYSTEM_CONF_STRUCT));
+	                malloc(sizeof(SYSTEM_CONF_STRUCT));
 	memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 	hcfs_system->backend_is_online = TRUE;
 
@@ -392,7 +381,7 @@ TEST(delete_loopTest, DeleteSuccess)
 	objname_counter = 0;
 	objname_list = (char **)malloc(sizeof(char *) * 100);
 	for (int32_t i = 0 ; i < 100 ; i++)
-		objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
+		objname_list[i] = (char *)malloc(sizeof(char) * size_objname);
 
 	test_data.num_inode = 40;
 	test_data.to_handle_inode = (int32_t *)malloc(sizeof(int32_t) * test_data.num_inode);
@@ -428,6 +417,4 @@ TEST(delete_loopTest, DeleteSuccess)
 	free(sys_super_block);
 	free(system_config);
 }
-/*
-	End of unittest of delete_loop()
- */
+// End of unittest of delete_loop()

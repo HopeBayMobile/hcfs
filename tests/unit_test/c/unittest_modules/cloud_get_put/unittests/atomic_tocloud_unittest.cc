@@ -20,14 +20,14 @@ static int do_delete (const char *fpath, const struct stat *sb,
 		int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {
-		case FTW_D:
-		case FTW_DNR:
-		case FTW_DP:
-			rmdir (fpath);
-			break;
-		default:
-			unlink (fpath);
-			break;
+	case FTW_D:
+	case FTW_DNR:
+	case FTW_DP:
+		rmdir (fpath);
+		break;
+	default:
+		unlink (fpath);
+		break;
 	}
 	return (0);
 }

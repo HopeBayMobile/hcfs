@@ -20,12 +20,11 @@ class pull_retry_inodeTest : public ::testing::Test {
 protected:
 	IMMEDIATELY_RETRY_LIST list;
 
-	void SetUp()
-	{
+	void SetUp() {
 		memset(&list, 0, sizeof(IMMEDIATELY_RETRY_LIST));
 		list.list_size = 8;
 		list.retry_inode = (ino_t *) malloc(sizeof(ino_t) *
-				list.list_size);
+		                                    list.list_size);
 	}
 
 	void TearDown()
@@ -68,16 +67,14 @@ class push_retry_inodeTest : public ::testing::Test {
 protected:
 	IMMEDIATELY_RETRY_LIST list;
 
-	void SetUp()
-	{
+	void SetUp() {
 		memset(&list, 0, sizeof(IMMEDIATELY_RETRY_LIST));
 		list.list_size = 8;
 		list.retry_inode = (ino_t *) calloc(sizeof(ino_t) *
 				list.list_size, 1);
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		free(list.retry_inode);
 	}
 };
@@ -102,8 +99,7 @@ TEST_F(push_retry_inodeTest, PushManyTimesSuccess)
  */
 class change_block_status_to_BOTHTest : public ::testing::Test {
 protected:
-	void SetUp()
-	{
+	void SetUp() {
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 				calloc(sizeof(SYSTEM_DATA_HEAD), 1);
 		sem_init(&(hcfs_system->something_to_replace), 0, 0);
@@ -113,8 +109,7 @@ protected:
 		mkdir("tocloud_tools_test_folder", 0700);
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		free(hcfs_system);
 		if (!access("tocloud_tools_test_folder", F_OK))
 			system("rm -rf tocloud_tools_test_folder");
