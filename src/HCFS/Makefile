@@ -77,6 +77,7 @@ OBJS_F := \
 	rebuild_parent_dirstat.o \
 	restoration_utils.o \
 	do_restoration.o \
+	mount_smart_cache.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"
