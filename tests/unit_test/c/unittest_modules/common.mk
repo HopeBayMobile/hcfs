@@ -51,7 +51,7 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 LDFLAGS += -lpthread -ldl -ljansson -lcrypto -lfuse -lsqlite3 -lrt
 
 # Support  gcc4.9 color output
-GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
+GCC_VERSION_GE_49 := $(shell expr `$(CC) -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
 	CPPFLAGS += -fdiagnostics-color=auto
 endif
