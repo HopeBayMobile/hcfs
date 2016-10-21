@@ -9,6 +9,7 @@
 /* Define for hcfs_fromcloud */
 #define BLOCK_NUM__FETCH_SUCCESS 1
 #define BLOCK_NUM__FETCH_FAIL 2
+#define TEST_DOWNLOAD_OBJ "data_test_download"
 
 #define EXTEND_FILE_SIZE 1234 // Used to truncate file size
 

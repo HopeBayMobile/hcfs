@@ -37,6 +37,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCF
 {
 	MOCK();
 	int32_t inode, block_no;
+	char buffer[EXTEND_FILE_SIZE];
 
 	if (FETCH_BACKEND_BLOCK_TESTING == TRUE)
 		return 200;
@@ -48,9 +49,16 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCF
 			return 200;
 	}
 
+	if (strcmp(objname, TEST_DOWNLOAD_OBJ) == 0) {
+		setbuf(fptr, NULL);
+		fprintf(fptr, "Test content");
+		//pwrite(fileno(fptr), buffer, strlen("Test content") + 1, 0);
+		return HTTP_OK;
+	}		
+
 	sscanf(objname, "data_%d_%d", &inode, &block_no);
 	if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
-		char buffer[EXTEND_FILE_SIZE] = {0};
+		buffer[0] = 0;
 		setbuf(fptr, NULL);
 		pwrite(fileno(fptr), buffer, EXTEND_FILE_SIZE, 0);
 		return HTTP_OK;
@@ -78,6 +86,12 @@ int32_t decode_to_fd(FILE *fptr, uint8_t *key, uint8_t *input, int32_t input_len
 {
 	char buffer[EXTEND_FILE_SIZE] = {0};
 	setbuf(fptr, NULL);
+	if (strncmp((char *) input, "Test content",
+	    strlen("Test content")) == 0) {
+		printf("Decode to fd\n");
+		pwrite(fileno(fptr), input, input_length, 0);
+		return 0;
+	}
 	pwrite(fileno(fptr), buffer, EXTEND_FILE_SIZE, 0);
 	//ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
 	return 0;
