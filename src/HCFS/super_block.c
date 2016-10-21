@@ -1415,6 +1415,7 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 	SUPER_BLOCK_ENTRY entry1, entry2;
 	ino_t first_dirty, last_dirty;
 	BOOL is_missing;
+	int32_t sync_status;
 
 	write_log(0, "Start to rebuild dirty inode linked list.\n");
 	if (missing_inode != 0)
@@ -1455,6 +1456,9 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 			return ret;
 
 		sys_super_block->head.num_dirty = 1;
+		sem_getvalue(&(hcfs_system->sync_wait_sem), &sync_status);
+		if (sync_status == 0)
+			sem_post(&(hcfs_system->sync_wait_sem));
 		ret = write_super_block_head();
 		if (ret < 0)
 			return ret;
@@ -1519,6 +1523,9 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 
 		sys_super_block->head.last_dirty_inode = tempentry.this_index;
 		sys_super_block->head.num_dirty += 1;
+		sem_getvalue(&(hcfs_system->sync_wait_sem), &sync_status);
+		if (sync_status == 0)
+			sem_post(&(hcfs_system->sync_wait_sem));
 		ret = write_super_block_head();
 		if (ret < 0)
 			return ret;
@@ -1559,7 +1566,7 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
 	BOOL sb_enqueue_later = FALSE;
-	int32_t pause_status;
+	int32_t pause_status, sync_status;
 
 	if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {
 		sb_enqueue_later = TRUE;
@@ -1611,6 +1618,10 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
+			sem_getvalue(&(hcfs_system->sync_wait_sem),
+			             &sync_status);
+			if (sync_status == 0)
+				sem_post(&(hcfs_system->sync_wait_sem));
 		} else {
 			ret = read_super_block_entry(
 			    sys_super_block->head.last_dirty_inode, &tempentry);
@@ -1650,6 +1661,10 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			sys_super_block->head.last_dirty_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_dirty++;
+			sem_getvalue(&(hcfs_system->sync_wait_sem),
+			             &sync_status);
+			if (sync_status == 0)
+				sem_post(&(hcfs_system->sync_wait_sem));
 			retsize = pread(sys_super_block->iofptr, &tempentry,
 				SB_ENTRY_SIZE, SB_HEAD_SIZE +
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));

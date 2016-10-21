@@ -251,6 +251,7 @@ static inline void _sync_terminate_thread(int32_t index)
 	char toupload_metapath[300], local_metapath[400];
 	char finish_sync;
 	mode_t this_mode;
+	int32_t sync_status;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
@@ -335,6 +336,10 @@ static inline void _sync_terminate_thread(int32_t index)
 			sync_ctl.threads_error[index] = FALSE;
 			sync_ctl.is_revert[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
+			sem_getvalue(&(hcfs_system->sync_wait_sem),
+			             &sync_status);
+			if (sync_status == 0)
+				sem_post(&(hcfs_system->sync_wait_sem));
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
 	}
@@ -2358,7 +2363,7 @@ void upload_loop(void)
 
 		/* sleep until backend is back */
 		if (hcfs_system->sync_paused) {
-			sleep(1);
+			sem_wait(&(hcfs_system->sync_wait_sem));
 			continue;
 		}
 
