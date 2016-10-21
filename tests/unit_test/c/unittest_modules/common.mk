@@ -43,7 +43,7 @@ CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
 	    -pthread -fprofile-arcs \
 	    -D_FILE_OFFSET_BITS=64 \
 	    -DDEDUP_ENABLE=0 \
-	    -DENCRYPT_ENABLE=1 \
+	    -DENCRYPT_ENABLE=0 \
 	    -DCOMPRESS_ENABLE=0 \
 	    -D_ANDROID_ENV_ \
 	    -DUNITTEST \

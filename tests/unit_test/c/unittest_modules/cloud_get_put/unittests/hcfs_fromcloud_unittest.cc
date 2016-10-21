@@ -150,6 +150,27 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, NULL));
 }
 
+TEST_F(fetch_from_cloudTest, FetchOneFile)
+{
+	char tmp_filename[50];
+	char objname[100];
+	char buffer[EXTEND_FILE_SIZE];
+	FILE *fptr;
+	off_t offset;
+
+	sprintf(objname, TEST_DOWNLOAD_OBJ);
+	sprintf(tmp_filename, "/tmp/testHCFS/data_test_download");
+	unlink(tmp_filename);
+	fptr = fopen(tmp_filename, "w+");
+	setbuf(fptr, NULL);
+	fetch_from_cloud(fptr, READ_BLOCK, objname);
+	fseek(fptr, 0, SEEK_SET);
+	fgets(buffer, 100, fptr);
+	fclose(fptr);
+	unlink(tmp_filename);
+	EXPECT_EQ(0, strncmp(buffer, "Test content", strlen("Test content")));
+}
+
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
 	pthread_t *tid = (pthread_t *)calloc(num_obj, sizeof(pthread_t));
