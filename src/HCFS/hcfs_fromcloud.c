@@ -148,15 +148,16 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 #endif
 
 	fclose(get_fptr);
+	uint8_t *object_key = NULL;
 #if ENCRYPT_ENABLE
 	uint8_t *key = get_key("this is hopebay testing");
-	uint8_t *object_key = calloc(KEY_SIZE, sizeof(uint8_t));
+	object_key = calloc(KEY_SIZE, sizeof(uint8_t));
 	decrypt_session_key(object_key, object_meta->enc_session_key, key);
 	OPENSSL_free(key);
 
+#endif
 	decode_to_fd(fptr, object_key, (uint8_t *)get_fptr_data, len,
 		     object_meta->enc_alg, object_meta->comp_alg);
-#endif
 
 	free_object_meta(object_meta);
 	free(get_fptr_data);
