@@ -49,6 +49,7 @@
 #include "event_notification.h"
 #include "meta_mem_cache.h"
 #include "do_restoration.h"
+#include "control_smartcache.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -1559,6 +1560,22 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			/* Attempt package backup immediately */
 			force_backup_package();
+			break;
+		case MOUNT_SMART_CACHE:
+			retcode = mount_smart_cache();
+			if (retcode < 0)
+				break;
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
+		case UNMOUNT_SMART_CACHE:
+			retcode = unmount_smart_cache();
+			if (retcode < 0)
+				break;
+			ret_len = sizeof(int32_t);
+			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		default:
 			retcode = ENOTSUP;

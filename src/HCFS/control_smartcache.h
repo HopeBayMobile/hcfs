@@ -1,7 +1,7 @@
 /*************************************************************************
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: mount_smart_cache.h
+* File Name: control_smartcache.h
 * Abstract: The c header file for handling to mount smart cache.
 *
 * Revision History
