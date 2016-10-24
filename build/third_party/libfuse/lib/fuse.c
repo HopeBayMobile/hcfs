@@ -4477,6 +4477,12 @@ static int fuse_init_intr_signal(int signum, int *installed)
 {
 	struct sigaction old_sa;
 
+	sighandler_init(&fuse_intr_sighandler);
+	*installed = 1;
+
+	/* 10/18/16 Jiahong */
+	/* Skip intr init routine, as it is done in sighandler_init */
+	/*
 	if (sigaction(signum, NULL, &old_sa) == -1) {
 		perror("fuse: cannot get old signal handler");
 		return -1;
@@ -4494,7 +4500,7 @@ static int fuse_init_intr_signal(int signum, int *installed)
 			return -1;
 		}
 		*installed = 1;
-	}
+	} */
 	return 0;
 }
 
@@ -4568,6 +4574,7 @@ static int node_table_init(struct node_table *t)
 }
 
 /* Jiahong (2/4/16) Borrowed the following code from mt_loop */
+/* Jiahong (10/18/16) Share SIGUSR1 */
 /* ADDED by seth
  * SIGUSR1 handler.
  * */
@@ -4582,15 +4589,10 @@ static void *fuse_prune_nodes(void *fuse)
 	int sleep_time;
 	/* Jiahong (2/4/16) Borrowed the following code from mt_loop */
 	/* added by seth */
-	struct sigaction actions;
-	int rc;
+	/* Jiahong (10/18/16) Share SIGUSR1 */
 
-	memset(&actions, 0, sizeof(actions));
-	sigemptyset(&actions.sa_mask);
-	actions.sa_flags = 0;
-	actions.sa_handler = thread_exit_handler1;
-	rc = sigaction(SIGUSR1,&actions,NULL);
-	/**/
+	/* Set action handler for SIGUSR1 */
+	sighandler_init(&thread_exit_handler1);
 
 	while(1) {
 		sleep_time = fuse_clean_cache(f);
@@ -4611,7 +4613,7 @@ void fuse_stop_cleanup_thread(struct fuse *f)
 {
 	if (lru_enabled(f)) {
 		pthread_mutex_lock(&f->lock);
-		/* Jiahong (2/4/16) borrowed the following code from mt_loop */
+		/* Jiahong (10/18/16) Share SIGUSR1 */
 		pthread_kill(f->prune_thread, SIGUSR1);
 		//pthread_cancel(f->prune_thread);
 		pthread_mutex_unlock(&f->lock);
@@ -4783,8 +4785,12 @@ void fuse_destroy(struct fuse *f)
 {
 	size_t i;
 
+	/* 10/18/16 Jiahong */
+	/* No need to restore signal handler for SIGUSR1 */
+	/*
 	if (f->conf.intr && f->intr_installed)
 		fuse_restore_intr_signal(f->conf.intr_signal);
+	*/
 
 	if (f->fs) {
 		struct fuse_context_i *c = fuse_get_context_internal();

@@ -12,6 +12,9 @@
 #include <string.h>
 #include <signal.h>
 
+static pthread_key_t sighandler_key;
+static pthread_once_t sighandler_key_once = PTHREAD_ONCE_INIT;
+
 static struct fuse_session *fuse_instance;
 
 static void exit_handler(int sig)
@@ -70,3 +73,35 @@ void fuse_remove_signal_handlers(struct fuse_session *se)
 	set_one_signal_handler(SIGPIPE, SIG_IGN, 1);
 }
 
+void sighandler_wrapper(int signum)
+{
+	void (*actual_routine)(int);
+
+	actual_routine = (void *) pthread_getspecific(sighandler_key);
+	if (actual_routine == NULL) {
+		printf("No routine specified for signal %d\n", signum);
+		return;
+	}
+	actual_routine(signum);
+}
+
+/* 10/18/16 by Jiahong: Share SIGUSR1 */
+/* Initiate sighandler_key for signal handling, and hook
+the signal handler wrapper to SIGUSR1 */
+void sighandler_initonce(void)
+{
+	struct sigaction actions;
+
+	(void) pthread_key_create(&sighandler_key, NULL);
+
+	memset(&actions, 0, sizeof(actions));
+	sigemptyset(&actions.sa_mask);
+	actions.sa_flags = 0;
+	actions.sa_handler = sighandler_wrapper;
+	sigaction(SIGUSR1,&actions,NULL);
+}
+void sighandler_init(void (*handler_ftn)(int))
+{
+	(void) pthread_once(&sighandler_key_once, sighandler_initonce);
+	pthread_setspecific(sighandler_key, (void *) handler_ftn);
+}

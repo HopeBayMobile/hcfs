@@ -23,6 +23,7 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 #ifdef __MULTI_THREAD
 
@@ -36,7 +37,11 @@ struct fuse_worker {
 	size_t bufsize;
 	char *buf;
 	struct fuse_mt *mt;
+	int8_t cancelable;
+	int8_t terminating;
 };
+
+static pthread_key_t sigkey;
 
 struct fuse_mt {
 	pthread_mutex_t lock;
@@ -75,9 +80,21 @@ static int fuse_loop_start_thread(struct fuse_mt *mt);
 /* ADDED by seth
  * SIGUSR1 handler.
  * */
+/* Jiahong (2016/10/18) using pthread_getspecific to obtain thread-specific
+stat, and share SIGUSR1 */
 void thread_exit_handler(int sig)
 {
-    pthread_exit(0);
+	struct fuse_worker *calling_ptr;
+
+	calling_ptr = (struct fuse_worker *) pthread_getspecific(sigkey);
+
+	if (calling_ptr == NULL)
+		return;
+
+	if (calling_ptr->cancelable != 0)
+		pthread_exit(0);
+	else
+		calling_ptr->terminating = 1;
 }
 
 static void *fuse_do_work(void *data)
@@ -85,21 +102,22 @@ static void *fuse_do_work(void *data)
 	struct fuse_worker *w = (struct fuse_worker *) data;
 	struct fuse_mt *mt = w->mt;
 	/* added by seth */
-	struct sigaction actions;
-	int rc;
+	/* Jiahong (10/13/2016) move sigaction to parent to avoid calling
+	every time this thread is called */
 	sigset_t sigset;
 
-	memset(&actions, 0, sizeof(actions));
-	sigemptyset(&actions.sa_mask);
-	actions.sa_flags = 0;
-	actions.sa_handler = thread_exit_handler;
-	rc = sigaction(SIGUSR1,&actions,NULL);
-	/**/
+	/* Set action handler for SIGUSR1 */
+	sighandler_init(&thread_exit_handler);
 
-	/* Need to block SIGUSR1 when processing fs operations
-	 * to guarantee data/statistics consistency */
+	pthread_setspecific(sigkey, data);
+
+	/* Now use flags in fuse_worker to control whether
+	the thread is cancelable, and whether the thread should
+	terminate after finishing actions */
+
 	sigemptyset(&sigset);
 	sigaddset(&sigset, SIGUSR1);
+	pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 
 	while (!fuse_session_exited(mt->se)) {
 		int isforget = 0;
@@ -111,9 +129,11 @@ static void *fuse_do_work(void *data)
 		int res;
 
 		//pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-		pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
+		w->cancelable = 1;
+		if (w->terminating == 1)
+			pthread_exit(0);
 		res = fuse_session_receive_buf(mt->se, &fbuf, &ch);
-		pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+		w->cancelable = 0;
 		//pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 		if (res == -EINTR)
 			continue;
@@ -236,6 +256,8 @@ static int fuse_loop_start_thread(struct fuse_mt *mt)
 		return -1;
 	}
 
+	w->cancelable = 1;
+	w->terminating = 0;
 	res = fuse_start_thread(&w->thread_id, fuse_do_work, w);
 	if (res == -1) {
 		free(w->buf);
@@ -279,6 +301,20 @@ int fuse_session_loop_mt(struct fuse_session *se)
 	pthread_mutex_lock(&mt.lock);
 	err = fuse_loop_start_thread(&mt);
 	pthread_mutex_unlock(&mt.lock);
+
+	/* Set action handler for SIGUSR1 */
+	sighandler_init(&thread_exit_handler);
+
+	/* Init key sigkey */
+	pthread_key_create(&sigkey, NULL);
+
+	/* Won't allow threads to receive SIGUSR1 until
+	we have initialized sigkey for each thread */
+	sigset_t sigset;
+	sigemptyset(&sigset);
+	sigaddset(&sigset, SIGUSR1);
+	pthread_sigmask(SIG_BLOCK, &sigset, NULL);
+
 	if (!err) {
 		/* sem_wait() is interruptible */
 		/* 2/22/16 it seems that on Android sem_wait may
