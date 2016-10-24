@@ -256,6 +256,7 @@ void update_sync_state(void)
 {
 	int32_t num_replace;
 	int32_t pause_status;
+	BOOL old_status;
 
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == OFF) {
@@ -271,7 +272,13 @@ void update_sync_state(void)
 		}
 
 	} else {
-		if (hcfs_system->sync_paused == TRUE) {
+		if (hcfs_system->sync_paused == TRUE)
+			old_status = TRUE;
+		else
+			old_status = FALSE;
+		hcfs_system->sync_paused = FALSE;
+
+		if (old_status == TRUE) {
 			sem_getvalue(&(hcfs_system->sync_wait_sem),
 			             &pause_status);
 			if (pause_status == 0)
@@ -285,8 +292,6 @@ void update_sync_state(void)
 			if (pause_status == 0)
 				sem_post(&(hcfs_system->dsync_wait_sem));
 		}
-
-		hcfs_system->sync_paused = FALSE;
 		/* Threads can sleep on cache full now */
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.cache_replace_status = 0;
