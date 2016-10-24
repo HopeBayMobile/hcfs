@@ -1119,6 +1119,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t size_diff_blk = 0, meta_size_diff_blk = 0;
 	int64_t disk_pin_size_delta = 0;
 	BOOL cleanup_meta = FALSE;
+	int32_t pause_status;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1129,7 +1130,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1140,7 +1143,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1152,7 +1157,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			__func__, errcode, strerror(errcode));
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1169,7 +1176,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		to sync this object anymore. */
 		fclose(toupload_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	setbuf(local_metafptr, NULL);
@@ -1196,7 +1205,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			fclose(local_metafptr);
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			sem_post(&(sync_ctl.sync_finished_sem));
+			sem_getvalue(&(sync_ctl.sync_finished_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1299,7 +1311,10 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			sem_post(&(sync_ctl.sync_finished_sem));
+			sem_getvalue(&(sync_ctl.sync_finished_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1317,7 +1332,10 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			sem_post(&(sync_ctl.sync_finished_sem));
+			sem_getvalue(&(sync_ctl.sync_finished_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 	}
@@ -1330,7 +1348,9 @@ store in some other file */
 		fclose(local_metafptr);
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1517,7 +1537,9 @@ store in some other file */
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1537,7 +1559,9 @@ store in some other file */
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_post(&(sync_ctl.sync_finished_sem));
+		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	fclose(toupload_metafptr);
@@ -1599,7 +1623,9 @@ store in some other file */
 				ptr->inode, DEL_BACKEND_BLOCKS);
 	}
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
-	sem_post(&(sync_ctl.sync_finished_sem));
+	sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+	if (pause_status == 0)
+		sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 
 errcode_handle:
@@ -1621,7 +1647,9 @@ errcode_handle:
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
-	sem_post(&(sync_ctl.sync_finished_sem));
+	sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
+	if (pause_status == 0)
+		sem_post(&(sync_ctl.sync_finished_sem));
 	UNUSED(errcode);
 	return;
 }

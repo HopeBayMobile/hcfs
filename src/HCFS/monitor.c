@@ -230,7 +230,7 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 
 	hcfs_system->backend_is_online = status;
 	update_sync_state();
-	if(status_changed)
+	if (status_changed)
 		sem_post(&(hcfs_system->monitor_sem));
 
 /* TODO FIXME: status_time is not used actually */
@@ -255,6 +255,7 @@ void force_retry_conn(void)
 void update_sync_state(void)
 {
 	int32_t num_replace;
+	int32_t pause_status;
 
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == OFF) {
@@ -270,6 +271,21 @@ void update_sync_state(void)
 		}
 
 	} else {
+		if (hcfs_system->sync_paused == TRUE) {
+			sem_getvalue(&(hcfs_system->sync_wait_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(hcfs_system->sync_wait_sem));
+			sem_getvalue(&(hcfs_system->pin_wait_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(hcfs_system->pin_wait_sem));
+			sem_getvalue(&(hcfs_system->dsync_wait_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(hcfs_system->dsync_wait_sem));
+		}
+
 		hcfs_system->sync_paused = FALSE;
 		/* Threads can sleep on cache full now */
 		sem_wait(&(hcfs_system->access_sem));

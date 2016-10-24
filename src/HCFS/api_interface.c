@@ -1324,6 +1324,8 @@ void api_module(void *index1)
 			unmount_all();
 			sync_hcfs_system_data(TRUE);
 			/* Wake up potential sleeping threads */
+			sem_post(&(hcfs_system->sync_wait_sem));
+			sem_post(&(hcfs_system->dsync_wait_sem));
 			sem_post(&(hcfs_system->something_to_replace));
 			sem_post(&(hcfs_system->fuse_sem));
 			/* First wait for system shutdown to finish */

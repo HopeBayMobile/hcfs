@@ -109,6 +109,9 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	sem_init(&(hcfs_system->monitor_sem), 1, 0);
+	sem_init(&(hcfs_system->sync_wait_sem), 1, 0);
+	sem_init(&(hcfs_system->dsync_wait_sem), 1, 0);
+	sem_init(&(hcfs_system->pin_wait_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
@@ -330,8 +333,6 @@ void init_backend_related_module(void)
 	}
 
 	if (CURRENT_BACKEND != NONE) {
-		/*pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);*/
-		/*pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);*/
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
 	}

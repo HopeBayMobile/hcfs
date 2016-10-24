@@ -367,9 +367,15 @@ int32_t init_download_control()
 	memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 	sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
 	sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_PIN_DL_CONCURRENCY);
+	sem_init(&(download_thread_ctl.th_wait_sem), 0, 0);
 
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 		(void *)&download_block_manager, NULL);
+	PTHREAD_REUSE_set_exithandler();
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[count]),
+		                     NULL);
 
 	write_log(5, "Init download thread control\n");
 	return 0;
@@ -377,6 +383,11 @@ int32_t init_download_control()
 
 int32_t destroy_download_control()
 {
+	sem_post(&(download_thread_ctl.th_wait_sem));
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(download_thread_ctl.dthread[count]));
+
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 	sem_destroy(&(download_thread_ctl.ctl_op_sem));
 	sem_destroy(&(download_thread_ctl.dl_th_sem));
@@ -398,16 +409,11 @@ int32_t destroy_download_control()
 void* download_block_manager(void *arg)
 {
 	int32_t t_idx;
-	int32_t ret;
-	pthread_t *tid;
+	PTHREAD_REUSE_T *tid;
 	DOWNLOAD_BLOCK_INFO *block_info;
-	struct timespec time_to_sleep;
 	char error_path[200];
 	FILE *fptr;
 	UNUSED(arg);
-
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while(TRUE) {
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
@@ -423,7 +429,7 @@ void* download_block_manager(void *arg)
 		/* Sleep when number of active threads <= 0 */
 		if (download_thread_ctl.active_th <= 0) {
 			sem_post(&(download_thread_ctl.ctl_op_sem));
-			sleep(1);
+			sem_wait(&(download_thread_ctl.th_wait_sem));
 			continue;
 		}
 
@@ -433,19 +439,11 @@ void* download_block_manager(void *arg)
 								FALSE)
 				continue;
 			/* Try to terminate thread */
-			tid = &(download_thread_ctl.download_thread[t_idx]);
+			tid = &(download_thread_ctl.dthread[t_idx]);
 			/* Do not lock download-control */
 			sem_post(&(download_thread_ctl.ctl_op_sem));
-			ret = pthread_join(*tid, NULL);
+			PTHREAD_REUSE_join(tid);
 			sem_wait(&(download_thread_ctl.ctl_op_sem));
-			if (ret < 0) {
-				if (ret == EBUSY)
-					continue;
-				else
-					write_log(0, "Error: Join thread "
-						"error in %s. Code %d.\n",
-						__func__, ret);
-			}
 			block_info = &(download_thread_ctl.block_info[t_idx]);
 
 			/* Create empty file to record failure */
@@ -471,8 +469,6 @@ void* download_block_manager(void *arg)
 			sem_post(&(download_thread_ctl.dl_th_sem));
 		}
 		sem_post(&(download_thread_ctl.ctl_op_sem));
-
-		nanosleep(&time_to_sleep, NULL);
 	}
 
 	return NULL;
@@ -763,6 +759,7 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 	int32_t which_th;
 	int32_t ret, errcode;
 	size_t ret_size;
+	int32_t pause_status;
 
 	e_index = blkno % MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -800,11 +797,15 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 		download_thread_ctl.block_info[which_th].page_pos = page_pos;
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;
-		pthread_create(&(download_thread_ctl.download_thread[which_th]),
-				NULL, (void *)&fetch_backend_block,
+		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[which_th]),
+				(void *)&fetch_backend_block,
 				(void *)&(download_thread_ctl.block_info[which_th]));
 
 		download_thread_ctl.active_th++;
+		/* Signal paused thread collector if needed */
+		sem_getvalue(&(download_thread_ctl.th_wait_sem), &pause_status);
+		if (pause_status == 0)
+			sem_post(&(download_thread_ctl.th_wait_sem));
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
 

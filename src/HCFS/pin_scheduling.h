@@ -12,6 +12,7 @@
 
 #include <pthread.h>
 #include "hcfs_fromcloud.h"
+#include "pthread_control.h"
 
 #define MAX_PINNING_FILE_CONCURRENCY ((MAX_PIN_DL_CONCURRENCY) / 2)
 
@@ -23,12 +24,13 @@ typedef struct {
 typedef struct {
 	pthread_t pinning_manager; /* Polling manager */
 	pthread_t pinning_collector; /* Collector for joining threads */
-	pthread_t pinning_file_tid[MAX_PINNING_FILE_CONCURRENCY];
+	PTHREAD_REUSE_T pinfile_tid[MAX_PINNING_FILE_CONCURRENCY];
 	PINNING_INFO pinning_info[MAX_PINNING_FILE_CONCURRENCY];
 	BOOL thread_active[MAX_PINNING_FILE_CONCURRENCY]; /* T or F */
 	BOOL thread_finish[MAX_PINNING_FILE_CONCURRENCY];
 	sem_t pinning_sem; /* Max active threads simultaneously */
 	sem_t ctl_op_sem; /* Control semaphore */
+	sem_t pin_active_sem;
 	int32_t total_active_pinning;
 	BOOL deep_sleep;
 } PINNING_SCHEDULER;

@@ -50,6 +50,10 @@
 #include "rebuild_super_block.h"
 #include "hcfs_fromcloud.h"
 #include "recover_super_block.h"
+#include "pin_scheduling.h"
+
+#define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
+#define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
 
 /************************************************************************
 *
@@ -1551,6 +1555,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
 	BOOL sb_enqueue_later = FALSE;
+	int32_t sync_status;
+	int32_t pause_status;
 
 	if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {
 		sb_enqueue_later = TRUE;
@@ -1675,12 +1681,22 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_to_be_deleted++;
+			/* Continue dsync thread if stopped */
+			sem_getvalue(&(hcfs_system->dsync_wait_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(hcfs_system->dsync_wait_sem));
 		} else {
 			this_entry->util_ll_prev =
 				sys_super_block->head.last_to_delete_inode;
 			sys_super_block->head.last_to_delete_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_to_be_deleted++;
+			/* Continue dsync thread if stopped */
+			sem_getvalue(&(hcfs_system->dsync_wait_sem),
+			             &pause_status);
+			if (pause_status == 0)
+				sem_post(&(hcfs_system->dsync_wait_sem));
 			retsize = pread(sys_super_block->iofptr, &tempentry,
 				SB_ENTRY_SIZE, SB_HEAD_SIZE +
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
@@ -2121,6 +2137,7 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY last_entry;
 	int32_t ret;
+	int32_t pause_status;
 
 	/* Return pin-status if this status is not UNPIN */
 	if (this_entry->pin_status != ST_UNPIN) {
@@ -2160,6 +2177,14 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 	}
 
 	sys_super_block->head.num_pinning_inodes++;
+	sem_getvalue(&(hcfs_system->pin_wait_sem), &pause_status);
+	if (pause_status == 0)
+		sem_post(&(hcfs_system->pin_wait_sem));
+	sem_getvalue(&(pinning_scheduler.pin_active_sem),
+	             &pause_status);
+	if (pause_status == 0)
+		sem_post(&(pinning_scheduler.pin_active_sem));
+
 	ret = write_super_block_head();
 	if (ret < 0)
 		goto error_handling;

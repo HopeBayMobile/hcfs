@@ -25,6 +25,7 @@
 #include "tocloud_tools.h"
 #include "global.h"
 #include "googledrive_curl.h"
+#include "pthread_control.h"
 
 #define MAX_DELETE_CONCURRENCY 4
 #define MAX_DSYNC_CONCURRENCY 2
@@ -57,9 +58,10 @@ typedef struct {
 	finished and is joined by the handler thread*/
 	sem_t delete_queue_sem;
 	sem_t delete_op_sem;
+	sem_t pause_sem;
 	pthread_t delete_handler_thread;
 	DELETE_THREAD_TYPE delete_threads[MAX_DELETE_CONCURRENCY];
-	pthread_t threads_no[MAX_DELETE_CONCURRENCY];
+	PTHREAD_REUSE_T threads_no[MAX_DELETE_CONCURRENCY];
 	char threads_in_use[MAX_DELETE_CONCURRENCY];
 	char threads_created[MAX_DELETE_CONCURRENCY];
 	char threads_finished[MAX_DELETE_CONCURRENCY];
@@ -71,9 +73,10 @@ typedef struct {
 typedef struct {
 	sem_t dsync_op_sem;
 	sem_t dsync_queue_sem; /*similar to delete_queue_sem*/
+	sem_t pause_sem;
 	IMMEDIATELY_RETRY_LIST retry_list;
 	pthread_t dsync_handler_thread;
-	pthread_t inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
+	PTHREAD_REUSE_T inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
 	char threads_created[MAX_DSYNC_CONCURRENCY];
 	char threads_finished[MAX_DSYNC_CONCURRENCY];

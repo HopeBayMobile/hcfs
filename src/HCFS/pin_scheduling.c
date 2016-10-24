@@ -31,11 +31,17 @@ int32_t init_pin_scheduler()
 	sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
 	sem_init(&(pinning_scheduler.pinning_sem), 0,
 			MAX_PINNING_FILE_CONCURRENCY);
+	sem_init(&(pinning_scheduler.pin_active_sem), 0, 0);
 
 	pthread_create(&pinning_scheduler.pinning_collector, NULL,
 			(void *)pinning_collect, NULL);
 	pthread_create(&pinning_scheduler.pinning_manager, NULL,
 			(void *)pinning_loop, NULL);
+	PTHREAD_REUSE_set_exithandler();
+	int32_t idx;
+	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++)
+		PTHREAD_REUSE_create(&(pinning_scheduler.pinfile_tid[idx]),
+		                     NULL);
 	write_log(10, "Debug: Create pinning scheduler\n");
 
 	return 0;
@@ -43,6 +49,13 @@ int32_t init_pin_scheduler()
 
 int32_t destroy_pin_scheduler()
 {
+	/* Wake pin wait if needed */
+	sem_post(&(pinning_scheduler.pin_active_sem));
+	sem_post(&(hcfs_system->pin_wait_sem));
+
+	int32_t idx;
+	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++)
+		PTHREAD_REUSE_terminate(&(pinning_scheduler.pinfile_tid[idx]));
 	pthread_join(pinning_scheduler.pinning_manager, NULL);
 	pthread_join(pinning_scheduler.pinning_collector, NULL);
 	sem_destroy(&(pinning_scheduler.ctl_op_sem));
@@ -55,22 +68,6 @@ int32_t destroy_pin_scheduler()
 static BOOL _pinning_wakeup_fn(void)
 {
 	return hcfs_system->system_going_down;
-}
-
-void _sleep_a_while(uint32_t *rest_times)
-{
-	uint32_t level;
-
-	level = (*rest_times) / 60;
-
-	if (level < 5) {
-		nonblock_sleep(level + 1, _pinning_wakeup_fn);
-		*rest_times += 1;
-	} else {
-		nonblock_sleep(5, _pinning_wakeup_fn);
-	}
-
-	return;
 }
 
 /**
@@ -86,12 +83,10 @@ void _sleep_a_while(uint32_t *rest_times)
 void* pinning_collect(void *arg)
 {
 	int32_t idx;
-	struct timespec time_to_sleep;
+	int32_t pause_status;
+	PTHREAD_REUSE_T *tid;
 
 	UNUSED(arg);
-
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while (TRUE) {
 		/* Wait for threads */
@@ -102,7 +97,7 @@ void* pinning_collect(void *arg)
 		}
 
 		if (pinning_scheduler.total_active_pinning <= 0) {
-			sleep(1);
+			sem_wait(&(pinning_scheduler.pin_active_sem));
 			continue;
 		}
 
@@ -114,8 +109,8 @@ void* pinning_collect(void *arg)
 				pinning_scheduler.thread_finish[idx] == FALSE)
 				continue;
 			sem_post(&(pinning_scheduler.ctl_op_sem));
-			pthread_join(pinning_scheduler.pinning_file_tid[idx],
-					NULL);
+			tid = &(pinning_scheduler.pinfile_tid[idx]);
+			PTHREAD_REUSE_join(tid);
 			sem_wait(&(pinning_scheduler.ctl_op_sem));
 
 			/* Recycle this thread */
@@ -127,10 +122,12 @@ void* pinning_collect(void *arg)
 
 			/* Post a semaphore */
 			sem_post(&(pinning_scheduler.pinning_sem));
-
+			sem_getvalue(&(pinning_scheduler.pin_active_sem),
+			         &pause_status);
+			if (pause_status == 0)
+				sem_post(&(pinning_scheduler.pin_active_sem));
 		}
 		sem_post(&(pinning_scheduler.ctl_op_sem));
-		nanosleep(&time_to_sleep, NULL);
 	}
 	return NULL;
 }
@@ -151,6 +148,7 @@ void pinning_worker(void *ptr)
 	PINNING_INFO *pinning_info;
 	ino_t this_inode;
 	int32_t t_idx, ret;
+	int32_t active_pause_status;
 
 	pinning_info = (PINNING_INFO *)ptr;
 	this_inode = pinning_info->this_inode;
@@ -179,6 +177,11 @@ void pinning_worker(void *ptr)
 					(uint64_t)this_inode);
 		}
 		pinning_scheduler.thread_finish[t_idx] = TRUE;
+		sem_getvalue(&(pinning_scheduler.pin_active_sem),
+		             &active_pause_status);
+		if (active_pause_status == 0)
+			sem_post(&(pinning_scheduler.pin_active_sem));
+
 		return; /* Do not dequeue when failing in pinning */
 	}
 
@@ -197,6 +200,9 @@ before finish pinning */
 	}
 
 	pinning_scheduler.thread_finish[t_idx] = TRUE;
+	sem_getvalue(&(pinning_scheduler.pin_active_sem), &active_pause_status);
+	if (active_pause_status == 0)
+		sem_post(&(pinning_scheduler.pin_active_sem));
 	return;
 }
 
@@ -213,12 +219,10 @@ before finish pinning */
 void pinning_loop()
 {
 	ino_t now_inode, next_inode;
-	uint32_t rest_times;
 	int32_t ret, i, t_idx;
 	char found, start_from_head;
 	SUPER_BLOCK_ENTRY sb_entry;
 
-	rest_times = 0;
 	start_from_head = TRUE;
 
 	/**** Begin to find some inodes and pin them ****/
@@ -227,14 +231,14 @@ void pinning_loop()
 		if (hcfs_system->sync_paused) {
 			write_log(10, "Debug: sync paused. pinning"
 				" manager takes a break\n");
-			_sleep_a_while(&rest_times);
+			sem_wait(&(hcfs_system->pin_wait_sem));
 			continue;
 		}
 
 		/* Check inodes in queue */
 		if (sys_super_block->head.num_pinning_inodes == 0) {
 			write_log(10, "Debug: pinning manager takes a break\n");
-			_sleep_a_while(&rest_times);
+			sem_wait(&(hcfs_system->pin_wait_sem));
 			continue;
 		}
 
@@ -252,7 +256,7 @@ void pinning_loop()
 			if (sys_super_block->head.num_pinning_inodes <=
 				pinning_scheduler.total_active_pinning) {
 				super_block_share_release();
-				sleep(1);
+				sem_wait(&(pinning_scheduler.pin_active_sem));
 				continue;
 			}
 			now_inode = sys_super_block->head.first_pin_inode;
@@ -319,7 +323,6 @@ already here*/
 		/* Begin to pin this inode */
 		write_log(10, "Debug: Begin to pin inode %"PRIu64"\n",
 			(uint64_t)now_inode);
-		rest_times = 0;
 
 		t_idx = -1;
 		sem_wait(&(pinning_scheduler.ctl_op_sem));
@@ -341,7 +344,7 @@ already here*/
 		pinning_scheduler.thread_active[t_idx] = TRUE;
 		pinning_scheduler.thread_finish[t_idx] = FALSE;
 		pinning_scheduler.total_active_pinning++;
-		pthread_create(&pinning_scheduler.pinning_file_tid[t_idx], NULL,
+		PTHREAD_REUSE_run(&pinning_scheduler.pinfile_tid[t_idx],
 				(void *)&pinning_worker,
 				(void *)&pinning_scheduler.pinning_info[t_idx]);
 		sem_post(&(pinning_scheduler.ctl_op_sem));
