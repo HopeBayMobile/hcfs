@@ -6,7 +6,7 @@
 #include "gtest/gtest.h"
 #include "curl/curl.h"
 #include "attr/xattr.h"
-extern "C"{
+extern "C" {
 #include "hcfscurl.h"
 #include "global.h"
 #include "hcfs_fromcloud.h"
@@ -19,71 +19,70 @@ extern "C"{
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
 
-static int do_delete (const char *fpath, const struct stat *sb,
-		int32_t tflag, struct FTW *ftwbuf)
+static int do_delete(const char *fpath, const struct stat *sb,
+                     int32_t tflag, struct FTW *ftwbuf)
 {
 	switch (tflag) {
-		case FTW_D:
-		case FTW_DNR:
-		case FTW_DP:
-			rmdir (fpath);
-			break;
-		default:
-			unlink (fpath);
-			break;
+	case FTW_D:
+	case FTW_DNR:
+	case FTW_DP:
+		rmdir(fpath);
+		break;
+	default:
+		unlink(fpath);
+		break;
 	}
 	return (0);
 }
 
-class fromcloudEnvironment : public ::testing::Environment {
- public:
-  char *workpath, *tmppath;
+class fromcloudEnvironment : public ::testing::Environment
+{
+public:
+	char *workpath, *tmppath;
 
-  virtual void SetUp() {
-    OPEN_BLOCK_PATH_FAIL = FALSE;
-    OPEN_META_PATH_FAIL = FALSE;
-    FETCH_BACKEND_BLOCK_TESTING = FALSE;
-    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
-    hcfs_system->system_going_down = FALSE;
-    hcfs_system->backend_is_online = TRUE;
-    hcfs_system->sync_manual_switch = ON;
-    hcfs_system->sync_paused = OFF;
-    sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
-    sem_init(&(hcfs_system->something_to_replace), 0, 0);
+	virtual void SetUp() {
+		OPEN_BLOCK_PATH_FAIL = FALSE;
+		OPEN_META_PATH_FAIL = FALSE;
+		FETCH_BACKEND_BLOCK_TESTING = FALSE;
+		hcfs_system = (SYSTEM_DATA_HEAD *)
+		              malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
+		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->sync_manual_switch = ON;
+		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
+		sem_init(&(hcfs_system->something_to_replace), 0, 0);
 
-    workpath = get_current_dir_name();
-    tmppath = (char *)malloc(strlen(workpath) + 20);
-    snprintf(tmppath, strlen(workpath) + 20, "%s/tmpdir", workpath);
-    if (access(tmppath, F_OK) != 0)
-	    mkdir(tmppath, 0700);
-    if (access("/tmp/testHCFS", F_OK) == 0) {
-	    unlink("/tmp/testHCFS");
-    }
-    symlink(tmppath, "/tmp/testHCFS");
-  }
+		workpath = get_current_dir_name();
+		tmppath = (char *)malloc(strlen(workpath) + 20);
+		snprintf(tmppath, strlen(workpath) + 20, "%s/tmpdir", workpath);
+		if (access(tmppath, F_OK) != 0)
+			mkdir(tmppath, 0700);
+		if (access("/tmp/testHCFS", F_OK) == 0) {
+			unlink("/tmp/testHCFS");
+		}
+		symlink(tmppath, "/tmp/testHCFS");
+	}
 
-  virtual void TearDown() {
-    free(hcfs_system);
-    nftw(tmppath, do_delete, 20, FTW_DEPTH);
-    unlink("/tmp/testHCFS");
-    if (workpath != NULL)
-      free(workpath);
-    if (tmppath != NULL)
-      free(tmppath);
-
-  }
+	virtual void TearDown() {
+		free(hcfs_system);
+		nftw(tmppath, do_delete, 20, FTW_DEPTH);
+		unlink("/tmp/testHCFS");
+		if (workpath != NULL)
+			free(workpath);
+		if (tmppath != NULL)
+			free(tmppath);
+	}
 };
 
-::testing::Environment* const fromcloud_env = ::testing::AddGlobalTestEnvironment(new fromcloudEnvironment);
+::testing::Environment* const fromcloud_env =
+	::testing::AddGlobalTestEnvironment(new fromcloudEnvironment);
 
-/*
-	Unittest of fetch_from_cloud()
-*/
+// Unittest of fetch_from_cloud()
 
 class fetch_from_cloudTest : public ::testing::Test {
 protected:
-	virtual void SetUp()
-	{
+	virtual void SetUp() {
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
 		//sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
@@ -96,13 +95,13 @@ protected:
 		sem_init(&objname_counter_sem, 0, 1);
 		objname_list = (char **)malloc(sizeof(char *)*num_obj);
 		for (int32_t i = 0 ; i < num_obj ; i++)
-			objname_list[i] = (char *)malloc(sizeof(char)*40);
+			objname_list[i] = (char *)malloc(sizeof(char) * 40);
 
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_paused = FALSE;
 	}
-	virtual void TearDown()
-	{
+
+	virtual void TearDown() {
 		sem_destroy(&download_curl_sem);
 		sem_destroy(&download_curl_control_sem);
 		sem_destroy(&objname_counter_sem);
@@ -110,9 +109,10 @@ protected:
 			free(objname_list[i]);
 		free(objname_list);
 	}
-	/* Static thread function, which is used to run function fetch_from_cloud() */
-	static void *fetch_from_cloud_for_thread(void *arg)
-	{
+
+	// Static thread function, which is used to run function
+	// fetch_from_cloud() */
+	static void *fetch_from_cloud_for_thread(void *arg) {
 		int64_t block_no = *((int64_t*)arg);
 		char tmp_filename[50];
 		char objname[100];
@@ -126,6 +126,7 @@ protected:
 		unlink(tmp_filename);
 		return NULL;
 	}
+
 	std::string expected_objname[100]; // Expected answer list
 	int32_t expected_obj_counter;
 	int32_t num_obj;
@@ -179,9 +180,9 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 	/* Run fetch_from_cloud() with multi-threads */
 	for (int32_t i = 0 ; i < num_obj ; i++) {
 		char tmp_filename[20];
-		block_no[i] = (i + 1)*5;
+		block_no[i] = (i + 1) * 5;
 		EXPECT_EQ(0, pthread_create(&tid[i], NULL,
-			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
+		                            fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
 
 		sprintf(tmp_filename, "data_%d_%ld", 1, block_no[i]); // Expected value
 		expected_objname[expected_obj_counter++] = std::string(tmp_filename);
@@ -197,18 +198,13 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 	}
 }
 
-/*
-	End of unittest of fetch_from_cloud()
-*/
+//	End of unittest of fetch_from_cloud()
 
-/*
-	Unittest of prefetch_block()
-*/
+//	Unittest of prefetch_block()
 
 class prefetch_blockTest : public ::testing::Test {
 protected:
-	virtual void SetUp()
-	{
+	virtual void SetUp() {
 		prefetch_ptr = (PREFETCH_STRUCT_TYPE *)malloc(sizeof(PREFETCH_STRUCT_TYPE));
 		prefetch_ptr->this_inode = 1;
 		prefetch_ptr->block_no = 1;
@@ -225,11 +221,12 @@ protected:
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_paused = FALSE;
 	}
-	virtual void TearDown()
-	{
+
+	virtual void TearDown() {
 		sem_destroy(&download_curl_sem);
 		sem_destroy(&download_curl_control_sem);
 	}
+
 	PREFETCH_STRUCT_TYPE *prefetch_ptr;
 };
 
@@ -285,11 +282,11 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks); // Prefetch one block from cloud
 	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK)); // Mock block path
 	ret = getxattr("/tmp/testHCFS/tmp_block", "user.dirty", &xattr_result,
-			sizeof(char));
+	               sizeof(char));
 	if (ret < 0) {
 		errcode = errno;
 		printf("Failed to getxattr. Code %d, %s\n", errcode,
-			strerror(errcode));
+		       strerror(errcode));
 	}
 	EXPECT_EQ(1, ret);
 	EXPECT_EQ('F', xattr_result); // xattr
@@ -308,23 +305,19 @@ TEST_F(prefetch_blockTest, PrefetchFail)
 	/* Does prefetch_block fail? It seems that fetch_from_cloud() never return with failure  */
 }
 
-/*
-	End of unittest of prefetch_block()
-*/
+//	End of unittest of prefetch_block()
 
-/* Unittest for download_block_manager */
+// Unittest for download_block_manager
 class download_block_managerTest : public ::testing::Test {
 protected:
-	void SetUp()
-	{
+	void SetUp() {
 		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 		sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
 		sem_init(&(download_thread_ctl.dl_th_sem), 0,
-				MAX_PIN_DL_CONCURRENCY);
+		         MAX_PIN_DL_CONCURRENCY);
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 	}
 };
 
@@ -342,14 +335,14 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 
 	/* Create download_block_manager */
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
-			&download_block_manager, NULL);
+	               &download_block_manager, NULL);
 
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
 		download_thread_ctl.block_info[i].dl_error = FALSE;
 		download_thread_ctl.block_info[i].active = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 		pthread_create(&(download_thread_ctl.download_thread[i]),
-				NULL, mock_thread_fn, NULL);
+		               NULL, mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
@@ -363,7 +356,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 	EXPECT_EQ(0, download_thread_ctl.active_th);
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		ASSERT_EQ(FALSE,
-			download_thread_ctl.block_info[i].active);
+		          download_thread_ctl.block_info[i].active);
 	}
 }
 
@@ -376,7 +369,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 
 	/* Create download_block_manager */
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
-			&download_block_manager, NULL);
+	               &download_block_manager, NULL);
 
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].active = TRUE;
@@ -384,7 +377,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 		download_thread_ctl.block_info[i].this_inode = i;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 		pthread_create(&(download_thread_ctl.download_thread[i]),
-				NULL, &mock_thread_fn, NULL);
+		               NULL, &mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
@@ -401,7 +394,7 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 
 		fetch_error_download_path(error_path, (ino_t)i);
 		EXPECT_EQ(FALSE,
-			download_thread_ctl.block_info[i].active);
+		          download_thread_ctl.block_info[i].active);
 		EXPECT_EQ(0, access(error_path, F_OK));
 		unlink(error_path);
 	}
@@ -414,10 +407,9 @@ class fetch_pinned_blocksTest : public ::testing::Test {
 protected:
 	char metapath[200];
 
-	void SetUp()
-	{
+	void SetUp() {
 		system_config = (SYSTEM_CONF_STRUCT *)
-			malloc(sizeof(SYSTEM_CONF_STRUCT));
+		                malloc(sizeof(SYSTEM_CONF_STRUCT));
 		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		MAX_BLOCK_SIZE = 100;
 		CACHE_FULL = FALSE;
@@ -425,7 +417,7 @@ protected:
 		fetch_meta_path(metapath, 0);
 		if (access(metapath, F_OK) == 0)
 			unlink(metapath);
-		
+
 		hcfs_system->system_going_down = FALSE;
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
@@ -433,14 +425,13 @@ protected:
 		init_download_control();
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		CACHE_FULL = FALSE;
-		
+
 		fetch_meta_path(metapath, 0);
 		if (access(metapath, F_OK) == 0)
 			unlink(metapath);
-	
+
 		hcfs_system->system_going_down = TRUE;
 		destroy_download_control();
 		free(system_config);
@@ -449,9 +440,7 @@ protected:
 
 TEST_F(fetch_pinned_blocksTest, MetaNotExist)
 {
-	ino_t inode;
-
-	inode = 5;
+	ino_t inode = 5;
 
 	/* Test */
 	EXPECT_EQ(-ENOENT, fetch_pinned_blocks(inode));
@@ -572,13 +561,12 @@ TEST_F(fetch_pinned_blocksTest, BlockStatusIsLocal)
 /* Unittest for fetch_backend_block */
 class fetch_backend_blockTest : public ::testing::Test {
 protected:
-	void SetUp()
-	{
+	void SetUp() {
 		mkdir("/tmp/testHCFS", 0700);
 		mknod("/tmp/testHCFS/tmp_meta", 0700, 0);
 		OPEN_BLOCK_PATH_FAIL = FALSE;
 		OPEN_META_PATH_FAIL = FALSE;
-    		FETCH_BACKEND_BLOCK_TESTING = TRUE;
+		FETCH_BACKEND_BLOCK_TESTING = TRUE;
 
 		memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 		download_thread_ctl.block_info[0].this_inode = 1;
@@ -592,8 +580,7 @@ protected:
 		//		MAX_DOWNLOAD_CURL_HANDLE / 2);
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
 	}
 };
@@ -606,7 +593,7 @@ TEST_F(fetch_backend_blockTest, FailToOpenBlockPath)
 
 	/* Test */
 	pthread_create(&tid, NULL, fetch_backend_block,
-		&(download_thread_ctl.block_info[0]));
+	               &(download_thread_ctl.block_info[0]));
 	pthread_join(tid, NULL);
 
 	/* Verify */
@@ -622,7 +609,7 @@ TEST_F(fetch_backend_blockTest, BlockStatusIsLDISK)
 
 	/* Test */
 	pthread_create(&tid, NULL, fetch_backend_block,
-		&(download_thread_ctl.block_info[0]));
+	               &(download_thread_ctl.block_info[0]));
 	pthread_join(tid, NULL);
 
 	/* Verify */
@@ -638,7 +625,7 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 
 	/* Test */
 	pthread_create(&tid, NULL, fetch_backend_block,
-		&(download_thread_ctl.block_info[0]));
+	               &(download_thread_ctl.block_info[0]));
 	pthread_join(tid, NULL);
 
 	/* Verify */
@@ -648,13 +635,13 @@ TEST_F(fetch_backend_blockTest, FetchSuccess)
 /* End of unittest for fetch_backend_block */
 
 /* Unittest for fetch_quota_from_cloud */
-class fetch_quota_from_cloudTest : public ::testing::Test {
+class fetch_quota_from_cloudTest : public ::testing::Test
+{
 protected:
 	char download_path[200];
-	void SetUp()
-	{
+	void SetUp() {
 		system_config = (SYSTEM_CONF_STRUCT *)
-				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		                malloc(sizeof(SYSTEM_CONF_STRUCT));
 		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
 		if (!access(METAPATH, F_OK))
@@ -675,8 +662,7 @@ protected:
 		FETCH_BACKEND_BLOCK_TESTING = FALSE;
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		if (!access(download_path, F_OK))
 			unlink(download_path);
 		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
@@ -722,10 +708,9 @@ TEST_F(fetch_quota_from_cloudTest, SystemGoingDown)
 /* Unittest for update_quota() */
 class update_quotaTest : public ::testing::Test {
 protected:
-	void SetUp()
-	{
+	void SetUp() {
 		system_config = (SYSTEM_CONF_STRUCT *)
-				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		                malloc(sizeof(SYSTEM_CONF_STRUCT));
 		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
 		if (!access(METAPATH, F_OK))
@@ -734,16 +719,15 @@ protected:
 		CURRENT_BACKEND = NONE;
 
 		memset(&download_usermeta_ctl, 0,
-				sizeof(DOWNLOAD_USERMETA_CTL));
+		       sizeof(DOWNLOAD_USERMETA_CTL));
 		sem_init(&(download_usermeta_ctl.access_sem), 0, 1);
 		download_usermeta_ctl.active = FALSE;
 
-    		hcfs_system->system_going_down = FALSE;
+		hcfs_system->system_going_down = FALSE;
 		hcfs_system->backend_is_online = TRUE;
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		free(METAPATH);
 		free(system_config);
@@ -770,7 +754,7 @@ TEST_F(update_quotaTest, ThreadIsRunning)
 TEST_F(update_quotaTest, CreateThreadSuccess)
 {
 	/* Let thread sleep in the loop */
-    	hcfs_system->system_going_down = FALSE;
+	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	download_usermeta_ctl.active = FALSE;
 	CURRENT_BACKEND = SWIFT;
@@ -779,7 +763,7 @@ TEST_F(update_quotaTest, CreateThreadSuccess)
 	EXPECT_EQ(TRUE, download_usermeta_ctl.active);
 
 	/* Wake the thread up */
-    	hcfs_system->system_going_down = TRUE;
+	hcfs_system->system_going_down = TRUE;
 	sleep(2);
 	EXPECT_EQ(FALSE, download_usermeta_ctl.active);
 }
@@ -796,20 +780,18 @@ int ret_val;
 
 class fetch_object_busywait_connTest : public ::testing::Test {
 public:
-	static void testEntry(void *ptr)
-	{
+	static void testEntry(void *ptr) {
 		ret_val = fetch_object_busywait_conn(fptr,
-				action_from, objname);
+		                                     action_from, objname);
 		return;
 	}
 
 protected:
 	pthread_t tid;
 
-	void SetUp()
-	{
+	void SetUp() {
 		system_config = (SYSTEM_CONF_STRUCT *)
-				malloc(sizeof(SYSTEM_CONF_STRUCT));
+		                malloc(sizeof(SYSTEM_CONF_STRUCT));
 		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_object_busywait_connTest");
 		if (!access(METAPATH, F_OK))
@@ -829,8 +811,7 @@ protected:
 		FETCH_BACKEND_BLOCK_TESTING = FALSE;
 	}
 
-	void TearDown()
-	{
+	void TearDown() {
 		rmdir(METAPATH);
 		free(METAPATH);
 		free(system_config);
@@ -845,14 +826,15 @@ TEST_F(fetch_object_busywait_connTest, BackendOffline_SystemShutdown)
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->system_going_down = FALSE;
 
-	sprintf(objpath,"%s/mock_object", METAPATH);
+	sprintf(objpath, "%s/mock_object", METAPATH);
 	fptr = fopen(objpath, "w+");
 	action_from = RESTORE_FETCH_OBJ;
 	strcpy(objname, "mock_obj");
 
 	/* Run */
 	pthread_create(&tid, NULL,
-		(void *)&fetch_object_busywait_connTest::testEntry, NULL);
+	               (void *)&fetch_object_busywait_connTest::testEntry,
+	               NULL);
 	sleep(1);
 	hcfs_system->system_going_down = TRUE;
 	pthread_join(tid, NULL);
@@ -873,14 +855,14 @@ TEST_F(fetch_object_busywait_connTest, Backend_From_Offline_To_Online)
 	hcfs_system->system_going_down = FALSE;
 	usermeta_notfound = TRUE;
 
-	sprintf(objpath,"%s/mock_object", METAPATH);
+	sprintf(objpath, "%s/mock_object", METAPATH);
 	fptr = fopen(objpath, "w+");
 	action_from = RESTORE_FETCH_OBJ;
 	strcpy(objname, "user_mock_obj");
 
 	/* Run */
 	pthread_create(&tid, NULL,
-		(void *)&fetch_object_busywait_connTest::testEntry, NULL);
+	               (void *)&fetch_object_busywait_connTest::testEntry, NULL);
 	sleep(1);
 	hcfs_system->backend_is_online = TRUE;
 	pthread_join(tid, NULL);
