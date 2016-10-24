@@ -21,6 +21,7 @@
 #include "global.h"
 #include "params.h"
 #include "fuseop.h"
+#include "meta.h"
 
 #define RESERVED_META_MARGIN 20971520 /* 20M */
 
@@ -42,6 +43,13 @@ BOOL use_old_cloud_stat;
 pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;
 
+typedef struct {
+	FILE_META_HEADER restored_smartcache_header;
+	ino_t inject_smartcache_ino;
+} RESTORED_SMARTCACHE_DATA;
+
+RESTORED_SMARTCACHE_DATA *sc_data;
+ino_t restored_smartcache_ino;
 FILE *to_delete_fptr;
 FILE *to_sync_fptr;
 
@@ -71,6 +79,8 @@ HCFS_RESTORED_SYSTEM_META *hcfs_restored_system_meta;
 #define RESTORE_BLOCKPATH restore_blockpath
 #define PACKAGE_XML "/data/system/packages.xml"
 #define PACKAGE_LIST "/data/system/packages.list"
+
+#define SMARTCACHE_IS_MISSING() (restored_smartcache_ino == 0 ? TRUE : FALSE)
 
 typedef struct {
 	DIR_ENTRY entry;

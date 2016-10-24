@@ -61,9 +61,9 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define D_ISSOCK 4
 
 /* Define constants for timestamp changes */
-#define ATIME 4
-#define MTIME 2
-#define CTIME 1
+#define A_TIME 4
+#define M_TIME 2
+#define C_TIME 1
 
 #define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
 
@@ -157,5 +157,6 @@ void *mount_single_thread(void *ptr);
 int32_t hook_fuse(int32_t argc, char **argv);
 
 ino_t data_data_root;
+ino_t data_smart_root;
 BOOL mgmt_app_is_created;
 #endif  /* GW20_HCFS_FUSEOP_H_ */

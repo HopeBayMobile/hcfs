@@ -35,6 +35,7 @@
 #include "utils.h"
 #include "restoration_utils.h"
 #include "hcfs_cacheops.h"
+#include "control_smartcache.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -624,7 +625,7 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t _fetch_pinned(ino_t thisinode)
+int32_t _fetch_pinned(ino_t thisinode, BOOL is_smartcache)
 {
 	FILE_META_TYPE tmpmeta;
 	HCFS_STAT tmpstat;
@@ -704,8 +705,19 @@ int32_t _fetch_pinned(ino_t thisinode)
 			seq = temppage.block_entries[nowindex].seqnum;
 			ret = _fetch_block(thisinode, count, seq);
 			if (ret < 0) {
-				errcode = ret;
-				goto errcode_handle;
+				if (ret == -ENOENT && is_smartcache == TRUE) {
+					/* Remove missing block when restoring
+					 * smart cache. */
+					write_log(4, "Warn: Block %lld not"
+						" found, remove it.", count);
+					temppage.block_entries[nowindex].status
+							= ST_NONE;
+					write_page = TRUE;
+					continue;
+				} else {
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 			/* Change block status in meta */
 			temppage.block_entries[nowindex].status = ST_BOTH;
@@ -1255,7 +1267,7 @@ int32_t _prune_missing_entries(ino_t thisinode,
 		parent_meta.total_children--;
 		write_log(10, "TOTAL CHILDREN is now %lld\n",
 			  parent_meta.total_children);
-		set_timestamp_now(&parent_stat, MTIME | CTIME);
+		set_timestamp_now(&parent_stat, M_TIME | C_TIME);
 
 		FSEEK(fptr, 0, SEEK_SET);
 		FWRITE(&parent_stat, sizeof(HCFS_STAT), 1, fptr);
@@ -1579,7 +1591,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		if (removed_list[idx].d_type == D_ISDIR)
 			dirstat.nlink--;
 		dirmeta.total_children--;
-		set_timestamp_now(&dirstat, MTIME | CTIME);
+		set_timestamp_now(&dirstat, M_TIME | C_TIME);
 		FSEEK(fptr, 0, SEEK_SET);
 		FWRITE(&dirstat, sizeof(HCFS_STAT), 1, fptr);
 		FWRITE(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
@@ -1738,7 +1750,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	size_t ret_size;
 	PRUNE_T *prune_list = NULL;
 	int32_t prune_index = 0, max_prunes = 0;
-	BOOL object_replace;
+	BOOL object_replace, is_smartcache;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	fptr = fopen(fetchedmeta, "r");
@@ -1761,7 +1773,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 		if (expand_val == 5)
 			can_prune = TRUE;
 	} else {
-		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
+		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0 ||
+		    strncmp(nowpath, SMART_CACHE_MP, strlen(SMART_CACHE_MP) == 0))
 			can_prune = TRUE;
 	}
 
@@ -1817,7 +1830,30 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 
 			write_log(10, "Processing %s/%s\n", nowpath,
 				  tmpptr->d_name);
-
+			if (SMARTCACHE_IS_MISSING() && depth == 0 &&
+				tmpptr->d_type == D_ISLNK &&
+				strncmp(nowpath, SMART_CACHE_MP,
+					strlen(SMART_CACHE_MP))) {
+				/* Just remove the element because
+				 * smart cache is missing. */
+				if (prune_index >= max_prunes)
+					_realloc_prune(&prune_list,
+							&max_prunes);
+				if (prune_index >= max_prunes) {
+					errcode = -ENOMEM;
+					free(prune_list);
+					goto errcode_handle;
+				}
+				memcpy(&(prune_list[prune_index].entry),
+						tmpptr, sizeof(DIR_ENTRY));
+				prune_index++;
+				write_log(4, "%s gone from %s. Removing.\n",
+					tmpptr->d_name, nowpath);
+				/* Mark delete */
+				FWRITE(&(tmpptr->d_ino), sizeof(ino_t), 1,
+						to_delete_fptr);
+				continue;
+			}
 			/*
 			 * For high-priority pin dirs in /data/app, if
 			 * missing, could just prune the app out (will
@@ -1867,9 +1903,14 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    (strncmp(nowpath, "/data/data",
 					     strlen("/data/data")) == 0)) {
-
-					ret = replace_missing_meta(nowpath,
-						tmpptr, hardln_mapping);
+					if (depth == 0 &&
+						tmpptr->d_type == D_ISLNK) {
+						/* TODO: Create symlink */
+					} else {
+						ret = replace_missing_meta(
+							nowpath, tmpptr,
+							hardln_mapping);
+					}
 					/*
 					 * Socket and fifo file will be
 					 * pruned
@@ -1910,14 +1951,21 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			/* If meta exist, fetch data or expand dir */
 			switch (tmpptr->d_type) {
 			case D_ISLNK:
+				/* TODO: Check link target in smart cache,
+				 * and prune entry if target not found. */
 				/* Just fetch the meta */
 				break;
 			case D_ISREG:
 			case D_ISFIFO:
 			case D_ISSOCK:
 				/* Fetch all blocks if pinned */
+				is_smartcache = FALSE;
+				if (IS_SMARTCACHE(nowpath, tmpptr->d_name)) {
+					is_smartcache = TRUE;
+					restored_smartcache_ino = tmpptr->d_ino;
+				}
 				can_prune = FALSE;
-				ret = _fetch_pinned(tmpino);
+				ret = _fetch_pinned(tmpino, is_smartcache);
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    ((tmpptr->d_type == D_ISREG) &&
 				     (strncmp(nowpath, "/data/data",
@@ -2346,6 +2394,53 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Fetch all files in smart cache volume.
+ *
+ * @param rootino Root inode of this volume smart cache belonging to.
+ */
+int32_t _restore_smart_cache_vol(ino_t rootino)
+{
+	INODE_PAIR_LIST *hardln_mapping;
+	char restore_todelete_list[METAPATHLEN];
+	int32_t ret;
+
+	restored_smartcache_ino = 0; /* Init smartcache ino as 0 */
+	snprintf(restore_todelete_list, METAPATHLEN,
+			"%s/todelete_list_%" PRIu64, RESTORE_METAPATH,
+			(uint64_t)rootino);
+	/*
+	 * FEATURE TODO: If download in stage1 can be
+	 * resumed in the middle, then will need to open
+	 * this list with "a+"
+	 */
+	if (to_delete_fptr != NULL)
+		fclose(to_delete_fptr);
+	to_delete_fptr = fopen(restore_todelete_list, "w+");
+	if (to_delete_fptr == NULL) {
+		write_log(0, "Unable to open todelete list. Code %d\n", errno);
+		ret = -ECANCELED;
+		goto out;
+	}
+	ret = _fetch_meta(rootino);
+	if (ret == 0) {
+		hardln_mapping = new_inode_pair_list();
+		if (hardln_mapping == NULL) {
+			write_log(0, "Error: Fail to allocate mem");
+			ret = -ECANCELED;
+			goto out;
+		}
+		ret = _expand_and_fetch(rootino,
+				SMART_CACHE_MP, 0, hardln_mapping);
+		destroy_inode_pair_list(hardln_mapping);
+	}
+	if (ret < 0)
+		write_log(0, "Fail to restore something in %s. Code %d",
+				__func__, -ret);
+out:
+	return ret;
+}
+
 int32_t run_download_minimal(void)
 {
 	ino_t rootino;
@@ -2469,6 +2564,20 @@ int32_t run_download_minimal(void)
 	for (count = 0; count < tmppage.num_entries; count++) {
 		tmpentry = &(tmppage.dir_entries[count]);
 		write_log(4, "Processing minimal for %s\n", tmpentry->d_name);
+		if (!strcmp(SMART_CACHE_VOL_NAME, tmpentry->d_name)) {
+			ret = _restore_smart_cache_vol(tmpentry->d_ino);
+			if (ret == -ECANCELED) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			if (restored_smartcache_ino > 0) {
+				/* Inject to now active HCFS */
+				ret = inject_restored_smartcache(
+						restored_smartcache_ino);
+				/* TODO: Mount and run fsck */
+			}
+			continue;
+		}
 		if (!strcmp("hcfs_app", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
 			snprintf(restore_todelete_list, METAPATHLEN,

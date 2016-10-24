@@ -349,7 +349,7 @@ int32_t dir_add_entry(ino_t parent_inode,
 	write_log(10,
 		"TOTAL CHILDREN is now %lld\n", parent_meta.total_children);
 
-	set_timestamp_now(&parent_stat, MTIME | CTIME);
+	set_timestamp_now(&parent_stat, M_TIME | C_TIME);
 	/*
 	 * Stat may be dirty after the operation so should write them
 	 * back to cache
@@ -474,7 +474,7 @@ int32_t dir_remove_entry(ino_t parent_inode,
 		parent_meta.total_children--;
 		write_log(10, "TOTAL CHILDREN is now %lld\n",
 						parent_meta.total_children);
-		set_timestamp_now(&parent_stat, MTIME | CTIME);
+		set_timestamp_now(&parent_stat, M_TIME | C_TIME);
 
 		ret = meta_cache_update_dir_data(parent_inode, &parent_stat,
 						&parent_meta, NULL, body_ptr);
@@ -524,7 +524,7 @@ int32_t change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			return ret_val;
 
 		tpage.dir_entries[count].d_ino = parent_inode2;
-		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		set_timestamp_now(&tmpstat, M_TIME | C_TIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
 		return ret_val;
@@ -562,7 +562,7 @@ int32_t change_entry_name(ino_t parent_inode,
 
 		snprintf(tpage.dir_entries[count].d_name, MAX_FILENAME_LEN + 1,
 			 "%s", targetname);
-		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		set_timestamp_now(&tmpstat, M_TIME | C_TIME);
 		ret_val = meta_cache_update_dir_data(parent_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
 		return ret_val;
@@ -633,7 +633,7 @@ int32_t change_dir_entry_inode(ino_t self_inode,
 			return -EINVAL;
 		}
 
-		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		set_timestamp_now(&tmpstat, M_TIME | C_TIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
 		return ret_val;
@@ -811,7 +811,7 @@ int32_t decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 	} else {
 		/* If it is still referenced, update the meta file. */
 		this_inode_stat.nlink--;
-		set_timestamp_now(&this_inode_stat, CTIME);
+		set_timestamp_now(&this_inode_stat, C_TIME);
 		ret_val = meta_cache_update_dir_data(this_inode,
 					&this_inode_stat, NULL, NULL, body_ptr);
 		meta_cache_close_file(body_ptr);
