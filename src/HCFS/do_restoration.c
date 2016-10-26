@@ -2452,6 +2452,8 @@ int32_t run_download_minimal(void)
 	DIR_ENTRY_PAGE tmppage;
 	FILE *fptr;
 	int32_t errcode, count, ret;
+	DIR_ENTRY tarentry;
+	int32_t dummy_index;
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 	BOOL is_fopen = FALSE;
@@ -2538,7 +2540,8 @@ int32_t run_download_minimal(void)
 		tmpentry = &(tmppage.dir_entries[count]);
 		if (!strcmp("hcfs_app", tmpentry->d_name) ||
 		    !strcmp("hcfs_data", tmpentry->d_name) ||
-		    !strcmp("hcfs_external", tmpentry->d_name)) {
+		    !strcmp("hcfs_external", tmpentry->d_name) ||
+		    !strcmp("hcfs_smartcache", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
 			ret = _fetch_FSstat(rootino);
 			if (ret == 0)
@@ -2561,39 +2564,51 @@ int32_t run_download_minimal(void)
 		goto errcode_handle;
 	}
 
-	/* Fetch data from root */
-	for (count = 0; count < tmppage.num_entries; count++) {
-		tmpentry = &(tmppage.dir_entries[count]);
-		write_log(4, "Processing minimal for %s\n", tmpentry->d_name);
-		if (!strcmp(SMART_CACHE_VOL_NAME, tmpentry->d_name)) {
-			ret = _restore_smart_cache_vol(tmpentry->d_ino);
-			if (ret == -ECANCELED) {
+	/* First try to download smartcache volume */
+	strcpy(tarentry.d_name, SMART_CACHE_VOL_NAME);
+	ret = dentry_binary_search(tmppage.dir_entries, tmppage.num_entries,
+			&tarentry, &dummy_index, FALSE);
+	if (ret < 0) {
+		/* TODO: Skip restore smartcache if vol not found */
+		restored_smartcache_ino = 0;
+	} else {
+		write_log(4, "Processing minimal for %s\n",
+				SMART_CACHE_VOL_NAME);
+		ret = _restore_smart_cache_vol(tmpentry->d_ino);
+		if (ret == -ECANCELED) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+		if (SMARTCACHE_IS_MISSING() == FALSE) {
+			/* Inject to now active HCFS */
+			ret = inject_restored_smartcache(
+					restored_smartcache_ino);
+			if (ret < 0) {
+				write_log(0, "Error: Fail to inject"
+						" smartcache to now system."
+						" Code %d", -ret);
 				errcode = ret;
 				goto errcode_handle;
 			}
-			if (restored_smartcache_ino > 0) {
-				/* Inject to now active HCFS */
-				ret = inject_restored_smartcache(
-						restored_smartcache_ino);
-				if (ret < 0) {
-					write_log(0, "Error: Fail to inject"
-						" smartcache to now system."
-						" Code %d", -ret);
-					errcode = ret;
-					goto errcode_handle;
-				}
-				/*  Mount and run fsck */
-				ret = mount_and_repair_restored_smartcache();
-				if (ret < 0) {
-					write_log(0, "Error: Fail to repair"
+			/*  Mount and run fsck */
+			ret = mount_and_repair_restored_smartcache();
+			if (ret < 0) {
+				write_log(0, "Error: Fail to repair"
 						"and mount smartcache to now"
 						" system. Code %d", -ret);
-					errcode = ret;
-					goto errcode_handle;
-				}
+				errcode = ret;
+				goto errcode_handle;
 			}
-			continue;
 		}
+	}
+
+	/* Fetch data from root */
+	for (count = 0; count < tmppage.num_entries; count++) {
+		tmpentry = &(tmppage.dir_entries[count]);
+		if (!strcmp(SMART_CACHE_VOL_NAME, tmpentry->d_name))
+			continue;
+
+		write_log(4, "Processing minimal for %s\n", tmpentry->d_name);
 		if (!strcmp("hcfs_app", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
 			snprintf(restore_todelete_list, METAPATHLEN,
