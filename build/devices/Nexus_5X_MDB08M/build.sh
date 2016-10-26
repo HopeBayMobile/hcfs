@@ -62,6 +62,7 @@ function main()
 	$UNTRACE
 	IMAGE_TYPE=$1
 	BRANCH_IN_5X=${BRANCH_IN_5X:-master}
+	BRANCH_IN_LAUNCHER=${BRANCH_IN_LAUNCHER:-master}
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	#DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
@@ -155,7 +156,7 @@ function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
 	git pull origin '${BRANCH_IN_5X}' && \
-	git submodule foreach git pull origin master"'
+	git submodule foreach git pull origin '${BRANCH_IN_LAUNCHER}'"'
 }
 function pull_hcfs_binaay() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
