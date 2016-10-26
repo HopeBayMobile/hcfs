@@ -31,6 +31,7 @@ endif
 
 OBJS_DIR = obj
 OBJS_F := \
+	block_iterator.o \
 	objmeta.o \
 	mount_manager.o \
 	FS_manager.o \

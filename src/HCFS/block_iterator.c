@@ -1,5 +1,11 @@
 #include "block_iterator.h"
 
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+
+#include "metaops.h"
+
 /**
 	Usage:
 	FILE_BLOCK_ITERATOR *now;
@@ -18,6 +24,8 @@
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 {
 	FILE_BLOCK_ITERATOR *iter;
+	int64_t ret_size;
+	int32_t ret, errcode;
 
 	iter = (FILE_BLOCK_ITERATOR *) calloc(sizeof(FILE_BLOCK_ITERATOR), 1);
 	if (!iter) {
@@ -36,7 +44,7 @@ FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 	/* Pointer */
 	iter->fptr = fptr;
 	iter->begin = begin_block;
-	iter->next = next_block;
+	iter->next = (void *)&next_block;
 	iter->jump = goto_block;
 	return iter;
 
@@ -52,7 +60,7 @@ void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
 
 FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 {
-	int64_t count, which_page, ret_size;
+	int64_t count, which_page, ret_size, page_pos;
 	int32_t e_index, ret, errcode;
 
 	for (count = iter->now_block + 1; count < iter->total_blocks; count++) {
@@ -60,18 +68,20 @@ FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
 		if (which_page == iter->now_page)
 			break;
-		page_pos = seek_page2(&(iter->filemeta), fptr, which_page, 0);
+		page_pos = seek_page2(&(iter->filemeta), iter->fptr,
+				which_page, 0);
 		if (page_pos <= 0) {
 			count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
 		} else {
-			FSEEK(fptr, page_pos, SEEK_SET);
-			FREAD(&(iter->page), sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+			FSEEK(iter->fptr, page_pos, SEEK_SET);
+			FREAD(&(iter->page), sizeof(BLOCK_ENTRY_PAGE), 1,
+					iter->fptr);
 			iter->page_pos = page_pos;
 			iter->now_page = which_page;
 			break;
 		}
 	}
-	if (count >= total_blocks)
+	if (count >= iter->total_blocks)
 		return NULL;
 
 	iter->e_index = e_index;
@@ -85,7 +95,7 @@ errcode_handle:
 
 FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 {
-	int64_t which_page, ret_size;
+	int64_t which_page, ret_size, page_pos;
 	int32_t e_index, errcode, ret;
 
 	if (block_no < 0 || block_no >= iter->total_blocks)
@@ -94,10 +104,12 @@ FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 	e_index = block_no % MAX_BLOCK_ENTRIES_PER_PAGE;
 	which_page = block_no / MAX_BLOCK_ENTRIES_PER_PAGE;
 	if (which_page != iter->now_page) {
-		page_pos = seek_page2(&(iter->filemeta), fptr, which_page, 0);
+		page_pos = seek_page2(&(iter->filemeta), iter->fptr,
+				which_page, 0);
 		if (page_pos > 0) {
-			FSEEK(fptr, page_pos, SEEK_SET);
-			FREAD(&(iter->page), sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+			FSEEK(iter->fptr, page_pos, SEEK_SET);
+			FREAD(&(iter->page), sizeof(BLOCK_ENTRY_PAGE), 1,
+					iter->fptr);
 			iter->page_pos = page_pos;
 			iter->now_page = which_page;
 		} else {
@@ -116,6 +128,8 @@ errcode_handle:
 
 FILE_BLOCK_ITERATOR *begin_block(FILE_BLOCK_ITERATOR *iter)
 {
+	//void * k = (FILE_BLOCK_ITERATOR *) malloc(sizeof(FILE_BLOCK_ITERATOR));
+	//free(k);
 	iter->now_block = -1;
 	iter->now_page = -1;
 	iter->e_index = 0;

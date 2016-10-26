@@ -18,9 +18,9 @@ typedef struct FILE_BLOCK_ITERATOR {
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE page;
 	FILE *fptr;
-	FILE_BLOCK_ITERATOR *(*next)(FILE_BLOCK_ITERATOR *iter);
-	FILE_BLOCK_ITERATOR *(*jump)(FILE_BLOCK_ITERATOR *iter, int64_t block_no);
-	FILE_BLOCK_ITERATOR *(*begin)(FILE_BLOCK_ITERATOR *iter);
+	void *(*next)(void *iter);
+	struct FILE_BLOCK_ITERATOR *(*jump)(struct FILE_BLOCK_ITERATOR *iter, int64_t block_no);
+	struct FILE_BLOCK_ITERATOR *(*begin)(struct FILE_BLOCK_ITERATOR *iter);
 } FILE_BLOCK_ITERATOR;
 
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr);
