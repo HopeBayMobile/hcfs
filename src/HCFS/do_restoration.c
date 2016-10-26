@@ -1960,7 +1960,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			case D_ISSOCK:
 				/* Fetch all blocks if pinned */
 				is_smartcache = FALSE;
-				if (IS_SMARTCACHE(nowpath, tmpptr->d_name)) {
+				if (IS_SMARTCACHE_FILE(nowpath,
+				    tmpptr->d_name)) {
 					is_smartcache = TRUE;
 					restored_smartcache_ino = tmpptr->d_ino;
 				}

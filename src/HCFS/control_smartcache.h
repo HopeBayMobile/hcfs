@@ -27,7 +27,7 @@
 #define RESTORED_SMART_CACHE_MP "/mnt/hcfsblock_restore"
 #define RESTORED_SMARTCACHE_TMP_NAME "hcfsblock_restore"
 
-#define IS_SMARTCACHE(folder, name) \
+#define IS_SMARTCACHE_FILE(folder, name) \
 	((strcmp(SMART_CACHE_ROOT_MP, folder) == 0) && \
 	 (strcmp(SMART_CACHE_FILE, name) == 0))
 
