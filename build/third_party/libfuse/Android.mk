@@ -11,7 +11,10 @@ LOCAL_CFLAGS		+= -O0 \
 			   -D__MULTI_THREAD
 
 LOCAL_LDFLAGS		= -O0 \
-			  -mno-fix-cortex-a53-843419 \
-			  -mfix-cortex-a53-835769
+
+ifneq ("$(NDK_TOOLCHAIN_VERSION)","clang")
+  LOCAL_LDFLAGS += -mno-fix-cortex-a53-843419
+  LOCAL_LDFLAGS += -mfix-cortex-a53-835769
+endif
 
 include $(BUILD_SHARED_LIBRARY)
