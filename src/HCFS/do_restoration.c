@@ -2570,16 +2570,19 @@ int32_t run_download_minimal(void)
 			&tarentry, &dummy_index, FALSE);
 	if (ret < 0) {
 		/* TODO: Skip restore smartcache if vol not found */
+		write_log(4, "Warn: %s not found", SMART_CACHE_VOL_NAME);
 		restored_smartcache_ino = 0;
 	} else {
 		write_log(4, "Processing minimal for %s\n",
 				SMART_CACHE_VOL_NAME);
+		tmpentry = &(tmppage.dir_entries[ret]);
 		ret = _restore_smart_cache_vol(tmpentry->d_ino);
 		if (ret == -ECANCELED) {
 			errcode = ret;
 			goto errcode_handle;
 		}
 		if (SMARTCACHE_IS_MISSING() == FALSE) {
+			write_log(4, "Begin to repair restored smart cache");
 			/* Inject to now active HCFS */
 			ret = inject_restored_smartcache(
 					restored_smartcache_ino);
