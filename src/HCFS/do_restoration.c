@@ -2574,7 +2574,22 @@ int32_t run_download_minimal(void)
 				/* Inject to now active HCFS */
 				ret = inject_restored_smartcache(
 						restored_smartcache_ino);
-				/* TODO: Mount and run fsck */
+				if (ret < 0) {
+					write_log(0, "Error: Fail to inject"
+						" smartcache to now system."
+						" Code %d", -ret);
+					errcode = ret;
+					goto errcode_handle;
+				}
+				/*  Mount and run fsck */
+				ret = mount_and_repair_restored_smartcache();
+				if (ret < 0) {
+					write_log(0, "Error: Fail to repair"
+						"and mount smartcache to now"
+						" system. Code %d", -ret);
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 			continue;
 		}
@@ -2643,6 +2658,25 @@ int32_t run_download_minimal(void)
 				destroy_inode_pair_list(hardln_mapping);
 			}
 			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+			/* After restoring of /data/data completed, unmount
+			 * and extract smart cache */
+			ret = unmount_smart_cache(RESTORED_SMART_CACHE_MP);
+			if (ret < 0) {
+				write_log(0, "Error: Fail to unmoun"
+						" smartcache from now system."
+						" Code %d", -ret);
+				errcode = ret;
+				goto errcode_handle;
+			}
+			ret = extract_restored_smartcache(
+					restored_smartcache_ino);
+			if (ret < 0) {
+				write_log(0, "Error: Fail to extract"
+						" smartcache from now system."
+						" Code %d", -ret);
 				errcode = ret;
 				goto errcode_handle;
 			}

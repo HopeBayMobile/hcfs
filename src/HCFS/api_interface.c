@@ -1570,7 +1570,7 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
 			break;
 		case UNMOUNT_SMART_CACHE:
-			retcode = unmount_smart_cache();
+			retcode = unmount_smart_cache(SMART_CACHE_MP);
 			if (retcode < 0)
 				break;
 			ret_len = sizeof(int32_t);
