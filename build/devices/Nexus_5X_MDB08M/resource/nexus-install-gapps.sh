@@ -79,8 +79,8 @@ SDK_PATH=$HOME/android-sdk-linux
 
 RECOVERY_URL=https://dl.twrp.me/bullhead/twrp-3.0.2-0-bullhead.img
 RECOVERY_FILE=$(basename $RECOVERY_URL)
-GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20160710/open_gapps-arm64-6.0-pico-20160710.zip
-GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20160710.zip
+GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20160710/open_gapps-arm64-6.0-pico-20161025.zip
+#GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20161025.zip
 GAPPS_FILE=$(basename $GAPPS_URL)
 FACTORY_URL=https://dl.google.com/dl/android/aosp/bullhead-mtc19v-factory-f3a6bee5.tgz
 FACTORY_FILE=$(basename $FACTORY_URL)
@@ -771,7 +771,7 @@ GrantPermissions() {
     adb -s $TARGET_DEVICE reboot
   fi
 
-  if Wait4App2Appear gms 80; then
+  if Wait4App2Appear gms 500; then
     echo ">> Start to grant permissions"
     adb -s $TARGET_DEVICE shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
     adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
