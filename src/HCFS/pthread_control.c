@@ -164,7 +164,12 @@ void *PTHREAD_REUSE_wrapper(void *thread_ptr)
 			pthread_exit(0);
 		sem_wait(&(this_thread->run));
 		this_thread->thread_routine(this_thread->arg);
-		sem_post(&(this_thread->finish));
+		/* If this thread is detachable, just let the
+		next round begin without join */
+		if (this_thread->detachstate == PTHREAD_CREATE_DETACHED)
+			sem_post(&(this_thread->occupied));
+		else
+			sem_post(&(this_thread->finish));
 	}
 	return NULL;
 }
@@ -194,8 +199,14 @@ int PTHREAD_REUSE_create(PTHREAD_REUSE_T *thread, const pthread_attr_t *attr)
 	/* sem_wait(&occupied) in REUSE_run, and sem_post(&occupied)
 	in REUSE_join */
 	sem_init(&(thread->occupied), 0, 1);
-
-	retval = pthread_create(&(thread->self), attr, PTHREAD_REUSE_wrapper,
+	if (attr != NULL)
+		pthread_attr_getdetachstate(attr, &(thread->detachstate));
+	else
+		thread->detachstate = PTHREAD_CREATE_JOINABLE;
+	write_log(8, "Reusable thread detachstate status is %s\n",
+	          (thread->detachstate == PTHREAD_CREATE_JOINABLE ?
+	           "joinable" : "detachable"));
+	retval = pthread_create(&(thread->self), NULL, PTHREAD_REUSE_wrapper,
 	                        (void *)thread);
 	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 
@@ -221,6 +232,8 @@ int PTHREAD_REUSE_run(PTHREAD_REUSE_T *thread,
 the current task */
 void PTHREAD_REUSE_join(PTHREAD_REUSE_T *thread)
 {
+	if (thread->detachstate == PTHREAD_CREATE_DETACHED)
+		return;
 	sem_wait(&(thread->finish));
 	sem_post(&(thread->occupied));
 }

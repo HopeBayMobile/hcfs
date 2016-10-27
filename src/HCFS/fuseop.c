@@ -8197,9 +8197,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	data_smart_root = (ino_t) 0;
 	mgmt_app_is_created = FALSE;
 
-	pthread_attr_init(&prefetch_thread_attr);
-	pthread_attr_setdetachstate(&prefetch_thread_attr,
-						PTHREAD_CREATE_DETACHED);
 #ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif

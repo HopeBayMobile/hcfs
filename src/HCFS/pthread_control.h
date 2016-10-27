@@ -43,6 +43,7 @@ typedef struct {
 	/* sem_wait(&occupied) in REUSE_run, and sem_post(&occupied)
 	in REUSE_join */
 	sem_t occupied;
+	int detachstate;
 } PTHREAD_REUSE_T;
 
 pthread_key_t PTHREAD_status_key;
