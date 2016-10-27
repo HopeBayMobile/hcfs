@@ -1767,14 +1767,18 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	/* Do not expand if not high priority pin and not needed */
 	expand_val = 1; /* The default */
 	if (dirmeta.local_pin != P_HIGH_PRI_PIN) {
-		expand_val = _check_expand(thisinode, nowpath, depth);
-		if (expand_val == 0)
-			return 0;
-		if (expand_val == 5)
+		if (!strncmp(nowpath, SMART_CACHE_ROOT_MP,
+					strlen(SMART_CACHE_ROOT_MP))) {
 			can_prune = TRUE;
+		} else {
+			expand_val = _check_expand(thisinode, nowpath, depth);
+			if (expand_val == 0)
+				return 0;
+			if (expand_val == 5)
+				can_prune = TRUE;
+		}
 	} else {
-		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0 ||
-		    strncmp(nowpath, SMART_CACHE_MP, strlen(SMART_CACHE_MP) == 0))
+		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;
 	}
 
@@ -1793,7 +1797,9 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 		for (count = 0; count < tmppage.num_entries; count++) {
 			object_replace = FALSE;
 			tmpptr = &(tmppage.dir_entries[count]);
-
+			if (IS_SMARTCACHE_FILE(nowpath, tmpptr->d_name))
+				write_log(0, "TEST: found smartcache in %d. Inode %"
+					PRIu64, __LINE__, (uint64_t)(tmpptr->d_ino));
 			if (tmpptr->d_ino == 0)
 				continue;
 			/* Skip "." and ".." */
@@ -1832,8 +1838,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				  tmpptr->d_name);
 			if (SMARTCACHE_IS_MISSING() && depth == 0 &&
 				tmpptr->d_type == D_ISLNK &&
-				strncmp(nowpath, SMART_CACHE_MP,
-					strlen(SMART_CACHE_MP))) {
+				strncmp(nowpath, SMART_CACHE_ROOT_MP,
+					strlen(SMART_CACHE_ROOT_MP))) {
 				/* Just remove the element because
 				 * smart cache is missing. */
 				if (prune_index >= max_prunes)
@@ -2432,7 +2438,7 @@ int32_t _restore_smart_cache_vol(ino_t rootino)
 			goto out;
 		}
 		ret = _expand_and_fetch(rootino,
-				SMART_CACHE_MP, 0, hardln_mapping);
+				SMART_CACHE_ROOT_MP, 0, hardln_mapping);
 		destroy_inode_pair_list(hardln_mapping);
 	}
 	if (ret < 0)
@@ -2569,7 +2575,7 @@ int32_t run_download_minimal(void)
 	ret = dentry_binary_search(tmppage.dir_entries, tmppage.num_entries,
 			&tarentry, &dummy_index, FALSE);
 	if (ret < 0) {
-		/* TODO: Skip restore smartcache if vol not found */
+		/* Skip restore smartcache if vol not found */
 		write_log(4, "Warn: %s not found", SMART_CACHE_VOL_NAME);
 		restored_smartcache_ino = 0;
 	} else {
@@ -2581,7 +2587,10 @@ int32_t run_download_minimal(void)
 			errcode = ret;
 			goto errcode_handle;
 		}
-		if (SMARTCACHE_IS_MISSING() == FALSE) {
+		if (SMARTCACHE_IS_MISSING() == TRUE) {
+			write_log(4, "Warn: Smart cache is missing. Remove"
+				" all symlink under /data/data");
+		} else {
 			write_log(4, "Begin to repair restored smart cache");
 			/* Inject to now active HCFS */
 			ret = inject_restored_smartcache(
@@ -2596,11 +2605,17 @@ int32_t run_download_minimal(void)
 			/*  Mount and run fsck */
 			ret = mount_and_repair_restored_smartcache();
 			if (ret < 0) {
-				write_log(0, "Error: Fail to repair"
+				if (ret == -ECANCELED) {
+					write_log(0, "Error: Fail to repair"
 						"and mount smartcache to now"
 						" system. Code %d", -ret);
-				errcode = ret;
-				goto errcode_handle;
+					errcode = ret;
+					goto errcode_handle;
+				} else {
+					restored_smartcache_ino = 0;
+					write_log(4, "Smartcache corrupted."
+						" Discard it.");
+				}
 			}
 		}
 	}

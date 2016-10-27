@@ -28,7 +28,7 @@ int32_t check_and_create_blockpaths(void);
 
 /*Will copy the filename of the meta file to pathname*/
 int32_t fetch_meta_path(char *pathname, ino_t this_inode);
-void fetch_restored_meta_path(char *pathname, ino_t this_inode);
+void fetch_temp_restored_meta_path(char *pathname, ino_t this_inode);
 
 int32_t fetch_stat_path(char *pathname, ino_t this_inode);
 

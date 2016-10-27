@@ -91,10 +91,11 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	if (!sc_data)
 		return -errno;
 
-	fetch_restored_meta_path(path_restore, smartcache_ino);
+	fetch_restore_meta_path(path_restore, smartcache_ino);
 	fptr = fopen(path_restore, "r+");
 	if (!fptr) {
-		write_log(0, "Error: Fail to open. Code %d", errno);
+		write_log(0, "Error: Fail to open %s. Code %d",
+				path_restore, errno);
 		return -errno;
 	}
 	meta_open = TRUE;
@@ -183,19 +184,23 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
-/*
 	DIR_STATS_TYPE tmpstat = {.num_local = 1,
 				  .num_cloud = 0,
-				  ,num_hybrid = 0};
+				  .num_hybrid = 0};
 	sem_wait(&(pathlookup_data_lock));
-	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
+	ret = update_dirstat_parent(data_smart_root, &tmpstat);
 	sem_post(&(pathlookup_data_lock));
-*/
+	if (ret < 0) {
+		write_log(0, "Error: Fail to update dir stat. Code %d", -ret);
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	/* Record data */
 	memcpy(&(sc_data->restored_smartcache_header), &origin_header,
 			sizeof(FILE_META_HEADER));
 	sc_data->inject_smartcache_ino = tmp_ino;
+	write_log(4, "Inject smart cache. Inode %"PRIu64, (uint64_t)tmp_ino);
 	return 0;
 
 errcode_handle:
@@ -250,7 +255,7 @@ int32_t mount_and_repair_restored_smartcache()
 			SMART_CACHE_ROOT_MP, RESTORED_SMARTCACHE_TMP_NAME);
 	ret = _run_command(command);
 	if (ret < 0) {
-		errcode = ret;
+		errcode = -ECANCELED;
 		goto errcode_handle;
 	}
 
@@ -259,7 +264,7 @@ int32_t mount_and_repair_restored_smartcache()
 			SMART_CACHE_ROOT_MP, RESTORED_SMARTCACHE_TMP_NAME);
 	ret = _run_command(command);
 	if (ret < 0) {
-		/* TODO: e2fsck fail */
+		/* TODO: If e2fsck fails, then discard the smart cache  */
 		errcode = ret;
 		goto errcode_handle;
 	}
@@ -272,6 +277,9 @@ int32_t mount_and_repair_restored_smartcache()
 					RESTORED_SMART_CACHE_MP);
 			MKDIR(RESTORED_SMART_CACHE_MP, 0);
 		} else {
+			write_log(0, "Fail to access %s. Stop restoring"
+				" Code %d", RESTORED_SMART_CACHE_MP, -errcode);
+			errcode = -ECANCELED;
 			goto errcode_handle;
 		}
 	}
@@ -280,11 +288,12 @@ int32_t mount_and_repair_restored_smartcache()
 			"ext4", 0, NULL);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to mount. Code %d", errno);
-		errcode = -errno;
+		errcode = -ECANCELED;
 		goto errcode_handle;
 	}
 
-	return ret;
+	write_log(4, "Info: Smart cache had been repired and mounted.");
+	return 0;
 
 errcode_handle:
 	return errcode;
@@ -306,15 +315,22 @@ static int32_t _remove_from_now_hcfs(ino_t ino_nowsys)
 	meta_cache_close_file(parent_ptr);
 	meta_cache_unlock_entry(parent_ptr);
 	if (ret < 0) {
+		write_log(0, "Error: Fail to remove entry in %s. Code %d",
+				__func__, -ret);
 		return ret;
 	}
 
 	/* TODO: statistics */
 	sc_ptr = meta_cache_lock_entry(ino_nowsys);
-	if (!parent_ptr)
+	if (!parent_ptr) {
+		write_log(0, "Error: Fail to lock restored smart cache."
+				" Code %d", errno);
 		return -errno;
+	}
 	ret = meta_cache_open_file(sc_ptr);
 	if (ret < 0) {
+		write_log(0, "Error: Fail to open restored smart cache."
+				" Code %d", errno);
 		return ret;
 	}
 	ret = check_file_storage_location(sc_ptr->fptr, &tmpstat);
@@ -328,24 +344,29 @@ static int32_t _remove_from_now_hcfs(ino_t ino_nowsys)
 	ret = sem_wait(&(pathlookup_data_lock));
 	if (ret < 0)
 		return ret;
-	ret = lookup_delete_parent(sc_data->inject_smartcache_ino,
-			data_smart_root);
-	if (ret < 0) {
-		sem_post(&(pathlookup_data_lock));
-		return ret;
-	}
 	tmpstat.num_local = -tmpstat.num_local;
 	tmpstat.num_cloud = -tmpstat.num_cloud;
 	tmpstat.num_hybrid = -tmpstat.num_hybrid;
 	ret = update_dirstat_parent(data_smart_root, &tmpstat);
-	sem_post(&(pathlookup_data_lock));
 	if (ret < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret;
+	}
+	ret = lookup_delete_parent(sc_data->inject_smartcache_ino,
+			data_smart_root);
+	sem_post(&(pathlookup_data_lock));
+	if (ret < 0 && ret != -ENOENT) {
+		write_log(0, "Error: Fail to delete parent in %s. Code %d",
+				__func__, -ret);
 		return ret;
 	}
 
 	ret = meta_cache_remove(ino_nowsys);
-	if (ret < 0)
+	if (ret < 0 && ret != -ENOENT) {
+		write_log(0, "Error: Fail to remove meta cache in %s. Code %d",
+				__func__, -ret);
 		return ret;
+	}
 
 	return 0;
 }
@@ -369,15 +390,21 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 
 	ino_nowsys = sc_data->inject_smartcache_ino;
 	ret = _remove_from_now_hcfs(ino_nowsys);
-	if (ret < 0)
+	if (ret < 0) {
+		write_log(0, "Error: Fail to remove restored smartcache."
+			" Code %d", -ret);
 		return ret;
+	}
 
 	/* Extract this file */
-	fetch_restored_meta_path(path_restore, smartcache_ino);
+	fetch_restore_meta_path(path_restore, smartcache_ino);
 	fetch_meta_path(path_nowsys, ino_nowsys);
 	ret = rename(path_nowsys, path_restore);
-	if (ret < 0)
+	if (ret < 0) {
+		write_log(0, "Error: Fail to rename in %s. Code %d",
+				__func__, errno);
 		return -errno;
+	}
 	fptr = fopen(path_restore, "r+");
 	if (!fptr) {
 		write_log(0, "Error: Fail to open. Code %d", errno);
@@ -416,8 +443,8 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 		ret = rename(thisblockpath, restored_blockpath);
 		if (ret < 0) {
 			write_log(0, "Error: Fail to rename in %s. Code %d",
-					__func__, -ret);
-			errcode = ret;
+					__func__, errno);
+			errcode = -errno;
 			goto errcode_handle;
 		}
 		/* TODO: Statistics */
@@ -441,8 +468,11 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	ret = super_block_delete(ino_nowsys);
 	if (ret < 0)
 		return ret;
-	ret = super_block_reclaim();
-	return ret;
+
+	write_log(4, "Info: Extracting restored smart cache from"
+			" now system completed");
+	rmdir(RESTORED_SMART_CACHE_MP); /* Just try to rm the folder */
+	return 0;
 
 errcode_handle:
 	if (meta_open)

@@ -20,6 +20,7 @@
 
 #include "metaops.h"
 #include "file_present.h"
+#include "do_restoration.h"
 
 /**
  * Given a path, try to find stat in now mounted HCFS.
@@ -352,3 +353,20 @@ int32_t lookup_package_uid_list(const char *pkgname)
 	return (ret != NULL) ? (*ret)->uid : -1;
 }
 
+int32_t create_smartcache_symlink(ino_t this_inode, char pkgname)
+{
+	char metapath[METAPATHLEN];
+	SYMLINK_META_HEADER symlink_header;
+
+	fetch_restore_meta_path(metapath, this_inode);
+	uid = lookup_package_uid_list(pkgname);
+	if (uid < 0)
+		return -ENOENT;
+	memset(&symlink_header, 0, sizeof(SYMLINK_META_HEADER));
+	init_hcfs_stat(&(symlink_header.st));
+	symlink_header.st.ino = this_inode;
+	symlink_header.st.mode = S_IFLNK;
+	symlink_header.st.uid = uid;
+	symlink_header.st.gid = gid;
+	//TODO: symlink_header.smt.
+}

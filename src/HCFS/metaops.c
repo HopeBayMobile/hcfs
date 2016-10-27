@@ -3211,7 +3211,7 @@ int32_t restore_meta_file(ino_t this_inode)
 	if (hcfs_system->backend_is_online == FALSE)
 		return -ENOTCONN;
 
-	fetch_restored_meta_path(restored_metapath, this_inode);
+	fetch_temp_restored_meta_path(restored_metapath, this_inode);
 	fptr = fopen(restored_metapath, "a+");
 	if (fptr == NULL) {
 		errcode = errno;

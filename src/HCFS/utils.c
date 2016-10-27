@@ -114,7 +114,7 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+void fetch_temp_restored_meta_path(char *pathname, ino_t this_inode)
 {
 	char restoring_meta_path[200];
 	int32_t errcode, ret;

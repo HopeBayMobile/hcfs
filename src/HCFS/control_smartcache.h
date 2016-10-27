@@ -23,7 +23,7 @@
 #define SMART_CACHE_VOL_NAME "hcfs_smartcache"
 #define SMART_CACHE_FILE "hcfsblock"
 
-#define RESTORED_SMART_CACHE_LODEV "/data/data/loop5"
+#define RESTORED_SMART_CACHE_LODEV "/dev/block/loop5"
 #define RESTORED_SMART_CACHE_MP "/mnt/hcfsblock_restore"
 #define RESTORED_SMARTCACHE_TMP_NAME "hcfsblock_restore"
 
