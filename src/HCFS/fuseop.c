@@ -269,6 +269,8 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 			return -EACCES;
 	return 0;
 }
+int symlink_internal(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
 
 /* Check permission routine for ll_access only */
 int32_t check_permission_access(fuse_req_t req,
@@ -1153,7 +1155,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	mode_t self_mode;
 	int32_t ret_val;
 	struct fuse_ctx *temp_context;
-	int32_t ret_code;
+	int32_t ret_code, ret;
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
 	HCFS_STAT parent_stat;
@@ -1169,8 +1171,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	gettimeofday(&tmp_time1, NULL);
-
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -1181,6 +1181,20 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
 		  (uint64_t)parent_inode);
+
+	if ((parent_inode == 2) && (strcmp(selfname, "com.example.app") == 0)) {
+		mkdir("/mnt/shortcut/com.example.app", mode);
+
+		ret = symlink_internal(req, "/mnt/shortcut/com.example.app",
+		                 parent, selfname, &tmp_param);
+		if (ret != 0) {
+			fuse_reply_err(req, ret);
+		} else {
+			tmp_param.attr.st_mode = mode | S_IFDIR;
+			fuse_reply_entry(req, &(tmp_param));
+		}
+		return;
+	}
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
@@ -6381,8 +6395,8 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 *       Summary: Make a symbolic link "name", which links to "link".
 *
 *************************************************************************/
-static void hfuse_ll_symlink(fuse_req_t req, const char *link,
-	fuse_ino_t parent, const char *name)
+int symlink_internal(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param)
 {
 	ino_t parent_inode;
 	ino_t self_inode;
@@ -6390,7 +6404,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	DIR_ENTRY_PAGE dir_page;
 	uint64_t this_generation;
 	struct fuse_ctx *temp_context;
-	struct fuse_entry_param tmp_param;
 	HCFS_STAT parent_stat;
 	HCFS_STAT this_stat;
 	int32_t ret_val;
@@ -6405,15 +6418,13 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		fuse_reply_err(req, ENOTSUP);
-		return;
+		return ENOTSUP;
 	}
 #endif
 
 	/* Reject if no more meta space */
 	if (NO_META_SPACE()) {
-		fuse_reply_err(req, ENOSPC);
-		return;
+		return ENOSPC;
 	}
 
 	parent_inode = real_ino(req, parent);
@@ -6421,50 +6432,42 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
 		write_log(0, "File name is too long\n");
-		fuse_reply_err(req, ENAMETOOLONG);
-		return;
+		return ENAMETOOLONG;
 	}
 	if (strlen(name) <= 0) {
-		fuse_reply_err(req, EINVAL);
-		return;
+		return EINVAL;
 	}
 
 	/* Reject if link path too long */
 	if (strlen(link) >= MAX_LINK_PATH) {
 		write_log(0, "Link path is too long\n");
-		fuse_reply_err(req, ENAMETOOLONG);
-		return;
+		return ENAMETOOLONG;
 	}
 	if (strlen(link) <= 0) {
-		fuse_reply_err(req, EINVAL);
-		return;
+		return EINVAL;
 	}
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
 	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	/* Error if parent is not a dir */
 	if (!S_ISDIR(parent_stat.mode)) {
-		fuse_reply_err(req, ENOTDIR);
-		return;
+		return ENOTDIR;
 	}
 
 	/* Checking permission */
 	ret_val = check_permission(req, &parent_stat, 3);
 	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	/* Check whether "name" exists or not */
 	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
 	if (!parent_meta_cache_entry) {
-		fuse_reply_err(req, errno);
-		return;
+		return errno;
 	}
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
 		&result_index, name, parent_meta_cache_entry,
@@ -6536,27 +6539,24 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	ret_val = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(parent_meta_cache_entry);
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 	ret_val = meta_cache_unlock_entry(parent_meta_cache_entry);
 	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	/* Reply fuse entry */
-	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
-	tmp_param.generation = this_generation;
-	tmp_param.ino = (fuse_ino_t) self_inode;
-	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
+	memset(tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param->generation = this_generation;
+	tmp_param->ino = (fuse_ino_t) self_inode;
+	convert_hcfsstat_to_sysstat(&(tmp_param->attr), &this_stat);
 
 	ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISLNK);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	if (delta_meta_size != 0)
@@ -6564,18 +6564,30 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	write_log(5, "Debug symlink: symlink operation success\n");
-	fuse_reply_entry(req, &(tmp_param));
-	return;
+	return 0;
 
 error_handle:
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
-	fuse_reply_err(req, -errcode);
+	return -errcode;
+}
+static void hfuse_ll_symlink(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name)
+{
+	struct fuse_entry_param tmp_param;
+	int32_t ret_val;
+
+	ret_val = symlink_internal(req, link, parent, name,
+	                           &tmp_param);
+
+	if (ret_val != 0)
+		fuse_reply_err(req, ret_val);
+	else
+		fuse_reply_entry(req, &(tmp_param));
 }
 
 /************************************************************************
