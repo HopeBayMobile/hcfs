@@ -7,6 +7,28 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.3.1931
+=====
+## New Features
+ - [Tera-App] enhancement/tera_api_service_performance: Enhancement/tera api service performance ([!126](gateway-2-0/android-management-app!126))
+ - [Nexus-5x] feature/disable_storage_detail_usage: Disable storage detail usage ([!60](gateway-2-0/nexus-5x!60))
+ - [Tera-Launcher] feature/alert_dialog_for_launch_app: Pop out alert dialog while launching app if wifi-only be set and using  cellular network ([!16](gateway-2-0/tera-launcher!16))
+
+## Fixed
+ - [HCFS] hotfix/download_issue_for_2.2.3: Hotfix/download issue for 2.2.3 (!611)
+ - [Tera-App] fix/#13608: bug fix #13608 ([!128](gateway-2-0/android-management-app!128))
+ - [Nexus-5x] fix/bug#13147: OTA時開啟wifi only,測試機開wifi連到另一台手機開的4G熱點,此時下載OTA package會停留在0%畫面 ([!66](gateway-2-0/nexus-5x!62/nexus-5x!66))
+ - [Nexus-5x] fix/bug#13611: User在開啟Auto download後關閉"HopeBayTech Updater" 的存取權限,此時按"CHECK FOR UPDATE" 什麼訊息都沒出現 ([!66](gateway-2-0/nexus-5x!66))
+ - [Nexus-5x] fix/bug#13620: 開啟"Update over Wi-Fi Only" 時在4G網路下如有更新不會跳出訊息提示使用者,手動檢查更新也會要求使用者開啟wifi ([!66](gateway-2-0/nexus-5x!66))
+ - [Nexus-5x] fix/selinux_for_loop_device_mount_unmount: add selinux rule for hcfs mount/umount loop device ([!63](gateway-2-0/nexus-5x!63))
+ - [Nexus-5x] bugfix/issue_13147: Only if wifi only is set and using plan network will forbid to download ([!62](gateway-2-0/nexus-5x!62))
+ - [Nexus-5x] fix/bug#13626: 當沒有新的版本可以更新時,user點選"CHECK FOR UPDATE"時不應該檢查 ([!61](gateway-2-0/nexus-5x!61))
+ - [Nexus-5x] bugfix/settings_crash: Fix Settings crash while enter USB&Storage fragment and press back key rapidly ([!58](gateway-2-0/nexus-5x!58))
+ - [Tera-Launcher] bugfix/launcher_performance: Using callback for check app availability ([!17](gateway-2-0/tera-launcher!17))
+
+## CI / Refactoring / Other
+ - [Nexus-5x] update/lib_terafonnapi: Update terafonnapi.jar ([!59](gateway-2-0/nexus-5x!59))
+
 v 2.2.3.1845
 =====
 ## New Features
