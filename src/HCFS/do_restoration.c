@@ -1731,6 +1731,53 @@ errcode_handle:
 	return errcode;
 }
 
+static int32_t _smartcache_dir_exist(const char *pkgname)
+{
+	char path[400];
+	int32_t ret;
+
+	sprintf(path, "%s/%s", RESTORED_SMART_CACHE_MP, pkgname);
+
+	ret = access(path, F_OK);
+	if (ret < 0) {
+		write_log(4, "Cannot access %s in %s. Code %d", path,
+				__func__, errno);
+		return -errno;
+	}
+
+	write_log(0, "TEST: %s exist", pkgname);
+	return 0;
+}
+
+static int32_t _try_repair_data_data(char *nowpath, DIR_ENTRY *tmpptr,
+		int32_t depth, ino_t restored_smartcache_ino,
+		INODE_PAIR_LIST *hardln_mapping)
+{
+	int32_t ret = 0;
+
+	errno = 0;
+	if (depth == 0 && tmpptr->d_type == D_ISLNK) {
+		/* Create symlink */
+		ret = _smartcache_dir_exist(tmpptr->d_name);
+		if (ret == 0) {
+			ret = create_smartcache_symlink(tmpptr->d_ino,
+					restored_smartcache_ino,
+					tmpptr->d_name);
+			if (ret < 0)
+				ret = -ECANCELED;
+		} else {
+			/* If entry not found, prune this entry,
+			 * else cancel restoring */
+			if (ret != -ENOENT)
+				ret = -ECANCELED;
+		}
+	} else {
+		ret = replace_missing_meta(nowpath, tmpptr, hardln_mapping);
+	}
+
+	return ret;
+}
+
 static int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
 int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 		INODE_PAIR_LIST *hardln_mapping)
@@ -1909,13 +1956,16 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				if (((ret == -ENOENT) && (expand_val == 1)) &&
 				    (strncmp(nowpath, "/data/data",
 					     strlen("/data/data")) == 0)) {
-					if (depth == 0 &&
-						tmpptr->d_type == D_ISLNK) {
-						/* TODO: Create symlink */
-					} else {
-						ret = replace_missing_meta(
-							nowpath, tmpptr,
-							hardln_mapping);
+					/* If meta is missing, either create
+					 * symlink or replacing with now
+					 * hcfs folder */
+					ret = _try_repair_data_data(nowpath,
+						tmpptr, depth,
+						restored_smartcache_ino,
+						hardln_mapping);
+					if (ret < 0 && ret == -ECANCELED) {
+						errcode = -errno;
+						goto errcode_handle;
 					}
 					/*
 					 * Socket and fifo file will be
@@ -1959,7 +2009,32 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			case D_ISLNK:
 				/* TODO: Check link target in smart cache,
 				 * and prune entry if target not found. */
-				/* Just fetch the meta */
+				if (depth == 0 &&
+				    strncmp(nowpath, SMART_CACHE_ROOT_MP,
+				    strlen(SMART_CACHE_ROOT_MP))) {
+					ret = _smartcache_dir_exist(
+						tmpptr->d_name);
+					if (ret == -ENOENT) {
+						if (prune_index >= max_prunes)
+							_realloc_prune(
+								&prune_list,
+								&max_prunes);
+						if (prune_index >= max_prunes) {
+							errcode = -ENOMEM;
+							free(prune_list);
+							goto errcode_handle;
+						}
+						memcpy(&(prune_list[prune_index].entry),
+							tmpptr, sizeof(DIR_ENTRY));
+						prune_index++;
+						write_log(4, "%s gone from %s. Removing.\n",
+							tmpptr->d_name, nowpath);
+						/* Prune this link */
+					} else if (ret < 0) {
+						errcode = ret;
+						goto errcode_handle;
+					}
+				}
 				break;
 			case D_ISREG:
 			case D_ISFIFO:

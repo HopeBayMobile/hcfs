@@ -62,4 +62,6 @@ int32_t init_package_uid_list(char *xml_path);
 void destroy_package_uid_list(void);
 int32_t lookup_package_uid_list(const char *pkgname);
 
+int32_t create_smartcache_symlink(ino_t this_inode, ino_t root_ino,
+		char *pkgname);
 #endif
