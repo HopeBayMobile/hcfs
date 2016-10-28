@@ -1130,6 +1130,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
+		return;
 	}
 
 	fuse_reply_entry(req, &(tmp_param));
@@ -1285,6 +1286,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
+		return;
 	}
 
 #ifdef _ANDROID_ENV_
@@ -6554,6 +6556,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
+		return;
 	}
 
 	if (delta_meta_size != 0)
@@ -6562,6 +6565,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
+		return;
 	}
 
 	write_log(5, "Debug symlink: symlink operation success\n");
@@ -7168,6 +7172,11 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 			sel_keysize = strlen(sel_key) + 1; /* null char */
 			if (size < actual_size + sel_keysize) {
 				fuse_reply_err(req, ERANGE);
+				if (xattr_page)
+					free(xattr_page);
+				if (key_buf)
+					free(key_buf);
+				return;
 			} else {
 				memcpy(key_buf + actual_size, sel_key,
 					sel_keysize);
@@ -7490,6 +7499,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	if (ret_val < 0) {
 		write_log(0, "Fail to increase lookup count\n");
 		fuse_reply_err(req, -ret_val);
+		return;
 	}
 
 	write_log(10, "Debug: Hard link %s is created successfully\n", newname);
