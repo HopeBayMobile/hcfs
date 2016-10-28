@@ -155,6 +155,8 @@
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
+extern ino_t DATA_volume_root;
+
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 /* Helper function for checking permissions.
    Inputs: fuse_req_t req, HCFS_STAT *thisstat, char mode
@@ -1182,10 +1184,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
 		  (uint64_t)parent_inode);
 
-	if ((parent_inode == 2) && (strcmp(selfname, "com.example.app") == 0)) {
-		mkdir("/mnt/shortcut/com.example.app", mode);
+	if ((parent_inode == DATA_volume_root) &&
+	    (strcmp(selfname, "com.king.candycrushsaga") == 0)) {
+		mkdir("/mnt/hcfsblock/com.king.candycrushsaga", mode);
 
-		ret = symlink_internal(req, "/mnt/shortcut/com.example.app",
+		ret = symlink_internal(req,
+		                 "/mnt/hcfsblock/com.king.candycrushsaga",
 		                 parent, selfname, &tmp_param);
 		if (ret != 0) {
 			fuse_reply_err(req, ret);

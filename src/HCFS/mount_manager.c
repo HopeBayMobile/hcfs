@@ -37,6 +37,8 @@
 
 MOUNT_T_GLOBAL mount_global = {{0}};
 
+ino_t DATA_volume_root = 0;
+
 /************************************************************************
 *
 * Function name: search_mount
@@ -686,6 +688,9 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
+
+	if (strcmp(fsname, DATA_VOL_NAME) == 0)
+		DATA_volume_root = tmp_entry.d_ino;
 #ifdef _ANDROID_ENV_
 	new_info->mp_mode = mp_mode;
 	new_info->volume_type = tmp_entry.d_type;
