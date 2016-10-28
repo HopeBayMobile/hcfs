@@ -198,8 +198,16 @@ void *_write_sys(__attribute__((unused)) void *fakeptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
+	PTHREAD_REUSE_T *this_thread;
 
+	this_thread =
+		(PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
+
+	this_thread->cancelable = 1;
+	if (this_thread->terminating == TRUE)
+		pthread_exit(0);
 	sleep(WRITE_SYS_INTERVAL);
+	this_thread->cancelable = 0;
 	sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
 	FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,

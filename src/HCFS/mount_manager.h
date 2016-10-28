@@ -27,6 +27,7 @@
 #ifdef _ANDROID_ENV_
 #include "path_reconstruct.h"
 #endif
+#include "pthread_control.h"
 
 enum MP_TYPE {
 	MP_DEFAULT = 1,
@@ -103,6 +104,7 @@ typedef struct {
 	FILE *stat_fptr;  /* For keeping track of FS stat. shared */
 	sem_t *stat_lock; /* shared */
 	BOOL writing_stat;
+	PTHREAD_REUSE_T *write_volstat_thread;
 	struct fuse_args mount_args;
 } MOUNT_T;
 
