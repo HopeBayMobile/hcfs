@@ -21,6 +21,7 @@ extern "C" {
 #include "params.h"
 #include "mount_manager.h"
 #include "hcfscurl.h"
+#include "pthread_control.h"
 }
 #include "gtest/gtest.h"
 
@@ -112,11 +113,11 @@ class init_api_interfaceTest : public ::testing::Test {
 		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
-			for (count = 0; count < api_server->num_threads; count++) {
-				PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	for (count = 0; count < api_server->num_threads; count++)
+		 		PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
+			for (count = 0; count < api_server->num_threads; count++)
 				PTHREAD_join(&(api_server->local_thread[count]), NULL);
-			}
-			PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
 			PTHREAD_join(&(api_server->monitor_thread), NULL);
 			sem_destroy(&(api_server->job_lock));
 			free(api_server);
@@ -190,11 +191,11 @@ class destroy_api_interfaceTest : public ::testing::Test {
 		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
-			for (count = 0; count < api_server->num_threads; count++) {
-				PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	for (count = 0; count < api_server->num_threads; count++)
+		 		PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
+			for (count = 0; count < api_server->num_threads; count++)
 				PTHREAD_join(&(api_server->local_thread[count]), NULL);
-			}
-			PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
 			PTHREAD_join(&(api_server->monitor_thread), NULL);
 			sem_destroy(&(api_server->job_lock));
 			free(api_server);
@@ -284,6 +285,9 @@ class api_moduleTest : public ::testing::TestWithParam<int32_t>
 		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
+		 	for (count = 0; count < api_server->num_threads; count++)
+		 		PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
 			for (count = 0; count < api_server->num_threads;
 			     count++) {
 				PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
@@ -1064,11 +1068,11 @@ class api_server_monitorTest : public ::testing::Test {
 			/* Adding lock wait before terminating to prevent last sec
 			   thread changes */
 			sem_wait(&(api_server->job_lock));
-			for (count = 0; count < api_server->num_threads; count++) {
-				PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	for (count = 0; count < api_server->num_threads; count++)
+		 		PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+		 	PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
+			for (count = 0; count < api_server->num_threads; count++)
 				PTHREAD_join(&(api_server->local_thread[count]), NULL);
-			}
-			PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
 			PTHREAD_join(&(api_server->monitor_thread), NULL);
 			sem_post(&(api_server->job_lock));
 			sem_destroy(&(api_server->job_lock));
