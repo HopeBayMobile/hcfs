@@ -782,6 +782,10 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	if (strcmp(nowpath, "/data/app") == 0)
 		return 1;
 	*/
+	if (strncmp(nowpath, SMART_CACHE_ROOT_MP,
+				strlen(SMART_CACHE_ROOT_MP)) == 0)
+		return 1;
+
 	/* If in /data/app, need to pull down everything now */
 	/* App could be installed but not pinned by management app */
 	if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
@@ -1750,18 +1754,17 @@ static int32_t _smartcache_dir_exist(const char *pkgname)
 }
 
 static int32_t _try_repair_data_data(char *nowpath, DIR_ENTRY *tmpptr,
-		int32_t depth, ino_t restored_smartcache_ino,
+		int32_t depth, ino_t restored_datadata_ino,
 		INODE_PAIR_LIST *hardln_mapping)
 {
 	int32_t ret = 0;
 
-	errno = 0;
 	if (depth == 0 && tmpptr->d_type == D_ISLNK) {
-		/* Create symlink */
 		ret = _smartcache_dir_exist(tmpptr->d_name);
 		if (ret == 0) {
+			/* Create symlink */
 			ret = create_smartcache_symlink(tmpptr->d_ino,
-					restored_smartcache_ino,
+					restored_datadata_ino,
 					tmpptr->d_name);
 			if (ret < 0)
 				ret = -ECANCELED;
@@ -1776,6 +1779,24 @@ static int32_t _try_repair_data_data(char *nowpath, DIR_ENTRY *tmpptr,
 	}
 
 	return ret;
+}
+
+
+static int32_t _add_to_prunelist(PRUNE_T *prune_list, int32_t *prune_index,
+	int32_t *max_prunes, const DIR_ENTRY *tmpptr, const char *nowpath)
+{
+	if (*prune_index >= *max_prunes)
+		_realloc_prune(&prune_list, max_prunes);
+	if (*prune_index >= *max_prunes) {
+		write_log(0, "Error: Fail to allocate memory in %s", __func__);
+		FREE(prune_list);
+		return -ENOMEM;
+	}
+	memcpy(&(prune_list[*prune_index].entry), tmpptr, sizeof(DIR_ENTRY));
+	(*prune_index)++;
+	write_log(4, "%s gone from %s. Removing.\n", tmpptr->d_name, nowpath);
+
+	return 0;
 }
 
 static int32_t _update_packages_list(PRUNE_T *prune_list, int32_t num_prunes);
@@ -1813,17 +1834,14 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 
 	/* Do not expand if not high priority pin and not needed */
 	expand_val = 1; /* The default */
-	if (dirmeta.local_pin != P_HIGH_PRI_PIN) {
-		if (!strncmp(nowpath, SMART_CACHE_ROOT_MP,
-					strlen(SMART_CACHE_ROOT_MP))) {
+	if (!strncmp(nowpath, SMART_CACHE_ROOT_MP, strlen(SMART_CACHE_ROOT_MP)))
 			can_prune = TRUE;
-		} else {
-			expand_val = _check_expand(thisinode, nowpath, depth);
-			if (expand_val == 0)
-				return 0;
-			if (expand_val == 5)
-				can_prune = TRUE;
-		}
+	if (dirmeta.local_pin != P_HIGH_PRI_PIN) {
+		expand_val = _check_expand(thisinode, nowpath, depth);
+		if (expand_val == 0)
+			return 0;
+		if (expand_val == 5)
+			can_prune = TRUE;
 	} else {
 		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;
@@ -1885,26 +1903,22 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				  tmpptr->d_name);
 			if (SMARTCACHE_IS_MISSING() && depth == 0 &&
 				tmpptr->d_type == D_ISLNK &&
-				strncmp(nowpath, SMART_CACHE_ROOT_MP,
-					strlen(SMART_CACHE_ROOT_MP))) {
+				strncmp(nowpath, "/data/data",
+						strlen("/data/data"))) {
 				/* Just remove the element because
 				 * smart cache is missing. */
-				if (prune_index >= max_prunes)
-					_realloc_prune(&prune_list,
-							&max_prunes);
-				if (prune_index >= max_prunes) {
-					errcode = -ENOMEM;
-					free(prune_list);
+				ret = _add_to_prunelist(prune_list,
+						&prune_index, &max_prunes,
+						tmpptr, nowpath);
+				if (ret < 0) {
+					errcode = ret;
 					goto errcode_handle;
 				}
-				memcpy(&(prune_list[prune_index].entry),
-						tmpptr, sizeof(DIR_ENTRY));
-				prune_index++;
-				write_log(4, "%s gone from %s. Removing.\n",
-					tmpptr->d_name, nowpath);
 				/* Mark delete */
 				FWRITE(&(tmpptr->d_ino), sizeof(ino_t), 1,
 						to_delete_fptr);
+				write_log(4, "Warn: Remove link %s because "
+					"smartcache is missing", tmpptr->d_name);
 				continue;
 			}
 			/*
@@ -1925,20 +1939,13 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				    (strcmp("base.apk", tmpptr->d_name) != 0))
 				    || (expand_val == 3)) {
 					/* Just remove the element */
-					if (prune_index >= max_prunes)
-						_realloc_prune(&prune_list,
-							       &max_prunes);
-					if (prune_index >= max_prunes) {
-						errcode = -ENOMEM;
-						free(prune_list);
+					ret = _add_to_prunelist(prune_list,
+						&prune_index, &max_prunes,
+						tmpptr, nowpath);
+					if (ret < 0) {
+						errcode = ret;
 						goto errcode_handle;
 					}
-					memcpy(&(prune_list[prune_index].entry),
-					       tmpptr, sizeof(DIR_ENTRY));
-					prune_index++;
-					write_log(
-					    4, "%s gone from %s. Removing.\n",
-					    tmpptr->d_name, nowpath);
 				} else {
 					/*
 					 * Remove the entire app folder.
@@ -1961,7 +1968,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					 * hcfs folder */
 					ret = _try_repair_data_data(nowpath,
 						tmpptr, depth,
-						restored_smartcache_ino,
+						restored_datadata_ino,
 						hardln_mapping);
 					if (ret < 0 && ret == -ECANCELED) {
 						errcode = -errno;
@@ -1977,20 +1984,13 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 						object_replace = TRUE;
 				}
 				if (can_prune == TRUE) {
-					if (prune_index >= max_prunes)
-						_realloc_prune(&prune_list,
-							       &max_prunes);
-					if (prune_index >= max_prunes) {
-						errcode = -ENOMEM;
-						free(prune_list);
+					ret = _add_to_prunelist(prune_list,
+						&prune_index, &max_prunes,
+						tmpptr, nowpath);
+					if (ret < 0) {
+						errcode = ret;
 						goto errcode_handle;
 					}
-					memcpy(&(prune_list[prune_index].entry),
-					       tmpptr, sizeof(DIR_ENTRY));
-					prune_index++;
-					write_log(
-					    4, "%s gone from %s. Removing.\n",
-					    tmpptr->d_name, nowpath);
 					continue;
 				} else if (ret < 0) {
 					errcode = ret;
@@ -2007,30 +2007,23 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			/* If meta exist, fetch data or expand dir */
 			switch (tmpptr->d_type) {
 			case D_ISLNK:
-				/* TODO: Check link target in smart cache,
+				/* Check link target in smart cache,
 				 * and prune entry if target not found. */
 				if (depth == 0 &&
 				    strncmp(nowpath, SMART_CACHE_ROOT_MP,
 				    strlen(SMART_CACHE_ROOT_MP))) {
 					ret = _smartcache_dir_exist(
 						tmpptr->d_name);
-					if (ret == -ENOENT) {
-						if (prune_index >= max_prunes)
-							_realloc_prune(
-								&prune_list,
-								&max_prunes);
-						if (prune_index >= max_prunes) {
-							errcode = -ENOMEM;
-							free(prune_list);
-							goto errcode_handle;
-						}
-						memcpy(&(prune_list[prune_index].entry),
-							tmpptr, sizeof(DIR_ENTRY));
-						prune_index++;
-						write_log(4, "%s gone from %s. Removing.\n",
-							tmpptr->d_name, nowpath);
+					if (ret == -ENOENT)
 						/* Prune this link */
-					} else if (ret < 0) {
+						ret = _add_to_prunelist(
+							prune_list,
+							&prune_index,
+							&max_prunes,
+							tmpptr, nowpath);
+					/* Any other error is regarded as
+					 * failure */
+					if (ret < 0) {
 						errcode = ret;
 						goto errcode_handle;
 					}
@@ -2057,22 +2050,11 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					if (ret < 0)
 						can_prune = TRUE;
 				}
-				if (can_prune == TRUE) {
-					if (prune_index >= max_prunes)
-						_realloc_prune(&prune_list,
-							       &max_prunes);
-					if (prune_index >= max_prunes) {
-						errcode = -ENOMEM;
-						free(prune_list);
-						goto errcode_handle;
-					}
-					memcpy(&(prune_list[prune_index].entry),
-					       tmpptr, sizeof(DIR_ENTRY));
-					prune_index++;
-					write_log(
-					    4, "%s gone from %s. Removing.\n",
-					    tmpptr->d_name, nowpath);
-				} else if (ret < 0) {
+				if (can_prune == TRUE)
+					ret = _add_to_prunelist(prune_list,
+						&prune_index, &max_prunes,
+						tmpptr, nowpath);
+				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
@@ -2086,21 +2068,11 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				if ((ret == -ENOENT) &&
 				    (strcmp(nowpath, "/data/app") == 0)) {
 					/* Need to prune the package */
-					if (prune_index >= max_prunes)
-						_realloc_prune(&prune_list,
-							       &max_prunes);
-					if (prune_index >= max_prunes) {
-						errcode = -ENOMEM;
-						free(prune_list);
-						goto errcode_handle;
-					}
-					memcpy(&(prune_list[prune_index].entry),
-					       tmpptr, sizeof(DIR_ENTRY));
-					prune_index++;
-					write_log(
-					    4, "%s gone from %s. Removing.\n",
-					    tmpptr->d_name, nowpath);
-				} else if (ret < 0) {
+					ret = _add_to_prunelist(prune_list,
+						&prune_index, &max_prunes,
+						tmpptr, nowpath);
+				}
+				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
@@ -2677,7 +2649,7 @@ int32_t run_download_minimal(void)
 				errcode = ret;
 				goto errcode_handle;
 			}
-			/*  Mount and run fsck */
+			/*  Run fsck and mount */
 			ret = mount_and_repair_restored_smartcache();
 			if (ret < 0) {
 				if (ret == -ECANCELED) {
@@ -2739,6 +2711,7 @@ int32_t run_download_minimal(void)
 		}
 		if (!strcmp("hcfs_data", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;
+			restored_datadata_ino = rootino;
 			snprintf(restore_todelete_list, METAPATHLEN,
 				 "%s/todelete_list_%" PRIu64, RESTORE_METAPATH,
 				 (uint64_t)rootino);
