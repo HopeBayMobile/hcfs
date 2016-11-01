@@ -2513,6 +2513,7 @@ int32_t run_download_minimal(void)
 	ino_t vol_max_inode, sys_max_inode;
 	INODE_PAIR_LIST *hardln_mapping;
 
+	restored_smartcache_size = 0;
 	/* Fetch quota value from backend and store in the restoration path */
 
 	/* First make sure that network connection is turned on */
@@ -2988,7 +2989,7 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 	SYSTEM_DATA_TYPE *restored_system_meta;
 	int64_t cache_limit;
 
-	cache_limit = CACHE_HARD_LIMIT / REDUCED_RATIO;
+	cache_limit = (CACHE_HARD_LIMIT - restored_smartcache_size) / REDUCED_RATIO;
 	if (pin_type == P_HIGH_PRI_PIN)
 		cache_limit = cache_limit + RESERVED_CACHE_SPACE;
 

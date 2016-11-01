@@ -67,6 +67,27 @@ errcode_handle:
 	return errcode;
 }
 
+static void _change_stage1_cache_size(int64_t restored_smartcache_size)
+{
+	CACHE_HARD_LIMIT += restored_smartcache_size;
+
+	/* Change the max system size as well */
+	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
+	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
+	system_config->max_pinned_limit[P_UNPIN] += restored_smartcache_size;
+
+	system_config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT;
+	system_config->max_pinned_limit[P_PIN] += restored_smartcache_size;
+
+	system_config->max_cache_limit[P_HIGH_PRI_PIN] =
+	    			CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
+	system_config->max_pinned_limit[P_HIGH_PRI_PIN] +=
+				restored_smartcache_size;
+
+	/* Update pin size */
+	hcfs_system->systemdata.pinned_size += restored_smartcache_size;
+}
+
 int32_t inject_restored_smartcache(ino_t smartcache_ino)
 {
 	char path_restore[METAPATHLEN];
@@ -85,6 +106,9 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	BOOL meta_open = FALSE;
 	BLOCK_ENTRY_PAGE tmppage;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
+	char pin_type;
+	struct stat tempstat;
+	int64_t blocksize;
 
 	sc_data = (RESTORED_SMARTCACHE_DATA *)
 			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);
@@ -103,6 +127,11 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	memcpy(&tmp_header, &origin_header, sizeof(FILE_META_HEADER));
 	tmp_ino = super_block_new_inode(&(tmp_header.st), &generation, P_PIN);
 
+	/* Temporily extend CACHE_HARD_LIMIT */
+	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
+	_change_stage1_cache_size(tmp_header.st.size);
+	restored_smartcache_size = tmp_header.st.size;
+	pin_type = tmp_header.fmt.local_pin;
 	/* Move blocks */
 	file_meta = &(tmp_header.fmt);
 	total_blocks = tmp_header.st.size == 0 ? 0 :
@@ -140,7 +169,18 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 			goto errcode_handle;
 		}
 		/* TODO: Statistics */
+		ret = stat(thisblockpath, &tempstat);
+		if (ret < 0) {
+			errcode = -errno;
+			goto errcode_handle;
+		}
+		blocksize = tempstat.st_blocks * 512;
+		update_restored_cache_usage(-blocksize, -1, pin_type);
+		hcfs_system->systemdata.cache_size += blocksize;
+		hcfs_system->systemdata.cache_blocks += 1;
 	}
+	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
+
 	tmp_header.st.ino = tmp_ino;
 	tmp_header.st.nlink = 1;
 	tmp_header.fmt.root_inode = data_smart_root;
@@ -387,6 +427,9 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	int32_t e_index;
 	BOOL meta_open = FALSE;
 	BLOCK_ENTRY_PAGE tmppage;
+	struct stat tempstat;
+	int64_t blocksize;
+	char pin_type;
 
 	ino_nowsys = sc_data->inject_smartcache_ino;
 	ret = _remove_from_now_hcfs(ino_nowsys);
@@ -412,10 +455,13 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	}
 	meta_open = TRUE;
 	PREAD(fileno(fptr), &tmp_header, sizeof(FILE_META_HEADER), 0);
+	pin_type = tmp_header.fmt.local_pin;
 	file_meta = &(tmp_header.fmt);
 	total_blocks = tmp_header.st.size == 0 ? 0 :
 			((tmp_header.st.size - 1) / MAX_BLOCK_SIZE + 1);
 	current_page = -1;
+
+	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
 	for (count = 0; count < total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
 		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -448,7 +494,20 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 			goto errcode_handle;
 		}
 		/* TODO: Statistics */
+		ret = stat(restored_blockpath, &tempstat);
+		if (ret < 0) {
+			errcode = -errno;
+			goto errcode_handle;
+		}
+		blocksize = tempstat.st_blocks * 512;
+		hcfs_system->systemdata.cache_size -= blocksize;
+		hcfs_system->systemdata.cache_blocks -= 1;
+		update_restored_cache_usage(blocksize, 1, pin_type);
 	}
+	/* Update statistics */
+	_change_stage1_cache_size(-restored_smartcache_size);
+	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
+
 	/* Recover some data */
 	tmp_header.st.ino = smartcache_ino;
 	tmp_header.st.nlink =
@@ -460,6 +519,7 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	PWRITE(fileno(fptr), &tmp_header, sizeof(FILE_META_HEADER), 0);
 	fclose(fptr);
 	meta_open = FALSE;
+	FREE(sc_data);
 
 	/* Reclaim the smart cahce inode in now hcfs */
 	ret = super_block_to_delete(ino_nowsys, FALSE);
