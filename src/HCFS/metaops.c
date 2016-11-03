@@ -1475,7 +1475,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	char meta_deleted;
-	int64_t metasize, metasize_blk, dirty_delta, unpin_dirty_delta;
+	int64_t metasize = 0, metasize_blk = 0, dirty_delta, unpin_dirty_delta;
 	BOOL meta_on_cloud;
 
 	meta_deleted = FALSE;
