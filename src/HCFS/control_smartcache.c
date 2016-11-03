@@ -67,7 +67,7 @@ errcode_handle:
 	return errcode;
 }
 
-static void _change_stage1_cache_size(int64_t restored_smartcache_size)
+static void _change_stage1_cache_limit(int64_t restored_smartcache_size)
 {
 	CACHE_HARD_LIMIT += restored_smartcache_size;
 
@@ -85,7 +85,6 @@ static void _change_stage1_cache_size(int64_t restored_smartcache_size)
 				restored_smartcache_size;
 
 	/* Update pin size */
-	hcfs_system->systemdata.pinned_size += restored_smartcache_size;
 }
 
 int32_t inject_restored_smartcache(ino_t smartcache_ino)
@@ -108,7 +107,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char pin_type;
 	struct stat tempstat;
-	int64_t blocksize;
+	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
 
 	sc_data = (RESTORED_SMARTCACHE_DATA *)
 			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);
@@ -127,15 +126,25 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	memcpy(&tmp_header, &origin_header, sizeof(FILE_META_HEADER));
 	tmp_ino = super_block_new_inode(&(tmp_header.st), &generation, P_PIN);
 
-	/* Temporily extend CACHE_HARD_LIMIT */
-	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
-	_change_stage1_cache_size(tmp_header.st.size);
-	restored_smartcache_size = tmp_header.st.size;
 	pin_type = tmp_header.fmt.local_pin;
-	/* Move blocks */
 	file_meta = &(tmp_header.fmt);
 	total_blocks = tmp_header.st.size == 0 ? 0 :
 			((tmp_header.st.size - 1) / MAX_BLOCK_SIZE + 1);
+
+	/* Extend CACHE_HARD_LIMIT */
+	restored_smartcache_size = tmp_header.st.size;
+	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
+	update_restored_cache_usage(-restored_smartcache_size,
+			-total_blocks, pin_type);
+	_change_stage1_cache_limit(restored_smartcache_size);
+	hcfs_system->systemdata.pinned_size += restored_smartcache_size;
+	hcfs_system->systemdata.cache_size += restored_smartcache_size;
+	hcfs_system->systemdata.cache_blocks += total_blocks;
+	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
+	datasize_est = restored_smartcache_size;
+	blocknum_est = total_blocks;
+
+	/* Move blocks */
 	current_page = -1;
 	for (count = 0; count < total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -168,19 +177,23 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 			errcode = ret;
 			goto errcode_handle;
 		}
-		/* TODO: Statistics */
+		/* Re-estimate statistics */
 		ret = stat(thisblockpath, &tempstat);
 		if (ret < 0) {
 			errcode = -errno;
 			goto errcode_handle;
 		}
 		blocksize = tempstat.st_blocks * 512;
-		update_restored_cache_usage(-blocksize, -1, pin_type);
-		hcfs_system->systemdata.cache_size += blocksize;
-		hcfs_system->systemdata.cache_blocks += 1;
+		datasize_est -= blocksize;
+		blocknum_est -= 1;
 	}
+	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
+	hcfs_system->systemdata.cache_size -= datasize_est;
+	hcfs_system->systemdata.cache_blocks -= blocknum_est;
+	update_restored_cache_usage(datasize_est, blocknum_est, pin_type);
 	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
 
+	/* Prepare meta */
 	tmp_header.st.ino = tmp_ino;
 	tmp_header.st.nlink = 1;
 	tmp_header.fmt.root_inode = data_smart_root;
@@ -428,7 +441,7 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	BOOL meta_open = FALSE;
 	BLOCK_ENTRY_PAGE tmppage;
 	struct stat tempstat;
-	int64_t blocksize;
+	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
 	char pin_type;
 
 	ino_nowsys = sc_data->inject_smartcache_ino;
@@ -459,9 +472,21 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	file_meta = &(tmp_header.fmt);
 	total_blocks = tmp_header.st.size == 0 ? 0 :
 			((tmp_header.st.size - 1) / MAX_BLOCK_SIZE + 1);
-	current_page = -1;
 
+	/* Update statistics */
+	restored_smartcache_size = tmp_header.st.size;
 	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
+	hcfs_system->systemdata.pinned_size -= restored_smartcache_size;
+	hcfs_system->systemdata.cache_size -= restored_smartcache_size;
+	hcfs_system->systemdata.cache_blocks -= total_blocks;
+	_change_stage1_cache_limit(restored_smartcache_size);
+	update_restored_cache_usage(restored_smartcache_size,
+				total_blocks, pin_type);
+	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
+
+	datasize_est = restored_smartcache_size;
+	blocknum_est = total_blocks;
+	current_page = -1;
 	for (count = 0; count < total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
 		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -493,19 +518,21 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 			errcode = -errno;
 			goto errcode_handle;
 		}
-		/* TODO: Statistics */
+		/* Statistics */
 		ret = stat(restored_blockpath, &tempstat);
 		if (ret < 0) {
 			errcode = -errno;
 			goto errcode_handle;
 		}
 		blocksize = tempstat.st_blocks * 512;
-		hcfs_system->systemdata.cache_size -= blocksize;
-		hcfs_system->systemdata.cache_blocks -= 1;
-		update_restored_cache_usage(blocksize, 1, pin_type);
+		datasize_est -= blocksize;
+		blocknum_est -= 1;
 	}
 	/* Update statistics */
-	_change_stage1_cache_size(-restored_smartcache_size);
+	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
+	hcfs_system->systemdata.cache_size += datasize_est;
+	hcfs_system->systemdata.cache_blocks += blocknum_est;
+	update_restored_cache_usage(-datasize_est, -blocknum_est, pin_type);
 	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
 
 	/* Recover some data */

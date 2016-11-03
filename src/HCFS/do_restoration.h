@@ -51,7 +51,8 @@ typedef struct {
 RESTORED_SMARTCACHE_DATA *sc_data;
 ino_t restored_smartcache_ino;
 ino_t restored_datadata_ino;
-int64_t restored_smartcache_size;
+int64_t origin_hard_limit;
+int64_t origin_meta_limit;
 FILE *to_delete_fptr;
 FILE *to_sync_fptr;
 
