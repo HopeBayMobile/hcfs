@@ -50,9 +50,6 @@
 #include "rebuild_super_block.h"
 #include "hcfs_fromcloud.h"
 
-#define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
-#define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
-
 /************************************************************************
 *
 * Function name: write_super_block_head
