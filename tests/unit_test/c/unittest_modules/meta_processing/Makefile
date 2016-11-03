@@ -45,6 +45,7 @@ $(eval $(call ADDTEST, lookup_count_unittest, \
 $(eval $(call ADDTEST, pin_scheduling_unittest, \
     pin_scheduling_mock_function.o \
     pin_scheduling.o \
+    pthread_control.o \
     pin_scheduling_unittest.o ))
 
 $(eval $(call ADDTEST, xattr_ops_unittest, \

@@ -291,6 +291,8 @@ class api_moduleTest : public ::testing::TestWithParam<int32_t>
 		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
 		free(HCFSPAUSESYNC);
 		free(METAPATH);
+		free(system_config->max_cache_limit);
+		free(system_config->max_pinned_limit);
 		free(hcfs_system);
 		free(system_config);
 	}

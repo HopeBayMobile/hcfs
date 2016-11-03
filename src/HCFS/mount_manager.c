@@ -555,8 +555,10 @@ errcode_handle:
 /* Helper for unmounting */
 int32_t do_unmount_FS(MOUNT_T *mount_info)
 {
-	PTHREAD_REUSE_terminate(mount_info->write_volstat_thread);
-	free(mount_info->write_volstat_thread);
+	if (mount_info->write_volstat_thread != NULL) {
+		PTHREAD_REUSE_terminate(mount_info->write_volstat_thread);
+		free(mount_info->write_volstat_thread);
+	}
 	sem_wait((mount_info->stat_lock));
 	update_FS_statistics(mount_info);
 	sem_post((mount_info->stat_lock));

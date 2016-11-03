@@ -75,7 +75,6 @@ int32_t get_xfer_status(void);
 int32_t init_api_interface(void)
 {
 	int32_t ret, errcode, count;
-	int32_t *val;
 	int32_t sock_flag;
 
 	write_log(10, "Starting API interface");
@@ -153,10 +152,8 @@ int32_t init_api_interface(void)
 	PTHREAD_set_exithandler();
 	for (count = 0; count < INIT_API_THREADS; count++) {
 		write_log(10, "Starting up API thread %d\n", count);
-		val = malloc(sizeof(int32_t));
-		*val = count;
 		ret = PTHREAD_create(&(api_server->local_thread[count]), NULL,
-			(void *)api_module, (void *)val);
+			(void *)api_module, NULL);
 		if (ret != 0) {
 			errcode = ret;
 			write_log(0, "Thread create error in %s. Code %d, %s\n",
@@ -164,7 +161,6 @@ int32_t init_api_interface(void)
 			errcode = -errcode;
 			goto errcode_handle;
 		}
-		val = NULL;
 	}
 
 	/* Fork a thread that monitor usage and control extra threads */
@@ -1111,13 +1107,10 @@ void api_module(void *index1)
 	ino_t *pinned_list, *unpinned_list;
 	int32_t loglevel;
 	int64_t max_pinned_size;
-	int32_t index = *((int32_t *) index1);
 	PTHREAD_T *thread_ptr;
+	UNUSED(index1);
 
-	free(index1);
 	thread_ptr = (PTHREAD_T *) pthread_getspecific(PTHREAD_status_key);
-
-	write_log(10, "Startup index %d\n", index);
 
 	while (hcfs_system->system_going_down == FALSE) {
 		thread_ptr->cancelable = 1;
@@ -1634,7 +1627,6 @@ void api_server_monitor(void)
 {
 	int32_t count, totalrefs, index, ret;
 	float totaltime, ratio;
-	int32_t *val;
 	struct timeval cur_time;
 	int32_t sel_index, cur_index;
 	PTHREAD_T *thread_ptr;
@@ -1706,13 +1698,10 @@ void api_server_monitor(void)
 
 		if (totalrefs > (INCREASE_RATIO * ratio)) {
 			/* Add one more thread */
-			val = malloc(sizeof(int32_t));
 			index = api_server->num_threads;
-			*val = index;
 			api_server->num_threads++;
 			PTHREAD_create(&(api_server->local_thread[index]), NULL,
-				(void *)api_module, (void *)val);
-			val = NULL;
+				(void *)api_module, NULL);
 			write_log(10, "Added one more thread to %d\n", index+1);
 		}
 

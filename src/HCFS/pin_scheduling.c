@@ -54,8 +54,11 @@ int32_t destroy_pin_scheduler()
 	sem_post(&(hcfs_system->pin_wait_sem));
 
 	int32_t idx;
-	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++)
+	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++) {
+		while (pinning_scheduler.thread_active[idx] == TRUE)
+			sleep(1);
 		PTHREAD_REUSE_terminate(&(pinning_scheduler.pinfile_tid[idx]));
+	}
 	pthread_join(pinning_scheduler.pinning_manager, NULL);
 	pthread_join(pinning_scheduler.pinning_collector, NULL);
 	sem_destroy(&(pinning_scheduler.ctl_op_sem));
@@ -91,9 +94,8 @@ void* pinning_collect(void *arg)
 	while (TRUE) {
 		/* Wait for threads */
 		if (hcfs_system->system_going_down == TRUE) {
-			if (pinning_scheduler.total_active_pinning <= 0) {
+			if (pinning_scheduler.total_active_pinning <= 0)
 				break;
-			}
 		}
 
 		if (pinning_scheduler.total_active_pinning <= 0) {
@@ -149,6 +151,12 @@ void pinning_worker(void *ptr)
 	ino_t this_inode;
 	int32_t t_idx, ret;
 	int32_t active_pause_status;
+	PTHREAD_REUSE_T *this_th;
+
+	this_th = (PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
+
+	if (this_th != NULL)
+		this_th->cancelable = FALSE;
 
 	pinning_info = (PINNING_INFO *)ptr;
 	this_inode = pinning_info->this_inode;

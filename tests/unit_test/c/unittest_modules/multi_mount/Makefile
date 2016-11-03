@@ -28,5 +28,6 @@ $(eval $(call ADDTEST, FS_manager_unittest, \
 
 $(eval $(call ADDTEST, mount_manager_unittest, \
   mount_manager.o \
+  pthread_control.o \
   mount_manager_fakeftn.o \
   mount_manager_unittest.o ))
