@@ -4576,6 +4576,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 	ssize_t ret_ssize;
 	BOOL block_dirty;
+	BOOL is_from_cloud;
 
 	/* Check system size before writing */
 	if (hcfs_system->systemdata.system_size >
@@ -4700,6 +4701,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	}
 
 	block_dirty = FALSE;
+	is_from_cloud = FALSE;
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
 		int64_t seq;
@@ -4814,6 +4816,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			case ST_CLOUD:
 			case ST_CtoL:
 				/*Download from backend */
+				is_from_cloud = TRUE;
 				ret = _write_fetch_backend(this_inode, bindex,
 					fh_ptr, &temppage, this_page_fpos,
 					entry_index, ispin);
@@ -4926,7 +4929,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	this_bytes_written = (size_t) ret_ssize;
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (this_bytes_written != 0) {
+	if ((this_bytes_written != 0) && (is_from_cloud == FALSE)) {
 		int64_t dirty_delta;
 
 		if (block_dirty == TRUE)
