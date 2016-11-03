@@ -19,6 +19,7 @@ extern "C" {
 #include "atomic_tocloud.h"
 #include "mount_manager.h"
 #include "do_restoration.h"
+#include "pthread_control.h"
 }
 
 #include "../../fff.h"
@@ -198,7 +199,7 @@ TEST_F(init_sync_stat_controlTest, InitCleanup)
 
 class InitUploadControlTool {
 public:
-	int fd;
+	int fd = 0;
 	char progress_path[100];
 
 	static InitUploadControlTool *Tool() {
@@ -213,6 +214,7 @@ public:
 		ptr1 = (UPLOAD_THREAD_TYPE *) ptr;
 		usleep(100000);
 		upload_ctl.threads_finished[ptr1->which_index] = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
 		return NULL;
 	}
 
@@ -246,7 +248,7 @@ public:
 		BLOCK_ENTRY_PAGE mock_block_page;
 		FILE *mock_file_meta;
 
-		init_sync_control();
+		memset(&mock_block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int32_t i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
@@ -261,7 +263,7 @@ public:
 		fclose(mock_file_meta);
 
 		strcpy(progress_path, "/tmp/mock_progress_file");
-		fd = open(progress_path, O_CREAT | O_RDWR);
+		fd = open(progress_path, O_CREAT | O_RDWR, 0600);
 
 		for (int32_t i = 0 ; i < num_block_entry ; i++) {
 			ino_t inode = 1;
@@ -291,10 +293,10 @@ public:
 			upload_ctl.threads_in_use[index] = TRUE;
 			upload_ctl.threads_created[index] = TRUE;
 			upload_ctl.threads_finished[index] = TRUE;
+			sem_post(&(upload_ctl.upload_finished_sem));
 			upload_ctl.total_active_upload_threads++;
 
-			pthread_create(&(upload_ctl.upload_threads_no[index]),
-			               NULL,
+			PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[index]),
 			               InitUploadControlTool::upload_thread_function,
 			               (void *) & (upload_ctl.upload_threads[index]));
 			// create thread
@@ -304,6 +306,7 @@ public:
 
 private:
 	InitUploadControlTool() {
+		memset(progress_path, 0, 100);
 	}
 
 	static InitUploadControlTool *tool;
@@ -321,12 +324,13 @@ InitUploadControlTool *InitUploadControlTool::tool = NULL;
 class init_upload_controlTest : public ::testing::Test {
 protected:
 	void SetUp() {
+		hcfs_system->system_going_down = FALSE;
 		no_backend_stat = TRUE;
 		init_sync_stat_control();
 		init_sync_control(); /* Add this init so that upload thread will not hang up */
 		sem_init(&upload_ctl.upload_queue_sem, 0, 1);
 		sem_init(&upload_ctl.upload_op_sem, 0, 1);
-		hcfs_system->system_going_down = FALSE;
+		PTHREAD_REUSE_set_exithandler();
 	}
 
 	void TearDown() {
@@ -335,14 +339,24 @@ protected:
 
 		/* Join the sync_control thread */
 		hcfs_system->system_going_down = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
+		pthread_join(upload_ctl.upload_handler_thread, NULL);
+		sem_destroy(&(upload_ctl.upload_finished_sem));
+
+		sem_post(&(sync_ctl.sync_finished_sem));
 		pthread_join(sync_ctl.sync_handler_thread, NULL);
+		sem_destroy(&(sync_ctl.sync_finished_sem));
+		sem_destroy(&upload_ctl.upload_queue_sem);
+		sem_destroy(&upload_ctl.upload_op_sem);
 
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
-		close(InitUploadControlTool::Tool()->fd);
-		unlink(InitUploadControlTool::Tool()->progress_path);
+		if (InitUploadControlTool::Tool() != NULL) {
+			close(InitUploadControlTool::Tool()->fd);
+			unlink(InitUploadControlTool::Tool()->progress_path);
+		}
 
 		InitUploadControlTool::Destruct();
 
@@ -367,7 +381,9 @@ TEST_F(init_upload_controlTest, DoNothing_JustRun)
 
 	/* Free resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	sem_destroy(&(upload_ctl.upload_finished_sem));
 }
 
 TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
@@ -389,8 +405,8 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	/* Verify */
 	ASSERT_EQ(0, upload_ctl.total_active_upload_threads);
 	for (int32_t i = 0 ; i < MAX_UPLOAD_CONCURRENCY ; i++) {
-		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
-		ASSERT_EQ(FALSE, upload_ctl.threads_created[i]) << "thread " << i << " is in use";
+		EXPECT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
+		EXPECT_EQ(FALSE, upload_ctl.threads_created[i]) << "thread " << i << " is in use";
 	}
 
 	/* Make sure that block upload will trigger cache replacement */
@@ -401,22 +417,24 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		char path[50];
 		BLOCK_UPLOADING_STATUS block_entry;
 
-		ASSERT_EQ(ST_LtoC, mock_block_page.block_entries[i].status); // Check status
+		EXPECT_EQ(ST_LtoC, mock_block_page.block_entries[i].status); // Check status
 		sprintf(path, "/tmp/testHCFS/data_1_%d", i);
 		getxattr(path, "user.dirty", xattr_val, 1);
-		ASSERT_STREQ("T", xattr_val);
+		EXPECT_STREQ("T", xattr_val);
 
 		pread(InitUploadControlTool::Tool()->fd, &block_entry,
 		      sizeof(BLOCK_UPLOADING_STATUS),
 		      i * sizeof(BLOCK_UPLOADING_STATUS));
-		ASSERT_EQ(TRUE, block_entry.finish_uploading);
-		ASSERT_EQ(i, block_entry.to_upload_seq);
+		EXPECT_EQ(TRUE, block_entry.finish_uploading);
+		EXPECT_EQ(i, block_entry.to_upload_seq);
 		unlink(path);
 	}
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	sem_destroy(&(upload_ctl.upload_finished_sem));
 	unlink(MOCK_META_PATH);
 }
 
@@ -429,6 +447,11 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 	/* Run tested function */
 	init_upload_control();
 	InitUploadControlTool::Tool()->init_delete_ctl();
+
+	PTHREAD_REUSE_set_exithandler();
+	for (int32_t i = 0 ; i < MAX_UPLOAD_CONCURRENCY ; i++)
+		PTHREAD_REUSE_create(&(upload_ctl.upload_threads_no[i]),
+		               NULL);
 
 	/* Generate mock threads */
 	for (int32_t i = 0 ; i < num_block_entry ; i++) {
@@ -448,9 +471,10 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 		upload_ctl.threads_in_use[index] = TRUE;
 		upload_ctl.threads_created[index] = TRUE;
 		upload_ctl.threads_finished[index] = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
 		upload_ctl.total_active_upload_threads++;
-		pthread_create(&(upload_ctl.upload_threads_no[index]),
-		               NULL, InitUploadControlTool::upload_thread_function,
+		PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[index]),
+		               InitUploadControlTool::upload_thread_function,
 		               (void *) & (upload_ctl.upload_threads[index]));
 		// create thread
 		sem_post(&(upload_ctl.upload_op_sem));
@@ -466,7 +490,9 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	sem_destroy(&(upload_ctl.upload_finished_sem));
 }
 
 /*
@@ -527,6 +553,7 @@ void *sync_thread_function(void *ptr)
 	ptr1 = (SYNC_THREAD_TYPE *) ptr;
 	usleep(100000); // Let thread busy
 	sync_ctl.threads_finished[ptr1->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return NULL;
 }
 
@@ -558,6 +585,7 @@ TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	free(retry_list.retry_inode);
@@ -587,12 +615,15 @@ TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
 		sync_ctl.threads_in_use[idle_thread] = i + 1;
 		sync_ctl.threads_created[idle_thread] = TRUE;
 		sync_ctl.threads_finished[idle_thread] = FALSE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		sync_ctl.is_revert[idle_thread] = FALSE;
 		sync_ctl.continue_nexttime[idle_thread] = FALSE;
 		sync_ctl.threads_error[idle_thread] = FALSE;
 
 		sync_threads[idle_thread].which_index = idle_thread;
-		pthread_create(&sync_ctl.inode_sync_thread[idle_thread], NULL,
+		PTHREAD_REUSE_create(&sync_ctl.inode_sync_thread[idle_thread],
+		               NULL);
+		PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[idle_thread],
 		               sync_thread_function,
 		               (void *) & (sync_threads[idle_thread]));
 		sync_ctl.total_active_sync_threads++;
@@ -607,6 +638,7 @@ TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 }
 
@@ -619,28 +651,33 @@ TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
 	/* Run tested function */
 	init_sync_control();
 
-	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR, 0600);
 
 	sem_wait(&sync_ctl.sync_queue_sem);
 	sem_wait(&sync_ctl.sync_op_sem);
 	sync_ctl.threads_in_use[0] = 2;
 	sync_ctl.threads_created[0] = TRUE;
 	sync_ctl.threads_finished[0] = FALSE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	sync_ctl.is_revert[0] = FALSE;
 	sync_ctl.continue_nexttime[0] = FALSE;
 	sync_ctl.threads_error[0] = TRUE; /* Set upload error */
 	sync_ctl.progress_fd[0] = fd;
 
 	sync_threads[0].which_index = 0;
-	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+	PTHREAD_REUSE_create(&sync_ctl.inode_sync_thread[0],
+	               NULL);
+	PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[0],
 	               sync_thread_function,
 	               (void *) & (sync_threads[0]));
+
 	sync_ctl.total_active_sync_threads++;
 	sem_post(&sync_ctl.sync_op_sem);
 	sleep(1);
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	/* Verify */
@@ -683,13 +720,17 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	sync_ctl.threads_in_use[0] = 2;
 	sync_ctl.threads_created[0] = TRUE;
 	sync_ctl.threads_finished[0] = FALSE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	sync_ctl.is_revert[0] = FALSE;
 	sync_ctl.continue_nexttime[0] = TRUE; /* Set continue_nexttime */
 	sync_ctl.threads_error[0] = TRUE; /* Set upload error */
 	sync_ctl.progress_fd[0] = fd;
 
 	sync_threads[0].which_index = 0;
-	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+
+	PTHREAD_REUSE_create(&sync_ctl.inode_sync_thread[0],
+	               NULL);
+	PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[0],
 	               sync_thread_function,
 	               (void *) & (sync_threads[0]));
 	sync_ctl.total_active_sync_threads++;
@@ -698,6 +739,7 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	/* Verify */
@@ -724,20 +766,23 @@ TEST_F(init_sync_controlTest, SyncSuccess)
 	/* The same as fetch_meta_path */
 	sprintf(metapath, "/tmp/testHCFS/mock_file_meta");
 	mknod(metapath, 0700, 0);
-	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR, 0600);
 
 	sem_wait(&sync_ctl.sync_queue_sem);
 	sem_wait(&sync_ctl.sync_op_sem);
 	sync_ctl.threads_in_use[0] = 2;
 	sync_ctl.threads_created[0] = TRUE;
 	sync_ctl.threads_finished[0] = FALSE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	sync_ctl.is_revert[0] = FALSE;
 	sync_ctl.continue_nexttime[0] = FALSE; /* No error */
 	sync_ctl.threads_error[0] = FALSE; /* No error */
 	sync_ctl.progress_fd[0] = fd;
 
 	sync_threads[0].which_index = 0;
-	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+	PTHREAD_REUSE_create(&sync_ctl.inode_sync_thread[0],
+	               NULL);
+	PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[0],
 	               sync_thread_function,
 	               (void *) & (sync_threads[0]));
 	sync_ctl.total_active_sync_threads++;
@@ -746,6 +791,7 @@ TEST_F(init_sync_controlTest, SyncSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
 
 	/* Verify */
@@ -804,7 +850,6 @@ protected:
 	}
 
 	void TearDown() {
-		void *res;
 		char tmppath[200];
 		char tmppath2[200];
 
@@ -820,11 +865,9 @@ protected:
 
 		unlink(MOCK_META_PATH);
 
-		hcfs_system->system_going_down = TRUE;
-		pthread_join(sync_ctl.sync_handler_thread, &res);
-
 		/* Join the sync_control thread */
 		hcfs_system->system_going_down = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		pthread_join(sync_ctl.sync_handler_thread, NULL);
 		close(fd);
 		unlink(progress_file);

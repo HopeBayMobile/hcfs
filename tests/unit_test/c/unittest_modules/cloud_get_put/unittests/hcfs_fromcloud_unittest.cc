@@ -15,6 +15,7 @@ extern "C" {
 #include "meta_mem_cache.h"
 #include "utils.h"
 #include "ut_global.h"
+#include "pthread_control.h"
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
@@ -341,8 +342,10 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 		download_thread_ctl.block_info[i].dl_error = FALSE;
 		download_thread_ctl.block_info[i].active = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		pthread_create(&(download_thread_ctl.download_thread[i]),
-		               NULL, mock_thread_fn, NULL);
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[i]),
+		               NULL);
+		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[i]),
+		               mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
@@ -376,8 +379,10 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 		download_thread_ctl.block_info[i].dl_error = TRUE;
 		download_thread_ctl.block_info[i].this_inode = i;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		pthread_create(&(download_thread_ctl.download_thread[i]),
-		               NULL, &mock_thread_fn, NULL);
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[i]),
+		               NULL);
+		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[i]),
+		               &mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}

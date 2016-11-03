@@ -22,6 +22,7 @@ $(eval $(call ADDMODULE))
 
 $(eval $(call ADDTEST, hcfs_fromcloud_unittest, \
   fromcloud_mock_function.o \
+  pthread_control.o \
   hcfs_fromcloud.o \
   hcfs_fromcloud_unittest.o ))
 
@@ -30,6 +31,7 @@ $(eval $(call ADDTEST, hcfs_tocloud_unittest, \
   enc.o \
   compress.o \
   objmeta.o \
+  pthread_control.o \
   dedup_mock_function.o \
   tocloud_mock_function.o \
   hcfs_tocloud.o \

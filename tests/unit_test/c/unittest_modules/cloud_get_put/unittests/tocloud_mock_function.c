@@ -291,6 +291,8 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 	MOCK();
 	BLOCK_UPLOADING_STATUS block_entry;
 
+	memset(&block_entry, 0, sizeof(BLOCK_UPLOADING_STATUS));
+
 	if (toupload_seq)
 		block_entry.to_upload_seq = *toupload_seq;
 	if (backend_seq)
