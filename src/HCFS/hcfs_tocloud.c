@@ -2337,7 +2337,6 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 
 	if (access(PACKAGE_XML, F_OK) != 0) {
 		write_log(0, "Unable to locate package list\n");
-		sem_post(&backup_pkg_sem);
 		return;
 	}
 
@@ -2345,7 +2344,6 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 	if (ret < 0) {
 		if (access(backup_xml, F_OK) == 0)
 			unlink(backup_xml);
-		sem_post(&backup_pkg_sem);
 		return;
 	}
 
