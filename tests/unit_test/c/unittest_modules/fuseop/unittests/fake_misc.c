@@ -1223,3 +1223,8 @@ void force_backup_package(void)
 {
 	return;
 }
+
+int32_t backup_package_list(void)
+{
+	return 0;
+}
