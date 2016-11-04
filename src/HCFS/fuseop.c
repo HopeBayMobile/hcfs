@@ -7936,10 +7936,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 				write_log(10, "Debug: Finish rebuilding."
 					" Now Enable sync/upload/cache mgmt");
 				/* Backup package list */
-				force_backup_package();
+				backup_package_list();
 			}
 		}
 		sem_post(&(hcfs_system->access_sem));
+		force_backup_package(); /*Backup if have_new_pkgbackup == TRUE*/
 	}
 
 	/* Join thread if still restoring */
