@@ -153,11 +153,6 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 	}
 
 	hcfs_system->system_going_down = TRUE;
-	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++) {
-		while (pinning_scheduler.thread_active[idx] == TRUE)
-			sleep(1);
-		PTHREAD_REUSE_terminate(&pinning_scheduler.pinfile_tid[idx]);
-	}
 	sem_post(&(pinning_scheduler.pin_active_sem));
         pthread_join(pinning_scheduler.pinning_collector, NULL);
 	hcfs_system->system_going_down = FALSE;

@@ -53,12 +53,6 @@ int32_t destroy_pin_scheduler()
 	sem_post(&(pinning_scheduler.pin_active_sem));
 	sem_post(&(hcfs_system->pin_wait_sem));
 
-	int32_t idx;
-	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++) {
-		while (pinning_scheduler.thread_active[idx] == TRUE)
-			sleep(1);
-		PTHREAD_REUSE_terminate(&(pinning_scheduler.pinfile_tid[idx]));
-	}
 	pthread_join(pinning_scheduler.pinning_manager, NULL);
 	pthread_join(pinning_scheduler.pinning_collector, NULL);
 	sem_destroy(&(pinning_scheduler.ctl_op_sem));
@@ -131,6 +125,8 @@ void* pinning_collect(void *arg)
 		}
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 	}
+	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++)
+		PTHREAD_REUSE_terminate(&(pinning_scheduler.pinfile_tid[idx]));
 	return NULL;
 }
 
