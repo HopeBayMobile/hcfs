@@ -7940,7 +7940,10 @@ int32_t hook_fuse(int32_t argc, char **argv)
 			}
 		}
 		sem_post(&(hcfs_system->access_sem));
-		force_backup_package(); /*Backup if have_new_pkgbackup == TRUE*/
+
+		/* Backup if have_new_pkgbackup == TRUE */
+		if (hcfs_system->system_going_down == FALSE)
+			force_backup_package();
 	}
 
 	/* Join thread if still restoring */
