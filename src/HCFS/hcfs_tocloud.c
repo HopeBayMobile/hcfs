@@ -359,10 +359,11 @@ void collect_finished_sync_threads(void *ptr)
 				write_log(10, "Set upload in progress to FALSE\n");
 			}
 			sem_post(&(sync_ctl.sync_op_sem));
-			while ((sync_ctl.total_active_sync_threads <= 0) &&
-			       (hcfs_system->system_going_down == FALSE))
-				sem_wait(&(sync_ctl.sync_finished_sem));
-			continue;
+			sem_wait(&(sync_ctl.sync_finished_sem));
+			if ((sync_ctl.total_active_sync_threads <= 0) &&
+			       (hcfs_system->system_going_down == TRUE))
+				break;
+			sem_wait(&(sync_ctl.sync_op_sem));
 		}
 
 		/* Some upload threads are working */
@@ -600,15 +601,13 @@ void collect_finished_upload_threads(void *ptr)
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 	       (upload_ctl.total_active_upload_threads > 0)) {
+		sem_wait(&(upload_ctl.upload_finished_sem));
+		if ((upload_ctl.total_active_upload_threads <= 0) &&
+			       (hcfs_system->system_going_down == TRUE))
+			break;
+
 		sem_wait(&(upload_ctl.upload_op_sem));
 
-		if (upload_ctl.total_active_upload_threads <= 0) {
-			sem_post(&(upload_ctl.upload_op_sem));
-			while ((upload_ctl.total_active_upload_threads <= 0) &&
-			       (hcfs_system->system_going_down == FALSE))
-				sem_wait(&(upload_ctl.upload_finished_sem));
-			continue;
-		}
 		for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
 			ret = _upload_terminate_thread(count);
 			/* Return code could be due to thread joining,
@@ -665,6 +664,13 @@ void init_sync_control(void)
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
 		PTHREAD_REUSE_create(&(sync_ctl.inode_sync_thread[count]),
 		                     NULL);
+}
+
+static inline void destroy_sync_control(void)
+{
+	sem_post(&(sync_ctl.sync_finished_sem));
+	pthread_join(sync_ctl.sync_handler_thread, NULL);
+	free(sync_ctl.retry_list.retry_inode);
 }
 
 void init_upload_control(void)
@@ -1119,7 +1125,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t size_diff_blk = 0, meta_size_diff_blk = 0;
 	int64_t disk_pin_size_delta = 0;
 	BOOL cleanup_meta = FALSE;
-	int32_t pause_status;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1130,9 +1135,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1143,9 +1146,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1157,9 +1158,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			__func__, errcode, strerror(errcode));
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1176,9 +1175,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		to sync this object anymore. */
 		fclose(toupload_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	setbuf(local_metafptr, NULL);
@@ -1205,10 +1202,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			fclose(local_metafptr);
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			sem_getvalue(&(sync_ctl.sync_finished_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(sync_ctl.sync_finished_sem));
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1311,10 +1305,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			sem_getvalue(&(sync_ctl.sync_finished_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(sync_ctl.sync_finished_sem));
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1332,10 +1323,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
-			sem_getvalue(&(sync_ctl.sync_finished_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(sync_ctl.sync_finished_sem));
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 	}
@@ -1348,9 +1336,7 @@ store in some other file */
 		fclose(local_metafptr);
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1375,7 +1361,10 @@ store in some other file */
 		int64_t now_meta_size, now_meta_size_blk, tmpval;
 
 		cleanup_meta = TRUE;
+<<<<<<< HEAD
 
+=======
+>>>>>>> Fixed tocloud UT
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
@@ -1537,9 +1526,7 @@ store in some other file */
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1559,9 +1546,7 @@ store in some other file */
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
-		sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(sync_ctl.sync_finished_sem));
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	fclose(toupload_metafptr);
@@ -1623,9 +1608,7 @@ store in some other file */
 				ptr->inode, DEL_BACKEND_BLOCKS);
 	}
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
-	sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-	if (pause_status == 0)
-		sem_post(&(sync_ctl.sync_finished_sem));
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 
 errcode_handle:
@@ -1638,7 +1621,10 @@ errcode_handle:
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
 	}
+<<<<<<< HEAD
 
+=======
+>>>>>>> Fixed tocloud UT
 	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 	flock(fileno(toupload_metafptr), LOCK_UN);
@@ -1647,9 +1633,7 @@ errcode_handle:
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
-	sem_getvalue(&(sync_ctl.sync_finished_sem), &pause_status);
-	if (pause_status == 0)
-		sem_post(&(sync_ctl.sync_finished_sem));
+	sem_post(&(sync_ctl.sync_finished_sem));
 	UNUSED(errcode);
 	return;
 }
@@ -2454,8 +2438,7 @@ void upload_loop(void)
 
 	sem_post(&(upload_ctl.upload_finished_sem));
 	pthread_join(upload_ctl.upload_handler_thread, NULL);
-	sem_post(&(sync_ctl.sync_finished_sem));
-	pthread_join(sync_ctl.sync_handler_thread, NULL);
+	destroy_sync_control();
 
 #ifdef _ANDROID_ENV_
 	return NULL;

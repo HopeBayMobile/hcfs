@@ -54,10 +54,13 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	return HTTP_OK;
 }
 
+int counter = 0;
 int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 	char transit_incomplete)
 {
 	MOCK();
+	counter++;
+	printf("Counter is now %d, dirty %d\n", counter, sys_super_block->head.num_dirty);
 	if (this_inode > 1 && transit_incomplete == FALSE) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
 		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
@@ -66,6 +69,7 @@ int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 		sem_post(&shm_verified_data->record_inode_sem);
 
 		sys_super_block->head.num_dirty--;
+		printf("Counter is now %d, dirty %d\n", counter, sys_super_block->head.num_dirty);
 		printf("Test: inode %zu is updated\n", this_inode);
 	}
 	return 0;
