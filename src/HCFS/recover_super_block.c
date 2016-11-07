@@ -289,43 +289,29 @@ int32_t _batch_write_sb_entries(SUPER_BLOCK_ENTRY *buf,
 /* Helper function to read struct FILE_STATS_TYPE recorded in regfile
  * meta file.
  */
-int32_t _read_regfile_meta(ino_t this_inode, FILE_STATS_TYPE *file_stats)
+int32_t _read_regfile_meta(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+		FILE_STATS_TYPE *file_stats)
 {
 	int32_t ret_code = 0;
 	int64_t rsize = 0;
-	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
-
-	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL) {
-		write_log(0, "Error lock meta cache of inode %"PRIu64".",
-				this_inode);
-		goto error_handle;
-	}
 
 	if ((meta_cache_entry->meta_opened == FALSE) || (meta_cache_entry->fptr == NULL))
 		ret_code = meta_cache_open_file(meta_cache_entry);
 		if (ret_code < 0) {
 			write_log(0, "Error open meta file of inode %"PRIu64".",
-				this_inode);
-		        goto error_handle;
+				meta_cache_entry->inode_num);
+		        return -1;
 		}
 
         rsize = pread(fileno(meta_cache_entry->fptr), file_stats, sizeof(FILE_STATS_TYPE),
 			sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
         if (rsize < (int64_t)sizeof(FILE_STATS_TYPE)) {
 		write_log(0, "Error read meta of inode %"PRIu64". Error code %d",
-				this_inode, errno);
-		goto error_handle;
+				meta_cache_entry->inode_num, errno);
+		return -1;
 	}
 
-	goto done;
-
-error_handle:
-	ret_code = -1;
-done:
-	meta_cache_close_file(meta_cache_entry);
-	meta_cache_unlock_entry(meta_cache_entry);
-	return ret_code;
+	return 0;
 }
 
 /* To walk all entries in superblock and reconstruct the entry
@@ -341,6 +327,7 @@ done:
  * @return 0 on success. Otherwise, the negation of error code.
  */
 int32_t reconstruct_sb_entries(SUPER_BLOCK_ENTRY *sb_entry_arr,
+		META_CACHE_ENTRY_STRUCT **meta_cache_arr,
 		int64_t num_entry_handle,
 		RECOVERY_ROUND_DATA *this_round)
 {
@@ -367,9 +354,12 @@ int32_t reconstruct_sb_entries(SUPER_BLOCK_ENTRY *sb_entry_arr,
 		sbentry2 = (sb_entry_arr + idx);
 		if (sbentry2->status != IS_DIRTY)
 			continue;
-		/* Read meta data here */
-		if (S_ISFILE(sbentry2->inode_stat.mode)) {
-			ret_code = _read_regfile_meta(sbentry2->this_index, &file_stats);
+		/* Already check file type of this inode when locking meta_cache_entry.
+		 * Pointer in array is NULL means that no need to read the dirty_data_size
+		 * from meta file.
+		 */
+		if (meta_cache_arr[idx] != NULL) {
+			ret_code = _read_regfile_meta(meta_cache_arr[idx], &file_stats);
 			if (ret_code < 0) {
 				write_log(0, "Error when recovering inode %"PRIu64". "
 						"Skip this entry and continue.",
@@ -485,14 +475,18 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data)
 void dump_sb_entries();
 void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 {
-	char error_msg[] = "Dirty queue recovery worker aborted.";
-	int32_t ret_code;
+	char error_msg[] = "SB queue recovery worker aborted.";
+	int32_t ret_code, count;
 	int64_t buf_size, num_entry_handle;
 	ino_t start_inode, end_inode;
 	SUPER_BLOCK_ENTRY *sb_entry_arr = NULL;
+	META_CACHE_ENTRY_STRUCT **meta_cache_arr = NULL;
+	META_CACHE_ENTRY_STRUCT *tmp_meta_cache_entry = NULL;
+	int32_t tmp_code;
+
 	RECOVERY_ROUND_DATA recover_round;
 
-	write_log(4, "Start to recvoer dirty queue in superblock.");
+	write_log(4, "Start to recover dirty queue in superblock.");
 
 	super_block_exclusive_locking();
 	if (sys_super_block->sb_recovery_meta.is_ongoing ||
@@ -514,6 +508,15 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 		pthread_exit((void *)-1);
 	}
 
+	buf_size = MAX_NUM_ENTRY_HANDLE * sizeof(META_CACHE_ENTRY_STRUCT*);
+	meta_cache_arr = (META_CACHE_ENTRY_STRUCT**)calloc(1, buf_size);
+	if (meta_cache_arr == NULL) {
+		write_log(0, "%s Error allocate memory.", error_msg);
+		super_block_exclusive_release();
+		free(sb_entry_arr);
+		pthread_exit((void *)-1);
+	}
+
 	/* Is there an unfinished recovery job? */
 	start_inode = fetch_last_recover_progress();
 	if (start_inode == 0) {
@@ -532,12 +535,28 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 	super_block_exclusive_release();
 
 	while (start_inode < end_inode) {
-		super_block_exclusive_locking();
-
 		if ((start_inode + MAX_NUM_ENTRY_HANDLE) <= end_inode)
 			num_entry_handle = MAX_NUM_ENTRY_HANDLE;
 		else
 			num_entry_handle = end_inode - start_inode + 1;
+
+		/* Lock meta_cache_entry if target inode is regular file.
+		 * Many fuse operations lock meta_mem_cache first and
+		 * superblock next, this will cause deadlock if we don't
+		 * lock meta_mem_cache before lock superblock.*/
+		for (count = 0; count < num_entry_handle; count++) {
+			tmp_meta_cache_entry =
+				meta_cache_lock_entry(start_inode + count);
+			if (tmp_meta_cache_entry == NULL ||
+					!S_ISFILE(tmp_meta_cache_entry->this_stat.mode)) {
+				meta_cache_arr[count] = NULL;
+				meta_cache_unlock_entry(tmp_meta_cache_entry);
+				continue;
+			}
+			meta_cache_arr[count] = tmp_meta_cache_entry;
+		}
+
+		super_block_exclusive_locking();
 
 		_CALL_N_CHECK_RETCODE(
 				_batch_read_sb_entries(sb_entry_arr, start_inode,
@@ -545,8 +564,8 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 				"Error read sb entries.");
 
 		_CALL_N_CHECK_RETCODE(
-				reconstruct_sb_entries(sb_entry_arr, num_entry_handle,
-					&recover_round),
+				reconstruct_sb_entries(sb_entry_arr, meta_cache_arr,
+					num_entry_handle, &recover_round),
 				"Error reconstruct dirty entries.");
 
 		_CALL_N_CHECK_RETCODE(
@@ -558,14 +577,20 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 				update_reconstruct_result(recover_round),
 				"Error update reconstruct result.");
 
-		start_inode += num_entry_handle;
-
 		_CALL_N_CHECK_RETCODE(
 				log_recover_progress(start_inode),
 				"Error log recovery progress.");
 
 		/* Unlock for a while to avoid block other ops too much time */
 		super_block_exclusive_release();
+
+		/* Unlock all locked meta_cache_entry */
+		for (count = 0; count < num_entry_handle; count++) {
+			if (meta_cache_arr[count] == NULL) {
+				meta_cache_unlock_entry(meta_cache_arr[count]);
+			}
+		}
+		start_inode += num_entry_handle;
 	}
 	/* Recovery was finished */
 	free(sb_entry_arr);
@@ -670,10 +695,6 @@ void dump_sb_entries()
 					sbentry2->this_index,
 					sbentry2->status,
 					sbentry2->pin_status,
-					sbentry2->util_ll_prev,
-					sbentry2->util_ll_next);
-			write_log(0, "DUMPSB - ino %ld with prev %ld, next %ld",
-					sbentry2->this_index,
 					sbentry2->util_ll_prev,
 					sbentry2->util_ll_next);
 		}

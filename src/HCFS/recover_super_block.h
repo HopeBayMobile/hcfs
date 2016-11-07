@@ -15,7 +15,7 @@
 #include "super_block.h"
 
 #define PROGRESS_FILE "recover_dirty_in_progress"
-#define MAX_NUM_ENTRY_HANDLE 64
+#define MAX_NUM_ENTRY_HANDLE 512
 #define MIN_RECOVERY_INTERVAL 3600 /* Only trigger recovery once in this interval */
 
 typedef struct recovery_round_data {
