@@ -1054,6 +1054,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t pin_size_delta = 0, last_file_size = 0;
 	int64_t size_diff_blk = 0, meta_size_diff_blk = 0;
 	int64_t disk_pin_size_delta = 0;
+	BOOL cleanup_meta = FALSE;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1297,6 +1298,9 @@ store in some other file */
 	if (!access(local_metapath, F_OK)) {
 		struct stat metastat; /* meta file ops */
 		int64_t now_meta_size, now_meta_size_blk, tmpval;
+
+		cleanup_meta = TRUE;
+
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
@@ -1397,6 +1401,7 @@ store in some other file */
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
+		cleanup_meta = FALSE;
 
 		schedule_sync_meta(toupload_metapath, which_curl);
 
@@ -1519,6 +1524,16 @@ store in some other file */
 	return;
 
 errcode_handle:
+	if (cleanup_meta == TRUE) {
+		sem_wait(&(upload_ctl.upload_op_sem));
+		upload_ctl.threads_in_use[which_curl] = FALSE;
+		upload_ctl.threads_created[which_curl] = FALSE;
+		upload_ctl.threads_finished[which_curl] = FALSE;
+		upload_ctl.total_active_upload_threads--;
+		sem_post(&(upload_ctl.upload_op_sem));
+		sem_post(&(upload_ctl.upload_queue_sem));
+	}
+
 	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 	flock(fileno(toupload_metafptr), LOCK_UN);
