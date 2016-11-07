@@ -1,4 +1,16 @@
-#include "hcfs_iterator.h"
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: meta_iterator.c
+* Abstract: The c source file for iterator operations
+*
+* Revision History
+* 2016/10/20 Kewei created this file.
+*
+**************************************************************************/
+
+#include "meta_iterator.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -8,13 +20,12 @@
 
 /**
 	Usage:
-	FILE_BLOCK_ITERATOR *now;
 	FILE_BLOCK_ITERATOR *iter = init_block_iter(fptr);
 	if (!iter)
 		return -errno;
-	for (now = iter_begin(iter); now; now = iter_next(iter)) {
-		// int64_t now_block is now->now_block;
-		// BLOCK_ENTRY_PAGE page is now->page;
+	while (iter_begin(iter) != NULL) {
+		// Now block index is iter->now_block;
+		// Now page is iter->page;
 	}
 	if (errno < 0) {
 		// Error occur

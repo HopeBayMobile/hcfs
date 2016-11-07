@@ -31,7 +31,7 @@ endif
 
 OBJS_DIR = obj
 OBJS_F := \
-	hcfs_iterator.o \
+	meta_iterator.o \
 	objmeta.o \
 	mount_manager.o \
 	FS_manager.o \

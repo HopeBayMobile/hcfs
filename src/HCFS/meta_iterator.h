@@ -20,10 +20,9 @@ typedef struct FILE_BLOCK_ITERATOR {
 	int32_t e_index;
 	int64_t now_block;
 	int64_t total_blocks;
-	int32_t errcode;
+	BLOCK_ENTRY_PAGE page;
 	HCFS_STAT filestat;
 	FILE_META_TYPE filemeta;
-	BLOCK_ENTRY_PAGE page;
 	FILE *fptr;
 	//void *(*next)(void *iter);
 	//struct FILE_BLOCK_ITERATOR *(*jump)(struct FILE_BLOCK_ITERATOR *iter, int64_t block_no);
