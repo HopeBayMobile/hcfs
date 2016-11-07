@@ -240,5 +240,8 @@ void PTHREAD_REUSE_join(PTHREAD_REUSE_T *thread)
 void PTHREAD_REUSE_terminate(PTHREAD_REUSE_T *thread)
 {
 	pthread_kill(thread->self, SIGUSR2);
+	/* Thread might be canceled with some other threads waiting */
+	if (thread->cancelable == 1)
+		sem_post(&(thread->finish));
 	pthread_join(thread->self, NULL);
 }

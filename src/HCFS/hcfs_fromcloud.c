@@ -384,9 +384,6 @@ int32_t init_download_control()
 int32_t destroy_download_control()
 {
 	sem_post(&(download_thread_ctl.th_wait_sem));
-	int32_t count;
-	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
-		PTHREAD_REUSE_terminate(&(download_thread_ctl.dthread[count]));
 
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 	sem_destroy(&(download_thread_ctl.ctl_op_sem));
@@ -415,7 +412,9 @@ void* download_block_manager(void *arg)
 	FILE *fptr;
 	UNUSED(arg);
 
-	while(TRUE) {
+	while ((hcfs_system->system_going_down == FALSE) ||
+	       (download_thread_ctl.active_th > 0)) {
+		sem_wait(&(download_thread_ctl.th_wait_sem));
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 
 		/* Wait all threads when system going down */
@@ -424,13 +423,6 @@ void* download_block_manager(void *arg)
 				sem_post(&(download_thread_ctl.ctl_op_sem));
 				break;
 			}
-		}
-
-		/* Sleep when number of active threads <= 0 */
-		if (download_thread_ctl.active_th <= 0) {
-			sem_post(&(download_thread_ctl.ctl_op_sem));
-			sem_wait(&(download_thread_ctl.th_wait_sem));
-			continue;
 		}
 
 		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY; t_idx++) {
@@ -470,6 +462,9 @@ void* download_block_manager(void *arg)
 		}
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(download_thread_ctl.dthread[count]));
 
 	return NULL;
 }
@@ -584,6 +579,7 @@ void* fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
+		sem_post(&(download_thread_ctl.th_wait_sem));
 		return NULL;
 	}
 	fclose(block_fptr);
@@ -593,6 +589,7 @@ void* fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
+		sem_post(&(download_thread_ctl.th_wait_sem));
 		return NULL;
 	}
 
@@ -624,6 +621,7 @@ void* fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
+			sem_post(&(download_thread_ctl.th_wait_sem));
 			return NULL;
 		}
 	}
@@ -682,6 +680,7 @@ void* fetch_backend_block(void *ptr)
 				block_info->block_no, __func__);
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
+			sem_post(&(download_thread_ctl.th_wait_sem));
 			return NULL;
 
 		} else { /* Strange.. */
@@ -715,6 +714,7 @@ void* fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
+			sem_post(&(download_thread_ctl.th_wait_sem));
 			return NULL;
 		}
 	}
@@ -728,13 +728,14 @@ void* fetch_backend_block(void *ptr)
 	if (ret < 0)
 		block_info->dl_error = TRUE;
 	*/
-
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	return NULL;
 
 thread_error:
 	block_info->dl_error = TRUE;
 	flock(fileno(block_fptr), LOCK_UN);
 	fclose(block_fptr);
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	return NULL;
 }
 
@@ -759,7 +760,6 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 	int32_t which_th;
 	int32_t ret, errcode;
 	size_t ret_size;
-	int32_t pause_status;
 
 	e_index = blkno % MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -802,10 +802,6 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 				(void *)&(download_thread_ctl.block_info[which_th]));
 
 		download_thread_ctl.active_th++;
-		/* Signal paused thread collector if needed */
-		sem_getvalue(&(download_thread_ctl.th_wait_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(download_thread_ctl.th_wait_sem));
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
 

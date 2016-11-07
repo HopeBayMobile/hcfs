@@ -41,6 +41,7 @@ BATCH_UT := 1
 $(eval $(call ADDTEST, hcfs_clouddelete_unittest, \
   clouddelete_mock_function.o \
   hcfs_clouddelete.o \
+  pthread_control.o \
   hcfs_clouddelete_unittest.o ))
 
 $(eval $(call ADDTEST, atomic_tocloud_unittest, \

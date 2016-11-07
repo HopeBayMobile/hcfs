@@ -99,6 +99,7 @@ protected:
 
 		verified_inodes_counter = 0;
 		sem_init(&verified_inodes_sem, 0, 1);
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
@@ -113,11 +114,7 @@ void* mock_thread_fctnl(void *ptr)
 
 	pinning_scheduler.pinfile_tid[info->t_idx].cancelable = FALSE;
 	pinning_scheduler.thread_finish[info->t_idx] = TRUE;
-	int32_t active_pause_status;
-	sem_getvalue(&(pinning_scheduler.pin_active_sem),
-	             &active_pause_status);
-	if (active_pause_status == 0)
-		sem_post(&(pinning_scheduler.pin_active_sem));
+	sem_post(&(pinning_scheduler.pin_active_sem));
 	return NULL;
 }
 

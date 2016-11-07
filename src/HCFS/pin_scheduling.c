@@ -80,21 +80,20 @@ static BOOL _pinning_wakeup_fn(void)
 void* pinning_collect(void *arg)
 {
 	int32_t idx;
-	int32_t pause_status;
 	PTHREAD_REUSE_T *tid;
 
 	UNUSED(arg);
 
-	while (TRUE) {
+	/* Use while here to terminate immediately after all
+	workers are finished + system shutting down */
+	while ((hcfs_system->system_going_down == FALSE) ||
+	       (pinning_scheduler.total_active_pinning > 0)) {
+		/* Wait for some pin worker to terminate */
+		sem_wait(&(pinning_scheduler.pin_active_sem));
 		/* Wait for threads */
 		if (hcfs_system->system_going_down == TRUE) {
 			if (pinning_scheduler.total_active_pinning <= 0)
 				break;
-		}
-
-		if (pinning_scheduler.total_active_pinning <= 0) {
-			sem_wait(&(pinning_scheduler.pin_active_sem));
-			continue;
 		}
 
 		/* Collect threads */
@@ -118,10 +117,6 @@ void* pinning_collect(void *arg)
 
 			/* Post a semaphore */
 			sem_post(&(pinning_scheduler.pinning_sem));
-			sem_getvalue(&(pinning_scheduler.pin_active_sem),
-			         &pause_status);
-			if (pause_status == 0)
-				sem_post(&(pinning_scheduler.pin_active_sem));
 		}
 		sem_post(&(pinning_scheduler.ctl_op_sem));
 	}
@@ -146,7 +141,6 @@ void pinning_worker(void *ptr)
 	PINNING_INFO *pinning_info;
 	ino_t this_inode;
 	int32_t t_idx, ret;
-	int32_t active_pause_status;
 	PTHREAD_REUSE_T *this_th;
 
 	this_th = (PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
@@ -181,10 +175,7 @@ void pinning_worker(void *ptr)
 					(uint64_t)this_inode);
 		}
 		pinning_scheduler.thread_finish[t_idx] = TRUE;
-		sem_getvalue(&(pinning_scheduler.pin_active_sem),
-		             &active_pause_status);
-		if (active_pause_status == 0)
-			sem_post(&(pinning_scheduler.pin_active_sem));
+		sem_post(&(pinning_scheduler.pin_active_sem));
 
 		return; /* Do not dequeue when failing in pinning */
 	}
@@ -204,9 +195,7 @@ before finish pinning */
 	}
 
 	pinning_scheduler.thread_finish[t_idx] = TRUE;
-	sem_getvalue(&(pinning_scheduler.pin_active_sem), &active_pause_status);
-	if (active_pause_status == 0)
-		sem_post(&(pinning_scheduler.pin_active_sem));
+	sem_post(&(pinning_scheduler.pin_active_sem));
 	return;
 }
 
@@ -260,7 +249,7 @@ void pinning_loop()
 			if (sys_super_block->head.num_pinning_inodes <=
 				pinning_scheduler.total_active_pinning) {
 				super_block_share_release();
-				sem_wait(&(pinning_scheduler.pin_active_sem));
+				sem_wait(&(hcfs_system->pin_wait_sem));
 				continue;
 			}
 			now_inode = sys_super_block->head.first_pin_inode;

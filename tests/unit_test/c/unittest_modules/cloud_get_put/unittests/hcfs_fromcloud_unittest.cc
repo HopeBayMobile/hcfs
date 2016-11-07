@@ -316,6 +316,8 @@ protected:
 		sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
 		sem_init(&(download_thread_ctl.dl_th_sem), 0,
 		         MAX_PIN_DL_CONCURRENCY);
+		PTHREAD_REUSE_set_exithandler();
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown() {
@@ -324,6 +326,7 @@ protected:
 
 void* mock_thread_fn(void *arg)
 {
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	return NULL;
 }
 
@@ -338,12 +341,15 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 	               &download_block_manager, NULL);
 
-	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[count]),
+		               NULL);
+
+	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].dl_error = FALSE;
 		download_thread_ctl.block_info[i].active = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[i]),
-		               NULL);
 		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[i]),
 		               mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
@@ -351,8 +357,8 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 	}
 
 	hcfs_system->system_going_down = TRUE;
-	sleep(1);
 
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 
 	/* Verify */
@@ -374,13 +380,15 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 	               &download_block_manager, NULL);
 
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[count]),
+		               NULL);
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].active = TRUE;
 		download_thread_ctl.block_info[i].dl_error = TRUE;
 		download_thread_ctl.block_info[i].this_inode = i;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[i]),
-		               NULL);
 		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[i]),
 		               &mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
@@ -388,8 +396,8 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 	}
 
 	hcfs_system->system_going_down = TRUE;
-	sleep(1);
 
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 
 	/* Verify */

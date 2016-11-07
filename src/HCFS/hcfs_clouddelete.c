@@ -121,13 +121,12 @@ void collect_finished_dsync_threads(void *ptr)
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 		(dsync_ctl.total_active_dsync_threads > 0)) {
+		sem_wait(&(dsync_ctl.pause_sem));
+		if ((hcfs_system->system_going_down == TRUE) &&
+		    (dsync_ctl.total_active_dsync_threads <= 0))
+			break;
 		sem_wait(&(dsync_ctl.dsync_op_sem));
 
-		if (dsync_ctl.total_active_dsync_threads <= 0) {
-			sem_post(&(dsync_ctl.dsync_op_sem));
-			sem_wait(&(dsync_ctl.pause_sem));
-			continue;
-		}
 		for (count = 0; count < MAX_DSYNC_CONCURRENCY; count++)
 			_dsync_terminate_thread(count);
 
@@ -182,13 +181,13 @@ void collect_finished_delete_threads(void *ptr)
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 		(delete_ctl.total_active_delete_threads > 0)) {
+		sem_wait(&(delete_ctl.pause_sem));
+		if ((hcfs_system->system_going_down == TRUE) &&
+			(delete_ctl.total_active_delete_threads <= 0))
+			break;
+
 		sem_wait(&(delete_ctl.delete_op_sem));
 
-		if (delete_ctl.total_active_delete_threads <= 0) {
-			sem_post(&(delete_ctl.delete_op_sem));
-			sem_wait(&(delete_ctl.pause_sem));
-			continue;
-		}
 		for (count = 0; count < MAX_DELETE_CONCURRENCY; count++)
 			_delete_terminate_thread(count);
 
@@ -237,6 +236,14 @@ void init_dsync_control(void)
 		                     NULL);
 }
 
+static inline void _destroy_delete_controls(void)
+{
+	sem_post(&(delete_ctl.pause_sem));
+	sem_post(&(dsync_ctl.pause_sem));
+	pthread_join(dsync_ctl.dsync_handler_thread, NULL);
+	pthread_join(delete_ctl.delete_handler_thread, NULL);
+	free(dsync_ctl.retry_list.retry_inode);
+}
 /* Helper for initializing curl handles for deleting backend objects */
 static inline int32_t _init_delete_handle(int32_t index)
 {
@@ -502,9 +509,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	ret = fetch_todelete_path(todel_metapath, this_inode);
 	if (ret < 0) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -591,9 +596,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -611,9 +614,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		super_block_delete(this_inode);
 		super_block_reclaim();
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -759,17 +760,13 @@ errcode_handle:
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
 	if (hcfs_system->system_going_down == TRUE) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -818,9 +815,7 @@ errcode_handle:
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -837,9 +832,7 @@ errcode_handle:
 	super_block_delete(this_inode);
 	super_block_reclaim();
 	dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-	sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-	if (pause_status == 0)
-		sem_post(&(dsync_ctl.pause_sem));
+	sem_post(&(dsync_ctl.pause_sem));
 	return;
 }
 
@@ -1059,6 +1052,9 @@ void *delete_loop(void *ptr)
 			continue;
 		}
 
+		write_log(10, "Debug statistics %d, %d\n",
+		          sys_super_block->head.num_to_be_deleted,
+		          dsync_ctl.total_active_dsync_threads);
 		/* Sleep if backend is online and system is running */
 		if (sys_super_block->head.num_to_be_deleted <=
 		    dsync_ctl.total_active_dsync_threads) {
@@ -1151,7 +1147,10 @@ anything can be deleted */
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		}
 	}
+	_destroy_delete_controls();
 	sem_post(&(delete_ctl.pause_sem));
 	sem_post(&(dsync_ctl.pause_sem));
+	pthread_join(dsync_ctl.dsync_handler_thread, NULL);
+	pthread_join(delete_ctl.delete_handler_thread, NULL);
 	return NULL;
 }

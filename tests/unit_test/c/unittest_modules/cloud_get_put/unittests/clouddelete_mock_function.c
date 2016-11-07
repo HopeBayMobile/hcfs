@@ -31,6 +31,7 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 {
 	MOCK();
+	printf("Running into fetch todelete\n");
 	if (this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
 		DEBUG_PRINT("this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS\n");
 		strcpy(pathname, TODELETE_PATH);
@@ -50,6 +51,8 @@ int32_t fetch_todelete_path(char *pathname, ino_t this_inode)
 		sem_post(&(to_verified_data.record_inode_sem));
 		pathname[0] = '\0';
 		printf("Test: mock inode %zu is deleted\n", this_inode);
+		sys_super_block->head.num_to_be_deleted--;
+
 		return -1;
 	}
 }

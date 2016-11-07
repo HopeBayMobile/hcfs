@@ -2180,10 +2180,6 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 	sem_getvalue(&(hcfs_system->pin_wait_sem), &pause_status);
 	if (pause_status == 0)
 		sem_post(&(hcfs_system->pin_wait_sem));
-	sem_getvalue(&(pinning_scheduler.pin_active_sem),
-	             &pause_status);
-	if (pause_status == 0)
-		sem_post(&(pinning_scheduler.pin_active_sem));
 
 	ret = write_super_block_head();
 	if (ret < 0)
