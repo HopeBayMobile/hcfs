@@ -1321,7 +1321,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	/* Create a thread to run upload_loop() */
 	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
 
-	sleep(20);
+	sleep(30);
 	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
 	sem_post(&(hcfs_system->sync_wait_sem));
 	pthread_join(thread_id, NULL);
