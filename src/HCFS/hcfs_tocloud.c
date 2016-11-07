@@ -1361,10 +1361,7 @@ store in some other file */
 		int64_t now_meta_size, now_meta_size_blk, tmpval;
 
 		cleanup_meta = TRUE;
-<<<<<<< HEAD
 
-=======
->>>>>>> Fixed tocloud UT
 		/* TODO: Refactor following code */
 		ret = fstat(fileno(toupload_metafptr), &metastat);
 		if (ret < 0) {
@@ -1621,10 +1618,7 @@ errcode_handle:
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
 	}
-<<<<<<< HEAD
 
-=======
->>>>>>> Fixed tocloud UT
 	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 	flock(fileno(toupload_metafptr), LOCK_UN);
