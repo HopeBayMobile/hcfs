@@ -30,6 +30,8 @@
 #include "super_block.h"
 #include "metaops.h"
 #include "parent_lookup.h"
+#include "mount_manager.h"
+#include "FS_manager.h"
 
 int32_t unmount_smart_cache(char *mount_point)
 {
@@ -51,7 +53,7 @@ int32_t mount_smart_cache()
 		errcode = -errno;
 		if (errcode == -ENOENT) {
 			write_log(6, "Create folder %s", SMART_CACHE_MP);
-			MKDIR(SMART_CACHE_MP, 0);
+			MKDIR(SMART_CACHE_MP, 0771);
 		} else {
 			goto errcode_handle;
 		}
@@ -108,6 +110,43 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	char pin_type;
 	struct stat tempstat;
 	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
+
+	/* Check if vol "hcfs_smartcache" exist. Create and mount if
+	 * it did not exist */
+	ret = mount_status(SMART_CACHE_VOL_NAME);
+	if (ret < 0 && ret != -ENOENT)
+		return ret;
+	if (data_smart_root == 0 || ret == -ENOENT) {
+		DIR_ENTRY tmp_entry;
+
+		if (access(SMART_CACHE_ROOT_MP, F_OK) < 0) {
+			if (errno == ENOENT) {
+				ret = mkdir(SMART_CACHE_ROOT_MP, 0771);
+				if (ret < 0) {
+					write_log(0, "Fail to mkdir in %s."
+						" Code %d", __func__, errno);
+					return -errno;
+				}
+			} else {
+				write_log(0, "Fail to access %s. Code %d",
+					SMART_CACHE_ROOT_MP, errno);
+				return -errno;
+			}
+		}
+		ret = add_filesystem(SMART_CACHE_VOL_NAME, ANDROID_INTERNAL,
+				&tmp_entry);
+		if (ret < 0 && ret != -EEXIST) {
+			write_log(0, "Error: Fail to add new vol in %s."
+					" Code %d", __func__, -ret);
+			return ret;
+		}
+		ret = mount_FS(SMART_CACHE_VOL_NAME, SMART_CACHE_ROOT_MP, 0);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to mount vol in %s."
+					" Code %d", __func__, -ret);
+			return ret;
+		}
+	}
 
 	sc_data = (RESTORED_SMARTCACHE_DATA *)
 			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);

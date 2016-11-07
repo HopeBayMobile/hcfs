@@ -7997,6 +7997,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	global_argv = argv;
 #endif
 	data_data_root = (ino_t) 0;
+	data_smart_root = (ino_t) 0;
 	mgmt_app_is_created = FALSE;
 
 	pthread_attr_init(&prefetch_thread_attr);
