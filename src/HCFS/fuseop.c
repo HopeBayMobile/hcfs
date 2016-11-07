@@ -4576,7 +4576,6 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	META_CACHE_ENTRY_STRUCT *tmpptr;
 	ssize_t ret_ssize;
 	BOOL block_dirty;
-	BOOL is_from_cloud;
 
 	/* Check system size before writing */
 	if (hcfs_system->systemdata.system_size >
