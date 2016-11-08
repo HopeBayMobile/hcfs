@@ -16,6 +16,7 @@
 #include <string.h>
 #include <errno.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "global.h"
 #include "params.h"
@@ -219,7 +220,6 @@ void reset_queue_and_stat()
 	sys_super_block->head.last_dirty_inode = 0;
 
 	/* systemdata */
-	/* TODO - Maybe need to consider cache size too */
 	/* TODO - Need to check if deadlock will occur here */
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.dirty_cache_size = 0;
@@ -292,24 +292,32 @@ int32_t _batch_write_sb_entries(SUPER_BLOCK_ENTRY *buf,
 int32_t _read_regfile_meta(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		FILE_STATS_TYPE *file_stats)
 {
+	BOOL open_file = FALSE;
 	int32_t ret_code = 0;
 	int64_t rsize = 0;
 
-	if ((meta_cache_entry->meta_opened == FALSE) || (meta_cache_entry->fptr == NULL))
+	if ((meta_cache_entry->meta_opened == FALSE) || (meta_cache_entry->fptr == NULL)) {
 		ret_code = meta_cache_open_file(meta_cache_entry);
 		if (ret_code < 0) {
 			write_log(0, "Error open meta file of inode %"PRIu64".",
 				meta_cache_entry->inode_num);
 		        return -1;
 		}
+		open_file = TRUE;
+	}
 
         rsize = pread(fileno(meta_cache_entry->fptr), file_stats, sizeof(FILE_STATS_TYPE),
 			sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
         if (rsize < (int64_t)sizeof(FILE_STATS_TYPE)) {
 		write_log(0, "Error read meta of inode %"PRIu64". Error code %d",
 				meta_cache_entry->inode_num, errno);
+		if (open_file)
+			meta_cache_close_file(meta_cache_entry);
 		return -1;
 	}
+
+	if (open_file)
+		meta_cache_close_file(meta_cache_entry);
 
 	return 0;
 }
@@ -482,11 +490,10 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 	SUPER_BLOCK_ENTRY *sb_entry_arr = NULL;
 	META_CACHE_ENTRY_STRUCT **meta_cache_arr = NULL;
 	META_CACHE_ENTRY_STRUCT *tmp_meta_cache_entry = NULL;
-	int32_t tmp_code;
 
 	RECOVERY_ROUND_DATA recover_round;
 
-	write_log(4, "Start to recover dirty queue in superblock.");
+	write_log(4, "Start to recover SB entries.");
 
 	super_block_exclusive_locking();
 	if (sys_super_block->sb_recovery_meta.is_ongoing ||
@@ -557,6 +564,10 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 		}
 
 		super_block_exclusive_locking();
+		/* Test concurrent dirty enqueue/dequeue */
+		write_log(0, "Sleep 2 seconds....");
+		sleep(2);
+		write_log(0, "End sleep 2 seconds....");
 
 		_CALL_N_CHECK_RETCODE(
 				_batch_read_sb_entries(sb_entry_arr, start_inode,
@@ -581,23 +592,30 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 				log_recover_progress(start_inode),
 				"Error log recovery progress.");
 
+		start_inode += num_entry_handle;
+		set_recovery_flag(TRUE, start_inode, end_inode);
+
 		/* Unlock for a while to avoid block other ops too much time */
 		super_block_exclusive_release();
 
 		/* Unlock all locked meta_cache_entry */
 		for (count = 0; count < num_entry_handle; count++) {
-			if (meta_cache_arr[count] == NULL) {
+			if (meta_cache_arr[count] != NULL) {
 				meta_cache_unlock_entry(meta_cache_arr[count]);
 			}
 		}
-		start_inode += num_entry_handle;
+
+		/* Test concurrent dirty enqueue/dequeue */
+		write_log(0, "Sleep 1 seconds....");
+		sleep(1);
+		write_log(0, "End sleep 1 seconds....");
 	}
 	/* Recovery was finished */
 	free(sb_entry_arr);
 	set_recovery_flag(FALSE, 0, 0);
 	unlink_recover_progress_file();
 
-	write_log(4, "Recvoer dirty queue in superblock finished.");
+	write_log(4, "Recover SB entries finished.");
 
 	/* Test code */
 	dump_sb_entries();
@@ -622,17 +640,27 @@ void dump_sb_entries()
 {
 	char error_msg[] = "DUMP SB ERROR.";
 	char dump_file_path[] = "/data/dump_sb.dat";
+	char dirty_forward_file[] = "/data/dirty_forward";
+	char dirty_backward_file[] = "/data/dirty_backward";
 	char buf[128];
 	int32_t ret_code;
 	int64_t buf_size, num_entry_handle, idx;
 	ino_t start_inode, end_inode;
-	FILE *dump_fptr;
+	FILE *dump_fptr, *dirty_forward, *dirty_backward;
 	SUPER_BLOCK_ENTRY *sb_entry_arr = NULL;
 	SUPER_BLOCK_ENTRY *sbentry2;
 
 	dump_fptr = fopen(dump_file_path, "w");
 	if (dump_fptr == NULL) 	return;
 	setbuf(dump_fptr, NULL);
+
+	dirty_forward = fopen(dirty_forward_file, "w");
+	if (dirty_forward == NULL) 	return;
+	setbuf(dirty_forward, NULL);
+
+	dirty_backward = fopen(dirty_backward_file, "w+");
+	if (dirty_backward == NULL) 	return;
+	setbuf(dirty_backward, NULL);
 
 	super_block_exclusive_locking();
 
@@ -700,7 +728,47 @@ void dump_sb_entries()
 		}
 		start_inode += num_entry_handle;
 	}
+	/* Go through dirty queue */
+	char large_buf[1024*150];
+	int64_t read_size;
+	ino_t forward, backward;
+	SUPER_BLOCK_ENTRY tmpentry1, tmpentry2;
+
+	forward = sys_super_block->head.first_dirty_inode;
+	backward = sys_super_block->head.last_dirty_inode;
+
+	while (1) {
+		if (forward == 0 && backward == 0)
+			break;
+
+		if (forward != 0) {
+			ret_code = read_super_block_entry(forward, &tmpentry1);
+			if (ret_code < 0) {
+				forward = 0;
+			} else {
+				forward = tmpentry1.util_ll_next;
+				fprintf(dirty_forward, "%ld\n", tmpentry1.this_index);
+			}
+		}
+
+		if (backward != 0) {
+			ret_code = read_super_block_entry(backward, &tmpentry2);
+			if (ret_code < 0) {
+				backward = 0;
+			} else {
+				backward = tmpentry2.util_ll_prev;
+				rewind(dirty_backward);
+				read_size = fread(large_buf, 1, 1024*150, dirty_backward);
+				rewind(dirty_backward);
+				fprintf(dirty_backward, "%ld\n", tmpentry2.this_index);
+				fwrite(large_buf, 1, read_size, dirty_backward);
+			}
+		}
+	}
+
 	super_block_exclusive_release();
 	fclose(dump_fptr);
+	fclose(dirty_forward);
+	fclose(dirty_backward);
 }
 /* End test code */
