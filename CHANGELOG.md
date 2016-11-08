@@ -7,6 +7,24 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.3.2009
+=====
+## New Features
+ - None
+
+## Fixed
+ - [HCFS] hotfix-2.2.3/fix_syncinode_errorhandling: Enhance error handling in sync inode to prevent IO error in meta sync occupying upload handle  ([!626](gateway-2-0/hcfs!626))
+ - [HCFS] hotfix/download_issue_for_2.2.3: Hotfix/download issue for 2.2.3  ([!611](gateway-2-0/hcfs!611))
+ - [HCFS] hotfix/hang_when_restoration_completed_2.2.3: Hotfix/hang when restoration completed 2.2.3  ([!624](gateway-2-0/hcfs!624))
+ - [Tera-App] bigfix/#13648: bugfix/#13648 Check whether dialog fragment is attached to activity before getString()  ([!134](gateway-2-0/android-management-app!134))
+ - [Tera-App] bugfix/#12866: bugfix/#12866 Don't execute factory reset if device category is unregistered ([!136](gateway-2-0/android-management-app!136))
+ - [Tera-App] bugfix/#13063: bugfix/#13063 Set default log level to Log.INFO and incease log level to Log.DEBUGN if debug.tera.enable property is set true  ([!135](gateway-2-0/android-management-app!135))
+ - [Tera-App] bugfix/change_account_failed_not_dismiss_progress_dialog: bugfix/change_account_failed_not_dismiss_progress_dialog Dismiss progress dialog when change account failed. In addition, integrate mgmt server error code into MgmtCluster.java  ([!127](gateway-2-0/android-management-app!127))
+ - [Tera-App] fix/#13738: bug fix #13738  ([!138](gateway-2-0/android-management-app!138))
+
+## CI / Refactoring / Other
+ - None
+
 v 2.2.3.1931
 =====
 ## New Features
