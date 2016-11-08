@@ -89,6 +89,15 @@ static void _change_stage1_cache_limit(int64_t restored_smartcache_size)
 	/* Update pin size */
 }
 
+/**
+ * Inject restored smart cache data and meta to now active HCFS. The restored
+ * smart cache will be placed under HCFS mount point /data/smartcache.
+ * If /data/smartcache did not exist, create the volume and mount hcfs on it.
+ *
+ * @param smartcache_ino Inode number of restored smart cache in restored HCFS.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t inject_restored_smartcache(ino_t smartcache_ino)
 {
 	char path_restore[METAPATHLEN];
@@ -335,6 +344,12 @@ static int32_t _run_command(char *command)
 	return 0;
 }
 
+/**
+ * Repair restored smart cache "/data/smartcache/hcfsblock_restore" using e2fsck
+ * and mount it on folder /data/mnt/hcfsblock_restore/.
+ *
+ * @return 0 on success, -ECANCELED if critical error occurred.
+ */
 int32_t mount_and_repair_restored_smartcache()
 {
 	int32_t ret;
@@ -356,7 +371,7 @@ int32_t mount_and_repair_restored_smartcache()
 			SMART_CACHE_ROOT_MP, RESTORED_SMARTCACHE_TMP_NAME);
 	ret = _run_command(command);
 	if (ret < 0) {
-		/* TODO: If e2fsck fails, then discard the smart cache  */
+		/* TODO: If e2fsck failed, then discard the smart cache  */
 		errcode = ret;
 		goto errcode_handle;
 	}
@@ -463,6 +478,15 @@ static int32_t _remove_from_now_hcfs(ino_t ino_nowsys)
 	return 0;
 }
 
+/**
+ * Extract restored smartcache from now active HCFS to restored meta and data
+ * folder, and remove the entry hcfsblock_restore from /data/smartcache. Also
+ * recover cache statistics.
+ *
+ * @param smartcache_ino Inode number of restored smart cache in restored HCFS.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t extract_restored_smartcache(ino_t smartcache_ino)
 {
 	char path_restore[METAPATHLEN];

@@ -1195,6 +1195,7 @@ int32_t _prune_missing_entries(ino_t thisinode,
 	struct stat tmpmeta_struct;
 	int64_t old_metasize, new_metasize;
 	int64_t old_metasize_blk, new_metasize_blk;
+	ino_t tmpino;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	fptr = fopen(fetchedmeta, "r+");
@@ -1223,10 +1224,34 @@ int32_t _prune_missing_entries(ino_t thisinode,
 			  prune_list[count].entry.d_name);
 		if (access(tmppath, F_OK) == 0) {
 			/* Delete everything inside recursively */
-			ret = _recursive_prune(prune_list[count].entry.d_ino);
-			if (ret < 0) {
-				errcode = ret;
-				goto errcode_handle;
+			tmpino = prune_list[count].entry.d_ino;
+			switch (prune_list[count].entry.d_type) {
+			case D_ISLNK:
+				/* Just delete the meta */
+				ret = delete_meta_blocks(tmpino, FALSE);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				break;
+			case D_ISREG:
+			case D_ISFIFO:
+			case D_ISSOCK:
+				/* Delete the blocks and meta */
+				ret = delete_meta_blocks(tmpino, TRUE);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				break;
+			case D_ISDIR:
+				ret = _recursive_prune(tmpino);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+			default:
+				break;
 			}
 		}
 		/* Need to remove entry from meta */
@@ -1253,12 +1278,11 @@ int32_t _prune_missing_entries(ino_t thisinode,
 		ret = delete_dir_entry_btree(&tmpentry, &tpage, fileno(fptr),
 					     &parent_meta, temp_dir_entries,
 					     temp_child_page_pos, FALSE);
+		write_log(10, "Delete dir entry returns %d\n", ret);
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
 		}
-
-		write_log(10, "delete dir entry returns %d\n", ret);
 
 		/*
 		 * If the entry is a subdir, decrease the hard link of
@@ -1782,17 +1806,27 @@ static int32_t _try_repair_data_data(char *nowpath, DIR_ENTRY *tmpptr,
 }
 
 
-static int32_t _add_to_prunelist(PRUNE_T *prune_list, int32_t *prune_index,
+static int32_t _add_to_prunelist(PRUNE_T **prune_list, int32_t *prune_index,
 	int32_t *max_prunes, const DIR_ENTRY *tmpptr, const char *nowpath)
 {
-	if (*prune_index >= *max_prunes)
-		_realloc_prune(&prune_list, max_prunes);
+	//_realloc_prune(&prune_list, max_prunes);
+	if (*prune_index >= *max_prunes) {
+		PRUNE_T *tmp_prune_ptr;
+
+		tmp_prune_ptr = (PRUNE_T *)realloc(*prune_list,
+					(*max_prunes + 10) * sizeof(PRUNE_T));
+		if (tmp_prune_ptr == NULL)
+			return -errno;
+		*prune_list = tmp_prune_ptr;
+		*max_prunes += 10;
+	}
+
 	if (*prune_index >= *max_prunes) {
 		write_log(0, "Error: Fail to allocate memory in %s", __func__);
-		FREE(prune_list);
+		FREE(*prune_list);
 		return -ENOMEM;
 	}
-	memcpy(&(prune_list[*prune_index].entry), tmpptr, sizeof(DIR_ENTRY));
+	memcpy(&((*prune_list)[*prune_index].entry), tmpptr, sizeof(DIR_ENTRY));
 	(*prune_index)++;
 	write_log(4, "%s gone from %s. Removing.\n", tmpptr->d_name, nowpath);
 
@@ -1863,8 +1897,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			object_replace = FALSE;
 			tmpptr = &(tmppage.dir_entries[count]);
 			if (IS_SMARTCACHE_FILE(nowpath, tmpptr->d_name))
-				write_log(0, "TEST: found smartcache in %d. Inode %"
-					PRIu64, __LINE__, (uint64_t)(tmpptr->d_ino));
+				write_log(4, "Found smartcache. Inode %"PRIu64,
+						(uint64_t)(tmpptr->d_ino));
 			if (tmpptr->d_ino == 0)
 				continue;
 			/* Skip "." and ".." */
@@ -1907,7 +1941,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 						strlen("/data/data"))) {
 				/* Just remove the element because
 				 * smart cache is missing. */
-				ret = _add_to_prunelist(prune_list,
+				ret = _add_to_prunelist(&prune_list,
 						&prune_index, &max_prunes,
 						tmpptr, nowpath);
 				if (ret < 0) {
@@ -1939,7 +1973,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				    (strcmp("base.apk", tmpptr->d_name) != 0))
 				    || (expand_val == 3)) {
 					/* Just remove the element */
-					ret = _add_to_prunelist(prune_list,
+					ret = _add_to_prunelist(&prune_list,
 						&prune_index, &max_prunes,
 						tmpptr, nowpath);
 					if (ret < 0) {
@@ -1984,7 +2018,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 						object_replace = TRUE;
 				}
 				if (can_prune == TRUE) {
-					ret = _add_to_prunelist(prune_list,
+					ret = _add_to_prunelist(&prune_list,
 						&prune_index, &max_prunes,
 						tmpptr, nowpath);
 					if (ret < 0) {
@@ -2017,7 +2051,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 					if (ret == -ENOENT)
 						/* Prune this link */
 						ret = _add_to_prunelist(
-							prune_list,
+							&prune_list,
 							&prune_index,
 							&max_prunes,
 							tmpptr, nowpath);
@@ -2051,7 +2085,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 						can_prune = TRUE;
 				}
 				if (can_prune == TRUE)
-					ret = _add_to_prunelist(prune_list,
+					ret = _add_to_prunelist(&prune_list,
 						&prune_index, &max_prunes,
 						tmpptr, nowpath);
 				if (ret < 0) {
@@ -2068,7 +2102,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				if ((ret == -ENOENT) &&
 				    (strcmp(nowpath, "/data/app") == 0)) {
 					/* Need to prune the package */
-					ret = _add_to_prunelist(prune_list,
+					ret = _add_to_prunelist(&prune_list,
 						&prune_index, &max_prunes,
 						tmpptr, nowpath);
 				}
