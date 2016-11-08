@@ -392,4 +392,10 @@ void HCFS_check_restore_status(char **json_res);
  * | False | Linux errors.|
  */
 void HCFS_notify_applist_change(char **json_res);
+
+void HCFS_enable_smart_cache(char **json_res);
+void HCFS_disable_smart_cache(char **json_res);
+void HCFS_smart_cache_boost(char **json_res);
+void HCFS_smart_cache_unboost(char **json_res);
+void HCFS_expand_smart_cache_size(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */

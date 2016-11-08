@@ -813,3 +813,153 @@ void HCFS_notify_applist_change(char **json_res)
 
 	close(fd);
 }
+
+void HCFS_enable_smart_cache(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+/*
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = ENABLE_SMART_CACHE;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+*/
+    ret_code = 1;
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_disable_smart_cache(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+/*
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = DISABLE_SMART_CACHE;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+*/
+    ret_code = 1;
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_smart_cache_unboost(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+/*
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = SMART_CACHE_UNBOOST;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+*/
+    ret_code = 2;
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_smart_cache_boost(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+/*
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = SMART_CACHE_BOOST;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+*/
+    ret_code = 1;
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_expand_smart_cache_size(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+/*
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = EXPAND_SMART_CACHE_SIZE;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+*/
+    ret_code = 1;
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
