@@ -155,9 +155,9 @@
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
-extern ino_t DATA_volume_root;
-
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
+static int32_t symlink_internal(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
 /* Helper function for checking permissions.
    Inputs: fuse_req_t req, HCFS_STAT *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
@@ -271,8 +271,6 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 			return -EACCES;
 	return 0;
 }
-int symlink_internal(fuse_req_t req, const char *link,
-	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
 
 /* Check permission routine for ll_access only */
 int32_t check_permission_access(fuse_req_t req,
@@ -481,6 +479,7 @@ void to_lowercase(const char *org_name, char *lower_case)
 /* Internal function for generating the ownership / permission for
 Android external storage */
 #define PKG_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
+#define PKG_WHITELIST_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/smart_list_white_list.db"
 
 static int32_t _lookup_pkg_cb(void *data, int32_t argc, char **argv, char **azColName)
 {
@@ -1140,6 +1139,61 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_entry(req, &(tmp_param));
 }
 
+static inline BOOL pkg_in_whitelist(const char *pkgname)
+{
+
+	sqlite3 *db;
+	int32_t ret_code, ret;
+	char *data;
+	char *sql_err = 0;
+	char sql[500];
+
+	write_log(8, "Looking up pkg %s\n", pkgname);
+	/* Return uid 0 if error occurred */
+	data = NULL;
+
+	/* Find pkg from db */
+	snprintf(sql, sizeof(sql),
+		 "SELECT uid from uid WHERE package_name='%s'",
+		 pkgname);
+
+	if (access(PKG_WHITELIST_DB_PATH, F_OK) != 0) {
+		write_log(4, "Query pkg uid err (open db) - db file not existed\n");
+		return -1;
+	}
+
+	ret_code = sqlite3_open(PKGWHITE_LIST_DB_PATH, &db);
+	if (ret_code != SQLITE_OK) {
+		write_log(4, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
+		return -1;
+	}
+
+	/* Sql statement */
+	ret_code =
+	    sqlite3_exec(db, sql, _lookup_pkg_cb, (void *)&data, &sql_err);
+	if (ret_code != SQLITE_OK) {
+		write_log(4, "Query pkg uid err (sql statement) - %s\n", sql_err);
+		sqlite3_free(sql_err);
+		sqlite3_close(db);
+		return -1;
+	}
+
+	sqlite3_close(db);
+
+	if (data == NULL) {
+		write_log(8, "Query pkg uid err (sql statement) - pkg not found\n");
+		*uid = 0;
+	} else {
+		*uid = (uid_t)atoi(data);
+		write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
+	}
+
+	if (strcmp(pkgname, "com.king.candycrushsaga") == 0)
+		return TRUE;
+	else
+		return FALSE;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_mkdir
@@ -1184,21 +1238,29 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
 		  (uint64_t)parent_inode);
 
-	if ((parent_inode == DATA_volume_root) &&
-	    (strcmp(selfname, "com.king.candycrushsaga") == 0)) {
-		mkdir("/mnt/hcfsblock/com.king.candycrushsaga", mode);
+#ifdef _ANDROID_ENV_
+	if ((parent_inode == data_data_root) && pkg_in_whitelist(selfname)) {
+		char link_target[MAX_FILENAME_LEN + 100];
 
-		ret = symlink_internal(req,
-		                 "/mnt/hcfsblock/com.king.candycrushsaga",
-		                 parent, selfname, &tmp_param);
-		if (ret != 0) {
-			fuse_reply_err(req, ret);
-		} else {
-			tmp_param.attr.st_mode = mode | S_IFDIR;
-			fuse_reply_entry(req, &(tmp_param));
+		sprintf(link_target, "/data/mnt/hcfsblock/%s", selfname);
+		ret = mkdir(link_target, mode);
+		if (ret == 0) {
+			ret = symlink_internal(req, link_target,
+					parent, selfname, &tmp_param);
+			if (ret == 0) {
+				tmp_param.attr.st_mode = mode | S_IFDIR;
+				fuse_reply_entry(req, &(tmp_param));
+				return;
+			} else {
+				rmdir(link_target);
+				errno = -ret;
+			}
 		}
-		return;
+		write_log(4, "Error: Failed to create symlink and smartcache "
+				"folder. Just create folder %s under "
+				"/data/data. Code %d", selfname, errno);
 	}
+#endif
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
@@ -6380,7 +6442,7 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 *       Summary: Make a symbolic link "name", which links to "link".
 *
 *************************************************************************/
-int symlink_internal(fuse_req_t req, const char *link,
+static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param)
 {
 	ino_t parent_inode;
@@ -6560,6 +6622,7 @@ error_handle:
 	meta_cache_unlock_entry(parent_meta_cache_entry);
 	return -errcode;
 }
+
 static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name)
 {
