@@ -393,7 +393,7 @@ void HCFS_check_restore_status(char **json_res);
  */
 void HCFS_notify_applist_change(char **json_res);
 
-void HCFS_enable_smart_cache(char **json_res);
+void HCFS_enable_smart_cache(char **json_res, char *smart_cache_size);
 void HCFS_disable_smart_cache(char **json_res);
 void HCFS_smart_cache_boost(char **json_res);
 void HCFS_smart_cache_unboost(char **json_res);
