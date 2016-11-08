@@ -814,7 +814,7 @@ void HCFS_notify_applist_change(char **json_res)
 	close(fd);
 }
 
-void HCFS_enable_smart_cache(char **json_res)
+void HCFS_enable_smart_cache(char **json_res, char *smart_cache_size)
 {
 	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
@@ -827,10 +827,11 @@ void HCFS_enable_smart_cache(char **json_res)
 	}
 
 	code = ENABLE_SMART_CACHE;
-	cmd_len = 0;
+	cmd_len = strlen(smart_cache_size) + 1;
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, smart_cache_size, cmd_len, 0);
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);
