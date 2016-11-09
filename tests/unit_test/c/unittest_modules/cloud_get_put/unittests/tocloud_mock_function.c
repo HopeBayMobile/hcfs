@@ -282,6 +282,8 @@ int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 int del_progress_file(int fd, ino_t inode)
 {
 	MOCK();
+	if (fd == 0)
+		printf("fd 0 is closed here!!!!!!!!!!!\n");
 	close(fd);
 	unlink("/tmp/mock_progress_file");
 	return 0;
@@ -336,8 +338,10 @@ int check_and_copy_file(const char *srcpath, const char *tarpath,
 
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
+
 	MOCK();
-	pathname[0] = 0;
+	snprintf(pathname, 100, "mock_meta_folder/tmpfile_%"
+	         PRIu64, (uint64_t) inode);
 	return;
 }
 
@@ -349,8 +353,14 @@ char block_finish_uploading(int32_t fd, int64_t blockno)
 
 int create_progress_file(ino_t inode)
 {
+	char tmppath[100];
+	int32_t fd;
+
 	MOCK();
-	return 0;
+	snprintf(tmppath, 100, "mock_meta_folder/tmpfile_%"
+	         PRIu64, (uint64_t) inode);
+	fd = open(tmppath, O_CREAT | O_RDWR, 0600);
+	return fd;
 }
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)

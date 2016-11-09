@@ -200,7 +200,7 @@ TEST_F(init_sync_stat_controlTest, InitCleanup)
 
 class InitUploadControlTool {
 public:
-	int fd = 0;
+	int fd = -1;
 	char progress_path[100];
 
 	static InitUploadControlTool *Tool() {
@@ -356,7 +356,8 @@ protected:
 		unlink(tmppath2);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		if (InitUploadControlTool::Tool() != NULL) {
-			close(InitUploadControlTool::Tool()->fd);
+			if (InitUploadControlTool::Tool()->fd >= 0)
+				close(InitUploadControlTool::Tool()->fd);
 			unlink(InitUploadControlTool::Tool()->progress_path);
 		}
 
@@ -1226,6 +1227,7 @@ protected:
 			fclose(fptr);
 		}
 
+		sync();
 		sem_init(&objname_counter_sem, 0, 1);
 		sem_init(&backup_pkg_sem, 0, 1);
 
@@ -1257,6 +1259,10 @@ protected:
 	void TearDown() {
 		char tmppath[200];
 		char tmppath2[200];
+		int count;
+
+		unlink("mock_meta_folder/tmpfile");
+
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
@@ -1290,6 +1296,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	DIR_META_TYPE empty_meta;
 	BLOCK_ENTRY_PAGE mock_block_page;
 	CLOUD_RELATED_DATA mock_cloud_data;
+	int32_t sleep_max;
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = TRUE;
@@ -1321,7 +1328,13 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	/* Create a thread to run upload_loop() */
 	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
 
-	sleep(30);
+	/* Sleep until dirty inodes are processed, or after 1 minutes */
+	sleep_max = 60;
+	while (sleep_max > 0) {
+		if (sys_super_block->head.num_dirty == 0)
+			break;
+		sleep(1);
+	}
 	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
 	sem_post(&(hcfs_system->sync_wait_sem));
 	pthread_join(thread_id, NULL);

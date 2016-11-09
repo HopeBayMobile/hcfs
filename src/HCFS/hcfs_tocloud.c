@@ -657,7 +657,8 @@ void init_sync_control(void)
 	sync_ctl.retry_list.retry_inode = (ino_t *)
 			calloc(MAX_SYNC_CONCURRENCY, sizeof(ino_t));
 	PTHREAD_REUSE_set_exithandler();
-
+	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
+		sync_ctl.progress_fd[count] = -1;
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
 		       (void *)&collect_finished_sync_threads, NULL);
 
