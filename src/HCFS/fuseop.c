@@ -513,6 +513,18 @@ static int32_t _lookup_pkg_status_cb(void *data, int32_t argc, char **argv, char
 	return 0;
 }
 
+static int32_t _lookup_pkg_whitelist_cb(void *data, int32_t argc, char **argv, char **azColName)
+{
+
+	UNUSED(argc);
+	UNUSED(azColName);
+	if (!argv[0])
+		return -1;
+
+	*(int32_t *)data = atoi(argv[0]);
+	return 0;
+}
+
 /*
  * Helper function for querying uid of input (pkgname),
  * result uid will be stored in (uid).
@@ -1143,55 +1155,48 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 {
 
 	sqlite3 *db;
-	int32_t ret_code, ret;
-	char *data;
+	int32_t ret_code;
+	int32_t res = 0;
 	char *sql_err = 0;
-	char sql[500];
+	char sql[MAX_FILENAME_LEN + 200];
+
+	if (access("/data/smartcache/hcfsblock", F_OK) < 0) {
+		write_log(8, "Lookup %s but smartcache not found.", pkgname);
+		return FALSE;
+	}
 
 	write_log(8, "Looking up pkg %s\n", pkgname);
-	/* Return uid 0 if error occurred */
-	data = NULL;
+	if (access(PKG_WHITELIST_DB_PATH, F_OK) < 0) {
+		write_log(4, "Query pkg uid err (open db). Code %d", errno);
+		return FALSE;
+	}
 
 	/* Find pkg from db */
 	snprintf(sql, sizeof(sql),
-		 "SELECT uid from uid WHERE package_name='%s'",
-		 pkgname);
+		 "SELECT EXISTS"
+		 "(SELECT * FROM smart_cache_while_list "
+		 "WHERE package_name='%s')", pkgname);
 
-	if (access(PKG_WHITELIST_DB_PATH, F_OK) != 0) {
-		write_log(4, "Query pkg uid err (open db) - db file not existed\n");
-		return -1;
-	}
-
-	ret_code = sqlite3_open(PKGWHITE_LIST_DB_PATH, &db);
+	ret_code = sqlite3_open(PKG_WHITELIST_DB_PATH, &db);
 	if (ret_code != SQLITE_OK) {
-		write_log(4, "Query pkg uid err (open db) - %s\n", sqlite3_errmsg(db));
-		return -1;
+		write_log(4, "Query pkg uid err (open db) - %s\n",
+				sqlite3_errmsg(db));
+		return FALSE;
 	}
 
 	/* Sql statement */
-	ret_code =
-	    sqlite3_exec(db, sql, _lookup_pkg_cb, (void *)&data, &sql_err);
+	ret_code = sqlite3_exec(db, sql, _lookup_pkg_whitelist_cb,
+				(void *)&res, &sql_err);
 	if (ret_code != SQLITE_OK) {
-		write_log(4, "Query pkg uid err (sql statement) - %s\n", sql_err);
+		write_log(4, "Query pkg uid err (sql statement) - %s\n",
+				sql_err);
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
-		return -1;
+		return FALSE;
 	}
-
 	sqlite3_close(db);
 
-	if (data == NULL) {
-		write_log(8, "Query pkg uid err (sql statement) - pkg not found\n");
-		*uid = 0;
-	} else {
-		*uid = (uid_t)atoi(data);
-		write_log(8, "Fetch pkg uid %d, %d\n", *uid, data);
-	}
-
-	if (strcmp(pkgname, "com.king.candycrushsaga") == 0)
-		return TRUE;
-	else
-		return FALSE;
+	return res == 1 ? TRUE : FALSE;
 }
 
 /************************************************************************
