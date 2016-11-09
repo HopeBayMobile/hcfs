@@ -47,8 +47,6 @@ typeof(write_log) write_log_wrap;
  * Fake library functions
  * #define FUNC_NAME(...) _ut_wrap(FUNC_NAME, Return_On_Error, __VA_ARGS__)
  */
-#define write_log(...) write_log_wrap(__VA_ARGS__)
-
 #define sem_init(...) _ut_wrap(sem_init, -1, __VA_ARGS__)
 #define sem_wait(...) _ut_wrap(sem_wait, -1, __VA_ARGS__)
 #define sem_post(...) _ut_wrap(sem_post, -1, __VA_ARGS__)
