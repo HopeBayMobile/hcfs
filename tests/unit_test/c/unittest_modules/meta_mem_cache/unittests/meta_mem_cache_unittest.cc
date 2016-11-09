@@ -325,7 +325,8 @@ class meta_cache_push_dir_pageTest : public ::testing::Test {
       char tmp_name[10];
       tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
       sprintf(tmp_name, "mytest%d", i);
-      test_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
+      test_dir_entry_page->dir_entries[i] = DIR_ENTRY{static_cast<uint64_t>(i),
+                                                      "", tmp_type};
       strcpy(test_dir_entry_page->dir_entries[i].d_name, tmp_name);
     }
     for (int32_t i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
@@ -333,7 +334,8 @@ class meta_cache_push_dir_pageTest : public ::testing::Test {
       char tmp_name[20];
       tmp_type = (i+1) % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
       sprintf(tmp_name, "reserved_test%d", i);
-      reserved_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
+      reserved_dir_entry_page->dir_entries[i] = DIR_ENTRY{static_cast<uint64_t>(i),
+                                                          "", tmp_type};
       strcpy(reserved_dir_entry_page->dir_entries[i].d_name, tmp_name);
     }
 
