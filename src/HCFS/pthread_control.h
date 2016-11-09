@@ -49,6 +49,7 @@ typedef struct {
 pthread_key_t PTHREAD_status_key;
 
 void PTHREAD_sighandler_init(void (*handler_ftn)(int));
+void PTHREAD_sighandler_destroy(void);
 int PTHREAD_create(PTHREAD_T *thread, const pthread_attr_t *attr,
                    void *(*start_routine) (void *), void *arg);
 void PTHREAD_set_exithandler();
