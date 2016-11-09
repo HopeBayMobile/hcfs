@@ -90,7 +90,7 @@ protected:
 
 		for (count = 0; count < num_roots; count++) {
 			char fsstat_path[100];
-			sprintf(fsstat_path, "%s/FS_sync/FSstat%"PRIu64,
+			sprintf(fsstat_path, "%s/FS_sync/FSstat%" PRIu64,
 				METAPATH, (uint64_t)rootlist[count]);
 			fptr = fopen(fsstat_path, "w");
 			if (fptr == NULL) {
@@ -141,7 +141,7 @@ TEST_F(init_rebuild_sbTest, BeginRebuildSuperBlock)
 	/* Verify FSstat */
 	for (int i = 0; i < 5; i++) {
 		char fsstat_path[100];
-		sprintf(fsstat_path, "%s/FS_sync/FSstat%"PRIu64,
+		sprintf(fsstat_path, "%s/FS_sync/FSstat%" PRIu64,
 			METAPATH, (uint64_t)roots[i]);
 		ASSERT_EQ(0, access(fsstat_path, F_OK));
 		unlink(fsstat_path);
