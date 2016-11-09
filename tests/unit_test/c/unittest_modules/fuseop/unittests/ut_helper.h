@@ -67,8 +67,8 @@ typeof(write_log) write_log_wrap;
 	extern uint32_t func##_error_on;                                       \
 	extern uint32_t func##_call_count;                                     \
 	extern int32_t func##_errno;
+/* expansion with given macro X */
 FAKE_FUNC_LIST
-X(write_log);
 #undef X
 
 #define _ut_wrap(func, error_ret, ...)                                         \
