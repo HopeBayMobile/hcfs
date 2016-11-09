@@ -257,16 +257,16 @@ protected:
 	}
 };
 
-void mock_worker(void *ptr)
+void *mock_worker(void *ptr)
 {
-	return;
+	return NULL;
 }
 
 TEST_F(destroy_rebuild_sbTest, Destroy_RemoveQueueFile)
 {
 	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
 		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
-			NULL, (void *)&mock_worker, NULL);
+			NULL, mock_worker, NULL);
 	}
 
 	destroy_rebuild_sb(TRUE);
@@ -279,7 +279,7 @@ TEST_F(destroy_rebuild_sbTest, Destroy_PreserveQueueFile)
 {
 	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
 		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
-			NULL, (void *)&mock_worker, NULL);
+			NULL, mock_worker, NULL);
 	}
 
 	destroy_rebuild_sb(FALSE);
@@ -336,7 +336,7 @@ protected:
 	}
 };
 
-void mock_worker2(void *ptr)
+void *mock_worker2(void *ptr)
 {
 	int idx = *(int *)ptr;
 
@@ -351,7 +351,7 @@ void mock_worker2(void *ptr)
 	rebuild_sb_tpool->num_idle--;
 	rebuild_sb_tpool->thread[idx].active = FALSE;
 	pthread_mutex_unlock(&(rebuild_sb_jobs->job_mutex));
-	return;
+	return NULL;
 }
 
 TEST_F(wake_sb_rebuilderTest, WakeUpAllThreads)
@@ -368,7 +368,7 @@ TEST_F(wake_sb_rebuilderTest, WakeUpAllThreads)
 	for (int idx = 0; idx < NUM_THREADS_IN_POOL; idx++) {
 		rebuild_sb_tpool->tidx[idx] = idx;
 		pthread_create(&(rebuild_sb_tpool->thread[idx].tid),
-			NULL, (void *)&mock_worker2,
+			NULL, mock_worker2,
 			&(rebuild_sb_tpool->tidx[idx]));
 		rebuild_sb_tpool->thread[idx].active = TRUE;
 	}
