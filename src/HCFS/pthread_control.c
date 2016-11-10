@@ -80,7 +80,7 @@ void PTHREAD_sighandler_init(void (*handler_ftn)(int))
  * PTHREAD wrapper for running the actual routine started by PTHREAD_create.
  *
  * @param thread_ptr Pointer to PTHREAD_T structure of this thread.
- * @return None
+ * @return NULL pointer
  */ 
 void *PTHREAD_wrapper(void *thread_ptr)
 {
@@ -210,15 +210,37 @@ void PTHREAD_REUSE_set_exithandler()
 	PTHREAD_sighandler_init(&PTHREAD_REUSE_exit_handler);
 }
 
+/**
+ * PTHREAD version of pthread_kill.
+ *
+ * @param thread Pointer to PTHREAD_T structure of this thread.
+ * @param sig Number of the signal.
+ * @return Result of pthread_kill
+ */ 
 int PTHREAD_kill(PTHREAD_T *thread, int sig)
 {
 	return pthread_kill(thread->self, sig);
 }
+
+/**
+ * PTHREAD version of pthread_join.
+ *
+ * @param thread Pointer to PTHREAD_T structure of this thread.
+ * @param retval Pointer to the pointer of return structure.
+ * @return Result of pthread_join
+ */ 
 int PTHREAD_join(PTHREAD_T *thread, void **retval)
 {
 	return pthread_join(thread->self, retval);
 }
 
+/**
+ * Reusable PTHREAD wrapper for running the actual routine started by
+ * PTHREAD_REUSE_create.
+ *
+ * @param thread_ptr Pointer to PTHREAD_REUSE_T structure of this thread.
+ * @return NULL pointer
+ */ 
 void *PTHREAD_REUSE_wrapper(void *thread_ptr)
 {
 	PTHREAD_REUSE_T *this_thread;
@@ -248,7 +270,15 @@ void *PTHREAD_REUSE_wrapper(void *thread_ptr)
 	return NULL;
 }
 
-/* Routine for reusable threads */
+/**
+ * Routine for creating reusable threads PTHREAD_REUSE_T. Routine for the
+ * thread needs to be run via PTHREAD_REUSE_run and collected via
+ * PTHREAD_REUSE_join.
+ *
+ * @param thread_ptr Pointer to PTHREAD_REUSE_T structure of this thread.
+ * @param attr Pointer to the thread attribute.
+ * @return Result of thread creation.
+ */ 
 int PTHREAD_REUSE_create(PTHREAD_REUSE_T *thread, const pthread_attr_t *attr)
 {
 	sigset_t sigset, oldset;
@@ -287,7 +317,15 @@ int PTHREAD_REUSE_create(PTHREAD_REUSE_T *thread, const pthread_attr_t *attr)
 	return retval;
 }
 
-/* REUSE_run will use sem_post(&run) to continue running the thread */
+/**
+ * Routine for running routines in reusable threads PTHREAD_REUSE_T.
+ *
+ * @param thread_ptr Pointer to PTHREAD_REUSE_T structure of this thread.
+ * @param start_routine Function to be run in ths thread.
+ * @param arg Argument for the function to be run.
+ * @return 0 if successful, EAGAIN if this thread is busy, and other error
+ * code if an error happens when waiting for the thread.
+ */ 
 int PTHREAD_REUSE_run(PTHREAD_REUSE_T *thread,
                       void *(*start_routine) (void *), void *arg)
 {
@@ -298,19 +336,35 @@ int PTHREAD_REUSE_run(PTHREAD_REUSE_T *thread,
 		return ret_val;
 	thread->thread_routine = start_routine;
 	thread->arg = arg;
+	/* REUSE_run will use sem_post(&run) to continue running the thread */
 	sem_post(&(thread->run));
 	return 0;
 }
 
-/* REUSE_join will use sem_wait(&finish) to wait for the thread to finish
-the current task */
+/**
+ * Routine for collecting finished routines in reusable threads PTHREAD_REUSE_T.
+ * If the thread is not detached, this function needs to be called before
+ * running the next routine in the same thread.
+ *
+ * @param thread_ptr Pointer to PTHREAD_REUSE_T structure of this thread.
+ * @return None
+ */ 
 void PTHREAD_REUSE_join(PTHREAD_REUSE_T *thread)
 {
 	if (thread->detachstate == PTHREAD_CREATE_DETACHED)
 		return;
+	/* REUSE_join will use sem_wait(&finish) to wait for the thread to
+	finish the current task */
 	sem_wait(&(thread->finish));
 	sem_post(&(thread->occupied));
 }
+
+/**
+ * Routine for terminating reusable threads PTHREAD_REUSE_T.
+ *
+ * @param thread_ptr Pointer to PTHREAD_REUSE_T structure of this thread.
+ * @return None
+ */ 
 void PTHREAD_REUSE_terminate(PTHREAD_REUSE_T *thread)
 {
 	pthread_kill(thread->self, SIGUSR2);
