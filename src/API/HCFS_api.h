@@ -398,4 +398,5 @@ void HCFS_enable_booster(char **json_res, long long booster_size);
 void HCFS_disable_booster(char **json_res);
 void HCFS_trigger_boost(char **json_res);
 void HCFS_trigger_unboost(char **json_res);
+void HCFS_clear_booster_package_remaining(char **json_res, char *package_name);
 #endif  /* GW20_HCFS_API_H_ */

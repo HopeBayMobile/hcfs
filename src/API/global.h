@@ -21,6 +21,7 @@
 #define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SOCK_PATH "/dev/shm/hcfs_reporter"
 #define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock"
+#define SMARTCACHE_PATH "/data/mnt/hcfsblock"
 
 #define LOG_PATH "/data"
 #define LOG_NAME "hcfsapid.log"
