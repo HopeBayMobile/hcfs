@@ -660,6 +660,7 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		new_info->stat_fptr = tmp_info->stat_fptr;
 		new_info->stat_lock = tmp_info->stat_lock;
 		new_info->vol_path_cache = tmp_info->vol_path_cache;
+		new_info->write_volstat_thread = tmp_info->write_volstat_thread;
 
 		/* Self data */
 		new_info->mp_mode = mp_mode;
