@@ -2106,8 +2106,14 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 	char old_pin_status;
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL)
+	if (meta_cache_entry == NULL) {
+		if (errno == ENOENT) {
+			write_log(5, "No entry in %s. Skip pinning meta %"
+					PRIu64, __func__, (uint64_t)this_inode);
+			return 0;
+		}
 		return -errno;
+	}
 
 	ret_code = 0;
 	/* Case regfile & fifo file */
@@ -2205,6 +2211,11 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 error_handling:
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
+	if (ret_code == -ENOENT) {
+		write_log(5, "No entry in %s. Skip pinning meta %"PRIu64,
+				__func__, (uint64_t)this_inode);
+		return 0;
+	}
 	return ret_code;
 }
 

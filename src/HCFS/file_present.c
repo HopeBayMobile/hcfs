@@ -1376,8 +1376,14 @@ int32_t pin_inode(ino_t this_inode,
 		ret = collect_dir_children(this_inode, &dir_node_list,
 			&num_dir_node, &nondir_node_list,
 			&num_nondir_node, NULL);
-		if (ret < 0)
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(4, "Folder is removed? Skip pinning"
+					" meta %"PRIu64, (uint64_t)this_inode);
+				return 0;
+			}
 			return ret;
+		}
 
 		/* first pin regfile & symlink */
 		ret = 0;
