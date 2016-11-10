@@ -970,15 +970,17 @@ void HCFS_clear_booster_package_remaining(char **json_res, char *package_name)
 	/* Remove symbolic link */
 	sprintf(path, "/data/data/%s", package_name);
 	ret_code = unlink(path);
-	if (ret_code < 0) {
+	if (ret_code < 0 && errno != ENOENT) {
 		ret_code = -errno;
 		goto out;
 	}
 	/* Remove target pkg folder */
 	sprintf(path, "%s/%s", SMARTCACHE_PATH, package_name);
 	ret_code = rmdir(path);
-	if (ret_code < 0)
+	if (ret_code < 0 && errno != ENOENT)
 		ret_code = -errno;
+	else
+		ret_code = 0;
 
 out:
 	if (ret_code < 0)
