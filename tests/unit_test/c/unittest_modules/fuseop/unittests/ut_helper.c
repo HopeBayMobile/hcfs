@@ -54,10 +54,10 @@ void reset_ut_helper(void)
 /*
  * Implementation of fake functions
  */
-
+#undef write_log
 char log_data[LOG_RECORD_SIZE][1024];
 int32_t write_log_hide = 11;
-int32_t write_log_wrap(int32_t level, const char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 

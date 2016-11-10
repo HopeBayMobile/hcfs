@@ -582,5 +582,5 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 				 int64_t delta_cache_blocks,
 				 char pin_type)
 {
-	return;
+	return 0;
 }

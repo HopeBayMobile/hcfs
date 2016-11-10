@@ -780,10 +780,10 @@ int ret_val;
 
 class fetch_object_busywait_connTest : public ::testing::Test {
 public:
-	static void testEntry(void *ptr) {
+	static void *testEntry(void *ptr) {
 		ret_val = fetch_object_busywait_conn(fptr,
 		                                     action_from, objname);
-		return;
+		return NULL;
 	}
 
 protected:
@@ -833,7 +833,7 @@ TEST_F(fetch_object_busywait_connTest, BackendOffline_SystemShutdown)
 
 	/* Run */
 	pthread_create(&tid, NULL,
-	               (void *)&fetch_object_busywait_connTest::testEntry,
+	               &fetch_object_busywait_connTest::testEntry,
 	               NULL);
 	sleep(1);
 	hcfs_system->system_going_down = TRUE;
@@ -862,7 +862,7 @@ TEST_F(fetch_object_busywait_connTest, Backend_From_Offline_To_Online)
 
 	/* Run */
 	pthread_create(&tid, NULL,
-	               (void *)&fetch_object_busywait_connTest::testEntry, NULL);
+	               &fetch_object_busywait_connTest::testEntry, NULL);
 	sleep(1);
 	hcfs_system->backend_is_online = TRUE;
 	pthread_join(tid, NULL);
