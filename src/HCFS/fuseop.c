@@ -479,7 +479,7 @@ void to_lowercase(const char *org_name, char *lower_case)
 /* Internal function for generating the ownership / permission for
 Android external storage */
 #define PKG_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
-#define PKG_WHITELIST_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/smart_list_white_list.db"
+#define PKG_WHITELIST_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/smart_cache_white_list.db"
 
 static int32_t _lookup_pkg_cb(void *data, int32_t argc, char **argv, char **azColName)
 {
@@ -1156,18 +1156,22 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 
 	sqlite3 *db;
 	int32_t ret_code;
-	int32_t res = 0;
+	int32_t res = -1;
 	char *sql_err = 0;
 	char sql[MAX_FILENAME_LEN + 200];
 
+	/* Reject if smartcache not found */
 	if (access("/data/smartcache/hcfsblock", F_OK) < 0) {
-		write_log(8, "Lookup %s but smartcache not found.", pkgname);
+		write_log(6, "Lookup %s but smartcache not found. Code %d",
+				pkgname, errno);
 		return FALSE;
 	}
 
-	write_log(8, "Looking up pkg %s\n", pkgname);
+	write_log(6, "Looking up pkg %s\n", pkgname);
+	/* Reject if db not found */
 	if (access(PKG_WHITELIST_DB_PATH, F_OK) < 0) {
-		write_log(4, "Query pkg uid err (open db). Code %d", errno);
+		write_log(4, "Query pkg whitelist err (open db). Code %d",
+				errno);
 		return FALSE;
 	}
 
@@ -1179,7 +1183,7 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 
 	ret_code = sqlite3_open(PKG_WHITELIST_DB_PATH, &db);
 	if (ret_code != SQLITE_OK) {
-		write_log(4, "Query pkg uid err (open db) - %s\n",
+		write_log(4, "Query pkg whitelist err (open db) - %s\n",
 				sqlite3_errmsg(db));
 		return FALSE;
 	}
@@ -1188,7 +1192,7 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 	ret_code = sqlite3_exec(db, sql, _lookup_pkg_whitelist_cb,
 				(void *)&res, &sql_err);
 	if (ret_code != SQLITE_OK) {
-		write_log(4, "Query pkg uid err (sql statement) - %s\n",
+		write_log(4, "Query pkg whitelist err (sql statement) - %s\n",
 				sql_err);
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
@@ -1249,7 +1253,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 		sprintf(link_target, "/data/mnt/hcfsblock/%s", selfname);
 		ret = mkdir(link_target, mode);
-		if (ret == 0) {
+		if (ret == 0 || (ret < 0 && errno == EEXIST)) {
 			ret = symlink_internal(req, link_target,
 					parent, selfname, &tmp_param);
 			if (ret == 0) {
@@ -1257,6 +1261,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 				fuse_reply_entry(req, &(tmp_param));
 				return;
 			} else {
+				write_log(4, "Failed to create symlink."
+						" Code %d", -ret);
 				rmdir(link_target);
 				errno = -ret;
 			}
