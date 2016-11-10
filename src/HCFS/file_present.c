@@ -1339,7 +1339,7 @@ int32_t pin_inode(ino_t this_inode,
 
 	} else if (ret > 0) {
 	/* Do not need to change pinned size */
-		write_log(5, "Debug: inode %"PRIu64" had been pinned\n",
+		write_log(8, "Debug: inode %"PRIu64" had been pinned\n",
 							(uint64_t)this_inode);
 	} else { /* Succeed in pinning */
 		/* Change pinned size if succeding in pinning this inode. */
