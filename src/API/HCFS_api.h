@@ -393,9 +393,9 @@ void HCFS_check_restore_status(char **json_res);
  */
 void HCFS_notify_applist_change(char **json_res);
 
-void HCFS_enable_smart_cache(char **json_res, char *smart_cache_size);
-void HCFS_disable_smart_cache(char **json_res);
-void HCFS_smart_cache_boost(char **json_res);
-void HCFS_smart_cache_unboost(char **json_res);
-void HCFS_expand_smart_cache_size(char **json_res);
+void HCFS_check_package_boost_status(char **json_res, char *package_name);
+void HCFS_enable_booster(char **json_res, long long booster_size);
+void HCFS_disable_booster(char **json_res);
+void HCFS_trigger_boost(char **json_res);
+void HCFS_trigger_unboost(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */
