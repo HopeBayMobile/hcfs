@@ -2270,9 +2270,15 @@ void upload_loop(void)
 	if every inode in the queue has been uploaded recently */
 	BOOL consecutive_skips, skip_everyone;
 	
+	struct timespec nonbusy_pause_time;
+
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 #endif
+	/* Initializing time structures */
+	nonbusy_pause_time.tv_sec = SYNC_NONBUSY_PAUSE_TIME;
+	nonbusy_pause_time.tv_nsec = 0;
+
 	init_upload_control();
 	init_sync_control();
 	/*	init_sync_stat_control(); */
@@ -2321,6 +2327,20 @@ void upload_loop(void)
 				if (hcfs_system->system_going_down == TRUE)
 					break;
 			}
+
+			
+			/* Sleep for SYNC_NONBUSY_PAUSE_TIME seconds if not
+			in a hurry */
+			/* Will not sleep if sync all is in progress, or
+			cache cannot be replaced if nothing is uploaded */
+			/* Sleep will be interrupted if system is going down
+			or cache is full */
+			if (((hcfs_system->systemdata.unpin_dirty_data_size +
+			      hcfs_system->systemdata.pinned_size) <
+			     CACHE_SOFT_LIMIT) &&
+			    (sys_super_block->sync_point_is_set == FALSE))
+				sem_timedwait(&(hcfs_system->sync_control_sem),
+				              &nonbusy_pause_time);
 
 			ino_check = 0;
 			consecutive_skips = FALSE;

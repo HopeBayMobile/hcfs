@@ -33,6 +33,8 @@
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 8
 
+#define SYNC_NONBUSY_PAUSE_TIME 10
+
 typedef struct {
 	off_t page_filepos;
 	int64_t page_entry_index;
