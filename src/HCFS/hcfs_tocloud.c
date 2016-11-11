@@ -2228,6 +2228,25 @@ errcode_handle:
 	fclose(to_sync_fptr);
 	unlink(restore_tosync_list);
 }
+
+static inline void _upload_sleep(int64_t shortest_wait, BOOL consecutive_skips)
+{
+	struct timespec nonbusy_pause_time;
+
+	if (((hcfs_system->systemdata.unpin_dirty_data_size +
+	      hcfs_system->systemdata.pinned_size) < CACHE_SOFT_LIMIT) &&
+	    (sys_super_block->sync_point_is_set == FALSE)) {
+		clock_gettime(CLOCK_REALTIME_COARSE, &nonbusy_pause_time);
+		if ((consecutive_skips == TRUE) &&
+		    (shortest_wait > SYNC_NONBUSY_PAUSE_TIME))
+			nonbusy_pause_time.tv_sec += shortest_wait;
+		else
+			nonbusy_pause_time.tv_sec += SYNC_NONBUSY_PAUSE_TIME;
+		sem_timedwait(&(hcfs_system->sync_control_sem),
+		              &nonbusy_pause_time);
+	}
+}
+
 #ifdef _ANDROID_ENV_
 void *upload_loop(void *ptr)
 #else
@@ -2244,7 +2263,6 @@ void upload_loop(void)
 	char sync_paused_status = FALSE;
 	char need_retry_backup;
 	struct timespec last_retry_time, current_time;
-	struct timespec nonbusy_pause_time;
 	int64_t last_synctime, this_waittime, shortest_wait;
 	BOOL consecutive_skips;
 	
@@ -2286,17 +2304,7 @@ void upload_loop(void)
 			cache cannot be replaced if nothing is uploaded */
 			/* Sleep will be interrupted if system is going down
 			or cache is full */
-			nonbusy_pause_time.tv_sec = SYNC_NONBUSY_PAUSE_TIME;
-			if ((consecutive_skips == TRUE) &&
-			    (shortest_wait > SYNC_NONBUSY_PAUSE_TIME))
-				nonbusy_pause_time.tv_sec = shortest_wait;
-			nonbusy_pause_time.tv_nsec = 0;
-			if (((hcfs_system->systemdata.unpin_dirty_data_size +
-			      hcfs_system->systemdata.pinned_size) <
-			     CACHE_SOFT_LIMIT) &&
-			    (sys_super_block->sync_point_is_set == FALSE))
-				sem_timedwait(&(hcfs_system->sync_control_sem),
-				              &nonbusy_pause_time);
+			_upload_sleep(shortest_wait, consecutive_skips);
 
 			ino_check = 0;
 			consecutive_skips = FALSE;
