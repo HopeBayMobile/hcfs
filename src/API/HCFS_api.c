@@ -987,5 +987,4 @@ out:
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
-	close(fd);
 }
