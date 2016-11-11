@@ -1049,6 +1049,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	fuse_reply_entry(req, &(tmp_param));
+	init_lastsync_time(self_inode);
 }
 
 static inline BOOL pkg_in_whitelist(const char *pkgname)
@@ -1298,6 +1299,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 #endif
 
 	fuse_reply_entry(req, &(tmp_param));
+	init_lastsync_time(self_inode);
+
 	gettimeofday(&tmp_time2, NULL);
 	write_log(10, "mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
@@ -6842,6 +6845,7 @@ static int32_t symlink_internal(fuse_req_t req, const char *link,
 	}
 
 	write_log(5, "Debug symlink: symlink operation success\n");
+	init_lastsync_time(self_inode);
 	return 0;
 
 error_handle:
@@ -7986,6 +7990,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	fi->fh = fh;
 
 	fuse_reply_create(req, &tmp_param, fi);
+	init_lastsync_time(self_inode);
 }
 
 

@@ -538,6 +538,9 @@ int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 		if (((is_start_transit == FALSE) && /* End of transit */
 				(tempentry.status == IS_DIRTY)) &&
 				((transit_incomplete != TRUE))) { /* Complete */
+			/* We are done first this upload, so update the xattr
+			"user.lastsync" */
+			set_lastsync_time(this_inode);
 			if (tempentry.mod_after_in_transit == TRUE) {
 				/* If sync point is set, relocate this inode
 				 * so that it is going to be last one. */

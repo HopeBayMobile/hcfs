@@ -2243,8 +2243,11 @@ void upload_loop(void)
 	BOOL is_start_check;
 	char sync_paused_status = FALSE;
 	char need_retry_backup;
-	struct timeval last_retry_time, current_time;
-
+	struct timespec last_retry_time, current_time;
+	struct timespec nonbusy_pause_time;
+	int64_t last_synctime, this_waittime, shortest_wait;
+	BOOL consecutive_skips;
+	
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 #endif
@@ -2259,6 +2262,7 @@ void upload_loop(void)
 	_update_restore_dirty_list();
 
 	need_retry_backup = FALSE;
+	consecutive_skips = FALSE;
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			/* Backup FS db if needed at the beginning of a round
@@ -2266,37 +2270,37 @@ void upload_loop(void)
 			ret = backup_FS_database();
 			if (ret < 0) {
 				need_retry_backup = TRUE;
-				gettimeofday(&last_retry_time, NULL);
+				clock_gettime(CLOCK_REALTIME_COARSE,
+				              &last_retry_time);
 			}
 
 			/* Start to recovery dirty queue if needed */
 			if (need_recover_sb())
 				start_sb_recovery();
-
-			for (sleep_count = 0; sleep_count < 10; sleep_count++) {
-				/* Break if system going down */
-				if (hcfs_system->system_going_down == TRUE)
-					break;
-
-				/* Avoid busy polling */
-				if (sys_super_block->head.num_dirty <=
-				    sync_ctl.total_active_sync_threads) {
-					sleep(1);
-					continue;
-				}
-
-				/*Sleep for a while if we are not really
-				in a hurry*/
-				if ((hcfs_system->systemdata.cache_size <
-				    CACHE_SOFT_LIMIT) ||
-				    (hcfs_system->systemdata.dirty_cache_size
-				    <= 0))
-					sleep(1);
-				else
-					break;
-			}
+		
+			/* Sleep for SYNC_NONBUSY_PAUSE_TIME seconds if not
+			in a hurry */
+			/* If need to delay upload further, sleep until
+			the next sync could be successful */
+			/* Will not sleep if sync all is in progress, or
+			cache cannot be replaced if nothing is uploaded */
+			/* Sleep will be interrupted if system is going down
+			or cache is full */
+			nonbusy_pause_time.tv_sec = SYNC_NONBUSY_PAUSE_TIME;
+			if ((consecutive_skips == TRUE) &&
+			    (shortest_wait > SYNC_NONBUSY_PAUSE_TIME))
+				nonbusy_pause_time.tv_sec = shortest_wait;
+			nonbusy_pause_time.tv_nsec = 0;
+			if (((hcfs_system->systemdata.unpin_dirty_data_size +
+			      hcfs_system->systemdata.pinned_size) <
+			     CACHE_SOFT_LIMIT) &&
+			    (sys_super_block->sync_point_is_set == FALSE))
+				sem_timedwait(&(hcfs_system->sync_control_sem),
+				              &nonbusy_pause_time);
 
 			ino_check = 0;
+			consecutive_skips = FALSE;
+			shortest_wait = NORMAL_UPLOAD_DELAY;
 		}
 		/* Break immediately if system going down */
 		if (hcfs_system->system_going_down == TRUE)
@@ -2315,9 +2319,9 @@ void upload_loop(void)
 
 		/* If FSmgr backup failed, retry if network
 		connection is on with at least 5 seconds
-		if between */
+		in between */
 		if (need_retry_backup == TRUE) {
-			gettimeofday(&current_time, NULL);
+			clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
 			if (current_time.tv_sec >
 			    (last_retry_time.tv_sec + 5)) {
 				ret = backup_FS_database();
@@ -2388,6 +2392,54 @@ void upload_loop(void)
 			}
 		}
 		super_block_exclusive_release();
+
+		/* If should not upload immediately for any case, check if
+		we should delay upload for this inode */
+		/* Skip this check if this is an inode in retry list */
+		if ((((hcfs_system->systemdata.unpin_dirty_data_size +
+		       hcfs_system->systemdata.pinned_size) <
+		      CACHE_SOFT_LIMIT) &&
+		     (sys_super_block->sync_point_is_set == FALSE)) &&
+		    ((retry_inode == 0) && (ino_sync != 0))) {
+			/* Fetch the timestamp for the last sync of this
+			inode */
+			last_synctime = get_lastsync_time(ino_sync);
+
+			if (consecutive_skips == FALSE) {
+				/* Fetch the current time if not skipping
+				previously in this round */
+				clock_gettime(CLOCK_REALTIME_COARSE,
+				              &current_time);
+				consecutive_skips = TRUE;
+			}
+			/* Otherwise just reuse the previous clock value */
+
+			if (current_time.tv_sec >= last_synctime) {
+				if ((current_time.tv_sec - last_synctime) <
+				    NORMAL_UPLOAD_DELAY) {
+					ino_sync = 0;
+					/* If can wait less, reset sleep time */
+					this_waittime = NORMAL_UPLOAD_DELAY -
+					                (current_time.tv_sec -
+					                 last_synctime);
+					if (this_waittime < shortest_wait)
+						shortest_wait = this_waittime;
+				} else {
+					consecutive_skips = FALSE;
+				}
+			} else {
+				/* If difference within NORMAL_UPLOAD_DELAY,
+				still skip */
+				/* Won't recompute time to sleep here, as time
+				may be inaccurate */
+				if ((last_synctime - current_time.tv_sec) <
+				    NORMAL_UPLOAD_DELAY)
+					ino_sync = 0;
+				else
+					consecutive_skips = FALSE;
+			}
+		}
+
 		write_log(6, "Inode to sync is %" PRIu64 "\n",
 			  (uint64_t)ino_sync);
 		/* Begin to sync the inode */

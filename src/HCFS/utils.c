@@ -2503,3 +2503,51 @@ int32_t convert_origin_apk(char *apkname, const char *minapk_name)
 	return 0;
 }
 
+void init_lastsync_time(ino_t thisinode)
+{
+	struct timespec current_time;
+	char pathname[METAPATHLEN];
+	int64_t timestamp;
+
+	memset(&current_time, 0, sizeof(struct timespec));
+	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
+	timestamp = current_time.tv_sec;
+
+	/* Adjust sync time so that the first upload delay is as desired */
+	/* Ignore the case when NORMAL_UPLOAD_DELAY < FIRST_UPLOAD_DELAY */
+	if (NORMAL_UPLOAD_DELAY > FIRST_UPLOAD_DELAY) {
+		if (timestamp > (NORMAL_UPLOAD_DELAY - FIRST_UPLOAD_DELAY))
+			timestamp -= (NORMAL_UPLOAD_DELAY - FIRST_UPLOAD_DELAY);
+		else
+			timestamp = 0;
+	}
+	fetch_meta_path(pathname, thisinode);
+	setxattr(pathname, "user.lastsync", &timestamp, sizeof(int64_t), 0);
+}
+
+void set_lastsync_time(ino_t thisinode)
+{
+	struct timespec current_time;
+	char pathname[METAPATHLEN];
+	int64_t timestamp;
+
+	memset(&current_time, 0, sizeof(struct timespec));
+	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
+	timestamp = current_time.tv_sec;
+
+	fetch_meta_path(pathname, thisinode);
+	setxattr(pathname, "user.lastsync", &timestamp, sizeof(int64_t), 0);
+}
+
+int64_t get_lastsync_time(ino_t thisinode)
+{
+	char pathname[METAPATHLEN];
+	int64_t timestamp = 0;
+	int32_t ret;
+
+	fetch_meta_path(pathname, thisinode);
+	ret = getxattr(pathname, "user.lastsync", &timestamp, sizeof(int64_t));
+	if (ret < 0)
+		timestamp = 0;
+	return timestamp;
+}
