@@ -1148,9 +1148,5 @@ anything can be deleted */
 		}
 	}
 	_destroy_delete_controls();
-	sem_post(&(delete_ctl.pause_sem));
-	sem_post(&(dsync_ctl.pause_sem));
-	pthread_join(dsync_ctl.dsync_handler_thread, NULL);
-	pthread_join(delete_ctl.delete_handler_thread, NULL);
 	return NULL;
 }
