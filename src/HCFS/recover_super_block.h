@@ -13,6 +13,7 @@
 
 #include "global.h"
 #include "super_block.h"
+#include "meta_mem_cache.h"
 
 #define PROGRESS_FILE "recover_dirty_in_progress"
 #define MAX_NUM_ENTRY_HANDLE 512
@@ -31,8 +32,30 @@ typedef struct recovery_round_data {
 	int64_t unpin_dirty_size_delta;
 } RECOVERY_ROUND_DATA;
 
+
 BOOL need_recover_sb();
+
 void fetch_recover_progressf_path(char *pathname);
+
+int32_t fetch_last_recover_progress(ino_t *start_inode, ino_t *end_inode);
+
+int32_t log_recover_progress(ino_t start_inode, ino_t end_inode);
+
+void unlink_recover_progress_file();
+
+void set_recovery_flag(BOOL is_ongoing, ino_t start_inode, ino_t end_inode);
+
+void reset_queue_and_stat();
+
+int32_t reconstruct_sb_entries(SUPER_BLOCK_ENTRY *sb_entry_arr,
+			       META_CACHE_ENTRY_STRUCT **meta_cache_arr,
+			       int64_t num_entry_handle,
+			       RECOVERY_ROUND_DATA *this_round);
+
+int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data);
+
 void *recover_sb_queue_worker(void *ptr);
+
+void start_sb_recovery();
 
 #endif /* GW20_HCFS_RECOVER_SB_H_ */

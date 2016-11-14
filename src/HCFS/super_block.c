@@ -1549,17 +1549,17 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	ssize_t retsize;
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
-	BOOL entry_is_recovering = FALSE;
+	BOOL sb_is_recovering = FALSE;
 
 	if (sys_super_block->sb_recovery_meta.is_ongoing &&
-			thisinode >= sys_super_block->sb_recovery_meta.start_inode &&
-			thisinode <= sys_super_block->sb_recovery_meta.end_inode) {
-		entry_is_recovering = TRUE;
+	    thisinode >= sys_super_block->sb_recovery_meta.start_inode &&
+	    thisinode <= sys_super_block->sb_recovery_meta.end_inode) {
+		sb_is_recovering = TRUE;
 	}
 
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */
-		if (which_ll == IS_DIRTY && !entry_is_recovering) {
+		if (which_ll == IS_DIRTY && !sb_is_recovering) {
 			get_meta_size(thisinode, NULL, &now_meta_size);
 			if (now_meta_size == 0)
 				return 0;
@@ -1573,8 +1573,10 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	}
 	if (this_entry->status != NO_LL) {
 		ret = ll_dequeue(thisinode, this_entry);
-		if (ret < 0)
+		if (ret < 0) {
+			puts("BBBBBBBBBBBBBBb");
 			return ret;
+		}
 	}
 
 	if (which_ll == NO_LL)
@@ -1589,7 +1591,7 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	switch (which_ll) {
 	case IS_DIRTY:
 		/* Only change staus of this entry if SB entries recovery is ongoing */
-		if (entry_is_recovering) {
+		if (sb_is_recovering) {
 			this_entry->status = which_ll;
 			return 0;
 		}
@@ -1748,8 +1750,9 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 	if (old_which_ll == IS_DIRTY) {
 		/* Only change staus of this entry if SB entries recovery is ongoing */
 		if (sys_super_block->sb_recovery_meta.is_ongoing &&
-			thisinode >= sys_super_block->sb_recovery_meta.start_inode &&
-			thisinode <= sys_super_block->sb_recovery_meta.end_inode) {
+		    thisinode >=
+			sys_super_block->sb_recovery_meta.start_inode &&
+		    thisinode <= sys_super_block->sb_recovery_meta.end_inode) {
 			this_entry->status = NO_LL;
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;
