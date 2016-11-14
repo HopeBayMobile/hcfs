@@ -1573,10 +1573,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	}
 	if (this_entry->status != NO_LL) {
 		ret = ll_dequeue(thisinode, this_entry);
-		if (ret < 0) {
-			puts("BBBBBBBBBBBBBBb");
+		if (ret < 0)
 			return ret;
-		}
 	}
 
 	if (which_ll == NO_LL)
