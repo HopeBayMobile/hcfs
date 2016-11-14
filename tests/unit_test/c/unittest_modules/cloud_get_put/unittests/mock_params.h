@@ -65,3 +65,5 @@ TEST_REVERT_STRUCT test_delete_struct;
 char is_first_upload;
 char fetch_from_cloud_fail;
 char usermeta_notfound;
+int64_t fake_access_time;
+BOOL test_upload_delay;

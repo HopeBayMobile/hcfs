@@ -2229,7 +2229,7 @@ errcode_handle:
 	unlink(restore_tosync_list);
 }
 
-static inline void _upload_sleep(int64_t shortest_wait, BOOL consecutive_skips)
+static inline void _upload_sleep(int64_t shortest_wait, BOOL skip_everyone)
 {
 	struct timespec nonbusy_pause_time;
 
@@ -2237,7 +2237,7 @@ static inline void _upload_sleep(int64_t shortest_wait, BOOL consecutive_skips)
 	      hcfs_system->systemdata.pinned_size) < CACHE_SOFT_LIMIT) &&
 	    (sys_super_block->sync_point_is_set == FALSE)) {
 		clock_gettime(CLOCK_REALTIME_COARSE, &nonbusy_pause_time);
-		if ((consecutive_skips == TRUE) &&
+		if ((skip_everyone == TRUE) &&
 		    (shortest_wait > SYNC_NONBUSY_PAUSE_TIME))
 			nonbusy_pause_time.tv_sec += shortest_wait;
 		else
@@ -2264,7 +2264,11 @@ void upload_loop(void)
 	char need_retry_backup;
 	struct timespec last_retry_time, current_time;
 	int64_t last_synctime, this_waittime, shortest_wait;
-	BOOL consecutive_skips;
+	/* consecutive_skips is for determining if we should find the
+	current time or could use previously cached value. */
+	/* skip_everyone is for finding out if we should sleep longer
+	if every inode in the queue has been uploaded recently */
+	BOOL consecutive_skips, skip_everyone;
 	
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
@@ -2281,6 +2285,7 @@ void upload_loop(void)
 
 	need_retry_backup = FALSE;
 	consecutive_skips = FALSE;
+	skip_everyone = FALSE;
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			/* Backup FS db if needed at the beginning of a round
@@ -2304,10 +2309,11 @@ void upload_loop(void)
 			cache cannot be replaced if nothing is uploaded */
 			/* Sleep will be interrupted if system is going down
 			or cache is full */
-			_upload_sleep(shortest_wait, consecutive_skips);
+			_upload_sleep(shortest_wait, skip_everyone);
 
 			ino_check = 0;
 			consecutive_skips = FALSE;
+			skip_everyone = TRUE;
 			shortest_wait = NORMAL_UPLOAD_DELAY;
 		}
 		/* Break immediately if system going down */
@@ -2400,6 +2406,11 @@ void upload_loop(void)
 			}
 		}
 		super_block_exclusive_release();
+		write_log(10, "%lld, %lld, %d, %llu, %llu\n",
+		          hcfs_system->systemdata.unpin_dirty_data_size,
+			hcfs_system->systemdata.pinned_size,
+			sys_super_block->sync_point_is_set,
+			retry_inode, ino_sync);
 
 		/* If should not upload immediately for any case, check if
 		we should delay upload for this inode */
@@ -2412,10 +2423,12 @@ void upload_loop(void)
 			/* Fetch the timestamp for the last sync of this
 			inode */
 			last_synctime = get_lastsync_time(ino_sync);
+			write_log(10, "last synctime %lld, is consecutive skip %d\n",
+			          last_synctime, consecutive_skips);
 
 			if (consecutive_skips == FALSE) {
 				/* Fetch the current time if not skipping
-				previously in this round */
+				consecutively */
 				clock_gettime(CLOCK_REALTIME_COARSE,
 				              &current_time);
 				consecutive_skips = TRUE;
@@ -2434,6 +2447,7 @@ void upload_loop(void)
 						shortest_wait = this_waittime;
 				} else {
 					consecutive_skips = FALSE;
+					skip_everyone = FALSE;
 				}
 			} else {
 				/* If difference within NORMAL_UPLOAD_DELAY,
@@ -2441,10 +2455,12 @@ void upload_loop(void)
 				/* Won't recompute time to sleep here, as time
 				may be inaccurate */
 				if ((last_synctime - current_time.tv_sec) <
-				    NORMAL_UPLOAD_DELAY)
+				    NORMAL_UPLOAD_DELAY) {
 					ino_sync = 0;
-				else
+				} else {
 					consecutive_skips = FALSE;
+					skip_everyone = FALSE;
+				}
 			}
 		}
 
@@ -2487,6 +2503,8 @@ void upload_loop(void)
 		} else {
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
+		write_log(10, "Next inode to check is %" PRIu64 "\n",
+		          (uint64_t) ino_check);
 		if (ino_check == 0)
 			is_start_check = TRUE;
 	}

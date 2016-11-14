@@ -1320,3 +1320,7 @@ void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter)
 		free(iter);
 	}
 }
+void init_lastsync_time(ino_t thisinode)
+{
+	UNUSED(thisinode);
+}

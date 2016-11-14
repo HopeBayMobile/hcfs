@@ -135,14 +135,21 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
 	(inode_ptr->inode_stat).mode = S_IFDIR;
+	/* Should add this counter first to avoid checking the first inode twice */
+	shm_test_data->tohandle_counter++;
 
 	if (shm_test_data->tohandle_counter == shm_test_data->num_inode) {
+		printf("Last inode. test_upload_delay is %d\n", test_upload_delay);
 		inode_ptr->util_ll_next = 0;
-		sys_super_block->head.first_dirty_inode = 0;
+		if (test_upload_delay == FALSE) {
+			sys_super_block->head.first_dirty_inode = 0;
+		} else {
+			shm_test_data->tohandle_counter = 0;
+			test_upload_delay = FALSE;
+		}
 	} else {
 		inode_ptr->util_ll_next = 
 			shm_test_data->to_handle_inode[shm_test_data->tohandle_counter];
-		shm_test_data->tohandle_counter++;
 	}
 	return 0;
 }
@@ -366,6 +373,9 @@ int create_progress_file(ino_t inode)
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 {
 	MOCK();
+	sync_ctl.threads_error[data_ptr->which_index] = FALSE;
+	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 }
 
@@ -570,4 +580,9 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 {
 	MOCK();
 	return 0;
+}
+
+int64_t get_lastsync_time(ino_t thisinode)
+{
+	return fake_access_time;
 }
