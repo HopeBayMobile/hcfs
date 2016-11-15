@@ -888,7 +888,7 @@ TEST_F(unpin_inodeTest, FailIn_fetch_inode_stat)
 {
 	ino_t inode = 0;
 
-	EXPECT_EQ(-ENOENT, unpin_inode(inode, &mock_reserved_size));
+	EXPECT_EQ(0, unpin_inode(inode, &mock_reserved_size));
 }
 
 TEST_F(unpin_inodeTest, FailIn_change_pin_flag)
