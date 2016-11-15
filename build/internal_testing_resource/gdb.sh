@@ -1,10 +1,9 @@
-
 #!/bin/bash
 # vim:set tabstop=4 shiftwidth=4 softtabstop=0 expandtab:
 set -e
 # Usage Info
 
-NDK_PATH=/opt/android-ndk-r12b
+NDK_PATH=`find /opt -maxdepth 1 -name 'android-ndk-r*'`
 TARGET_ARCH=64
 
 ErrorReport() {
@@ -34,12 +33,15 @@ Usage() {
 }
 
 CheckParams() {
+    PUSHONLY=0
+    PUSH=0
     while [ "$1" != "" ]; do
         case $1 in
-        -h)     Usage 0 ;;
-        -ndk)   NDK_PATH=$2; shift ;;
-        -push)  PUSH=1 ;;
-        *)      Usage 1 ;;
+        -h)        Usage 0 ;;
+        -ndk)      NDK_PATH=$2; shift ;;
+        -push)     PUSH=1 ;;
+        -pushonly) PUSHONLY=1 ;;
+        *)         Usage 1 ;;
         esac
         shift
     done
@@ -67,7 +69,9 @@ CheckTools() {
     if ! CheckProgram gdb; then
         _ret=1
     elif ! gdb --configuration | grep -q multiarch; then
-        echo "gdb doesn't include ndk data, please use -ndk pass android-ndk-r12+ path"
+        echo ""
+        echo "Error: gdb doesn't include ndk data, please use -ndk pass android-ndk-r12+ path"
+        echo Gdb path found in script: `which gdb`
         _ret=1
     fi
     if which cgdb > /dev/null 2>&1; then
@@ -80,6 +84,7 @@ CheckTools() {
 }
 
 PullGDBFiles() {
+    echo [PullGDBFiles]
     adb wait-for-device
     SRC=system/bin
     for i in linker${TARGET_ARCH};
@@ -98,8 +103,10 @@ PullGDBFiles() {
 }
 
 PushGDBbinary() {
+    echo [PushGDBbinary]
     adb wait-for-device
     adb root
+    adb wait-for-device
     if ! (adb disable-verity | grep -q already); then
         adb reboot
         adb wait-for-device
@@ -113,10 +120,10 @@ PushGDBbinary() {
     done
     adb shell 'set `ps | grep /system/bin/hcfs`; su root kill $2'&
     adb reboot
-    sleep 40
 }
 
 StartGDB() {
+    echo [StartGDB]
     adb wait-for-device
     adb shell 'set `ps | grep /system/bin/hcfs`; su root gdbserver'${TARGET_ARCH}' --attach :5678 $2'&
     gdbserverpid=$!
@@ -134,8 +141,11 @@ CheckTools
 
 # Main scripts
 
-if [[ $PUSH ]]; then
+if [[ $PUSH = 1 || $PUSHONLY = 1 ]]; then
     PushGDBbinary
+fi
+if [[ $PUSHONLY == 1 ]]; then
+    exit 0
 fi
 PullGDBFiles
 StartGDB
