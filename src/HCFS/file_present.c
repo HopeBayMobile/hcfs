@@ -1329,9 +1329,14 @@ int32_t pin_inode(ino_t this_inode,
 
 	memset(&tempstat, 0, sizeof(HCFS_STAT));
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
-	if (ret < 0)
+	if (ret < 0) {
+		if (ret == -ENOENT) {
+			write_log(4, "No entry in %s. Skip pinning meta %"
+					PRIu64, __func__, (uint64_t)this_inode);
+			return 0;
+		}
 		return ret;
-
+	}
 
 	ret = change_pin_flag(this_inode, tempstat.mode, pin_type);
 	if (ret < 0) {
@@ -1473,9 +1478,14 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 
 	memset(&tempstat, 0, sizeof(HCFS_STAT));
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
-	if (ret < 0)
+	if (ret < 0) {
+		if (ret == -ENOENT) {
+			write_log(4, "No entry in %s. Skip pinning meta %"
+					PRIu64, __func__, (uint64_t)this_inode);
+			return 0;
+		}
 		return ret;
-
+	}
 
 	ret = change_pin_flag(this_inode, tempstat.mode, P_UNPIN);
 	if (ret < 0) {
@@ -1523,8 +1533,14 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		ret = collect_dir_children(this_inode, &dir_node_list,
 			&num_dir_node, &nondir_node_list,
 			&num_nondir_node, NULL);
-		if (ret < 0)
+		if (ret < 0) {
+			if (ret == -ENOENT) {
+				write_log(4, "Folder is removed? Skip pinning"
+					" meta %"PRIu64, (uint64_t)this_inode);
+				return 0;
+			}
 			return ret;
+		}
 
 		/* first unpin regfile & symlink */
 		ret = 0;
