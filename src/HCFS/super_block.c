@@ -1992,7 +1992,7 @@ int32_t super_block_finish_pinning(ino_t this_inode)
 int32_t super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
-	int32_t ret;
+	int32_t ret = 0;
 
 	/* Try fetching meta file from backend if in restoring mode */
 	if (hcfs_system->system_restoring == RESTORING_STAGE2) {

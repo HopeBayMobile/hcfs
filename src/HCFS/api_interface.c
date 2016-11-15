@@ -536,7 +536,7 @@ int32_t pin_inode_handle(ino_t *pinned_list, int32_t num_inode,
 			/* Roll back */
 			zero_size = 0;
 			for (count2 = 0; count2 < num_inode; count2++) {
-				write_log(5, "Fail to pin, Roll back inode %"
+				write_log(4, "Fail to pin, Roll back inode %"
 					PRIu64"\n",
 					(uint64_t)pinned_list[count2]);
 				unpin_inode(pinned_list[count2],
