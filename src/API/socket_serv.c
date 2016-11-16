@@ -441,6 +441,25 @@ int32_t do_notify_applist_change(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_clear_booster_pkg_remaining(char *largebuf, int32_t arg_len,
+				 char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Start clear booster pkg\n");
+	ret_code = clear_booster_package_remaining(largebuf);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End clear booster pkg\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -540,7 +559,8 @@ int32_t process_request(void *arg)
 		{INITIATE_RESTORATION,	do_trigger_restore},
 		{CHECK_RESTORATION_STATUS,	do_check_restore_status},
 		{NOTIFY_APPLIST_CHANGE,	do_notify_applist_change},
-		{COLLECTSYSLOGS,	do_collect_sys_logs}
+		{COLLECTSYSLOGS,	do_collect_sys_logs},
+		{CLEAR_BOOSTER_PKG,	do_clear_booster_pkg_remaining}
 	};
 
 	uint32_t n;

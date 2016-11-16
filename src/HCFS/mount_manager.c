@@ -796,6 +796,15 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		data_data_root = new_info->f_ino;
 		write_log(10, "Debug mount: root of /data/data is %" PRIu64
 		          "\n", (uint64_t) data_data_root);
+		if (access("/data/data/com.hopebaytech.hcfsmgmt", F_OK) == 0) {
+			mgmt_app_is_created = TRUE;
+			write_log(4, "mgmt pkg folder existed");
+		} else {
+			mgmt_app_is_created = FALSE;
+			if (errno != ENOENT)
+				write_log(0, "Error: Cannot access mgmt"
+					" pkg folder. Code %d", errno);
+		}
 	}
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
