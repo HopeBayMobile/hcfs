@@ -57,14 +57,14 @@ exit ${1:-0}
 parse_options()
 {
 	TARGET=
-	TEST=0
+	RUN_TEST=0
 	while [[ $# -gt 0 ]]; do
 		case $1 in
 		lib)      TARGET+="$1;" ;;
 		ci-test)  TARGET+="$1;" ;;
 		unittest) TARGET+="$1;" ;;
 		pyhcfs)   TARGET+="$1;" ;;
-		--test)   TEST=1        ;;
+			--test)  RUN_TEST=1 ;;
 		-h)       Usage         ;;
 		-d)
 			if [ $# -lt 2 ]; then
@@ -126,7 +126,7 @@ pyhcfs ()
 	docker pull docker:5000/docker_hcfs_test_slave
 	set -x
 
-	if [ "$TEST" -eq 1 ]; then
+	if (( "$RUN_TEST" == 1 )); then
 		PYHCFS_TARGET=test
 	else
 		PYHCFS_TARGET=bdist_egg
