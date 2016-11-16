@@ -4,17 +4,21 @@
 # Load Default Value
 : "${TARGET_ARCH:=64}"
 
-
-ErrorReport() {
+ErrorReport()
+{
 	local script="$1"
 	local parent_lineno="$2"
 	local code="${3:-1}"
 	eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
 	echo "Error is near ${script} line ${parent_lineno}. Return ${code}"
-	local Start=$((parent_lineno-2))
-	if [[ $Start -lt 1 ]]; then
+	local Start
+	local Point
+	if [[ $parent_lineno -lt 1 ]]; then
 		Start=$parent_lineno
 		Point=1
+	else
+		Start=$((parent_lineno-2))
+		Point=3
 	fi
 	local End=$((parent_lineno+2))
 	cat -n "${script}" \

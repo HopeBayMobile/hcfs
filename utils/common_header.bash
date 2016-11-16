@@ -1,23 +1,35 @@
 # fix CI error
-if [ `id -u` -eq 0 ]; then
+if [ $(id -u) -eq 0 ]; then
 	umask 000
 fi
 
-function script_error_report() {
-	set +x
+ErrorReport()
+{
 	local script="$1"
 	local parent_lineno="$2"
-	local message="$3"
-	local code="${4:-1}"
-	echo "Error near ${script} line ${parent_lineno}; exiting with status ${code}"
-	if [[ -n "$message" ]] ; then
-		echo -e "Message: ${message}"
+	local code="${3:-1}"
+	eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
+	echo "Error is near ${script} line ${parent_lineno}. Return ${code}"
+	local Start
+	local Point
+	if [[ $parent_lineno -lt 1 ]]; then
+		Start=$parent_lineno
+		Point=1
+	else
+		Start=$((parent_lineno-2))
+		Point=3
 	fi
+	local End=$((parent_lineno+2))
+	cat -n "${script}" \
+		| sed -n "${Start},${End}p" \
+		| sed $Point"s/^  / >/"
+	eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
 	exit "${code}"
 }
 
-function install_pkg (){
-	[[ "$-" =~ "x" ]] && flag_x="-x" || flag_x="+x"
+install_pkg()
+{
+	[[ "$-" = *"x"* ]] && flag_x="-x" || flag_x="+x"
 	set +x
 	for pkg in $packages;
 	do
@@ -25,7 +37,7 @@ function install_pkg (){
 			install="$install $pkg"
 		fi
 	done
-	install="$(echo -e "$install $force_install" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+	install="$(echo -e "${install:-} ${force_install:-}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 	if [ -n "$install" ]; then
 		echo -e "\nError: Require packages: $install"
 		if [ "$1" = "check_pkg" ]; then
@@ -38,7 +50,7 @@ function install_pkg (){
 		force_install=""
 	fi
 	eval set $flag_x
-	for i in $post_pkg_install
+	for i in ${post_pkg_install:-}
 	do
 		echo Running post-install tasks: $i
 		$i
@@ -48,15 +60,17 @@ function install_pkg (){
 	fi
 }
 
-function check_script_changes()
+check_script_changes()
 {
 	script_path=$(dirname $1)
 	script_path=$(cd $script_path; pwd)
 	THIS_SCRIPT="$script_path/$(basename $1)"
-	checkfile="`dirname ${THIS_SCRIPT}`/.done_`basename ${THIS_SCRIPT}`.md5"
-	if [ ! -z "$setup_dev_env_mode" ]; then
-		checkfile="`dirname ${THIS_SCRIPT}`/.done_`basename ${THIS_SCRIPT}`_$setup_dev_env_mode.md5"
+	checkfile=$(dirname ${THIS_SCRIPT})/.done_$(basename ${THIS_SCRIPT})
+	if [ ! -z "${setup_dev_env_mode:=}" ]; then
+		checkfile+="_$setup_dev_env_mode"
 	fi
+	checkfile+=".md5"
+	echo checkfile $checkfile
 
 	if md5sum -c "$checkfile" >/dev/null 2>&1; then
 		exit
@@ -65,7 +79,7 @@ function check_script_changes()
 	fi
 }
 
-function commit_script_changes()
+commit_script_changes()
 {
 	checkfile="`dirname ${THIS_SCRIPT}`/.done_`basename ${THIS_SCRIPT}`.md5"
 	if [ ! -z "$setup_dev_env_mode" ]; then
@@ -83,8 +97,13 @@ function commit_script_changes()
 }
 
 # Main source
-# Enable error trace
-trap 'script_error_report "${BASH_SOURCE[0]}" ${LINENO}' ERR
-set -e -o errtrace
+
 # Enable debug log only if verbose on
 if ${CI_VERBOSE:-false}; then set -x; else set +x; fi
+
+# Enable error trace
+trap 'ErrorReport "${BASH_SOURCE[0]}" ${LINENO} $?' ERR
+set -o pipefail  # trace ERR through pipes
+set -o errtrace  # trace ERR through 'time command' and other functions
+set -o nounset   ## set -u : exit the script if you try to use an uninitialised variable
+set -o errexit   ## set -e : exit the script if any statement returns a non-true return value
