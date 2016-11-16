@@ -43,4 +43,6 @@ int32_t notify_applist_change();
 
 int32_t collect_sys_logs();
 
+int32_t clear_booster_package_remaining(char *package_name);
+
 #endif  /* GW20_HCFSAPI_SYS_H_ */

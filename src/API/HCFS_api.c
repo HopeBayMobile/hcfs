@@ -964,25 +964,26 @@ void HCFS_trigger_unboost(char **json_res)
 
 void HCFS_clear_booster_package_remaining(char **json_res, char *package_name)
 {
-	int32_t ret_code;
-	char path[500];
 
-	/* Remove symbolic link */
-	sprintf(path, "/data/data/%s", package_name);
-	ret_code = unlink(path);
-	if (ret_code < 0 && errno != ENOENT) {
-		ret_code = -errno;
-		goto out;
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
 	}
-	/* Remove target pkg folder */
-	sprintf(path, "%s/%s", SMARTCACHE_PATH, package_name);
-	ret_code = rmdir(path);
-	if (ret_code < 0 && errno != ENOENT)
-		ret_code = -errno;
-	else
-		ret_code = 0;
 
-out:
+	code = CLEAR_BOOSTER_PKG;
+	cmd_len = strlen(package_name) + 1;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, package_name, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else

@@ -1160,7 +1160,11 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 	char *sql_err = 0;
 	char sql[MAX_FILENAME_LEN + 200];
 
+	if (mgmt_app_is_created == FALSE)
+		return FALSE;
+
 	/* Reject if smartcache not found */
+	write_log(8, "Debug: check hcfsblock");
 	if (access("/data/smartcache/hcfsblock", F_OK) < 0) {
 		write_log(6, "Lookup %s but smartcache not found. Code %d",
 				pkgname, errno);
@@ -1169,8 +1173,8 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 
 	write_log(6, "Looking up pkg %s\n", pkgname);
 	/* Reject if db not found */
-	if (access(PKG_WHITELIST_DB_PATH, F_OK) < 0) {
-		write_log(4, "Query pkg whitelist err (open db). Code %d",
+	if (access(PKG_DB_PATH, F_OK) < 0) {
+		write_log(4, "Query pkg whitelist err (access db). Code %d",
 				errno);
 		return FALSE;
 	}
@@ -1178,10 +1182,10 @@ static inline BOOL pkg_in_whitelist(const char *pkgname)
 	/* Find pkg from db */
 	snprintf(sql, sizeof(sql),
 		 "SELECT EXISTS"
-		 "(SELECT * FROM smart_cache_while_list "
+		 "(SELECT * FROM booster_white_list "
 		 "WHERE package_name='%s')", pkgname);
 
-	ret_code = sqlite3_open(PKG_WHITELIST_DB_PATH, &db);
+	ret_code = sqlite3_open(PKG_DB_PATH, &db);
 	if (ret_code != SQLITE_OK) {
 		write_log(4, "Query pkg whitelist err (open db) - %s\n",
 				sqlite3_errmsg(db));
@@ -1387,10 +1391,13 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 #endif
 
+	/* Check if mgmt pkg folder is created. */
+	if (parent_inode == data_data_root && mgmt_app_is_created == FALSE &&
+	    !strcmp(selfname, "com.hopebaytech.hcfsmgmt"))
+		mgmt_app_is_created = TRUE;
+
 	fuse_reply_entry(req, &(tmp_param));
-
 	gettimeofday(&tmp_time2, NULL);
-
 	write_log(10, "mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 }
@@ -1613,6 +1620,11 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	/* Check mgmt pkg folder. */
+	if (parent_inode == data_data_root && mgmt_app_is_created == TRUE &&
+	    !strcmp(selfname, "com.hopebaytech.hcfsmgmt"))
+		mgmt_app_is_created = FALSE;
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
@@ -7986,6 +7998,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	global_argv = argv;
 #endif
 	data_data_root = (ino_t) 0;
+	mgmt_app_is_created = FALSE;
 
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
