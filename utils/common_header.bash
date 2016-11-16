@@ -3,32 +3,44 @@ if [ $(id -u) -eq 0 ]; then
 	umask 000
 fi
 
-ErrorReport()
-{
+PrintLine() { eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo; }
+
+ErrorReport() {
+	{ set +x; } 2>/dev/null
 	local script="$1"
 	local parent_lineno="$2"
 	local code="${3:-1}"
-	eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
+	PIPE=$(mktemp)
+
+	PrintLine
+	# Escape message as json string
+	exec > >(tee >(sed -e "s/\"/'/g" -e 's/\\/\\\\/g' | sed ':a;N;$!ba;s/\n/\\n/g' > $PIPE))
+
 	echo "Error is near ${script} line ${parent_lineno}. Return ${code}"
-	local Start
-	local Point
-	if [[ $parent_lineno -lt 1 ]]; then
-		Start=$parent_lineno
-		Point=1
-	else
-		Start=$((parent_lineno-2))
-		Point=3
+	local Start=$((parent_lineno-2))
+	local Point=3
+	if (( $parent_lineno <= 2 )); then
+		Start=1
+		Point=$parent_lineno
 	fi
 	local End=$((parent_lineno+2))
 	cat -n "${script}" \
 		| sed -n "${Start},${End}p" \
 		| sed $Point"s/^  / >/"
-	eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
+
+	exec > /dev/tty
+	PrintLine
+
+	# Report script error to slack for analize
+	URL="https://hooks.slack.com/services/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"
+	{
+		curl --silent -X POST --data-urlencode \
+			"payload={\"text\": \"$(cat $PIPE)\"}" "$URL" || :
+	} 2>&1 >/dev/null && rm $PIPE &
 	exit "${code}"
 }
 
-install_pkg()
-{
+install_pkg() {
 	[[ "$-" = *"x"* ]] && flag_x="-x" || flag_x="+x"
 	set +x
 	for pkg in $packages;
@@ -60,8 +72,7 @@ install_pkg()
 	fi
 }
 
-check_script_changes()
-{
+check_script_changes() {
 	script_path=$(dirname $1)
 	script_path=$(cd $script_path; pwd)
 	THIS_SCRIPT="$script_path/$(basename $1)"
@@ -79,8 +90,7 @@ check_script_changes()
 	fi
 }
 
-commit_script_changes()
-{
+commit_script_changes() {
 	checkfile="`dirname ${THIS_SCRIPT}`/.done_`basename ${THIS_SCRIPT}`.md5"
 	if [ ! -z "$setup_dev_env_mode" ]; then
 		checkfile="`dirname ${THIS_SCRIPT}`/.done_`basename ${THIS_SCRIPT}`_$setup_dev_env_mode.md5"
