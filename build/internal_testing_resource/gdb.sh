@@ -1,4 +1,6 @@
 #!/bin/bash
+# vim:set tabstop=4 shiftwidth=4 softtabstop=0 noexpandtab:
+
 # Load Default Value
 : "${TARGET_ARCH:=64}"
 
@@ -196,4 +198,3 @@ if [[ $PUSHONLY != 1 ]]; then
 	StartGDB
 fi
 
-# vim:set tabstop=4 shiftwidth=4 softtabstop=0 noexpandtab:
