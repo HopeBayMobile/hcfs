@@ -9,6 +9,7 @@ ErrorReport()
 	local script="$1"
 	local parent_lineno="$2"
 	local code="${3:-1}"
+	echo
 	eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
 	echo "Error is near ${script} line ${parent_lineno}. Return ${code}"
 	local Start
@@ -64,11 +65,11 @@ EOU
 CheckParams() {
 	PUSHONLY=0
 	PUSH=0
-	while [ "${1:-}" != "" ]; do
+	while (( $# > 0 )); do
 		case $1 in
 		-h)        Usage 0;;
 		-ndk)
-			if [ $# -lt 2 ]; then
+			if (( $# < 2 )); then
 				echo "Usage: -ndk <NDK_PATH>"
 				exit 1
 			fi
@@ -81,45 +82,43 @@ CheckParams() {
 		shift
 	done
 
-	# set PATH
-	if [ -z "${NDK_PATH_SET:=}" -a -z "$NDK_PATH" ] ; then
-		echo "Error: require NDK_PATH, use -ndk <NDK_PATH> OR export NDK_PATH before execute script"
-		exit 1
-	fi
-	if [ -n "$NDK_PATH" ]; then
-		export PATH=$NDK_PATH/prebuilt/linux-x86_64/bin:$PATH
-	fi
-	if [ -n "$NDK_PATH_SET" ]; then
-		export PATH=$NDK_PATH_SET/prebuilt/linux-x86_64/bin:$PATH
-	fi
+	# Customize PATH, later path has higher priority
+	local ENV_PATH=()
+	ENV_PATH+=("/opt/android-*")
+	ENV_PATH+=("${NDK_PATH:-}")
+	ENV_PATH+=("${NDK_PATH_SET:-}")
+
+	local EXPANDED=()
+	for E in "${ENV_PATH[@]}"; do
+		EXPANDED+=("${E}")
+		EXPANDED+=("${E}/prebuilt/linux-x86_64/bin")
+		EXPANDED+=("${E}/platform-tools")
+	done
+	for E in ${EXPANDED[@]}
+	do
+		if [[ -d "$E" && ! ":$PATH:" == *":$E:"* ]]; then
+			export PATH="$E:$PATH"
+		fi
+	done
 }
 
 CheckProgram() {
 	local _tool=$1
-	which "$_tool" > /dev/null 2>&1 || echo "$ERROR_HDR $_tool is not found. Please install it or add its path in \$PATH."
+	if ! which "$_tool" > /dev/null 2>&1; then
+		echo "Error, $_tool is not found. $2"
+		exit 1
+	fi
 }
 
 CheckTools() {
 	local _ret=0
-	if ! CheckProgram adb; then
-		echo "   Or, install adb from android-sdk"
-		_ret=1
-	fi
-	if ! CheckProgram fastboot; then
-		echo "   Or, install adb from android-sdk"
-		_ret=1
-	fi
+	CheckProgram adb "Please install adb from android-sdk"
+	CheckProgram ndk-build "Please install android-ndk, set -ndk <NDK_PATH> OR export NDK_PATH"
 
-	if ! CheckProgram gdb; then
-		_ret=1
-	elif ! gdb --configuration | grep -q multiarch; then
-		which gdb
-		echo ""
-		echo "Error: gdb doesn't include ndk data, please use -ndk pass android-ndk-r12+ path"
-		echo Gdb path found in script: "$(which gdb)"
-		_ret=1
+	if ! [[ $(gdb --configuration) = *android* ]]; then
+		echo "Error: gdb in PATH ( $(\which gdb) ) is not android-ndk version, which" \
+			"is located at android-ndk-r*/prebuilt/linux-x86_64/bin/" && false
 	fi
-		which gdb
 	if which cgdb > /dev/null 2>&1; then
 		GDB=cgdb
 	else
@@ -132,23 +131,29 @@ CheckTools() {
 PullGDBFiles() {
 	echo ">> [PullGDBFiles]"
 	adb wait-for-device
-	SRC=system/bin
-	for i in linker${TARGET_ARCH};
-	do
-		if [ ! -f "./$SRC/$i" ]; then
-			adb pull "/$SRC/$i" "./$SRC/"
-		fi
-	done
-
 	echo ">>   Check required library files. Pull files if they are missing or mismatch"
+	local REQUIREMENT=()
+	REQUIREMENT+=("system/bin/linker${TARGET_ARCH}")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libstdc++.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libm.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libc.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libssl.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libz.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libc++.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/liblog.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libicuuc.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libicui18n.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libutils.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libbacktrace.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libcutils.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libbase.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libunwind.so")
+	REQUIREMENT+=("system/lib${TARGET_ARCH}/libnetd_client.so")
+
 	CHANGELIST=$(ANDROID_PRODUCT_OUT=. adb sync -l system 2>&1)
-	SRC=system/lib${TARGET_ARCH}
-	for i in libcrypto.so libsqlite.so libstdc++.so libm.so libc.so libssl.so \
-	libz.so libc++.so liblog.so libicuuc.so libicui18n.so libutils.so \
-	libbacktrace.so libcutils.so libbase.so libunwind.so libnetd_client.so;
-	do
-		if [[ ! -f ./$SRC/$i || $CHANGELIST = *$i* ]]; then
-			adb pull -a "/$SRC/$i" "./$SRC/" || :
+	for F in "${REQUIREMENT[@]}"; do
+		if [[ ! -f ./$F || $CHANGELIST = *$F* ]]; then
+			adb pull -a "/$F" "./$F" || :
 		fi
 	done
 }
@@ -159,16 +164,16 @@ PushGDBbinary() {
 	adb root
 	adb wait-for-device
 	if ! adb disable-verity | grep -q already; then
-		echo ">>   Disable-verity and reboot"
+		echo ">> Disable-verity and reboot"
 		adb reboot
 		adb wait-for-device
 		adb root
 	fi
 	adb remount
 	echo ">>   Push hcfs"
-	OUT=$(ANDROID_PRODUCT_OUT=. adb sync system)
-	if [[ ! $OUT = *"0 files pushed"* ]]; then
-		echo ">>   Some files pushed, Reboot"
+	OUT=$(ANDROID_PRODUCT_OUT=. adb sync system | tee /dev/fd/2)
+	if [[ ! $OUT = *" 0 files pushed"* ]]; then
+		echo ">> File changed. Reboot."
 		adb shell 'set `ps | grep /system/bin/hcfs`; su root kill $2'&
 		adb reboot
 	fi
@@ -177,8 +182,15 @@ PushGDBbinary() {
 StartGDB() {
 	echo ">> [StartGDB]"
 	adb wait-for-device
+	printmesg="echo >> Wait /storage/emulated being mounted"
+	until [[ -n `adb shell "mount |grep /storage/emulated"` ]]; do
+		$printmesg
+		printmesg=true
+		sleep 1; echo -n .
+	done
+	sleep 5; echo Done
+	unset printmesg
 	adb forward tcp:5678 tcp:5678
-	adb shell 'set `ps | grep gdbserver`; [ -n "$2" ] && su root kill $2'
 	adb shell 'set `ps | grep /system/bin/hcfs`; su root gdbserver --attach :5678 $2'&
 	gdbserverpid=$!
 	sleep 1
@@ -194,10 +206,10 @@ CheckTools
 
 # Main scripts
 
-PullGDBFiles
-if [[ $PUSH = 1 || $PUSHONLY = 1 ]]; then
-	PushGDBbinary
-fi
+#PullGDBFiles
+#if [[ $PUSH = 1 || $PUSHONLY = 1 ]]; then
+#	PushGDBbinary
+#fi
 if [[ $PUSHONLY != 1 ]]; then
 	StartGDB
 fi
