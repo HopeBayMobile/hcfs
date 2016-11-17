@@ -393,10 +393,97 @@ void HCFS_check_restore_status(char **json_res);
  */
 void HCFS_notify_applist_change(char **json_res);
 
+/*Check Package Boost Status
+ * @json_res result string in json format.
+ *
+ * To check if an installed package is boosted or not.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if package is boosted|
+ * | | 1 if package is unboosted|
+ * | False | Linux errors.|
+ */
 void HCFS_check_package_boost_status(char **json_res, char *package_name);
-void HCFS_enable_booster(char **json_res, long long booster_size);
+
+/*Enable Booster
+ * @json_res result string in json format.
+ * @size initial size of smart cache.
+ *
+ * To setup environment of smart cache. This API will create img file, setup
+ * loop device, process ext4 mkfs and mount.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
+void HCFS_enable_booster(char **json_res, int64_t size);
+
+/*Disable Booster
+ * @json_res result string in json format.
+ *
+ * To destroy environment of smart cache. The existed img file for smart cache
+ * will be deleted.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
 void HCFS_disable_booster(char **json_res);
+
+/*Trigger Boost
+ * @json_res result string in json format.
+ *
+ * To move all packages selected from /data/data to smart cache. The list of
+ * packages will stored in database maintained by Tera Mgmt APP. Note - This API
+ * will return immediately when receiving API request. HCFSAPID will send an
+ * event to notify the result after "boost" finished/failed.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
 void HCFS_trigger_boost(char **json_res);
+
+/*Trigger Unboost
+ * @json_res result string in json format.
+ *
+ * To move all packages selected from smart cache to /data/data. The list of
+ * packages will stored in database maintained by Tera Mgmt APP. Note - This API
+ * will return immediately when receiving API request. HCFSAPID will send an
+ * event to notify the result after "boost" finished/failed.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
 void HCFS_trigger_unboost(char **json_res);
+
+/*Clear Booster package
+ * @json_res result string in json format.
+ *
+ * To clear data related to (package_name) in smart cache.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
 void HCFS_clear_booster_package_remaining(char **json_res, char *package_name);
 #endif  /* GW20_HCFS_API_H_ */

@@ -14,7 +14,8 @@ hcfsapid_OBJS = \
 	hcfs_sys.o \
 	enc.o \
 	socket_util.o \
-	logger.o
+	logger.o \
+	smart_cache.o
 hcfsapid_OBJS := $(addprefix $(OBJS_DIR),$(hcfsapid_OBJS))
 
 test_OBJS = \
