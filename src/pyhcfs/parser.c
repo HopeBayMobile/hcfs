@@ -483,7 +483,8 @@ int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage)
 		ret_val = ERROR_SYSCALL;
 	       	goto errcode_handle;
 	}
-	if (buf.st_size != sizeof(FS_CLOUD_STAT_T)) {
+	if ((buf.st_size != sizeof(FS_CLOUD_STAT_T)) && 
+				(buf.st_size != sizeof(FS_CLOUD_STAT_T_V1))) {
 		ret_val = ERROR_SYSCALL;
 		errno = EINVAL;
 	        goto errcode_handle;
