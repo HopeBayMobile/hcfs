@@ -479,7 +479,6 @@ void to_lowercase(const char *org_name, char *lower_case)
 /* Internal function for generating the ownership / permission for
 Android external storage */
 #define PKG_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
-#define PKG_WHITELIST_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/smart_cache_white_list.db"
 
 static int32_t _lookup_pkg_cb(void *data, int32_t argc, char **argv, char **azColName)
 {
@@ -1389,12 +1388,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		/*Check if need to cleanup package lookup cache */
 		remove_cache_pkg(selfname);
 	}
-#endif
 
 	/* Check if mgmt pkg folder is created. */
 	if (parent_inode == data_data_root && mgmt_app_is_created == FALSE &&
 	    !strcmp(selfname, "com.hopebaytech.hcfsmgmt"))
 		mgmt_app_is_created = TRUE;
+#endif
 
 	fuse_reply_entry(req, &(tmp_param));
 	gettimeofday(&tmp_time2, NULL);
@@ -1621,12 +1620,12 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+#ifdef _ANDROID_ENV_
 	/* Check mgmt pkg folder. */
 	if (parent_inode == data_data_root && mgmt_app_is_created == TRUE &&
 	    !strcmp(selfname, "com.hopebaytech.hcfsmgmt"))
 		mgmt_app_is_created = FALSE;
 
-#ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
