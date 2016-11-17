@@ -29,9 +29,8 @@ TRACE="set -xv"; UNTRACE="set +xv"
 set +v -e -o functrace
 
 function require_var (){
-	if eval '[ -n "$'$1'" ]'; then
-		echo -e [$1]: $1
-	else
+	eval printf '%-20s%s' $1 \${$1:-};echo
+	if eval [ -z \"\${$1:-}\" ]; then
 		echo Error: required environment variables $1 does not exist
 		exit 1
 	fi
@@ -261,7 +260,7 @@ function mount_nas() {
 
 
 $TRACE
-if [ -n "$1" ]; then
+if [ -n "${1:-}" ]; then
 	main $1
 else
 	main userdebug
