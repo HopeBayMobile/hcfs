@@ -526,12 +526,12 @@ TEST_F(get_vol_usageTest, FileNotExist)
 	EXPECT_EQ(ret_val, -1);
 	EXPECT_EQ(errno, ENOENT);
 }
-TEST_F(get_vol_usageTest, FileReadError)
+TEST_F(get_vol_usageTest, EmptyFileError)
 {
 	int64_t vol_usage = 0;
 	ret_val = get_vol_usage("/proc/self/mem", &vol_usage);
 	EXPECT_EQ(ret_val, -1);
-	EXPECT_EQ(errno, EIO);
+	EXPECT_EQ(errno, EINVAL);
 }
 
 INSTANTIATE_TEST_CASE_P(GetVolUsage, get_vol_usageTest, ValuesIn(paths));
