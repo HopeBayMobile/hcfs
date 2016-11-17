@@ -817,25 +817,28 @@ void HCFS_notify_applist_change(char **json_res)
 void HCFS_check_package_boost_status(char **json_res, char *package_name)
 {
 	int32_t fd, ret_code;
-	uint32_t code, reply_len, cmd_len;
+	uint32_t code, cmd_len, reply_len;
+	ssize_t str_len;
+	char buf[1000];
 
-/*
 	fd = _api_socket_conn();
 	if (fd < 0) {
 		_json_response(json_res, FALSE, -fd, NULL);
 		return;
 	}
 
-	code = ;
-	cmd_len = strlen(booster_size) + 1;
+	code = CHECK_PACKAGE_BOOST_STATUS;
+	cmd_len = 0;
+
+	CONCAT_ARGS(package_name);
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
-	send(fd, booster_size, cmd_len, 0);
+	send(fd, buf, cmd_len, 0);
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);
-*/
+
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
@@ -844,12 +847,11 @@ void HCFS_check_package_boost_status(char **json_res, char *package_name)
 	close(fd);
 }
 
-void HCFS_enable_booster(char **json_res, long long booster_size)
+void HCFS_enable_booster(char **json_res, int64_t size)
 {
 	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
 
-/*
 	fd = _api_socket_conn();
 	if (fd < 0) {
 		_json_response(json_res, FALSE, -fd, NULL);
@@ -857,15 +859,15 @@ void HCFS_enable_booster(char **json_res, long long booster_size)
 	}
 
 	code = ENABLE_BOOSTER;
-	cmd_len = sizeof(long64_t);
+	cmd_len = sizeof(int64_t);
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
-	send(fd, booster_size, cmd_len, 0);
+	send(fd, &size, sizeof(int64_t), 0);
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);
-*/
+
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
@@ -876,39 +878,14 @@ void HCFS_enable_booster(char **json_res, long long booster_size)
 
 void HCFS_disable_booster(char **json_res)
 {
-	int32_t fd, ret_code;
-	uint32_t code, reply_len, cmd_len;
-
-/*
-	fd = _api_socket_conn();
-	if (fd < 0) {
-		_json_response(json_res, FALSE, -fd, NULL);
-		return;
-	}
-
-	code = DISABLE_BOOSTER;
-	cmd_len = 0;
-
-	send(fd, &code, sizeof(uint32_t), 0);
-	send(fd, &cmd_len, sizeof(uint32_t), 0);
-
-	recv(fd, &reply_len, sizeof(uint32_t), 0);
-	recv(fd, &ret_code, sizeof(int32_t), 0);
-*/
-	if (ret_code < 0)
-		_json_response(json_res, FALSE, -ret_code, NULL);
-	else
-		_json_response(json_res, TRUE, ret_code, NULL);
-
-	close(fd);
+	_json_response(json_res, FALSE, -ENOTSUP, NULL);
 }
 
 void HCFS_trigger_boost(char **json_res)
 {
 	int32_t fd, ret_code;
-	uint32_t code, reply_len, cmd_len;
+	uint32_t code, cmd_len, reply_len;
 
-/*
 	fd = _api_socket_conn();
 	if (fd < 0) {
 		_json_response(json_res, FALSE, -fd, NULL);
@@ -923,8 +900,7 @@ void HCFS_trigger_boost(char **json_res)
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);
-*/
-    ret_code = 1;
+
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
@@ -936,9 +912,8 @@ void HCFS_trigger_boost(char **json_res)
 void HCFS_trigger_unboost(char **json_res)
 {
 	int32_t fd, ret_code;
-	uint32_t code, reply_len, cmd_len;
+	uint32_t code, cmd_len, reply_len;
 
-/*
 	fd = _api_socket_conn();
 	if (fd < 0) {
 		_json_response(json_res, FALSE, -fd, NULL);
@@ -953,7 +928,7 @@ void HCFS_trigger_unboost(char **json_res)
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);
-*/
+
 	if (ret_code < 0)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
@@ -964,9 +939,10 @@ void HCFS_trigger_unboost(char **json_res)
 
 void HCFS_clear_booster_package_remaining(char **json_res, char *package_name)
 {
-
 	int32_t fd, ret_code;
 	uint32_t code, reply_len, cmd_len;
+	ssize_t str_len;
+	char buf[1000];
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -974,12 +950,14 @@ void HCFS_clear_booster_package_remaining(char **json_res, char *package_name)
 		return;
 	}
 
-	code = CLEAR_BOOSTER_PKG;
-	cmd_len = strlen(package_name) + 1;
+	code = CLEAR_BOOSTED_PACKAGE;
+	cmd_len = 0;
+
+	CONCAT_ARGS(package_name);
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
-	send(fd, package_name, cmd_len, 0);
+	send(fd, buf, cmd_len, 0);
 
 	recv(fd, &reply_len, sizeof(uint32_t), 0);
 	recv(fd, &ret_code, sizeof(int32_t), 0);
@@ -988,4 +966,6 @@ void HCFS_clear_booster_package_remaining(char **json_res, char *package_name)
 		_json_response(json_res, FALSE, -ret_code, NULL);
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
