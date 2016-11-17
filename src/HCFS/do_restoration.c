@@ -2491,6 +2491,7 @@ int32_t _restore_smart_cache_vol(ino_t rootino)
 {
 	INODE_PAIR_LIST *hardln_mapping;
 	char restore_todelete_list[METAPATHLEN];
+	char hcfsblock_restore_path[400];
 	int32_t ret;
 
 	restored_smartcache_ino = 0; /* Init smartcache ino as 0 */
@@ -2510,6 +2511,22 @@ int32_t _restore_smart_cache_vol(ino_t rootino)
 		ret = -ECANCELED;
 		goto out;
 	}
+
+	/* Check if hcfsblock_restore is already under /data/smartcache/,
+	 * If so, remove it. */
+	sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
+				RESTORED_SMARTCACHE_TMP_NAME);
+	if (access(hcfsblock_restore_path, F_OK) == 0) {
+		write_log(4, "hcfsblock_restore is already found, remove it.");
+		ret = unlink(hcfsblock_restore_path);
+		if (ret < 0 && errno != ENOENT) {
+			write_log(0, "Error: Fail to remove hcfsblock_restore."
+					" Code %d", errno);
+			ret = -ECANCELED;
+			goto out;
+		}
+	}
+
 	ret = _fetch_meta(rootino);
 	if (ret == 0) {
 		hardln_mapping = new_inode_pair_list();

@@ -427,7 +427,7 @@ static int32_t _remove_from_now_hcfs(ino_t ino_nowsys)
 		return ret;
 	}
 
-	/* TODO: statistics */
+	/* TODO: Is statistics ok? */
 	sc_ptr = meta_cache_lock_entry(ino_nowsys);
 	if (!parent_ptr) {
 		write_log(0, "Error: Fail to lock restored smart cache."
