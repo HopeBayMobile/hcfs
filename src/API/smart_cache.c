@@ -99,6 +99,34 @@ int32_t _mount_hcfs_vol()
 	return ret_code;
 }
 
+/* Helper function to send event to notify server
+ *
+ * @return Return code returned by hcfs api service.
+ */
+int32_t _send_notify_event(int32_t event_id)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = SEND_NOTIFY_EVENT;
+	cmd_len = sizeof(int32_t);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &event_id, sizeof(int32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
 /* Helper function to remove nonempty folder by system cmd.
  */
 int32_t _remove_folder(char *pathname)
@@ -382,7 +410,7 @@ static int32_t _iterate_pkg_cb(void *data,
  */
 void *process_boost(void *ptr)
 {
-	int32_t ret_code;
+	int32_t ret_code, retry_times;
 	char *sql_err = 0;
 	char sql[1024];
 	BOOST_JOB_META boost_job;
@@ -400,11 +428,13 @@ void *process_boost(void *ptr)
 			 SMARTCACHE_TABLE_NAME, ST_INIT_UNBOOST);
 
 	if (access(SMARTCACHE_DB_PATH, F_OK) != 0) {
+		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
 		pthread_exit((void *)-1);
 	}
 
 	ret_code = sqlite3_open(SMARTCACHE_DB_PATH, &(boost_job.db));
 	if (ret_code != SQLITE_OK) {
+		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
 		pthread_exit((void *)-1);
 	}
 
@@ -413,10 +443,12 @@ void *process_boost(void *ptr)
 	if (ret_code != SQLITE_OK) {
 		sqlite3_free(sql_err);
 		sqlite3_close(boost_job.db);
+		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
 		pthread_exit((void *)-1);
 	}
 
 	sqlite3_close(boost_job.db);
+	RETRY_SEND_EVENT(EVENT_BOOST_SUCCESS);
 	pthread_exit((void *)0);
 }
 
