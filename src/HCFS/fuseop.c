@@ -4814,6 +4814,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			case ST_CLOUD:
 			case ST_CtoL:
 				/*Download from backend */
+				block_dirty = TRUE;
 				ret = _write_fetch_backend(this_inode, bindex,
 					fh_ptr, &temppage, this_page_fpos,
 					entry_index, ispin);
