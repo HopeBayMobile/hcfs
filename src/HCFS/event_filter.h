@@ -24,6 +24,8 @@ enum { TESTSERVER = 0,
        EXCEED_PIN_MAX,
        SPACE_NOT_ENOUGH,
        CREATE_THUMBNAIL,
+       TRIGGER_BOOST_SUCCESS,
+       TRIGGER_BOOST_FAILED,
        NUM_EVENTS } EVENT_TYPE;
 #define IS_EVENT_VALID(A) ((0 <= A) && (A < NUM_EVENTS))
 
@@ -36,14 +38,16 @@ typedef enum {
 /* To declare all events */
 #define REGISTER_EVENTS                                                        \
 	EVENT_FILTER event_filters[] = {                                       \
-	    {TESTSERVER, 0, 0},                                                \
-	    {TOKEN_EXPIRED, 0, 120},                                           \
-	    {SYNCDATACOMPLETE, 0, 0},                                          \
-	    {RESTORATION_STAGE1_CALLBACK, 0, 0},                               \
-	    {RESTORATION_STAGE2_CALLBACK, 0, 0},                               \
-	    {EXCEED_PIN_MAX, 0, 0},                                            \
-	    {SPACE_NOT_ENOUGH, 0, 0},                                          \
-	    {CREATE_THUMBNAIL, 0, 0},                                          \
+		{ TESTSERVER, 0, 0 },                                          \
+		{ TOKEN_EXPIRED, 0, 120 },                                     \
+		{ SYNCDATACOMPLETE, 0, 0 },                                    \
+		{ RESTORATION_STAGE1_CALLBACK, 0, 0 },                         \
+		{ RESTORATION_STAGE2_CALLBACK, 0, 0 },                         \
+		{ EXCEED_PIN_MAX, 0, 0 },                                      \
+		{ SPACE_NOT_ENOUGH, 0, 0 },                                    \
+		{ CREATE_THUMBNAIL, 0, 0 },                                    \
+		{ TRIGGER_BOOST_SUCCESS, 0, 0 },                               \
+		{ TRIGGER_BOOST_FAILED, 0, 0 },                                \
 	};
 
 typedef struct {

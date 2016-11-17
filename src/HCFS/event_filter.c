@@ -51,14 +51,21 @@ int32_t check_event_filter(int32_t event_id)
  ***********************************************************************/
 int32_t check_send_interval(int32_t event_id)
 {
+	uint32_t idx;
 	int64_t now_ts, timedelta;
 
-	now_ts = (int64_t)time(NULL);
-	timedelta = (int64_t)difftime(now_ts,
-			event_filters[event_id].last_send_timestamp);
-	if (timedelta < event_filters[event_id].send_interval)
-		return -1;
-
+	for (idx = 0; idx < sizeof(event_filters) / sizeof(event_filters[0]);
+	     idx++) {
+		if (event_id == event_filters[idx].name) {
+			now_ts = (int64_t)time(NULL);
+			timedelta = (int64_t)difftime(
+			    now_ts, event_filters[idx].last_send_timestamp);
+			if (timedelta < event_filters[idx].send_interval)
+				return -1;
+			else
+				return 0;
+		}
+	}
 	return 0;
 }
 

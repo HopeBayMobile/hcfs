@@ -671,7 +671,6 @@ int32_t process_request(void *arg)
 			goto done;
 		}
 	}
-
 	/* async APIs */
 	for (n = 0; n < sizeof(async_cmds) / sizeof(async_cmds[0]); n++) {
 		if (api_code == async_cmds[n].name) {

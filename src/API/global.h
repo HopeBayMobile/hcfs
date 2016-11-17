@@ -26,6 +26,13 @@
 #define LOG_NAME "hcfsapid.log"
 #define LOG_LEVEL 4
 
+/* Notify Events */
+#define MAX_RETRY_SEND_TIMES 5
+#define RETCODE_QUEUE_FULL 2
+
+#define EVENT_BOOST_SUCCESS 8
+#define EVENT_BOOST_FAILED 9
+
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
@@ -72,6 +79,7 @@
 #define INITIATE_RESTORATION 42
 #define CHECK_RESTORATION_STATUS 43
 #define NOTIFY_APPLIST_CHANGE 44
+#define SEND_NOTIFY_EVENT 45
 
 enum { SETCONFIG = 100,
        GETCONFIG,
