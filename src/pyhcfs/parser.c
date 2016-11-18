@@ -475,15 +475,15 @@ int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage)
 	stat_ret_val = fstat(meta_fd, &buf);
 	if (stat_ret_val < 0) {
 		ret_val = ERROR_SYSCALL;
-	       	goto errcode_handle;
+		goto errcode_handle;
 	}
 	if (buf.st_size == sizeof(FS_CLOUD_STAT_T)) {
-                //FSStat current version
-                ret_ssize = pread(meta_fd, &meta_stat, sizeof(FS_CLOUD_STAT_T), 0);
-	}else if(buf.st_size == sizeof(FS_CLOUD_STAT_T_V1)){
+		//FSStat current version
+		ret_ssize = pread(meta_fd, &meta_stat, sizeof(FS_CLOUD_STAT_T), 0);
+	} else if (buf.st_size == sizeof(FS_CLOUD_STAT_T_V1)) {
                 //FSStat old version
                 ret_ssize = pread(meta_fd, &meta_stat, sizeof(FS_CLOUD_STAT_T_V1), 0);
-	}else{
+	} else {
                 ret_val = ERROR_SYSCALL;
                 errno = EINVAL;
                 goto errcode_handle;
