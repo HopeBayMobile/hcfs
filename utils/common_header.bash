@@ -1,3 +1,6 @@
+# Enable debug log only if verbose on
+if ${CI_VERBOSE:-false}; then set -x; else set +x; fi
+
 # fix CI error
 if [ $(id -u) -eq 0 ]; then
 	umask 000
@@ -39,6 +42,12 @@ ErrorReport() {
 	} 2>&1 >/dev/null && rm $PIPE &
 	exit "${code}"
 }
+
+# Enable error trace
+trap 'ErrorReport "${BASH_SOURCE[0]}" ${LINENO} $?' ERR
+set -o pipefail  # trace ERR through pipes
+set -o errtrace  # trace ERR through 'time command' and other functions
+set -o errexit   ## set -e : exit the script if any statement returns a non-true return value
 
 install_pkg() {
 	[[ "$-" = *"x"* ]] && flag_x="-x" || flag_x="+x"
@@ -105,15 +114,3 @@ commit_script_changes() {
 	md5sum "$commit_file" | sudo tee -a "$checkfile"
 	sudo chown --reference="$commit_file" "$checkfile"
 }
-
-# Main source
-
-# Enable debug log only if verbose on
-if ${CI_VERBOSE:-false}; then set -x; else set +x; fi
-
-# Enable error trace
-trap 'ErrorReport "${BASH_SOURCE[0]}" ${LINENO} $?' ERR
-set -o pipefail  # trace ERR through pipes
-set -o errtrace  # trace ERR through 'time command' and other functions
-set -o nounset   ## set -u : exit the script if you try to use an uninitialised variable
-set -o errexit   ## set -e : exit the script if any statement returns a non-true return value
