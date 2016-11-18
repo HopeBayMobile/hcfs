@@ -496,7 +496,7 @@ int32_t do_enable_booster(char *largebuf, int32_t arg_len,
 	write_log(8, "Enable booster\n");
 
 	memcpy(&smart_cache_size, largebuf, sizeof(int64_t));
-	if (smart_cache_size <= 0)
+	if (smart_cache_size < 1048576) /* At least 1MB */
 		return -EINVAL;
 
 	ret_code = enable_booster(smart_cache_size);
