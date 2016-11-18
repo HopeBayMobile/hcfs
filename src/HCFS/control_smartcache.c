@@ -33,6 +33,13 @@
 #include "mount_manager.h"
 #include "FS_manager.h"
 
+/**
+ * Unmount smart cache.
+ *
+ * @param mount_point Mount point of this smart cache.
+ *
+ * @return 0 on success, otherwise error code.
+ */
 int32_t unmount_smart_cache(char *mount_point)
 {
 	int32_t ret;
@@ -42,31 +49,6 @@ int32_t unmount_smart_cache(char *mount_point)
 		ret = -errno;
 
 	return ret;
-}
-
-int32_t mount_smart_cache()
-{
-	int32_t ret;
-	int32_t errcode;
-
-	if (access(SMART_CACHE_MP, F_OK) < 0) {
-		errcode = -errno;
-		if (errcode == -ENOENT) {
-			write_log(6, "Create folder %s", SMART_CACHE_MP);
-			MKDIR(SMART_CACHE_MP, 0771);
-		} else {
-			goto errcode_handle;
-		}
-	}
-
-	ret = mount("/dev/block/loop6", SMART_CACHE_MP, "ext4", 0, NULL);
-	if (ret < 0)
-		ret = -errno;
-
-	return ret;
-
-errcode_handle:
-	return errcode;
 }
 
 static void _change_stage1_cache_limit(int64_t restored_smartcache_size)
@@ -321,6 +303,11 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * Use function "system" to execute "command".
+ *
+ * @return 0 on success, otherwise -EPERM on error.
+ */
 static int32_t _run_command(char *command)
 {
 	int32_t status, errcode;
@@ -336,9 +323,15 @@ static int32_t _run_command(char *command)
 
 	write_log(4, "Test: status code: %d. Command: %s", status, command);
 
-	if (!WIFEXITED(status)) {
+	if (WIFEXITED(status)) {
+		if (WEXITSTATUS(status) != EXIT_SUCCESS) {
+			write_log(0, "Return status in %s: %d",
+				__func__, WEXITSTATUS(status));
+			return -EPERM;
+		}
+	} else {
 		write_log(0, "Return status in %s: %d", __func__, status);
-		return -EPERM;
+		return -EAGAIN;
 	}
 
 	return 0;
@@ -371,16 +364,26 @@ int32_t mount_and_repair_restored_smartcache()
 			SMART_CACHE_ROOT_MP, RESTORED_SMARTCACHE_TMP_NAME);
 	ret = _run_command(command);
 	if (ret < 0) {
-		/* TODO: If e2fsck failed, then discard the smart cache  */
-		errcode = ret;
+		/* If e2fsck failed, then discard the smart cache */
+		if (ret == -EPERM) {
+			errcode = ret; /* Skip smart cache and keep restoring */
+		} else {
+			errcode = -ECANCELED; /* restoration fail */
+		}
 		goto errcode_handle;
 	}
 
 	/* Create folder and prepare to mount */
+	if (access("/data/mnt", F_OK) < 0) {
+		write_log(0, "Fail to access %s. Stop restoring"
+				" Code %d", "/data/mnt", errno);
+		errcode = -ECANCELED;
+		goto errcode_handle;
+	}
 	if (access(RESTORED_SMART_CACHE_MP, F_OK) < 0) {
 		errcode = -errno;
 		if (errcode == -ENOENT) {
-			write_log(6, "Create folder %s",
+			write_log(4, "Create folder %s",
 					RESTORED_SMART_CACHE_MP);
 			MKDIR(RESTORED_SMART_CACHE_MP, 0);
 		} else {
@@ -406,6 +409,11 @@ errcode_handle:
 	return errcode;
 }
 
+/*
+ * Remove restored smartcache from now active hcfs under /data/smartcache.
+ * This function is invoked after restoration of /data/data completed and then
+ * we need to extract restored smart cache from now hcfs system.
+ */
 static int32_t _remove_from_now_hcfs(ino_t ino_nowsys)
 {
 	META_CACHE_ENTRY_STRUCT *parent_ptr, *sc_ptr;

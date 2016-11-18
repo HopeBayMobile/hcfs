@@ -32,7 +32,6 @@
 	 (strcmp(SMART_CACHE_FILE, name) == 0))
 
 int32_t unmount_smart_cache(char *mount_point);
-int32_t mount_smart_cache();
 int32_t inject_restored_smartcache(ino_t smartcache_ino);
 int32_t extract_restored_smartcache(ino_t smartcache_ino);
 int32_t mount_and_repair_restored_smartcache();

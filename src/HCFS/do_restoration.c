@@ -2069,7 +2069,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				/* Fetch all blocks if pinned */
 				is_smartcache = FALSE;
 				if (IS_SMARTCACHE_FILE(nowpath,
-				    tmpptr->d_name)) {
+							tmpptr->d_name)) {
 					is_smartcache = TRUE;
 					restored_smartcache_ino = tmpptr->d_ino;
 				}
@@ -2517,7 +2517,7 @@ int32_t _restore_smart_cache_vol(ino_t rootino)
 	sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
 				RESTORED_SMARTCACHE_TMP_NAME);
 	if (access(hcfsblock_restore_path, F_OK) == 0) {
-		write_log(4, "hcfsblock_restore is already found, remove it.");
+		write_log(4, "hcfsblock_restore already existed, remove it.");
 		ret = unlink(hcfsblock_restore_path);
 		if (ret < 0 && errno != ENOENT) {
 			write_log(0, "Error: Fail to remove hcfsblock_restore."
@@ -2558,6 +2558,7 @@ int32_t run_download_minimal(void)
 	int32_t errcode, count, ret;
 	DIR_ENTRY tarentry;
 	int32_t dummy_index;
+	int64_t hcfs_smartcache_vol_ino;
 	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 	BOOL is_fopen = FALSE;
@@ -2682,7 +2683,8 @@ int32_t run_download_minimal(void)
 		write_log(4, "Processing minimal for %s\n",
 				SMART_CACHE_VOL_NAME);
 		tmpentry = &(tmppage.dir_entries[ret]);
-		ret = _restore_smart_cache_vol(tmpentry->d_ino);
+		hcfs_smartcache_vol_ino = tmpentry->d_ino;
+		ret = _restore_smart_cache_vol(hcfs_smartcache_vol_ino);
 		if (ret == -ECANCELED) {
 			errcode = ret;
 			goto errcode_handle;
@@ -2712,9 +2714,33 @@ int32_t run_download_minimal(void)
 					errcode = ret;
 					goto errcode_handle;
 				} else {
-					restored_smartcache_ino = 0;
+					PRUNE_T *prune_list = NULL;
+					int32_t prune_index = 0;
+					int32_t max_prunes = 0;
+					DIR_ENTRY hcfsblock_entry;
+
+					/* In case smart cache is corrupted
+					 * and cannot be recover, discard it
+					 * and remove hcfsblock from
+					 * /data/smartcache/. */
+					extract_restored_smartcache(
+						restored_smartcache_ino);
 					write_log(4, "Smartcache corrupted."
 						" Discard it.");
+					strcpy(hcfsblock_entry.d_name,
+							SMART_CACHE_FILE);
+					hcfsblock_entry.d_ino =
+						restored_smartcache_ino;
+					hcfsblock_entry.d_type = D_ISREG;
+					/* Prune it. */
+					ret = _add_to_prunelist(&prune_list,
+						&prune_index, &max_prunes,
+						&hcfsblock_entry,
+						"/data/smartcache");
+					_prune_missing_entries(
+						hcfs_smartcache_vol_ino,
+						prune_list, prune_index);
+					restored_smartcache_ino = 0;
 				}
 			}
 		}
@@ -2798,22 +2824,24 @@ int32_t run_download_minimal(void)
 			}
 			/* After restoring of /data/data completed, unmount
 			 * and extract smart cache */
-			ret = unmount_smart_cache(RESTORED_SMART_CACHE_MP);
-			if (ret < 0) {
-				write_log(0, "Error: Fail to unmoun"
+			if (SMARTCACHE_IS_MISSING() == FALSE) {
+				ret = unmount_smart_cache(RESTORED_SMART_CACHE_MP);
+				if (ret < 0) {
+					write_log(0, "Error: Fail to unmount"
 						" smartcache from now system."
 						" Code %d", -ret);
-				errcode = ret;
-				goto errcode_handle;
-			}
-			ret = extract_restored_smartcache(
-					restored_smartcache_ino);
-			if (ret < 0) {
-				write_log(0, "Error: Fail to extract"
+					errcode = ret;
+					goto errcode_handle;
+				}
+				ret = extract_restored_smartcache(
+						restored_smartcache_ino);
+				if (ret < 0) {
+					write_log(0, "Error: Fail to extract"
 						" smartcache from now system."
 						" Code %d", -ret);
-				errcode = ret;
-				goto errcode_handle;
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 			continue;
 		}
