@@ -14,6 +14,7 @@
 
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -152,10 +153,11 @@ int32_t _remove_folder(char *pathname)
 int32_t enable_booster(int64_t smart_cache_size)
 {
 	char cmd[4096];
-	char cmd_create_image_file[] = "dd if=/dev/zero of=%s/%s bs=1 count=%d";
+	char cmd_create_image_file[] = "dd if=/dev/zero of=%s/%s bs=1048576 count=%d";
 	char cmd_setup_loop_device[] = "losetup %s %s/%s";
 	char cmd_create_ext4_fs[] = "make_ext4fs %s";
 	char cmd_mount_ext4_fs[] = "mount -t ext4 %s %s";
+	char cmd_restorecon[] = "restorecon %s";
 	int32_t ret_code, status;
 
 	ret_code = _create_hcfs_vol();
@@ -166,21 +168,22 @@ int32_t enable_booster(int64_t smart_cache_size)
 		return ret_code;
 	}
 
-	unlink(SMARTCACHE);
+	rmdir(SMARTCACHE);
 	ret_code = mkdir(SMARTCACHE, 0771);
-	if (ret_code < 0) {
+	if (ret_code < 0 && ret_code != EEXIST) {
 		write_log(0, "In %s. Failed to mkdir %s. Error code - %d",
-			  __func__, SMARTCACHE, ret_code);
+			  __func__, SMARTCACHE, errno);
 		return ret_code;
 	}
 	/* chown to system:sytem */
 	chown(SMARTCACHE, 1000, 1000);
 
-	unlink(SMARTCACHEMTP);
+	rmdir(SMARTCACHEMTP);
+	mkdir(SMARTCACHEAMNT, 0771);
 	ret_code = mkdir(SMARTCACHEMTP, 0771);
-	if (ret_code < 0) {
+	if (ret_code < 0 && ret_code != EEXIST) {
 		write_log(0, "In %s. Failed to mkdir %s. Error code - %d",
-			  __func__, SMARTCACHEMTP, ret_code);
+			  __func__, SMARTCACHEMTP, errno);
 		return ret_code;
 	}
 
@@ -193,7 +196,7 @@ int32_t enable_booster(int64_t smart_cache_size)
 	}
 
 	snprintf(cmd, sizeof(cmd), cmd_create_image_file, SMARTCACHE, HCFSBLOCK,
-		 smart_cache_size);
+		 (smart_cache_size / 1048576));
 	RUN_CMD_N_CHECK();
 
 	snprintf(cmd, sizeof(cmd), cmd_setup_loop_device, LOOPDEV, SMARTCACHE,

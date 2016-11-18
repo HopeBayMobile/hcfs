@@ -21,7 +21,7 @@
 #define ANDROID_INTERNAL 1
 #define MP_DEFAULT 1
 
-#define SMARTCACHE_DB_PATH "/tmp/test.db"
+#define SMARTCACHE_DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
 #define SMARTCACHE_TABLE_NAME "uid"
 
 #define TOUNBOOST 0
@@ -40,6 +40,7 @@
 
 #define SMARTCACHEVOL "hcfs_smartcache"
 #define SMARTCACHE "/data/smartcache" /* hcfs mountpoint */
+#define SMARTCACHEAMNT "/data/mnt" /* parent of ext4 mountpoint */
 #define SMARTCACHEMTP "/data/mnt/hcfsblock" /* ext4 mountpoint */
 #define LOOPDEV "/dev/block/loop6"
 #define HCFSBLOCK "hcfsblock"

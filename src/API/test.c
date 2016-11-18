@@ -151,19 +151,19 @@ int32_t main()
 	//printf("check package boost status com.bbb - %s\n", res22);
 	//free(res22);
 
-	//char *res23;
-	//HCFS_enable_booster(&res23, 104857600);
-	//printf("Enable booster - %s\n", res23);
-	//free(res23);
+	char *res23;
+	HCFS_enable_booster(&res23, 104857600);
+	printf("Enable booster - %s\n", res23);
+	free(res23);
 
 	//char *res24;
 	//HCFS_trigger_boost(&res24);
 	//printf("Trigger boost - %s\n", res24);
 	//free(res24);
 
-	char *res25;
-	HCFS_trigger_unboost(&res25);
-	printf("Trigger unboost - %s\n", res25);
-	free(res25);
+	//char *res25;
+	//HCFS_trigger_unboost(&res25);
+	//printf("Trigger unboost - %s\n", res25);
+	//free(res25);
 }
 
