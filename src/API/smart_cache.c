@@ -132,7 +132,7 @@ int32_t _send_notify_event(int32_t event_id)
  */
 int32_t _remove_folder(char *pathname)
 {
-	char cmd[4096];
+	char cmd[1024];
 	char cmd_remove_folder[] = "rm -rf %s";
 	int32_t status;
 
@@ -152,13 +152,17 @@ int32_t _remove_folder(char *pathname)
  */
 int32_t enable_booster(int64_t smart_cache_size)
 {
-	char cmd[4096];
-	char cmd_create_image_file[] = "dd if=/dev/zero of=%s/%s bs=1048576 count=%d";
-	char cmd_setup_loop_device[] = "losetup %s %s/%s";
+	char cmd[1024];
+	char cmd_create_image_file[] = "dd if=/dev/zero of=%s bs=1048576 count=%d";
+	char cmd_setup_loop_device[] = "losetup %s %s";
 	char cmd_create_ext4_fs[] = "make_ext4fs %s";
 	char cmd_mount_ext4_fs[] = "mount -t ext4 %s %s";
 	char cmd_restorecon[] = "restorecon %s";
+	char image_file_path[strlen(SMARTCACHE) + strlen(HCFSBLOCK) + 10];
 	int32_t ret_code, status;
+
+	snprintf(image_file_path, sizeof(image_file_path), "%s/%s", SMARTCACHE,
+		 HCFSBLOCK);
 
 	ret_code = _create_hcfs_vol();
 	if (ret_code < 0 && ret_code != -EEXIST) {
@@ -177,15 +181,22 @@ int32_t enable_booster(int64_t smart_cache_size)
 	}
 	/* chown to system:sytem */
 	chown(SMARTCACHE, 1000, 1000);
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
+	RUN_CMD_N_CHECK();
+
+	mkdir(SMARTCACHEAMNT, 0771);
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEAMNT);
+	RUN_CMD_N_CHECK();
 
 	rmdir(SMARTCACHEMTP);
-	mkdir(SMARTCACHEAMNT, 0771);
 	ret_code = mkdir(SMARTCACHEMTP, 0771);
 	if (ret_code < 0 && ret_code != EEXIST) {
 		write_log(0, "In %s. Failed to mkdir %s. Error code - %d",
 			  __func__, SMARTCACHEMTP, errno);
 		return ret_code;
 	}
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
+	RUN_CMD_N_CHECK();
 
 	ret_code = _mount_hcfs_vol();
 	if (ret_code < 0) {
@@ -194,19 +205,25 @@ int32_t enable_booster(int64_t smart_cache_size)
 			  __func__, SMARTCACHEVOL, ret_code);
 		return ret_code;
 	}
-
-	snprintf(cmd, sizeof(cmd), cmd_create_image_file, SMARTCACHE, HCFSBLOCK,
-		 (smart_cache_size / 1048576));
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
 	RUN_CMD_N_CHECK();
 
-	snprintf(cmd, sizeof(cmd), cmd_setup_loop_device, LOOPDEV, SMARTCACHE,
-		 HCFSBLOCK);
+	snprintf(cmd, sizeof(cmd), cmd_create_image_file, image_file_path,
+		 (smart_cache_size / 1048576));
+	RUN_CMD_N_CHECK();
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, image_file_path);
+	RUN_CMD_N_CHECK();
+
+	snprintf(cmd, sizeof(cmd), cmd_setup_loop_device, LOOPDEV,
+		 image_file_path);
 	RUN_CMD_N_CHECK();
 
 	snprintf(cmd, sizeof(cmd), cmd_create_ext4_fs, LOOPDEV);
 	RUN_CMD_N_CHECK();
 
 	snprintf(cmd, sizeof(cmd), cmd_mount_ext4_fs, LOOPDEV, SMARTCACHEMTP);
+	RUN_CMD_N_CHECK();
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
 	RUN_CMD_N_CHECK();
 
 	return 0;
@@ -218,11 +235,12 @@ int32_t enable_booster(int64_t smart_cache_size)
  */
 int32_t boost_package(char *package_name)
 {
-	char pkg_fullpath[strlen(package_name) + 20];
-	char pkg_tmppath[strlen(package_name) + 25];
-	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name)];
+	char pkg_fullpath[strlen(package_name) + strlen(DATA_PREFIX) + 10];
+	char pkg_tmppath[strlen(package_name) + strlen(DATA_PREFIX) + 20];
+	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name) +
+				  10];
 	char cmd[4096];
-	char cmd_copy_pkg_data[] = "cp -r %s %s";
+	char cmd_copy_pkg_data[] = "cp -rp %s %s";
 	int32_t ret_code, status;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
@@ -289,10 +307,11 @@ end:
  */
 int32_t unboost_package(char *package_name)
 {
-	char pkg_fullpath[strlen(package_name) + 20];
-	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name)];
+	char pkg_fullpath[strlen(package_name) + strlen(DATA_PREFIX) + 10];
+	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name) +
+				  10];
 	char cmd[4096];
-	char cmd_copy_pkg_data[] = "cp -r %s %s";
+	char cmd_copy_pkg_data[] = "cp -rp %s %s";
 	int32_t ret_code, status;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
@@ -311,8 +330,8 @@ int32_t unboost_package(char *package_name)
 
 		ret_code = _remove_folder(pkg_fullpath);
 		if (ret_code < 0) {
-			write_log(0, "In %s. Failed to run cmd %s", __func__,
-				  cmd);
+			write_log(0, "In %s. Failed to remove folder %s",
+				  __func__, pkg_fullpath);
 			return -1;
 		}
 	}
@@ -332,8 +351,10 @@ int32_t unboost_package(char *package_name)
 	goto end;
 
 rollback:
-	if (access(pkg_fullpath, F_OK) != -1)
+	if (access(pkg_fullpath, F_OK) != -1) {
 		_remove_folder(pkg_fullpath);
+		symlink(smart_cache_fullpath, pkg_fullpath);
+	}
 	ret_code = -1;
 
 end:
@@ -418,6 +439,9 @@ void *process_boost(void *ptr)
 	char sql[1024];
 	BOOST_JOB_META boost_job;
 
+	write_log(4, "Start to process packages %s",
+		  (boost_job.to_boost) ? "boosting" : "unboosting");
+
 	boost_job.to_boost = (int32_t)ptr;
 
 	/* Find target packages */
@@ -452,6 +476,8 @@ void *process_boost(void *ptr)
 
 	sqlite3_close(boost_job.db);
 	RETRY_SEND_EVENT(EVENT_BOOST_SUCCESS);
+	write_log(4, "Finish process %s.",
+		  (boost_job.to_boost) ? "boosting" : "unboosting");
 	pthread_exit((void *)0);
 }
 

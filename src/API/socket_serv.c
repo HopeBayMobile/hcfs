@@ -674,7 +674,7 @@ int32_t process_request(void *arg)
 	/* async APIs */
 	for (n = 0; n < sizeof(async_cmds) / sizeof(async_cmds[0]); n++) {
 		if (api_code == async_cmds[n].name) {
-			write_log(0, "Start asynchronous API (%d)", api_code);
+			write_log(8, "Start asynchronous API (%d)", api_code);
 			res_size = 0;
 			ret_code = async_cmds[n].cmd_fn(
 			    largebuf, arg_len, resbuf, &res_size,
@@ -683,7 +683,7 @@ int32_t process_request(void *arg)
 
 			/* Wait for async thread terminated */
 			pthread_join(async_cmds[n].async_thread, NULL);
-			write_log(0, "Asynchronous API (%d) finished",
+			write_log(8, "Asynchronous API (%d) finished",
 				  api_code);
 			goto done;
 		}
