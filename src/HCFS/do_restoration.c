@@ -179,11 +179,11 @@ int32_t initiate_restoration(void)
 		return -EPERM;
 	}
 
+	/* TODO: check f smartcache exist and mount it. Then check hcfsblock_restore */
 	sem_wait(&restore_sem);
 
 	/* First check if there is enough space for restoration */
 	sem_wait(&(hcfs_system->access_sem));
-
 	if (_enough_local_space() == FALSE) {
 		sem_post(&(hcfs_system->access_sem));
 		errcode = -ENOSPC;
