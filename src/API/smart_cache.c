@@ -308,6 +308,7 @@ end:
 int32_t unboost_package(char *package_name)
 {
 	char pkg_fullpath[strlen(package_name) + strlen(DATA_PREFIX) + 10];
+	char pkg_tmppath[strlen(package_name) + strlen(DATA_PREFIX) + 20];
 	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name) +
 				  10];
 	char cmd[4096];
@@ -318,6 +319,7 @@ int32_t unboost_package(char *package_name)
 		 package_name);
 	snprintf(smart_cache_fullpath, sizeof(smart_cache_fullpath), "%s/%s",
 		 SMARTCACHEMTP, package_name);
+	snprintf(pkg_tmppath, sizeof(pkg_tmppath), "%s.tmp", pkg_fullpath);
 
 	if (access(SMARTCACHEMTP, F_OK) == -1) {
 		write_log(0, "In %s. Smart cache not existed.", __func__);
@@ -338,10 +340,18 @@ int32_t unboost_package(char *package_name)
 
 	memset(cmd, 0, sizeof(cmd));
 	snprintf(cmd, sizeof(cmd), cmd_copy_pkg_data, smart_cache_fullpath,
-		 pkg_fullpath);
+		 pkg_tmppath);
 	status = system(cmd);
 	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
 		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
+		goto rollback;
+	}
+
+	ret_code = rename(pkg_tmppath, pkg_fullpath);
+	if (ret_code < 0) {
+		write_log(0,
+			  "In %s. Failed to create temp file %s. Error code %d",
+			  __func__, pkg_tmppath, errno);
 		goto rollback;
 	}
 
@@ -354,6 +364,9 @@ rollback:
 	if (access(pkg_fullpath, F_OK) != -1) {
 		_remove_folder(pkg_fullpath);
 		symlink(smart_cache_fullpath, pkg_fullpath);
+	}
+	if (access(pkg_tmppath, F_OK) != -1) {
+		_remove_folder(pkg_tmppath);
 	}
 	ret_code = -1;
 
