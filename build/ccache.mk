@@ -9,7 +9,9 @@ ifeq "$(CCACHE_MK_INCLUDED)" ""
 
     $(shell ccache -M 50G > /dev/null)
   else
-  all:
+    all: echo_ccache
+    echo_ccache:
+	@echo ''
 	@echo '>> Install ccache can speed up make time about 4x or higher.'
 	@echo '>> For ubuntu 14,16, use `utils/setup_dev_env.sh  -m install_ccache` to install ccache'
   endif
