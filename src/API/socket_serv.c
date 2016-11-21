@@ -32,6 +32,7 @@
 #include "pin_ops.h"
 #include "hcfs_stat.h"
 #include "hcfs_sys.h"
+#include "smart_cache.h"
 #include "marco.h"
 #include "logger.h"
 
@@ -441,25 +442,113 @@ int32_t do_notify_applist_change(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
-int32_t do_clear_booster_pkg_remaining(char *largebuf, int32_t arg_len,
+int32_t do_check_package_boost_status(char *largebuf, int32_t arg_len,
+			   	      char *resbuf, int32_t *res_size)
+{
+	char package_name[arg_len + 10];
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t str_len = 0;
+
+	write_log(8, "Check package boost status\n");
+
+	memcpy(&str_len, largebuf, sizeof(int64_t));
+	strncpy(package_name, largebuf + sizeof(int64_t), str_len);
+	ret_code = check_pkg_boost_status(package_name);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End check package boost status\n");
+	return ret_code;
+}
+
+int32_t do_clear_boosted_package(char *largebuf, int32_t arg_len,
 				 char *resbuf, int32_t *res_size)
 {
+	char package_name[arg_len + 10];
 	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t str_len = 0;
+
+	write_log(8, "Clear boosted package\n");
+
+	memcpy(&str_len, largebuf, sizeof(int64_t));
+	strncpy(package_name, largebuf + sizeof(int64_t), str_len);
+	ret_code = clear_boosted_package(package_name);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End clear boosted package\n");
+	return ret_code;
+}
+
+int32_t do_enable_booster(char *largebuf, int32_t arg_len,
+			  char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t smart_cache_size;
+
+	UNUSED(arg_len);
+
+	write_log(8, "Enable booster\n");
+
+	memcpy(&smart_cache_size, largebuf, sizeof(int64_t));
+	if (smart_cache_size < 1048576) /* At least 1MB */
+		return -EINVAL;
+
+	ret_code = enable_booster(smart_cache_size);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End enable booster\n");
+	return ret_code;
+}
+
+int32_t do_trigger_boost(char *largebuf, int32_t arg_len,
+			 char *resbuf, int32_t *res_size,
+			 pthread_t *tid)
+{
+	int32_t ret_code = 0;
 	uint32_t ret_len = 0;
 
 	UNUSED(largebuf);
 	UNUSED(arg_len);
 
-	write_log(8, "Start clear booster pkg\n");
-	ret_code = clear_booster_package_remaining(largebuf);
+	write_log(8, "Trigger boost\n");
+
+	ret_code = trigger_boost(TOBOOST, tid);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
-	write_log(8, "End clear booster pkg\n");
+	write_log(8, "End Trigger boost\n");
 	return ret_code;
 }
 
+int32_t do_trigger_unboost(char *largebuf, int32_t arg_len,
+			   char *resbuf, int32_t *res_size,
+			   pthread_t *tid)
+{
+	int32_t ret_code = 0;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Trigger unboost\n");
+
+	ret_code = trigger_boost(TOUNBOOST, tid);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End Trigger unboost\n");
+	return ret_code;
+}
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -560,15 +649,42 @@ int32_t process_request(void *arg)
 		{CHECK_RESTORATION_STATUS,	do_check_restore_status},
 		{NOTIFY_APPLIST_CHANGE,	do_notify_applist_change},
 		{COLLECTSYSLOGS,	do_collect_sys_logs},
-		{CLEAR_BOOSTER_PKG,	do_clear_booster_pkg_remaining}
+		{CHECK_PACKAGE_BOOST_STATUS,	do_check_package_boost_status},
+		{ENABLE_BOOSTER,	do_enable_booster},
+		{CLEAR_BOOSTED_PACKAGE,	do_clear_boosted_package}
+	};
+
+	/* Asynchronous API will return immediately and process cmd in
+	 * background */
+	SOCK_ASYNC_CMDS async_cmds[] = {
+		{TRIGGER_BOOST,		do_trigger_boost},
+		{TRIGGER_UNBOOST,	do_trigger_unboost},
 	};
 
 	uint32_t n;
 	for (n = 0; n < sizeof(cmds) / sizeof(cmds[0]); n++) {
 		if (api_code == cmds[n].name) {
 			res_size = 0;
-			ret_code = cmds[n].cmd_fn(largebuf, arg_len, resbuf, &res_size);
+			ret_code = cmds[n].cmd_fn(largebuf, arg_len, resbuf,
+						  &res_size);
 			sends(fd, resbuf, res_size);
+			goto done;
+		}
+	}
+	/* async APIs */
+	for (n = 0; n < sizeof(async_cmds) / sizeof(async_cmds[0]); n++) {
+		if (api_code == async_cmds[n].name) {
+			write_log(8, "Start asynchronous API (%d)", api_code);
+			res_size = 0;
+			ret_code = async_cmds[n].cmd_fn(
+			    largebuf, arg_len, resbuf, &res_size,
+			    &(async_cmds[n].async_thread));
+			sends(fd, resbuf, res_size);
+
+			/* Wait for async thread terminated */
+			pthread_join(async_cmds[n].async_thread, NULL);
+			write_log(8, "Asynchronous API (%d) finished",
+				  api_code);
 			goto done;
 		}
 	}

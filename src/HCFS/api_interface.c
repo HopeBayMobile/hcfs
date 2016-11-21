@@ -905,6 +905,18 @@ int32_t set_swift_token(int32_t arg_len, char *largebuf)
 	return ret_code;
 }
 
+int32_t send_notify_event(int32_t arg_len __attribute__((unused)),
+			  char *largebuf)
+{
+	int32_t ret_code = 0;
+	int32_t event_id;
+
+	memcpy(&event_id, largebuf, sizeof(int32_t));
+
+	ret_code = add_notify_event(event_id, NULL, FALSE);
+
+	return ret_code;
+}
 /************************************************************************
 *
 * Function name: api_module
@@ -1568,6 +1580,16 @@ void api_module(void *index)
 			ret_len = sizeof(int32_t);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
 			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			break;
+		case SEND_NOTIFY_EVENT:
+			retcode = send_notify_event(arg_len, largebuf);
+			if (retcode > 0) {
+				ret_len = sizeof(int32_t);
+				send(fd1, &ret_len, sizeof(uint32_t),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+			}
+			retcode = 0;
 			break;
 		default:
 			retcode = ENOTSUP;
