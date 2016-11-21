@@ -18,20 +18,6 @@
 
 #include "metaops.h"
 
-/**
-	Usage:
-	FILE_BLOCK_ITERATOR *iter = init_block_iter(fptr);
-	if (!iter)
-		return -errno;
-	while (iter_begin(iter) != NULL) {
-		// Now block index is iter->now_block;
-		// Now page is iter->page;
-	}
-	if (errno < 0) {
-		// Error occur
-	}
-	destroy_block_iter(iter);
- */
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 {
 	FILE_BLOCK_ITERATOR *iter;
@@ -51,8 +37,9 @@ FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 
 	iter->total_blocks = iter->filestat.size == 0 ? 0 :
 			((iter->filestat.size - 1) / MAX_BLOCK_SIZE) + 1;
-	iter->now_block = -1;
-	iter->now_page = -1;
+	iter->now_block_no = -1;
+	iter->now_page_no = -1;
+	iter->now_bentry = NULL;
 	/* Pointer */
 	iter->fptr = fptr;
 	iter->base.begin = (void *)&begin_block;
@@ -71,10 +58,10 @@ FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 	int64_t count, which_page, ret_size, page_pos;
 	int32_t e_index, ret, errcode;
 
-	for (count = iter->now_block + 1; count < iter->total_blocks; count++) {
+	for (count = iter->now_block_no + 1; count < iter->total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
 		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
-		if (which_page == iter->now_page)
+		if (which_page == iter->now_page_no)
 			break;
 		page_pos = seek_page2(&(iter->filemeta), iter->fptr,
 				which_page, 0);
@@ -85,7 +72,7 @@ FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 			FREAD(&(iter->page), sizeof(BLOCK_ENTRY_PAGE), 1,
 					iter->fptr);
 			iter->page_pos = page_pos;
-			iter->now_page = which_page;
+			iter->now_page_no = which_page;
 			break;
 		}
 	}
@@ -95,7 +82,8 @@ FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 	}
 
 	iter->e_index = e_index;
-	iter->now_block = count;
+	iter->now_block_no = count;
+	iter->now_bentry = iter->page.block_entries + e_index;
 	return iter;
 
 errcode_handle:
@@ -115,7 +103,7 @@ FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 
 	e_index = block_no % MAX_BLOCK_ENTRIES_PER_PAGE;
 	which_page = block_no / MAX_BLOCK_ENTRIES_PER_PAGE;
-	if (which_page != iter->now_page) {
+	if (which_page != iter->now_page_no) {
 		page_pos = seek_page2(&(iter->filemeta), iter->fptr,
 				which_page, 0);
 		if (page_pos > 0) {
@@ -123,7 +111,7 @@ FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 			FREAD(&(iter->page), sizeof(BLOCK_ENTRY_PAGE), 1,
 					iter->fptr);
 			iter->page_pos = page_pos;
-			iter->now_page = which_page;
+			iter->now_page_no = which_page;
 		} else {
 			errno = ENOENT;
 			return NULL;
@@ -131,7 +119,8 @@ FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 	}
 
 	iter->e_index = e_index;
-	iter->now_block = block_no;
+	iter->now_block_no = block_no;
+	iter->now_bentry = iter->page.block_entries + e_index;
 	return iter;
 
 errcode_handle:
@@ -141,10 +130,11 @@ errcode_handle:
 
 FILE_BLOCK_ITERATOR *begin_block(FILE_BLOCK_ITERATOR *iter)
 {
-	iter->now_block = -1;
-	iter->now_page = -1;
+	iter->now_block_no = -1;
+	iter->now_page_no = -1;
 	iter->e_index = 0;
 	iter->page_pos = 0;
+	iter->now_bentry = NULL;
 	return next_block(iter);
 }
 

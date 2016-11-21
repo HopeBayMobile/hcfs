@@ -43,3 +43,8 @@ $(eval $(call ADDTEST, syncpoint_control_unittest, \
   syncpoint_control.o \
   syncpoint_control_mock_ftn.o \
   syncpoint_control_unittest.o ))
+
+$(eval $(call ADDTEST, meta_iterator_unittest, \
+  meta_iterator.o \
+  meta_iterator_mock_ftn.o \
+  meta_iterator_unittest.o ))

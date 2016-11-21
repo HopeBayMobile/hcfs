@@ -8,25 +8,37 @@
 #include "meta.h"
 
 typedef struct ITERATOR_BASE {
+	void *(*begin)(void *iter);
 	void *(*next)(void *iter);
 	void *(*jump)(void *iter, int64_t target_idx);
-	void *(*begin)(void *iter);
 } ITERATOR_BASE;
 
+/**
+ *	Usage:
+ *	FILE_BLOCK_ITERATOR *iter = init_block_iter(fptr);
+ *	if (!iter)
+ *		return -errno;
+ *	while (iter_begin(iter) != NULL) {
+ *		// Now block index is iter->now_block_no;
+ *		// Now page is iter->page;
+ *	}
+ *	if (errno < 0) {
+ *		// Error occur
+ *	}
+ *	destroy_block_iter(iter);
+ */
 typedef struct FILE_BLOCK_ITERATOR {
 	ITERATOR_BASE base;
-	int64_t page_pos;
-	int64_t now_page;
-	int32_t e_index;
-	int64_t now_block;
 	int64_t total_blocks;
-	BLOCK_ENTRY_PAGE page;
+	int64_t now_page_no;
+	int32_t e_index;
+	int64_t now_block_no;
+	int64_t page_pos;
 	HCFS_STAT filestat;
 	FILE_META_TYPE filemeta;
+	BLOCK_ENTRY_PAGE page;
+	BLOCK_ENTRY *now_bentry;
 	FILE *fptr;
-	//void *(*next)(void *iter);
-	//struct FILE_BLOCK_ITERATOR *(*jump)(struct FILE_BLOCK_ITERATOR *iter, int64_t block_no);
-	//struct FILE_BLOCK_ITERATOR *(*begin)(struct FILE_BLOCK_ITERATOR *iter);
 } FILE_BLOCK_ITERATOR;
 
 #define iter_begin(iter) iter->base.begin(iter)
