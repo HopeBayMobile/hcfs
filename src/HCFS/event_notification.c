@@ -215,14 +215,12 @@ int32_t event_enqueue(int32_t event_id, json_t *event, BOOL blocking)
 	}
 	if (!json_is_object(event)) {
 		write_log(4, "Event info must be a json object.\n");
-		json_decref(event);
 		return -EINVAL;
 	}
 	ret_code =
 		json_object_set_new(event, "event_id", json_integer(event_id));
 	if (ret_code < 0) {
 		write_log(4, "Failed to construct event - Enqueue aborted.");
-		json_decref(event);
 		return -errno;
 	}
 
@@ -231,7 +229,6 @@ int32_t event_enqueue(int32_t event_id, json_t *event, BOOL blocking)
 		write_log(4, "%s - %s",
 				"Failed to add to event queue",
 				"Event queue full.");
-		json_decref(event);
 		return -ENOSPC;
 	}
 
@@ -606,47 +603,51 @@ int32_t add_notify_event_obj(int32_t event_id, json_t *event, char blocking)
 	int32_t ret_code = OP_SUCCESSFUL;
 
 	/* Server not set? */
-	if (notify_server_path == NULL) {
-		write_log(4, "Event is dropped because notify server not set.");
+	while (TRUE) {
+		if (notify_server_path == NULL) {
+			write_log(4,
+				  "Event dropped, notify server is not set.");
+			ret_code = ERR_SERVER_NOT_SET;
+			break;
+		}
+		if (!json_is_object(event)) {
+			write_log(4, "Event info must be a json object.\n");
+			ret_code = -EINVAL;
+			break;
+		}
+		/* Event ID validator */
+		if (!IS_EVENT_VALID(event_id)) {
+			ret_code = -EINVAL;
+			break;
+		}
+		/* Event filter */
+		ret_code = check_event_filter(event_id);
+		if (ret_code < 0) {
+			write_log(8, "Event is dropped by event filter.");
+			ret_code = ERR_DROP_BY_FILTER;
+			break;
+		}
+		ret_code = event_enqueue(event_id, event, blocking);
+		if (ret_code == -ENOSPC) {
+			write_log(4,
+				  "Event is dropped due to queue full error.");
+			ret_code = ERR_QUEUE_FULL;
+			break;
+		}
+
+		break; /* Finish */
+	}
+
+	if (ret_code == OP_SUCCESSFUL) {
+		write_log(8, "Event (id %d) enqueue was successful.", event_id);
+		/* Wake up queue worker */
+		pthread_mutex_lock(&(event_queue->worker_active_lock));
+		pthread_cond_signal(&(event_queue->worker_active_cond));
+		pthread_mutex_unlock(&(event_queue->worker_active_lock));
+	} else {
 		json_decref(event);
-		return ERR_SERVER_NOT_SET;
 	}
 
-	if (!json_is_object(event)) {
-		write_log(4, "Event info must be a json object.\n");
-		json_decref(event);
-		return -EINVAL;
-	}
-
-	/* Event ID validator */
-	if (!IS_EVENT_VALID(event_id)) {
-		json_decref(event);
-		return -EINVAL;
-	}
-
-	/* Event filter */
-	ret_code = check_event_filter(event_id);
-	if (ret_code < 0) {
-		write_log(8, "Event is dropped by event filter.");
-		json_decref(event);
-		return ERR_DROP_BY_FILTER;
-	}
-
-	ret_code = event_enqueue(event_id, event, blocking);
-	if (ret_code == -ENOSPC) {
-		write_log(4, "Event is dropped due to queue full error.");
-		return ERR_QUEUE_FULL;
-	} else if (ret_code < 0) {
-		return ret_code;
-	}
-
-	write_log(8, "Event (id %d) enqueue was successful.", event_id);
-
-	/* Wake up queue worker */
-	pthread_mutex_lock(&(event_queue->worker_active_lock));
-	pthread_cond_signal(&(event_queue->worker_active_cond));
-	pthread_mutex_unlock(&(event_queue->worker_active_lock));
-
-	return OP_SUCCESSFUL;
+	return ret_code;
 }
 
