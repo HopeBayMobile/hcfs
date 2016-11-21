@@ -90,7 +90,6 @@ check_script_changes() {
 		checkfile+="_$setup_dev_env_mode"
 	fi
 	checkfile+=".md5"
-	echo checkfile $checkfile
 
 	if md5sum -c "$checkfile" >/dev/null 2>&1; then
 		exit
