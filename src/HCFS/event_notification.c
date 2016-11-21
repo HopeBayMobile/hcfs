@@ -135,7 +135,7 @@ static int32_t _get_server_conn(char *path)
  *  Return value: 0 if successful. Otherwise returns the negation of the
  *                appropriate error code.
  ***********************************************************************/
-int32_t set_event_notify_server(char *server_path)
+int32_t set_event_notify_server(const char *server_path)
 {
 	int32_t ret_code;
 	int32_t server_fd = 0;
@@ -191,47 +191,38 @@ done:
 }
 
 /************************************************************************
+ * @brief Add an event_id event with event info to event queue.
  *
- * Function name: event_enqueue
- *        Inputs: int32_t event_id, char *event_info_json_str
- *                char blocking
- *        Output: Integer
- *       Summary: Add an (event_id) event with (event_info_json_str) info
- *                to event queue. The rule of (event_info_json_str) and
- *                (blocking) are described in add_notify_event function.
- *  Return value: 0 if successful. Otherwise returns the negation of the
- *                appropriate error code.
+ * The rule of event and blocking are described in add_notify_event
+ * function.
+ *
+ * @param event_id
+ * @param event
+ * @param blocking
+ * @return Integer. 0 if successful. Otherwise returns the negation of the
+ * appropriate error code.
+ * @see add_notify_event
  ***********************************************************************/
-int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
-		      char blocking)
+int32_t event_enqueue(int32_t event_id, json_t *event, BOOL blocking)
 {
 	int32_t ret_code;
-	json_t *event = NULL;
-	json_error_t json_err;
 
-	if (event_info_json_str == NULL) {
+	if (event == NULL)
 		event = json_object();
-		if (event == NULL) {
-			write_log(4, "Failed to initialize event - Enqueue aborted.");
-			return -errno;
-		}
-
-	} else {
-		event = json_loads(event_info_json_str, JSON_DECODE_ANY, &json_err);
-		if (event == NULL) {
-			write_log(4, "%s, error - %s\n",
-					"Failed to parse event info", json_err.text);
-			return -EINVAL;
-		} else if (!json_is_object(event)) {
-			write_log(4, "Event info must be a json object.\n");
-			return -EINVAL;
-		}
+	if (event == NULL) {
+		write_log(4, "Failed to construct event - Enqueue aborted.");
+		return -errno;
 	}
-
+	if (!json_is_object(event)) {
+		write_log(4, "Event info must be a json object.\n");
+		json_decref(event);
+		return -EINVAL;
+	}
 	ret_code =
 		json_object_set_new(event, "event_id", json_integer(event_id));
 	if (ret_code < 0) {
 		write_log(4, "Failed to construct event - Enqueue aborted.");
+		json_decref(event);
 		return -errno;
 	}
 
@@ -240,6 +231,7 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
 		write_log(4, "%s - %s",
 				"Failed to add to event queue",
 				"Event queue full.");
+		json_decref(event);
 		return -ENOSPC;
 	}
 
@@ -265,13 +257,6 @@ int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
 
 	/* Unlock */
 	sem_post(&(event_queue->queue_access_sem));
-
-	if (event_info_json_str == NULL)
-		write_log(8, "Event (id %d) enqueue was successful.", event_id);
-	else
-		write_log(8, "Event (id %d with parameter %s) enqueue was successful.",
-				event_id, event_info_json_str);
-
 	return 0;
 }
 
@@ -340,7 +325,7 @@ int32_t event_dequeue(int32_t num_events)
  *                appropriate error code.
  *
  ***********************************************************************/
-int32_t send_event_to_server(int32_t fd, char *events_in_json)
+int32_t send_event_to_server(int32_t fd, const char *events_in_json)
 {
 	int32_t r_size;
 	int32_t ret_val = 0;
@@ -476,8 +461,8 @@ void *event_worker_loop(void *ptr)
 						-ret_code);
 				goto error_handler;
 			} else {
-				write_log(8, "Send event to server, event str - %s",
-						msg_str_to_send);
+				write_log(0, "Send event to server: %s",
+					  msg_str_to_send);
 			}
 
 			/* These events are send, remove from queue */
@@ -566,8 +551,50 @@ void destroy_event_worker_loop_thread()
  *        Otherwise - The negation of the appropriate error code.
  *
  ***********************************************************************/
-int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
+int32_t add_notify_event(int32_t event_id,
+			 const char *event_info_json_str,
 			 char blocking)
+{
+	json_t *event = NULL;
+	json_error_t json_err;
+
+	if (event_info_json_str == NULL) {
+		event = json_object();
+		if (event == NULL) {
+			write_log(
+			    4, "Failed to initialize event - Enqueue aborted.");
+			return -errno;
+		}
+	} else {
+		event =
+		    json_loads(event_info_json_str, JSON_DECODE_ANY, &json_err);
+		if (event == NULL) {
+			write_log(4, "%s, error - %s\n",
+				  "Failed to parse event info", json_err.text);
+			return -EINVAL;
+		}
+	}
+
+	return add_notify_event_obj(event_id, event, blocking);
+}
+
+/************************************************************************
+ * @brief Add json_t *event into event queue
+ *
+ * The rule of event and blocking are described in add_notify_event
+ * function.
+ *
+ * @param event_id
+ * @param event
+ * @param blocking
+ * @return Integer. 0 if successful. Otherwise returns the negation of the
+ * appropriate error code.
+ *
+ * @see add_notify_event
+ * @note event must be keept after add_notify_event, the pointer value
+ * will be inserted to queue directly.
+ ***********************************************************************/
+int32_t add_notify_event_obj(int32_t event_id, json_t *event, char blocking)
 {
 	int32_t ret_code;
 
@@ -575,6 +602,11 @@ int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
 	if (notify_server_path == NULL) {
 		write_log(4, "Event is dropped because notify server not set.");
 		return 1;
+	}
+
+	if (!json_is_object(event)) {
+		write_log(4, "Event info must be a json object.\n");
+		return -EINVAL;
 	}
 
 	/* Event ID validator */
@@ -588,7 +620,8 @@ int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
 		return 3;
 	}
 
-	ret_code = event_enqueue(event_id, event_info_json_str, blocking);
+	ret_code = event_enqueue(event_id, event, blocking);
+
 	if (ret_code == -ENOSPC) {
 		/* Event queue is full */
 		write_log(4, "Event is dropped due to queue full error.");
@@ -598,6 +631,7 @@ int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
 		return ret_code;
 	}
 
+	write_log(8, "Event (id %d) enqueue was successful.", event_id);
 	ret_code = 0;
 done:
 	/* Wake up queue worker */

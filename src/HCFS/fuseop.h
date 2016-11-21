@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <fuse/fuse_opt.h>
 
+#include "FS_manager.h"
 #include "global.h"
 #include "meta.h"
 

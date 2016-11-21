@@ -2218,7 +2218,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		/* Clear path cache entry if needed */
 		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-						old_target_inode);
+							old_target_inode);
 			if (ret_val < 0) {
 				_cleanup_rename(body_ptr, old_target_ptr,
 						parent1_ptr, parent2_ptr);
@@ -2269,7 +2269,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 			while (1) {
 				alias_name = get_name_in_alias_group(
-								self_inode, lowercase, &alias_ino);
+				    self_inode, lowercase, &alias_ino);
 				if (alias_name == NULL)
 					break;
 
@@ -2306,9 +2306,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		}
 	}
 
-	/* If a file or directory is moved to another parent, statistics for
-	the path from the old parent to the root and for the path from the
-	new parent to the root are changed.*/
+	/* If a file or directory is moved to another parent, statistics
+	 * for the path from the old parent to the root and
+	 * for the path from the new parent to the root are changed.
+	 */
 	if (parent_inode1 != parent_inode2) {
 		if (S_ISDIR(self_mode)) {
 			/* If this inode is a directory, find the dir stat */
@@ -2393,20 +2394,27 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		}
 		sem_post(&(pathlookup_data_lock));
 
+	} /* (parent_inode1 != parent_inode2) */
+
 #ifdef _ANDROID_ENV_
-		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-							self_inode);
-			if (ret_val < 0) {
-				_cleanup_rename(body_ptr, old_target_ptr,
-						parent1_ptr, parent2_ptr);
-				meta_cache_remove(self_inode);
-				fuse_reply_err(req, -ret_val);
-				return;
-			}
+	/* If a file or directory is moved to another parent, the
+	 * pathcache (to which parent) is changed. If a file is renamed,
+	 * the name in pathcache is invalid, too.
+	 */
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
+	    (parent_inode1 != parent_inode2 ||
+	     strcmp(selfname1, selfname2) != 0)) {
+		ret_val =
+		    delete_pathcache_node(tmpptr->vol_path_cache, self_inode);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr, parent1_ptr,
+					parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, -ret_val);
+			return;
 		}
-#endif
 	}
+#endif
 
 	meta_cache_get_meta_size(parent1_ptr, &new_metasize1,
 			&new_metasize1_blk);
@@ -7636,7 +7644,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_stat.ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
 			&this_stat, this_generation, tmpptr,

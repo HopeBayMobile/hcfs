@@ -17,11 +17,14 @@
 /* Register event filter here */
 EVENT_FILTER event_filters[] = {
 	/* name, last_send_timestamp, send_interval */
-	{TESTSERVER,	   0,	  0},
-	{TOKENEXPIRED,	   0,	120},
-	{SYNCDATACOMPLETE, 0,     0},
-	{RESTORATION_STAGE1_CALLBACK,	0,	0},
-	{RESTORATION_STAGE2_CALLBACK,	0,	0},
+	{TESTSERVER,                  0, 0},
+	{TOKEN_EXPIRED,               0, 120},
+	{SYNCDATACOMPLETE,            0, 0},
+	{RESTORATION_STAGE1_CALLBACK, 0, 0},
+	{RESTORATION_STAGE2_CALLBACK, 0, 0},
+	{EXCEED_PIN_MAX,              0, 0},
+	{SPACE_NOT_ENOUGH,            0, 0},
+	{CREATE_THUMBNAIL,            0, 0},
 };
 
 

@@ -28,7 +28,7 @@ int32_t unmount_all(void)
 	return 0;
 }
 
-int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+int32_t add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry)
 {
 	CREATEDFS = TRUE;
 	strcpy(recvFSname, fsname);

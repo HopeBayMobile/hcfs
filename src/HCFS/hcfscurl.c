@@ -502,7 +502,7 @@ errcode_handle:
 *
 * Function name: hcfs_get_auth_swifttoken
 *        Inputs:
-*       Summary: Send TOKENEXPIRED event to notify server to ask for new
+*       Summary: Send TOKEN_EXPIRED event to notify server to ask for new
 *                token.
 *  Return value: Return 200 if event is sent, or -1 if error.
 *
@@ -517,7 +517,7 @@ int32_t hcfs_get_auth_swifttoken(void)
 	if (swift_auth_string[0] != 0)
 		return 200;
 
-	ret_code = add_notify_event(TOKENEXPIRED, NULL, FALSE);
+	ret_code = add_notify_event(TOKEN_EXPIRED, NULL, FALSE);
 
 	/* add event was successful or event already sent */
 	if ((ret_code == 0 || ret_code == 3) &&

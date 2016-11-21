@@ -41,17 +41,32 @@ ino_t lookup_pathname(const char *path, int32_t *errcode)
 {
 	MOCK();
 	*errcode = 0;
-	if (strcmp(path, "/") == 0)
-		return 1;
-	if (strcmp(path, "/does_not_exist") == 0) {
-		*errcode = -ENOENT;
-		return 0;
-	}
-	if (strcmp(path, "/testfile") == 0) {
-		return 2;
-	}
-	if (strcmp(path, "/testsamefile") == 0) {
-		return 2;
+	uint32_t i;
+	struct {
+		const char *name;
+		ino_t inod;
+		int32_t errcode;
+	} files[] = { { "/does_not_exist",              0,                  -ENOENT},
+		      { "/testmkdir/test",              0,                  -ENOENT},
+		      { "/",                            1,                  0},
+		      { "/testfile",                    2,                  0},
+		      { "/testsamefile",                2,                  0},
+		      { "/testfile1",                   10,                 0},
+		      { "/testfile2",                   11,                 0},
+		      { "/testdir1",                    12,                 0},
+		      { "/testdir2",                    13,                 0},
+		      { "/testtruncate",                14,                 0},
+		      { "/testread",                    15,                 0},
+		      { "/testwrite",                   16,                 0},
+		      { "/testlistdir",                 TEST_LISTDIR_INODE, 0},
+		      { "/testsetxattr",                18,                 0},
+		      { "/testsetxattr_permissiondeny", 19,                 0},
+		      { "/testsetxattr_fail",           20,                 0} };
+	for (i = 0; i < sizeof(files); i++) {
+		if (strcmp(path, files[i].name) == 0) {
+			*errcode = files[i].errcode;
+			return files[i].inod;
+		}
 	}
 	if (strcmp(path, "/testcreate") == 0) {
 		if (before_mknod_created == TRUE) {
@@ -66,43 +81,6 @@ ino_t lookup_pathname(const char *path, int32_t *errcode)
 			return 0;
 		}
 		return 6;
-	}
-	if (strcmp(path, "/testmkdir/test") == 0) {
-		*errcode = -ENOENT;
-		return 0;
-	}
-	if (strcmp(path, "/testfile1") == 0) {
-		return 10;
-	}
-	if (strcmp(path, "/testfile2") == 0) {
-		return 11;
-	}
-	if (strcmp(path, "/testdir1") == 0) {
-		return 12;
-	}
-	if (strcmp(path, "/testdir2") == 0) {
-		return 13;
-	}
-	if (strcmp(path, "/testtruncate") == 0) {
-		return 14;
-	}
-	if (strcmp(path, "/testread") == 0) {
-		return 15;
-	}
-	if (strcmp(path, "/testwrite") == 0) {
-		return 16;
-	}
-	if (strcmp(path, "/testlistdir") == 0) {
-		return TEST_LISTDIR_INODE;
-	}
-	if (strcmp(path, "/testsetxattr") == 0) {
-		return 18;
-	}
-	if (strcmp(path, "/testsetxattr_permissiondeny") == 0) {
-		return 19;
-	}
-	if (strcmp(path, "/testsetxattr_fail") == 0) {
-		return 20;
 	}
 
 	*errcode = -EACCES;

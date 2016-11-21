@@ -36,9 +36,14 @@ FAKE_VALUE_FUNC_VARARG(int32_t, write_log, int32_t, const char *, ...);
 
 EVENT_FILTER event_filters[] = {
 	/* name, last_send_timestamp, send_interval */
-	{TESTSERVER,    0,      0},
-	{TOKENEXPIRED,  0,      120},
-	{SYNCDATACOMPLETE, 0,     0},
+	{TESTSERVER,                  0, 0},
+	{TOKEN_EXPIRED,               0, 120},
+	{SYNCDATACOMPLETE,            0, 0},
+	{RESTORATION_STAGE1_CALLBACK, 0, 0},
+	{RESTORATION_STAGE2_CALLBACK, 0, 0},
+	{EXCEED_PIN_MAX,              0, 0},
+	{SPACE_NOT_ENOUGH,            0, 0},
+	{CREATE_THUMBNAIL,            0, 0},
 };
 
 
@@ -85,7 +90,7 @@ class set_event_notify_serverTest : public ::testing::Test
 TEST_F(set_event_notify_serverTest, SetServerOK)
 {
 	int32_t ret_code;
-	char *server_path = "event.notify.mock.server";
+	const char *server_path = "event.notify.mock.server";
 
 	ret_code = pthread_create(&server_thread, NULL, &init_mock_server, NULL);
 	EXPECT_EQ(ret_code, 0);
@@ -100,7 +105,7 @@ TEST_F(set_event_notify_serverTest, SetServerOK)
 TEST_F(set_event_notify_serverTest, ServerNotReady)
 {
 	int32_t ret_code;
-	char *server_path = "test.server.not.ready";
+	const char *server_path = "test.server.not.ready";
 
 	ret_code = set_event_notify_server(server_path);
 	EXPECT_EQ(ret_code, -111);
@@ -153,10 +158,11 @@ TEST_F(event_enqueueTest, EnqueueOneEl)
 TEST_F(event_enqueueTest, EnqueueWithEventInfo)
 {
 	int32_t ret_code, event_info;
-	char *event_info_json_str = "{\"info\":999}";
 	json_t *tmp_obj;
 
-	ret_code = event_enqueue(1, event_info_json_str, FALSE);
+	tmp_obj = json_pack("{si}","info", 999);
+	ASSERT_NE(tmp_obj, NULL);
+	ret_code = event_enqueue(1, tmp_obj, FALSE);
 	EXPECT_EQ(ret_code, 0);
 	EXPECT_EQ(event_queue->num_events, 1);
 	EXPECT_EQ(event_queue->head, 0);
@@ -167,25 +173,27 @@ TEST_F(event_enqueueTest, EnqueueWithEventInfo)
 	EXPECT_EQ(event_info, 999);
 
 	json_decref(tmp_obj);
+	json_decref(event_queue->events[0]);
 }
 
 TEST_F(event_enqueueTest, EnqueueWithErrorEventInfo)
 {
 	int32_t ret_code, event_info;
-	char *event_info_json_str = "xxxxxx";
 	json_t *tmp_obj;
 
-	ret_code = event_enqueue(1, event_info_json_str, FALSE);
+	tmp_obj = json_pack("s","xxxxxxxxxxxx");
+	ret_code = event_enqueue(1, tmp_obj, FALSE);
 	EXPECT_EQ(ret_code, -EINVAL);
 }
 
 TEST_F(event_enqueueTest, EnqueueWithErrorEventInfo2)
 {
 	int32_t ret_code, event_info;
-	char *event_info_json_str = "[{}]";
+	const char *event_info_json_str = "[{}]";
 	json_t *tmp_obj;
+	tmp_obj = json_pack("[{}]");
 
-	ret_code = event_enqueue(1, event_info_json_str, FALSE);
+	ret_code = event_enqueue(1, json_pack(event_info_json_str), FALSE);
 	EXPECT_EQ(ret_code, -EINVAL);
 }
 
@@ -306,7 +314,7 @@ class send_event_to_serverTest : public ::testing::Test
         int32_t ret_code, fd, status, sock_len;
         struct sockaddr_un addr;
 	pthread_t server_thread;
-	char *path = "event.notify.mock.server";
+	const char *path = "event.notify.mock.server";
 
 	void SetUp()
 	{
@@ -403,24 +411,25 @@ class add_notify_eventTest : public ::testing::Test
 
 	void TearDown()
 	{
+		event_dequeue(EVENT_QUEUE_SIZE);
 		sem_destroy(&(event_queue->queue_access_sem));
 		pthread_mutex_destroy(&(event_queue->worker_active_lock));
 		pthread_cond_destroy(&(event_queue->worker_active_cond));
 		free(event_queue);
 	}
 };
-
 TEST_F(add_notify_eventTest, AddOK)
 {
 	int32_t ret_code, idx;
 
-	notify_server_path = "fake.server";
+	notify_server_path = strdup("fake.server");
 
 	for (idx = 0; idx < NUM_EVENTS; idx++) {
 		printf("%d\n", idx);
 		ret_code = add_notify_event(idx, NULL, FALSE);
 		EXPECT_EQ(ret_code, 0);
 	}
+	EXPECT_EQ(event_dequeue(NUM_EVENTS), NUM_EVENTS);
 }
 
 TEST_F(add_notify_eventTest, NotifyServerNotSet)
@@ -437,7 +446,7 @@ TEST_F(add_notify_eventTest, InvalidEventID)
 {
 	int32_t ret_code;
 
-	notify_server_path = "fake.server";
+	notify_server_path = strdup("fake.server");
 
 	ret_code = add_notify_event(9999, NULL, FALSE);
 	EXPECT_EQ(ret_code, -EINVAL);
@@ -447,18 +456,19 @@ TEST_F(add_notify_eventTest, EventQueueFull)
 {
 	int32_t ret_code;
 
-	notify_server_path = "fake.server";
+	notify_server_path = strdup("fake.server");
 	event_queue->num_events = EVENT_QUEUE_SIZE;
 
 	ret_code = add_notify_event(1, NULL, FALSE);
 	EXPECT_EQ(ret_code, 2);
+	event_queue->num_events = 0;
 }
 
 TEST_F(add_notify_eventTest, BlockedByEventFilter)
 {
 	int32_t ret_code;
 
-	notify_server_path = "fake.server";
+	notify_server_path = strdup("fake.server");
 	check_event_filter_fake.return_val = -1;
 
 	ret_code = add_notify_event(1, NULL, FALSE);
