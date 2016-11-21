@@ -729,7 +729,7 @@ InstallOpenGapps() {
       echo ">> Now wipe the device"
       adb -s $TARGET_DEVICE shell twrp wipe cache
       WaitMode "recovery" 30
-      sleep 2
+      sleep 5
       echo ">> Upload Gapps into the device"
       adb -s $TARGET_DEVICE push "$GAPPS_FILE" "/cache/$GAPPS_FILE"
       echo ">> Install Gapps"

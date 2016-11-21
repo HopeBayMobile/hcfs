@@ -1,4 +1,5 @@
 #!/bin/bash
+# vim:set tabstop=4 shiftwidth=4 softtabstop=0 noexpandtab:
 #########################################################################
 #
 # Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
@@ -16,18 +17,25 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $repo/utils/common_header.bash
 cd $repo
 
-function usage()
+Usage()
 {
-sed -e "s/\t/    /g" <<EOF
-Usage: ./build.sh [ACTION] [OPTIONS]
+cat <<EOF
+NAME
+	build.sh - HCFS build script
 
-ACTION:
+SYNOPSIS
+	./build.sh [action] [option]
+
+DESCRIPTION
 	lib [-d ndk-path]
 		Build Android Libraries. ndk-path is path to Android-ndk directory
+
 	ci-test
 		Run continuous integration tests.
+
 	unittest
 		Run unit tests.
+
 	image 5x|s58a [--userdebug|--user] [--test]
 		5x|s58a
 			Build Android image.
@@ -36,41 +44,44 @@ ACTION:
 			respectively. Script will build both type if not specified.
 		--test
 			test image build process.
+
 	pyhcfs [--test]
 		Build python library "pyhcfs" at dist/
-OPTIONS:
+
 	-h
 		Show usage
 EOF
+exit ${1:-0}
 }
 
-function parse_options()
+parse_options()
 {
-	TEST=0
+	TARGET=
+	RUN_TEST=0
 	while [[ $# -gt 0 ]]; do
 		case $1 in
-		lib)
-			TARGET="$1"; shift ;;
-		ci-test)
-			TARGET="$1"; shift ;;
-		unittest)
-			TARGET="$1"; shift ;;
-		pyhcfs)
-			TARGET="$1"; shift ;;
-		-d )
-			if [ -z "$2" ] ; then echo "Invalid argument for -d"; usage; exit 1; fi
-			export SET_NDK_BUILD="$2"; shift 2 ;;
-		-h )
-			usage; exit ;;
-		--test)
-			TEST=1; shift 1;;
+		lib)      TARGET+="$1;" ;;
+		ci-test)  TARGET+="$1;" ;;
+		unittest) TARGET+="$1;" ;;
+		pyhcfs)   TARGET+="$1;" ;;
+			--test)  RUN_TEST=1 ;;
+		-h)       Usage         ;;
+		-d)
+			if [ $# -lt 2 ]; then
+				echo "Usage: -d <NDK_PATH>"
+				Usage 1
+			fi
+			export SET_NDK_BUILD="$2";
+			shift ;;
 		*)
-			exec 2>&1 ;echo "Invalid option: $@"; usage; exit 1 ;;
+			echo "Invalid option -- $@" 2>&1
+			Usage 1 ;;
 		esac
+		shift
 	done
 }
 
-function set_PARALLEL_JOBS()
+set_PARALLEL_JOBS()
 {
 	if hash nproc; then
 		_nr_cpu=`nproc`
@@ -80,12 +91,12 @@ function set_PARALLEL_JOBS()
 	export PARALLEL_JOBS="-l ${_nr_cpu}.5"
 }
 
-function unittest()
+unittest()
 {
 	$repo/tests/unit_test/run_unittests
 }
 
-function ci-test()
+ci-test()
 {
 	export CI=1
 	export CI_VERBOSE=true
@@ -93,7 +104,7 @@ function ci-test()
 	$repo/tests/ci_code_report.sh
 }
 
-function lib()
+lib()
 {
 	# load NDK_BUILD
 	# compress with password protection
@@ -109,14 +120,13 @@ function lib()
 	exit
 }
 
-function pyhcfs ()
+pyhcfs ()
 {
 	$repo/utils/setup_dev_env.sh -m docker_host
-	$repo/utils/setup_dev_env.sh
 	docker pull docker:5000/docker_hcfs_test_slave
 	set -x
 
-	if [ "$TEST" -eq 1 ]; then
+	if (( "$RUN_TEST" == 1 )); then
 		PYHCFS_TARGET=test
 	else
 		PYHCFS_TARGET=bdist_egg
@@ -142,8 +152,4 @@ parse_options "$@"
 set_PARALLEL_JOBS
 
 # Running target
-if [ -n "$TARGET" ]; then
-	eval $TARGET
-else
-	usage
-fi
+eval ${TARGET:=Usage}

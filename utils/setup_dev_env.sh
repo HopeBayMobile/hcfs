@@ -1,4 +1,5 @@
 #!/bin/bash
+# vim:set tabstop=4 shiftwidth=4 softtabstop=0 noexpandtab:
 #########################################################################
 #
 # Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
@@ -181,22 +182,34 @@ docker_host() {
 }
 post_install_docker() {
 	# skip is docker version is qualified
+	set -x
 	if hash docker && \
 		expr `docker version | sed -n -r -e "/Client/{N;s/[^0-9]*(.*)/\1/p}"` \>= 1.11.2 >&/dev/null; then
-		return
+		NEED_INSTALL_DOCKER=false
 	fi
 
-	sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
-	wget -qO- https://get.docker.com/ > /tmp/install_docker
-	sed -i '/$sh_c '\''sleep 3; apt-get update; apt-get install -y -q lxc-docker'\''/c\$sh_c '\''sleep 3; apt-get update; apt-get install -o Dpkg::Options::=--force-confdef -y -q lxc-docker'\''' /tmp/install_docker
-	sudo sh /tmp/install_docker
+	if ${NEED_INSTALL_DOCKER:-true}; then
+		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com \
+			58118E89F3A912897C070ADBF76221572C52609D
+		wget -qO- https://get.docker.com/ > /tmp/install_docker
+		sed -i 's#apt-get install#& -o Dpkg::Options::=--force-confdef#' \
+			/tmp/install_docker
+		sudo sh /tmp/install_docker
+	fi
 
 	# Setup Docker config
-	if ! grep -q docker:5000 /etc/default/docker; then
-		echo "Updating /etc/default/docker"
-		echo 'DOCKER_OPTS="$DOCKER_OPTS --insecure-registry docker:5000"' \
-			| sudo tee -a /etc/default/docker
+	if ! sudo grep -q "docker:5000" /etc/docker/daemon.json; then
+		echo "Updating /etc/docker/daemon.json"
+		cat <<-EOF |
+		{ "insecure-registries":[
+			"docker.hopebaytech.com:5000",
+			"docker:5000" ] }
+		EOF
+		sudo tee /etc/docker/daemon.json
 		sudo service docker restart ||:
+	fi
+	if ! grep -q "search hopebaytech.com" /etc/resolv.conf; then
+		echo "search hopebaytech.com" | sudo tee -a /etc/resolv.conf
 	fi
 
 	U=${SUDO_USER:-$USER}

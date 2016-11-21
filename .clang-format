@@ -9,3 +9,4 @@ BinPackParameters: false
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 PenaltyReturnTypeOnItsOwnLine: 1000
+Cpp11BracedListStyle: false

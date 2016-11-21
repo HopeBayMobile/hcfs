@@ -1,1 +1,1 @@
-../../Acer_S58A/resource/FlashAll.bat
+../../../internal_testing_resource/FlashAll.bat
