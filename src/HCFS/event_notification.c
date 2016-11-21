@@ -608,42 +608,45 @@ int32_t add_notify_event_obj(int32_t event_id, json_t *event, char blocking)
 	/* Server not set? */
 	if (notify_server_path == NULL) {
 		write_log(4, "Event is dropped because notify server not set.");
+		json_decref(event);
 		return ERR_SERVER_NOT_SET;
 	}
 
 	if (!json_is_object(event)) {
 		write_log(4, "Event info must be a json object.\n");
+		json_decref(event);
 		return -EINVAL;
 	}
 
 	/* Event ID validator */
-	if (!IS_EVENT_VALID(event_id))
+	if (!IS_EVENT_VALID(event_id)) {
+		json_decref(event);
 		return -EINVAL;
+	}
 
 	/* Event filter */
 	ret_code = check_event_filter(event_id);
 	if (ret_code < 0) {
 		write_log(8, "Event is dropped by event filter.");
+		json_decref(event);
 		return ERR_DROP_BY_FILTER;
 	}
 
 	ret_code = event_enqueue(event_id, event, blocking);
-
 	if (ret_code == -ENOSPC) {
 		write_log(4, "Event is dropped due to queue full error.");
-		ret_code = ERR_QUEUE_FULL;
+		return ERR_QUEUE_FULL;
 	} else if (ret_code < 0) {
 		return ret_code;
 	}
 
 	write_log(8, "Event (id %d) enqueue was successful.", event_id);
-	ret_code = 0;
-done:
+
 	/* Wake up queue worker */
 	pthread_mutex_lock(&(event_queue->worker_active_lock));
 	pthread_cond_signal(&(event_queue->worker_active_cond));
 	pthread_mutex_unlock(&(event_queue->worker_active_lock));
 
-	return ret_code;
+	return OP_SUCCESSFUL;
 }
 
