@@ -206,10 +206,10 @@ CheckTools
 
 # Main scripts
 
-#PullGDBFiles
-#if [[ $PUSH = 1 || $PUSHONLY = 1 ]]; then
-#	PushGDBbinary
-#fi
+PullGDBFiles
+if [[ $PUSH = 1 || $PUSHONLY = 1 ]]; then
+	PushGDBbinary
+fi
 if [[ $PUSHONLY != 1 ]]; then
 	StartGDB
 fi
