@@ -461,7 +461,7 @@ void *event_worker_loop(void *ptr)
 						-ret_code);
 				goto error_handler;
 			} else {
-				write_log(0, "Send event to server: %s",
+				write_log(8, "Send event to server: %s",
 					  msg_str_to_send);
 			}
 
