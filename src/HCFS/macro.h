@@ -274,10 +274,8 @@
 
 #define FREE(ptr)                                                              \
 	do {                                                                   \
-		if ((ptr) != NULL) {                                           \
-			free(ptr);                                             \
-			(ptr) = NULL;                                          \
-		}                                                              \
+		free(ptr);                                                     \
+		(ptr) = NULL;                                                  \
 	} while (0)
 
 #endif  /* SRC_HCFS_MACRO_H_ */
