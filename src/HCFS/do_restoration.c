@@ -36,6 +36,7 @@
 #include "restoration_utils.h"
 #include "hcfs_cacheops.h"
 #include "control_smartcache.h"
+#include "FS_manager.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -169,9 +170,17 @@ BOOL _enough_local_space(void)
 	return TRUE;
 }
 
+/**
+ * Before begining restoration stage1, initialize something and check free
+ * cache space so that ensure restoration can be correctly proceed.
+ *
+ * @return 0 on success. otherwise negative error code.
+ */
 int32_t initiate_restoration(void)
 {
 	int32_t ret, errcode;
+	char hcfsblock_restore_path[400];
+	DIR_ENTRY dentry;
 
 	ret = check_restoration_status();
 	if (ret > 0) {
@@ -179,7 +188,35 @@ int32_t initiate_restoration(void)
 		return -EPERM;
 	}
 
-	/* TODO: check f smartcache exist and mount it. Then check hcfsblock_restore */
+	/* Check if smartcache exist and mount it. Then remove
+	 * hcfsblock_restore if it is found. System reboot? */
+	ret = check_filesystem(SMART_CACHE_VOL_NAME, &dentry);
+	if (ret == 0) {
+		ret = mount_FS(SMART_CACHE_VOL_NAME, SMART_CACHE_ROOT_MP, 0);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to mount vol in %s."
+					" Code %d", __func__, -ret);
+			return ret;
+		}
+		/* Check if hcfsblock_restore is already under
+		 * /data/smartcache/, If so, remove it. */
+		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
+				RESTORED_SMARTCACHE_TMP_NAME);
+		if (access(hcfsblock_restore_path, F_OK) == 0) {
+			write_log(4, "hcfsblock_restore already"
+				" existed, remove it in %s.", __func__);
+			ret = unlink(hcfsblock_restore_path);
+			if (ret < 0 && errno != ENOENT) {
+				write_log(0, "Error: Fail to remove"
+					" hcfsblock_restore."
+					" Code %d", errno);
+				return -errno;
+			}
+		}
+	} else {
+		write_log(0, "TEST: smartcache not found. Code %d", -ret);
+	}
+
 	sem_wait(&restore_sem);
 
 	/* First check if there is enough space for restoration */
