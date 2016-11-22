@@ -313,6 +313,7 @@ int32_t unboost_package(char *package_name)
 				  10];
 	char cmd[4096];
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
+	char cmd_restorecon_recursive = "restorecon -R %s";
 	int32_t ret_code, status;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
@@ -352,6 +353,14 @@ int32_t unboost_package(char *package_name)
 		write_log(0,
 			  "In %s. Failed to create temp file %s. Error code %d",
 			  __func__, pkg_tmppath, errno);
+		goto rollback;
+	}
+
+	memset(cmd, 0, sizeof(cmd));
+	snprintf(cmd, sizeof(cmd), cmd_restorecon_recursive, pkg_fullpath);
+	status = system(cmd);
+	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
 		goto rollback;
 	}
 
