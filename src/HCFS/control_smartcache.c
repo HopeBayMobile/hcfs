@@ -72,6 +72,40 @@ static void _change_stage1_cache_limit(int64_t restored_smartcache_size)
 }
 
 /**
+ * Use function "system" to execute "command".
+ *
+ * @return 0 on success, otherwise -EPERM on error.
+ */
+static int32_t _run_command(char *command)
+{
+	int32_t status, errcode;
+
+	status = system(command);
+	if (status < 0) {
+		errcode = errno;
+		write_log(0, "Error: Fail to set loop dev in %s. Code %d",
+				__func__, errcode);
+		return -errcode;
+	}
+
+	write_log(4, "Test: status code: %d. Command: %s", status, command);
+
+	if (WIFEXITED(status)) {
+		if (WEXITSTATUS(status) != EXIT_SUCCESS) {
+			write_log(0, "Return status in %s: %d",
+				__func__, WEXITSTATUS(status));
+			return -EPERM;
+		}
+	} else {
+		write_log(0, "Return status in %s: %d", __func__, status);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+
+/**
  * Inject restored smart cache data and meta to now active HCFS. The restored
  * smart cache will be placed under HCFS mount point /data/smartcache.
  * If /data/smartcache did not exist, create the volume and mount hcfs on it.
@@ -101,6 +135,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	char pin_type;
 	struct stat tempstat;
 	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
+	char cmd[300];
 
 	/* Check if vol "hcfs_smartcache" exist. Create and mount if
 	 * it did not exist */
@@ -137,6 +172,21 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 					" Code %d", __func__, -ret);
 			return ret;
 		}
+
+		/* Restore label */
+		sprintf(cmd, "restorecon %s", SMART_CACHE_ROOT_MP);
+		ret = _run_command(cmd);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to restorecon in %s."
+					" Code %d", __func__, -ret);
+			return ret;
+		}
+		ret = chmod(SMART_CACHE_ROOT_MP, 0771);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to chmod in %s."
+					" Code %d", __func__, -ret);
+			return ret;
+		}
 	}
 
 	sc_data = (RESTORED_SMARTCACHE_DATA *)
@@ -167,6 +217,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	update_restored_cache_usage(-restored_smartcache_size,
 			-total_blocks, pin_type);
 	_change_stage1_cache_limit(restored_smartcache_size);
+	hcfs_system->systemdata.system_size += restored_smartcache_size;
 	hcfs_system->systemdata.pinned_size += restored_smartcache_size;
 	hcfs_system->systemdata.cache_size += restored_smartcache_size;
 	hcfs_system->systemdata.cache_blocks += total_blocks;
@@ -301,40 +352,6 @@ errcode_handle:
 	}
 	FREE(sc_data);
 	return errcode;
-}
-
-/**
- * Use function "system" to execute "command".
- *
- * @return 0 on success, otherwise -EPERM on error.
- */
-static int32_t _run_command(char *command)
-{
-	int32_t status, errcode;
-
-	/* TODO: determine returned status */
-	status = system(command);
-	if (status < 0) {
-		errcode = errno;
-		write_log(0, "Error: Fail to set loop dev in %s. Code %d",
-				__func__, errcode);
-		return -errcode;
-	}
-
-	write_log(4, "Test: status code: %d. Command: %s", status, command);
-
-	if (WIFEXITED(status)) {
-		if (WEXITSTATUS(status) != EXIT_SUCCESS) {
-			write_log(0, "Return status in %s: %d",
-				__func__, WEXITSTATUS(status));
-			return -EPERM;
-		}
-	} else {
-		write_log(0, "Return status in %s: %d", __func__, status);
-		return -EAGAIN;
-	}
-
-	return 0;
 }
 
 /**
@@ -547,10 +564,11 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	/* Update statistics */
 	restored_smartcache_size = tmp_header.st.size;
 	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
+	hcfs_system->systemdata.system_size -= restored_smartcache_size;
 	hcfs_system->systemdata.pinned_size -= restored_smartcache_size;
 	hcfs_system->systemdata.cache_size -= restored_smartcache_size;
 	hcfs_system->systemdata.cache_blocks -= total_blocks;
-	_change_stage1_cache_limit(restored_smartcache_size);
+	_change_stage1_cache_limit(-restored_smartcache_size);
 	update_restored_cache_usage(restored_smartcache_size,
 				total_blocks, pin_type);
 	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */

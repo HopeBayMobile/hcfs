@@ -179,42 +179,11 @@ BOOL _enough_local_space(void)
 int32_t initiate_restoration(void)
 {
 	int32_t ret, errcode;
-	char hcfsblock_restore_path[400];
-	DIR_ENTRY dentry;
 
 	ret = check_restoration_status();
 	if (ret > 0) {
 		/* If restoration is already in progress, do not permit */
 		return -EPERM;
-	}
-
-	/* Check if smartcache exist and mount it. Then remove
-	 * hcfsblock_restore if it is found. System reboot? */
-	ret = check_filesystem(SMART_CACHE_VOL_NAME, &dentry);
-	if (ret == 0) {
-		ret = mount_FS(SMART_CACHE_VOL_NAME, SMART_CACHE_ROOT_MP, 0);
-		if (ret < 0) {
-			write_log(0, "Error: Fail to mount vol in %s."
-					" Code %d", __func__, -ret);
-			return ret;
-		}
-		/* Check if hcfsblock_restore is already under
-		 * /data/smartcache/, If so, remove it. */
-		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
-				RESTORED_SMARTCACHE_TMP_NAME);
-		if (access(hcfsblock_restore_path, F_OK) == 0) {
-			write_log(4, "hcfsblock_restore already"
-				" existed, remove it in %s.", __func__);
-			ret = unlink(hcfsblock_restore_path);
-			if (ret < 0 && errno != ENOENT) {
-				write_log(0, "Error: Fail to remove"
-					" hcfsblock_restore."
-					" Code %d", errno);
-				return -errno;
-			}
-		}
-	} else {
-		write_log(0, "TEST: smartcache not found. Code %d", -ret);
 	}
 
 	sem_wait(&restore_sem);
@@ -226,8 +195,11 @@ int32_t initiate_restoration(void)
 		errcode = -ENOSPC;
 		goto errcode_handle;
 	}
-
 	sem_post(&(hcfs_system->access_sem));
+
+	/* Record orignal limit */
+	origin_hard_limit = CACHE_HARD_LIMIT;
+	origin_meta_limit = META_SPACE_LIMIT;
 
 	/* First create the restoration folders if needed */
 	if (access(RESTORE_METAPATH, F_OK) != 0)
@@ -331,15 +303,58 @@ int32_t notify_restoration_result(int8_t stage, int32_t result)
 	return ret;
 }
 
+/**
+ * If system reboot during restoration stage1, this function will be invoked
+ * before all volumes being mounted so that ensure cache space is sufficient.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int32_t restore_stage1_reduce_cache(void)
 {
-	sem_wait(&(hcfs_system->access_sem));
+	char hcfsblock_restore_path[400];
+	DIR_ENTRY dentry;
+	int32_t ret;
 
+	/* Check if smartcache exist and mount it. Then remove
+	 * hcfsblock_restore if it is found. System reboot? */
+	ret = check_filesystem(SMART_CACHE_VOL_NAME, &dentry);
+	if (ret == 0) {
+		ret = mount_FS(SMART_CACHE_VOL_NAME, SMART_CACHE_ROOT_MP, 0);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to mount vol in %s."
+					" Code %d", __func__, -ret);
+			return ret;
+		}
+		/* Check if hcfsblock_restore is already under
+		 * /data/smartcache/, If so, remove it. */
+		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
+				RESTORED_SMARTCACHE_TMP_NAME);
+		if (access(hcfsblock_restore_path, F_OK) == 0) {
+			write_log(4, "hcfsblock_restore already"
+				" existed, remove it in %s.", __func__);
+			ret = unlink(hcfsblock_restore_path);
+			if (ret < 0 && errno != ENOENT) {
+				write_log(0, "Error: Fail to remove"
+					" hcfsblock_restore."
+					" Code %d", errno);
+				return -errno;
+			}
+		} else {
+			write_log(4, "Cannot access %s. Code %d",
+				hcfsblock_restore_path, errno);
+		}
+	}
+
+	sem_wait(&(hcfs_system->access_sem));
 	/* Need enough cache space */
 	if (_enough_local_space() == FALSE) {
 		sem_post(&(hcfs_system->access_sem));
 		return -ENOSPC;
 	}
+
+	/* Record orignal limit */
+	origin_hard_limit = CACHE_HARD_LIMIT;
+	origin_meta_limit = META_SPACE_LIMIT;
 
 	CACHE_HARD_LIMIT = CACHE_HARD_LIMIT * REDUCED_RATIO;
 	META_SPACE_LIMIT = META_SPACE_LIMIT * REDUCED_RATIO;
@@ -2602,8 +2617,6 @@ int32_t run_download_minimal(void)
 	ino_t vol_max_inode, sys_max_inode;
 	INODE_PAIR_LIST *hardln_mapping;
 
-	origin_hard_limit = CACHE_HARD_LIMIT;
-	origin_meta_limit = META_SPACE_LIMIT;
 	/* Fetch quota value from backend and store in the restoration path */
 
 	/* First make sure that network connection is turned on */

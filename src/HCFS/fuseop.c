@@ -7977,7 +7977,7 @@ void _unlink_restore_stat(void)
 
 int32_t hook_fuse(int32_t argc, char **argv)
 {
-	int32_t dl_count;
+	int32_t dl_count, ret;
 #ifndef _ANDROID_ENV_
 	pthread_t communicate_tid[MAX_FUSE_COMMUNICATION_THREAD];
 	int32_t socket_fd;
@@ -7999,6 +7999,8 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	data_data_root = (ino_t) 0;
 	data_smart_root = (ino_t) 0;
 	mgmt_app_is_created = FALSE;
+	origin_hard_limit = 0;
+	origin_meta_limit = 0;
 
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
@@ -8013,6 +8015,15 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();
+
+	/* Try to reduce cache size if now in stage 1 of restoration */
+	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+		ret = restore_stage1_reduce_cache();
+		if (ret == 0)
+			start_download_minimal();
+		else
+			notify_restoration_result(1, ret);
+	}
 
 	/* Check and cleanup meta / data no longer in use from content
 	before restoration */
