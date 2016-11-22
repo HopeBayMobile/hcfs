@@ -1805,8 +1805,18 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	char lowercase[MAX_FILENAME_LEN+1], *alias_name;
 	ino_t alias_ino;
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
+#ifdef _ANDROID_ENV_
+	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
+		is_external = TRUE;
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+	}
+#endif
 
 	write_log(6, "Debug rename: name %s, parent %" PRIu64 "\n", selfname1,
 		  (uint64_t)parent_inode1);
@@ -1832,18 +1842,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-
-#ifdef _ANDROID_ENV_
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		if (tmpptr->vol_path_cache == NULL) {
-			fuse_reply_err(req, EIO);
-			return;
-		}
+	if (is_external)
 		_rewrite_stat(tmpptr, &parent_stat1, NULL, NULL);
-		is_external = TRUE;
-	}
-#endif
 
 	if (!S_ISDIR(parent_stat1.mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -1865,15 +1865,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-#ifdef _ANDROID_ENV_
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		if (tmpptr->vol_path_cache == NULL) {
-			fuse_reply_err(req, EIO);
-			return;
-		}
+	if (is_external)
 		_rewrite_stat(tmpptr, &parent_stat2, NULL, NULL);
-	}
-#endif
 
 	if (!S_ISDIR(parent_stat2.mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -2214,20 +2207,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			}
 		}
 
-#ifdef _ANDROID_ENV_
-		/* Clear path cache entry if needed */
-		if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
-							old_target_inode);
-			if (ret_val < 0) {
-				_cleanup_rename(body_ptr, old_target_ptr,
-						parent1_ptr, parent2_ptr);
-				fuse_reply_err(req, -ret_val);
-				return;
-			}
-		}
-#endif
-
 		old_target_ptr = NULL;
 	} else {
 		/* If newpath does not exist, add the new entry */
@@ -2396,16 +2375,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	} /* (parent_inode1 != parent_inode2) */
 
-#ifdef _ANDROID_ENV_
-	/* If a file or directory is moved to another parent, the
-	 * pathcache (to which parent) is changed. If a file is renamed,
-	 * the name in pathcache is invalid, too.
-	 */
-	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type) &&
-	    (parent_inode1 != parent_inode2 ||
-	     strcmp(selfname1, selfname2) != 0)) {
-		ret_val =
-		    delete_pathcache_node(tmpptr->vol_path_cache, self_inode);
+	/* Clear path cache entry after rename */
+	if (is_external) {
+		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
+						old_target_inode);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr, parent1_ptr,
 					parent2_ptr);
@@ -2414,7 +2387,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 	}
-#endif
 
 	meta_cache_get_meta_size(parent1_ptr, &new_metasize1,
 			&new_metasize1_blk);
