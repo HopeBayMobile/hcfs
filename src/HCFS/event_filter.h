@@ -15,14 +15,36 @@
 
 #include <inttypes.h>
 
-#define NUM_EVENTS 5
-#define IS_EVENT_VALID(A) ((0 <= A) && (A < NUM_EVENTS))
 /* Event IDs */
-#define TESTSERVER 0
-#define TOKENEXPIRED 1
-#define SYNCDATACOMPLETE 2
-#define RESTORATION_STAGE1_CALLBACK 3
-#define RESTORATION_STAGE2_CALLBACK 4
+enum { TESTSERVER = 0,
+       TOKEN_EXPIRED,
+       SYNCDATACOMPLETE,
+       RESTORATION_STAGE1_CALLBACK,
+       RESTORATION_STAGE2_CALLBACK,
+       EXCEED_PIN_MAX,
+       SPACE_NOT_ENOUGH,
+       CREATE_THUMBNAIL,
+       NUM_EVENTS } EVENT_TYPE;
+#define IS_EVENT_VALID(A) ((0 <= A) && (A < NUM_EVENTS))
+
+typedef enum {
+	MEDIA_TYPE_IMAGE = 0,
+	MEDIA_TYPE_VIDEO,
+	MEDIA_TYPE_NON_MEDIA
+} MEDIA_TYPE;
+
+/* To declare all events */
+#define REGISTER_EVENTS                                                        \
+	EVENT_FILTER event_filters[] = {                                       \
+	    {TESTSERVER, 0, 0},                                                \
+	    {TOKEN_EXPIRED, 0, 120},                                           \
+	    {SYNCDATACOMPLETE, 0, 0},                                          \
+	    {RESTORATION_STAGE1_CALLBACK, 0, 0},                               \
+	    {RESTORATION_STAGE2_CALLBACK, 0, 0},                               \
+	    {EXCEED_PIN_MAX, 0, 0},                                            \
+	    {SPACE_NOT_ENOUGH, 0, 0},                                          \
+	    {CREATE_THUMBNAIL, 0, 0},                                          \
+	};
 
 typedef struct {
 	int32_t name;

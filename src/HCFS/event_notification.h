@@ -14,9 +14,11 @@
 #define GW20_SRC_EVENT_NOTIFY
 
 #include <inttypes.h>
-#include <semaphore.h>
-#include <pthread.h>
 #include <jansson.h>
+#include <pthread.h>
+#include <semaphore.h>
+
+#include "global.h"
 
 #define SERVERREPLYOK 1 /* Server should reply after event msg received */
 #define MAX_NOTIFY_SERVER_LENGTH 256
@@ -41,18 +43,19 @@ extern EVENT_QUEUE *event_queue;
 
 
 int32_t init_event_queue(void);
-int32_t set_event_notify_server(char *path);
+int32_t set_event_notify_server(const char *path);
 
 void *event_worker_loop(void *ptr);
 void destroy_event_worker_loop_thread(void);
 
-int32_t event_enqueue(int32_t event_id, char *event_info_json_str,
-		      char blocking);
+int32_t event_enqueue(int32_t event_id, json_t *event, BOOL blocking);
 int32_t event_dequeue(int32_t num_events);
 
-int32_t send_event_to_server(int32_t fd, char *events_in_json);
+int32_t send_event_to_server(int32_t fd, const char *events_in_json);
 
-int32_t add_notify_event(int32_t event_id, char *event_info_json_str,
+int32_t add_notify_event(int32_t event_id,
+			 const char *event_info_json_str,
 			 char blocking);
+int32_t add_notify_event_obj(int32_t event_id, json_t *event, char blocking);
 
 #endif /* GW20_SRC_EVENT_NOTIFY */

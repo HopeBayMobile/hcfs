@@ -15,15 +15,7 @@
 #include <time.h>
 
 /* Register event filter here */
-EVENT_FILTER event_filters[] = {
-	/* name, last_send_timestamp, send_interval */
-	{TESTSERVER,	   0,	  0},
-	{TOKENEXPIRED,	   0,	120},
-	{SYNCDATACOMPLETE, 0,     0},
-	{RESTORATION_STAGE1_CALLBACK,	0,	0},
-	{RESTORATION_STAGE2_CALLBACK,	0,	0},
-};
-
+REGISTER_EVENTS;
 
 /************************************************************************
  *
