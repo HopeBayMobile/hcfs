@@ -32,6 +32,7 @@
 #include "parent_lookup.h"
 #include "mount_manager.h"
 #include "FS_manager.h"
+#include "meta_iterator.h"
 
 /**
  * Unmount smart cache.
@@ -122,20 +123,18 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	char block_status;
 	ino_t tmp_ino;
 	FILE_META_HEADER origin_header, tmp_header;
-	FILE_META_TYPE *file_meta;
 	FILE *fptr;
-	int64_t ret_size, ret_ssize;
+	int64_t ret_ssize;
 	uint64_t generation;
-	int64_t count, total_blocks, current_page, which_page, page_pos;
-	int32_t e_index;
+	int64_t count, total_blocks;
 	int32_t ret, errcode;
 	BOOL meta_open = FALSE;
-	BLOCK_ENTRY_PAGE tmppage;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char pin_type;
 	struct stat tempstat;
 	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
 	char cmd[300];
+	FILE_BLOCK_ITERATOR *iter;
 
 	/* Check if vol "hcfs_smartcache" exist. Create and mount if
 	 * it did not exist */
@@ -207,9 +206,12 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	tmp_ino = super_block_new_inode(&(tmp_header.st), &generation, P_PIN);
 
 	pin_type = tmp_header.fmt.local_pin;
-	file_meta = &(tmp_header.fmt);
-	total_blocks = tmp_header.st.size == 0 ? 0 :
-			((tmp_header.st.size - 1) / MAX_BLOCK_SIZE + 1);
+	iter = init_block_iter(fptr); /* Block iterator */
+	if (!iter) {
+		fclose(fptr);
+		return -errno;
+	}
+	total_blocks = iter->total_blocks;
 
 	/* Extend CACHE_HARD_LIMIT */
 	restored_smartcache_size = tmp_header.st.size;
@@ -226,28 +228,13 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	blocknum_est = total_blocks;
 
 	/* Move blocks */
-	current_page = -1;
-	for (count = 0; count < total_blocks; count++) {
-		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
-		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
-
-		if (current_page != which_page) {
-			page_pos = seek_page2(file_meta, fptr,
-					which_page, 0);
-			if (page_pos <= 0) {
-				count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
-				continue;
-			}
-			current_page = which_page;
-			FSEEK(fptr, page_pos, SEEK_SET);
-			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
-					1, fptr);
-		}
-
+	while (iter_next(iter)) {
 		/* Skip if block does not exist */
-		block_status = tmppage.block_entries[e_index].status;
+		block_status = iter->now_bentry->status;
 		if (block_status == ST_NONE)
 			continue;
+
+		count = iter->now_block_no; /* Block index */
 		fetch_restore_block_path(restored_blockpath,
 				smartcache_ino, count);
 		fetch_block_path(thisblockpath, tmp_ino, count);
@@ -268,6 +255,12 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 		datasize_est -= blocksize;
 		blocknum_est -= 1;
 	}
+	if (errno != ENOENT) {
+		errcode = -errno;
+		goto errcode_handle;
+	}
+	destroy_block_iter(iter);
+
 	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
 	hcfs_system->systemdata.cache_size -= datasize_est;
 	hcfs_system->systemdata.cache_blocks -= blocknum_est;
@@ -521,16 +514,14 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	ino_t ino_nowsys;
 	char block_status;
 	FILE_META_HEADER tmp_header;
-	FILE_META_TYPE *file_meta;
 	FILE *fptr;
-	int64_t ret_size, ret_ssize;
-	int64_t count, total_blocks, current_page, which_page, page_pos;
-	int32_t e_index;
+	int64_t ret_ssize;
+	int64_t count, total_blocks;
 	BOOL meta_open = FALSE;
-	BLOCK_ENTRY_PAGE tmppage;
 	struct stat tempstat;
 	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
 	char pin_type;
+	FILE_BLOCK_ITERATOR *iter;
 
 	ino_nowsys = sc_data->inject_smartcache_ino;
 	ret = _remove_from_now_hcfs(ino_nowsys);
@@ -557,9 +548,12 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	meta_open = TRUE;
 	PREAD(fileno(fptr), &tmp_header, sizeof(FILE_META_HEADER), 0);
 	pin_type = tmp_header.fmt.local_pin;
-	file_meta = &(tmp_header.fmt);
-	total_blocks = tmp_header.st.size == 0 ? 0 :
-			((tmp_header.st.size - 1) / MAX_BLOCK_SIZE + 1);
+	iter = init_block_iter(fptr);
+	if (!iter) {
+		fclose(fptr);
+		return -errno;
+	}
+	total_blocks = iter->total_blocks;
 
 	/* Update statistics */
 	restored_smartcache_size = tmp_header.st.size;
@@ -575,28 +569,13 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 
 	datasize_est = restored_smartcache_size;
 	blocknum_est = total_blocks;
-	current_page = -1;
-	for (count = 0; count < total_blocks; count++) {
-		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
-		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
 
-		if (current_page != which_page) {
-			page_pos = seek_page2(file_meta, fptr,
-					which_page, 0);
-			if (page_pos <= 0) {
-				count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
-				continue;
-			}
-			current_page = which_page;
-			FSEEK(fptr, page_pos, SEEK_SET);
-			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
-					1, fptr);
-		}
-
+	while (iter_next(iter)) {
 		/* Skip if block does not exist */
-		block_status = tmppage.block_entries[e_index].status;
+		block_status = iter->now_bentry->status;
 		if (block_status == ST_NONE)
 			continue;
+		count = iter->now_block_no;
 		fetch_restore_block_path(restored_blockpath,
 				smartcache_ino, count);
 		fetch_block_path(thisblockpath, ino_nowsys, count);
@@ -617,6 +596,12 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 		datasize_est -= blocksize;
 		blocknum_est -= 1;
 	}
+	if (errno != ENOENT) {
+		errcode = -errno;
+		goto errcode_handle;
+	}
+	destroy_block_iter(iter);
+
 	/* Update statistics */
 	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
 	hcfs_system->systemdata.cache_size += datasize_est;

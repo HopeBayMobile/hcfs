@@ -26,7 +26,7 @@ FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 
 	iter = (FILE_BLOCK_ITERATOR *) calloc(sizeof(FILE_BLOCK_ITERATOR), 1);
 	if (!iter) {
-		write_log(0, "Error: Fail to alloc mem in %s. Code",
+		write_log(0, "Error: Fail to alloc mem in %s. Code %d",
 				__func__, errno);
 		return NULL;
 	}
@@ -140,6 +140,6 @@ FILE_BLOCK_ITERATOR *begin_block(FILE_BLOCK_ITERATOR *iter)
 
 void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
 {
-	FREE(iter);
+	free(iter);
 }
 

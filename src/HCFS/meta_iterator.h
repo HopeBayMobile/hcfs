@@ -18,11 +18,11 @@ typedef struct ITERATOR_BASE {
  *	FILE_BLOCK_ITERATOR *iter = init_block_iter(fptr);
  *	if (!iter)
  *		return -errno;
- *	while (iter_begin(iter) != NULL) {
+ *	while (iter_next(iter) != NULL) {
  *		// Now block index is iter->now_block_no;
  *		// Now page is iter->page;
  *	}
- *	if (errno < 0) {
+ *	if (errno != ENOENT) {
  *		// Error occur
  *	}
  *	destroy_block_iter(iter);
@@ -30,10 +30,10 @@ typedef struct ITERATOR_BASE {
 typedef struct FILE_BLOCK_ITERATOR {
 	ITERATOR_BASE base;
 	int64_t total_blocks;
-	int64_t now_page_no;
-	int32_t e_index;
-	int64_t now_block_no;
-	int64_t page_pos;
+	int64_t now_page_no; /* page number */
+	int32_t e_index; /* entry index */
+	int64_t now_block_no; /* block number */
+	int64_t page_pos; /* block page position in file */
 	HCFS_STAT filestat;
 	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE page;
