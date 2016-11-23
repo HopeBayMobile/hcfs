@@ -2961,6 +2961,16 @@ int32_t run_download_minimal(void)
 
 	sem_post(&restore_sem);
 
+	/* Create folder /data/mnt/hcfsblock if smartcache exist */
+	if (SMARTCACHE_IS_MISSING() == FALSE) {
+		ret = mkdir(SMART_CACHE_MP, 0771);
+		if (ret < 0 && errno != EEXIST) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+		/* TODO: restorecon? */
+	}
+
 	if (to_delete_fptr != NULL)
 		fclose(to_delete_fptr);
 	fclose(to_sync_fptr);
