@@ -64,7 +64,7 @@ int32_t _create_hcfs_vol()
  */
 int32_t _mount_hcfs_vol()
 {
-	char buf[4096];
+	char buf[1024];
 	int32_t fd, ret_code, fsname_len, first_size, rest_size;
 	uint32_t code, cmd_len, reply_len;
 
@@ -239,7 +239,7 @@ int32_t boost_package(char *package_name)
 	char pkg_tmppath[strlen(package_name) + strlen(DATA_PREFIX) + 20];
 	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name) +
 				  10];
-	char cmd[4096];
+	char cmd[1024];
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
 	int32_t ret_code, status;
 
@@ -311,9 +311,9 @@ int32_t unboost_package(char *package_name)
 	char pkg_tmppath[strlen(package_name) + strlen(DATA_PREFIX) + 20];
 	char smart_cache_fullpath[strlen(SMARTCACHEMTP) + strlen(package_name) +
 				  10];
-	char cmd[4096];
+	char cmd[1024];
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
-	char cmd_restorecon_recursive = "restorecon -R %s";
+	char cmd_restorecon_recursive[] = "restorecon -R %s";
 	int32_t ret_code, status;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
@@ -577,3 +577,29 @@ int32_t clear_boosted_package(char *package_name)
 
 	return ret_code;
 }
+
+int32_t toggle_smart_cache_mount(char to_mount)
+{
+	char cmd[1024];
+	char cmd_mount_ext4_fs[] = "mount -t ext4 %s %s";
+	char cmd_umount_ext4_fs[] = "umount %s";
+	int32_t status;
+
+	memset(cmd, 0, sizeof(cmd));
+
+	if (to_mount)
+		snprintf(cmd, sizeof(cmd), cmd_mount_ext4_fs, LOOPDEV,
+			 SMARTCACHEMTP);
+	else
+		snprintf(cmd, sizeof(cmd), cmd_umount_ext4_fs, SMARTCACHEMTP);
+
+	status = system(cmd);
+	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
+		return -1;
+	}
+
+	return 0;
+}
+
+

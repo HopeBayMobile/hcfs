@@ -486,4 +486,32 @@ void HCFS_trigger_unboost(char **json_res);
  * | False | Linux errors.|
  */
 void HCFS_clear_booster_package_remaining(char **json_res, char *package_name);
+
+/*Mount smart cache
+ * @json_res result string in json format.
+ *
+ * To mount smart cache.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
+void HCFS_mount_smart_cache(char **json_res);
+
+/*Umount smart cache
+ * @json_res result string in json format.
+ *
+ * To umount smart cache.
+ *
+ * Return code -
+ *
+ * >|||
+ * | ------------- |:-------------|
+ * | True | 0 if success|
+ * | False | Linux errors.|
+ */
+void HCFS_umount_smart_cache(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */
