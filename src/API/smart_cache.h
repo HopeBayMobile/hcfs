@@ -70,4 +70,5 @@ int32_t check_pkg_boost_status(char *package_name);
 
 int32_t clear_boosted_package(char *package_name);
 
+int32_t toggle_smart_cache_mount(char to_mount);
 #endif  /* GW20_HCFSAPI_SMART_CACHE_H_ */
