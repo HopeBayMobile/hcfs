@@ -49,6 +49,7 @@
 #include "meta.h"
 #include "rebuild_super_block.h"
 #include "hcfs_fromcloud.h"
+#include "recover_super_block.h"
 
 /************************************************************************
 *
@@ -1549,17 +1550,15 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	ssize_t retsize;
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
-	BOOL sb_is_recovering = FALSE;
+	BOOL sb_enqueue_later = FALSE;
 
-	if (sys_super_block->sb_recovery_meta.is_ongoing &&
-	    thisinode >= sys_super_block->sb_recovery_meta.start_inode &&
-	    thisinode <= sys_super_block->sb_recovery_meta.end_inode) {
-		sb_is_recovering = TRUE;
+	if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {
+		sb_enqueue_later = TRUE;
 	}
 
 	if (this_entry->status == which_ll) {
 		/* Update dirty meta if needs (from DIRTY to DIRTY) */
-		if (which_ll == IS_DIRTY && !sb_is_recovering) {
+		if (which_ll == IS_DIRTY && !sb_enqueue_later) {
 			get_meta_size(thisinode, NULL, &now_meta_size);
 			if (now_meta_size == 0)
 				return 0;
@@ -1588,8 +1587,9 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 
 	switch (which_ll) {
 	case IS_DIRTY:
-		/* Only change staus of this entry if SB entries recovery is ongoing */
-		if (sb_is_recovering) {
+		/* Only change staus if this entry is going to be re-enqueue
+		 * later */
+		if (sb_enqueue_later) {
 			this_entry->status = which_ll;
 			return 0;
 		}
@@ -1601,7 +1601,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
 		} else {
-			ret = read_super_block_entry(sys_super_block->head.last_dirty_inode, &tempentry);
+			ret = read_super_block_entry(
+			    sys_super_block->head.last_dirty_inode, &tempentry);
 			if (ret < 0)
 				return ret;
 
@@ -1746,11 +1747,9 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		return 0;
 
 	if (old_which_ll == IS_DIRTY) {
-		/* Only change staus of this entry if SB entries recovery is ongoing */
-		if (sys_super_block->sb_recovery_meta.is_ongoing &&
-		    thisinode >=
-			sys_super_block->sb_recovery_meta.start_inode &&
-		    thisinode <= sys_super_block->sb_recovery_meta.end_inode) {
+		/* Only change staus if this entry is going to be re-dequeue
+		 * later */
+		if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {
 			this_entry->status = NO_LL;
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;

@@ -176,6 +176,30 @@ int32_t custom_meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
         return 0;
 }
 
+int32_t change_system_meta(int64_t arg1 __attribute__((unused)),
+			   int64_t arg2 __attribute__((unused)),
+			   int64_t arg3 __attribute__((unused)),
+			   int64_t arg4 __attribute__((unused)),
+			   int64_t dirty_cache_delta,
+			   int64_t unpin_dirty_delta,
+			   BOOL arg5 __attribute__((unused)))
+{
+	sem_wait(&(hcfs_system->access_sem));
+
+	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
+	if (hcfs_system->systemdata.dirty_cache_size < 0)
+		hcfs_system->systemdata.dirty_cache_size = 0;
+
+	/* Unpin & dirty means the space cannot be freed */
+	hcfs_system->systemdata.unpin_dirty_data_size += unpin_dirty_delta;
+	if (hcfs_system->systemdata.unpin_dirty_data_size < 0)
+		hcfs_system->systemdata.unpin_dirty_data_size = 0;
+
+	sem_post(&(hcfs_system->access_sem));
+
+	return 0;
+}
+
 /* round_size */
 int64_t round_size(int64_t size)
 {
@@ -501,8 +525,8 @@ TEST_F(fetch_last_recover_progressTest, ErrorInRead)
 }
 /* End unittest for fetch_last_recover_progress */
 
-/* Unittest for log_recover_progress */
-class log_recover_progressTest : public ::testing::Test
+/* Unittest for update_recover_progress */
+class update_recover_progressTest : public ::testing::Test
 {
         protected:
 	char progressf_path[128];
@@ -512,12 +536,12 @@ class log_recover_progressTest : public ::testing::Test
 	void TearDown() { unlink(progressf_path); }
 };
 
-TEST_F(log_recover_progressTest, Success)
+TEST_F(update_recover_progressTest, Success)
 {
 	ino_t inodes_in_file[2];
 	ino_t target_inodes[2] = {10, 100};
 
-	EXPECT_EQ(0, log_recover_progress(target_inodes[0], target_inodes[1]));
+	EXPECT_EQ(0, update_recover_progress(target_inodes[0], target_inodes[1]));
 
 	FILE *tmp_fp = fopen(progressf_path, "r");
 	fread(inodes_in_file, 2, sizeof(ino_t), tmp_fp);
@@ -528,24 +552,24 @@ TEST_F(log_recover_progressTest, Success)
 	EXPECT_EQ(0, access(progressf_path, F_OK));
 }
 
-TEST_F(log_recover_progressTest, ErrorInFopen)
+TEST_F(update_recover_progressTest, ErrorInFopen)
 {
 	ino_t inodes_in_file[2];
 	ino_t target_inodes[2] = {10, 100};
 
 	fopen_force_error = 1;
-	EXPECT_EQ(-1, log_recover_progress(target_inodes[0], target_inodes[1]));
+	EXPECT_EQ(-1, update_recover_progress(target_inodes[0], target_inodes[1]));
 	EXPECT_EQ(-1, access(progressf_path, F_OK));
 	fopen_force_error = 0;
 }
 
-TEST_F(log_recover_progressTest, ErrorInFwrite)
+TEST_F(update_recover_progressTest, ErrorInFwrite)
 {
 	ino_t inodes_in_file[2];
 	ino_t target_inodes[2] = {10, 100};
 
 	fwrite_force_error = 1;
-	EXPECT_EQ(-1, log_recover_progress(target_inodes[0], target_inodes[1]));
+	EXPECT_EQ(-1, update_recover_progress(target_inodes[0], target_inodes[1]));
 	EXPECT_EQ(-1, access(progressf_path, F_OK));
 	fwrite_force_error = 0;
 }
@@ -1367,20 +1391,4 @@ TEST_F(recover_sb_queue_workerTest, Success)
 	hcfs_system->systemdata.unpin_dirty_data_size = 0;
 }
 /* End unittest for recover_sb_queue_worker */
-
-/* Unittest for */
-class Test : public ::testing::Test
-{
-        protected:
-
-        void SetUp() {}
-
-        void TearDown() {}
-};
-
-TEST_F(Test, )
-{
-	EXPECT_EQ(0, 0);
-}
-/* End unittest for */
 

@@ -32,6 +32,10 @@ typedef struct recovery_round_data {
 	int64_t unpin_dirty_size_delta;
 } RECOVERY_ROUND_DATA;
 
+#define IS_SBENTRY_BEING_RECOVER_LATER(thisinode)                              \
+	((sys_super_block->sb_recovery_meta.is_ongoing) &&                     \
+	 (thisinode >= sys_super_block->sb_recovery_meta.start_inode) &&       \
+	 (thisinode <= sys_super_block->sb_recovery_meta.end_inode))
 
 BOOL need_recover_sb();
 
@@ -39,7 +43,7 @@ void fetch_recover_progressf_path(char *pathname);
 
 int32_t fetch_last_recover_progress(ino_t *start_inode, ino_t *end_inode);
 
-int32_t log_recover_progress(ino_t start_inode, ino_t end_inode);
+int32_t update_recover_progress(ino_t start_inode, ino_t end_inode);
 
 void unlink_recover_progress_file();
 

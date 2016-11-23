@@ -140,7 +140,7 @@ int32_t fetch_last_recover_progress(ino_t *start_inode, ino_t *end_inode)
  *
  * @return 0 on success. Otherwise, the negation of error code.
  */
-int32_t log_recover_progress(ino_t start_inode, ino_t end_inode)
+int32_t update_recover_progress(ino_t start_inode, ino_t end_inode)
 {
 	char progressf_path[METAPATHLEN + strlen(PROGRESS_FILE)];
 	char tmp_progressf_path[METAPATHLEN + strlen(PROGRESS_FILE) + 4];
@@ -331,8 +331,8 @@ int32_t _read_regfile_meta(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
  * Note - Only recovery dirty entries now. Will support all types
  *        of entry queues later.
  *
- * Original Queue: 1 -> 3 -> 2 -> 3
- * After reconstruct: 1 -> 2 -> 3 -> 4
+ * Original Queue: (inode 1) -> (inode 3) -> (inode 2) -> (inode 4)
+ * After reconstruct: (inode 1) -> (inode 2) -> (inode 3) -> (inode 4)
  *
  * @return 0 on success. Otherwise, the negation of error code.
  */
@@ -345,7 +345,7 @@ int32_t reconstruct_sb_entries(SUPER_BLOCK_ENTRY *sb_entry_arr,
 	int32_t ret_code;
 	int64_t round_dirty_data_size, round_dirty_meta_size, idx;
 	SUPER_BLOCK_ENTRY tempentry;
-	SUPER_BLOCK_ENTRY *sbentry1, *sbentry2;
+	SUPER_BLOCK_ENTRY *sbentry_prev, *sbentry_cur;
 	FILE_STATS_TYPE file_stats;
 
 	if (!sb_entry_arr || !meta_cache_arr || !this_round ||
@@ -361,11 +361,11 @@ int32_t reconstruct_sb_entries(SUPER_BLOCK_ENTRY *sb_entry_arr,
 		if (ret_code < 0)
 			return ret_code;
 	}
-	sbentry1 = &tempentry;
+	sbentry_prev = &tempentry;
 
 	for (idx = 0; idx < num_entry_handle; idx++) {
-		sbentry2 = (sb_entry_arr + idx);
-		if (sbentry2->status != IS_DIRTY)
+		sbentry_cur = &sb_entry_arr[idx];
+		if (sbentry_cur->status != IS_DIRTY)
 			continue;
 		/* Already check file type of this inode when locking
 		 * meta_cache_entry. Pointer in array is NULL means that no need
@@ -379,50 +379,51 @@ int32_t reconstruct_sb_entries(SUPER_BLOCK_ENTRY *sb_entry_arr,
 					  "Error when recovering inode %" PRIu64
 					  ". "
 					  "Skip this entry and continue.",
-					  sbentry2->this_index);
+					  sbentry_cur->this_index);
 				continue;
 			}
-			write_log(8, "In %s, Inode %"PRIu64" has dirty size %ld",
-					__func__, sbentry2->this_index,
-					file_stats.dirty_data_size);
+			write_log(8,
+				  "In %s, Inode %" PRIu64 " has dirty size %ld",
+				  __func__, sbentry_cur->this_index,
+				  file_stats.dirty_data_size);
 
 			/* Record dirty stats */
 			round_dirty_data_size =
 			    round_size(file_stats.dirty_data_size);
 			round_dirty_meta_size =
-			    round_size(sbentry2->dirty_meta_size);
+			    round_size(sbentry_cur->dirty_meta_size);
 
 			this_round->dirty_size_delta +=
 			    (round_dirty_data_size + round_dirty_meta_size);
 
-			if (sbentry2->pin_status != ST_PINNING &&
-			    sbentry2->pin_status != ST_PIN)
+			if (sbentry_cur->pin_status != ST_PINNING &&
+			    sbentry_cur->pin_status != ST_PIN)
 				this_round->unpin_dirty_size_delta +=
 				    round_dirty_data_size;
 		} else {
 			round_dirty_meta_size =
-			    round_size(sbentry2->dirty_meta_size);
+			    round_size(sbentry_cur->dirty_meta_size);
 			this_round->dirty_size_delta += round_dirty_meta_size;
 		}
 
-		sbentry2->util_ll_prev = sbentry1->this_index;
-		sbentry1->util_ll_next = sbentry2->this_index;
+		sbentry_cur->util_ll_prev = sbentry_prev->this_index;
+		sbentry_prev->util_ll_next = sbentry_cur->this_index;
 		if (!find_first_dirty) {
 			/* Record stats/parms changes this round */
-			memcpy(&(this_round->prev_last_entry), sbentry1,
+			memcpy(&(this_round->prev_last_entry), sbentry_prev,
 			       SB_ENTRY_SIZE);
-			memcpy(&(this_round->this_first_entry), sbentry2,
+			memcpy(&(this_round->this_first_entry), sbentry_cur,
 			       SB_ENTRY_SIZE);
 			find_first_dirty = TRUE;
 		}
-		sbentry1 = sbentry2;
+		sbentry_prev = sbentry_cur;
 		this_round->this_num_dirty += 1;
 	}
-	/* sbentry1 will be the last dirty entry in array */
-	sbentry1->util_ll_next = 0;
+	/* sbentry_prev will be the last dirty entry in array */
+	sbentry_prev->util_ll_next = 0;
 
 	/* Record stats/parms changes this round */
-	memcpy(&(this_round->this_last_entry), sbentry1, SB_ENTRY_SIZE);
+	memcpy(&(this_round->this_last_entry), sbentry_prev, SB_ENTRY_SIZE);
 
 	return 0;
 }
@@ -484,12 +485,9 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data)
 		return ret_code;
 	}
 
-	sem_wait(&(hcfs_system->access_sem));
-	hcfs_system->systemdata.dirty_cache_size += round_data.dirty_size_delta;
-	hcfs_system->systemdata.unpin_dirty_data_size +=
-	    round_data.unpin_dirty_size_delta;
-	sync_hcfs_system_data(FALSE);
-	sem_post(&(hcfs_system->access_sem));
+	/* System statistics */
+	change_system_meta(0, 0, 0, 0, round_data.dirty_size_delta,
+			   round_data.unpin_dirty_size_delta, TRUE);
 
 	return 0;
 }
@@ -503,7 +501,6 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data)
 			free(sb_entry_arr);                                    \
 			free(meta_cache_arr);                                  \
 			set_recovery_flag(FALSE, 0, 0);                        \
-			unlink_recover_progress_file();                        \
 			pthread_exit((void *)-1);                              \
 			return NULL;                                           \
 		}                                                              \
@@ -564,7 +561,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 		start_inode = MIN_INODE_NO;
 		end_inode =
 		    sys_super_block->head.num_total_inodes + MIN_INODE_NO - 1;
-		_CALL_N_CHECK_RETCODE(log_recover_progress(start_inode, end_inode),
+		_CALL_N_CHECK_RETCODE(update_recover_progress(start_inode, end_inode),
 				      "Error log recovery progress.");
 		/* Reset parameters about dirty queue */
 		reset_queue_and_stat();
@@ -619,7 +616,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 		/* Prepare for next round */
 		start_inode += num_entry_handle;
 
-		_CALL_N_CHECK_RETCODE(log_recover_progress(start_inode, end_inode),
+		_CALL_N_CHECK_RETCODE(update_recover_progress(start_inode, end_inode),
 				      "Error log recovery progress.");
 
 		set_recovery_flag(TRUE, start_inode, end_inode);
