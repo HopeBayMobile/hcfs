@@ -21,6 +21,7 @@ typedef struct ITERATOR_BASE {
  *	while (iter_next(iter) != NULL) {
  *		// Now block index is iter->now_block_no;
  *		// Now page is iter->page;
+ *		// Now entry is iter->now_bentry;
  *	}
  *	if (errno != ENOENT) {
  *		// Error occur
