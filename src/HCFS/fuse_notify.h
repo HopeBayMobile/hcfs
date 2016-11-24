@@ -17,8 +17,7 @@
 #include "macro.h"
 #include "mount_manager.h"
 
-#define FUSE_NOTIFY_BUF_MAX_LEN 1024
-#define FUSE_NOTIFY_BUF_ELEMSIZE 52
+#define FUSE_NOTIFY_RINGBUF_SIZE 1024
 
 enum NOTIFY_FUNCTION { NOOP, DELETE };
 enum NOTIFY_ACTION { RUN, DESTROY_BUF };
@@ -26,9 +25,6 @@ enum NOTIFY_ACTION { RUN, DESTROY_BUF };
 /* Ring Buffer elements */
 
 /* Data chunk */
-typedef struct {
-	uint8_t padding[FUSE_NOTIFY_BUF_ELEMSIZE];
-} _PACKED FUSE_NOTIFY_DATA;
 
 /* Common header among data chunks */
 #define FUSE_NOTIFY_PROTO_MEMBER enum NOTIFY_FUNCTION func;
@@ -47,25 +43,34 @@ typedef struct {
 } _PACKED FUSE_NOTIFY_DELETE_DATA;
 
 /* Ring Buffer */
+
+typedef struct FUSE_NOTIFY_LL {
+	FUSE_NOTIFY_PROTO *proto;
+	struct FUSE_NOTIFY_LL *next;
+
+} FUSE_NOTIFY_LL;
+
+#define FUSE_NOTIFY_ENTRY_SIZE sizeof(FUSE_NOTIFY_DELETE_DATA)
 typedef struct {
-	FUSE_NOTIFY_DATA elems[FUSE_NOTIFY_BUF_MAX_LEN];
+	uint8_t ring_buf[FUSE_NOTIFY_RINGBUF_SIZE][FUSE_NOTIFY_ENTRY_SIZE];
+	FUSE_NOTIFY_PROTO *extend_queue;
 	size_t len;
 	size_t in;
 	size_t out;
 	sem_t not_empty;
 	sem_t not_full;
 	sem_t access_sem;
-} FUSE_NOTIFY_RING_BUF;
+} FUES_NOTIFY_SHARED_DATA;
 
 /* notify functions */
-typedef int32_t(fuse_notify_fn)(FUSE_NOTIFY_DATA *, enum NOTIFY_ACTION);
+typedef int32_t(fuse_notify_fn)(FUSE_NOTIFY_PROTO *, enum NOTIFY_ACTION);
 fuse_notify_fn _do_hfuse_ll_notify_noop;
 fuse_notify_fn _do_hfuse_ll_notify_delete;
 
 int32_t init_notify_buf(void);
 void destory_notify_buf(void);
 int32_t notify_buf_enqueue(const void *const notify);
-FUSE_NOTIFY_DATA *notify_buf_dequeue();
+FUSE_NOTIFY_PROTO *notify_buf_dequeue();
 
 int32_t init_hfuse_ll_notify_loop(void);
 int32_t destory_hfuse_ll_notify_loop(void);
