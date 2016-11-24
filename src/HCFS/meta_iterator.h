@@ -43,6 +43,7 @@ typedef struct FILE_BLOCK_ITERATOR {
 
 #define iter_begin(iter) iter->base.begin(iter)
 #define iter_next(iter) iter->base.next(iter)
+#define iter_jump(iter, elem_idx) iter->base.jump(iter, elem_idx)
 
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr);
 void destroy_block_iter(FILE_BLOCK_ITERATOR *iter);

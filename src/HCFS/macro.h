@@ -30,6 +30,8 @@
 
 #define UNUSED(x) ((void)x)
 
+#define FILE_EOF(fptr) feof(fptr) ? EIO : 0
+
 #define FSEEK(A, B, C)\
 	do {\
 		errcode = 0;\
@@ -177,7 +179,8 @@
 	do {\
 		errcode = 0;\
 		ret_size = fread(A, B, C, D);\
-		if ((ret_size < C) && ((errcode = ferror(D)) != 0)) {\
+		if ((ret_size < C) && ((errcode = ferror(D)) != 0 ||\
+				(errcode = FILE_EOF(D)) != 0)) {\
 			clearerr(D);\
 			write_log(0, "IO error in %s. Code %d\n", __func__,\
 			          errcode);\
@@ -191,7 +194,7 @@
 		errcode = 0;\
 		ret_size = fwrite(A, B, C, D);\
 		if (((ssize_t)ret_size < (ssize_t)C) &&\
-		    ((errcode = ferror(D)) != 0)) {\
+		    ((errcode = ferror(D)) != 0 || (errcode = FILE_EOF(D)) != 0)) {\
 			clearerr(D);\
 			write_log(0, "IO error in %s. Code %d\n", __func__,\
 			          errcode);\
