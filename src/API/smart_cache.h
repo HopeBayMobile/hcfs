@@ -57,7 +57,8 @@ typedef struct boost_job_meta {
 		if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {      \
 			write_log(0, "In %s. Failed to run cmd %s", __func__,  \
 				  cmd);                                        \
-			return -EAGAIN;                                        \
+			ret_code = -EAGAIN;                                    \
+			goto rollback;                                         \
 		}                                                              \
 		memset(cmd, 0, sizeof(cmd));                                   \
 	} while (0)
@@ -70,4 +71,5 @@ int32_t check_pkg_boost_status(char *package_name);
 
 int32_t clear_boosted_package(char *package_name);
 
+int32_t toggle_smart_cache_mount(char to_mount);
 #endif  /* GW20_HCFSAPI_SMART_CACHE_H_ */

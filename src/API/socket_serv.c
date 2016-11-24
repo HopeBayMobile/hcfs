@@ -549,6 +549,49 @@ int32_t do_trigger_unboost(char *largebuf, int32_t arg_len,
 	write_log(8, "End Trigger unboost\n");
 	return ret_code;
 }
+
+int32_t do_mount_smart_cache(char *largebuf, int32_t arg_len,
+			     char *resbuf, int32_t *res_size)
+{
+	char to_mount = TRUE;
+	int32_t ret_code = 0;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Mount smart cache\n");
+
+	ret_code = toggle_smart_cache_mount(to_mount);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End mount smart cache\n");
+	return ret_code;
+}
+
+int32_t do_umount_smart_cache(char *largebuf, int32_t arg_len,
+			      char *resbuf, int32_t *res_size)
+{
+	char to_mount = FALSE;
+	int32_t ret_code = 0;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Umount smart cache\n");
+
+	ret_code = toggle_smart_cache_mount(to_mount);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End umount smart cache\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -651,7 +694,9 @@ int32_t process_request(void *arg)
 		{COLLECTSYSLOGS,	do_collect_sys_logs},
 		{CHECK_PACKAGE_BOOST_STATUS,	do_check_package_boost_status},
 		{ENABLE_BOOSTER,	do_enable_booster},
-		{CLEAR_BOOSTED_PACKAGE,	do_clear_boosted_package}
+		{CLEAR_BOOSTED_PACKAGE,	do_clear_boosted_package},
+		{MOUNT_SMART_CACHE,	do_mount_smart_cache},
+		{UMOUNT_SMART_CACHE,	do_umount_smart_cache}
 	};
 
 	/* Asynchronous API will return immediately and process cmd in
