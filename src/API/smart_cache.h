@@ -57,7 +57,8 @@ typedef struct boost_job_meta {
 		if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {      \
 			write_log(0, "In %s. Failed to run cmd %s", __func__,  \
 				  cmd);                                        \
-			return -EAGAIN;                                        \
+			ret_code = -EAGAIN;                                    \
+			goto rollback;                                         \
 		}                                                              \
 		memset(cmd, 0, sizeof(cmd));                                   \
 	} while (0)

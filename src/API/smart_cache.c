@@ -58,11 +58,11 @@ int32_t _create_hcfs_vol()
 	return ret_code;
 }
 
-/* Helper function to mount hcfs volume
+/* Helper function to mount smart cache volume
  *
  * @return Return code returned by hcfs api service.
  */
-int32_t _mount_hcfs_vol()
+int32_t _mount_smart_cache_vol()
 {
 	char buf[1024];
 	int32_t fd, ret_code, fsname_len, first_size, rest_size;
@@ -87,6 +87,101 @@ int32_t _mount_hcfs_vol()
 	snprintf(&(buf[first_size + fsname_len]),
 		 sizeof(buf) - fsname_len - sizeof(int32_t) - sizeof(char),
 		 "%s", SMARTCACHE);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+/* Helper function to umount smart cache volume
+ *
+ * @return Return code returned by hcfs api service.
+ */
+int32_t _umount_smart_cache_vol()
+{
+	char buf[1024];
+	int32_t fd, ret_code, fsname_len;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = UNMOUNTVOL;
+	cmd_len =
+	    sizeof(int32_t) + strlen(SMARTCACHEVOL) + strlen(SMARTCACHE) + 2;
+
+	fsname_len = strlen(SMARTCACHEVOL);
+	memcpy(buf, &fsname_len, sizeof(int32_t));
+	strcpy(buf + sizeof(int32_t), SMARTCACHEVOL);
+	strcpy(buf + sizeof(int32_t) + fsname_len + 1, SMARTCACHE);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+/* Helper function to check mount status of  smart cache volume
+ *
+ * @return Return code returned by hcfs api service.
+ */
+int32_t _check_smart_cache_vol_mount()
+{
+	char buf[1024];
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = CHECKMOUNT;
+	cmd_len = strlen(SMARTCACHEVOL) + 1;
+	strncpy(buf, SMARTCACHEVOL, sizeof(buf));
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+/* Helper function to delete smart cache volume
+ *
+ * @return Return code returned by hcfs api service.
+ */
+int32_t _delete_smart_cache_vol()
+{
+	char buf[1024];
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = DELETEVOL;
+	cmd_len = strlen(SMARTCACHEVOL) + 1;
+	strncpy(buf, SMARTCACHEVOL, sizeof(buf));
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -174,7 +269,7 @@ int32_t enable_booster(int64_t smart_cache_size)
 
 	rmdir(SMARTCACHE);
 	ret_code = mkdir(SMARTCACHE, 0771);
-	if (ret_code < 0 && ret_code != EEXIST) {
+	if (ret_code < 0 && errno != EEXIST) {
 		write_log(0, "In %s. Failed to mkdir %s. Error code - %d",
 			  __func__, SMARTCACHE, errno);
 		return ret_code;
@@ -190,7 +285,7 @@ int32_t enable_booster(int64_t smart_cache_size)
 
 	rmdir(SMARTCACHEMTP);
 	ret_code = mkdir(SMARTCACHEMTP, 0771);
-	if (ret_code < 0 && ret_code != EEXIST) {
+	if (ret_code < 0 && errno != EEXIST) {
 		write_log(0, "In %s. Failed to mkdir %s. Error code - %d",
 			  __func__, SMARTCACHEMTP, errno);
 		return ret_code;
@@ -198,15 +293,18 @@ int32_t enable_booster(int64_t smart_cache_size)
 	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
 	RUN_CMD_N_CHECK();
 
-	ret_code = _mount_hcfs_vol();
-	if (ret_code < 0) {
-		write_log(0,
-			  "In %s. Failed to mount volume %s. Error code - %d",
-			  __func__, SMARTCACHEVOL, ret_code);
-		return ret_code;
+	if (_check_smart_cache_vol_mount() != 0) {
+		ret_code = _mount_smart_cache_vol();
+		if (ret_code < 0) {
+			write_log(
+			    0,
+			    "In %s. Failed to mount volume %s. Error code - %d",
+			    __func__, SMARTCACHEVOL, ret_code);
+			return ret_code;
+		}
+		snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
+		RUN_CMD_N_CHECK();
 	}
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
-	RUN_CMD_N_CHECK();
 
 	snprintf(cmd, sizeof(cmd), cmd_create_image_file, image_file_path,
 		 (smart_cache_size / 1048576));
@@ -227,6 +325,14 @@ int32_t enable_booster(int64_t smart_cache_size)
 	RUN_CMD_N_CHECK();
 
 	return 0;
+
+rollback:
+	if (access(image_file_path, F_OK) != -1)
+		_remove_folder(image_file_path);
+	_umount_smart_cache_vol();
+	_delete_smart_cache_vol();
+
+	return ret_code;
 }
 
 /* To move package data - Move data from /data/data/<pkg_folder> to smart cache.
@@ -241,6 +347,7 @@ int32_t boost_package(char *package_name)
 				  10];
 	char cmd[1024];
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
+	char cmd_restorecon_recursive[] = "restorecon -R %s/%s";
 	int32_t ret_code, status;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
@@ -273,6 +380,14 @@ int32_t boost_package(char *package_name)
 		write_log(0,
 			  "In %s. Failed to create temp file %s. Error code %d",
 			  __func__, pkg_tmppath, errno);
+		goto rollback;
+	}
+
+	snprintf(cmd, sizeof(cmd), cmd_restorecon_recursive, SMARTCACHEMTP,
+		 package_name);
+	status = system(cmd);
+	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
 		goto rollback;
 	}
 
