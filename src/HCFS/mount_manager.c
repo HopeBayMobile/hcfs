@@ -820,9 +820,6 @@ static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 	int32_t ret;
 	MOUNT_T *tmp_info;
 
-	if (mount_info->volume_type != ANDROID_MULTIEXTERNAL)
-		return 0;
-
 	/* Search any mountpoint of given volume name */
 	ret = search_mount(mount_info->f_name, NULL, &tmp_info);
 	if (ret < 0) {
