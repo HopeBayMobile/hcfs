@@ -20,21 +20,21 @@
 #include "global.h"
 
 typedef struct {
-	pthread_t self;
-	BOOL cancelable;
-	BOOL terminating;
-	void *(*thread_routine)(void *);
-	void (*SIGUSR2_handler)(int);
-	void *arg;
+	pthread_t self;  /* The real thread */
+	BOOL cancelable;  /* Specify if the thread can be canceled */
+	BOOL terminating; /* Specify if someone wants to terminate the thread */
+	void *(*thread_routine)(void *);  /* Routine to be run in the thread */
+	void (*SIGUSR2_handler)(int);  /* SIGUSR2 signal handler routine */
+	void *arg;  /* Argument to the routine to be run in the thread */
 } PTHREAD_T;
 
 typedef struct {
-	pthread_t self;
-	BOOL cancelable;
-	BOOL terminating;
-	void *(*thread_routine)(void *);
-	void (*SIGUSR2_handler)(int);
-	void *arg;
+	pthread_t self;  /* The real thread */
+	BOOL cancelable;  /* Specify if the thread can be canceled */
+	BOOL terminating; /* Specify if someone wants to terminate the thread */
+	void *(*thread_routine)(void *);  /* Routine to be run in the thread */
+	void (*SIGUSR2_handler)(int);  /* SIGUSR2 signal handler routine */
+	void *arg;  /* Argument to the routine to be run in the thread */
 
 	/* sem_wait(&run) if thread waiting for PTHREAD_REUSE_run */
 	sem_t run;
@@ -43,13 +43,12 @@ typedef struct {
 	/* sem_wait(&occupied) in REUSE_run, and sem_post(&occupied)
 	in REUSE_join */
 	sem_t occupied;
-	int detachstate;
+	int detachstate;  /* Specify if the thread is detached */
 } PTHREAD_REUSE_T;
 
 pthread_key_t PTHREAD_status_key;
 
 void PTHREAD_sighandler_init(void (*handler_ftn)(int));
-void PTHREAD_sighandler_destroy(void);
 int PTHREAD_create(PTHREAD_T *thread, const pthread_attr_t *attr,
                    void *(*start_routine) (void *), void *arg);
 void PTHREAD_set_exithandler();
