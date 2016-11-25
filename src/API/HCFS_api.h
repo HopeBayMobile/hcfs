@@ -22,22 +22,22 @@
  *
  * To set value of a specific field in HCFS configuration.
  *
- * >| Key supported | Valid value |
- * | ------------- |:-------------|
- * | current_backend | none/swift|
- * | swift_account | account|
- * | swift_user    | user|
- * | swift_pass    | password|
- * | swift_url     | <server url>:<port>|
- * | swift_container| container name|
- * | swift_protocol| http/https|
+ * > | Key supported   | Valid value         |
+ *   | -------------   | :-------------      |
+ *   | current_backend | none/swift          |
+ *   | swift_account   | account             |
+ *   | swift_user      | user                |
+ *   | swift_pass      | password            |
+ *   | swift_url       | <server url>:<port> |
+ *   | swift_container | container name      |
+ *   | swift_protocol  | http/https          |
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_set_config(char **json_res, char *key, char *value);
 
@@ -49,10 +49,10 @@ void HCFS_set_config(char **json_res, char *key, char *value);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_get_config(char **json_res, char *key);
 
@@ -63,10 +63,10 @@ void HCFS_get_config(char **json_res, char *key);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_reload_config(char **json_res);
 
@@ -78,27 +78,27 @@ void HCFS_reload_config(char **json_res);
  * Return data dict in json_res -
  * ```json
  * data: {
- *     quota: Bytes,
- *     vol_used: Bytes,
- *     cloud_used: Bytes,
- *     cache_total: Bytes,
- *     cache_used: Bytes,
- *     cache_dirty: Bytes,
- *     pin_max: Bytes,
- *     pin_total: Bytes,
- *     xfer_up: Bytes,
- *     xfer_down: Bytes,
- *     cloud_conn: True|False,
+ *     quota:         Bytes,
+ *     vol_used:      Bytes,
+ *     cloud_used:    Bytes,
+ *     cache_total:   Bytes,
+ *     cache_used:    Bytes,
+ *     cache_dirty:   Bytes,
+ *     pin_max:       Bytes,
+ *     pin_total:     Bytes,
+ *     xfer_up:       Bytes,
+ *     xfer_down:     Bytes,
+ *     cloud_conn:    True|False,
  *     data_transfer: Integer (0 means no data transfer, 1 means data transfer in progress, 2 means data transfer in progress but slow.)
  * }
  * ```
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_stat(char **json_res);
 
@@ -116,10 +116,10 @@ void HCFS_stat(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_get_occupied_size(char **json_res);
 
@@ -131,10 +131,10 @@ void HCFS_get_occupied_size(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_toggle_sync(char **json_res, int32_t enabled);
 
@@ -152,10 +152,10 @@ void HCFS_toggle_sync(char **json_res, int32_t enabled);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_get_sync_status(char **json_res);
 
@@ -170,11 +170,11 @@ void HCFS_get_sync_status(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | ENOSPC when pinned space is not available.|
- * | | Other linux errors.|
+ * > |               |                                            |
+ *   | ------------- | :-------------                             |
+ *   | True          | 0                                          |
+ *   | False         | ENOSPC when pinned space is not available. |
+ *   |               | Other linux errors.                        |
  */
 void HCFS_pin_path(char **json_res, char *pin_path, char pin_type);
 
@@ -188,10 +188,10 @@ void HCFS_pin_path(char **json_res, char *pin_path, char pin_type);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_unpin_path(char **json_res, char *pin_path);
 
@@ -203,12 +203,12 @@ void HCFS_unpin_path(char **json_res, char *pin_path);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if object is not pinned.|
- * | | 1 if object is pinned.|
- * | | 2 if object is high-priority-pinned.|
- * | False | Linux errors.|
+ * > |               |                                      |
+ *   | ------------- | :-------------                       |
+ *   | True          | 0 if object is not pinned.           |
+ *   |               | 1 if object is pinned.               |
+ *   |               | 2 if object is high-priority-pinned. |
+ *   | False         | Linux errors.                        |
  */
 void HCFS_pin_status(char **json_res, char *pathname);
 
@@ -229,11 +229,11 @@ void HCFS_pin_status(char **json_res, char *pathname);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | ENOENT if the inode does not existed.|
- * | | Other linux errors.|
+ * > |               |                                       |
+ *   | ------------- | :-------------                        |
+ *   | True          | 0                                     |
+ *   | False         | ENOENT if the inode does not existed. |
+ *   |               | Other linux errors.                   |
  */
 void HCFS_dir_status(char **json_res, char *pathname);
 
@@ -245,12 +245,12 @@ void HCFS_dir_status(char **json_res, char *pathname);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if the file status is "local"|
- * | | 1 if the file status is "cloud"|
- * | | 2 if the file status is "hybrid"|
- * | False | Linux errors.|
+ * > |               |                                  |
+ *   | ------------- | :-------------                   |
+ *   | True          | 0 if the file status is "local"  |
+ *   |               | 1 if the file status is "cloud"  |
+ *   |               | 2 if the file status is "hybrid" |
+ *   | False         | Linux errors.                    |
  */
 void HCFS_file_status(char **json_res, char *pathname);
 
@@ -261,10 +261,10 @@ void HCFS_file_status(char **json_res, char *pathname);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_reset_xfer(char **json_res);
 
@@ -276,10 +276,10 @@ void HCFS_reset_xfer(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_set_notify_server(char **json_res, char *path);
 
@@ -292,10 +292,10 @@ void HCFS_set_notify_server(char **json_res, char *path);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_set_swift_token(char **json_res, char *url, char *token);
 
@@ -307,11 +307,11 @@ void HCFS_set_swift_token(char **json_res, char *url, char *token);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 when setting sync point completed|
- * | | 1 if there is no dirty data|
- * | False | Linux errors.|
+ * > |               |                                     |
+ *   | ------------- | :-------------                      |
+ *   | True          | 0 when setting sync point completed |
+ *   |               | 1 if there is no dirty data         |
+ *   | False         | Linux errors.                       |
  */
 void HCFS_set_sync_point(char **json_res);
 
@@ -322,11 +322,11 @@ void HCFS_set_sync_point(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 when the sync point is removed successfully|
- * | | 1 if no sync point is set|
- * | False | Linux errors.|
+ * > |               |                                               |
+ *   | ------------- | :-------------                                |
+ *   | True          | 0 when the sync point is removed successfully |
+ *   |               | 1 if no sync point is set                     |
+ *   | False         | Linux errors.                                 |
  */
 void HCFS_clear_sync_point(char **json_res);
 
@@ -339,10 +339,10 @@ void HCFS_clear_sync_point(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if successful|
- * | False | Linux errors.|
+ * > |               |                 |
+ *   | ------------- | :-------------  |
+ *   | True          | 0 if successful |
+ *   | False         | Linux errors.   |
  */
 void HCFS_collect_sys_logs(char **json_res);
 
@@ -353,10 +353,10 @@ void HCFS_collect_sys_logs(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if successful|
- * | False | Linux errors.|
+ * > |               |                 |
+ *   | ------------- | :-------------  |
+ *   | True          | 0 if successful |
+ *   | False         | Linux errors.   |
  */
 void HCFS_trigger_restore(char **json_res);
 
@@ -367,12 +367,12 @@ void HCFS_trigger_restore(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if not being restored|
- * | | 1 if in stage 1 of restoration process|
- * | | 2 if in stage 2 of restoration process|
- * | False | Linux errors.|
+ * > |               |                                        |
+ *   | ------------- | :-------------                         |
+ *   | True          | 0 if not being restored                |
+ *   |               | 1 if in stage 1 of restoration process |
+ *   |               | 2 if in stage 2 of restoration process |
+ *   | False         | Linux errors.                          |
  */
 void HCFS_check_restore_status(char **json_res);
 
@@ -384,12 +384,12 @@ void HCFS_check_restore_status(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if not being restored|
- * | | 1 if in stage 1 of restoration process|
- * | | 2 if in stage 2 of restoration process|
- * | False | Linux errors.|
+ * > |               |                                        |
+ *   | ------------- | :-------------                         |
+ *   | True          | 0 if not being restored                |
+ *   |               | 1 if in stage 1 of restoration process |
+ *   |               | 2 if in stage 2 of restoration process |
+ *   | False         | Linux errors.                          |
  */
 void HCFS_notify_applist_change(char **json_res);
 
