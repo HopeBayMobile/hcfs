@@ -19,7 +19,7 @@ cd $repo
 
 Usage()
 {
-cat <<EOF
+	cat <<EOF
 NAME
 	build.sh - HCFS build script
 
@@ -51,7 +51,7 @@ DESCRIPTION
 	-h
 		Show usage
 EOF
-exit ${1:-0}
+	exit ${1:-0}
 }
 
 parse_options()
@@ -120,7 +120,7 @@ lib()
 	exit
 }
 
-pyhcfs ()
+pyhcfs()
 {
 	$repo/utils/setup_dev_env.sh -m docker_host
 	docker pull docker:5000/docker_hcfs_test_slave

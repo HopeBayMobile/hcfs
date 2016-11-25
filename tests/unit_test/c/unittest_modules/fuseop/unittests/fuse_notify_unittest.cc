@@ -40,23 +40,23 @@ int32_t ut_enqueue_call;
 int32_t ut_enqueue(size_t n)
 {
 	size_t i, in = 0;
-	static size_t seq = __LINE__;
+	uint8_t fake_data = 0;
 	int32_t ret, write_log_hide_orgin = write_log_hide;
 	FUSE_NOTIFY_PROTO *data;
 
 	if (n > 50)
 		write_log_hide = 10;
 	for (i = 0; i < n; i++) {
-		printf("Fill with %lu\n", seq);
+		write_log(11, "notify.len %lu\n", notify.len);
 		data = (FUSE_NOTIFY_PROTO *)saved_notify[ut_enqueue_call % 20];
-		memset(data, seq, FUSE_NOTIFY_ENTRY_SIZE);
+		memset(data, fake_data, FUSE_NOTIFY_ENTRY_SIZE);
 		data->func = NOOP;
 		ret = notify_buf_enqueue(data);
 		in = notify.in + 1;
 		if (in == FUSE_NOTIFY_RINGBUF_SIZE)
 			in = 0;
 		ut_enqueue_call++;
-		seq++;
+		fake_data++;
 	}
 
 	write_log_hide = write_log_hide_orgin;
@@ -193,6 +193,43 @@ TEST_F(NotifyBuffer_Initialized, Enqueue)
 		  memcmp(saved_notify[0], notify.ring_buf[0], FUSE_NOTIFY_ENTRY_SIZE));
 }
 
+TEST_F(NotifyBuffer_Initialized, EnqueueToLinkedListFailToAllocateNode)
+{
+	int32_t i;
+	uint8_t fake_data = 0;
+	uint8_t *d = NULL;
+
+	malloc_error_on = 1;
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE+1), -1);
+	write_log_hide = 2;
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE; i++) {
+		d = (uint8_t*)notify_buf_dequeue();
+		ASSERT_EQ(1, (d != NULL));
+		/* use d[offset] to skip func field */
+		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
+		free(d);
+		fake_data++;
+	}
+}
+TEST_F(NotifyBuffer_Initialized, EnqueueToLinkedListFailToAllocateData)
+{
+	int32_t i;
+	uint8_t fake_data = 0;
+	uint8_t *d = NULL;
+
+	malloc_error_on = 2;
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE+1), -1);
+	write_log_hide = 2;
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE; i++) {
+		d = (uint8_t*)notify_buf_dequeue();
+		ASSERT_EQ(1, (d != NULL));
+		/* use d[offset] to skip func field */
+		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
+		free(d);
+		fake_data++;
+	}
+}
+
 TEST_F(NotifyBuffer_Initialized, Dequeue)
 {
 	FUSE_NOTIFY_PROTO *d = NULL;
@@ -202,6 +239,24 @@ TEST_F(NotifyBuffer_Initialized, Dequeue)
 	ASSERT_NE(0, (d != NULL));
 	EXPECT_EQ(0, memcmp(d, notify.ring_buf, FUSE_NOTIFY_ENTRY_SIZE));
 	free(d);
+}
+
+TEST_F(NotifyBuffer_Initialized, DequeueLinkedList)
+{
+	int32_t i;
+	uint8_t fake_data = 0;
+	uint8_t *d = NULL;
+
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE * 2), 0);
+	write_log_hide = 2;
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE * 2; i++) {
+		d = (uint8_t*)notify_buf_dequeue();
+		ASSERT_EQ(1, (d != NULL));
+		/* use d[offset] to skip func field */
+		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
+		free(d);
+		fake_data++;
+	}
 }
 
 TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
@@ -439,8 +494,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_OverflowRingBuffer)
 		ret = hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 		EXPECT_EQ(ret, 0);
 	}
-	write_log_hide = 11;
-	printf("notify.len %lu\n", notify.len);
+	write_log(5, "notify.len %lu\n", notify.len);
 	EXPECT_EQ(notify.len, 10000 * MP_TYPE_NUM);
 	free(ch);
 	free(name);
@@ -475,4 +529,21 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_DiffCaseNameTriggerAllNotify)
 	for (i = 0; i < MP_TYPE_NUM; i++)
 		free(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
 	EXPECT_EQ(notify.len, 3);
+}
+
+TEST_F(NotifyBuffer_Initialized, notify_delete_mp_Fail)
+{
+	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
+	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
+	char *name = strdup("a");
+	int32_t i;
+
+	mount_global.ch[1] = ch;
+	for (i = 2; i <= MP_TYPE_NUM; i++)
+		mount_global.ch[i] = fake_mp;
+	strndup_error_on = 1;
+	EXPECT_EQ(-ENOMEM, hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name));
+	free(ch);
+	free(name);
+	free(fake_mp);
 }
