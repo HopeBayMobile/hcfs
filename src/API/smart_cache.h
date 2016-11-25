@@ -63,6 +63,22 @@ typedef struct boost_job_meta {
 		}                                                              \
 	} while (0)
 
+#define REMOVE_IF_EXIST(PATH)                                                  \
+	do {                                                                   \
+		if (access(PATH, F_OK) != -1) {                                \
+			write_log(4,                                           \
+				  "In %s. Path %s existed. Force remove it.",  \
+				  __func__, PATH);                             \
+			ret_code = _remove_folder(PATH);                       \
+			if (ret_code < 0) {                                    \
+				write_log(0,                                   \
+					  "In %s. Failed to remove folder %s", \
+					  __func__, PATH);                     \
+				return -1;                                     \
+			}                                                      \
+		}                                                              \
+	} while (0)
+
 int32_t enable_booster(int64_t smart_cache_size);
 
 int32_t trigger_boost(char to_boost, pthread_t *tid);
