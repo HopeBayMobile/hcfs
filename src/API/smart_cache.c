@@ -373,7 +373,7 @@ int32_t boost_package(char *package_name)
 	RUN_CMD_N_CHECK(cmd_restorecon_recursive, smart_cache_fullpath);
 
 	ret_code = symlink(smart_cache_fullpath, pkg_fullpath);
-	if (ret_code < 0) {
+	if (ret_code < 0 && errno != EEXIST) {
 		write_log(0, "In %s. Failed to create link %s. Error code %d",
 			  __func__, smart_cache_fullpath, errno);
 		goto rollback;
