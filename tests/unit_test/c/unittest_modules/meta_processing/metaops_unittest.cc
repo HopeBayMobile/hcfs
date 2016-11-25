@@ -2241,7 +2241,7 @@ TEST_F(restore_meta_fileTest, RestoreDir_Success)
 
 	/* Generate mock restored file */
 	inode = 5;
-	fetch_restored_meta_path(mock_restore_path, inode);
+	fetch_temp_restored_meta_path(mock_restore_path, inode);
 	fptr = fopen(mock_restore_path, "w+");
 	setbuf(fptr, NULL);
 	memset(&tmpstat, 0, sizeof(HCFS_STAT));
@@ -2303,7 +2303,7 @@ TEST_F(restore_meta_fileTest, RestoreSymlink_Success)
 
 	/* Generate mock restored file */
 	inode = 5;
-	fetch_restored_meta_path(mock_restore_path, inode);
+	fetch_temp_restored_meta_path(mock_restore_path, inode);
 	fptr = fopen(mock_restore_path, "w+");
 	setbuf(fptr, NULL);
 	memset(&tmpstat, 0, sizeof(HCFS_STAT));
@@ -2371,7 +2371,7 @@ TEST_F(restore_meta_fileTest, RestoreRegfile_Success)
 
 	/* Generate mock restored file */
 	inode = 5;
-	fetch_restored_meta_path(mock_restore_path, inode);
+	fetch_temp_restored_meta_path(mock_restore_path, inode);
 	fptr = fopen(mock_restore_path, "w+");
 	setbuf(fptr, NULL);
 	memset(&tmpstat, 0, sizeof(HCFS_STAT));

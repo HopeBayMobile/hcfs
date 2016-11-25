@@ -511,7 +511,7 @@ int32_t change_pin_size(int64_t delta_pin_size)
 	return 0;
 }
 
-void fetch_restored_meta_path(char *pathname, ino_t this_inode)
+void fetch_temp_restored_meta_path(char *pathname, ino_t this_inode)
 {
 	sprintf(pathname, "restore_meta_fileTestPath/restore_meta_%"PRIu64,
 			(uint64_t)this_inode);
@@ -584,3 +584,4 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 {
 	return 0;
 }
+
