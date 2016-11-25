@@ -132,8 +132,6 @@ int32_t main(int32_t argc, char **argv)
 		code = CHECK_RESTORATION_STATUS;
 	else if (strcasecmp(argv[1], "notify_applist_change") == 0)
 		code = NOTIFY_APPLIST_CHANGE;
-	else if (strcasecmp(argv[1], "unmount_smart_cache") == 0)
-		code = UNMOUNT_SMART_CACHE;
 	else
 		code = -1;
 	if (code < 0) {
@@ -154,7 +152,6 @@ int32_t main(int32_t argc, char **argv)
 	case TRIGGERUPDATEQUOTA:
 	case INITIATE_RESTORATION:
 	case NOTIFY_APPLIST_CHANGE:
-	case UNMOUNT_SMART_CACHE:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);

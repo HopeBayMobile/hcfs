@@ -223,7 +223,6 @@ int32_t init_package_uid_list(char *plistpath)
 
 #define namepat " name=\"([^\"]+)\""
 #define uidpat " (sharedUserId|userId)=\"([[:digit:]]+)\""
-	puts("exec");
 	errcode =
 	    regcomp(&re, "^[[:space:]]*<package.*" namepat ".*" uidpat ".*$",
 		    REG_EXTENDED | REG_NEWLINE);

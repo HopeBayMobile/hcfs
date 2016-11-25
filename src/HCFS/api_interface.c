@@ -1573,14 +1573,6 @@ void api_module(void *index)
 			/* Attempt package backup immediately */
 			force_backup_package();
 			break;
-		case UNMOUNT_SMART_CACHE:
-			retcode = unmount_smart_cache(SMART_CACHE_MP);
-			if (retcode < 0)
-				break;
-			ret_len = sizeof(int32_t);
-			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
-			send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
-			break;
 		case SEND_NOTIFY_EVENT:
 			retcode = send_notify_event(arg_len, largebuf);
 			if (retcode > 0) {

@@ -7,6 +7,20 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
 
+v 2.2.3.2056
+=====
+## New Features
+ - [Tera-Launcher] feature/alert_dialog_for_launch_app: Pop out alert dialog while launching app if wifi-only be set and usingcellular network  ([!16](gateway-2-0/tera-launcher!16))
+
+## Fixed
+ - [HCFS] bugfix/fix_pin_fail_caused_by_NOENT: skip pinning in case that entry is not found.  ([!637](gateway-2-0/hcfs!637))
+ - [Tera-App] bugfix/#13836: bugfix/#13836 Handle josn non-key situation and not to execute getDirLocationStatus() if path is belong to system app  ([!142](gateway-2-0/android-management-app!142))
+ - [Nexus-5X] bugfix/#13851: Fix alert dialog show conditionFactory reset will not show alert dialog while set to erase cloud data  ([!71](gateway-2-0/nexus-5x!71))
+
+## CI / Refactoring / Other
+ - [HCFS] ci/update_launch_by_branch_or_tag: update launcher with branch or tag See merge request !614  ([!633](gateway-2-0/hcfs!633))
+
+
 v 2.2.3.2033
 =====
 ## New Features

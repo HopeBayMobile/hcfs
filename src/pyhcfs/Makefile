@@ -20,7 +20,7 @@ clean:
 	rm -rf $(TARGET) *.o
 
 check_pkgs:
-	@$(shell cd ../../utils;pwd)/check_compile_pkgs.sh
+	@$(shell cd ../../utils;pwd)/setup_dev_env.sh -m pyhcfs
 
 demo: all
 	@echo ====== start demo ======

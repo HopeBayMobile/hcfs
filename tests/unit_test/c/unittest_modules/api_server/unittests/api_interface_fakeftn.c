@@ -28,7 +28,7 @@ int32_t unmount_all(void)
 	return 0;
 }
 
-int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+int32_t add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry)
 {
 	CREATEDFS = TRUE;
 	strcpy(recvFSname, fsname);
@@ -226,6 +226,12 @@ void force_backup_package(void)
 	return;
 }
 int32_t backup_package_list(void)
+{
+	return 0;
+}
+int32_t add_notify_event(int32_t event_id,
+			 const char *event_info_json_str,
+			 char blocking)
 {
 	return 0;
 }

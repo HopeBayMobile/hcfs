@@ -11,10 +11,10 @@ TEST_DATA_PATHS = [
 
 pp = pprint.PrettyPrinter(indent=4)
 
-def test_list_external_volume():
+def list_volume():
     for dir_path in TEST_DATA_PATHS:
         _TEST_FSMGR_FILENAME = str.encode(os.path.join(_HERE, dir_path, 'fsmgr'))
-        ret = parser.list_external_volume(_TEST_FSMGR_FILENAME)
+        ret = parser.list_volume(_TEST_FSMGR_FILENAME)
         pp.pprint(ret)
         assert ret[0][0] > 1
         assert ret[0][1] == b'hcfs_external'
@@ -66,9 +66,9 @@ def test_list_file_blocks():
 
 if __name__ == '__main__':
     print("-----------------------------")
-    print("- Test list_external_volume -")
+    print("- Test list_volume -")
     print("-----------------------------")
-    test_list_external_volume()
+    list_volume()
 
     print("\n\n")
     print("-----------------------------")
