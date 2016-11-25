@@ -1250,6 +1250,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
 		  (uint64_t)parent_inode);
 
+	gettimeofday(&tmp_time1, NULL);
 #ifdef _ANDROID_ENV_
 	if ((parent_inode == data_data_root) && pkg_in_whitelist(selfname)) {
 		char link_target[MAX_FILENAME_LEN + 100];
