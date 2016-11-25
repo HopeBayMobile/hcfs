@@ -44,15 +44,16 @@
 #define SMARTCACHEMTP "/data/mnt/hcfsblock" /* ext4 mountpoint */
 #define LOOPDEV "/dev/block/loop6"
 #define HCFSBLOCK "hcfsblock"
-#define HCFSBLOCKSIZE 104857600 /* default 100MB */
 
 typedef struct boost_job_meta {
 	int32_t to_boost;
 	sqlite3 *db;
 } BOOST_JOB_META;
 
-#define RUN_CMD_N_CHECK()                                                      \
+#define RUN_CMD_N_CHECK(RAWCMD, ...)                                           \
 	do {                                                                   \
+		memset(cmd, 0, sizeof(cmd));                                   \
+		snprintf(cmd, sizeof(cmd), RAWCMD, ##__VA_ARGS__);             \
 		status = system(cmd);                                          \
 		if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {      \
 			write_log(0, "In %s. Failed to run cmd %s", __func__,  \
@@ -60,7 +61,6 @@ typedef struct boost_job_meta {
 			ret_code = -EAGAIN;                                    \
 			goto rollback;                                         \
 		}                                                              \
-		memset(cmd, 0, sizeof(cmd));                                   \
 	} while (0)
 
 int32_t enable_booster(int64_t smart_cache_size);

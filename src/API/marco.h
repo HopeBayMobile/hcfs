@@ -60,6 +60,7 @@
 		while (retry_times < MAX_RETRY_SEND_TIMES) {                   \
 			ret_code = _send_notify_event(event_id);               \
 			if (ret_code == RETCODE_QUEUE_FULL) {                  \
+				sleep(1);                                      \
 				retry_times += 1;                              \
 				continue;                                      \
 			}                                                      \

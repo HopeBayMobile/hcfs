@@ -276,12 +276,10 @@ int32_t enable_booster(int64_t smart_cache_size)
 	}
 	/* chown to system:sytem */
 	chown(SMARTCACHE, 1000, 1000);
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHE);
 
 	mkdir(SMARTCACHEAMNT, 0771);
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEAMNT);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHEAMNT);
 
 	rmdir(SMARTCACHEMTP);
 	ret_code = mkdir(SMARTCACHEMTP, 0771);
@@ -290,8 +288,7 @@ int32_t enable_booster(int64_t smart_cache_size)
 			  __func__, SMARTCACHEMTP, errno);
 		return ret_code;
 	}
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHEMTP);
 
 	if (_check_smart_cache_vol_mount() != 0) {
 		ret_code = _mount_smart_cache_vol();
@@ -302,27 +299,16 @@ int32_t enable_booster(int64_t smart_cache_size)
 			    __func__, SMARTCACHEVOL, ret_code);
 			return ret_code;
 		}
-		snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
-		RUN_CMD_N_CHECK();
+		RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHE);
 	}
 
-	snprintf(cmd, sizeof(cmd), cmd_create_image_file, image_file_path,
-		 (smart_cache_size / 1048576));
-	RUN_CMD_N_CHECK();
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, image_file_path);
-	RUN_CMD_N_CHECK();
-
-	snprintf(cmd, sizeof(cmd), cmd_setup_loop_device, LOOPDEV,
-		 image_file_path);
-	RUN_CMD_N_CHECK();
-
-	snprintf(cmd, sizeof(cmd), cmd_create_ext4_fs, LOOPDEV);
-	RUN_CMD_N_CHECK();
-
-	snprintf(cmd, sizeof(cmd), cmd_mount_ext4_fs, LOOPDEV, SMARTCACHEMTP);
-	RUN_CMD_N_CHECK();
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_create_image_file, image_file_path,
+			(smart_cache_size / 1048576));
+	RUN_CMD_N_CHECK(cmd_restorecon, image_file_path);
+	RUN_CMD_N_CHECK(cmd_setup_loop_device, LOOPDEV, image_file_path);
+	RUN_CMD_N_CHECK(cmd_create_ext4_fs, LOOPDEV);
+	RUN_CMD_N_CHECK(cmd_mount_ext4_fs, LOOPDEV, SMARTCACHEMTP);
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHEMTP);
 
 	return 0;
 
@@ -454,6 +440,18 @@ int32_t unboost_package(char *package_name)
 		}
 	}
 
+	if (access(pkg_tmppath, F_OK) != -1) {
+		write_log(4, "In %s. Pacakge path %s existed. Force remove it.",
+			  __func__, pkg_tmppath);
+
+		ret_code = _remove_folder(pkg_tmppath);
+		if (ret_code < 0) {
+			write_log(0, "In %s. Failed to remove folder %s",
+				  __func__, pkg_tmppath);
+			return -1;
+		}
+	}
+
 	memset(cmd, 0, sizeof(cmd));
 	snprintf(cmd, sizeof(cmd), cmd_copy_pkg_data, smart_cache_fullpath,
 		 pkg_tmppath);
@@ -539,6 +537,12 @@ static int32_t _iterate_pkg_cb(void *data,
 		write_log(0, "In %s. No matched result.", __func__);
 		return -1;
 	}
+
+	if (strncmp(argv[0], "", 1) == 0 || (strncmp(argv[0], " ", 1) == 0)) {
+		write_log(0, "In %s. Invalid package name.", __func__);
+		return -1;
+	}
+
 	package_name = argv[0];
 
 	boost_job = (BOOST_JOB_META*)data;
@@ -698,16 +702,23 @@ int32_t toggle_smart_cache_mount(char to_mount)
 	char cmd[1024];
 	char cmd_mount_ext4_fs[] = "mount -t ext4 %s %s";
 	char cmd_umount_ext4_fs[] = "umount %s";
+	char cmd_restorecon[] = "restorecon %s";
 	int32_t status;
 
 	memset(cmd, 0, sizeof(cmd));
-
 	if (to_mount)
 		snprintf(cmd, sizeof(cmd), cmd_mount_ext4_fs, LOOPDEV,
 			 SMARTCACHEMTP);
 	else
 		snprintf(cmd, sizeof(cmd), cmd_umount_ext4_fs, SMARTCACHEMTP);
+	status = system(cmd);
+	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
+		return -1;
+	}
 
+	memset(cmd, 0, sizeof(cmd));
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
 	status = system(cmd);
 	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
 		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);

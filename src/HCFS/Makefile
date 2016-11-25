@@ -17,7 +17,7 @@ CPPFLAGS = -DDEDUP_ENABLE=0 \
 	   -D_XOPEN_SOURCE=700 \
 	   -D_DEFAULT_SOURCE \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\" \
-	   -D_BSD_SOURCE
+	   -D_BSD_SOURCE \
 
 CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
 LDFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
