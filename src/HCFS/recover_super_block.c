@@ -74,11 +74,13 @@ BOOL need_recover_sb()
 		goto cleanup;
 	}
 
-	/* Num_dirty & dirty_inode_queue not matched. First dirty
-	 * inode will always be equal to last dirty inode since
-	 * they had been written in one write operation */
-	if (!(sys_super_block->head.num_dirty == 0 &&
-	      sys_super_block->head.first_dirty_inode == 0)) {
+	/* Num_dirty & dirty_inode_queue not matched. Only check first dirty
+	 * inode here because of last dirty inode is always updated with first
+	 * dirty inode in one write operation. */
+	if ((sys_super_block->head.num_dirty == 0 &&
+	     sys_super_block->head.first_dirty_inode != 0) ||
+	    (sys_super_block->head.num_dirty != 0 &&
+	     sys_super_block->head.first_dirty_inode == 0)) {
 		need_recovery = TRUE;
 		goto cleanup;
 	}
@@ -506,7 +508,6 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data)
 		}                                                              \
 	} while (0)
 
-void dump_sb_entries();
 void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 {
 	char error_msg[] = "SB queue recovery worker aborted.";

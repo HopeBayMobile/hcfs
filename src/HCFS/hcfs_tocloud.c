@@ -2165,7 +2165,7 @@ void upload_loop(void)
 				gettimeofday(&last_retry_time, NULL);
 			}
 
-			/* Strat to recovery dirty queue if needed */
+			/* Start to recovery dirty queue if needed */
 			if (need_recover_sb())
 				start_sb_recovery();
 
