@@ -400,11 +400,11 @@ void HCFS_notify_applist_change(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if package is boosted|
- * | | 1 if package is unboosted|
- * | False | Linux errors.|
+ * > |               |                           |
+ *   | ------------- | :-------------            |
+ *   | True          | 0 if package is boosted   |
+ *   |               | 1 if package is unboosted |
+ *   | False         | Linux errors.             |
  */
 void HCFS_check_package_boost_status(char **json_res, char *package_name);
 
@@ -417,10 +417,10 @@ void HCFS_check_package_boost_status(char **json_res, char *package_name);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_enable_booster(char **json_res, int64_t size);
 
@@ -432,10 +432,10 @@ void HCFS_enable_booster(char **json_res, int64_t size);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_disable_booster(char **json_res);
 
@@ -449,10 +449,10 @@ void HCFS_disable_booster(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_trigger_boost(char **json_res);
 
@@ -466,10 +466,10 @@ void HCFS_trigger_boost(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_trigger_unboost(char **json_res);
 
@@ -480,10 +480,10 @@ void HCFS_trigger_unboost(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_clear_booster_package_remaining(char **json_res, char *package_name);
 
@@ -494,10 +494,10 @@ void HCFS_clear_booster_package_remaining(char **json_res, char *package_name);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_mount_smart_cache(char **json_res);
 
@@ -508,10 +508,10 @@ void HCFS_mount_smart_cache(char **json_res);
  *
  * Return code -
  *
- * >|||
- * | ------------- |:-------------|
- * | True | 0 if success|
- * | False | Linux errors.|
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
  */
 void HCFS_umount_smart_cache(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */
