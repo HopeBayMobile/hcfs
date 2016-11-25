@@ -18,6 +18,14 @@
 
 #include "metaops.h"
 
+/**
+ * Initilize block iterator using parameter "fptr", which is a file pointer of
+ * the meta file. This function will NOT lock the meta file so it should be
+ * locked by caller if race condition may occur when using this block iterator.
+ *
+ * @param fptr File pointer of the meta file to be iterated.
+ *
+ */
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 {
 	FILE_BLOCK_ITERATOR *iter;

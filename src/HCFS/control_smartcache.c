@@ -298,7 +298,8 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 		errcode = ret;
 		goto errcode_handle;
 	}
-	/* TODO: check if hcfs_restore exist */
+	/* TODO: check if hcfs_restore exist. It should be remove at the
+	 * begining of restoration stage 1 */
 	ret = dir_add_entry(data_smart_root, tmp_ino,
 			RESTORED_SMARTCACHE_TMP_NAME,
 			tmp_header.st.mode, body_ptr, FALSE);

@@ -49,7 +49,7 @@ typedef struct {
 } RESTORED_SMARTCACHE_DATA;
 
 RESTORED_SMARTCACHE_DATA *sc_data;
-ino_t restored_smartcache_ino;
+ino_t restored_smartcache_ino; /* If this inode is 0, it means no smartcache */
 ino_t restored_datadata_ino;
 int64_t origin_hard_limit;
 int64_t origin_meta_limit;

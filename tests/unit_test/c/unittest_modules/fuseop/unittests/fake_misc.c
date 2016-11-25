@@ -1206,3 +1206,13 @@ int32_t backup_package_list(void)
 {
 	return 0;
 }
+
+int32_t restore_stage1_reduce_cache(void)
+{
+	return 0;
+}
+
+void start_download_minimal(void)
+{
+	return;
+}

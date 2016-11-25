@@ -2758,7 +2758,7 @@ int32_t run_download_minimal(void)
 			ret = mount_and_repair_restored_smartcache();
 			if (ret < 0) {
 				if (ret == -ECANCELED) {
-					write_log(0, "Error: Fail to repair"
+					write_log(0, "Error: Fail to repair "
 						"and mount smartcache to now"
 						" system. Code %d", -ret);
 					errcode = ret;
@@ -2770,8 +2770,8 @@ int32_t run_download_minimal(void)
 					DIR_ENTRY hcfsblock_entry;
 
 					/* In case smart cache is corrupted
-					 * and cannot be recover, discard it
-					 * and remove hcfsblock from
+					 * and cannot be recovered, just
+					 * discard it and remove hcfsblock from
 					 * /data/smartcache/. */
 					extract_restored_smartcache(
 						restored_smartcache_ino);
