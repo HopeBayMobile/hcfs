@@ -58,8 +58,6 @@ int32_t init_notify_buf(void)
 	do {
 		if (sem_init(&notify.not_empty, 1, 0) == -1)
 			break;
-		if (sem_init(&notify.not_full, 1, 0) == -1)
-			break;
 		if (sem_init(&notify.access_sem, 1, 1) == -1)
 			break;
 
@@ -95,11 +93,47 @@ void destory_notify_buf(void)
 	notify.len = 0;
 	sem_destroy(&notify.access_sem);
 	sem_destroy(&notify.not_empty);
-	sem_destroy(&notify.not_full);
 
 	write_log(10, "Debug %s: Done\n", __func__);
 }
 
+/*
+ * Enqueue notify data to an extra linked list. It's called when ring
+ * buffer is full.
+ */
+int32_t _ll_enqueue(const void *const data)
+{
+	FUSE_NOTIFY_LL *node = malloc(sizeof(FUSE_NOTIFY_LL));
+
+	if (node == NULL)
+		return -1;
+	node->data = malloc(FUSE_NOTIFY_ENTRY_SIZE);
+	if (node->data == NULL) {
+		FREE(node);
+		return -1;
+	}
+
+	/* Fill data */
+	node->next = NULL;
+	memcpy(node->data, data, FUSE_NOTIFY_ENTRY_SIZE);
+
+	/* Chain ndoe */
+	if (notify.extend_ll_head == NULL) {
+		notify.extend_ll_head = node;
+		notify.extend_ll_rear = node;
+	} else {
+		notify.extend_ll_rear->next = node;
+		notify.extend_ll_rear = node;
+	}
+
+	return 0;
+}
+int32_t _rb_enqueue(const void *const data)
+{
+	inc_buf_idx(&notify.in);
+	memcpy(&notify.ring_buf[notify.in], data, FUSE_NOTIFY_ENTRY_SIZE);
+	return 0;
+}
 /* @param notify: A pointer of data to be added into notify queue
  *
  * @return zero for success, -errno for failure
@@ -108,41 +142,64 @@ int32_t notify_buf_enqueue(const void *const data)
 {
 	int32_t ret = -1;
 
-	while (TRUE) {
-		if (hcfs_system->system_going_down == TRUE)
-			break;
-		/* Fuse has multiple threads. Enqueue need to be thread safe */
+	errno = 0;
+	while (hcfs_system->system_going_down == FALSE) {
 		sem_wait(&notify.access_sem);
 
-		if (notify.len == FUSE_NOTIFY_RINGBUF_SIZE) {
-			sem_post(&notify.access_sem);
-			sem_wait(&notify.not_full);
-			continue;
-		}
-
-		inc_buf_idx(&notify.in);
-		memcpy(&notify.ring_buf[notify.in], data,
-		       FUSE_NOTIFY_ENTRY_SIZE);
+		/* Fuse has multiple threads. Enqueue need to be thread safe */
+		ret = (notify.len >= FUSE_NOTIFY_RINGBUF_SIZE)
+			  ? _ll_enqueue(data)
+			  : _rb_enqueue(data);
+		if (ret < 0)
+			break;
 		notify.len++;
-
-		sem_post(&notify.access_sem);
-
-		ret = 0;
-		write_log(10, "Debug %s: Add %lu\n", __func__, notify.in);
 
 		/* wake notify thread up */
 		if (notify.len == 1)
 			sem_post(&notify.not_empty);
+
+		write_log(10, "Debug %s: Add %lu\n", __func__, notify.in);
+		ret = 0;
 		break;
 	};
+	sem_post(&notify.access_sem);
 
 	if (ret < 0)
-		write_log(1, "Error %s: Failed. %s\n", __func__,
-			  strerror(-ret));
-
+		write_log(0, "Error %s: Failed. %s\n", __func__,
+			  errno ? strerror(errno) : "");
 	return ret;
 }
 
+FUSE_NOTIFY_PROTO *_ll_dequeue(void)
+{
+	FUSE_NOTIFY_LL *node;
+	FUSE_NOTIFY_PROTO *data = NULL;
+
+	if (notify.extend_ll_head == NULL)
+		return NULL;
+
+	node = notify.extend_ll_head;
+	notify.extend_ll_head = notify.extend_ll_head->next;
+	if (notify.extend_ll_head == NULL)
+		notify.extend_ll_rear = NULL;
+
+	data = node->data;
+	FREE(node);
+	return data;
+}
+FUSE_NOTIFY_PROTO *_rb_dequeue(void)
+{
+	FUSE_NOTIFY_PROTO *data = NULL;
+
+	data = malloc(FUSE_NOTIFY_ENTRY_SIZE);
+	if (data == NULL)
+		return NULL;
+
+	memcpy(data, &notify.ring_buf[notify.out], FUSE_NOTIFY_ENTRY_SIZE);
+	write_log(10, "Debug %s: Get %lu\n", __func__, notify.out);
+	inc_buf_idx(&notify.out);
+	return data;
+}
 /* Dequeue the notify ring buffer
  *
  * @return Pointer on success, NULL on fail with errno set.
@@ -152,29 +209,30 @@ FUSE_NOTIFY_PROTO *notify_buf_dequeue()
 	FUSE_NOTIFY_PROTO *data = NULL;
 
 	errno = 0;
-	while (TRUE) {
-		if (hcfs_system->system_going_down == TRUE)
-			break;
+	while (hcfs_system->system_going_down == FALSE) {
+		sem_wait(&notify.access_sem);
 		if (notify.len == 0) {
+			sem_post(&notify.access_sem);
 			sem_wait(&notify.not_empty);
 			continue;
 		}
 
-		data = malloc(FUSE_NOTIFY_ENTRY_SIZE);
+		data = _rb_dequeue();
 		if (data == NULL)
 			break;
-
-		memcpy(data, &notify.ring_buf[notify.out],
-		       FUSE_NOTIFY_ENTRY_SIZE);
-		write_log(10, "Debug %s: Get %lu\n", __func__, notify.out);
-		inc_buf_idx(&notify.out);
 		notify.len--;
 
-		/* wake fuse IO thread up */
-		if (notify.len == (FUSE_NOTIFY_RINGBUF_SIZE - 1))
-			sem_post(&notify.not_full);
+		/* Try to move one notify from linked list to ring buffer */
+		if (notify.len < FUSE_NOTIFY_RINGBUF_SIZE) {
+			FUSE_NOTIFY_PROTO *tmp_notify = _ll_dequeue();
+
+			if (tmp_notify != NULL)
+				_rb_enqueue(tmp_notify);
+			FREE(tmp_notify);
+		}
 		break;
 	}
+	sem_post(&notify.access_sem);
 
 	return data;
 }
@@ -249,7 +307,7 @@ void *hfuse_ll_notify_loop(void *ptr)
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 		if (data != NULL) {
-			func_num = ((FUSE_NOTIFY_PROTO *)data)->func;
+			func_num = data->func;
 			notify_fn[func_num](data, RUN);
 			write_log(10, "Debug %s: Notification is sent.\n",
 				  __func__);

@@ -35,22 +35,23 @@ extern fuse_notify_fn *notify_fn[];
  * Helper functions
  */
 
-uint8_t data[20][FUSE_NOTIFY_ENTRY_SIZE];
-int32_t ut_enqueue_call = 0;
+uint8_t saved_notify[20][FUSE_NOTIFY_ENTRY_SIZE];
+int32_t ut_enqueue_call;
 int32_t ut_enqueue(size_t n)
 {
 	size_t i, in = 0;
 	static size_t seq = __LINE__;
 	int32_t ret, write_log_hide_orgin = write_log_hide;
+	FUSE_NOTIFY_PROTO *data;
 
 	if (n > 50)
 		write_log_hide = 10;
 	for (i = 0; i < n; i++) {
 		printf("Fill with %lu\n", seq);
-		memset(&data[ut_enqueue_call % 20], seq,
-		       FUSE_NOTIFY_ENTRY_SIZE);
-		((FUSE_NOTIFY_PROTO *)&data[ut_enqueue_call % 20])->func = NOOP;
-		ret = notify_buf_enqueue((void *)&data[ut_enqueue_call % 20]);
+		data = (FUSE_NOTIFY_PROTO *)saved_notify[ut_enqueue_call % 20];
+		memset(data, seq, FUSE_NOTIFY_ENTRY_SIZE);
+		data->func = NOOP;
+		ret = notify_buf_enqueue(data);
 		in = notify.in + 1;
 		if (in == FUSE_NOTIFY_RINGBUF_SIZE)
 			in = 0;
@@ -87,7 +88,7 @@ void reset_unittest_env(void)
 	}
 	hcfs_system->system_going_down = FALSE;
 	memset(&notify, 0, sizeof(FUES_NOTIFY_SHARED_DATA));
-	memset(&data, 0, sizeof(data));
+	memset(&saved_notify, 0, sizeof(saved_notify));
 }
 
 /*
@@ -142,13 +143,6 @@ TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_2)
 	EXPECT_LT(init_notify_buf(), 0);
 }
 
-TEST_F(NotifyBufferSetUpAndTearDown, InitFail_InitSemFail_3)
-{
-
-	sem_init_error_on = 3;
-	EXPECT_LT(init_notify_buf(), 0);
-}
-
 TEST_F(NotifyBufferSetUpAndTearDown, DestroyBufSuccess)
 {
 	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
@@ -195,7 +189,8 @@ class NotifyBuffer_Initialized : public ::testing::Test
 TEST_F(NotifyBuffer_Initialized, Enqueue)
 {
 	ut_enqueue(1);
-	EXPECT_EQ(0, memcmp(data, notify.ring_buf, FUSE_NOTIFY_ENTRY_SIZE));
+	EXPECT_EQ(0,
+		  memcmp(saved_notify[0], notify.ring_buf[0], FUSE_NOTIFY_ENTRY_SIZE));
 }
 
 TEST_F(NotifyBuffer_Initialized, Dequeue)
@@ -207,17 +202,6 @@ TEST_F(NotifyBuffer_Initialized, Dequeue)
 	ASSERT_NE(0, (d != NULL));
 	EXPECT_EQ(0, memcmp(d, notify.ring_buf, FUSE_NOTIFY_ENTRY_SIZE));
 	free(d);
-}
-TEST_F(NotifyBuffer_Initialized, DequeueOnFullWillPostNotFull)
-{
-	FUSE_NOTIFY_PROTO *d = NULL;
-	int32_t not_full;
-
-	ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE);
-	d = notify_buf_dequeue();
-	free(d);
-	sem_getvalue(&notify.not_full, &not_full);
-	EXPECT_EQ(not_full, 1);
 }
 
 TEST_F(NotifyBuffer_Initialized, DequeueMallocFail) {
@@ -265,10 +249,14 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop)
 
 TEST_F(NotifyBuffer_Initialized, destoryLoop_SemPostFail)
 {
+	struct timespec wait = {0, 1000000};
 	init_hfuse_ll_notify_loop();
 	hcfs_system->system_going_down = TRUE;
-	sem_post_error_on = 1;
+	nanosleep(&wait, NULL);
+
+	sem_post_call_count = 0;
 	sem_post_errno = 123;
+	sem_post_error_on = 1;
 	ASSERT_EQ(destory_hfuse_ll_notify_loop(), -123);
 	sem_post_error_on = -1;
 	destory_hfuse_ll_notify_loop();
@@ -330,24 +318,24 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
 {
-	FUSE_NOTIFY_PROTO *data =
+	FUSE_NOTIFY_PROTO *this_data =
 	    (FUSE_NOTIFY_PROTO *)calloc(1, FUSE_NOTIFY_ENTRY_SIZE);
-	((FUSE_NOTIFY_DELETE_DATA *)data)->func = DELETE;
-	((FUSE_NOTIFY_DELETE_DATA *)data)->name = (char *)malloc(1);
-	_do_hfuse_ll_notify_delete(data, RUN);
-	free(data);
+	((FUSE_NOTIFY_DELETE_DATA *)this_data)->func = DELETE;
+	((FUSE_NOTIFY_DELETE_DATA *)this_data)->name = (char *)malloc(1);
+	_do_hfuse_ll_notify_delete(this_data, RUN);
+	free(this_data);
 	EXPECT_EQ(fuse_lowlevel_notify_delete_call_count, 1);
 }
 
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN_Fail)
 {
-	FUSE_NOTIFY_PROTO *data =
+	FUSE_NOTIFY_PROTO *this_data =
 	    (FUSE_NOTIFY_PROTO *)calloc(1, FUSE_NOTIFY_ENTRY_SIZE);
-	((FUSE_NOTIFY_DELETE_DATA *)data)->func = DELETE;
-	((FUSE_NOTIFY_DELETE_DATA *)data)->name = (char *)malloc(1);
+	((FUSE_NOTIFY_DELETE_DATA *)this_data)->func = DELETE;
+	((FUSE_NOTIFY_DELETE_DATA *)this_data)->name = (char *)malloc(1);
 	fuse_lowlevel_notify_delete_error_on = 1;
-	EXPECT_EQ(_do_hfuse_ll_notify_delete(data, RUN), 0);
-	free(data);
+	EXPECT_EQ(_do_hfuse_ll_notify_delete(this_data, RUN), 0);
+	free(this_data);
 }
 
 TEST_F(NotifyBuffer_Initialized, notify_delete)
@@ -435,46 +423,38 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_SkipAll)
 	EXPECT_EQ(notify.len, 0);
 }
 
-void *unblock_queue_full(void *)
-{
-	struct timespec wait1ms = {0, 1000000};
-	struct timespec wait100ms = {0, 100000000};
-
-	pthread_detach(pthread_self());
-	while (notify.len != FUSE_NOTIFY_RINGBUF_SIZE)
-		nanosleep(&wait1ms, NULL);
-	nanosleep(&wait100ms, NULL);
-	hcfs_system->system_going_down = TRUE;
-	sem_post(&notify.not_full);
-
-	return NULL;
-}
-
-TEST_F(NotifyBuffer_Initialized, notify_delete_mp_BufferOverflow)
+TEST_F(NotifyBuffer_Initialized, notify_delete_mp_OverflowRingBuffer)
 {
 	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
 	struct fuse_chan *fake_mp = (struct fuse_chan *)malloc(1);
 	char *name = strdup("a");
 	int32_t i;
 	int32_t ret;
-	pthread_t t;
+	FUSE_NOTIFY_LL *node, *next_node;
 
 	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	write_log_hide = 10;
-	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE / MP_TYPE_NUM; i++) {
+	for (i = 0; i < 10000; i++) {
 		ret = hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 		EXPECT_EQ(ret, 0);
 	}
 	write_log_hide = 11;
-	pthread_create(&t, NULL, unblock_queue_full, NULL);
-	EXPECT_EQ(hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name), -1);
-	EXPECT_EQ(notify.len, FUSE_NOTIFY_RINGBUF_SIZE);
+	printf("notify.len %lu\n", notify.len);
+	EXPECT_EQ(notify.len, 10000 * MP_TYPE_NUM);
 	free(ch);
 	free(name);
 	free(fake_mp);
 	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE; i++)
 		free(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
+	node = notify.extend_ll_head;
+	while (node != NULL) {
+		next_node = node->next;
+		FREE(((FUSE_NOTIFY_DELETE_DATA *)node->data)->name);
+		FREE(node->data);
+		FREE(node);
+		node = next_node;
+	}
 }
 
 TEST_F(NotifyBuffer_Initialized, notify_delete_mp_DiffCaseNameTriggerAllNotify)

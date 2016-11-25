@@ -44,21 +44,21 @@ typedef struct {
 
 /* Ring Buffer */
 
-typedef struct FUSE_NOTIFY_LL {
-	FUSE_NOTIFY_PROTO *proto;
-	struct FUSE_NOTIFY_LL *next;
+#define FUSE_NOTIFY_ENTRY_SIZE sizeof(FUSE_NOTIFY_DELETE_DATA)
 
+typedef struct FUSE_NOTIFY_LL {
+	void *data;
+	struct FUSE_NOTIFY_LL *next;
 } FUSE_NOTIFY_LL;
 
-#define FUSE_NOTIFY_ENTRY_SIZE sizeof(FUSE_NOTIFY_DELETE_DATA)
 typedef struct {
 	uint8_t ring_buf[FUSE_NOTIFY_RINGBUF_SIZE][FUSE_NOTIFY_ENTRY_SIZE];
-	FUSE_NOTIFY_PROTO *extend_queue;
+	FUSE_NOTIFY_LL *extend_ll_head;
+	FUSE_NOTIFY_LL *extend_ll_rear;
 	size_t len;
 	size_t in;
 	size_t out;
 	sem_t not_empty;
-	sem_t not_full;
 	sem_t access_sem;
 } FUES_NOTIFY_SHARED_DATA;
 
