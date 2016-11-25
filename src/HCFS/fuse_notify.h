@@ -17,24 +17,14 @@
 #include "macro.h"
 #include "mount_manager.h"
 
-#define FUSE_NOTIFY_RINGBUF_SIZE 1024
+#define FUSE_NOTIFY_RINGBUF_MAXLEN 1024
 
-enum NOTIFY_FUNCTION { NOOP, DELETE };
-enum NOTIFY_ACTION { RUN, DESTROY_BUF };
-
-/* Ring Buffer elements */
-
-/* Data chunk */
-
-/* Common header among data chunks */
-#define FUSE_NOTIFY_PROTO_MEMBER enum NOTIFY_FUNCTION func;
-typedef struct {
-	FUSE_NOTIFY_PROTO_MEMBER
-} _PACKED FUSE_NOTIFY_PROTO;
+typedef enum NOTIFY_FUNCTION { NOOP, DELETE } NOTIFY_FUNCTION;
+typedef enum NOTIFY_ACTION { RUN, DESTROY_BUF } NOTIFY_ACTION;
 
 /* Actual notify data defenitions */
 typedef struct {
-	FUSE_NOTIFY_PROTO_MEMBER
+	NOTIFY_FUNCTION func;
 	struct fuse_chan *ch;
 	fuse_ino_t parent;
 	fuse_ino_t child;
@@ -45,16 +35,23 @@ typedef struct {
 /* Ring Buffer */
 
 #define FUSE_NOTIFY_ENTRY_SIZE sizeof(FUSE_NOTIFY_DELETE_DATA)
+/*
+ * Prototype struct of FUSE_NOTIFY. It's size must equal to largest struct
+ */
+typedef struct {
+	NOTIFY_FUNCTION func;
+	uint8_t _[FUSE_NOTIFY_ENTRY_SIZE - sizeof(NOTIFY_FUNCTION)];
+} _PACKED FUSE_NOTIFY_PROTO;
 
-typedef struct FUSE_NOTIFY_LL {
+typedef struct FUSE_NOTIFY_LINKED_NODE {
 	void *data;
-	struct FUSE_NOTIFY_LL *next;
-} FUSE_NOTIFY_LL;
+	struct FUSE_NOTIFY_LINKED_NODE *next;
+} FUSE_NOTIFY_LINKED_NODE;
 
 typedef struct {
-	uint8_t ring_buf[FUSE_NOTIFY_RINGBUF_SIZE][FUSE_NOTIFY_ENTRY_SIZE];
-	FUSE_NOTIFY_LL *extend_ll_head;
-	FUSE_NOTIFY_LL *extend_ll_rear;
+	FUSE_NOTIFY_PROTO ring_buf[FUSE_NOTIFY_RINGBUF_MAXLEN];
+	FUSE_NOTIFY_LINKED_NODE *linked_list_head;
+	FUSE_NOTIFY_LINKED_NODE *linked_list_rear;
 	size_t len;
 	size_t in;
 	size_t out;

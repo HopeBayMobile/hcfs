@@ -35,7 +35,7 @@ extern fuse_notify_fn *notify_fn[];
  * Helper functions
  */
 
-uint8_t saved_notify[20][FUSE_NOTIFY_ENTRY_SIZE];
+FUSE_NOTIFY_PROTO saved_notify[20];
 int32_t ut_enqueue_call;
 int32_t ut_enqueue(size_t n)
 {
@@ -48,12 +48,12 @@ int32_t ut_enqueue(size_t n)
 		write_log_hide = 10;
 	for (i = 0; i < n; i++) {
 		write_log(11, "notify.len %lu\n", notify.len);
-		data = (FUSE_NOTIFY_PROTO *)saved_notify[ut_enqueue_call % 20];
+		data = &saved_notify[ut_enqueue_call % 20];
 		memset(data, fake_data, FUSE_NOTIFY_ENTRY_SIZE);
 		data->func = NOOP;
 		ret = notify_buf_enqueue(data);
 		in = notify.in + 1;
-		if (in == FUSE_NOTIFY_RINGBUF_SIZE)
+		if (in == FUSE_NOTIFY_RINGBUF_MAXLEN)
 			in = 0;
 		ut_enqueue_call++;
 		fake_data++;
@@ -68,7 +68,7 @@ void ut_dequeue(int32_t n)
 	int32_t i;
 	for (i = 0; i < n; i++) {
 		d = notify_buf_dequeue();
-		free(d);
+		FREE(d);
 	}
 }
 
@@ -165,9 +165,10 @@ TEST_F(NotifyBufferSetUpAndTearDown, DestroyBufSuccess)
 		name3 = ((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name;
 		EXPECT_NE(0, (name3 == NULL));
 	}
-	free(ch);
-	free(name);
-	free(name2);
+	FREE(ch);
+	FREE(name);
+	FREE(name2);
+	FREE(fake_mp);
 }
 
 class NotifyBuffer_Initialized : public ::testing::Test
@@ -190,7 +191,7 @@ TEST_F(NotifyBuffer_Initialized, Enqueue)
 {
 	ut_enqueue(1);
 	EXPECT_EQ(0,
-		  memcmp(saved_notify[0], notify.ring_buf[0], FUSE_NOTIFY_ENTRY_SIZE));
+		  memcmp(&saved_notify[0], &notify.ring_buf[0], sizeof(FUSE_NOTIFY_PROTO)));
 }
 
 TEST_F(NotifyBuffer_Initialized, EnqueueToLinkedListFailToAllocateNode)
@@ -200,14 +201,14 @@ TEST_F(NotifyBuffer_Initialized, EnqueueToLinkedListFailToAllocateNode)
 	uint8_t *d = NULL;
 
 	malloc_error_on = 1;
-	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE+1), -1);
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_MAXLEN+1), -1);
 	write_log_hide = 2;
-	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE; i++) {
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_MAXLEN; i++) {
 		d = (uint8_t*)notify_buf_dequeue();
 		ASSERT_EQ(1, (d != NULL));
 		/* use d[offset] to skip func field */
 		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
-		free(d);
+		FREE(d);
 		fake_data++;
 	}
 }
@@ -218,14 +219,14 @@ TEST_F(NotifyBuffer_Initialized, EnqueueToLinkedListFailToAllocateData)
 	uint8_t *d = NULL;
 
 	malloc_error_on = 2;
-	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE+1), -1);
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_MAXLEN+1), -1);
 	write_log_hide = 2;
-	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE; i++) {
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_MAXLEN; i++) {
 		d = (uint8_t*)notify_buf_dequeue();
 		ASSERT_EQ(1, (d != NULL));
 		/* use d[offset] to skip func field */
 		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
-		free(d);
+		FREE(d);
 		fake_data++;
 	}
 }
@@ -238,7 +239,7 @@ TEST_F(NotifyBuffer_Initialized, Dequeue)
 	d = notify_buf_dequeue();
 	ASSERT_NE(0, (d != NULL));
 	EXPECT_EQ(0, memcmp(d, notify.ring_buf, FUSE_NOTIFY_ENTRY_SIZE));
-	free(d);
+	FREE(d);
 }
 
 TEST_F(NotifyBuffer_Initialized, DequeueLinkedList)
@@ -247,14 +248,14 @@ TEST_F(NotifyBuffer_Initialized, DequeueLinkedList)
 	uint8_t fake_data = 0;
 	uint8_t *d = NULL;
 
-	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_SIZE * 2), 0);
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_MAXLEN * 2), 0);
 	write_log_hide = 2;
-	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE * 2; i++) {
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_MAXLEN * 2; i++) {
 		d = (uint8_t*)notify_buf_dequeue();
 		ASSERT_EQ(1, (d != NULL));
 		/* use d[offset] to skip func field */
 		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
-		free(d);
+		FREE(d);
 		fake_data++;
 	}
 }
@@ -378,7 +379,7 @@ TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->func = DELETE;
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->name = (char *)malloc(1);
 	_do_hfuse_ll_notify_delete(this_data, RUN);
-	free(this_data);
+	FREE(this_data);
 	EXPECT_EQ(fuse_lowlevel_notify_delete_call_count, 1);
 }
 
@@ -390,7 +391,7 @@ TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN_Fail)
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->name = (char *)malloc(1);
 	fuse_lowlevel_notify_delete_error_on = 1;
 	EXPECT_EQ(_do_hfuse_ll_notify_delete(this_data, RUN), 0);
-	free(this_data);
+	FREE(this_data);
 }
 
 TEST_F(NotifyBuffer_Initialized, notify_delete)
@@ -398,9 +399,9 @@ TEST_F(NotifyBuffer_Initialized, notify_delete)
 	struct fuse_chan *ch = (struct fuse_chan *)malloc(1);
 	char *name = strdup("a");
 	hfuse_ll_notify_delete(ch, 0, 0, name, 1);
-	free(ch);
-	free(name);
-	free(((FUSE_NOTIFY_DELETE_DATA*)&notify.ring_buf[0])->name);
+	FREE(ch);
+	FREE(name);
+	FREE(((FUSE_NOTIFY_DELETE_DATA*)&notify.ring_buf[0])->name);
 	EXPECT_EQ(notify.len, 1);
 }
 
@@ -411,8 +412,8 @@ TEST_F(NotifyBuffer_Initialized, notify_deleteFail_SystemShutdownFail)
 	int32_t ret;
 	hcfs_system->system_going_down = TRUE;
 	ret = hfuse_ll_notify_delete(ch, 0, 0, name, 1);
-	free(ch);
-	free(name);
+	FREE(ch);
+	FREE(name);
 	EXPECT_EQ(notify.len, 0);
 	EXPECT_EQ(ret, -1);
 }
@@ -423,8 +424,8 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_StrndupFail)
 	char *name = strdup("a");
 	strndup_error_on = 1;
 	EXPECT_LT(hfuse_ll_notify_delete(ch, 0, 0, name, 1), 0);
-	free(ch);
-	free(name);
+	FREE(ch);
+	FREE(name);
 	EXPECT_EQ(notify.len, 0);
 }
 
@@ -439,11 +440,11 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_Normal)
 	for (i = 2; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
-	free(ch);
-	free(name);
-	free(fake_mp);
+	FREE(ch);
+	FREE(name);
+	FREE(fake_mp);
 	for (i = 0; i < MP_TYPE_NUM - 1; i++)
-		free(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
+		FREE(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
 	EXPECT_EQ(notify.len, 2);
 }
 
@@ -457,11 +458,11 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_FakeAll)
 	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
-	free(ch);
-	free(name);
-	free(fake_mp);
+	FREE(ch);
+	FREE(name);
+	FREE(fake_mp);
 	for (i = 0; i < MP_TYPE_NUM; i++)
-		free(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
+		FREE(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
 	EXPECT_EQ(notify.len, 3);
 }
 TEST_F(NotifyBuffer_Initialized, notify_delete_mp_SkipAll)
@@ -473,8 +474,8 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_SkipAll)
 	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = NULL;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
-	free(ch);
-	free(name);
+	FREE(ch);
+	FREE(name);
 	EXPECT_EQ(notify.len, 0);
 }
 
@@ -485,7 +486,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_OverflowRingBuffer)
 	char *name = strdup("a");
 	int32_t i;
 	int32_t ret;
-	FUSE_NOTIFY_LL *node, *next_node;
+	FUSE_NOTIFY_LINKED_NODE *node, *next_node;
 
 	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
@@ -496,12 +497,12 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_OverflowRingBuffer)
 	}
 	write_log(5, "notify.len %lu\n", notify.len);
 	EXPECT_EQ(notify.len, 10000 * MP_TYPE_NUM);
-	free(ch);
-	free(name);
-	free(fake_mp);
-	for (i = 0; i < FUSE_NOTIFY_RINGBUF_SIZE; i++)
-		free(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
-	node = notify.extend_ll_head;
+	FREE(ch);
+	FREE(name);
+	FREE(fake_mp);
+	for (i = 0; i < FUSE_NOTIFY_RINGBUF_MAXLEN; i++)
+		FREE(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
+	node = notify.linked_list_head;
 	while (node != NULL) {
 		next_node = node->next;
 		FREE(((FUSE_NOTIFY_DELETE_DATA *)node->data)->name);
@@ -523,11 +524,12 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_DiffCaseNameTriggerAllNotify)
 	for (i = 2; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
 	hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name2);
-	free(ch);
-	free(name);
-	free(name2);
+	FREE(ch);
+	FREE(name);
+	FREE(name2);
+	FREE(fake_mp);
 	for (i = 0; i < MP_TYPE_NUM; i++)
-		free(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
+		FREE(((FUSE_NOTIFY_DELETE_DATA *)&notify.ring_buf[i])->name);
 	EXPECT_EQ(notify.len, 3);
 }
 
@@ -543,7 +545,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_Fail)
 		mount_global.ch[i] = fake_mp;
 	strndup_error_on = 1;
 	EXPECT_EQ(-ENOMEM, hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name));
-	free(ch);
-	free(name);
-	free(fake_mp);
+	FREE(ch);
+	FREE(name);
+	FREE(fake_mp);
 }

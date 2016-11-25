@@ -38,7 +38,7 @@ fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
 static inline void inc_buf_idx(size_t *x)
 {
 	(*x)++;
-	if ((*x) == FUSE_NOTIFY_RINGBUF_SIZE)
+	if ((*x) == FUSE_NOTIFY_RINGBUF_MAXLEN)
 		(*x) = 0;
 }
 
@@ -52,7 +52,8 @@ int32_t init_notify_buf(void)
 
 	errno = 0;
 	memset(&notify, 0, sizeof(FUES_NOTIFY_SHARED_DATA));
-	notify.in = FUSE_NOTIFY_RINGBUF_SIZE - 1;
+	notify.in = FUSE_NOTIFY_RINGBUF_MAXLEN - 1;
+	/* notify.in will be 0 at first enqueue */
 	notify.out = 0;
 	notify.len = 0;
 	do {
@@ -63,7 +64,6 @@ int32_t init_notify_buf(void)
 
 		write_log(10, "Debug %s: Succeed.\n", __func__);
 		ret = 0;
-		break;
 	} while (0);
 
 	if (ret < 0) {
@@ -83,14 +83,11 @@ void destory_notify_buf(void)
 	idx = notify.out;
 	/* Free member in notify data */
 	for (len = 1; len <= notify.len; len++) {
-		proto = (FUSE_NOTIFY_PROTO *)notify.ring_buf[idx];
+		proto = &notify.ring_buf[idx];
 		notify_fn[proto->func](proto, DESTROY_BUF);
 		inc_buf_idx(&idx);
 	}
 
-	notify.in = 0;
-	notify.out = 0;
-	notify.len = 0;
 	sem_destroy(&notify.access_sem);
 	sem_destroy(&notify.not_empty);
 
@@ -101,9 +98,9 @@ void destory_notify_buf(void)
  * Enqueue notify data to an extra linked list. It's called when ring
  * buffer is full.
  */
-int32_t _ll_enqueue(const void *const data)
+int32_t _linked_list_enqueue(const void *const data)
 {
-	FUSE_NOTIFY_LL *node = malloc(sizeof(FUSE_NOTIFY_LL));
+	FUSE_NOTIFY_LINKED_NODE *node = malloc(sizeof(FUSE_NOTIFY_LINKED_NODE));
 
 	if (node == NULL)
 		return -1;
@@ -118,17 +115,17 @@ int32_t _ll_enqueue(const void *const data)
 	memcpy(node->data, data, FUSE_NOTIFY_ENTRY_SIZE);
 
 	/* Chain ndoe */
-	if (notify.extend_ll_head == NULL) {
-		notify.extend_ll_head = node;
-		notify.extend_ll_rear = node;
+	if (notify.linked_list_head == NULL) {
+		notify.linked_list_head = node;
+		notify.linked_list_rear = node;
 	} else {
-		notify.extend_ll_rear->next = node;
-		notify.extend_ll_rear = node;
+		notify.linked_list_rear->next = node;
+		notify.linked_list_rear = node;
 	}
 
 	return 0;
 }
-int32_t _rb_enqueue(const void *const data)
+int32_t _ring_buffer_enqueue(const void *const data)
 {
 	inc_buf_idx(&notify.in);
 	memcpy(&notify.ring_buf[notify.in], data, FUSE_NOTIFY_ENTRY_SIZE);
@@ -147,9 +144,9 @@ int32_t notify_buf_enqueue(const void *const data)
 		sem_wait(&notify.access_sem);
 
 		/* Fuse has multiple threads. Enqueue need to be thread safe */
-		ret = (notify.len >= FUSE_NOTIFY_RINGBUF_SIZE)
-			  ? _ll_enqueue(data)
-			  : _rb_enqueue(data);
+		ret = (notify.len >= FUSE_NOTIFY_RINGBUF_MAXLEN)
+			  ? _linked_list_enqueue(data)
+			  : _ring_buffer_enqueue(data);
 		if (ret < 0)
 			break;
 		notify.len++;
@@ -161,7 +158,7 @@ int32_t notify_buf_enqueue(const void *const data)
 		write_log(10, "Debug %s: Add %lu\n", __func__, notify.in);
 		ret = 0;
 		break;
-	};
+	}
 	sem_post(&notify.access_sem);
 
 	if (ret < 0)
@@ -170,24 +167,24 @@ int32_t notify_buf_enqueue(const void *const data)
 	return ret;
 }
 
-FUSE_NOTIFY_PROTO *_ll_dequeue(void)
+FUSE_NOTIFY_PROTO *_linked_list_dequeue(void)
 {
-	FUSE_NOTIFY_LL *node;
+	FUSE_NOTIFY_LINKED_NODE *node;
 	FUSE_NOTIFY_PROTO *data = NULL;
 
-	if (notify.extend_ll_head == NULL)
+	if (notify.linked_list_head == NULL)
 		return NULL;
 
-	node = notify.extend_ll_head;
-	notify.extend_ll_head = notify.extend_ll_head->next;
-	if (notify.extend_ll_head == NULL)
-		notify.extend_ll_rear = NULL;
+	node = notify.linked_list_head;
+	notify.linked_list_head = notify.linked_list_head->next;
+	if (notify.linked_list_head == NULL)
+		notify.linked_list_rear = NULL;
 
 	data = node->data;
 	FREE(node);
 	return data;
 }
-FUSE_NOTIFY_PROTO *_rb_dequeue(void)
+FUSE_NOTIFY_PROTO *_ring_buffer_dequeue(void)
 {
 	FUSE_NOTIFY_PROTO *data = NULL;
 
@@ -217,17 +214,17 @@ FUSE_NOTIFY_PROTO *notify_buf_dequeue()
 			continue;
 		}
 
-		data = _rb_dequeue();
+		data = _ring_buffer_dequeue();
 		if (data == NULL)
 			break;
 		notify.len--;
 
 		/* Try to move one notify from linked list to ring buffer */
-		if (notify.len < FUSE_NOTIFY_RINGBUF_SIZE) {
-			FUSE_NOTIFY_PROTO *tmp_notify = _ll_dequeue();
+		if (notify.len < FUSE_NOTIFY_RINGBUF_MAXLEN) {
+			FUSE_NOTIFY_PROTO *tmp_notify = _linked_list_dequeue();
 
 			if (tmp_notify != NULL)
-				_rb_enqueue(tmp_notify);
+				_ring_buffer_enqueue(tmp_notify);
 			FREE(tmp_notify);
 		}
 		break;
