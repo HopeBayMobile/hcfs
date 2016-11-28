@@ -1533,12 +1533,15 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 					now_entry, sizeof(DIR_ENTRY));
 				list_counter++;
 				if (list_counter >= list_size) {
+					DIR_ENTRY *tmp;
 					list_size += 20;
-					removed_list = realloc(removed_list,
-						list_size);
-					if (removed_list == NULL) {
+					tmp = realloc(removed_list,
+					              list_size);
+					if (tmp == NULL) {
 						errcode = -errno;
 						goto errcode_handle;
+					} else {
+						removed_list = tmp;
 					}
 				}
 			} else {
