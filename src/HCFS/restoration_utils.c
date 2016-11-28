@@ -285,6 +285,12 @@ int32_t init_package_uid_list(char *plistpath)
 		goto errcode_handle;
 	}
 
+	if (!pkg_cnt) {
+		write_log(0,
+		          "Malformed content retrieved from package list.\n");
+		goto errcode_handle;
+	}
+
 	/* Build & sort array */
 	restore_pkg_info.sarray =
 	    (PKG_NODE **)malloc(pkg_cnt * sizeof(PKG_NODE *));
