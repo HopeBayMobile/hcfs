@@ -34,6 +34,7 @@
 #include "path_reconstruct.h"
 #endif
 #include "rebuild_super_block.h"
+#include "metaops.h"
 
 MOUNT_T_GLOBAL mount_global = {{0}};
 
@@ -793,17 +794,22 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	}
 
 	if (strncmp(mp, "/data/data", strlen("data/data")) == 0) {
+		DIR_ENTRY dentry;
+
+		/* Record root inode and check if mgmt app folder is created. */
 		data_data_root = new_info->f_ino;
 		write_log(10, "Debug mount: root of /data/data is %" PRIu64
 		          "\n", (uint64_t) data_data_root);
-		if (access("/data/data/com.hopebaytech.hcfsmgmt", F_OK) == 0) {
+		ret = lookup_dir(data_data_root, "com.hopebaytech.hcfsmgmt",
+					&dentry, FALSE);
+		if (ret == 0) {
 			mgmt_app_is_created = TRUE;
 			write_log(4, "mgmt pkg folder existed");
 		} else {
 			mgmt_app_is_created = FALSE;
-			if (errno != ENOENT)
+			if (ret != -ENOENT)
 				write_log(0, "Error: Cannot access mgmt"
-					" pkg folder. Code %d", errno);
+					" pkg folder. Code %d", -ret);
 		}
 	}
 	if (strncmp(mp, "/data/smartcache", strlen("data/smartcache")) == 0) {
@@ -834,9 +840,6 @@ static int32_t _check_destroy_vol_shared_data(MOUNT_T *mount_info)
 {
 	int32_t ret;
 	MOUNT_T *tmp_info;
-
-	if (mount_info->volume_type != ANDROID_MULTIEXTERNAL)
-		return 0;
 
 	/* Search any mountpoint of given volume name */
 	ret = search_mount(mount_info->f_name, NULL, &tmp_info);

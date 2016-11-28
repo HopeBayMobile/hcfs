@@ -1250,6 +1250,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
 		  (uint64_t)parent_inode);
 
+	gettimeofday(&tmp_time1, NULL);
 #ifdef _ANDROID_ENV_
 	if ((parent_inode == data_data_root) && pkg_in_whitelist(selfname)) {
 		char link_target[MAX_FILENAME_LEN + 100];
@@ -7988,10 +7989,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 #ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
+	/* Init meta cache before api interface being setup */
+	init_meta_cache_headers();
 	init_api_interface();
 	init_alias_group();
 
-	init_meta_cache_headers();
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();

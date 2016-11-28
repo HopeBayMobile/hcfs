@@ -276,12 +276,10 @@ int32_t enable_booster(int64_t smart_cache_size)
 	}
 	/* chown to system:sytem */
 	chown(SMARTCACHE, 1000, 1000);
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHE);
 
 	mkdir(SMARTCACHEAMNT, 0771);
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEAMNT);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHEAMNT);
 
 	rmdir(SMARTCACHEMTP);
 	ret_code = mkdir(SMARTCACHEMTP, 0771);
@@ -290,8 +288,7 @@ int32_t enable_booster(int64_t smart_cache_size)
 			  __func__, SMARTCACHEMTP, errno);
 		return ret_code;
 	}
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHEMTP);
 
 	if (_check_smart_cache_vol_mount() != 0) {
 		ret_code = _mount_smart_cache_vol();
@@ -302,27 +299,16 @@ int32_t enable_booster(int64_t smart_cache_size)
 			    __func__, SMARTCACHEVOL, ret_code);
 			return ret_code;
 		}
-		snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHE);
-		RUN_CMD_N_CHECK();
+		RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHE);
 	}
 
-	snprintf(cmd, sizeof(cmd), cmd_create_image_file, image_file_path,
-		 (smart_cache_size / 1048576));
-	RUN_CMD_N_CHECK();
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, image_file_path);
-	RUN_CMD_N_CHECK();
-
-	snprintf(cmd, sizeof(cmd), cmd_setup_loop_device, LOOPDEV,
-		 image_file_path);
-	RUN_CMD_N_CHECK();
-
-	snprintf(cmd, sizeof(cmd), cmd_create_ext4_fs, LOOPDEV);
-	RUN_CMD_N_CHECK();
-
-	snprintf(cmd, sizeof(cmd), cmd_mount_ext4_fs, LOOPDEV, SMARTCACHEMTP);
-	RUN_CMD_N_CHECK();
-	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
-	RUN_CMD_N_CHECK();
+	RUN_CMD_N_CHECK(cmd_create_image_file, image_file_path,
+			(smart_cache_size / 1048576));
+	RUN_CMD_N_CHECK(cmd_restorecon, image_file_path);
+	RUN_CMD_N_CHECK(cmd_setup_loop_device, LOOPDEV, image_file_path);
+	RUN_CMD_N_CHECK(cmd_create_ext4_fs, LOOPDEV);
+	RUN_CMD_N_CHECK(cmd_mount_ext4_fs, LOOPDEV, SMARTCACHEMTP);
+	RUN_CMD_N_CHECK(cmd_restorecon, SMARTCACHEMTP);
 
 	return 0;
 
@@ -349,6 +335,7 @@ int32_t boost_package(char *package_name)
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
 	char cmd_restorecon_recursive[] = "restorecon -R %s/%s";
 	int32_t ret_code, status;
+	struct stat tmp_st;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
 		 package_name);
@@ -367,32 +354,26 @@ int32_t boost_package(char *package_name)
 		return -1;
 	}
 
-	snprintf(cmd, sizeof(cmd), cmd_copy_pkg_data, pkg_fullpath,
-		 SMARTCACHEMTP);
-	status = system(cmd);
-	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
-		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
-		goto rollback;
-	}
+	/* If the type of pkg_fullpath is folder means that previous boosting
+	 * for this package had been interrupted. Just finish the unfinished
+	 * parts */
+	ret_code = lstat(pkg_fullpath, &tmp_st);
+	if (ret_code == 0 && S_ISDIR(tmp_st.st_mode)) {
+		REMOVE_IF_EXIST(smart_cache_fullpath);
+		RUN_CMD_N_CHECK(cmd_copy_pkg_data, pkg_fullpath, SMARTCACHEMTP);
 
-	ret_code = rename(pkg_fullpath, pkg_tmppath);
-	if (ret_code < 0) {
-		write_log(0,
-			  "In %s. Failed to create temp file %s. Error code %d",
-			  __func__, pkg_tmppath, errno);
-		goto rollback;
+		ret_code = rename(pkg_fullpath, pkg_tmppath);
+		if (ret_code < 0) {
+			write_log(0, "In %s. Failed to create temp file %s. "
+				     "Error code %d",
+				  __func__, pkg_tmppath, errno);
+			goto rollback;
+		}
 	}
-
-	snprintf(cmd, sizeof(cmd), cmd_restorecon_recursive, SMARTCACHEMTP,
-		 package_name);
-	status = system(cmd);
-	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
-		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
-		goto rollback;
-	}
+	RUN_CMD_N_CHECK(cmd_restorecon_recursive, smart_cache_fullpath);
 
 	ret_code = symlink(smart_cache_fullpath, pkg_fullpath);
-	if (ret_code < 0) {
+	if (ret_code < 0 && errno != EEXIST) {
 		write_log(0, "In %s. Failed to create link %s. Error code %d",
 			  __func__, smart_cache_fullpath, errno);
 		goto rollback;
@@ -430,6 +411,7 @@ int32_t unboost_package(char *package_name)
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
 	char cmd_restorecon_recursive[] = "restorecon -R %s";
 	int32_t ret_code, status;
+	struct stat tmp_st;
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
 		 package_name);
@@ -442,42 +424,27 @@ int32_t unboost_package(char *package_name)
 		return -1;
 	}
 
-	if (access(pkg_fullpath, F_OK) != -1) {
-		write_log(4, "In %s. Pacakge path %s existed. Force remove it.",
-			  __func__, pkg_fullpath);
+	/* If the type of pkg_fullpath is symlnk means that previous unboosting
+	 * for this package had been interrupted. Just finish the unfinished
+	 * parts */
+	ret_code = lstat(pkg_fullpath, &tmp_st);
+	if (ret_code < 0 || S_ISLNK(tmp_st.st_mode)) {
+		REMOVE_IF_EXIST(pkg_fullpath);
+		REMOVE_IF_EXIST(pkg_tmppath);
 
-		ret_code = _remove_folder(pkg_fullpath);
+		RUN_CMD_N_CHECK(cmd_copy_pkg_data, smart_cache_fullpath,
+				pkg_tmppath);
+
+		ret_code = rename(pkg_tmppath, pkg_fullpath);
 		if (ret_code < 0) {
-			write_log(0, "In %s. Failed to remove folder %s",
-				  __func__, pkg_fullpath);
-			return -1;
+			write_log(0, "In %s. Failed to create temp file %s. "
+				     "Error code %d",
+				  __func__, pkg_tmppath, errno);
+			goto rollback;
 		}
 	}
 
-	memset(cmd, 0, sizeof(cmd));
-	snprintf(cmd, sizeof(cmd), cmd_copy_pkg_data, smart_cache_fullpath,
-		 pkg_tmppath);
-	status = system(cmd);
-	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
-		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
-		goto rollback;
-	}
-
-	ret_code = rename(pkg_tmppath, pkg_fullpath);
-	if (ret_code < 0) {
-		write_log(0,
-			  "In %s. Failed to create temp file %s. Error code %d",
-			  __func__, pkg_tmppath, errno);
-		goto rollback;
-	}
-
-	memset(cmd, 0, sizeof(cmd));
-	snprintf(cmd, sizeof(cmd), cmd_restorecon_recursive, pkg_fullpath);
-	status = system(cmd);
-	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
-		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);
-		goto rollback;
-	}
+	RUN_CMD_N_CHECK(cmd_restorecon_recursive, pkg_fullpath);
 
 	_remove_folder(smart_cache_fullpath);
 
@@ -539,6 +506,12 @@ static int32_t _iterate_pkg_cb(void *data,
 		write_log(0, "In %s. No matched result.", __func__);
 		return -1;
 	}
+
+	if (strncmp(argv[0], "", 1) == 0 || (strncmp(argv[0], " ", 1) == 0)) {
+		write_log(0, "In %s. Invalid package name.", __func__);
+		return -1;
+	}
+
 	package_name = argv[0];
 
 	boost_job = (BOOST_JOB_META*)data;
@@ -698,16 +671,47 @@ int32_t toggle_smart_cache_mount(char to_mount)
 	char cmd[1024];
 	char cmd_mount_ext4_fs[] = "mount -t ext4 %s %s";
 	char cmd_umount_ext4_fs[] = "umount %s";
+	char cmd_setup_loop_device[] = "losetup %s %s";
+	char cmd_restorecon[] = "restorecon %s";
+	char image_file_path[strlen(SMARTCACHE) + strlen(HCFSBLOCK) + 10];
 	int32_t status;
 
-	memset(cmd, 0, sizeof(cmd));
+	if (to_mount) {
+		snprintf(image_file_path, sizeof(image_file_path), "%s/%s",
+			 SMARTCACHE, HCFSBLOCK);
 
-	if (to_mount)
+		memset(cmd, 0, sizeof(cmd));
+		snprintf(cmd, sizeof(cmd), cmd_setup_loop_device, LOOPDEV,
+			 image_file_path);
+		status = system(cmd);
+		if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+			write_log(0, "In %s. Failed to run cmd %s", __func__,
+				  cmd);
+			return -1;
+		}
+
+		memset(cmd, 0, sizeof(cmd));
 		snprintf(cmd, sizeof(cmd), cmd_mount_ext4_fs, LOOPDEV,
 			 SMARTCACHEMTP);
-	else
+		status = system(cmd);
+		if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+			write_log(0, "In %s. Failed to run cmd %s", __func__,
+				  cmd);
+			return -1;
+		}
+	} else {
+		memset(cmd, 0, sizeof(cmd));
 		snprintf(cmd, sizeof(cmd), cmd_umount_ext4_fs, SMARTCACHEMTP);
+		status = system(cmd);
+		if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
+			write_log(0, "In %s. Failed to run cmd %s", __func__,
+				  cmd);
+			return -1;
+		}
+	}
 
+	memset(cmd, 0, sizeof(cmd));
+	snprintf(cmd, sizeof(cmd), cmd_restorecon, SMARTCACHEMTP);
 	status = system(cmd);
 	if ((!WIFEXITED(status)) || (WEXITSTATUS(status) != 0)) {
 		write_log(0, "In %s. Failed to run cmd %s", __func__, cmd);

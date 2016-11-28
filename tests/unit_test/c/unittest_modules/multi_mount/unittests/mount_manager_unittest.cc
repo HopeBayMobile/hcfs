@@ -605,6 +605,13 @@ TEST_F(mount_FSTest, MountedFS) {
   EXPECT_EQ(MP_DEFAULT, mount_mgr.root->mt_entry->mp_mode);
   ASSERT_STREQ("/tmp/testmount", mount_mgr.root->mt_entry->f_mp);
 
+  if (mount_mgr.root->mt_entry->stat_fptr != NULL)
+    fclose(mount_mgr.root->mt_entry->stat_fptr);
+
+  free(mount_mgr.root->mt_entry->lookup_table);
+  free(mount_mgr.root->mt_entry->FS_stat);
+  sem_destroy(mount_mgr.root->mt_entry->stat_lock);
+  free(mount_mgr.root->mt_entry->stat_lock);
   free(mount_mgr.root->mt_entry->f_mp);
   free(mount_mgr.root->mt_entry->vol_path_cache);
   pthread_join(mount_mgr.root->mt_entry->mt_thread, NULL);
@@ -891,6 +898,7 @@ TEST_F(unmount_allTest, UnmountAll) {
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
     ret = mount_FS(fsname, "/tmp/testmount", MP_DEFAULT);
+    EXPECT_EQ(0, ret);
    }
   EXPECT_EQ(100, mount_mgr.num_mt_FS);
   ret = unmount_all();
@@ -928,6 +936,7 @@ class change_mount_statTest : public ::testing::Test {
     unlink("/tmp/testHCFS/metapath/tmpstat");
     nftw(METAPATH, do_delete, 20, FTW_DEPTH);
     nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+    free(tmp_mount.stat_lock);
     free(tmp_mount.FS_stat);
     free(METAPATH);
    }
