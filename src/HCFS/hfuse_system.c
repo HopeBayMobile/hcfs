@@ -150,8 +150,12 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	ret = get_quota_from_backup(&quota);
 	if (ret < 0) {
 		write_log(5, "Backup usermeta looks unreliable. "
-				"tmp set quota to %lld\n", CACHE_HARD_LIMIT);
-		hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
+				"tmp set quota to %lld\n", DEFAULT_QUOTA);
+		/* Quota should be as large as the max amount of data
+		the system can contain, including system + user data.
+		Here system apps could use reserved cache space, so
+		should adjust default quota size as such. */
+		hcfs_system->systemdata.system_quota = DEFAULT_QUOTA;
 	} else {
 		write_log(5, "Backup usermeta exist. set quota to %lld\n",
 				quota);
