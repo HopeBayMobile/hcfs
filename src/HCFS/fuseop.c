@@ -7986,10 +7986,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 #ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
+	/* Init meta cache before api interface being setup */
+	init_meta_cache_headers();
 	init_api_interface();
 	init_alias_group();
 
-	init_meta_cache_headers();
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();
