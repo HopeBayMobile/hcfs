@@ -12,7 +12,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE     := hcfsapid
 LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
-LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c logger.c)
+LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c logger.c smart_cache.c)
 LOCAL_SHARED_LIBRARIES = libsqlite libcrypto
 include $(BUILD_EXECUTABLE)
 

@@ -156,6 +156,8 @@
 	changes */
 
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
+static int32_t symlink_internal(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
 /* Helper function for checking permissions.
    Inputs: fuse_req_t req, HCFS_STAT *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
@@ -507,6 +509,18 @@ static int32_t _lookup_pkg_status_cb(void *data, int32_t argc, char **argv, char
 
 	res[0] = atoi(argv[0]);
 	res[1] = atoi(argv[1]);
+	return 0;
+}
+
+static int32_t _lookup_pkg_whitelist_cb(void *data, int32_t argc, char **argv, char **azColName)
+{
+
+	UNUSED(argc);
+	UNUSED(azColName);
+	if (!argv[0])
+		return -1;
+
+	*(int32_t *)data = atoi(argv[0]);
 	return 0;
 }
 
@@ -1136,6 +1150,62 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_entry(req, &(tmp_param));
 }
 
+static inline BOOL pkg_in_whitelist(const char *pkgname)
+{
+
+	sqlite3 *db;
+	int32_t ret_code;
+	int32_t res = -1;
+	char *sql_err = 0;
+	char sql[MAX_FILENAME_LEN + 200];
+
+	if (mgmt_app_is_created == FALSE)
+		return FALSE;
+
+	/* Reject if smartcache not found */
+	write_log(8, "Debug: check hcfsblock");
+	if (access("/data/smartcache/hcfsblock", F_OK) < 0) {
+		write_log(6, "Lookup %s but smartcache not found. Code %d",
+				pkgname, errno);
+		return FALSE;
+	}
+
+	write_log(6, "Looking up pkg %s\n", pkgname);
+	/* Reject if db not found */
+	if (access(PKG_DB_PATH, F_OK) < 0) {
+		write_log(4, "Query pkg whitelist err (access db). Code %d",
+				errno);
+		return FALSE;
+	}
+
+	/* Find pkg from db */
+	snprintf(sql, sizeof(sql),
+		 "SELECT EXISTS"
+		 "(SELECT * FROM booster_white_list "
+		 "WHERE package_name='%s')", pkgname);
+
+	ret_code = sqlite3_open(PKG_DB_PATH, &db);
+	if (ret_code != SQLITE_OK) {
+		write_log(4, "Query pkg whitelist err (open db) - %s\n",
+				sqlite3_errmsg(db));
+		return FALSE;
+	}
+
+	/* Sql statement */
+	ret_code = sqlite3_exec(db, sql, _lookup_pkg_whitelist_cb,
+				(void *)&res, &sql_err);
+	if (ret_code != SQLITE_OK) {
+		write_log(4, "Query pkg whitelist err (sql statement) - %s\n",
+				sql_err);
+		sqlite3_free(sql_err);
+		sqlite3_close(db);
+		return FALSE;
+	}
+	sqlite3_close(db);
+
+	return res == 1 ? TRUE : FALSE;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_mkdir
@@ -1153,7 +1223,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	mode_t self_mode;
 	int32_t ret_val;
 	struct fuse_ctx *temp_context;
-	int32_t ret_code;
+	int32_t ret_code, ret;
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
 	HCFS_STAT parent_stat;
@@ -1169,8 +1239,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	gettimeofday(&tmp_time1, NULL);
-
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -1181,6 +1249,33 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	write_log(8, "Debug mkdir: name %s, parent %" PRIu64 "\n", selfname,
 		  (uint64_t)parent_inode);
+
+	gettimeofday(&tmp_time1, NULL);
+#ifdef _ANDROID_ENV_
+	if ((parent_inode == data_data_root) && pkg_in_whitelist(selfname)) {
+		char link_target[MAX_FILENAME_LEN + 100];
+
+		sprintf(link_target, "/data/mnt/hcfsblock/%s", selfname);
+		ret = mkdir(link_target, mode);
+		if (ret == 0 || (ret < 0 && errno == EEXIST)) {
+			ret = symlink_internal(req, link_target,
+					parent, selfname, &tmp_param);
+			if (ret == 0) {
+				tmp_param.attr.st_mode = mode | S_IFDIR;
+				fuse_reply_entry(req, &(tmp_param));
+				return;
+			} else {
+				write_log(4, "Failed to create symlink."
+						" Code %d", -ret);
+				rmdir(link_target);
+				errno = -ret;
+			}
+		}
+		write_log(4, "Error: Failed to create symlink and smartcache "
+				"folder. Just create folder %s under "
+				"/data/data. Code %d", selfname, errno);
+	}
+#endif
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
@@ -1294,12 +1389,15 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		/*Check if need to cleanup package lookup cache */
 		remove_cache_pkg(selfname);
 	}
+
+	/* Check if mgmt pkg folder is created. */
+	if (parent_inode == data_data_root && mgmt_app_is_created == FALSE &&
+	    !strcmp(selfname, "com.hopebaytech.hcfsmgmt"))
+		mgmt_app_is_created = TRUE;
 #endif
 
 	fuse_reply_entry(req, &(tmp_param));
-
 	gettimeofday(&tmp_time2, NULL);
-
 	write_log(10, "mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 }
@@ -1524,6 +1622,11 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
+	/* Check mgmt pkg folder. */
+	if (parent_inode == data_data_root && mgmt_app_is_created == TRUE &&
+	    !strcmp(selfname, "com.hopebaytech.hcfsmgmt"))
+		mgmt_app_is_created = FALSE;
+
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
@@ -6362,8 +6465,8 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 *       Summary: Make a symbolic link "name", which links to "link".
 *
 *************************************************************************/
-static void hfuse_ll_symlink(fuse_req_t req, const char *link,
-	fuse_ino_t parent, const char *name)
+static int32_t symlink_internal(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param)
 {
 	ino_t parent_inode;
 	ino_t self_inode;
@@ -6371,7 +6474,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	DIR_ENTRY_PAGE dir_page;
 	uint64_t this_generation;
 	struct fuse_ctx *temp_context;
-	struct fuse_entry_param tmp_param;
 	HCFS_STAT parent_stat;
 	HCFS_STAT this_stat;
 	int32_t ret_val;
@@ -6386,15 +6488,13 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 #ifdef _ANDROID_ENV_
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
-		fuse_reply_err(req, ENOTSUP);
-		return;
+		return ENOTSUP;
 	}
 #endif
 
 	/* Reject if no more meta space */
 	if (NO_META_SPACE()) {
-		fuse_reply_err(req, ENOSPC);
-		return;
+		return ENOSPC;
 	}
 
 	parent_inode = real_ino(req, parent);
@@ -6402,50 +6502,42 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
 		write_log(0, "File name is too long\n");
-		fuse_reply_err(req, ENAMETOOLONG);
-		return;
+		return ENAMETOOLONG;
 	}
 	if (strlen(name) <= 0) {
-		fuse_reply_err(req, EINVAL);
-		return;
+		return EINVAL;
 	}
 
 	/* Reject if link path too long */
 	if (strlen(link) >= MAX_LINK_PATH) {
 		write_log(0, "Link path is too long\n");
-		fuse_reply_err(req, ENAMETOOLONG);
-		return;
+		return ENAMETOOLONG;
 	}
 	if (strlen(link) <= 0) {
-		fuse_reply_err(req, EINVAL);
-		return;
+		return EINVAL;
 	}
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
 			NULL, &local_pin);
 	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	/* Error if parent is not a dir */
 	if (!S_ISDIR(parent_stat.mode)) {
-		fuse_reply_err(req, ENOTDIR);
-		return;
+		return ENOTDIR;
 	}
 
 	/* Checking permission */
 	ret_val = check_permission(req, &parent_stat, 3);
 	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	/* Check whether "name" exists or not */
 	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
 	if (!parent_meta_cache_entry) {
-		fuse_reply_err(req, errno);
-		return;
+		return errno;
 	}
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
 		&result_index, name, parent_meta_cache_entry,
@@ -6517,27 +6609,24 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	ret_val = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(parent_meta_cache_entry);
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 	ret_val = meta_cache_unlock_entry(parent_meta_cache_entry);
 	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	/* Reply fuse entry */
-	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
-	tmp_param.generation = this_generation;
-	tmp_param.ino = (fuse_ino_t) self_inode;
-	convert_hcfsstat_to_sysstat(&(tmp_param.attr), &this_stat);
+	memset(tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param->generation = this_generation;
+	tmp_param->ino = (fuse_ino_t) self_inode;
+	convert_hcfsstat_to_sysstat(&(tmp_param->attr), &this_stat);
 
 	ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISLNK);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	if (delta_meta_size != 0)
@@ -6545,18 +6634,31 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	ret_val = change_mount_stat(tmpptr, 0, delta_meta_size, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
-		fuse_reply_err(req, -ret_val);
-		return;
+		return -ret_val;
 	}
 
 	write_log(5, "Debug symlink: symlink operation success\n");
-	fuse_reply_entry(req, &(tmp_param));
-	return;
+	return 0;
 
 error_handle:
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
-	fuse_reply_err(req, -errcode);
+	return -errcode;
+}
+
+static void hfuse_ll_symlink(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name)
+{
+	struct fuse_entry_param tmp_param;
+	int32_t ret_val;
+
+	ret_val = symlink_internal(req, link, parent, name,
+	                           &tmp_param);
+
+	if (ret_val != 0)
+		fuse_reply_err(req, ret_val);
+	else
+		fuse_reply_entry(req, &(tmp_param));
 }
 
 /************************************************************************
@@ -7876,6 +7978,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	global_argv = argv;
 #endif
 	data_data_root = (ino_t) 0;
+	mgmt_app_is_created = FALSE;
 
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
@@ -7883,10 +7986,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 #ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif
+	/* Init meta cache before api interface being setup */
+	init_meta_cache_headers();
 	init_api_interface();
 	init_alias_group();
 
-	init_meta_cache_headers();
 	startup_finish_delete();
 	init_download_control();
 	init_pin_scheduler();

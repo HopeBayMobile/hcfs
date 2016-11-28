@@ -20,10 +20,21 @@
 
 typedef struct {
 	uint32_t name;
-	int32_t (*cmd_fn)(char *largebuf, int32_t arg_len,
-			  char *resbuf, int32_t *res_size);
+	int32_t (*cmd_fn)(char *largebuf,
+			  int32_t arg_len,
+			  char *resbuf,
+			  int32_t *res_size);
 } SOCK_CMDS;
 
+typedef struct {
+	uint32_t name;
+	int32_t (*cmd_fn)(char *largebuf,
+			  int32_t arg_len,
+			  char *resbuf,
+			  int32_t *res_size,
+			  pthread_t *tid);
+	pthread_t async_thread;
+} SOCK_ASYNC_CMDS;
 
 typedef struct {
 	char in_used;

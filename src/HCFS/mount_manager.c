@@ -34,6 +34,7 @@
 #include "path_reconstruct.h"
 #endif
 #include "rebuild_super_block.h"
+#include "metaops.h"
 
 MOUNT_T_GLOBAL mount_global = {{0}};
 
@@ -686,6 +687,7 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
+
 #ifdef _ANDROID_ENV_
 	new_info->mp_mode = mp_mode;
 	new_info->volume_type = tmp_entry.d_type;
@@ -792,9 +794,23 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	}
 
 	if (strncmp(mp, "/data/data", strlen("data/data")) == 0) {
+		DIR_ENTRY dentry;
+
+		/* Record root inode and check if mgmt app folder is created. */
 		data_data_root = new_info->f_ino;
 		write_log(10, "Debug mount: root of /data/data is %" PRIu64
 		          "\n", (uint64_t) data_data_root);
+		ret = lookup_dir(data_data_root, "com.hopebaytech.hcfsmgmt",
+					&dentry, FALSE);
+		if (ret == 0) {
+			mgmt_app_is_created = TRUE;
+			write_log(4, "mgmt pkg folder existed");
+		} else {
+			mgmt_app_is_created = FALSE;
+			if (ret != -ENOENT)
+				write_log(0, "Error: Cannot access mgmt"
+					" pkg folder. Code %d", -ret);
+		}
 	}
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));

@@ -76,6 +76,34 @@ int32_t _api_socket_conn()
 	return fd;
 }
 
+void _send_apicode_without_args(int32_t api_code, char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = api_code;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
 void HCFS_set_config(char **json_res, char *key, char *value)
 {
 	int32_t fd, ret_code;
@@ -199,16 +227,26 @@ void HCFS_stat(char **json_res)
 		if (data == NULL)
 			goto error;
 		JSON_OBJ_SET_NEW(data, "quota", json_integer(hcfs_stats.quota));
-		JSON_OBJ_SET_NEW(data, "vol_used", json_integer(hcfs_stats.vol_usage));
-		JSON_OBJ_SET_NEW(data, "cloud_used", json_integer(hcfs_stats.cloud_usage));
-		JSON_OBJ_SET_NEW(data, "cache_total", json_integer(hcfs_stats.cache_total));
-		JSON_OBJ_SET_NEW(data, "cache_used", json_integer(hcfs_stats.cache_used));
-		JSON_OBJ_SET_NEW(data, "cache_dirty", json_integer(hcfs_stats.cache_dirty));
-		JSON_OBJ_SET_NEW(data, "pin_max", json_integer(hcfs_stats.pin_max));
-		JSON_OBJ_SET_NEW(data, "pin_total", json_integer(hcfs_stats.pin_total));
-		JSON_OBJ_SET_NEW(data, "xfer_up", json_integer(hcfs_stats.xfer_up));
-		JSON_OBJ_SET_NEW(data, "xfer_down", json_integer(hcfs_stats.xfer_down));
-		JSON_OBJ_SET_NEW(data, "cloud_conn", json_boolean(hcfs_stats.cloud_stat));
+		JSON_OBJ_SET_NEW(data, "vol_used",
+				 json_integer(hcfs_stats.vol_usage));
+		JSON_OBJ_SET_NEW(data, "cloud_used",
+				 json_integer(hcfs_stats.cloud_usage));
+		JSON_OBJ_SET_NEW(data, "cache_total",
+				 json_integer(hcfs_stats.cache_total));
+		JSON_OBJ_SET_NEW(data, "cache_used",
+				 json_integer(hcfs_stats.cache_used));
+		JSON_OBJ_SET_NEW(data, "cache_dirty",
+				 json_integer(hcfs_stats.cache_dirty));
+		JSON_OBJ_SET_NEW(data, "pin_max",
+				 json_integer(hcfs_stats.pin_max));
+		JSON_OBJ_SET_NEW(data, "pin_total",
+				 json_integer(hcfs_stats.pin_total));
+		JSON_OBJ_SET_NEW(data, "xfer_up",
+				 json_integer(hcfs_stats.xfer_up));
+		JSON_OBJ_SET_NEW(data, "xfer_down",
+				 json_integer(hcfs_stats.xfer_down));
+		JSON_OBJ_SET_NEW(data, "cloud_conn",
+				 json_boolean(hcfs_stats.cloud_stat));
 		JSON_OBJ_SET_NEW(data, "data_transfer",
 				 json_integer(hcfs_stats.data_transfer));
 
@@ -812,4 +850,170 @@ void HCFS_notify_applist_change(char **json_res)
 		_json_response(json_res, TRUE, ret_code, NULL);
 
 	close(fd);
+}
+
+void HCFS_check_package_boost_status(char **json_res, char *package_name)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+	ssize_t str_len;
+	char buf[1000];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CHECK_PACKAGE_BOOST_STATUS;
+	cmd_len = 0;
+
+	CONCAT_ARGS(package_name);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_enable_booster(char **json_res, int64_t size)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = ENABLE_BOOSTER;
+	cmd_len = sizeof(int64_t);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, &size, sizeof(int64_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_disable_booster(char **json_res)
+{
+	_json_response(json_res, FALSE, -ENOTSUP, NULL);
+}
+
+void HCFS_trigger_boost(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = TRIGGER_BOOST;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_trigger_unboost(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = TRIGGER_UNBOOST;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_clear_booster_package_remaining(char **json_res, char *package_name)
+{
+	int32_t fd, ret_code;
+	uint32_t code, reply_len, cmd_len;
+	ssize_t str_len;
+	char buf[1000];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CLEAR_BOOSTED_PACKAGE;
+	cmd_len = 0;
+
+	CONCAT_ARGS(package_name);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_mount_smart_cache(char **json_res)
+{
+	_send_apicode_without_args(MOUNT_SMART_CACHE, json_res);
+}
+
+void HCFS_umount_smart_cache(char **json_res)
+{
+	_send_apicode_without_args(UMOUNT_SMART_CACHE, json_res);
 }

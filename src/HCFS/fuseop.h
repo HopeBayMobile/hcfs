@@ -158,4 +158,5 @@ void *mount_single_thread(void *ptr);
 int32_t hook_fuse(int32_t argc, char **argv);
 
 ino_t data_data_root;
+BOOL mgmt_app_is_created;
 #endif  /* GW20_HCFS_FUSEOP_H_ */
