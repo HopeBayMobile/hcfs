@@ -108,6 +108,15 @@ errcode_handle:
 	return NULL;
 }
 
+/**
+ * Jump to some specified block.
+ *
+ * @param iter Iterator structure of the file meta.
+ * @param block_no Index of the target block.
+ *
+ * @return this iterator itself. Otherwise return NULL and error code
+ *         is recorded in errno.
+ */
 FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 {
 	int64_t which_page, ret_size, page_pos;
@@ -145,6 +154,14 @@ errcode_handle:
 	return NULL;
 }
 
+/**
+ * Jump to first block. It is the first entry of existed page.
+ *
+ * @param iter Iterator structure of the file meta.
+ *
+ * @return this iterator itself. Otherwise return NULL and error code
+ *         is recorded in errno.
+ */
 FILE_BLOCK_ITERATOR *begin_block(FILE_BLOCK_ITERATOR *iter)
 {
 	iter->now_block_no = -1;
@@ -155,6 +172,13 @@ FILE_BLOCK_ITERATOR *begin_block(FILE_BLOCK_ITERATOR *iter)
 	return next_block(iter);
 }
 
+/**
+ * Free resource about block iterator.
+ *
+ * @param iter Iterator structure of the file meta.
+ *
+ * @return none.
+ */
 void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
 {
 	free(iter);

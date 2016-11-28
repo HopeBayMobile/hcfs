@@ -102,7 +102,7 @@ void static_assert_test(void) {
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
-   "mode" is the bit-wise OR of A_TIME, MTIME, C_TIME.
+   "mode" is the bit-wise OR of A_TIME, M_TIME, C_TIME.
 */
 void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 {
