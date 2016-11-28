@@ -134,3 +134,8 @@ int32_t restore_meta_super_block_entry(ino_t this_inode,
 	return 0;
 }
 
+int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
+		   BOOL is_external)
+{
+	return 0;
+}
