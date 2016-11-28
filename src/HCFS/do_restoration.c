@@ -1412,7 +1412,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *removed_list = NULL;
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
-	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	int64_t temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
 	HCFS_STAT dirstat, tmpstat;
 	BOOL meta_open = FALSE;
 	BOOL need_copy;
