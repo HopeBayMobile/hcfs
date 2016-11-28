@@ -124,6 +124,7 @@ extern SYSTEM_CONF_STRUCT *system_config;
 #define RESERVED_CACHE_SPACE system_config->cache_reserved_space
 #define CACHE_LIMITS(p) (system_config->max_cache_limit[(int32_t)p])
 #define PINNED_LIMITS(p) (system_config->max_pinned_limit[(int32_t)p])
+#define DEFAULT_QUOTA (CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE)
 
 static const char DEFAULT_CONFIG_PATH[] = "/data/hcfs.conf";
 static const char CONFIG_PASSPHRASE[] = "lets encrypt configuration";

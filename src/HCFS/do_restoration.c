@@ -307,7 +307,6 @@ int32_t restore_stage1_reduce_cache(void)
 	META_SPACE_LIMIT = META_SPACE_LIMIT * REDUCED_RATIO;
 
 	/* Change the max system size as well */
-	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
 	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
 	system_config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
 
@@ -318,6 +317,12 @@ int32_t restore_stage1_reduce_cache(void)
 	    CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
 	system_config->max_pinned_limit[P_HIGH_PRI_PIN] =
 	    MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+
+	/* Quota should be as large as the max amount of data
+	the system can contain, including system + user data.
+	Here system apps could use reserved cache space, so
+	should adjust default quota size as such. */
+	hcfs_system->systemdata.system_quota = DEFAULT_QUOTA;
 
 	sem_post(&(hcfs_system->access_sem));
 
