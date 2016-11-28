@@ -1756,8 +1756,10 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	expand_val = 1; /* The default */
 	if (dirmeta.local_pin != P_HIGH_PRI_PIN) {
 		expand_val = _check_expand(thisinode, nowpath, depth);
-		if (expand_val == 0)
+		if (expand_val == 0) {
+			fclose(fptr);
 			return 0;
+		}
 		if (expand_val == 5)
 			can_prune = TRUE;
 	} else {
