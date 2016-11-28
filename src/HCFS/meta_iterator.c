@@ -25,6 +25,7 @@
  *
  * @param fptr File pointer of the meta file to be iterated.
  *
+ * @return pointer of the iterator. return NULL in case that error happened.
  */
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 {
@@ -61,6 +62,14 @@ errcode_handle:
 	return NULL;
 }
 
+/**
+ * Go to next block entry.
+ *
+ * @param iter Iterator structure of the file meta.
+ *
+ * @return this iterator itself. Otherwise return NULL and error code
+ *         is recorded in errno.
+ */
 FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 {
 	int64_t count, which_page, ret_size, page_pos;

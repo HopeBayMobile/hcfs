@@ -68,8 +68,6 @@ static void _change_stage1_cache_limit(int64_t restored_smartcache_size)
 	    			CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
 	system_config->max_pinned_limit[P_HIGH_PRI_PIN] +=
 				restored_smartcache_size;
-
-	/* Update pin size */
 }
 
 /**
@@ -104,7 +102,6 @@ static int32_t _run_command(char *command)
 
 	return 0;
 }
-
 
 /**
  * Inject restored smart cache data and meta to now active HCFS. The restored
