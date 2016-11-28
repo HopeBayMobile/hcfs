@@ -46,6 +46,7 @@ pthread_t download_minimal_thread;
 typedef struct {
 	FILE_META_HEADER restored_smartcache_header;
 	ino_t inject_smartcache_ino;
+	int64_t smart_cache_size;
 } RESTORED_SMARTCACHE_DATA;
 
 RESTORED_SMARTCACHE_DATA *sc_data;

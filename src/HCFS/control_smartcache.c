@@ -103,6 +103,66 @@ static int32_t _run_command(char *command)
 	return 0;
 }
 
+int32_t write_restored_smartcache_info()
+{
+	FILE *fptr;
+	int32_t ret, errcode;
+	int64_t ret_size;
+	char path[METAPATHLEN];
+
+	sprintf(path, "%s/restored_smartcache_info", METAPATH);
+	fptr = fopen(path, "w+");
+	if (!fptr) {
+		write_log(0, "Error: Fail to open in %s. Code %d",
+				__func__, errno);
+		return -errno;
+	}
+	FWRITE(&sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
+	fclose(fptr);
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
+int32_t read_restored_smartcache_info()
+{
+	FILE *fptr;
+	int32_t ret, errcode;
+	int64_t ret_size;
+	char path[METAPATHLEN];
+
+	sprintf(path, "%s/restored_smartcache_info", METAPATH);
+	fptr = fopen(path, "r");
+	if (!fptr) {
+		write_log(0, "Error: Fail to open in %s. Code %d",
+				__func__, errno);
+		return -errno;
+	}
+
+	FREAD(&sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
+	fclose(fptr);
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
+int32_t destroy_restored_smartcacahe_info()
+{
+	int32_t ret, errcode;
+	char path[METAPATHLEN];
+
+	free(sc_data);
+	sprintf(path, "%s/restored_smartcache_info", METAPATH);
+	UNLINK(path);
+
+	return 0;
+
+errcode_handle:
+	return -errcode;
+}
+
 /**
  * Inject restored smart cache data and meta to now active HCFS. The restored
  * smart cache will be placed under HCFS mount point /data/smartcache.
@@ -184,11 +244,6 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 			return ret;
 		}
 	}
-
-	sc_data = (RESTORED_SMARTCACHE_DATA *)
-			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);
-	if (!sc_data)
-		return -errno;
 
 	fetch_restore_meta_path(path_restore, smartcache_ino);
 	fptr = fopen(path_restore, "r+");
@@ -325,6 +380,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	memcpy(&(sc_data->restored_smartcache_header), &origin_header,
 			sizeof(FILE_META_HEADER));
 	sc_data->inject_smartcache_ino = tmp_ino;
+	sc_data->smart_cache_size = restored_smartcache_size; 
 	write_log(4, "Inject smart cache. Inode %"PRIu64, (uint64_t)tmp_ino);
 	return 0;
 

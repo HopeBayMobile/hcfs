@@ -154,12 +154,12 @@ BOOL _enough_local_space(void)
 
 	/* Need cache size to be less than 0.2 of max possible cache size */
 	if (hcfs_system->systemdata.cache_size >=
-	    CACHE_HARD_LIMIT * REDUCED_RATIO)
+	    CACHE_HARD_LIMIT * REDUCED_RATIO - sc_data->smart_cache_size)
 		return FALSE;
 
 	/* Need pin size to be less than 0.2 of max possible pin size */
 	if (hcfs_system->systemdata.pinned_size >=
-	    MAX_PINNED_LIMIT * REDUCED_RATIO)
+	    MAX_PINNED_LIMIT * REDUCED_RATIO - sc_data->smart_cache_size)
 		return FALSE;
 
 	/* Need pin size to be less than 0.2 of max possible meta size */
@@ -186,8 +186,19 @@ int32_t initiate_restoration(void)
 		return -EPERM;
 	}
 
-	sem_wait(&restore_sem);
+	/* Try to read smartcache data. */
+	sc_data = (RESTORED_SMARTCACHE_DATA *)
+			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);
+	if (!sc_data) {
+		write_log(0, "Error: Fail to malloc in %s. Code %d",
+				__func__, errno);
+		return -errno;
+	}
+	ret = read_restored_smartcache_info();
+	if (ret < 0 && ret != -ENOENT)
+		return ret;
 
+	sem_wait(&restore_sem);
 	/* First check if there is enough space for restoration */
 	sem_wait(&(hcfs_system->access_sem));
 	if (_enough_local_space() == FALSE) {
@@ -317,17 +328,17 @@ int32_t restore_stage1_reduce_cache(void)
 
 	/* Check if smartcache exist and mount it. Then remove
 	 * hcfsblock_restore if it is found. System reboot? */
-	ret = check_filesystem(SMART_CACHE_VOL_NAME, &dentry);
+/*	ret = check_filesystem(SMART_CACHE_VOL_NAME, &dentry);
 	if (ret == 0) {
 		ret = mount_FS(SMART_CACHE_VOL_NAME, SMART_CACHE_ROOT_MP, 0);
 		if (ret < 0) {
 			write_log(0, "Error: Fail to mount vol in %s."
 					" Code %d", __func__, -ret);
 			return ret;
-		}
+		}*/
 		/* Check if hcfsblock_restore is already under
 		 * /data/smartcache/, If so, remove it. */
-		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
+/*		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
 				RESTORED_SMARTCACHE_TMP_NAME);
 		if (access(hcfsblock_restore_path, F_OK) == 0) {
 			write_log(4, "hcfsblock_restore already"
@@ -343,7 +354,19 @@ int32_t restore_stage1_reduce_cache(void)
 			write_log(4, "Cannot access %s. Code %d",
 				hcfsblock_restore_path, errno);
 		}
+	}*/
+
+	/* Try to read smartcache data. */
+	sc_data = (RESTORED_SMARTCACHE_DATA *)
+			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);
+	if (!sc_data) {
+		write_log(0, "Error: Fail to malloc in %s. Code %d",
+				__func__, errno);
+		return -errno;
 	}
+	ret = read_restored_smartcache_info();
+	if (iret < 0 && ret != -ENOENT)
+		return ret;
 
 	sem_wait(&(hcfs_system->access_sem));
 	/* Need enough cache space */
