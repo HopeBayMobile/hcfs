@@ -2528,7 +2528,7 @@ errcode_handle:
  *
  * @param rootino Root inode of this volume smart cache belonging to.
  */
-int32_t _restore_smart_cache_vol(ino_t rootino)
+int32_t _restore_smart_cache_vol(ino_t rootino, BOOL *smartcache_in_hcfs)
 {
 	INODE_PAIR_LIST *hardln_mapping;
 	char restore_todelete_list[METAPATHLEN];
@@ -2555,6 +2555,7 @@ int32_t _restore_smart_cache_vol(ino_t rootino)
 			write_log(4, "Smartcache is mounted. Skip"
 					" Downloading again.");
 			restored_smartcache_ino = sc_data->origin_smartcache_ino;
+			*smartcache_in_hcfs = TRUE;
 			goto out;
 		}
 		/* Remove the restored smartcache in now active hcfs and
@@ -2653,6 +2654,7 @@ int32_t run_download_minimal(void)
 	BOOL is_fopen = FALSE;
 	ino_t vol_max_inode, sys_max_inode;
 	INODE_PAIR_LIST *hardln_mapping;
+	BOOL smartcache_in_hcfs;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -2771,7 +2773,9 @@ int32_t run_download_minimal(void)
 				SMART_CACHE_VOL_NAME);
 		tmpentry = &(tmppage.dir_entries[ret]);
 		hcfs_smartcache_vol_ino = tmpentry->d_ino;
-		ret = _restore_smart_cache_vol(hcfs_smartcache_vol_ino);
+		smartcache_in_hcfs = FALSE;
+		ret = _restore_smart_cache_vol(hcfs_smartcache_vol_ino,
+					&smartcache_in_hcfs);
 		if (ret == -ECANCELED) {
 			errcode = ret;
 			goto errcode_handle;
@@ -2779,6 +2783,9 @@ int32_t run_download_minimal(void)
 		if (SMARTCACHE_IS_MISSING() == TRUE) {
 			write_log(4, "Warn: Smart cache is missing. Remove"
 				" all symlink under /data/data");
+		} else if (smartcache_in_hcfs == TRUE) {
+			write_log(4, "Restored smart cache had been in"
+					" now hcfs.");
 		} else {
 			write_log(4, "Begin to repair restored smart cache");
 			/* Inject to now active HCFS */

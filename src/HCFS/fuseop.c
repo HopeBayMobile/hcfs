@@ -7958,7 +7958,7 @@ void _unlink_restore_stat(void)
 
 int32_t hook_fuse(int32_t argc, char **argv)
 {
-	int32_t dl_count, ret;
+	int32_t dl_count;
 #ifndef _ANDROID_ENV_
 	pthread_t communicate_tid[MAX_FUSE_COMMUNICATION_THREAD];
 	int32_t socket_fd;
