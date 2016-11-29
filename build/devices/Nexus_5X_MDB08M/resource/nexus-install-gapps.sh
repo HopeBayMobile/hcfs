@@ -15,6 +15,10 @@
 # History:
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.19  2016/11/29 10:30:00  Jethro
+# update image and use sideload again.
+# On windows, ADB is much stable within VMware player rather than Virtualbox.
+#
 # Revision 1.18  2016/08/24 14:11:00  wyliang
 # Add missed "-s $TARGET_DEVICE" in FlashImages()
 #
@@ -79,8 +83,8 @@ SDK_PATH=$HOME/android-sdk-linux
 
 RECOVERY_URL=https://dl.twrp.me/bullhead/twrp-3.0.2-0-bullhead.img
 RECOVERY_FILE=$(basename $RECOVERY_URL)
-GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20161025/open_gapps-arm64-6.0-pico-20161025.zip
-GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20161025.zip
+GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20161025/open_gapps-arm64-6.0-pico-20161125.zip
+GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20161125.zip
 GAPPS_FILE=$(basename $GAPPS_URL)
 FACTORY_URL=https://dl.google.com/dl/android/aosp/bullhead-mtc19v-factory-f3a6bee5.tgz
 FACTORY_FILE=$(basename $FACTORY_URL)
