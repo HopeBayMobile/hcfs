@@ -2532,9 +2532,12 @@ errcode_handle:
 }
 
 /**
- * Fetch all files in smart cache volume.
+ * Fetch "hcfsblock" and other files in smart cache volume "hcfs_smartcache".
  *
  * @param rootino Root inode of this volume smart cache belonging to.
+ *
+ * @return 0 on success, -ECANCELED on failure of restoration, otherwise
+ *           negative error code.
  */
 int32_t _restore_smart_cache_vol(ino_t rootino,
 			BOOL *smartcache_already_in_hcfs)
