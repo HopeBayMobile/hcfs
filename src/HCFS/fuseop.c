@@ -2796,14 +2796,14 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 	}
 	if (total_deleted_blocks > 0) {
 		unpin_dirty_size = (P_IS_UNPIN(ispin) ? -total_deleted_dirty_cache : 0);
-		change_system_meta(0, 0, -total_deleted_cache,
-				   -total_deleted_blocks,
-				   -total_deleted_dirty_cache,
-				   unpin_dirty_size, TRUE);
-		ret = update_file_stats(body_ptr->fptr,
-				-total_deleted_fileblocks,
-				-total_deleted_blocks, -total_deleted_cache,
-				-total_deleted_dirty_cache, inode_index);
+		change_system_meta_ignore_dirty(
+		    inode_index, 0, 0, -total_deleted_cache,
+		    -total_deleted_blocks, -total_deleted_dirty_cache,
+		    unpin_dirty_size, TRUE);
+		ret = update_file_stats(
+		    body_ptr->fptr, -total_deleted_fileblocks,
+		    -total_deleted_blocks, -total_deleted_cache,
+		    -total_deleted_dirty_cache, inode_index);
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -2984,8 +2984,9 @@ int32_t truncate_truncate(ino_t this_inode,
 				}
 
 				block_size_blk = tempstat.st_blocks * 512;
-				change_system_meta(0, 0, block_size_blk, 1,
-						   block_size_blk, 0, TRUE);
+				change_system_meta_ignore_dirty(
+				    this_inode, 0, 0, block_size_blk, 1,
+				    block_size_blk, 0, TRUE);
 				cache_delta += block_size_blk;
 				cache_block_delta += 1;
 			}
@@ -3024,8 +3025,9 @@ int32_t truncate_truncate(ino_t this_inode,
 
 		unpin_dirty_size = (P_IS_UNPIN(tempfilemeta->local_pin) ?
 				delta_dirty_size : 0);
-		change_system_meta(0, 0, new_block_size - old_block_size,
-				0, delta_dirty_size, unpin_dirty_size, TRUE);
+		change_system_meta_ignore_dirty(
+		    this_inode, 0, 0, new_block_size - old_block_size, 0,
+		    delta_dirty_size, unpin_dirty_size, TRUE);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -3113,8 +3115,9 @@ int32_t truncate_truncate(ino_t this_inode,
 		unpin_dirty_size =
 		    (P_IS_UNPIN(tempfilemeta->local_pin) ? block_dirty_size
 							 : 0);
-		change_system_meta(0, 0, new_block_size - old_block_size,
-				0, block_dirty_size, unpin_dirty_size, TRUE);
+		change_system_meta_ignore_dirty(
+		    this_inode, 0, 0, new_block_size - old_block_size, 0,
+		    block_dirty_size, unpin_dirty_size, TRUE);
 
 		cache_delta += new_block_size - old_block_size;
 
@@ -4588,9 +4591,9 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			block_size_blk = tempstat2.st_blocks * 512;
 			unpin_dirty_size = (P_IS_UNPIN(ispin) ?
 					block_size_blk : 0);
-			change_system_meta(0, 0, block_size_blk, 1,
-					block_size_blk,
-					unpin_dirty_size, TRUE);
+			change_system_meta_ignore_dirty(
+			    this_inode, 0, 0, block_size_blk, 1, block_size_blk,
+			    unpin_dirty_size, TRUE);
 			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
@@ -5019,8 +5022,9 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 			dirty_delta = new_cache_size;
 
 		unpin_dirty_size = (P_IS_UNPIN(ispin) ? dirty_delta : 0);
-		change_system_meta(0, 0, new_cache_size - old_cache_size, 0,
-				dirty_delta, unpin_dirty_size, TRUE);
+		change_system_meta_ignore_dirty(
+		    this_inode, 0, 0, new_cache_size - old_cache_size, 0,
+		    dirty_delta, unpin_dirty_size, TRUE);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);

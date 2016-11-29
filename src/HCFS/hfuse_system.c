@@ -742,7 +742,17 @@ int32_t main(int32_t argc, char **argv)
 
 	destory_hfuse_ll_notify_loop();
 
+	/* Waiting sb recovery thread */
+	while (TRUE) {
+		if (!sys_super_block->sb_recovery_meta.is_ongoing) {
+			write_log(10,
+				  "Debug: No super block recovery is running.");
+			break;
+		}
+	}
+
 	sync_hcfs_system_data(TRUE);
+	super_block_destroy();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();

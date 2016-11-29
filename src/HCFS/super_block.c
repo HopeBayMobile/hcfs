@@ -489,9 +489,9 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 				if (dirty_delta_meta_size != 0) {
 					tempentry.dirty_meta_size =
 							now_meta_size;
-					change_system_meta(0, 0, 0, 0,
-						dirty_delta_meta_size,
-						0, TRUE);
+					change_system_meta_ignore_dirty(
+					    this_inode, 0, 0, 0, 0,
+					    dirty_delta_meta_size, 0, TRUE);
 					need_write = TRUE;
 				}
 			}
@@ -1590,6 +1590,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 		/* Only change staus if this entry is going to be re-enqueue
 		 * later */
 		if (sb_enqueue_later) {
+			get_meta_size(thisinode, NULL, &now_meta_size);
+			this_entry->dirty_meta_size = now_meta_size;
 			this_entry->status = which_ll;
 			return 0;
 		}
@@ -1750,6 +1752,7 @@ int32_t ll_dequeue(ino_t thisinode, SUPER_BLOCK_ENTRY *this_entry)
 		/* Only change staus if this entry is going to be re-dequeue
 		 * later */
 		if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {
+			this_entry->dirty_meta_size = 0;
 			this_entry->status = NO_LL;
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;

@@ -510,6 +510,7 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data)
 
 void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 {
+	BOOL system_going_down = FALSE;
 	char error_msg[] = "SB queue recovery worker aborted.";
 	int32_t ret_code, count;
 	int64_t buf_size, num_entry_handle;
@@ -571,8 +572,14 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 	set_recovery_flag(TRUE, start_inode, end_inode);
 	super_block_exclusive_release();
 
-	while ((start_inode < end_inode) &&
-	       (hcfs_system->system_going_down == FALSE)) {
+	while (start_inode < end_inode) {
+		if (hcfs_system->system_going_down) {
+			write_log(4, "%s System is going to shutdown, start to "
+				     "process cleanup.");
+			system_going_down = TRUE;
+			break;
+		}
+
 		if ((start_inode + MAX_NUM_ENTRY_HANDLE) <= end_inode)
 			num_entry_handle = MAX_NUM_ENTRY_HANDLE;
 		else
@@ -636,9 +643,11 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 	free(sb_entry_arr);
 	free(meta_cache_arr);
 	set_recovery_flag(FALSE, 0, 0);
-	unlink_recover_progress_file();
 
-	write_log(4, "Recover SB entries finished.");
+	if (!system_going_down) {
+		unlink_recover_progress_file();
+		write_log(4, "Recover SB entries finished.");
+	}
 
 	pthread_exit((void*)0);
 	return NULL;
@@ -648,7 +657,12 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 void start_sb_recovery()
 {
 	pthread_t recover_thread;
-	pthread_create(&recover_thread, NULL, &recover_sb_queue_worker, NULL);
+	pthread_attr_t attr_t;
+
+	pthread_attr_init(&attr_t);
+	pthread_attr_setdetachstate(&attr_t, PTHREAD_CREATE_DETACHED);
+	pthread_create(&recover_thread, &attr_t, &recover_sb_queue_worker,
+		       NULL);
 	return;
 }
 

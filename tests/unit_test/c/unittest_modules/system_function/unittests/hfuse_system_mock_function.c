@@ -300,3 +300,7 @@ int32_t convert_cloud_stat_struct(char *path)
 {
 	return 0;
 }
+int32_t super_block_destroy(void)
+{
+	return 0;
+}

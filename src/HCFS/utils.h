@@ -59,6 +59,15 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 			   int64_t unpin_dirty_data_size,
 			   BOOL need_sync);
 
+int32_t change_system_meta_ignore_dirty(ino_t this_inode,
+					int64_t system_data_size_delta,
+					int64_t meta_size_delta,
+					int64_t cache_data_size_delta,
+					int64_t cache_blocks_delta,
+					int64_t dirty_cache_delta,
+					int64_t unpin_dirty_delta,
+					BOOL need_sync);
+
 void _shift_xfer_window(void);
 int32_t change_xfer_meta(int64_t xfer_size_upload,
 			 int64_t xfer_size_download,
