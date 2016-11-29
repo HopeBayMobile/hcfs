@@ -687,6 +687,14 @@ int32_t main(int32_t argc, char **argv)
 			exit(-1);
 		}
 
+		/* Try to reduce cache size if now in stage 1 of restoration */
+		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			ret = restore_stage1_reduce_cache();
+			if (ret == 0)
+				start_download_minimal();
+			else
+				notify_restoration_result(1, ret);
+		}
 		/* Only bring up monitor thread if in restoration process */
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 

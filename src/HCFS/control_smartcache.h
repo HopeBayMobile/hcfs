@@ -31,8 +31,15 @@
 	((strcmp(SMART_CACHE_ROOT_MP, folder) == 0) && \
 	 (strcmp(SMART_CACHE_FILE, name) == 0))
 
+
+int32_t write_restored_smartcache_info();
+int32_t read_restored_smartcache_info();
+int32_t destroy_restored_smartcacahe_info();
+
 int32_t unmount_smart_cache(char *mount_point);
 int32_t inject_restored_smartcache(ino_t smartcache_ino);
 int32_t extract_restored_smartcache(ino_t smartcache_ino);
 int32_t mount_and_repair_restored_smartcache();
+int32_t mount_hcfs_smartcache_vol();
+void change_stage1_cache_limit(int64_t restored_smartcache_size);
 #endif

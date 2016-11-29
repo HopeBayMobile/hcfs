@@ -149,17 +149,17 @@ errcode_handle:
 	return errcode;
 }
 
-BOOL _enough_local_space(void)
+BOOL _enough_local_space(int32_t smart_cache_size_to_reduce)
 {
 
 	/* Need cache size to be less than 0.2 of max possible cache size */
-	if (hcfs_system->systemdata.cache_size >=
-	    CACHE_HARD_LIMIT * REDUCED_RATIO - sc_data->smart_cache_size)
+	if (hcfs_system->systemdata.cache_size - smart_cache_size_to_reduce >=
+	    CACHE_HARD_LIMIT * REDUCED_RATIO)
 		return FALSE;
 
 	/* Need pin size to be less than 0.2 of max possible pin size */
-	if (hcfs_system->systemdata.pinned_size >=
-	    MAX_PINNED_LIMIT * REDUCED_RATIO - sc_data->smart_cache_size)
+	if (hcfs_system->systemdata.pinned_size - smart_cache_size_to_reduce >=
+	    MAX_PINNED_LIMIT * REDUCED_RATIO)
 		return FALSE;
 
 	/* Need pin size to be less than 0.2 of max possible meta size */
@@ -186,22 +186,13 @@ int32_t initiate_restoration(void)
 		return -EPERM;
 	}
 
-	/* Try to read smartcache data. */
-	sc_data = (RESTORED_SMARTCACHE_DATA *)
-			calloc(sizeof(RESTORED_SMARTCACHE_DATA), 1);
-	if (!sc_data) {
-		write_log(0, "Error: Fail to malloc in %s. Code %d",
-				__func__, errno);
-		return -errno;
-	}
-	ret = read_restored_smartcache_info();
-	if (ret < 0 && ret != -ENOENT)
-		return ret;
+	/* Do not need to read restored smart cache size because this function
+	 * is invoked when starting to do restoration stage1 first time. */
 
 	sem_wait(&restore_sem);
 	/* First check if there is enough space for restoration */
 	sem_wait(&(hcfs_system->access_sem));
-	if (_enough_local_space() == FALSE) {
+	if (_enough_local_space(0) == FALSE) {
 		sem_post(&(hcfs_system->access_sem));
 		errcode = -ENOSPC;
 		goto errcode_handle;
@@ -322,39 +313,8 @@ int32_t notify_restoration_result(int8_t stage, int32_t result)
  */
 int32_t restore_stage1_reduce_cache(void)
 {
-	char hcfsblock_restore_path[400];
-	DIR_ENTRY dentry;
 	int32_t ret;
-
-	/* Check if smartcache exist and mount it. Then remove
-	 * hcfsblock_restore if it is found. System reboot? */
-/*	ret = check_filesystem(SMART_CACHE_VOL_NAME, &dentry);
-	if (ret == 0) {
-		ret = mount_FS(SMART_CACHE_VOL_NAME, SMART_CACHE_ROOT_MP, 0);
-		if (ret < 0) {
-			write_log(0, "Error: Fail to mount vol in %s."
-					" Code %d", __func__, -ret);
-			return ret;
-		}*/
-		/* Check if hcfsblock_restore is already under
-		 * /data/smartcache/, If so, remove it. */
-/*		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
-				RESTORED_SMARTCACHE_TMP_NAME);
-		if (access(hcfsblock_restore_path, F_OK) == 0) {
-			write_log(4, "hcfsblock_restore already"
-				" existed, remove it in %s.", __func__);
-			ret = unlink(hcfsblock_restore_path);
-			if (ret < 0 && errno != ENOENT) {
-				write_log(0, "Error: Fail to remove"
-					" hcfsblock_restore."
-					" Code %d", errno);
-				return -errno;
-			}
-		} else {
-			write_log(4, "Cannot access %s. Code %d",
-				hcfsblock_restore_path, errno);
-		}
-	}*/
+	int64_t sc_size;
 
 	/* Try to read smartcache data. */
 	sc_data = (RESTORED_SMARTCACHE_DATA *)
@@ -365,15 +325,17 @@ int32_t restore_stage1_reduce_cache(void)
 		return -errno;
 	}
 	ret = read_restored_smartcache_info();
-	if (iret < 0 && ret != -ENOENT)
+	if (ret < 0 && ret != -ENOENT)
 		return ret;
 
 	sem_wait(&(hcfs_system->access_sem));
 	/* Need enough cache space */
-	if (_enough_local_space() == FALSE) {
+	if (_enough_local_space(sc_data->smart_cache_size) == FALSE) {
 		sem_post(&(hcfs_system->access_sem));
 		return -ENOSPC;
 	}
+
+	sc_size = sc_data->smart_cache_size;
 
 	/* Record orignal limit */
 	origin_hard_limit = CACHE_HARD_LIMIT;
@@ -384,16 +346,18 @@ int32_t restore_stage1_reduce_cache(void)
 
 	/* Change the max system size as well */
 	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
-	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
-	system_config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT;
+	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT + sc_size;
+	system_config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT + sc_size;
 
-	system_config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT;
-	system_config->max_pinned_limit[P_PIN] = MAX_PINNED_LIMIT;
+	system_config->max_cache_limit[P_PIN] = CACHE_HARD_LIMIT + sc_size;
+	system_config->max_pinned_limit[P_PIN] = MAX_PINNED_LIMIT + sc_size;
 
 	system_config->max_cache_limit[P_HIGH_PRI_PIN] =
-	    CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE;
+	    CACHE_HARD_LIMIT + RESERVED_CACHE_SPACE + sc_size;
 	system_config->max_pinned_limit[P_HIGH_PRI_PIN] =
-	    MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE;
+	    MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE + sc_size;
+
+	CACHE_HARD_LIMIT += sc_size;
 
 	sem_post(&(hcfs_system->access_sem));
 
@@ -2572,6 +2536,54 @@ int32_t _restore_smart_cache_vol(ino_t rootino)
 	int32_t ret;
 
 	restored_smartcache_ino = 0; /* Init smartcache ino as 0 */
+
+	/* Check if the restored smartcache had been injected into now hcfs.
+	 * If so, try to run fsck and mount it.
+	 */
+	if (sc_data->inject_smartcache_ino > 0) {
+		write_log(4, "Smartcache had been download. Try to mount it.");
+		ret = mount_hcfs_smartcache_vol();
+		if (ret < 0) {
+			write_log(0, "Error: Fail to mount hcfs_smartcache."
+					" Code %d", -ret);
+			ret = -ECANCELED;
+			goto out;
+		}
+		ret = mount_and_repair_restored_smartcache();
+		if (ret == 0) {
+			/* Skip downloading smartcache and keep restoration */
+			write_log(4, "Smartcache is mounted. Skip"
+					" Downloading again.");
+			restored_smartcache_ino = sc_data->origin_smartcache_ino;
+			goto out;
+		}
+		/* Remove the restored smartcache in now active hcfs and
+		 * download again. */
+		write_log(0, "Error: Fail to repair and mount"
+				" smartcache. Download again. Code %d", -ret);
+		sprintf(hcfsblock_restore_path, "%s/%s", SMART_CACHE_ROOT_MP,
+				RESTORED_SMARTCACHE_TMP_NAME);
+		if (access(hcfsblock_restore_path, F_OK) == 0) {
+			ret = unlink(hcfsblock_restore_path);
+			if (ret < 0 && errno != ENOENT) {
+				write_log(0, "Error: Fail to remove"
+					" hcfsblock_restore."
+					" Code %d", errno);
+				ret = -ECANCELED;
+				goto out;
+			}
+		} else {
+			write_log(4, "Cannot access %s. Code %d",
+				hcfsblock_restore_path, errno);
+		}
+		/* Recover the cache size limit */
+		sem_wait(&(hcfs_system->access_sem));
+		change_stage1_cache_limit(-(sc_data->smart_cache_size));
+		sem_post(&(hcfs_system->access_sem));
+		/* Reset sc_data and keep going. */
+		memset(&sc_data, 0, sizeof(RESTORED_SMARTCACHE_DATA));
+	}
+
 	snprintf(restore_todelete_list, METAPATHLEN,
 			"%s/todelete_list_%" PRIu64, RESTORE_METAPATH,
 			(uint64_t)rootino);

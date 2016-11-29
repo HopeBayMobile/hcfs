@@ -52,12 +52,17 @@ int32_t unmount_smart_cache(char *mount_point)
 	return ret;
 }
 
-static void _change_stage1_cache_limit(int64_t restored_smartcache_size)
+/**
+ * Change system quota, cache limit and pin limit caused by smartcache size.
+ * When restored smartcache injecting to and extracting from 
+ *
+ */
+void change_stage1_cache_limit(int64_t restored_smartcache_size)
 {
 	CACHE_HARD_LIMIT += restored_smartcache_size;
 
 	/* Change the max system size as well */
-	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
+	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT; /* TODO: Modify */
 	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
 	system_config->max_pinned_limit[P_UNPIN] += restored_smartcache_size;
 
@@ -106,7 +111,7 @@ static int32_t _run_command(char *command)
 int32_t write_restored_smartcache_info()
 {
 	FILE *fptr;
-	int32_t ret, errcode;
+	int32_t errcode;
 	int64_t ret_size;
 	char path[METAPATHLEN];
 
@@ -128,14 +133,14 @@ errcode_handle:
 int32_t read_restored_smartcache_info()
 {
 	FILE *fptr;
-	int32_t ret, errcode;
+	int32_t errcode;
 	int64_t ret_size;
 	char path[METAPATHLEN];
 
 	sprintf(path, "%s/restored_smartcache_info", METAPATH);
 	fptr = fopen(path, "r");
 	if (!fptr) {
-		write_log(0, "Error: Fail to open in %s. Code %d",
+		write_log(4, "Fail to open in %s. Code %d",
 				__func__, errno);
 		return -errno;
 	}
@@ -153,7 +158,7 @@ int32_t destroy_restored_smartcacahe_info()
 	int32_t ret, errcode;
 	char path[METAPATHLEN];
 
-	free(sc_data);
+	FREE(sc_data);
 	sprintf(path, "%s/restored_smartcache_info", METAPATH);
 	UNLINK(path);
 
@@ -164,37 +169,15 @@ errcode_handle:
 }
 
 /**
- * Inject restored smart cache data and meta to now active HCFS. The restored
- * smart cache will be placed under HCFS mount point /data/smartcache.
- * If /data/smartcache did not exist, create the volume and mount hcfs on it.
+ * Mount volume hcfs_smartcache on /data/smartcache.
  *
- * @param smartcache_ino Inode number of restored smart cache in restored HCFS.
- *
- * @return 0 on success, otherwise negative error code.
+ * @return 0 on successful mounting, otherwise negative error code.
  */
-int32_t inject_restored_smartcache(ino_t smartcache_ino)
+int32_t mount_hcfs_smartcache_vol()
 {
-	char path_restore[METAPATHLEN];
-	char path_nowsys[METAPATHLEN];
-	char restored_blockpath[400], thisblockpath[400];
-	char block_status;
-	ino_t tmp_ino;
-	FILE_META_HEADER origin_header, tmp_header;
-	FILE *fptr;
-	int64_t ret_ssize;
-	uint64_t generation;
-	int64_t count, total_blocks;
-	int32_t ret, errcode;
-	BOOL meta_open = FALSE;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
-	char pin_type;
-	struct stat tempstat;
-	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
+	int32_t ret;
 	char cmd[300];
-	FILE_BLOCK_ITERATOR *iter;
 
-	/* Check if vol "hcfs_smartcache" exist. Create and mount if
-	 * it did not exist */
 	ret = mount_status(SMART_CACHE_VOL_NAME);
 	if (ret < 0 && ret != -ENOENT)
 		return ret;
@@ -211,7 +194,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 				}
 			} else {
 				write_log(0, "Fail to access %s. Code %d",
-					SMART_CACHE_ROOT_MP, errno);
+						SMART_CACHE_ROOT_MP, errno);
 				return -errno;
 			}
 		}
@@ -245,6 +228,44 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 		}
 	}
 
+	return 0;
+}
+
+/**
+ * Inject restored smart cache data and meta to now active HCFS. The restored
+ * smart cache will be placed under HCFS mount point /data/smartcache.
+ * If /data/smartcache did not exist, create the volume and mount hcfs on it.
+ *
+ * @param smartcache_ino Inode number of restored smart cache in restored HCFS.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t inject_restored_smartcache(ino_t smartcache_ino)
+{
+	char path_restore[METAPATHLEN];
+	char path_nowsys[METAPATHLEN];
+	char restored_blockpath[400], thisblockpath[400];
+	char block_status;
+	ino_t tmp_ino;
+	FILE_META_HEADER origin_header, tmp_header;
+	FILE *fptr;
+	int64_t ret_ssize;
+	uint64_t generation;
+	int64_t count, total_blocks;
+	int32_t ret, errcode;
+	BOOL meta_open = FALSE;
+	META_CACHE_ENTRY_STRUCT *body_ptr;
+	char pin_type;
+	struct stat tempstat;
+	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;
+	FILE_BLOCK_ITERATOR *iter;
+
+	/* Check if vol "hcfs_smartcache" exist. Create and mount if
+	 * it did not exist */
+	ret = mount_hcfs_smartcache_vol();
+	if (ret < 0)
+		return ret;
+
 	fetch_restore_meta_path(path_restore, smartcache_ino);
 	fptr = fopen(path_restore, "r+");
 	if (!fptr) {
@@ -270,7 +291,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	sem_wait(&(hcfs_system->access_sem)); /* Lock system meta */
 	update_restored_cache_usage(-restored_smartcache_size,
 			-total_blocks, pin_type);
-	_change_stage1_cache_limit(restored_smartcache_size);
+	change_stage1_cache_limit(restored_smartcache_size);
 	hcfs_system->systemdata.system_size += restored_smartcache_size;
 	hcfs_system->systemdata.pinned_size += restored_smartcache_size;
 	hcfs_system->systemdata.cache_size += restored_smartcache_size;
@@ -380,7 +401,13 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	memcpy(&(sc_data->restored_smartcache_header), &origin_header,
 			sizeof(FILE_META_HEADER));
 	sc_data->inject_smartcache_ino = tmp_ino;
+	sc_data->origin_smartcache_ino = smartcache_ino;
 	sc_data->smart_cache_size = restored_smartcache_size; 
+	ret = write_restored_smartcache_info();
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 	write_log(4, "Inject smart cache. Inode %"PRIu64, (uint64_t)tmp_ino);
 	return 0;
 
@@ -466,7 +493,7 @@ int32_t mount_and_repair_restored_smartcache()
 		goto errcode_handle;
 	}
 
-	write_log(4, "Info: Smart cache had been repired and mounted.");
+	write_log(4, "Info: Smart cache had been repaired and mounted.");
 	return 0;
 
 errcode_handle:
@@ -616,7 +643,7 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	hcfs_system->systemdata.pinned_size -= restored_smartcache_size;
 	hcfs_system->systemdata.cache_size -= restored_smartcache_size;
 	hcfs_system->systemdata.cache_blocks -= total_blocks;
-	_change_stage1_cache_limit(-restored_smartcache_size);
+	change_stage1_cache_limit(-restored_smartcache_size);
 	update_restored_cache_usage(restored_smartcache_size,
 				total_blocks, pin_type);
 	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
@@ -674,7 +701,7 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	PWRITE(fileno(fptr), &tmp_header, sizeof(FILE_META_HEADER), 0);
 	fclose(fptr);
 	meta_open = FALSE;
-	FREE(sc_data);
+	destroy_restored_smartcacahe_info();
 
 	/* Reclaim the smart cahce inode in now hcfs */
 	ret = super_block_to_delete(ino_nowsys, FALSE);

@@ -7998,15 +7998,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	init_download_control();
 	init_pin_scheduler();
 
-	/* Try to reduce cache size if now in stage 1 of restoration */
-	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
-		ret = restore_stage1_reduce_cache();
-		if (ret == 0)
-			start_download_minimal();
-		else
-			notify_restoration_result(1, ret);
-	}
-
 	/* Check and cleanup meta / data no longer in use from content
 	before restoration */
 	cleanup_stage1_data();
