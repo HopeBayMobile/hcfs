@@ -2528,7 +2528,8 @@ errcode_handle:
  *
  * @param rootino Root inode of this volume smart cache belonging to.
  */
-int32_t _restore_smart_cache_vol(ino_t rootino, BOOL *smartcache_in_hcfs)
+int32_t _restore_smart_cache_vol(ino_t rootino,
+			BOOL *smartcache_already_in_hcfs)
 {
 	INODE_PAIR_LIST *hardln_mapping;
 	char restore_todelete_list[METAPATHLEN];
@@ -2555,7 +2556,7 @@ int32_t _restore_smart_cache_vol(ino_t rootino, BOOL *smartcache_in_hcfs)
 			write_log(4, "Smartcache is mounted. Skip"
 					" Downloading again.");
 			restored_smartcache_ino = sc_data->origin_smartcache_ino;
-			*smartcache_in_hcfs = TRUE;
+			*smartcache_already_in_hcfs = TRUE;
 			goto out;
 		}
 		/* Remove the restored smartcache in now active hcfs and
@@ -2654,7 +2655,7 @@ int32_t run_download_minimal(void)
 	BOOL is_fopen = FALSE;
 	ino_t vol_max_inode, sys_max_inode;
 	INODE_PAIR_LIST *hardln_mapping;
-	BOOL smartcache_in_hcfs;
+	BOOL smartcache_already_in_hcfs = FALSE;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -2773,9 +2774,9 @@ int32_t run_download_minimal(void)
 				SMART_CACHE_VOL_NAME);
 		tmpentry = &(tmppage.dir_entries[ret]);
 		hcfs_smartcache_vol_ino = tmpentry->d_ino;
-		smartcache_in_hcfs = FALSE;
+		smartcache_already_in_hcfs = FALSE;
 		ret = _restore_smart_cache_vol(hcfs_smartcache_vol_ino,
-					&smartcache_in_hcfs);
+					&smartcache_already_in_hcfs);
 		if (ret == -ECANCELED) {
 			errcode = ret;
 			goto errcode_handle;
@@ -2783,7 +2784,7 @@ int32_t run_download_minimal(void)
 		if (SMARTCACHE_IS_MISSING() == TRUE) {
 			write_log(4, "Warn: Smart cache is missing. Remove"
 				" all symlink under /data/data");
-		} else if (smartcache_in_hcfs == TRUE) {
+		} else if (smartcache_already_in_hcfs == TRUE) {
 			write_log(4, "Restored smart cache had been in"
 					" now hcfs.");
 		} else {
@@ -2818,7 +2819,7 @@ int32_t run_download_minimal(void)
 					 * discard it and remove hcfsblock from
 					 * /data/smartcache/. */
 					extract_restored_smartcache(
-						restored_smartcache_ino);
+						restored_smartcache_ino, FALSE);
 					write_log(4, "Smartcache corrupted."
 						" Discard it.");
 					strcpy(hcfsblock_entry.d_name,
@@ -2928,7 +2929,8 @@ int32_t run_download_minimal(void)
 					goto errcode_handle;
 				}
 				ret = extract_restored_smartcache(
-						restored_smartcache_ino);
+						restored_smartcache_ino,
+						smartcache_already_in_hcfs);
 				if (ret < 0) {
 					write_log(0, "Error: Fail to extract"
 						" smartcache from now system."
@@ -3176,9 +3178,9 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 	    restored_system_meta->cache_size + delta_cache_size > cache_limit) {
 		UNLOCK_RESTORED_SYSMETA();
 		write_log(0, "Error: No space when restoring. restored cache"
-			" size %lld. system cache size %lld",
-			hcfs_system->systemdata.cache_size,
-			restored_system_meta->cache_size);
+			" size %lld. system cache size %lld. Cache limit %lld",
+			restored_system_meta->cache_size,
+			hcfs_system->systemdata.cache_size, cache_limit);
 		return -ENOSPC;
 	}
 	restored_system_meta->cache_size += delta_cache_size;

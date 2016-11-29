@@ -114,6 +114,7 @@
 #include "rebuild_super_block.h"
 #include "hfuse_system.h"
 #include "do_restoration.h"
+#include "control_smartcache.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
  *
  *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
@@ -7980,8 +7981,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	data_data_root = (ino_t) 0;
 	data_smart_root = (ino_t) 0;
 	mgmt_app_is_created = FALSE;
-	origin_hard_limit = 0;
-	origin_meta_limit = 0;
 
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
@@ -8031,6 +8030,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 		/* Backup if have_new_pkgbackup == TRUE */
 		if (hcfs_system->system_going_down == FALSE)
 			force_backup_package();
+	}
+
+	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+		if (access("/data/mnt/hcfsblock_restore", F_OK) == 0)
+			unmount_smart_cache("/data/mnt/hcfsblock_restore");
 	}
 
 	/* Join thread if still restoring */

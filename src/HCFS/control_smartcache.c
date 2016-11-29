@@ -122,7 +122,7 @@ int32_t write_restored_smartcache_info()
 				__func__, errno);
 		return -errno;
 	}
-	FWRITE(&sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
+	FWRITE(sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
 	fclose(fptr);
 
 	return 0;
@@ -145,7 +145,7 @@ int32_t read_restored_smartcache_info()
 		return -errno;
 	}
 
-	FREAD(&sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
+	FREAD(sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
 	fclose(fptr);
 
 	return 0;
@@ -586,7 +586,8 @@ static int32_t _remove_from_now_hcfs(ino_t ino_nowsys)
  *
  * @return 0 on success, otherwise negative error code.
  */
-int32_t extract_restored_smartcache(ino_t smartcache_ino)
+int32_t extract_restored_smartcache(ino_t smartcache_ino,
+			BOOL smartcache_already_in_hcfs)
 {
 	char path_restore[METAPATHLEN];
 	char path_nowsys[METAPATHLEN];
@@ -626,6 +627,7 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 		write_log(0, "Error: Fail to open. Code %d", errno);
 		return -errno;
 	}
+	setbuf(fptr, NULL);
 	meta_open = TRUE;
 	PREAD(fileno(fptr), &tmp_header, sizeof(FILE_META_HEADER), 0);
 	pin_type = tmp_header.fmt.local_pin;
@@ -689,6 +691,25 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino)
 	hcfs_system->systemdata.cache_blocks += blocknum_est;
 	update_restored_cache_usage(-datasize_est, -blocknum_est, pin_type);
 	sem_post(&(hcfs_system->access_sem)); /* Unlock system meta */
+
+	/* If system reboot when restored smart cache in now HCFS, need to
+	 * rectifty the statistics because it is not downloaded again. */
+	if (smartcache_already_in_hcfs == TRUE) {
+		struct stat metastat;
+		int64_t metasize, metasize_blk;
+
+		fstat(fileno(fptr), &metastat);
+		metasize = metastat.st_size;
+		metasize_blk = metastat.st_blocks * 512;
+
+		UPDATE_RECT_SYSMETA(
+			.delta_system_size = -(metasize + tmp_header.st.size),
+			.delta_meta_size = -metasize_blk,
+			.delta_pinned_size = -round_size(tmp_header.st.size),
+			.delta_backend_size = -(metasize + tmp_header.st.size),
+			.delta_backend_meta_size = -metasize,
+			.delta_backend_inodes = -1);
+	}
 
 	/* Recover some data */
 	tmp_header.st.ino = smartcache_ino;

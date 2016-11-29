@@ -15,6 +15,8 @@
 #include <inttypes.h>
 #include <sys/stat.h>
 
+#include "global.h"
+
 #define COMMAND_LEN 300
 
 #define SMART_CACHE_ROOT_MP "/data/smartcache"
@@ -38,8 +40,9 @@ int32_t destroy_restored_smartcacahe_info();
 
 int32_t unmount_smart_cache(char *mount_point);
 int32_t inject_restored_smartcache(ino_t smartcache_ino);
-int32_t extract_restored_smartcache(ino_t smartcache_ino);
 int32_t mount_and_repair_restored_smartcache();
 int32_t mount_hcfs_smartcache_vol();
 void change_stage1_cache_limit(int64_t restored_smartcache_size);
+int32_t extract_restored_smartcache(ino_t smartcache_ino,
+			BOOL smartcache_already_in_hcfs);
 #endif
