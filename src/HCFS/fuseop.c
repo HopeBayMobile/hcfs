@@ -8032,10 +8032,11 @@ int32_t hook_fuse(int32_t argc, char **argv)
 			force_backup_package();
 	}
 
-	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+/*	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
 		if (access("/data/mnt/hcfsblock_restore", F_OK) == 0)
 			unmount_smart_cache("/data/mnt/hcfsblock_restore");
 	}
+*/
 
 	/* Join thread if still restoring */
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)

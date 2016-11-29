@@ -333,7 +333,7 @@ int32_t boost_package(char *package_name)
 				  10];
 	char cmd[1024];
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
-	char cmd_restorecon_recursive[] = "restorecon -R %s/%s";
+	char cmd_restorecon_recursive[] = "restorecon -R %s";
 	int32_t ret_code, status;
 	struct stat tmp_st;
 

@@ -62,7 +62,7 @@ void change_stage1_cache_limit(int64_t restored_smartcache_size)
 	CACHE_HARD_LIMIT += restored_smartcache_size;
 
 	/* Change the max system size as well */
-	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT; /* TODO: Modify */
+	hcfs_system->systemdata.system_quota = DEFAULT_QUOTA;
 	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT;
 	system_config->max_pinned_limit[P_UNPIN] += restored_smartcache_size;
 

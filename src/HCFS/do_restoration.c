@@ -345,7 +345,6 @@ int32_t restore_stage1_reduce_cache(void)
 	META_SPACE_LIMIT = META_SPACE_LIMIT * REDUCED_RATIO;
 
 	/* Change the max system size as well */
-	hcfs_system->systemdata.system_quota = CACHE_HARD_LIMIT;
 	system_config->max_cache_limit[P_UNPIN] = CACHE_HARD_LIMIT + sc_size;
 	system_config->max_pinned_limit[P_UNPIN] = MAX_PINNED_LIMIT + sc_size;
 
@@ -358,6 +357,12 @@ int32_t restore_stage1_reduce_cache(void)
 	    MAX_PINNED_LIMIT + RESERVED_CACHE_SPACE + sc_size;
 
 	CACHE_HARD_LIMIT += sc_size;
+
+	/* Quota should be as large as the max amount of data
+	the system can contain, including system + user data.
+	Here system apps could use reserved cache space, so
+	should adjust default quota size as such. */
+	hcfs_system->systemdata.system_quota = DEFAULT_QUOTA;
 
 	sem_post(&(hcfs_system->access_sem));
 
@@ -1491,7 +1496,7 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *removed_list = NULL;
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
-	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	int64_t temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
 	HCFS_STAT dirstat, tmpstat;
 	BOOL meta_open = FALSE;
 	BOOL need_copy;
@@ -1612,12 +1617,15 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 					now_entry, sizeof(DIR_ENTRY));
 				list_counter++;
 				if (list_counter >= list_size) {
+					DIR_ENTRY *tmp;
 					list_size += 20;
-					removed_list = realloc(removed_list,
-						list_size);
-					if (removed_list == NULL) {
+					tmp = realloc(removed_list,
+					              list_size);
+					if (tmp == NULL) {
 						errcode = -errno;
 						goto errcode_handle;
+					} else {
+						removed_list = tmp;
 					}
 				}
 			} else {
