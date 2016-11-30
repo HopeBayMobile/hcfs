@@ -1673,7 +1673,7 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 			return ret;
 	} else {
 		ino_t target_inode;
-		char targetpath[MAX_FILENAME_LEN];
+		char targetpath[METAPATHLEN];
 		HCFS_STAT hcfsstat;
 
 		write_log(4, "Warn: Detect missing hardlink %s", tmppath);
