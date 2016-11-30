@@ -129,7 +129,7 @@ int32_t write_restored_smartcache_info(void)
 		return -errno;
 	}
 	FWRITE(sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
-	fflush(fptr);
+	sync();
 	fclose(fptr);
 
 	return 0;
@@ -322,6 +322,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 		/* Skip if block does not exist */
 		block_status = iter->now_bentry->status;
 		if (block_status == ST_NONE)
+			/* TODO: Create block when status is ST_NONE */
 			continue;
 
 		count = iter->now_block_no; /* Block index */
@@ -674,7 +675,9 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino,
 		/* Skip if block does not exist */
 		block_status = iter->now_bentry->status;
 		if (block_status == ST_NONE)
+			/* TODO: Create block when status is ST_NONE */
 			continue;
+
 		count = iter->now_block_no;
 		fetch_restore_block_path(restored_blockpath,
 				smartcache_ino, count);
