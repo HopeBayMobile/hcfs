@@ -129,6 +129,7 @@ int32_t write_restored_smartcache_info(void)
 		return -errno;
 	}
 	FWRITE(sc_data, sizeof(RESTORED_SMARTCACHE_DATA), 1, fptr);
+	fflush(fptr);
 	fclose(fptr);
 
 	return 0;
