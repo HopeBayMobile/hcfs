@@ -25,10 +25,15 @@ class hfuse_systemEnvironment : public ::testing::Environment {
 			system_config = (SYSTEM_CONF_STRUCT *)
 				malloc(sizeof(SYSTEM_CONF_STRUCT));
 			memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
+
+			sys_super_block = (SUPER_BLOCK_CONTROL *)calloc(
+			    1, sizeof(SUPER_BLOCK_CONTROL));
+			sys_super_block->sb_recovery_meta.is_ongoing = 0; /* FALSE */
 		}
 		void TearDown()
 		{
 			free(system_config);
+			free(sys_super_block);
 		}
 };
 

@@ -50,6 +50,7 @@
 #include "meta_mem_cache.h"
 #include "do_restoration.h"
 #include "control_smartcache.h"
+#include "recover_super_block.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -917,6 +918,7 @@ int32_t send_notify_event(int32_t arg_len __attribute__((unused)),
 
 	return ret_code;
 }
+
 /************************************************************************
 *
 * Function name: api_module
@@ -1575,7 +1577,7 @@ void api_module(void *index)
 			break;
 		case SEND_NOTIFY_EVENT:
 			retcode = send_notify_event(arg_len, largebuf);
-			if (retcode > 0) {
+			if (retcode >= 0) {
 				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);

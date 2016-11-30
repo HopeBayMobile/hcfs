@@ -1681,8 +1681,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				    (P_IS_UNPIN(file_meta.local_pin)
 					 ? dirty_delta
 					 : 0);
-				change_system_meta(0, 0, -cache_block_size, -1,
-					dirty_delta, unpin_dirty_delta, FALSE);
+				change_system_meta_ignore_dirty(
+				    this_inode, 0, 0, -cache_block_size, -1,
+				    dirty_delta, unpin_dirty_delta, FALSE);
 			}
 		}
 		sem_wait(&(hcfs_system->access_sem));
@@ -2071,11 +2072,13 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
 	 * increase unpin-dirty size
 	 */
 	if (P_IS_PIN(ispin))
-		change_system_meta(0, 0, 0, 0, 0,
-				-filestats.dirty_data_size, FALSE);
+		change_system_meta_ignore_dirty(ptr->inode_num, 0, 0, 0, 0, 0,
+						-filestats.dirty_data_size,
+						FALSE);
 	else
-		change_system_meta(0, 0, 0, 0, 0,
-				filestats.dirty_data_size, FALSE);
+		change_system_meta_ignore_dirty(ptr->inode_num, 0, 0, 0, 0, 0,
+						filestats.dirty_data_size,
+						FALSE);
 
 	return 0;
 

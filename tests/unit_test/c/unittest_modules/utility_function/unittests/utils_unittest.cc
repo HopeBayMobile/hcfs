@@ -1231,6 +1231,96 @@ TEST_F(change_system_metaTest, UpdateSuccess)
  */
 
 /*
+ * Unittest of change_system_meta()
+ */
+class change_system_meta_ignore_dirtyTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		hcfs_system =
+			(SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+
+		sys_super_block =
+		    (SUPER_BLOCK_CONTROL *)calloc(1, sizeof(SUPER_BLOCK_CONTROL));
+
+	}
+
+	void TearDown()
+	{
+		free(hcfs_system);
+		free(sys_super_block);
+	}
+};
+
+TEST_F(change_system_meta_ignore_dirtyTest, UpdateSuccess)
+{
+	int32_t ret;
+	ino_t target_inode = 100;;
+
+	sys_super_block->sb_recovery_meta.is_ongoing = FALSE;
+
+	ret = change_system_meta_ignore_dirty(target_inode, 1, 2, 3, 4, 5, 6,
+					      FALSE);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(2, hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(3, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
+	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
+	EXPECT_EQ(6, hcfs_system->systemdata.unpin_dirty_data_size);
+}
+
+TEST_F(change_system_meta_ignore_dirtyTest, UpdateSuccess2)
+{
+	int32_t ret;
+	ino_t target_inode;
+
+	sys_super_block->sb_recovery_meta.is_ongoing = TRUE;
+	sys_super_block->sb_recovery_meta.start_inode = 10;
+	sys_super_block->sb_recovery_meta.end_inode = 100;
+
+	target_inode = 1000;
+	ret = change_system_meta_ignore_dirty(target_inode, 1, 2, 3, 4, 5, 6,
+					      FALSE);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(2, hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(3, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
+	EXPECT_EQ(5, hcfs_system->systemdata.dirty_cache_size);
+	EXPECT_EQ(6, hcfs_system->systemdata.unpin_dirty_data_size);
+}
+
+TEST_F(change_system_meta_ignore_dirtyTest, DirtyIgnoreCase)
+{
+	int32_t ret;
+	ino_t target_inode;
+
+	sys_super_block->sb_recovery_meta.is_ongoing = TRUE;
+	sys_super_block->sb_recovery_meta.start_inode = 10;
+	sys_super_block->sb_recovery_meta.end_inode = 100;
+
+	target_inode = 100;
+	ret = change_system_meta_ignore_dirty(target_inode, 1, 2, 3, 4, 5, 6,
+					      FALSE);
+	EXPECT_EQ(0, ret);
+
+	EXPECT_EQ(1, hcfs_system->systemdata.system_size);
+	EXPECT_EQ(2, hcfs_system->systemdata.system_meta_size);
+	EXPECT_EQ(3, hcfs_system->systemdata.cache_size);
+	EXPECT_EQ(4, hcfs_system->systemdata.cache_blocks);
+	EXPECT_EQ(0, hcfs_system->systemdata.dirty_cache_size);
+	EXPECT_EQ(0, hcfs_system->systemdata.unpin_dirty_data_size);
+}
+/*
+ * End of unittest of change_system_meta()
+ */
+
+/*
  * Unittest of _shift_xfer_window()
  */
 class _shift_xfer_windowTest : public ::testing::Test {

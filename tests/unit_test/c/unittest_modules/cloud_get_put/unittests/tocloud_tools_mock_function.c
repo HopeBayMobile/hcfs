@@ -47,6 +47,18 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	return 0;
 }
 
+int32_t change_system_meta_ignore_dirty(ino_t this_inode,
+					int64_t system_data_size_delta,
+					int64_t meta_size_delta,
+					int64_t cache_data_size_delta,
+					int64_t cache_blocks_delta,
+					int64_t dirty_cache_delta,
+					int64_t unpin_dirty_data_size,
+					BOOL need_sync)
+{
+	return 0;
+}
+
 int32_t change_action(int32_t fd, char new_action)
 {
 	return 0;

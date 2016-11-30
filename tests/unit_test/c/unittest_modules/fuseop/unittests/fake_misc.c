@@ -237,6 +237,21 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	return 0;
 }
 
+int32_t change_system_meta_ignore_dirty(ino_t this_inode,
+					int64_t system_data_size_delta,
+					int64_t meta_size_delta,
+					int64_t cache_data_size_delta,
+					int64_t cache_blocks_delta,
+					int64_t dirty_cache_delta,
+					int64_t unpin_dirty_data_size,
+					BOOL need_sync)
+{
+	return change_system_meta(system_data_size_delta, meta_size_delta,
+				  cache_data_size_delta, cache_blocks_delta,
+				  dirty_cache_delta, unpin_dirty_data_size,
+				  need_sync);
+}
+
 int32_t parse_parent_self(const char *pathname, char *parentname, char *selfname)
 {
 	MOCK();

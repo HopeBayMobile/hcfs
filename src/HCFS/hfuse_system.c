@@ -59,6 +59,7 @@
 #include "syncpoint_control.h"
 #include "do_restoration.h"
 #include "rebuild_super_block.h"
+#include "recover_super_block.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -743,7 +744,10 @@ int32_t main(int32_t argc, char **argv)
 
 	destory_hfuse_ll_notify_loop();
 
+	wait_sb_recovery_terminate();
+
 	sync_hcfs_system_data(TRUE);
+	super_block_destroy();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
 	destroy_pkg_cache();

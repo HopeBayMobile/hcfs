@@ -29,11 +29,22 @@
 
 #define NUM_SCAN_RECLAIMED 512
 
+#define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
+#define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
+
 /* pin-status in super block */
 #define ST_DEL 0
 #define ST_UNPIN 1
 #define ST_PINNING 2
 #define ST_PIN 3
+
+/* Struct to track the status of queue recovery in superblock */
+typedef struct SB_RECOVERY_META {
+	BOOL is_ongoing; /* Super Block entries recovery ongoing */
+	ino_t start_inode; /* Inode now processed */
+	ino_t end_inode; /* Last inode will processed */
+	time_t last_recovery_ts; /* Timestamp last recovery finished */
+} SB_RECOVERY_META;
 
 /* SUPER_BLOCK_ENTRY defines the structure for an entry in super block */
 typedef struct SUPER_BLOCK_ENTRY {
@@ -96,6 +107,7 @@ typedef struct {
 	BOOL now_reclaim_fullscan;
 	BOOL sync_point_is_set; /* Indicate if need to sync all data */
 	struct SYNC_POINT_INFO *sync_point_info; /* NULL if no sync point */
+	SB_RECOVERY_META sb_recovery_meta; /* Info about sb recovery */
 } SUPER_BLOCK_CONTROL;
 
 SUPER_BLOCK_CONTROL *sys_super_block;

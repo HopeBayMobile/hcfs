@@ -229,16 +229,16 @@ int32_t init_package_uid_list(char *plistpath)
 	if (errcode != 0) {
 		regerror(errcode, &re, ebuff, 1024);
 		errcode = -errcode;
-		write_log(0, "Error when compiling regex pattern. (%s)\n",
-			  ebuff);
+		write_log(0, "%s: Error when compiling regex pattern. (%s)\n",
+			  __func__, ebuff);
 		goto errcode_handle;
 	}
 
 	src = fopen(plistpath, "r");
 	if (src == NULL) {
 		errcode = -errno;
-		write_log(0, "Error when opening src package list. (%s)\n",
-			  strerror(-errcode));
+		write_log(0, "%s: Error when opening %s. (%s)\n", __func__,
+			  plistpath, strerror(-errcode));
 		goto errcode_handle;
 	}
 	clearerr(src);
@@ -282,8 +282,16 @@ int32_t init_package_uid_list(char *plistpath)
 
 	}
 	if (ferror(src) && !feof(src)) {
-		write_log(0, "Package list update terminated unexpectedly\n");
+		write_log(0, "%s: Error when reading %s.\n", __func__,
+			  plistpath);
 		errcode = -ferror(src);
+		goto errcode_handle;
+	}
+
+	if (!pkg_cnt) {
+		write_log(0, "%s: Malformed content retrieved from %s.\n",
+			  __func__, plistpath);
+		errcode = -EINVAL;
 		goto errcode_handle;
 	}
 
