@@ -131,7 +131,7 @@ int32_t update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 	ssize_t ret_ssize;
 	PRIMARY_PARENT_T tmpparent;
 
-	if (thisinode <= 0)
+	if (!thisinode)
 		return -EINVAL;
 	ret = sem_wait(&(pathlookup_data_lock));
 	if (ret < 0) {
@@ -206,7 +206,7 @@ int32_t update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
 
-	if (baseinode <= 0)
+	if (!baseinode)
 		return -EINVAL;
 	ret = sem_getvalue(&(pathlookup_data_lock), &sem_val);
 	if ((sem_val > 0) || (ret < 0))
@@ -253,7 +253,7 @@ int32_t read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
 	int32_t errcode, ret;
 	ssize_t ret_ssize;
 
-	if (thisinode <= 0)
+	if (!thisinode)
 		return -EINVAL;
 	ret = sem_wait(&(pathlookup_data_lock));
 	if (ret < 0) {
