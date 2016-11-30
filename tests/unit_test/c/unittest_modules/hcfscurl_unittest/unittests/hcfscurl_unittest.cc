@@ -14,9 +14,8 @@ FAKE_VALUE_FUNC(int32_t, add_notify_event, int32_t, char *, char);
 
 void *set_swift_token(void *)
 {
-	int sleep_time = 5;
-	printf("Set up swift token after %d seconds later\n", sleep_time);
-	sleep(sleep_time);
+	printf("Set up swift token after 0.1 seconds later\n");
+	nanosleep(&((struct timespec){ 0, 100000000 }), NULL);
 	pthread_cond_broadcast(&(swifttoken_control.waiting_cond));
 	return NULL;
 }
@@ -804,6 +803,8 @@ TEST(hcfs_init_backendTest, InitSwiftTokenBackendOK)
 
 	add_notify_event_fake.return_val = 0;
 
+	pthread_t tmpthread;
+	pthread_create(&tmpthread, NULL, set_swift_token, NULL);
 	EXPECT_EQ(200, hcfs_init_backend(&curl_handle));
 	EXPECT_EQ(SWIFTTOKEN, curl_handle.curl_backend);
 }
