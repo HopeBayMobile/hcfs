@@ -50,6 +50,7 @@
 #include "enc.h"
 #include "super_block.h"
 #include "do_restoration.h"
+#include "recover_super_block.h"
 
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
@@ -1101,9 +1102,12 @@ off_t check_file_size(const char *path)
 *
 *************************************************************************/
 int32_t change_system_meta(int64_t system_data_size_delta,
-		int64_t meta_size_delta, int64_t cache_data_size_delta,
-		int64_t cache_blocks_delta, int64_t dirty_cache_delta,
-		int64_t unpin_dirty_delta, BOOL need_sync)
+			   int64_t meta_size_delta,
+			   int64_t cache_data_size_delta,
+			   int64_t cache_blocks_delta,
+			   int64_t dirty_cache_delta,
+			   int64_t unpin_dirty_delta,
+			   BOOL need_sync)
 {
 	int32_t ret;
 
@@ -1148,6 +1152,43 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 	return ret;
 }
 
+/************************************************************************
+*
+* Function name: change_system_meta_ignore_dirty
+*        Inputs: ino_t this_inode,
+*                int64_t system_data_size_delta,
+*                int64_t meta_size_delta
+*                int64_t cache_data_size_delta,
+*                int64_t cache_blocks_delta,
+*                int64_t dirty_cache_delta,
+*                int64_t unpin_dirty_delta,
+*                BOOL need_sync
+*       Summary: A wrapper function of change_system_meta with new argument
+*                "ino_t this_inode". Will check if the super block entry of
+*                this_inode is going to be recovered soon after and determine if
+*                need update statistics about dirty size.
+*  Return value: 0 if successful. Otherwise returns -1.
+*
+*************************************************************************/
+int32_t change_system_meta_ignore_dirty(ino_t this_inode,
+					int64_t system_data_size_delta,
+					int64_t meta_size_delta,
+					int64_t cache_data_size_delta,
+					int64_t cache_blocks_delta,
+					int64_t dirty_cache_delta,
+					int64_t unpin_dirty_delta,
+					BOOL need_sync)
+{
+	if (IS_SBENTRY_BEING_RECOVER_LATER(this_inode))
+		return change_system_meta(
+		    system_data_size_delta, meta_size_delta,
+		    cache_data_size_delta, cache_blocks_delta, 0, 0, need_sync);
+	else
+		return change_system_meta(
+		    system_data_size_delta, meta_size_delta,
+		    cache_data_size_delta, cache_blocks_delta,
+		    dirty_cache_delta, unpin_dirty_delta, need_sync);
+}
 /************************************************************************
 *
 * Function name: _shift_xfer_window

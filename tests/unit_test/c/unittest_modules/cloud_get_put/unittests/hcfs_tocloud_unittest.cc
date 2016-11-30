@@ -21,6 +21,12 @@ extern "C" {
 #include "do_restoration.h"
 }
 
+#include "../../fff.h"
+DEFINE_FFF_GLOBALS;
+
+FAKE_VALUE_FUNC(BOOL, need_recover_sb);
+FAKE_VOID_FUNC(start_sb_recovery);
+
 extern SYSTEM_CONF_STRUCT *system_config;
 
 static int do_delete(const char *fpath, const struct stat *sb,

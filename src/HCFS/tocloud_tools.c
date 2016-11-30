@@ -108,8 +108,9 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 			delta_unpin_dirty_size = -cache_block_size;
 		else
 			delta_unpin_dirty_size = 0;
-		change_system_meta(0, 0, 0, 0, -cache_block_size,
-				delta_unpin_dirty_size, TRUE);
+		change_system_meta_ignore_dirty(inode, 0, 0, 0, 0,
+						-cache_block_size,
+						delta_unpin_dirty_size, TRUE);
 		/* Update dirty size in file meta */
 		update_file_stats(local_metafptr, 0, 0, 0,
 				-cache_block_size, inode);
@@ -321,8 +322,9 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 				cache_block_size, this_inode);
 		unpin_dirty_delta = (P_IS_UNPIN(filemeta.local_pin) ?
 				cache_block_size : 0);
-		change_system_meta(0, 0, 0, 0, cache_block_size,
-				unpin_dirty_delta, FALSE);
+		change_system_meta_ignore_dirty(this_inode, 0, 0, 0, 0,
+						cache_block_size,
+						unpin_dirty_delta, FALSE);
 		/* Keep running following code */
 	case ST_LtoC:
 		bentry_page.block_entries[eindex].status = ST_LDISK;

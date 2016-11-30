@@ -38,6 +38,8 @@ class superblockEnvironment : public ::testing::Environment {
 		void TearDown()
 		{
 			free(hcfs_system);
+			free(system_config->max_cache_limit);
+			free(system_config->max_pinned_limit);
 			free(system_config);
 		}
 };
@@ -1786,6 +1788,29 @@ TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
 		now_inode = sb_entry.util_ll_next; // Go to next dirty inode
 	}
 }
+
+TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_When_Queue_Recovery)
+{
+	ino_t this_inode, start_inode, end_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+
+	start_inode = 10;
+	end_inode = 100;
+	this_inode = 50;
+
+	sb_entry.status = IS_DIRTY;
+
+	sys_super_block->sb_recovery_meta.is_ongoing = TRUE;
+	sys_super_block->sb_recovery_meta.start_inode = start_inode;
+	sys_super_block->sb_recovery_meta.end_inode = end_inode;
+
+	EXPECT_EQ(0, ll_enqueue(this_inode, IS_DIRTY, &sb_entry));
+	EXPECT_EQ(IS_DIRTY, sb_entry.status);
+
+	sys_super_block->sb_recovery_meta.is_ongoing = FALSE;
+	sys_super_block->sb_recovery_meta.start_inode = 0;
+	sys_super_block->sb_recovery_meta.end_inode = 0;
+}
 /*
 	End of unittest of ll_enqueue()
  */
@@ -2009,6 +2034,32 @@ TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
 
 
 	EXPECT_EQ(123, hcfs_system->systemdata.dirty_cache_size);
+}
+
+TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_When_Queue_Recovery)
+{
+	ino_t this_inode, start_inode, end_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+
+	start_inode = 10;
+	end_inode = 100;
+	this_inode = 50;
+
+	sb_entry.util_ll_next = sb_entry.util_ll_prev = 999;
+	sb_entry.status = IS_DIRTY;
+
+	sys_super_block->sb_recovery_meta.is_ongoing = TRUE;
+	sys_super_block->sb_recovery_meta.start_inode = start_inode;
+	sys_super_block->sb_recovery_meta.end_inode = end_inode;
+
+	EXPECT_EQ(0, ll_dequeue(this_inode, &sb_entry));
+	EXPECT_EQ(NO_LL, sb_entry.status);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+
+	sys_super_block->sb_recovery_meta.is_ongoing = FALSE;
+	sys_super_block->sb_recovery_meta.start_inode = 0;
+	sys_super_block->sb_recovery_meta.end_inode = 0;
 }
 
 TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)

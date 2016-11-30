@@ -68,6 +68,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "hcfs_cacheops.h"
 #include "rebuild_super_block.h"
 #include "do_restoration.h"
+#include "recover_super_block.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -2163,6 +2164,10 @@ void upload_loop(void)
 				need_retry_backup = TRUE;
 				gettimeofday(&last_retry_time, NULL);
 			}
+
+			/* Start to recovery dirty queue if needed */
+			if (need_recover_sb())
+				start_sb_recovery();
 
 			for (sleep_count = 0; sleep_count < 10; sleep_count++) {
 				/* Break if system going down */
