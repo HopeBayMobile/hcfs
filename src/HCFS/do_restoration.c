@@ -577,7 +577,6 @@ int32_t _update_FS_stat(ino_t rootinode, ino_t *max_inode)
 	int64_t restored_meta_limit, after_add_metasize, delta_meta_size;
 	SYSTEM_DATA_TYPE *restored_system_meta, *rectified_system_meta;
 
-	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync", RESTORE_METAPATH);
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 RESTORE_METAPATH, (uint64_t)rootinode);
 
