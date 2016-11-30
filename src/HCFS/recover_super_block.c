@@ -654,7 +654,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 }
 
 /* To start superblock queue recovery worker. */
-void start_sb_recovery()
+void start_sb_recovery(void)
 {
 	pthread_t recover_thread;
 	pthread_attr_t attr_t;
@@ -666,3 +666,24 @@ void start_sb_recovery()
 	return;
 }
 
+/* To wait a running recovery job terminated */
+void wait_sb_recovery_terminate(void)
+{
+	struct timespec timer;
+	timer.tv_sec = 0;
+	timer.tv_nsec = 100000000;
+
+	uint32_t retry_times = 0;
+	while (retry_times < 5) {
+		if (!sys_super_block->sb_recovery_meta.is_ongoing) {
+			write_log(10,
+				  "Debug: No super block recovery is running.");
+			return;
+		}
+		nanosleep(&timer, NULL); /* Sleep for 0.1 sec */
+		retry_times++;
+	}
+
+	write_log(4, "Force to terminate sb recovery thread.");
+	return;
+}

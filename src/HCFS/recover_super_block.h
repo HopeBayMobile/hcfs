@@ -60,6 +60,8 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data);
 
 void *recover_sb_queue_worker(void *ptr);
 
-void start_sb_recovery();
+void start_sb_recovery(void);
+
+void wait_sb_recovery_terminate(void);
 
 #endif /* GW20_HCFS_RECOVER_SB_H_ */

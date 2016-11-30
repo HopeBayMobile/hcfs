@@ -304,3 +304,7 @@ int32_t super_block_destroy(void)
 {
 	return 0;
 }
+void wait_sb_recovery_terminate(void)
+{
+	return;
+}
