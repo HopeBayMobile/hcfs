@@ -2122,8 +2122,8 @@ static void _replace_version(char *fbuf, int32_t initpos, int32_t fbuflen)
 		/* Start of another field */
 		startpos++;
 		int32_t endpos = startpos;
-		while (((fbuf[endpos] != '=') && (fbuf[endpos] != ' ')) &&
-		       (endpos < fbuflen))
+		while ((endpos < fbuflen) &&
+		       ((fbuf[endpos] != '=') && (fbuf[endpos] != ' ')))
 			endpos++;
 		if ((endpos >= fbuflen) || ((endpos - startpos) > 255))
 			break;
