@@ -108,7 +108,13 @@ static int32_t _run_command(char *command)
 	return 0;
 }
 
-int32_t write_restored_smartcache_info()
+/**
+ * Write restored smart cache data to file. This function is invoked
+ * when smart cache is moved into hcfs in restoration stage1.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t write_restored_smartcache_info(void)
 {
 	FILE *fptr;
 	int32_t errcode;
@@ -130,7 +136,12 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t read_restored_smartcache_info()
+/**
+ * Read restored smart cache data from a specified file.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t read_restored_smartcache_info(void)
 {
 	FILE *fptr;
 	int32_t errcode;
@@ -153,7 +164,12 @@ errcode_handle:
 	return errcode;
 }
 
-int32_t destroy_restored_smartcacahe_info()
+/**
+ * Remove the restored smart cache data file and free memory of "sc_data".
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
+int32_t destroy_restored_smartcacahe_info(void)
 {
 	int32_t ret, errcode;
 	char path[METAPATHLEN];
@@ -173,7 +189,7 @@ errcode_handle:
  *
  * @return 0 on successful mounting, otherwise negative error code.
  */
-int32_t mount_hcfs_smartcache_vol()
+int32_t mount_hcfs_smartcache_vol(void)
 {
 	int32_t ret;
 	char cmd[300];

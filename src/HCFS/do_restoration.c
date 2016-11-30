@@ -1856,7 +1856,6 @@ static int32_t _try_repair_data_data(char *nowpath, DIR_ENTRY *tmpptr,
 static int32_t _add_to_prunelist(PRUNE_T **prune_list, int32_t *prune_index,
 	int32_t *max_prunes, const DIR_ENTRY *tmpptr, const char *nowpath)
 {
-	//_realloc_prune(&prune_list, max_prunes);
 	if (*prune_index >= *max_prunes) {
 		PRUNE_T *tmp_prune_ptr;
 

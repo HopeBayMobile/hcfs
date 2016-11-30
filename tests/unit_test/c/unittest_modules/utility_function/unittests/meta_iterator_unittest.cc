@@ -42,6 +42,7 @@ class init_block_iterTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		system("rm -rf iterator_test");
 		mkdir("iterator_test", 0777);
 	}
 
