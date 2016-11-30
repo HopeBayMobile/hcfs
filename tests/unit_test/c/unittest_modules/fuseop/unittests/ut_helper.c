@@ -30,7 +30,6 @@ void __attribute__((constructor)) Init(void)
 		func##_real = (typeof(func) *)dlsym(RTLD_NEXT, #func);         \
 		if (!func##_real && strcmp(#func, "write_log") != 0)           \
 			func##_real = func;                                    \
-		printf(#func " %p\n", func##_real);                            \
 	} while (0)
 	FAKE_FUNC_LIST
 #undef X

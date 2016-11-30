@@ -26,7 +26,7 @@
 #include "ut_helper.h"
 #endif
 
-FUSE_NOTIFY_RING_BUF notify_buf;
+FUES_NOTIFY_SHARED_DATA notify;
 fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
 			       _do_hfuse_ll_notify_delete};
 
@@ -38,7 +38,7 @@ fuse_notify_fn *notify_fn[] = {_do_hfuse_ll_notify_noop,
 static inline void inc_buf_idx(size_t *x)
 {
 	(*x)++;
-	if ((*x) == FUSE_NOTIFY_BUF_MAX_LEN)
+	if ((*x) == FUSE_NOTIFY_RINGBUF_MAXLEN)
 		(*x) = 0;
 }
 
@@ -50,35 +50,27 @@ int32_t init_notify_buf(void)
 {
 	int32_t ret = -1;
 
-#define STATIC_CHECK_BUF_SIZE(X)                                               \
-	_Static_assert(sizeof(X) <= FUSE_NOTIFY_BUF_ELEMSIZE,                  \
-		       "FUSE_NOTIFY_BUF_ELEMSFIZE is not enough for " #X)
-	STATIC_CHECK_BUF_SIZE(FUSE_NOTIFY_DELETE_DATA);
-
 	errno = 0;
-	while (TRUE) {
-		memset(&notify_buf, 0, sizeof(FUSE_NOTIFY_RING_BUF));
-		notify_buf.in = FUSE_NOTIFY_BUF_MAX_LEN - 1;
-		notify_buf.out = 0;
-		notify_buf.len = 0;
-
-		if (sem_init(&notify_buf.not_empty, 1, 0) == -1)
+	memset(&notify, 0, sizeof(FUES_NOTIFY_SHARED_DATA));
+	notify.in = FUSE_NOTIFY_RINGBUF_MAXLEN - 1;
+	/* notify.in will be 0 at first enqueue */
+	notify.out = 0;
+	notify.len = 0;
+	do {
+		if (sem_init(&notify.not_empty, 1, 0) == -1)
 			break;
-		if (sem_init(&notify_buf.not_full, 1, 0) == -1)
-			break;
-		if (sem_init(&notify_buf.access_sem, 1, 1) == -1)
+		if (sem_init(&notify.access_sem, 1, 1) == -1)
 			break;
 
-		ret = 0;
 		write_log(10, "Debug %s: Succeed.\n", __func__);
-		break;
-	}
-	if (ret < 0 && errno != 0)
-		ret = -errno;
+		ret = 0;
+	} while (0);
 
 	if (ret < 0) {
-		write_log(1, "Error %s: Failed. %s\n", __func__,
-			  strerror(-ret));
+		if (errno != 0)
+			ret = -errno;
+		write_log(0, "Error %s: Failed. %s\n", __func__,
+			  errno ? strerror(errno) : "");
 	}
 	return ret;
 }
@@ -87,107 +79,162 @@ void destory_notify_buf(void)
 {
 	size_t len, idx;
 	FUSE_NOTIFY_PROTO *proto;
-	FUSE_NOTIFY_DATA *data;
 
-	idx = notify_buf.out;
+	idx = notify.out;
 	/* Free member in notify data */
-	for (len = 1; len <= notify_buf.len; len++) {
-		proto = (FUSE_NOTIFY_PROTO *)&notify_buf.elems[idx];
-		data = &notify_buf.elems[idx];
-		notify_fn[proto->func](data, DESTROY_BUF);
+	for (len = 1; len <= notify.len; len++) {
+		proto = &notify.ring_buf[idx];
+		notify_fn[proto->func](proto, DESTROY_BUF);
 		inc_buf_idx(&idx);
 	}
 
-	notify_buf.in = 0;
-	notify_buf.out = 0;
-	notify_buf.len = 0;
-	sem_destroy(&notify_buf.access_sem);
-	sem_destroy(&notify_buf.not_empty);
-	sem_destroy(&notify_buf.not_full);
+	sem_destroy(&notify.access_sem);
+	sem_destroy(&notify.not_empty);
 
 	write_log(10, "Debug %s: Done\n", __func__);
 }
 
+/*
+ * Enqueue notify data to an extra linked list. It's called when ring
+ * buffer is full.
+ */
+int32_t _linked_list_enqueue(const void *const data)
+{
+	FUSE_NOTIFY_LINKED_NODE *node = malloc(sizeof(FUSE_NOTIFY_LINKED_NODE));
+
+	if (node == NULL)
+		return -1;
+	node->data = malloc(FUSE_NOTIFY_ENTRY_SIZE);
+	if (node->data == NULL) {
+		FREE(node);
+		return -1;
+	}
+
+	/* Fill data */
+	node->next = NULL;
+	memcpy(node->data, data, FUSE_NOTIFY_ENTRY_SIZE);
+
+	/* Chain ndoe */
+	if (notify.linked_list_head == NULL) {
+		notify.linked_list_head = node;
+		notify.linked_list_rear = node;
+	} else {
+		notify.linked_list_rear->next = node;
+		notify.linked_list_rear = node;
+	}
+
+	return 0;
+}
+int32_t _ring_buffer_enqueue(const void *const data)
+{
+	inc_buf_idx(&notify.in);
+	memcpy(&notify.ring_buf[notify.in], data, FUSE_NOTIFY_ENTRY_SIZE);
+	return 0;
+}
 /* @param notify: A pointer of data to be added into notify queue
  *
  * @return zero for success, -errno for failure
  */
-int32_t notify_buf_enqueue(const void *const notify)
+int32_t notify_buf_enqueue(const void *const data)
 {
 	int32_t ret = -1;
 
-	while (TRUE) {
-		if (hcfs_system->system_going_down == TRUE)
-			break;
+	errno = 0;
+	while (hcfs_system->system_going_down == FALSE) {
+		sem_wait(&notify.access_sem);
+
 		/* Fuse has multiple threads. Enqueue need to be thread safe */
-		sem_wait(&notify_buf.access_sem);
-
-		if (notify_buf.len == FUSE_NOTIFY_BUF_MAX_LEN) {
-			sem_post(&notify_buf.access_sem);
-			sem_wait(&notify_buf.not_full);
-			continue;
-		}
-
-		inc_buf_idx(&notify_buf.in);
-		memcpy(&notify_buf.elems[notify_buf.in], notify,
-		       sizeof(FUSE_NOTIFY_DATA));
-		notify_buf.len++;
-
-		sem_post(&notify_buf.access_sem);
-
-		ret = 0;
-		write_log(10, "Debug %s: Add %lu\n", __func__, notify_buf.in);
+		ret = (notify.len >= FUSE_NOTIFY_RINGBUF_MAXLEN)
+			  ? _linked_list_enqueue(data)
+			  : _ring_buffer_enqueue(data);
+		if (ret < 0)
+			break;
+		notify.len++;
 
 		/* wake notify thread up */
-		if (notify_buf.len == 1)
-			sem_post(&notify_buf.not_empty);
+		if (notify.len == 1)
+			sem_post(&notify.not_empty);
+
+		write_log(10, "Debug %s: Add %lu\n", __func__, notify.in);
+		ret = 0;
 		break;
-	};
+	}
+	sem_post(&notify.access_sem);
 
 	if (ret < 0)
-		write_log(1, "Error %s: Failed. %s\n", __func__,
-			  strerror(-ret));
-
+		write_log(0, "Error %s: Failed. %s\n", __func__,
+			  errno ? strerror(errno) : "");
 	return ret;
 }
 
+FUSE_NOTIFY_PROTO *_linked_list_dequeue(void)
+{
+	FUSE_NOTIFY_LINKED_NODE *node;
+	FUSE_NOTIFY_PROTO *data = NULL;
+
+	if (notify.linked_list_head == NULL)
+		return NULL;
+
+	node = notify.linked_list_head;
+	notify.linked_list_head = notify.linked_list_head->next;
+	if (notify.linked_list_head == NULL)
+		notify.linked_list_rear = NULL;
+
+	data = node->data;
+	FREE(node);
+	return data;
+}
+FUSE_NOTIFY_PROTO *_ring_buffer_dequeue(void)
+{
+	FUSE_NOTIFY_PROTO *data = NULL;
+
+	data = malloc(FUSE_NOTIFY_ENTRY_SIZE);
+	if (data == NULL)
+		return NULL;
+
+	memcpy(data, &notify.ring_buf[notify.out], FUSE_NOTIFY_ENTRY_SIZE);
+	write_log(10, "Debug %s: Get %lu\n", __func__, notify.out);
+	inc_buf_idx(&notify.out);
+	return data;
+}
 /* Dequeue the notify ring buffer
  *
  * @return Pointer on success, NULL on fail with errno set.
  */
-FUSE_NOTIFY_DATA *notify_buf_dequeue()
+FUSE_NOTIFY_PROTO *notify_buf_dequeue()
 {
-	FUSE_NOTIFY_DATA *data = NULL;
+	FUSE_NOTIFY_PROTO *data = NULL;
 
 	errno = 0;
-	while (TRUE) {
-		if (hcfs_system->system_going_down == TRUE)
-			break;
-		if (notify_buf.len == 0) {
-			sem_wait(&notify_buf.not_empty);
+	while (hcfs_system->system_going_down == FALSE) {
+		sem_wait(&notify.access_sem);
+		if (notify.len == 0) {
+			sem_post(&notify.access_sem);
+			sem_wait(&notify.not_empty);
 			continue;
 		}
 
-		data = malloc(sizeof(FUSE_NOTIFY_DATA));
+		data = _ring_buffer_dequeue();
 		if (data == NULL)
 			break;
+		notify.len--;
 
-		memcpy(data, &notify_buf.elems[notify_buf.out],
-		       sizeof(FUSE_NOTIFY_DATA));
-		write_log(10, "Debug %s: Get %lu\n", __func__, notify_buf.out);
-		inc_buf_idx(&notify_buf.out);
-		notify_buf.len--;
+		/* Try to move one notify from linked list to ring buffer */
+		if (notify.len < FUSE_NOTIFY_RINGBUF_MAXLEN) {
+			FUSE_NOTIFY_PROTO *tmp_notify = _linked_list_dequeue();
 
-		/* wake fuse IO thread up */
-		if (notify_buf.len == (FUSE_NOTIFY_BUF_MAX_LEN - 1))
-			sem_post(&notify_buf.not_full);
+			if (tmp_notify != NULL)
+				_ring_buffer_enqueue(tmp_notify);
+			FREE(tmp_notify);
+		}
 		break;
 	}
+	sem_post(&notify.access_sem);
 
 	return data;
 }
 
-/* Initialize notify_buf and create new thread to loop reading buffer and
+/* Initialize notify and create new thread to loop reading buffer and
  * send notify to VFS.
  *
  * @return zero for success, -errno for failure
@@ -224,7 +271,7 @@ int32_t destory_hfuse_ll_notify_loop(void)
 
 	write_log(10, "Debug %s: Start.\n", __func__);
 	/* let loop handle destory tasks itself */
-	if (sem_post(&notify_buf.not_empty) == -1) {
+	if (sem_post(&notify.not_empty) == -1) {
 		save_errno = errno;
 		write_log(1, "Error %s: sem_post failed. %s\n",
 			  __func__, strerror(save_errno));
@@ -244,7 +291,7 @@ int32_t destory_hfuse_ll_notify_loop(void)
 
 void *hfuse_ll_notify_loop(void *ptr)
 {
-	FUSE_NOTIFY_DATA *data = NULL;
+	FUSE_NOTIFY_PROTO *data = NULL;
 	int32_t func_num;
 	int32_t save_errno = 0;
 
@@ -257,7 +304,7 @@ void *hfuse_ll_notify_loop(void *ptr)
 		if (hcfs_system->system_going_down == TRUE)
 			break;
 		if (data != NULL) {
-			func_num = ((FUSE_NOTIFY_PROTO *)data)->func;
+			func_num = data->func;
 			notify_fn[func_num](data, RUN);
 			write_log(10, "Debug %s: Notification is sent.\n",
 				  __func__);
@@ -281,12 +328,12 @@ void *hfuse_ll_notify_loop(void *ptr)
  * unexpected error happend. noop will free when not
  *     exexute with DESTROY_BU mode.
  *
- * @param data_ptr pointer to FUSE_NOTIFY_DATA
+ * @param data_ptr pointer to FUSE_NOTIFY_PROTO
  * @param action what action will be execute.
 
  * @return zero.
  */
-int32_t _do_hfuse_ll_notify_noop(_UNUSED FUSE_NOTIFY_DATA *data,
+int32_t _do_hfuse_ll_notify_noop(_UNUSED FUSE_NOTIFY_PROTO *data,
 				 _UNUSED enum NOTIFY_ACTION action)
 {
 	write_log(10, "Debug %s: Do nothing.\n", __func__);
@@ -296,12 +343,12 @@ int32_t _do_hfuse_ll_notify_noop(_UNUSED FUSE_NOTIFY_DATA *data,
 /* Actuall function to call libfuse notify; If action == DESTROY_BUF,
  * function will only free nested data structure.
  *
- * @param data_ptr pointer to FUSE_NOTIFY_DATA
+ * @param data_ptr pointer to FUSE_NOTIFY_PROTO
  * @param action what action will be execute.
  *
  * @return zero for success, -errno for failure
  */
-int32_t _do_hfuse_ll_notify_delete(FUSE_NOTIFY_DATA *data,
+int32_t _do_hfuse_ll_notify_delete(FUSE_NOTIFY_PROTO *data,
 				enum NOTIFY_ACTION action)
 {
 	int32_t ret = 0;
