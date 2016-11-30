@@ -2776,10 +2776,8 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	}
 
 	/* Free and unlock */
-	if (key_buf)
-		free(key_buf);
-	if (value_buf)
-		free(value_buf);
+	free(key_buf);
+	free(value_buf);
 
 	ret = meta_cache_close_file(pbody_ptr);
 	if (ret < 0) {
@@ -3237,10 +3235,7 @@ int32_t restore_meta_file(ino_t this_inode)
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errno));
-		if (fptr != NULL) {
-			fclose(fptr);
-			fptr = NULL;
-		}
+		fclose(fptr);
 		return -EIO;
 	}
 	if (!access(metapath, F_OK)) { /* Check again when get lock */
