@@ -2112,17 +2112,16 @@ void _init_quota_restore(void)
 
 static void _replace_version(char *fbuf, int32_t initpos, int32_t fbuflen)
 {
-	int32_t startpos, endpos;
-
-	startpos = initpos;
+	int32_t startpos = initpos;
 	while (startpos < fbuflen) {
-		while ((fbuf[startpos] != ' ') && (startpos < fbuflen))
+		while ((startpos < fbuflen) && (fbuf[startpos] != ' '))
 			startpos++;
 		if (startpos >= fbuflen)
 			break;
+
 		/* Start of another field */
 		startpos++;
-		endpos = startpos;
+		int32_t endpos = startpos;
 		while (((fbuf[endpos] != '=') && (fbuf[endpos] != ' ')) &&
 		       (endpos < fbuflen))
 			endpos++;
@@ -2141,13 +2140,13 @@ static void _replace_version(char *fbuf, int32_t initpos, int32_t fbuflen)
 		}
 		/* Mark the start and the end of the value */
 		startpos = endpos;
-		while ((fbuf[startpos] != '"') && (startpos < fbuflen))
+		while ((startpos < fbuflen) && (fbuf[startpos] != '"'))
 			startpos++;
 		if (startpos >= fbuflen)
 			break;
 		startpos++;
 		endpos = startpos;
-		while ((fbuf[endpos] != '"') && (endpos < fbuflen))
+		while ((endpos < fbuflen) && (fbuf[endpos] != '"'))
 			endpos++;
 		/* terminate if no value or no valid value */
 		if ((endpos >= fbuflen) || (endpos == startpos))
