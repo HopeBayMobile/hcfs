@@ -102,7 +102,7 @@ void static_assert_test(void) {
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
-   "mode" is the bit-wise OR of ATIME, MTIME, CTIME.
+   "mode" is the bit-wise OR of A_TIME, M_TIME, C_TIME.
 */
 void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 {
@@ -113,7 +113,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 
 	write_log(10, "Current time %s, ret %d\n",
 		ctime(&(timenow.tv_sec)), ret);
-	if (mode & ATIME) {
+	if (mode & A_TIME) {
 		thisstat->atime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->atime), &timenow,
@@ -121,7 +121,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 #endif
 	}
 
-	if (mode & MTIME) {
+	if (mode & M_TIME) {
 		thisstat->mtime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->mtime), &timenow,
@@ -129,7 +129,7 @@ void set_timestamp_now(HCFS_STAT *thisstat, char mode)
 #endif
 	}
 
-	if (mode & CTIME) {
+	if (mode & C_TIME) {
 		thisstat->ctime = (time_t)(timenow.tv_sec);
 #ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->ctime), &timenow,

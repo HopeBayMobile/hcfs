@@ -1,12 +1,11 @@
 /*************************************************************************
-
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: syncpoint_control.h
 * Abstract: The c header file for sync point processing.
 *
 * Revision History
-* 2015/2/6 Kewei created this header file so as to define structure.
+* 2016/7/12 Kewei created this header file.
 *
 **************************************************************************/
 

@@ -21,6 +21,7 @@
 #include "global.h"
 #include "params.h"
 #include "fuseop.h"
+#include "meta.h"
 
 #define RESERVED_META_MARGIN 20971520 /* 20M */
 
@@ -42,6 +43,21 @@ BOOL use_old_cloud_stat;
 pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;
 
+typedef struct {
+	FILE_META_HEADER restored_smartcache_header; /* Original header */
+	/* Original smart cache inode in restoration system */
+	ino_t origin_smartcache_ino;
+	/* Smart cache inode in active hcfs system */
+	ino_t inject_smartcache_ino;
+	/* Size of this smart cache */
+	int64_t smart_cache_size;
+} RESTORED_SMARTCACHE_DATA;
+
+RESTORED_SMARTCACHE_DATA *sc_data;
+ino_t restored_smartcache_ino; /* If this inode is 0, it means no smartcache */
+ino_t restored_datadata_ino;
+int64_t origin_hard_limit;
+int64_t origin_meta_limit;
 FILE *to_delete_fptr;
 FILE *to_sync_fptr;
 
@@ -71,6 +87,8 @@ HCFS_RESTORED_SYSTEM_META *hcfs_restored_system_meta;
 #define RESTORE_BLOCKPATH restore_blockpath
 #define PACKAGE_XML "/data/system/packages.xml"
 #define PACKAGE_LIST "/data/system/packages.list"
+
+#define SMARTCACHE_IS_MISSING() (restored_smartcache_ino == 0 ? TRUE : FALSE)
 
 typedef struct {
 	DIR_ENTRY entry;

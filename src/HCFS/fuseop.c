@@ -114,6 +114,7 @@
 #include "rebuild_super_block.h"
 #include "hfuse_system.h"
 #include "do_restoration.h"
+#include "control_smartcache.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
  *
  *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
@@ -1092,7 +1093,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.gid = temp_context->gid;
 
 	/* Use the current time for timestamps */
-	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
 			ispin);
@@ -1333,7 +1334,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.uid = temp_context->uid;
 	this_stat.gid = temp_context->gid;
 
-	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 
 	this_stat.size = 0;
 	this_stat.blksize = ST_BLKSIZE;
@@ -4369,7 +4370,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			return;
 		}
 
-		set_timestamp_now(&temp_stat, ATIME);
+		set_timestamp_now(&temp_stat, A_TIME);
 
 		/* Write changes to disk but do not sync to backend */
 		ret = meta_cache_update_stat_nosync(
@@ -5342,7 +5343,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 
 	if (total_bytes_written > 0)
-		set_timestamp_now(&temp_stat, MTIME | CTIME);
+		set_timestamp_now(&temp_stat, M_TIME | C_TIME);
 
 	ret = meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat, NULL,
 					NULL, 0, fh_ptr->meta_cache_ptr);
@@ -5860,8 +5861,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	ret = 0;
 	if (buf_pos > 0) {
-		/* Do not sync atime change to backend */
-		set_timestamp_now(&thisstat, ATIME);
+		/* Do not sync A_TIME change to backend */
+		set_timestamp_now(&thisstat, A_TIME);
 		ret = meta_cache_update_stat_nosync(this_inode, &thisstat,
 						    body_ptr);
 	}
@@ -6583,7 +6584,7 @@ static int32_t symlink_internal(fuse_req_t req, const char *link,
 
 	this_stat.uid = temp_context->uid;
 	this_stat.gid = temp_context->gid;
-	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
 			local_pin);
@@ -6714,7 +6715,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	}
 
 	/* Update access time but do not sync to backend */
-	set_timestamp_now(&symlink_stat, ATIME);
+	set_timestamp_now(&symlink_stat, A_TIME);
 	ret_code = meta_cache_update_stat_nosync(this_inode, &symlink_stat,
 		meta_cache_entry);
 	if (ret_code < 0) {
@@ -7713,7 +7714,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.gid = temp_context->gid;
 
 	/* Use the current time for timestamps */
-	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
 			ispin);
 	/* If cannot get new inode number, error is ENOSPC */
@@ -7982,6 +7983,7 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	global_argv = argv;
 #endif
 	data_data_root = (ino_t) 0;
+	data_smart_root = (ino_t) 0;
 	mgmt_app_is_created = FALSE;
 
 	pthread_attr_init(&prefetch_thread_attr);
@@ -8033,6 +8035,12 @@ int32_t hook_fuse(int32_t argc, char **argv)
 		if (hcfs_system->system_going_down == FALSE)
 			force_backup_package();
 	}
+
+/*	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+		if (access("/data/mnt/hcfsblock_restore", F_OK) == 0)
+			unmount_smart_cache("/data/mnt/hcfsblock_restore");
+	}
+*/
 
 	/* Join thread if still restoring */
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)

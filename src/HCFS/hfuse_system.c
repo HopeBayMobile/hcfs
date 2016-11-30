@@ -691,11 +691,12 @@ int32_t main(int32_t argc, char **argv)
 			write_log(0, "Unexpected sb error in stage 1\n");
 			exit(-1);
 		}
-
 		/* Only bring up monitor thread if in restoration process */
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+
 		/* Try to reduce cache size if now in stage 1 of restoration */
 		if (hcfs_system->system_restoring == RESTORING_STAGE1) {
+			write_log(0, "TEST: keep restoration stage1");
 			ret = restore_stage1_reduce_cache();
 			if (ret == 0)
 				start_download_minimal();

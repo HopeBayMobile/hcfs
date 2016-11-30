@@ -2,7 +2,7 @@
 *
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: super_block.c
+* File Name: syncpoint_control.c
 * Abstract: The c source code file for setting sync point.
 *
 * Revision History

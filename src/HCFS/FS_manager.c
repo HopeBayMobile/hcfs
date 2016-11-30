@@ -258,7 +258,7 @@ ino_t _create_root_inode()
 	this_stat.uid = getuid();
 	this_stat.gid = getgid();
 
-	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 
 	root_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
 

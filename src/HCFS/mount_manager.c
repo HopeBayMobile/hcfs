@@ -812,6 +812,11 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 					" pkg folder. Code %d", -ret);
 		}
 	}
+	if (strncmp(mp, "/data/smartcache", strlen("data/smartcache")) == 0) {
+		data_smart_root = new_info->f_ino;
+		write_log(10, "Debug mount: root of /data/smartcache is %" PRIu64
+		          "\n", (uint64_t) data_smart_root);
+	}
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
 

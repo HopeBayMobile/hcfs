@@ -20,6 +20,8 @@
 
 #include "metaops.h"
 #include "file_present.h"
+#include "do_restoration.h"
+#include "control_smartcache.h"
 
 /**
  * Given a path, try to find stat in now mounted HCFS.
@@ -359,3 +361,63 @@ int32_t lookup_package_uid_list(const char *pkgname)
 	return (ret != NULL) ? (*ret)->uid : -1;
 }
 
+int32_t create_smartcache_symlink(ino_t this_inode, ino_t root_ino,
+		char *pkgname)
+{
+	char metapath[METAPATHLEN];
+	char link_target[MAX_LINK_PATH];
+	SYMLINK_META_HEADER symlink_header;
+	int64_t ret_ssize, errcode, ret_size;
+	struct stat tmpstat;
+	int64_t uid, metasize, metasize_blk;
+	FILE *fptr;
+
+	uid = lookup_package_uid_list(pkgname);
+	if (uid < 0)
+		return -ENOENT;
+	memset(&symlink_header, 0, sizeof(SYMLINK_META_HEADER));
+	sprintf(link_target, "%s/%s", SMART_CACHE_MP, pkgname);
+	init_hcfs_stat(&(symlink_header.st));
+	symlink_header.st.ino = this_inode;
+	symlink_header.st.mode = S_IFLNK;
+	symlink_header.st.uid = uid;
+	symlink_header.st.gid = uid;
+	symlink_header.smt.link_len = strlen(link_target);
+	symlink_header.smt.generation = 1;
+	symlink_header.smt.source_arch = ARCH_CODE;
+	symlink_header.smt.root_inode = root_ino;
+	symlink_header.smt.local_pin = P_PIN;
+	strncpy(symlink_header.smt.link_path, link_target, strlen(link_target));
+	/* cloud related data are all zero. */
+	/* TODO: Perhaps add xattr? */
+
+	fetch_restore_meta_path(metapath, this_inode);
+	fptr = fopen(metapath, "w+");
+	if (!fptr) {
+		write_log(0, "Error: Fail to create symlink in %s. Code %d",
+				__func__, errno);
+		return -errno;
+	}
+	setbuf(fptr, NULL);
+	PWRITE(fileno(fptr), &symlink_header, sizeof(SYMLINK_META_HEADER), 0);
+	fstat(fileno(fptr), &tmpstat);
+	fclose(fptr);
+
+	metasize = tmpstat.st_size;
+	metasize_blk = tmpstat.st_blocks * 512;
+	UPDATE_RECT_SYSMETA(.delta_system_size = -metasize,
+			    .delta_meta_size = -metasize_blk,
+			    .delta_pinned_size = 0,
+			    .delta_backend_size = 0,
+			    .delta_backend_meta_size = 0,
+			    .delta_backend_inodes = 0);
+
+	/* Mark dirty */
+	FWRITE(&this_inode, sizeof(ino_t), 1, to_sync_fptr);
+	write_log(4, "Successfully create symlink %s", pkgname);
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}

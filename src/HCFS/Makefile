@@ -31,6 +31,7 @@ endif
 
 OBJS_DIR = obj
 OBJS_F := \
+	meta_iterator.o \
 	objmeta.o \
 	mount_manager.o \
 	FS_manager.o \
@@ -77,6 +78,7 @@ OBJS_F := \
 	rebuild_parent_dirstat.o \
 	restoration_utils.o \
 	do_restoration.o \
+	control_smartcache.o \
 	recover_super_block.o \
 
 # obj file used in android env

@@ -49,6 +49,7 @@
 #include "event_notification.h"
 #include "meta_mem_cache.h"
 #include "do_restoration.h"
+#include "control_smartcache.h"
 #include "recover_super_block.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot

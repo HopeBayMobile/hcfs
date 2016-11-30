@@ -1641,7 +1641,10 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 			if (access(toupload_metapath, F_OK) == 0) {
 				write_log(2, "Cannot copy since "
 						"%s exists", toupload_metapath);
-				unlink(toupload_metapath);
+				ret = unlink(toupload_metapath);
+				if (ret < 0)
+					write_log(0, "Error: Fail to unlink in "
+						"%s. Code %d", __func__, errno);
 			}
 			ret = check_and_copy_file(local_metapath,
 					toupload_metapath, FALSE, FALSE);
