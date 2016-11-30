@@ -2884,20 +2884,14 @@ int32_t truncate_truncate(ino_t this_inode,
 			errcode = errno;
 			write_log(0, "IO error in truncate. Code %d, %s\n",
 				errcode, strerror(errno));
-			if (blockfptr != NULL) {
-				fclose(blockfptr);
-				blockfptr = NULL;
-			}
+			fclose(blockfptr);
 			return -EIO;
 		}
 
 		ret = meta_cache_lookup_file_data(this_inode, NULL, NULL,
 				temppage, currentfilepos, *body_ptr);
 		if (ret < 0) {
-			if (blockfptr != NULL) {
-				fclose(blockfptr);
-				blockfptr = NULL;
-			}
+			fclose(blockfptr);
 			return ret;
 		}
 
@@ -2910,10 +2904,7 @@ int32_t truncate_truncate(ino_t this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
 				if (ret < 0) {
-					if (blockfptr != NULL) {
-						fclose(blockfptr);
-						blockfptr = NULL;
-					}
+					fclose(blockfptr);
 					return ret;
 				}
 			}
@@ -2932,10 +2923,7 @@ int32_t truncate_truncate(ino_t this_inode,
 					objname);
 
 			if (ret < 0) {
-				if (blockfptr != NULL) {
-					fclose(blockfptr);
-					blockfptr = NULL;
-				}
+				fclose(blockfptr);
 				return -EIO;
 			}
 
@@ -2943,20 +2931,14 @@ int32_t truncate_truncate(ino_t this_inode,
 			*body_ptr = meta_cache_lock_entry(this_inode);
 			if (*body_ptr == NULL) {
 				ret = -errno;
-				if (blockfptr != NULL) {
-					fclose(blockfptr);
-					blockfptr = NULL;
-				}
+				fclose(blockfptr);
 				return ret;
 			}
 
 			ret = meta_cache_lookup_file_data(this_inode, NULL,
 				NULL, temppage, currentfilepos, *body_ptr);
 			if (ret < 0) {
-				if (blockfptr != NULL) {
-					fclose(blockfptr);
-					blockfptr = NULL;
-				}
+				fclose(blockfptr);
 				return ret;
 			}
 
@@ -2967,20 +2949,14 @@ int32_t truncate_truncate(ino_t this_inode,
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
-					if (blockfptr != NULL) {
-						fclose(blockfptr);
-						blockfptr = NULL;
-					}
+					fclose(blockfptr);
 					return -EIO;
 				}
 				ret = meta_cache_update_file_data(this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
 				if (ret < 0) {
-					if (blockfptr != NULL) {
-						fclose(blockfptr);
-						blockfptr = NULL;
-					}
+					fclose(blockfptr);
 					return ret;
 				}
 
@@ -2997,20 +2973,14 @@ int32_t truncate_truncate(ino_t this_inode,
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
-					if (blockfptr != NULL) {
-						fclose(blockfptr);
-						blockfptr = NULL;
-					}
+					fclose(blockfptr);
 					return -EIO;
 				}
 				ret = meta_cache_update_file_data(this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
 				if (ret < 0) {
-					if (blockfptr != NULL) {
-						fclose(blockfptr);
-						blockfptr = NULL;
-					}
+					fclose(blockfptr);
 					return ret;
 				}
 			}
@@ -3073,10 +3043,7 @@ int32_t truncate_truncate(ino_t this_inode,
 			errcode = errno;
 			write_log(0, "IO error in truncate. Code %d, %s\n",
 				errcode, strerror(errno));
-			if (blockfptr != NULL) {
-				fclose(blockfptr);
-				blockfptr = NULL;
-			}
+			fclose(blockfptr);
 			return -EIO;
 		}
 
@@ -3087,20 +3054,14 @@ int32_t truncate_truncate(ino_t this_inode,
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 			if (ret < 0) {
-				if (blockfptr != NULL) {
-					fclose(blockfptr);
-					blockfptr = NULL;
-				}
+				fclose(blockfptr);
 				return -EIO;
 			}
 
 			ret = meta_cache_update_file_data(this_inode, NULL,
 				NULL, temppage, currentfilepos, *body_ptr);
 			if (ret < 0) {
-				if (blockfptr != NULL) {
-					fclose(blockfptr);
-					blockfptr = NULL;
-				}
+				fclose(blockfptr);
 				return ret;
 			}
 		}
