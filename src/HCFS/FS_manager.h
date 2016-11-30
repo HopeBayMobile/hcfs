@@ -33,7 +33,7 @@ or external */
 #endif
 
 typedef struct {
-	uint64_t num_FS;
+	int64_t num_FS;
 	int32_t FS_list_fh;
 	uint8_t sys_uuid[16];
 	sem_t op_lock;

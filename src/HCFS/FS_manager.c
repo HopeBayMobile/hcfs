@@ -865,7 +865,7 @@ int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
-	if (fs_mgr_head->num_FS > buf_num) {
+	if (fs_mgr_head->num_FS > (int) buf_num) {
 		*ret_num = fs_mgr_head->num_FS;
 		sem_post(&(fs_mgr_head->op_lock));
 		return 0;
@@ -903,7 +903,7 @@ int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
 		next_node_pos = tpage.tree_walk_next;
 	}
 
-	if (((int64_t)fs_mgr_head->num_FS != num_walked) ||
+	if ((fs_mgr_head->num_FS != num_walked) ||
 		(tmp_head.total_children != num_walked)) {
 		/* Number of FS is wrong. */
 		write_log(0, "Error in FS num. Recomputing\n");
