@@ -156,7 +156,7 @@ function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
 	git pull origin '${BRANCH_IN_5X}' && \
-    git submodule update --init --recursive && \
+	git submodule update --init --recursive && \
 	git submodule foreach git pull origin '${BRANCH_FOR_SUBMODULE}'"'
 }
 function pull_hcfs_binaay() {
