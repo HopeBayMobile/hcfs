@@ -459,11 +459,7 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	}
 	chunk = NULL;
 
-	ret = asprintf(&url, "%s://%s/auth/v1.0", SWIFT_PROTOCOL, swift_url);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s://%s/auth/v1.0", SWIFT_PROTOCOL, swift_url);
 
 	sprintf(user_string, "X-Storage-User: %s", swift_user);
 	sprintf(pass_string, "X-Storage-Pass: %s", swift_pass);
@@ -837,7 +833,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	FILE *swift_header_fptr, *swift_list_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	int32_t ret, num_retries, errcode;
+	int32_t ret_val, ret, num_retries, errcode;
 
 	/* For SWIFTTOKEN backend - token not set situation */
 	if (swift_auth_string[0] == 0)
@@ -871,11 +867,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, "Content-Length:");
 
-	ret = asprintf(&url, "%s/%s", swift_url_string, SWIFT_CONTAINER);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s/%s", swift_url_string, SWIFT_CONTAINER);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -899,12 +891,12 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 		return -1;
 	}
 
-	ret = parse_swift_list_header(swift_header_fptr);
-	if ((ret >= 500 && ret <= 505) ||
-	    (ret >= 400 && ret <= 403))
+	ret_val = parse_swift_list_header(swift_header_fptr);
+	if ((ret_val >= 500 && ret_val <= 505) ||
+	    (ret_val >= 400 && ret_val <= 403))
 		update_backend_status(FALSE, NULL);
 
-	if ((ret >= 200) && (ret < 300))
+	if ((ret_val >= 200) && (ret_val < 300))
 		dump_list_body(swift_list_body_fptr);
 	/*TODO: add retry routines somewhere for failed attempts*/
 
@@ -915,7 +907,8 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	curl_slist_free_all(chunk);
 
-	return ret;
+errcode_handle:
+	return ret_val;
 }
 
 /************************************************************************
@@ -999,12 +992,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 	put_control.object_size = objsize;
 	put_control.remaining_size = objsize;
 
-	ret = asprintf(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
-		       objname);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -1126,15 +1114,11 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 	chunk = curl_slist_append(chunk, "Expect:");
 
 	if (!strncmp("download_usermeta", curl_handle->id, 100))
-		ret = asprintf(&url, "%s/%s_gateway_config/%s",
-			swift_url_string, SWIFT_USER, objname);
+		ASPRINTF(&url, "%s/%s_gateway_config/%s", swift_url_string,
+			 SWIFT_USER, objname);
 	else
-		ret = asprintf(&url, "%s/%s/%s", swift_url_string,
-			SWIFT_CONTAINER, objname);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+		ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
+			 objname);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -1266,12 +1250,7 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	ret = asprintf(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
-		       objname);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -2149,11 +2128,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	put_control.object_size = objsize;
 	put_control.remaining_size = objsize;
 
-	ret = asprintf(&url, "%s/%s", S3_BUCKET_URL, objname);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -2284,11 +2259,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	ret = asprintf(&url, "%s/%s", S3_BUCKET_URL, objname);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -2426,11 +2397,7 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	ret = asprintf(&url, "%s/%s", S3_BUCKET_URL, objname);
-	if (ret == -1) {
-		write_log(0, "%s: Out of memory.\n", __func__);
-		return -1;
-	}
+	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);

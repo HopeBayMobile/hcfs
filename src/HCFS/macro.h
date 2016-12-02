@@ -262,6 +262,7 @@
 		} \
 	} while (0)
 
+
 #define TIMEIT(A)\
 	do {\
 		gettimeofday(&start, NULL);\
@@ -275,6 +276,16 @@
 	do {                                                                   \
 		free(ptr);                                                     \
 		(ptr) = NULL;                                                  \
+	} while (0)
+
+#define ASPRINTF(...)                                                          \
+	do {                                                                   \
+		errno = 0;                                                     \
+		ret = asprintf(__VA_ARGS__);                                   \
+		if (ret == -1) {                                               \
+			write_log(0, "%s: Out of memory.\n", __func__);        \
+			goto errcode_handle;                                   \
+		}                                                              \
 	} while (0)
 
 #endif  /* SRC_HCFS_MACRO_H_ */
