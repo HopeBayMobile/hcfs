@@ -1,11 +1,66 @@
 Please view this file on the android-dev branch, on stable branches it's out of date.
 
 ## Known Issues / Limitations / Features to be Implemented
- 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet retested in this build.
- 2. If cache is full during recording video, user need to wait cache been flush to storage after recording finished.
+ 1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet re-tested in this build.
+ 2. If cache is full during recording video, user need to wait cache been flushed to storage after recording finished.
  3. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
+ 6. If booster partition is damaged and cannot be repaired during restoration, the booster partition will be deleted with no notification.Tera app does not do any response to this situation.
+ 7. Settings might crash when sync all data.
+ 8. Database might be locked and let tera app crashed.
+ 9. If pin space < 100MB, Tera app does not deal with this situation, the booster will still be created.
+ 10. if data in booster space is > booster size, Tera app does not deal with this situation.
+ 11. When sync all data, the booster might not be unmounted successfully.
+ 12. After successfully sync all data, the booster will not re-mounted. And the icon will be gone from the Launcher after rebooting.
+ 13. If the system is shutdown or reboot when boosting/unboosting, the Tera app did not deal with this situation after booting complete, and the icon will be gone from Launcher also.
+ 14. the booster might not sync all data ok since we did not execute `sync` command before syncing the booster.
+
+v 2.2.4.2171
+=====
+## New Features
+ - [HCFS] feature/1491-inform-media-files: Add middleware function add_notify_event_objbuild json object with json_pack and Call add_notify_event_obj to reduceoverhead on building and parsing json string.Other Changes* Update event table* Refactoring lookup_pathname in fuseop/unittests/fake_misc.c  ([!644](gateway-2-0/hcfs!644))
+ - [HCFS] feature/recover_sb_dirty_queue: Feature/recover sb dirty queue  ([!639](gateway-2-0/hcfs!639))
+ - [HCFS] feature/smart_cache_api_doc: Fix typos in API doc and restorecon cmd  ([!654](gateway-2-0/hcfs!654))
+ - [HCFS] feature/smart_cache: Feature/smart cache  ([!646](gateway-2-0/hcfs!646))
+ - [HCFS] feature/smartcache_restore: Feature/smartcache restore  ([!648](gateway-2-0/hcfs!648))
+ - [Nexus-5X] feature/smart_cache: add selinux for restoration for block_dev  ([!78](gateway-2-0/nexus-5x!78))
+ - [Nexus-5X] feature/smart_cache: smart cache mount and selinux Add getAppBoostStatus method  ([!76](gateway-2-0/nexus-5x!76))
+ - [Nexus-5X] feature/use_thumbnails_in_gallery: Feature/use thumbnails in gallery  ([!72](gateway-2-0/nexus-5x!72))
+ - [Tera-App] feature/smart_cache: Feature/smart cache  ([!146](gateway-2-0/android-management-app!146))
+ - [Tera-Launcher] feature/alert_dialog_for_launch_app: Pop out alert dialog while launching app if wifi-only be set and usingcellular network  ([!16](gateway-2-0/tera-launcher!16))
+ - [Tera-Launcher] feature/smart_cache: Feature/smart cache  ([!19](gateway-2-0/tera-launcher!19))
+ - [Tera-Launcher] feature/toggle_pin_unpin_feature: Support toggle pin/unpin feature on Launcher  ([!18](gateway-2-0/tera-launcher!18))
+
+## Fixed
+ - [HCFS] bugfix/13664_delete_file_has_alot_alias: Bugfix/13664 delete file has alot alias  ([!647](gateway-2-0/hcfs!647))
+ - [HCFS] bugfix/bug_dirty_cache_size_addtwice: fix add twice dirty size  ([!621](gateway-2-0/hcfs!621))
+ - [HCFS] fix/array_index_used_before_limits_check: do_restoration: fix: array index used before limits checkWe shall always perform the following check before actual use:```Cwhile ((startpos < fbuflen) && (fbuf[startpos] != ' ')) {...}```Logical operator '&&' guarantees evaluation of their operands fromleft to right.  ([!663](gateway-2-0/hcfs!663))
+ - [HCFS] fix/comparison_with_unsigned: unsigned variable is never less than zero  ([!664](gateway-2-0/hcfs!664))
+ - [HCFS] fix/doubly_manipulated_buffer: do_restoration: prevent buffer from being doubly filledBuffer 'despath' is being written before its old content has been used.Likely a mistake during merge.  ([!660](gateway-2-0/hcfs!660))
+ - [HCFS] fix/fs_manager_fault_handling: FS_manager: signify num_FS for further error handlingmemer num_FS in struct FS_MANAGER_HEAD_TYPE was of type uint64_t, whichis not ideal for error handling, and there are various non-functional checks correspondingly.  ([!661](gateway-2-0/hcfs!661))
+ - [HCFS] fix/malformed_package_list: restoration_utils: stop at malformed package listPackage count in given path was not verified before we are building and sorting array, that caused unexpected troubles with malformed package list.  ([!657](gateway-2-0/hcfs!657))
+ - [HCFS] fix/pyhcfs_old_version_FSStat_compatible: Fix to be compatiable FSStat V1  ([!643](gateway-2-0/hcfs!643))
+ - [HCFS] fix/realloc_mistake: do_restoration: fix realloc mistake'removed_list' nulled but not freed upon failure. If realloc fails, then the original memory allocation exists, but isleaked as it is no longer referred to by d_data. So you need to keep ahandle on the original allocation until you have verified that the newallocation is valid.  ([!653](gateway-2-0/hcfs!653))
+ - [HCFS] fix/restoration_resource_leak: do_restoration: fix resource leak  ([!652](gateway-2-0/hcfs!652))
+ - [HCFS] hotfix/cherrypick_fixes: Fixed resource leak in mount_manager  ([!649](gateway-2-0/hcfs!649))
+ - [HCFS] hotfix/default_quota_fix: Fixed default quota issue  ([!655](gateway-2-0/hcfs!655))
+ - [Nexus-5X] bugfix/#13848: Show sync data completed notification only start sync by Settings  ([!79](gateway-2-0/nexus-5x!79))
+ - [Nexus-5X] fix/issue_13839: add more i18n for Settings  ([!83](gateway-2-0/nexus-5x!83))
+ - [Nexus-5X] fix/issue_13839: modify the string for sync-all-data button in the factory reset  ([!82](gateway-2-0/nexus-5x!82))
+ - [Nexus-5X] hotfix/mount_hcfs_smartcache: mount smartcache  ([!77](gateway-2-0/nexus-5x!77))
+ - [Tera-App] bugfix/#13753: Change sync status when user login Tera app and show access cloud settings if log~in with mobile network first time  ([!144](gateway-2-0/android-management-app!144))
+ - [Tera-App] bugfix/#13866: Add a job service to pin android folder until pin success  ([!145](gateway-2-0/android-management-app!145))
+ - [Tera-App] bugfix/#13875: Use JobScheduler to poll the piggyback from mgmt server even when app is removed by user from recent apps  ([!143](gateway-2-0/android-management-app!143))
+
+## CI / Refactoring / Other
+ - [HCFS] ci/refactoring: CI/refactoring 
+    * Improve compatibility on installing docker host
+    * Fix script's potential issue with shellcheck
+    * Better error handling of shell script
+    * Print source code near error lines ([!642](gateway-2-0/hcfs!642))
+ - [Nexus-5X] modify_shutdown_condition: Modify shutdown condition while low powerStart shutdown thread while power level is lower than 3%  ([!81](gateway-2-0/nexus-5x!81))
+
 
 v 2.2.3.2056
 =====
