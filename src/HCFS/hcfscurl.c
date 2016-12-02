@@ -61,7 +61,7 @@ char swift_url_string[1024];
 #define HCFS_SET_DEFAULT_CURL()                                                \
 	do {                                                                   \
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
-		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file);    \
+		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
 		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);                  \
 		curl_easy_setopt(curl, CURLOPT_PUT, 0L);                       \
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);            \
@@ -83,13 +83,13 @@ char swift_url_string[1024];
 
 /************************************************************************
 *
-* Function name: write_file
+* Function name: write_file_fn
 *        Inputs: void *ptr, size_t size, size_t nmemb, void *fstream
 *       Summary: Same as fwrite but will return total bytes.
 *  Return value: Total size for writing to fstream. Return 0 if error.
 *
 *************************************************************************/
-size_t write_file(void *ptr, size_t size, size_t nmemb, void *fstream)
+size_t write_file_fn(void *ptr, size_t size, size_t nmemb, void *fstream)
 {
 	size_t ret_size;
 	int32_t errcode = -1;
@@ -875,7 +875,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, swift_list_body_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
@@ -1127,7 +1127,7 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
@@ -1486,7 +1486,7 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, S3_list_body_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
@@ -2268,7 +2268,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
