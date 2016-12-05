@@ -149,7 +149,7 @@ errcode_handle:
 	return errcode;
 }
 
-BOOL _enough_local_space(int32_t smart_cache_size_to_reduce)
+BOOL _enough_local_space(int64_t smart_cache_size_to_reduce)
 {
 
 	/* Need cache size to be less than 0.2 of max possible cache size */
