@@ -160,4 +160,5 @@ int32_t hook_fuse(int32_t argc, char **argv);
 ino_t data_data_root;
 ino_t data_smart_root;
 BOOL mgmt_app_is_created;
+BOOL use_minimal_apk;
 #endif  /* GW20_HCFS_FUSEOP_H_ */
