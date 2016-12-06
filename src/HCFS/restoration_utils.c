@@ -266,7 +266,7 @@ int32_t init_package_uid_list(char *plistpath)
 			pkg_info_list_head = tmp_pkg;
 			last_node = tmp_pkg;
 		}
-		if (last_node != tmp_pkg) {
+		if (last_node && last_node != tmp_pkg) {
 			last_node->next = tmp_pkg;
 			last_node = tmp_pkg;
 		}
