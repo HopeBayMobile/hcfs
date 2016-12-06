@@ -919,6 +919,24 @@ int32_t send_notify_event(int32_t arg_len __attribute__((unused)),
 	return ret_code;
 }
 
+void _init_minimal_apk_table(void) {}
+int32_t toggle_use_minimal_apk(bool new_val)
+{
+	int32_t ret = 0;
+	bool old_val = hcfs_system->use_minimal_apk;
+
+	hcfs_system->use_minimal_apk = new_val;
+
+	/*
+	 * TODO: An in-memory lookup should be initiated when the API
+	 * changes the value from false to true
+	 */
+	if (old_val == false && new_val == true)
+		_init_minimal_apk_table();
+
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -1581,9 +1599,22 @@ void api_module(void *index)
 				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t),
+				     MSG_NOSIGNAL);
 			}
 			retcode = 0;
+			break;
+		case TOGGLE_USE_MINIMAL_APK:
+			memcpy(&uint32_ret, largebuf, sizeof(uint32_t));
+			/* Only control with boolean value */
+			retcode = toggle_use_minimal_apk(!!uint32_ret);
+			if (retcode == 0) {
+				ret_len = sizeof(retcode);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
+			}
 			break;
 		default:
 			retcode = ENOTSUP;

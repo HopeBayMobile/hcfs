@@ -133,7 +133,7 @@ typedef struct {
 	BOOL writing_sys_data;
 
 	/* Define whether minimal apk should be used. Default is false. */
-	BOOL use_minimal_apk;
+	bool use_minimal_apk;
 
 	/* Lots of functions will invoke download directly */
 	sem_t xfer_download_in_progress_sem;

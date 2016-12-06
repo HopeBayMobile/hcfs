@@ -41,11 +41,11 @@ typedef struct {
 	size_t namelen;
 } _PACKED FUSE_NOTIFY_INVAL_ENT_DATA;
 
-/* Ring Buffer */
-
+/* Maximum data size of FUSE_NOTIFY, It should set to the largest structure. */
 #define FUSE_NOTIFY_ENTRY_SIZE sizeof(FUSE_NOTIFY_DELETE_DATA)
+
 /*
- * Prototype struct of FUSE_NOTIFY. It's size must equal to largest struct
+ * Prototype struct of FUSE_NOTIFY.
  */
 typedef struct {
 	NOTIFY_FUNCTION func;
