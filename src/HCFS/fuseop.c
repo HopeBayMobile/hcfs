@@ -4416,7 +4416,8 @@ int32_t write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 			hcfs_system->systemdata.cache_size,
 			max_cache_size);
 		if (hcfs_system->systemdata.cache_size > max_cache_size) {
-			if (CURRENT_BACKEND == NONE)
+			if (CURRENT_BACKEND == NONE ||
+			    hcfs_system->system_restoring == RESTORING_STAGE1)
 				return -ENOSPC;
 			if (hcfs_system->system_going_down == TRUE)
 				return -EBUSY;
@@ -4725,7 +4726,8 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->opened_block = -1;
 			}
-			if (CURRENT_BACKEND == NONE) {
+			if (CURRENT_BACKEND == NONE ||
+			    hcfs_system->system_restoring == RESTORING_STAGE1) {
 				*reterr = -ENOSPC;
 				return 0;
 			}
