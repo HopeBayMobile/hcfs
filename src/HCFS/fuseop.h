@@ -132,6 +132,9 @@ typedef struct {
 	BOOL xfer_upload_in_progress;
 	BOOL writing_sys_data;
 
+	/* Define whether minimal apk should be used. Default is false. */
+	BOOL use_minimal_apk;
+
 	/* Lots of functions will invoke download directly */
 	sem_t xfer_download_in_progress_sem;
 	/* Xfer window must be shifted in an interval */
@@ -160,5 +163,4 @@ int32_t hook_fuse(int32_t argc, char **argv);
 ino_t data_data_root;
 ino_t data_smart_root;
 BOOL mgmt_app_is_created;
-BOOL use_minimal_apk;
 #endif  /* GW20_HCFS_FUSEOP_H_ */

@@ -111,6 +111,7 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
+	hcfs_system->use_minimal_apk = FALSE;
 	hcfs_system->system_restoring = restoring_status;
 
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
