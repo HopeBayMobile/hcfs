@@ -601,12 +601,12 @@ int32_t lookup_pkg(char *pkgname, uid_t *uid)
 
 /*
  * Helper function for querying status of input (pkgname),
- * result ispin will be TRUE if pkg is pinned, otherwise FALSE.
+ * result ispin will be one of: 0 = unpin, 1 = pin, 2 = high priority pin.
  * result issys will be TRUE if pkg is system app, otherwise FALSE.
  *
  * @return - 0 for success, otherwise -1.
  */
-int32_t lookup_pkg_status(const char *pkgname, BOOL *ispin, BOOL *issys)
+int32_t lookup_pkg_status(const char *pkgname, uint8_t *ispin, BOOL *issys)
 {
 
 	sqlite3 *db;
@@ -682,7 +682,8 @@ static inline void _android6_permission(HCFS_STAT *thisstat,
 
 static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 {
-	BOOL ispin, issys;
+	uint8_t ispin;
+	BOOL issys;
 	int32_t ret;
 
 	ret = lookup_pkg_status(tmptok_prev, &ispin, &issys);

@@ -16,10 +16,11 @@
 
 #include <stdint.h>
 #include <limits.h>
+#include <stdbool.h>
 
-#define BOOL uint8_t
-#define TRUE 1
-#define FALSE 0
+#define BOOL bool
+#define TRUE true
+#define FALSE false
 #define ON 1
 #define OFF 0
 
