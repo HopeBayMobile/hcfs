@@ -62,6 +62,8 @@ char swift_url_string[1024];
 	do {                                                                   \
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
 		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
+		curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);                   \
+		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);                    \
 		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);                  \
 		curl_easy_setopt(curl, CURLOPT_PUT, 0L);                       \
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);            \
