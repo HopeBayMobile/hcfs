@@ -36,6 +36,7 @@
 *                  moved convert_hcfsstat_to_sysstat to meta.c
 * 2016/8/24 Ripley add rename feature for external volume.
 * 2016/10/6 Ripley Support concurrent access on the alias inodes.
+* 2016/12/6 Jiahong adding routines for using minimal apks
 *
 **************************************************************************/
 
@@ -115,6 +116,7 @@
 #include "hfuse_system.h"
 #include "do_restoration.h"
 #include "control_smartcache.h"
+#include "apk_mgmt.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
  *
  *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
@@ -1697,6 +1699,21 @@ static inline BOOL _is_apk(const char *filename)
 
 	return FALSE;
 }
+
+/* Helper function on checking whether to use minimal apk */
+static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
+                                        ino_t *minapk_ino)
+{
+	/* TODO: 2. Check if parent is an app folder */
+	/* TODO: 4. Check if minimal apk exists */
+	/* TODO: 5. Check if apk is local */
+
+	UNUSED(parent_ino);
+	UNUSED(selfname);
+	UNUSED(minapk_ino);
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_lookup
@@ -1714,7 +1731,7 @@ a directory (for NFS) */
 /* TODO: error handling if parent_inode is not a directory and name is not "."
 */
 
-	ino_t this_inode, parent_inode;
+	ino_t this_ino, parent_ino;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	struct fuse_entry_param output_param;
@@ -1723,10 +1740,10 @@ a directory (for NFS) */
 	MOUNT_T *tmpptr;
 	BOOL is_external = FALSE;
 
-	parent_inode = real_ino(req, parent);
+	parent_ino = real_ino(req, parent);
 
 	write_log(8, "Debug lookup parent %" PRIu64 ", name %s\n",
-			(uint64_t)parent_inode, selfname);
+			(uint64_t)parent_ino, selfname);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1734,7 +1751,7 @@ a directory (for NFS) */
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
+	ret_val = fetch_inode_stat(parent_ino, &parent_stat, NULL, NULL);
 
 	write_log(10, "Debug lookup parent mode %d\n", parent_stat.mode);
 	if (ret_val < 0) {
@@ -1769,35 +1786,78 @@ a directory (for NFS) */
 	}
 
 	memset(&output_param, 0, sizeof(struct fuse_entry_param));
+	memset(&temp_dentry, 0, sizeof(DIR_ENTRY));
 
 	/* Proceed on checking whether to use minimal apk here */
 
 	if (((hcfs_system->use_minimal_apk == TRUE) &&
 	     (tmpptr->f_ino == hcfs_system->data_app_root)) &&
 	    (_is_apk(selfname) == TRUE)) {
-		/* TODO: 1. check hash table and reuse result */
-		/* TODO: 2. Check if parent is an app folder */
-		/* TODO: 3. Check if apk exists */
-		/* TODO: 4. Check if minimal apk exists */
-		/* TODO: 5. Check if apk is local */
-		/* TODO: 6. Decide what stat to fetch */
-		/* TODO: 7. Insert result to hash table if not in hash table */
+		ino_t minapk_ino;
 
+		/* Query hash table for cached result */
+		ret_val = query_minapk_data(parent_ino, selfname, &minapk_ino);
+		if ((ret_val == 0) && (minapk_ino > 0)) {
+			/* Reuse info for stored minimal apk */
+			temp_dentry.d_ino = minapk_ino;
+			snprintf(temp_dentry.d_name, sizeof(temp_dentry.d_name),
+			         "%s", selfname);
+		} else if ((ret_val == 0) && (minapk_ino == 0)) {
+			/* There is no minimal apk. Use the original one */
+			ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
+					     is_external);
+			write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+				  (uint64_t)parent_ino, selfname, ret_val);
+
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		} else {
+			/* Nothing is cached in hash table. Check the result */
+			/* First check if the apk exists */
+			ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
+					     is_external);
+			write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+				  (uint64_t)parent_ino, selfname, ret_val);
+
+			/* Don't insert anything to hash table if
+			apk not found */
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+			/* temp_dentry now points to the apk entry */
+			/* Check whether to use minimal apk */
+			ret_val = _check_use_minapk(parent_ino, selfname,
+			                        &minapk_ino);
+
+			/* Decide whether to use minimal apk */
+			if ((ret_val == 0) && (minapk_ino > 0)) {
+				/* Use minimal apk */
+				temp_dentry.d_ino = minapk_ino;
+			} else {
+				minapk_ino = 0;
+			}
+
+			/* Insert the result to hash table */
+			insert_minapk_data(parent_ino, selfname, minapk_ino);
+		}
 	} else {
-		ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
+		ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
 				     is_external);
+		write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+			  (uint64_t)parent_ino, selfname, ret_val);
+
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
 	}
 
-	write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
-		  (uint64_t)parent_inode, selfname, ret_val);
+	this_ino = temp_dentry.d_ino;
 
-	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
-	}
-
-	this_inode = temp_dentry.d_ino;
-	ret_val = fetch_inode_stat(this_inode, &this_stat, &this_gen, NULL);
+	ret_val = fetch_inode_stat(this_ino, &this_stat, &this_gen, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1815,13 +1875,13 @@ a directory (for NFS) */
 #endif
 
 	if (S_ISFILE((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+		ret_val = lookup_increase(tmpptr->lookup_table, this_ino,
 				1, D_ISREG);
 	if (S_ISDIR((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+		ret_val = lookup_increase(tmpptr->lookup_table, this_ino,
 				1, D_ISDIR);
 	if (S_ISLNK((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+		ret_val = lookup_increase(tmpptr->lookup_table, this_ino,
 				1, D_ISLNK);
 
 	if (ret_val < 0) {
@@ -1834,7 +1894,7 @@ a directory (for NFS) */
 	 * the inode number is different. */
 	if (is_external && strcmp(selfname, temp_dentry.d_name)) {
 		/* Find if the alias inode is existed, and if not, create it. */
-		ret_val = seek_and_add_in_alias_group(temp_dentry.d_ino, &this_inode,
+		ret_val = seek_and_add_in_alias_group(temp_dentry.d_ino, &this_ino,
 		                                      temp_dentry.d_name, selfname);
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
@@ -1842,10 +1902,10 @@ a directory (for NFS) */
 		}
 	}
 
-	output_param.ino = (fuse_ino_t) this_inode;
+	output_param.ino = (fuse_ino_t) this_ino;
 	output_param.generation = this_gen;
 	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
-			(uint64_t)this_inode, this_gen);
+			(uint64_t)this_ino, this_gen);
 
 	fuse_reply_entry(req, &output_param);
 }

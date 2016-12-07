@@ -78,7 +78,8 @@ void destroy_minapk_table()
  *
  * @return 0 on success, -EEXIST if key pair (parent inode, apk name) exists.
  */
-int32_t insert_minapk_data(ino_t parent_ino, char *apk_name, ino_t minapk_ino)
+int32_t insert_minapk_data(ino_t parent_ino, const char *apk_name,
+                           ino_t minapk_ino)
 {
 	UNUSED(parent_ino);
 	UNUSED(apk_name);
@@ -97,7 +98,8 @@ int32_t insert_minapk_data(ino_t parent_ino, char *apk_name, ino_t minapk_ino)
  * @return 0 on success, -ENOENT if key pair (parent inode, apk name)
  *         does not exist.
  */
-int32_t query_minapk_data(ino_t parent_ino, char *apk_name, ino_t *minapk_ino)
+int32_t query_minapk_data(ino_t parent_ino, const char *apk_name,
+                          ino_t *minapk_ino)
 {
 	UNUSED(parent_ino);
 	UNUSED(apk_name);
@@ -115,7 +117,7 @@ int32_t query_minapk_data(ino_t parent_ino, char *apk_name, ino_t *minapk_ino)
  * @return 0 on success, -ENOENT if key pair (parent inode, apk name)
  *         does not exist.
  */
-int32_t remove_minapk_data(ino_t parent_ino, char *apk_name)
+int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name)
 {
 	UNUSED(parent_ino);
 	UNUSED(apk_name);
