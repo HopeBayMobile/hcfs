@@ -47,7 +47,7 @@ HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
 		goto out;
 	}
 	for (idx = 0; idx < table_size; idx++) {
-		ret = sem_init(&(hash_list->hash_table->bucket_sem), 0, 1);
+		ret = sem_init(&(hash_list->hash_table[idx].bucket_sem), 0, 1);
 		if (ret < 0) {
 			free(hash_list->hash_table);
 			free(hash_list);

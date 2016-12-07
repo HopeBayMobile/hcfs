@@ -32,12 +32,13 @@ HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
 int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data);
 int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data);
 int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key);
-int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key, void *update_data);
+int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
+		void *update_data);
 void destroy_hash_list(HASH_LIST *hash_list);
 
 void hash_list_lock(HASH_LIST *hash_list);
 void hash_list_unlock(HASH_LIST *hash_list);
 
-//void hash_list_bucket_lock(HASH_LIST *hash_list, void *key);
-//void hash_list_bucket_unlock(HASH_LIST *void *key);
-//void *hash_list_get_entry_data(HASH_LIST *hash_listd *key)
+/*void hash_list_bucket_lock(HASH_LIST *hash_list, void *key);*/
+/*void hash_list_bucket_unlock(HASH_LIST *void *key);*/
+/*void *hash_list_get_entry_data(HASH_LIST *hash_listd *key)*/
