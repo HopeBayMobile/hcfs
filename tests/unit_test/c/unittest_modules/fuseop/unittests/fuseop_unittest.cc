@@ -2896,6 +2896,9 @@ TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
 	const char *ans = "hello!listxattr:)";
 
 	ret = listxattr("/tmp/test_fuse/testsetxattr", buf, 100);
+	
+	ASSERT_NE(-1, ret);
+
 	buf[ret] = '\0';
 
 	ASSERT_EQ(strlen(ans), ret);
