@@ -321,6 +321,36 @@ rollback:
 	return ret_code;
 }
 
+/* To change boost status of package in database.
+ */
+int32_t change_boost_status(char *pkg_name, int32_t status)
+{
+	int32_t ret_code;
+	char *sql_err = 0;
+	char sql[1024];
+	sqlite3 *db;
+
+	ret_code = sqlite3_open(SMARTCACHE_DB_PATH, &db);
+	if (ret_code != SQLITE_OK) {
+		return -1;
+	}
+
+	snprintf(sql, sizeof(sql),
+		 "Update %s SET boost_status=%d WHERE package_name='%s'",
+		 SMARTCACHE_TABLE_NAME, status, pkg_name);
+
+	ret_code = sqlite3_exec(db, sql, NULL, NULL, &sql_err);
+	if (ret_code != SQLITE_OK) {
+		write_log(0, "In %s. Error msg - %s\n", __func__, sql_err);
+		sqlite3_free(sql_err);
+		sqlite3_close(db);
+		return -1;
+	}
+
+	sqlite3_close(db);
+	return 0;
+}
+
 /* To move package data - Move data from /data/data/<pkg_folder> to smart cache.
  *
  * @return Return 0 if success. Otherwise, return -1.
@@ -336,6 +366,8 @@ int32_t boost_package(char *package_name)
 	char cmd_restorecon_recursive[] = "restorecon -R %s";
 	int32_t ret_code, status;
 	struct stat tmp_st;
+
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_BOOSTING);
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
 		 package_name);
@@ -354,11 +386,9 @@ int32_t boost_package(char *package_name)
 		return -1;
 	}
 
-	/* If the type of pkg_fullpath is folder means that previous boosting
-	 * for this package had been interrupted. Just finish the unfinished
-	 * parts */
-	ret_code = lstat(pkg_fullpath, &tmp_st);
-	if (ret_code == 0 && S_ISDIR(tmp_st.st_mode)) {
+	/* If pkg_tmppath existed means that previous boosting for this package
+	 * had been interrupted. Just finish the unfinished parts */
+	if (access(pkg_tmppath, F_OK) == -1) {
 		REMOVE_IF_EXIST(smart_cache_fullpath);
 		RUN_CMD_N_CHECK(cmd_copy_pkg_data, pkg_fullpath, SMARTCACHEMTP);
 
@@ -372,6 +402,8 @@ int32_t boost_package(char *package_name)
 	}
 	RUN_CMD_N_CHECK(cmd_restorecon_recursive, smart_cache_fullpath);
 
+	REMOVE_IF_EXIST(pkg_fullpath);
+
 	ret_code = symlink(smart_cache_fullpath, pkg_fullpath);
 	if (ret_code < 0 && errno != EEXIST) {
 		write_log(0, "In %s. Failed to create link %s. Error code %d",
@@ -380,6 +412,8 @@ int32_t boost_package(char *package_name)
 	}
 
 	_remove_folder(pkg_tmppath);
+
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_BOOSTED);
 	ret_code = 0;
 	goto end;
 
@@ -391,6 +425,8 @@ rollback:
 		unlink(pkg_fullpath);
 		rename(pkg_tmppath, pkg_fullpath);
 	}
+
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_BOOST_FAILED);
 	ret_code = -1;
 
 end:
@@ -412,6 +448,8 @@ int32_t unboost_package(char *package_name)
 	char cmd_restorecon_recursive[] = "restorecon -R %s";
 	int32_t ret_code, status;
 	struct stat tmp_st;
+
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_UNBOOSTING);
 
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
 		 package_name);
@@ -448,42 +486,24 @@ int32_t unboost_package(char *package_name)
 
 	_remove_folder(smart_cache_fullpath);
 
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_UNBOOSTED);
 	ret_code = 0;
 	goto end;
 
 rollback:
 	if (access(pkg_fullpath, F_OK) != -1) {
 		_remove_folder(pkg_fullpath);
-		symlink(smart_cache_fullpath, pkg_fullpath);
 	}
 	if (access(pkg_tmppath, F_OK) != -1) {
 		_remove_folder(pkg_tmppath);
 	}
+	symlink(smart_cache_fullpath, pkg_fullpath);
+
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_UNBOOST_FAILED);
 	ret_code = -1;
 
 end:
 	return ret_code;
-}
-
-/* To change boost status of package in database.
- */
-int32_t change_boost_status(sqlite3 *db, char *pkg_name, int32_t status)
-{
-	int32_t ret_code;
-	char *sql_err = 0;
-	char sql[1024];
-
-	snprintf(sql, sizeof(sql),
-		 "Update %s SET boost_status=%d WHERE package_name='%s'",
-		 SMARTCACHE_TABLE_NAME, status, pkg_name);
-	ret_code = sqlite3_exec(db, sql, NULL, NULL, &sql_err);
-	if (ret_code != SQLITE_OK) {
-		write_log(0, "In %s. Error msg - %s\n", __func__, sql_err);
-		sqlite3_free(sql_err);
-		return -1;
-	}
-
-	return 0;
 }
 
 /* Sqlite callback function to iterate packages to boost/unboost.
@@ -493,11 +513,9 @@ static int32_t _iterate_pkg_cb(void *data,
 			       char **argv,
 			       char **azColName)
 {
-	char to_boost;
 	char *package_name;
-	int32_t ret_code;
+	char **tmp_ptr;
 	BOOST_JOB_META *boost_job;
-	sqlite3 *db;
 
 	UNUSED(argc);
 	UNUSED(azColName);
@@ -515,26 +533,35 @@ static int32_t _iterate_pkg_cb(void *data,
 	package_name = argv[0];
 
 	boost_job = (BOOST_JOB_META*)data;
-	to_boost = boost_job->to_boost;
-	db = boost_job->db;
 
-	if (to_boost) {
-		change_boost_status(db, package_name, ST_BOOSTING);
-		ret_code = boost_package(package_name);
-		if (ret_code < 0) {
-			change_boost_status(db, package_name, ST_BOOST_FAILED);
+	/* Check if need to expand pkg list */
+	if (boost_job->num_pkg >= boost_job->pkg_list_size) {
+		write_log(4, "In %s. To expand size of pkg list. (num_pkg %d, "
+			     "pkg_list_size %d",
+			  __func__, boost_job->num_pkg,
+			  boost_job->pkg_list_size);
+
+		tmp_ptr = (char **)realloc(boost_job->pkg_list,
+					   boost_job->pkg_list_size * 2);
+		if (tmp_ptr == NULL) {
+			write_log(4, "In %s. Failed to expand pkg list.",
+				  __func__);
 			return -1;
 		}
-		change_boost_status(db, package_name, ST_BOOSTED);
-	} else {
-		change_boost_status(db, package_name, ST_UNBOOSTING);
-		ret_code = unboost_package(package_name);
-		if (ret_code < 0) {
-			change_boost_status(db, package_name, ST_UNBOOST_FAILED);
-			return -1;
-		}
-		change_boost_status(db, package_name, ST_UNBOOSTED);
+		boost_job->pkg_list = tmp_ptr;
+		boost_job->pkg_list_size = boost_job->pkg_list_size * 2;
 	}
+
+	/* Add pkg to list */
+	boost_job->pkg_list[boost_job->num_pkg] =
+	    (char *)calloc(1, strlen(package_name) + 1);
+	if (*(boost_job->pkg_list) == NULL) {
+		write_log(0, "In %s, Failed to alloc memory.", __func__);
+		return -1;
+	}
+	strncpy(boost_job->pkg_list[boost_job->num_pkg], package_name,
+		strlen(package_name) + 1);
+	boost_job->num_pkg += 1;
 
 	return 0;
 }
@@ -544,15 +571,28 @@ static int32_t _iterate_pkg_cb(void *data,
  */
 void *process_boost(void *ptr)
 {
-	int32_t ret_code, retry_times;
+	BOOL boost_fail = FALSE;
+	char *package_name;
 	char *sql_err = 0;
 	char sql[1024];
+	int32_t ret_code, retry_times, idx;
 	BOOST_JOB_META boost_job;
+	sqlite3 *db;
+
+	boost_job.to_boost = (int32_t)ptr;
 
 	write_log(4, "Start to process packages %s",
 		  (boost_job.to_boost) ? "boosting" : "unboosting");
 
-	boost_job.to_boost = (int32_t)ptr;
+	boost_job.num_pkg = 0;
+	boost_job.pkg_list_size = DEFAULT_PKG_LIST_SIZE;
+	boost_job.pkg_list = (char **)calloc(1, boost_job.pkg_list_size);
+	if (boost_job.pkg_list == NULL) {
+		write_log(0, "In %s. Faield to alloc memory for pkg list.",
+			  __func__);
+		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
+		pthread_exit((void *)-1);
+	}
 
 	/* Find target packages */
 	if (boost_job.to_boost)
@@ -565,30 +605,58 @@ void *process_boost(void *ptr)
 			 SMARTCACHE_TABLE_NAME, ST_INIT_UNBOOST);
 
 	if (access(SMARTCACHE_DB_PATH, F_OK) != 0) {
-		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
-		pthread_exit((void *)-1);
+		boost_fail = TRUE;
+		goto cleanup;
 	}
 
-	ret_code = sqlite3_open(SMARTCACHE_DB_PATH, &(boost_job.db));
+	ret_code = sqlite3_open(SMARTCACHE_DB_PATH, &db);
 	if (ret_code != SQLITE_OK) {
-		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
-		pthread_exit((void *)-1);
+		write_log(4, "In %s. Failed to open database.", __func__);
+		boost_fail = TRUE;
+		goto cleanup;
 	}
 
-	ret_code = sqlite3_exec(boost_job.db, sql, _iterate_pkg_cb,
+	ret_code = sqlite3_exec(db, sql, _iterate_pkg_cb,
 				(void *)&boost_job, &sql_err);
 	if (ret_code != SQLITE_OK) {
 		sqlite3_free(sql_err);
-		sqlite3_close(boost_job.db);
+		sqlite3_close(db);
+		boost_fail = TRUE;
+		goto cleanup;
+	}
+	sqlite3_close(db);
+
+	/* Start to boost/unboost */
+	for (idx = 0; idx < boost_job.num_pkg; idx++) {
+		package_name = boost_job.pkg_list[idx];
+
+		if (boost_job.to_boost)
+			ret_code = boost_package(package_name);
+		else
+			ret_code = unboost_package(package_name);
+		if (ret_code < 0) {
+			boost_fail = TRUE;
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	for (idx = 0; idx < boost_job.num_pkg; idx++) {
+		free(boost_job.pkg_list[idx]);
+	}
+	free(boost_job.pkg_list);
+
+	if (!boost_fail) {
+		write_log(4, "Finish process %s.",
+			  (boost_job.to_boost) ? "boosting" : "unboosting");
+		RETRY_SEND_EVENT(EVENT_BOOST_SUCCESS);
+		pthread_exit((void *)0);
+	} else {
+		write_log(0, "Process %s failed.",
+			  (boost_job.to_boost) ? "boosting" : "unboosting");
 		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
 		pthread_exit((void *)-1);
 	}
-
-	sqlite3_close(boost_job.db);
-	RETRY_SEND_EVENT(EVENT_BOOST_SUCCESS);
-	write_log(4, "Finish process %s.",
-		  (boost_job.to_boost) ? "boosting" : "unboosting");
-	pthread_exit((void *)0);
 }
 
 /* To process packages "boost"/"unboost". The list of packages will stored in
