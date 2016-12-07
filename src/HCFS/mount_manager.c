@@ -794,7 +794,7 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 	}
 
 	if (strncmp(mp, "/data/app", strlen("data/app")) == 0)
-		hfuse_system->data_app_root = new_info->f_ino;
+		hcfs_system->data_app_root = new_info->f_ino;
 
 	if (strncmp(mp, "/data/data", strlen("data/data")) == 0) {
 		DIR_ENTRY dentry;

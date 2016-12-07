@@ -1681,6 +1681,22 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_err(req, -ret_val);
 }
 
+/* Helper function for checking if the file extension is .apk */
+static inline BOOL _is_apk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short */
+	if (name_len < 5)
+		return FALSE;
+
+	if (!strncmp(&(filename[name_len - 4]), ".apk", 4))
+		return TRUE;
+
+	return FALSE;
+}
 /************************************************************************
 *
 * Function name: hfuse_ll_lookup
@@ -1756,8 +1772,8 @@ a directory (for NFS) */
 
 	/* Proceed on checking whether to use minimal apk here */
 
-	if (((hfuse_system->use_minimal_apk == TRUE) &&
-	     (tmpptr->f_ino == data_app_root)) &&
+	if (((hcfs_system->use_minimal_apk == TRUE) &&
+	     (tmpptr->f_ino == hcfs_system->data_app_root)) &&
 	    (_is_apk(selfname) == TRUE)) {
 		/* TODO: 1. check hash table and reuse result */
 		/* TODO: 2. Check if parent is an app folder */
