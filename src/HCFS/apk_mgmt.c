@@ -37,24 +37,44 @@ int32_t toggle_use_minimal_apk(bool new_val)
 	return ret;
 }
 
-int32_t initialize_minimal_apk(void) {
+/**
+ * Create hash table to store minimal apk, then enable system flag
+ * `use_minimal_apk`
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
+int32_t initialize_minimal_apk(void)
+{
+	create_minapk_table();
+
 	/* Enable use_minimal_apk after everything ready */
 	hcfs_system->use_minimal_apk = true;
 	return 0;
 }
-int32_t terminate_minimal_apk(void) {
+
+/**
+ * Disable flag `use_minimal_apk`, invalid each minimal apk's dentry on
+ * system, remove them from hash list and delete hash table.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
+int32_t terminate_minimal_apk(void)
+{
 	/* Disable use_minimal_apk first, then destroy everything */
 	hcfs_system->use_minimal_apk = false;
+
+	/* TODO : iterate over hash table, invalid all minapk */
+
+	destroy_minapk_table();
 	return 0;
 }
-
 
 /**
  * Create structure of minimal apk lookup table.
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t create_minapk_table()
+int32_t create_minapk_table(void)
 {
 	return 0;
 }
@@ -64,9 +84,9 @@ int32_t create_minapk_table()
  *
  * @return 0 on success, otherwise negation of error code.
  */
-void destroy_minapk_table()
+int32_t destroy_minapk_table(void)
 {
-	return;
+	return 0;
 }
 
 /**

@@ -10,25 +10,35 @@
 *
 **************************************************************************/
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/uio.h>
+#include "HCFSvol.h"
+
+#include <ctype.h>
+#include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/un.h>
 #include <unistd.h>
-#include <inttypes.h>
 
-#include "../HCFS/meta.h"
-#include "global.h"
-#include "HCFSvol.h"
-#include "../HCFS/meta.h"
+#include "meta.h"
+
+void usage(void){
+	int32_t i;
+	printf("\nSupported Commands: ");
+	for (i = 0; i < CMD_SIZE; i++) {
+		printf("%s%s", cmd_list[i].name,
+		       (i + 1 == CMD_SIZE) ? "\n" : ", ");
+	}
+}
 
 int32_t main(int32_t argc, char **argv)
 {
-	int32_t fd, size_msg, status, count, retcode, code, fsname_len;
+	int32_t fd, size_msg, status, count, retcode, code, fsname_len, cmd_idx;
+
 	uint32_t cmd_len, reply_len, total_recv, to_recv;
 	int32_t total_entries;
 	struct sockaddr_un addr;
@@ -39,103 +49,27 @@ int32_t main(int32_t argc, char **argv)
 	int64_t num_local, num_cloud, num_hybrid, retllcode;
 	uint32_t uint32_ret;
 	int64_t downxfersize, upxfersize;
-	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
+	const char *shm_hcfs_reporter = "/dev/shm/hcfs_reporter";
 	int32_t first_size, rest_size, loglevel;
 	ssize_t str_size;
 	char vol_mode;
 
+	code = -1;
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
+		usage();
 		exit(-EPERM);
 	}
-	if (strcasecmp(argv[1], "create") == 0) {
-		if (argc < 4) {
-			printf("Usage: HCFSvol create <Vol name> internal/external\n");
-			exit(-EINVAL);
+	for (cmd_idx = 0; cmd_idx < CMD_SIZE; cmd_idx++) {
+		if (strcasecmp(argv[1], cmd_list[cmd_idx].name) == 0) {
+			code = cmd_list[cmd_idx].code;
+			break;
 		}
-		code = CREATEVOL;
-	} else if (strcasecmp(argv[1], "delete") == 0)
-		code = DELETEVOL;
-	else if (strcasecmp(argv[1], "check") == 0)
-		code = CHECKVOL;
-	else if (strcasecmp(argv[1], "list") == 0)
-		code = LISTVOL;
-	else if (strcasecmp(argv[1], "terminate") == 0)
-		code = TERMINATE;
-	else if (strcasecmp(argv[1], "mount") == 0)
-		code = MOUNTVOL;
-	else if (strcasecmp(argv[1], "unmount") == 0)
-		code = UNMOUNTVOL;
-	else if (strcasecmp(argv[1], "checkmount") == 0)
-		code = CHECKMOUNT;
-	else if (strcasecmp(argv[1], "unmountall") == 0)
-		code = UNMOUNTALL;
-	else if (strcasecmp(argv[1], "checknode") == 0)
-		code = CHECKDIRSTAT;
-	else if (strcasecmp(argv[1], "volsize") == 0)
-		code = GETVOLSIZE;
-	else if (strcasecmp(argv[1], "metasize") == 0)
-		code = GETMETASIZE;
-	else if (strcasecmp(argv[1], "cloudsize") == 0)
-		code = GETCLOUDSIZE;
-	else if (strcasecmp(argv[1], "pinsize") == 0)
-		code = GETPINSIZE;
-	else if (strcasecmp(argv[1], "cachesize") == 0)
-		code = GETCACHESIZE;
-	else if (strcasecmp(argv[1], "location") == 0)
-		code = CHECKLOC;
-	else if (strcasecmp(argv[1], "ispin") == 0)
-		code = CHECKPIN;
-	else if (strcasecmp(argv[1], "maxpinsize") == 0)
-		code = GETMAXPINSIZE;
-	else if (strcasecmp(argv[1], "maxcachesize") == 0)
-		code = GETMAXCACHESIZE;
-	else if (strcasecmp(argv[1], "dirtysize") == 0)
-		code = GETDIRTYCACHESIZE;
-	else if (strcasecmp(argv[1], "getxfer") == 0)
-		code = GETXFERSTAT;
-	else if (strcasecmp(argv[1], "resetxfer") == 0)
-		code = RESETXFERSTAT;
-	else if (strcasecmp(argv[1], "cloudstat") == 0)
-		code = CLOUDSTAT;
-	else if (strcasecmp(argv[1], "setsyncswitch") == 0)
-		code = SETSYNCSWITCH;
-	else if (strcasecmp(argv[1], "getsyncswitch") == 0)
-		code = GETSYNCSWITCH;
-	else if (strcasecmp(argv[1], "getsyncstat") == 0)
-		code = GETSYNCSTAT;
-	else if (strcasecmp(argv[1], "reloadconfig") == 0)
-		code = RELOADCONFIG;
-	else if (strcasecmp(argv[1], "getquota") == 0)
-		code = GETQUOTA;
-	else if (strcasecmp(argv[1], "updatequota") == 0)
-		code = TRIGGERUPDATEQUOTA;
-	else if (strcasecmp(argv[1], "changelog") == 0)
-		code = CHANGELOG;
-	else if (strcasecmp(argv[1], "unpindirtysize") == 0)
-		code = UNPINDIRTYSIZE;
-	else if (strcasecmp(argv[1], "occupiedsize") == 0)
-		code = OCCUPIEDSIZE;
-	else if (strcasecmp(argv[1], "xferstatus") == 0)
-		code = GETXFERSTATUS;
-	else if (strcasecmp(argv[1], "setnotifyserver") == 0)
-		code = SETNOTIFYSERVER;
-	else if (strcasecmp(argv[1], "setswifttoken") == 0)
-		code = SETSWIFTTOKEN;
-	else if (strcasecmp(argv[1], "setsyncpoint") == 0)
-		code = SETSYNCPOINT;
-	else if (strcasecmp(argv[1], "cancelsyncpoint") == 0)
-		code = CANCELSYNCPOINT;
-	else if (strcasecmp(argv[1], "initiate_restoration") == 0)
-		code = INITIATE_RESTORATION;
-	else if (strcasecmp(argv[1], "check_restoration_status") == 0)
-		code = CHECK_RESTORATION_STATUS;
-	else if (strcasecmp(argv[1], "notify_applist_change") == 0)
-		code = NOTIFY_APPLIST_CHANGE;
-	else
-		code = -1;
+	}
+
 	if (code < 0) {
 		printf("Unsupported action\n");
+		usage();
 		exit(-ENOTSUP);
 	}
 
@@ -218,6 +152,11 @@ int32_t main(int32_t argc, char **argv)
 		printf("Restoration status is %d\n", retcode);
 		break;
 	case CREATEVOL:
+		if (argc < 4) {
+			printf("Usage: HCFSvol create <Vol name> %s",
+			       "internal/external\n");
+			exit(-EINVAL);
+		}
 #ifdef _ANDROID_ENV_
 		cmd_len = strlen(argv[2]) + 2;
 		strncpy(buf, argv[2], sizeof(buf));
@@ -439,18 +378,28 @@ int32_t main(int32_t argc, char **argv)
 			printf("%s\n", tmp[count].d_name);
 #endif
 		break;
+	/* Toggle functions */
 	case SETSYNCSWITCH:
-		if (argc != 3) {
-			printf("./HCFSvol setsyncswitch [on|off]\n");
-			exit(-EINVAL);
+	case TOGGLE_USE_MINIMAL_APK:
+		status = -1;
+		if (argc == 3) {
+			for (char *p = argv[2]; *p != '\0'; ++p)
+				*p = tolower(*p);
+			if (strcasecmp(argv[2], "on") == 0 ||
+			    strcasecmp(argv[2], "true") == 0 ||
+			    strcasecmp(argv[2], "1") == 0) {
+				status = TRUE;
+			} else if (strcasecmp(argv[2], "off") == 0 ||
+				   strcasecmp(argv[2], "false") == 0 ||
+				   strcasecmp(argv[2], "0") == 0) {
+				status = FALSE;
+			}
 		}
-		if (strcasecmp(argv[2], "on") == 0) {
-			status = TRUE;
-		} else if (strcasecmp(argv[2], "off") == 0) {
-			status = FALSE;
-		} else {
-			printf("./HCFSvol setsyncswitch [on|off]\n");
-			exit(-ENOTSUP);
+
+		if (status == -1) {
+			printf("Usage: ./HCFSvol %s  true on 1 | false off 0\n",
+			       cmd_list[cmd_idx].name);
+			exit(-EINVAL);
 		}
 
 		cmd_len = sizeof(status);

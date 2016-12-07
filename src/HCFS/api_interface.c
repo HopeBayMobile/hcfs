@@ -775,17 +775,18 @@ int32_t check_dir_stat_handle(int32_t arg_len, char *largebuf, DIR_STATS_TYPE *t
 	return retcode;
 }
 
-int32_t set_sync_switch_handle(int32_t sync_switch)
+int32_t set_sync_switch_handle(bool sync_switch)
 {
 	int32_t retcode = 0;
-	int32_t pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+	int32_t pause_file;
 
-	hcfs_system->sync_manual_switch = (sync_switch == TRUE) ? ON : OFF;
+	hcfs_system->sync_manual_switch = sync_switch;
 	update_sync_state();
 
-	if (sync_switch == TRUE && pause_file)
+	pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);
+	if (sync_switch == ON && pause_file)
 		retcode = unlink(HCFSPAUSESYNC);
-	if (sync_switch != TRUE && !pause_file)
+	if (sync_switch == OFF && !pause_file)
 		retcode = mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
 	if (retcode == -1) {
 		retcode = -errno;
@@ -960,7 +961,6 @@ void api_module(void *index)
 	char pin_type;
 	uint32_t num_inode;
 	ino_t *pinned_list, *unpinned_list;
-	uint32_t sync_switch;
 	int32_t loglevel;
 	int64_t max_pinned_size;
 
@@ -1452,14 +1452,21 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(retcode), MSG_NOSIGNAL);
 			retcode = 0;
 			break;
+		/* Toggle functions */
 		case SETSYNCSWITCH:
-			memcpy(&sync_switch, largebuf, sizeof(uint32_t));
-			retcode = set_sync_switch_handle(sync_switch);
+		case TOGGLE_USE_MINIMAL_APK:
+			memcpy(&uint32_ret, largebuf, sizeof(uint32_t));
+			if (api_code == SETSYNCSWITCH)
+				retcode = set_sync_switch_handle(!!uint32_ret);
+			else if (api_code == TOGGLE_USE_MINIMAL_APK)
+				retcode = toggle_use_minimal_apk(!!uint32_ret);
+
 			if (retcode == 0) {
 				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t),
+				     MSG_NOSIGNAL);
 			}
 			break;
 		case GETSYNCSWITCH:
@@ -1587,18 +1594,6 @@ void api_module(void *index)
 				     MSG_NOSIGNAL);
 			}
 			retcode = 0;
-			break;
-		case TOGGLE_USE_MINIMAL_APK:
-			memcpy(&uint32_ret, largebuf, sizeof(uint32_t));
-			/* Only control with boolean value */
-			retcode = toggle_use_minimal_apk(!!uint32_ret);
-			if (retcode == 0) {
-				ret_len = sizeof(retcode);
-				send(fd1, &ret_len, sizeof(ret_len),
-				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(retcode),
-				     MSG_NOSIGNAL);
-			}
 			break;
 		default:
 			retcode = ENOTSUP;
