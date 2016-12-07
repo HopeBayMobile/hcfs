@@ -63,9 +63,10 @@ int32_t terminate_minimal_apk(void)
 	/* Disable use_minimal_apk first, then destroy everything */
 	hcfs_system->use_minimal_apk = false;
 
-	/* TODO : iterate over hash table, invalid all minapk */
-
-	destroy_minapk_table();
+	/*
+	 * TODO : iterate over hash table, invalid all minapk
+	 * destroy_minapk_table();
+	 */
 	return 0;
 }
 
