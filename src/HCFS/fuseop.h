@@ -135,6 +135,9 @@ typedef struct {
 	/* Define whether minimal apk should be used. Default is false. */
 	BOOL use_minimal_apk;
 
+	/* Root inode # of /data/app */
+	ino_t data_app_root;
+
 	/* Lots of functions will invoke download directly */
 	sem_t xfer_download_in_progress_sem;
 	/* Xfer window must be shifted in an interval */

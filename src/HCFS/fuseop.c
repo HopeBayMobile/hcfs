@@ -1753,8 +1753,23 @@ a directory (for NFS) */
 
 	memset(&output_param, 0, sizeof(struct fuse_entry_param));
 
-	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
-			     is_external);
+	/* Proceed on checking whether to use minimal apk here */
+
+	if (((hfuse_system->use_minimal_apk == TRUE) &&
+	     (tmpptr->f_ino == data_app_root)) &&
+	    (_is_apk(selfname) == TRUE)) {
+		/* TODO: 1. check hash table and reuse result */
+		/* TODO: 2. Check if parent is an app folder */
+		/* TODO: 3. Check if apk exists */
+		/* TODO: 4. Check if minimal apk exists */
+		/* TODO: 5. Check if apk is local */
+		/* TODO: 6. Decide what stat to fetch */
+		/* TODO: 7. Insert result to hash table if not in hash table */
+
+	} else {
+		ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
+				     is_external);
+	}
 
 	write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
 		  (uint64_t)parent_inode, selfname, ret_val);
@@ -1803,7 +1818,7 @@ a directory (for NFS) */
 	if (is_external && strcmp(selfname, temp_dentry.d_name)) {
 		/* Find if the alias inode is existed, and if not, create it. */
 		ret_val = seek_and_add_in_alias_group(temp_dentry.d_ino, &this_inode,
-											temp_dentry.d_name, selfname);
+		                                      temp_dentry.d_name, selfname);
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
 			return;
