@@ -1786,8 +1786,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	return ret;
 
 errcode_handle:
-	fclose(metafptr);
 	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
 	return errcode;
 }
 
