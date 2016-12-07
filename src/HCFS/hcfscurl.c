@@ -42,7 +42,11 @@
 #include "event_filter.h"
 
 #define MAX_RETRIES 5
-
+#ifdef UNITTEST
+#define RETRY_INTERVAL 0
+#else
+#define RETRY_INTERVAL 10
+#endif
 
 /* For SWIFTTOKEN backend only */
 SWIFTTOKEN_CONTROL swifttoken_control = {
@@ -51,11 +55,26 @@ SWIFTTOKEN_CONTROL swifttoken_control = {
 	PTHREAD_COND_INITIALIZER
 };
 
-char swift_auth_string[1024] = {0};
-char swift_url_string[1024] = {0};
+char swift_auth_string[1024];
+char swift_url_string[1024];
 
-/* Marco to compute data transfer throughput.
- * If object size < 32KB, for this computation the size is rounded up to 32KB.
+#define HCFS_SET_DEFAULT_CURL()                                                \
+	do {                                                                   \
+		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
+		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
+		curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);                   \
+		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);                    \
+		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);                  \
+		curl_easy_setopt(curl, CURLOPT_PUT, 0L);                       \
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);            \
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);            \
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);                  \
+		curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);                    \
+		curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);                   \
+	} while (0)
+/*
+ * Marco to compute data transfer throughput.  If object size < 32KB, for
+ * this computation the size is rounded up to 32KB.
  */
 #define COMPUTE_THROUGHPUT()                                                   \
 	do {                                                                   \
@@ -66,13 +85,13 @@ char swift_url_string[1024] = {0};
 
 /************************************************************************
 *
-* Function name: write_file_function
+* Function name: write_file_fn
 *        Inputs: void *ptr, size_t size, size_t nmemb, void *fstream
 *       Summary: Same as fwrite but will return total bytes.
 *  Return value: Total size for writing to fstream. Return 0 if error.
 *
 *************************************************************************/
-size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
+size_t write_file_fn(void *ptr, size_t size, size_t nmemb, void *fstream)
 {
 	size_t ret_size;
 	int32_t errcode = -1;
@@ -420,7 +439,7 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
-	char auth_url[200];
+	char *url;
 	char user_string[1024];
 	char pass_string[1024];
 	int32_t ret_val;
@@ -442,27 +461,21 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	}
 	chunk = NULL;
 
-	sprintf(auth_url, "%s://%s/auth/v1.0", SWIFT_PROTOCOL, swift_url);
+	ASPRINTF(&url, "%s://%s/auth/v1.0", SWIFT_PROTOCOL, swift_url);
+
 	sprintf(user_string, "X-Storage-User: %s", swift_user);
 	sprintf(pass_string, "X-Storage-Pass: %s", swift_pass);
 	chunk = curl_slist_append(chunk, user_string);
 	chunk = curl_slist_append(chunk, pass_string);
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, fptr);
-	curl_easy_setopt(curl, CURLOPT_URL, auth_url);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, fptr);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -780,22 +793,13 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
-
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
+
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
 	res = curl_easy_perform(curl);
 
@@ -827,11 +831,11 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	/*TODO: How to actually export the list of objects to other functions*/
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
-	char container_string[200];
+	char *url = NULL;
 	FILE *swift_header_fptr, *swift_list_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	int32_t ret_val, num_retries, errcode;
+	int32_t ret_val, ret, num_retries, errcode;
 
 	/* For SWIFTTOKEN backend - token not set situation */
 	if (swift_auth_string[0] == 0)
@@ -861,28 +865,23 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s", swift_url_string, SWIFT_CONTAINER);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, "Content-Length:");
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, swift_list_body_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
+	ASPRINTF(&url, "%s/%s", swift_url_string, SWIFT_CONTAINER);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
+
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, swift_list_body_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -910,6 +909,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	curl_slist_free_all(chunk);
 
+errcode_handle:
 	return ret_val;
 }
 
@@ -932,7 +932,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 	off_t objsize;
 	object_put_control put_control;
 	CURLcode res;
-	char container_string[200];
+	char *url = NULL;
 	char object_string[150];
 	FILE *swift_header_fptr;
 	CURL *curl;
@@ -963,8 +963,6 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 	setbuf(swift_header_fptr, NULL);
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
-		objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 	if (object_meta != NULL) {
@@ -996,25 +994,22 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 	put_control.object_size = objsize;
 	put_control.remaining_size = objsize;
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 1L);
-	curl_easy_setopt(curl, CURLOPT_READDATA, (void *)&put_control);
-	curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
-	curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+	curl_easy_setopt(curl, CURLOPT_PUT, 1L);
+	curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
+	curl_easy_setopt(curl, CURLOPT_READDATA, (void *)&put_control);
+	curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
 
 	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -1086,7 +1081,7 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
-	char container_string[200];
+	char *url = NULL;
 
 	FILE *swift_header_fptr;
 	CURL *curl;
@@ -1117,34 +1112,28 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 	setbuf(swift_header_fptr, NULL);
 
 	chunk = NULL;
-
-	if (!strncmp("download_usermeta", curl_handle->id, 100))
-		sprintf(container_string, "%s/%s_gateway_config/%s",
-			swift_url_string, SWIFT_USER, objname);
-	else
-		sprintf(container_string, "%s/%s/%s", swift_url_string,
-			SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+	if (!strncmp("download_usermeta", curl_handle->id, 100))
+		ASPRINTF(&url, "%s/%s_gateway_config/%s", swift_url_string,
+			 SWIFT_USER, objname);
+	else
+		ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
+			 objname);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
+
 	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -1233,7 +1222,7 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
-	char container_string[200];
+	char *url = NULL;
 	char delete_command[10];
 	FILE *swift_header_fptr;
 	CURL *curl;
@@ -1258,31 +1247,24 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	}
 
 	strcpy(delete_command, "DELETE");
-	chunk = NULL;
 
-	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
-		objname);
+	chunk = NULL;
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -1500,20 +1482,13 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, S3_list_body_fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
+	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, S3_BUCKET_URL);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
+
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, S3_list_body_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
@@ -1643,7 +1618,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			if (curl_handle->curl != NULL)
 				hcfs_destroy_swift_backend(curl_handle->curl);
 			ret_val = hcfs_init_swift_backend(curl_handle);
@@ -1801,7 +1776,7 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			if (ret_val == 401) {
 				ret_val = hcfs_swift_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -1819,7 +1794,7 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			ret_val = hcfs_S3_list_container(curl_handle);
 		}
 
@@ -1872,7 +1847,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			if (ret_val == 401) {
 				ret_val = hcfs_swift_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -1892,7 +1867,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			FSEEK(fptr, 0, SEEK_SET);
 			ret_val = hcfs_S3_put_object(fptr, objname, curl_handle,
 						     object_meta);
@@ -1950,7 +1925,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			if (ret_val == 401) {
 				ret_val = hcfs_swift_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -1971,7 +1946,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			FSEEK(fptr, 0, SEEK_SET);
 			FTRUNCATE(fileno(fptr), 0);
 			ret_val = hcfs_S3_get_object(fptr, objname, curl_handle,
@@ -2035,7 +2010,7 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			if (ret_val == 401) {
 				ret_val = hcfs_swift_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -2053,7 +2028,7 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 			num_retries++;
 			write_log(2,
 				  "Retrying backend operation in 10 seconds");
-			sleep(10);
+			sleep(RETRY_INTERVAL);
 			ret_val = hcfs_S3_delete_object(objname, curl_handle);
 		}
 
@@ -2082,7 +2057,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	off_t objsize;
 	object_put_control put_control;
 	CURLcode res;
-	char container_string[200];
+	char *url = NULL;
 	FILE *S3_header_fptr;
 	CURL *curl;
 	char header_filename[100];
@@ -2124,7 +2099,6 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s", S3_BUCKET_URL, objname);
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
@@ -2156,25 +2130,22 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	put_control.object_size = objsize;
 	put_control.remaining_size = objsize;
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 1L);
-	curl_easy_setopt(curl, CURLOPT_READDATA, (void *)&put_control);
-	curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
-	curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+	curl_easy_setopt(curl, CURLOPT_PUT, 1L);
+	curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
+	curl_easy_setopt(curl, CURLOPT_READDATA, (void *)&put_control);
+	curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
 
 	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -2245,8 +2216,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
-	char container_string[200];
-
+	char *url = NULL;
 	FILE *S3_header_fptr;
 	CURL *curl;
 	char header_filename[100];
@@ -2287,30 +2257,24 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s", S3_BUCKET_URL, objname);
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
-
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	TIMEIT(HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
@@ -2392,7 +2356,7 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
-	char container_string[200];
+	char *url = NULL;
 	char delete_command[10];
 
 	FILE *S3_header_fptr;
@@ -2431,30 +2395,23 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
-
-	sprintf(container_string, "%s/%s", S3_BUCKET_URL, objname);
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
-	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
-	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
-	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
-	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
-	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
-	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
+
+	HCFS_SET_DEFAULT_CURL();
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 
-	curl_easy_setopt(curl, CURLOPT_URL, container_string);
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
+	FREE(url);
 
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));

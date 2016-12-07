@@ -162,15 +162,14 @@ PushGDBbinary() {
 	echo ">> [PushGDBbinary]"
 	adb wait-for-device
 	adb root
-	adb wait-for-device
 	if ! adb disable-verity | grep -q already; then
 		echo ">> Disable-verity and reboot"
 		adb reboot
-		adb wait-for-device
-		adb root
 	fi
-	adb remount
+	adb wait-for-device
 	echo ">>   Push hcfs"
+	adb root
+	adb remount
 	OUT=$(ANDROID_PRODUCT_OUT=. adb sync system | tee /dev/fd/2)
 	if [[ ! $OUT = *" 0 files pushed"* ]]; then
 		echo ">> File changed. Reboot."
