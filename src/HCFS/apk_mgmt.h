@@ -15,9 +15,16 @@
 
 #include <stdbool.h>
 #include <inttypes.h>
+#include <sys/types.h>
 
 int32_t toggle_use_minimal_apk(bool new_val);
 int32_t initialize_minimal_apk(void);
 int32_t terminate_minimal_apk(void);
+
+int32_t create_minapk_table();
+void destroy_minapk_table();
+int32_t insert_minapk_data(ino_t parent_ino, char *apk_name, ino_t minapk_ino);
+int32_t query_minapk_data(ino_t parent_ino, char *apk_name, ino_t *minapk_ino);
+int32_t remove_minapk_data(ino_t parent_ino, char *apk_name);
 
 #endif  /* SRC_HCFS_APK_MGMT_H_ */
