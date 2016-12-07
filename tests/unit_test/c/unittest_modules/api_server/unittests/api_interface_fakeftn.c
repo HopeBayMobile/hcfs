@@ -235,3 +235,6 @@ int32_t add_notify_event(int32_t event_id,
 {
 	return 0;
 }
+int32_t toggle_use_minimal_apk(bool new_val){
+	return 0;
+}
