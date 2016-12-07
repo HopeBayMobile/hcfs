@@ -368,6 +368,8 @@ int32_t boost_package(char *package_name)
 
 	CHANGE_PKG_BOOST_STATUS(package_name, ST_BOOSTING);
 
+	CHANGE_PKG_BOOST_STATUS(package_name, ST_BOOSTING);
+
 	snprintf(pkg_fullpath, sizeof(pkg_fullpath), "%s/%s", DATA_PREFIX,
 		 package_name);
 	snprintf(smart_cache_fullpath, sizeof(smart_cache_fullpath), "%s/%s",
