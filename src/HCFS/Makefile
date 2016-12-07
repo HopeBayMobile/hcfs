@@ -80,6 +80,7 @@ OBJS_F := \
 	do_restoration.o \
 	control_smartcache.o \
 	recover_super_block.o \
+	apk_mgmt.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

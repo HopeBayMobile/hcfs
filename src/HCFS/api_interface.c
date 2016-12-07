@@ -51,6 +51,7 @@
 #include "do_restoration.h"
 #include "control_smartcache.h"
 #include "recover_super_block.h"
+#include "apk_mgmt.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -919,23 +920,6 @@ int32_t send_notify_event(int32_t arg_len __attribute__((unused)),
 	return ret_code;
 }
 
-void _init_minimal_apk_table(void) {}
-int32_t toggle_use_minimal_apk(bool new_val)
-{
-	int32_t ret = 0;
-	bool old_val = hcfs_system->use_minimal_apk;
-
-	hcfs_system->use_minimal_apk = new_val;
-
-	/*
-	 * TODO: An in-memory lookup should be initiated when the API
-	 * changes the value from false to true
-	 */
-	if (old_val == false && new_val == true)
-		_init_minimal_apk_table();
-
-	return ret;
-}
 
 /************************************************************************
 *
