@@ -2825,7 +2825,7 @@ int32_t restore_meta_structure(FILE *fptr)
 	int64_t total_blocks, count;
 	int64_t pin_size, metasize, metasize_blk;
 	int32_t e_index;
-	BOOL block_status;
+	uint8_t block_status;
 	BOOL write_page;
 	BOOL just_meta;
 	size_t ret_size;

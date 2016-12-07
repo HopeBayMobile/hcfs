@@ -133,7 +133,7 @@ typedef struct {
 	BOOL writing_sys_data;
 
 	/* Define whether minimal apk should be used. Default is false. */
-	BOOL use_minimal_apk;
+	bool use_minimal_apk;
 
 	/* Root inode # of /data/app */
 	ino_t data_app_root;

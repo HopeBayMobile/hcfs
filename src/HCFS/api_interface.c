@@ -51,6 +51,7 @@
 #include "do_restoration.h"
 #include "control_smartcache.h"
 #include "recover_super_block.h"
+#include "apk_mgmt.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -919,6 +920,7 @@ int32_t send_notify_event(int32_t arg_len __attribute__((unused)),
 	return ret_code;
 }
 
+
 /************************************************************************
 *
 * Function name: api_module
@@ -1581,9 +1583,22 @@ void api_module(void *index)
 				ret_len = sizeof(int32_t);
 				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(int32_t),
+				     MSG_NOSIGNAL);
 			}
 			retcode = 0;
+			break;
+		case TOGGLE_USE_MINIMAL_APK:
+			memcpy(&uint32_ret, largebuf, sizeof(uint32_t));
+			/* Only control with boolean value */
+			retcode = toggle_use_minimal_apk(!!uint32_ret);
+			if (retcode == 0) {
+				ret_len = sizeof(retcode);
+				send(fd1, &ret_len, sizeof(ret_len),
+				     MSG_NOSIGNAL);
+				send(fd1, &retcode, sizeof(retcode),
+				     MSG_NOSIGNAL);
+			}
 			break;
 		default:
 			retcode = ENOTSUP;
