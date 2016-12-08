@@ -23,6 +23,9 @@ typedef struct HASH_LIST {
 	int32_t (*data_update_ftn)(void *data, void *update_data);
 	LIST_HEAD *hash_table;
 	sem_t table_sem;
+	uint32_t num_lock_bucket;
+	sem_t shared_var_sem;
+	sem_t can_lock_table_sem;
 } HASH_LIST;
 
 HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
@@ -36,8 +39,8 @@ int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
 		void *update_data);
 void destroy_hash_list(HASH_LIST *hash_list);
 
-void hash_list_lock(HASH_LIST *hash_list);
-void hash_list_unlock(HASH_LIST *hash_list);
+void hash_list_global_lock(HASH_LIST *hash_list);
+void hash_list_global_unlock(HASH_LIST *hash_list);
 
 /*void hash_list_bucket_lock(HASH_LIST *hash_list, void *key);*/
 /*void hash_list_bucket_unlock(HASH_LIST *void *key);*/
