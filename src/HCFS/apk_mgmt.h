@@ -18,7 +18,8 @@
 #include <sys/types.h>
 
 #include "params.h"
-#include "hash_list_struct.h"
+//#include "hash_list_struct.h"
+#include "meta_iterator.h"
 
 int32_t toggle_use_minimal_apk(bool new_val);
 int32_t initialize_minimal_apk(void);
@@ -30,11 +31,12 @@ typedef struct MIN_APK_LOOKUP_KEY {
 	char apk_name[MAX_FILENAME_LEN];
 } MIN_APK_LOOKUP_KEY;
 
-typedef struct MINAPK_LOOKUP_DATA {
+typedef struct MIN_APK_LOOKUP_DATA {
 	ino_t min_apk_ino;
-} MINAPK_LOOKUP_DATA;
+} MIN_APK_LOOKUP_DATA;
 
 HASH_LIST *minapk_lookup_table;
+HASH_LIST_ITERATOR *minapk_lookup_iter;
 
 int32_t create_minapk_table(void);
 void destroy_minapk_table(void);
@@ -43,5 +45,10 @@ int32_t insert_minapk_data(ino_t parent_ino, const char *apk_name,
 int32_t query_minapk_data(ino_t parent_ino, const char *apk_name,
 		ino_t *minapk_ino);
 int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name);
+
+int32_t init_iterate_minapk_table(void);
+int32_t iterate_minapk_table(ino_t *parent_ino, char *apk_name,
+		ino_t *minapk_ino);
+void end_iterate_minapk_table(void);
 
 #endif  /* SRC_HCFS_APK_MGMT_H_ */

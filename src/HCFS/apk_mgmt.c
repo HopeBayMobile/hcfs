@@ -100,7 +100,7 @@ int32_t create_minapk_table(void)
 
 	minapk_lookup_table = create_hash_list(_minapk_hash, _minapk_cmp, NULL,
 		MINAPK_TABLE_SIZE, sizeof(MIN_APK_LOOKUP_KEY),
-		sizeof(MINAPK_LOOKUP_DATA));
+		sizeof(MIN_APK_LOOKUP_DATA));
 	if (!minapk_lookup_table) {
 		ret = -errno;
 		write_log(0, "Error: Fail to create min apk table."
@@ -137,7 +137,7 @@ int32_t insert_minapk_data(ino_t parent_ino,
 			   ino_t minapk_ino)
 {
 	MIN_APK_LOOKUP_KEY temp_key;
-	MINAPK_LOOKUP_DATA temp_data = {.min_apk_ino = minapk_ino};
+	MIN_APK_LOOKUP_DATA temp_data = {.min_apk_ino = minapk_ino};
 	int32_t ret;
 
 	temp_key.parent_ino = parent_ino;
@@ -167,7 +167,7 @@ int32_t query_minapk_data(ino_t parent_ino,
 			  ino_t *minapk_ino)
 {
 	MIN_APK_LOOKUP_KEY temp_key;
-	MINAPK_LOOKUP_DATA temp_data;
+	MIN_APK_LOOKUP_DATA temp_data;
 	int32_t ret = 0;
 
 	temp_key.parent_ino = parent_ino;
@@ -211,3 +211,50 @@ int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name)
 	return ret;
 }
 
+int32_t init_iterate_minapk_table(void)
+{
+	HASH_LIST_ITERATOR *iter;
+	int32_t ret = 0;
+
+	hash_list_global_lock(minapk_lookup_table);
+	iter = init_hashlist_iter(minapk_lookup_table);
+	if (!iter) {
+		ret = -errno;
+		goto out;
+	}
+	minapk_lookup_iter = iter;
+
+out:
+	return ret;
+}
+
+int32_t iterate_minapk_table(ino_t *parent_ino, char *apk_name,
+		ino_t *minapk_ino)
+{
+	HASH_LIST_ITERATOR *iter;
+	MIN_APK_LOOKUP_KEY *key;
+	MIN_APK_LOOKUP_DATA *data;
+	int32_t ret = 0;
+
+	iter = iter_next(minapk_lookup_iter);
+	if (!iter) {
+		ret = -errno;
+		goto out;
+	}
+
+	key = (MIN_APK_LOOKUP_KEY *)(iter->now_key);
+	data = (MIN_APK_LOOKUP_DATA *)(iter->now_data);
+
+	*parent_ino = key->parent_ino;
+	strncpy(apk_name, key->apk_name, MAX_FILENAME_LEN);
+	*minapk_ino = data->min_apk_ino;
+
+out:
+	return ret;
+}
+
+void end_iterate_minapk_table(void)
+{
+	destroy_hashlist_iter(minapk_lookup_iter);
+	hash_list_global_unlock(minapk_lookup_table);
+}

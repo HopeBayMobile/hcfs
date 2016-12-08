@@ -184,3 +184,75 @@ void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
 	free(iter);
 }
 
+HASH_LIST_ITERATOR *init_hashlist_iter(HASH_LIST *hash_list)
+{
+	HASH_LIST_ITERATOR *iter;
+
+	iter = (HASH_LIST_ITERATOR *) calloc(sizeof(HASH_LIST_ITERATOR), 1);
+	if (!iter) {
+		write_log(0, "Error: Fail to alloc mem in %s. Code %d",
+				__func__, errno);
+		return NULL;
+	}
+
+	iter->hash_list = hash_list;
+	iter->base.next = (void *)&next_entry;
+	iter->base.begin = (void *)&begin_entry;
+	iter->now_bucket_idx = -1;
+	iter->now_node = NULL;
+	iter->now_key = NULL;
+	iter->now_data = NULL;
+	return iter;
+}
+
+HASH_LIST_ITERATOR *next_entry(HASH_LIST_ITERATOR *iter)
+{
+	uint32_t idx;
+	LIST_NODE *next_node = NULL;
+
+	/* Try next node in this bucket */
+	if (iter->now_node) {
+		next_node = iter->now_node->next;
+		if (next_node) {
+			iter->now_node = next_node;
+			iter->now_key = next_node->key;
+			iter->now_data = next_node->data;
+			return iter;
+		}
+	}
+
+	/* Try next bucket */
+	for (idx = iter->now_bucket_idx + 1;
+				idx < iter->hash_list->table_size; idx++) {
+		next_node = iter->hash_list->hash_table[idx].first_entry;
+		if (next_node)
+			break;
+		else
+			continue;
+	}
+	if (next_node) {
+		iter->now_bucket_idx = idx;
+		iter->now_node = next_node;
+		iter->now_key = next_node->key;
+		iter->now_data = next_node->data;
+		return iter;
+	}
+
+	errno = ENOENT;
+	return NULL;
+}
+
+HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter)
+{
+	iter->now_bucket_idx = -1;
+	iter->now_node = NULL;
+	iter->now_key = NULL;
+	iter->now_data = NULL;
+
+	return next_entry(iter);
+}
+
+void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter)
+{
+	free(iter);
+}
