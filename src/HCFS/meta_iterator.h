@@ -1,5 +1,5 @@
-#ifndef GW20_HCFS_HCFS_ITERATOR_H_
-#define GW20_HCFS_HCFS_ITERATOR_H_
+#ifndef SRC_HCFS_META_ITERATOR_H_
+#define SRC_HCFS_META_ITERATOR_H_
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -81,4 +81,4 @@ HASH_LIST_ITERATOR *next_entry(HASH_LIST_ITERATOR *iter);
 HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter);
 void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter);
 
-#endif
+#endif  // SRC_HCFS_META_ITERATOR_H_

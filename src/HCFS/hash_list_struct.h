@@ -1,3 +1,17 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hash_list_struct.h
+* Abstract: 
+*
+* Revision History
+* 2016/12/08
+*
+**************************************************************************/
+#ifndef SRC_HCFS_HASH_LIST_STRUCT_H_
+#define SRC_HCFS_HASH_LIST_STRUCT_H_
+
 #include <inttypes.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -45,3 +59,5 @@ void hash_list_global_unlock(HASH_LIST *hash_list);
 /*void hash_list_bucket_lock(HASH_LIST *hash_list, void *key);*/
 /*void hash_list_bucket_unlock(HASH_LIST *void *key);*/
 /*void *hash_list_get_entry_data(HASH_LIST *hash_listd *key)*/
+
+#endif  /* SRC_HCFS_HASH_LIST_STRUCT_H_ */

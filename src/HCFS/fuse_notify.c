@@ -515,10 +515,10 @@ int32_t hfuse_ll_notify_inval_ent(struct fuse_chan *ch,
 {
 	int32_t ret = 0;
 	FUSE_NOTIFY_INVAL_ENT_DATA event = {.func = INVAL_ENT,
-					 .ch = ch,
-					 .parent = parent,
-					 .name = NULL,
-					 .namelen = namelen};
+					    .ch = ch,
+					    .parent = parent,
+					    .name = NULL,
+					    .namelen = namelen };
 	while (TRUE) {
 		event.name = strndup(name, namelen);
 		if (event.name == NULL) {
