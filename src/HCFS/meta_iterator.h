@@ -14,9 +14,12 @@ typedef struct ITERATOR_BASE {
 	void *(*jump)(void *iter, int64_t target_idx);
 } ITERATOR_BASE;
 
-#define iter_begin(iter) iter->base.begin(iter)
-#define iter_next(iter) iter->base.next(iter)
-#define iter_jump(iter, elem_idx) iter->base.jump(iter, elem_idx)
+#define iter_begin(iter)                                                       \
+	((iter && iter->base.begin) ? iter->base.begin(iter) : NULL)
+#define iter_next(iter)                                                        \
+	((iter && iter->base.next) ? iter->base.next(iter) : NULL)
+#define iter_jump(iter, elem_idx)                                              \
+	((iter && iter->base.jump) ? iter->base.jump(iter, elem_idx) : NULL)
 
 /**
  *	Usage:
