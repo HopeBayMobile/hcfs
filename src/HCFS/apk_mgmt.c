@@ -99,8 +99,9 @@ int32_t destroy_minapk_table(void)
  *
  * @return 0 on success, -EEXIST if key pair (parent inode, apk name) exists.
  */
-int32_t insert_minapk_data(ino_t parent_ino, const char *apk_name,
-                           ino_t minapk_ino)
+int32_t insert_minapk_data(ino_t parent_ino,
+			   const char *apk_name,
+			   ino_t minapk_ino)
 {
 	UNUSED(parent_ino);
 	UNUSED(apk_name);

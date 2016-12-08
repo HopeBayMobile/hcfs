@@ -16,6 +16,8 @@
 extern "C" {
 #include "hfuse_system.h"
 #include "fuseop.h"
+#include "apk_mgmt.h"
+
 #include "ut_helper.h"
 }
 
@@ -37,6 +39,7 @@ void reset_unittest_env(void)
 {
 	hcfs_system->system_going_down = FALSE;
 }
+
 class UnittestEnvironment : public ::testing::Environment
 {
 	public:
@@ -50,5 +53,31 @@ class UnittestEnvironment : public ::testing::Environment
 	virtual void TearDown() {}
 };
 
-::testing::Environment *const fuseop_env =
+::testing::Environment *const unitest_env =
     ::testing::AddGlobalTestEnvironment(new UnittestEnvironment);
+
+class NotifyBufferSetUpAndTearDown : public ::testing::Test
+{
+	protected:
+	virtual void SetUp() {
+	}
+
+	virtual void TearDown()
+	{
+		reset_unittest_env();
+		reset_fake_functions();
+	}
+};
+
+TEST(ToggleMinimalApkTest, On)
+{
+	hcfs_system->use_minimal_apk = 0;
+	ASSERT_EQ(toggle_use_minimal_apk(1), 0);
+	EXPECT_EQ(hcfs_system->use_minimal_apk, 1);
+}
+TEST(ToggleMinimalApkTest, Off)
+{
+	hcfs_system->use_minimal_apk = 1;
+	EXPECT_EQ(toggle_use_minimal_apk(0), 0);
+	EXPECT_EQ(hcfs_system->use_minimal_apk, 0);
+}
