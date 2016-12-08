@@ -65,6 +65,13 @@ int32_t fetch_all_parents(ino_t self_inode, int32_t *parentnum, ino_t **parentli
 	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
 	      sizeof(PRIMARY_PARENT_T), filepos);
 
+	if (ret_ssize != sizeof(PRIMARY_PARENT_T)) {
+		write_log(2, "Short-read when querying parent db. (Inode %"
+		          PRIu64 ")\n", (uint64_t) self_inode);
+		*parentnum = 0;
+		return 0;
+	}
+
 	if ((tmpparent.parentinode == 0) && (tmpparent.haveothers == FALSE)) {
 		*parentnum = 0;
 		return 0;

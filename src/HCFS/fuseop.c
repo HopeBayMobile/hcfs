@@ -1690,7 +1690,7 @@ static inline BOOL _is_apk(const char *filename)
 
 	name_len = strlen(filename);
 
-	/* If filename is too short */
+	/* If filename is too short to be an apk*/
 	if (name_len < 5)
 		return FALSE;
 
@@ -1700,17 +1700,105 @@ static inline BOOL _is_apk(const char *filename)
 	return FALSE;
 }
 
-/* Helper function on checking whether to use minimal apk */
-static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
-                                        ino_t *minapk_ino)
+/* Helper function for converting apk name to minimal apk name */
+int32_t _convert_minapk(const char *apkname, char *minapk_name)
 {
-	/* TODO: 2. Check if parent is an app folder */
+	size_t name_len;
+
+	name_len = strlen(apkname);
+
+	/* Could not be an apk */
+	if (name_len < 5)
+		return -EINVAL;
+
+	if ((name_len + 1) > sizeof(minapk_name)) {
+		write_log(2, "Not enough memory for minapk name. (%d)\n",
+		          sizeof(minapk_name));
+		return -ENOMEM;
+	}
+
+	/* The length to copy before ".apk" */
+	name_len -= 4;
+	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
+	snprintf(&(minapk_name[1 + name_len]), 4, "min");
+	write_log(10, "[App unpin] Name of minapk: %s\n", minapk_name);
+	return 0;
+}
+
+/* Helper function on checking whether to use minimal apk */
+/* Returns 0 if check completed normally, and negative of error if check
+terminated abnormally. Value of "*minapk_ino" is non-zero if minimal apk
+is found and we will use it, otherwise the value is zero. */
+static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
+                                        ino_t *minapk_ino, ino_t apk_ino)
+{
 	/* TODO: 4. Check if minimal apk exists */
 	/* TODO: 5. Check if apk is local */
+	char minapk_name[MAX_FILENAME_LEN+1];
+	int32_t errcode, ret;
+	ino_t *parentlist;
+	int32_t numparents, count;
+	DIR_ENTRY temp_dentry;
 
-	UNUSED(parent_ino);
-	UNUSED(selfname);
-	UNUSED(minapk_ino);
+	*minapk_ino = 0;
+
+	/* First check if the parent is an app folder under the root
+	of /data/app */
+	ret = sem_wait(&(pathlookup_data_lock));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Unexpected error: %d (%s)\n", errcode,
+		          strerror(errcode));
+		write_log(6, "Error location at %s\n", __func__);
+		errcode = -errcode;
+		return errcode;
+	}
+	parentlist = NULL;
+	ret = fetch_all_parents(parent_ino, &numparents, &parentlist);
+
+	/* Check parent only if fetch parent is successful */
+	if (ret >= 0) {
+		for (count = 0; count < numparents; count++)
+			if (parentlist[count] == hcfs_system->data_app_root)
+				break;
+	}
+	free(parentlist);
+	parentlist = NULL;
+	sem_post(&(pathlookup_data_lock));
+
+	/* Return if encountered an error */
+	if (ret < 0)
+		return ret;
+
+	/* If parent folder is not an app folder under /data/app, do not
+	use minimal apk */
+	if (count == numparents)
+		return 0;
+
+	ret = _convert_minapk(selfname, minapk_name);
+	if (ret < 0)
+		return ret;
+
+	memset(&temp_dentry, 0, sizeof(DIR_ENTRY));
+
+	/* Check if the minimal apk exists in the same folder */
+	ret = lookup_dir(parent_ino, minapk_name, &temp_dentry, FALSE);
+
+	/* Still return 0 if cannot find minimal apk */
+	if (ret == -ENOENT)
+		return 0;
+	else if (ret < 0) 
+		return ret;
+
+	/* Check if the original apk is "local" */
+	ret = check_data_location(apk_ino);
+	/* Don't use the minimal apk if the check failed or the apk is
+	"local" */
+	if (ret <= 0)
+		return ret;
+
+	/* Found the minimal apk, and should use it */
+	*minapk_ino = temp_dentry.d_ino;
 	return 0;
 }
 
@@ -1830,7 +1918,7 @@ a directory (for NFS) */
 			/* temp_dentry now points to the apk entry */
 			/* Check whether to use minimal apk */
 			ret_val = _check_use_minapk(parent_ino, selfname,
-			                        &minapk_ino);
+			                        &minapk_ino, temp_dentry.d_ino);
 
 			/* Decide whether to use minimal apk */
 			if ((ret_val == 0) && (minapk_ino > 0)) {

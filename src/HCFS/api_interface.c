@@ -52,6 +52,7 @@
 #include "control_smartcache.h"
 #include "recover_super_block.h"
 #include "apk_mgmt.h"
+#include "metaops.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -602,61 +603,14 @@ int32_t unpin_inode_handle(ino_t *unpinned_list, uint32_t num_inode)
 int32_t check_location_handle(int32_t arg_len, char *largebuf)
 {
 	ino_t target_inode;
-	int32_t errcode;
-	char metapath[METAPATHLEN];
-	HCFS_STAT thisstat;
-	META_CACHE_ENTRY_STRUCT *thisptr;
-	char inode_loc;
-	FILE_STATS_TYPE tmpstats;
-	ssize_t ret_ssize;
 
 	if (arg_len != sizeof(ino_t))
 		return -EINVAL;
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
-	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
+	write_log(10, "Debug API: checkloc inode %" PRIu64 "\n",
 		  (uint64_t)target_inode);
-	errcode = fetch_meta_path(metapath, target_inode);
-	if (errcode < 0)
-		return errcode;
-
-	if (access(metapath, F_OK) != 0)
-		return -ENOENT;
-
-	thisptr = meta_cache_lock_entry(target_inode);
-	if (thisptr == NULL)
-		return -errno;
-
-	errcode = meta_cache_lookup_file_data(target_inode, &thisstat,
-						NULL, NULL, 0, thisptr);
-	if (errcode < 0)
-		goto errcode_handle;
-
-	if (S_ISREG(thisstat.mode)) {
-		errcode = meta_cache_open_file(thisptr);
-		if (errcode < 0)
-			goto errcode_handle;
-		PREAD(fileno(thisptr->fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
-		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
-		if ((tmpstats.num_blocks == 0) ||
-		    (tmpstats.num_blocks == tmpstats.num_cached_blocks))
-			inode_loc = 0;  /* If the location is "local" */
-		else if (tmpstats.num_cached_blocks == 0)
-			inode_loc = 1;  /* If the location is "cloud" */
-		else
-			inode_loc = 2;  /* If the location is "hybrid" */
-	} else {
-		inode_loc = 0;  /* Non-file obj defaults to "local" */
-	}
-
-	meta_cache_close_file(thisptr);
-	meta_cache_unlock_entry(thisptr);
-
-	return inode_loc;
-
-errcode_handle:
-	meta_cache_unlock_entry(thisptr);
-	return errcode;
+	return check_data_location(target_inode);
 }
 
 int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)

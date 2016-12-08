@@ -102,4 +102,7 @@ int32_t restore_meta_structure(FILE *fptr);
 int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 			ino_t target_ino);
 
+/* Returns 0 if a file is "local", 1 if "cloud", or 2 if "hybrid" */
+int32_t check_data_location(ino_t this_inode);
+
 #endif /* GW20_HCFS_METAOPS_H_ */
