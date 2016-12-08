@@ -19,13 +19,11 @@
 #include <unistd.h>
 #include <time.h>
 #include <semaphore.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <sys/mman.h>
 #include <inttypes.h>
 
 #include "params.h"
