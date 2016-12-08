@@ -14,7 +14,8 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <errno.h>
 #include <stdint.h>
 #include <inttypes.h>
