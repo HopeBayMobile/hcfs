@@ -12,17 +12,21 @@
 
 #include "apk_mgmt.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
+#include "fuse_notify.h"
 #include "fuseop.h"
 #include "global.h"
+#include "hash_list_struct.h"
 #include "hfuse_system.h"
 #include "macro.h"
 #include "params.h"
+#include "utils.h"
 
 int32_t toggle_use_minimal_apk(bool new_val)
 {
@@ -45,13 +49,47 @@ int32_t toggle_use_minimal_apk(bool new_val)
  */
 int32_t initialize_minimal_apk(void)
 {
-	create_minapk_table();
+	int32_t ret = 0;
+
+	ret = create_minapk_table();
+	if (ret < 0)
+		return ret;
 
 	/* Enable use_minimal_apk after everything ready */
 	hcfs_system->use_minimal_apk = true;
-	return 0;
+
+	return ret;
 }
 
+int32_t _invalid_all_minapk(void)
+{
+	int32_t ret = 0;
+	ino_t parent_ino, minapk_ino;
+	char apk_name[MAX_FILENAME_LEN];
+	MOUNT_T *mount_info;
+
+	ret = init_iterate_minapk_table();
+	if (ret < 0)
+		return ret;
+
+	do {
+		ret = search_mount(APP_VOL_NAME, NULL, &mount_info);
+		if (ret < 0) {
+			write_log(0, "[E] %s: Volume %s not found.",
+				  APP_VOL_NAME);
+			break;
+		}
+		while (iterate_minapk_table(&parent_ino, apk_name,
+					    &minapk_ino) != -ENOENT) {
+			hfuse_ll_notify_inval_ent(
+			    mount_info->chan_ptr, parent_ino, apk_name,
+			    strnlen(apk_name, MAX_FILENAME_LEN - 1));
+		}
+	} while (0);
+
+	end_iterate_minapk_table();
+	return ret;
+}
 /**
  * Disable flag `use_minimal_apk`, invalid each minimal apk's dentry on
  * system, remove them from hash list and delete hash table.
@@ -60,14 +98,36 @@ int32_t initialize_minimal_apk(void)
  */
 int32_t terminate_minimal_apk(void)
 {
+	int32_t ret = 0;
+
 	/* Disable use_minimal_apk first, then destroy everything */
 	hcfs_system->use_minimal_apk = false;
 
-	/*
-	 * TODO : iterate over hash table, invalid all minapk
-	 * destroy_minapk_table();
-	 */
-	return 0;
+	ret = _invalid_all_minapk();
+	if (ret < 0) {
+		write_log(0, "[E] %s: Fail to invalid minapk dentries, %s",
+			  "This can lead to unexpected behavior.");
+	}
+
+	destroy_minapk_table();
+	return ret;
+}
+
+static int32_t _minapk_hash(const void *key)
+{
+	return (((MIN_APK_LOOKUP_KEY *)key)->parent_ino % MINAPK_TABLE_SIZE);
+}
+
+static int32_t _minapk_cmp(const void *key1, const void *key2)
+{
+	MIN_APK_LOOKUP_KEY *k1 = (MIN_APK_LOOKUP_KEY *)key1;
+	MIN_APK_LOOKUP_KEY *k2 = (MIN_APK_LOOKUP_KEY *)key2;
+
+	if (k1->parent_ino == k2->parent_ino &&
+	    !strncmp(k1->apk_name, k2->apk_name, MAX_FILENAME_LEN))
+		return 0;
+	else
+		return -1;
 }
 
 /**
@@ -77,7 +137,18 @@ int32_t terminate_minimal_apk(void)
  */
 int32_t create_minapk_table(void)
 {
-	return 0;
+	int32_t ret = 0;
+
+	minapk_lookup_table = create_hash_list(
+	    _minapk_hash, _minapk_cmp, NULL, MINAPK_TABLE_SIZE,
+	    sizeof(MIN_APK_LOOKUP_KEY), sizeof(MIN_APK_LOOKUP_DATA));
+	if (!minapk_lookup_table) {
+		ret = -errno;
+		write_log(0, "Error: Fail to create min apk table. Code %d",
+			  -ret);
+	}
+
+	return ret;
 }
 
 /**
@@ -85,9 +156,11 @@ int32_t create_minapk_table(void)
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t destroy_minapk_table(void)
+void destroy_minapk_table(void)
 {
-	return 0;
+	if (minapk_lookup_table)
+		destroy_hash_list(minapk_lookup_table);
+	minapk_lookup_table = NULL;
 }
 
 /**
@@ -103,10 +176,18 @@ int32_t insert_minapk_data(ino_t parent_ino,
 			   const char *apk_name,
 			   ino_t minapk_ino)
 {
-	UNUSED(parent_ino);
-	UNUSED(apk_name);
-	UNUSED(minapk_ino);
-	return 0;
+	MIN_APK_LOOKUP_KEY temp_key;
+	MIN_APK_LOOKUP_DATA temp_data = {.min_apk_ino = minapk_ino };
+	int32_t ret;
+
+	temp_key.parent_ino = parent_ino;
+	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
+	ret =
+	    insert_hash_list_entry(minapk_lookup_table, &temp_key, &temp_data);
+	if (ret < 0 && ret != -EEXIST)
+		write_log(2, "Fail to insert min apk data. Code %d", -ret);
+
+	return ret;
 }
 
 /**
@@ -124,10 +205,25 @@ int32_t query_minapk_data(ino_t parent_ino,
 			  const char *apk_name,
 			  ino_t *minapk_ino)
 {
-	UNUSED(parent_ino);
-	UNUSED(apk_name);
-	*minapk_ino = 0;
-	return 0;
+	MIN_APK_LOOKUP_KEY temp_key;
+	MIN_APK_LOOKUP_DATA temp_data;
+	int32_t ret = 0;
+
+	temp_key.parent_ino = parent_ino;
+	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
+	ret =
+	    lookup_hash_list_entry(minapk_lookup_table, &temp_key, &temp_data);
+	if (ret < 0) {
+		if (ret != -ENOENT)
+			write_log(0,
+				  "Error: Fail to query minimal apk. Code %d",
+				  -ret);
+		goto out;
+	}
+
+	*minapk_ino = temp_data.min_apk_ino;
+out:
+	return ret;
 }
 
 /**
@@ -142,7 +238,64 @@ int32_t query_minapk_data(ino_t parent_ino,
  */
 int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name)
 {
-	UNUSED(parent_ino);
-	UNUSED(apk_name);
-	return 0;
+	MIN_APK_LOOKUP_KEY temp_key;
+	int32_t ret = 0;
+
+	temp_key.parent_ino = parent_ino;
+	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
+	ret = remove_hash_list_entry(minapk_lookup_table, &temp_key);
+	if (ret < 0 && ret != -ENOENT)
+		write_log(0, "Error: Fail to remove min apk data. Code %d",
+			  -ret);
+
+	return ret;
+}
+
+int32_t init_iterate_minapk_table(void)
+{
+	HASH_LIST_ITERATOR *iter;
+	int32_t ret = 0;
+
+	hash_list_global_lock(minapk_lookup_table);
+	iter = init_hashlist_iter(minapk_lookup_table);
+	if (!iter) {
+		ret = -errno;
+		goto out;
+	}
+	minapk_lookup_iter = iter;
+
+out:
+	return ret;
+}
+
+int32_t iterate_minapk_table(ino_t *parent_ino,
+			     char *apk_name,
+			     ino_t *minapk_ino)
+{
+	HASH_LIST_ITERATOR *iter;
+	MIN_APK_LOOKUP_KEY *key;
+	MIN_APK_LOOKUP_DATA *data;
+	int32_t ret = 0;
+
+	iter = iter_next(minapk_lookup_iter);
+	if (!iter) {
+		ret = -errno;
+		goto out;
+	}
+
+	key = (MIN_APK_LOOKUP_KEY *)(iter->now_key);
+	data = (MIN_APK_LOOKUP_DATA *)(iter->now_data);
+
+	*parent_ino = key->parent_ino;
+	strncpy(apk_name, key->apk_name, MAX_FILENAME_LEN);
+	*minapk_ino = data->min_apk_ino;
+
+out:
+	return ret;
+}
+
+void end_iterate_minapk_table(void)
+{
+	destroy_hashlist_iter(minapk_lookup_iter);
+	hash_list_global_unlock(minapk_lookup_table);
 }
