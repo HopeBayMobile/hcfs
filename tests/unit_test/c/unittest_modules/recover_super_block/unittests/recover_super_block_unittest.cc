@@ -176,6 +176,21 @@ int32_t custom_meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
         return 0;
 }
 
+void __attribute__((constructor)) Init(void)
+{
+#define CUSTOM_FAKE(F) F##_fake.custom_fake = custom_##F;
+		/* Fake functions */
+		CUSTOM_FAKE(fopen);
+		CUSTOM_FAKE(fwrite);
+		CUSTOM_FAKE(pread);
+		CUSTOM_FAKE(pwrite);
+		CUSTOM_FAKE(write_super_block_entry);
+		CUSTOM_FAKE(read_super_block_entry);
+		CUSTOM_FAKE(meta_cache_lock_entry);
+		CUSTOM_FAKE(meta_cache_open_file);
+#undef CUSTOM_FAKE
+}
+
 int32_t change_system_meta(int64_t arg1 __attribute__((unused)),
 			   int64_t arg2 __attribute__((unused)),
 			   int64_t arg3 __attribute__((unused)),
@@ -334,18 +349,6 @@ class RecoverSBEnvironment : public ::testing::Environment
 {
 	public:
 	virtual void SetUp() {
-#define CUSTOM_FAKE(F) F##_fake.custom_fake = custom_##F;
-		/* Fake functions */
-		CUSTOM_FAKE(fopen);
-		CUSTOM_FAKE(fwrite);
-		CUSTOM_FAKE(pread);
-		CUSTOM_FAKE(pwrite);
-		CUSTOM_FAKE(write_super_block_entry);
-		CUSTOM_FAKE(read_super_block_entry);
-		CUSTOM_FAKE(meta_cache_lock_entry);
-		CUSTOM_FAKE(meta_cache_open_file);
-#undef CUSTOM_FAKE
-
 		mkdir(MOCK_METAPATH, S_IRWXU | S_IRWXG | S_IRWXO);
 
 		/* Mock config info */
