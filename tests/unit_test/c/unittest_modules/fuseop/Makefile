@@ -25,6 +25,7 @@ $(eval $(call ADDTEST, fuseop_unittest, \
   alias.o \
   fuseop.o \
   fake_meta_mem_cache.o \
+  fake_apk_mgmt.o \
   fake_misc.o \
   fake_fuse_notify.o \
   fuseop_unittest.o \

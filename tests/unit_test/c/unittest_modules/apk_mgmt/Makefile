@@ -21,7 +21,7 @@ $(eval $(call ADDMODULE))
 
 # All tests produced by this Makefile.
 
-$(eval $(call ADDTEST, fuse_notify_unittest, \
+$(eval $(call ADDTEST, apk_mgmt_unittest, \
   apk_mgmt.o \
   apk_mgmt_unittest.o \
   ut_helper.o ))
