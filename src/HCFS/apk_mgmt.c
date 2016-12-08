@@ -183,6 +183,9 @@ int32_t insert_minapk_data(ino_t parent_ino,
 	MIN_APK_LOOKUP_DATA temp_data = {.min_apk_ino = minapk_ino };
 	int32_t ret;
 
+	if (!minapk_lookup_table)
+		return -EINVAL;
+
 	temp_key.parent_ino = parent_ino;
 	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
 	ret =
@@ -211,6 +214,9 @@ int32_t query_minapk_data(ino_t parent_ino,
 	MIN_APK_LOOKUP_KEY temp_key;
 	MIN_APK_LOOKUP_DATA temp_data;
 	int32_t ret = 0;
+
+	if (!minapk_lookup_table)
+		return -EINVAL;
 
 	temp_key.parent_ino = parent_ino;
 	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
@@ -244,6 +250,9 @@ int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name)
 	MIN_APK_LOOKUP_KEY temp_key;
 	int32_t ret = 0;
 
+	if (!minapk_lookup_table)
+		return -EINVAL;
+
 	temp_key.parent_ino = parent_ino;
 	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
 	ret = remove_hash_list_entry(minapk_lookup_table, &temp_key);
@@ -258,6 +267,9 @@ int32_t init_iterate_minapk_table(void)
 {
 	HASH_LIST_ITERATOR *iter;
 	int32_t ret = 0;
+
+	if (!minapk_lookup_table)
+		return -EINVAL;
 
 	hash_list_global_lock(minapk_lookup_table);
 	iter = init_hashlist_iter(minapk_lookup_table);
@@ -280,6 +292,9 @@ int32_t iterate_minapk_table(ino_t *parent_ino,
 	MIN_APK_LOOKUP_DATA *data;
 	int32_t ret = 0;
 
+	if (!minapk_lookup_table || !minapk_lookup_iter)
+		return -EINVAL;
+
 	iter = iter_next(minapk_lookup_iter);
 	if (!iter) {
 		ret = -errno;
@@ -299,6 +314,12 @@ out:
 
 void end_iterate_minapk_table(void)
 {
+	if (!minapk_lookup_table || !minapk_lookup_iter) {
+		write_log(4, "Minimal apk lookup table is invalid");
+		return;
+	}
+
 	destroy_hashlist_iter(minapk_lookup_iter);
+	minapk_lookup_iter = NULL;
 	hash_list_global_unlock(minapk_lookup_table);
 }

@@ -161,6 +161,10 @@
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
+static inline BOOL _is_apk(const char *filename);
+static inline BOOL _is_minapk(const char *filename);
+int32_t _convert_minapk(const char *apkname, char *minapk_name);
+int32_t _convert_origin_apk(char *apkname, const char *minapk_name);
 /* Helper function for checking permissions.
    Inputs: fuse_req_t req, HCFS_STAT *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
@@ -1422,7 +1426,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
 	ino_t parent_inode, alias_ino;
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
 	BOOL is_external = FALSE;
@@ -1488,6 +1492,31 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
+	/* Handle removal of minimal apk */
+	if ((hcfs_system->use_minimal_apk == TRUE) &&
+	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
+		if (_is_apk(selfname) == TRUE) {
+			ret = remove_minapk_data(parent_inode, selfname);
+			if (ret < 0 && ret != -ENOENT) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		} else if (_is_minapk(selfname) == TRUE) {
+			char origin_apk[MAX_FILENAME_LEN] = {0};
+
+			ret = _convert_origin_apk(origin_apk, selfname);
+			if (ret < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+			ret = remove_minapk_data(parent_inode, origin_apk);
+			if (ret < 0 && ret != -ENOENT) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+	}
+
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
@@ -1700,6 +1729,23 @@ static inline BOOL _is_apk(const char *filename)
 	return FALSE;
 }
 
+static inline BOOL _is_minapk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	/* minapk name is ".<x>min" */
+	if (*filename == '.' &&
+		!strncmp(filename + name_len - 3, "min", 3))
+		return TRUE;
+	else
+		return FALSE;
+}
 /* Helper function for converting apk name to minimal apk name */
 int32_t _convert_minapk(const char *apkname, char *minapk_name)
 {
@@ -1715,6 +1761,28 @@ int32_t _convert_minapk(const char *apkname, char *minapk_name)
 	return 0;
 }
 
+int32_t _convert_origin_apk(char *apkname, const char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(minapk_name);
+
+	/* Could not be an apk */
+	if (name_len < 5)
+		return -EINVAL;
+
+	if ((name_len + 1) > sizeof(apkname)) {
+		write_log(2, "Not enough memory for minapk name. (%d)\n",
+		          sizeof(apkname));
+		return -ENOMEM;
+	}
+
+	/* From .<x>min to <x>.apk */
+	memcpy(apkname, minapk_name + 1, name_len - 4);
+	memcpy(apkname + name_len - 4, ".apk", 4);
+	apkname[name_len] = '\0';
+	return 0;
+}
 /* Helper function on checking whether to use minimal apk */
 /* Returns 0 if check completed normally, and negative of error if check
 terminated abnormally. Value of "*minapk_ino" is non-zero if minimal apk
@@ -2065,7 +2133,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		6. Process rename.
 	*/
 	ino_t parent_inode1, parent_inode2, self_inode, old_target_inode;
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	HCFS_STAT tempstat, old_target_stat;
 	mode_t self_mode, old_target_mode;
 	DIR_META_TYPE tempmeta;
@@ -2698,6 +2766,50 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				0, 0, 0, 0, TRUE);
 		change_mount_stat(tmpptr, 0,
 				  delta_meta_size1 + delta_meta_size2, 0);
+	}
+
+	/* Update minimal apk table */
+	/* Case1: Rename from app folder under /data/app/ to another
+	 * folder not /data/app */
+	if ((hcfs_system->use_minimal_apk == TRUE) && (
+	    parent_inode1 == hcfs_system->data_app_root &&
+	    S_ISDIR(self_mode) &&
+	    parent_inode2 != hcfs_system->data_app_root &&
+	    S_ISDIR(old_target_mode))) {
+		/* TODO: remove min apk entry */
+	}
+
+	if ((hcfs_system->use_minimal_apk == TRUE) &&
+	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
+		const char *selfname[2] = {selfname1, selfname2};
+		ino_t parent_inode[2] = {parent_inode1, parent_inode2};
+		int32_t i;
+
+		for (i = 0; i < 2; i++) {
+			if (_is_apk(selfname[i])) {
+				ret = remove_minapk_data(parent_inode[i],
+						selfname[i]);
+				if (ret < 0 && ret != -ENOENT) {
+					fuse_reply_err(req, -ret_val);
+					return;
+				}
+			} else if (_is_minapk(selfname[i])) {
+				char origin_apk[MAX_FILENAME_LEN] = {0};
+
+				ret = _convert_origin_apk(origin_apk,
+						selfname[i]);
+				if (ret < 0) {
+					fuse_reply_err(req, -ret_val);
+					return;
+				}
+				ret = remove_minapk_data(parent_inode[i],
+						origin_apk);
+				if (ret < 0 && ret != -ENOENT) {
+					fuse_reply_err(req, -ret_val);
+					return;
+				}
+			}
+		}
 	}
 
 	fuse_reply_err(req, 0);
@@ -8212,12 +8324,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 		if (hcfs_system->system_going_down == FALSE)
 			force_backup_package();
 	}
-
-/*	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
-		if (access("/data/mnt/hcfsblock_restore", F_OK) == 0)
-			unmount_smart_cache("/data/mnt/hcfsblock_restore");
-	}
-*/
 
 	/* Join thread if still restoring */
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)

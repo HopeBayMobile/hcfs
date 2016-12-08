@@ -60,6 +60,7 @@
 #include "do_restoration.h"
 #include "rebuild_super_block.h"
 #include "recover_super_block.h"
+#include "apk_mgmt.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -608,6 +609,9 @@ int32_t main(int32_t argc, char **argv)
 		write_log(0, "Error in setting open file limits\n");
 		/* exit(-1); */
 	}
+
+	minapk_lookup_table = NULL;
+	minapk_lookup_iter = NULL;
 
 	/* Convert meta changes if needed */
 	process_upgrade_meta_changes();
