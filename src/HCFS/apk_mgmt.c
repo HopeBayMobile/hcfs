@@ -258,3 +258,4 @@ void end_iterate_minapk_table(void)
 	destroy_hashlist_iter(minapk_lookup_iter);
 	hash_list_global_unlock(minapk_lookup_table);
 }
+
