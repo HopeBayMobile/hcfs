@@ -1707,16 +1707,6 @@ int32_t _convert_minapk(const char *apkname, char *minapk_name)
 
 	name_len = strlen(apkname);
 
-	/* Could not be an apk */
-	if (name_len < 5)
-		return -EINVAL;
-
-	if ((name_len + 1) > sizeof(minapk_name)) {
-		write_log(2, "Not enough memory for minapk name. (%d)\n",
-		          sizeof(minapk_name));
-		return -ENOMEM;
-	}
-
 	/* The length to copy before ".apk" */
 	name_len -= 4;
 	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
@@ -1784,6 +1774,8 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	/* Check if the minimal apk exists in the same folder */
 	ret = lookup_dir(parent_ino, minapk_name, &temp_dentry, FALSE);
 
+	write_log(6, "[App unpin] Min apk %s found? %s\n", minapk_name,
+	          ret == 0 ? "True" : "False");
 	/* Still return 0 if cannot find minimal apk */
 	if (ret == -ENOENT)
 		return 0;
@@ -1869,6 +1861,8 @@ a directory (for NFS) */
 	ret_val = check_permission(req, &parent_stat, 1);
 
 	if (ret_val < 0) {
+		write_log(6, "[lookup] Permission not granted for parent %"
+		          PRIu64 ", name %s\n", (uint64_t)parent_ino, selfname);
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
@@ -1919,10 +1913,13 @@ a directory (for NFS) */
 			/* Check whether to use minimal apk */
 			ret_val = _check_use_minapk(parent_ino, selfname,
 			                        &minapk_ino, temp_dentry.d_ino);
+			write_log(6, "[App unpin] check_use_minapk: %d, %"
+			          PRIu64 "\n", ret_val, (uint64_t) minapk_ino);
 
 			/* Decide whether to use minimal apk */
 			if ((ret_val == 0) && (minapk_ino > 0)) {
 				/* Use minimal apk */
+				write_log(10, "[App unpin] Use minapk\n");
 				temp_dentry.d_ino = minapk_ino;
 			} else {
 				minapk_ino = 0;

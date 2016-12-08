@@ -150,6 +150,7 @@ class fuseopEnvironment : public ::testing::Environment {
     hcfs_system->backend_is_online = TRUE;
     hcfs_system->sync_manual_switch = ON;
     hcfs_system->sync_paused = OFF;
+    hcfs_system->data_app_root = TEST_APPROOT_INODE;
     fail_open_files = FALSE;
 
     system_fh_table.entry_table_flags = (uint8_t *) malloc(sizeof(char) * 100);
@@ -3414,4 +3415,75 @@ TEST_F(hfuse_ll_fallocateTest, NoExtend) {
 }
 
 /* End of the test case for the function hfuse_ll_fallocate */
+
+/* Begin of the test case for the function hfuse_ll_lookup */
+class hfuse_ll_lookup : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+    root_updated = FALSE;
+    fake_block_status = ST_NONE;
+    after_update_block_page = FALSE;
+    tmp_apk_location = 0;
+    cached_minapk = FALSE;
+    exists_minapk = FALSE;
+    hcfs_system->use_minimal_apk = FALSE;
+    hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 10000;
+  }
+
+  virtual void TearDown() {
+    cached_minapk = FALSE;
+    exists_minapk = FALSE;
+    tmp_apk_location = 0;
+    hcfs_system->use_minimal_apk = FALSE;
+  }
+};
+TEST_F(hfuse_ll_lookup, UseMinimalApk) {
+  int32_t ret_val;
+  struct stat tempstat;
+
+  /* Do not use minapk */
+  stat("/tmp/test_fuse/com.example.test/base.apk", &tempstat);
+  EXPECT_EQ(20480000, tempstat.st_size);
+
+  /* minapk does not exist*/
+  hcfs_system->use_minimal_apk = TRUE;
+  exists_minapk = FALSE;
+  tmp_apk_location = 1;
+  stat("/tmp/test_fuse/com.example.test/base.apk", &tempstat);
+  EXPECT_EQ(20480000, tempstat.st_size);
+
+  /* Exists minapk but not cached (apk is not local)*/
+  hcfs_system->use_minimal_apk = TRUE;
+  exists_minapk = TRUE;
+  tmp_apk_location = 1;
+  stat("/tmp/test_fuse/com.example.test/base.apk", &tempstat);
+  EXPECT_EQ(204800, tempstat.st_size);
+
+  /* Exists minapk, not cached, and apk is local */
+  hcfs_system->use_minimal_apk = TRUE;
+  exists_minapk = FALSE;
+  tmp_apk_location = 0;
+  stat("/tmp/test_fuse/com.example.test/base.apk", &tempstat);
+  EXPECT_EQ(20480000, tempstat.st_size);
+
+  /* Exists minapk, cached */
+  hcfs_system->use_minimal_apk = TRUE;
+  exists_minapk = TRUE;
+  cached_minapk = TRUE;
+  stat("/tmp/test_fuse/com.example.test/base.apk", &tempstat);
+  EXPECT_EQ(204800, tempstat.st_size);
+
+  /* Does not exist minapk, cached */
+  hcfs_system->use_minimal_apk = TRUE;
+  exists_minapk = FALSE;
+  cached_minapk = TRUE;
+  stat("/tmp/test_fuse/com.example.test/base.apk", &tempstat);
+  EXPECT_EQ(20480000, tempstat.st_size);
+}
+
+/* End of the test case for the function hfuse_ll_lookup */
 
