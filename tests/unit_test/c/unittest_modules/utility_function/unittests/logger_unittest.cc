@@ -38,11 +38,11 @@ class open_logTest : public ::testing::Test {
     dup2(outfileno, fileno(stdout));
     dup2(errfileno, fileno(stderr));
     if (logptr != NULL) {
-      if (logptr->fptr != NULL) {
-        fclose(logptr->fptr);
+      if (logger_get_fileptr(logptr)) {
+        fclose(logger_get_fileptr(logptr));
       }
       unlink(tmpfilename);
-      sem_destroy(&(logptr->logsem));
+      sem_destroy(logger_get_semaphore(logptr));
       free(logptr);
     }
     free(system_config);
@@ -98,10 +98,10 @@ protected:
 
 	virtual void TearDown() {
 		if (logptr != NULL) {
-			if (logptr->fptr != NULL) {
-				fclose(logptr->fptr);
+			if (logger_get_fileptr(logptr)) {
+				fclose(logger_get_fileptr(logptr));
 			}
-			sem_destroy(&(logptr->logsem));
+			sem_destroy(logger_get_semaphore(logptr));
 			free(logptr);
 		}
 
