@@ -23,12 +23,12 @@
 #include <time.h>
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <curl/curl.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdint.h>
-#include <sys/time.h>
 
 #include "b64encode.h"
 #include "params.h"
