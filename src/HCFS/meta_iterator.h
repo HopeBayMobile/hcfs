@@ -15,11 +15,20 @@ typedef struct ITERATOR_BASE {
 } ITERATOR_BASE;
 
 #define iter_begin(iter)                                                       \
-	((iter && iter->base.begin) ? iter->base.begin(iter) : NULL)
+	((iter && iter->base.begin) ? iter->base.begin(iter) : ({              \
+		errno = EINVAL;                                                \
+		NULL;                                                          \
+	}))
 #define iter_next(iter)                                                        \
-	((iter && iter->base.next) ? iter->base.next(iter) : NULL)
+	((iter && iter->base.next) ? iter->base.next(iter) : ({                \
+		errno = EINVAL;                                                \
+		NULL;                                                          \
+	}))
 #define iter_jump(iter, elem_idx)                                              \
-	((iter && iter->base.jump) ? iter->base.jump(iter, elem_idx) : NULL)
+	((iter && iter->base.jump) ? iter->base.jump(iter, elem_idx) : ({      \
+		errno = EINVAL;                                                \
+		NULL;                                                          \
+	}))
 
 /**
  *	Usage:
