@@ -1771,12 +1771,6 @@ int32_t _convert_origin_apk(char *apkname, const char *minapk_name)
 	if (name_len < 5)
 		return -EINVAL;
 
-	if ((name_len + 1) > sizeof(apkname)) {
-		write_log(2, "Not enough memory for minapk name. (%d)\n",
-		          sizeof(apkname));
-		return -ENOMEM;
-	}
-
 	/* From .<x>min to <x>.apk */
 	memcpy(apkname, minapk_name + 1, name_len - 4);
 	memcpy(apkname + name_len - 4, ".apk", 4);
@@ -1941,7 +1935,7 @@ a directory (for NFS) */
 	/* Proceed on checking whether to use minimal apk here */
 
 	if (((hcfs_system->use_minimal_apk == TRUE) &&
-	     (tmpptr->f_ino == hcfs_system->data_app_root)) &&
+	    (tmpptr->f_ino == hcfs_system->data_app_root)) &&
 	    (_is_apk(selfname) == TRUE)) {
 		ino_t minapk_ino;
 
@@ -2774,18 +2768,23 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	if ((hcfs_system->use_minimal_apk == TRUE) && (
 	    parent_inode1 == hcfs_system->data_app_root &&
 	    S_ISDIR(self_mode) &&
-	    parent_inode2 != hcfs_system->data_app_root &&
-	    S_ISDIR(old_target_mode))) {
-		/* TODO: remove min apk entry */
+	    parent_inode2 != hcfs_system->data_app_root)) {
+		/* TODO: remove all entries with key (parent_inode1, <x>.apk)
+		 * in minapk_lookup_table */
 	}
 
 	if ((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
 		const char *selfname[2] = {selfname1, selfname2};
+		mode_t mode[2] = {self_mode, old_target_mode};
 		ino_t parent_inode[2] = {parent_inode1, parent_inode2};
 		int32_t i;
 
+		/* Remove entry when rename from (to) the .apk file or
+		 * minimal apk file. */
 		for (i = 0; i < 2; i++) {
+			if (!S_ISREG(mode[i]))
+				continue;
 			if (_is_apk(selfname[i])) {
 				ret = remove_minapk_data(parent_inode[i],
 						selfname[i]);
