@@ -383,8 +383,8 @@ int32_t main(int32_t argc, char **argv)
 	case TOGGLE_USE_MINIMAL_APK:
 		status = -1;
 		if (argc == 3) {
-			for (char *p = argv[2]; *p != '\0'; ++p)
-				*p = tolower(*p);
+			for (ptr = argv[2]; *ptr != '\0'; ++ptr)
+				*ptr = tolower(*ptr);
 			if (strcasecmp(argv[2], "on") == 0 ||
 			    strcasecmp(argv[2], "true") == 0 ||
 			    strcasecmp(argv[2], "1") == 0) {
