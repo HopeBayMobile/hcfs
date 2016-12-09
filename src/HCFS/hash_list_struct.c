@@ -1,3 +1,14 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hash_list_struct.h
+* Abstract: The source file of a generic linked list in hash table struct.
+*
+* Revision History
+* 2016/12/07 Kewei created this file and define data structure.
+*
+**************************************************************************/
 
 #include "hash_list_struct.h"
 
@@ -10,19 +21,41 @@
 #include "global.h"
 #include "macro.h"
 
+/**
+ * Globally lock the hash table
+ *
+ * @param hash_list hash list table structure.
+ *
+ * @return none.
+ */
 void hash_list_global_lock(HASH_LIST *hash_list)
 {
 	sem_wait(&hash_list->table_sem);
 	sem_wait(&hash_list->can_lock_table_sem);
 }
 
+/**
+ * Unlock the global lock of hash table
+ *
+ * @param hash_list hash list table structure.
+ *
+ * @return none.
+ */
 void hash_list_global_unlock(HASH_LIST *hash_list)
 {
 	sem_post(&hash_list->can_lock_table_sem);
 	sem_post(&hash_list->table_sem);
 }
 
-void _bucket_lock(HASH_LIST *hash_list, sem_t *bucket_sem)
+/**
+ * Partially lock the bucket using "bucket_sem".
+ *
+ * @param hash_list hash list table structure.
+ * @param bucket_sem Semaphore of the bucket.
+ *
+ * @return none.
+ */
+static void _bucket_lock(HASH_LIST *hash_list, sem_t *bucket_sem)
 {
 	/* Lock bucket */
 	sem_wait(bucket_sem);
@@ -40,7 +73,15 @@ void _bucket_lock(HASH_LIST *hash_list, sem_t *bucket_sem)
 	sem_post(&hash_list->table_sem);
 }
 
-void _bucket_unlock(HASH_LIST *hash_list, sem_t *bucket_sem)
+/**
+ * Unlock the partial lock "bucket_sem".
+ *
+ * @param hash_list hash list table structure.
+ * @param bucket_sem Semaphore of the bucket.
+ *
+ * @return none.
+ */
+static void _bucket_unlock(HASH_LIST *hash_list, sem_t *bucket_sem)
 {
 	/* update num_lock_bucket */
 	sem_wait(&hash_list->shared_var_sem);
@@ -54,16 +95,34 @@ void _bucket_unlock(HASH_LIST *hash_list, sem_t *bucket_sem)
 	sem_post(bucket_sem);
 }
 
-HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
-		int32_t (*key_cmp_ftn)(const void *key1, const void *key2),
-		int32_t (*data_update_ftn)(void *data, void *update_data),
-		uint32_t table_size, uint32_t key_size, uint32_t data_size)
+/**
+ * Create a hash list data structure.
+ *
+ * @param hash_ftn Hash function. It cannot be null.
+ * @param key_cmp_ftn Key compare function. Return 0 when hitting.
+ *        It cannot be null.
+ * @param data_update_ftn Function used to update data in entry. It can be
+ *        skipped if hash table entry will not be updated.
+ * @param table_size Number of buckets in the hash table.
+ * @param key_size Size of user's "key" structure.
+ * @param data_size Size of user's "data" structure.
+ *
+ * @return hash_list structure on success, otherwise null. errno is set to
+ *         indicate the error.
+ */
+HASH_LIST *create_hash_list(hash_ftn_t *hash_ftn,
+			    key_cmp_ftn_t *key_cmp_ftn,
+			    data_update_ftn_t *data_update_ftn,
+			    uint32_t table_size,
+			    uint32_t key_size,
+			    uint32_t data_size)
 {
 	HASH_LIST *hash_list = NULL;
 	int32_t ret, ret1, ret2, ret3;
 	uint32_t idx;
 
-	if (table_size <= 0 || hash_ftn == NULL || key_cmp_ftn == NULL) {
+	if (table_size <= 0 || key_size <= 0 || data_size <= 0 ||
+	    hash_ftn == NULL || key_cmp_ftn == NULL) {
 		errno = EINVAL;
 		goto out;
 	}
@@ -90,7 +149,7 @@ HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
 		free(hash_list->hash_table);
 		free(hash_list);
 		hash_list = NULL;
-		goto out;
+		goto out; /* errno is set */
 	}
 
 	for (idx = 0; idx < table_size; idx++) {
@@ -99,7 +158,7 @@ HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
 			free(hash_list->hash_table);
 			free(hash_list);
 			hash_list = NULL;
-			goto out;
+			goto out; /* errno is set */
 		}
 	}
 	hash_list->table_size = table_size;
