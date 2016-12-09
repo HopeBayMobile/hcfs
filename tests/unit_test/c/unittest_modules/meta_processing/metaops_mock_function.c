@@ -108,6 +108,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 		bptr = (META_CACHE_ENTRY_STRUCT *)
 				malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(bptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		bptr->inode_num = this_inode;
 		return bptr;
 	} else {
 		errno = ENOMEM;
@@ -128,11 +129,17 @@ int32_t meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 
 int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	char metapath[400];
 	if (test_change_pin_flag) {
 		body_ptr->fptr = fopen("test_meta_file", "r");
 		setbuf(body_ptr->fptr, NULL);
 		if (body_ptr->fptr == NULL)
 			return errno;
+	}
+	if ((body_ptr != NULL) &&
+	    (body_ptr->inode_num == INO_CHECK_LOC_FILE)) {
+		fetch_meta_path(metapath, body_ptr->inode_num);
+		body_ptr->fptr = fopen(metapath, "r+");
 	}
 	return 0;
 }
@@ -143,6 +150,11 @@ int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 	if (test_change_pin_flag && target_ptr->fptr) {
 		printf("fileno %d\n", fileno(target_ptr->fptr));
 		//fclose(target_ptr->fptr);
+		target_ptr->fptr = NULL;
+	}
+	if ((target_ptr != NULL) &&
+	    (target_ptr->inode_num == INO_CHECK_LOC_FILE)) {
+		fclose(target_ptr->fptr);
 		target_ptr->fptr = NULL;
 	}
 	return 0;
@@ -173,6 +185,15 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode, HCFS_STAT *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		int64_t page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (this_inode == INO_CHECK_LOC_DIR) {
+		inode_stat->mode = S_IFDIR;
+		return 0;
+	}
+
+	if (this_inode == INO_CHECK_LOC_FILE) {
+		inode_stat->mode = S_IFREG;
+		return 0;
+	}
 
 	file_meta_ptr->local_pin = pin_flag_in_meta;
 	switch(this_inode) {

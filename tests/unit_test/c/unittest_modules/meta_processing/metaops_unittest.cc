@@ -2658,3 +2658,83 @@ TEST_F(check_meta_on_cloudTest, DTypeIsRegMetaOnCloud)
 /*
  * End of unittest of check_meta_on_cloud()
  */
+
+/* Begin unittests of check_data_location */
+class check_data_locationTest : public ::testing::Test {
+protected:
+	char metapath[400];
+	void SetUp() {
+		snprintf(metapath, 400, "%s_%" PRIu64 "",
+		         MOCK_META_PATH, INO_CHECK_LOC_DIR);
+		unlink(metapath);
+		snprintf(metapath, 400, "%s_%" PRIu64 "",
+		         MOCK_META_PATH, INO_CHECK_LOC_FILE);
+		unlink(metapath);
+	}
+
+	void TearDown() {
+		snprintf(metapath, 400, "%s_%" PRIu64 "",
+		         MOCK_META_PATH, INO_CHECK_LOC_DIR);
+		unlink(metapath);
+		snprintf(metapath, 400, "%s_%" PRIu64 "",
+		         MOCK_META_PATH, INO_CHECK_LOC_FILE);
+		unlink(metapath);
+	}
+};
+
+TEST_F(check_data_locationTest, DirLocation)
+{
+	snprintf(metapath, 400, "%s_%" PRIu64 "",
+	         MOCK_META_PATH, INO_CHECK_LOC_DIR);
+	/* If no meta file */
+	EXPECT_EQ(-ENOENT, check_data_location(INO_CHECK_LOC_DIR));
+
+	/* If exists a meta file for a dir */
+	mknod(metapath, S_IFREG | 0600, 0);
+	EXPECT_EQ(0, check_data_location(INO_CHECK_LOC_DIR));
+}
+
+TEST_F(check_data_locationTest, FileLocation)
+{
+	FILE_STATS_TYPE tmpstats;
+
+	snprintf(metapath, 400, "%s_%" PRIu64 "",
+	         MOCK_META_PATH, INO_CHECK_LOC_FILE);
+	/* If no meta file */
+	EXPECT_EQ(-ENOENT, check_data_location(INO_CHECK_LOC_FILE));
+
+	/* If exists a meta file for a dir */
+
+	/* Test cases for "local" */
+	FILE *fptr = fopen(metapath, "w");
+	tmpstats.num_blocks = 0;
+	tmpstats.num_cached_blocks = 0;
+	pwrite(fileno(fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	EXPECT_EQ(0, check_data_location(INO_CHECK_LOC_FILE));
+	fptr = fopen(metapath, "w");
+	tmpstats.num_blocks = 100;
+	tmpstats.num_cached_blocks = 100;
+	pwrite(fileno(fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	EXPECT_EQ(0, check_data_location(INO_CHECK_LOC_FILE));
+
+	/* Test cases for "cloud" */
+	fptr = fopen(metapath, "w");
+	tmpstats.num_blocks = 100;
+	tmpstats.num_cached_blocks = 0;
+	pwrite(fileno(fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	EXPECT_EQ(1, check_data_location(INO_CHECK_LOC_FILE));
+
+	/* Test cases for "hybrid" */
+	fptr = fopen(metapath, "w");
+	tmpstats.num_blocks = 100;
+	tmpstats.num_cached_blocks = 50;
+	pwrite(fileno(fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	EXPECT_EQ(2, check_data_location(INO_CHECK_LOC_FILE));
+}
+
+/* End of unittests of check_data_location */
+
