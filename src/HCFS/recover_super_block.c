@@ -503,7 +503,7 @@ int32_t update_reconstruct_result(RECOVERY_ROUND_DATA round_data)
 			free(sb_entry_arr);                                    \
 			free(meta_cache_arr);                                  \
 			set_recovery_flag(FALSE, 0, 0);                        \
-			pthread_exit((void *)-1);                              \
+			pthread_exit(&(int) { -1 });                            \
 			return NULL;                                           \
 		}                                                              \
 	} while (0)
@@ -533,7 +533,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 			  sys_super_block->sb_recovery_meta.is_ongoing,
 			  hcfs_system->system_restoring);
 		super_block_exclusive_release();
-		pthread_exit((void *)-1);
+		pthread_exit(&(int) { -1 });
 		return NULL;
 	}
 
@@ -542,7 +542,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 	if (sb_entry_arr == NULL) {
 		write_log(0, "%s Error allocate memory.", error_msg);
 		super_block_exclusive_release();
-		pthread_exit((void *)-1);
+		pthread_exit(&(int) { -1 });
 		return NULL;
 	}
 
@@ -552,7 +552,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 		write_log(0, "%s Error allocate memory.", error_msg);
 		super_block_exclusive_release();
 		free(sb_entry_arr);
-		pthread_exit((void *)-1);
+		pthread_exit(&(int) { -1 });
 		return NULL;
 	}
 
@@ -649,7 +649,7 @@ void *recover_sb_queue_worker(void *ptr __attribute__((unused)))
 		write_log(4, "Recover SB entries finished.");
 	}
 
-	pthread_exit((void*)0);
+	pthread_exit(&(int) { 0 });
 	return NULL;
 }
 

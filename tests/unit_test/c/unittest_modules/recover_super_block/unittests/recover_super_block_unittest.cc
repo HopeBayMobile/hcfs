@@ -1292,19 +1292,19 @@ TEST_F(recover_sb_queue_workerTest, RecoveryAborted)
 	sys_super_block->sb_recovery_meta.is_ongoing = TRUE;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(-1, retval);
+	EXPECT_EQ(-1, *(int *)retval);
 	sys_super_block->sb_recovery_meta.is_ongoing = FALSE;
 
 	sys_super_block->sync_point_is_set = TRUE;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(-1, retval);
+	EXPECT_EQ(-1, *(int *)retval);
 	sys_super_block->sync_point_is_set = FALSE;
 
 	hcfs_system->system_restoring = RESTORING_STAGE1;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(-1, retval);
+	EXPECT_EQ(-1, *(int *)retval);
 	hcfs_system->system_restoring = NOT_RESTORING;
 }
 
@@ -1336,7 +1336,7 @@ TEST_F(recover_sb_queue_workerTest, Success)
 	write_super_block_entry_use_real = 1;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(0, retval);
+	EXPECT_EQ(0, *(int *)retval);
 	write_super_block_entry_use_real = 0;
 
 	/* Verify */
