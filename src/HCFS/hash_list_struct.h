@@ -28,13 +28,16 @@ typedef struct LIST_HEAD {
 	sem_t bucket_sem;
 } LIST_HEAD;
 
+typedef int32_t key_cmp_ftn_t(const void *, const void *);
+typedef int32_t data_update_ftn_t(void *data, void *update_data);
+typedef int32_t hash_ftn_t(const void *key);
 typedef struct HASH_LIST {
 	uint32_t table_size;
 	uint32_t key_size;
 	uint32_t data_size;
-	int32_t (*hash_ftn)(const void *key);
-	int32_t (*key_cmp_ftn)(const void *key1, const void *key2);
-	int32_t (*data_update_ftn)(void *data, void *update_data);
+	hash_ftn_t *hash_ftn;
+	key_cmp_ftn_t *key_cmp_ftn;
+	data_update_ftn_t *data_update_ftn;
 	LIST_HEAD *hash_table;
 	sem_t table_sem;
 	uint32_t num_lock_bucket;
@@ -42,10 +45,12 @@ typedef struct HASH_LIST {
 	sem_t can_lock_table_sem;
 } HASH_LIST;
 
-HASH_LIST *create_hash_list(int32_t (*hash_ftn)(const void *key),
-		int32_t (*key_cmp_ftn)(const void *key1, const void *key2),
-		int32_t (*data_update_ftn)(void *data, void *update_data),
-		uint32_t table_size, uint32_t key_size, uint32_t data_size);
+HASH_LIST *create_hash_list(hash_ftn_t *hash_ftn,
+			    key_cmp_ftn_t *key_cmp_ftn,
+			    data_update_ftn_t *data_update_ftn,
+			    uint32_t table_size,
+			    uint32_t key_size,
+			    uint32_t data_size);
 int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data);
 int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data);
 int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key);
