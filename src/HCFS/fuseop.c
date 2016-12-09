@@ -2762,17 +2762,51 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				  delta_meta_size1 + delta_meta_size2, 0);
 	}
 
+#ifdef _ANDROID_ENV_
 	/* Update minimal apk table */
-	/* Case1: Rename from app folder under /data/app/ to another
-	 * folder not /data/app */
+	/* Rename an app folder under /data/app to another place
+	 * where is not under /data/app */
 	if ((hcfs_system->use_minimal_apk == TRUE) && (
 	    parent_inode1 == hcfs_system->data_app_root &&
 	    S_ISDIR(self_mode) &&
 	    parent_inode2 != hcfs_system->data_app_root)) {
-		/* TODO: remove all entries with key (parent_inode1, <x>.apk)
+		DIR_ENTRY_ITERATOR *iter;
+		/* remove all entries with key (parent_inode1, <x>.apk)
 		 * in minapk_lookup_table */
+		body_ptr = meta_cache_lock_entry(self_inode);
+		ret = meta_cache_open_file(body_ptr);
+		if (ret < 0) {
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, -ret);
+			return;
+		}
+		iter = init_dir_iter(body_ptr->fptr);
+		if (!iter) {
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, -errno);
+			return;
+		}
+		while (iter_next(iter)) {
+			if (!strcmp(iter->now_entry->d_name, ".") ||
+			    !strcmp(iter->now_entry->d_name, ".."))
+				continue;
+			/* Check if it is apk file */
+			if (iter->now_entry->d_type == D_ISREG &&
+			    _is_apk(iter->now_entry->d_name)) {
+				ret = remove_minapk_data(self_inode,
+						   iter->now_entry->d_name);
+				if (ret < 0 && ret != -ENOENT)
+					break;
+			}
+		}
+		destroy_dir_iter(iter);
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
 	}
 
+	/* Remove entry when rename from (to) the .apk file or
+	 * minimal apk file. */
 	if ((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
 		const char *selfname[2] = {selfname1, selfname2};
@@ -2780,8 +2814,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		ino_t parent_inode[2] = {parent_inode1, parent_inode2};
 		int32_t i;
 
-		/* Remove entry when rename from (to) the .apk file or
-		 * minimal apk file. */
+		/* Both check old name and new name. */
 		for (i = 0; i < 2; i++) {
 			if (!S_ISREG(mode[i]))
 				continue;
@@ -2810,6 +2843,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			}
 		}
 	}
+#endif
 
 	fuse_reply_err(req, 0);
 }

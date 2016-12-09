@@ -18,6 +18,12 @@
 
 #include "metaops.h"
 
+/*********************************
+ *
+ * Method of file block iterator
+ *
+ *********************************/
+
 /**
  * Initilize block iterator using parameter "fptr", which is a file pointer of
  * the meta file. This function will NOT lock the meta file so it should be
@@ -184,6 +190,20 @@ void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
 	free(iter);
 }
 
+/*********************************
+ *
+ * Method of hash list iterator
+ *
+ *********************************/
+
+/**
+ * Initialize iterator of hash list structure.
+ *
+ * @param hash_list Pointer of the hash list structure.
+ *
+ * @return iterator of the hash list. Return null on error, and error code
+ *         is recorded in errno.
+ */
 HASH_LIST_ITERATOR *init_hashlist_iter(HASH_LIST *hash_list)
 {
 	HASH_LIST_ITERATOR *iter;
@@ -205,6 +225,14 @@ HASH_LIST_ITERATOR *init_hashlist_iter(HASH_LIST *hash_list)
 	return iter;
 }
 
+/**
+ * Go to next entry. It traverse hash array from 0 to last element.
+ *
+ * @param iter Iterator of hash list.
+ *
+ * @return iterator of the hash list. Return null on no entry or error,
+ *         and error code is recorded in errno.
+ */
 HASH_LIST_ITERATOR *next_entry(HASH_LIST_ITERATOR *iter)
 {
 	uint32_t idx;
@@ -254,5 +282,110 @@ HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter)
 
 void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter)
 {
+	free(iter);
+}
+
+
+DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
+{
+	DIR_ENTRY_ITERATOR *iter;
+	int64_t ret_size;
+	int32_t ret, errcode;
+
+	iter = (DIR_ENTRY_ITERATOR *) calloc(sizeof(DIR_ENTRY_ITERATOR), 1);
+	if (!iter) {
+		write_log(0, "Error: Fail to alloc mem in %s. Code %d",
+				__func__, errno);
+		return NULL;
+	}
+
+	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
+	FREAD(&(iter->dir_meta), sizeof(DIR_META_TYPE), 1, fptr);
+
+	iter->fptr = fptr;
+	iter->base.begin = (void *)&next_dir_entry;
+	iter->base.next = (void *)&begin_dir_entry;
+	iter->now_dirpage_pos = -1;
+	iter->now_entry_idx = -1;
+	iter->now_entry = NULL;
+	return iter;
+
+errcode_handle:
+	errno = -errcode;
+	destroy_dir_iter(iter);
+	return NULL;
+}
+
+DIR_ENTRY_ITERATOR *next_dir_entry(DIR_ENTRY_ITERATOR *iter)
+{
+	int64_t now_page_pos;
+	int32_t ret, errcode;
+	size_t ret_size;
+	FILE *fptr = iter->fptr;
+
+	/* Check now page pos */
+	if (iter->now_dirpage_pos == 0) {
+		errno = ENOENT;
+		return NULL;
+
+	} else if (iter->now_dirpage_pos == -1) {
+		/* Begin from first page */
+		now_page_pos = iter->dir_meta.tree_walk_list_head;
+		if (now_page_pos == 0) {
+			errno = ENOENT;
+			return NULL;
+		}
+		FSEEK(fptr, now_page_pos, SEEK_SET);
+		FREAD(&(iter->now_page), sizeof(DIR_ENTRY_PAGE), 1, fptr);
+		iter->now_dirpage_pos = now_page_pos;
+		iter->now_entry_idx = -1;
+	}
+
+	/* Try next entry */
+	if (iter->now_entry_idx + 1 < iter->now_page.num_entries) {
+		iter->now_entry_idx += 1;
+		iter->now_entry =
+			&(iter->now_page.dir_entries[iter->now_entry_idx]);
+		return iter;
+	}
+
+	/* Go to next page */
+	iter->now_entry_idx = -1;
+	iter->now_dirpage_pos = iter->now_page.tree_walk_next;
+	while (iter->now_dirpage_pos) {
+		FSEEK(fptr, iter->now_dirpage_pos, SEEK_SET);
+		FREAD(&(iter->now_page), sizeof(DIR_ENTRY_PAGE), 1, fptr);
+		if (iter->now_page.num_entries > 0) {
+			iter->now_entry_idx = 0;
+			iter->now_entry =
+			    &(iter->now_page.dir_entries[0]);
+			    break;
+		}
+
+		iter->now_dirpage_pos = iter->now_page.tree_walk_next;
+	}
+
+	if (iter->now_dirpage_pos == 0) {
+		errno = ENOENT;
+		return NULL;
+	}
+
+	return iter;
+
+errcode_handle:
+	errno = -errcode;
+	return NULL;
+}
+
+DIR_ENTRY_ITERATOR *begin_dir_entry(DIR_ENTRY_ITERATOR *iter)
+{
+	iter->now_dirpage_pos = -1;
+	iter->now_entry_idx = -1;
+	iter->now_entry = NULL;
+
+	return next_dir_entry(iter);
+}
+
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter){
 	free(iter);
 }

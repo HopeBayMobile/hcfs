@@ -88,9 +88,36 @@ typedef struct HASH_LIST_ITERATOR {
 } HASH_LIST_ITERATOR;
 
 HASH_LIST_ITERATOR *init_hashlist_iter(HASH_LIST *hash_list);
-void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter);
 HASH_LIST_ITERATOR *next_entry(HASH_LIST_ITERATOR *iter);
 HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter);
 void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter);
+
+/**
+ *	Usage:
+ *	DIR_ENTRY_ITERATOR *iter = init_dir_iter(fptr);
+ *	if (!iter)
+ *		return -errno;
+ *	while (iter_next(iter) != NULL) {
+ *		// iter->now_data
+ *	}
+ *	if (errno != ENOENT) {
+ *		// Error occur
+ *	}
+ *	destroy_dir_iter(iter);
+ */
+typedef struct DIR_ENTRY_ITERATOR {
+	ITERATOR_BASE base;
+	int64_t now_dirpage_pos;
+	int32_t now_entry_idx;
+	DIR_META_TYPE dir_meta;
+	DIR_ENTRY_PAGE now_page;
+	DIR_ENTRY *now_entry;
+	FILE *fptr;
+} DIR_ENTRY_ITERATOR;
+
+DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr);
+DIR_ENTRY_ITERATOR *next_dir_entry(DIR_ENTRY_ITERATOR *iter);
+DIR_ENTRY_ITERATOR *begin_dir_entry(DIR_ENTRY_ITERATOR *iter);
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter);
 
 #endif  // SRC_HCFS_META_ITERATOR_H_
