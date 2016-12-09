@@ -20,7 +20,9 @@
 
 /*********************************
  *
+ *
  * Method of file block iterator
+ *
  *
  *********************************/
 
@@ -192,7 +194,9 @@ void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
 
 /*********************************
  *
+ *
  * Method of hash list iterator
+ *
  *
  *********************************/
 
@@ -226,7 +230,8 @@ HASH_LIST_ITERATOR *init_hashlist_iter(HASH_LIST *hash_list)
 }
 
 /**
- * Go to next entry. It traverse hash array from 0 to last element.
+ * Go to next entry. It traverse hash table from first element with index 0
+ * to last one.
  *
  * @param iter Iterator of hash list.
  *
@@ -270,6 +275,14 @@ HASH_LIST_ITERATOR *next_entry(HASH_LIST_ITERATOR *iter)
 	return NULL;
 }
 
+/**
+ * Jump to first element of the hash list structure.
+ *
+ * @param iter Iterator of hash list.
+ *
+ * @return iterator of the hash list. Return null on no entry or error,
+ *         and error code is recorded in errno.
+ */
 HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter)
 {
 	iter->now_bucket_idx = -1;
@@ -280,12 +293,35 @@ HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter)
 	return next_entry(iter);
 }
 
+/**
+ * Free resource of the hash list iterator.
+ *
+ * @param iter Iterator of hash list.
+ *
+ * @return none.
+ */
 void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter)
 {
 	free(iter);
 }
 
+/*********************************
+ *
+ *
+ * Method of dir entry iterator
+ *
+ *
+ *********************************/
 
+/**
+ * Initilize dir iterator using parameter "fptr", which is a file pointer of
+ * the meta file. This function will NOT lock the meta file so it should be
+ * locked by caller if race condition may occur when using this block iterator.
+ *
+ * @param fptr File pointer of the meta file to be iterated.
+ *
+ * @return pointer of the iterator. return NULL in case that error happened.
+ */
 DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
 {
 	DIR_ENTRY_ITERATOR *iter;
@@ -316,6 +352,16 @@ errcode_handle:
 	return NULL;
 }
 
+/**
+ * Go to next dir entry. The iterator traverse dir structure using the
+ * pointer "tree_walk_next" recorded in dir meta file. It go to next entry
+ * instead of going ahead to next page if now page is not in the end.
+ *
+ * @param iter Pointer of the dir entry iterator.
+ *
+ * @return the iterator itself on success, otherwise NULL. Error code is
+ *         recorded in errno.
+ */
 DIR_ENTRY_ITERATOR *next_dir_entry(DIR_ENTRY_ITERATOR *iter)
 {
 	int64_t now_page_pos;
@@ -347,10 +393,12 @@ DIR_ENTRY_ITERATOR *next_dir_entry(DIR_ENTRY_ITERATOR *iter)
 		iter->now_entry =
 			&(iter->now_page.dir_entries[iter->now_entry_idx]);
 		return iter;
+	} else {
+		iter->now_entry_idx = -1;
+		iter->now_entry = NULL;
 	}
 
 	/* Go to next page */
-	iter->now_entry_idx = -1;
 	iter->now_dirpage_pos = iter->now_page.tree_walk_next;
 	while (iter->now_dirpage_pos) {
 		FSEEK(fptr, iter->now_dirpage_pos, SEEK_SET);
@@ -377,6 +425,14 @@ errcode_handle:
 	return NULL;
 }
 
+/**
+ * Jump to first entry of "tree_walk_list_head".
+ *
+ * @param iter Pointer of the dir entry iterator.
+ *
+ * @return the iterator itself on success, otherwise NULL. Error code is
+ *         recorded in errno.
+ */
 DIR_ENTRY_ITERATOR *begin_dir_entry(DIR_ENTRY_ITERATOR *iter)
 {
 	iter->now_dirpage_pos = -1;
@@ -386,6 +442,13 @@ DIR_ENTRY_ITERATOR *begin_dir_entry(DIR_ENTRY_ITERATOR *iter)
 	return next_dir_entry(iter);
 }
 
+/**
+ * Free resource of iterator.
+ *
+ * @param iter Pointer of the dir entry iterator.
+ *
+ * @return none.
+ */
 void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter){
 	free(iter);
 }
