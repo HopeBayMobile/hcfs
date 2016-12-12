@@ -490,4 +490,3 @@ void destroy_hash_list(HASH_LIST *hash_list)
 out:
 	return;
 }
-
