@@ -254,7 +254,7 @@ int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 
 
 out:
-	if (ret < 0)
+	if (ret < 0 && ret != -EEXIST)
 		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 
@@ -309,7 +309,7 @@ int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
 
 out:
-	if (ret < 0)
+	if (ret < 0 && ret != -ENOENT)
 		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 }
@@ -374,7 +374,7 @@ int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key)
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
 
 out:
-	if (ret < 0)
+	if (ret < 0 && ret != -ENOENT)
 		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 }

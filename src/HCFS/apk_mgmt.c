@@ -333,7 +333,7 @@ out:
 /**
  * Destroy the iterator of min apk lookup table.
  *
- * @return none. 
+ * @return none.
  */
 void end_iterate_minapk_table(void)
 {
@@ -346,3 +346,4 @@ void end_iterate_minapk_table(void)
 	minapk_lookup_iter = NULL;
 	hash_list_global_unlock(minapk_lookup_table);
 }
+
