@@ -585,7 +585,7 @@ int32_t list_file_blocks(const char *meta_path,
 	current_page = -1;
 	ret_idx = 0;
 
-	if (meta_stat.size > 0 ) {
+	if (meta_stat.size > 0) {
 		total_blocks = ((meta_stat.size - 1) / MAX_BLOCK_SIZE) + 1;
 	} else {
 		/* size=0 */
