@@ -27,14 +27,15 @@
 #include <fcntl.h>
 #include <inttypes.h>
 
-#include "socket_util.h"
 #include "global.h"
-#include "pin_ops.h"
 #include "hcfs_stat.h"
 #include "hcfs_sys.h"
-#include "smart_cache.h"
-#include "marco.h"
 #include "logger.h"
+#include "marco.h"
+#include "minimal_apk.h"
+#include "pin_ops.h"
+#include "smart_cache.h"
+#include "socket_util.h"
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 sem_t thread_access_sem; /* For thread pool control */
@@ -592,6 +593,48 @@ int32_t do_umount_smart_cache(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_check_minimal_apk(char *largebuf, int32_t arg_len,
+			     char *resbuf, int32_t *res_size)
+{
+	char package_name[arg_len + 10];
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t str_len = 0;
+
+	write_log(8, "Check minimal apk\n");
+
+	memcpy(&str_len, largebuf, sizeof(int64_t));
+	strncpy(package_name, largebuf + sizeof(int64_t), str_len);
+	ret_code = check_minimal_apk(package_name);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End check minimal apk\n");
+	return ret_code;
+}
+
+int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
+			      char *resbuf, int32_t *res_size)
+{
+	char package_name[arg_len + 10];
+	int32_t ret_code;
+	uint32_t ret_len = 0;
+	int64_t str_len = 0;
+
+	write_log(8, "Create minimal apk\n");
+
+	memcpy(&str_len, largebuf, sizeof(int64_t));
+	strncpy(package_name, largebuf + sizeof(int64_t), str_len);
+	ret_code = create_minimal_apk(package_name);
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End create minimal apk\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -696,7 +739,9 @@ int32_t process_request(void *arg)
 		{ENABLE_BOOSTER,		do_enable_booster},
 		{CLEAR_BOOSTED_PACKAGE,		do_clear_boosted_package},
 		{MOUNT_SMART_CACHE,		do_mount_smart_cache},
-		{UMOUNT_SMART_CACHE,		do_umount_smart_cache}
+		{UMOUNT_SMART_CACHE,		do_umount_smart_cache},
+		{CHECK_MINI_APK,		do_check_minimal_apk},
+		{CREATE_MINI_APK,		do_create_minimal_apk},
 	};
 
 	/* Asynchronous API will return immediately and process cmd in

@@ -17,7 +17,6 @@
 #include <pthread.h>
 #include <sqlite3.h>
 
-#define DATA_PREFIX "/data/data"
 #define ANDROID_INTERNAL 1
 #define MP_DEFAULT 1
 

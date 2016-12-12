@@ -28,11 +28,6 @@
 #include "marco.h"
 
 
-#define DATA_PREFIX "/data/data"
-#define APP_PREFIX "/data/app"
-#define EXTERNAL_PREFIX "/storage/emulated"
-
-
 /************************************************************************
  * *
  * * Function name: _walk_folder

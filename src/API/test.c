@@ -26,7 +26,7 @@
 #include "hcfs_stat.h"
 #include "global.h"
 
-int32_t main(int argc, char *argv[])
+int32_t main(void)
 {
 	char pin_path[100] = "/home/yuxun/mp/test1";
 	char pin_path2[100] = "/home/yuxun/mp/test2";
@@ -147,36 +147,30 @@ int32_t main(int argc, char *argv[])
 	//HCFS_check_package_boost_status(&res22, "com.aaa");
 	//printf("check package boost status com.aaa - %s\n", res22);
 	//free(res22);
-	//HCFS_check_package_boost_status(&res22, "com.bbb");
-	//printf("check package boost status com.bbb - %s\n", res22);
-	//free(res22);
 
-	if (argc >= 2) {
-		if (strcmp("enable", argv[1]) == 0) {
-			puts("Enable....");
-			char *res23;
-			HCFS_enable_booster(&res23, 104857600);
-			printf("Enable booster - %s\n", res23);
-			free(res23);
-		}
+	//char *res23;
+	//HCFS_enable_booster(&res23, 104857600);
+	//printf("Enable booster - %s\n", res23);
+	//free(res23);
 
-		if (strcmp("boost", argv[1]) == 0) {
-			puts("Boost....");
-			char *res24;
-			HCFS_trigger_boost(&res24);
-			printf("Trigger boost - %s\n", res24);
-			free(res24);
-		}
+	//char *res24;
+	//HCFS_trigger_boost(&res24);
+	//printf("Trigger boost - %s\n", res24);
+	//free(res24);
 
-		if (strcmp("unboost", argv[1]) == 0) {
-			puts("Unboost....");
-			char *res25;
-			HCFS_trigger_unboost(&res25);
-			printf("Trigger unboost - %s\n", res25);
-			free(res25);
-		}
-	} else {
-		puts("Nothing happened....");
-	}
+	//char *res25;
+	//HCFS_trigger_unboost(&res25);
+	//printf("Trigger unboost - %s\n", res25);
+	//free(res25);
+
+	char *res26;
+	HCFS_create_minimal_apk(&res26, "com.facebook.katana-1", 1);
+	printf("Create minimal apk - %s\n", res26);
+	free(res26);
+
+	char *res27;
+	HCFS_check_minimal_apk(&res27, "com.facebook.katana-1");
+	printf("Check minimal apk - %s\n", res27);
+	free(res27);
 }
 
