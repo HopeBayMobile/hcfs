@@ -161,9 +161,9 @@ int32_t collect_dir_children(ino_t this_inode,
 	(*nondir_node_list)[1] = this_inode + 3;
 	*num_nondir_node = 2;
 
-	*nondir_type_list = malloc(sizeof(ino_t) * 2);
-	(*nondir_type_list)[0] = S_IFREG;
-	(*nondir_type_list)[1] = S_IFREG;
+	*nondir_type_list = calloc(sizeof(ino_t), 2);
+	(*nondir_type_list)[0] |= S_IFREG;
+	(*nondir_type_list)[1] |= S_IFREG;
 
 	return 0;
 }
