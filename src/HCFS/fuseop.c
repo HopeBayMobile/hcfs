@@ -2795,7 +2795,7 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 		/* Update block seq */
 		tmpentry->seqnum = filemeta->finished_seq;
 	}
-	if (total_deleted_blocks > 0) {
+	if ((total_deleted_fileblocks >0) || (total_deleted_blocks > 0)) {
 		unpin_dirty_size = (P_IS_UNPIN(ispin) ? -total_deleted_dirty_cache : 0);
 		change_system_meta_ignore_dirty(
 		    inode_index, 0, 0, -total_deleted_cache,
