@@ -17,17 +17,17 @@ typedef struct ITERATOR_BASE {
 #define iter_begin(iter)                                                       \
 	((iter && iter->base.begin) ? iter->base.begin(iter) : ({              \
 		errno = EINVAL;                                                \
-		NULL;                                                          \
+		(void *)NULL;                                                  \
 	}))
 #define iter_next(iter)                                                        \
 	((iter && iter->base.next) ? iter->base.next(iter) : ({                \
 		errno = EINVAL;                                                \
-		NULL;                                                          \
+		(void *)NULL;                                                  \
 	}))
 #define iter_jump(iter, elem_idx)                                              \
 	((iter && iter->base.jump) ? iter->base.jump(iter, elem_idx) : ({      \
 		errno = EINVAL;                                                \
-		NULL;                                                          \
+		(void *)NULL;                                                  \
 	}))
 
 /**

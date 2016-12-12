@@ -183,7 +183,9 @@ out:
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
+int32_t insert_hash_list_entry(HASH_LIST *hash_list,
+			       const void *key,
+			       const void *data)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now;
@@ -269,7 +271,9 @@ out:
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
+int32_t lookup_hash_list_entry(HASH_LIST *hash_list,
+			       const void *key,
+			       void *data)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now;
@@ -322,7 +326,7 @@ out:
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key)
+int32_t remove_hash_list_entry(HASH_LIST *hash_list, const void *key)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now, *prev, *hit_node = NULL;
@@ -384,12 +388,13 @@ out:
  *
  * @param hash_list Pointer of hash list structure.
  * @param key Pointer of key.
+ * @param data Pointer of data stored the data after updating.
  * @param update_data Pointer of the needed data used to update entry.
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
-		void *update_data)
+int32_t update_hash_list_entry(HASH_LIST *hash_list, const void *key,
+		void *data, void *update_data)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now;
@@ -397,7 +402,7 @@ int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
 	int32_t ret = 0;
 	void *hit_data = NULL;
 
-	if (!(hash_list && key && update_data)) {
+	if (!(hash_list && key)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -433,6 +438,8 @@ int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
 
 	/* Update data */
 	ret = hash_list->data_update_ftn(hit_data, update_data);
+	if (data)
+		memcpy(data, hit_data, hash_list->data_size);
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
 
 out:

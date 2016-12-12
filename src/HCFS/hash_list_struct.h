@@ -75,11 +75,17 @@ HASH_LIST *create_hash_list(hash_ftn_t *hash_ftn,
 void destroy_hash_list(HASH_LIST *hash_list);
 
 /* Following operations will lock the bucket "key" belonging to. */
-int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data);
-int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data);
-int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key);
-int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
-		void *update_data);
+int32_t insert_hash_list_entry(HASH_LIST *hash_list,
+			       const void *key,
+			       const void *data);
+int32_t lookup_hash_list_entry(HASH_LIST *hash_list,
+			       const void *key,
+			       void *data);
+int32_t remove_hash_list_entry(HASH_LIST *hash_list, const void *key);
+int32_t update_hash_list_entry(HASH_LIST *hash_list,
+			       const void *key,
+			       void *data,
+			       void *update_data);
 
 /* Global lock will lock whole hash table. */
 void hash_list_global_lock(HASH_LIST *hash_list);
