@@ -30,11 +30,26 @@
 #include "utils.h"
 #include "fuseop.h"
 
+struct LOG_internal {
+        sem_t logsem;
+        FILE *fptr;
+        int32_t now_log_size;
+        char *log_filename;
+        char *latest_log_msg;
+        char *now_log_msg;
+        int32_t repeated_times;
+        struct timeval latest_log_time;
+        time_t latest_log_start_time;
+        pthread_t tid;
+        pthread_attr_t flusher_attr;
+        BOOL flusher_is_created;
+};
+
 /**
  * Open/create the log file named "log_filename" and initialize some
  * log file info, such as "now_log_size", file mode.
  */
-int32_t _open_log_file(void)
+static int32_t _open_log_file(void)
 {
 	int32_t ret, errcode;
 	char log_file[500];
@@ -134,7 +149,7 @@ int32_t open_log(char *filename)
  * Shift log files by renaming the file name. Latest log file is <file name>.1,
  * and Oldest one is <file name>.5.
  */
-void _rename_logfile(void)
+static void _rename_logfile(void)
 {
 	int32_t log_idx, miss_log_idx;
 	char base_log_path[400], log_path[500], prev_log_path[500];
@@ -225,7 +240,7 @@ static inline void _check_log_file_size(void)
 
 #define REPEATED_LOG_IS_CACHED() (logptr->latest_log_start_time > 0)
 
-void log_sweeper(void)
+static void log_sweeper(void)
 {
 	int32_t sleep_sec, timediff;
 	struct timeval tmptime;
@@ -448,3 +463,19 @@ int32_t close_log(void)
 	logptr = NULL;
 	return 0;
 }
+
+#ifdef UNITTEST
+FILE *logger_get_fileptr(LOG_STRUCT *ptr)
+{
+	if (ptr)
+		return ptr->fptr;
+	return NULL;
+}
+
+sem_t *logger_get_semaphore(LOG_STRUCT *ptr)
+{
+	if (ptr)
+		return &(ptr->logsem);
+	return NULL;
+}
+#endif  /* UNITTEST */
