@@ -263,6 +263,12 @@ int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name)
 	return ret;
 }
 
+/**
+ * Initialize an iterator for min apk lookup table. It locks whole hash
+ * table before init an iterator.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
 int32_t init_iterate_minapk_table(void)
 {
 	HASH_LIST_ITERATOR *iter;
@@ -283,6 +289,15 @@ out:
 	return ret;
 }
 
+/**
+ * Wrap the iterator function and get key/data of min apk lookup table.
+ *
+ * @param parent_ino Pointer of parent inode number.
+ * @param apk_name Pointer of apk name.
+ * @param minapk_ino Pointer of min apk inode.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
 int32_t iterate_minapk_table(ino_t *parent_ino,
 			     char *apk_name,
 			     ino_t *minapk_ino)
@@ -292,8 +307,11 @@ int32_t iterate_minapk_table(ino_t *parent_ino,
 	MIN_APK_LOOKUP_DATA *data;
 	int32_t ret = 0;
 
-	if (!minapk_lookup_table || !minapk_lookup_iter)
-		return -EINVAL;
+	if (!(minapk_lookup_table && minapk_lookup_iter && parent_ino &&
+	      apk_name && minapk_ino)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	iter = iter_next(minapk_lookup_iter);
 	if (!iter) {
@@ -312,6 +330,11 @@ out:
 	return ret;
 }
 
+/**
+ * Destroy the iterator of min apk lookup table.
+ *
+ * @return none. 
+ */
 void end_iterate_minapk_table(void)
 {
 	if (!minapk_lookup_table || !minapk_lookup_iter) {

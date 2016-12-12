@@ -174,6 +174,15 @@ out:
 	return hash_list;
 }
 
+/**
+ * Insert an entry with data pair(key, data) into the hash list structure.
+ *
+ * @param hash_list Pointer of hash list structure.
+ * @param key Pointer of key put in the new entry.
+ * @param data Pointer of data put in the new entry.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
 int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 {
 	LIST_HEAD *list_head;
@@ -182,6 +191,11 @@ int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 	int32_t hash_idx;
 	int32_t ret = 0;
 	BOOL hit;
+
+	if (!(hash_list && key && data)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	hash_idx = hash_list->hash_ftn(key);
 	if (hash_idx < 0 || (uint32_t)hash_idx >= hash_list->table_size) {
@@ -237,11 +251,24 @@ int32_t insert_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 	list_head->first_entry = new_entry;
 	list_head->num_entries += 1;
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
+
+
 out:
+	if (ret < 0)
+		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 
 }
 
+/**
+ * Query the hash list and get data using parameter "key".
+ *
+ * @param hash_list Pointer of hash list structure.
+ * @param key Pointer of key.
+ * @param data Pointer of data.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
 int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 {
 	LIST_HEAD *list_head;
@@ -249,6 +276,11 @@ int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 	int32_t hash_idx;
 	int32_t ret = 0;
 	void *ret_data = NULL;
+
+	if (!(hash_list && key && data)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	hash_idx = hash_list->hash_ftn(key);
 	if (hash_idx < 0 || (uint32_t)hash_idx >= hash_list->table_size) {
@@ -275,16 +307,32 @@ int32_t lookup_hash_list_entry(HASH_LIST *hash_list, void *key, void *data)
 	}
 	memcpy(data, ret_data, hash_list->data_size);
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
+
 out:
+	if (ret < 0)
+		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 }
 
+/**
+ * Remove an entry in hash list.
+ *
+ * @param hash_list Pointer of hash list structure.
+ * @param key Pointer of key.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
 int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now, *prev, *hit_node = NULL;
 	int32_t hash_idx;
 	int32_t ret = 0;
+
+	if (!(hash_list && key)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	hash_idx = hash_list->hash_ftn(key);
 	if (hash_idx < 0 || (uint32_t)hash_idx >= hash_list->table_size) {
@@ -324,10 +372,22 @@ int32_t remove_hash_list_entry(HASH_LIST *hash_list, void *key)
 	free(hit_node->data);
 	free(hit_node);
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
+
 out:
+	if (ret < 0)
+		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 }
 
+/**
+ * Update an entry in this hash list using "update_data".
+ *
+ * @param hash_list Pointer of hash list structure.
+ * @param key Pointer of key.
+ * @param update_data Pointer of the needed data used to update entry.
+ *
+ * @return 0 on success, otherwise negation of error code.
+ */
 int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
 		void *update_data)
 {
@@ -337,8 +397,15 @@ int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
 	int32_t ret = 0;
 	void *hit_data = NULL;
 
-	if (!(hash_list->data_update_ftn))
-		return -ENOSYS; /* Not implemented */
+	if (!(hash_list && key && update_data)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!(hash_list->data_update_ftn)) {
+		ret = -ENOSYS; /* Not implemented */
+		goto out;
+	}
 
 	hash_idx = hash_list->hash_ftn(key);
 	if (hash_idx < 0 || (uint32_t)hash_idx >= hash_list->table_size) {
@@ -367,14 +434,29 @@ int32_t update_hash_list_entry(HASH_LIST *hash_list, void *key,
 	/* Update data */
 	ret = hash_list->data_update_ftn(hit_data, update_data);
 	_bucket_unlock(hash_list, &list_head->bucket_sem);
+
 out:
+	if (ret < 0)
+		write_log(2, "Error in %s. Code %d", __func__, -ret);
 	return ret;
 }
 
+/**
+ * Destroy the hash list and free all entries.
+ *
+ * @param hash_list Hash list to be destroyed.
+ *
+ * @return none.
+ */
 void destroy_hash_list(HASH_LIST *hash_list)
 {
 	uint32_t idx;
 	LIST_NODE *now, *next;
+
+	if (!hash_list) {
+		write_log(4, "Destroy null pointer in %s", __func__);
+		goto out;
+	}
 
 	hash_list_global_lock(hash_list);
 
@@ -398,6 +480,7 @@ void destroy_hash_list(HASH_LIST *hash_list)
 	FREE(hash_list->hash_table);
 	FREE(hash_list);
 
+out:
 	return;
 }
 
