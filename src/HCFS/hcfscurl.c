@@ -216,7 +216,7 @@ int32_t parse_swift_list_header(FILE *fptr)
 		if (!strncmp(temp_string, HEADERSTR_OBJCOUNT,
 			     sizeof(HEADERSTR_OBJCOUNT) - 1)) {
 			ret_val = sscanf(temp_string,
-					 "X-Container-Object-Count: %s\n",
+					 "X-Container-Object-Count: %1023s\n",
 					 temp_string2);
 			if (ret_val != 1)
 				return -1;
@@ -1321,7 +1321,7 @@ void convert_currenttime(char *date_string)
 
 	write_log(10, "current time %s\n", current_time);
 
-	ret_val = sscanf(current_time, "%s %s %s %s %s\n", wday, month, mday,
+	ret_val = sscanf(current_time, "%4s %4s %4s %19s %5s\n", wday, month, mday,
 			 timestr, year);
 	if (ret_val != 5)
 		write_log(1, "Error: convert string %s\n", date_string);
