@@ -16,13 +16,13 @@
 #include "hcfs_fromcloud.h"
 
 #include <time.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <sys/mman.h>
 #include <sys/file.h>
 #include <inttypes.h>
 #include <jansson.h>
