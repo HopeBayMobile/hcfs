@@ -566,10 +566,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 		/* Check if need to sync past the current size */
 
-		if (tmp_size == 0)
-			total_blocks = 0;
-		else
-			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
+		total_blocks = BLOCKS_OF_SIZE(tmp_size, MAX_BLOCK_SIZE);
 
 		/* Delete all blocks */
 		current_page = -1;

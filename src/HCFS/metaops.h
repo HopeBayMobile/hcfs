@@ -30,6 +30,7 @@
 #include "mount_manager.h"
 #include "meta.h"
 
+#define BLOCKS_OF_SIZE(size, block) ((size == 0) ? 0 : ((size - 1) / block + 1))
 int32_t dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr,
 			BOOL is_external);

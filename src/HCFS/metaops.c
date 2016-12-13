@@ -1624,11 +1624,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		 * TODO: Perhaps can move the actual block deletion to
 		 * the deletion loop as well
 		 */
-		if (this_inode_stat.size == 0)
-			total_blocks = 0;
-		else
-			total_blocks = ((this_inode_stat.size - 1) /
-				MAX_BLOCK_SIZE) + 1;
+		total_blocks =
+		    BLOCKS_OF_SIZE(this_inode_stat.size, MAX_BLOCK_SIZE);
 
 		current_page = -1;
 		for (count = 0; count < total_blocks; count++) {
@@ -2880,8 +2877,7 @@ int32_t restore_meta_structure(FILE *fptr)
 
 	/* Restore status and statistics */
 	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
-	total_blocks = (this_stat.size == 0) ? 0 :
-		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
+	total_blocks = BLOCKS_OF_SIZE(this_stat.size, MAX_BLOCK_SIZE);
 
 	current_page = -1;
 	write_page = FALSE;
@@ -3058,8 +3054,7 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 		return -EINVAL;
 	}
 
-	total_blocks = (this_stat.size == 0) ? 0 :
-		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
+	total_blocks = BLOCKS_OF_SIZE(this_stat.size, MAX_BLOCK_SIZE);
 	current_page = -1;
 	write_page = FALSE;
 	cached_size = 0;
