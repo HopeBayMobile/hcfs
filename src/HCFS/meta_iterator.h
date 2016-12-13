@@ -8,6 +8,11 @@
 #include "meta.h"
 #include "hash_list_struct.h"
 
+/**
+ * file block iterator, directory entry iterator, and hash list entry iterator
+ * is implemented.
+ */
+
 typedef struct ITERATOR_BASE {
 	void *(*begin)(void *iter);
 	void *(*next)(void *iter);

@@ -274,8 +274,10 @@ int32_t init_iterate_minapk_table(void)
 	HASH_LIST_ITERATOR *iter;
 	int32_t ret = 0;
 
-	if (!minapk_lookup_table)
-		return -EINVAL;
+	if (!minapk_lookup_table) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	hash_list_global_lock(minapk_lookup_table);
 	iter = init_hashlist_iter(minapk_lookup_table);
@@ -322,9 +324,14 @@ int32_t iterate_minapk_table(ino_t *parent_ino,
 	key = (MIN_APK_LOOKUP_KEY *)(iter->now_key);
 	data = (MIN_APK_LOOKUP_DATA *)(iter->now_data);
 
-	*parent_ino = key->parent_ino;
-	strncpy(apk_name, key->apk_name, MAX_FILENAME_LEN);
-	*minapk_ino = data->min_apk_ino;
+	if (key && data) {
+		*parent_ino = key->parent_ino;
+		strncpy(apk_name, key->apk_name, MAX_FILENAME_LEN);
+		*minapk_ino = data->min_apk_ino;
+	} else {
+		write_log(0, "Error: Data or key in the entry is null.");
+		ret = -ENOMEM;
+	}
 
 out:
 	return ret;

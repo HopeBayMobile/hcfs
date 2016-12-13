@@ -57,9 +57,50 @@ int32_t custom_insert_hash_list_entry(HASH_LIST *hash_list,
 
 FAKE_VALUE_FUNC(
     int32_t, lookup_hash_list_entry, HASH_LIST *, const void *, void *);
+int32_t query_minapk_data_success = 0;
+int32_t custom_lookup_hash_list_entry(HASH_LIST *hash_list,
+			       const void *key,
+			       void *data)
+{
+	if (query_minapk_data_success) {
+		((MIN_APK_LOOKUP_DATA *)data)->min_apk_ino = 5566;
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
 FAKE_VALUE_FUNC(int32_t, remove_hash_list_entry, HASH_LIST *, const void *);
+
+int32_t remove_minapk_data_success = 0;
+int32_t custom_remove_hash_list_entry(HASH_LIST *hash_list, const void *key)
+{
+	if (remove_minapk_data_success) {
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
 FAKE_VOID_FUNC(hash_list_global_lock, HASH_LIST *);
+
 FAKE_VALUE_FUNC(HASH_LIST_ITERATOR *, init_hashlist_iter, HASH_LIST *);
+
+int32_t init_hashlist_iter_success = 0;
+HASH_LIST_ITERATOR *custom_init_hashlist_iter(HASH_LIST *hash_list)
+{
+	if (init_hashlist_iter_success) {
+		/*HASH_LIST_ITERATOR *ret = (HASH_LIST_ITERATOR *)
+			calloc(sizeof(HASH_LIST_ITERATOR),1);
+		ret->base.next = (void *)&mock_next;
+		return ret;*/
+		return (HASH_LIST_ITERATOR *)1;
+	}
+
+	errno = ENOMEM;
+	return NULL;
+}
+
 FAKE_VOID_FUNC(destroy_hashlist_iter, HASH_LIST_ITERATOR *);
 FAKE_VOID_FUNC(hash_list_global_unlock, HASH_LIST *);
 

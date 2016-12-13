@@ -48,7 +48,7 @@ int32_t query_minapk_data(ino_t parent_ino,
 int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name);
 
 /**
- * Traverse all entries of the minapk table
+ * // Traverse all entries of the minapk table
  *
  * ino_t parent_ino, minapk_ino;
  * char apk_name[MAX_FILENAME_LEN];
@@ -60,7 +60,6 @@ int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name);
  * 	//do something...
  * }
  * end_iterate_minapk_table();
- *
  */
 int32_t init_iterate_minapk_table(void);
 int32_t iterate_minapk_table(ino_t *parent_ino,

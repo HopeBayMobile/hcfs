@@ -59,17 +59,27 @@ int32_t write_log_hide = 11;
 int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
+	size_t len;
+	int32_t log_idx;
+	char output[4096];
 
 	if (level >= write_log_hide)
 		return 0;
 	write_log_call_count++;
 	va_start(alist, format);
-	vprintf(format, alist);
+	vsprintf(output, format, alist);
 	va_end(alist);
+	len = strlen(output);
+	if (output[len - 1] != '\n') {
+		output[len] = '\n';
+		output[len + 1] = 0;
+	}
+	printf("%s", output);
 
+	/* Cache and check logs. */
 	va_start(alist, format);
-	vsprintf(log_data[write_log_call_count % LOG_RECORD_SIZE], format,
-		 alist);
+	log_idx = write_log_call_count % LOG_RECORD_SIZE;
+	vsprintf(log_data[log_idx], format, alist);
 	va_end(alist);
 	return 0;
 }
