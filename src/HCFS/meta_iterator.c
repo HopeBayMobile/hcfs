@@ -449,6 +449,4 @@ DIR_ENTRY_ITERATOR *begin_dir_entry(DIR_ENTRY_ITERATOR *iter)
  *
  * @return none.
  */
-void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter){
-	free(iter);
-}
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter) { free(iter); }

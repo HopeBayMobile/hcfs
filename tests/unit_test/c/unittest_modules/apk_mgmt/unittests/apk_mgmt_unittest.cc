@@ -405,7 +405,7 @@ TEST_F(iterate_minapk_tableTest, IteratorNoEntry)
 	minapk_lookup_table = (HASH_LIST *)1;
 	minapk_lookup_iter =
 	    (HASH_LIST_ITERATOR *)calloc(sizeof(HASH_LIST_ITERATOR), 1);
-	minapk_lookup_iter->base.next = (void *)&mock_next;
+	minapk_lookup_iter->base.next = (void* (*)(void*))&mock_next;
 
 	/* Test */
 	EXPECT_EQ(-ENOENT,
@@ -422,7 +422,7 @@ TEST_F(iterate_minapk_tableTest, IterateSuccess)
 	minapk_lookup_table = (HASH_LIST *)1;
 	minapk_lookup_iter =
 	    (HASH_LIST_ITERATOR *)calloc(sizeof(HASH_LIST_ITERATOR), 1);
-	minapk_lookup_iter->base.next = (void *)&mock_next;
+	minapk_lookup_iter->base.next = (void* (*)(void*))&mock_next;
 
 	iterate_hashlist_success = 1;
 

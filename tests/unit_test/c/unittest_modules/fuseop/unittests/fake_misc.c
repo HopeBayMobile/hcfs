@@ -10,15 +10,16 @@
 #include <fuse/fuse_lowlevel.h>
 #include <attr/xattr.h>
 
-#include "meta_mem_cache.h"
-#include "filetables.h"
-#include "hcfs_fromcloud.h"
-#include "xattr_ops.h"
-#include "global.h"
-#include "mount_manager.h"
-#include "dir_statistics.h"
 #include "atomic_tocloud.h"
+#include "dir_statistics.h"
+#include "filetables.h"
+#include "global.h"
+#include "hcfs_fromcloud.h"
+#include "meta_iterator.h"
+#include "meta_mem_cache.h"
+#include "mount_manager.h"
 #include "params.h"
+#include "xattr_ops.h"
 
 #include "fake_misc.h"
 
@@ -1281,3 +1282,5 @@ int32_t check_data_location(ino_t this_inode)
 	return 0;
 }
 
+DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr) { return NULL; }
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter) {}
