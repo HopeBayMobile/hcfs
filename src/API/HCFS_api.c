@@ -1035,8 +1035,8 @@ void HCFS_create_minimal_apk(char **json_res,
 	code = CREATE_MINI_APK;
 	cmd_len = 0;
 
-	//memcpy(buf, blocking, sizeof(int32_t));
-	//cmd_len += sizeof(int32_t);
+	memcpy(buf, &blocking, sizeof(int32_t));
+	cmd_len += sizeof(int32_t);
 	CONCAT_ARGS(package_name);
 
 	send(fd, &code, sizeof(uint32_t), 0);

@@ -615,18 +615,40 @@ int32_t do_check_minimal_apk(char *largebuf, int32_t arg_len,
 }
 
 int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
-			      char *resbuf, int32_t *res_size)
+			      char *resbuf, int32_t *res_size,
+			      pthread_t *tid)
 {
-	char package_name[arg_len + 10];
-	int32_t ret_code;
+	char *package_name;
+	int32_t ret_code, blocking;
 	uint32_t ret_len = 0;
 	int64_t str_len = 0;
 
 	write_log(8, "Create minimal apk\n");
 
-	memcpy(&str_len, largebuf, sizeof(int64_t));
-	strncpy(package_name, largebuf + sizeof(int64_t), str_len);
-	ret_code = create_minimal_apk(package_name);
+	memcpy(&blocking, largebuf, sizeof(int32_t));
+	memcpy(&str_len, largebuf + sizeof(int32_t), sizeof(int64_t));
+
+	package_name = (char *)calloc(1, arg_len + 10);
+	if (package_name == NULL) {
+		write_log(0, "Failed to alloc memory for package name.");
+		return -ENOMEM;
+	}
+
+	strncpy(package_name, largebuf + sizeof(int32_t) + sizeof(int64_t),
+		str_len);
+
+	if (blocking) {
+		UNUSED(tid);
+		write_log(8, "Blocking create minimal apk of %s", package_name);
+		ret_code = create_minimal_apk(package_name);
+		free(package_name);
+	} else {
+		write_log(8, "Non-blocking create minimal apk of %s",
+			  package_name);
+		pthread_create(tid, NULL, &create_minimal_apk_async,
+			       (void *)package_name);
+		ret_code = 0;
+	}
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
@@ -741,14 +763,14 @@ int32_t process_request(void *arg)
 		{MOUNT_SMART_CACHE,		do_mount_smart_cache},
 		{UMOUNT_SMART_CACHE,		do_umount_smart_cache},
 		{CHECK_MINI_APK,		do_check_minimal_apk},
-		{CREATE_MINI_APK,		do_create_minimal_apk},
 	};
 
 	/* Asynchronous API will return immediately and process cmd in
 	 * background */
 	SOCK_ASYNC_CMDS async_cmds[] = {
-		{TRIGGER_BOOST,		do_trigger_boost},
-		{TRIGGER_UNBOOST,	do_trigger_unboost},
+		{TRIGGER_BOOST,		do_trigger_boost,	0},
+		{TRIGGER_UNBOOST,	do_trigger_unboost,	0},
+		{CREATE_MINI_APK,	do_create_minimal_apk,	0},
 	};
 
 	uint32_t n;

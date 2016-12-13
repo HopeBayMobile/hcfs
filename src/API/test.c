@@ -164,7 +164,7 @@ int32_t main(void)
 	//free(res25);
 
 	char *res26;
-	HCFS_create_minimal_apk(&res26, "com.facebook.katana-1", 1);
+	HCFS_create_minimal_apk(&res26, "com.facebook.katana-1", 0);
 	printf("Create minimal apk - %s\n", res26);
 	free(res26);
 

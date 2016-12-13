@@ -37,6 +37,8 @@
 
 int32_t create_minimal_apk(char *pkg_name);
 
+void *create_minimal_apk_async(void *ptr);
+
 int32_t check_minimal_apk(char *pkg_name);
 
 #endif  /* GW20_HCFSAPI_MINI_APK_H_ */

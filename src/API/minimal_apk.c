@@ -13,6 +13,8 @@
 #include "minimal_apk.h"
 
 #include <errno.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,8 +85,6 @@ int32_t add_lib_dirs(zip_t *base_apk, zip_t *mini_apk)
 			ret_code = zip_dir_add(mini_apk, dir_name, 0);
 			if (ret_code < 0) {
 				zip_error = zip_get_error(mini_apk);
-				write_log(0, "AAAAAAAAAAa %d\n",
-					  zip_error_code_zip(zip_error));
 				if (zip_error_code_zip(zip_error) !=
 				    ZIP_ER_EXISTS) {
 					write_log(0, "Failed to add lib dirs "
@@ -213,6 +213,8 @@ int32_t create_minimal_apk(char *pkg_name)
 	int32_t ret_code;
 	struct stat tmp_stat;
 	struct utimbuf base_apk_timbuf;
+	struct group *grp_t;
+	struct passwd *passwd_t;
 
 	ret_code = 0;
 	base_apk_path = mini_apk_path = NULL;
@@ -270,6 +272,12 @@ int32_t create_minimal_apk(char *pkg_name)
 		goto error;
 	}
 
+	/* change owner & permisssions */
+	grp_t = getgrnam("system");
+	passwd_t = getpwnam("system");
+	chown(mini_apk_path, passwd_t->pw_uid, grp_t->gr_gid);
+	chmod(mini_apk_path, 0644);
+
 	ret_code = 0;
 	goto end;
 
@@ -282,6 +290,25 @@ end:
 	return ret_code;
 }
 
+/* To create minimal apk asynchronously.
+ */
+void *create_minimal_apk_async(void *ptr)
+{
+	char *package_name;
+
+	package_name = (char *)ptr;
+	create_minimal_apk(package_name);
+	free(package_name);
+
+	pthread_exit(&(int){ 0 });
+}
+
+/* To check whether the minimal apk of an installed app is existed or not.
+ *
+ * @pkg_name target package.
+ *
+ * @return Return 0 if not existed, 1 if existed and 2 if creation is ongoing.
+ */
 int32_t check_minimal_apk(char *pkg_name)
 {
 	char *mini_apk_path;

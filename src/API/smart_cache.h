@@ -45,7 +45,7 @@
 #define HCFSBLOCK "hcfsblock"
 
 typedef struct boost_job_meta {
-	int32_t to_boost;
+	char to_boost;
 	sqlite3 *db;
 } BOOST_JOB_META;
 
