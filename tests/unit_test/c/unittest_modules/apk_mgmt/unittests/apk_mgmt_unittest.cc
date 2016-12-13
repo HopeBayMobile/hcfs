@@ -3,7 +3,7 @@
 * Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: apk_mgmt_unittest.cc
-* Abstract: 
+* Abstract:
 * 	The unittest code for:
 * 	1. Mimicing Full APK using Minimal APK
 *
@@ -20,41 +20,8 @@ extern "C" {
 #include "mount_manager.h"
 
 #include "ut_helper.h"
+#include "apk_mgmt_mock.h"
 }
-
-#include "../../fff.h"
-DEFINE_FFF_GLOBALS;
-
-FAKE_VALUE_FUNC(int32_t, search_mount, char *, char *, MOUNT_T **);
-FAKE_VALUE_FUNC(int32_t,
-		hfuse_ll_notify_inval_ent,
-		struct fuse_chan *,
-		fuse_ino_t,
-		const char *,
-		size_t);
-FAKE_VALUE_FUNC(HASH_LIST *,
-		create_hash_list,
-		hash_ftn_t *,
-		key_cmp_ftn_t *,
-		data_update_ftn_t *,
-		uint32_t,
-		uint32_t,
-		uint32_t);
-
-FAKE_VOID_FUNC(destroy_hash_list, HASH_LIST *);
-/*FAKE_VALUE_FUNC(destroy_hash_list,HASH_LIST *);*/
-FAKE_VALUE_FUNC(int32_t, insert_hash_list_entry, HASH_LIST *, void *, void *);
-FAKE_VALUE_FUNC(int32_t, lookup_hash_list_entry, HASH_LIST *, void *, void *);
-FAKE_VALUE_FUNC(int32_t, remove_hash_list_entry, HASH_LIST *, void *);
-FAKE_VOID_FUNC(hash_list_global_lock, HASH_LIST *);
-FAKE_VALUE_FUNC(HASH_LIST_ITERATOR *, init_hashlist_iter, HASH_LIST *);
-FAKE_VOID_FUNC(destroy_hashlist_iter, HASH_LIST_ITERATOR *);
-FAKE_VOID_FUNC(hash_list_global_unlock, HASH_LIST *);
-
-/*
- * Helper functions
- */
-
 
 /*
  * Google Tests
@@ -77,6 +44,10 @@ class UnittestEnvironment : public ::testing::Environment
 		hcfs_system =
 		    (SYSTEM_DATA_HEAD *)calloc(1, sizeof(SYSTEM_DATA_HEAD));
 		reset_fake_functions();
+#define CUSTOM_FAKE(F) F##_fake.custom_fake = custom_##F
+		CUSTOM_FAKE(create_hash_list);
+		CUSTOM_FAKE(insert_hash_list_entry);
+#undef CUSTOM_FAKE
 	}
 
 	virtual void TearDown() {}
@@ -100,13 +71,126 @@ class NotifyBufferSetUpAndTearDown : public ::testing::Test
 
 TEST(ToggleMinimalApkTest, On)
 {
+	create_hash_list_success = 1;
+	minapk_lookup_table = NULL;
 	hcfs_system->use_minimal_apk = 0;
 	ASSERT_EQ(toggle_use_minimal_apk(1), 0);
 	EXPECT_EQ(hcfs_system->use_minimal_apk, 1);
 }
 TEST(ToggleMinimalApkTest, Off)
 {
+	create_hash_list_success = 1;
+	minapk_lookup_table = (HASH_LIST * )1;
+	minapk_lookup_iter = (HASH_LIST_ITERATOR *)1;
 	hcfs_system->use_minimal_apk = 1;
 	EXPECT_EQ(toggle_use_minimal_apk(0), 0);
 	EXPECT_EQ(hcfs_system->use_minimal_apk, 0);
+}
+
+/**
+ * Unittest for create_minapk_table()
+ */
+class create_minapk_tableTest : public ::testing::Test
+{
+	protected:
+	void SetUp()
+	{
+		create_hash_list_success = 0;
+		minapk_lookup_table = NULL;
+	}
+
+	void TearDown()
+	{
+		create_hash_list_success = 0;
+		minapk_lookup_table = NULL;
+	}
+};
+
+TEST_F(create_minapk_tableTest, CreateSuccess)
+{
+	int32_t ret;
+
+	create_hash_list_success = 1;
+	ret = create_minapk_table();
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ((HASH_LIST *)1, minapk_lookup_table);
+}
+
+TEST_F(create_minapk_tableTest, CreateFail)
+{
+	int32_t ret;
+
+	create_hash_list_success = 0;
+	ret = create_minapk_table();
+	EXPECT_EQ(-ENOMEM, ret);
+	EXPECT_EQ(NULL, minapk_lookup_table);
+}
+/**
+ * End unittest for create_minapk_table()
+ */
+
+/**
+ * Unittest for destroy_minapk_table()
+ */
+class destroy_minapk_tableTest : public ::testing::Test
+{
+	protected:
+	void SetUp()
+	{
+		minapk_lookup_table = NULL;
+	}
+
+	void TearDown()
+	{
+		minapk_lookup_table = NULL;
+	}
+};
+
+TEST_F(destroy_minapk_tableTest, DestroySuccess)
+{
+	minapk_lookup_table = (HASH_LIST * )1;
+	destroy_minapk_table();
+
+	EXPECT_EQ(NULL, minapk_lookup_table);
+}
+/**
+ * End unittest for destroy_minapk_table()
+ */
+
+/**
+ * Unittest for destroy_minapk_table()
+ */
+class insert_minapk_dataTest : public ::testing::Test
+{
+	protected:
+	void SetUp()
+	{
+		insert_minapk_data_success = 0;
+		minapk_lookup_table = NULL;
+	}
+
+	void TearDown()
+	{
+		insert_minapk_data_success = 0;
+		minapk_lookup_table = NULL;
+	}
+};
+
+TEST_F(insert_minapk_dataTest, Minapktable_NotExist)
+{
+	EXPECT_EQ(-EINVAL, insert_minapk_data(2, "test_apk_name", 123));
+}
+
+TEST_F(insert_minapk_dataTest, InsertFail_EntryExist)
+{
+	minapk_lookup_table = (HASH_LIST * )1;
+	insert_minapk_data_success = 0;
+	EXPECT_EQ(-EEXIST, insert_minapk_data(2, "test_apk_name", 123));
+}
+
+TEST_F(insert_minapk_dataTest, InsertSuccess)
+{
+	minapk_lookup_table = (HASH_LIST * )1;
+	insert_minapk_data_success = 1;
+	EXPECT_EQ(0, insert_minapk_data(2, "test_apk_name", 123));
 }
