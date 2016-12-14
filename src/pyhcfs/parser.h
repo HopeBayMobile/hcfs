@@ -3,6 +3,7 @@
 #include "fuseop.h"
 #include "FS_manager.h"
 #include "meta.h"
+#include "metaops.h"
 
 /* Private declaration */
 #define LIST_DIR_LIMIT 1000

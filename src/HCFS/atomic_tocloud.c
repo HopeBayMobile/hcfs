@@ -1111,8 +1111,8 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 			PREAD(fileno(backend_metafptr), &tempfilestat,
 					sizeof(HCFS_STAT), 0);
 			*backend_size = tempfilestat.size;
-			*total_backend_blocks = (*backend_size == 0) ? 
-				0 : (*backend_size - 1) / MAX_BLOCK_SIZE + 1;
+			*total_backend_blocks =
+			    BLOCKS_OF_SIZE(*backend_size, MAX_BLOCK_SIZE);
 			ret = init_progress_info(ptr->progress_fd,
 					*total_backend_blocks, *backend_size,
 					backend_metafptr, last_pin_status);

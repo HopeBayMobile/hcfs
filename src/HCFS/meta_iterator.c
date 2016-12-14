@@ -44,8 +44,8 @@ FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 	FREAD(&(iter->filestat), sizeof(HCFS_STAT), 1, fptr);
 	FREAD(&(iter->filemeta), sizeof(FILE_META_TYPE), 1, fptr);
 
-	iter->total_blocks = iter->filestat.size == 0 ? 0 :
-			((iter->filestat.size - 1) / MAX_BLOCK_SIZE) + 1;
+	iter->total_blocks =
+	    BLOCKS_OF_SIZE(iter->filestat.size, MAX_BLOCK_SIZE);
 	iter->now_block_no = -1;
 	iter->now_page_no = -1;
 	iter->now_bentry = NULL;

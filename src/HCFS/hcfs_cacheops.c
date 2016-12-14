@@ -146,8 +146,8 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 			return 1;
 		}
 
-		total_blocks = (temphead_stat.size +
-					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
+		total_blocks =
+		    BLOCKS_OF_SIZE(temphead_stat.size, MAX_BLOCK_SIZE);
 
 		page_index = MAX_BLOCK_ENTRIES_PER_PAGE;
 
