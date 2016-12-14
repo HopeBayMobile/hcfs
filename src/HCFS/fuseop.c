@@ -159,11 +159,16 @@
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
-/* Helper function for checking permissions.
-   Inputs: fuse_req_t req, HCFS_STAT *thisstat, char mode
-     Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
-*/
-int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
+
+/*!
+ * Helper function for checking permissions.
+ * @param req           request of FUSE operations
+ * @param thisstat      file status
+ * @param mode          bitwise ORs of read, write, exec (4, 2, 1)
+ * @param root_check    perform root check or not
+ */
+int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat,
+                         int32_t mode, BOOL root_check)
 {
 	struct fuse_ctx *temp_context;
 	gid_t *tmp_list = NULL, tmp1_list[10];
@@ -174,15 +179,20 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 	if (temp_context == NULL)
 		return -ENOMEM;
 
-	/* Do not grant access based on uid now */
-	/*
-		if (temp_context->uid == 0)
+	if (!root_check) {
+		/* Check the capabilities of the process */
+		if (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE) == TRUE)
 			return 0;
-	*/
-
-	/* Check the capabilities of the process */
-	if (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE) == TRUE)
-		return 0;
+	} else {
+		/* root check: if exec is set for any for reg files */
+		if ((temp_context->uid == 0) ||
+		    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE))) {
+			if ((S_ISREG(thisstat->mode)) && (mode & X_OK) &&
+			    (!(thisstat->mode & (S_IXUSR | S_IXGRP | S_IXOTH))))
+				return -EACCES;
+			return 0;
+		}
+	}
 
 	/* First check owner permission */
 	if (temp_context->uid == thisstat->uid) {
@@ -272,121 +282,6 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat, char mode)
 			return -EACCES;
 	return 0;
 }
-
-/* Check permission routine for ll_access only */
-int32_t check_permission_access(fuse_req_t req,
-				HCFS_STAT *thisstat,
-				int32_t mode)
-{
-	struct fuse_ctx *temp_context;
-	gid_t *tmp_list = NULL, tmp1_list[10];
-	int32_t num_groups, count;
-	char is_in_group;
-
-	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
-	if (temp_context == NULL)
-		return -ENOMEM;
-
-	/*If this is the root check if exec is set for any for reg files*/
-	if ((temp_context->uid == 0) ||
-	    (_check_capability(temp_context->pid, CAP_DAC_OVERRIDE) == TRUE)) {
-		if ((S_ISREG(thisstat->mode)) && (mode & X_OK)) {
-			if (!(thisstat->mode &
-				(S_IXUSR | S_IXGRP | S_IXOTH)))
-				return -EACCES;
-		}
-		return 0;
-	}
-
-	/* First check owner permission */
-	if (temp_context->uid == thisstat->uid) {
-		if (mode & R_OK)
-			if (!(thisstat->mode & S_IRUSR))
-				return -EACCES;
-		if (mode & W_OK)
-			if (!(thisstat->mode & S_IWUSR))
-				return -EACCES;
-		if (mode & X_OK)
-			if (!(thisstat->mode & S_IXUSR))
-				return -EACCES;
-		return 0;
-	}
-
-	/* Check group permission */
-	if (temp_context->gid == thisstat->gid) {
-		if (mode & R_OK)
-			if (!(thisstat->mode & S_IRGRP))
-				return -EACCES;
-		if (mode & W_OK)
-			if (!(thisstat->mode & S_IWGRP))
-				return -EACCES;
-		if (mode & X_OK)
-			if (!(thisstat->mode & S_IXGRP))
-				return -EACCES;
-		return 0;
-	}
-
-	/* Check supplementary group ID */
-
-	num_groups = fuse_req_getgroups(req, 10, tmp1_list);
-
-	if (num_groups <= 10) {
-		tmp_list = tmp1_list;
-	} else {
-		tmp_list = malloc(sizeof(gid_t) * num_groups);
-		if (tmp_list == NULL)
-			return -ENOMEM;
-		num_groups = fuse_req_getgroups(req,
-					sizeof(gid_t) * num_groups, tmp_list);
-	}
-
-	if (num_groups < 0) {
-		write_log(5,
-			"Debug check permission getgroups failed, skipping\n");
-		num_groups = 0;
-	}
-
-	is_in_group = FALSE;
-	write_log(10, "Debug permission number of groups %d\n", num_groups);
-	for (count = 0; count < num_groups; count++) {
-		write_log(10, "group gid %d, %d\n", tmp_list[count],
-					thisstat->gid);
-		if (tmp_list[count] == thisstat->gid) {
-			is_in_group = TRUE;
-			break;
-		}
-	}
-
-	if (tmp_list != tmp1_list)
-		free(tmp_list);
-
-	if (is_in_group == TRUE) {
-		if (mode & R_OK)
-			if (!(thisstat->mode & S_IRGRP))
-				return -EACCES;
-		if (mode & W_OK)
-			if (!(thisstat->mode & S_IWGRP))
-				return -EACCES;
-		if (mode & X_OK)
-			if (!(thisstat->mode & S_IXGRP))
-				return -EACCES;
-		return 0;
-	}
-
-	/* Check others */
-
-	if (mode & R_OK)
-		if (!(thisstat->mode & S_IROTH))
-			return -EACCES;
-	if (mode & W_OK)
-		if (!(thisstat->mode & S_IWOTH))
-			return -EACCES;
-	if (mode & X_OK)
-		if (!(thisstat->mode & S_IXOTH))
-			return -EACCES;
-	return 0;
-}
-
 
 int32_t is_member(fuse_req_t req, gid_t this_gid, gid_t target_gid)
 {
@@ -1063,7 +958,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1311,7 +1206,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1460,7 +1355,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1587,7 +1482,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1744,7 +1639,7 @@ a directory (for NFS) */
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 1);
+	ret_val = check_permission(req, &parent_stat, 1, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1955,7 +1850,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat1, 3);
+	ret_val = check_permission(req, &parent_stat1, 3, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1978,7 +1873,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat2, 3);
+	ret_val = check_permission(req, &parent_stat2, 3, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -2124,7 +2019,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	/* Check if need to move to different parent inode, a dir is
 		writeable*/
 	if ((S_ISDIR(tempstat.mode)) && (parent_inode1 != parent_inode2)) {
-		ret_val = check_permission(req, &tempstat, 2);
+		ret_val = check_permission(req, &tempstat, 2, FALSE);
 
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
@@ -3570,7 +3465,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	if (((file_flags & O_ACCMODE) == O_RDONLY) ||
 			((file_flags & O_ACCMODE) == O_RDWR)) {
 		/* Checking permission */
-		ret_val = check_permission(req, &this_stat, 4);
+		ret_val = check_permission(req, &this_stat, 4, FALSE);
 
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
@@ -3581,7 +3476,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	if (((file_flags & O_ACCMODE) == O_WRONLY) ||
 			((file_flags & O_ACCMODE) == O_RDWR)) {
 		/* Checking permission */
-		ret_val = check_permission(req, &this_stat, 2);
+		ret_val = check_permission(req, &this_stat, 2, FALSE);
 
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
@@ -5559,7 +5454,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &this_stat, 4);
+	ret_val = check_permission(req, &this_stat, 4, FALSE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -6090,7 +5985,7 @@ void hfuse_ll_setattr(fuse_req_t req,
 
 continue_check:
 		/* Checking permission */
-		ret_val = check_permission(req, &newstat, 2);
+		ret_val = check_permission(req, &newstat, 2, FALSE);
 
 		if (ret_val < 0) {
 			meta_cache_close_file(body_ptr);
@@ -6237,7 +6132,7 @@ allow_truncate:
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			((temp_context->uid != newstat.uid) ||
-				(check_permission(req, &newstat, 2) < 0))) {
+				(check_permission(req, &newstat, 2, FALSE) < 0))) {
 			/* Not privileged and
 				(not owner or no write permission)*/
 
@@ -6257,7 +6152,7 @@ allow_truncate:
 	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
 		if ((_check_capability(temp_context->pid, CAP_FOWNER) != TRUE) &&
 			((temp_context->uid != newstat.uid) ||
-				(check_permission(req, &newstat, 2) < 0))) {
+				(check_permission(req, &newstat, 2, FALSE) < 0))) {
 			/* Not privileged and
 				(not owner or no write permission)*/
 
@@ -6358,7 +6253,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int32_t mode)
 	}
 
 	/* Checking permission */
-	ret_val = check_permission_access(req, &thisstat, mode);
+	ret_val = check_permission(req, &thisstat, mode, TRUE);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -6497,7 +6392,7 @@ static int32_t symlink_internal(fuse_req_t req, const char *link,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3, FALSE);
 	if (ret_val < 0) {
 		return -ret_val;
 	}
@@ -6727,9 +6622,9 @@ static int32_t _xattr_permission(char name_space,
 	case SYSTEM:
 	case USER:
 		if (ops == WRITE_XATTR)
-			return check_permission(req, thisstat, 2);
+			return check_permission(req, thisstat, 2, FALSE);
 		if (ops == READ_XATTR)
-			return check_permission(req, thisstat, 4);
+			return check_permission(req, thisstat, 4, FALSE);
 		break;
 	case SECURITY:
 		return 0;
@@ -7463,7 +7358,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3); /* W+X */
+	ret_val = check_permission(req, &parent_stat, 3, FALSE); /* W+X */
 	if (ret_val < 0) {
 		write_log(0, "Dir permission denied. W+X is needed\n");
 		fuse_reply_err(req, -ret_val);
@@ -7650,7 +7545,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3, FALSE);
 	if (ret_val < 0) {
 		write_log(0, "Dir permission denied. W+X is needed\n");
 		fuse_reply_err(req, -ret_val);
@@ -7798,7 +7693,7 @@ static void hfuse_ll_fallocate(fuse_req_t req, fuse_ino_t ino, int32_t mode,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &newstat, 2);
+	ret_val = check_permission(req, &newstat, 2, FALSE);
 
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
