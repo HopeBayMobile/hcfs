@@ -937,9 +937,12 @@ int32_t main()
 {
 	open_log(LOG_NAME);
 	write_log(0, "Initailizing...");
-	sem_post(&thread_access_sem);
 	memset(thread_pool, 0, sizeof(SOCK_THREAD) * MAX_THREAD);
 	sem_init(&thread_access_sem, 0, 1);
+
+	/* List for onging minimal apk creation */
+	init_minimal_apk_list();
+
 	write_log(0, "Starting HCFSAPID Server...");
 	init_server();
 	write_log(0, "End HCFSAPID Server");

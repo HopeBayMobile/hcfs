@@ -20,6 +20,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <jansson.h>
+#include <time.h>
 
 #include "HCFS_api.h"
 #include "pin_ops.h"
@@ -164,12 +165,16 @@ int32_t main(void)
 	//free(res25);
 
 	char *res26;
-	HCFS_create_minimal_apk(&res26, "com.facebook.katana-1", 0);
+	HCFS_create_minimal_apk(&res26, "com.braveknight.quiz01-1", 0);
 	printf("Create minimal apk - %s\n", res26);
 	free(res26);
 
 	char *res27;
-	HCFS_check_minimal_apk(&res27, "com.facebook.katana-1");
+	HCFS_check_minimal_apk(&res27, "com.braveknight.quiz01-1");
+	printf("Check minimal apk - %s\n", res27);
+	free(res27);
+	sleep(2);
+	HCFS_check_minimal_apk(&res27, "com.braveknight.quiz01-1");
 	printf("Check minimal apk - %s\n", res27);
 	free(res27);
 }

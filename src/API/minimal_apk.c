@@ -28,6 +28,101 @@
 #include "logger.h"
 
 
+LL_ONGOING_MINI_APK *ongoing_mini_apk_list = NULL;
+sem_t mini_apk_list_sem;
+
+/* Helper function to initialize ongoing mini apk list
+ */
+void init_minimal_apk_list()
+{
+	sem_init(&mini_apk_list_sem, 0, 1);
+	return;
+}
+
+/* Helper function to add an apk to ongoing list
+ */
+void _apk_list_add(char *pkg_name) {
+	LL_ONGOING_MINI_APK *apk_entry, *curr_entry;
+
+	apk_entry =
+	    (LL_ONGOING_MINI_APK *)calloc(1, sizeof(LL_ONGOING_MINI_APK));
+	apk_entry->pkg_name = (char *)calloc(1, strlen(pkg_name) + 1);
+	apk_entry->next = NULL;
+
+	strcpy(apk_entry->pkg_name, pkg_name);
+
+	if (ongoing_mini_apk_list == NULL) {
+		ongoing_mini_apk_list = apk_entry;
+		return;
+	}
+
+	curr_entry = ongoing_mini_apk_list;
+	while (curr_entry->next != NULL) {
+		curr_entry = curr_entry->next;
+	}
+
+	curr_entry->next = apk_entry;
+
+	return;
+}
+
+/* Helper function to check whether an apk is ongoing or not
+ *
+ * @return Return TRUE if in list. Return FALSE if not in list.
+ */
+BOOL _apk_list_search(char *pkg_name)
+{
+	BOOL pkg_existed = FALSE;
+	LL_ONGOING_MINI_APK *curr_entry;
+
+	curr_entry = ongoing_mini_apk_list;
+	while (curr_entry != NULL) {
+		if (strncmp(curr_entry->pkg_name, pkg_name, strlen(pkg_name)) ==
+		    0) {
+			pkg_existed = TRUE;
+			break;
+		}
+		curr_entry = curr_entry->next;
+	}
+
+	return pkg_existed;
+}
+
+/* Helper function to remove an apk in list
+ */
+void _apk_list_remove(char *pkg_name) {
+	BOOL pkg_existed = FALSE;
+	int32_t count = 0;
+	LL_ONGOING_MINI_APK *prev_entry, *curr_entry;
+
+	if (ongoing_mini_apk_list == NULL)
+		return;
+
+	prev_entry = curr_entry = ongoing_mini_apk_list;
+	while (curr_entry != NULL) {
+		if (strncmp(curr_entry->pkg_name, pkg_name,
+			    strlen(pkg_name)) == 0) {
+			pkg_existed = TRUE;
+			break;
+		}
+		prev_entry = curr_entry;
+		curr_entry = prev_entry->next;
+		count++;
+	}
+
+	if (pkg_existed) {
+		if (count == 0) {
+			ongoing_mini_apk_list = curr_entry->next;
+		} else {
+			prev_entry->next = curr_entry->next;
+		}
+		free(curr_entry->pkg_name);
+		free(curr_entry);
+	}
+
+	return;
+}
+
 /* Helper function to get dir name of a full path
  * e.g. Input: "/tmp/dir/file" => Output: "/tmp/dir"
  *
@@ -36,22 +131,28 @@
 char *_get_dir_name(const char *file_name)
 {
 	char *ret_str;
-	uint32_t count, idx;
+	int32_t idx;
+	uint32_t count;
 
 	if (file_name == NULL)
 		return NULL;
 
-	idx = 0;
+	idx = -1;
 	for (count = 0; count < strlen(file_name); count++) {
-		if (strncmp(&file_name[count], "/", 1) == 0)
+		if (file_name[count] == '/')
 			idx = count;
 	}
 
-	if (idx == 0)
-		return NULL;
+	if (idx == -1) {
+		ret_str = (char *)calloc(1, 1);
+	} else if (idx == 0) {
+		ret_str = (char *)calloc(1, 2);
+		ret_str[0] = '/';
+	} else {
+		ret_str = (char *)calloc(1, idx + 1);
+		strncpy(ret_str, file_name, idx);
+	}
 
-	ret_str = (char *)calloc(1, strlen(file_name) + 1);
-	strncpy(ret_str, file_name, idx);
 	return ret_str;
 }
 
@@ -66,37 +167,37 @@ int32_t add_lib_dirs(zip_t *base_apk, zip_t *mini_apk)
 
 	num_entries = zip_get_num_entries(base_apk, 0);
 	if (num_entries < 0) {
-		write_log(0, "Failed to parse base apk files");
+		WRITE_LOG(0, "Failed to parse base apk files");
 		return -1;
 	}
 
 	for (idx = 0; idx < num_entries; idx++) {
 		file_name = (char *)zip_get_name(base_apk, idx, 0);
 		if (file_name == NULL) {
-			write_log(0, "Failed to parse file names in base apk. "
+			WRITE_LOG(0, "Failed to parse file names in base apk. "
 				     "Error msg - %s",
 				  zip_strerror(base_apk));
 			return -1;
 		}
 
 		/* To find lib folders */
-		if (strncmp(file_name, "lib/", 4) == 0) {
-			dir_name = _get_dir_name(file_name);
-			ret_code = zip_dir_add(mini_apk, dir_name, 0);
-			if (ret_code < 0) {
-				zip_error = zip_get_error(mini_apk);
-				if (zip_error_code_zip(zip_error) !=
-				    ZIP_ER_EXISTS) {
-					write_log(0, "Failed to add lib dirs "
-						     "to mini apk. "
-						     "Error msg - %s",
-						  zip_strerror(mini_apk));
-					free(dir_name);
-					return -1;
-				}
+		if (strncmp(file_name, "lib/", 4) != 0)
+			continue;
+
+		dir_name = _get_dir_name(file_name);
+		ret_code = zip_dir_add(mini_apk, dir_name, 0);
+		if (ret_code < 0) {
+			zip_error = zip_get_error(mini_apk);
+			if (zip_error_code_zip(zip_error) != ZIP_ER_EXISTS) {
+				WRITE_LOG(0, "Failed to add lib dirs "
+					     "to mini apk. "
+					     "Error msg - %s",
+					  zip_strerror(mini_apk));
+				free(dir_name);
+				return -1;
 			}
-			free(dir_name);
 		}
+		free(dir_name);
 	}
 	return 0;
 }
@@ -114,7 +215,7 @@ int32_t add_apk_files(zip_t *base_apk, zip_t *mini_apk)
 	     count < sizeof(apk_files) / sizeof(apk_files[0]); count++) {
 		idx_in_base = zip_name_locate(base_apk, apk_files[count], 0);
 		if (idx_in_base < 0) {
-			write_log(
+			WRITE_LOG(
 			    0, "Cann't find %s in base apk", apk_files[count]);
 			return -1;
 		}
@@ -122,14 +223,14 @@ int32_t add_apk_files(zip_t *base_apk, zip_t *mini_apk)
 		tmp_zs_t =
 		    zip_source_zip(mini_apk, base_apk, idx_in_base, 0, 0, 0);
 		if (tmp_zs_t == NULL) {
-			write_log(0, "Failed to get %s source. "
+			WRITE_LOG(0, "Failed to get %s source. "
 				     "Error msg - %s",
 				  apk_files[count], zip_strerror(mini_apk));
 			return -1;
 		}
 
 		if (zip_add(mini_apk, apk_files[count], tmp_zs_t) == -1) {
-			write_log(0, "Failed to add %s to mini apk. "
+			WRITE_LOG(0, "Failed to add %s to mini apk. "
 				     "Error msg - %s",
 				  apk_files[count], zip_strerror(mini_apk));
 			zip_source_free(tmp_zs_t);
@@ -157,14 +258,14 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 	zip_error_t zip_err_t;
 
 	if ((base_apk_path == NULL) || (mini_apk_path == NULL)) {
-		write_log(0, "Invalid path string.");
+		WRITE_LOG(0, "Invalid path string.");
 		return -1;
 	}
 
 	mini_apk_zip = zip_open(mini_apk_path, ZIP_CREATE, &zip_errcode);
 	if (mini_apk_zip == NULL) {
 		zip_error_init_with_code(&zip_err_t, zip_errcode);
-		write_log(0, "Failed to open mini apk. Error msg - %s",
+		WRITE_LOG(0, "Failed to open mini apk. Error msg - %s",
 			  zip_error_strerror(&zip_err_t));
 		zip_error_fini(&zip_err_t);
 		return -1;
@@ -173,7 +274,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 	base_apk_zip = zip_open(base_apk_path, ZIP_CHECKCONS, &zip_errcode);
 	if (base_apk_zip == NULL) {
 		zip_error_init_with_code(&zip_err_t, zip_errcode);
-		write_log(0, "Failed to open base apk. Error msg - %s",
+		WRITE_LOG(0, "Failed to open base apk. Error msg - %s",
 			  zip_error_strerror(&zip_err_t));
 		zip_error_fini(&zip_err_t);
 		zip_close(mini_apk_zip);
@@ -182,7 +283,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 
 	ret_code = add_lib_dirs(base_apk_zip, mini_apk_zip);
 	if (ret_code < 0) {
-		write_log(0, "Failed to add lib dirs to minimal api.");
+		WRITE_LOG(0, "Failed to add lib dirs to minimal api.");
 		zip_close(mini_apk_zip);
 		zip_close(base_apk_zip);
 		return -1;
@@ -190,7 +291,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 
 	add_apk_files(base_apk_zip, mini_apk_zip);
 	if (ret_code < 0) {
-		write_log(0, "Failed to add apk files to minimal api.");
+		WRITE_LOG(0, "Failed to add apk files to minimal api.");
 		zip_close(mini_apk_zip);
 		zip_close(base_apk_zip);
 		return -1;
@@ -209,74 +310,81 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
  */
 int32_t create_minimal_apk(char *pkg_name)
 {
-	char *base_apk_path, *mini_apk_path;
+	char *base_apk_path, *mini_apk_path, *app_dir_path;
 	int32_t ret_code;
-	struct stat tmp_stat;
-	struct utimbuf base_apk_timbuf;
+	struct stat base_apk_stat, app_dir_stat;
+	struct utimbuf base_apk_timbuf, app_dir_timbuf;
 	struct group *grp_t;
 	struct passwd *passwd_t;
 
 	ret_code = 0;
-	base_apk_path = mini_apk_path = NULL;
+	base_apk_path = mini_apk_path = app_dir_path = NULL;
 
 	if (pkg_name == NULL) {
-		write_log(0, "Invalid pkg_name.");
+		WRITE_LOG(0, "Invalid pkg_name.");
 		return -1;
 	}
+
+	sem_wait(&mini_apk_list_sem);
+	if (_apk_list_search(pkg_name)) {
+		sem_post(&mini_apk_list_sem);
+		return 0;
+	}
+	_apk_list_add(pkg_name);
+	sem_post(&mini_apk_list_sem);
 
 	ret_code = asprintf(&base_apk_path, "%s/%s/%s", APP_PREFIX, pkg_name,
 			    BASE_APK_NAME);
 	if (ret_code < 0) {
-		write_log(0, "Failed to concat base apk path string.");
+		WRITE_LOG(0, "Failed to concat base apk path string.");
 		return -1;
 	}
 
 	ret_code = asprintf(&mini_apk_path, "%s/%s/%s", APP_PREFIX, pkg_name,
 			    MINI_APK_NAME);
 	if (ret_code < 0) {
-		write_log(0, "Failed to concat mini apk path string.");
+		WRITE_LOG(0, "Failed to concat mini apk path string.");
 		goto error;
 	}
 
 	if (access(mini_apk_path, F_OK) != -1) {
-		write_log(
+		WRITE_LOG(
 		    4, "Minimal apk of %s alreay existed. Skip apk creation.",
 		    pkg_name);
 		ret_code = 0;
 		goto end;
 	}
 
-	ret_code = stat(base_apk_path, &tmp_stat);
+	app_dir_path = _get_dir_name(base_apk_path);
+	ret_code = stat(app_dir_path, &app_dir_stat);
 	if (ret_code < 0) {
-		write_log(0, "Failed to lookup base apk of %s. Error code - %d",
+		WRITE_LOG(0, "Failed to lookup app dir of %s. Error code - %d",
 			  pkg_name, errno);
 		goto error;
 	}
 
+	ret_code = stat(base_apk_path, &base_apk_stat);
+	if (ret_code < 0) {
+		WRITE_LOG(0, "Failed to lookup base apk of %s. Error code - %d",
+			  pkg_name, errno);
+		goto error;
+	}
+
+	/* create minimal apk file */
 	ret_code = create_zip_file(base_apk_path, mini_apk_path);
 	if (ret_code < 0) {
-		write_log(0, "Failed to create minimal apk file of %s.",
+		WRITE_LOG(0, "Failed to create minimal apk file of %s.",
 			  pkg_name);
 		goto error;
 	}
 
-	/* change timestamps as same as base.apk */
-	base_apk_timbuf.actime = tmp_stat.st_atime;
-	base_apk_timbuf.modtime = tmp_stat.st_mtime;
-	ret_code = utime(mini_apk_path, &base_apk_timbuf);
-	if (ret_code < 0) {
-		write_log(0, "Failed to change mod time for minimal apk of %s. "
-			     "Error code - %d",
-			  pkg_name, errno);
-		unlink(mini_apk_path);
-		goto error;
-	}
-
 	/* change owner & permisssions */
-	grp_t = getgrnam("system");
-	passwd_t = getpwnam("system");
-	chown(mini_apk_path, passwd_t->pw_uid, grp_t->gr_gid);
+	CHOWN(mini_apk_path, "system", "system");
 	chmod(mini_apk_path, 0644);
+
+	/* restore mod time */
+	UTIME(mini_apk_path, base_apk_timbuf, base_apk_stat);
+	UTIME(app_dir_path, app_dir_timbuf, app_dir_stat);
 
 	ret_code = 0;
 	goto end;
@@ -287,6 +395,11 @@ error:
 end:
 	free(base_apk_path);
 	free(mini_apk_path);
+	free(app_dir_path);
+	/* Remove from ongoing list */
+	sem_wait(&mini_apk_list_sem);
+	_apk_list_remove(pkg_name);
+	sem_post(&mini_apk_list_sem);
 	return ret_code;
 }
 
@@ -317,14 +430,20 @@ int32_t check_minimal_apk(char *pkg_name)
 	ret_code = asprintf(&mini_apk_path, "%s/%s/%s", APP_PREFIX, pkg_name,
 			    MINI_APK_NAME);
 	if (ret_code < 0) {
-		write_log(0, "Failed to concat mini apk path string.");
+		WRITE_LOG(0, "Failed to concat mini apk path string.");
 		return -EINVAL;
 	}
 
-	if (access(mini_apk_path, F_OK) == -1)
+	sem_wait(&mini_apk_list_sem);
+
+	if (_apk_list_search(pkg_name))
+		apk_status = ST_IS_CREATING;
+	else if (access(mini_apk_path, F_OK) == -1)
 		apk_status = ST_NOT_EXISTED;
 	else
 		apk_status = ST_EXISTED;
+
+	sem_post(&mini_apk_list_sem);
 
 	free(mini_apk_path);
 	return apk_status;
