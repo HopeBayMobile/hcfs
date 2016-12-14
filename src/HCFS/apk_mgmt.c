@@ -112,8 +112,8 @@ int32_t terminate_minimal_apk(void)
 
 	ret = _invalid_all_minapk();
 	if (ret < 0) {
-		write_log(0, "[E] %s: Fail to invalid minapk dentries, %s",
-			  __func__, "This can lead to unexpected behavior.\n");
+		write_log(0, "[E] %s: Fail to invalid minapk dentries, %s\n",
+			  __func__, "This can lead to unexpected behavior.");
 	}
 
 	destroy_minapk_table();
