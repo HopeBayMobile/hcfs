@@ -1576,7 +1576,6 @@ TEST_F(hfuse_ll_writeTest, NoBackend_CacheFull) {
   char tempbuf[1024];
   size_t ret_items;
   int32_t count;
-  int32_t tmp_len;
 
   hcfs_system->systemdata.cache_size = 5000000;
   CURRENT_BACKEND = NONE;
@@ -1584,7 +1583,6 @@ TEST_F(hfuse_ll_writeTest, NoBackend_CacheFull) {
   fetch_block_path(temppath, 16, 0);
   fake_block_status = ST_NONE;
   snprintf(tempbuf, 100, "This is a test data");
-  tmp_len = strlen(tempbuf);
 
   ASSERT_EQ(hcfs_system->systemdata.cache_size, 5000000);
   fptr = fopen("/tmp/test_fuse/testwrite", "r+");
@@ -1610,7 +1608,6 @@ TEST_F(hfuse_ll_writeTest, RestoreStage1_CacheFull) {
   char tempbuf[1024];
   size_t ret_items;
   int32_t count;
-  int32_t tmp_len;
 
   hcfs_system->systemdata.cache_size = 5000000;
   hcfs_system->system_restoring = RESTORING_STAGE1;
@@ -1618,7 +1615,6 @@ TEST_F(hfuse_ll_writeTest, RestoreStage1_CacheFull) {
   fetch_block_path(temppath, 16, 0);
   fake_block_status = ST_NONE;
   snprintf(tempbuf, 100, "This is a test data");
-  tmp_len = strlen(tempbuf);
 
   ASSERT_EQ(hcfs_system->systemdata.cache_size, 5000000);
   fptr = fopen("/tmp/test_fuse/testwrite", "r+");
@@ -2898,12 +2894,11 @@ TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
 	int32_t errcode;
 	char buf[100];
 	const char *ans = "hello!listxattr:)";
-	
-	ret = listxattr("/tmp/test_fuse/testsetxattr", 
-		buf, 100);
+
+	ret = listxattr("/tmp/test_fuse/testsetxattr", buf, 100);
 	buf[ret] = '\0';
 
-	EXPECT_EQ(strlen(ans), ret);
+	ASSERT_EQ(strlen(ans), ret);
 	EXPECT_STREQ(ans, buf);
 }
 
