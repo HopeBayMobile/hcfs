@@ -34,10 +34,16 @@ int32_t toggle_use_minimal_apk(bool new_val)
 	int32_t ret = 0;
 	bool old_val = hcfs_system->use_minimal_apk;
 
-	if (old_val == false && new_val == true)
-		ret = initialize_minimal_apk();
-	else if (old_val == true && new_val == false)
-		ret = terminate_minimal_apk();
+	if (old_val == new_val)
+		return 0;
+
+	ret = new_val ? initialize_minimal_apk() : terminate_minimal_apk();
+	if (ret != 0)
+		write_log(0, "[E] %s: use_minimal_apk failed to %s",
+			  new_val ? "enable" : "disable");
+	else
+		write_log(4, "[I] %s: use_minimal_apk %s successful",
+			  new_val ? "enable" : "disable");
 
 	return ret;
 }
@@ -53,12 +59,10 @@ int32_t initialize_minimal_apk(void)
 	int32_t ret = 0;
 
 	ret = create_minapk_table();
-	if (ret < 0)
-		return ret;
 
 	/* Enable use_minimal_apk after everything ready */
-	hcfs_system->use_minimal_apk = true;
-
+	if (ret == 0)
+		hcfs_system->use_minimal_apk = true;
 	return ret;
 }
 
@@ -353,4 +357,3 @@ void end_iterate_minapk_table(void)
 	minapk_lookup_iter = NULL;
 	hash_list_global_unlock(minapk_lookup_table);
 }
-

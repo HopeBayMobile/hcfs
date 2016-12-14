@@ -76,7 +76,8 @@ CMD cmd_list[] = { { "create", CREATEVOL },
 		   { "initiate_restoration", INITIATE_RESTORATION },
 		   { "check_restoration_status", CHECK_RESTORATION_STATUS },
 		   { "notify_applist_change", NOTIFY_APPLIST_CHANGE },
-		   { "toggle_use_minimal_apk", TOGGLE_USE_MINIMAL_APK } };
+		   { "toggle_use_minimal_apk", TOGGLE_USE_MINIMAL_APK },
+		   { "get_minimal_apk_status", GET_MINIMAL_APK_STATUS } };
 enum { CMD_SIZE = sizeof(cmd_list) / sizeof(cmd_list[0]) };
 
 #endif /* GW20_SRC_HCFSVOL_H_ */

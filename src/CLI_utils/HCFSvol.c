@@ -124,6 +124,7 @@ int32_t main(int32_t argc, char **argv)
 	case GETSYNCSWITCH:
 	case GETSYNCSTAT:
 	case GETXFERSTATUS:
+	case GET_MINIMAL_APK_STATUS:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -142,6 +143,9 @@ int32_t main(int32_t argc, char **argv)
 			printf("Xfer status is %d\n", uint32_ret);
 		else if (code == CHECK_RESTORATION_STATUS)
 			printf("Restoration status is %d\n", uint32_ret);
+		else if(code == GET_MINIMAL_APK_STATUS)
+			printf("Minimal apk is %s\n",
+			       uint32_ret ? "ON" : "OFF");
 		break;
 	case CHECK_RESTORATION_STATUS:
 		cmd_len = 0;

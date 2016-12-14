@@ -26,7 +26,7 @@ extern "C" {
 
 #define UNUSED(x) ((void)x)
 
-extern int32_t api_server_monitor_time;
+extern struct timespec api_server_monitor_time;
 SYSTEM_CONF_STRUCT *system_config;
 
 SWIFTTOKEN_CONTROL swifttoken_control = {
@@ -44,6 +44,7 @@ protected:
 	int32_t count;
 
 	virtual void SetUp() {
+		api_server_monitor_time = { 0, 1000 * 1000 * 100 };
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 		              malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
@@ -157,6 +158,7 @@ TEST_F(destroy_api_interfaceTest, TestIntegrity)
 {
 	int32_t ret_val, errcode;
 
+	api_server_monitor_time = { 0, 1000 * 1000 * 100 };
 	ret_val = init_api_interface();
 	ASSERT_EQ(0, ret_val);
 	ret_val = access(SOCK_PATH, F_OK);
@@ -195,7 +197,7 @@ protected:
 		    (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		system_config->max_pinned_limit =
 		    (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
-		api_server_monitor_time = 1;
+		api_server_monitor_time = { 0, 1000 * 1000 * 100 };
 		hcfs_system =
 		    (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
@@ -1857,6 +1859,7 @@ class api_server_monitorTest : public ::testing::Test {
 	struct sockaddr_un addr;
 
 	virtual void SetUp() {
+		api_server_monitor_time = { 0, 1000 * 1000 * 100 };
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 		              malloc(sizeof(SYSTEM_DATA_HEAD));
 		hcfs_system->system_going_down = FALSE;
@@ -1940,7 +1943,7 @@ TEST_F(api_server_monitorTest, TestThreadIncrease)
 		ASSERT_EQ(sizeof(uint32_t), ret_val);
 		ASSERT_EQ(0, errcode);
 	}
-	sleep(5);
+	sleep(1);
 	EXPECT_GE(api_server->num_threads, INIT_API_THREADS);
 }
 
