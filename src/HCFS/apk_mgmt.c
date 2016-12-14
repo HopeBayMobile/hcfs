@@ -39,10 +39,10 @@ int32_t toggle_use_minimal_apk(bool new_val)
 
 	ret = new_val ? initialize_minimal_apk() : terminate_minimal_apk();
 	if (ret != 0)
-		write_log(0, "[E] %s: use_minimal_apk failed to %s",
+		write_log(0, "[E] %s: use_minimal_apk failed to %s", __func__,
 			  new_val ? "enable" : "disable");
 	else
-		write_log(4, "[I] %s: use_minimal_apk %s successful",
+		write_log(4, "[I] %s: use_minimal_apk %s successful", __func__,
 			  new_val ? "enable" : "disable");
 
 	return ret;
