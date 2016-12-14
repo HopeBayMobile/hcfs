@@ -1668,9 +1668,8 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 				PREAD(data->progress_list_fd, &progress_meta,
 						sizeof(PROGRESS_META), 0);
 				progress_meta.toupload_size = tmpstat.size;
-				toupload_blocks = (tmpstat.size == 0) ?
-						0 : (tmpstat.size - 1) /
-						MAX_BLOCK_SIZE + 1;
+				toupload_blocks = BLOCKS_OF_SIZE(
+				    tmpstat.size, MAX_BLOCK_SIZE);
 				progress_meta.total_toupload_blocks =
 						toupload_blocks;
 				PWRITE(data->progress_list_fd, &progress_meta,

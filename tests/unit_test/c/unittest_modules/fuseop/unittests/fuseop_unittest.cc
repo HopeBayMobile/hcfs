@@ -1496,6 +1496,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
     after_update_block_page = FALSE;
     test_fetch_from_backend = FALSE;
     fake_block_status = ST_NONE;
+    CURRENT_BACKEND = 1;
     hcfs_system->systemdata.system_quota = 25600000;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
@@ -1513,6 +1514,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
     fetch_block_path(temppath, 16, 0);
     if (access(temppath, F_OK) == 0)
       unlink(temppath);
+    CURRENT_BACKEND = 1;
   }
 };
 
@@ -1563,6 +1565,69 @@ TEST_F(hfuse_ll_writeTest, WriteWhenExceedingSystemQuota) {
   tmp_err = errno;
   EXPECT_EQ(ret_items, 0);
   EXPECT_EQ(tmp_err, ENOSPC);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_ll_writeTest, NoBackend_CacheFull) {
+  int32_t ret_val;
+  int32_t tmp_err;
+  HCFS_STAT tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int32_t count;
+
+  hcfs_system->systemdata.cache_size = 5000000;
+  CURRENT_BACKEND = NONE;
+
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_NONE;
+  snprintf(tempbuf, 100, "This is a test data");
+
+  ASSERT_EQ(hcfs_system->systemdata.cache_size, 5000000);
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+  setbuf(fptr, NULL);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  tmp_err = errno;
+  EXPECT_TRUE(ret_items < 1);
+  EXPECT_EQ(ENOSPC, tmp_err);
+  fclose(fptr);
+  fptr = NULL;
+  CURRENT_BACKEND = 1;
+}
+
+TEST_F(hfuse_ll_writeTest, RestoreStage1_CacheFull) {
+  int32_t ret_val;
+  int32_t tmp_err;
+  HCFS_STAT tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int32_t count;
+
+  hcfs_system->systemdata.cache_size = 5000000;
+  hcfs_system->system_restoring = RESTORING_STAGE1;
+
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_NONE;
+  snprintf(tempbuf, 100, "This is a test data");
+
+  ASSERT_EQ(hcfs_system->systemdata.cache_size, 5000000);
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+  setbuf(fptr, NULL);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  tmp_err = errno;
+  EXPECT_TRUE(ret_items < 1);
+  EXPECT_EQ(ENOSPC, tmp_err);
   fclose(fptr);
   fptr = NULL;
 }
@@ -2830,12 +2895,11 @@ TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
 	int32_t errcode;
 	char buf[100];
 	const char *ans = "hello!listxattr:)";
-	
-	ret = listxattr("/tmp/test_fuse/testsetxattr", 
-		buf, 100);
+
+	ret = listxattr("/tmp/test_fuse/testsetxattr", buf, 100);
 	buf[ret] = '\0';
 
-	EXPECT_EQ(strlen(ans), ret);
+	ASSERT_EQ(strlen(ans), ret);
 	EXPECT_STREQ(ans, buf);
 }
 

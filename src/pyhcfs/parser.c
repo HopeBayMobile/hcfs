@@ -584,7 +584,9 @@ int32_t list_file_blocks(const char *meta_path,
 	/* loop over all meta blocks */
 	current_page = -1;
 	ret_idx = 0;
-	total_blocks = ((meta_stat.size - 1) / MAX_BLOCK_SIZE) + 1;
+	
+	total_blocks = BLOCKS_OF_SIZE(meta_stat.size, MAX_BLOCK_SIZE);
+
 	for (count = 0; count < total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
 		which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;

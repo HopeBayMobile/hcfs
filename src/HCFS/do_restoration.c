@@ -706,7 +706,7 @@ int32_t _fetch_pinned(ino_t thisinode, BOOL is_smartcache)
 	/* Assuming fixed block size now */
 	write_page = FALSE;
 	tmpsize = tmpstat.size;
-	totalblocks = ((tmpsize - 1) / MAX_BLOCK_SIZE) + 1;
+	totalblocks = BLOCKS_OF_SIZE(tmpsize, MAX_BLOCK_SIZE);
 	lastpage = -1;
 	for (count = 0; count < totalblocks; count++) {
 		nowpage = count / MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -1059,11 +1059,7 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 	 * be changed later to reflect the actual meta size
 	 */
 
-	if (this_inode_stat.size == 0)
-		total_blocks = 0;
-	else
-		total_blocks =
-		    ((this_inode_stat.size - 1) / MAX_BLOCK_SIZE) + 1;
+	total_blocks = BLOCKS_OF_SIZE(this_inode_stat.size, MAX_BLOCK_SIZE);
 
 	current_page = -1;
 	for (count = 0; count < total_blocks; count++) {
@@ -1751,7 +1747,7 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 			return ret;
 	} else {
 		ino_t target_inode;
-		char targetpath[MAX_FILENAME_LEN];
+		char targetpath[METAPATHLEN];
 		HCFS_STAT hcfsstat;
 
 		write_log(4, "Warn: Detect missing hardlink %s", tmppath);

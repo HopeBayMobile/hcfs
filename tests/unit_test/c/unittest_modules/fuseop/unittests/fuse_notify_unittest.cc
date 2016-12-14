@@ -30,6 +30,7 @@ extern "C" {
 MOUNT_T_GLOBAL mount_global;
 extern FUES_NOTIFY_SHARED_DATA notify;
 extern fuse_notify_fn *notify_fn[];
+struct timespec wait_1ms = {0, 1000000};
 
 /*
  * Helper functions
@@ -45,11 +46,10 @@ int32_t ut_enqueue(size_t n)
 	FUSE_NOTIFY_PROTO *data;
 
 	if (n > 50)
-		write_log_hide = 10;
+		write_log_hide = 0;
 	for (i = 0; i < n; i++) {
-		write_log(11, "notify.len %lu\n", notify.len);
 		data = &saved_notify[ut_enqueue_call % 20];
-		memset(data, fake_data, FUSE_NOTIFY_ENTRY_SIZE);
+		memset(data, fake_data, sizeof(FUSE_NOTIFY_PROTO));
 		data->func = NOOP;
 		ret = notify_buf_enqueue(data);
 		in = notify.in + 1;
@@ -65,11 +65,15 @@ int32_t ut_enqueue(size_t n)
 void ut_dequeue(int32_t n)
 {
 	FUSE_NOTIFY_PROTO *d = NULL;
-	int32_t i;
+	int32_t i, write_log_hide_orgin = write_log_hide;
+
+	if (n > 50)
+		write_log_hide = 0;
 	for (i = 0; i < n; i++) {
 		d = notify_buf_dequeue();
 		FREE(d);
 	}
+	write_log_hide = write_log_hide_orgin;
 }
 
 void reset_fake_functions(void)
@@ -201,7 +205,8 @@ TEST_F(NotifyBuffer_Initialized, EnqueueToLinkedListFailToAllocateNode)
 	uint8_t *d = NULL;
 
 	malloc_error_on = 1;
-	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_MAXLEN+1), -1);
+	write_log_hide = 11;
+	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_MAXLEN + 1), -1);
 	write_log_hide = 2;
 	for (i = 0; i < FUSE_NOTIFY_RINGBUF_MAXLEN; i++) {
 		d = (uint8_t*)notify_buf_dequeue();
@@ -238,7 +243,7 @@ TEST_F(NotifyBuffer_Initialized, Dequeue)
 	ut_enqueue(1);
 	d = notify_buf_dequeue();
 	ASSERT_NE(0, (d != NULL));
-	EXPECT_EQ(0, memcmp(d, notify.ring_buf, FUSE_NOTIFY_ENTRY_SIZE));
+	EXPECT_EQ(0, memcmp(d, notify.ring_buf, sizeof(FUSE_NOTIFY_PROTO)));
 	FREE(d);
 }
 
@@ -246,15 +251,15 @@ TEST_F(NotifyBuffer_Initialized, DequeueLinkedList)
 {
 	int32_t i;
 	uint8_t fake_data = 0;
-	uint8_t *d = NULL;
+	FUSE_NOTIFY_PROTO *d = NULL;
 
+	write_log_hide = 0;
 	EXPECT_EQ(ut_enqueue(FUSE_NOTIFY_RINGBUF_MAXLEN * 2), 0);
-	write_log_hide = 2;
 	for (i = 0; i < FUSE_NOTIFY_RINGBUF_MAXLEN * 2; i++) {
-		d = (uint8_t*)notify_buf_dequeue();
-		ASSERT_EQ(1, (d != NULL));
-		/* use d[offset] to skip func field */
-		EXPECT_EQ(0, memcmp(&fake_data, &(d[5]), sizeof(fake_data)));
+		d = notify_buf_dequeue();
+		ASSERT_TRUE(d != NULL);
+		EXPECT_EQ(fake_data, d->_[0]);
+		EXPECT_EQ(fake_data, d->_[10]);
 		FREE(d);
 		fake_data++;
 	}
@@ -305,10 +310,9 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop)
 
 TEST_F(NotifyBuffer_Initialized, destoryLoop_SemPostFail)
 {
-	struct timespec wait = {0, 1000000};
 	init_hfuse_ll_notify_loop();
 	hcfs_system->system_going_down = TRUE;
-	nanosleep(&wait, NULL);
+	nanosleep(&wait_1ms, NULL);
 
 	sem_post_call_count = 0;
 	sem_post_errno = 123;
@@ -326,20 +330,19 @@ TEST_F(NotifyBuffer_Initialized, destoryLoop_PthreadJoinFail)
 	pthread_join(fuse_nofify_thread, NULL);
 	destory_hfuse_ll_notify_loop();
 	EXPECT_STREQ(log_data[write_log_call_count % LOG_RECORD_SIZE],
-		     "Error destory_hfuse_ll_notify_loop: Failed to join "
+		     "[E] destory_hfuse_ll_notify_loop: Failed to join "
 		     "nofify_thread. No such process\n");
 }
 
 TEST_F(NotifyBuffer_Initialized, loopCallNotify)
 {
 	int32_t i;
-	struct timespec wait = {0, 100000};
 	init_hfuse_ll_notify_loop();
-	nanosleep(&wait, NULL);
+	nanosleep(&wait_1ms, NULL);
 	ut_enqueue(5);
 	for (i = 0; i < 100; i++) {
 		if (notify.len != 0)
-			nanosleep(&wait, NULL);
+			nanosleep(&wait_1ms, NULL);
 	}
 	hcfs_system->system_going_down = TRUE;
 	sem_post(&notify.not_empty);
@@ -350,7 +353,6 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotify)
 TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 {
 	int32_t task;
-	struct timespec wait = {0, 100000};
 	init_hfuse_ll_notify_loop();
 	write_log_hide = 2;
 	malloc_error_on = 1;
@@ -360,22 +362,24 @@ TEST_F(NotifyBuffer_Initialized, loopCallNotifyFailed)
 		if(task == 0)
 			break;
 		/* waiting loop to finish */
-		nanosleep(&wait, NULL);
+		nanosleep(&wait_1ms, NULL);
 	}
 	puts("UT: system_going_down");
 	hcfs_system->system_going_down = TRUE;
 	sem_post(&notify.not_empty);
 	pthread_join(fuse_nofify_thread, NULL);
 #define msg \
-	"Error hfuse_ll_notify_loop: Dequeue failed. Cannot allocate memory\n"
-	EXPECT_STREQ(log_data[write_log_call_count % LOG_RECORD_SIZE], msg);
+	"[E] _ring_buffer_dequeue: Cannot allocate memory\n"
+	EXPECT_STREQ(log_data[(write_log_call_count + LOG_RECORD_SIZE - 1) %
+			      LOG_RECORD_SIZE],
+		     msg);
 #undef msg
 }
 
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
 {
 	FUSE_NOTIFY_PROTO *this_data =
-	    (FUSE_NOTIFY_PROTO *)calloc(1, FUSE_NOTIFY_ENTRY_SIZE);
+	    (FUSE_NOTIFY_PROTO *)calloc(1, sizeof(FUSE_NOTIFY_PROTO));
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->func = DELETE;
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->name = (char *)malloc(1);
 	_do_hfuse_ll_notify_delete(this_data, RUN);
@@ -386,7 +390,7 @@ TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN)
 TEST_F(NotifyBuffer_Initialized, _do_hfuse_ll_notify_delete_RUN_Fail)
 {
 	FUSE_NOTIFY_PROTO *this_data =
-	    (FUSE_NOTIFY_PROTO *)calloc(1, FUSE_NOTIFY_ENTRY_SIZE);
+	    (FUSE_NOTIFY_PROTO *)calloc(1, sizeof(FUSE_NOTIFY_PROTO));
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->func = DELETE;
 	((FUSE_NOTIFY_DELETE_DATA *)this_data)->name = (char *)malloc(1);
 	fuse_lowlevel_notify_delete_error_on = 1;
@@ -490,13 +494,13 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_OverflowRingBuffer)
 
 	for (i = 1; i <= MP_TYPE_NUM; i++)
 		mount_global.ch[i] = fake_mp;
-	write_log_hide = 10;
-	for (i = 0; i < 10000; i++) {
+	write_log_hide = 0;
+	for (i = 0; i < 5000; i++) {
 		ret = hfuse_ll_notify_delete_mp(ch, 0, 0, name, 1, name);
 		EXPECT_EQ(ret, 0);
 	}
 	write_log(5, "notify.len %lu\n", notify.len);
-	EXPECT_EQ(notify.len, 10000 * MP_TYPE_NUM);
+	EXPECT_EQ(notify.len, 5000 * MP_TYPE_NUM);
 	FREE(ch);
 	FREE(name);
 	FREE(fake_mp);
@@ -510,6 +514,7 @@ TEST_F(NotifyBuffer_Initialized, notify_delete_mp_OverflowRingBuffer)
 		FREE(node);
 		node = next_node;
 	}
+	write_log_hide = 10;
 }
 
 TEST_F(NotifyBuffer_Initialized, notify_delete_mp_DiffCaseNameTriggerAllNotify)

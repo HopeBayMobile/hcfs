@@ -1475,7 +1475,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 	char meta_deleted;
-	int64_t metasize, metasize_blk, dirty_delta, unpin_dirty_delta;
+	int64_t metasize = 0, metasize_blk = 0, dirty_delta, unpin_dirty_delta;
 	BOOL meta_on_cloud;
 
 	meta_deleted = FALSE;
@@ -1624,11 +1624,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		 * TODO: Perhaps can move the actual block deletion to
 		 * the deletion loop as well
 		 */
-		if (this_inode_stat.size == 0)
-			total_blocks = 0;
-		else
-			total_blocks = ((this_inode_stat.size - 1) /
-				MAX_BLOCK_SIZE) + 1;
+		total_blocks =
+		    BLOCKS_OF_SIZE(this_inode_stat.size, MAX_BLOCK_SIZE);
 
 		current_page = -1;
 		for (count = 0; count < total_blocks; count++) {
@@ -1786,8 +1783,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	return ret;
 
 errcode_handle:
-	fclose(metafptr);
 	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
 	return errcode;
 }
 
@@ -2776,10 +2773,8 @@ int32_t inherit_xattr(ino_t parent_inode, ino_t this_inode,
 	}
 
 	/* Free and unlock */
-	if (key_buf)
-		free(key_buf);
-	if (value_buf)
-		free(value_buf);
+	free(key_buf);
+	free(value_buf);
 
 	ret = meta_cache_close_file(pbody_ptr);
 	if (ret < 0) {
@@ -2882,8 +2877,7 @@ int32_t restore_meta_structure(FILE *fptr)
 
 	/* Restore status and statistics */
 	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
-	total_blocks = (this_stat.size == 0) ? 0 :
-		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
+	total_blocks = BLOCKS_OF_SIZE(this_stat.size, MAX_BLOCK_SIZE);
 
 	current_page = -1;
 	write_page = FALSE;
@@ -3060,8 +3054,7 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 		return -EINVAL;
 	}
 
-	total_blocks = (this_stat.size == 0) ? 0 :
-		((this_stat.size - 1) / MAX_BLOCK_SIZE + 1);
+	total_blocks = BLOCKS_OF_SIZE(this_stat.size, MAX_BLOCK_SIZE);
 	current_page = -1;
 	write_page = FALSE;
 	cached_size = 0;
@@ -3237,10 +3230,7 @@ int32_t restore_meta_file(ino_t this_inode)
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errno));
-		if (fptr != NULL) {
-			fclose(fptr);
-			fptr = NULL;
-		}
+		fclose(fptr);
 		return -EIO;
 	}
 	if (!access(metapath, F_OK)) { /* Check again when get lock */

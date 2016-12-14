@@ -37,11 +37,12 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -207,8 +208,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 		PREAD(fileno(fptr), &tmpmeta, sizeof(FILE_META_TYPE),
 				sizeof(HCFS_STAT));
 
-		num_blocks = ((tmpstat.size == 0) ? 0
-				: (tmpstat.size - 1) / MAX_BLOCK_SIZE + 1);
+		num_blocks = BLOCKS_OF_SIZE(tmpstat.size, MAX_BLOCK_SIZE);
 
 		current_page = -1;
 		for (bcount = 0; bcount < num_blocks; bcount++) {
@@ -1172,11 +1172,7 @@ store in some other file */
 #endif
 
 		/* Compute number of blocks */
-		if (toupload_size == 0)
-			total_blocks = 0;
-		else
-			total_blocks = ((toupload_size - 1)
-				/ MAX_BLOCK_SIZE) + 1;
+		total_blocks = BLOCKS_OF_SIZE(toupload_size, MAX_BLOCK_SIZE);
 
 		/* Begin to upload blocks */
 		page_pos = 0;

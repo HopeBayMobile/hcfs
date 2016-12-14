@@ -212,7 +212,7 @@ int32_t init_package_uid_list(char *plistpath)
 	FILE *src = NULL;
 	int32_t errcode = 0, ret_num;
 	char fbuf[4100], *sptr;
-	regex_t re = {0};
+	regex_t re = {.re_nsub = 0};
 	regmatch_t pm[10];
 	const size_t nmatch = 10;
 	char ebuff[1024];

@@ -53,7 +53,7 @@ typedef struct {
 } _PACKED FUSE_NOTIFY_PROTO;
 
 typedef struct FUSE_NOTIFY_LINKED_NODE {
-	void *data;
+	FUSE_NOTIFY_PROTO *data;
 	struct FUSE_NOTIFY_LINKED_NODE *next;
 } FUSE_NOTIFY_LINKED_NODE;
 
@@ -76,8 +76,8 @@ fuse_notify_fn _do_hfuse_ll_notify_inval_ent;
 
 int32_t init_notify_buf(void);
 void destory_notify_buf(void);
-int32_t notify_buf_enqueue(const void *const notify);
-FUSE_NOTIFY_PROTO *notify_buf_dequeue();
+int32_t notify_buf_enqueue(const FUSE_NOTIFY_PROTO *notify);
+FUSE_NOTIFY_PROTO *notify_buf_dequeue(void);
 
 int32_t init_hfuse_ll_notify_loop(void);
 int32_t destory_hfuse_ll_notify_loop(void);

@@ -35,6 +35,8 @@ void __attribute__((constructor)) Init(void)
 #undef X
 }
 
+int32_t write_log_hide;
+
 void reset_ut_helper(void)
 {
 #define X(func)                                                                \
@@ -48,6 +50,7 @@ void reset_ut_helper(void)
 	sem_init_errno = EINVAL;
 	strndup_errno = ENOMEM;
 	malloc_errno = ENOMEM;
+	write_log_hide = 11;
 }
 
 /*
@@ -55,7 +58,6 @@ void reset_ut_helper(void)
  */
 #undef write_log
 char log_data[LOG_RECORD_SIZE][1024];
-int32_t write_log_hide = 11;
 int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;

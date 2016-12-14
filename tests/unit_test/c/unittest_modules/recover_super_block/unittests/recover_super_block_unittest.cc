@@ -176,6 +176,21 @@ int32_t custom_meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
         return 0;
 }
 
+void __attribute__((constructor)) Init(void)
+{
+#define CUSTOM_FAKE(F) F##_fake.custom_fake = custom_##F;
+		/* Fake functions */
+		CUSTOM_FAKE(fopen);
+		CUSTOM_FAKE(fwrite);
+		CUSTOM_FAKE(pread);
+		CUSTOM_FAKE(pwrite);
+		CUSTOM_FAKE(write_super_block_entry);
+		CUSTOM_FAKE(read_super_block_entry);
+		CUSTOM_FAKE(meta_cache_lock_entry);
+		CUSTOM_FAKE(meta_cache_open_file);
+#undef CUSTOM_FAKE
+}
+
 int32_t change_system_meta(int64_t arg1 __attribute__((unused)),
 			   int64_t arg2 __attribute__((unused)),
 			   int64_t arg3 __attribute__((unused)),
@@ -334,18 +349,6 @@ class RecoverSBEnvironment : public ::testing::Environment
 {
 	public:
 	virtual void SetUp() {
-#define CUSTOM_FAKE(F) F##_fake.custom_fake = custom_##F;
-		/* Fake functions */
-		CUSTOM_FAKE(fopen);
-		CUSTOM_FAKE(fwrite);
-		CUSTOM_FAKE(pread);
-		CUSTOM_FAKE(pwrite);
-		CUSTOM_FAKE(write_super_block_entry);
-		CUSTOM_FAKE(read_super_block_entry);
-		CUSTOM_FAKE(meta_cache_lock_entry);
-		CUSTOM_FAKE(meta_cache_open_file);
-#undef CUSTOM_FAKE
-
 		mkdir(MOCK_METAPATH, S_IRWXU | S_IRWXG | S_IRWXO);
 
 		/* Mock config info */
@@ -1292,19 +1295,19 @@ TEST_F(recover_sb_queue_workerTest, RecoveryAborted)
 	sys_super_block->sb_recovery_meta.is_ongoing = TRUE;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(-1, retval);
+	EXPECT_EQ(-1, *(int *)retval);
 	sys_super_block->sb_recovery_meta.is_ongoing = FALSE;
 
 	sys_super_block->sync_point_is_set = TRUE;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(-1, retval);
+	EXPECT_EQ(-1, *(int *)retval);
 	sys_super_block->sync_point_is_set = FALSE;
 
 	hcfs_system->system_restoring = RESTORING_STAGE1;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(-1, retval);
+	EXPECT_EQ(-1, *(int *)retval);
 	hcfs_system->system_restoring = NOT_RESTORING;
 }
 
@@ -1336,7 +1339,7 @@ TEST_F(recover_sb_queue_workerTest, Success)
 	write_super_block_entry_use_real = 1;
 	pthread_create(&worker_t, NULL, &recover_sb_queue_worker, NULL);
 	EXPECT_EQ(0, pthread_join(worker_t, &retval));
-	EXPECT_EQ(0, retval);
+	EXPECT_EQ(0, *(int *)retval);
 	write_super_block_entry_use_real = 0;
 
 	/* Verify */

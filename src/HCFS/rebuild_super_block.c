@@ -12,8 +12,8 @@
 #include "rebuild_super_block.h"
 
 #include <unistd.h>
+#include <pthread.h>
 #include <sys/file.h>
-#include <string.h>
 
 #include "logger.h"
 #include "errno.h"

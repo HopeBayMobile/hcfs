@@ -16,13 +16,13 @@
 #include "hcfs_fromcloud.h"
 
 #include <time.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <sys/mman.h>
 #include <sys/file.h>
 #include <inttypes.h>
 #include <jansson.h>
@@ -858,7 +858,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	flock(fileno(fptr), LOCK_UN);
 
 	total_size = tempstat.size;
-	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
+	total_blocks = BLOCKS_OF_SIZE(total_size, MAX_BLOCK_SIZE);
 
 	fetch_error_download_path(error_path, inode);
 	if (access(error_path, F_OK) == 0) /* Delete error path */

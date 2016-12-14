@@ -65,7 +65,7 @@ function main()
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	#DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
-	DOCKER_IMAGE="docker:5000/${BOXNAME}:source-only-6.0.0_r26_MDB08M_20160623"
+	DOCKER_IMAGE="docker:5000/${BOXNAME}:source-only-6.0.0_r26_MDB08M_20161201"
 	echo ================================================================================
 	echo $IMAGE_TYPE
 	echo $BRANCH_IN_5X
@@ -155,7 +155,7 @@ function update_system_source() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
 	git pull origin '${BRANCH_IN_5X}' && \
-	git submodule update --init --recursive && \
+	git submodule update --init --recursive --remote && \
 	git submodule foreach git pull origin '${BRANCH_FOR_SUBMODULE}'"'
 }
 function pull_hcfs_binaay() {
