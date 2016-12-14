@@ -221,6 +221,9 @@ int32_t init_package_uid_list(char *plistpath)
 	size_t pkg_cnt = 0;
 	size_t i;
 
+	if (pkg_info_list_head)
+		destroy_package_uid_list();
+
 #define namepat " name=\"([^\"]+)\""
 #define uidpat " (sharedUserId|userId)=\"([[:digit:]]+)\""
 	errcode =
@@ -262,14 +265,13 @@ int32_t init_package_uid_list(char *plistpath)
 			goto errcode_handle;
 		}
 		/* Append package node to list */
-		if (pkg_info_list_head == NULL) {
+		if (pkg_info_list_head == NULL)
 			pkg_info_list_head = tmp_pkg;
-			last_node = tmp_pkg;
-		}
-		if (last_node && last_node != tmp_pkg) {
+
+		/* Update last node */
+		if (last_node && last_node != tmp_pkg)
 			last_node->next = tmp_pkg;
-			last_node = tmp_pkg;
-		}
+		last_node = tmp_pkg;
 
 		/* Set name */
 		strncpy(tmp_pkg->name, &sptr[pm[1].rm_so],
