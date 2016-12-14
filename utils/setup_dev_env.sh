@@ -199,6 +199,7 @@ post_install_docker() {
 
 	# Setup Docker config
 	if ! sudo grep -q "docker:5000" /etc/docker/daemon.json; then
+		sudo mkdir -p /etc/docker
 		echo "Updating /etc/docker/daemon.json"
 		cat <<-EOF |
 		{ "insecure-registries":[
