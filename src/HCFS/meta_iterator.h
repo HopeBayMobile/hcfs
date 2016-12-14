@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: meta_iterator.c
+* Abstract: The c header file for iterator operations
+*
+* Revision History
+* 2016/10/20 Kewei created this file.
+*
+**************************************************************************/
+
 #ifndef SRC_HCFS_META_ITERATOR_H_
 #define SRC_HCFS_META_ITERATOR_H_
 

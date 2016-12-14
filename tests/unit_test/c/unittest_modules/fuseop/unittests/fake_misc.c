@@ -20,6 +20,7 @@
 #include "mount_manager.h"
 #include "params.h"
 #include "xattr_ops.h"
+#include "meta_iterator.h"
 
 #include "fake_misc.h"
 
@@ -1282,5 +1283,12 @@ int32_t check_data_location(ino_t this_inode)
 	return 0;
 }
 
-DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr) { return NULL; }
-void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter) {}
+DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
+{
+	return (DIR_ENTRY_ITERATOR *)1;
+}
+
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter)
+{
+	return;
+}
