@@ -446,6 +446,17 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			*result_index = -1;
 			break;
 		}
+		if (strcmp(childname,"base.apk") == 0) {
+			result_page->dir_entries[0].d_ino = 15;
+			*result_index = 0;
+			break;
+		}
+		if (strcmp(childname, "com.example.test") == 0) {
+			result_page->dir_entries[0].d_ino = 13;
+			*result_index = 0;
+			break;
+		}
+
 		break;
 	default:
 		break;

@@ -42,5 +42,7 @@ int32_t query_minapk_data(ino_t parent_ino,
 int32_t remove_minapk_data(_UNUSED ino_t parent_ino,
 			   _UNUSED const char *apk_name)
 {
+	remove_apk_success = 1;
+	strcpy(verified_apk_name, apk_name);
 	return 0;
 }

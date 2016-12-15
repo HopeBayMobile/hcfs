@@ -190,6 +190,10 @@ int32_t lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 			this_inode = TEST_APPDIR_INODE;
 			this_type = D_ISDIR;
 		}
+		if (strcmp(childname, "base.apk") == 0) {
+			this_inode = 15;
+			this_type = D_ISREG;
+		}
 	}
 
 	if (parent == 6) {
@@ -1283,12 +1287,36 @@ int32_t check_data_location(ino_t this_inode)
 	return 0;
 }
 
+DIR_ENTRY_ITERATOR *mock_next(DIR_ENTRY_ITERATOR *iter)
+{
+	if (iter->now_entry) {
+		free(iter->now_entry);
+		iter->now_entry = NULL;
+		errno = ENOENT;
+		return NULL;
+	}
+
+	iter->now_entry = calloc(sizeof(DIR_ENTRY), 1);
+	iter->now_entry->d_type = D_ISREG;
+	strcpy(iter->now_entry->d_name, "kewei.apk");
+	return iter;
+}
+
 DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
 {
-	return (DIR_ENTRY_ITERATOR *)1;
+	DIR_ENTRY_ITERATOR *iter =
+	    (DIR_ENTRY_ITERATOR *)calloc(sizeof(DIR_ENTRY_ITERATOR), 1);
+	iter->base.next = (void *)&mock_next;
+	return iter;
 }
 
 void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter)
 {
-	return;
+	if (iter) {
+		if (iter->now_entry) {
+			free(iter->now_entry);
+			iter->now_entry = NULL;
+		}
+		free(iter);
+	}
 }

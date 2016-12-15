@@ -36,4 +36,6 @@ time_t updated_mtime;
 struct timespec updated_atim;
 struct timespec updated_mtim;
 
+int32_t remove_apk_success;
+char verified_apk_name[400];
 #define CORRECT_VALUE_SIZE 24269

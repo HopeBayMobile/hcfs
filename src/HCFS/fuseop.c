@@ -2129,7 +2129,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	ino_t parent_inode1, parent_inode2, self_inode, old_target_inode;
 	int32_t ret_val, ret;
 	HCFS_STAT tempstat, old_target_stat;
-	mode_t self_mode, old_target_mode;
+	mode_t self_mode = 0, old_target_mode = 0;
 	DIR_META_TYPE tempmeta;
 	META_CACHE_ENTRY_STRUCT *body_ptr = NULL, *old_target_ptr = NULL;
 	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
@@ -2400,7 +2400,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		ret_val = meta_cache_lookup_file_data(old_target_inode,
 					&old_target_stat, NULL, NULL,
 						0, old_target_ptr);
-
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2816,7 +2815,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 		/* Both check old name and new name. */
 		for (i = 0; i < 2; i++) {
-			if (!S_ISREG(mode[i]))
+			if (!S_ISREG(mode[i]) && mode[i] != 0)
 				continue;
 			if (_is_apk(selfname[i])) {
 				ret = remove_minapk_data(parent_inode[i],

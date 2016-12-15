@@ -709,6 +709,71 @@ TEST_F(hfuse_renameTest, RenameFile) {
   EXPECT_EQ(ret_val, 0);
 }
 
+TEST_F(hfuse_renameTest, RenameToApkFile_UpdateMinapkTable)
+{
+	int32_t ret;
+
+	before_update_file_data = TRUE;
+	root_updated = FALSE;
+	fake_block_status = ST_NONE;
+	after_update_block_page = FALSE;
+	tmp_apk_location = 0;
+	cached_minapk = FALSE;
+
+	remove_apk_success = 0;
+	hcfs_system->use_minimal_apk = TRUE;
+  	exists_minapk = TRUE;
+	ret = rename("/tmp/test_fuse/testfile1",
+		     "/tmp/test_fuse/com.example.test/base.apk");
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(1, remove_apk_success);
+	EXPECT_STREQ(verified_apk_name, "base.apk");
+}
+
+TEST_F(hfuse_renameTest, RenameToMinApkFile_UpdateMinapkTable)
+{
+	int32_t ret;
+
+	before_update_file_data = TRUE;
+	root_updated = FALSE;
+	fake_block_status = ST_NONE;
+	after_update_block_page = FALSE;
+	tmp_apk_location = 0;
+	cached_minapk = FALSE;
+
+	remove_apk_success = 0;
+	hcfs_system->use_minimal_apk = TRUE;
+  	exists_minapk = TRUE;
+	ret = rename("/tmp/test_fuse/testfile1",
+		     "/tmp/test_fuse/com.example.test/.basemin");
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(1, remove_apk_success);
+	EXPECT_STREQ(verified_apk_name, "base.apk");
+}
+
+TEST_F(hfuse_renameTest, RenameToMinApkFile_UpdateMinapkTablexxx)
+{
+	int32_t ret;
+
+	before_update_file_data = TRUE;
+	root_updated = FALSE;
+	fake_block_status = ST_NONE;
+	after_update_block_page = FALSE;
+	tmp_apk_location = 0;
+	cached_minapk = FALSE;
+
+	remove_apk_success = 0;
+	hcfs_system->use_minimal_apk = TRUE;
+  	exists_minapk = TRUE;
+	ret = rename("/tmp/test_fuse/com.example.test",
+		     "/tmp/test_fuse/testdir1/testfile");
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(1, remove_apk_success);
+	EXPECT_STREQ(verified_apk_name, "kewei.apk");
+}
+
+
+
 /* End of the test case for the function hfuse_rename */
 
 /* Begin of the test case for the function hfuse_chmod */
@@ -3551,3 +3616,55 @@ TEST_F(hfuse_ll_lookup, UseMinimalApk) {
 
 /* End of the test case for the function hfuse_ll_lookup */
 
+class hfuse_ll_unlinkTest : public ::testing::Test
+{
+	protected:
+	virtual void SetUp()
+	{
+		before_update_file_data = TRUE;
+		root_updated = FALSE;
+		fake_block_status = ST_NONE;
+		after_update_block_page = FALSE;
+		tmp_apk_location = 0;
+		cached_minapk = FALSE;
+		exists_minapk = FALSE;
+		hcfs_system->use_minimal_apk = FALSE;
+		hcfs_system->systemdata.system_size = 12800000;
+		hcfs_system->systemdata.cache_size = 1200000;
+		hcfs_system->systemdata.cache_blocks = 13;
+		hcfs_system->systemdata.pinned_size = 10000;
+	}
+
+	virtual void TearDown()
+	{
+		cached_minapk = FALSE;
+		exists_minapk = FALSE;
+		tmp_apk_location = 0;
+		hcfs_system->use_minimal_apk = FALSE;
+	}
+};
+
+TEST_F(hfuse_ll_unlinkTest, UnlinkAPKFile_RemoveEntry)
+{
+	int32_t ret;
+
+	remove_apk_success = 0;
+	hcfs_system->use_minimal_apk = TRUE;
+	ret = unlink("/tmp/test_fuse/com.example.test/base.apk");
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(1, remove_apk_success);
+	EXPECT_STREQ(verified_apk_name, "base.apk");
+}
+
+TEST_F(hfuse_ll_unlinkTest, UnlinkMinimalApkFile_RemoveEntry)
+{
+	int32_t ret;
+
+	remove_apk_success = 0;
+	hcfs_system->use_minimal_apk = TRUE;
+  	exists_minapk = TRUE;
+	ret = unlink("/tmp/test_fuse/com.example.test/.basemin");
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(1, remove_apk_success);
+	EXPECT_STREQ(verified_apk_name, "base.apk");
+}
