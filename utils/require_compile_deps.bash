@@ -21,3 +21,8 @@ packages+=" libsqlite3-dev"
 packages+=" libjansson-dev"
 packages+=" libcap-dev"
 #packages+=" python3-dev python3-setuptools python3-pip"
+
+# libzip
+packages+=" zlib1g-dev"
+packages+=" wget"
+export post_pkg_install+=" install_libzip"
