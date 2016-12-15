@@ -233,45 +233,6 @@ buildbox() {
 	packages+=" zip"
 }
 
-install_libzip() {
-	TAR_FILE_URL="https://nih.at/libzip/libzip-1.1.3.tar.gz"
-	TAR_FILE="${TAR_FILE_URL##*/}"
-
-	BASE_DIR="/tmp"
-	SOURCE_DIR="libzip-1.1.3"
-
-	CONF_HEADER_SRC="/usr/local/lib/libzip/include/zipconf.h"
-	CONF_HEADER_DEST="/usr/local/include/zipconf.h"
-
-	if [ -f ${CONF_HEADER_DEST} ]
-	then
-		echo "Libzip already installed.\nSkip installation."
-		return
-	fi
-
-	pushd ${BASE_DIR}
-
-	echo "Download and extract libzip source..."
-	sudo rm -rf ${BASE_DIR}/${SOURCE_DIR}
-	sudo rm -rf ${BASE_DIR}/${TAR_FILE}
-	wget ${TAR_FILE_URL}
-	tar -zxvf ${TAR_FILE}
-
-	echo "Install libzip..."
-	cd ${BASE_DIR}/${SOURCE_DIR}
-	./configure
-	make
-	sudo make install
-	sudo ln -s ${CONF_HEADER_SRC} ${CONF_HEADER_DEST}
-
-	echo "Clean temp files..."
-	sudo rm -rf ${BASE_DIR}/${SOURCE_DIR}
-	sudo rm -rf ${BASE_DIR}/${TAR_FILE}
-
-	echo "Libzip installation done!!"
-	popd
-}
-
 # init for each mode
 packages=""
 for i in $(echo $setup_dev_env_mode | sed "s/,/ /g")
