@@ -15,6 +15,10 @@
 # History:
 #
 # $Log: nexus-install-gapps.sh,v $
+# Revision 1.19  2016/11/29 10:30:00  Jethro
+# update image and use sideload again.
+# On windows, ADB is much stable within VMware player rather than Virtualbox.
+#
 # Revision 1.18  2016/08/24 14:11:00  wyliang
 # Add missed "-s $TARGET_DEVICE" in FlashImages()
 #
@@ -79,8 +83,8 @@ SDK_PATH=$HOME/android-sdk-linux
 
 RECOVERY_URL=https://dl.twrp.me/bullhead/twrp-3.0.2-0-bullhead.img
 RECOVERY_FILE=$(basename $RECOVERY_URL)
-GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20160710/open_gapps-arm64-6.0-pico-20160710.zip
-GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20160710.zip
+GAPPS_URL=https://github.com/opengapps/arm64/releases/download/20161025/open_gapps-arm64-6.0-pico-20161125.zip
+GAPPS_URL=ftp://nas/ubuntu/CloudDataSolution/HCFS_android/resources/open_gapps-arm64-6.0-pico-20161125.zip
 GAPPS_FILE=$(basename $GAPPS_URL)
 FACTORY_URL=https://dl.google.com/dl/android/aosp/bullhead-mtc19v-factory-f3a6bee5.tgz
 FACTORY_FILE=$(basename $FACTORY_URL)
@@ -726,14 +730,11 @@ InstallOpenGapps() {
   while true; do
     case `GetMode` in
     recovery)
-      echo ">> Now wipe the device"
-      adb -s $TARGET_DEVICE shell twrp wipe cache
-      WaitMode "recovery" 30
-      sleep 5
-      echo ">> Upload Gapps into the device"
-      adb -s $TARGET_DEVICE push "$GAPPS_FILE" "/cache/$GAPPS_FILE"
-      echo ">> Install Gapps"
-      adb -s $TARGET_DEVICE shell twrp install "/cache/$GAPPS_FILE"
+      echo ">> Sideload gapps image"
+      WaitMode "recovery" 60
+      adb -s $TARGET_DEVICE shell twrp sideload
+      WaitMode "sideload" 60
+      adb -s $TARGET_DEVICE sideload "$GAPPS_FILE"
       # wipe cache again
       WaitMode "recovery" 30
       sleep 2
@@ -771,7 +772,7 @@ GrantPermissions() {
     adb -s $TARGET_DEVICE reboot
   fi
 
-  if Wait4App2Appear gms 80; then
+  if Wait4App2Appear gms 500; then
     echo ">> Start to grant permissions"
     adb -s $TARGET_DEVICE shell pm grant com.google.android.setupwizard android.permission.READ_PHONE_STATE
     adb -s $TARGET_DEVICE shell pm grant com.google.android.gms android.permission.ACCESS_FINE_LOCATION
