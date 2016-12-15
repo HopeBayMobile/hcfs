@@ -65,6 +65,8 @@ extern sem_t mini_apk_list_sem;
 
 void init_minimal_apk_list();
 
+void destroy_minimal_apk_list();
+
 int32_t create_minimal_apk(char *pkg_name);
 
 void *create_minimal_apk_async(void *ptr);

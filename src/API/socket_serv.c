@@ -945,6 +945,10 @@ int32_t main()
 
 	write_log(0, "Starting HCFSAPID Server...");
 	init_server();
-	write_log(0, "End HCFSAPID Server");
+
+	/* deconstruct */
+	destroy_minimal_apk_list();
+
+	write_log(0, "HCFSAPID Server Terminated.");
 	return 0;
 }

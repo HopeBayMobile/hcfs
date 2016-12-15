@@ -39,6 +39,12 @@ void init_minimal_apk_list()
 	return;
 }
 
+void destroy_minimal_apk_list()
+{
+	sem_destroy(&mini_apk_list_sem);
+	return;
+}
+
 /* Helper function to add an apk to ongoing list
  */
 void _apk_list_add(char *pkg_name) {
@@ -46,10 +52,15 @@ void _apk_list_add(char *pkg_name) {
 
 	apk_entry =
 	    (LL_ONGOING_MINI_APK *)calloc(1, sizeof(LL_ONGOING_MINI_APK));
-	apk_entry->pkg_name = (char *)calloc(1, strlen(pkg_name) + 1);
+	apk_entry->pkg_name = strdup(pkg_name);
 	apk_entry->next = NULL;
 
-	strcpy(apk_entry->pkg_name, pkg_name);
+	if (apk_entry->pkg_name == NULL) {
+		WRITE_LOG(
+		    0, "Failed to alloc memory for new apk entry. Error - %d",
+		    errno);
+		return;
+	}
 
 	if (ongoing_mini_apk_list == NULL) {
 		ongoing_mini_apk_list = apk_entry;
