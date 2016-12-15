@@ -252,18 +252,21 @@ install_libzip() {
 	pushd ${BASE_DIR}
 
 	echo "Download and extract libzip source..."
+	sudo rm -rf ${BASE_DIR}/${SOURCE_DIR}
+	sudo rm -rf ${BASE_DIR}/${TAR_FILE}
 	wget ${TAR_FILE_URL}
 	tar -zxvf ${TAR_FILE}
 
 	echo "Install libzip..."
 	cd ${BASE_DIR}/${SOURCE_DIR}
 	./configure
-	make install
-	ln -s ${CONF_HEADER_SRC} ${CONF_HEADER_DEST}
+	make
+	sudo make install
+	sudo ln -s ${CONF_HEADER_SRC} ${CONF_HEADER_DEST}
 
 	echo "Clean temp files..."
-	rm -rf ${BASE_DIR}/${SOURCE_DIR}
-	rm -rf ${BASE_DIR}/${TAR_FILE}
+	sudo rm -rf ${BASE_DIR}/${SOURCE_DIR}
+	sudo rm -rf ${BASE_DIR}/${TAR_FILE}
 
 	echo "Libzip installation done!!"
 	popd
