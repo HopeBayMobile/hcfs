@@ -20,9 +20,13 @@
  * Structure of a node in the linked list. "key" and "data" should be
  * defined by user.
  */
+typedef void hash_key_t;
+typedef void hash_data_t;
+typedef void data_update_t;
+
 typedef struct LIST_NODE {
-	void *key;
-	void *data;
+	hash_key_t *key;
+	hash_data_t *data;
 	struct LIST_NODE *next;
 } LIST_NODE;
 
@@ -47,9 +51,10 @@ typedef struct LIST_HEAD {
  * When using "global lock", it means all buckets in the hash table can not
  * be accessed.
  */
-typedef int32_t key_cmp_ftn_t(const void *, const void *);
-typedef int32_t data_update_ftn_t(void *data, void *update_data);
-typedef int32_t hash_ftn_t(const void *key);
+typedef int32_t key_cmp_ftn_t(const hash_key_t *, const hash_key_t *);
+typedef int32_t data_update_ftn_t(hash_data_t *data,
+				  data_update_t *update_data);
+typedef int32_t hash_ftn_t(const hash_key_t *key);
 
 typedef struct HASH_LIST {
 	uint32_t table_size;
@@ -76,16 +81,16 @@ void destroy_hash_list(HASH_LIST *hash_list);
 
 /* Following operations will lock the bucket "key" belonging to. */
 int32_t insert_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       const void *data);
+			       const hash_key_t *key,
+			       const hash_data_t *data);
 int32_t lookup_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       void *data);
+			       const hash_key_t *key,
+			       hash_data_t *data);
 int32_t remove_hash_list_entry(HASH_LIST *hash_list, const void *key);
 int32_t update_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       void *data,
-			       void *update_data);
+			       const hash_key_t *key,
+			       hash_data_t *data,
+			       data_update_t *update_data);
 
 /* Global lock will lock whole hash table. */
 void hash_list_global_lock(HASH_LIST *hash_list);
