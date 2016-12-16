@@ -1343,10 +1343,10 @@ void api_module(void *index)
 		}
 	/* default to return retcode */
 return_retcode:
-		ret_len = sizeof(int32_t);
-		send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
-		send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
-		goto no_return;
+	ret_len = sizeof(int32_t);
+	send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+	send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+	goto no_return;
 return_llretval:
 	ret_len = sizeof(int64_t);
 	send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
