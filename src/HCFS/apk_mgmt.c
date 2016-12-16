@@ -85,8 +85,8 @@ int32_t _invalid_all_minapk(void)
 				  APP_VOL_NAME);
 			break;
 		}
-		while (iterate_minapk_table(&parent_ino, apk_name,
-					    &minapk_ino) != -ENOENT) {
+		while ((ret = iterate_minapk_table(&parent_ino, apk_name,
+						   &minapk_ino)) == 0) {
 			apk_name_len = strnlen(apk_name, MAX_FILENAME_LEN - 1);
 			hfuse_ll_notify_inval_ent(mount_info->chan_ptr,
 						  parent_ino, apk_name,
@@ -319,6 +319,7 @@ int32_t iterate_minapk_table(ino_t *parent_ino,
 		goto out;
 	}
 
+	/* lookup table has been locked. Just iterate all entries. */
 	iter = iter_next(minapk_lookup_iter);
 	if (!iter) {
 		ret = -errno;
