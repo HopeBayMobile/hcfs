@@ -25,13 +25,7 @@
 #define MP_READ 2
 #define MP_WRITE 3
 #endif
-/*
-typedef struct {
-	ino_t d_ino;
-	char d_name[MAX_FILENAME_LEN+1];
-	char d_type;
-} DIR_ENTRY;
-*/
+
 typedef struct {
 	const char *name;
 	int32_t code;
@@ -77,7 +71,10 @@ CMD cmd_list[] = { { "create", CREATEVOL },
 		   { "check_restoration_status", CHECK_RESTORATION_STATUS },
 		   { "notify_applist_change", NOTIFY_APPLIST_CHANGE },
 		   { "toggle_use_minimal_apk", TOGGLE_USE_MINIMAL_APK },
-		   { "get_minimal_apk_status", GET_MINIMAL_APK_STATUS } };
+		   { "get_minimal_apk_status", GET_MINIMAL_APK_STATUS },
+		   { "high-pin", PIN},
+		   { "pin", PIN},
+		   { "unpin", UNPIN} };
 enum { CMD_SIZE = sizeof(cmd_list) / sizeof(cmd_list[0]) };
 
 #endif /* GW20_SRC_HCFSVOL_H_ */

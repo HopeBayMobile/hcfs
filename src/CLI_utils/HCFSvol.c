@@ -37,7 +37,8 @@ void usage(void){
 
 int32_t main(int32_t argc, char **argv)
 {
-	int32_t fd, size_msg, status, count, retcode, code, fsname_len, cmd_idx;
+	int32_t fd, size_msg, status, count, retcode, code, fsname_len, cmd_idx,
+	    i;
 
 	uint32_t cmd_len, reply_len, total_recv, to_recv;
 	int32_t total_entries;
@@ -53,6 +54,12 @@ int32_t main(int32_t argc, char **argv)
 	int32_t first_size, rest_size, loglevel;
 	ssize_t str_size;
 	char vol_mode;
+	struct stat tempstat;
+	ino_t this_inode;
+	int64_t reserved_size = 0;
+	uint32_t num_inodes = 0;
+	ino_t inode_list[1000];
+	char pin_type;
 
 	code = -1;
 	if (argc < 2) {
@@ -77,7 +84,11 @@ int32_t main(int32_t argc, char **argv)
 	strncpy(addr.sun_path, shm_hcfs_reporter, sizeof(addr.sun_path));
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
-	printf("status is %d, %s.\n", status, strerror(errno));
+	if (status) {
+		fprintf(stderr, "connection failed. Error: %s.\n",
+			strerror(errno));
+		exit(-errno);
+	}
 	switch (code) {
 	case TERMINATE:
 	case UNMOUNTALL:
@@ -518,6 +529,64 @@ int32_t main(int32_t argc, char **argv)
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n", -retcode,
 			       strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
+	case PIN:
+	case UNPIN:
+		if (!strcasecmp(argv[1], "pin"))
+			pin_type = 1;
+		else if (!strcasecmp(argv[1], "high-pin"))
+			pin_type = 2;
+		if (argc < 3) {
+			fprintf(stderr,
+				"Usage: HCFSvol pin/unpin/high-pin <path1> "
+				"<path2>...\n");
+			exit(-EINVAL);
+		}
+		num_inodes = 0;
+		for (i = 2; i < argc; i++) {
+			if (stat(argv[i], &tempstat) < 0) {
+				fprintf(stderr, "%s does not exist\n", argv[i]);
+				exit(-ENOENT);
+			} else {
+				this_inode = tempstat.st_ino;
+			}
+			inode_list[num_inodes] = this_inode;
+			num_inodes++;
+			printf("%s - inode %" PRIu64 " - num_inode %d\n",
+			       argv[i], (uint64_t)this_inode, num_inodes);
+		}
+		if (code == PIN) {
+			cmd_len = sizeof(int64_t) + sizeof(char) +
+				  sizeof(uint32_t) + num_inodes * sizeof(ino_t);
+			memcpy(buf, &reserved_size,
+			       sizeof(int64_t)); /* Pre-allocating pinned size
+						    (be allowed to be 0) */
+			memcpy(buf + sizeof(int64_t), &pin_type, sizeof(char));
+			memcpy(buf + sizeof(int64_t) + sizeof(char),
+			       &num_inodes, /* # of inodes */
+			       sizeof(uint32_t));
+			memcpy(buf + sizeof(int64_t) + sizeof(char) +
+				   sizeof(uint32_t), /* inode array */
+			       inode_list,
+			       sizeof(ino_t) * num_inodes);
+		} else if (code == UNPIN) {
+			cmd_len = sizeof(uint32_t) + num_inodes * sizeof(ino_t);
+			memcpy(buf, &num_inodes,
+			       sizeof(uint32_t));      /* # of inodes */
+			memcpy(buf + sizeof(uint32_t), /* inode array */
+			       inode_list, sizeof(ino_t) * num_inodes);
+		}
+		send(fd, &code, sizeof(uint32_t), 0);
+		send(fd, &cmd_len, sizeof(uint32_t), 0);
+		send(fd, buf, cmd_len, 0);
+
+		recv(fd, &reply_len, sizeof(uint32_t), 0);
+		recv(fd, &retcode, sizeof(int32_t), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
 		break;

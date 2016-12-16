@@ -86,7 +86,7 @@ int32_t insert_hash_list_entry(HASH_LIST *hash_list,
 int32_t lookup_hash_list_entry(HASH_LIST *hash_list,
 			       const hash_key_t *key,
 			       hash_data_t *data);
-int32_t remove_hash_list_entry(HASH_LIST *hash_list, const void *key);
+int32_t remove_hash_list_entry(HASH_LIST *hash_list, const hash_key_t *key);
 int32_t update_hash_list_entry(HASH_LIST *hash_list,
 			       const hash_key_t *key,
 			       hash_data_t *data,

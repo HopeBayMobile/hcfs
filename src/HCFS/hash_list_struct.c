@@ -184,8 +184,8 @@ out:
  * @return 0 on success, otherwise negation of error code.
  */
 int32_t insert_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       const void *data)
+			       const hash_key_t *key,
+			       const hash_data_t *data)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now;
@@ -272,8 +272,8 @@ out:
  * @return 0 on success, otherwise negation of error code.
  */
 int32_t lookup_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       void *data)
+			       const hash_key_t *key,
+			       hash_data_t *data)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now;
@@ -326,7 +326,7 @@ out:
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t remove_hash_list_entry(HASH_LIST *hash_list, const void *key)
+int32_t remove_hash_list_entry(HASH_LIST *hash_list, const hash_key_t *key)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now, *prev, *hit_node = NULL;
@@ -393,8 +393,10 @@ out:
  *
  * @return 0 on success, otherwise negation of error code.
  */
-int32_t update_hash_list_entry(HASH_LIST *hash_list, const void *key,
-		void *data, void *update_data)
+int32_t update_hash_list_entry(HASH_LIST *hash_list,
+			       const hash_key_t *key,
+			       hash_data_t *data,
+			       data_update_t *update_data)
 {
 	LIST_HEAD *list_head;
 	LIST_NODE *now;
