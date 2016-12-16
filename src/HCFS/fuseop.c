@@ -41,7 +41,9 @@
 **************************************************************************/
 
 #define FUSE_USE_VERSION 29
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "fuseop.h"
 

@@ -32,7 +32,9 @@ meta is created and going to be synced.
 TODO: Cleanup temp files in /dev/shm at system startup
 */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "hcfs_tocloud.h"
 
 #include <unistd.h>

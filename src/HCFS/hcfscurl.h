@@ -13,7 +13,9 @@
 #ifndef GW20_HCFS_HCFSCURL_H_
 #define GW20_HCFS_HCFSCURL_H_
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <curl/curl.h>

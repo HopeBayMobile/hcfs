@@ -11,7 +11,9 @@
 *
 **************************************************************************/
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "fuse_notify.h"
 
 #include <errno.h>

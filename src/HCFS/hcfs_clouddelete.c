@@ -27,7 +27,9 @@ check the upload threads and sync threads to find out if there are any pending
 uploads. It must wait until those are cleared. It must then wait for any
 additional pending meta or block deletion for this inode to finish.*/
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "hcfs_clouddelete.h"
 
 #include <sys/file.h>
