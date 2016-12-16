@@ -2815,13 +2815,13 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 		/* Both check old name and new name. */
 		for (i = 0; i < 2; i++) {
-			if (!S_ISREG(mode[i]) && mode[i] != 0)
+			if (mode[i] != 0 && !S_ISREG(mode[i]))
 				continue;
 			if (_is_apk(selfname[i])) {
 				ret = remove_minapk_data(parent_inode[i],
 						selfname[i]);
 				if (ret < 0 && ret != -ENOENT) {
-					fuse_reply_err(req, -ret_val);
+					fuse_reply_err(req, -ret);
 					return;
 				}
 			} else if (_is_minapk(selfname[i])) {
@@ -2829,14 +2829,13 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 				ret = _convert_origin_apk(origin_apk,
 						selfname[i]);
-				if (ret < 0) {
-					fuse_reply_err(req, -ret_val);
-					return;
-				}
+				if (ret < 0)
+					continue; /* Skip this name */
+
 				ret = remove_minapk_data(parent_inode[i],
 						origin_apk);
 				if (ret < 0 && ret != -ENOENT) {
-					fuse_reply_err(req, -ret_val);
+					fuse_reply_err(req, -ret);
 					return;
 				}
 			}

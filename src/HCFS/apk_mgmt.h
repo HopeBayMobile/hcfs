@@ -56,10 +56,12 @@ int32_t remove_minapk_data(ino_t parent_ino, const char *apk_name);
  * ret = init_iterate_minapk_table();
  * if (ret < 0)
  * 	// Init failed :(
- * while (iterate_minapk_table(&parent_ino, apk_name, &minapk_ino) != -ENOENT) {
+ * while ((ret =
+ *	   iterate_minapk_table(&parent_ino, apk_name, &minapk_ino)) == 0) {
  * 	//do something...
  * }
  * end_iterate_minapk_table();
+ * // Check ret
  */
 int32_t init_iterate_minapk_table(void);
 int32_t iterate_minapk_table(ino_t *parent_ino,
