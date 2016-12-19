@@ -92,6 +92,8 @@ int32_t _invalid_all_minapk(void)
 						  parent_ino, apk_name,
 						  apk_name_len);
 		}
+		if (ret == -ENOENT)
+			ret = 0;
 	} while (0);
 
 	end_iterate_minapk_table();

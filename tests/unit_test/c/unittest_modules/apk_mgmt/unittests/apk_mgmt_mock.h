@@ -1,6 +1,6 @@
-#include "hfuse_system.h"
-#include "fuseop.h"
 #include "apk_mgmt.h"
+#include "fuseop.h"
+#include "hfuse_system.h"
 #include "mount_manager.h"
 #include <errno.h>
 
@@ -23,13 +23,24 @@ FAKE_VALUE_FUNC(HASH_LIST *,
 		uint32_t,
 		uint32_t);
 
+int32_t search_mount_success = 0;
+MOUNT_T search_mount_ret;
+int32_t custom_search_mount(char *a, char *b, MOUNT_T **c)
+{
+	if (search_mount_success) {
+		*c = &search_mount_ret;
+		return 0;
+	}
+	return -1;
+}
+
 int32_t create_hash_list_success = 0;
 HASH_LIST *custom_create_hash_list(hash_ftn_t *hash_ftn,
-			    key_cmp_ftn_t *key_cmp_ftn,
-			    data_update_ftn_t *data_update_ftn,
-			    uint32_t table_size,
-			    uint32_t key_size,
-			    uint32_t data_size)
+				   key_cmp_ftn_t *key_cmp_ftn,
+				   data_update_ftn_t *data_update_ftn,
+				   uint32_t table_size,
+				   uint32_t key_size,
+				   uint32_t data_size)
 {
 	if (create_hash_list_success) {
 		return (HASH_LIST *)1;
@@ -45,8 +56,8 @@ FAKE_VALUE_FUNC(
     int32_t, insert_hash_list_entry, HASH_LIST *, const void *, const void *)
 int32_t insert_minapk_data_success = 0;
 int32_t custom_insert_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       const void *data)
+				      const void *key,
+				      const void *data)
 {
 	if (insert_minapk_data_success)
 		return 0;
@@ -54,13 +65,12 @@ int32_t custom_insert_hash_list_entry(HASH_LIST *hash_list,
 		return -EEXIST;
 }
 
-
 FAKE_VALUE_FUNC(
     int32_t, lookup_hash_list_entry, HASH_LIST *, const void *, void *);
 int32_t query_minapk_data_success = 0;
 int32_t custom_lookup_hash_list_entry(HASH_LIST *hash_list,
-			       const void *key,
-			       void *data)
+				      const void *key,
+				      void *data)
 {
 	if (query_minapk_data_success) {
 		((MIN_APK_LOOKUP_DATA *)data)->min_apk_ino = 5566;
@@ -87,14 +97,13 @@ FAKE_VOID_FUNC(hash_list_global_lock, HASH_LIST *);
 FAKE_VALUE_FUNC(HASH_LIST_ITERATOR *, init_hashlist_iter, HASH_LIST *);
 
 int32_t init_hashlist_iter_success = 0;
+HASH_LIST_ITERATOR *init_hashlist_iter_ret;
 HASH_LIST_ITERATOR *custom_init_hashlist_iter(HASH_LIST *hash_list)
 {
 	if (init_hashlist_iter_success) {
-		/*HASH_LIST_ITERATOR *ret = (HASH_LIST_ITERATOR *)
-			calloc(sizeof(HASH_LIST_ITERATOR),1);
-		ret->base.next = (void *)&mock_next;
-		return ret;*/
-		return (HASH_LIST_ITERATOR *)1;
+		if (init_hashlist_iter_ret == NULL)
+			return (HASH_LIST_ITERATOR *)1;
+		return init_hashlist_iter_ret;
 	}
 
 	errno = ENOMEM;
