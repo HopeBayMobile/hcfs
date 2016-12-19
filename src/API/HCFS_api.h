@@ -384,10 +384,10 @@ void HCFS_check_restore_status(char **json_res);
  *
  * Return code -
  *
- * > |               |                                        |
- *   | ------------- | :-------------                         |
- *   | True          | 0                                      |
- *   | False         | Linux errors.                          |
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0              |
+ *   | False         | Linux errors.  |
  */
 void HCFS_notify_applist_change(char **json_res);
 
@@ -514,4 +514,39 @@ void HCFS_mount_smart_cache(char **json_res);
  *   | False         | Linux errors.  |
  */
 void HCFS_umount_smart_cache(char **json_res);
+
+/*Create minimal apk
+ * @json_res result string in json format.
+ * @package_name target package name (e.g. com.xxx.xxx-1)
+ * @blocking To determine if this API will return immediately or return
+ *           until minimal apk was created. Passing TRUE(1) for blocking.
+ *
+ * To create minimal apk for target package.
+ *
+ * Return code -
+ *
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
+ */
+void HCFS_create_minimal_apk(char **json_res, char *package_name, int32_t blocking);
+
+/*Check minimal apk
+ * @json_res result string in json format.
+ * @package_name target package name (e.g. com.xxx.xxx-1)
+ *
+ * To check whether the minimal apk of target package is existed or not.
+ *
+ * Return code -
+ *
+ * > |               |                               |
+ *   | ------------- | :-------------                |
+ *   | True          | 0 if not existed.             |
+ *   |               | 1 if existed.                 |
+ *   |               | 2 if minimal apk is creating. |
+ *   | False         | Linux errors.                 |
+ */
+void HCFS_check_minimal_apk(char **json_res, char *package_name);
+
 #endif  /* GW20_HCFS_API_H_ */

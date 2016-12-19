@@ -30,7 +30,6 @@
 #include "socket_util.h"
 #include "hcfs_stat.h"
 
-
 void _json_response(char **json_str, char result, int32_t code, json_t *data)
 {
 	json_t *res_obj;
@@ -1016,4 +1015,74 @@ void HCFS_mount_smart_cache(char **json_res)
 void HCFS_umount_smart_cache(char **json_res)
 {
 	_send_apicode_without_args(UMOUNT_SMART_CACHE, json_res);
+}
+
+void HCFS_create_minimal_apk(char **json_res,
+			     char *package_name,
+			     int32_t blocking)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+	ssize_t str_len;
+	char buf[1000];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CREATE_MINI_APK;
+	cmd_len = 0;
+
+	memcpy(buf, &blocking, sizeof(int32_t));
+	cmd_len += sizeof(int32_t);
+	CONCAT_ARGS(package_name);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
+void HCFS_check_minimal_apk(char **json_res, char *package_name)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+	ssize_t str_len;
+	char buf[1000];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CHECK_MINI_APK;
+	cmd_len = 0;
+
+	CONCAT_ARGS(package_name);
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
 }
