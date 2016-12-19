@@ -49,24 +49,14 @@ char swift_url_string[1024] = {0};
 		SEND(code);                                                    \
 		SEND(size);                                                    \
 	} while (0)
-#define API_SEND1(in_code, in_data1)                                           \
+#define API_SEND1(in_code, data, data_len)                                     \
 	do {                                                                   \
 		uint32_t code = in_code;                                       \
-		typeof(in_data1) data1 = { in_data1 };                         \
-		uint32_t size = sizeof(data1);                                 \
+		uint32_t size = data_len;                                      \
 		printf("Start sending\n");                                     \
 		SEND(code);                                                    \
 		SEND(size);                                                    \
-		SEND(data1);                                                   \
-	} while (0)
-#define API_SENDBUF(in_code, buf, buf_len)                                     \
-	do {                                                                   \
-		uint32_t code = in_code;                                       \
-		uint32_t size = buf_len;                                       \
-		printf("Start sending\n");                                     \
-		SEND(code);                                                    \
-		SEND(size);                                                    \
-		SENDBUF(buf, size);                                            \
+		SENDBUF(data, data_len);                                       \
 	} while (0)
 
 #define RECV(x) ASSERT_EQ(sizeof(x), recv(fd, &(x), sizeof(x), 0))
@@ -382,7 +372,7 @@ TEST_F(api_moduleTest, LargeEchoTest)
 	teststr[2000] = 0;
 
 	cmd_len = 2001;
-	API_SENDBUF(ECHOTEST, teststr, cmd_len);
+	API_SEND1(ECHOTEST, teststr, cmd_len);
 
 	printf("Start recv\n");
 	ret_val = recv(fd, &size_msg, sizeof(uint32_t), 0);
@@ -439,7 +429,7 @@ TEST_F(api_moduleTest, CreateFSTest)
 
 	CREATEDFS = false;
 	snprintf(tmpstr, 10, "123456789");
-	API_SENDBUF(CREATEVOL, tmpstr, sizeof(tmpstr));
+	API_SEND1(CREATEVOL, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(true, CREATEDFS);
@@ -454,7 +444,7 @@ TEST_F(api_moduleTest, DeleteFSTest)
 
 	DELETEDFS = false;
 	snprintf(tmpstr, 10, "123456789");
-	API_SENDBUF(DELETEVOL, tmpstr, sizeof(tmpstr));
+	API_SEND1(DELETEVOL, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(true, DELETEDFS);
@@ -469,7 +459,7 @@ TEST_F(api_moduleTest, CheckFSTest)
 
 	CHECKEDFS = false;
 	snprintf(tmpstr, 10, "123456789");
-	API_SENDBUF(CHECKVOL, tmpstr, sizeof(tmpstr));
+	API_SEND1(CHECKVOL, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(true, CHECKEDFS);
@@ -565,7 +555,7 @@ TEST_F(api_moduleTest, CheckMountTest)
 
 	CHECKEDMOUNT = false;
 	snprintf(tmpstr, 10, "123456789");
-	API_SENDBUF(CHECKMOUNT, tmpstr, sizeof(tmpstr));
+	API_SEND1(CHECKMOUNT, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(true, CHECKEDMOUNT);
@@ -604,7 +594,7 @@ TEST_F(api_moduleTest, pin_inodeTest_InvalidPinType)
 	hcfs_system->systemdata.pinned_size = 0;
 
 	cmd_len = sizeof(int64_t) + sizeof(char);
-	API_SENDBUF(PIN, buf, cmd_len);
+	API_SEND1(PIN, buf, cmd_len);
 	API_RECV1(retcode);
 	ASSERT_EQ(-EINVAL, retcode);
 }
@@ -632,7 +622,7 @@ TEST_F(api_moduleTest, pin_inodeTest_NoSpace)
 	system_config->max_pinned_limit[pin_type] = 300 * 0.8;
 
 	cmd_len = sizeof(int64_t) + sizeof(uint32_t);
-	API_SENDBUF(PIN, buf, cmd_len);
+	API_SEND1(PIN, buf, cmd_len);
 	API_RECV1(retcode);
 	ASSERT_EQ(-ENOSPC, retcode);
 }
@@ -663,7 +653,7 @@ TEST_F(api_moduleTest, pin_inodeTest_Success)
 	system_config->max_cache_limit[pin_type] = 500;
 	system_config->max_pinned_limit[pin_type] = 500 * 0.8;
 
-	API_SENDBUF(PIN, buf, cmd_len);
+	API_SEND1(PIN, buf, cmd_len);
 
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
@@ -695,7 +685,7 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack)
 	system_config->max_cache_limit[pin_type] = 500;
 	system_config->max_pinned_limit[pin_type] = 500 * 0.8;
 
-	API_SENDBUF(PIN, buf, cmd_len);
+	API_SEND1(PIN, buf, cmd_len);
 	API_RECV1(retcode);
 	ASSERT_EQ(-EIO, retcode);
 }
@@ -718,7 +708,7 @@ TEST_F(api_moduleTest, unpin_inodeTest_Success)
 	CACHE_HARD_LIMIT = 500;
 	hcfs_system->systemdata.pinned_size = 0;
 
-	API_SENDBUF(UNPIN, buf, cmd_len);
+	API_SEND1(UNPIN, buf, cmd_len);
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 }
@@ -741,7 +731,7 @@ TEST_F(api_moduleTest, unpin_inodeTest_Fail)
 	CACHE_HARD_LIMIT = 500;
 	hcfs_system->systemdata.pinned_size = 0;
 
-	API_SENDBUF(UNPIN, buf, cmd_len);
+	API_SEND1(UNPIN, buf, cmd_len);
 
 	API_RECV1(retcode);
 	ASSERT_EQ(-EIO, retcode);
@@ -767,7 +757,7 @@ TEST_F(api_moduleTest, SetSyncSwitch)
 	/* Disable sync */
 	hcfs_system->sync_manual_switch = true;
 	sw = false;
-	API_SEND1(SETSYNCSWITCH, sw);
+	API_SEND1(SETSYNCSWITCH, sw, sizeof(uint32_t));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(false, hcfs_system->sync_manual_switch);
@@ -778,7 +768,7 @@ TEST_F(api_moduleTest, SetSyncSwitch)
 	hcfs_system->sync_manual_switch = false;
 	sw = true;
 	mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
-	API_SEND1(SETSYNCSWITCH, sw);
+	API_SEND1(SETSYNCSWITCH, sw, sizeof(uint32_t));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(true, hcfs_system->sync_manual_switch);
@@ -793,7 +783,7 @@ TEST_F(api_moduleTest, SetSyncSwitchOnFail)
 	hcfs_system->sync_manual_switch = false;
 	mkdir(HCFSPAUSESYNC, 0700);
 
-	API_SEND1(SETSYNCSWITCH, sw);
+	API_SEND1(SETSYNCSWITCH, sw, sizeof(uint32_t));
 
 	API_RECV1(retcode);
 
@@ -880,7 +870,7 @@ TEST_F(api_moduleTest, ChangeLogLevelSuccess)
 	system_config->log_level = 10; /* Original level */
 	loglevel = 6; /* New level */
 
-	API_SEND1(CHANGELOG, loglevel);
+	API_SEND1(CHANGELOG, loglevel, sizeof(loglevel));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 
@@ -992,7 +982,7 @@ TEST_F(api_moduleTest, SetNotifyServerOK)
 	cmd_len = strlen(server_path) + 1;
 	memcpy(buf, server_path, cmd_len);
 
-	API_SENDBUF(SETNOTIFYSERVER, buf, cmd_len);
+	API_SEND1(SETNOTIFYSERVER, buf, cmd_len);
 
 	API_RECV1(status);
 	ASSERT_EQ(0, status);
@@ -1017,7 +1007,7 @@ TEST_F(api_moduleTest, SetNotifyServerFailed)
 	cmd_len = strlen(server_path) + 1;
 	memcpy(buf, server_path, cmd_len);
 
-	API_SENDBUF(SETNOTIFYSERVER, buf, cmd_len);
+	API_SEND1(SETNOTIFYSERVER, buf, cmd_len);
 	API_RECV1(status);
 	ASSERT_EQ(-1, status);
 }
@@ -1138,10 +1128,12 @@ TEST_F(api_moduleTest, GetMinimalApkStatus)
 TEST_F(api_moduleTest, SetMinimalApkStatus)
 {
 	int32_t retcode;
+	uint32_t sw = true;
 
 	/* Disable sync */
 	hcfs_system->use_minimal_apk = true;
-	API_SEND1(TOGGLE_USE_MINIMAL_APK, false);
+	sw = false;
+	API_SEND1(TOGGLE_USE_MINIMAL_APK, sw, sizeof(uint32_t));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(false, hcfs_system->use_minimal_apk);
@@ -1150,7 +1142,8 @@ TEST_F(api_moduleTest, SetMinimalApkStatus)
 
 	/* Enable sync */
 	hcfs_system->use_minimal_apk = false;
-	API_SEND1(TOGGLE_USE_MINIMAL_APK, true);
+	sw = true;
+	API_SEND1(TOGGLE_USE_MINIMAL_APK, sw, sizeof(uint32_t));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
 	ASSERT_EQ(true, hcfs_system->use_minimal_apk);
