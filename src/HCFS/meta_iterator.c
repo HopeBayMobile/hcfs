@@ -316,7 +316,7 @@ void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter)
 /**
  * Initilize dir iterator using parameter "fptr", which is a file pointer of
  * the meta file. This function will NOT lock the meta file so it should be
- * locked by caller if race condition may occur when using this block iterator.
+ * locked by caller if race condition may occur when using this dir iterator.
  *
  * @param fptr File pointer of the meta file to be iterated.
  *
@@ -339,8 +339,8 @@ DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
 	FREAD(&(iter->dir_meta), sizeof(DIR_META_TYPE), 1, fptr);
 
 	iter->fptr = fptr;
-	iter->base.begin = (void *)&next_dir_entry;
-	iter->base.next = (void *)&begin_dir_entry;
+	iter->base.begin = (void *)&begin_dir_entry;
+	iter->base.next = (void *)&next_dir_entry;
 	iter->now_dirpage_pos = -1;
 	iter->now_entry_idx = -1;
 	iter->now_entry = NULL;

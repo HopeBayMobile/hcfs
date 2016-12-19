@@ -5,6 +5,8 @@
 
 SYSTEM_CONF_STRUCT *system_config = NULL;
 int32_t RETURN_PAGE_NOT_FOUND;
+int32_t calloc_success;
+int32_t fseek_success;
 
 int32_t write_log(int32_t level, const char *format, ...)
 {
