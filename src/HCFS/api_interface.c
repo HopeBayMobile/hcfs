@@ -179,8 +179,6 @@ int32_t destroy_api_interface(void)
 
 	/* Adding lock wait before terminating to prevent last sec
 	thread changes */
-	/* TODO: This could cause a deadlock when trying to terminate
-	api thread */
 	sem_wait(&(api_server->job_lock));
 	api_server->api_shutting_down = TRUE;
 	sem_post(&(api_server->job_lock));
