@@ -99,6 +99,7 @@ class UnittestEnv : public ::testing::Environment
 
 ::testing::Environment *const fuseop_env =
     ::testing::AddGlobalTestEnvironment(new UnittestEnv);
+
 class init_api_interfaceTest : public ::testing::Test {
 	protected:
 	int32_t count;
@@ -758,7 +759,6 @@ TEST_F(api_moduleTest, CloudState)
 }
 
 /* Test SETSYNCSWITCH API call */
-/*INSTANTIATE_TEST_CASE_P(SetSyncSwitchOff, api_moduleTest, ValuesIn(paths));*/
 TEST_F(api_moduleTest, SetSyncSwitch)
 {
 	int32_t retcode;
@@ -808,6 +808,7 @@ TEST_F(api_moduleTest, GetSyncSwitch)
 	ASSERT_EQ(retcode, ON);
 
 	ASSERT_EQ(0, connect_sock());
+
 	hcfs_system->sync_manual_switch = OFF;
 	API_SEND(GETSYNCSWITCH);
 	API_RECV1(retcode);
@@ -1111,6 +1112,44 @@ TEST_F(api_server_monitorTest, TestThreadIncrease)
 	}
 	sleep(1);
 	EXPECT_GE(api_server->num_threads, INIT_API_THREADS);
+}
+
+TEST_F(api_moduleTest, GetMinimalApkStatus)
+{
+	int32_t retcode;
+
+	hcfs_system->use_minimal_apk = true;
+	API_SEND(GET_MINIMAL_APK_STATUS);
+	API_RECV1(retcode);
+	ASSERT_EQ(retcode, true);
+
+	ASSERT_EQ(0, connect_sock());
+
+	hcfs_system->use_minimal_apk = false;
+	API_SEND(GET_MINIMAL_APK_STATUS);
+	API_RECV1(retcode);
+	ASSERT_EQ(retcode, false);
+}
+
+TEST_F(api_moduleTest, SetMinimalApkStatus)
+{
+	int32_t retcode;
+
+	/* Disable sync */
+	hcfs_system->use_minimal_apk = true;
+	API_SEND1(TOGGLE_USE_MINIMAL_APK, false);
+	API_RECV1(retcode);
+	ASSERT_EQ(0, retcode);
+	ASSERT_EQ(false, hcfs_system->use_minimal_apk);
+
+	ASSERT_EQ(0, connect_sock());
+
+	/* Enable sync */
+	hcfs_system->use_minimal_apk = false;
+	API_SEND1(TOGGLE_USE_MINIMAL_APK, true);
+	API_RECV1(retcode);
+	ASSERT_EQ(0, retcode);
+	ASSERT_EQ(true, hcfs_system->use_minimal_apk);
 }
 
 /* End of the test case for the function api_server_monitor */

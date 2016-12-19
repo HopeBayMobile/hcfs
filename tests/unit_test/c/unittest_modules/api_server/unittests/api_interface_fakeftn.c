@@ -236,6 +236,7 @@ int32_t add_notify_event(int32_t event_id,
 	return 0;
 }
 int32_t toggle_use_minimal_apk(bool new_val){
+	hcfs_system->use_minimal_apk = new_val;
 	return 0;
 }
 int32_t check_data_location(ino_t this_inode)
