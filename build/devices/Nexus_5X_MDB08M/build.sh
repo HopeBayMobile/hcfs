@@ -156,7 +156,8 @@ function update_system_source() {
 	ssh -t -o "BatchMode yes" root@$DOCKER_IP 'bash -il -c " \
 	git pull origin '${BRANCH_IN_5X}' && \
 	git submodule update --init --recursive --remote && \
-	git submodule foreach git pull origin '${BRANCH_FOR_SUBMODULE}'"'
+	git submodule foreach git pull origin '${BRANCH_FOR_SUBMODULE}' && \
+    git submodule foreach git checkout '${BRANCH_FOR_SUBMODULE}' "'
 }
 function pull_hcfs_binaay() {
 	{ _hdr_inc - - BUILD_VARIANT $IMAGE_TYPE $FUNCNAME; } 2>/dev/null
