@@ -365,7 +365,6 @@ int32_t boost_package(char *package_name)
 	char cmd_copy_pkg_data[] = "cp -rp %s %s";
 	char cmd_restorecon_recursive[] = "restorecon -R %s";
 	int32_t ret_code, status;
-	struct stat tmp_st;
 
 	CHANGE_PKG_BOOST_STATUS(package_name, ST_BOOSTING);
 
@@ -462,9 +461,9 @@ int32_t unboost_package(char *package_name)
 		return -1;
 	}
 
-	/* If the type of pkg_fullpath is symlnk means that previous unboosting
-	 * for this package had been interrupted. Just finish the unfinished
-	 * parts */
+	/* If the type of pkg_fullpath isn't symlnk means that previous
+	 * unboosting for this package had been interrupted. Just finish the
+	 * unfinished parts */
 	ret_code = lstat(pkg_fullpath, &tmp_st);
 	if (ret_code < 0 || S_ISLNK(tmp_st.st_mode)) {
 		REMOVE_IF_EXIST(pkg_fullpath);
@@ -515,6 +514,7 @@ static int32_t _iterate_pkg_cb(void *data,
 {
 	char *package_name;
 	char **tmp_ptr;
+	int32_t num_pkg;
 	BOOST_JOB_META *boost_job;
 
 	UNUSED(argc);
@@ -532,35 +532,34 @@ static int32_t _iterate_pkg_cb(void *data,
 
 	package_name = argv[0];
 
-	boost_job = (BOOST_JOB_META*)data;
+	boost_job = (BOOST_JOB_META *)data;
+
+	num_pkg = boost_job->num_pkg;
 
 	/* Check if need to expand pkg list */
-	if (boost_job->num_pkg >= boost_job->pkg_list_size) {
+	if (num_pkg >= boost_job->pkg_list_size) {
 		write_log(4, "In %s. To expand size of pkg list. (num_pkg %d, "
-			     "pkg_list_size %d",
-			  __func__, boost_job->num_pkg,
-			  boost_job->pkg_list_size);
+			     "pkg_list_size %d)",
+			  __func__, num_pkg, boost_job->pkg_list_size);
 
 		tmp_ptr = (char **)realloc(boost_job->pkg_list,
-					   boost_job->pkg_list_size * 2);
+					   boost_job->pkg_list_size * 2 *
+					       sizeof(char **));
 		if (tmp_ptr == NULL) {
 			write_log(4, "In %s. Failed to expand pkg list.",
 				  __func__);
 			return -1;
 		}
 		boost_job->pkg_list = tmp_ptr;
-		boost_job->pkg_list_size = boost_job->pkg_list_size * 2;
+		boost_job->pkg_list_size *= 2;
 	}
 
 	/* Add pkg to list */
-	boost_job->pkg_list[boost_job->num_pkg] =
-	    (char *)calloc(1, strlen(package_name) + 1);
-	if (*(boost_job->pkg_list) == NULL) {
+	boost_job->pkg_list[num_pkg] = strdup(package_name);
+	if (boost_job->pkg_list[num_pkg] == NULL) {
 		write_log(0, "In %s, Failed to alloc memory.", __func__);
 		return -1;
 	}
-	strncpy(boost_job->pkg_list[boost_job->num_pkg], package_name,
-		strlen(package_name) + 1);
 	boost_job->num_pkg += 1;
 
 	return 0;
@@ -576,26 +575,35 @@ void *process_boost(void *ptr)
 	char *sql_err = 0;
 	char sql[1024];
 	int32_t ret_code, retry_times, idx;
-	BOOST_JOB_META boost_job;
+	BOOST_JOB_META *boost_job = NULL;
 	sqlite3 *db;
 
-	boost_job.to_boost = (int32_t)ptr;
+	boost_job = (BOOST_JOB_META *)calloc(1, sizeof(BOOST_JOB_META));
+	if (boost_job == NULL) {
+		write_log(0,
+			  "Failed to alloc memory for boost meta. Error - %d.",
+			  errno);
+		pthread_exit(&(int){ -1 });
+	}
+
+	boost_job->to_boost = *(int *)ptr;
+	free(ptr);
 
 	write_log(4, "Start to process packages %s",
-		  (boost_job.to_boost) ? "boosting" : "unboosting");
+		  (boost_job->to_boost) ? "boosting" : "unboosting");
 
-	boost_job.num_pkg = 0;
-	boost_job.pkg_list_size = DEFAULT_PKG_LIST_SIZE;
-	boost_job.pkg_list = (char **)calloc(1, boost_job.pkg_list_size);
-	if (boost_job.pkg_list == NULL) {
+	boost_job->num_pkg = 0;
+	boost_job->pkg_list_size = DEFAULT_PKG_LIST_SIZE;
+	boost_job->pkg_list = (char **)calloc(1, boost_job->pkg_list_size);
+	if (boost_job->pkg_list == NULL) {
 		write_log(0, "In %s. Faield to alloc memory for pkg list.",
 			  __func__);
-		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
-		pthread_exit((void *)-1);
+		boost_fail = TRUE;
+		goto cleanup;
 	}
 
 	/* Find target packages */
-	if (boost_job.to_boost)
+	if (boost_job->to_boost)
 		snprintf(sql, sizeof(sql),
 			 "SELECT package_name from %s WHERE boost_status=%d",
 			 SMARTCACHE_TABLE_NAME, ST_INIT_BOOST);
@@ -617,7 +625,7 @@ void *process_boost(void *ptr)
 	}
 
 	ret_code = sqlite3_exec(db, sql, _iterate_pkg_cb,
-				(void *)&boost_job, &sql_err);
+				(void *)boost_job, &sql_err);
 	if (ret_code != SQLITE_OK) {
 		sqlite3_free(sql_err);
 		sqlite3_close(db);
@@ -627,10 +635,9 @@ void *process_boost(void *ptr)
 	sqlite3_close(db);
 
 	/* Start to boost/unboost */
-	for (idx = 0; idx < boost_job.num_pkg; idx++) {
-		package_name = boost_job.pkg_list[idx];
-
-		if (boost_job.to_boost)
+	for (idx = 0; idx < boost_job->num_pkg; idx++) {
+		package_name = boost_job->pkg_list[idx];
+		if (boost_job->to_boost)
 			ret_code = boost_package(package_name);
 		else
 			ret_code = unboost_package(package_name);
@@ -641,21 +648,22 @@ void *process_boost(void *ptr)
 	}
 
 cleanup:
-	for (idx = 0; idx < boost_job.num_pkg; idx++) {
-		free(boost_job.pkg_list[idx]);
+	for (idx = 0; idx < boost_job->num_pkg; idx++) {
+		free(boost_job->pkg_list[idx]);
 	}
-	free(boost_job.pkg_list);
+	free(boost_job->pkg_list);
+	free(boost_job);
 
 	if (!boost_fail) {
 		write_log(4, "Finish process %s.",
-			  (boost_job.to_boost) ? "boosting" : "unboosting");
+			  (boost_job->to_boost) ? "boosting" : "unboosting");
 		RETRY_SEND_EVENT(EVENT_BOOST_SUCCESS);
-		pthread_exit((void *)0);
+		pthread_exit(&(int){ 0 });
 	} else {
 		write_log(0, "Process %s failed.",
-			  (boost_job.to_boost) ? "boosting" : "unboosting");
+			  (boost_job->to_boost) ? "boosting" : "unboosting");
 		RETRY_SEND_EVENT(EVENT_BOOST_FAILED);
-		pthread_exit((void *)-1);
+		pthread_exit(&(int){ -1 });
 	}
 }
 
@@ -674,6 +682,12 @@ cleanup:
 int32_t trigger_boost(char to_boost, pthread_t *tid)
 {
 	char image_file_path[strlen(SMARTCACHE) + strlen(HCFSBLOCK) + 10];
+	int32_t *boost;
+
+	boost = (int32_t *)calloc(1, sizeof(int32_t));
+	if (boost == NULL)
+		return -ENOMEM;
+	*boost = (to_boost) ? 1 : 0;
 
 	snprintf(image_file_path, sizeof(image_file_path), "%s/%s", SMARTCACHE,
 		 HCFSBLOCK);
@@ -681,7 +695,8 @@ int32_t trigger_boost(char to_boost, pthread_t *tid)
 	if (access(image_file_path, F_OK) == -1)
 		return -ENOENT;
 
-	pthread_create(tid, NULL, &process_boost, (void *)to_boost);
+	pthread_create(tid, NULL, &process_boost, boost);
+
 	return 0;
 }
 
