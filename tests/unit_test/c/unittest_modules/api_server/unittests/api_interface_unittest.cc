@@ -107,8 +107,8 @@ class init_api_interfaceTest : public ::testing::Test {
 	virtual void SetUp() {
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 		              malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->system_going_down = false;
+		hcfs_system->backend_is_online = true;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->fuse_sem), 0, 0);
@@ -118,7 +118,7 @@ class init_api_interfaceTest : public ::testing::Test {
 	}
 
 	virtual void TearDown() {
-		hcfs_system->system_going_down = TRUE;
+		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
 			for (count = 0; count < api_server->num_threads; count++)
@@ -182,8 +182,8 @@ class destroy_api_interfaceTest : public ::testing::Test {
 	virtual void SetUp() {
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 		              malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->system_going_down = false;
+		hcfs_system->backend_is_online = true;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->fuse_sem), 0, 0);
@@ -193,7 +193,7 @@ class destroy_api_interfaceTest : public ::testing::Test {
 	}
 
 	virtual void TearDown() {
-		hcfs_system->system_going_down = TRUE;
+		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
 			for (count = 0; count < api_server->num_threads; count++)
@@ -219,7 +219,7 @@ TEST_F(destroy_api_interfaceTest, TestIntegrity)
 	ret_val = access(SOCK_PATH, F_OK);
 	ASSERT_EQ(0, ret_val);
 
-	hcfs_system->system_going_down = TRUE;
+	hcfs_system->system_going_down = true;
 
 	ret_val = destroy_api_interface();
 	ASSERT_EQ(0, ret_val);
@@ -255,8 +255,8 @@ class api_moduleTest : public ::testing::TestWithParam<int32_t>
 		    (int64_t*)calloc(NUM_PIN_TYPES, sizeof(int64_t));
 		hcfs_system =
 		    (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->system_going_down = false;
+		hcfs_system->backend_is_online = true;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->access_sem), 0, 1);
@@ -272,7 +272,7 @@ class api_moduleTest : public ::testing::TestWithParam<int32_t>
 		if (access(METAPATH, F_OK) != 0)
 			mkdir(METAPATH, 0700);
 		HCFSPAUSESYNC = (char *)malloc(strlen(METAPATH) + 20);
-		ASSERT_EQ(TRUE, HCFSPAUSESYNC != NULL);
+		ASSERT_EQ(true, HCFSPAUSESYNC != NULL);
 		snprintf(HCFSPAUSESYNC, strlen(METAPATH) + 20,
 		         "%s/hcfspausesync", METAPATH);
 		ASSERT_EQ(0, init_api_interface());
@@ -284,7 +284,7 @@ class api_moduleTest : public ::testing::TestWithParam<int32_t>
 	virtual void TearDown() {
 		if (fd != 0)
 			close(fd);
-		hcfs_system->system_going_down = TRUE;
+		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
 			for (count = 0; count < api_server->num_threads;
@@ -417,14 +417,14 @@ TEST_F(api_moduleTest, TerminateTest)
 {
 	int32_t ret_val, retcode;
 
-	UNMOUNTEDALL = FALSE;
+	UNMOUNTEDALL = false;
 	API_SEND(TERMINATE);
 
 	sem_post(&(api_server->shutdown_sem));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, hcfs_system->system_going_down);
-	ASSERT_EQ(TRUE, UNMOUNTEDALL);
+	ASSERT_EQ(true, hcfs_system->system_going_down);
+	ASSERT_EQ(true, UNMOUNTEDALL);
 	/* Check if terminate will indeed signal threads sleeping on
 	something_to_replace */
 	sem_getvalue(&(hcfs_system->something_to_replace), &ret_val);
@@ -437,12 +437,12 @@ TEST_F(api_moduleTest, CreateFSTest)
 	int32_t retcode;
 	char tmpstr[10];
 
-	CREATEDFS = FALSE;
+	CREATEDFS = false;
 	snprintf(tmpstr, 10, "123456789");
 	API_SENDBUF(CREATEVOL, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, CREATEDFS);
+	ASSERT_EQ(true, CREATEDFS);
 	EXPECT_STREQ("123456789", recvFSname);
 }
 
@@ -452,12 +452,12 @@ TEST_F(api_moduleTest, DeleteFSTest)
 	int32_t retcode;
 	char tmpstr[10];
 
-	DELETEDFS = FALSE;
+	DELETEDFS = false;
 	snprintf(tmpstr, 10, "123456789");
 	API_SENDBUF(DELETEVOL, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, DELETEDFS);
+	ASSERT_EQ(true, DELETEDFS);
 	EXPECT_STREQ("123456789", recvFSname);
 }
 
@@ -467,23 +467,23 @@ TEST_F(api_moduleTest, CheckFSTest)
 	int32_t retcode;
 	char tmpstr[10];
 
-	CHECKEDFS = FALSE;
+	CHECKEDFS = false;
 	snprintf(tmpstr, 10, "123456789");
 	API_SENDBUF(CHECKVOL, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, CHECKEDFS);
+	ASSERT_EQ(true, CHECKEDFS);
 	EXPECT_STREQ("123456789", recvFSname);
 }
 
 /* Test LISTVOL API call */
 TEST_F(api_moduleTest, ListFSTestNoFS)
 {
-	LISTEDFS = FALSE;
+	LISTEDFS = false;
 	numlistedFS = 0;
 	API_SEND(LISTVOL);
 	API_RECV();
-	ASSERT_EQ(TRUE, LISTEDFS);
+	ASSERT_EQ(true, LISTEDFS);
 }
 
 /* Test LISTVOL API call */
@@ -491,13 +491,13 @@ TEST_F(api_moduleTest, ListFSTestOneFS)
 {
 	DIR_ENTRY tmp_entry;
 
-	LISTEDFS = FALSE;
+	LISTEDFS = false;
 	numlistedFS = 1;
 
 	API_SEND(LISTVOL);
 	API_RECV1(tmp_entry);
 	ASSERT_STREQ("test123", tmp_entry.d_name);
-	ASSERT_EQ(TRUE, LISTEDFS);
+	ASSERT_EQ(true, LISTEDFS);
 }
 
 /* Test MOUNTVOL API call */
@@ -510,7 +510,7 @@ TEST_F(api_moduleTest, MountFSTest)
 	int32_t fsname_len;
 	char mp_mode;
 
-	MOUNTEDFS = FALSE;
+	MOUNTEDFS = false;
 	code = MOUNTVOL;
 	cmd_len =
 	    sizeof(int32_t) + sizeof(char) + sizeof(tmpstr) + sizeof(mpstr);
@@ -528,7 +528,7 @@ TEST_F(api_moduleTest, MountFSTest)
 
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, MOUNTEDFS);
+	ASSERT_EQ(true, MOUNTEDFS);
 	EXPECT_STREQ("123456789", recvFSname);
 	EXPECT_STREQ("123456789", recvmpname);
 }
@@ -540,7 +540,7 @@ TEST_F(api_moduleTest, UnmountFSTest)
 	uint32_t code, cmd_len, fsname_len;
 	char tmpstr[10];
 
-	UNMOUNTEDFS = FALSE;
+	UNMOUNTEDFS = false;
 	code = UNMOUNTVOL;
 	cmd_len = 20 + sizeof(int32_t);
 	snprintf(tmpstr, 10, "123456789");
@@ -553,7 +553,7 @@ TEST_F(api_moduleTest, UnmountFSTest)
 	SEND(tmpstr);
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, UNMOUNTEDFS);
+	ASSERT_EQ(true, UNMOUNTEDFS);
 	EXPECT_STREQ("123456789", recvFSname);
 }
 
@@ -563,12 +563,12 @@ TEST_F(api_moduleTest, CheckMountTest)
 	int32_t retcode;
 	char tmpstr[10];
 
-	CHECKEDMOUNT = FALSE;
+	CHECKEDMOUNT = false;
 	snprintf(tmpstr, 10, "123456789");
 	API_SENDBUF(CHECKMOUNT, tmpstr, sizeof(tmpstr));
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, CHECKEDMOUNT);
+	ASSERT_EQ(true, CHECKEDMOUNT);
 	EXPECT_STREQ("123456789", recvFSname);
 }
 
@@ -577,11 +577,11 @@ TEST_F(api_moduleTest, UnmountAllTest)
 {
 	int32_t retcode;
 
-	UNMOUNTEDALL = FALSE;
+	UNMOUNTEDALL = false;
 	API_SEND(UNMOUNTALL);
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, UNMOUNTEDALL);
+	ASSERT_EQ(true, UNMOUNTEDALL);
 }
 
 TEST_F(api_moduleTest, pin_inodeTest_InvalidPinType)
@@ -593,7 +593,7 @@ TEST_F(api_moduleTest, pin_inodeTest_InvalidPinType)
 	char pin_type;
 	uint32_t num_inode;
 
-	PIN_INODE_ROLLBACK = FALSE;
+	PIN_INODE_ROLLBACK = false;
 	reserved_size = 1000;
 	pin_type = 3; /* This pin type is not supported */
 	num_inode = 0;
@@ -618,7 +618,7 @@ TEST_F(api_moduleTest, pin_inodeTest_NoSpace)
 	uint8_t pin_type;
 	uint32_t num_inode;
 
-	PIN_INODE_ROLLBACK = FALSE;
+	PIN_INODE_ROLLBACK = false;
 	reserved_size = 1000;
 	pin_type = 1;
 	num_inode = 0;
@@ -647,7 +647,7 @@ TEST_F(api_moduleTest, pin_inodeTest_Success)
 	uint32_t num_inode;
 	ino_t inode_list[1];
 
-	PIN_INODE_ROLLBACK = FALSE; /* pin_inode() success */
+	PIN_INODE_ROLLBACK = false; /* pin_inode() success */
 	reserved_size = 10;
 	pin_type = 1;
 	num_inode = 1;
@@ -679,7 +679,7 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack)
 	uint32_t num_inode;
 	ino_t inode_list[1];
 
-	PIN_INODE_ROLLBACK = TRUE; /* pin_inode() fail */
+	PIN_INODE_ROLLBACK = true; /* pin_inode() fail */
 	reserved_size = 10;
 	pin_type = 1;
 	num_inode = 1;
@@ -708,7 +708,7 @@ TEST_F(api_moduleTest, unpin_inodeTest_Success)
 	uint32_t num_inode;
 	ino_t inode_list[1];
 
-	UNPIN_INODE_FAIL = FALSE; /* unpin_inode() success */
+	UNPIN_INODE_FAIL = false; /* unpin_inode() success */
 	num_inode = 1;
 	inode_list[0] = 5;
 	cmd_len = sizeof(uint32_t) + sizeof(ino_t);
@@ -731,7 +731,7 @@ TEST_F(api_moduleTest, unpin_inodeTest_Fail)
 	uint32_t num_inode;
 	ino_t inode_list[1];
 
-	UNPIN_INODE_FAIL = TRUE; /* unpin_inode() success */
+	UNPIN_INODE_FAIL = true; /* unpin_inode() success */
 	num_inode = 1;
 	inode_list[0] = 5;
 	cmd_len = sizeof(uint32_t) + sizeof(ino_t);
@@ -754,47 +754,51 @@ TEST_F(api_moduleTest, CloudState)
 
 	API_SEND(CLOUDSTAT);
 	API_RECV1(retcode);
-	ASSERT_EQ(TRUE, retcode);
-	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
+	ASSERT_EQ(true, retcode);
+	ASSERT_EQ(true, hcfs_system->backend_is_online);
 }
 
 /* Test SETSYNCSWITCH API call */
 TEST_F(api_moduleTest, SetSyncSwitch)
 {
 	int32_t retcode;
+	uint32_t sw;
 
 	/* Disable sync */
-	hcfs_system->sync_manual_switch = TRUE;
-	API_SEND1(SETSYNCSWITCH, FALSE);
+	hcfs_system->sync_manual_switch = true;
+	sw = false;
+	API_SEND1(SETSYNCSWITCH, sw);
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(FALSE, hcfs_system->sync_manual_switch);
+	ASSERT_EQ(false, hcfs_system->sync_manual_switch);
 
 	ASSERT_EQ(0, connect_sock());
 
 	/* Enable sync */
-	hcfs_system->sync_manual_switch = FALSE;
+	hcfs_system->sync_manual_switch = false;
+	sw = true;
 	mknod(HCFSPAUSESYNC, S_IFREG | 0600, 0);
-	API_SEND1(SETSYNCSWITCH, TRUE);
+	API_SEND1(SETSYNCSWITCH, sw);
 	API_RECV1(retcode);
 	ASSERT_EQ(0, retcode);
-	ASSERT_EQ(TRUE, hcfs_system->sync_manual_switch);
+	ASSERT_EQ(true, hcfs_system->sync_manual_switch);
 }
 
 TEST_F(api_moduleTest, SetSyncSwitchOnFail)
 {
 	int32_t retcode;
+	uint32_t sw = true;
 
 	/* Enable sync */
-	hcfs_system->sync_manual_switch = FALSE;
+	hcfs_system->sync_manual_switch = false;
 	mkdir(HCFSPAUSESYNC, 0700);
 
-	API_SEND1(SETSYNCSWITCH, TRUE);
+	API_SEND1(SETSYNCSWITCH, sw);
 
 	API_RECV1(retcode);
 
 	ASSERT_EQ(-21, retcode);
-	ASSERT_EQ(TRUE, hcfs_system->sync_manual_switch);
+	ASSERT_EQ(true, hcfs_system->sync_manual_switch);
 }
 
 /* Test GETSYNCSWITCH API call */
@@ -922,7 +926,7 @@ TEST_F(api_moduleTest, XferStatusNoTransit)
 	int32_t status;
 
 	hcfs_system->systemdata.xfer_now_window = 0;
-	hcfs_system->xfer_upload_in_progress = FALSE;
+	hcfs_system->xfer_upload_in_progress = false;
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 
 	API_SEND(GETXFERSTATUS);
@@ -941,7 +945,7 @@ TEST_F(api_moduleTest, XferStatusNormalTransit)
 	hcfs_system->systemdata.xfer_now_window = 1;
 	hcfs_system->systemdata.xfer_throughput[1] = 1000;
 	hcfs_system->systemdata.xfer_total_obj[1] = 1;
-	hcfs_system->xfer_upload_in_progress = TRUE;
+	hcfs_system->xfer_upload_in_progress = true;
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 
 	API_SEND(GETXFERSTATUS);
@@ -960,7 +964,7 @@ TEST_F(api_moduleTest, XferStatusSlowTransit)
 	hcfs_system->systemdata.xfer_now_window = 0;
 	hcfs_system->systemdata.xfer_throughput[0] = 10;
 	hcfs_system->systemdata.xfer_total_obj[0] = 1;
-	hcfs_system->xfer_upload_in_progress = FALSE;
+	hcfs_system->xfer_upload_in_progress = false;
 	sem_init(&(hcfs_system->xfer_download_in_progress_sem), 0, 0);
 	sem_post(&(hcfs_system->xfer_download_in_progress_sem));
 
@@ -1031,8 +1035,8 @@ class api_server_monitorTest : public ::testing::Test {
 	virtual void SetUp() {
 		hcfs_system = (SYSTEM_DATA_HEAD *)
 		              malloc(sizeof(SYSTEM_DATA_HEAD));
-		hcfs_system->system_going_down = FALSE;
-		hcfs_system->backend_is_online = TRUE;
+		hcfs_system->system_going_down = false;
+		hcfs_system->backend_is_online = true;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 		sem_init(&(hcfs_system->fuse_sem), 0, 0);
@@ -1052,7 +1056,7 @@ class api_server_monitorTest : public ::testing::Test {
 			if (fd[count] != 0)
 				close(fd[count]);
 		}
-		hcfs_system->system_going_down = TRUE;
+		hcfs_system->system_going_down = true;
 
 		if (api_server != NULL) {
 			/* Adding lock wait before terminating to prevent last sec
