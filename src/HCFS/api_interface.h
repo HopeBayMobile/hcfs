@@ -25,6 +25,8 @@
 #include <pthread.h>
 #endif
 
+#include "global.h"
+
 #define MAX_API_THREADS 4
 #define INIT_API_THREADS 2
 #define PROCESS_WINDOW 60
@@ -61,6 +63,7 @@ typedef struct {
 	time_t last_update;
 	sem_t job_lock;
 	sem_t shutdown_sem;
+	BOOL api_shutting_down;
 } API_SERVER_TYPE;
 
 API_SERVER_TYPE *api_server;
