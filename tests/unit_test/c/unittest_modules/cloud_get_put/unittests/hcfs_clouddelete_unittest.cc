@@ -190,6 +190,8 @@ public:
 		mock_thread_info =
 		    (DSYNC_THREAD_TYPE *)calloc(1, sizeof(DSYNC_THREAD_TYPE));
 		backend_meta[0] = 0;
+		objname_list = NULL;
+		expected_num_objname = 0;
 	}
 
 	virtual void TearDown() {
@@ -216,11 +218,12 @@ public:
 
 	void destroy_objname_buffer(uint32_t num_objname) {
 		uint32_t i;
-		for (i = 0 ; i < num_objname ; i++)
-			if (objname_list[i])
-				free(objname_list[i]);
-		if (objname_list)
-			free(objname_list);
+		if (objname_list == NULL)
+			return;
+		for (i = 0; i < num_objname; i++)
+			free(objname_list[i]);
+		free(objname_list);
+		objname_list = NULL;
 	}
 
 	void init_sync_ctl() {
@@ -274,7 +277,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	cloud_related.upload_seq = 1;
 
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
-	ASSERT_NE(0, (meta != NULL));
+	ASSERT_TRUE(meta != NULL);
 	setbuf(meta, NULL);
 	fseek(meta, 0, SEEK_SET);
 	fwrite(&meta_stat, sizeof(HCFS_STAT), 1, meta); // Write stat
