@@ -28,10 +28,11 @@ static int do_delete(const char *fpath, const struct stat *sb,
 	return (0);
 }
 
+char *workpath;
 class deleteEnvironment : public ::testing::Environment
 {
 public:
-	char *workpath, *tmppath;
+	char *tmppath;
 
 	virtual void SetUp() {
 		hcfs_system = (SYSTEM_DATA_HEAD *)
@@ -41,20 +42,16 @@ public:
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
 
-		workpath = NULL;
-		tmppath = NULL;
-		if (access("/tmp/testHCFS", F_OK) != 0) {
-			workpath = get_current_dir_name();
-			tmppath = (char *)malloc(strlen(workpath) + 20);
-			snprintf(tmppath, strlen(workpath) + 20, "%s/tmpdir", workpath);
-			if (access(tmppath, F_OK) != 0)
-				mkdir(tmppath, 0700);
-			symlink(tmppath, "/tmp/testHCFS");
-		}
+		tmppath = get_current_dir_name();
+		workpath = (char *)malloc(strlen(tmppath) + 20);
+		snprintf(workpath, strlen(tmppath) + 20, "%s/tmpdir", tmppath);
+		if (access(workpath, F_OK) == 0)
+			nftw(workpath, do_delete, 20, FTW_DEPTH);
+		mkdir(workpath, 0700);
 	}
 
 	virtual void TearDown() {
-		nftw("/tmp/testHCFS", do_delete, 20, FTW_DEPTH);
+		nftw(workpath, do_delete, 20, FTW_DEPTH);
 		free(workpath);
 		free(tmppath);
 		free(hcfs_system);
