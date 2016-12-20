@@ -17,7 +17,11 @@
 
 #define CONFIG_PATH "/data/hcfs.conf"
 #define DB_PATH "/data/data/com.hopebaytech.hcfsmgmt/databases/uid.db"
-#define SOCK_PATH "/dev/shm/hcfs_reporter"
+#ifdef UNITTEST
+  #define SOCK_PATH "hcfs_reporter"
+#else
+  #define SOCK_PATH "/dev/shm/hcfs_reporter"
+#endif
 #define API_SOCK_PATH "/data/data/com.hopebaytech.hcfsmgmt/hcfsapid_sock"
 
 #define DATA_PREFIX "/data/data"
