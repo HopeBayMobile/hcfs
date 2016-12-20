@@ -927,7 +927,7 @@ void api_module(void *index)
 		if (fd1 < 0) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
-			nanosleep(&wait100ms, NULL);  /* Sleep for 0.1 sec */
+			nanosleep(&wait100ms, NULL); /* Sleep for 0.1 sec */
 			continue;
 		}
 		write_log(10, "Processing API request\n");
@@ -985,7 +985,7 @@ void api_module(void *index)
 			buf_reused = TRUE;
 		} else {
 			/* Allocate a buffer that's large enough */
-			largebuf = malloc(arg_len+20);
+			largebuf = malloc(arg_len + 20);
 			/* If error in allocating, return ENOMEM */
 			if (largebuf == NULL) {
 				write_log(0, "Out of memory in %s\n", __func__);
@@ -1007,8 +1007,7 @@ void api_module(void *index)
 				to_recv = 1024;
 			else
 				to_recv = arg_len - msg_len;
-			size_msg = recv(fd1, &largebuf[msg_len],
-					to_recv, 0);
+			size_msg = recv(fd1, &largebuf[msg_len], to_recv, 0);
 			if (size_msg <= 0)
 				break;
 			msg_len += size_msg;
@@ -1028,10 +1027,10 @@ void api_module(void *index)
 		switch (api_code) {
 		case PIN:
 			memcpy(&reserved_pinned_size, largebuf,
-				sizeof(int64_t));
+			       sizeof(int64_t));
 
 			memcpy(&pin_type, largebuf + sizeof(int64_t),
-				sizeof(char));
+			       sizeof(char));
 
 			/* Check required size */
 			if (!P_IS_PIN(pin_type)) {
@@ -1045,7 +1044,8 @@ void api_module(void *index)
 				goto return_retcode;
 			}
 			if (hcfs_system->systemdata.pinned_size +
-				reserved_pinned_size >= max_pinned_size) {
+				reserved_pinned_size >=
+			    max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
 				write_log(5, "No pinned space available\n");
 				retcode = -ENOSPC;
@@ -1055,28 +1055,30 @@ void api_module(void *index)
 			hcfs_system->systemdata.pinned_size +=
 			    reserved_pinned_size;
 			sem_post(&(hcfs_system->access_sem));
-			write_log(
-			    10,
-			    "Debug: Preallocate pinned size %" PRId64 ". %s %" PRId64 "\n",
-			    reserved_pinned_size, "Now system pinned size",
-			    hcfs_system->systemdata.pinned_size);
+			write_log(10, "Debug: Preallocate pinned size %" PRId64
+				      ". %s %" PRId64 "\n",
+				  reserved_pinned_size,
+				  "Now system pinned size",
+				  hcfs_system->systemdata.pinned_size);
 
 			/* Prepare inode array */
-			memcpy(&num_inode, largebuf + sizeof(int64_t) + sizeof(char),
-					sizeof(uint32_t));
+			memcpy(&num_inode,
+			       largebuf + sizeof(int64_t) + sizeof(char),
+			       sizeof(uint32_t));
 
 			pinned_list = malloc(sizeof(ino_t) * num_inode);
 			if (pinned_list == NULL) {
 				retcode = -ENOMEM;
 				goto return_retcode;
 			}
-			memcpy(pinned_list, largebuf + sizeof(int64_t) + sizeof(char) +
-				sizeof(uint32_t),
-				sizeof(ino_t) * num_inode);
+			memcpy(pinned_list, largebuf + sizeof(int64_t) +
+						sizeof(char) + sizeof(uint32_t),
+			       sizeof(ino_t) * num_inode);
 
 			/* Begin to pin all of them */
-			retcode = pin_inode_handle(pinned_list, num_inode,
-						reserved_pinned_size, pin_type);
+			retcode =
+			    pin_inode_handle(pinned_list, num_inode,
+					     reserved_pinned_size, pin_type);
 			free(pinned_list);
 			goto return_retcode;
 		case UNPIN:
@@ -1088,23 +1090,23 @@ void api_module(void *index)
 			}
 
 			memcpy(unpinned_list, largebuf + sizeof(uint32_t),
-				sizeof(ino_t) * num_inode);
+			       sizeof(ino_t) * num_inode);
 
 			/* Begin to unpin all of them */
 			retcode = unpin_inode_handle(unpinned_list, num_inode);
 			free(unpinned_list);
 			goto return_retcode;
 		case CHECKDIRSTAT:
-			retcode = check_dir_stat_handle(arg_len, largebuf,
-							&tmpstat);
+			retcode =
+			    check_dir_stat_handle(arg_len, largebuf, &tmpstat);
 			if (retcode == 0) {
 				ret_len = 3 * sizeof(int64_t);
 				send(fd1, &ret_len, sizeof(uint32_t),
 				     MSG_NOSIGNAL);
-				send(fd1, &(tmpstat.num_local),
-				     sizeof(int64_t), MSG_NOSIGNAL);
-				send(fd1, &(tmpstat.num_cloud),
-				     sizeof(int64_t), MSG_NOSIGNAL);
+				send(fd1, &(tmpstat.num_local), sizeof(int64_t),
+				     MSG_NOSIGNAL);
+				send(fd1, &(tmpstat.num_cloud), sizeof(int64_t),
+				     MSG_NOSIGNAL);
 				send(fd1, &(tmpstat.num_hybrid),
 				     sizeof(int64_t), MSG_NOSIGNAL);
 			}
@@ -1130,15 +1132,16 @@ void api_module(void *index)
 		case VOLSTAT:
 			/* Returns the system statistics */
 			sem_wait(&(hcfs_system->access_sem));
-			snprintf(buf, sizeof(buf), "%" PRId64 " %" PRId64 " %" PRId64,
-				hcfs_system->systemdata.system_size,
-				hcfs_system->systemdata.cache_size,
-				hcfs_system->systemdata.cache_blocks);
+			snprintf(buf, sizeof(buf),
+				 "%" PRId64 " %" PRId64 " %" PRId64,
+				 hcfs_system->systemdata.system_size,
+				 hcfs_system->systemdata.cache_size,
+				 hcfs_system->systemdata.cache_blocks);
 			sem_post(&(hcfs_system->access_sem));
 			write_log(10, "debug stat hcfs %s\n", buf);
-			ret_len = strlen(buf)+1;
+			ret_len = strlen(buf) + 1;
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
-			send(fd1, buf, strlen(buf)+1, MSG_NOSIGNAL);
+			send(fd1, buf, strlen(buf) + 1, MSG_NOSIGNAL);
 			goto no_return;
 		case GETPINSIZE:
 			sem_wait(&(hcfs_system->access_sem));
@@ -1203,7 +1206,7 @@ void api_module(void *index)
 			goto return_llretval;
 		case TESTAPI:
 			/* Simulate too long API call of 5 seconds */
-			nanosleep(&wait100ms, NULL);  /* Sleep for 0.1 sec */
+			nanosleep(&wait100ms, NULL); /* Sleep for 0.1 sec */
 			cur_index = *((int32_t *)index);
 			write_log(10, "Index is %d\n", cur_index);
 			goto return_retcode;
@@ -1218,7 +1221,7 @@ void api_module(void *index)
 				else
 					to_send = ret_len - total_sent;
 				size_msg = send(fd1, &largebuf[total_sent],
-					to_send, MSG_NOSIGNAL);
+						to_send, MSG_NOSIGNAL);
 				total_sent += size_msg;
 			}
 			goto no_return;
@@ -1237,7 +1240,7 @@ void api_module(void *index)
 			retcode = list_FS_handle(&entryarray, &num_entries);
 			if (retcode < 0)
 				goto return_retcode;
-			tmpptr = (char *) entryarray;
+			tmpptr = (char *)entryarray;
 			ret_len = sizeof(DIR_ENTRY) * num_entries;
 			write_log(10, "Debug listFS return size %d\n", ret_len);
 			send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
@@ -1248,7 +1251,7 @@ void api_module(void *index)
 				else
 					to_send = ret_len - total_sent;
 				size_msg = send(fd1, &tmpptr[total_sent],
-					to_send, MSG_NOSIGNAL);
+						to_send, MSG_NOSIGNAL);
 				total_sent += size_msg;
 			}
 			if (num_entries > 0)
@@ -1343,53 +1346,54 @@ void api_module(void *index)
 		}
 	/* default to return retcode */
 return_retcode:
-	ret_len = sizeof(int32_t);
-	send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
-	send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
-	goto no_return;
+		ret_len = sizeof(int32_t);
+		send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+		send(fd1, &retcode, sizeof(int32_t), MSG_NOSIGNAL);
+		goto no_return;
 return_llretval:
-	ret_len = sizeof(int64_t);
-	send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
-	send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
-	goto no_return;
+		ret_len = sizeof(int64_t);
+		send(fd1, &ret_len, sizeof(uint32_t), MSG_NOSIGNAL);
+		send(fd1, &llretval, ret_len, MSG_NOSIGNAL);
+		goto no_return;
 no_return:
-	if ((largebuf != NULL) && (buf_reused == FALSE))
-		free(largebuf);
-	largebuf = NULL;
-	close(fd1);
+		if ((largebuf != NULL) && (buf_reused == FALSE))
+			free(largebuf);
+		largebuf = NULL;
+		close(fd1);
 
-	/* Compute process time and update statistics */
-	gettimeofday(&end_time, NULL);
-	elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001) -
-		       (start_time.tv_sec + start_time.tv_usec * 0.000001);
-	if (elapsed_time < 0)
-		elapsed_time = 0;
-	sem_wait(&(api_server->job_lock));
-	sel_index = end_time.tv_sec % PROCESS_WINDOW;
-	if (api_server->last_update < end_time.tv_sec) {
-		/* reset statistics */
-		count = end_time.tv_sec - api_server->last_update;
-		if (count > PROCESS_WINDOW)
-			count = PROCESS_WINDOW;
-		cur_index = sel_index;
-		while (count > 0) {
-			count--;
-			api_server->job_count[cur_index] = 0;
-			api_server->job_totaltime[cur_index] = 0;
-			if (count <= 0)
-				break;
-			cur_index--;
-			if (cur_index < 0)
-				cur_index = PROCESS_WINDOW - 1;
+		/* Compute process time and update statistics */
+		gettimeofday(&end_time, NULL);
+		elapsed_time =
+		    (end_time.tv_sec + end_time.tv_usec * 0.000001) -
+		    (start_time.tv_sec + start_time.tv_usec * 0.000001);
+		if (elapsed_time < 0)
+			elapsed_time = 0;
+		sem_wait(&(api_server->job_lock));
+		sel_index = end_time.tv_sec % PROCESS_WINDOW;
+		if (api_server->last_update < end_time.tv_sec) {
+			/* reset statistics */
+			count = end_time.tv_sec - api_server->last_update;
+			if (count > PROCESS_WINDOW)
+				count = PROCESS_WINDOW;
+			cur_index = sel_index;
+			while (count > 0) {
+				count--;
+				api_server->job_count[cur_index] = 0;
+				api_server->job_totaltime[cur_index] = 0;
+				if (count <= 0)
+					break;
+				cur_index--;
+				if (cur_index < 0)
+					cur_index = PROCESS_WINDOW - 1;
+			}
+
+			api_server->last_update = end_time.tv_sec;
 		}
-
-		api_server->last_update = end_time.tv_sec;
-	}
-	api_server->job_count[sel_index] += 1;
-	api_server->job_totaltime[sel_index] += elapsed_time;
-	sem_post(&(api_server->job_lock));
-	write_log(10, "Updated API server process time, %f sec\n",
-		  elapsed_time);
+		api_server->job_count[sel_index] += 1;
+		api_server->job_totaltime[sel_index] += elapsed_time;
+		sem_post(&(api_server->job_lock));
+		write_log(10, "Updated API server process time, %f sec\n",
+			  elapsed_time);
 	}
 	free(index);
 }
