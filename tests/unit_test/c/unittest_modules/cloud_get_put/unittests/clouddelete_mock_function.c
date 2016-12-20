@@ -1,3 +1,6 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include <sys/stat.h>
 #include <stdio.h>
 #include <curl/curl.h>
@@ -137,10 +140,14 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	return 0;
 }
 
+extern char *workpath;
 int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
 	MOCK();
-	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	char *tmp = NULL;
+	asprintf(&tmp, "%s/%s", workpath, "mock_trunc");
+	strcpy(pathname, tmp);
+	free(tmp);
 	return 0;
 }
 

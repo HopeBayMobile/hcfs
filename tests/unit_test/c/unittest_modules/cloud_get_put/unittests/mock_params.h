@@ -17,8 +17,8 @@
 #define INODE__FETCH_TODELETE_PATH_SUCCESS 1
 #define INODE__FETCH_TODELETE_PATH_FAIL 2
 
-#define TODELETE_PATH "/tmp/testHCFS/todelete_meta_path"
-#define MOCK_META_PATH "/tmp/testHCFS/mock_file_meta"
+#define TODELETE_PATH "tmpdir/todelete_meta_path"
+#define MOCK_META_PATH "tmpdir/mock_file_meta"
 
 char **objname_list;
 int32_t objname_counter;

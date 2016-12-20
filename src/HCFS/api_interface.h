@@ -31,7 +31,11 @@
 #define INIT_API_THREADS 2
 #define PROCESS_WINDOW 60
 #define INCREASE_RATIO 0.8
-#define SOCK_PATH "/dev/shm/hcfs_reporter"
+#ifdef UNITTEST
+  #define SOCK_PATH "hcfs_reporter"
+#else
+  #define SOCK_PATH "/dev/shm/hcfs_reporter"
+#endif
 #define API_SERVER_MONITOR_TIME 30
 
 /* Message format for an API request:
