@@ -1,6 +1,6 @@
 Please view this file on the android-dev branch, on stable branches it's out of date.
 
-## Known Issues / Limitations / Features to be Implemented
+## Known Issues / Limitations
  1. Encryption is not enabled now. Some crash issue occurred in the previous build when encryption is turned on (during decryption), and was not yet re-tested in this build.
  2. If cache is full during recording video, user need to wait cache been flushed to storage after recording finished.
  3. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
@@ -15,6 +15,69 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  12. After successfully sync all data, the booster will not re-mounted. And the icon will be gone from the Launcher after rebooting.
  13. If the system is shutdown or reboot when boosting/unboosting, the Tera app did not deal with this situation after booting complete, and the icon will be gone from Launcher also.
  14. the booster might not sync all data ok since we did not execute `sync` command before syncing the booster.
+ 15. [HCFS] In restoration stage1, if system reboot when restored smart cache(2.7GB) has been downloaded and moved into now active hcfs, stage1 will fail because of no more space.
+       It should have kept restoring after rebooting in stage1.
+
+v 2.2.4.2269
+=====
+## New Features
+ - [HCFS] feature/update-nexus-install-gapps: Feature/update nexus install gapps. Update image and use sideload again.On windows, ADB is much stable within VMware player rather than Virtualbox.  ([!658](gateway-2-0/hcfs!658))
+ - [Tera-Launcher] feature/smart_cache: Feature/smart cache  ([!19](gateway-2-0/tera-launcher!19))
+ - [Tera-Service] feature/create_thumbnail_by_intent: Support create thumbnail while receive intent The TeraService will create thumbnail while receivecom.teraservice.create.thumbnail intent  ([!6](TeraAndroid/android_packages_apps_TeraService!6))
+
+## Fixed
+ - [HCFS] bugfix/12929-url-string-overflow: Fix #12929 Swift URL is too long cause hcfs crash# CommentThis bug is resolved by using asprintf to allocate string memory on the fly.The cost is extra malloc on each curl OP, however due to the cost of curl is much more than a memory allocation, the performance should only have little effect.  ([!665](gateway-2-0/hcfs!665))
+ - [HCFS] bugfix/fix_pin_file_downloaded_error: Fix Bug #12293 Pin app but app's file cannot be downloaded completelyFix block counting error in truncate_delete_block  ([!687](gateway-2-0/hcfs!687))
+ - [HCFS] bugfix/reboot_hang_in_restoration_stage1: bugfix/reboot_hang_when_cachefull_in_restoration_stage1  ([!676](gateway-2-0/hcfs!676))
+ - [HCFS] fix/#14255-delete-file-with-800-alias: Fix/#14255 crash on deleting file with 800 aliasIn function [_linked_list_enqueue](https://gitlab.hopebaytech.com/gateway-2-0/hcfs/merge_requests/689/diffs#485e277c31afa32cec3098ed4c059915b0fe4207_224_225):The condition of when to move 1 notify from linked list back to ring buffer is wrong. On the contrary, the shift should happen when ring buffer overflow, e.g. `notify.len >= FUSE_NOTIFY_RINGBUF_MAXLEN`.Those data believed original from linked list are actually from ring buffer's old data, thus cause error when hcfs try to free nested member that already been freed.I use simpler condition here. Notify get shift only if there is notify in linked list.```diff-		if (notify.len < FUSE_NOTIFY_RINGBUF_MAXLEN) {+		if (notify.linked_list_head) {```  ([!689](gateway-2-0/hcfs!689))
+ - [HCFS] fix/dereferencing_after_deallocated: metaops: fix dereferencing fd after deallocated  ([!674](gateway-2-0/hcfs!674))
+ - [HCFS] fix/ndk-warnings: eliminate NDK/clang compilation warnings  ([!620](gateway-2-0/hcfs!620))
+ - [HCFS] fix/null_dereference: restoration_utils: avoid dereference of null pointer  ([!675](gateway-2-0/hcfs!675))
+ - [HCFS] fix/out_of_bounds_access: do_restoration: fix ouf-of-bounds access  ([!662](gateway-2-0/hcfs!662))
+ - [HCFS] fix/pthread_exit_portability: Fix pthread exit / pthread_joiun portabilityThe pthread_exit() function terminates the calling thread and returns avalue via retval that (if the thread is joinable) is available to another thread in the same process that calls pthread_join(3).  ([!683](gateway-2-0/hcfs!683))
+ - [HCFS] fix/pyhcfs-build: fix pyhcfs build  ([!690](gateway-2-0/hcfs!690))
+ - [HCFS] fix/recover-super-block-ut-error: Fix recover super block UT errorcustom_fake need to be defined earlier, since some runtime like covr will use basic functions like `pread`  ([!680](gateway-2-0/hcfs!680))
+ - [HCFS] fix/redundant_checks: fuseop: eliminate redundant checks We should simplify probe error handling though.  ([!666](gateway-2-0/hcfs!666))
+ - [HCFS] fix/scanf_field_overrun: hcfscurl: avoid buffer overflow resulting from scanfsscanf() without field width limits can crash with huge input data.  ([!679](gateway-2-0/hcfs!679))
+ - [HCFS] fix/unexpected_inclusion: avoid unexpected header inclusionTo eliminate the complexity of static analyzer, we should avoid unexpected inclusion.  ([!682](gateway-2-0/hcfs!682))
+ - [HCFS] fix/ut_meta_processing_overflow: UT: meta_processing: fix overflow in implicit constant conversion  ([!685](gateway-2-0/hcfs!685))
+ - [HCFS] hotfix/int32_overflow: hotfix/int32_overflow  ([!673](gateway-2-0/hcfs!673))
+ - [HCFS] origin/bugfix/block_count_error: Origin/bugfix/block count error  ([!686](gateway-2-0/hcfs!686))
+ - [HCFS] Fix/#14171 wrong usage of smart cache 2.2.4
+ - [HCFS] hotfix/fix_api_hang_in_shutdown: fix hang issue in api interface when shutting down ([!684](gateway-2-0/hcfs!684))
+ - [Tera-App] bugfix/#13065: Bugfix/#13065 Don't sign out user if user complete change account process when user leave change account page  ([!160](gateway-2-0/android-management-app!160))
+ - [Tera-App] bugfix/#13507: bugfix/#13507 Prevent folder from showing pin/unpin icon when user move to next level folder then back to parent folder at once.  ([!149](gateway-2-0/android-management-app!149))
+ - [Tera-App] bugfix/#13866: Bugfix/#13866 Start a job service to pin /storage/emulated/0/Android folder until pin success  ([!162](gateway-2-0/android-management-app!162))
+ - [Tera-App] bugfix/#13929: Bugfix/#13929 Add open app flag to start Tera app when user click on the restoration done notification.  ([!152](gateway-2-0/android-management-app!152))
+ - [Tera-App] bugfix/#14081: Bugfix/#14081 Do not send insufficient pin space notification to user if user is doing restoration.  ([!151](gateway-2-0/android-management-app!151))
+ - [Tera-App] bugfix/#14093: Bugfix/#14093 Not allow user to open app/file if data is not in local with "cloud isconnected" status.  ([!159](gateway-2-0/android-management-app!159))
+ - [Tera-App] bugfix/#14096: Bugfix/#14096 If user click home key or switch app key to temporarily leave Tera app, keep the last visible page when user go back to Tera app again.  ([!150](gateway-2-0/android-management-app!150))
+ - [Tera-App] bugfix/#14177: Bugfix/#14177 Fixed OOM due to not sampling when decoding image  ([!156](gateway-2-0/android-management-app!156))
+ - [Tera-App] bugfix/#14183: Bugfix/#14183 Use isAdded() to check fragment is attached to activity or not before calling getString()  ([!161](gateway-2-0/android-management-app!161))
+ - [Tera-App] bugfix/#14186: Bugfix/#14186 Handle error code returned from mgmt server  ([!157](gateway-2-0/android-management-app!157))
+ - [Tera-App] bugfix/#14231: Bugfix/#14231 Change the text color of cancel.  ([!169](gateway-2-0/android-management-app!169))
+ - [Tera-App] bugfix/#14273: Bugfix/#14273 Add error message if auth code is invalid or expired  ([!167](gateway-2-0/android-management-app!167))
+ - [Tera-App] bugfix/#14286: Bugfix/#14286 If the showing content process is not completed, not allow user to change between All Apps/Pinned Apps or All Files/Pinned Files. It can prevent user from pining/unpining apps/files when the showing content process is still running.  ([!166](gateway-2-0/android-management-app!166))
+ - [Tera-App] bugfix/#14334: Bugfix/#14334 Add try catche to handle the I/O error of reading thumbnail.  ([!170](gateway-2-0/android-management-app!170))
+ - [Tera-App] bugfix/#14382: Bugfix/#14382 Don't not log out Tera app if failed to authenticate with Mgmt server  ([!174](gateway-2-0/android-management-app!174))
+ - [Tera-App] bugfix/#14394: Bugfix/#14394 Disable all non-system apps with enabled status BOOSTED boost status  ([!172](gateway-2-0/android-management-app!172))
+ - [Tera-App] bugfix/app_dialog_null_pointer: Bugfix/app_dialog_null_pointerFixed getString() null pointer exception due to fragment is not attached to activity  ([!165](gateway-2-0/android-management-app!165))
+ - [Tera-App] bugfix/dismiss_progress_dialog_when_resotre_failed: Bugfix/dismiss_progress_dialog_when_resotre_failedDismiss progress dialog when register Tera in restoration page.  ([!168](gateway-2-0/android-management-app!168))
+ - [Tera-Launcher] bugfix/#14222: Bugfix/#14222  ([!20](gateway-2-0/tera-launcher!20))
+ - [Tera-Launcher] bugfix/#14261: The application info will be null while uninstall  ([!24](gateway-2-0/tera-launcher!24))
+ - [Tera-Service] bugfix/#14202: The intent will be null while restart serviceIf service crashed and then restarted, the intent will be null.It will cause null pointer exception  ([!7](TeraAndroid/android_packages_apps_TeraService!7))
+
+## CI / Refactoring / Other
+ - [HCFS] ci/update_submodule: Change container and update submodule by remote  ([!668](gateway-2-0/hcfs!668))
+ - [HCFS] ci/update_submodule: Update submodule and correct variable name  ([!667](gateway-2-0/hcfs!667))
+ - [HCFS] refactor/encapsulate_logger: Refactoring: encapsulate logger internal structure Encapsulation can be used to hide data members and members function,that is important to not only object-oriented programming but also avoid mistakes on changing implementation-specific fields without being altered.This patch uses the technique of forware declaration to move the real logger structure into C source rather than header files, to ensure minimal exposure outside logger implementation.  ([!681](gateway-2-0/hcfs!681))
+
+### Project Branch / Tag in this build 
+ - [HCFS] release2.2.4_bugfix
+ - [Tera-App] 2.2.4.0003 
+ - [Tera-Launcher] 2.2.4.0002
+ - [Tera-Service] 2.2.4.0002
+ - [Nexus-5X] release-2.2.4-bugfix
 
 v 2.2.4.2171
 =====
