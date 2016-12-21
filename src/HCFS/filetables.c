@@ -232,7 +232,7 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 	char snap_name[METAPATHLEN + 1];
 	int64_t ret_pos;
 	int32_t errcode, ret;
-	FILE *snapfptr;
+	FILE *snapfptr = NULL;
 	size_t ret_size;
 	uint8_t buf[4096];
 	BOOL have_opened_nonsnap;
@@ -311,5 +311,7 @@ errcode_handle:
 	if (snap_created)
 		unlink(snap_name);
 	sem_post(&(system_fh_table.fh_table_sem));
+	if (snapfptr)
+		fclose(snapfptr);
 	return errcode;
 }

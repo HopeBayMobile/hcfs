@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -g -pthread -Wall -Wextra
-LDFLAGS = -lsqlite3 -ljansson -lcrypto
+LDFLAGS = -lsqlite3 -ljansson -lcrypto -lzip
 
 # [Autodependencies with GNU make]
 # http://scottmcpeak.com/autodepend/autodepend.html
@@ -15,7 +15,8 @@ hcfsapid_OBJS = \
 	enc.o \
 	socket_util.o \
 	logger.o \
-	smart_cache.o
+	smart_cache.o \
+	minimal_apk.o
 hcfsapid_OBJS := $(addprefix $(OBJS_DIR),$(hcfsapid_OBJS))
 
 test_OBJS = \

@@ -25,11 +25,17 @@
 #include <pthread.h>
 #endif
 
+#include "global.h"
+
 #define MAX_API_THREADS 4
 #define INIT_API_THREADS 2
 #define PROCESS_WINDOW 60
 #define INCREASE_RATIO 0.8
-#define SOCK_PATH "/dev/shm/hcfs_reporter"
+#ifdef UNITTEST
+  #define SOCK_PATH "hcfs_reporter"
+#else
+  #define SOCK_PATH "/dev/shm/hcfs_reporter"
+#endif
 #define API_SERVER_MONITOR_TIME {30,0}
 
 /* Message format for an API request:
@@ -61,6 +67,7 @@ typedef struct {
 	time_t last_update;
 	sem_t job_lock;
 	sem_t shutdown_sem;
+	BOOL api_shutting_down;
 } API_SERVER_TYPE;
 
 API_SERVER_TYPE *api_server;

@@ -17,7 +17,6 @@
 #include <pthread.h>
 #include <sqlite3.h>
 
-#define DATA_PREFIX "/data/data"
 #define ANDROID_INTERNAL 1
 #define MP_DEFAULT 1
 
@@ -45,9 +44,13 @@
 #define LOOPDEV "/dev/block/loop6"
 #define HCFSBLOCK "hcfsblock"
 
+#define DEFAULT_PKG_LIST_SIZE 64
+
 typedef struct boost_job_meta {
 	int32_t to_boost;
-	sqlite3 *db;
+	int32_t num_pkg;
+	int32_t pkg_list_size;
+	char **pkg_list;
 } BOOST_JOB_META;
 
 #define RUN_CMD_N_CHECK(RAWCMD, ...)                                           \
@@ -76,6 +79,14 @@ typedef struct boost_job_meta {
 					  __func__, PATH);                     \
 				return -1;                                     \
 			}                                                      \
+		}                                                              \
+	} while (0)
+
+#define CHANGE_PKG_BOOST_STATUS(pkg, status)                                   \
+	do {                                                                   \
+		ret_code = change_boost_status(pkg, status);                   \
+		if (ret_code < 0) {                                            \
+			goto rollback;                                         \
 		}                                                              \
 	} while (0)
 

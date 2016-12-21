@@ -90,6 +90,7 @@ int32_t init_api_interface(void)
 	sem_init(&(api_server->shutdown_sem), 0, 0);
 	api_server->num_threads = INIT_API_THREADS;
 	api_server->last_update = 0;
+	api_server->api_shutting_down = FALSE;
 	memset(api_server->job_count, 0, sizeof(int32_t) * PROCESS_WINDOW);
 	memset(api_server->job_totaltime, 0, sizeof(float) * PROCESS_WINDOW);
 	memset(api_server->local_thread, 0,
@@ -181,10 +182,12 @@ int32_t destroy_api_interface(void)
 	/* Adding lock wait before terminating to prevent last sec
 	thread changes */
 	sem_wait(&(api_server->job_lock));
+	api_server->api_shutting_down = TRUE;
+	sem_post(&(api_server->job_lock));
+
 	for (count = 0; count < api_server->num_threads; count++)
 		pthread_join(api_server->local_thread[count], NULL);
 	pthread_join(api_server->monitor_thread, NULL);
-	sem_post(&(api_server->job_lock));
 	sem_destroy(&(api_server->job_lock));
 	UNLINK(api_server->sock.addr.sun_path);
 	free(api_server);
@@ -1426,6 +1429,12 @@ void api_server_monitor(void)
 		if (ret < 0)
 			continue;
 		gettimeofday(&cur_time, NULL);
+
+		/* If system is going down, just terminate */
+		if (api_server->api_shutting_down == TRUE) {
+			sem_post(&(api_server->job_lock));
+			break;
+		}
 
 		/* Resets the statistics due to sliding window*/
 		sel_index = cur_time.tv_sec % PROCESS_WINDOW;
