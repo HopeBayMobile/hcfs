@@ -295,7 +295,7 @@ void init_delete_control(void)
 
 /* Helper function for marking a delete thread as in use */
 static inline int32_t _use_delete_thread(int32_t index, int32_t dsync_index,
-				char is_blk_flag,
+				BOOL is_blk_flag,
 #if (DEDUP_ENABLE)
 		ino_t this_inode, int64_t blockno, int64_t seq,
 		uint8_t *obj_id)

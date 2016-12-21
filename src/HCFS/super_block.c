@@ -513,7 +513,7 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 /************************************************************************
 *
 * Function name: super_block_update_transit
-*        Inputs: ino_t this_inode, char is_start_transit
+*        Inputs: ino_t this_inode, BOOL is_start_transit
 *       Summary: Update the in_transit status for inode number "this_inode".
 *                Mark the in_transit flag using the input "is_start_transit".
 *                "transit_incomplete" indicates whether the transfer is not
@@ -521,7 +521,7 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
+int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 	char transit_incomplete)
 {
 	int32_t ret_val;

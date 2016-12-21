@@ -35,7 +35,7 @@ typedef struct {
 #if (DEDUP_ENABLE)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
-	char is_block;
+	BOOL is_block;
 	int32_t which_curl;
 	int32_t which_index;
 	int32_t dsync_index;

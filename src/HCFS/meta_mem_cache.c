@@ -77,7 +77,7 @@ errcode_handle:
 	return errcode;
 }
 
-inline char is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
+inline BOOL is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return body_ptr->uploading_info.is_uploading;
 }
@@ -1859,7 +1859,7 @@ errcode_handle:
  * @return 0 for succeeding in setting info, otherwise -1 on error.
  */
 int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-	char is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
+	BOOL is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 

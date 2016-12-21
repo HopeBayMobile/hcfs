@@ -181,7 +181,7 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat,
 	struct fuse_ctx *temp_context;
 	gid_t *tmp_list = NULL, tmp1_list[10];
 	int32_t num_groups, count;
-	char is_in_group;
+	BOOL is_in_group;
 
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
 	if (temp_context == NULL)
@@ -295,8 +295,7 @@ int32_t is_member(fuse_req_t req, gid_t this_gid, gid_t target_gid)
 {
 	gid_t *tmp_list, tmp1_list[10];
 	int32_t num_groups, count;
-	char is_in_group;
-
+	BOOL is_in_group;
 
 	if (this_gid == target_gid)
 		return 1;
