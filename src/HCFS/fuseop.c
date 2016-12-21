@@ -3071,6 +3071,8 @@ int32_t truncate_truncate(ino_t this_inode,
 				       last_index);
 	if (ret < 0)
 		return ret;
+	if (!*body_ptr)
+		return -EINVAL;
 
 	ret = fetch_block_path(thisblockpath, filestat->ino, last_block);
 	if (ret < 0)
