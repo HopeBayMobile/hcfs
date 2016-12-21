@@ -47,4 +47,10 @@ $(eval $(call ADDTEST, syncpoint_control_unittest, \
 $(eval $(call ADDTEST, meta_iterator_unittest, \
   meta_iterator.o \
   meta_iterator_mock_ftn.o \
+  hash_list_struct.o \
   meta_iterator_unittest.o ))
+
+$(eval $(call ADDTEST, hash_list_struct_unittest, \
+  hash_list_struct.o \
+  hash_list_struct_mock_ftn.o \
+  hash_list_struct_unittest.o ))

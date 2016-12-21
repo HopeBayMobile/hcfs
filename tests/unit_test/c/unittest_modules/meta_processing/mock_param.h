@@ -79,6 +79,10 @@ char delete_pathcache_node_success;
 /* inherit_xattr() */
 #define INO_NO_XATTR_PAGE 758925
 #define INO_XATTR_PAGE_EXIST 490013
+
+#define INO_CHECK_LOC_DIR 12345
+#define INO_CHECK_LOC_FILE 12543
+
 size_t TOTAL_KEY_SIZE;
 size_t XATTR_VALUE_SIZE; 
 char xattr_key[3][100];

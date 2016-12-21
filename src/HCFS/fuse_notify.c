@@ -11,7 +11,9 @@
 *
 **************************************************************************/
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "fuse_notify.h"
 
 #include <errno.h>
@@ -29,7 +31,8 @@
 
 FUES_NOTIFY_SHARED_DATA notify;
 fuse_notify_fn *notify_fn[] = { _do_hfuse_ll_notify_noop,
-				_do_hfuse_ll_notify_delete };
+				_do_hfuse_ll_notify_delete,
+				_do_hfuse_ll_notify_inval_ent };
 
 /* Increase index in ring buffer
  *
@@ -346,7 +349,7 @@ int32_t _do_hfuse_ll_notify_noop(_UNUSED FUSE_NOTIFY_PROTO *data,
 	return 0;
 }
 
-/* Actuall function to call libfuse notify; If action == DESTROY_BUF,
+/* Actual function to call libfuse notify_delete; If action == DESTROY_BUF,
  * function will only free nested data structure.
  *
  * @param data_ptr pointer to FUSE_NOTIFY_PROTO
@@ -379,6 +382,38 @@ int32_t _do_hfuse_ll_notify_delete(FUSE_NOTIFY_PROTO *data,
 		write_log(10, "[D] %s: Notified Kernel.\n", __func__);
 	else
 		write_log(0, "[E] %s: %s\n", __func__, strerror(-ret));
+	return ret;
+}
+
+/* Actual function to call libfuse notify_inval_entry; If action == DESTROY_BUF,
+ * function will only free nested data structure.
+ *
+ * @param data_ptr pointer to FUSE_NOTIFY_PROTO
+ * @param action what action will be execute.
+ *
+ * @return zero for success, -errno for failure
+ */
+int32_t _do_hfuse_ll_notify_inval_ent(FUSE_NOTIFY_PROTO *data,
+				enum NOTIFY_ACTION action)
+{
+	int32_t ret = 0;
+	FUSE_NOTIFY_INVAL_ENT_DATA *inval = (FUSE_NOTIFY_INVAL_ENT_DATA *)data;
+
+	if (action == RUN)
+		ret = fuse_lowlevel_notify_inval_entry(
+		    inval->ch, inval->parent, inval->name, inval->namelen);
+	/* Don't error if notify_inval_ent non-existed entries */
+	if (ret == -ENOENT)
+		ret = 0;
+
+	/* Free members. Don't free fuse_chan since it's shared */
+	free(inval->name);
+	inval->name = NULL;
+
+	if (ret == 0)
+		write_log(10, "Debug %s: Notified Kernel.\n", __func__);
+	else
+		write_log(1, "Error %s: %s\n", __func__, strerror(-ret));
 	return ret;
 }
 /* END -- Functions running in notify thread */
@@ -479,4 +514,48 @@ int32_t hfuse_ll_notify_delete_mp(struct fuse_chan *ch,
 		write_log(0, "[E] %s: %s\n", __func__, strerror(-ret));
 	return ret;
 }
+
+/* Add inval_entry notify task to buffer and wake up loop thread to handle it.
+ *
+ * @param ch Fuse channel to communicate with.
+ * @param parent Inode of file to invalidate.
+ * @param name Name of file to invalidate.
+ * @param namelen Length of filename.
+ *
+ * @return zero for success, -errno for failure
+ */
+int32_t hfuse_ll_notify_inval_ent(struct fuse_chan *ch,
+			    fuse_ino_t parent,
+			    const char *name,
+			    size_t namelen)
+{
+	int32_t ret = 0;
+	FUSE_NOTIFY_INVAL_ENT_DATA event = {.func = INVAL_ENT,
+					    .ch = ch,
+					    .parent = parent,
+					    .name = NULL,
+					    .namelen = namelen };
+	while (TRUE) {
+		event.name = strndup(name, namelen);
+		if (event.name == NULL) {
+			ret = -errno;
+			break;
+		}
+		ret = notify_buf_enqueue((void *)&event);
+		if (ret < 0)
+			break;
+		write_log(10, "Debug %s: New notify is queued\n", __func__);
+		break;
+	}
+
+	if (ret < 0) {
+		write_log(1, "Error %s: %s\n", __func__, strerror(-ret));
+		/* recycle on fail */
+		if (event.name != NULL)
+			free(event.name);
+	}
+
+	return ret;
+}
+
 /* END -- Functions running in fuse operation */

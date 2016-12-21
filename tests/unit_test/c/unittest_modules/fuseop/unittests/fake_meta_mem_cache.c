@@ -293,6 +293,7 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 	if (dir_meta_ptr != NULL) {
 		switch (this_inode) {
 		case 13:
+		case TEST_APPDIR_INODE:
 			dir_meta_ptr->total_children = 2;
 			break;
 		case TEST_LISTDIR_INODE:
@@ -306,6 +307,8 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 			break;
 		}
 	}
+	int64_t this_page_pos;
+	DIR_ENTRY *tmpptr;
 	if (dir_page != NULL) {
 		switch (this_inode) {
 		case TEST_LISTDIR_INODE:
@@ -313,6 +316,32 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 			fseek(fptr, dir_page->this_page_pos, SEEK_SET);
 			fread(dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 			fclose(fptr);
+			break;
+		case TEST_APPDIR_INODE:
+			this_page_pos = dir_page->this_page_pos;
+			memset(dir_page, 0, sizeof(DIR_ENTRY_PAGE));
+			dir_page->this_page_pos = this_page_pos;
+			dir_page->num_entries = 4;
+			tmpptr = &(dir_page->dir_entries[0]);
+			tmpptr->d_ino = TEST_APPDIR_INODE;
+			snprintf(tmpptr->d_name, sizeof(tmpptr->d_name),
+			         ".");
+			tmpptr->d_type = D_ISDIR;
+			tmpptr = &(dir_page->dir_entries[1]);
+			tmpptr->d_ino = TEST_APPROOT_INODE;
+			snprintf(tmpptr->d_name, sizeof(tmpptr->d_name),
+			         "..");
+			tmpptr->d_type = D_ISDIR;
+			tmpptr = &(dir_page->dir_entries[2]);
+			tmpptr->d_ino = TEST_APPAPK_INODE;
+			snprintf(tmpptr->d_name, sizeof(tmpptr->d_name),
+			         "base.apk");
+			tmpptr->d_type = D_ISREG;
+			tmpptr = &(dir_page->dir_entries[3]);
+			tmpptr->d_ino = TEST_APPMIN_INODE;
+			snprintf(tmpptr->d_name, sizeof(tmpptr->d_name),
+			         ".basemin");
+			tmpptr->d_type = D_ISREG;
 			break;
 		default:
 			break;
@@ -417,6 +446,17 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			*result_index = -1;
 			break;
 		}
+		if (strcmp(childname,"base.apk") == 0) {
+			result_page->dir_entries[0].d_ino = 15;
+			*result_index = 0;
+			break;
+		}
+		if (strcmp(childname, "com.example.test") == 0) {
+			result_page->dir_entries[0].d_ino = 13;
+			*result_index = 0;
+			break;
+		}
+
 		break;
 	default:
 		break;

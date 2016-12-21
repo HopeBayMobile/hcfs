@@ -36,11 +36,14 @@
 *                  moved convert_hcfsstat_to_sysstat to meta.c
 * 2016/8/24 Ripley add rename feature for external volume.
 * 2016/10/6 Ripley Support concurrent access on the alias inodes.
+* 2016/12/6 Jiahong adding routines for using minimal apks
 *
 **************************************************************************/
 
 #define FUSE_USE_VERSION 29
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "fuseop.h"
 
@@ -115,6 +118,7 @@
 #include "hfuse_system.h"
 #include "do_restoration.h"
 #include "control_smartcache.h"
+#include "apk_mgmt.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
  *
  *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
@@ -159,6 +163,10 @@
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
+static inline BOOL _is_apk(const char *filename);
+static inline BOOL _is_minapk(const char *filename);
+int32_t _convert_minapk(const char *apkname, char *minapk_name);
+int32_t _convert_origin_apk(char *apkname, const char *minapk_name);
 
 /*!
  * Helper function for checking permissions.
@@ -496,12 +504,12 @@ int32_t lookup_pkg(char *pkgname, uid_t *uid)
 
 /*
  * Helper function for querying status of input (pkgname),
- * result ispin will be TRUE if pkg is pinned, otherwise FALSE.
+ * result ispin will be one of: 0 = unpin, 1 = pin, 2 = high priority pin.
  * result issys will be TRUE if pkg is system app, otherwise FALSE.
  *
  * @return - 0 for success, otherwise -1.
  */
-int32_t lookup_pkg_status(const char *pkgname, BOOL *ispin, BOOL *issys)
+int32_t lookup_pkg_status(const char *pkgname, uint8_t *ispin, BOOL *issys)
 {
 
 	sqlite3 *db;
@@ -577,7 +585,8 @@ static inline void _android6_permission(HCFS_STAT *thisstat,
 
 static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 {
-	BOOL ispin, issys;
+	uint8_t ispin;
+	BOOL issys;
 	int32_t ret;
 
 	ret = lookup_pkg_status(tmptok_prev, &ispin, &issys);
@@ -1314,7 +1323,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
 	ino_t parent_inode, alias_ino;
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
 	BOOL is_external = FALSE;
@@ -1380,6 +1389,31 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
+	/* Handle removal of minimal apk */
+	if ((hcfs_system->use_minimal_apk == TRUE) &&
+	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
+		if (_is_apk(selfname) == TRUE) {
+			ret = remove_minapk_data(parent_inode, selfname);
+			if (ret < 0 && ret != -ENOENT) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		} else if (_is_minapk(selfname) == TRUE) {
+			char origin_apk[MAX_FILENAME_LEN] = {0};
+
+			ret = _convert_origin_apk(origin_apk, selfname);
+			if (ret < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+			ret = remove_minapk_data(parent_inode, origin_apk);
+			if (ret < 0 && ret != -ENOENT) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+	}
+
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		ret_val =
 		    delete_pathcache_node(tmpptr->vol_path_cache, this_inode);
@@ -1575,6 +1609,150 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_err(req, -ret_val);
 }
 
+/* Helper function for checking if the file extension is .apk */
+static inline BOOL _is_apk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	if (!strncmp(&(filename[name_len - 4]), ".apk", 4))
+		return TRUE;
+
+	return FALSE;
+}
+
+static inline BOOL _is_minapk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	/* minapk name is ".<x>min" */
+	if (*filename == '.' &&
+		!strncmp(filename + name_len - 3, "min", 3))
+		return TRUE;
+	else
+		return FALSE;
+}
+/* Helper function for converting apk name to minimal apk name */
+int32_t _convert_minapk(const char *apkname, char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(apkname);
+
+	/* The length to copy before ".apk" */
+	name_len -= 4;
+	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
+	snprintf(&(minapk_name[1 + name_len]), 4, "min");
+	write_log(10, "[App unpin] Name of minapk: %s\n", minapk_name);
+	return 0;
+}
+
+int32_t _convert_origin_apk(char *apkname, const char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(minapk_name);
+
+	/* Could not be an apk */
+	if (name_len < 5)
+		return -EINVAL;
+
+	/* From .<x>min to <x>.apk */
+	memcpy(apkname, minapk_name + 1, name_len - 4);
+	memcpy(apkname + name_len - 4, ".apk", 4);
+	apkname[name_len] = '\0';
+	return 0;
+}
+/* Helper function on checking whether to use minimal apk */
+/* Returns 0 if check completed normally, and negative of error if check
+terminated abnormally. Value of "*minapk_ino" is non-zero if minimal apk
+is found and we will use it, otherwise the value is zero. */
+static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
+                                        ino_t *minapk_ino, ino_t apk_ino)
+{
+	/* TODO: 4. Check if minimal apk exists */
+	/* TODO: 5. Check if apk is local */
+	char minapk_name[MAX_FILENAME_LEN+1];
+	int32_t errcode, ret;
+	ino_t *parentlist;
+	int32_t numparents, count;
+	DIR_ENTRY temp_dentry;
+
+	*minapk_ino = 0;
+
+	/* First check if the parent is an app folder under the root
+	of /data/app */
+	ret = sem_wait(&(pathlookup_data_lock));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Unexpected error: %d (%s)\n", errcode,
+		          strerror(errcode));
+		write_log(6, "Error location at %s\n", __func__);
+		errcode = -errcode;
+		return errcode;
+	}
+	parentlist = NULL;
+	ret = fetch_all_parents(parent_ino, &numparents, &parentlist);
+
+	/* Check parent only if fetch parent is successful */
+	if (ret >= 0) {
+		for (count = 0; count < numparents; count++)
+			if (parentlist[count] == hcfs_system->data_app_root)
+				break;
+	}
+	free(parentlist);
+	parentlist = NULL;
+	sem_post(&(pathlookup_data_lock));
+
+	/* Return if encountered an error */
+	if (ret < 0)
+		return ret;
+
+	/* If parent folder is not an app folder under /data/app, do not
+	use minimal apk */
+	if (count == numparents)
+		return 0;
+
+	ret = _convert_minapk(selfname, minapk_name);
+	if (ret < 0)
+		return ret;
+
+	memset(&temp_dentry, 0, sizeof(DIR_ENTRY));
+
+	/* Check if the minimal apk exists in the same folder */
+	ret = lookup_dir(parent_ino, minapk_name, &temp_dentry, FALSE);
+
+	write_log(6, "[App unpin] Min apk %s found? %s\n", minapk_name,
+	          ret == 0 ? "True" : "False");
+	/* Still return 0 if cannot find minimal apk */
+	if (ret == -ENOENT)
+		return 0;
+	else if (ret < 0) 
+		return ret;
+
+	/* Check if the original apk is "local" */
+	ret = check_data_location(apk_ino);
+	/* Don't use the minimal apk if the check failed or the apk is
+	"local" */
+	if (ret <= 0)
+		return ret;
+
+	/* Found the minimal apk, and should use it */
+	*minapk_ino = temp_dentry.d_ino;
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_lookup
@@ -1592,7 +1770,7 @@ a directory (for NFS) */
 /* TODO: error handling if parent_inode is not a directory and name is not "."
 */
 
-	ino_t this_inode, parent_inode;
+	ino_t this_ino, parent_ino;
 	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	struct fuse_entry_param output_param;
@@ -1601,10 +1779,10 @@ a directory (for NFS) */
 	MOUNT_T *tmpptr;
 	BOOL is_external = FALSE;
 
-	parent_inode = real_ino(req, parent);
+	parent_ino = real_ino(req, parent);
 
 	write_log(8, "Debug lookup parent %" PRIu64 ", name %s\n",
-			(uint64_t)parent_inode, selfname);
+			(uint64_t)parent_ino, selfname);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1612,7 +1790,7 @@ a directory (for NFS) */
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
+	ret_val = fetch_inode_stat(parent_ino, &parent_stat, NULL, NULL);
 
 	write_log(10, "Debug lookup parent mode %d\n", parent_stat.mode);
 	if (ret_val < 0) {
@@ -1642,25 +1820,88 @@ a directory (for NFS) */
 	ret_val = check_permission(req, &parent_stat, 1, FALSE);
 
 	if (ret_val < 0) {
+		write_log(6, "[lookup] Permission not granted for parent %"
+		          PRIu64 ", name %s\n", (uint64_t)parent_ino, selfname);
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
 	memset(&output_param, 0, sizeof(struct fuse_entry_param));
+	memset(&temp_dentry, 0, sizeof(DIR_ENTRY));
 
-	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry,
-			     is_external);
+	/* Proceed on checking whether to use minimal apk here */
 
-	write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
-		  (uint64_t)parent_inode, selfname, ret_val);
+	if (((hcfs_system->use_minimal_apk == TRUE) &&
+	    (tmpptr->f_ino == hcfs_system->data_app_root)) &&
+	    (_is_apk(selfname) == TRUE)) {
+		ino_t minapk_ino;
 
-	if (ret_val < 0) {
-		fuse_reply_err(req, -ret_val);
-		return;
+		/* Query hash table for cached result */
+		ret_val = query_minapk_data(parent_ino, selfname, &minapk_ino);
+		if ((ret_val == 0) && (minapk_ino > 0)) {
+			/* Reuse info for stored minimal apk */
+			temp_dentry.d_ino = minapk_ino;
+			snprintf(temp_dentry.d_name, sizeof(temp_dentry.d_name),
+			         "%s", selfname);
+		} else if ((ret_val == 0) && (minapk_ino == 0)) {
+			/* There is no minimal apk. Use the original one */
+			ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
+					     is_external);
+			write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+				  (uint64_t)parent_ino, selfname, ret_val);
+
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		} else {
+			/* Nothing is cached in hash table. Check the result */
+			/* First check if the apk exists */
+			ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
+					     is_external);
+			write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+				  (uint64_t)parent_ino, selfname, ret_val);
+
+			/* Don't insert anything to hash table if
+			apk not found */
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+			/* temp_dentry now points to the apk entry */
+			/* Check whether to use minimal apk */
+			ret_val = _check_use_minapk(parent_ino, selfname,
+			                        &minapk_ino, temp_dentry.d_ino);
+			write_log(6, "[App unpin] check_use_minapk: %d, %"
+			          PRIu64 "\n", ret_val, (uint64_t) minapk_ino);
+
+			/* Decide whether to use minimal apk */
+			if ((ret_val == 0) && (minapk_ino > 0)) {
+				/* Use minimal apk */
+				write_log(10, "[App unpin] Use minapk\n");
+				temp_dentry.d_ino = minapk_ino;
+			} else {
+				minapk_ino = 0;
+			}
+
+			/* Insert the result to hash table */
+			insert_minapk_data(parent_ino, selfname, minapk_ino);
+		}
+	} else {
+		ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
+				     is_external);
+		write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
+			  (uint64_t)parent_ino, selfname, ret_val);
+
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
 	}
 
-	this_inode = temp_dentry.d_ino;
-	ret_val = fetch_inode_stat(this_inode, &this_stat, &this_gen, NULL);
+	this_ino = temp_dentry.d_ino;
+
+	ret_val = fetch_inode_stat(this_ino, &this_stat, &this_gen, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1678,13 +1919,13 @@ a directory (for NFS) */
 #endif
 
 	if (S_ISFILE((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+		ret_val = lookup_increase(tmpptr->lookup_table, this_ino,
 				1, D_ISREG);
 	if (S_ISDIR((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+		ret_val = lookup_increase(tmpptr->lookup_table, this_ino,
 				1, D_ISDIR);
 	if (S_ISLNK((output_param.attr).st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+		ret_val = lookup_increase(tmpptr->lookup_table, this_ino,
 				1, D_ISLNK);
 
 	if (ret_val < 0) {
@@ -1697,18 +1938,18 @@ a directory (for NFS) */
 	 * the inode number is different. */
 	if (is_external && strcmp(selfname, temp_dentry.d_name)) {
 		/* Find if the alias inode is existed, and if not, create it. */
-		ret_val = seek_and_add_in_alias_group(temp_dentry.d_ino, &this_inode,
-											temp_dentry.d_name, selfname);
+		ret_val = seek_and_add_in_alias_group(temp_dentry.d_ino, &this_ino,
+		                                      temp_dentry.d_name, selfname);
 		if (ret_val < 0) {
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
 	}
 
-	output_param.ino = (fuse_ino_t) this_inode;
+	output_param.ino = (fuse_ino_t) this_ino;
 	output_param.generation = this_gen;
 	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
-			(uint64_t)this_inode, this_gen);
+			(uint64_t)this_ino, this_gen);
 
 	fuse_reply_entry(req, &output_param);
 }
@@ -1783,9 +2024,9 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		6. Process rename.
 	*/
 	ino_t parent_inode1, parent_inode2, self_inode, old_target_inode;
-	int32_t ret_val;
+	int32_t ret_val, ret;
 	HCFS_STAT tempstat, old_target_stat;
-	mode_t self_mode, old_target_mode;
+	mode_t self_mode = 0, old_target_mode = 0;
 	DIR_META_TYPE tempmeta;
 	META_CACHE_ENTRY_STRUCT *body_ptr = NULL, *old_target_ptr = NULL;
 	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
@@ -2056,7 +2297,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		ret_val = meta_cache_lookup_file_data(old_target_inode,
 					&old_target_stat, NULL, NULL,
 						0, old_target_ptr);
-
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2417,6 +2657,88 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		change_mount_stat(tmpptr, 0,
 				  delta_meta_size1 + delta_meta_size2, 0);
 	}
+
+#ifdef _ANDROID_ENV_
+	/* Update minimal apk table */
+	/* Rename an app folder under /data/app to another place
+	 * where is not under /data/app */
+	if ((hcfs_system->use_minimal_apk == TRUE) && (
+	    parent_inode1 == hcfs_system->data_app_root &&
+	    S_ISDIR(self_mode) &&
+	    parent_inode2 != hcfs_system->data_app_root)) {
+		DIR_ENTRY_ITERATOR *iter;
+		/* remove all entries with key (parent_inode1, <x>.apk)
+		 * in minapk_lookup_table */
+		body_ptr = meta_cache_lock_entry(self_inode);
+		ret = meta_cache_open_file(body_ptr);
+		if (ret < 0) {
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, -ret);
+			return;
+		}
+		iter = init_dir_iter(body_ptr->fptr);
+		if (!iter) {
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, -errno);
+			return;
+		}
+		while (iter_next(iter)) {
+			if (!strcmp(iter->now_entry->d_name, ".") ||
+			    !strcmp(iter->now_entry->d_name, ".."))
+				continue;
+			/* Check if it is apk file */
+			if (iter->now_entry->d_type == D_ISREG &&
+			    _is_apk(iter->now_entry->d_name)) {
+				ret = remove_minapk_data(self_inode,
+						   iter->now_entry->d_name);
+				if (ret < 0 && ret != -ENOENT)
+					break;
+			}
+		}
+		destroy_dir_iter(iter);
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+	}
+
+	/* Remove entry when rename from (to) the .apk file or
+	 * minimal apk file. */
+	if ((hcfs_system->use_minimal_apk == TRUE) &&
+	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
+		const char *selfname[2] = {selfname1, selfname2};
+		mode_t mode[2] = {self_mode, old_target_mode};
+		ino_t parent_inode[2] = {parent_inode1, parent_inode2};
+		int32_t i;
+
+		/* Both check old name and new name. */
+		for (i = 0; i < 2; i++) {
+			if (mode[i] != 0 && !S_ISREG(mode[i]))
+				continue;
+			if (_is_apk(selfname[i])) {
+				ret = remove_minapk_data(parent_inode[i],
+						selfname[i]);
+				if (ret < 0 && ret != -ENOENT) {
+					fuse_reply_err(req, -ret);
+					return;
+				}
+			} else if (_is_minapk(selfname[i])) {
+				char origin_apk[MAX_FILENAME_LEN] = {0};
+
+				ret = _convert_origin_apk(origin_apk,
+						selfname[i]);
+				if (ret < 0)
+					continue; /* Skip this name */
+
+				ret = remove_minapk_data(parent_inode[i],
+						origin_apk);
+				if (ret < 0 && ret != -ENOENT) {
+					fuse_reply_err(req, -ret);
+					return;
+				}
+			}
+		}
+	}
+#endif
 
 	fuse_reply_err(req, 0);
 }
@@ -7893,12 +8215,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 		if (hcfs_system->system_going_down == FALSE)
 			force_backup_package();
 	}
-
-/*	if (hcfs_system->system_restoring == RESTORING_STAGE1) {
-		if (access("/data/mnt/hcfsblock_restore", F_OK) == 0)
-			unmount_smart_cache("/data/mnt/hcfsblock_restore");
-	}
-*/
 
 	/* Join thread if still restoring */
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)

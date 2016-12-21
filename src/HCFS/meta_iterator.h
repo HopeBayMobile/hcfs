@@ -1,17 +1,51 @@
-#ifndef GW20_HCFS_HCFS_ITERATOR_H_
-#define GW20_HCFS_HCFS_ITERATOR_H_
+/*************************************************************************
+*
+* Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: meta_iterator.c
+* Abstract: The c header file for iterator operations
+*
+* Revision History
+* 2016/10/20 Kewei created this file.
+*
+**************************************************************************/
+
+#ifndef SRC_HCFS_META_ITERATOR_H_
+#define SRC_HCFS_META_ITERATOR_H_
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "meta.h"
+#include "hash_list_struct.h"
+
+/**
+ * file block iterator, directory entry iterator, and hash list entry iterator
+ * is implemented.
+ */
 
 typedef struct ITERATOR_BASE {
 	void *(*begin)(void *iter);
 	void *(*next)(void *iter);
 	void *(*jump)(void *iter, int64_t target_idx);
 } ITERATOR_BASE;
+
+#define iter_begin(iter)                                                       \
+	((iter && iter->base.begin) ? iter->base.begin(iter) : ({              \
+		errno = EINVAL;                                                \
+		(void *)NULL;                                                  \
+	}))
+#define iter_next(iter)                                                        \
+	((iter && iter->base.next) ? iter->base.next(iter) : ({                \
+		errno = EINVAL;                                                \
+		(void *)NULL;                                                  \
+	}))
+#define iter_jump(iter, elem_idx)                                              \
+	((iter && iter->base.jump) ? iter->base.jump(iter, elem_idx) : ({      \
+		errno = EINVAL;                                                \
+		(void *)NULL;                                                  \
+	}))
 
 /**
  *	Usage:
@@ -42,14 +76,65 @@ typedef struct FILE_BLOCK_ITERATOR {
 	FILE *fptr;
 } FILE_BLOCK_ITERATOR;
 
-#define iter_begin(iter) iter->base.begin(iter)
-#define iter_next(iter) iter->base.next(iter)
-#define iter_jump(iter, elem_idx) iter->base.jump(iter, elem_idx)
-
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr);
 void destroy_block_iter(FILE_BLOCK_ITERATOR *iter);
 FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter);
 FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no);
 FILE_BLOCK_ITERATOR *begin_block(FILE_BLOCK_ITERATOR *iter);
 
-#endif
+/**
+ *	Usage:
+ *	HASH_LIST_ITERATOR *iter = init_hashlist_iter(fptr);
+ *	if (!iter)
+ *		return -errno;
+ *	while (iter_next(iter) != NULL) {
+ *		// iter->now_data
+ *	}
+ *	if (errno != ENOENT) {
+ *		// Error occur
+ *	}
+ *	destroy_hashlist_iter(iter);
+ */
+typedef struct HASH_LIST_ITERATOR {
+	ITERATOR_BASE base;
+	HASH_LIST *hash_list;
+	uint32_t now_bucket_idx;
+	LIST_NODE *now_node;
+	void *now_key;
+	void *now_data;
+} HASH_LIST_ITERATOR;
+
+HASH_LIST_ITERATOR *init_hashlist_iter(HASH_LIST *hash_list);
+HASH_LIST_ITERATOR *next_entry(HASH_LIST_ITERATOR *iter);
+HASH_LIST_ITERATOR *begin_entry(HASH_LIST_ITERATOR *iter);
+void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter);
+
+/**
+ *	Usage:
+ *	DIR_ENTRY_ITERATOR *iter = init_dir_iter(fptr);
+ *	if (!iter)
+ *		return -errno;
+ *	while (iter_next(iter) != NULL) {
+ *		// iter->now_data
+ *	}
+ *	if (errno != ENOENT) {
+ *		// Error occur
+ *	}
+ *	destroy_dir_iter(iter);
+ */
+typedef struct DIR_ENTRY_ITERATOR {
+	ITERATOR_BASE base;
+	int64_t now_dirpage_pos;
+	int32_t now_entry_idx;
+	DIR_META_TYPE dir_meta;
+	DIR_ENTRY_PAGE now_page;
+	DIR_ENTRY *now_entry;
+	FILE *fptr;
+} DIR_ENTRY_ITERATOR;
+
+DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr);
+DIR_ENTRY_ITERATOR *next_dir_entry(DIR_ENTRY_ITERATOR *iter);
+DIR_ENTRY_ITERATOR *begin_dir_entry(DIR_ENTRY_ITERATOR *iter);
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter);
+
+#endif  // SRC_HCFS_META_ITERATOR_H_

@@ -10,7 +10,9 @@
 *
 **************************************************************************/
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "atomic_tocloud.h"
 
 #include <fcntl.h>

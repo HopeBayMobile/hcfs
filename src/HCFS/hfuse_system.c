@@ -60,6 +60,7 @@
 #include "do_restoration.h"
 #include "rebuild_super_block.h"
 #include "recover_super_block.h"
+#include "apk_mgmt.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -111,6 +112,7 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
+	hcfs_system->use_minimal_apk = FALSE;
 	hcfs_system->system_restoring = restoring_status;
 
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
@@ -607,6 +609,9 @@ int32_t main(int32_t argc, char **argv)
 		write_log(0, "Error in setting open file limits\n");
 		/* exit(-1); */
 	}
+
+	minapk_lookup_table = NULL;
+	minapk_lookup_iter = NULL;
 
 	/* Convert meta changes if needed */
 	process_upgrade_meta_changes();

@@ -125,12 +125,18 @@ typedef struct {
 	sem_t something_to_replace;
 
 	/* system state controllers */
-	BOOL system_going_down;
-	BOOL backend_is_online;
-	BOOL sync_manual_switch;
-	BOOL sync_paused;
-	BOOL xfer_upload_in_progress;
-	BOOL writing_sys_data;
+	bool system_going_down;
+	bool backend_is_online;
+	bool sync_manual_switch;
+	bool sync_paused;
+	bool xfer_upload_in_progress;
+	bool writing_sys_data;
+
+	/* Define whether minimal apk should be used. Default is false. */
+	bool use_minimal_apk;
+
+	/* Root inode # of /data/app */
+	ino_t data_app_root;
 
 	/* Lots of functions will invoke download directly */
 	sem_t xfer_download_in_progress_sem;
@@ -159,5 +165,5 @@ int32_t hook_fuse(int32_t argc, char **argv);
 
 ino_t data_data_root;
 ino_t data_smart_root;
-BOOL mgmt_app_is_created;
+bool mgmt_app_is_created;
 #endif  /* GW20_HCFS_FUSEOP_H_ */

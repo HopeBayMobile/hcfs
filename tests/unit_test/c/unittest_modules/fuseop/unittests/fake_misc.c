@@ -10,15 +10,17 @@
 #include <fuse/fuse_lowlevel.h>
 #include <attr/xattr.h>
 
-#include "meta_mem_cache.h"
-#include "filetables.h"
-#include "hcfs_fromcloud.h"
-#include "xattr_ops.h"
-#include "global.h"
-#include "mount_manager.h"
-#include "dir_statistics.h"
 #include "atomic_tocloud.h"
+#include "dir_statistics.h"
+#include "filetables.h"
+#include "global.h"
+#include "hcfs_fromcloud.h"
+#include "meta_iterator.h"
+#include "meta_mem_cache.h"
+#include "mount_manager.h"
 #include "params.h"
+#include "xattr_ops.h"
+#include "meta_iterator.h"
 
 #include "fake_misc.h"
 
@@ -184,11 +186,32 @@ int32_t lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 			this_inode = 23;
 			this_type = D_ISDIR;
 		}
+		if (strcmp(childname, "com.example.test") == 0) {
+			this_inode = TEST_APPDIR_INODE;
+			this_type = D_ISDIR;
+		}
+		if (strcmp(childname, "base.apk") == 0) {
+			this_inode = 15;
+			this_type = D_ISREG;
+		}
 	}
 
 	if (parent == 6) {
 		if (strcmp(childname, "test") == 0) {
 			return -ENOENT;
+		}
+	}
+
+	if (parent == TEST_APPDIR_INODE) {
+		if (strcmp(childname, "base.apk") == 0) {
+			this_inode = TEST_APPAPK_INODE;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, ".basemin") == 0) {
+			if (exists_minapk == FALSE)
+				return -ENOENT;
+			this_inode = TEST_APPMIN_INODE;
+			this_type = D_ISREG;
 		}
 	}
 
@@ -582,6 +605,23 @@ int32_t fetch_inode_stat(ino_t this_inode,
 		inode_stat->ino = 23;
 		inode_stat->mode = S_IFDIR | 0600;
 		inode_stat->atime = 100000;
+		break;
+	case 24:
+		inode_stat->ino = 24;
+		inode_stat->mode = S_IFDIR | 0700;
+		inode_stat->atime = 100000;
+		break;
+	case 25:
+		inode_stat->ino = 25;
+		inode_stat->mode = S_IFREG | 0600;
+		inode_stat->atime = 100000;
+		inode_stat->size = 20480000;
+		break;
+	case 26:
+		inode_stat->ino = 26;
+		inode_stat->mode = S_IFREG | 0600;
+		inode_stat->atime = 100000;
+		inode_stat->size = 204800;
 		break;
 	default:
 		break;
@@ -1230,4 +1270,53 @@ int32_t restore_stage1_reduce_cache(void)
 void start_download_minimal(void)
 {
 	return;
+}
+int32_t fetch_all_parents(ino_t self_inode, int32_t *parentnum, ino_t **parentlist)
+{
+	if (self_inode == TEST_APPDIR_INODE) {
+		*parentnum = 1;
+		*parentlist = malloc(sizeof(ino_t));
+		*parentlist[0] = TEST_APPROOT_INODE;
+	}
+	return 0;
+}
+int32_t check_data_location(ino_t this_inode)
+{
+	if (this_inode == TEST_APPAPK_INODE)
+		return tmp_apk_location;
+	return 0;
+}
+
+DIR_ENTRY_ITERATOR *mock_next(DIR_ENTRY_ITERATOR *iter)
+{
+	if (iter->now_entry) {
+		free(iter->now_entry);
+		iter->now_entry = NULL;
+		errno = ENOENT;
+		return NULL;
+	}
+
+	iter->now_entry = calloc(sizeof(DIR_ENTRY), 1);
+	iter->now_entry->d_type = D_ISREG;
+	strcpy(iter->now_entry->d_name, "kewei.apk");
+	return iter;
+}
+
+DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
+{
+	DIR_ENTRY_ITERATOR *iter =
+	    (DIR_ENTRY_ITERATOR *)calloc(sizeof(DIR_ENTRY_ITERATOR), 1);
+	iter->base.next = (void *)&mock_next;
+	return iter;
+}
+
+void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter)
+{
+	if (iter) {
+		if (iter->now_entry) {
+			free(iter->now_entry);
+			iter->now_entry = NULL;
+		}
+		free(iter);
+	}
 }

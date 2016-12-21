@@ -37,9 +37,9 @@ include $(realpath $(HCFS_ROOT)/build/ccache.mk)
 # Flags for gcc (We trace coverage of hcfs source only)
 CFLAGS += -ftest-coverage -std=gnu11
 # Flags for g++
-CXXFLAGS += -fpermissive -Wno-missing-field-initializers -std=gnu++11
+CXXFLAGS += -fpermissive -std=gnu++11
 # Flags passed to C and C++ compilers
-CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable \
+CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter \
 	    -pthread -fprofile-arcs \
 	    -D_FILE_OFFSET_BITS=64 \
 	    -DDEDUP_ENABLE=0 \

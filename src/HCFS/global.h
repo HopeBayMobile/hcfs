@@ -16,10 +16,11 @@
 
 #include <stdint.h>
 #include <limits.h>
+#include <stdbool.h>
 
-#define BOOL uint8_t
-#define TRUE 1
-#define FALSE 0
+#define BOOL bool
+#define TRUE true
+#define FALSE false
 #define ON 1
 #define OFF 0
 
@@ -86,6 +87,8 @@
 #define CHECK_RESTORATION_STATUS 43
 #define NOTIFY_APPLIST_CHANGE 44
 #define SEND_NOTIFY_EVENT 45
+#define TOGGLE_USE_MINIMAL_APK 46
+#define GET_MINIMAL_APK_STATUS 47
 
 #define DEFAULT_PIN FALSE
 

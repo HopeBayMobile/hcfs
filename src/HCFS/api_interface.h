@@ -36,7 +36,7 @@
 #else
   #define SOCK_PATH "/dev/shm/hcfs_reporter"
 #endif
-#define API_SERVER_MONITOR_TIME 30
+#define API_SERVER_MONITOR_TIME {30,0}
 
 /* Message format for an API request:
 	(From the first byte)

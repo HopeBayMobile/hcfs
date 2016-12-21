@@ -2820,7 +2820,7 @@ int32_t restore_meta_structure(FILE *fptr)
 	int64_t total_blocks, count;
 	int64_t pin_size, metasize, metasize_blk;
 	int32_t e_index;
-	BOOL block_status;
+	uint8_t block_status;
 	BOOL write_page;
 	BOOL just_meta;
 	size_t ret_size;
@@ -3276,4 +3276,71 @@ errcode_handle:
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 	return ret;
+}
+
+/**
+ * Check the data location of a filesystem object.
+ *
+ * @param this_inode Inode number of the file / dir to be checked.
+ *
+ * @return 0 if a file / data is "local", 1 if "cloud", or 2 if "hybrid".
+ *         Otherwise negative error code.
+ */
+int32_t check_data_location(ino_t this_inode)
+{
+	int32_t errcode;
+	char metapath[METAPATHLEN];
+	HCFS_STAT thisstat;
+	META_CACHE_ENTRY_STRUCT *thisptr;
+	char inode_loc;
+	FILE_STATS_TYPE tmpstats;
+	ssize_t ret_ssize;
+
+	write_log(10, "Debug checkloc inode %" PRIu64 "\n",
+		  (uint64_t)this_inode);
+	errcode = fetch_meta_path(metapath, this_inode);
+	if (errcode < 0)
+		return errcode;
+
+	if (access(metapath, F_OK) != 0)
+		return -ENOENT;
+
+	thisptr = meta_cache_lock_entry(this_inode);
+	if (thisptr == NULL)
+		return -errno;
+
+	errcode = meta_cache_lookup_file_data(this_inode, &thisstat,
+						NULL, NULL, 0, thisptr);
+	if (errcode < 0)
+		goto errcode_handle;
+
+	if (S_ISREG(thisstat.mode)) {
+		errcode = meta_cache_open_file(thisptr);
+		if (errcode < 0)
+			goto errcode_handle;
+		PREAD(fileno(thisptr->fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+		if ((tmpstats.num_blocks == 0) ||
+		    (tmpstats.num_blocks == tmpstats.num_cached_blocks))
+			inode_loc = 0;  /* If the location is "local" */
+		else if (tmpstats.num_cached_blocks == 0)
+			inode_loc = 1;  /* If the location is "cloud" */
+		else
+			inode_loc = 2;  /* If the location is "hybrid" */
+	} else {
+		inode_loc = 0;  /* Non-file obj defaults to "local" */
+	}
+
+	write_log(6, "Location of inode %" PRIu64 " is %d.\n",
+	          (uint64_t) this_inode, inode_loc);
+	meta_cache_close_file(thisptr);
+	meta_cache_unlock_entry(thisptr);
+
+	return inode_loc;
+
+errcode_handle:
+	write_log(0, "Cannot read meta when checking loc for inode %"
+	          PRIu64 "\n", (uint64_t) this_inode);
+	meta_cache_unlock_entry(thisptr);
+	return errcode;
 }
