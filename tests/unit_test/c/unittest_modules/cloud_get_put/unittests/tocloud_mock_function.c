@@ -54,7 +54,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	return HTTP_OK;
 }
 
-int32_t super_block_update_transit(ino_t this_inode, char is_start_transit,
+int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 	char transit_incomplete)
 {
 	MOCK();
