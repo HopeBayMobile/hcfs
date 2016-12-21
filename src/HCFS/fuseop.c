@@ -504,12 +504,12 @@ int32_t lookup_pkg(char *pkgname, uid_t *uid)
 
 /*
  * Helper function for querying status of input (pkgname),
- * result ispin will be one of: 0 = unpin, 1 = pin, 2 = high priority pin.
+ * result pin will be one of: 0 = unpin, 1 = pin, 2 = high priority pin.
  * result issys will be TRUE if pkg is system app, otherwise FALSE.
  *
  * @return - 0 for success, otherwise -1.
  */
-int32_t lookup_pkg_status(const char *pkgname, uint8_t *ispin, BOOL *issys)
+int32_t lookup_pkg_status(const char *pkgname, PIN_t *pin_status, BOOL *issys)
 {
 
 	sqlite3 *db;
@@ -552,11 +552,11 @@ int32_t lookup_pkg_status(const char *pkgname, uint8_t *ispin, BOOL *issys)
 		return -1;
 	}
 
-	write_log(8, "Fetch pkg status issys = %d, ispin = %d\n",
+	write_log(8, "Fetch pkg status issys = %d, pin_status = %d\n",
 		  status_code[0], status_code[1]);
 
 	*issys = status_code[0];
-	*ispin = status_code[1];
+	*pin_status = status_code[1];
 	return 0;
 }
 
@@ -583,20 +583,20 @@ static inline void _android6_permission(HCFS_STAT *thisstat,
 }
 
 
-static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
+static inline void _try_get_pin_st(const char *tmptok_prev, PIN_t *pin_status)
 {
-	uint8_t ispin;
+	PIN_t pin;
 	BOOL issys;
 	int32_t ret;
 
-	ret = lookup_pkg_status(tmptok_prev, &ispin, &issys);
+	ret = lookup_pkg_status(tmptok_prev, &pin, &issys);
 	/* Get pin st if success */
 	if (ret == 0) {
 		if (issys == TRUE) {
 			*pin_status = P_HIGH_PRI_PIN;
 		} else {
-			if (P_IS_VALID_PIN(ispin))
-				*pin_status = (char)ispin;
+			if (P_IS_VALID_PIN(pin))
+				*pin_status = (PIN_t) pin;
 			else
 				write_log(0, "Error: Lookup pin status "
 						"is not valid value\n");
@@ -610,7 +610,7 @@ static inline void _try_get_pin_st(const char *tmptok_prev, char *pin_status)
 int32_t _rewrite_stat(MOUNT_T *tmpptr,
 		      HCFS_STAT *thisstat,
 		      const char *selfname,
-		      char *pin_status)
+		      PIN_t *pin_status)
 {
 	int32_t ret, errcode;
 	char *tmppath;
@@ -721,7 +721,7 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 					/* When parent is /0/Android/data/,
 					 * need to check self pkg name */
 					if (selfname) {
-						if (pin_status)
+						if (pin_status != P_UNPIN)
 						/* Create external pkg
 						 * folder */
 							_try_get_pin_st(
@@ -747,7 +747,7 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 					lookup_pkg(tmptok_prev, &tmpuid);
 					/* If lookup failed in the previous step,
 					no need to lookup pin status */
-					if ((pin_status) && (tmpuid != 0))
+					if ((pin_status != P_UNPIN) && (tmpuid != 0))
 						_try_get_pin_st(tmptok_prev,
 								pin_status);
 					thisstat->uid = tmpuid;
@@ -767,7 +767,7 @@ int32_t _rewrite_stat(MOUNT_T *tmpptr,
 			lookup_pkg(tmptok_prev, &tmpuid);
 			/* If lookup failed in the previous step,
 			no need to lookup pin status */
-			if ((pin_status) && (tmpuid != 0))
+			if ((pin_status != P_UNPIN) && (tmpuid != 0))
 				_try_get_pin_st(tmptok_prev,
 						pin_status);
 			thisstat->uid = tmpuid;
@@ -902,7 +902,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	uint64_t this_generation;
 	MOUNT_T *tmpptr;
 	char local_pin;
-	char ispin;
+	PIN_t pin;
 	int64_t delta_meta_size;
 	BOOL is_external = FALSE;
 
@@ -944,21 +944,21 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
-	ispin = (char) 255;
+	pin = P_INVALID;
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL, &ispin);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, &pin);
 		is_external = TRUE;
 	}
-	/* Inherit parent pin status if "ispin" is not modified */
-	if (ispin == (char) 255)
-		ispin = local_pin;
+	/* Inherit parent pin status if "pin" is not modified */
+	if (pin == P_INVALID)
+		pin = local_pin;
 #else
 	/* Default inherit parent's pin status */
-	ispin = local_pin;
+	pin = local_pin;
 #endif
 
 	if (!S_ISDIR(parent_stat.mode)) {
@@ -1000,7 +1000,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
-			ispin);
+			pin);
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
@@ -1015,7 +1015,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
 			&this_stat, this_generation, tmpptr,
-			&delta_meta_size, ispin, is_external);
+			&delta_meta_size, pin, is_external);
 
 	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0) {
@@ -1135,7 +1135,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	uint64_t this_gen;
 	MOUNT_T *tmpptr;
 	char local_pin;
-	char ispin;
+	PIN_t pin;
 	int64_t delta_meta_size;
 	BOOL is_external = FALSE;
 
@@ -1193,21 +1193,21 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	ispin = (char) 255;
+	pin = P_INVALID;
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, selfname, &ispin);
+		_rewrite_stat(tmpptr, &parent_stat, selfname, &pin);
 		is_external = TRUE;
 	}
-	/* Inherit parent pin status if "ispin" is not modified */
-	if (ispin == (char) 255)
-		ispin = local_pin;
+	/* Inherit parent pin status if "pin" is not modified */
+	if (pin == P_INVALID)
+		pin = local_pin;
 #else
 	/* Default inherit parent's pin status */
-	ispin = local_pin;
+	pin = local_pin;
 #endif
 	if (!S_ISDIR(parent_stat.mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -1244,7 +1244,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.blksize = ST_BLKSIZE;
 	this_stat.blocks = 0;
 
-	self_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
+	self_inode = super_block_new_inode(&this_stat, &this_gen, pin);
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
 		return;
@@ -1259,7 +1259,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	delta_meta_size = 0;
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat, this_gen,
-			tmpptr, &delta_meta_size, ispin,
+			tmpptr, &delta_meta_size, pin,
 			is_external);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -2883,13 +2883,13 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 	off_t total_deleted_dirty_cache;
 	int32_t ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
-	char ispin;
+	PIN_t pin;
 
 	total_deleted_cache = 0;
 	total_deleted_dirty_cache = 0;
 	total_deleted_blocks = 0;
 	total_deleted_fileblocks = 0;
-	ispin = filemeta->local_pin;
+	pin = filemeta->local_pin;
 
 	write_log(10, "Debug truncate_delete_block, start %d, old_last %lld,",
 		start_index, old_last_block);
@@ -3013,7 +3013,7 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 		tmpentry->seqnum = filemeta->finished_seq;
 	}
 	if ((total_deleted_fileblocks > 0) || (total_deleted_blocks > 0)) {
-		unpin_dirty_size = (P_IS_UNPIN(ispin) ? -total_deleted_dirty_cache : 0);
+		unpin_dirty_size = (P_IS_UNPIN(pin) ? -total_deleted_dirty_cache : 0);
 		change_system_meta_ignore_dirty(
 		    inode_index, 0, 0, -total_deleted_cache,
 		    -total_deleted_blocks, -total_deleted_dirty_cache,
@@ -4572,12 +4572,12 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 /* Helper function for write operation. Will wait on cache full and wait
 *  until cache is not full. */
 int32_t write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
-		FH_ENTRY *fh_ptr, off_t this_page_fpos, char ispin)
+		FH_ENTRY *fh_ptr, off_t this_page_fpos, PIN_t pin)
 {
 	int32_t ret;
 	int64_t max_cache_size;
 
-	max_cache_size = get_cache_limit(ispin);
+	max_cache_size = get_cache_limit(pin);
 	if (max_cache_size < 0)
 		return -EIO;
 
@@ -4634,7 +4634,7 @@ int32_t write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 /* Helper function for the write operation. Will fetch a block from backend. */
 int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, int64_t eindex,
-		char ispin)
+		PIN_t pin)
 {
 	char thisblockpath[400];
 	char objname[1000];
@@ -4769,7 +4769,7 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 				return ret;
 			}
 			block_size_blk = tempstat2.st_blocks * 512;
-			unpin_dirty_size = (P_IS_UNPIN(ispin) ?
+			unpin_dirty_size = (P_IS_UNPIN(pin) ?
 					block_size_blk : 0);
 			change_system_meta_ignore_dirty(
 			    this_inode, 0, 0, block_size_blk, 1, block_size_blk,
@@ -4826,7 +4826,7 @@ error_handling:
 *  block from backend if needed. */
 size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode,
-		int32_t *reterr, char ispin, int64_t now_seq)
+		int32_t *reterr, PIN_t pin, int64_t now_seq)
 {
 	int64_t current_page;
 	char thisblockpath[400];
@@ -4892,7 +4892,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		tmpdiff = (offset + (off_t) size) - old_cache_size;
 		write_log(10, "%zu, %lld, %lld, %lld, %lld\n", size,
 			(off_t) size, tmpdiff, offset, old_cache_size);
-		max_cache_size = get_cache_limit(ispin);
+		max_cache_size = get_cache_limit(pin);
 		if (max_cache_size < 0) {
 			*reterr = -EIO;
 			return 0;
@@ -4978,7 +4978,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		}
 
 		ret = write_wait_full_cache(&temppage, entry_index, fh_ptr,
-					    this_page_fpos, ispin);
+					    this_page_fpos, pin);
 		if (ret < 0) {
 			*reterr = ret;
 			return 0;
@@ -5084,7 +5084,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 				block_dirty = TRUE;
 				ret = _write_fetch_backend(this_inode, bindex,
 					fh_ptr, &temppage, this_page_fpos,
-					entry_index, ispin);
+					entry_index, pin);
 				if (ret < 0) {
 					*reterr = ret;
 					return 0;
@@ -5202,7 +5202,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 		else
 			dirty_delta = new_cache_size;
 
-		unpin_dirty_size = (P_IS_UNPIN(ispin) ? dirty_delta : 0);
+		unpin_dirty_size = (P_IS_UNPIN(pin) ? dirty_delta : 0);
 		change_system_meta_ignore_dirty(
 		    this_inode, 0, 0, new_cache_size - old_cache_size, 0,
 		    dirty_delta, unpin_dirty_size, TRUE);
@@ -7807,7 +7807,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	int64_t fh;
 	MOUNT_T *tmpptr;
 	char local_pin;
-	char ispin;
+	PIN_t pin;
 	int64_t delta_meta_size;
 	BOOL is_external = FALSE;
 
@@ -7844,21 +7844,21 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 #ifdef _ANDROID_ENV_
-	ispin = (char) 255;
+	pin = P_INVALID;
 	if (IS_ANDROID_EXTERNAL(tmpptr->volume_type)) {
 		if (tmpptr->vol_path_cache == NULL) {
 			fuse_reply_err(req, EIO);
 			return;
 		}
-		_rewrite_stat(tmpptr, &parent_stat, NULL, &ispin);
+		_rewrite_stat(tmpptr, &parent_stat, NULL, &pin);
 		is_external = TRUE;
 	}
-	/* Inherit parent pin status if "ispin" is not modified */
-	if (ispin == (char) 255)
-		ispin = local_pin;
+	/* Inherit parent pin status if "pin" is not modified */
+	if (pin == P_INVALID)
+		pin = local_pin;
 #else
 	/* Default inherit parent's pin status */
-	ispin = local_pin;
+	pin = local_pin;
 #endif
 
 	if (!S_ISDIR(parent_stat.mode)) {
@@ -7896,7 +7896,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 	self_inode = super_block_new_inode(&this_stat, &this_generation,
-			ispin);
+			pin);
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
@@ -7906,7 +7906,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
 			&this_stat, this_generation, tmpptr,
-			&delta_meta_size, ispin, is_external);
+			&delta_meta_size, pin, is_external);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
