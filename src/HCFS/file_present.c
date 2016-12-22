@@ -210,7 +210,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			HCFS_STAT *this_stat, uint64_t this_gen,
 			MOUNT_T *mountptr, int64_t *delta_meta_size,
-			char ispin, BOOL is_external)
+			PIN_t pin, BOOL is_external)
 {
 	int32_t ret_val, ret, errcode;
 	size_t ret_size;
@@ -279,9 +279,9 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
         this_meta.finished_seq = 0;
 	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
-	this_meta.local_pin = ispin;
+	this_meta.local_pin = pin;
 	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
-		selfname, ispin);
+		selfname, pin);
 
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
@@ -396,7 +396,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 			  uint64_t this_gen,
 			  MOUNT_T *mountptr,
 			  int64_t *delta_meta_size,
-			  char ispin,
+			  PIN_t pin,
 			  BOOL is_external)
 {
 	DIR_META_TYPE this_meta;
@@ -470,9 +470,9 @@ int32_t mkdir_update_meta(ino_t self_inode,
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	this_meta.finished_seq = 0;
-	this_meta.local_pin = ispin;
+	this_meta.local_pin = pin;
 	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
-		selfname, ispin);
+		selfname, pin);
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0) {
@@ -844,7 +844,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			    const char *name,
 			    MOUNT_T *mountptr,
 			    int64_t *delta_meta_size,
-			    char ispin,
+			    PIN_t pin,
 			    BOOL is_external)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
@@ -908,10 +908,10 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
 	symlink_meta.finished_seq = 0;
-	symlink_meta.local_pin = ispin;
+	symlink_meta.local_pin = pin;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 	write_log(10, "Debug: File %s inherits parent pin status = %d\n",
-		name, ispin);
+		name, pin);
 
 	/* Update self meta data */
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);

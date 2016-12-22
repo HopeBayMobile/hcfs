@@ -2042,13 +2042,13 @@ int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
  * to unpin.
  *
  * @param ptr Meta cache entry pointer.
- * @param ispin New pinned status. TRUE means from unpin to pin, and FALSE
+ * @param pin New pinned status. TRUE means from unpin to pin, and FALSE
  *              means from pin to unpin
  *
  * @return 0 on succes, otherwise negative error code.
  */
 static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
-					char ispin)
+					PIN_t pin)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -2068,7 +2068,7 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
 	 * when from unpin to pin, decrease unpin-dirty size, otherwise
 	 * increase unpin-dirty size
 	 */
-	if (P_IS_PIN(ispin))
+	if (P_IS_PIN(pin))
 		change_system_meta_ignore_dirty(ptr->inode_num, 0, 0, 0, 0, 0,
 						-filestats.dirty_data_size,
 						FALSE);

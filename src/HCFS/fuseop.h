@@ -73,10 +73,15 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 #define SELINUX_EXTERNAL_XATTR_VAL "u:object_r:fuse:s0"
 
 /* Defines for local pin property */
-#define NUM_PIN_TYPES 3
-#define P_UNPIN 0
-#define P_PIN 1
-#define P_HIGH_PRI_PIN 2
+typedef enum {
+	P_UNPIN,
+	P_PIN,
+	P_HIGH_PRI_PIN,
+	/* end */
+	NUM_PIN_TYPES,
+	P_INVALID = 255,
+} PIN_t;
+
 /* Marcos to check pin property */
 #define P_IS_VALID_PIN(p) (p < NUM_PIN_TYPES) /* To valid pin property */
 #define P_IS_PIN(p) ((p == P_PIN) || (p == P_HIGH_PRI_PIN))

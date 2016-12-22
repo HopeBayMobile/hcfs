@@ -38,7 +38,7 @@ int32_t mknod_update_meta(ino_t self_inode,
 			  uint64_t this_gen,
 			  MOUNT_T *mountptr,
 			  int64_t *delta_meta_size,
-			  char ispin,
+			  PIN_t pin,
 			  BOOL is_external);
 
 int32_t mkdir_update_meta(ino_t self_inode,
@@ -48,7 +48,7 @@ int32_t mkdir_update_meta(ino_t self_inode,
 			  uint64_t this_gen,
 			  MOUNT_T *mountptr,
 			  int64_t *delta_meta_size,
-			  char ispin,
+			  PIN_t pin,
 			  BOOL is_external);
 
 int32_t unlink_update_meta(fuse_req_t req,
@@ -71,7 +71,7 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 			    const char *name,
 			    MOUNT_T *mountptr,
 			    int64_t *delta_meta_size,
-			    char ispin,
+			    PIN_t pin,
 			    BOOL is_external);
 
 int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,

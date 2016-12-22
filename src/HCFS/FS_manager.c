@@ -233,7 +233,7 @@ ino_t _create_root_inode()
 	uint64_t this_gen;
 	FS_STAT_T tmp_stat;
 	CLOUD_RELATED_DATA cloud_related_data;
-	char ispin;
+	PIN_t pin;
 
 	statfptr = NULL;
 
@@ -244,12 +244,12 @@ ino_t _create_root_inode()
 #ifdef _ANDROID_ENV_
 	self_mode = S_IFDIR | 0770;
 	if (voltype == ANDROID_INTERNAL) /* Default pin internal storage */
-		ispin = P_PIN;
+		pin = P_PIN;
 	else
-		ispin = DEFAULT_PIN;
+		pin = DEFAULT_PIN;
 #else
 	self_mode = S_IFDIR | 0775;
-	ispin = DEFAULT_PIN;
+	pin = DEFAULT_PIN;
 #endif
 	this_stat.mode = self_mode;
 
@@ -260,7 +260,7 @@ ino_t _create_root_inode()
 
 	set_timestamp_now(&this_stat, A_TIME | M_TIME | C_TIME);
 
-	root_inode = super_block_new_inode(&this_stat, &this_gen, ispin);
+	root_inode = super_block_new_inode(&this_stat, &this_gen, pin);
 
 	if (root_inode <= 1) {
 		write_log(0, "Error creating new root inode\n");
@@ -292,7 +292,7 @@ ino_t _create_root_inode()
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
-	this_meta.local_pin = ispin;
+	this_meta.local_pin = pin;
 	FSEEK(metafptr, sizeof(HCFS_STAT), SEEK_SET);
 
 	/* Init parent lookup. Root inode does not have a parent */

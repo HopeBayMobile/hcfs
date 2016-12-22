@@ -626,7 +626,7 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
 	SYMLINK_META_TYPE linkmeta;
-	char is_local_pin = P_UNPIN;
+	PIN_t local_pin = P_UNPIN;
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: checkpin inode %" PRIu64 "\n",
@@ -652,7 +652,7 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 						&filemeta, NULL, 0, thisptr);
 		if (retcode < 0)
 			goto error_handling;
-		is_local_pin = filemeta.local_pin;
+		local_pin = filemeta.local_pin;
 	}
 
 	if (S_ISDIR(thisstat.mode)) {
@@ -660,7 +660,7 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 						&dirmeta, NULL, thisptr);
 		if (retcode < 0)
 			goto error_handling;
-		is_local_pin = dirmeta.local_pin;
+		local_pin = dirmeta.local_pin;
 	}
 
 	if (S_ISLNK(thisstat.mode)) {
@@ -668,14 +668,14 @@ int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
 						&linkmeta, thisptr);
 		if (retcode < 0)
 			goto error_handling;
-		is_local_pin = linkmeta.local_pin;
+		local_pin = linkmeta.local_pin;
 	}
 
 	meta_cache_close_file(thisptr);
 	meta_cache_unlock_entry(thisptr);
 
-	if (P_IS_VALID_PIN(is_local_pin))
-		return is_local_pin;
+	if (P_IS_VALID_PIN(local_pin))
+		return local_pin;
 	retcode = -EIO;
 	goto error_handling;
 
