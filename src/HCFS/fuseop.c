@@ -865,7 +865,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 		convert_hcfsstat_to_sysstat(&ret_stat, &tmp_stat);
-		fuse_reply_attr(req, &ret_stat, 0);
+		fuse_reply_attr(req, &ret_stat, REPLY_ATTR_TIMEOUT);
 	} else {
 		gettimeofday(&tmp_time2, NULL);
 
@@ -6946,6 +6946,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	fuse_reply_readlink(req, link_buffer);
 }
 
+#ifndef FUSE_NOXATTR
 /**
  * Check xattr R/W permission.
  *
@@ -6982,7 +6983,9 @@ static int32_t _xattr_permission(char name_space,
 
 	return -EINVAL;
 }
+#endif /* FUSE_NOXATTR */
 
+#ifndef FUSE_NOXATTR
 /************************************************************************
 *
 * Function name: hfuse_ll_setxattr
@@ -7145,7 +7148,9 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
+#endif  /* FUSE_NOXATTR */
 
+#ifndef FUSE_NOXATTR
 /************************************************************************
 *
 * Function name: hfuse_ll_getxattr
@@ -7334,7 +7339,9 @@ error_handle:
 		free(value);
 	fuse_reply_err(req, -retcode);
 }
+#endif /* FUSE_NOXATTR */
 
+#ifndef FUSE_NOXATTR
 /************************************************************************
 *
 * Function name: hfuse_ll_listxattr
@@ -7490,7 +7497,9 @@ error_handle:
 		free(key_buf);
 	fuse_reply_err(req, -retcode);
 }
+#endif /* FUSE_NOXATTR */
 
+#ifndef FUSE_NOXATTR
 /************************************************************************
 *
 * Function name: hfuse_ll_removexattr
@@ -7631,6 +7640,7 @@ error_handle:
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
 }
+#endif /* FUSE_NOXATTR */
 
 /************************************************************************
 *
@@ -8104,10 +8114,12 @@ struct fuse_lowlevel_ops hfuse_ops = {
 	.forget = hfuse_ll_forget,
 	.symlink = hfuse_ll_symlink,
 	.readlink = hfuse_ll_readlink,
+#ifndef FUSE_NOXATTR
 	.setxattr = hfuse_ll_setxattr,
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
+#endif
 	.link = hfuse_ll_link,
 	.create = hfuse_ll_create,
 	.fallocate = hfuse_ll_fallocate,

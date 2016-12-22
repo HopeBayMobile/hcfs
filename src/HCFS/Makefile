@@ -18,6 +18,7 @@ CPPFLAGS = -DENABLE_DEDUP=0 \
 	   -D_DEFAULT_SOURCE \
 	   -DVERSION_NUM=\"$(VERSION_NUM)\" \
 	   -D_BSD_SOURCE \
+	   -DFUSE_NOXATTR \
 
 CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
 LDFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson

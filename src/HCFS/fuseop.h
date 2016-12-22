@@ -172,4 +172,8 @@ int32_t hook_fuse(int32_t argc, char **argv);
 ino_t data_data_root;
 ino_t data_smart_root;
 bool mgmt_app_is_created;
+
+/* FUSE op parameters */
+#define REPLY_ATTR_TIMEOUT 0.1 /* Timeout for cached getattr results */
+
 #endif  /* GW20_HCFS_FUSEOP_H_ */

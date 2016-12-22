@@ -75,6 +75,7 @@ struct fuse_ll {
 	int no_splice_write;
 	int no_splice_move;
 	int no_splice_read;
+	int writeback_cache;
 	struct fuse_lowlevel_ops op;
 	int got_init;
 	struct cuse_data *cuse_data;
