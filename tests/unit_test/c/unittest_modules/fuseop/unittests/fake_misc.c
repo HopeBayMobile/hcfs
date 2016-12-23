@@ -869,9 +869,9 @@ int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if (size == 0) {
 		*actual_size = CORRECT_VALUE_SIZE;
 	} else {
-		char *ans = "hello!listxattr:)";
+		char ans[] = "hello!listxattr:)";
 		strcpy(key_buf, ans);
-		*actual_size = strlen(ans);
+		*actual_size = strlen(ans) + 1;
 	}
 	return 0;
 }
