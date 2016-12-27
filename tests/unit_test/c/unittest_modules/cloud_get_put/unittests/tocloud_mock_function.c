@@ -95,7 +95,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTT
 	return 200;
 }
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 int32_t do_block_delete(ino_t this_inode, int64_t block_no, uint8_t *obj_id,
 		    CURL_HANDLE *curl_handle)
 #else
