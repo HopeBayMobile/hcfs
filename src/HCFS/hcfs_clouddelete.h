@@ -32,7 +32,7 @@ typedef struct {
 	ino_t inode;
 	int64_t blockno;
 	int64_t seq;
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
 	BOOL is_block;
@@ -83,7 +83,7 @@ DELETE_THREAD_CONTROL delete_ctl;
 DSYNC_THREAD_CONTROL dsync_ctl;
 
 int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		    uint8_t *obj_id,
 #endif
 		    CURL_HANDLE *curl_handle);

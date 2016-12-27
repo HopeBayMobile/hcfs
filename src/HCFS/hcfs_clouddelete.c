@@ -296,7 +296,7 @@ void init_delete_control(void)
 /* Helper function for marking a delete thread as in use */
 static inline int32_t _use_delete_thread(int32_t index, int32_t dsync_index,
 				BOOL is_blk_flag,
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		ino_t this_inode, int64_t blockno, int64_t seq,
 		uint8_t *obj_id)
 #else
@@ -313,7 +313,7 @@ static inline int32_t _use_delete_thread(int32_t index, int32_t dsync_index,
 	delete_ctl.delete_threads[index].inode = this_inode;
 	delete_ctl.delete_threads[index].seq = seq;
 	if (is_blk_flag == TRUE) {
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		memcpy(delete_ctl.delete_threads[index].obj_id, obj_id, OBJID_LENGTH);
 #endif
 		delete_ctl.delete_threads[index].blockno = blockno;
@@ -609,7 +609,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				curl_id = -1;
 				for (count = 0; count < MAX_DELETE_CONCURRENCY;
 								count++) {
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 					ret_val = _use_delete_thread(count,
 						which_dsync_index, TRUE,
 						ptr->inode, block_count,
@@ -693,7 +693,7 @@ errcode_handle:
 	sem_wait(&(delete_ctl.delete_op_sem));
 	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		ret_val = _use_delete_thread(count, which_dsync_index, FALSE,
 				ptr->inode, -1, 0, NULL);
 #else
@@ -785,7 +785,7 @@ int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 				uint8_t *obj_id, CURL_HANDLE *curl_handle)
 #else
 				CURL_HANDLE *curl_handle)
@@ -793,7 +793,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 {
 	char objname[400];
 	int32_t ret_val, ret;
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	DDT_BTREE_NODE tree_root;
 	DDT_BTREE_META ddt_meta;
 	char obj_id_str[OBJID_STRING_LENGTH];
@@ -802,7 +802,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #endif
 
 /* Handle objname - consider platforms, dedup flag  */
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	/* Object named by block hashkey */
 	fetch_backend_block_objname(objname, obj_id);
 
@@ -822,7 +822,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #endif
 
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	if (ddt_ret == 0)
 #endif
 	{
@@ -840,7 +840,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 		else
 			ret = -EIO;
 	}
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	else if (ddt_ret == 1) {
 		write_log(10, "Only decrease refcount of object - %s", objname);
 		ret = 0;
@@ -883,7 +883,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	if (delete_thread_ptr->is_block == TRUE)
 		ret = do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno, delete_thread_ptr->seq,
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 			delete_thread_ptr->obj_id,
 #endif
 			&(delete_curl_handles[which_curl]));

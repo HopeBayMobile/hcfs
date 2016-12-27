@@ -288,7 +288,7 @@ uint8_t *get_key(const char *passphrase)
 FILE *transform_encrypt_fd(FILE *in_fd, uint8_t *key,
 			   uint8_t **data)
 {
-#if COMPRESS_ENABLE
+#if ENABLE(COMPRESS)
 	uint8_t *buf =
 	    calloc(compress_bound_f(MAX_BLOCK_SIZE), sizeof(uint8_t));
 #else
@@ -299,7 +299,7 @@ FILE *transform_encrypt_fd(FILE *in_fd, uint8_t *key,
 		    0, "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
-#if COMPRESS_ENABLE
+#if ENABLE(COMPRESS)
 	int32_t read_count = fread(buf, sizeof(uint8_t),
 			       compress_bound_f(MAX_BLOCK_SIZE), in_fd);
 #else

@@ -3130,7 +3130,7 @@ int32_t truncate_truncate(ino_t this_inode,
 			meta_cache_unlock_entry(*body_ptr);
 
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 			fetch_backend_block_objname(objname,
 					last_block_entry->obj_id);
 #else
@@ -4013,7 +4013,7 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		}
 
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		fetch_backend_block_objname(objname,
 				tpage->block_entries[eindex].obj_id);
 #else
@@ -4704,7 +4704,7 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		fetch_backend_block_objname(objname,
 				tpage->block_entries[eindex].obj_id);
 #else

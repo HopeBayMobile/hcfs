@@ -399,7 +399,7 @@ errcode_handle:
  *
  * @return 0 on success, otherwise negative error code.
  */ 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
 	const uint8_t *toupload_objid, const uint8_t *backend_objid,
@@ -660,7 +660,7 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
 		SET_CLOUD_BLOCK_EXIST(block_uploading_status.block_exist);
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		memcpy(block_uploading_status.backend_objid,
 				block_page.block_entries[e_index].obj_id,
 				sizeof(char) * OBJID_LENGTH);

@@ -26,7 +26,7 @@
 #include "logger.h"
 #include "utils.h"
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 /* TODO: If local deduplication is enabled for any reason, restoration of
 dedupe table should be designed and implemented. */
 
@@ -1137,4 +1137,4 @@ int32_t obj_id_to_string(uint8_t obj_id[OBJID_LENGTH],
 	output_str[OBJID_STRING_LENGTH - 1] = 0;
 	return 0;
 }
-#endif /* DEDUP_ENABLE */
+#endif /* ENABLE(DEDUP) */

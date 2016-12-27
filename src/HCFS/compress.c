@@ -12,7 +12,7 @@
 #include "logger.h"
 #include "macro.h"
 
-#if COMPRESS_ENABLE
+#if ENABLE(COMPRESS)
 
 /************************************************************************
  * *
@@ -63,7 +63,7 @@ decompress_func decompress_f = LZ4_decompress_safe;
  * *************************************************************************/
 compress_bound_func compress_bound_f = LZ4_compressBound;
 
-#endif  /* COMPRESS_ENABLE */
+#endif  /* ENABLE(COMPRESS) */
 
 /************************************************************************
  * *
@@ -78,7 +78,7 @@ compress_bound_func compress_bound_f = LZ4_compressBound;
  * *************************************************************************/
 FILE *transform_compress_fd(FILE *in_fd, uint8_t **data)
 {
-#if COMPRESS_ENABLE
+#if ENABLE(COMPRESS)
 	uint8_t *buf = calloc(MAX_BLOCK_SIZE, sizeof(uint8_t));
 
 	if (buf == NULL) {
@@ -123,7 +123,7 @@ FILE *transform_compress_fd(FILE *in_fd, uint8_t **data)
 	UNUSED(in_fd);
 	UNUSED(data);
 	return NULL;
-#endif /* COMPRESS_ENABLE */
+#endif /* ENABLE(COMPRESS) */
 }
 /************************************************************************
  * *
@@ -139,7 +139,7 @@ FILE *transform_compress_fd(FILE *in_fd, uint8_t **data)
 int32_t decompress_to_fd(FILE *decompress_to_fd, uint8_t *input,
 		     int32_t input_length)
 {
-#if COMPRESS_ENABLE
+#if ENABLE(COMPRESS)
 	write_log(10, "decompress_size: %d\n", input_length);
 	uint8_t *output =
 	    (uint8_t *)calloc(MAX_BLOCK_SIZE, sizeof(uint8_t));

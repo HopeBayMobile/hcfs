@@ -54,7 +54,7 @@
 *************************************************************************/
 int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 {
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	char obj_id_str[OBJID_STRING_LENGTH];
 #endif
 	int32_t status;
@@ -149,7 +149,7 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	fclose(get_fptr);
 	uint8_t *object_key = NULL;
-#if ENCRYPT_ENABLE
+#if ENABLE(ENCRYPT)
 	uint8_t *key = get_key("this is hopebay testing");
 	object_key = calloc(KEY_SIZE, sizeof(uint8_t));
 	decrypt_session_key(object_key, object_meta->enc_session_key, key);
@@ -161,7 +161,7 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
 	free_object_meta(object_meta);
 	free(get_fptr_data);
-#if ENCRYPT_ENABLE
+#if ENABLE(ENCRYPT)
 	if (object_key != NULL)
 		OPENSSL_free(object_key);
 #endif
@@ -268,7 +268,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		fetch_backend_block_objname(objname,
 				temppage.block_entries[entry_index].obj_id);
 #else

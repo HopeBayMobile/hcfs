@@ -28,6 +28,10 @@
 #define CURRENT_META_VER 1
 #define BACKWARD_COMPATIBILITY 1
 
+/* ENABLE() - turn on a specific feature of HCFS */
+#define ENABLE(HCFS_FEATURE) \
+	(defined ENABLE_##HCFS_FEATURE && ENABLE_##HCFS_FEATURE)
+
 #define X64 1
 #define ARM_32BIT 2
 #define ANDROID_32BIT 3
