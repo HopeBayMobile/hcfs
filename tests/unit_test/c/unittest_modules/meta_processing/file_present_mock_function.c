@@ -339,7 +339,7 @@ int32_t meta_cache_remove_sync_later(META_CACHE_ENTRY_STRUCT *body_ptr)
 }
 
 int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-		char is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
+		BOOL is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
 {
 	CHECK_UPLOADING_FLAG = is_now_uploading;
 	CHECK_TOUPLOAD_BLOCKS = toupload_blocks;

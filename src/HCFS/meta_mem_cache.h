@@ -73,7 +73,7 @@ to other entries.
 /* Structure UPLOADING_INFO includes some information used to check whether this
  * inode is now uploading or not */
 typedef struct {
-	char is_uploading; /* TRUE or FALSE */
+	BOOL is_uploading; /* TRUE or FALSE */
 	int32_t progress_list_fd;
 	int64_t toupload_blocks;
 } UPLOADING_INFO;
@@ -208,7 +208,7 @@ int32_t meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
 int32_t expire_meta_mem_cache_entry(void);
 
 int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-				      char is_now_uploading,
+				      BOOL is_now_uploading,
 				      int32_t new_fd,
 				      int64_t toupload_blocks);
 

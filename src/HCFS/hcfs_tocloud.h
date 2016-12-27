@@ -37,15 +37,15 @@ typedef struct {
 	ino_t inode;
 	int64_t blockno;
 	int64_t seq;
-	char is_block;
-	char is_delete;
+	BOOL is_block;
+	BOOL is_delete;
 	char backend_delete_type; /* FALSE, TOUPLOAD_BLOCKS, BACKEND_BLOCKS */
 	int32_t which_curl;
 	int32_t progress_fd;
 	char tempfilename[400];
 	int32_t which_index;
 #if (DEDUP_ENABLE)
-	char is_upload;
+	BOOL is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
 	and decrease the refcount of old_hash_key*/
 	uint8_t obj_id[OBJID_LENGTH];
@@ -56,7 +56,7 @@ typedef struct {
 	ino_t inode;
 	mode_t this_mode;
 	int32_t progress_fd;
-	char is_revert;
+	BOOL is_revert;
 	int32_t which_index;
 } SYNC_THREAD_TYPE;
 
@@ -150,9 +150,9 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t pin_size_delta, int64_t disk_pin_size_delta,
 		int64_t disk_meta_size_delta);
 
-int32_t select_upload_thread(char is_block, char is_delete,
+int32_t select_upload_thread(BOOL is_block, BOOL is_delete,
 #if (DEDUP_ENABLE)
-		char is_upload,
+		BOOL is_upload,
 		uint8_t old_obj_id[],
 #endif
 		ino_t this_inode, int64_t block_count,

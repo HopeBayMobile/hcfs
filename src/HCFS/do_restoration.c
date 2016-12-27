@@ -113,9 +113,8 @@ int32_t tag_restoration(char *content)
 	FILE *fptr = NULL;
 	int32_t ret, errcode;
 	size_t ret_size;
-	char is_open;
+	BOOL is_open = FALSE;
 
-	is_open = FALSE;
 	fetch_restore_stat_path(restore_stat_path);
 	if (access(restore_stat_path, F_OK) == 0)
 		unlink(restore_stat_path);
@@ -236,7 +235,7 @@ int32_t check_restoration_status(void)
 	FILE *fptr;
 	int32_t errcode, retval;
 	size_t ret_size;
-	char is_open;
+	BOOL is_open;
 
 	sem_wait(&restore_sem);
 

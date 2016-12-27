@@ -729,9 +729,9 @@ errcode_handle:
  *
  * @return usable curl index
  */ 
-int32_t select_upload_thread(char is_block, char is_delete,
+int32_t select_upload_thread(BOOL is_block, BOOL is_delete,
 #if (DEDUP_ENABLE)
-				char is_upload,
+				BOOL is_upload,
 				uint8_t old_obj_id[],
 #endif
 				ino_t this_inode, int64_t block_count,
@@ -1040,7 +1040,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t size_diff = 0;
 	int32_t progress_fd;
 	BOOL is_local_meta_deleted;
-	char is_revert;
+	BOOL is_revert;
 	int64_t meta_size_diff = 0;
 	int64_t upload_seq = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
@@ -2134,7 +2134,7 @@ void upload_loop(void)
 	int32_t count, sleep_count;
 	char in_sync;
 	int32_t ret_val, ret;
-	char is_start_check;
+	BOOL is_start_check;
 	char sync_paused_status = FALSE;
 	char need_retry_backup;
 	struct timeval last_retry_time, current_time;
@@ -2411,7 +2411,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	char fname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
-	char is_fopen;
+	BOOL is_fopen;
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 

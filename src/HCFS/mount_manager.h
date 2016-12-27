@@ -96,7 +96,7 @@ typedef struct {
 	pthread_t mt_thread;
 	struct fuse_session *session_ptr;
 	struct fuse_chan *chan_ptr;
-	char is_unmount;
+	BOOL is_unmount;
 	LOOKUP_HEAD_TYPE *lookup_table; /* All vol share the same one */
 	FS_STAT_T *FS_stat; /* shared */
 	FILE *stat_fptr;  /* For keeping track of FS stat. shared */

@@ -181,10 +181,8 @@ int32_t _init_backend_stat(ino_t root_inode)
 	char fname[METAPATHLEN];
 	FILE *fptr;
 	size_t ret_size;
-	char is_fopen;
+	BOOL is_fopen = FALSE;
 	FS_CLOUD_STAT_T cloud_fs_stat;
-
-	is_fopen = FALSE;
 
 	write_log(10, "Debug creating backend stat file\n");
 

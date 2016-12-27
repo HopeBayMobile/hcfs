@@ -31,7 +31,7 @@
 /* Data that should be known by fuse process when uploading a file */
 typedef struct {
 	ino_t inode;
-	char is_uploading;
+	BOOL is_uploading;
 	BOOL is_revert;
 	BOOL finish_sync;
 	int32_t progress_list_fd;
