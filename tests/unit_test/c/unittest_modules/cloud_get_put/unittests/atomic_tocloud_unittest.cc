@@ -466,7 +466,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 	ASSERT_EQ(0, tmp_size);
 	num_blocks = 1200 * MAX_BLOCK_ENTRIES_PER_PAGE;
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	unsigned char toupload_objid[OBJID_LENGTH], backend_objid[OBJID_LENGTH];
 
 	memset(toupload_objid, 'K', OBJID_LENGTH);
@@ -487,7 +487,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 		char finish = TRUE;
 		int ret = -1;
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		ret = set_progress_info(fd, i, &toupload_exist,
 			&backend_exist, toupload_objid, backend_objid, &finish);
 #else
@@ -500,7 +500,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 	/* Verify */
 	memset(&empty_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
 	memset(&ans_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	memcpy(ans_status.to_upload_objid, toupload_objid, OBJID_LENGTH);
 	memcpy(ans_status.backend_objid, backend_objid, OBJID_LENGTH);
 #else
@@ -563,7 +563,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 		MAX_BLOCK_ENTRIES_PER_PAGE + MAX_BLOCK_ENTRIES_PER_PAGE / 2;
 	
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	unsigned char toupload_objid[OBJID_LENGTH], backend_objid[OBJID_LENGTH];
 
 	memset(toupload_objid, 'K', OBJID_LENGTH);
@@ -585,7 +585,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 		char finish = TRUE;
 		int ret = -1;
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		ret = set_progress_info(fd, block_index[i], &toupload_exist,
 			&backend_exist, toupload_objid, backend_objid, &finish);
 #else
@@ -598,7 +598,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 	/* Verify */
 	memset(&empty_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
 	memset(&ans_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	memcpy(ans_status.to_upload_objid, toupload_objid, OBJID_LENGTH);
 	memcpy(ans_status.backend_objid, backend_objid, OBJID_LENGTH);
 #else

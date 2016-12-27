@@ -190,7 +190,7 @@ void busy_wait_all_specified_upload_threads(ino_t inode)
  *
  * @return 0 on success, -1 when do not need to delete blocks on cloud.
  */ 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 static inline int _choose_deleted_block(char delete_which_one,
 	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
 {
@@ -377,7 +377,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	ssize_t ret_size;
 	long long page_pos;
 	FILE_META_TYPE filemeta;
-#if DEDUP_ENABLE
+#if ENABLE(DEDUP)
 	unsigned char block_objid[OBJID_LENGTH];
 #endif
 
@@ -440,7 +440,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		e_index = block_count % BLK_INCREMENTS;
 
 		block_info = &(tmppage.status_entry[e_index]);
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		ret = _choose_deleted_block(delete_which_one,
 			block_info, block_objid, inode);
 #else
@@ -469,7 +469,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 		sem_wait(&(upload_ctl.upload_queue_sem));
 		sem_wait(&(upload_ctl.upload_op_sem));
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		which_curl = select_upload_thread(TRUE, FALSE,
 			TRUE, block_objid,
 			inode, block_count, block_seq,

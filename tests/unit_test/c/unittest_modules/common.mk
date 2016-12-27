@@ -42,9 +42,9 @@ CXXFLAGS += -fpermissive -std=gnu++11
 CPPFLAGS += -g -Wall -Wextra -Wno-unused-parameter \
 	    -pthread -fprofile-arcs \
 	    -D_FILE_OFFSET_BITS=64 \
-	    -DDEDUP_ENABLE=0 \
-	    -DENCRYPT_ENABLE=0 \
-	    -DCOMPRESS_ENABLE=0 \
+	    -DENABLE_DEDUP=0 \
+	    -DENABLE_ENCRYPT=0 \
+	    -DENABLE_COMPRESS=0 \
 	    -D_ANDROID_ENV_ \
 	    -DUNITTEST \
 

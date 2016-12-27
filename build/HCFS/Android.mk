@@ -16,8 +16,8 @@ LOCAL_MODULE    := hcfs
 LOCAL_CFLAGS    += -pie -fPIE -O0 -Wall -Wextra \
 		   -D_FILE_OFFSET_BITS=64 \
 		   -D_ANDROID_ENV_ \
-		   -DENCRYPT_ENABLE=0 \
-		   -DDEDUP_ENABLE=0 \
+		   -DENABLE_ENCRYPT=0 \
+		   -DENABLE_DEDUP=0 \
 		   -DSTAT_VFS_H="<fuse/sys/statvfs.h>" \
 		   -D_ANDROID_PREMOUNT_ \
 		   -DVERSION_NUM=\"$(VERSION_NUM)\"
@@ -33,9 +33,9 @@ LOCAL_SHARED_LIBRARIES += libcurl \
 ## Compression feature
 COMPRESS_ENABLE := 0
 ifeq "$(COMPRESS_ENABLE)" "0"
-    LOCAL_CFLAGS += -DCOMPRESS_ENABLE=0
+    LOCAL_CFLAGS += -DENABLE_COMPRESS=0
 else
-    LOCAL_CFLAGS += -DCOMPRESS_ENABLE=1
+    LOCAL_CFLAGS += -DENABLE_COMPRESS=1
     LOCAL_SHARED_LIBRARIES += liblz4
 endif
 include $(BUILD_EXECUTABLE)

@@ -41,7 +41,7 @@ typedef struct {
 typedef struct {
 	char finish_uploading;
 	char block_exist; /*first bit means toupload block, second means cloud*/
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	uint8_t to_upload_objid[OBJID_LENGTH];
 	uint8_t backend_objid[OBJID_LENGTH];
 #else
@@ -74,7 +74,7 @@ int32_t comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 int32_t get_progress_info(int32_t fd, int64_t block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
 	const uint8_t *toupload_objid, const uint8_t *backend_objid,

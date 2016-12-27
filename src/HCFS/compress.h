@@ -13,7 +13,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
-#if COMPRESS_ENABLE
+#include "global.h"
+
+#if ENABLE(COMPRESS)
 #include <lz4.h>
 #endif
 

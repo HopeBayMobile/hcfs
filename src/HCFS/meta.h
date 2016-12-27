@@ -201,7 +201,7 @@ typedef struct {
 typedef struct {
 	uint8_t status;
 	uint8_t uploaded;
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
 	uint32_t paged_out_count;

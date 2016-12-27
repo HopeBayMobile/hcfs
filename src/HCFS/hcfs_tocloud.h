@@ -44,7 +44,7 @@ typedef struct {
 	int32_t progress_fd;
 	char tempfilename[400];
 	int32_t which_index;
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 	BOOL is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
 	and decrease the refcount of old_hash_key*/
@@ -119,7 +119,7 @@ UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
 int32_t do_block_sync(ino_t this_inode, int64_t block_no,
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
 		  uint8_t *hash_in_meta);
 #else
@@ -151,7 +151,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t disk_meta_size_delta);
 
 int32_t select_upload_thread(BOOL is_block, BOOL is_delete,
-#if (DEDUP_ENABLE)
+#if ENABLE(DEDUP)
 		BOOL is_upload,
 		uint8_t old_obj_id[],
 #endif

@@ -1738,13 +1738,13 @@ errcode_handle:
 }
 
 void fetch_backend_block_objname(char *objname,
-#if DEDUP_ENABLE
+#if ENABLE(DEDUP)
 	unsigned char *obj_id)
 #else
 	ino_t inode, long long block_no, long long seqnum)
 #endif
 {
-#if DEDUP_ENABLE
+#if ENABLE(DEDUP)
 	char obj_id_str[OBJID_STRING_LENGTH];
 
 	obj_id_to_string(obj_id, obj_id_str);
