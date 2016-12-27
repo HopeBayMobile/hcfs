@@ -2967,7 +2967,7 @@ TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
 
 	buf[ret] = '\0';
 
-	ASSERT_EQ(strlen(ans), ret);
+	ASSERT_EQ(strlen(ans) + 1, ret);
 	EXPECT_STREQ(ans, buf);
 }
 
