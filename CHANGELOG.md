@@ -6,16 +6,15 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  3. When installing an app, pinned space must contain enough space for the app as the installation process will first download the content to the pinned space.
  4. Data upload to the device via USB might fail if the amount of data to upload on the device plus the data to be uploaded exceeds cache size, and the network speed is slow.
  5. (A temp fix for crash issue) Files in /data/app are pinned now. An "unpin" action will not unpin files in the app package folder under /data/app.
- 6. If booster partition is damaged and cannot be repaired during restoration, the booster partition will be deleted with no notification.Tera app does not do any response to this situation.
- 7. Settings might crash when sync all data.
- 8. Database might be locked and let tera app crashed.
- 9. If pin space < 100MB, Tera app does not deal with this situation, the booster will still be created.
+ 6. If booster partition is damaged and cannot be repaired during restoration, the booster partition will be deleted without notification.Tera app does not do any response to this situation.(fixed in 2.2.5)
+ 7. Settings might crash when sync all data.(resolved in 2.2.5)
+ 8. Database might be locked and let tera app crashed. (fixed in 2.2.5)
+ 9. If pin space < 100MB, Tera app does not deal with this situation, the booster will still be created. (fixed in 2.2.5)
  10. if data in booster space is > booster size, Tera app does not deal with this situation.
  11. When sync all data, the booster might not be unmounted successfully.
- 12. After successfully sync all data, the booster will not re-mounted. And the icon will be gone from the Launcher after rebooting.
- 13. If the system is shutdown or reboot when boosting/unboosting, the Tera app did not deal with this situation after booting complete, and the icon will be gone from Launcher also.
- 14. the booster might not sync all data ok since we did not execute `sync` command before syncing the booster.
- 15. [HCFS] In restoration stage1, if system reboot when restored smart cache(2.7GB) has been downloaded and moved into now active hcfs, stage1 will fail because of no more space.
+ 12. If the system is shutdown or reboot when boosting/unboosting, the Tera app did not deal with this situation after booting complete, and the icon will be gone from Launcher also. (fixed in 2.2.5)
+ 13. the booster might not sync all data ok since we did not execute `sync` command before syncing the booster.
+ 14. [HCFS] In restoration stage1, if system reboot when restored smart cache(2.7GB) has been downloaded and moved into now active hcfs, stage1 will fail because of no more space.
        It should have kept restoring after rebooting in stage1.
 
 v 2.2.4.2354
