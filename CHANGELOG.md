@@ -18,6 +18,36 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  15. [HCFS] In restoration stage1, if system reboot when restored smart cache(2.7GB) has been downloaded and moved into now active hcfs, stage1 will fail because of no more space.
        It should have kept restoring after rebooting in stage1.
 
+v 2.2.4.2354
+=====
+## New Features
+ - [Tera-App] feature/add_isboosting_api: Add isBoosting api  ([!179](gateway-2-0/android-management-app!179))
+
+## Fixed
+ - [HCFS] fix/#14171_wrong_usage_of_smart_cache_2.2.4: Fix/#14171 wrong usage of smart cache 2.2.4  ([!694](gateway-2-0/hcfs!694))
+ - [Nexus-5X] fix/bug_14364: Fix/bug 14364 and add more TW chinese for HBTUpdater  ([!101](gateway-2-0/nexus-5x!101))
+ - [Nexus-5X] fix/bug_14364: modify strings.xml for bug 14364  ([!103](gateway-2-0/nexus-5x!103))
+ - [Nexus-5X] fix/bug_14397: bugfix#14397 ([!97](gateway-2-0/nexus-5x!97))
+ - [Nexus-5X] fix/hbtupdater_i18n_new: add some hbtupdater i18n for TW Chinese  ([!98](gateway-2-0/nexus-5x!98))
+ - [Tera-App] bugfix/#14464: Bugfix/#14464 Launch Tera app with intent made by Intent.makeRestartActivityTask(). If the Tera app has already launched, Tera app will be relaunched so thatonCreate() will be called instead of onNewIntent(). The switch fragment operations are processed in onCreate(), thus we need to call onCreate().  ([!183](gateway-2-0/android-management-app!183))
+ - [Tera-Launcher] bugfix/#14261: The application info will be null while uninstall ([!25](gateway-2-0/tera-launcher!25))
+ - [Tera-Launcher] bugfix/launcher_boost_handle: Bugfix/launcher boost handle  ([!26](gateway-2-0/tera-launcher!26))
+ - [Tera-Service] bugfix/#14202: The intent will be null while restart serviceIf service crashed and then restarted, the intent will be null.It will cause null pointer exception  ([!7](TeraAndroid/android_packages_apps_TeraService!7))
+
+## CI / Refactoring / Other
+ - [Nexus-5X] revert-67e7b3fe: Revert "Merge branch 'update_terafonn_jar' into 'master'"This reverts commit 67e7b3feb11921bdb75cb5d8097f7666b21f7db8  ([!94](gateway-2-0/nexus-5x!94))
+ - [Nexus-5X] revert-e3e8fdfe: Revert "Merge branch 'update_terafonn_jar-2.2.4' into 'release/2.2.4-bugfix'"This reverts merge request !91  ([!93](gateway-2-0/nexus-5x!93))
+ - [Nexus-5X] update_terafonn_jar-2.2.4: Update terafonn jar for 2.2.4 branch  ([!91](gateway-2-0/nexus-5x!91))
+ - [Nexus-5X] update_terafonn_jar-2.2.4: Update terafonnapi jar  ([!96](gateway-2-0/nexus-5x!96))
+ - [Nexus-5X] update_terafonn_jar: Rename API Rename isBoosting to isBoostOrUnboostInProgress ([!89](gateway-2-0/nexus-5x!89))
+
+### Project Branch / Tag in this build
+ - [HCFS] release2.2.4_bugfix
+ - [Tera-App] 2.2.4.0004
+ - [Nexus-5X] 2.2.4.0004
+ - [Tera-Launcher] 2.2.4.0004
+ - [Tera-Service] 2.2.4.0004
+
 v 2.2.4.2269
 =====
 ## New Features
