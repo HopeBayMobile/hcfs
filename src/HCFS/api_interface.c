@@ -53,6 +53,7 @@
 #include "recover_super_block.h"
 #include "apk_mgmt.h"
 #include "metaops.h"
+#include "googledrive_curl.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -810,6 +811,48 @@ int32_t set_notify_server_loc(int32_t arg_len, char *largebuf)
 	return ret;
 }
 
+int32_t set_googledrive_token(int32_t arg_len, char *largebuf)
+{
+	int32_t ret = 0;
+	ssize_t str_size;
+	char *token_str;
+
+	if (CURRENT_BACKEND != GOOGLEDRIVE || !googledrive_token_control) {
+		write_log(4, "Set google drive token API only supported for "
+			     "GOOGLEDRIVE type");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	memcpy(&str_size, largebuf, sizeof(ssize_t));
+	if ((uint32_t)arg_len != sizeof(ssize_t) + str_size) {
+		write_log(4, "Arg len is %d but actual len is %d. In %s",
+			  arg_len, sizeof(ssize_t) + str_size, __func__);
+		ret = -EINVAL;
+		goto out;
+	}
+	
+	token_str = calloc(str_size + 10, 1);
+	if (token_str == NULL) {
+		ret = -errno;
+		goto out_free_mem;
+	}
+	memcpy(token_str, largebuf + sizeof(ssize_t), str_size);
+
+	/* Lock before change values of url and token */
+	pthread_mutex_lock(&(googledrive_token_control->access_lock));
+	sprintf(googledrive_token, "Authorization:Bearer %s", token_str);
+
+	/* Wake up all threads blocked in get_swift_auth fn */
+	pthread_cond_broadcast(&(googledrive_token_control->waiting_cond));
+	pthread_mutex_unlock(&(googledrive_token_control->waiting_lock));
+
+out_free_mem:
+	free(token_str);
+out:
+	return ret;
+}
+
 int32_t set_swift_token(int32_t arg_len, char *largebuf)
 {
 	int32_t ret_code = 0;
@@ -1321,6 +1364,9 @@ void api_module(void *index)
 			goto return_retcode;
 		case SETSWIFTTOKEN:
 			retcode = set_swift_token(arg_len, largebuf);
+			goto return_retcode;
+		case SET_GOOGLEDRIVE_TOKEN:
+			retcode = set_googledrive_token(arg_len, largebuf);
 			goto return_retcode;
 		case NOTIFY_APPLIST_CHANGE:
 			retcode = backup_package_list();

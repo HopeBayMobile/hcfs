@@ -49,7 +49,7 @@
 #endif
 
 /* For SWIFTTOKEN backend only */
-SWIFTTOKEN_CONTROL swifttoken_control = {
+BACKEND_TOKEN_CONTROL swifttoken_control = {
 	PTHREAD_MUTEX_INITIALIZER,
 	PTHREAD_MUTEX_INITIALIZER,
 	PTHREAD_COND_INITIALIZER
@@ -1598,6 +1598,9 @@ int32_t _S3_http_can_retry(int32_t code)
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	int32_t ret_val, num_retries;
+	hcfs_init_backend_t *init_ftn = NULL;
+	hcfs_destory_backend_t *destroy_ftn = NULL;
+
 
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
@@ -1609,9 +1612,19 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 	case SWIFTTOKEN:
+		init_ftn = hcfs_init_swift_backend;
+		destroy_ftn = hcfs_destroy_swift_backend;
+		break;
+	default:
+		break;
+	}
+
+	switch (CURRENT_BACKEND) {
+	case SWIFT:
+	case SWIFTTOKEN:
 		write_log(2, "Connecting to Swift backend\n");
 		num_retries = 0;
-		ret_val = hcfs_init_swift_backend(curl_handle);
+		ret_val = init_ftn(curl_handle);
 		while ((!_http_is_success(ret_val)) &&
 		       ((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
@@ -1620,14 +1633,14 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 				  "Retrying backend operation in 10 seconds");
 			sleep(RETRY_INTERVAL);
 			if (curl_handle->curl != NULL)
-				hcfs_destroy_swift_backend(curl_handle->curl);
-			ret_val = hcfs_init_swift_backend(curl_handle);
+				destroy_ftn(curl_handle->curl);
+			ret_val = init_ftn(curl_handle);
 		}
 		if (_http_is_success(ret_val) == TRUE) {
 			curl_handle->curl_backend = CURRENT_BACKEND;
 		} else {
 			if (curl_handle->curl != NULL)
-				hcfs_destroy_swift_backend(curl_handle->curl);
+				destroy_ftn(curl_handle->curl);
 			curl_handle->curl_backend = NONE;
 			curl_handle->curl = NULL;
 		}

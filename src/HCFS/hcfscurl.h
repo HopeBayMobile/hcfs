@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfscurl.h
 * Abstract: The c header file for CURL operations.
@@ -48,9 +48,9 @@ typedef struct {
 	/* control to make threads waiting for new token */
 	pthread_mutex_t waiting_lock;
 	pthread_cond_t waiting_cond;
-} SWIFTTOKEN_CONTROL;
+} BACKEND_TOKEN_CONTROL;
 
-extern SWIFTTOKEN_CONTROL swifttoken_control;
+extern BACKEND_TOKEN_CONTROL swifttoken_control;
 extern char swift_auth_string[1024];
 extern char swift_url_string[1024];
 
@@ -61,8 +61,10 @@ sem_t download_curl_control_sem;
 sem_t download_curl_sem;
 sem_t nonread_download_curl_sem;
 
-/* Swift collections */
+typedef int32_t hcfs_init_backend_t(CURL_HANDLE *);
+typedef void hcfs_destory_backend_t(CURL *);
 
+/* Swift collections */
 int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 			CURL_HANDLE *curl_handle);
 int32_t hcfs_get_auth_swifttoken(void);
