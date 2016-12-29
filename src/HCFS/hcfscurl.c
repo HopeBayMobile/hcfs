@@ -40,6 +40,7 @@
 #include "utils.h"
 #include "event_notification.h"
 #include "event_filter.h"
+#include "googledrive_curl.h"
 
 #define MAX_RETRIES 5
 #ifdef UNITTEST
@@ -513,21 +514,29 @@ errcode_handle:
 
 /************************************************************************
 *
-* Function name: hcfs_get_auth_swifttoken
+* Function name: hcfs_get_auth_token
 *        Inputs:
 *       Summary: Send TOKEN_EXPIRED event to notify server to ask for new
 *                token.
 *  Return value: Return 200 if event is sent, or -1 if error.
 *
 *************************************************************************/
-int32_t hcfs_get_auth_swifttoken(void)
+int32_t hcfs_get_auth_token(void)
 {
 	int32_t ret_code;
 	struct timespec timeout;
+	BACKEND_TOKEN_CONTROL *token_controller;
 
 	/* Token is already set */
 	if (swift_auth_string[0] != 0)
 		return 200;
+
+	switch (CURRENT_BACKEND) {
+	case SWIFTTOKEN:
+		token_controller = &swifttoken_control;
+	case GOOGLEDRIVE:
+		token_controller = googledrive_token_control; 
+	}
 
 	ret_code = add_notify_event(TOKEN_EXPIRED, NULL, FALSE);
 
@@ -535,13 +544,13 @@ int32_t hcfs_get_auth_swifttoken(void)
 	if ((ret_code == 0 || ret_code == 3) &&
 			(hcfs_system->system_going_down == FALSE)) {
 		/* Wait for new token being set */
-		pthread_mutex_lock(&(swifttoken_control.waiting_lock));
+		pthread_mutex_lock(&(token_controller->waiting_lock));
 		clock_gettime(CLOCK_REALTIME, &timeout);
 		timeout.tv_sec += MAX_WAIT_TIME;
-		pthread_cond_timedwait(&(swifttoken_control.waiting_cond),
-				&(swifttoken_control.waiting_lock),
+		pthread_cond_timedwait(&(token_controller->waiting_cond),
+				&(token_controller->waiting_lock),
 				&timeout);
-		pthread_mutex_unlock(&(swifttoken_control.waiting_lock));
+		pthread_mutex_unlock(&(token_controller->waiting_lock));
 		/* If system is shutting down, do not attempt followup
 		 * operations
 		 */
@@ -586,7 +595,7 @@ int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 		curl_handle->curl = curl_easy_init();
 
 		if (curl_handle->curl) {
-			ret_code = hcfs_get_auth_swifttoken();
+			ret_code = hcfs_get_auth_token();
 			if (ret_code == 200 || swift_auth_string[0] != 0)
 				return 200;
 			else
@@ -668,7 +677,7 @@ int32_t hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 		}
 
 		if (curl_handle->curl)
-			return hcfs_get_auth_swifttoken();
+			return hcfs_get_auth_token();
 
 		return -1;
 	default:
@@ -1601,7 +1610,6 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	hcfs_init_backend_t *init_ftn = NULL;
 	hcfs_destory_backend_t *destroy_ftn = NULL;
 
-
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
@@ -1615,6 +1623,10 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 		init_ftn = hcfs_init_swift_backend;
 		destroy_ftn = hcfs_destroy_swift_backend;
 		break;
+	case GOOGLEDRIVE:
+		init_ftn = hcfs_init_gdrive_backend;
+		destroy_ftn = hcfs_destroy_gdrive_backend;
+		break;
 	default:
 		break;
 	}
@@ -1622,6 +1634,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 	case SWIFTTOKEN:
+	case GOOGLEDRIVE:
 		write_log(2, "Connecting to Swift backend\n");
 		num_retries = 0;
 		ret_val = init_ftn(curl_handle);
@@ -1678,6 +1691,9 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 	if (curl_handle->curl_backend == NONE)
 		return;
 	switch (CURRENT_BACKEND) {
+	case GOOGLEDRIVE:
+		hcfs_destroy_gdrive_backend(curl_handle->curl);
+		break;
 	case SWIFT:
 	case SWIFTTOKEN:
 		hcfs_destroy_swift_backend(curl_handle->curl);

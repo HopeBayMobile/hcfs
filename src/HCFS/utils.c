@@ -51,6 +51,7 @@
 #include "super_block.h"
 #include "do_restoration.h"
 #include "recover_super_block.h"
+#include "googledrive_curl.h"
 
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
 {
@@ -555,6 +556,8 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 				config->current_backend = SWIFT;
 			if (strcasecmp(argval, "SWIFTTOKEN") == 0)
 				config->current_backend = SWIFTTOKEN;
+			if (strcasecmp(argval, "GOOGLEDRIVE") == 0)
+				config->current_backend = GOOGLEDRIVE;
 			if (strcasecmp(argval, "S3") == 0)
 				config->current_backend = S3;
 			if (strcasecmp(argval, "NONE") == 0)
@@ -934,6 +937,15 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		}
 	}
 
+	if (config->current_backend == GOOGLEDRIVE) {
+		if (!(config->googledrive_folder)) {
+			write_log(
+			    0,
+			    "google drive folder missing from configuration\n");
+			return -1;
+		}
+	}
+
 	if (config->current_backend == SWIFTTOKEN) {
 		if (config->swift_user == NULL) {
 			write_log(0,
@@ -1061,6 +1073,13 @@ int32_t init_system_config_settings(const char *config_path,
 		write_log(0, "Failed to init cache thresholds, errcode %d.\n",
 				-ret);
 		return ret;
+	}
+
+	/* Init token controller */
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		ret = init_gdrive_token_control();
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
@@ -1892,6 +1911,10 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 			return -EINVAL;
 
 	switch (new_config->current_backend) {
+	case GOOGLEDRIVE:
+		if (strcmp(GOOGLEDRIVE_FOLDER, new_config->googledrive_folder))
+			return -EINVAL;
+		break;
 	case SWIFT:
 	case SWIFTTOKEN:
 		/*if (strcmp(SWIFT_ACCOUNT, new_config->swift_account))
@@ -2008,6 +2031,12 @@ int32_t reload_system_config(const char *config_path)
 	system_config = new_config;
 	FREE_SYSTEM_CONFIG_MEMBER(temp_config)
 	free(temp_config);
+
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		ret = init_gdrive_token_control();
+		if (ret < 0)
+			return ret;
+	}
 
 	/* Init backend related threads */
 	if ((enable_related_module == TRUE)

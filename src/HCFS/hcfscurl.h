@@ -67,7 +67,6 @@ typedef void hcfs_destory_backend_t(CURL *);
 /* Swift collections */
 int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 			CURL_HANDLE *curl_handle);
-int32_t hcfs_get_auth_swifttoken(void);
 int32_t hcfs_init_swift_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_swift_backend(CURL *curl);
 int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle);
@@ -92,6 +91,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		       HTTP_meta *);
 
 /* Generic */
+int32_t hcfs_get_auth_token(void);
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle);
 int32_t hcfs_test_backend(CURL_HANDLE *curl_handle);

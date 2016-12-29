@@ -28,4 +28,8 @@
 BACKEND_TOKEN_CONTROL *googledrive_token_control;
 char googledrive_token[1024];
 
+int32_t init_gdrive_token_control(void);
+int32_t hcfs_init_gdrive_backend(CURL_HANDLE *curl_handle);
+void hcfs_destroy_gdrive_backend(CURL *curl);
+
 #endif
