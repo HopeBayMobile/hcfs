@@ -6607,13 +6607,13 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int32_t mode)
 *
 * Function name: hfuse_ll_forget
 *        Inputs: fuse_req_t req, fuse_ino_t ino,
-*                uint64_t nlookup
+*                unsigned long nlookup
 *       Summary: Decrease lookup count for object "ino" by "nlookup", and
 *                handle actual filesystem object deletion if count is 0.
 *
 *************************************************************************/
 static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
-	uint64_t nlookup)
+	unsigned long nlookup)
 {
 	int32_t amount;
 	int32_t current_val;

@@ -12,9 +12,11 @@ LOCAL_CFLAGS		+= -O0 \
 
 LOCAL_LDFLAGS		= -O0 \
 
+ifeq ("$(APP_ABI)", "arm64-v8a")
 ifneq ("$(NDK_TOOLCHAIN_VERSION)","clang")
   LOCAL_LDFLAGS += -mno-fix-cortex-a53-843419
   LOCAL_LDFLAGS += -mfix-cortex-a53-835769
+endif
 endif
 
 include $(BUILD_SHARED_LIBRARY)

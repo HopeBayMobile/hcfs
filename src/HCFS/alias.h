@@ -20,7 +20,12 @@
 
 #define MAX_NAME_MAP        4           /* (MAX_FILENAME_LEN + 1) >> 6 */
 #define MAX_GROUP_LEN       64
+
+#if defined(__aarch64__)
 #define MIN_ALIAS_VALUE     4611686018427387904     /* 2^62 */
+#else
+#define MIN_ALIAS_VALUE     1073741824     /* 2^30 */
+#endif
 
 #define IS_ALIAS_INODE(x)   (x > MIN_ALIAS_VALUE ? 1 : 0)
 #define MAX(x, y)           (x > y ? x : y)

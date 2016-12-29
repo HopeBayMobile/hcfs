@@ -311,7 +311,7 @@ int32_t build_cache_usage(void)
 				continue;
 			}
 			write_log(10, "Count is now %d, %lu, %lu\n", count,
-			          (uint64_t)&count, (uint64_t)&blockno);
+			          (unsigned long)&count, (unsigned long)&blockno);
 			write_log(10, "Block file for %" PRIu64 " %lld\n",
 			          (uint64_t)this_inode, blockno);
 			ret = fetch_block_path(thisblockpath, this_inode,
@@ -346,12 +346,19 @@ int32_t build_cache_usage(void)
 				}
 				memset(tempnode, 0, tmp_size);
 			}
+#if defined(__aarch64__)
 			if (tempnode->last_access_time < tempstat.st_atime)
 				tempnode->last_access_time = tempstat.st_atime;
 
 			if (tempnode->last_mod_time < tempstat.st_mtime)
 				tempnode->last_mod_time = tempstat.st_mtime;
+#else
+			if (tempnode->last_access_time < (long)tempstat.st_atime)
+				tempnode->last_access_time = (long)tempstat.st_atime;
 
+			if (tempnode->last_mod_time < (long)tempstat.st_mtime)
+				tempnode->last_mod_time = (long)tempstat.st_mtime;
+#endif
 			tempnode->this_inode = this_inode;
 
 			ret = get_block_dirty_status(thisblockpath, NULL,

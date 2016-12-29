@@ -11,15 +11,14 @@ NDK_PROJECT_PATH := $(abspath .)
 #####
 # Target variables
 #####
-TARGETS       += acer-s58a
-TARGETS       += nexus-5x
+TARGETS       += nexus-7
 #   Add target list grouping by gdb or not
 HCFS_OUTS     := $(TARGETS:%=out/%-hcfs)
 HCFS_GDB_OUTS := $(TARGETS:%=out/%-hcfs-gdb)
 ALL_OUTS      := $(HCFS_OUTS) $(HCFS_GDB_OUTS)
 
 #   let device be a variable of its targets
-#   e.g. $(nexus-5x) == out/nexus-5x-hcfs out/nexus-5x-hcfs-gdb
+#   e.g. $(nexus-7) == out/nexus-7-hcfs out/nexus-7-hcfs-gdb
 $(foreach t,$(TARGETS),$(eval $(t):= out/$(t)-hcfs out/$(t)-hcfs-gdb))
 
 #####
@@ -45,15 +44,8 @@ $(HCFS_GDB_OUTS): APP_LDFLAGS += -ggdb -O0
 #####
 
 # Some devices use BoringSSL instead of OpenSSL
-TARGETS_USING_BORINGSSL := $(acer-s58a) $(nexus-5x)
+TARGETS_USING_BORINGSSL := $(nexus-7)
 $(TARGETS_USING_BORINGSSL): NDK_ARG += OPENSSL_IS_BORINGSSL=1
-
-# For s58a, copy required .so files to NDK lib
-arch_arm64_lib_path := $(NDK_DIR)/platforms/android-21/arch-arm64/usr/lib
-$(acer-s58a): $(arch_arm64_lib_path)/.copy_s58a_system_libs
-$(arch_arm64_lib_path)/.copy_s58a_system_libs:
-	rsync -a $(build_dir)/prebuilt/acer-s58a/system/*.so $(arch_arm64_lib_path)/
-	touch $(arch_arm64_lib_path)/.copy_s58a_system_libs
 
 #####
 # Make rules
@@ -69,17 +61,17 @@ clean:
 $(ALL_OUTS): third_party/jansson force
 
 # Add out rules driven from targets
-# e.g. nexus-5x: out/nexus-5x-hcfs out/nexus-5x-hcfs-gdb
+# e.g. nexus-7: out/nexus-7-hcfs out/nexus-7-hcfs-gdb
 $(foreach t,$(TARGETS),$(eval $(t): out/$(t)-hcfs out/$(t)-hcfs-gdb))
 
 out/%-hcfs:
 	@rm -rf $@
 	ndk-build $(NDK_ARG)
-	@mkdir -p $@/system/{bin,lib64}
-	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -I{} -0r mv {} $@/system/lib64
+	@mkdir -p $@/system/{bin,lib}
+	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -I{} -0r mv {} $@/system/lib
 	@find $@/$(APP_ABI) -maxdepth 1 ! -name '*.so' -type f -print0 | xargs -I{} -0r mv {} $@/system/bin
 	@for i in $$(\ls $(build_dir)/prebuilt/$*/system/); \
-	  do if [ -f $@/system/lib64/$$i ]; then rm -f $@/system/lib64/$$i; fi done
+	  do if [ -f $@/system/lib/$$i ]; then rm -f $@/system/lib/$$i; fi done
 	@ln -sf $(build_dir)/internal_testing_resource/* $@/
 	@rm -rf $@/gdb.* $@/$(APP_ABI)
 
@@ -88,13 +80,13 @@ out/%-hcfs-gdb:
 	@rm -rf $@ $@.zip
 	ndk-build $(NDK_ARG)
 	# Setup system folder, mapping to /system on device
-	@mkdir -p $@/system/{bin,lib64}
+	@mkdir -p $@/system/{bin,lib}
 	@rsync -ac -f'- /*/' $(@:out/%=obj/%)/local/$(APP_ABI)/ $@/$(APP_ABI)/
-	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -I{} -0r cp {} $@/system/lib64
+	@find $@/$(APP_ABI) -maxdepth 1 -name '*.so' -type f -print0 | xargs -I{} -0r cp {} $@/system/lib
 	@find $@/$(APP_ABI) -maxdepth 1 ! -name '*.so' ! -name 'gdb.setup' -type f -print0 | xargs -I{} -0r cp {} $@/system/bin
 	# remove .so files already in device
 	@for i in $$(\ls $(build_dir)/prebuilt/$*/system/); \
-	  do if [ -f $@/system/lib64/$$i ]; then rm -f $@/system/lib64/$$i; fi done
+	  do if [ -f $@/system/lib/$$i ]; then rm -f $@/system/lib/$$i; fi done
 	@# copy resources
 	ln -sf $(build_dir)/internal_testing_resource/* $@/
 	sed -e "s#$(build_dir)/$(@:out/%=obj/%)/local/##g" \
