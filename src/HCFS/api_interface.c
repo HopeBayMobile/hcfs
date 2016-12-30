@@ -1310,6 +1310,21 @@ void api_module(void *index1)
 		case CHECKPIN:
 			retcode = checkpin_handle(arg_len, largebuf);
 			goto return_retcode;
+		case SET_UPLOAD_INTERVAL:
+			memcpy(&(system_config->first_upload_delay),
+			       &(largebuf[0]),sizeof(int32_t));
+			memcpy(&(system_config->normal_upload_delay),
+			       &(largebuf[sizeof(int32_t)]), sizeof(int32_t));
+			memcpy(&(system_config->sync_nonbusy_pause_time),
+			       &(largebuf[sizeof(int32_t)*2]), sizeof(int32_t));
+			write_log(4, "Upload interval now set at %d seconds"
+			          " for first upload.\n", FIRST_UPLOAD_DELAY);
+			write_log(4, "Upload interval now set at %d seconds"
+			          " for normal upload.\n", NORMAL_UPLOAD_DELAY);
+			write_log(4, "Nonbusy upload wait now set at %d seconds"
+			          ".\n", SYNC_NONBUSY_PAUSE_TIME);
+			retcode = 0;
+			goto return_retcode;
 		case TERMINATE:
 			/* Terminate the system */
 			/* Moving system_going_down flag earlier */

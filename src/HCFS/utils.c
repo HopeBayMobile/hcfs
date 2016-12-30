@@ -368,6 +368,9 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 	config->current_backend = -1;
 	config->log_level = 0;
 	config->log_path = NULL;
+	config->first_upload_delay = DEFAULT_FIRST_UPLOAD_DELAY;
+	config->normal_upload_delay = DEFAULT_NORMAL_UPLOAD_DELAY;
+	config->sync_nonbusy_pause_time = DEFAULT_SYNC_NONBUSY_PAUSE_TIME;
 
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
@@ -548,6 +551,39 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 				return -1;
 			}
 			config->max_block_size = temp_val;
+			continue;
+		}
+		if (strcasecmp(argname, "first_upload_delay") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				write_log(0, "Number conversion error: %s\n", argname);
+				return -1;
+			}
+			config->first_upload_delay = temp_val;
+			continue;
+		}
+		if (strcasecmp(argname, "normal_upload_delay") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				write_log(0, "Number conversion error: %s\n", argname);
+				return -1;
+			}
+			config->normal_upload_delay = temp_val;
+			continue;
+		}
+		if (strcasecmp(argname, "sync_nonbusy_pause_time") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				write_log(0, "Number conversion error: %s\n", argname);
+				return -1;
+			}
+			config->sync_nonbusy_pause_time = temp_val;
 			continue;
 		}
 		if (strcasecmp(argname, "current_backend") == 0) {

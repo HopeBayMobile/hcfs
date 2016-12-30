@@ -33,6 +33,9 @@ typedef struct {
 	int64_t *max_pinned_limit;
 	int64_t max_block_size;
 	int32_t current_backend;
+	int32_t first_upload_delay;
+	int32_t normal_upload_delay;
+	int32_t sync_nonbusy_pause_time;
 	char *swift_account;
 	char *swift_user;
 	char *swift_pass;
@@ -88,6 +91,18 @@ extern SYSTEM_CONF_STRUCT *system_config;
 #define CACHE_HARD_LIMIT system_config->cache_hard_limit
 #define CACHE_DELTA system_config->cache_update_delta
 #define META_SPACE_LIMIT system_config->meta_space_limit
+
+/* Use xattr "user.lastsync" to check the last sync complete time, and
+use the following two parameters to decide how long to wait until the
+next sync start for an inode */
+/* FIRST_UPLOAD_DELAY should be smaller than NORMAL_UPLOAD_DELAY. */
+#define FIRST_UPLOAD_DELAY system_config->first_upload_delay
+#define NORMAL_UPLOAD_DELAY system_config->normal_upload_delay
+#define SYNC_NONBUSY_PAUSE_TIME system_config->sync_nonbusy_pause_time
+/* Default values */
+#define DEFAULT_FIRST_UPLOAD_DELAY 30
+#define DEFAULT_NORMAL_UPLOAD_DELAY 60
+#define DEFAULT_SYNC_NONBUSY_PAUSE_TIME 10
 
 #define MAX_PINNED_RATIO 0.8
 #define MAX_PINNED_LIMIT (CACHE_HARD_LIMIT * MAX_PINNED_RATIO)

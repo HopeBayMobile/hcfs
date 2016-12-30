@@ -33,14 +33,6 @@
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 8
 
-#define SYNC_NONBUSY_PAUSE_TIME 10
-/* Use xattr "user.lastsync" to check the last sync complete time, and
-use the following two parameters to decide how long to wait until the
-next sync start for an inode */
-/* FIRST_UPLOAD_DELAY should be smaller than NORMAL_UPLOAD_DELAY. */
-#define FIRST_UPLOAD_DELAY 30
-#define NORMAL_UPLOAD_DELAY 60
-
 typedef struct {
 	off_t page_filepos;
 	int64_t page_entry_index;

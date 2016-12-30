@@ -2300,7 +2300,6 @@ void upload_loop(void)
 			/* Start to recovery dirty queue if needed */
 			if (need_recover_sb())
 				start_sb_recovery();
-		
 			/* Sleep for SYNC_NONBUSY_PAUSE_TIME seconds if not
 			in a hurry */
 			/* If need to delay upload further, sleep until
@@ -2310,6 +2309,18 @@ void upload_loop(void)
 			/* Sleep will be interrupted if system is going down
 			or cache is full */
 			_upload_sleep(shortest_wait, skip_everyone);
+
+			/* Break immediately if system going down */
+			if (hcfs_system->system_going_down == TRUE)
+				break;
+
+			/* Avoid busy polling */
+			if (sys_super_block->head.num_dirty <=
+			    sync_ctl.total_active_sync_threads) {
+				sem_wait(&(hcfs_system->sync_wait_sem));
+				if (hcfs_system->system_going_down == TRUE)
+					break;
+			}
 
 			ino_check = 0;
 			consecutive_skips = FALSE;
