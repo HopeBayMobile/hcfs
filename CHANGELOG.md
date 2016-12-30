@@ -17,6 +17,26 @@ Please view this file on the android-dev branch, on stable branches it's out of 
  14. [HCFS] In restoration stage1, if system reboot when restored smart cache(2.7GB) has been downloaded and moved into now active hcfs, stage1 will fail because of no more space.
        It should have kept restoring after rebooting in stage1.
 
+
+v 2.2.4.2378
+=====
+## New Features
+ - [Tera-App] Feature/fixed_200MB_booster_size
+
+## Fixed
+ - No item
+
+## CI / Refactoring / Other
+ - No item
+
+### Branch used in this release
+ - [HCFS] release2.2.4_bugfix
+ - [Tera-App] 2.2.4.0005
+ - [Nexus-5X] 2.2.4.0004
+ - [Tera-Launcher] 2.2.4.0004
+ - [Tera-Service] 2.2.4.0004
+
+
 v 2.2.4.2354
 =====
 ## New Features
