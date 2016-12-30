@@ -28,6 +28,8 @@
 /* For swift token control */
 #define MAX_WAIT_TIME 60
 
+typedef void added_info_t; /* Additional data curl ops needed. */
+
 typedef struct {
 	FILE *fptr;
 	off_t object_size;
@@ -95,16 +97,50 @@ int32_t hcfs_get_auth_token(void);
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle);
 int32_t hcfs_test_backend(CURL_HANDLE *curl_handle);
-int32_t hcfs_list_container(CURL_HANDLE *curl_handle);
-int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HTTP_meta *);
-int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HCFS_encode_object_meta *);
-int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
+int32_t hcfs_list_container(FILE *fptr,
+			    CURL_HANDLE *curl_handle,
+			    added_info_t *);
+int32_t hcfs_put_object(FILE *fptr,
+			char *objname,
+			CURL_HANDLE *curl_handle,
+			HTTP_meta *,
+			added_info_t *);
+int32_t hcfs_get_object(FILE *fptr,
+			char *objname,
+			CURL_HANDLE *curl_handle,
+			HCFS_encode_object_meta *,
+			added_info_t *);
+int32_t hcfs_delete_object(char *objname,
+			   CURL_HANDLE *curl_handle,
+			   added_info_t *);
+/* Tools */
+#define MAX_RETRIES 5
+#ifdef UNITTEST
+#define RETRY_INTERVAL 0
+#else
+#define RETRY_INTERVAL 10
+#endif
 
+#define HCFS_SET_DEFAULT_CURL()                                                \
+	do {                                                                   \
+		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
+		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
+		curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);                   \
+		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);                    \
+		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);                  \
+		curl_easy_setopt(curl, CURLOPT_PUT, 0L);                       \
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);            \
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);            \
+		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);                  \
+		curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);                    \
+		curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);                   \
+	} while (0)
+
+int32_t http_is_success(int32_t code);
+size_t write_file_fn(void *ptr, size_t size, size_t nmemb, void *fstream);
+int32_t parse_http_header_retcode(FILE *fptr);
 int32_t parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader, const char *, const char *,
 				  const char *, const char *);
-int32_t _http_is_success(int32_t code);
 
 #endif /* GW20_HCFS_HCFSCURL_H_ */

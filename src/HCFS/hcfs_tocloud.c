@@ -1670,8 +1670,8 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		FILE *new_fptr = transform_fd(fptr, object_key, &data,
 					      ENABLE_ENCRYPT, ENABLE_COMPRESS);
 		write_log(10, "start to put..\n");
-		ret_val =
-		    hcfs_put_object(new_fptr, objname, curl_handle, http_meta);
+		ret_val = hcfs_put_object(new_fptr, objname, curl_handle,
+					  http_meta, NULL);
 
 		fclose(new_fptr);
 		if (object_key != NULL)
@@ -1742,7 +1742,7 @@ int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 		return -EIO;
 	}
 
-	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL);
+	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL, NULL);
 
 	fclose(fptr);
 	/* Already retried in get object if necessary */
@@ -2375,7 +2375,7 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL);
+	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL, NULL);
 	if ((ret < 200) || (ret > 299))
 		goto errcode_handle;
 	flock(fileno(fptr), LOCK_UN);
@@ -2449,7 +2449,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		is_fopen = TRUE;
 		/* First try to download one */
 		ret = hcfs_get_object(fptr, objname,
-		                      &(sync_stat_ctl.statcurl), NULL);
+		                      &(sync_stat_ctl.statcurl), NULL, NULL);
 		if ((ret < 200) || (ret > 299)) {
 			if (ret != 404) {
 				errcode = -EIO;
@@ -2492,7 +2492,8 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
+	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL,
+			      NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		goto errcode_handle;

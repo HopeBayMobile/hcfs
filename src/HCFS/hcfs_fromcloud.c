@@ -119,7 +119,7 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
 
         status = hcfs_get_object(get_fptr, objname,
                                  &(download_curl_handles[which_curl_handle]),
-                                 object_meta);
+                                 object_meta, NULL);
 
 	/* process failed get here */
 	if ((status >= 200) && (status <= 299)) {
@@ -1014,7 +1014,7 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 
 		status = hcfs_get_object(fptr, objname,
 				&(download_usermeta_curl_handle),
-				NULL);
+				NULL, NULL);
 		if (200 <= status && status <= 299) {
 			break;
 		} else if (status == 404) {

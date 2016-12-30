@@ -42,13 +42,6 @@
 #include "event_filter.h"
 #include "googledrive_curl.h"
 
-#define MAX_RETRIES 5
-#ifdef UNITTEST
-#define RETRY_INTERVAL 0
-#else
-#define RETRY_INTERVAL 10
-#endif
-
 /* For SWIFTTOKEN backend only */
 BACKEND_TOKEN_CONTROL swifttoken_control = {
 	PTHREAD_MUTEX_INITIALIZER,
@@ -59,20 +52,6 @@ BACKEND_TOKEN_CONTROL swifttoken_control = {
 char swift_auth_string[1024];
 char swift_url_string[1024];
 
-#define HCFS_SET_DEFAULT_CURL()                                                \
-	do {                                                                   \
-		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
-		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
-		curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);                   \
-		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);                    \
-		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);                  \
-		curl_easy_setopt(curl, CURLOPT_PUT, 0L);                       \
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);            \
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);            \
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);                  \
-		curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);                    \
-		curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);                   \
-	} while (0)
 /*
  * Marco to compute data transfer throughput.  If object size < 32KB, for
  * this computation the size is rounded up to 32KB.
@@ -1048,7 +1027,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	if (_http_is_success(ret_val)) {
+	if (http_is_success(ret_val)) {
 		/* Record xfer throughput */
 		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
@@ -1175,7 +1154,7 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 		update_backend_status(FALSE, NULL);
 
 	/* get object meta data */
-	if (_http_is_success(ret_val) && object_meta) {
+	if (http_is_success(ret_val) && object_meta) {
 		char header[1024] = {0};
 
 		FSEEK(swift_header_fptr, 0, SEEK_SET);
@@ -1548,7 +1527,7 @@ int32_t hcfs_S3_test_backend(CURL_HANDLE *curl_handle)
 	return -1;
 }
 
-int32_t _http_is_success(int32_t code)
+int32_t http_is_success(int32_t code)
 {
 	if ((code >= 200) && (code < 300))
 		return TRUE;
@@ -1638,7 +1617,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 		write_log(2, "Connecting to Swift backend\n");
 		num_retries = 0;
 		ret_val = init_ftn(curl_handle);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1649,7 +1628,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 				destroy_ftn(curl_handle->curl);
 			ret_val = init_ftn(curl_handle);
 		}
-		if (_http_is_success(ret_val) == TRUE) {
+		if (http_is_success(ret_val) == TRUE) {
 			curl_handle->curl_backend = CURRENT_BACKEND;
 		} else {
 			if (curl_handle->curl != NULL)
@@ -1660,7 +1639,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 		break;
 	case S3:
 		ret_val = hcfs_init_S3_backend(curl_handle);
-		if (_http_is_success(ret_val) == TRUE) {
+		if (http_is_success(ret_val) == TRUE) {
 			curl_handle->curl_backend = S3;
 		} else {
 			if (curl_handle->curl != NULL)
@@ -1730,7 +1709,7 @@ int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
-		if (_http_is_success(ret_val) == FALSE) {
+		if (http_is_success(ret_val) == FALSE) {
 			write_log(5, "Error connecting to backend\n");
 			sleep(5);
 			return ret_val;
@@ -1775,17 +1754,20 @@ int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 /* TODO: nothing is actually returned in list container. FIX THIS*/
-int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
+int32_t hcfs_list_container(FILE *fptr,
+			    CURL_HANDLE *curl_handle,
+			    added_info_t *more)
 {
 	int32_t ret_val, num_retries;
 
+	UNUSED(more);
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
-		if (_http_is_success(ret_val) == FALSE) {
+		if (http_is_success(ret_val) == FALSE) {
 			write_log(5, "Error connecting to backend\n");
 			sleep(5);
 			return ret_val;
@@ -1799,7 +1781,7 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 	case SWIFTTOKEN:
 		ret_val = hcfs_swift_list_container(curl_handle);
 
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1815,9 +1797,29 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 		}
 
 		break;
+	case GOOGLEDRIVE:
+		ret_val = hcfs_gdrive_list_container(fptr, curl_handle, more);
+
+		while ((!http_is_success(ret_val)) &&
+		       ((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				  "Retrying backend operation in 10 seconds");
+			sleep(RETRY_INTERVAL);
+			if (ret_val == 401) {
+				ret_val = hcfs_gdrive_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			ret_val =
+			    hcfs_gdrive_list_container(fptr, curl_handle, more);
+		}
+
+		break;
 	case S3:
 		ret_val = hcfs_S3_list_container(curl_handle);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_S3_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1846,18 +1848,19 @@ int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HTTP_meta *object_meta)
+		    HTTP_meta *object_meta, added_info_t *more)
 {
 	int32_t ret_val, num_retries;
 	int32_t ret, errcode;
 
+	UNUSED(more);
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
-		if (_http_is_success(ret_val) == FALSE) {
+		if (http_is_success(ret_val) == FALSE) {
 			write_log(5, "Error connecting to backend\n");
 			sleep(5);
 			return ret_val;
@@ -1870,7 +1873,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	case SWIFTTOKEN:
 		ret_val = hcfs_swift_put_object(fptr, objname, curl_handle,
 						object_meta);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1890,7 +1893,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	case S3:
 		ret_val =
 		    hcfs_S3_put_object(fptr, objname, curl_handle, object_meta);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_S3_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1924,18 +1927,19 @@ errcode_handle:
 *
 *************************************************************************/
 int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HCFS_encode_object_meta *object_meta)
+		    HCFS_encode_object_meta *object_meta, added_info_t *more)
 {
 	int32_t ret_val, num_retries;
 	int32_t ret, errcode;
 
+	UNUSED(more);
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
-		if (_http_is_success(ret_val) == FALSE) {
+		if (http_is_success(ret_val) == FALSE) {
 			write_log(5, "Error connecting to backend\n");
 			sleep(5);
 			return ret_val;
@@ -1948,7 +1952,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	case SWIFTTOKEN:
 		ret_val = hcfs_swift_get_object(fptr, objname, curl_handle,
 						object_meta);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1969,7 +1973,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	case S3:
 		ret_val =
 		    hcfs_S3_get_object(fptr, objname, curl_handle, object_meta);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_S3_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -1987,7 +1991,7 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		break;
 	}
 	/* Truncate output if not successful */
-	if (!_http_is_success(ret_val))
+	if (!http_is_success(ret_val))
 		FTRUNCATE(fileno(fptr), 0);
 
 	return ret_val;
@@ -2010,17 +2014,20 @@ errcode_handle:
 /* TODO: Fix handling in reauthing in SWIFT.  Now will try to reauth for
  * any HTTP error
  */
-int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int32_t hcfs_delete_object(char *objname,
+			   CURL_HANDLE *curl_handle,
+			   added_info_t *more)
 {
 	int32_t ret_val, num_retries;
 
+	UNUSED(more);
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
-		if (_http_is_success(ret_val) == FALSE) {
+		if (http_is_success(ret_val) == FALSE) {
 			write_log(5, "Error connecting to backend\n");
 			sleep(5);
 			return ret_val;
@@ -2033,7 +2040,7 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	case SWIFTTOKEN:
 		ret_val = hcfs_swift_delete_object(objname, curl_handle);
 
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -2051,7 +2058,7 @@ int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 		break;
 	case S3:
 		ret_val = hcfs_S3_delete_object(objname, curl_handle);
-		while ((!_http_is_success(ret_val)) &&
+		while ((!http_is_success(ret_val)) &&
 		       ((_S3_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
@@ -2204,7 +2211,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	fclose(S3_header_fptr);
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
-	if (_http_is_success(ret_val)) {
+	if (http_is_success(ret_val)) {
 		/* Record xfer throughput */
 		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
@@ -2330,7 +2337,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		update_backend_status(FALSE, NULL);
 
 	/* get object meta data */
-	if (_http_is_success(ret_val) && object_meta) {
+	if (http_is_success(ret_val) && object_meta) {
 		char header[1024] = {0};
 
 		FSEEK(S3_header_fptr, 0, SEEK_SET);
