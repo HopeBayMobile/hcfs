@@ -48,7 +48,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <sys/xattr.h>
+#include <linux/xattr.h>
 #include <openssl/sha.h>
 #include <inttypes.h>
 

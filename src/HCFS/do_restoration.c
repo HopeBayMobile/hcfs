@@ -3028,48 +3028,49 @@ int _delete_node(const char *thispath,
 		 int flag,
 		 struct FTW *buf)
 {
-	int ret, errcode = 0;
-
-	UNUSED(buf);
-	UNUSED(thisstat);
-	switch (flag) {
-	case FTW_F:
-		UNLINK(thispath);
-		break;
-	case FTW_D:
-		write_log(4, "Unprocessed files in deleting unused content?\n");
-		errcode = -EAGAIN;
-		break;
-	case FTW_DP:
-		RMDIR(thispath);
-		break;
-	default:
-		write_log(4, "Unexpected error in deleting unused content?\n");
-		errcode = -EIO;
-		break;
-	}
-	return errcode;
-
-errcode_handle:
-	write_log(4, "IO error causing deleting unused content to terminate\n");
-	return errcode;
+	return 0;
+//	int ret, errcode = 0;
+//
+//	UNUSED(buf);
+//	UNUSED(thisstat);
+//	switch (flag) {
+//	case FTW_F:
+//		UNLINK(thispath);
+//		break;
+//	case FTW_D:
+//		write_log(4, "Unprocessed files in deleting unused content?\n");
+//		errcode = -EAGAIN;
+//		break;
+//	case FTW_DP:
+//		RMDIR(thispath);
+//		break;
+//	default:
+//		write_log(4, "Unexpected error in deleting unused content?\n");
+//		errcode = -EIO;
+//		break;
+//	}
+//	return errcode;
+//
+//errcode_handle:
+//	write_log(4, "IO error causing deleting unused content to terminate\n");
+//	return errcode;
 }
 
 void cleanup_stage1_data(void)
 {
-	char todelete_metapath[METAPATHLEN];
-	char todelete_blockpath[BLOCKPATHLEN];
-
-	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete", METAPATH);
-	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete", BLOCKPATH);
-
-	if (access(todelete_metapath, F_OK) == 0)
-		nftw(todelete_metapath, _delete_node, 10,
-		     FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
-
-	if (access(todelete_blockpath, F_OK) == 0)
-		nftw(todelete_blockpath, _delete_node, 10,
-		     FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+//	char todelete_metapath[METAPATHLEN];
+//	char todelete_blockpath[BLOCKPATHLEN];
+//
+//	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete", METAPATH);
+//	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete", BLOCKPATH);
+//
+//	if (access(todelete_metapath, F_OK) == 0)
+//		nftw(todelete_metapath, _delete_node, 10,
+//		     FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+//
+//	if (access(todelete_blockpath, F_OK) == 0)
+//		nftw(todelete_blockpath, _delete_node, 10,
+//		     FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
 }
 
 /* Function for backing up package list (packages.xml) */

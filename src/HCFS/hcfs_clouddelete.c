@@ -39,7 +39,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <errno.h>
 #include <dirent.h>
 #include <sys/mman.h>
-#include <sys/xattr.h>
+#include <linux/xattr.h>
 #include <inttypes.h>
 #include <jansson.h>
 

@@ -22,7 +22,7 @@
 #include "xattr_ops.h"
 
 #include <errno.h>
-#include <sys/xattr.h>
+#include <linux/xattr.h>
 
 #include "meta_mem_cache.h"
 #include "super_block.h"

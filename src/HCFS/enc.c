@@ -9,6 +9,7 @@
 
 #include "enc.h"
 
+#include <errno.h>
 #include <sys/file.h>
 
 #include "utils.h"

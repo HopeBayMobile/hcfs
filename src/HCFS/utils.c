@@ -29,7 +29,7 @@
 #include <limits.h>
 #include <signal.h>
 #include <time.h>
-#include <sys/xattr.h>
+#include <linux/xattr.h>
 #include <inttypes.h>
 #include <jansson.h>
 #include <strings.h>

@@ -70,10 +70,10 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
-#include <sys/xattr.h>
+#include <linux/xattr.h>
 #include <inttypes.h>
 #include <sqlite3.h>
-#include <sys/capability.h>
+#include <linux/capability.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
