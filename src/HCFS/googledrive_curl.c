@@ -207,6 +207,7 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
+/*
 __attribute__((constructor))
 void test()
 {
@@ -234,4 +235,4 @@ void test()
 	fclose(fptr);
 	exit(0);
 }
-
+*/
