@@ -142,5 +142,15 @@ int32_t parse_http_header_retcode(FILE *fptr);
 int32_t parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader, const char *, const char *,
 				  const char *, const char *);
+/*
+ * Marco to compute data transfer throughput.  If object size < 32KB, for
+ * this computation the size is rounded up to 32KB.
+ */
+#define COMPUTE_THROUGHPUT()                                                   \
+	do {                                                                   \
+		off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;   \
+		time_spent = (time_spent <= 0) ? 0.001 : time_spent;           \
+		xfer_thpt = (int64_t)(objsize_kb / time_spent);                \
+	} while (0)
 
 #endif /* GW20_HCFS_HCFSCURL_H_ */

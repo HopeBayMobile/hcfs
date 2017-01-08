@@ -25,6 +25,7 @@
 #include "params.h"
 #include "hcfscurl.h"
 
+#define BOUNDARY_STRING "hcfs_boundary"
 /* Upload: If file ID is empty, then perform "create" operation. Otherwiese
  * perform "update" op. Besides, if parent ID is empty, then just upload under
  * root folder.
@@ -37,6 +38,17 @@ typedef struct {
 	char fileID[256];     /*File ID*/
 	char parentID[256];   /*Parent ID, can be empty string*/
 } GOOGLEDRIVE_OBJ_INFO;
+
+typedef struct {
+	FILE *fptr;
+	size_t object_size;
+	size_t object_remaining_size;
+	char *head_string;
+	int32_t head_remaining;
+	char *tail_string;
+	int32_t tail_remaining;
+	int32_t total_remaining;
+} object_post_control;
 
 BACKEND_TOKEN_CONTROL *googledrive_token_control;
 char googledrive_token[1024];

@@ -52,16 +52,6 @@ BACKEND_TOKEN_CONTROL swifttoken_control = {
 char swift_auth_string[1024];
 char swift_url_string[1024];
 
-/*
- * Marco to compute data transfer throughput.  If object size < 32KB, for
- * this computation the size is rounded up to 32KB.
- */
-#define COMPUTE_THROUGHPUT()                                                   \
-	do {                                                                   \
-		off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;   \
-		time_spent = (time_spent <= 0) ? 0.001 : time_spent;           \
-		xfer_thpt = (int64_t)(objsize_kb / time_spent);                \
-	} while (0)
 
 /************************************************************************
 *
