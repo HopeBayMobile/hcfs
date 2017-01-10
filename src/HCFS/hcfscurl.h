@@ -65,6 +65,8 @@ sem_t nonread_download_curl_sem;
 
 typedef int32_t hcfs_init_backend_t(CURL_HANDLE *);
 typedef void hcfs_destory_backend_t(CURL *);
+typedef int32_t hcfs_test_backend_t(CURL_HANDLE *);
+typedef int32_t hcfs_reauth_t(CURL_HANDLE *);
 
 /* Swift collections */
 int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
@@ -142,6 +144,8 @@ int32_t parse_http_header_retcode(FILE *fptr);
 int32_t parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader, const char *, const char *,
 				  const char *, const char *);
+size_t read_file_function(void *ptr, size_t size, size_t nmemb,
+			  void *put_control1);
 /*
  * Marco to compute data transfer throughput.  If object size < 32KB, for
  * this computation the size is rounded up to 32KB.

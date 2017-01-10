@@ -1692,6 +1692,8 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 {
 	int32_t ret_val;
+	hcfs_test_backend_t *test_backend_ftn;
+	hcfs_reauth_t *reauth_ftn;
 
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
@@ -1705,33 +1707,36 @@ int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 			return ret_val;
 		}
 	}
-
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 	case SWIFTTOKEN:
-		ret_val = hcfs_swift_test_backend(curl_handle);
-		if (ret_val == 401) {
-			write_log(2, "Retrying backend login");
-			ret_val = hcfs_swift_reauth(curl_handle);
-			if ((ret_val < 200) || (ret_val > 299))
-				return ret_val;
-			ret_val = hcfs_swift_test_backend(curl_handle);
-		}
+		test_backend_ftn = hcfs_swift_test_backend;
+		reauth_ftn = hcfs_swift_reauth;
+		break;
+	case GOOGLEDRIVE:
+		test_backend_ftn = hcfs_gdrive_test_backend;
+		reauth_ftn = hcfs_gdrive_reauth;
 		break;
 	case S3:
-		ret_val = hcfs_S3_test_backend(curl_handle);
-		if (ret_val == 401) {
-			write_log(2, "Retrying backend login");
-			ret_val = hcfs_S3_reauth(curl_handle);
-			if ((ret_val < 200) || (ret_val > 299))
-				return ret_val;
-			ret_val = hcfs_S3_test_backend(curl_handle);
-		}
+		test_backend_ftn = hcfs_S3_test_backend;
+		reauth_ftn = hcfs_S3_reauth;
 		break;
 	default:
 		ret_val = -1;
-		break;
+		goto out;
 	}
+
+	ret_val = test_backend_ftn(curl_handle);
+	if (ret_val == 401) {
+		write_log(2, "Retrying backend login");
+		ret_val = reauth_ftn(curl_handle);
+		if ((ret_val < 200) || (ret_val > 299))
+			return ret_val;
+		ret_val = test_backend_ftn(curl_handle);
+	}
+
+out:
+
 	return ret_val;
 }
 
@@ -1788,6 +1793,10 @@ int32_t hcfs_list_container(FILE *fptr,
 
 		break;
 	case GOOGLEDRIVE:
+		if (!more) {
+			ret_val = -EINVAL;
+			break;
+		}
 		ret_val = hcfs_gdrive_list_container(fptr, curl_handle, more);
 
 		while ((!http_is_success(ret_val)) &&
@@ -1842,6 +1851,9 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 {
 	int32_t ret_val, num_retries;
 	int32_t ret, errcode;
+	GOOGLEDRIVE_OBJ_INFO *gdrive_obj_info;
+	int32_t (*gdrive_upload_action)(FILE *, char *, CURL_HANDLE *,
+			  GOOGLEDRIVE_OBJ_INFO *);
 
 	UNUSED(more);
 	ret_val = ignore_sigpipe();
@@ -1878,6 +1890,43 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			FSEEK(fptr, 0, SEEK_SET);
 			ret_val = hcfs_swift_put_object(
 			    fptr, objname, curl_handle, object_meta);
+		}
+		break;
+	case GOOGLEDRIVE:
+		if (!more) {
+			ret_val = -EINVAL;
+			break;
+		}
+		gdrive_obj_info = (GOOGLEDRIVE_OBJ_INFO *)more;
+		if (gdrive_obj_info->fileID[0] != 0) {
+			/* Update object if given file ID */
+			gdrive_upload_action = hcfs_gdrive_put_object;
+		} else {
+			/* Post new object if no ID */
+			if (gdrive_obj_info->file_title[0] != 0) {
+				gdrive_upload_action = hcfs_gdrive_post_object;
+			} else {
+				ret_val = -EINVAL;
+				break;
+			}
+		}
+		ret_val = gdrive_upload_action(fptr, objname, curl_handle,
+						  gdrive_obj_info);
+		while ((!http_is_success(ret_val)) &&
+		       ((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				  "Retrying backend operation in 10 seconds");
+			sleep(RETRY_INTERVAL);
+			if (ret_val == 401) {
+				ret_val = hcfs_gdrive_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			FSEEK(fptr, 0, SEEK_SET);
+			ret_val = gdrive_upload_action(
+			    fptr, objname, curl_handle, gdrive_obj_info);
 		}
 		break;
 	case S3:
@@ -1958,6 +2007,31 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			FTRUNCATE(fileno(fptr), 0);
 			ret_val = hcfs_swift_get_object(
 			    fptr, objname, curl_handle, object_meta);
+		}
+		break;
+	case GOOGLEDRIVE:
+		if (!more) {
+			ret_val = -EINVAL;
+			break;
+		}
+		ret_val = hcfs_gdrive_get_object(fptr, objname, curl_handle,
+						more);
+		while ((!http_is_success(ret_val)) &&
+		       ((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				  "Retrying backend operation in 10 seconds");
+			sleep(RETRY_INTERVAL);
+			if (ret_val == 401) {
+				ret_val = hcfs_gdrive_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			FSEEK(fptr, 0, SEEK_SET);
+			FTRUNCATE(fileno(fptr), 0);
+			ret_val = hcfs_gdrive_get_object(
+			    fptr, objname, curl_handle, more);
 		}
 		break;
 	case S3:
@@ -2046,6 +2120,30 @@ int32_t hcfs_delete_object(char *objname,
 			    hcfs_swift_delete_object(objname, curl_handle);
 		}
 		break;
+	case GOOGLEDRIVE:
+		if (!more) {
+			ret_val = -EINVAL;
+			break;
+		}
+		ret_val = hcfs_gdrive_delete_object(objname, curl_handle, more);
+
+		while ((!http_is_success(ret_val)) &&
+		       ((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				  "Retrying backend operation in 10 seconds");
+			sleep(RETRY_INTERVAL);
+			if (ret_val == 401) {
+				ret_val = hcfs_gdrive_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			ret_val = hcfs_gdrive_delete_object(objname,
+							    curl_handle, more);
+		}
+		break;
+
 	case S3:
 		ret_val = hcfs_S3_delete_object(objname, curl_handle);
 		while ((!http_is_success(ret_val)) &&

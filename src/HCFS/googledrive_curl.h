@@ -53,12 +53,28 @@ typedef struct {
 BACKEND_TOKEN_CONTROL *googledrive_token_control;
 char googledrive_token[1024];
 
-int32_t init_gdrive_token_control(void);
-int32_t hcfs_gdrive_reauth(CURL_HANDLE *curl_handle);
-int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
-				   GOOGLEDRIVE_OBJ_INFO *more);
 int32_t hcfs_init_gdrive_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_gdrive_backend(CURL *curl);
+int32_t init_gdrive_token_control(void);
+int32_t hcfs_gdrive_reauth(CURL_HANDLE *curl_handle);
+int32_t hcfs_gdrive_test_backend(CURL_HANDLE *curl_handle);
+int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
+				   GOOGLEDRIVE_OBJ_INFO *more);
+int32_t hcfs_gdrive_get_object(FILE *fptr,
+			       char *objname,
+			       CURL_HANDLE *curl_handle,
+			       GOOGLEDRIVE_OBJ_INFO *obj_info);
+int32_t hcfs_gdrive_delete_object(char *objname,
+				  CURL_HANDLE *curl_handle,
+				  GOOGLEDRIVE_OBJ_INFO *obj_info);
+int32_t hcfs_gdrive_put_object(FILE *fptr,
+			       char *objname,
+			       CURL_HANDLE *curl_handle,
+			       GOOGLEDRIVE_OBJ_INFO *obj_info);
+int32_t hcfs_gdrive_post_object(FILE *fptr,
+			       char *objname,
+			       CURL_HANDLE *curl_handle,
+			       GOOGLEDRIVE_OBJ_INFO *obj_info);
 
 int32_t get_gdrive_fileID(const char *file_name,
 			  char *parentid,
