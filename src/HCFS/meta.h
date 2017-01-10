@@ -144,8 +144,9 @@ typedef struct {
 	int64_t size_last_upload; /* Record data + meta */
 	int64_t meta_last_upload; /* Record meta only */
 	int64_t upload_seq;
-	uint8_t padding[64];
-} _PACKED CLOUD_RELATED_DATA, CLOUD_RELATED_DATA_v1;
+	char metaID[64]; /* Record meta ID on google drive */
+	/* uint8_t padding[64];*/
+} _PACKED CLOUD_RELATED_DATA, CLOUD_RELATED_DATA_v2;
 
 /******************************************************************************
  * Structures for directories
@@ -206,7 +207,8 @@ typedef struct {
 #endif
 	uint32_t paged_out_count;
 	int64_t seqnum;
-} _PACKED BLOCK_ENTRY, BLOCK_ENTRY_v1;
+	char blockID[64]; /* Record block ID */
+} _PACKED BLOCK_ENTRY, BLOCK_ENTRY_v2;
 
 /* Defining the structure of one page of block status page */
 typedef struct {

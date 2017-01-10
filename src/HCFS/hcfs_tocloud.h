@@ -27,6 +27,7 @@
 #include "fuseop.h"
 #include "dedup_table.h"
 #include "tocloud_tools.h"
+#include "googledrive_curl.h"
 
 #define MAX_UPLOAD_CONCURRENCY 4
 #define MAX_SYNC_CONCURRENCY 2
@@ -44,6 +45,7 @@ typedef struct {
 	int32_t progress_fd;
 	char tempfilename[400];
 	int32_t which_index;
+	GOOGLEDRIVE_OBJ_INFO gdrive_obj_info;
 #if ENABLE(DEDUP)
 	BOOL is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
@@ -123,7 +125,8 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
 		  uint8_t *hash_in_meta);
 #else
-		  int64_t seq, CURL_HANDLE *curl_handle, char *filename);
+		  int64_t seq, CURL_HANDLE *curl_handle, char *filename,
+		  GOOGLEDRIVE_OBJ_INFO *gdrive_info);
 #endif
 
 int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);

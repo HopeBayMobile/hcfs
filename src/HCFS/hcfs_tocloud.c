@@ -912,6 +912,19 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 #endif
 
 		sem_post(&(upload_ctl.upload_op_sem));
+
+		/* Set file title and parent ID if backend is google drive */
+		if (CURRENT_BACKEND == GOOGLEDRIVE) {
+			char objname[100];
+			UPLOAD_THREAD_TYPE *upload_ptr =
+			    &(upload_ctl.upload_threads[which_curl]);
+			fetch_backend_block_objname(objname, ptr->inode,
+						    block_count,
+						    toupload_block_seq);
+			strcpy(upload_ptr->gdrive_obj_info.file_title,
+			       objname);
+			get_parnet_id(upload_ptr->gdrive_obj_info.parentID);
+		}
 		ret = dispatch_upload_block(which_curl);
 		if (ret < 0) {
 			write_log(4, "Error: Fail to dipatch and upload"
@@ -1550,7 +1563,8 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		CURL_HANDLE *curl_handle, char *filename, char uploaded,
 		uint8_t id_in_meta[])
 #else
-		int64_t seq, CURL_HANDLE *curl_handle, char *filename)
+		int64_t seq, CURL_HANDLE *curl_handle, char *filename,
+		GOOGLEDRIVE_OBJ_INFO *gdrive_info)
 #endif
 {
 	char objname[400];
@@ -1671,7 +1685,7 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 					      ENABLE_ENCRYPT, ENABLE_COMPRESS);
 		write_log(10, "start to put..\n");
 		ret_val = hcfs_put_object(new_fptr, objname, curl_handle,
-					  http_meta, NULL);
+					  http_meta, gdrive_info);
 
 		fclose(new_fptr);
 		if (object_key != NULL)
@@ -1800,10 +1814,10 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 				thread_ptr->is_upload, thread_ptr->obj_id);
 
 #else
-		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				thread_ptr->seq,
-				&(upload_curl_handles[which_curl]),
-				thread_ptr->tempfilename);
+		ret = do_block_sync(
+		    thread_ptr->inode, thread_ptr->blockno, thread_ptr->seq,
+		    &(upload_curl_handles[which_curl]),
+		    thread_ptr->tempfilename, &(thread_ptr->gdrive_obj_info));
 #endif
 	} else {
 		ret = do_meta_sync(thread_ptr->inode,
