@@ -916,6 +916,13 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
+void get_parnet_id(char *id, ino_t this_inode, int64_t blockno)
+{
+	UNUSED(this_inode);
+	UNUSED(blockno);
+
+	sprintf(id, "123");
+}
 
 __attribute__((constructor))
 void test()

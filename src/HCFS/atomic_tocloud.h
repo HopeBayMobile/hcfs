@@ -28,6 +28,8 @@
 #define DEL_TOUPLOAD_BLOCKS 2
 #define DEL_BACKEND_BLOCKS 3
 
+#define GDRIVE_ID_LENGTH 64
+
 /* Data that should be known by fuse process when uploading a file */
 typedef struct {
 	ino_t inode;
@@ -45,6 +47,8 @@ typedef struct {
 	uint8_t to_upload_objid[OBJID_LENGTH];
 	uint8_t backend_objid[OBJID_LENGTH];
 #else
+	char to_upload_gdrive_id[GDRIVE_ID_LENGTH];
+	char backend_gdrive_id[GDRIVE_ID_LENGTH];
 	int64_t to_upload_seq;
 	int64_t backend_seq;
 #endif
@@ -83,6 +87,7 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
 	const int64_t *toupload_seq, const int64_t *backend_seq,
+	const char *toupload_gdrive_id, const char *backend_gdrive_id,
 	const char *finish);
 #endif
 

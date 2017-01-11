@@ -40,7 +40,7 @@
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
-		int64_t page_pos, int64_t toupload_seq)
+		int64_t page_pos, int64_t toupload_seq, char *blockid)
 {
 	BLOCK_ENTRY_PAGE tmp_page;
 	int64_t local_seq;
@@ -91,7 +91,9 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 	if (local_status == ST_LtoC && local_seq == toupload_seq) {
 		tmp_page.block_entries[e_index].status = ST_BOTH;
 		tmp_page.block_entries[e_index].uploaded = TRUE;
-
+		if (CURRENT_BACKEND == GOOGLEDRIVE)
+			strncpy(tmp_page.block_entries[e_index].blockID,
+				blockid, 64);
 		ret = fetch_block_path(blockpath, inode, blockno);
 		if (ret < 0) {
 			errcode = ret;

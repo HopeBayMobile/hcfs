@@ -461,6 +461,7 @@ errcode_handle:
 int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_exist, const char *backend_exist,
 	const int64_t *toupload_seq, const int64_t *backend_seq,
+	const char *toupload_gdrive_id, const char *backend_gdrive_id,
 	const char *finish)
 {
 	int32_t errcode;
@@ -499,6 +500,14 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 		block_uploading_status->backend_seq = *backend_seq;
 	if (finish)
 		block_uploading_status->finish_uploading = *finish;
+
+	/* Google drive id */
+	if (toupload_gdrive_id)
+		strcpy(block_uploading_status->to_upload_gdrive_id,
+		       toupload_gdrive_id);
+	if (backend_gdrive_id)
+		strcpy(block_uploading_status->backend_gdrive_id,
+		       backend_gdrive_id);
 
 	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);

@@ -80,4 +80,6 @@ int32_t get_gdrive_fileID(const char *file_name,
 			  char *parentid,
 			  char *fileid);
 
+void get_parnet_id(char *id, ino_t this_inode, int64_t blockno);
+
 #endif

@@ -388,8 +388,8 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	int32_t count1;
 	int32_t ret;
 	char toupload_blockpath[400];
-#if ENABLE(DEDUP)
 	int32_t errcode;
+#if ENABLE(DEDUP)
 	uint8_t blk_obj_id[OBJID_LENGTH];
 #endif
 	ino_t this_inode;
@@ -397,7 +397,13 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	int64_t blockno;
 	int64_t toupload_block_seq;
 	int32_t progress_fd;
+	int32_t e_index;
 	char toupload_exist, finish_uploading;
+	char *blockid;
+	BOOL is_toupload_meta_lock;
+	size_t ret_size;
+	BLOCK_ENTRY_PAGE temppage;
+	FILE *toupload_metafptr;
 
 	if (upload_ctl.threads_in_use[index] == FALSE)
 		return 0;
@@ -429,10 +435,11 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	this_inode = upload_ctl.upload_threads[index].inode;
 	//is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
-	//e_index = upload_ctl.upload_threads[index].page_entry_index;
+	e_index = upload_ctl.upload_threads[index].page_entry_index;
 	blockno = upload_ctl.upload_threads[index].blockno;
 	progress_fd = upload_ctl.upload_threads[index].progress_fd;
 	toupload_block_seq = upload_ctl.upload_threads[index].seq;
+	blockid = upload_ctl.upload_threads[index].gdrive_obj_info.fileID;
 
 	/* Terminate it directly when thread is used to delete
 	 * old data on cloud */
@@ -522,10 +529,45 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 		blk_obj_id, NULL, &finish_uploading);
 
 #else
+	if (CURRENT_BACKEND != GOOGLEDRIVE)
+		blockid = NULL;
+	/* TODO: Remove this? */
+	if (blockid) {
+		char toupload_metapath[400];
+
+		fetch_toupload_meta_path(toupload_metapath, this_inode);
+		toupload_metafptr = fopen(toupload_metapath, "r+");
+		if (toupload_metafptr == NULL) {
+			errcode = errno;
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				  errcode, strerror(errcode));
+			return -errcode;
+		}
+		setbuf(toupload_metafptr, NULL);
+
+		flock(fileno(toupload_metafptr), LOCK_EX);
+		is_toupload_meta_lock = TRUE;
+
+		/* Record object id on to-upload meta */
+		FSEEK(toupload_metafptr, page_filepos, SEEK_SET);
+		FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
+		      toupload_metafptr);
+		strncpy(temppage.block_entries[e_index].blockID, blockid,
+			GDRIVE_ID_LENGTH);
+		FSEEK(toupload_metafptr, page_filepos, SEEK_SET);
+		FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
+		       toupload_metafptr);
+
+		flock(fileno(toupload_metafptr), LOCK_UN);
+		fclose(toupload_metafptr);
+		is_toupload_meta_lock = FALSE;
+	}
+
 	toupload_exist = TRUE;
 	finish_uploading = TRUE;
 	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
-		&toupload_block_seq, NULL, &finish_uploading);
+			  &toupload_block_seq, NULL, blockid, NULL,
+			  &finish_uploading);
 #endif
 	fetch_toupload_block_path(toupload_blockpath, this_inode,
 			blockno, toupload_block_seq);
@@ -533,7 +575,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 		unlink_upload_file(toupload_blockpath);
 
 	ret = change_block_status_to_BOTH(this_inode, blockno, page_filepos,
-			toupload_block_seq);
+			toupload_block_seq, blockid);
 	if (ret < 0) {
 		if (ret != -ENOENT) {
 			write_log(0, "Error: Fail to change status to BOTH\n");
@@ -555,14 +597,12 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 
 	return 0;
 
-#if ENABLE(DEDUP)
 errcode_handle:
 	if (is_toupload_meta_lock == TRUE) {
 		flock(fileno(toupload_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);
 	}
 	return errcode;
-#endif
 }
 
 void collect_finished_upload_threads(void *ptr)
@@ -923,7 +963,8 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 						    toupload_block_seq);
 			strcpy(upload_ptr->gdrive_obj_info.file_title,
 			       objname);
-			get_parnet_id(upload_ptr->gdrive_obj_info.parentID);
+			get_parnet_id(upload_ptr->gdrive_obj_info.parentID,
+				      ptr->inode, block_count);
 		}
 		ret = dispatch_upload_block(which_curl);
 		if (ret < 0) {
@@ -956,7 +997,8 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		finish_uploading = TRUE;
 		toupload_exist = FALSE;
 		set_progress_info(ptr->progress_fd, block_count,
-			&toupload_exist, NULL, NULL, NULL, &finish_uploading);
+				  &toupload_exist, NULL, NULL, NULL, NULL, NULL,
+				  &finish_uploading);
 		flock(fileno(local_metafptr), LOCK_UN);
 
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
@@ -994,8 +1036,8 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 			&finish_uploading);
 #else
 		set_progress_info(ptr->progress_fd, block_count,
-			&toupload_exist, NULL, &toupload_block_seq, NULL,
-			&finish_uploading);
+				  &toupload_exist, NULL, &toupload_block_seq,
+				  NULL, NULL, NULL, &finish_uploading);
 #endif
 		flock(fileno(local_metafptr), LOCK_UN);
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,

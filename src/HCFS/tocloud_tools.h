@@ -28,7 +28,7 @@ typedef struct IMMEDIATELY_RETRY_LIST {
 } IMMEDIATELY_RETRY_LIST; 
 
 int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
-		int64_t page_pos, int64_t toupload_seq);
+		int64_t page_pos, int64_t toupload_seq, char *blockid);
 
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		char delete_which_one);
