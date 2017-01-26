@@ -74,7 +74,9 @@ CMD cmd_list[] = { { "create", CREATEVOL },
 		   { "get_minimal_apk_status", GET_MINIMAL_APK_STATUS },
 		   { "high-pin", PIN},
 		   { "pin", PIN},
-		   { "unpin", UNPIN} };
+		   { "unpin", UNPIN},
+		   { "set_googledrive_token", SET_GOOGLEDRIVE_TOKEN} };
+
 enum { CMD_SIZE = sizeof(cmd_list) / sizeof(cmd_list[0]) };
 
 #endif /* GW20_SRC_HCFSVOL_H_ */

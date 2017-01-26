@@ -824,6 +824,8 @@ int32_t set_googledrive_token(int32_t arg_len, char *largebuf)
 		goto out;
 	}
 
+	str_size = arg_len;
+	/*
 	memcpy(&str_size, largebuf, sizeof(ssize_t));
 	if ((uint32_t)arg_len != sizeof(ssize_t) + str_size) {
 		write_log(4, "Arg len is %d but actual len is %d. In %s",
@@ -831,16 +833,17 @@ int32_t set_googledrive_token(int32_t arg_len, char *largebuf)
 		ret = -EINVAL;
 		goto out;
 	}
-	
+	*/
 	token_str = calloc(str_size + 10, 1);
 	if (token_str == NULL) {
 		ret = -errno;
 		goto out_free_mem;
 	}
-	memcpy(token_str, largebuf + sizeof(ssize_t), str_size);
+	memcpy(token_str, largebuf, str_size);
+	write_log(0, "TEST token: %s", token_str);
 
 	/* Lock before change values of url and token */
-	pthread_mutex_lock(&(googledrive_token_control->access_lock));
+	pthread_mutex_lock(&(googledrive_token_control->waiting_lock));
 	sprintf(googledrive_token, "Authorization:Bearer %s", token_str);
 
 	/* Wake up all threads blocked in get_swift_auth fn */

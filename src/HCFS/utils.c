@@ -937,6 +937,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		}
 	}
 
+/* TODO: Add google drive folder
 	if (config->current_backend == GOOGLEDRIVE) {
 		if (!(config->googledrive_folder)) {
 			write_log(
@@ -945,6 +946,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 			return -1;
 		}
 	}
+*/
 
 	if (config->current_backend == SWIFTTOKEN) {
 		if (config->swift_user == NULL) {

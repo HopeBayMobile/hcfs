@@ -958,6 +958,8 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 			char objname[100];
 			UPLOAD_THREAD_TYPE *upload_ptr =
 			    &(upload_ctl.upload_threads[which_curl]);
+			memset(&(upload_ptr->gdrive_obj_info), 0,
+			       sizeof(GOOGLEDRIVE_OBJ_INFO));
 			fetch_backend_block_objname(objname, ptr->inode,
 						    block_count,
 						    toupload_block_seq);
@@ -1456,10 +1458,48 @@ store in some other file */
 
 		flock(fileno(local_metafptr), LOCK_UN);
 		cleanup_meta = FALSE;
-
+		/* Prepare google drive data */
+		if (CURRENT_BACKEND == GOOGLEDRIVE) {
+			UPLOAD_THREAD_TYPE *upload_ptr =
+			    &(upload_ctl.upload_threads[which_curl]);
+			memset(&(upload_ptr->gdrive_obj_info), 0,
+			       sizeof(GOOGLEDRIVE_OBJ_INFO));
+			if (cloud_related_data.metaID[0]) {
+				strcpy(upload_ptr->gdrive_obj_info.fileID,
+				       cloud_related_data.metaID);
+			} else {
+				char objname[300];
+				fetch_backend_meta_objname(objname, ptr->inode);
+				strcpy(upload_ptr->gdrive_obj_info.file_title,
+				       objname);
+			}	
+		}
 		schedule_sync_meta(toupload_metapath, which_curl);
-
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
+		if (CURRENT_BACKEND == GOOGLEDRIVE &&
+		    cloud_related_data.metaID[0] == 0) {
+			// TODO: write file id to cloud related data
+			char *metaid = upload_ctl.upload_threads[which_curl]
+				       .gdrive_obj_info.fileID;
+			ssize_t offset;
+
+			if (S_ISFILE(ptr->this_mode))
+				offset = sizeof(HCFS_STAT) +
+					 sizeof(FILE_META_TYPE) +
+					 sizeof(FILE_STATS_TYPE);
+			else if (S_ISLNK(ptr->this_mode))
+				offset = sizeof(HCFS_STAT) +
+					 sizeof(SYMLINK_META_TYPE);
+			else if (S_ISDIR(ptr->this_mode))
+				offset =
+				    sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
+			FSEEK(local_metafptr, offset, SEEK_SET);
+			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, toupload_metafptr);
+			strcpy(cloud_related_data.metaID, metaid);
+			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+					1, local_metafptr);
+		}
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1742,10 +1782,12 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 			free(data);
 
 		/* Already retried in get object if necessary */
-		if ((ret_val >= 200) && (ret_val <= 299))
+		if ((ret_val >= 200) && (ret_val <= 299)) {
 			ret = 0;
-		else
+		} else {
+			write_log(6, "ret_val is %d in %s", ret_val, __func__);
 			ret = -ENOTCONN;
+		}
 
 #if ENABLE(DEDUP)
 		/* Upload finished - Need to update dedup table */
@@ -1764,7 +1806,10 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 	return ret;
 }
 
-int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
+int32_t do_meta_sync(ino_t this_inode,
+		     CURL_HANDLE *curl_handle,
+		     char *filename,
+		     GOOGLEDRIVE_OBJ_INFO *gdrive_info)
 {
 	char objname[1000];
 	int32_t ret_val, errcode, ret;
@@ -1798,14 +1843,17 @@ int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 		return -EIO;
 	}
 
-	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL, NULL);
+	ret_val =
+	    hcfs_put_object(new_fptr, objname, curl_handle, NULL, gdrive_info);
 
 	fclose(fptr);
 	/* Already retried in get object if necessary */
-	if ((200 <= ret_val) && (ret_val <= 299))
+	if ((200 <= ret_val) && (ret_val <= 299)) {
 		ret = 0;
-	else
+	} else {
+		write_log(6, "ret_val is %d in %s", ret_val, __func__);
 		ret = -ENOTCONN;
+	}
 
 	if (fptr != new_fptr)
 		fclose(new_fptr);
@@ -1864,11 +1912,14 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	} else {
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
-				thread_ptr->tempfilename);
+				thread_ptr->tempfilename,
+				&(thread_ptr->gdrive_obj_info));
 	}
 
-	if (ret < 0)
+	if (ret < 0) {
+		write_log(6, "error code %d in %s", ret, __func__);
 		goto errcode_handle;
+	}
 
 	UNLINK(thread_ptr->tempfilename);
 	change_system_meta(0, 0, -filesize, 0, 0, 0, FALSE);
@@ -1876,7 +1927,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	return;
 
 errcode_handle:
-	write_log(10, "Recording error in %s\n", __func__);
+	write_log(10, "Recording error in %s. Code %d\n", __func__, ret);
 
 	/* If upload caused by disconnection, then upload next time */
 	fetch_meta_path(local_metapath, thread_ptr->inode);
@@ -1915,7 +1966,8 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 #else
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
 					thread_ptr->seq,
-					&(upload_curl_handles[which_curl]));
+					&(upload_curl_handles[which_curl]),
+					&(thread_ptr->gdrive_obj_info));
 #endif
 	} else {
 		ret = 0;
@@ -1949,7 +2001,8 @@ errcode_handle:
 int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl)
 {
 	strncpy(upload_ctl.upload_threads[which_curl].tempfilename,
-		toupload_metapath, sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
+		toupload_metapath,
+		sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
 		       (void *)&con_object_sync,
 		       (void *)&(upload_ctl.upload_threads[which_curl]));

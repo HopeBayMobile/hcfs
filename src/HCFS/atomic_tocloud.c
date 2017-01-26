@@ -503,11 +503,11 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 
 	/* Google drive id */
 	if (toupload_gdrive_id)
-		strcpy(block_uploading_status->to_upload_gdrive_id,
-		       toupload_gdrive_id);
+		strncpy(block_uploading_status->to_upload_gdrive_id,
+			toupload_gdrive_id, GDRIVE_ID_LENGTH);
 	if (backend_gdrive_id)
-		strcpy(block_uploading_status->backend_gdrive_id,
-		       backend_gdrive_id);
+		strncpy(block_uploading_status->backend_gdrive_id,
+			backend_gdrive_id, GDRIVE_ID_LENGTH);
 
 	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
@@ -676,6 +676,10 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 #else
 		block_uploading_status.backend_seq =
 			block_page.block_entries[e_index].seqnum;
+		if (CURRENT_BACKEND == GOOGLEDRIVE)
+			strncpy(block_uploading_status.backend_gdrive_id,
+				block_page.block_entries[e_index].blockID,
+				GDRIVE_ID_LENGTH);
 
 		/*write_log(10, "Debug: init progress file block%lld_%lld",
 				block, block_uploading_status.backend_seq);*/

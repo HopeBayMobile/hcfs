@@ -25,6 +25,8 @@
 #include "params.h"
 #include "hcfscurl.h"
 
+#define GDRIVE_ID_LENGTH 64
+
 #define BOUNDARY_STRING "hcfs_boundary"
 /* Upload: If file ID is empty, then perform "create" operation. Otherwiese
  * perform "update" op. Besides, if parent ID is empty, then just upload under

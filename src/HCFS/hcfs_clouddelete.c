@@ -362,9 +362,12 @@ static inline void _check_del_progress_file(ino_t inode)
 	}
 }
 
-static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mode,
-		ino_t *root_inode, int64_t *backend_size_change,
-		int64_t *meta_size_change)
+static inline int32_t _read_backend_meta(char *backend_metapath,
+					 mode_t this_mode,
+					 ino_t *root_inode,
+					 int64_t *backend_size_change,
+					 int64_t *meta_size_change,
+					 char *gdrive_metaID)
 {
 	FILE *metafptr;
 	FILE_META_TYPE tempfilemeta;
@@ -396,6 +399,9 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+				    sizeof(FILE_STATS_TYPE), SEEK_SET);
+		FREAD(gdrive_metaID, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempfilemeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -405,6 +411,7 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+		FREAD(gdrive_metaID, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempdirmeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -414,6 +421,7 @@ static inline int32_t _read_backend_meta(char *backend_metapath, mode_t this_mod
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
+		FREAD(gdrive_metaID, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempsymmeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -474,6 +482,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t pin_size_delta_blk;
 	int64_t block_seq;
 	ino_t root_inode;
+	char fileID[GDRIVE_ID_LENGTH];
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -532,7 +541,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	ret = _read_backend_meta(backend_metapath, ptr->this_mode,
 			&root_inode, &backend_size_change,
-			&meta_size_change);
+			&meta_size_change, fileID);
 	if (ret < 0) {
 		write_log(0, "Error: Meta %s cannot be read. Code %d\n",
 				backend_metapath, -ret);
@@ -629,6 +638,16 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				sem_post(&(delete_ctl.delete_op_sem));
 				tmp_tn = &(delete_ctl.threads_no[curl_id]);
 				tmp_dt = &(delete_ctl.delete_threads[curl_id]);
+				if (CURRENT_BACKEND == GOOGLEDRIVE) {
+					memset(&(tmp_dt->gdrive_info), 0,
+					       sizeof(GOOGLEDRIVE_OBJ_INFO));
+					strncpy(
+					    tmp_dt->gdrive_info.fileID,
+					    temppage
+						.block_entries[current_index]
+						.blockID,
+					    GDRIVE_ID_LENGTH);
+				}
 				pthread_create(tmp_tn, NULL,
 						(void *)&con_object_dsync,
 							(void *)tmp_dt);
@@ -665,6 +684,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		flock(fileno(backend_metafptr), LOCK_UN);
 		backend_mlock = FALSE;
 	}
+
 
 errcode_handle:
 	/* TODO: If cannot handle object deletion from metaptr, need to scrub */
@@ -705,7 +725,11 @@ errcode_handle:
 			break;
 		}
 	}
-
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		tmp_dt = &(delete_ctl.delete_threads[curl_id]);
+		memset(&(tmp_dt->gdrive_info), 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strncpy(tmp_dt->gdrive_info.fileID, fileID, GDRIVE_ID_LENGTH);
+	}
 	pthread_create(&(delete_ctl.threads_no[curl_id]), NULL,
 		(void *)&con_object_dsync,
 		(void *)&(delete_ctl.delete_threads[curl_id]));
@@ -754,7 +778,9 @@ errcode_handle:
 *  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
+int32_t do_meta_delete(ino_t this_inode,
+		       CURL_HANDLE *curl_handle,
+		       GOOGLEDRIVE_OBJ_INFO *gdrive_info)
 {
 	char objname[1000];
 	int32_t ret_val, ret;
@@ -763,7 +789,7 @@ int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 	write_log(10, "Debug meta deletion: objname %s, inode %" PRIu64 "\n",
 						objname, (uint64_t)this_inode);
 	sprintf(curl_handle->id, "delete_meta_%" PRIu64 "", (uint64_t)this_inode);
-	ret_val = hcfs_delete_object(objname, curl_handle, NULL);
+	ret_val = hcfs_delete_object(objname, curl_handle, gdrive_info);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
@@ -788,7 +814,8 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #if ENABLE(DEDUP)
 				uint8_t *obj_id, CURL_HANDLE *curl_handle)
 #else
-				CURL_HANDLE *curl_handle)
+				CURL_HANDLE *curl_handle,
+				GOOGLEDRIVE_OBJ_INFO *gdrive_info)
 #endif
 {
 	char objname[400];
@@ -831,7 +858,7 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 			objname, (uint64_t)this_inode, block_no);
 		sprintf(curl_handle->id, "delete_blk_%" PRIu64 "_%" PRId64"_%"PRId64,
 				(uint64_t)this_inode, block_no, seq);
-		ret_val = hcfs_delete_object(objname, curl_handle, NULL);
+		ret_val = hcfs_delete_object(objname, curl_handle, gdrive_info);
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))
 			ret = 0;
@@ -886,10 +913,12 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 #if ENABLE(DEDUP)
 			delete_thread_ptr->obj_id,
 #endif
-			&(delete_curl_handles[which_curl]));
+			&(delete_curl_handles[which_curl]),
+			&(delete_thread_ptr->gdrive_info));
 	else
 		ret = do_meta_delete(delete_thread_ptr->inode,
-			&(delete_curl_handles[which_curl]));
+			&(delete_curl_handles[which_curl]),
+			&(delete_thread_ptr->gdrive_info));
 
 	if (ret < 0 && ret != -ENOENT) { /* do not care 404 not found */
 		delete_ctl.threads_error[which_index] = TRUE;

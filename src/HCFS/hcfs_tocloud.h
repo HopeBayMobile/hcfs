@@ -129,7 +129,10 @@ int32_t do_block_sync(ino_t this_inode, int64_t block_no,
 		  GOOGLEDRIVE_OBJ_INFO *gdrive_info);
 #endif
 
-int32_t do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
+int32_t do_meta_sync(ino_t this_inode,
+		     CURL_HANDLE *curl_handle,
+		     char *filename,
+		     GOOGLEDRIVE_OBJ_INFO *gdrive_info);
 
 void init_upload_control(void);
 void init_sync_control(void);

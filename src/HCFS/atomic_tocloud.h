@@ -28,8 +28,6 @@
 #define DEL_TOUPLOAD_BLOCKS 2
 #define DEL_BACKEND_BLOCKS 3
 
-#define GDRIVE_ID_LENGTH 64
-
 /* Data that should be known by fuse process when uploading a file */
 typedef struct {
 	ino_t inode;

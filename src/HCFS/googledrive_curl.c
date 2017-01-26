@@ -626,7 +626,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	/* For google drive backend - token not set situation */
 	if (googledrive_token[0] == 0)
 		return 401;
-	if (obj_info->fileID[0] == 0 || obj_info->file_title[0] == 0) {
+	if (obj_info->file_title[0] == 0) {
 		write_log(4, "Required file id and file title when get %s",
 			  objname);
 		return -1;
@@ -924,6 +924,7 @@ void get_parnet_id(char *id, ino_t this_inode, int64_t blockno)
 	sprintf(id, "123");
 }
 
+/*
 __attribute__((constructor))
 void test()
 {
@@ -937,7 +938,7 @@ void test()
 	strcpy(curl_handle.id, "test");
 	strcpy(googledrive_token, "Authorization:Bearer ya29.CjDPAyAA2KGRGsp7Wd6TJ6rzo7HAcp4BRXevOENeJnKcKZGxJmIzpKcnoDugnQEplB4");
 
-/*	info.fileID[0] = 0;
+	info.fileID[0] = 0;
 	info.parentID[0] = 0;
 	//strcpy(info.file_title, "test.jpg");
 	//strcpy(info.parentID, "0B9tmNFTdZf0beEo0MW5MQXNtTXM");
@@ -958,9 +959,8 @@ void test()
 	printf("-----delete test-----\n");
 	ret = hcfs_gdrive_delete_object("test.jpg", &curl_handle, &info);
 	printf("ret = %d, %s", ret, info.fileID);
-*/
 	ret = hcfs_gdrive_test_backend(&curl_handle);
 	printf("ret = %d", ret);
 	exit(0);
 }
-
+*/

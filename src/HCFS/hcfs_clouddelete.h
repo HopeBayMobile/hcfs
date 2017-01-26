@@ -24,6 +24,7 @@
 #include "dedup_table.h"
 #include "tocloud_tools.h"
 #include "global.h"
+#include "googledrive_curl.h"
 
 #define MAX_DELETE_CONCURRENCY 4
 #define MAX_DSYNC_CONCURRENCY 2
@@ -35,6 +36,8 @@ typedef struct {
 #if ENABLE(DEDUP)
 	uint8_t obj_id[OBJID_LENGTH];
 #endif
+	GOOGLEDRIVE_OBJ_INFO gdrive_info;
+	//char fileID[GDRIVE_ID_LENGTH];
 	BOOL is_block;
 	int32_t which_curl;
 	int32_t which_index;
@@ -86,8 +89,10 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #if ENABLE(DEDUP)
 		    uint8_t *obj_id,
 #endif
-		    CURL_HANDLE *curl_handle);
-int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
+		CURL_HANDLE *curl_handle,
+		GOOGLEDRIVE_OBJ_INFO *gdrive_info);
+int32_t do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle,
+		       GOOGLEDRIVE_OBJ_INFO *gdrive_info);
 
 void init_delete_control(void);
 void init_dsync_control(void);

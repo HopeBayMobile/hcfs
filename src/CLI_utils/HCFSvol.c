@@ -445,8 +445,10 @@ int32_t main(int32_t argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	case SETNOTIFYSERVER:
+	case SET_GOOGLEDRIVE_TOKEN:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
+		printf("token: %s, size of token: %d\n", buf, cmd_len);
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);

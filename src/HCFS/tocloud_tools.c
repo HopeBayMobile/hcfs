@@ -236,7 +236,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 #else
 static inline int _choose_deleted_block(char delete_which_one,
 		const BLOCK_UPLOADING_STATUS *block_info,
-		long long *block_seq, ino_t inode)
+		long long *block_seq, char *fileID, ino_t inode)
 {
 	char finish_uploading;
 	long long to_upload_seq;
@@ -260,6 +260,8 @@ static inline int _choose_deleted_block(char delete_which_one,
 			return -1;
 
 		*block_seq = to_upload_seq;
+		if (fileID)
+			strcpy(fileID, block_info->to_upload_gdrive_id);
 		return 0;
 	}
 
@@ -272,6 +274,8 @@ static inline int _choose_deleted_block(char delete_which_one,
 			return -1;
 
 		*block_seq = backend_seq;
+		if (fileID)
+			strcpy(fileID, block_info->backend_gdrive_id);
 		return 0;
 	}
 	return -1; /* unknown type */
@@ -282,9 +286,13 @@ static inline int _choose_deleted_block(char delete_which_one,
  * Revert block status to ST_LDISK when cancelling to sync this time.
  *
  * @return 0 on success, -ECANCELED on skipping delete this block on cloud.
- */ 
-static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
-		long long blockno, long long page_pos, int eindex)
+ */
+static int _revert_block_status(FILE *local_metafptr,
+				ino_t this_inode,
+				long long blockno,
+				long long page_pos,
+				int eindex,
+				char *blockID)
 {
 	char status;
 	int ret, errcode;
@@ -330,6 +338,9 @@ static int _revert_block_status(FILE *local_metafptr, ino_t this_inode,
 		/* Keep running following code */
 	case ST_LtoC:
 		bentry_page.block_entries[eindex].status = ST_LDISK;
+		if (blockID)
+			strcpy(bentry_page.block_entries[eindex].blockID,
+			       blockID);
 		PWRITE(fileno(local_metafptr), &bentry_page,
 				sizeof(BLOCK_ENTRY_PAGE), page_pos);
 		flock(fileno(local_metafptr), LOCK_UN);
@@ -379,6 +390,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	ssize_t ret_size;
 	long long page_pos;
 	FILE_META_TYPE filemeta;
+	char blockID[100];
 #if ENABLE(DEDUP)
 	unsigned char block_objid[OBJID_LENGTH];
 #endif
@@ -447,8 +459,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			block_info, block_objid, inode);
 #else
 		block_seq = 0;
-		ret = _choose_deleted_block(delete_which_one,
-			block_info, &block_seq, inode);
+		if (CURRENT_BACKEND == GOOGLEDRIVE)
+			ret =
+			    _choose_deleted_block(delete_which_one, block_info,
+						  &block_seq, blockID, inode);
+		else
+			ret =
+			    _choose_deleted_block(delete_which_one, block_info,
+						  &block_seq, NULL, inode);
 #endif
 		if (ret < 0) /* This block do not need to be deleted */
 			continue;
@@ -457,8 +475,14 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 				page_pos != 0) {
 			/* In case of deleting those blocks just uploaded,
 			 * try to revert block status if needed. */
-			ret = _revert_block_status(local_metafptr, inode,
-					block_count, page_pos, e_index);
+			if (CURRENT_BACKEND == GOOGLEDRIVE)
+				ret = _revert_block_status(
+				    local_metafptr, inode, block_count,
+				    page_pos, e_index, blockID);
+			else
+				ret = _revert_block_status(
+				    local_metafptr, inode, block_count,
+				    page_pos, e_index, NULL);
 			if (ret < 0) {
 				if (ret == -ECANCELED) {
 					continue;
@@ -484,6 +508,13 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			inode, block_count, block_seq,
 			page_pos, e_index, progress_fd, delete_which_one);
 #endif
+		if (CURRENT_BACKEND == GOOGLEDRIVE) {
+			UPLOAD_THREAD_TYPE *upload_ptr =
+			    &(upload_ctl.upload_threads[which_curl]);
+			memset(&(upload_ptr->gdrive_obj_info), 0,
+			       sizeof(GOOGLEDRIVE_OBJ_INFO));
+			strcpy(upload_ptr->gdrive_obj_info.fileID, blockID);
+		}
 		dispatch_delete_block(which_curl);
 		sem_post(&(upload_ctl.upload_op_sem));
 	}
