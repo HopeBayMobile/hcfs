@@ -1604,7 +1604,9 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	case SWIFT:
 	case SWIFTTOKEN:
 	case GOOGLEDRIVE:
-		write_log(2, "Connecting to Swift backend\n");
+		write_log(2, "Connecting to %s backend\n",
+			  CURRENT_BACKEND == GOOGLEDRIVE ? "google drive"
+							 : "swift");
 		num_retries = 0;
 		ret_val = init_ftn(curl_handle);
 		while ((!http_is_success(ret_val)) &&

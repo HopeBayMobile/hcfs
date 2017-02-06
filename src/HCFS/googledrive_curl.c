@@ -216,15 +216,29 @@ void _create_multipart_data(char *head,
 			    const char *file_title,
 			    const char *parentID)
 {
-	sprintf(head, "--%s\n"
-		      "Content-Type: application/json; "
-		      "charset=UTF-8\n\n"
-		      "{"
-		      "\"title\":\"%s\", "
-		      "\"parents\":[{\"id\":\"%s\"}]"
-		      "}\n\n"
-		      "--%s\n\n",
-		      BOUNDARY_STRING, file_title, parentID, BOUNDARY_STRING);
+	// TODO: Change the pointer of parent ID.
+	parentID = NULL;
+
+	if (parentID) {
+		sprintf(head, "--%s\n"
+			      "Content-Type: application/json; "
+			      "charset=UTF-8\n\n"
+			      "{"
+			      "\"title\":\"%s\", "
+			      "\"parents\":[{\"id\":\"%s\"}]"
+			      "}\n\n"
+			      "--%s\n\n",
+			BOUNDARY_STRING, file_title, parentID, BOUNDARY_STRING);
+	} else {
+		sprintf(head, "--%s\n"
+			      "Content-Type: application/json; "
+			      "charset=UTF-8\n\n"
+			      "{"
+			      "\"title\":\"%s\""
+			      "}\n\n"
+			      "--%s\n\n",
+			BOUNDARY_STRING, file_title, BOUNDARY_STRING);
+	}
 
 	sprintf(tail, "\n\n--%s--", BOUNDARY_STRING);
 }
@@ -780,7 +794,7 @@ errcode_handle:
 	}
 	if (gdrive_body_fptr) {
 		fclose(gdrive_body_fptr);
-		unlink(body_filename);
+		//TODO: unlink(body_filename);
 	}
 	if (chunk)
 		curl_slist_free_all(chunk);
