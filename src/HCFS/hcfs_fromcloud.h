@@ -20,6 +20,7 @@
 
 #include "hcfscurl.h"
 #include "global.h"
+#include "googledrive_curl.h"
 
 #ifdef _ANDROID_ENV_
 #include <pthread.h>
@@ -45,6 +46,7 @@ typedef struct {
 	ino_t this_inode;
 	int64_t block_no;
 	int64_t seqnum;
+	char blockID[GDRIVE_ID_LENGTH]; /*google drive block id*/
 	off_t page_pos;
 	char dl_error;
 	char active;
@@ -70,7 +72,10 @@ DOWNLOAD_USERMETA_CTL download_usermeta_ctl;
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname);
+int32_t fetch_from_cloud(FILE *fptr,
+			 char action_from,
+			 char *objname,
+			 char *fileID);
 int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname);
 
 void* download_block_manager(void *arg);

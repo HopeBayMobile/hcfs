@@ -1181,7 +1181,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		ret = init_backend_file_info(ptr, &backend_size,
 				&total_backend_blocks,
 				cloud_related_data.upload_seq,
-				&last_pin_status);
+				&last_pin_status,
+				cloud_related_data.metaID);
 		if (ret < 0) {
 			fclose(toupload_metafptr);
 			fclose(local_metafptr);
@@ -1496,7 +1497,9 @@ store in some other file */
 			FSEEK(local_metafptr, offset, SEEK_SET);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
 					1, toupload_metafptr);
-			strcpy(cloud_related_data.metaID, metaid);
+			strncpy(cloud_related_data.metaID, metaid,
+				GDRIVE_ID_LENGTH);
+			FSEEK(local_metafptr, offset, SEEK_SET);
 			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
 					1, local_metafptr);
 		}

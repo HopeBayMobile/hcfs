@@ -1476,6 +1476,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FS_STAT_T tmpstat;
 	char meta_deleted;
 	int64_t metasize = 0, metasize_blk = 0, dirty_delta, unpin_dirty_delta;
+	int64_t truncate_size = 0;
 	BOOL meta_on_cloud;
 
 	meta_deleted = FALSE;
@@ -1503,6 +1504,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
 			return ret;
+		fetch_meta_path(thismetapath, this_inode);
 
 		ret = check_meta_on_cloud(this_inode, d_type,
 				&meta_on_cloud, &metasize, &metasize_blk);
@@ -1522,18 +1524,26 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				return ret;
 		} else {
 			/* Push to to-delete queue */
-			ret = super_block_to_delete(this_inode, TRUE);
+			ret = delete_inode_meta(this_inode);
 			if (ret < 0)
 				return ret;
-			/* Remove meta file directly */
-			fetch_meta_path(targetmetapath, this_inode);
-			ret = unlink(targetmetapath);
+			truncate_size = d_type == D_ISDIR
+					    ? sizeof(DIR_META_HEADER)
+					    : sizeof(SYMLINK_META_HEADER);
+			fetch_todelete_path(targetmetapath, this_inode);
+			ret = truncate(targetmetapath, truncate_size);
 			if (ret < 0) {
-				write_log(0, "Error: Fail to remove meta %"
+				write_log(0, "Error: Fail to truncate meta %"
 						PRIu64". Code %d\n",
 						(uint64_t)this_inode, errno);
 				return ret;
 			}
+			ret = super_block_to_delete(this_inode, TRUE);
+			if (ret < 0)
+				return ret;
+			/* Remove meta file directly */
+			//fetch_meta_path(targetmetapath, this_inode);
+			//ret = unlink(targetmetapath);
 		}
 
 		if (mptr == NULL)
@@ -1558,7 +1568,6 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		 * Meta file should be downloaded already in unlink,
 		 * rmdir, or rename ops
 		 */
-
 		if (access(thismetapath, F_OK) != 0) {
 			errcode = errno;
 			if (errcode != ENOENT) {
@@ -1738,9 +1747,11 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 			/* Remove meta file directly */
 			fetch_todelete_path(targetmetapath, this_inode);
-			ret = unlink(targetmetapath);
+			truncate_size = sizeof(FILE_META_HEADER);
+			ret = truncate(targetmetapath, truncate_size);
+			//ret = unlink(targetmetapath);
 			if (ret < 0) {
-				write_log(0, "Error: Fail to remove meta %"
+				write_log(0, "Error: Fail to truncate meta %"
 						PRIu64". Code %d\n",
 						(uint64_t)this_inode, errno);
 				return ret;
@@ -3243,7 +3254,8 @@ int32_t restore_meta_file(ino_t this_inode)
 
 	/* Fetch meta from cloud */
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
-	ret = fetch_from_cloud(fptr, RESTORE_FETCH_OBJ, objname);
+	/* TODO: When restoring, querying object id and then download */
+	ret = fetch_from_cloud(fptr, RESTORE_FETCH_OBJ, objname, NULL);
 	if (ret < 0) {
 		write_log(0,
 			  "Error: Fail to fetch meta from cloud in %s. Code %d",

@@ -3137,8 +3137,13 @@ int32_t truncate_truncate(ino_t this_inode,
 			fetch_backend_block_objname(objname, filestat->ino,
 					last_block, last_block_entry->seqnum);
 #endif
-			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
-					objname);
+			if (CURRENT_BACKEND == GOOGLEDRIVE)
+				ret = fetch_from_cloud(
+				    blockfptr, READ_BLOCK, objname,
+				    last_block_entry->blockID);
+			else
+				ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+						       objname, NULL);
 
 			if (ret < 0) {
 				fclose(blockfptr);
@@ -4020,8 +4025,14 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		fetch_backend_block_objname(objname, this_inode, bindex,
 				tpage->block_entries[eindex].seqnum);
 #endif
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
-				objname);
+		if (CURRENT_BACKEND == GOOGLEDRIVE)
+			ret = fetch_from_cloud(
+			    fh_ptr->blockfptr, READ_BLOCK, objname,
+			    tpage->block_entries[eindex].blockID);
+		else
+			ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+					       objname, NULL);
+
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
 				fclose(fh_ptr->blockfptr);
@@ -4711,7 +4722,13 @@ int32_t _write_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 		fetch_backend_block_objname(objname, this_inode, bindex,
 				tpage->block_entries[eindex].seqnum);
 #endif
-		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK, objname);
+		if (CURRENT_BACKEND == GOOGLEDRIVE)
+			ret = fetch_from_cloud(
+			    fh_ptr->blockfptr, READ_BLOCK, objname,
+			    tpage->block_entries[eindex].blockID);
+		else
+			ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+					       objname, NULL);
 
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {

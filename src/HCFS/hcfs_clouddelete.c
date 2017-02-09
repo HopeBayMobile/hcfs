@@ -41,6 +41,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <sys/mman.h>
 #include <sys/xattr.h>
 #include <inttypes.h>
+#include <jansson.h>
 
 #include "hcfs_tocloud.h"
 #include "params.h"
@@ -366,8 +367,7 @@ static inline int32_t _read_backend_meta(char *backend_metapath,
 					 mode_t this_mode,
 					 ino_t *root_inode,
 					 int64_t *backend_size_change,
-					 int64_t *meta_size_change,
-					 char *gdrive_metaID)
+					 int64_t *meta_size_change)
 {
 	FILE *metafptr;
 	FILE_META_TYPE tempfilemeta;
@@ -399,9 +399,8 @@ static inline int32_t _read_backend_meta(char *backend_metapath,
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
-				    sizeof(FILE_STATS_TYPE), SEEK_SET);
-		FREAD(gdrive_metaID, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
+		//FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+		//		    sizeof(FILE_STATS_TYPE), SEEK_SET);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempfilemeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -411,7 +410,6 @@ static inline int32_t _read_backend_meta(char *backend_metapath,
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
-		FREAD(gdrive_metaID, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempdirmeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -421,7 +419,6 @@ static inline int32_t _read_backend_meta(char *backend_metapath,
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
-		FREAD(gdrive_metaID, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempsymmeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -482,7 +479,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t pin_size_delta_blk;
 	int64_t block_seq;
 	ino_t root_inode;
-	char fileID[GDRIVE_ID_LENGTH];
+	char metaID[GDRIVE_ID_LENGTH];
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -506,14 +503,93 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_metafptr = fopen(backend_metapath, "w+");
 	if (backend_metafptr == NULL) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		unlink(backend_metapath);
 		return;
 	}
 	setbuf(backend_metafptr, NULL);
 
 	fetch_backend_meta_objname(objname, this_inode);
-	ret = fetch_from_cloud(backend_metafptr,
-			FETCH_FILE_META, objname);
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		CURL_HANDLE *now_curl;
+		char list_content_name[200];
+		FILE *fptr;
+		GOOGLEDRIVE_OBJ_INFO gdrive_info;
+		json_error_t jerror;
+		json_t *json_data, *json_id;
+		const char *id;
+
+		curl_id = -1;
+		for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
+			ret = _use_delete_thread(count, which_dsync_index,
+						     FALSE, ptr->inode, -1, 0);
+			if (ret == 0) {
+				curl_id = count;
+				break;
+			}
+		}
+		now_curl = &(delete_curl_handles[curl_id]);
+		sprintf(list_content_name, "/dev/shm/list_content_curl_%d",
+			curl_id);
+		fptr = fopen(list_content_name, "w+");
+		if (!fptr) {
+			write_log(4, "Fail to open file in %s. Code %d",
+				  __func__, errno);
+			fclose(backend_metafptr);
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
+		}
+		setbuf(fptr, NULL);
+
+		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		sprintf(gdrive_info.file_title, "meta_%" PRIu64,
+			(uint64_t)this_inode);
+		write_log(0, "TEST: query title: %s", gdrive_info.file_title);
+		ret = hcfs_list_container(fptr, now_curl, &gdrive_info);
+		if (ret < 0) {
+			write_log(4, "Fail to query id in %s. Code %d",
+				  __func__, ret);
+			fclose(fptr);
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
+		}
+		fseek(fptr, 0, SEEK_SET);
+		json_data = json_loadf(fptr, JSON_DISABLE_EOF_CHECK,
+				       &jerror);
+		if (!json_data) {
+			write_log(0, "Error: Fail to read json file\n");
+			fclose(fptr);
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
+		}
+		json_id = json_object_get(json_data, "id");
+		if (!json_id) {
+			json_delete(json_data);
+			write_log(
+			    0,
+			    "Error: Fail to parse json file. id not found\n");
+			fclose(fptr);
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
+		}
+		id = json_string_value(json_id);
+		if (!id) {
+			json_delete(json_data);
+			write_log(0, "Error: Json file is corrupt\n");
+			fclose(fptr);
+			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+			return;
+		}
+		strncpy(metaID, id, GDRIVE_ID_LENGTH);
+		fclose(fptr);
+		unlink(list_content_name);
+		json_delete(json_data);
+
+		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
+				       objname, metaID);
+
+	} else {
+		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
+				       objname, NULL);
+	}
 	if (ret < 0) {
 		if (ret == -EIO) {
 			write_log(5, "Error: Fail to download "
@@ -539,9 +615,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		return;
 	}
 
-	ret = _read_backend_meta(backend_metapath, ptr->this_mode,
-			&root_inode, &backend_size_change,
-			&meta_size_change, fileID);
+	ret =
+	    _read_backend_meta(backend_metapath, ptr->this_mode, &root_inode,
+			       &backend_size_change, &meta_size_change);
 	if (ret < 0) {
 		write_log(0, "Error: Meta %s cannot be read. Code %d\n",
 				backend_metapath, -ret);
@@ -728,7 +804,7 @@ errcode_handle:
 	if (CURRENT_BACKEND == GOOGLEDRIVE) {
 		tmp_dt = &(delete_ctl.delete_threads[curl_id]);
 		memset(&(tmp_dt->gdrive_info), 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-		strncpy(tmp_dt->gdrive_info.fileID, fileID, GDRIVE_ID_LENGTH);
+		strncpy(tmp_dt->gdrive_info.fileID, metaID, GDRIVE_ID_LENGTH);
 	}
 	pthread_create(&(delete_ctl.threads_no[curl_id]), NULL,
 		(void *)&con_object_dsync,

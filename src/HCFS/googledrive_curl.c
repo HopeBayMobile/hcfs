@@ -851,11 +851,13 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 			ASPRINTF(&filter_string, "q='%s'+in+parents",
 				 obj_info->parentID);
 		}
+	} else {
+		filter_string = title_string;
 	}
 
 	/* Create URL */
 	if (filter_string) {
-	printf("%s\n", filter_string);
+		printf("%s\n", filter_string);
 		ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files?%s",
 			 filter_string);
 		FREE(filter_string);

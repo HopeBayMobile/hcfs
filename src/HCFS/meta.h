@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include "macro.h"
 
+#include "googledrive_curl.h"
+
 /******************************************************************************
  * BEGIN META definition
  *****************************************************************************/
@@ -144,7 +146,7 @@ typedef struct {
 	int64_t size_last_upload; /* Record data + meta */
 	int64_t meta_last_upload; /* Record meta only */
 	int64_t upload_seq;
-	char metaID[64]; /* Record meta ID on google drive */
+	char metaID[GDRIVE_ID_LENGTH + 1]; /* Record meta ID on google drive */
 	/* uint8_t padding[64];*/
 } _PACKED CLOUD_RELATED_DATA, CLOUD_RELATED_DATA_v2;
 
@@ -207,7 +209,7 @@ typedef struct {
 #endif
 	uint32_t paged_out_count;
 	int64_t seqnum;
-	char blockID[64]; /* Record block ID */
+	char blockID[GDRIVE_ID_LENGTH + 1]; /* Record block ID */
 } _PACKED BLOCK_ENTRY, BLOCK_ENTRY_v2;
 
 /* Defining the structure of one page of block status page */

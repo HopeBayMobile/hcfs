@@ -25,7 +25,7 @@
 #include "params.h"
 #include "hcfscurl.h"
 
-#define GDRIVE_ID_LENGTH 64
+#define GDRIVE_ID_LENGTH 63
 
 #define BOUNDARY_STRING "hcfs_boundary"
 /* Upload: If file ID is empty, then perform "create" operation. Otherwiese

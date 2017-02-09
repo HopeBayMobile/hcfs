@@ -1043,7 +1043,7 @@ errcode_handle:
  */
 int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 		int64_t *backend_size, int64_t *total_backend_blocks,
-		int64_t upload_seq, uint8_t *last_pin_status)
+		int64_t upload_seq, uint8_t *last_pin_status, char *metaID)
 {
 	FILE *backend_metafptr = NULL;
 	char backend_metapath[400];
@@ -1095,8 +1095,12 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 		setbuf(backend_metafptr, NULL); /* Do not need to lock */
 
 		fetch_backend_meta_objname(objname, ptr->inode);
-		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				objname);
+		if (CURRENT_BACKEND == GOOGLEDRIVE)
+			ret = fetch_from_cloud(
+			    backend_metafptr, FETCH_FILE_META, objname, metaID);
+		else
+			ret = fetch_from_cloud(
+			    backend_metafptr, FETCH_FILE_META, objname, NULL);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(10, "Debug: upload first time\n");

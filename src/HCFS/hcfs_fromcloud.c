@@ -52,8 +52,12 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+int32_t fetch_from_cloud(FILE *fptr,
+			 char action_from,
+			 char *objname,
+			 char *fileID)
 {
+	GOOGLEDRIVE_OBJ_INFO obj_info;
 #if ENABLE(DEDUP)
 	char obj_id_str[OBJID_STRING_LENGTH];
 #endif
@@ -117,9 +121,13 @@ int32_t fetch_from_cloud(FILE *fptr, char action_from, char *objname)
         HCFS_encode_object_meta *object_meta =
             calloc(1, sizeof(HCFS_encode_object_meta));
 
+	if (fileID) {
+		memset(&obj_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strncpy(obj_info.fileID, fileID, GDRIVE_ID_LENGTH);
+	}
         status = hcfs_get_object(get_fptr, objname,
                                  &(download_curl_handles[which_curl_handle]),
-                                 object_meta, NULL);
+                                 object_meta, &obj_info);
 
 	/* process failed get here */
 	if ((status >= 200) && (status <= 299)) {
@@ -275,7 +283,9 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		fetch_backend_block_objname(objname, ptr->this_inode,
 				ptr->block_no, ptr->seqnum);
 #endif
-		ret = fetch_from_cloud(blockfptr, READ_BLOCK, objname);
+		ret = fetch_from_cloud(
+		    blockfptr, READ_BLOCK, objname,
+		    temppage.block_entries[entry_index].blockID);
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;
@@ -469,7 +479,10 @@ void* download_block_manager(void *arg)
 }
 
 static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
-	char from_st, char to_st, int64_t cache_size_delta)
+				    char from_st,
+				    char to_st,
+				    int64_t cache_size_delta,
+				    char *fetch_blockID)
 {
 	BLOCK_ENTRY_PAGE block_page;
 	int32_t e_index, ret;
@@ -497,6 +510,13 @@ static int32_t _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	if (ret < 0) {
 		meta_cache_unlock_entry(meta_cache_entry);
 		return ret;
+	}
+
+	if (fetch_blockID) {
+		strncpy(fetch_blockID,
+			block_page.block_entries[e_index].blockID,
+			GDRIVE_ID_LENGTH);
+		fetch_blockID[GDRIVE_ID_LENGTH] = 0;
 	}
 
 	if (block_page.block_entries[e_index].status == from_st) {
@@ -556,6 +576,7 @@ void* fetch_backend_block(void *ptr)
 	int32_t ret, semval;
 	int64_t block_size_blk;
 	struct stat blockstat; /* block ops */
+	char blockID[GDRIVE_ID_LENGTH + 1] = {0};
 
 	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
 	fetch_block_path(block_path, block_info->this_inode,
@@ -587,7 +608,7 @@ void* fetch_backend_block(void *ptr)
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
 
-	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0);
+	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, blockID);
 	if (ret < 0) {
 		/* When file is removed, unlink this empty block directly
 		because status of this block is st_cloud */
@@ -611,7 +632,10 @@ void* fetch_backend_block(void *ptr)
 		}
 	}
 
-	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname);
+	if (CURRENT_BACKEND == GOOGLEDRIVE)
+		ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, blockID);
+	else
+		ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, NULL);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;
@@ -643,7 +667,8 @@ void* fetch_backend_block(void *ptr)
 			goto thread_error;
 		}
 
-		ret = _modify_block_status(block_info, ST_CtoL, ST_CLOUD, 0);
+		ret = _modify_block_status(block_info, ST_CtoL, ST_CLOUD, 0,
+					   NULL);
 		if (ret < 0) /* IO/memory error */
 			goto thread_error;
 
@@ -675,7 +700,7 @@ void* fetch_backend_block(void *ptr)
 
 	/* Update status */
 	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH,
-				block_size_blk);
+				block_size_blk, NULL);
 	if (ret < 0) {
 		if (ret == -ENOENT)
 			write_log(5, "Fail to modify block status in %s because"
@@ -1168,8 +1193,9 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 			retries_since_last_notify = 0;
 			flock(fileno(fptr), LOCK_EX);
 			FTRUNCATE(fileno(fptr), 0);
-			ret = fetch_from_cloud(fptr,
-				action_from, objname);
+			/* TODO: Query id before download. */
+			ret =
+			    fetch_from_cloud(fptr, action_from, objname, NULL);
 			flock(fileno(fptr), LOCK_UN);
 			if (ret < 0) {
 				if (ret == -ENOENT)
