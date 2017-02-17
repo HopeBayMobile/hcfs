@@ -1013,6 +1013,8 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 	int64_t quota;
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
+	char *quota_key;
+	GOOGLEDRIVE_OBJ_INFO dummy_gdrive_info;
 
 	UNUSED(ptr);
 	strncpy(objname, "usermeta.json", 100);
@@ -1039,7 +1041,7 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 
 		status = hcfs_get_object(fptr, objname,
 				&(download_usermeta_curl_handle),
-				NULL, NULL);
+				NULL, &dummy_gdrive_info);
 		if (200 <= status && status <= 299) {
 			break;
 		} else if (status == 404) {
@@ -1067,16 +1069,40 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 		goto errcode_handle;
 	}
 
-	json_quota = json_object_get(json_data, "quota");
-	if (!json_quota || !json_is_integer(json_quota)) {
+	if (CURRENT_BACKEND == GOOGLEDRIVE)
+		quota_key = "quotaBytesTotal";
+	else
+		quota_key = "quota";
+
+	json_quota = json_object_get(json_data, quota_key);
+	if (!json_quota) {
 		json_delete(json_data);
 		write_log(0, "Error: Json file is corrupt\n");
 		goto errcode_handle;
 	}
-	quota = json_integer_value(json_quota);
-	if (quota < 0) {
+	if (json_is_integer(json_quota)) {
+		quota = json_integer_value(json_quota);
+		if (quota < 0) {
+			json_delete(json_data);
+			write_log(0,
+				  "Error: Quota from cloud is less than zero");
+			goto errcode_handle;
+		}
+	} else if (json_is_string(json_quota)) {
+		const char *quota_string;
+		quota_string = json_string_value(json_quota);
+		write_log(0, "TEST: quota is %s", quota_string);
+		quota = atoll(quota_string);
+		if (quota < 0) {
+			json_delete(json_data);
+			write_log(0,
+				  "Error: Quota from cloud is less than zero");
+			goto errcode_handle;
+		}
+
+	} else {
 		json_delete(json_data);
-		write_log(0, "Error: Quota from cloud is less than zero");
+		write_log(0, "Error: Type error in json data in %s", __func__);
 		goto errcode_handle;
 	}
 	if (enable_quota == TRUE) {
@@ -1106,7 +1132,7 @@ errcode_handle:
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 	}
-	unlink(download_path);
+	//unlink(download_path);
 
 	sem_wait(&(download_usermeta_ctl.access_sem));
 	download_usermeta_ctl.active = FALSE;

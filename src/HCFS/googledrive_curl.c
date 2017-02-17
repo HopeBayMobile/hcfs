@@ -262,12 +262,16 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	struct timeval stop, start, diff;
 	double time_spent;
 	int64_t xfer_thpt;
+	BOOL fetch_quota;
 
 	/* For GOOGLEDRIVE backend - token not set situation */
 	if (googledrive_token[0] == 0)
 		return 401;
 
-	if (obj_info->fileID[0] == 0) {
+	fetch_quota = strncmp("download_usermeta", curl_handle->id, 100) == 0
+			  ? TRUE
+			  : FALSE;
+	if (obj_info && obj_info->fileID[0] == 0 && fetch_quota == FALSE) {
 		write_log(4, "Required file id when get %s", objname);
 		return -1;
 	}
@@ -289,8 +293,13 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	chunk = curl_slist_append(chunk, googledrive_token);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	ASPRINTF(&url, "https://www.googleapis.com/drive/v3/files/%s?alt=media",
-		 obj_info->fileID);
+	if (fetch_quota)
+		ASPRINTF(&url, "https://www.googleapis.com/drive/v2/about");
+	else
+		ASPRINTF(
+		    &url,
+		    "https://www.googleapis.com/drive/v3/files/%s?alt=media",
+		    obj_info->fileID);
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
