@@ -514,6 +514,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 		todel_fptr = fopen(todel_metapath, "r");
 		if (!todel_fptr) {
+			if (errno == ENOENT) {
+				super_block_delete(this_inode);
+				super_block_reclaim();
+			}
 			write_log(0, "Fail to open %s in %s. Code %d",
 				  todel_metapath, __func__, errno);
 			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
