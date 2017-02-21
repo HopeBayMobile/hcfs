@@ -5201,11 +5201,10 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	}
 
 	old_cache_size = check_file_size(thisblockpath);
-	if (offset > old_cache_size) {
-		write_log(10, "Debug write: cache block size smaller than ");
-		write_log(10, "starting offset. Extending\n");
-		ftruncate(fileno(fh_ptr->blockfptr), offset);
-	}
+
+	/* There was a ftruncate line here, which is not needed as
+	pwrite can extend beyond the current size. This also seems
+	to cause data corruption when writeback cache is enabled */
 
 	PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
 
