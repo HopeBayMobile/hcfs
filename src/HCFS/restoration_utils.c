@@ -14,7 +14,7 @@
 
 #include <errno.h>
 #include <string.h>
-#include <ftw.h>
+//TODO: temp remove #include <ftw.h>
 #include <regex.h>
 #include <stddef.h>
 

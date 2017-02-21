@@ -13,7 +13,7 @@
 #include "do_restoration.h"
 
 #include <errno.h>
-#include <ftw.h>
+//TODO: temp remove #include <ftw.h>
 #include <regex.h>
 #include <stddef.h>
 #include <stdio.h>
