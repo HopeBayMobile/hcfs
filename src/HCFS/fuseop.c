@@ -4446,11 +4446,9 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if ((!((fh_ptr->flags & O_ACCMODE) == O_RDONLY)) &&
-			(!((fh_ptr->flags & O_ACCMODE) == O_RDWR))) {
-		fuse_reply_err(req, EBADF);
-		return;
-	}
+	/* There was a section that checks for read permission, but
+	in async mode of fuse write, read op will be called to read
+	in a page, so this check could cause errors */
 
 	if (fh_ptr->flags & O_NOATIME)
 		noatime = TRUE;
