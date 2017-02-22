@@ -3023,12 +3023,12 @@ errcode_handle:
 	return errcode;
 }
 
-int _delete_node(const char *thispath,
-		 const struct stat *thisstat,
-		 int flag,
-		 struct FTW *buf)
-{
-	return 0;
+//int _delete_node(const char *thispath,
+//		 const struct stat *thisstat,
+//		 int flag,
+//		 struct FTW *buf)
+//{
+//	return 0;
 //	int ret, errcode = 0;
 //
 //	UNUSED(buf);
@@ -3054,7 +3054,7 @@ int _delete_node(const char *thispath,
 //errcode_handle:
 //	write_log(4, "IO error causing deleting unused content to terminate\n");
 //	return errcode;
-}
+//}
 
 void cleanup_stage1_data(void)
 {

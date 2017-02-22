@@ -495,7 +495,7 @@ int32_t hcfs_get_auth_token(void)
 {
 	int32_t ret_code;
 	struct timespec timeout;
-	BACKEND_TOKEN_CONTROL *token_controller;
+	BACKEND_TOKEN_CONTROL *token_controller = NULL;
 
 	/* Token is already set */
 	if (swift_auth_string[0] != 0)
@@ -504,8 +504,13 @@ int32_t hcfs_get_auth_token(void)
 	switch (CURRENT_BACKEND) {
 	case SWIFTTOKEN:
 		token_controller = &swifttoken_control;
+		break;
 	case GOOGLEDRIVE:
-		token_controller = googledrive_token_control; 
+		token_controller = googledrive_token_control;
+		break;
+	default:
+		write_log(0, "Error: Invalid backend type");
+		return -1;
 	}
 
 	ret_code = add_notify_event(TOKEN_EXPIRED, NULL, FALSE);

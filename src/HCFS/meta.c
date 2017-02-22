@@ -58,11 +58,11 @@ void convert_hcfsstat_to_sysstat(struct stat *ret_stat, HCFS_STAT *tmp_stat)
 	ret_stat->st_ctime_nsec = tmp_stat->ctime_nsec;
 #else
 	ret_stat->st_atime      = tmp_stat->atime;
-	ret_stat->st_atime_nsec = tmp_stat->atime_nsec;
+	//ret_stat->st_atime_nsec = tmp_stat->atime_nsec;
 	ret_stat->st_mtime      = tmp_stat->mtime;
-	ret_stat->st_mtime_nsec = tmp_stat->mtime_nsec;
+	//ret_stat->st_mtime_nsec = tmp_stat->mtime_nsec;
 	ret_stat->st_ctime      = tmp_stat->ctime;
-	ret_stat->st_ctime_nsec = tmp_stat->ctime_nsec;
+	//ret_stat->st_ctime_nsec = tmp_stat->ctime_nsec;
 #endif
 }
 #pragma GCC diagnostic push

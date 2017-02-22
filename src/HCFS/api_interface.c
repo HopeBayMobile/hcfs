@@ -859,16 +859,26 @@ out:
 int32_t set_swift_token(int32_t arg_len, char *largebuf)
 {
 	int32_t ret_code = 0;
-	int64_t read_size;
+	int64_t read_size = 0;
 	ssize_t str_size;
 	char *url_str, *token_str;
+
+	/* When backend is google drive, pipe to set google drive token */
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		/* Skip swift url */
+		read_size = 0;
+		memcpy(&str_size, largebuf, sizeof(ssize_t));
+		read_size += sizeof(ssize_t) + str_size;
+		/* Fetch google drive token */
+		memcpy(&str_size, largebuf + read_size, sizeof(ssize_t));
+		read_size += sizeof(ssize_t);
+		return set_googledrive_token(str_size, largebuf + read_size);
+	}
 
 	if (CURRENT_BACKEND != SWIFTTOKEN) {
 		write_log(4, "Set swift token API only supported for SWIFTTOKEN type");
 		return -EINVAL;
 	}
-
-	read_size = 0;
 
 	memcpy(&str_size, largebuf, sizeof(ssize_t));
 	read_size += sizeof(ssize_t);
