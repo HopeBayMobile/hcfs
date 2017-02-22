@@ -24,8 +24,7 @@
 #include "objmeta.h"
 #include "params.h"
 #include "hcfscurl.h"
-
-#define GDRIVE_ID_LENGTH 63
+#include "meta.h"
 
 #define BOUNDARY_STRING "hcfs_boundary"
 /* Upload: If file ID is empty, then perform "create" operation. Otherwiese
@@ -35,12 +34,6 @@
  * Delete: Do not need parent ID, but file ID is necessary.
  * List: All fields are not necessary.
  */
-typedef struct {
-	char file_title[512]; /*File name on google drive*/
-	char fileID[256];     /*File ID*/
-	char parentID[256];   /*Parent ID, can be empty string*/
-} GOOGLEDRIVE_OBJ_INFO;
-
 typedef struct {
 	FILE *fptr;
 	size_t object_size;

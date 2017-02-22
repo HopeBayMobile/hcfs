@@ -14,12 +14,12 @@
 
 #include <jansson.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "hcfscurl.h"
 #include "macro.h"
 #include "monitor.h"
 #include "fuseop.h"
-
 
 size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 			  void *post_control1)

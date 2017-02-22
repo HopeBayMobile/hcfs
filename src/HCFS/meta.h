@@ -18,8 +18,6 @@
 #include <sys/stat.h>
 #include "macro.h"
 
-#include "googledrive_curl.h"
-
 /******************************************************************************
  * BEGIN META definition
  *****************************************************************************/
@@ -57,6 +55,14 @@
 #define                    ST_BLKSIZE 4096
 
 static const char META_MAGIC[] = "hcfs";
+
+
+#define GDRIVE_ID_LENGTH 63
+typedef struct {
+	char file_title[512]; /*File name on google drive*/
+	char fileID[256];     /*File ID*/
+	char parentID[256];   /*Parent ID, can be empty string*/
+} GOOGLEDRIVE_OBJ_INFO;
 
 typedef struct { /* 128 bytes */
 	uint8_t magic[4];
