@@ -965,8 +965,12 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 						    toupload_block_seq);
 			strcpy(upload_ptr->gdrive_obj_info.file_title,
 			       objname);
-			get_parnet_id(upload_ptr->gdrive_obj_info.parentID,
-				      ptr->inode, block_count);
+			ret = get_parent_id(
+			    upload_ptr->gdrive_obj_info.parentID, objname);
+			if (ret < 0) {
+				sync_ctl.threads_error[ptr->which_index] = TRUE;
+				return ret;
+			}
 		}
 		ret = dispatch_upload_block(which_curl);
 		if (ret < 0) {
@@ -1473,13 +1477,24 @@ store in some other file */
 				fetch_backend_meta_objname(objname, ptr->inode);
 				strcpy(upload_ptr->gdrive_obj_info.file_title,
 				       objname);
-			}	
+				ret = get_parent_id(
+				    upload_ptr->gdrive_obj_info.parentID,
+				    objname);
+				if (ret < 0) {
+					sync_ctl
+					    .threads_error[ptr->which_index] =
+					    TRUE;
+					sync_ctl.threads_finished
+					    [ptr->which_index] = TRUE;
+					return;
+				}
+			}
 		}
 		schedule_sync_meta(toupload_metapath, which_curl);
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
 		if (CURRENT_BACKEND == GOOGLEDRIVE &&
 		    cloud_related_data.metaID[0] == 0) {
-			// TODO: write file id to cloud related data
+			/* Write file id to cloud related data */
 			char *metaid = upload_ctl.upload_threads[which_curl]
 				       .gdrive_obj_info.fileID;
 			ssize_t offset;

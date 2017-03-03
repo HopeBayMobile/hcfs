@@ -56,12 +56,14 @@
 
 static const char META_MAGIC[] = "hcfs";
 
+typedef enum { GDRIVE_FILE = 0, GDRIVE_FOLDER } gdrive_obj_t;
 
 #define GDRIVE_ID_LENGTH 63
 typedef struct {
 	char file_title[512]; /*File name on google drive*/
 	char fileID[256];     /*File ID*/
 	char parentID[256];   /*Parent ID, can be empty string*/
+	gdrive_obj_t type;
 } GOOGLEDRIVE_OBJ_INFO;
 
 typedef struct { /* 128 bytes */

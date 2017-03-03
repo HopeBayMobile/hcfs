@@ -152,7 +152,7 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
  */
 #define COMPUTE_THROUGHPUT()                                                   \
 	do {                                                                   \
-		off_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024;   \
+		int64_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024; \
 		time_spent = (time_spent <= 0) ? 0.001 : time_spent;           \
 		xfer_thpt = (int64_t)(objsize_kb / time_spent);                \
 	} while (0)

@@ -27,6 +27,15 @@
 #include "meta.h"
 
 #define BOUNDARY_STRING "hcfs_boundary"
+
+typedef struct {
+	sem_t op_lock;
+	char hcfs_folder_id[GDRIVE_ID_LENGTH];
+} GOOGLE_DRIVE_FOLDER_ID_CACHE_T;
+
+/* Record google drive folder id */
+GOOGLE_DRIVE_FOLDER_ID_CACHE_T *gdrive_folder_id_cache;
+
 /* Upload: If file ID is empty, then perform "create" operation. Otherwiese
  * perform "update" op. Besides, if parent ID is empty, then just upload under
  * root folder.
@@ -75,6 +84,6 @@ int32_t get_gdrive_fileID(const char *file_name,
 			  char *parentid,
 			  char *fileid);
 
-void get_parnet_id(char *id, ino_t this_inode, int64_t blockno);
+int32_t get_parent_id(char *id, const char *objname);
 
 #endif

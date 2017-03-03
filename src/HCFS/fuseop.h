@@ -31,6 +31,7 @@
 #include "FS_manager.h"
 #include "global.h"
 #include "meta.h"
+#include "googledrive_curl.h"
 
 extern struct fuse_lowlevel_ops hfuse_ops;
 

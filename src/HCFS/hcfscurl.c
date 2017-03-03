@@ -913,7 +913,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 			      HTTP_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
+	int64_t objsize;
 	object_put_control put_control;
 	CURLcode res;
 	char *url = NULL;
@@ -1029,7 +1029,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
 		write_log(10,
-			  "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+			  "Upload obj %s, size %"PRId64", in %f seconds, %"PRId64" KB/s\n",
 			  objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -1741,6 +1741,8 @@ int32_t hcfs_test_backend(CURL_HANDLE *curl_handle)
 		if ((ret_val < 200) || (ret_val > 299))
 			return ret_val;
 		ret_val = test_backend_ftn(curl_handle);
+	} else {
+		write_log(6, "Test backend ret_val is %d", ret_val);
 	}
 
 out:
@@ -1881,6 +1883,8 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 	case SWIFTTOKEN:
+		if (!fptr)
+			return -ENOMEM;
 		ret_val = hcfs_swift_put_object(fptr, objname, curl_handle,
 						object_meta);
 		while ((!http_is_success(ret_val)) &&
@@ -1906,6 +1910,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			break;
 		}
 		gdrive_obj_info = (GOOGLEDRIVE_OBJ_INFO *)more;
+		/* Select appropriate action (PUT/POST) */
 		if (gdrive_obj_info->fileID[0] != 0) {
 			/* Update object if given file ID */
 			gdrive_upload_action = hcfs_gdrive_put_object;
@@ -1918,6 +1923,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 				break;
 			}
 		}
+		/* Run it */
 		ret_val = gdrive_upload_action(fptr, objname, curl_handle,
 						  gdrive_obj_info);
 		while ((!http_is_success(ret_val)) &&

@@ -57,7 +57,8 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 	}
 
 	/* Body */
-	if (post_control->object_remaining_size > 0) {
+	if (post_control->object_remaining_size > 0 &&
+	    post_control->fptr != NULL) {
 		fptr = post_control->fptr;
 		if (expect_read > (size_t)post_control->object_remaining_size)
 			actual_to_read = post_control->object_remaining_size;
@@ -98,10 +99,20 @@ int32_t init_gdrive_token_control(void)
 	if (googledrive_token_control)
 		return -EEXIST;
 
+	/* Init folder id cache */
+	gdrive_folder_id_cache = (GOOGLE_DRIVE_FOLDER_ID_CACHE_T *)calloc(
+	    sizeof(GOOGLE_DRIVE_FOLDER_ID_CACHE_T), 1);
+	if (!gdrive_folder_id_cache)
+		return -errno;
+	sem_init(&(gdrive_folder_id_cache->op_lock), 0, 1);
+
+	/* Init google drive token controller */
 	googledrive_token_control =
 	    (BACKEND_TOKEN_CONTROL *)calloc(sizeof(BACKEND_TOKEN_CONTROL), 1);
-	if (!googledrive_token_control)
+	if (!googledrive_token_control) {
+		FREE(gdrive_folder_id_cache);
 		return -errno;
+	}
 
 	pthread_mutex_init(&googledrive_token_control->access_lock, NULL);
 	pthread_mutex_init(&googledrive_token_control->waiting_lock, NULL);
@@ -211,15 +222,36 @@ int32_t hcfs_init_gdrive_backend(CURL_HANDLE *curl_handle)
 	return -1;
 }
 
+void _create_folder_json_content(char *head,
+			    char *tail,
+			    const char *file_title,
+			    const char *parentID)
+{
+	if (parentID[0]) {
+		sprintf(head,
+			"{"
+			"\"title\":\"%s\", "
+			"\"parents\":[{\"id\":\"%s\"}], "
+			"\"mimeType\": \"application/vnd.google-apps.folder\""
+			"}\n",
+			file_title, parentID);
+	} else {
+		sprintf(head,
+			"{"
+			"\"title\":\"%s\", "
+			"\"mimeType\": \"application/vnd.google-apps.folder\""
+			"}\n",
+			file_title);
+	}
+	tail[0] = 0;
+}
 void _create_multipart_data(char *head,
 			    char *tail,
 			    const char *file_title,
 			    const char *parentID)
 {
-	// TODO: Change the pointer of parent ID.
-	parentID = NULL;
-
-	if (parentID) {
+	//parentID = NULL;
+	if (parentID[0]) {
 		sprintf(head, "--%s\n"
 			      "Content-Type: application/json; "
 			      "charset=UTF-8\n\n"
@@ -258,7 +290,7 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	int32_t ret_val, ret, errcode;
 	int32_t num_retries;
 	int64_t ret_pos;
-	off_t objsize;
+	int64_t objsize;
 	struct timeval stop, start, diff;
 	double time_spent;
 	int64_t xfer_thpt;
@@ -358,7 +390,7 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
 		write_log(
-		    10, "Download obj %s, size %llu, in %f seconds, %d KB/s\n",
+		    10, "Download obj %s, size %"PRId64", in %f seconds, %"PRId64" KB/s\n",
 		    objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -472,7 +504,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 			       GOOGLEDRIVE_OBJ_INFO *obj_info)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
+	int64_t objsize;
 	object_put_control put_control;
 	CURLcode res;
 	char *url = NULL;
@@ -596,8 +628,8 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
-		write_log(10,
-			  "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+		write_log(10, "Upload obj %s, size %" PRId64
+			      ", in %f seconds, %" PRId64 " KB/s\n",
 			  objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -627,7 +659,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 			       GOOGLEDRIVE_OBJ_INFO *obj_info)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
+	int64_t objsize;
 	object_post_control post_control;
 	CURLcode res;
 	char *url = NULL;
@@ -681,19 +713,41 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	setbuf(gdrive_header_fptr, NULL);
 	setbuf(gdrive_body_fptr, NULL);
 
-	sprintf(header_content_type,
-		"Content-Type:multipart/related; boundary=%s", BOUNDARY_STRING);
-	chunk = NULL;
-	chunk = curl_slist_append(chunk, "Expect:");
-	chunk = curl_slist_append(chunk, googledrive_token);
-	chunk = curl_slist_append(chunk, header_content_type);
-	_create_multipart_data(head, tail, obj_info->file_title,
-			       obj_info->parentID);
-	FSEEK(fptr, 0, SEEK_END);
-	FTELL(fptr);
-	objsize = ret_pos;
-	FSEEK(fptr, 0, SEEK_SET);
-	/* write_log(10, "object size: %d, objname: %s\n", objsize, objname); */
+	if (obj_info->type == GDRIVE_FOLDER) {
+		chunk = NULL;
+		chunk = curl_slist_append(chunk, "Expect:");
+		chunk = curl_slist_append(chunk, googledrive_token);
+		chunk =
+		    curl_slist_append(chunk, "Content-Type: application/json");
+		_create_folder_json_content(head, tail, obj_info->file_title,
+					    obj_info->parentID);
+		ASPRINTF(&url,
+			 "https://www.googleapis.com/drive/v2/files");
+	} else {
+		sprintf(header_content_type,
+			"Content-Type:multipart/related; boundary=%s",
+			BOUNDARY_STRING);
+		chunk = NULL;
+		chunk = curl_slist_append(chunk, "Expect:");
+		chunk = curl_slist_append(chunk, googledrive_token);
+		chunk = curl_slist_append(chunk, header_content_type);
+		_create_multipart_data(head, tail, obj_info->file_title,
+				       obj_info->parentID);
+		ASPRINTF(&url, "https://www.googleapis.com/upload/drive/v2/"
+			       "files?uploadType=multipart");
+	}
+
+	/* Fetch object size */
+	if (fptr) {
+		FSEEK(fptr, 0, SEEK_END);
+		FTELL(fptr);
+		objsize = ret_pos;
+		FSEEK(fptr, 0, SEEK_SET);
+	} else {
+		objsize = 0;
+	}
+	/* write_log(10, "object size: %d, objname: %s\n", objsize,
+	 * objname); */
 
 	if (objsize < 0) {
 		write_log(0, "Object %s size smaller than zero.", objname);
@@ -710,9 +764,6 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	total_size =
 	    objsize + post_control.head_remaining + post_control.tail_remaining;
 	post_control.total_remaining = total_size;
-
-	ASPRINTF(&url, "https://www.googleapis.com/upload/drive/v2/"
-		       "files?uploadType=multipart");
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
@@ -786,8 +837,8 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 		COMPUTE_THROUGHPUT();
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
-		write_log(10,
-			  "Upload obj %s, size %llu, in %f seconds, %d KB/s\n",
+		write_log(10, "Upload obj %s, size %" PRId64
+			      ", in %f seconds, %" PRId64 " KB/s\n",
 			  objname, objsize, time_spent, xfer_thpt);
 	} else {
 		/* We still need to record this failure for xfer throughput */
@@ -941,12 +992,102 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
-void get_parnet_id(char *id, ino_t this_inode, int64_t blockno)
+int32_t get_parent_id(char *id, const char *objname)
 {
-	UNUSED(this_inode);
-	UNUSED(blockno);
+	char hcfs_root_id_filename[200];
+	CURL_HANDLE upload_handle;
+	GOOGLEDRIVE_OBJ_INFO gdrive_info;
+	int32_t ret = 0;
+	FILE *fptr;
 
-	sprintf(id, "123");
+	/* Only data and meta are put under hcfs_root_folder */
+	if (strncmp(objname, "data", 4) && strncmp(objname, "meta", 4)) {
+		id[0] = 0;
+		goto out;
+	}
+
+	if (gdrive_folder_id_cache->hcfs_folder_id[0]) {
+		strncpy(id, gdrive_folder_id_cache->hcfs_folder_id,
+			GDRIVE_ID_LENGTH);
+		write_log(0, "TEST: parent id is %s", id);
+		goto out;
+	}
+
+	snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
+		 "%s/hcfs_root_id", METAPATH);
+
+	/* Create folder */
+	sem_wait(&(gdrive_folder_id_cache->op_lock));
+	if (gdrive_folder_id_cache->hcfs_folder_id[0]) {
+		strncpy(id, gdrive_folder_id_cache->hcfs_folder_id,
+			GDRIVE_ID_LENGTH);
+		sem_post(&(gdrive_folder_id_cache->op_lock));
+		goto out;
+	}
+
+	fptr = fopen(hcfs_root_id_filename, "r");
+	if (fptr) { /* Read id and fetch to mem cache */
+		int64_t id_len;
+		int64_t ret_size;
+		fseek(fptr, 0, SEEK_END);
+		id_len = ftell(fptr);
+		fseek(fptr, 0, SEEK_SET);
+		ret_size = fread(id, id_len, 1, fptr);
+		if (ret_size == 1) {
+			id[id_len] = 0;
+			strncpy(gdrive_folder_id_cache->hcfs_folder_id, id,
+				GDRIVE_ID_LENGTH);
+			sem_post(&(gdrive_folder_id_cache->op_lock));
+			goto out;
+		} else {
+			fclose(fptr);
+		}
+	} else {
+		if (errno != ENOENT) {
+			ret = -errno;
+			sem_post(&(gdrive_folder_id_cache->op_lock));
+			goto out;
+		}
+	}
+
+	/* Create folder */
+	memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+	strcpy(gdrive_info.file_title, "hcfs_data_folder");
+	gdrive_info.type = GDRIVE_FOLDER;
+
+	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+	snprintf(upload_handle.id, sizeof(upload_handle.id),
+		 "create_folder_curl");
+	upload_handle.curl_backend = NONE;
+	upload_handle.curl = NULL;
+	ret = hcfs_put_object(NULL, "hcfs_data_folder", &upload_handle, NULL,
+			      &gdrive_info);
+	if ((ret < 200) || (ret > 299)) {
+		ret = -EIO;
+		write_log(0, "Error in creating hcfs_data_folder\n");
+		sem_post(&(gdrive_folder_id_cache->op_lock));
+		goto out;
+	}
+
+	fptr = fopen(hcfs_root_id_filename, "w+");
+	if (!fptr) {
+		ret = -errno;
+		sem_post(&(gdrive_folder_id_cache->op_lock));
+		goto out;
+	}
+	fwrite(gdrive_info.fileID, strlen(gdrive_info.fileID), 1, fptr);
+	fclose(fptr);
+	/* Copy to cache */
+	strncpy(gdrive_folder_id_cache->hcfs_folder_id, gdrive_info.fileID,
+		GDRIVE_ID_LENGTH);
+	/* Copy to target */
+	strncpy(id, gdrive_folder_id_cache->hcfs_folder_id, GDRIVE_ID_LENGTH);
+	sem_post(&(gdrive_folder_id_cache->op_lock));
+
+out:
+	if (ret < 0)
+		write_log(0, "Error in fetching parent id. Code %d", -ret);
+	return ret;
 }
 
 /*
