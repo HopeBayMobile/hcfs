@@ -29,8 +29,8 @@
 #include "tocloud_tools.h"
 #include "googledrive_curl.h"
 
-#define MAX_UPLOAD_CONCURRENCY 4
-#define MAX_SYNC_CONCURRENCY 2
+#define MAX_UPLOAD_CONCURRENCY 16
+#define MAX_SYNC_CONCURRENCY 8
 
 typedef struct {
 	off_t page_filepos;

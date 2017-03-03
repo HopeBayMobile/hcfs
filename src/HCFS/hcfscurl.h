@@ -24,7 +24,7 @@
 #include "objmeta.h"
 #include "params.h"
 
-#define MAX_DOWNLOAD_CURL_HANDLE 4
+#define MAX_DOWNLOAD_CURL_HANDLE 16
 /* For swift token control */
 #define MAX_WAIT_TIME 60
 

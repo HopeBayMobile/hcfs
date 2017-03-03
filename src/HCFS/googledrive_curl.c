@@ -1009,7 +1009,7 @@ int32_t get_parent_id(char *id, const char *objname)
 	if (gdrive_folder_id_cache->hcfs_folder_id[0]) {
 		strncpy(id, gdrive_folder_id_cache->hcfs_folder_id,
 			GDRIVE_ID_LENGTH);
-		write_log(0, "TEST: parent id is %s", id);
+		write_log(6, "parent id is %s", id);
 		goto out;
 	}
 
