@@ -1511,7 +1511,7 @@ store in some other file */
 				    sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
 			FSEEK(local_metafptr, offset, SEEK_SET);
 			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, toupload_metafptr);
+					1, local_metafptr);
 			strncpy(cloud_related_data.metaID, metaid,
 				GDRIVE_ID_LENGTH);
 			FSEEK(local_metafptr, offset, SEEK_SET);

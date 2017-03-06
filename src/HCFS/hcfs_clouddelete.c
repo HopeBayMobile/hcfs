@@ -530,7 +530,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			offset = sizeof(DIR_META_HEADER) -
 				 sizeof(CLOUD_RELATED_DATA);
 		} else if (S_ISLNK(ptr->this_mode)) {
-			offset = sizeof(SYMLINK_META_TYPE) -
+			offset = sizeof(SYMLINK_META_HEADER) -
 				 sizeof(CLOUD_RELATED_DATA);
 		} else {
 			write_log(0, "Type error %d in %s. Code %d",
@@ -558,7 +558,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 					(uint64_t)this_inode);
 
 		} else if (ret == -ENOENT) {
-			write_log(10, "Debug: Nothing on"
+			write_log(4, "Debug: Nothing on"
 					" cloud to be deleted for"
 					" inode_%"PRIu64"\n",
 					(uint64_t)this_inode);
@@ -919,6 +919,8 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 	fclose(ddt_fptr);
 #endif
 
+	if (ret < 0)
+		write_log(4, "Fail to delete object. Code %d", -ret);
 	return ret;
 }
 /* TODO: How to retry object deletion later if failed at some point */
