@@ -1000,6 +1000,8 @@ int32_t get_parent_id(char *id, const char *objname)
 	int32_t ret = 0;
 	FILE *fptr;
 
+	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+
 	/* Only data and meta are put under hcfs_root_folder */
 	if (strncmp(objname, "data", 4) && strncmp(objname, "meta", 4)) {
 		id[0] = 0;
@@ -1055,7 +1057,6 @@ int32_t get_parent_id(char *id, const char *objname)
 	strcpy(gdrive_info.file_title, "hcfs_data_folder");
 	gdrive_info.type = GDRIVE_FOLDER;
 
-	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
 	snprintf(upload_handle.id, sizeof(upload_handle.id),
 		 "create_folder_curl");
 	upload_handle.curl_backend = NONE;
@@ -1085,6 +1086,8 @@ int32_t get_parent_id(char *id, const char *objname)
 	sem_post(&(gdrive_folder_id_cache->op_lock));
 
 out:
+	if (upload_handle.curl != NULL)
+		hcfs_destroy_backend(&upload_handle);
 	if (ret < 0)
 		write_log(0, "Error in fetching parent id. Code %d", -ret);
 	return ret;

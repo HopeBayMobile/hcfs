@@ -39,6 +39,13 @@ typedef struct {
 	sem_t op_lock;
 } FS_MANAGER_HEAD_TYPE;
 
+/* Data layout of fs_manager file */
+typedef struct {
+	uint8_t sys_uuid[16];
+	DIR_META_TYPE fs_dir_meta;
+	CLOUD_RELATED_DATA fs_clouddata; 
+} _PACKED FS_MANAGER_HEADER_LAYOUT;
+
 FS_MANAGER_HEAD_TYPE *fs_mgr_head;
 char *fs_mgr_path;
 

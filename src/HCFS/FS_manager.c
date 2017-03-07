@@ -54,6 +54,7 @@ int32_t init_fs_manager(void)
 {
 	int32_t errcode, fd, ret;
 	DIR_META_TYPE tmp_head;
+	CLOUD_RELATED_DATA tmp_clouddata;
 	ssize_t ret_ssize;
 	struct timeval tmptime;
 
@@ -97,6 +98,7 @@ int32_t init_fs_manager(void)
 		fs_mgr_head->num_FS = 0;
 
 		memset(&tmp_head, 0, sizeof(DIR_META_TYPE));
+		memset(&tmp_clouddata, 0, sizeof(CLOUD_RELATED_DATA));
 
 		gettimeofday(&tmptime, NULL);
 		fd = open("/dev/urandom", O_RDONLY);
@@ -121,9 +123,10 @@ int32_t init_fs_manager(void)
 		close(fd);
 
 		PWRITE(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid, 16, 0);
-
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
 		       sizeof(DIR_META_TYPE), 16);
+		PWRITE(fs_mgr_head->FS_list_fh, &tmp_clouddata,
+		       sizeof(CLOUD_RELATED_DATA), 16 + sizeof(DIR_META_TYPE));
 
 		ret = prepare_FS_database_backup();
 		if (ret < 0) {
@@ -409,16 +412,17 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	if (fs_mgr_head->num_FS <= 0) {
-		ftruncate(fs_mgr_head->FS_list_fh, sizeof(DIR_META_TYPE) + 16);
+		ftruncate(fs_mgr_head->FS_list_fh,
+			  sizeof(FS_MANAGER_HEADER_LAYOUT));
 		tmp_head.total_children = 0;
 		fs_mgr_head->num_FS = 0;
-		tmp_head.root_entry_page = sizeof(DIR_META_TYPE) + 16;
+		tmp_head.root_entry_page = sizeof(FS_MANAGER_HEADER_LAYOUT);
 		tmp_head.next_xattr_page = 0;
 		tmp_head.entry_page_gc_list = 0;
-		tmp_head.tree_walk_list_head = sizeof(DIR_META_TYPE) + 16;
+		tmp_head.tree_walk_list_head = sizeof(FS_MANAGER_HEADER_LAYOUT);
 		tmp_head.generation = 0;
 		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
-		tpage.this_page_pos = sizeof(DIR_META_TYPE) + 16;
+		tpage.this_page_pos = sizeof(FS_MANAGER_HEADER_LAYOUT);
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
 		       sizeof(DIR_META_TYPE), 16);
 		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
@@ -1002,7 +1006,11 @@ int32_t backup_FS_database(void)
 	CURL_HANDLE upload_handle;
 	char buf[4096];
 	size_t ret_size;
+	ssize_t ret_ssize;
 	off_t ret_pos;
+	GOOGLEDRIVE_OBJ_INFO gdrive_info;
+	CLOUD_RELATED_DATA clouddata;
+	BOOL need_record_id = FALSE;
 
 	if (CURRENT_BACKEND == NONE)
 		return 0;
@@ -1064,14 +1072,42 @@ int32_t backup_FS_database(void)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle, NULL, NULL);
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		/* Read meta ID */
+		PREAD(fileno(fptr), &clouddata, sizeof(CLOUD_RELATED_DATA),
+		      16 + sizeof(DIR_META_TYPE));
+		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strncpy(gdrive_info.file_title, "FSmgr_backup", 50);
+		if (clouddata.metaID[0]) {
+			strncpy(gdrive_info.fileID, clouddata.metaID,
+				GDRIVE_ID_LENGTH);
+			need_record_id = FALSE;
+			write_log(0, "TEST: Old id %s", gdrive_info.fileID);
+		} else {
+			need_record_id = TRUE;
+		}
+		ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle,
+				      NULL, &gdrive_info);
+	} else {
+		ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle,
+				      NULL, NULL);
+	}
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in backing up FS database\n");
 		goto errcode_handle;
 	}
-
 	fclose(fptr);
+
+	/* Check if need to record google drive obj id */
+	if (need_record_id) {
+		write_log(0, "TEST: New id %s", gdrive_info.fileID);
+		strncpy(clouddata.metaID, gdrive_info.fileID, GDRIVE_ID_LENGTH);
+		sem_wait(&(fs_mgr_head->op_lock));
+		PWRITE(fs_mgr_head->FS_list_fh, &clouddata,
+		       sizeof(CLOUD_RELATED_DATA), 16 + sizeof(DIR_META_TYPE));
+		sem_post(&(fs_mgr_head->op_lock));
+	}
 
 	unlink("/tmp/FSmgr_upload");
 	hcfs_destroy_backend(&upload_handle);
