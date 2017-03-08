@@ -2205,6 +2205,7 @@ int32_t get_quota_from_backup(int64_t *quota)
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
 	int32_t errcode;
+	char *quota_key;
 
 	*quota = 0;
 	sprintf(path, "%s/usermeta", METAPATH);
@@ -2212,6 +2213,10 @@ int32_t get_quota_from_backup(int64_t *quota)
 		errcode = errno;
 		return -errcode;
 	}
+	if (CURRENT_BACKEND == GOOGLEDRIVE)
+		quota_key = "quotaBytesTotal";
+	else
+		quota_key = "quota";
 
 	json_result = dec_backup_usermeta(path);
 	if (!json_result)
@@ -2223,18 +2228,43 @@ int32_t get_quota_from_backup(int64_t *quota)
 		write_log(0, "Error: Fail to parse json file\n");
 		return -EINVAL;
 	}
-	json_quota = json_object_get(json_data, "quota");
-	if (!json_quota || !json_is_integer(json_quota)) {
+	json_quota = json_object_get(json_data, quota_key);
+	if (!json_quota) {
 		free(json_result);
 		json_delete(json_data);
 		write_log(0, "Error: Json file is corrupt\n");
 		return -EINVAL;
 	}
-	*quota = json_integer_value(json_quota);
-	if (*quota < 0) {
-		write_log(0, "Error: Quota is less than zero?\n");
-		*quota = 0;
+
+	/* Get quota */
+	if (json_is_integer(json_quota)) {
+		*quota = json_integer_value(json_quota);
+		if (*quota < 0) {
+			free(json_result);
+			json_delete(json_data);
+			write_log(0, "Error: Quota is less than zero?\n");
+			return -EINVAL;
+		}
+	} else if (json_is_string(json_quota)) {
+		const char *quota_string;
+		quota_string = json_string_value(json_quota);
+		write_log(0, "TEST: quota is %s", quota_string);
+		*quota = atoll(quota_string);
+		if (*quota < 0) {
+			free(json_result);
+			json_delete(json_data);
+			write_log(0,
+				  "Error: Quota from cloud is less than zero");
+			return -EINVAL;
+		}
+
+	} else {
+		free(json_result);
+		json_delete(json_data);
+		write_log(0, "Error: Type error in json data in %s", __func__);
+		return -EINVAL;
 	}
+
 
 	free(json_result);
 	json_delete(json_data);
@@ -2369,5 +2399,17 @@ errcode_handle:
 	          errcode);
 	fclose(fptr);
 	return errcode;
+}
+
+void get_random_string(char *str, unsigned int iLen)
+{
+	char symbols[] =
+	    "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	unsigned int ind = 0;
+	srand(time(NULL) + rand());
+	while (ind < iLen) {
+		str[ind++] = symbols[rand() % 62];
+	}
+	str[iLen] = '\0';
 }
 

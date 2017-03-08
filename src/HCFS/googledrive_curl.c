@@ -248,7 +248,8 @@ void _create_folder_json_content(char *head,
 void _create_multipart_data(char *head,
 			    char *tail,
 			    const char *file_title,
-			    const char *parentID)
+			    const char *parentID,
+			    const char *boundary_string)
 {
 	//parentID = NULL;
 	if (parentID[0]) {
@@ -260,7 +261,7 @@ void _create_multipart_data(char *head,
 			      "\"parents\":[{\"id\":\"%s\"}]"
 			      "}\n\n"
 			      "--%s\n\n",
-			BOUNDARY_STRING, file_title, parentID, BOUNDARY_STRING);
+			boundary_string, file_title, parentID, boundary_string);
 	} else {
 		sprintf(head, "--%s\n"
 			      "Content-Type: application/json; "
@@ -269,10 +270,57 @@ void _create_multipart_data(char *head,
 			      "\"title\":\"%s\""
 			      "}\n\n"
 			      "--%s\n\n",
-			BOUNDARY_STRING, file_title, BOUNDARY_STRING);
+			boundary_string, file_title, boundary_string);
 	}
 
-	sprintf(tail, "\n\n--%s--", BOUNDARY_STRING);
+	sprintf(tail, "\n\n--%s--", boundary_string);
+}
+
+void _check_forbidden_reason(FILE *body_fptr)
+{
+	json_error_t jerror;
+	json_t *json_data = NULL, *json_msg = NULL, *json_error_data;
+	const char *msg = NULL;
+
+	fseek(body_fptr, 0, SEEK_SET);
+
+	json_data =
+	    json_loadf(body_fptr, JSON_DISABLE_EOF_CHECK, &jerror);
+	if (!json_data) {
+		write_log(0, "Error: Fail to read json file. In %s\n",
+			  __func__);
+		return;
+	}
+	json_error_data = json_object_get(json_data, "error");
+	if (!json_error_data) {
+		write_log(
+		    0,
+		    "Error: Fail to parse json file. Error data not found\n");
+		goto out;
+	}
+	json_msg = json_object_get(json_error_data, "message");
+	if (!json_msg) {
+		write_log(0, "Error: Fail to parse json file. msg not found\n");
+		goto out;
+	}
+	msg = json_string_value(json_msg);
+	if (!msg) {
+		write_log(0, "Error: Json file is corrupt. In %s\n", __func__);
+		goto out;
+	}
+
+	/* Check */
+	write_log(4, "Warn: Http 403 caused by '%s'", msg);
+
+	if (strcmp(msg, "User Rate Limit Exceeded") == 0 ||
+	    strcmp(msg, "Rate Limit Exceeded") == 0)
+		goto out;
+
+	/* Let conn be false */
+	update_backend_status(FALSE, NULL);
+out:
+	json_delete(json_data);
+	return;
 }
 
 int32_t hcfs_gdrive_get_object(FILE *fptr,
@@ -421,9 +469,9 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	CURLcode res;
 	char *url = NULL;
 	char delete_command[10];
-	FILE *gdrive_header_fptr;
+	FILE *gdrive_header_fptr, *gdrive_body_fptr;
 	CURL *curl;
-	char header_filename[100];
+	char header_filename[200], body_filename[200];
 	int32_t ret_val, errcode, ret;
 	int32_t num_retries;
 
@@ -439,6 +487,8 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 
 	sprintf(header_filename, "/dev/shm/googledrive_delete_head%s.tmp",
 		curl_handle->id);
+	sprintf(body_filename, "/dev/shm/googledrive_delete_body%s.tmp",
+		curl_handle->id);
 	curl = curl_handle->curl;
 
 	gdrive_header_fptr = fopen(header_filename, "w+");
@@ -448,6 +498,17 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 			  strerror(errcode));
 		return -1;
 	}
+	gdrive_body_fptr = fopen(body_filename, "w+");
+	if (gdrive_body_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
+		fclose(gdrive_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+	setbuf(gdrive_body_fptr, NULL);
+	setbuf(gdrive_header_fptr, NULL);
 
 	strcpy(delete_command, "DELETE");
 
@@ -464,7 +525,9 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_body_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
+	//curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
@@ -473,7 +536,9 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	if (res != CURLE_OK) {
 		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
 		fclose(gdrive_header_fptr);
+		fclose(gdrive_body_fptr);
 		unlink(header_filename);
+		unlink(body_filename);
 		curl_slist_free_all(chunk);
 		return -1;
 	}
@@ -482,16 +547,22 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	ret_val = parse_http_header_retcode(gdrive_header_fptr);
 	if (ret_val < 0) {
 		fclose(gdrive_header_fptr);
+		fclose(gdrive_body_fptr);
 		unlink(header_filename);
+		unlink(body_filename);
 		return -1;
 	}
 
 	if ((ret_val >= 500 && ret_val <= 505) ||
-	    (ret_val >= 400 && ret_val <= 403))
+	    (ret_val >= 400 && ret_val <= 402))
 		update_backend_status(FALSE, NULL);
+	else if (ret_val == 403)
+		_check_forbidden_reason(gdrive_body_fptr);
 
 	fclose(gdrive_header_fptr);
+	fclose(gdrive_body_fptr);
 	UNLINK(header_filename);
+	UNLINK(body_filename);
 
 	return ret_val;
 errcode_handle:
@@ -612,8 +683,11 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 	}
 
 	if ((ret_val >= 500 && ret_val <= 505) ||
-	    (ret_val >= 400 && ret_val <= 403)) {
+	    (ret_val >= 400 && ret_val <= 402)) {
 		update_backend_status(FALSE, NULL);
+	} else if (ret_val == 403) {
+		_check_forbidden_reason(gdrive_body_fptr);
+		goto errcode_handle;
 	}
 
 	fclose(gdrive_header_fptr);
@@ -724,15 +798,18 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 		ASPRINTF(&url,
 			 "https://www.googleapis.com/drive/v2/files");
 	} else {
+		char boundary_string[40];
+
+		get_random_string(boundary_string, 32);
 		sprintf(header_content_type,
 			"Content-Type:multipart/related; boundary=%s",
-			BOUNDARY_STRING);
+			boundary_string);
 		chunk = NULL;
 		chunk = curl_slist_append(chunk, "Expect:");
 		chunk = curl_slist_append(chunk, googledrive_token);
 		chunk = curl_slist_append(chunk, header_content_type);
 		_create_multipart_data(head, tail, obj_info->file_title,
-				       obj_info->parentID);
+				       obj_info->parentID, boundary_string);
 		ASPRINTF(&url, "https://www.googleapis.com/upload/drive/v2/"
 			       "files?uploadType=multipart");
 	}
@@ -799,8 +876,11 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	}
 
 	if ((ret_val >= 500 && ret_val <= 505) ||
-	    (ret_val >= 400 && ret_val <= 403)) {
+	    (ret_val >= 400 && ret_val <= 402)) {
 		update_backend_status(FALSE, NULL);
+	} else if (ret_val == 403) {
+		_check_forbidden_reason(gdrive_body_fptr);
+		goto errcode_handle;
 	}
 
 	fclose(gdrive_header_fptr);
@@ -812,7 +892,8 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	json_data =
 	    json_loadf(gdrive_body_fptr, JSON_DISABLE_EOF_CHECK, &jerror);
 	if (!json_data) {
-		write_log(0, "Error: Fail to read json file\n");
+		write_log(0, "Error: Fail to read json file\n. Error %s",
+			  jerror.text);
 		goto errcode_handle;
 	}
 	json_id = json_object_get(json_data, "id");

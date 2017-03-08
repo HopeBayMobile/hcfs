@@ -155,4 +155,6 @@ uint32_t djb_hash(const char *const key, size_t keylen)
 	return hash;
 }
 
+void get_random_string(char *str, unsigned int iLen);
+
 #endif  /* SRC_HCFS_UTILS_H_ */

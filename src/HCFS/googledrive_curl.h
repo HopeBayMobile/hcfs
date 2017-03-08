@@ -26,7 +26,7 @@
 #include "hcfscurl.h"
 #include "meta.h"
 
-#define BOUNDARY_STRING "hcfs_boundary"
+#define BOUNDARY_STRING "rhwuirnjkscd_hcfs_boundary_testing"
 
 typedef struct {
 	sem_t op_lock;

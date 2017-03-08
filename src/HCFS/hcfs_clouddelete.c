@@ -520,6 +520,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			}
 			write_log(0, "Fail to open %s in %s. Code %d",
 				  todel_metapath, __func__, errno);
+			fclose(backend_metafptr);
+			unlink(backend_metapath);
 			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 			return;
 		}
@@ -535,6 +537,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		} else {
 			write_log(0, "Type error %d in %s. Code %d",
 				  ptr->this_mode, __func__, errno);
+			fclose(backend_metafptr);
+			unlink(backend_metapath);
 			dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 			return;
 		}
@@ -920,7 +924,9 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #endif
 
 	if (ret < 0)
-		write_log(4, "Fail to delete object. Code %d", -ret);
+		write_log(4, "Fail to delete object. Code %d. Http ret code "
+			     "%d.",
+			  -ret, ret_val);
 	return ret;
 }
 /* TODO: How to retry object deletion later if failed at some point */
