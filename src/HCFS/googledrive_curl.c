@@ -47,7 +47,7 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 			actual_to_read = post_control->head_remaining;
 		else
 			actual_to_read = expect_read;
-		memcpy(ptr, post_control->head_string, actual_to_read);
+		memcpy((char *)ptr, post_control->head_string, actual_to_read);
 		post_control->head_remaining -= actual_to_read;
 		post_control->total_remaining -= actual_to_read;
 		expect_read -= actual_to_read;
@@ -892,8 +892,8 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	json_data =
 	    json_loadf(gdrive_body_fptr, JSON_DISABLE_EOF_CHECK, &jerror);
 	if (!json_data) {
-		write_log(0, "Error: Fail to read json file\n. Error %s",
-			  jerror.text);
+		write_log(0, "Error: Fail to read json file. Error %s. Code %d",
+			  jerror.text, ret_val);
 		goto errcode_handle;
 	}
 	json_id = json_object_get(json_data, "id");

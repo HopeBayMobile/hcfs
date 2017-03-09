@@ -2222,10 +2222,10 @@ int32_t get_quota_from_backup(int64_t *quota)
 	if (!json_result)
 		return -ENOENT;
 	
-	json_data = json_loads(json_result, 0, &jerror);
+	json_data = json_loads(json_result, JSON_DISABLE_EOF_CHECK, &jerror);
 	if (!json_data) {
+		write_log(0, "Error: Fail to parse json file. %s", jerror.text);
 		free(json_result);
-		write_log(0, "Error: Fail to parse json file\n");
 		return -EINVAL;
 	}
 	json_quota = json_object_get(json_data, quota_key);
