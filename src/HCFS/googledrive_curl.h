@@ -52,6 +52,7 @@ typedef struct {
 	char *tail_string;
 	int32_t tail_remaining;
 	int32_t total_remaining;
+	const char *objname;
 } object_post_control;
 
 BACKEND_TOKEN_CONTROL *googledrive_token_control;

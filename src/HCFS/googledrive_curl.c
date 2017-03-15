@@ -33,13 +33,13 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 
 	post_control = (object_post_control *)post_control1;
 
-	if (post_control->total_remaining <= 0)
-		return 0;
-
 	total_read = 0;
+	if (post_control->total_remaining <= 0)
+		goto complete;
+
 	expect_read = size * nmemb;
 	if (expect_read <= 0)
-		return total_read;
+		goto complete;
 
 	/* Read head */
 	if (post_control->head_remaining > 0) {
@@ -48,12 +48,13 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 		else
 			actual_to_read = expect_read;
 		memcpy((char *)ptr, post_control->head_string, actual_to_read);
+		post_control->head_string += actual_to_read; /* Move pointer */
 		post_control->head_remaining -= actual_to_read;
 		post_control->total_remaining -= actual_to_read;
 		expect_read -= actual_to_read;
 		total_read += actual_to_read;
 		if (expect_read <= 0)
-			return total_read;
+			goto complete;
 	}
 
 	/* Body */
@@ -70,7 +71,7 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 		expect_read -= ret_size;
 		total_read += ret_size;
 		if (expect_read <= 0)
-			return total_read;
+			goto complete;
 	}
 
 	/* Tail */
@@ -81,12 +82,16 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 			actual_to_read = expect_read;
 		memcpy((char *)ptr + total_read, post_control->tail_string,
 				actual_to_read);
+		post_control->tail_string += actual_to_read; /* Move pointer */
 		post_control->tail_remaining -= actual_to_read;
 		post_control->total_remaining -= actual_to_read;
 		expect_read -= actual_to_read;
 		total_read += actual_to_read;
 	}
 
+complete:
+	//if (strncmp(post_control->objname, "data_4600", 9) == 0)
+	//	fwrite(ptr, 1, actual_to_read, stdout);
 	return total_read;
 
 errcode_handle:
@@ -847,6 +852,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	total_size =
 	    objsize + post_control.head_remaining + post_control.tail_remaining;
 	post_control.total_remaining = total_size;
+	post_control.objname = obj_info->file_title;
 
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
