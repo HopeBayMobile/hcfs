@@ -96,14 +96,18 @@ errcode_handle:
 
 int32_t init_gdrive_token_control(void)
 {
+	int32_t ret = 0;
+
 	if (googledrive_token_control)
-		return -EEXIST;
+		goto out;
 
 	/* Init folder id cache */
 	gdrive_folder_id_cache = (GOOGLE_DRIVE_FOLDER_ID_CACHE_T *)calloc(
 	    sizeof(GOOGLE_DRIVE_FOLDER_ID_CACHE_T), 1);
-	if (!gdrive_folder_id_cache)
-		return -errno;
+	if (!gdrive_folder_id_cache) {
+		ret = -errno;
+		goto out;
+	}
 	sem_init(&(gdrive_folder_id_cache->op_lock), 0, 1);
 
 	/* Init google drive token controller */
@@ -111,14 +115,16 @@ int32_t init_gdrive_token_control(void)
 	    (BACKEND_TOKEN_CONTROL *)calloc(sizeof(BACKEND_TOKEN_CONTROL), 1);
 	if (!googledrive_token_control) {
 		FREE(gdrive_folder_id_cache);
-		return -errno;
+		ret = -errno;
+		goto out;
 	}
 
 	pthread_mutex_init(&googledrive_token_control->access_lock, NULL);
 	pthread_mutex_init(&googledrive_token_control->waiting_lock, NULL);
 	pthread_cond_init(&googledrive_token_control->waiting_cond, NULL);
 
-	return 0;
+out:
+	return ret;
 }
 
 int32_t hcfs_gdrive_reauth(CURL_HANDLE *curl_handle)
