@@ -12,7 +12,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE     := hcfsapid
 LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
-LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c logger.c smart_cache.c minimal_apk.c)
+LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c logger.c smart_cache.c minimal_apk.c strrchr_chk.c strchr_chk.c vsprintf_chk.c strcat_chk.c)
 LOCAL_SHARED_LIBRARIES = libsqlite libcrypto libzip
 include $(BUILD_EXECUTABLE)
 
@@ -20,7 +20,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE     := hcfsconf
 LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
-LOCAL_SRC_FILES  := $(addprefix ../../src/API/, hcfsconf.c enc.c logger.c)
+LOCAL_SRC_FILES  := $(addprefix ../../src/API/, hcfsconf.c enc.c logger.c strrchr_chk.c strchr_chk.c vsprintf_chk.c strcat_chk.c strlen_chk.c)
 LOCAL_SHARED_LIBRARIES = libcrypto
 include $(BUILD_EXECUTABLE)
 

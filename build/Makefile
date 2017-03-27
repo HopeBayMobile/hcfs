@@ -13,6 +13,7 @@ NDK_PROJECT_PATH := $(abspath .)
 # Target variables
 #####
 TARGETS32       += nexus-7
+TARGETS32       += AOSP-kitkat-arm
 TARGETS64       += nexus-5x
 TARGETS         += $(TARGETS32)
 TARGETS         += $(TARGETS64)
