@@ -23,7 +23,7 @@
 #include "global.h"
 #include "params.h"
 
-#define MONITOR_RETRYING 3
+#define MONITOR_RETRYING 2
 
 void *monitor_loop(void *ptr);
 int32_t check_backend_status(void);
