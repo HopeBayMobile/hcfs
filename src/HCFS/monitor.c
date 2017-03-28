@@ -108,6 +108,11 @@ void *monitor_loop(void *ptr)
 			sem_wait(&(hcfs_system->monitor_sem));
 			continue;
 		}
+		if (hcfs_system->sync_manual_switch == OFF) {
+			write_log(6, "Sleeping monitor thread: manual switch off\n");
+			sem_wait(&(hcfs_system->monitor_sem));
+			continue;
+		}
 		/* Change exponential backoff to fixed random interval */
 		max = MONITOR_MAX_TIMEOUT;
 		min = MONITOR_MIN_TIMEOUT;
