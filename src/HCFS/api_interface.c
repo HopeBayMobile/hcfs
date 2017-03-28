@@ -1406,6 +1406,9 @@ void api_module(void *index)
 		case GET_MINIMAL_APK_STATUS:
 			retcode = hcfs_system->use_minimal_apk;
 			goto return_retcode;
+		case RETRY_CONN:
+			retcode = sem_post(&(hcfs_system->monitor_sem));
+			goto return_retcode;
 		default:
 			retcode = ENOTSUP;
 			goto return_retcode;
