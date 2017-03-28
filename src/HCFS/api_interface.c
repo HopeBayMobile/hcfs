@@ -737,6 +737,10 @@ int32_t set_sync_switch_handle(bool sync_switch)
 	int32_t pause_file;
 
 	hcfs_system->sync_manual_switch = sync_switch;
+	/* If change connection manually to on, retry connection right away
+	if network was down */
+	if (sync_switch == TRUE)
+		force_retry_conn();
 	update_sync_state();
 
 	pause_file = (access(HCFSPAUSESYNC, F_OK) == 0);

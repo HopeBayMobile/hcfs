@@ -33,8 +33,6 @@
 
 CURL_HANDLE monitor_curl_handle;
 
-int32_t backoff_exponent = 0;
-
 void _write_monitor_loop_status_log(double duration)
 {
 	static BOOL init = TRUE;
@@ -100,22 +98,19 @@ void *monitor_loop(void *ptr)
 
 	write_log(2, "[Monitor] Start monitor loop\n");
 
-	backoff_exponent = 0;
 	hcfs_system->backend_is_online = check_backend_status();
 	update_sync_state();
 
 	while (hcfs_system->system_going_down == FALSE) {
 		if (hcfs_system->backend_is_online == TRUE) {
-			backoff_exponent = 0;
 			if (hcfs_system->system_restoring == RESTORING_STAGE2)
 				wake_sb_rebuilder();
 			sem_wait(&(hcfs_system->monitor_sem));
 			continue;
 		}
-		if (backoff_exponent < MONITOR_MAX_BACKOFF_EXPONENT)
-			backoff_exponent += 1;
-		max = (int32_t)pow(2, backoff_exponent);
-		min = (max >= 8) ? max / 8 : 1;
+		/* Change exponential backoff to fixed random interval */
+		max = MONITOR_MAX_TIMEOUT;
+		min = MONITOR_MIN_TIMEOUT;
 		wait_sec = MONITOR_BACKOFF_SLOT;
 		wait_sec *= (min + (rand() % (max - min + 1)));
 		write_log(5, "[Monitor] wait %d seconds before retransmit\n",
@@ -169,7 +164,7 @@ int32_t check_backend_status(void) {
  *
  * Function name: destroy_monitor_loop_thread
  *        Inputs: none
- *       Summary: awake monitor_loop and prepaire for process
+ *       Summary: wake monitor_loop and prepare for process
  *       termination, require hcfs_system->system_going_down == FALSE,
  *       otherwise loop will wait again immediately.
  *  Return value: none
@@ -233,12 +228,23 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 	}
 }
 
+/* Force retrying backend connection if manual switch is turned on */
+void force_retry_conn(void)
+{
+	BOOL org_status = hcfs_system->backend_is_online;
+	if (org_status == FALSE) {
+		hcfs_system->backend_is_online = check_backend_status();
+		if (org_status != hcfs_system->backend_is_online)
+			sem_post(&(hcfs_system->monitor_sem));
+	}
+}
+
 void update_sync_state(void)
 {
 	int32_t num_replace;
 
 	if (hcfs_system->backend_is_online == FALSE ||
-	    hcfs_system->sync_manual_switch == FALSE) {
+	    hcfs_system->sync_manual_switch == OFF) {
 		/* Change from online to offline */
 		if (hcfs_system->sync_paused == FALSE) {
 			hcfs_system->sync_paused = TRUE;

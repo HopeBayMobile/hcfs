@@ -30,5 +30,6 @@ double diff_time(const struct timespec *start, const struct timespec *end);
 void update_backend_status(register BOOL status, struct timespec *status_time);
 void update_sync_state(void);
 void _write_monitor_loop_status_log(double duration);
+void force_retry_conn(void);
 
 #endif  /* SRC_HCFS_MONITOR_H_ */
