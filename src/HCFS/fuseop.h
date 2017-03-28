@@ -13,6 +13,7 @@
 * 2015/6/30 Jiahong moved dir and file meta defs to other files
 * 2016/5/23 Jiahong adding semaphore for cache management
 * 2016/7/12 Jethro moved meta structs to meta.h
+* 2017/3/28 Kewei checked system space statistics.
 *
 **************************************************************************/
 

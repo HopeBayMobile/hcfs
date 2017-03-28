@@ -1122,7 +1122,7 @@ off_t check_file_size(const char *path)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int32_t change_system_meta(int64_t system_data_size_delta,
+int32_t change_system_meta(int64_t system_size_delta,
 			   int64_t meta_size_delta,
 			   int64_t cache_data_size_delta,
 			   int64_t cache_blocks_delta,
@@ -1192,7 +1192,7 @@ int32_t change_system_meta(int64_t system_data_size_delta,
 *
 *************************************************************************/
 int32_t change_system_meta_ignore_dirty(ino_t this_inode,
-					int64_t system_data_size_delta,
+					int64_t system_size_delta,
 					int64_t meta_size_delta,
 					int64_t cache_data_size_delta,
 					int64_t cache_blocks_delta,
