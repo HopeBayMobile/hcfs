@@ -1113,7 +1113,7 @@ off_t check_file_size(const char *path)
 /************************************************************************
 *
 * Function name: change_system_meta
-*        Inputs: int64_t system_data_size_delta,
+*        Inputs: int64_t system_size_delta,
 *                int64_t meta_size_delta
 *                int64_t cache_data_size_delta,
 *                int64_t cache_blocks_delta, int64_t dirty_cache_delta
@@ -1134,7 +1134,7 @@ int32_t change_system_meta(int64_t system_size_delta,
 
 	sem_wait(&(hcfs_system->access_sem));
 	/* System size includes meta size */
-	hcfs_system->systemdata.system_size += (system_data_size_delta);
+	hcfs_system->systemdata.system_size += (system_size_delta);
 	if (hcfs_system->systemdata.system_size < 0)
 		hcfs_system->systemdata.system_size = 0;
 
@@ -1177,7 +1177,7 @@ int32_t change_system_meta(int64_t system_size_delta,
 *
 * Function name: change_system_meta_ignore_dirty
 *        Inputs: ino_t this_inode,
-*                int64_t system_data_size_delta,
+*                int64_t system_size_delta,
 *                int64_t meta_size_delta
 *                int64_t cache_data_size_delta,
 *                int64_t cache_blocks_delta,
@@ -1202,11 +1202,11 @@ int32_t change_system_meta_ignore_dirty(ino_t this_inode,
 {
 	if (IS_SBENTRY_BEING_RECOVER_LATER(this_inode))
 		return change_system_meta(
-		    system_data_size_delta, meta_size_delta,
+		    system_size_delta, meta_size_delta,
 		    cache_data_size_delta, cache_blocks_delta, 0, 0, need_sync);
 	else
 		return change_system_meta(
-		    system_data_size_delta, meta_size_delta,
+		    system_size_delta, meta_size_delta,
 		    cache_data_size_delta, cache_blocks_delta,
 		    dirty_cache_delta, unpin_dirty_delta, need_sync);
 }
