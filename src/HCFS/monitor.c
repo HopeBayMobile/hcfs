@@ -153,11 +153,14 @@ int32_t check_backend_status(void) {
 	BOOL status;
 	int32_t ret_val;
 
+	now_retry_conn = TRUE; /* This flag is used to check if system is retrying */
 	write_log(5, "[Monitor] check_backend_status\n");
 	clock_gettime(CLOCK_REALTIME, &test_start);
 
 	ret_val = hcfs_test_backend(&monitor_curl_handle);
 	status = ((ret_val >= 200) && (ret_val <= 299));
+	if (status == TRUE)
+		now_retry_conn = FALSE;
 
 	clock_gettime(CLOCK_REALTIME, &test_stop);
 	test_duration = diff_time(&test_start, &test_stop);

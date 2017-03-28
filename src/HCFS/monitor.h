@@ -23,6 +23,8 @@
 #include "global.h"
 #include "params.h"
 
+#define MONITOR_RETRYING 3
+
 void *monitor_loop(void *ptr);
 int32_t check_backend_status(void);
 void destroy_monitor_loop_thread(void);
@@ -31,5 +33,6 @@ void update_backend_status(register BOOL status, struct timespec *status_time);
 void update_sync_state(void);
 void _write_monitor_loop_status_log(double duration);
 void force_retry_conn(void);
+BOOL now_retry_conn;
 
 #endif  /* SRC_HCFS_MONITOR_H_ */

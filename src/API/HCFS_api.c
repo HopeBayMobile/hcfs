@@ -245,7 +245,7 @@ void HCFS_stat(char **json_res)
 		JSON_OBJ_SET_NEW(data, "xfer_down",
 				 json_integer(hcfs_stats.xfer_down));
 		JSON_OBJ_SET_NEW(data, "cloud_conn",
-				 json_boolean(hcfs_stats.cloud_stat));
+				 json_integer(hcfs_stats.cloud_stat));
 		JSON_OBJ_SET_NEW(data, "data_transfer",
 				 json_integer(hcfs_stats.data_transfer));
 
@@ -1054,6 +1054,34 @@ void HCFS_create_minimal_apk(char **json_res,
 	close(fd);
 }
 
+void HCFS_retry_conn(char **json_res)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = RETRY_CONN;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+	close(fd);
+}
+
 void HCFS_check_minimal_apk(char **json_res, char *package_name)
 {
 	int32_t fd, ret_code;
@@ -1086,3 +1114,4 @@ void HCFS_check_minimal_apk(char **json_res, char *package_name)
 
 	close(fd);
 }
+

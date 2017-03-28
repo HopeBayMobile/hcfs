@@ -43,4 +43,5 @@ int32_t notify_applist_change();
 
 int32_t collect_sys_logs();
 
+int32_t retry_backend_conn();
 #endif  /* GW20_HCFSAPI_SYS_H_ */

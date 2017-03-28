@@ -1334,6 +1334,8 @@ void api_module(void *index)
 			goto return_retcode;
 		case CLOUDSTAT:
 			retcode = (int32_t)hcfs_system->backend_is_online;
+			if (retcode == FALSE && now_retry_conn == TRUE)
+				retcode = MONITOR_RETRYING;
 			goto return_retcode;
 		case SETSYNCSWITCH:
 			uint32val = *(uint32_t *)largebuf;

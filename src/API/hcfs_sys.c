@@ -723,6 +723,41 @@ int32_t notify_applist_change()
 	return ret_code;
 }
 
+/************************************************************************
+ * *
+ * * Function name: retry_backend_conn
+ * *        Inputs:
+ * *       Summary: To inform HCFS that immediately retry connection of
+ * *                backend.
+ * *
+ * *  Return value: 0 if successful.
+ * *                Otherwise returns negation of error code.
+ * *
+ * *************************************************************************/
+int32_t retry_backend_conn()
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = RETRY_CONN;
+	cmd_len = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ret_code, sizeof(int32_t), 0);
+
+	close(fd);
+
+	return ret_code;
+}
+
+
 /* helper function for system() result checking */
 #define check_system_result()\
 	do {\

@@ -88,7 +88,7 @@ void HCFS_reload_config(char **json_res);
  *     pin_total:     Bytes,
  *     xfer_up:       Bytes,
  *     xfer_down:     Bytes,
- *     cloud_conn:    True|False,
+ *     cloud_conn:    Bytes, (1 means conn, 0 means disconn, and 3 means retrying)
  *     data_transfer: Integer (0 means no data transfer, 1 means data transfer in progress, 2 means data transfer in progress but slow.)
  * }
  * ```
@@ -549,4 +549,17 @@ void HCFS_create_minimal_apk(char **json_res, char *package_name, int32_t blocki
  */
 void HCFS_check_minimal_apk(char **json_res, char *package_name);
 
+/*Retry to connect to backend
+ * @json_res result string in json format.
+ *
+ * Immediately retry to connect to backend
+ *
+ * Return code -
+ *
+ * > |               |                |
+ *   | ------------- | :------------- |
+ *   | True          | 0 if success   |
+ *   | False         | Linux errors.  |
+ */
+void HCFS_retry_conn(char **json_res);
 #endif  /* GW20_HCFS_API_H_ */

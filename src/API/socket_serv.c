@@ -657,6 +657,26 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 	return ret_code;
 }
 
+int32_t do_retry_conn(char *largebuf, int32_t arg_len,
+		      char *resbuf, int32_t *res_size)
+{
+	int32_t ret_code = 0;
+	uint32_t ret_len = 0;
+
+	UNUSED(largebuf);
+	UNUSED(arg_len);
+
+	write_log(8, "Umount smart cache\n");
+
+	ret_code = retry_backend_conn();
+
+	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
+	CONCAT_REPLY(&ret_code, sizeof(int32_t));
+
+	write_log(8, "End umount smart cache\n");
+	return ret_code;
+}
+
 /************************************************************************
  * *
  * * Function name: _get_unused_thread
@@ -763,6 +783,7 @@ int32_t process_request(void *arg)
 		{MOUNT_SMART_CACHE,		do_mount_smart_cache},
 		{UMOUNT_SMART_CACHE,		do_umount_smart_cache},
 		{CHECK_MINI_APK,		do_check_minimal_apk},
+		{RETRY_CONN,			do_retry_conn}
 	};
 
 	/* Asynchronous API will return immediately and process cmd in
