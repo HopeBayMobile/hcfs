@@ -88,7 +88,7 @@ void HCFS_reload_config(char **json_res);
  *     pin_total:     Bytes,
  *     xfer_up:       Bytes,
  *     xfer_down:     Bytes,
- *     cloud_conn:    Bytes, (1 means conn, 0 means disconn, and 3 means retrying)
+ *     cloud_conn:    Bytes, (1 means conn, 0 means disconn, and 2 means retrying)
  *     data_transfer: Integer (0 means no data transfer, 1 means data transfer in progress, 2 means data transfer in progress but slow.)
  * }
  * ```
