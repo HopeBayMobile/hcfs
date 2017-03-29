@@ -65,7 +65,7 @@ function main()
 	DEVICE_IMG=HCFS-nexus-5x-image
 	IMG_DIR=${PUBLISH_DIR}/${DEVICE_IMG}-${IMAGE_TYPE}
 	#DOCKER_IMAGE="docker:5000/${BOXNAME}:prebuilt-${IMAGE_TYPE}-20160621-with-launcher"
-	DOCKER_IMAGE="docker:5000/${BOXNAME}:source-only-6.0.0_r26_MDB08M_20161201"
+	DOCKER_IMAGE="docker:5000/${BOXNAME}:source-only-6.0.0_r26_MDB08M_20170329"
 	echo ================================================================================
 	echo $IMAGE_TYPE
 	echo $BRANCH_IN_5X
