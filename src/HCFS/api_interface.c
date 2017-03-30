@@ -1409,12 +1409,13 @@ void api_module(void *index)
 			retcode = hcfs_system->use_minimal_apk;
 			goto return_retcode;
 		case RETRY_CONN:
-			write_log(0, "TEST: Now retry connection");
+			write_log(6, "TEST: Now retry connection");
 			if (CURRENT_BACKEND == NONE) {
 				write_log(4, "Cannot retry connection. Backend needed.");
 				retcode = -EINVAL;
 			} else {
-				retcode = sem_post(&(hcfs_system->monitor_sem));
+				force_retry_conn();
+				retcode = 0;
 			}
 			goto return_retcode;
 		default:

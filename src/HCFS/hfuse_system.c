@@ -115,6 +115,10 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	hcfs_system->use_minimal_apk = FALSE;
 	hcfs_system->system_restoring = restoring_status;
 
+	/* Flags from monitor.h */
+	now_retry_conn = FALSE;
+	manual_retry_conn = FALSE;
+
 	hcfs_system->sync_manual_switch = !(access(HCFSPAUSESYNC, F_OK) == 0);
 	update_sync_state(); /* compute hcfs_system->sync_paused */
 

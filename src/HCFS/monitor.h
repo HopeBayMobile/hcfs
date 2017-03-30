@@ -34,5 +34,6 @@ void update_sync_state(void);
 void _write_monitor_loop_status_log(double duration);
 void force_retry_conn(void);
 BOOL now_retry_conn;
+BOOL manual_retry_conn;
 
 #endif  /* SRC_HCFS_MONITOR_H_ */

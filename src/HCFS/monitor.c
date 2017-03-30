@@ -82,6 +82,7 @@ void _write_monitor_loop_status_log(double duration)
 void *monitor_loop(void *ptr)
 {
 	struct timespec ts;
+	int32_t ret_val;
 	int32_t wait_sec = 0;
 	int32_t min, max;
 #ifdef _ANDROID_ENV_
@@ -106,9 +107,6 @@ void *monitor_loop(void *ptr)
 				wake_sb_rebuilder();
 			sem_wait(&(hcfs_system->monitor_sem));
 			continue;
-		} else {
-			hcfs_system->backend_is_online = check_backend_status();
-			update_sync_state();
 		}
 		if (hcfs_system->sync_manual_switch == OFF) {
 			write_log(6, "Sleeping monitor thread: manual switch off\n");
@@ -125,14 +123,18 @@ void *monitor_loop(void *ptr)
 
 		clock_gettime(CLOCK_REALTIME, &ts);
 		ts.tv_sec += wait_sec;
-		sem_timedwait(&(hcfs_system->monitor_sem), &ts);
+		ret_val = sem_timedwait(&(hcfs_system->monitor_sem), &ts);
 
-		/*if (ret_val == 0)
-			continue;
-		else if (errno == ETIMEDOUT) {
+		BOOL will_retry = FALSE;
+		if ((ret_val == 0) && (manual_retry_conn == TRUE))
+			will_retry = TRUE;
+		if ((ret_val != 0) && (errno == ETIMEDOUT))
+			will_retry = TRUE;
+
+		if (will_retry == TRUE)	{
 			hcfs_system->backend_is_online = check_backend_status();
 			update_sync_state();
-		}*/
+		}
 	}
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)
 		wake_sb_rebuilder();
@@ -237,14 +239,15 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 	}
 }
 
-/* Force retrying backend connection if manual switch is turned on */
+/* Force retrying backend connection */
 void force_retry_conn(void)
 {
 	BOOL org_status = hcfs_system->backend_is_online;
+
+	/* Don't need to retry if backend is already online */
 	if (org_status == FALSE) {
-		hcfs_system->backend_is_online = check_backend_status();
-		if (org_status != hcfs_system->backend_is_online)
-			sem_post(&(hcfs_system->monitor_sem));
+		manual_retry_conn = TRUE;
+		sem_post(&(hcfs_system->monitor_sem));
 	}
 }
 
