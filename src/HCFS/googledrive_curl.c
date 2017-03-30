@@ -1147,18 +1147,18 @@ int32_t get_parent_id(char *id, const char *objname)
 
 	/* Create folder */
 	memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-	strcpy(gdrive_info.file_title, "hcfs_data_folder");
+	strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
 	gdrive_info.type = GDRIVE_FOLDER;
 
 	snprintf(upload_handle.id, sizeof(upload_handle.id),
 		 "create_folder_curl");
 	upload_handle.curl_backend = NONE;
 	upload_handle.curl = NULL;
-	ret = hcfs_put_object(NULL, "hcfs_data_folder", &upload_handle, NULL,
+	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &upload_handle, NULL,
 			      &gdrive_info);
 	if ((ret < 200) || (ret > 299)) {
 		ret = -EIO;
-		write_log(0, "Error in creating hcfs_data_folder\n");
+		write_log(0, "Error in creating %s\n", GOOGLEDRIVE_FOLDER_NAME);
 		sem_post(&(gdrive_folder_id_cache->op_lock));
 		goto out;
 	}

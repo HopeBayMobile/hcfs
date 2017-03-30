@@ -49,7 +49,8 @@ int32_t _validate_config_key(char *key)
 		"swift_pass",\
 		"swift_url",\
 		"swift_container",\
-		"swift_protocol"\
+		"swift_protocol",\
+		"googledrive_folder",\
 	};
 
 

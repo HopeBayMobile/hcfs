@@ -75,7 +75,7 @@ extern SYSTEM_CONF_STRUCT *system_config;
 #define S3_PROTOCOL system_config->s3_protocol
 #define S3_BUCKET_URL system_config->s3_bucket_url
 
-#define GOOGLEDRIVE_FOLDER system_config->googledrive_folder
+#define GOOGLEDRIVE_FOLDER_NAME system_config->googledrive_folder
 
 #define METAPATH system_config->metapath
 #define BLOCKPATH system_config->blockpath

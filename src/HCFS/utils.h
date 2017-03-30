@@ -22,6 +22,9 @@
 #include "global.h"
 #include "macro.h"
 
+/* Default google drive folder name */
+#define DEFAULT_FOLDER_NAME "teradata"
+
 int32_t check_and_create_metapaths(void);
 int32_t check_and_create_blockpaths(void);
 

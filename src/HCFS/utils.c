@@ -569,8 +569,24 @@ int32_t read_system_config(const char *config_path, SYSTEM_CONF_STRUCT *config)
 			}
 			continue;
 		}
+		/* Check if there is google drive folder name */
+		if (strcasecmp(argname, "googledrive_folder") == 0) {
+			config->googledrive_folder =
+			    (char *)malloc(strlen(argval) + 10);
+			if (!config->googledrive_folder) {
+				write_log(0,
+					"Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
+			snprintf(config->googledrive_folder,
+				 strlen(argval) + 10, "%s", argval);
+			continue;
+		}
+
 		if (strcasecmp(argname, "swift_account") == 0) {
-			config->swift_account = (char *) malloc(strlen(argval) + 10);
+			config->swift_account =
+			    (char *)malloc(strlen(argval) + 10);
 			if (config->swift_account == NULL) {
 				write_log(0,
 					"Out of memory when reading config\n");
@@ -937,16 +953,24 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		}
 	}
 
-/* TODO: Add google drive folder
+	/* Check google drive folder name */
 	if (config->current_backend == GOOGLEDRIVE) {
 		if (!(config->googledrive_folder)) {
+			config->googledrive_folder =
+				(char *) malloc(strlen(DEFAULT_FOLDER_NAME));
+			if (!config->googledrive_folder) {
+				write_log(0,
+					"Out of memory when reading config\n");
+				return -1;
+			}
+			snprintf(config->googledrive_folder,
+				strlen(DEFAULT_FOLDER_NAME) + 10, "%s",
+				DEFAULT_FOLDER_NAME);
 			write_log(
-			    0,
-			    "google drive folder missing from configuration\n");
-			return -1;
+			    4,
+			    "Missing google drive folder name, default name teradata\n");
 		}
 	}
-*/
 
 	if (config->current_backend == SWIFTTOKEN) {
 		if (config->swift_user == NULL) {
@@ -1914,7 +1938,8 @@ int32_t _check_config(const SYSTEM_CONF_STRUCT *new_config)
 
 	switch (new_config->current_backend) {
 	case GOOGLEDRIVE:
-		if (strcmp(GOOGLEDRIVE_FOLDER, new_config->googledrive_folder))
+		if (strcmp(GOOGLEDRIVE_FOLDER_NAME,
+			   new_config->googledrive_folder))
 			return -EINVAL;
 		break;
 	case SWIFT:
