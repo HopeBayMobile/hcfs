@@ -134,8 +134,7 @@ void *monitor_loop(void *ptr)
 		if (will_retry == TRUE)	{
 			hcfs_system->backend_is_online = check_backend_status();
 			update_sync_state();
-			manual_retry_conn = (manual_retry_conn == FALSE ?
-					manual_retry_conn : FALSE);
+			manual_retry_conn = FALSE;
 		}
 	}
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)
