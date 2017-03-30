@@ -666,14 +666,13 @@ int32_t do_retry_conn(char *largebuf, int32_t arg_len,
 	UNUSED(largebuf);
 	UNUSED(arg_len);
 
-	write_log(8, "Umount smart cache\n");
+	write_log(8, "Send API RETRY_CONN\n");
 
 	ret_code = retry_backend_conn();
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
 	CONCAT_REPLY(&ret_code, sizeof(int32_t));
 
-	write_log(8, "End umount smart cache\n");
 	return ret_code;
 }
 

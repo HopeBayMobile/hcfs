@@ -134,6 +134,8 @@ void *monitor_loop(void *ptr)
 		if (will_retry == TRUE)	{
 			hcfs_system->backend_is_online = check_backend_status();
 			update_sync_state();
+			manual_retry_conn = (manual_retry_conn == FALSE ?
+					manual_retry_conn : FALSE);
 		}
 	}
 	if (hcfs_system->system_restoring == RESTORING_STAGE2)
@@ -155,7 +157,7 @@ int32_t check_backend_status(void) {
 	BOOL status;
 	int32_t ret_val;
 
-	now_retry_conn = TRUE; /* This flag is used to check if system is retrying */
+	now_retry_conn = TRUE; /* This flag is used to check if system is retrying conn */
 	write_log(5, "[Monitor] check_backend_status\n");
 	clock_gettime(CLOCK_REALTIME, &test_start);
 
