@@ -1078,6 +1078,7 @@ int32_t backup_FS_database(void)
 		      16 + sizeof(DIR_META_TYPE));
 		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
 		strncpy(gdrive_info.file_title, FSMGR_BACKUP, 50);
+		get_parent_id(gdrive_info.parentID, FSMGR_BACKUP);
 		if (clouddata.metaID[0]) {
 			strncpy(gdrive_info.fileID, clouddata.metaID,
 				GDRIVE_ID_LENGTH);
