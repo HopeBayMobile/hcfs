@@ -958,7 +958,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 		if (!(config->googledrive_folder)) {
 			config->googledrive_folder =
 				(char *) malloc(strlen(DEFAULT_FOLDER_NAME));
-			if (!config->googledrive_folder) {
+			if (!(config->googledrive_folder)) {
 				write_log(0,
 					"Out of memory when reading config\n");
 				return -1;

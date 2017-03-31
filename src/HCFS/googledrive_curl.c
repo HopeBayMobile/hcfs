@@ -1085,6 +1085,15 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
+/**
+ * Get object parent ID
+ *
+ * Given objname, get parent id from cache if it exists. Otherwise create a tera
+ * root folder and then fetch folder id.
+ *
+ * @param id Pointer of parent ID
+ * @param objname Object name
+ */
 int32_t get_parent_id(char *id, const char *objname)
 {
 	char hcfs_root_id_filename[200];
@@ -1095,8 +1104,10 @@ int32_t get_parent_id(char *id, const char *objname)
 
 	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
 
-	/* Only data and meta are put under hcfs_root_folder */
-	if (strncmp(objname, "data", 4) && strncmp(objname, "meta", 4)) {
+	/* Now data/meta/fsmgr-backup are put under folder "teradata" */
+	if (strncmp(objname, "data", 4) != 0 &&
+	    strncmp(objname, "meta", 4) != 0 &&
+	    strncmp(objname, FSMGR_BACKUP, strlen(FSMGR_BACKUP)) != 0) {
 		id[0] = 0;
 		goto out;
 	}
@@ -1116,8 +1127,7 @@ int32_t get_parent_id(char *id, const char *objname)
 	if (gdrive_folder_id_cache->hcfs_folder_id[0]) {
 		strncpy(id, gdrive_folder_id_cache->hcfs_folder_id,
 			GDRIVE_ID_LENGTH);
-		sem_post(&(gdrive_folder_id_cache->op_lock));
-		goto out;
+		goto unlock_sem_out;
 	}
 
 	fptr = fopen(hcfs_root_id_filename, "r");
@@ -1132,16 +1142,14 @@ int32_t get_parent_id(char *id, const char *objname)
 			id[id_len] = 0;
 			strncpy(gdrive_folder_id_cache->hcfs_folder_id, id,
 				GDRIVE_ID_LENGTH);
-			sem_post(&(gdrive_folder_id_cache->op_lock));
-			goto out;
+			goto unlock_sem_out;
 		} else {
 			fclose(fptr);
 		}
 	} else {
 		if (errno != ENOENT) {
 			ret = -errno;
-			sem_post(&(gdrive_folder_id_cache->op_lock));
-			goto out;
+			goto unlock_sem_out;
 		}
 	}
 
@@ -1154,20 +1162,18 @@ int32_t get_parent_id(char *id, const char *objname)
 		 "create_folder_curl");
 	upload_handle.curl_backend = NONE;
 	upload_handle.curl = NULL;
-	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &upload_handle, NULL,
-			      &gdrive_info);
+	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &upload_handle,
+			      NULL, &gdrive_info);
 	if ((ret < 200) || (ret > 299)) {
 		ret = -EIO;
 		write_log(0, "Error in creating %s\n", GOOGLEDRIVE_FOLDER_NAME);
-		sem_post(&(gdrive_folder_id_cache->op_lock));
-		goto out;
+		goto unlock_sem_out;
 	}
 
 	fptr = fopen(hcfs_root_id_filename, "w+");
 	if (!fptr) {
 		ret = -errno;
-		sem_post(&(gdrive_folder_id_cache->op_lock));
-		goto out;
+		goto unlock_sem_out;
 	}
 	fwrite(gdrive_info.fileID, strlen(gdrive_info.fileID), 1, fptr);
 	fclose(fptr);
@@ -1176,6 +1182,8 @@ int32_t get_parent_id(char *id, const char *objname)
 		GDRIVE_ID_LENGTH);
 	/* Copy to target */
 	strncpy(id, gdrive_folder_id_cache->hcfs_folder_id, GDRIVE_ID_LENGTH);
+
+unlock_sem_out:
 	sem_post(&(gdrive_folder_id_cache->op_lock));
 
 out:

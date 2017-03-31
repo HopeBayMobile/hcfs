@@ -2348,7 +2348,7 @@ int32_t check_init_super_block()
 		if (errcode == ENOENT) {
 			_ASSERT_BACKEND_EXIST_();
 			/* Get fsmgr from cloud */
-			sprintf(objname, "FSmgr_backup");
+			sprintf(objname, FSMGR_BACKUP);
 			fsmgr_fptr = fopen(fsmgr_path, "w+");
 			if (!fsmgr_fptr) {
 				errcode = errno;

@@ -53,7 +53,7 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 		errcode = errno;
 		if (errcode == ENOENT) {
 			/* Get fsmgr from cloud */
-			sprintf(objname, "FSmgr_backup");
+			sprintf(objname, FSMGR_BACKUP);
 			fsmgr_fptr = fopen(fsmgr_path, "w+");
 			if (!fsmgr_fptr) {
 				errcode = errno;

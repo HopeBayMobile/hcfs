@@ -1077,7 +1077,7 @@ int32_t backup_FS_database(void)
 		PREAD(fileno(fptr), &clouddata, sizeof(CLOUD_RELATED_DATA),
 		      16 + sizeof(DIR_META_TYPE));
 		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-		strncpy(gdrive_info.file_title, "FSmgr_backup", 50);
+		strncpy(gdrive_info.file_title, FSMGR_BACKUP, 50);
 		if (clouddata.metaID[0]) {
 			strncpy(gdrive_info.fileID, clouddata.metaID,
 				GDRIVE_ID_LENGTH);
@@ -1086,10 +1086,10 @@ int32_t backup_FS_database(void)
 		} else {
 			need_record_id = TRUE;
 		}
-		ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle,
+		ret = hcfs_put_object(fptr, FSMGR_BACKUP, &upload_handle,
 				      NULL, &gdrive_info);
 	} else {
-		ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle,
+		ret = hcfs_put_object(fptr, FSMGR_BACKUP, &upload_handle,
 				      NULL, NULL);
 	}
 	if ((ret < 200) || (ret > 299)) {
@@ -1168,7 +1168,7 @@ int32_t restore_FS_database(void)
 		goto errcode_handle;
 	}
 	ret =
-	    hcfs_get_object(fptr, "FSmgr_backup", &download_handle, NULL, NULL);
+	    hcfs_get_object(fptr, FSMGR_BACKUP, &download_handle, NULL, NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in restoring FS database\n");

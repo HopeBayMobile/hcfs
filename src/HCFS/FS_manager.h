@@ -30,6 +30,8 @@ or external */
 /* Android internal volumes */
 #define APP_VOL_NAME "hcfs_app"
 #define DATA_VOL_NAME "hcfs_data"
+
+#define FSMGR_BACKUP "FSmgr_backup"
 #endif
 
 typedef struct {

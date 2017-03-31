@@ -2711,7 +2711,7 @@ int32_t run_download_minimal(void)
 	}
 
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
-	ret = restore_fetch_obj("FSmgr_backup", despath, FALSE);
+	ret = restore_fetch_obj(FSMGR_BACKUP, despath, FALSE);
 
 	if (ret < 0) {
 		errcode = ret;
