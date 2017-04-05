@@ -61,6 +61,7 @@ typedef struct {
 	int64_t pinned_size;
 	int64_t disk_pinned_size;
 	int64_t disk_meta_size;
+	char fileID[GDRIVE_ID_LENGTH + 1]; /* For backend googledrive */
 } FS_CLOUD_STAT_T_V2;
 
 typedef struct {

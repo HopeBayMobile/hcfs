@@ -957,7 +957,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 	if (config->current_backend == GOOGLEDRIVE) {
 		if (!(config->googledrive_folder)) {
 			config->googledrive_folder =
-				(char *) malloc(strlen(DEFAULT_FOLDER_NAME));
+			    (char *)malloc(strlen(DEFAULT_FOLDER_NAME) + 10);
 			if (!(config->googledrive_folder)) {
 				write_log(0,
 					"Out of memory when reading config\n");
@@ -966,9 +966,8 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 			snprintf(config->googledrive_folder,
 				strlen(DEFAULT_FOLDER_NAME) + 10, "%s",
 				DEFAULT_FOLDER_NAME);
-			write_log(
-			    4,
-			    "Missing google drive folder name, default name teradata\n");
+			write_log(4, "Missing google drive folder name, "
+				     "default name teradata\n");
 		}
 	}
 

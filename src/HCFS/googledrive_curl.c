@@ -1107,6 +1107,7 @@ int32_t get_parent_id(char *id, const char *objname)
 	/* Now data/meta/fsmgr-backup are put under folder "teradata" */
 	if (strncmp(objname, "data", 4) != 0 &&
 	    strncmp(objname, "meta", 4) != 0 &&
+	    strncmp(objname, "FSstat", 6) != 0 &&
 	    strncmp(objname, FSMGR_BACKUP, strlen(FSMGR_BACKUP)) != 0) {
 		id[0] = 0;
 		goto out;

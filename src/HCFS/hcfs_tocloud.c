@@ -2619,8 +2619,36 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL,
-			      NULL);
+
+	if (CURRENT_BACKEND == GOOGLEDRIVE) {
+		GOOGLEDRIVE_OBJ_INFO obj_info;
+		FS_CLOUD_STAT_T fs_cloud_stat;
+		BOOL need_record_id = FALSE;
+
+		memset(&obj_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		obj_info.type = GDRIVE_FILE;
+		strncpy(obj_info.file_title, objname, GDRIVE_ID_LENGTH);
+		get_parent_id(obj_info.parentID, objname);
+		FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
+		strncpy(obj_info.fileID, fs_cloud_stat.fileID,
+			GDRIVE_ID_LENGTH);
+		if (obj_info.fileID[0] == 0)
+			need_record_id = TRUE;
+		FSEEK(fptr, 0, SEEK_SET);
+		ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl),
+				      NULL, &obj_info);
+		if (need_record_id && obj_info.fileID[0] != 0) {
+			strncpy(fs_cloud_stat.fileID, obj_info.fileID,
+				GDRIVE_ID_LENGTH);
+			FSEEK(fptr, 0, SEEK_SET);
+			FWRITE(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1,
+			       fptr);
+		}
+	} else {
+		ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl),
+				      NULL, NULL);
+	}
+
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		goto errcode_handle;
