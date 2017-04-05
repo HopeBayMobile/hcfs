@@ -2650,6 +2650,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	}
 
 	if ((ret < 200) || (ret > 299)) {
+		write_log(4, "Fail to sync %s. ret %d", objname, ret);
 		errcode = -EIO;
 		goto errcode_handle;
 	}
