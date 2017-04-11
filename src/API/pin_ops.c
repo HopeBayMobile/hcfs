@@ -27,6 +27,10 @@
 #include "socket_util.h"
 #include "marco.h"
 
+#define DATA_PREFIX "/data/data"
+#define APP_PREFIX "/data/app"
+#define EXTERNAL_PREFIX "/storage/emulated"
+#define DALVIK_PREFIX "/data/dalvik-cache" /* For android 4.4 */
 
 /************************************************************************
  * *
@@ -89,9 +93,11 @@ int32_t _validate_hcfs_path(char *pathname)
 		return ret_code;
 
 	/* Following are mountpoints used in Android system. */
-	if (!strncmp(resolved_path, DATA_PREFIX, sizeof(DATA_PREFIX) - 1)
-	    || !strncmp(resolved_path, APP_PREFIX, sizeof(APP_PREFIX) - 1)
-	    || !strncmp(resolved_path, EXTERNAL_PREFIX, sizeof(EXTERNAL_PREFIX) - 1))
+	if (!strncmp(resolved_path, DATA_PREFIX, sizeof(DATA_PREFIX) - 1) ||
+	    !strncmp(resolved_path, APP_PREFIX, sizeof(APP_PREFIX) - 1) ||
+	    !strncmp(resolved_path, EXTERNAL_PREFIX,
+		     sizeof(EXTERNAL_PREFIX) - 1) ||
+	    !strncmp(resolved_path, DALVIK_PREFIX, sizeof(DALVIK_PREFIX) - 1))
 		ret_code = 0;
 
 	free(resolved_path);
