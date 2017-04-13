@@ -4616,11 +4616,11 @@ int32_t write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 
 			write_log(10, "debug write waiting on full cache\n");
 			ret = sleep_on_cache_full();
+			sem_wait(&(fh_ptr->block_sem));
 			if (ret < 0)
 				return ret;
 
 			/*Re-read status*/
-			sem_wait(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 			if (fh_ptr->meta_cache_ptr == NULL) {
@@ -4932,13 +4932,13 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 
 			write_log(10, "debug write waiting on full cache\n");
 			ret = sleep_on_cache_full();
+			sem_wait(&(fh_ptr->block_sem));
 			if (ret < 0) {
 				*reterr = ret;
 				return 0;
 			}
 
 			/*Re-read status*/
-			sem_wait(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 			if (fh_ptr->meta_cache_ptr == NULL) {

@@ -46,7 +46,6 @@ typedef struct {
 	ino_t this_inode;
 	int64_t block_no;
 	int64_t seqnum;
-	char blockID[GDRIVE_ID_LENGTH]; /*google drive block id*/
 	off_t page_pos;
 	char dl_error;
 	char active;
