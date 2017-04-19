@@ -95,7 +95,7 @@ int32_t main(int32_t argc, char **argv)
 		errcode = errno;
 		fprintf(stderr, "connection failed. Error: %s.\n",
 			strerror(errcode));
-		mknod("/dev/shm/failed", 0755, 0);
+		mknod("/dev/shm/failed", 0700, 0);
 		return errcode;
 	}
 	switch (code) {

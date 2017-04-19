@@ -29,6 +29,7 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <inttypes.h>
+#include <pwd.h>
 
 #include "macro.h"
 #include "global.h"
@@ -121,8 +122,18 @@ int32_t init_api_interface(void)
 		goto errcode_handle;
 	}
 
-	/* For allowing others to acccess */
-	chmod(SOCK_PATH, 0777);
+	/* If user is root, and "system" group exists, chgrp to "system" */
+	uid_t thisuser = geteuid();
+	if (thisuser == 0) {  /* If root */
+		struct passwd *sys_struct = getpwnam("system");
+		if (sys_struct != NULL) {  /* chgrp */
+			write_log(4, "Changing group of hcfs sock\n");
+			chown(SOCK_PATH, thisuser, sys_struct->pw_gid);
+		}
+	}
+
+	/* For allowing group to acccess */
+	chmod(SOCK_PATH, 0770);
 
 	sock_flag = fcntl(api_server->sock.fd, F_GETFL, 0);
 	sock_flag = sock_flag | O_NONBLOCK;
