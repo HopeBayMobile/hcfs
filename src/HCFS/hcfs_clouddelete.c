@@ -556,7 +556,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 	if (ret < 0) {
 		if (ret == -EIO) {
-			write_log(5, "Error: Fail to download "
+			write_log(4, "Error: Fail to download "
 					"backend meta_%"PRIu64". "
 					"Delete next time.\n",
 					(uint64_t)this_inode);
@@ -569,12 +569,13 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			_check_del_progress_file(this_inode);
 			super_block_delete(this_inode);
 			super_block_reclaim();
+			/* todelete meta file may existed if system had been
+			 * upgraded */
+			unlink(todel_metapath);
 		}
 
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
-		/* todelete meta file may existed if system had been upgraded */
-		unlink(todel_metapath);
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 		return;
 	}

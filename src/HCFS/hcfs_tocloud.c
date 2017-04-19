@@ -1303,20 +1303,6 @@ store in some other file */
 		if (sync_error == TRUE) {
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
-				/* Restore cloud usage statistics */
-				pos = sizeof(HCFS_STAT) +
-					sizeof(FILE_META_TYPE) +
-					sizeof(FILE_STATS_TYPE);
-				FSEEK(toupload_metafptr, pos, SEEK_SET);
-				FREAD(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, toupload_metafptr);
-				flock(fileno(local_metafptr), LOCK_EX);
-				FSEEK(local_metafptr, pos, SEEK_SET);
-				FWRITE(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
-				flock(fileno(local_metafptr), LOCK_UN);
 				/* Delete pre-upload blocks */
 				delete_backend_blocks(progress_fd, total_blocks,
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
@@ -1402,9 +1388,6 @@ store in some other file */
 					tempfilestat.size + now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, pos, SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 		if (S_ISDIR(ptr->this_mode)) {
 			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
@@ -1428,10 +1411,6 @@ store in some other file */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, sizeof(HCFS_STAT) +
-					sizeof(DIR_META_TYPE), SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 		if (S_ISLNK(ptr->this_mode)) {
 			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
@@ -1455,10 +1434,6 @@ store in some other file */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, sizeof(HCFS_STAT) +
-					sizeof(SYMLINK_META_TYPE), SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
@@ -1497,26 +1472,9 @@ store in some other file */
 			/* Write file id to cloud related data */
 			char *metaid = upload_ctl.upload_threads[which_curl]
 				       .gdrive_obj_info.fileID;
-			ssize_t offset;
 
-			if (S_ISFILE(ptr->this_mode))
-				offset = sizeof(HCFS_STAT) +
-					 sizeof(FILE_META_TYPE) +
-					 sizeof(FILE_STATS_TYPE);
-			else if (S_ISLNK(ptr->this_mode))
-				offset = sizeof(HCFS_STAT) +
-					 sizeof(SYMLINK_META_TYPE);
-			else if (S_ISDIR(ptr->this_mode))
-				offset =
-				    sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
-			FSEEK(local_metafptr, offset, SEEK_SET);
-			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 			strncpy(cloud_related_data.metaID, metaid,
 				GDRIVE_ID_LENGTH);
-			FSEEK(local_metafptr, offset, SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 
 		sem_wait(&(upload_ctl.upload_op_sem));
@@ -1562,21 +1520,6 @@ store in some other file */
 		if (S_ISREG(ptr->this_mode)) {
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
-				/* Restore cloud usage statistics */
-				pos = sizeof(HCFS_STAT) +
-					sizeof(FILE_META_TYPE) +
-					sizeof(FILE_STATS_TYPE);
-				FSEEK(toupload_metafptr, pos, SEEK_SET);
-				FREAD(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, toupload_metafptr);
-				flock(fileno(local_metafptr), LOCK_EX);
-				FSEEK(local_metafptr, pos, SEEK_SET);
-				FWRITE(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
-				flock(fileno(local_metafptr), LOCK_UN);
-
 				/* Delete pre-upload blocks */
 				delete_backend_blocks(progress_fd, total_blocks,
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
@@ -1587,8 +1530,21 @@ store in some other file */
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
-
 	fclose(toupload_metafptr);
+
+	/* Write cloud related data back to local mata when syncing completed */
+	flock(fileno(local_metafptr), LOCK_EX);
+	if (S_ISFILE(ptr->this_mode))
+		pos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+			 sizeof(FILE_STATS_TYPE);
+	else if (S_ISLNK(ptr->this_mode))
+		pos = sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE);
+	else if (S_ISDIR(ptr->this_mode))
+		pos = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
+	FSEEK(local_metafptr, pos, SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+	       local_metafptr);
+	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 
 	/* Upload successfully. Update FS stat in backend */
