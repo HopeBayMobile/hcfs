@@ -395,12 +395,11 @@ static inline int32_t _read_backend_meta(char *backend_metapath,
 	}
 	setbuf(metafptr, NULL);
 
+	FSEEK(metafptr, 0, SEEK_SET);
 	if (S_ISFILE(this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&temphcfsstat, sizeof(HCFS_STAT), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		//FSEEK(metafptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
-		//		    sizeof(FILE_STATS_TYPE), SEEK_SET);
 		flock(fileno(metafptr), LOCK_UN);
 		*root_inode = tempfilemeta.root_inode;
 		*meta_size_change = tempstat.st_size;
@@ -735,8 +734,6 @@ errcode_handle:
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
 	}
-	/* todelete meta file may existed if system had been upgraded */
-	unlink(todel_metapath);
 
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
@@ -796,6 +793,9 @@ errcode_handle:
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
 		return;
 	}
+
+	/* todelete meta file may existed if system had been upgraded */
+	unlink(todel_metapath);
 
 	/* Update FS stat in the backend if updated previously */
 	update_backend_stat(root_inode, -backend_size_change,
@@ -925,9 +925,9 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 #endif
 
 	if (ret < 0)
-		write_log(4, "Fail to delete object. Code %d. Http ret code "
+		write_log(4, "Fail to delete object %s. Code %d. Http ret code "
 			     "%d.",
-			  -ret, ret_val);
+			  objname - ret, ret_val);
 	return ret;
 }
 /* TODO: How to retry object deletion later if failed at some point */

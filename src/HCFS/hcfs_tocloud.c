@@ -2490,7 +2490,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t pin_size_delta, int64_t disk_pin_size_delta,
 		int64_t disk_meta_size_delta)
 {
-	int32_t ret, errcode;
+	int32_t ret, errcode, put_ret;
 	char fname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
@@ -2591,8 +2591,8 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		if (obj_info.fileID[0] == 0)
 			need_record_id = TRUE;
 		FSEEK(fptr, 0, SEEK_SET);
-		ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl),
-				      NULL, &obj_info);
+		put_ret = hcfs_put_object(
+		    fptr, objname, &(sync_stat_ctl.statcurl), NULL, &obj_info);
 		if (need_record_id && obj_info.fileID[0] != 0) {
 			strncpy(fs_cloud_stat.fileID, obj_info.fileID,
 				GDRIVE_ID_LENGTH);
@@ -2601,11 +2601,11 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 			       fptr);
 		}
 	} else {
-		ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl),
-				      NULL, NULL);
+		put_ret = hcfs_put_object(
+		    fptr, objname, &(sync_stat_ctl.statcurl), NULL, NULL);
 	}
 
-	if ((ret < 200) || (ret > 299)) {
+	if ((put_ret < 200) || (put_ret > 299)) {
 		write_log(4, "Fail to sync %s. ret %d", objname, ret);
 		errcode = -EIO;
 		goto errcode_handle;
