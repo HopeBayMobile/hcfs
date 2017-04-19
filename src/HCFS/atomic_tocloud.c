@@ -1261,7 +1261,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 			 * DEL_BACKEND_BLOCKS because of 
 			 * unexpected crash. Keep working.
 			 * Delete old blocks on cloud. */
-			write_log(2, "sync warn: inode %"PRIu64" toupload meta"
+			write_log(2, "sync warn: inode %"PRIu64" toupload meta "
 				"disappear. Perhaps crash?\n", (uint64_t)inode);
 			delete_backend_blocks(progress_fd,
 					progress_meta.total_backend_blocks,
