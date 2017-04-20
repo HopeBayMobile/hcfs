@@ -21,6 +21,25 @@
 #include "monitor.h"
 #include "fuseop.h"
 
+#define MAX_BACKOFF_EXP 3
+
+void gdrive_exp_backoff_sleep(int32_t busy_retry_times)
+{
+	struct timeval current_time;
+	struct timespec sleep_time;
+	int32_t n;
+
+	gettimeofday(&current_time, NULL);
+	srandom((uint32_t)(current_time.tv_usec));
+
+	n = busy_retry_times > MAX_BACKOFF_EXP ? MAX_BACKOFF_EXP
+					       : busy_retry_times;
+	sleep_time.tv_sec = 1 << n;
+	sleep_time.tv_nsec = random() % 999999999 + 1;
+
+	nanosleep(&sleep_time, NULL); /* Sleep a while */
+}
+
 size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 			  void *post_control1)
 {
@@ -287,11 +306,12 @@ void _create_multipart_data(char *head,
 	sprintf(tail, "\n\n--%s--", boundary_string);
 }
 
-void _check_forbidden_reason(FILE *body_fptr)
+int32_t _check_forbidden_reason(FILE *body_fptr)
 {
 	json_error_t jerror;
 	json_t *json_data = NULL, *json_msg = NULL, *json_error_data;
 	const char *msg = NULL;
+	int32_t ret = 403;
 
 	fseek(body_fptr, 0, SEEK_SET);
 
@@ -300,7 +320,7 @@ void _check_forbidden_reason(FILE *body_fptr)
 	if (!json_data) {
 		write_log(0, "Error: Fail to read json file. In %s\n",
 			  __func__);
-		return;
+		return 403;
 	}
 	json_error_data = json_object_get(json_data, "error");
 	if (!json_error_data) {
@@ -321,17 +341,20 @@ void _check_forbidden_reason(FILE *body_fptr)
 	}
 
 	/* Check */
-	write_log(4, "Warn: Http 403 caused by '%s'", msg);
 
-	if (strcmp(msg, "User Rate Limit Exceeded") == 0 ||
-	    strcmp(msg, "Rate Limit Exceeded") == 0)
+	if (strcasecmp(msg, "User Rate Limit Exceeded") == 0 ||
+	    strcasecmp(msg, "Rate Limit Exceeded") == 0) {
+		ret = -EBUSY;
 		goto out;
+	}
 
 	/* Let conn be false */
+	write_log(4, "Warn: Http 403 caused by '%s'", msg);
 	update_backend_status(FALSE, NULL);
+	ret = 403;
 out:
 	json_delete(json_data);
-	return;
+	return ret;
 }
 
 int32_t hcfs_gdrive_get_object(FILE *fptr,
@@ -429,8 +452,10 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	}
 
 	if ((ret_val >= 500 && ret_val <= 505) ||
-	    (ret_val >= 400 && ret_val <= 403))
+	    (ret_val >= 400 && ret_val <= 402))
 		update_backend_status(FALSE, NULL);
+	else if (ret_val == 403)
+		ret_val = _check_forbidden_reason(fptr);
 
 	/* get object meta data */
 	if (http_is_success(ret_val)) {
@@ -538,7 +563,6 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_body_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
-	//curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 
 	HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
@@ -568,7 +592,7 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	    (ret_val >= 400 && ret_val <= 402))
 		update_backend_status(FALSE, NULL);
 	else if (ret_val == 403)
-		_check_forbidden_reason(gdrive_body_fptr);
+		ret_val = _check_forbidden_reason(gdrive_body_fptr);
 
 	fclose(gdrive_header_fptr);
 	fclose(gdrive_body_fptr);
@@ -697,8 +721,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 	    (ret_val >= 400 && ret_val <= 402)) {
 		update_backend_status(FALSE, NULL);
 	} else if (ret_val == 403) {
-		_check_forbidden_reason(gdrive_body_fptr);
-		goto errcode_handle;
+		ret_val = _check_forbidden_reason(gdrive_body_fptr);
 	}
 
 	fclose(gdrive_header_fptr);
@@ -891,8 +914,8 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	    (ret_val >= 400 && ret_val <= 402)) {
 		update_backend_status(FALSE, NULL);
 	} else if (ret_val == 403) {
-		_check_forbidden_reason(gdrive_body_fptr);
-		goto errcode_handle;
+		ret_val = _check_forbidden_reason(gdrive_body_fptr);
+		goto set_retval_busy_handle;
 	}
 
 	fclose(gdrive_header_fptr);
@@ -941,6 +964,8 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	return ret_val;
 
 errcode_handle:
+	ret_val = -1;
+set_retval_busy_handle:
 	if (gdrive_header_fptr) {
 		fclose(gdrive_header_fptr);
 		unlink(header_filename);
@@ -951,7 +976,7 @@ errcode_handle:
 	}
 	if (chunk)
 		curl_slist_free_all(chunk);
-	return -1;
+	return ret_val;
 }
 
 int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,

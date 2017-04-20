@@ -924,10 +924,9 @@ int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
 	fclose(ddt_fptr);
 #endif
 
-	if (ret < 0)
+	if (ret < 0 && ret != -ENOENT)
 		write_log(4, "Fail to delete object %s. Code %d. Http ret code "
-			     "%d.",
-			  objname - ret, ret_val);
+			     "%d.", objname, ret, ret_val);
 	return ret;
 }
 /* TODO: How to retry object deletion later if failed at some point */
