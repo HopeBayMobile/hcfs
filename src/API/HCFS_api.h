@@ -563,7 +563,4 @@ void HCFS_check_minimal_apk(char **json_res, char *package_name);
  */
 void HCFS_retry_conn(char **json_res);
 
-/* Placeholder for 2.2.5 functions */
-void HCFS_check_minimal_apk(const char **json_res, const char *package_path, int blocking);
-void HCFS_create_minimal_apk(const char **json_res, const char *package_path, int blocking);
 #endif  /* GW20_HCFS_API_H_ */
