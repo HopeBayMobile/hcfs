@@ -27,17 +27,29 @@ void gdrive_exp_backoff_sleep(int32_t busy_retry_times)
 {
 	struct timeval current_time;
 	struct timespec sleep_time;
-	int32_t n;
+	int32_t n, max, min;
+
+	if (busy_retry_times <= 0) {
+		sleep(1);
+		goto out;
+	}
 
 	gettimeofday(&current_time, NULL);
 	srandom((uint32_t)(current_time.tv_usec));
 
 	n = busy_retry_times > MAX_BACKOFF_EXP ? MAX_BACKOFF_EXP
 					       : busy_retry_times;
-	sleep_time.tv_sec = 1 << n;
-	sleep_time.tv_nsec = random() % 999999999 + 1;
+	max = (1 << n) + 1;
+	min = 1 << (n - 1);
 
-	nanosleep(&sleep_time, NULL); /* Sleep a while */
+	/* sleep in range (2^(n-1), 2^n + 1), that is:
+	 * (1, 3), (2, 5), (3, 9)... */
+	sleep_time.tv_sec = min + (random() % (max - min));
+	sleep_time.tv_nsec = random() % 999999999;
+	nanosleep(&sleep_time, NULL);
+
+out:
+	return;
 }
 
 size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,

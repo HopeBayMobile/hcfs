@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2017 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfscurl.c
 * Abstract: The c source code file for CURL operations.
@@ -1840,12 +1840,12 @@ int32_t hcfs_list_container(FILE *fptr,
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
 			if (ret_val == -EBUSY) {
-				gdrive_exp_backoff_sleep(busy_retry_times++);
+				gdrive_exp_backoff_sleep(++busy_retry_times);
 				write_log(4, "When list obj, user rate limit "
 					     "exceeded. Curl "
 					     "%s retry %d times",
 					  curl_handle->id,
-					  busy_retry_times + 1);
+					  busy_retry_times);
 			} else {
 				write_log(
 				    2,
@@ -1967,12 +1967,12 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;	
 			if (ret_val == -EBUSY) {
-				gdrive_exp_backoff_sleep(busy_retry_times++);
+				gdrive_exp_backoff_sleep(++busy_retry_times);
 				write_log(4, "When put obj, user rate limit "
 					     "exceeded. Curl "
 					     "%s retry %d times",
 					  curl_handle->id,
-					  busy_retry_times + 1);
+					  busy_retry_times);
 			} else {
 				write_log(
 				    2,
@@ -2081,12 +2081,12 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
 			if (ret_val == -EBUSY) {
-				gdrive_exp_backoff_sleep(busy_retry_times++);
+				gdrive_exp_backoff_sleep(++busy_retry_times);
 				write_log(4, "When get obj, user rate limit "
 					     "exceeded. Curl "
 					     "%s retry %d times",
 					  curl_handle->id,
-					  busy_retry_times + 1);
+					  busy_retry_times);
 			} else {
 				write_log(
 				    2,
@@ -2202,12 +2202,12 @@ int32_t hcfs_delete_object(char *objname,
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
 			if (ret_val == -EBUSY) {
-				gdrive_exp_backoff_sleep(busy_retry_times++);
+				gdrive_exp_backoff_sleep(++busy_retry_times);
 				write_log(4, "When delete obj, user rate limit "
 					     "exceeded. Curl "
 					     "%s retry %d times",
 					  curl_handle->id,
-					  busy_retry_times + 1);
+					  busy_retry_times);
 			} else {
 				write_log(
 				    2,
