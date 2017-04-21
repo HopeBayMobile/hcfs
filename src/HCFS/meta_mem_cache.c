@@ -1628,6 +1628,14 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	result_ptr = &(current_ptr->body);
 
 	sem_wait(&((current_ptr->body).access_sem));
+	int testval;
+	sem_getvalue(&((current_ptr->body).access_sem), &testval);
+	if (testval != 0) {
+		write_log(0, "Bogus sem value after locking (%d)", testval);
+		sem_destroy(&((current_ptr->body).access_sem));
+		sem_init(&((current_ptr->body).access_sem), 0, 0);
+	}
+
 	sem_post(&(meta_mem_cache[index].header_sem));
 
 	/* Lock meta file if opened */

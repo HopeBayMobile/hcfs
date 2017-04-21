@@ -121,6 +121,9 @@ int32_t init_api_interface(void)
 		goto errcode_handle;
 	}
 
+	/* For allowing others to acccess */
+	chmod(SOCK_PATH, 0777);
+
 	sock_flag = fcntl(api_server->sock.fd, F_GETFL, 0);
 	sock_flag = sock_flag | O_NONBLOCK;
 	fcntl(api_server->sock.fd, F_SETFL, sock_flag);
