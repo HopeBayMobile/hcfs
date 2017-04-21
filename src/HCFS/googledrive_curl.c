@@ -43,7 +43,7 @@ void gdrive_exp_backoff_sleep(int32_t busy_retry_times)
 	min = 1 << (n - 1);
 
 	/* sleep in range (2^(n-1), 2^n + 1), that is:
-	 * (1, 3), (2, 5), (3, 9)... */
+	 * (1, 3), (2, 5), (4, 9)... */
 	sleep_time.tv_sec = min + (random() % (max - min));
 	sleep_time.tv_nsec = random() % 999999999;
 	nanosleep(&sleep_time, NULL);
