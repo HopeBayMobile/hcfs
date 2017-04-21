@@ -1714,9 +1714,6 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	parentlist = NULL;
 	sem_post(&(pathlookup_data_lock));
 
-	write_log(4, "Debug app unpin: parent %" PRIu64 ", numparent %d, ret %d\n",
-	          (uint64_t) parent_ino, numparents, ret);
-
 	/* Return if encountered an error */
 	if (ret < 0)
 		return ret;
@@ -1736,7 +1733,7 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	/* Check if the minimal apk exists in the same folder */
 	ret = lookup_dir(parent_ino, minapk_name, &temp_dentry, FALSE);
 
-	write_log(4, "[App unpin] Min apk %s found? %s\n", minapk_name,
+	write_log(6, "[App unpin] Min apk %s found? %s\n", minapk_name,
 	          ret == 0 ? "True" : "False");
 	/* Still return 0 if cannot find minimal apk */
 	if (ret == -ENOENT)
@@ -1833,13 +1830,10 @@ a directory (for NFS) */
 	memset(&temp_dentry, 0, sizeof(DIR_ENTRY));
 
 	/* Proceed on checking whether to use minimal apk here */
-	write_log(4, "Debug lookup %d %s %" PRIu64 " %" PRIu64 "\n", hcfs_system->use_minimal_apk, selfname, (uint64_t) tmpptr->f_ino, (uint64_t) hcfs_system->data_app_root);
-
 	if (((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) &&
 	    (_is_apk(selfname) == TRUE)) {
 		ino_t minapk_ino;
-		write_log(4, "Debug checking minapk\n");
 
 		/* Query hash table for cached result */
 		ret_val = query_minapk_data(parent_ino, selfname, &minapk_ino);
@@ -1852,7 +1846,7 @@ a directory (for NFS) */
 			/* There is no minimal apk. Use the original one */
 			ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
 					     is_external);
-			write_log(4, "Debug lookup %" PRIu64 ", %s, %d\n",
+			write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
 				  (uint64_t)parent_ino, selfname, ret_val);
 
 			if (ret_val < 0) {
@@ -1864,7 +1858,7 @@ a directory (for NFS) */
 			/* First check if the apk exists */
 			ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
 					     is_external);
-			write_log(4, "Debug lookup %" PRIu64 ", %s, %d\n",
+			write_log(10, "Debug lookup %" PRIu64 ", %s, %d\n",
 				  (uint64_t)parent_ino, selfname, ret_val);
 
 			/* Don't insert anything to hash table if
@@ -1877,13 +1871,13 @@ a directory (for NFS) */
 			/* Check whether to use minimal apk */
 			ret_val = _check_use_minapk(parent_ino, selfname,
 			                        &minapk_ino, temp_dentry.d_ino);
-			write_log(4, "[App unpin] check_use_minapk: %d, %"
+			write_log(6, "[App unpin] check_use_minapk: %d, %"
 			          PRIu64 "\n", ret_val, (uint64_t) minapk_ino);
 
 			/* Decide whether to use minimal apk */
 			if ((ret_val == 0) && (minapk_ino > 0)) {
 				/* Use minimal apk */
-				write_log(4, "[App unpin] Use minapk\n");
+				write_log(10, "[App unpin] Use minapk\n");
 				temp_dentry.d_ino = minapk_ino;
 			} else {
 				minapk_ino = 0;
