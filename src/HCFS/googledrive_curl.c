@@ -30,7 +30,7 @@ void gdrive_exp_backoff_sleep(int32_t busy_retry_times)
 	int32_t n, max, min;
 
 	if (busy_retry_times <= 0) {
-		sleep(1);
+		write_log(4, "Retry times LE than 0.");
 		goto out;
 	}
 
