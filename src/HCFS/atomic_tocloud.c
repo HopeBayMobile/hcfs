@@ -776,8 +776,7 @@ errcode_handle:
 
 int32_t fetch_toupload_block_path(char *pathname,
 				  ino_t inode,
-				  int64_t block_no,
-				  __attribute__((unused)) int64_t seq)
+				  int64_t block_no)
 {
 	char path[200];
 	int32_t errcode;

@@ -1922,9 +1922,11 @@ int32_t meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
  * @param seq Sequence number of this block
  *
  * @return 0 on success, otherwise negative error code.
- */ 
-int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inode,
-	int64_t bindex, int64_t seq)
+ */
+int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr,
+				   ino_t inode,
+				   int64_t bindex,
+				   int64_t seq)
 {
 	char toupload_bpath[500], local_bpath[500], objname[500];
 	char inode_uploading;
@@ -1963,7 +1965,7 @@ int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr, ino_t inod
 			return 0;
 
 		fetch_block_path(local_bpath, inode, bindex);
-		fetch_toupload_block_path(toupload_bpath, inode, bindex, seq);
+		fetch_toupload_block_path(toupload_bpath, inode, bindex);
 		fetch_backend_block_objname(objname, inode, bindex, seq);
 		write_log(10, "Debug: begin to copy block, obj is %s", objname);
 		ret = check_and_copy_file(local_bpath, toupload_bpath,

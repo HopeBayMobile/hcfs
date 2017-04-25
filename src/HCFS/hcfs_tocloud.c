@@ -225,7 +225,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 				}
 			}
 			/* TODO: consider truncating situation */
-			fetch_toupload_block_path(block_path, inode, bcount, 0);
+			fetch_toupload_block_path(block_path, inode, bcount);
 			if (access(block_path, F_OK) == 0)
 				unlink_upload_file(block_path);
 		}
@@ -569,8 +569,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 			  &toupload_block_seq, NULL, blockid, NULL,
 			  &finish_uploading);
 #endif
-	fetch_toupload_block_path(toupload_blockpath, this_inode,
-			blockno, toupload_block_seq);
+	fetch_toupload_block_path(toupload_blockpath, this_inode, blockno);
 	if (access(toupload_blockpath, F_OK) == 0)
 		unlink_upload_file(toupload_blockpath);
 
@@ -1008,7 +1007,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		flock(fileno(local_metafptr), LOCK_UN);
 
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
-				block_count, toupload_block_seq);
+					  block_count);
 		if (access(toupload_bpath, F_OK) == 0)
 			unlink_upload_file(toupload_bpath);
 
@@ -1047,7 +1046,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 #endif
 		flock(fileno(local_metafptr), LOCK_UN);
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
-			block_count, toupload_block_seq);
+					  block_count);
 		if (access(toupload_bpath, F_OK) == 0)
 			unlink_upload_file(toupload_bpath);
 
@@ -2003,8 +2002,8 @@ int32_t dispatch_upload_block(int32_t which_curl)
 		goto errcode_handle;
 	}
 
-	ret = fetch_toupload_block_path(toupload_blockpath,
-		upload_ptr->inode, upload_ptr->blockno, upload_ptr->seq);
+	ret = fetch_toupload_block_path(toupload_blockpath, upload_ptr->inode,
+					upload_ptr->blockno);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

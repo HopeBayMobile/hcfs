@@ -89,8 +89,11 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *finish);
 #endif
 
-int32_t init_progress_info(int32_t fd, int64_t backend_blocks, int64_t backend_size,
-	FILE *backend_metafptr, uint8_t *last_pin_status);
+int32_t init_progress_info(int32_t fd,
+			   int64_t backend_blocks,
+			   int64_t backend_size,
+			   FILE *backend_metafptr,
+			   uint8_t *last_pin_status);
 
 int32_t create_progress_file(ino_t inode);
 
@@ -101,8 +104,9 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 
 int32_t fetch_toupload_meta_path(char *pathname, ino_t inode);
 
-int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
-	int64_t block_no, int64_t seq);
+int32_t fetch_toupload_block_path(char *pathname,
+				  ino_t inode,
+				  int64_t block_no);
 
 int32_t fetch_backend_meta_path(char *pathname, ino_t inode);
 void fetch_del_backend_meta_path(char *pathname, ino_t inode);
@@ -112,8 +116,11 @@ char block_finish_uploading(int32_t fd, int64_t blockno);
 int64_t query_status_page(int32_t fd, int64_t block_index);
 
 int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
-		int64_t *backend_size, int64_t *total_backend_blocks,
-		int64_t upload_seq, uint8_t *last_pin_status, char *metaID);
+			       int64_t *backend_size,
+			       int64_t *total_backend_blocks,
+			       int64_t upload_seq,
+			       uint8_t *last_pin_status,
+			       char *metaID);
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr);
 

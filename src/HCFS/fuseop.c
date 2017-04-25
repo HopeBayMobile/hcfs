@@ -119,6 +119,7 @@
 #include "do_restoration.h"
 #include "control_smartcache.h"
 #include "apk_mgmt.h"
+#include "meta_iterator.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
  *
  *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
@@ -3253,6 +3254,64 @@ int32_t truncate_truncate(ino_t this_inode,
 	return 0;
 }
 
+int32_t try_cancel_undone_sync(ino_t this_inode,
+			       META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	char path[METAPATHLEN];
+	char toupload_metapath[METAPATHLEN];
+	char block_path[400];
+	FILE *fptr;
+	FILE_BLOCK_ITERATOR *block_iter;
+	int32_t ret = 0;
+
+	/* Do nothing if it is uploading */
+	if (body_ptr->uploading_info.is_uploading == TRUE)
+		goto out;
+
+	/* Do nothing if no progress file */
+	fetch_progress_file_path(path, this_inode);
+	if (access(path, F_OK) < 0)
+		goto out;
+
+	/* Try to access toupload meta and skip if no progress file */
+	fetch_toupload_meta_path(toupload_metapath, this_inode);
+	if (access(toupload_metapath, F_OK) < 0)
+		goto out;
+
+	fptr = fopen(toupload_metapath, "r");
+	if (!fptr) {
+		ret = -errno;
+		goto out;
+	}
+
+	/* Init iterator as well as traverse all block */
+	block_iter = init_block_iter(fptr);
+	if (!block_iter) {
+		ret = -errno;
+		goto out;
+	}
+
+	while (iter_next(block_iter)) {
+		fetch_toupload_block_path(block_path, this_inode,
+					  block_iter->now_block_no);
+		if (access(block_path, F_OK) == 0)
+			unlink_upload_file(block_path);
+	}
+	if (errno != ENOENT) {
+		ret = -errno;
+		goto out;
+	}
+
+	destroy_block_iter(block_iter);
+	fclose(fptr);
+	/* Cancel the continue-uploading routine. Do not remove
+	 * progress file because it will be used to collect
+	 * garbage on cloud*/
+	unlink(toupload_metapath);
+out:
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_truncate
@@ -3332,6 +3391,10 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 			"Debug truncate: no size change. Nothing changed.\n");
 		return 0;
 	}
+
+	/* TODO TODO: Check if progress file and to-upload meta exist but not
+	 * syncing. If so, remove to-upload meta and all to-upload blocks */
+	try_cancel_undone_sync(this_inode, *body_ptr);
 
 	if (filestat->size < offset) {
 		int64_t pin_sizediff;
