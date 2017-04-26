@@ -35,6 +35,26 @@ void usage(void){
 	}
 }
 
+ino_t _parse_arg_to_ino(char *arg)
+{
+	struct stat tempstat;
+	char *str_checker;
+	ino_t tmpino;
+
+	errno = 0;
+	str_checker = NULL;
+	tmpino = 0;
+	tmpino = strtol(arg, &str_checker, 10);
+	if (str_checker != NULL) {
+		int err = stat(arg, &tempstat);
+		if (err < 0)
+			return 0;
+		tmpino = tempstat.st_ino;
+	}
+
+	return tmpino;
+}
+
 int32_t main(int32_t argc, char **argv)
 {
 	int32_t fd, size_msg, status, count, retcode = 0, code, fsname_len;
@@ -279,7 +299,13 @@ int32_t main(int32_t argc, char **argv)
 		}
 		break;
 	case CHECKDIRSTAT:
-		tmpino = atol(argv[2]);
+		tmpino = _parse_arg_to_ino(argv[2]);
+		if (errno != 0) {
+			retcode = -errno;
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+			break;
+		}
 		cmd_len = sizeof(ino_t);
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -311,7 +337,11 @@ int32_t main(int32_t argc, char **argv)
 		break;
 	case CHECKLOC:
 	case CHECKPIN:
-		tmpino = atol(argv[2]);
+		tmpino = _parse_arg_to_ino(argv[2]);
+		if (errno != 0) {
+			retcode = -errno;
+			break;
+		}
 		cmd_len = sizeof(ino_t);
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
