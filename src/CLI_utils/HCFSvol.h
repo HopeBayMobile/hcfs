@@ -75,7 +75,8 @@ CMD cmd_list[] = { { "create", CREATEVOL },
 		   { "high-pin", PIN},
 		   { "pin", PIN},
 		   { "unpin", UNPIN},
-		   { "set_googledrive_token", SET_GOOGLEDRIVE_TOKEN} };
+		   { "set_googledrive_token", SET_GOOGLEDRIVE_TOKEN},
+		   { "isskipdex", ISSKIPDEX} };
 
 enum { CMD_SIZE = sizeof(cmd_list) / sizeof(cmd_list[0]) };
 

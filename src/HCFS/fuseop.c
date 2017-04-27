@@ -163,10 +163,6 @@
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
-static inline BOOL _is_apk(const char *filename);
-static inline BOOL _is_minapk(const char *filename);
-int32_t _convert_minapk(const char *apkname, char *minapk_name);
-int32_t _convert_origin_apk(char *apkname, const char *minapk_name);
 
 /*!
  * Helper function for checking permissions.
@@ -1391,16 +1387,16 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	/* Handle removal of minimal apk */
 	if ((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
-		if (_is_apk(selfname) == TRUE) {
+		if (is_apk(selfname) == TRUE) {
 			ret = remove_minapk_data(parent_inode, selfname);
 			if (ret < 0 && ret != -ENOENT) {
 				fuse_reply_err(req, -ret_val);
 				return;
 			}
-		} else if (_is_minapk(selfname) == TRUE) {
+		} else if (is_minapk(selfname) == TRUE) {
 			char origin_apk[MAX_FILENAME_LEN] = {0};
 
-			ret = _convert_origin_apk(origin_apk, selfname);
+			ret = convert_origin_apk(origin_apk, selfname);
 			if (ret < 0) {
 				fuse_reply_err(req, -ret_val);
 				return;
@@ -1608,71 +1604,6 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_err(req, -ret_val);
 }
 
-/* Helper function for checking if the file extension is .apk */
-static inline BOOL _is_apk(const char *filename)
-{
-	int32_t name_len;
-
-	name_len = strlen(filename);
-
-	/* If filename is too short to be an apk*/
-	if (name_len < 5)
-		return FALSE;
-
-	if (!strncmp(&(filename[name_len - 4]), ".apk", 4))
-		return TRUE;
-
-	return FALSE;
-}
-
-static inline BOOL _is_minapk(const char *filename)
-{
-	int32_t name_len;
-
-	name_len = strlen(filename);
-
-	/* If filename is too short to be an apk*/
-	if (name_len < 5)
-		return FALSE;
-
-	/* minapk name is ".<x>min" */
-	if (*filename == '.' &&
-		!strncmp(filename + name_len - 3, "min", 3))
-		return TRUE;
-	else
-		return FALSE;
-}
-/* Helper function for converting apk name to minimal apk name */
-int32_t _convert_minapk(const char *apkname, char *minapk_name)
-{
-	size_t name_len;
-
-	name_len = strlen(apkname);
-
-	/* The length to copy before ".apk" */
-	name_len -= 4;
-	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
-	snprintf(&(minapk_name[1 + name_len]), 4, "min");
-	write_log(10, "[App unpin] Name of minapk: %s\n", minapk_name);
-	return 0;
-}
-
-int32_t _convert_origin_apk(char *apkname, const char *minapk_name)
-{
-	size_t name_len;
-
-	name_len = strlen(minapk_name);
-
-	/* Could not be an apk */
-	if (name_len < 5)
-		return -EINVAL;
-
-	/* From .<x>min to <x>.apk */
-	memcpy(apkname, minapk_name + 1, name_len - 4);
-	memcpy(apkname + name_len - 4, ".apk", 4);
-	apkname[name_len] = '\0';
-	return 0;
-}
 /* Helper function on checking whether to use minimal apk */
 /* Returns 0 if check completed normally, and negative of error if check
 terminated abnormally. Value of "*minapk_ino" is non-zero if minimal apk
@@ -1724,7 +1655,7 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	if ((count == numparents) && (parent_ino != hcfs_system->data_app_root))
 		return 0;
 
-	ret = _convert_minapk(selfname, minapk_name);
+	ret = convert_minapk(selfname, minapk_name);
 	if (ret < 0)
 		return ret;
 
@@ -1832,7 +1763,7 @@ a directory (for NFS) */
 	/* Proceed on checking whether to use minimal apk here */
 	if (((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) &&
-	    (_is_apk(selfname) == TRUE)) {
+	    (is_apk(selfname) == TRUE)) {
 		ino_t minapk_ino;
 
 		/* Query hash table for cached result */
@@ -2688,7 +2619,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				continue;
 			/* Check if it is apk file */
 			if (iter->now_entry->d_type == D_ISREG &&
-			    _is_apk(iter->now_entry->d_name)) {
+			    is_apk(iter->now_entry->d_name)) {
 				ret = remove_minapk_data(self_inode,
 						   iter->now_entry->d_name);
 				if (ret < 0 && ret != -ENOENT)
@@ -2713,17 +2644,17 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		for (i = 0; i < 2; i++) {
 			if (mode[i] != 0 && !S_ISREG(mode[i]))
 				continue;
-			if (_is_apk(selfname[i])) {
+			if (is_apk(selfname[i])) {
 				ret = remove_minapk_data(parent_inode[i],
 						selfname[i]);
 				if (ret < 0 && ret != -ENOENT) {
 					fuse_reply_err(req, -ret);
 					return;
 				}
-			} else if (_is_minapk(selfname[i])) {
+			} else if (is_minapk(selfname[i])) {
 				char origin_apk[MAX_FILENAME_LEN] = {0};
 
-				ret = _convert_origin_apk(origin_apk,
+				ret = convert_origin_apk(origin_apk,
 						selfname[i]);
 				if (ret < 0)
 					continue; /* Skip this name */

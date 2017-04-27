@@ -2437,3 +2437,69 @@ void get_random_string(char *str, unsigned int iLen)
 	str[iLen] = '\0';
 }
 
+/* Helper function for checking if the file extension is .apk */
+BOOL is_apk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	if (!strncmp(&(filename[name_len - 4]), ".apk", 4))
+		return TRUE;
+
+	return FALSE;
+}
+
+BOOL is_minapk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	/* minapk name is ".<x>min" */
+	if (*filename == '.' &&
+		!strncmp(filename + name_len - 3, "min", 3))
+		return TRUE;
+	else
+		return FALSE;
+}
+/* Helper function for converting apk name to minimal apk name */
+int32_t convert_minapk(const char *apkname, char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(apkname);
+
+	/* The length to copy before ".apk" */
+	name_len -= 4;
+	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
+	snprintf(&(minapk_name[1 + name_len]), 4, "min");
+	write_log(10, "[App unpin] Name of minapk: %s\n", minapk_name);
+	return 0;
+}
+
+int32_t convert_origin_apk(char *apkname, const char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(minapk_name);
+
+	/* Could not be an apk */
+	if (name_len < 5)
+		return -EINVAL;
+
+	/* From .<x>min to <x>.apk */
+	memcpy(apkname, minapk_name + 1, name_len - 4);
+	memcpy(apkname + name_len - 4, ".apk", 4);
+	apkname[name_len] = '\0';
+	return 0;
+}
+

@@ -258,6 +258,7 @@ int32_t main(int32_t argc, char **argv)
 	case DELETEVOL:
 	case CHECKVOL:
 	case CHECKMOUNT:
+	case ISSKIPDEX:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);

@@ -160,4 +160,10 @@ uint32_t djb_hash(const char *const key, size_t keylen)
 
 void get_random_string(char *str, unsigned int iLen);
 
+BOOL is_apk(const char *filename);
+BOOL is_minapk(const char *filename);
+int32_t convert_minapk(const char *apkname, char *minapk_name);
+int32_t convert_origin_apk(char *apkname, const char *minapk_name);
+
+
 #endif  /* SRC_HCFS_UTILS_H_ */
