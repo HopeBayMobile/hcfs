@@ -2737,6 +2737,8 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 
 	sleep_times = 0;
 	while (hcfs_system->system_going_down == FALSE) {
+		/* Check if this file is uploading. If so, try to copy block
+		 * if this block is not being uploaded. Otherwise do nothing. */
 		ret = meta_cache_check_uploading(*body_ptr,
 				this_inode, blockno, seq);
 		if (ret == -ENOSPC) {
@@ -3305,9 +3307,12 @@ int32_t try_cancel_undone_sync(ino_t this_inode,
 	destroy_block_iter(block_iter);
 	fclose(fptr);
 	/* Cancel the continue-uploading routine. Do not remove
-	 * progress file because it will be used to collect
-	 * garbage on cloud*/
+	 * progress file because it will be used to remove all
+	 * garbage on cloud */
 	unlink(toupload_metapath);
+	write_log(
+	    4, "Remove to-upload blocks when truncating inode %" PRIu64,
+	    (uint64_t)this_inode);
 out:
 	return ret;
 }
