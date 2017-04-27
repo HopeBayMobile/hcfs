@@ -3275,7 +3275,7 @@ int32_t try_cancel_undone_sync(ino_t this_inode,
 	if (access(path, F_OK) < 0)
 		goto out;
 
-	/* Try to access toupload meta and skip if no progress file */
+	/* Try to access toupload meta */
 	fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (access(toupload_metapath, F_OK) < 0)
 		goto out;
@@ -3286,7 +3286,7 @@ int32_t try_cancel_undone_sync(ino_t this_inode,
 		goto out;
 	}
 
-	/* Init iterator as well as traverse all block */
+	/* Init iterator and then traverse all blocks */
 	block_iter = init_block_iter(fptr);
 	if (!block_iter) {
 		ret = -errno;
@@ -3306,9 +3306,8 @@ int32_t try_cancel_undone_sync(ino_t this_inode,
 
 	destroy_block_iter(block_iter);
 	fclose(fptr);
-	/* Cancel the continue-uploading routine. Do not remove
-	 * progress file because it will be used to remove all
-	 * garbage on cloud */
+	/* Abandon the sync this time . Do not remove progress
+	 * file because it will be used to remove all garbage on cloud */
 	unlink(toupload_metapath);
 	write_log(
 	    4, "Remove to-upload blocks when truncating inode %" PRIu64,
