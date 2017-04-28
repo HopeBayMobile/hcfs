@@ -3285,10 +3285,13 @@ int32_t try_cancel_undone_sync(ino_t this_inode,
 		ret = -errno;
 		goto out;
 	}
+	flock(fileno(fptr), LOCK_EX);
 
 	/* Init iterator and then traverse all blocks */
 	block_iter = init_block_iter(fptr);
 	if (!block_iter) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
 		ret = -errno;
 		goto out;
 	}
@@ -3301,17 +3304,20 @@ int32_t try_cancel_undone_sync(ino_t this_inode,
 	}
 	if (errno != ENOENT) {
 		ret = -errno;
-		goto out;
+		goto release_resource;
 	}
 
-	destroy_block_iter(block_iter);
-	fclose(fptr);
 	/* Abandon the sync this time . Do not remove progress
 	 * file because it will be used to remove all garbage on cloud */
 	unlink(toupload_metapath);
 	write_log(
-	    4, "Remove to-upload blocks when truncating inode %" PRIu64,
+	    6, "Remove to-upload blocks when truncating inode %" PRIu64,
 	    (uint64_t)this_inode);
+
+release_resource:
+	destroy_block_iter(block_iter);
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
 out:
 	return ret;
 }

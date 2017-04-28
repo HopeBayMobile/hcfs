@@ -967,7 +967,7 @@ int32_t validate_system_config(SYSTEM_CONF_STRUCT *config)
 				strlen(DEFAULT_FOLDER_NAME) + 10, "%s",
 				DEFAULT_FOLDER_NAME);
 			write_log(4, "Missing google drive folder name, "
-				     "default name teradata\n");
+				     "default name %s\n", DEFAULT_FOLDER_NAME);
 		}
 	}
 
