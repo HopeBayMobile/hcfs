@@ -144,7 +144,8 @@ static void *fuse_do_work(void *data)
 			   kernel due to mount call not readied.
 			   TODO: Distinguish error occurred before completion
 			   of mount call and the ones during FUSE op */
-			sleep(1);
+			if (res < 0)
+				sleep(1);
 			continue;
 			if (res < 0) {
 				fuse_session_exit(mt->se);

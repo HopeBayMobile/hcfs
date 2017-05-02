@@ -1357,7 +1357,6 @@ int32_t check_meta_on_cloud(ino_t this_inode,
 			int64_t *metasize, int64_t *metalocalsize)
 {
 	char thismetapath[400];
-	char thisprofilepath[400];
 	int32_t ret, errcode;
 	FILE *metafptr = NULL;
 	CLOUD_RELATED_DATA this_clouddata;
@@ -1422,9 +1421,8 @@ int32_t check_meta_on_cloud(ino_t this_inode,
 	flock(fileno(metafptr), LOCK_UN);
 	fclose(metafptr);
 
-	fetch_progress_file_path(thisprofilepath, this_inode);
-	if ((access(thisprofilepath, F_OK) == -1) &&
-			(this_clouddata.upload_seq == 0))
+	/* Do not check if progress file exist or not. Just check upload seq */
+	if (this_clouddata.upload_seq == 0)
 		*meta_on_cloud = FALSE;
 	else
 		*meta_on_cloud = TRUE;

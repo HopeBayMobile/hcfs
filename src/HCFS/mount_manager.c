@@ -793,10 +793,10 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		goto errcode_handle;
 	}
 
-	if (strncmp(mp, "/data/app", strlen("data/app")) == 0)
+	if (strcmp(fsname, "hcfs_app") == 0)
 		hcfs_system->data_app_root = new_info->f_ino;
 
-	if (strncmp(mp, "/data/data", strlen("data/data")) == 0) {
+	if (strcmp(fsname, "hcfs_data") == 0) {
 		DIR_ENTRY dentry;
 
 		/* Record root inode and check if mgmt app folder is created. */

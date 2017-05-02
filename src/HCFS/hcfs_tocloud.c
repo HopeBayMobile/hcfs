@@ -225,7 +225,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 				}
 			}
 			/* TODO: consider truncating situation */
-			fetch_toupload_block_path(block_path, inode, bcount, 0);
+			fetch_toupload_block_path(block_path, inode, bcount);
 			if (access(block_path, F_OK) == 0)
 				unlink_upload_file(block_path);
 		}
@@ -569,8 +569,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 			  &toupload_block_seq, NULL, blockid, NULL,
 			  &finish_uploading);
 #endif
-	fetch_toupload_block_path(toupload_blockpath, this_inode,
-			blockno, toupload_block_seq);
+	fetch_toupload_block_path(toupload_blockpath, this_inode, blockno);
 	if (access(toupload_blockpath, F_OK) == 0)
 		unlink_upload_file(toupload_blockpath);
 
@@ -1008,7 +1007,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		flock(fileno(local_metafptr), LOCK_UN);
 
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
-				block_count, toupload_block_seq);
+					  block_count);
 		if (access(toupload_bpath, F_OK) == 0)
 			unlink_upload_file(toupload_bpath);
 
@@ -1047,7 +1046,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 #endif
 		flock(fileno(local_metafptr), LOCK_UN);
 		fetch_toupload_block_path(toupload_bpath, ptr->inode,
-			block_count, toupload_block_seq);
+					  block_count);
 		if (access(toupload_bpath, F_OK) == 0)
 			unlink_upload_file(toupload_bpath);
 
@@ -1303,20 +1302,6 @@ store in some other file */
 		if (sync_error == TRUE) {
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
-				/* Restore cloud usage statistics */
-				pos = sizeof(HCFS_STAT) +
-					sizeof(FILE_META_TYPE) +
-					sizeof(FILE_STATS_TYPE);
-				FSEEK(toupload_metafptr, pos, SEEK_SET);
-				FREAD(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, toupload_metafptr);
-				flock(fileno(local_metafptr), LOCK_EX);
-				FSEEK(local_metafptr, pos, SEEK_SET);
-				FWRITE(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
-				flock(fileno(local_metafptr), LOCK_UN);
 				/* Delete pre-upload blocks */
 				delete_backend_blocks(progress_fd, total_blocks,
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
@@ -1402,9 +1387,6 @@ store in some other file */
 					tempfilestat.size + now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, pos, SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 		if (S_ISDIR(ptr->this_mode)) {
 			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
@@ -1428,10 +1410,6 @@ store in some other file */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, sizeof(HCFS_STAT) +
-					sizeof(DIR_META_TYPE), SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 		if (S_ISLNK(ptr->this_mode)) {
 			FSEEK(toupload_metafptr, sizeof(HCFS_STAT), SEEK_SET);
@@ -1455,10 +1433,6 @@ store in some other file */
 			cloud_related_data.size_last_upload = now_meta_size;
 			cloud_related_data.meta_last_upload = now_meta_size;
 			cloud_related_data.upload_seq++;
-			FSEEK(local_metafptr, sizeof(HCFS_STAT) +
-					sizeof(SYMLINK_META_TYPE), SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 
 		flock(fileno(local_metafptr), LOCK_UN);
@@ -1497,26 +1471,9 @@ store in some other file */
 			/* Write file id to cloud related data */
 			char *metaid = upload_ctl.upload_threads[which_curl]
 				       .gdrive_obj_info.fileID;
-			ssize_t offset;
 
-			if (S_ISFILE(ptr->this_mode))
-				offset = sizeof(HCFS_STAT) +
-					 sizeof(FILE_META_TYPE) +
-					 sizeof(FILE_STATS_TYPE);
-			else if (S_ISLNK(ptr->this_mode))
-				offset = sizeof(HCFS_STAT) +
-					 sizeof(SYMLINK_META_TYPE);
-			else if (S_ISDIR(ptr->this_mode))
-				offset =
-				    sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
-			FSEEK(local_metafptr, offset, SEEK_SET);
-			FREAD(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 			strncpy(cloud_related_data.metaID, metaid,
 				GDRIVE_ID_LENGTH);
-			FSEEK(local_metafptr, offset, SEEK_SET);
-			FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
 		}
 
 		sem_wait(&(upload_ctl.upload_op_sem));
@@ -1562,21 +1519,6 @@ store in some other file */
 		if (S_ISREG(ptr->this_mode)) {
 			if (sync_ctl.continue_nexttime[ptr->which_index] ==
 					FALSE) {
-				/* Restore cloud usage statistics */
-				pos = sizeof(HCFS_STAT) +
-					sizeof(FILE_META_TYPE) +
-					sizeof(FILE_STATS_TYPE);
-				FSEEK(toupload_metafptr, pos, SEEK_SET);
-				FREAD(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, toupload_metafptr);
-				flock(fileno(local_metafptr), LOCK_EX);
-				FSEEK(local_metafptr, pos, SEEK_SET);
-				FWRITE(&cloud_related_data,
-					sizeof(CLOUD_RELATED_DATA),
-					1, local_metafptr);
-				flock(fileno(local_metafptr), LOCK_UN);
-
 				/* Delete pre-upload blocks */
 				delete_backend_blocks(progress_fd, total_blocks,
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
@@ -1587,8 +1529,21 @@ store in some other file */
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
-
 	fclose(toupload_metafptr);
+
+	/* Write cloud related data back to local mata when syncing completed */
+	flock(fileno(local_metafptr), LOCK_EX);
+	if (S_ISFILE(ptr->this_mode))
+		pos = sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+			 sizeof(FILE_STATS_TYPE);
+	else if (S_ISLNK(ptr->this_mode))
+		pos = sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE);
+	else if (S_ISDIR(ptr->this_mode))
+		pos = sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE);
+	FSEEK(local_metafptr, pos, SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+	       local_metafptr);
+	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 
 	/* Upload successfully. Update FS stat in backend */
@@ -2047,8 +2002,8 @@ int32_t dispatch_upload_block(int32_t which_curl)
 		goto errcode_handle;
 	}
 
-	ret = fetch_toupload_block_path(toupload_blockpath,
-		upload_ptr->inode, upload_ptr->blockno, upload_ptr->seq);
+	ret = fetch_toupload_block_path(toupload_blockpath, upload_ptr->inode,
+					upload_ptr->blockno);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -2534,7 +2489,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		int64_t pin_size_delta, int64_t disk_pin_size_delta,
 		int64_t disk_meta_size_delta)
 {
-	int32_t ret, errcode;
+	int32_t ret, errcode, put_ret;
 	char fname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
@@ -2635,8 +2590,8 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		if (obj_info.fileID[0] == 0)
 			need_record_id = TRUE;
 		FSEEK(fptr, 0, SEEK_SET);
-		ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl),
-				      NULL, &obj_info);
+		put_ret = hcfs_put_object(
+		    fptr, objname, &(sync_stat_ctl.statcurl), NULL, &obj_info);
 		if (need_record_id && obj_info.fileID[0] != 0) {
 			strncpy(fs_cloud_stat.fileID, obj_info.fileID,
 				GDRIVE_ID_LENGTH);
@@ -2645,12 +2600,12 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 			       fptr);
 		}
 	} else {
-		ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl),
-				      NULL, NULL);
+		put_ret = hcfs_put_object(
+		    fptr, objname, &(sync_stat_ctl.statcurl), NULL, NULL);
 	}
 
-	if ((ret < 200) || (ret > 299)) {
-		write_log(4, "Fail to sync %s. ret %d", objname, ret);
+	if ((put_ret < 200) || (put_ret > 299)) {
+		write_log(4, "Fail to sync %s. ret %d", objname, put_ret);
 		errcode = -EIO;
 		goto errcode_handle;
 	}

@@ -35,10 +35,30 @@ void usage(void){
 	}
 }
 
+ino_t _parse_arg_to_ino(char *arg)
+{
+	struct stat tempstat;
+	char *str_checker;
+	ino_t tmpino;
+
+	errno = 0;
+	str_checker = NULL;
+	tmpino = 0;
+	tmpino = strtol(arg, &str_checker, 10);
+	if (str_checker != NULL) {
+		int err = stat(arg, &tempstat);
+		if (err < 0)
+			return 0;
+		tmpino = tempstat.st_ino;
+	}
+
+	return tmpino;
+}
+
 int32_t main(int32_t argc, char **argv)
 {
-	int32_t fd, size_msg, status, count, retcode, code, fsname_len, cmd_idx,
-	    i;
+	int32_t fd, size_msg, status, count, retcode = 0, code, fsname_len;
+	int32_t cmd_idx, i;
 
 	uint32_t cmd_len, reply_len, total_recv, to_recv;
 	int32_t total_entries;
@@ -65,7 +85,7 @@ int32_t main(int32_t argc, char **argv)
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
 		usage();
-		exit(-EPERM);
+		return EINVAL;
 	}
 	for (cmd_idx = 0; cmd_idx < CMD_SIZE; cmd_idx++) {
 		if (strcasecmp(argv[1], cmd_list[cmd_idx].name) == 0) {
@@ -77,17 +97,26 @@ int32_t main(int32_t argc, char **argv)
 	if (code < 0) {
 		printf("Unsupported action\n");
 		usage();
-		exit(-ENOTSUP);
+		return ENOTSUP;
 	}
 
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, shm_hcfs_reporter, sizeof(addr.sun_path));
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0) {
+		int err = errno;
+		fprintf(stderr, "Unable to create socket (%s)\n",
+		        strerror(err));
+		return err;
+	}
 	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
+	int errcode;
 	if (status) {
+		errcode = errno;
 		fprintf(stderr, "connection failed. Error: %s.\n",
-			strerror(errno));
-		exit(-errno);
+			strerror(errcode));
+		mknod("/dev/shm/failed", 0700, 0);
+		return errcode;
 	}
 	switch (code) {
 	case TERMINATE:
@@ -170,7 +199,7 @@ int32_t main(int32_t argc, char **argv)
 		if (argc < 4) {
 			printf("Usage: HCFSvol create <Vol name> %s",
 			       "internal/external\n");
-			exit(-EINVAL);
+			return EINVAL;
 		}
 #ifdef _ANDROID_ENV_
 		cmd_len = strlen(argv[2]) + 2;
@@ -183,7 +212,7 @@ int32_t main(int32_t argc, char **argv)
 			buf[strlen(argv[2]) + 1] = ANDROID_MULTIEXTERNAL;
 		} else {
 			printf("Unsupported storage type\n");
-			exit(-ENOTSUP);
+			return ENOTSUP;
 		}
 
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
@@ -229,6 +258,7 @@ int32_t main(int32_t argc, char **argv)
 	case DELETEVOL:
 	case CHECKVOL:
 	case CHECKMOUNT:
+	case ISSKIPDEX:
 		cmd_len = strlen(argv[2]) + 1;
 		strncpy(buf, argv[2], sizeof(buf));
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
@@ -270,7 +300,13 @@ int32_t main(int32_t argc, char **argv)
 		}
 		break;
 	case CHECKDIRSTAT:
-		tmpino = atol(argv[2]);
+		tmpino = _parse_arg_to_ino(argv[2]);
+		if (errno != 0) {
+			retcode = -errno;
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+			break;
+		}
 		cmd_len = sizeof(ino_t);
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -302,7 +338,11 @@ int32_t main(int32_t argc, char **argv)
 		break;
 	case CHECKLOC:
 	case CHECKPIN:
-		tmpino = atol(argv[2]);
+		tmpino = _parse_arg_to_ino(argv[2]);
+		if (errno != 0) {
+			retcode = -errno;
+			break;
+		}
 		cmd_len = sizeof(ino_t);
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -414,7 +454,7 @@ int32_t main(int32_t argc, char **argv)
 		if (status == -1) {
 			printf("Usage: ./HCFSvol %s  true on 1 | false off 0\n",
 			       cmd_list[cmd_idx].name);
-			exit(-EINVAL);
+			return EINVAL;
 		}
 
 		cmd_len = sizeof(status);
@@ -428,7 +468,7 @@ int32_t main(int32_t argc, char **argv)
 	case CHANGELOG:
 		if (argc != 3) {
 			printf("./HCFSvol changelog <log level>\n");
-			exit(-EINVAL);
+			return EINVAL;
 		}
 		loglevel = atoi(argv[2]);
 		cmd_len = sizeof(int32_t);
@@ -544,13 +584,13 @@ int32_t main(int32_t argc, char **argv)
 			fprintf(stderr,
 				"Usage: HCFSvol pin/unpin/high-pin <path1> "
 				"<path2>...\n");
-			exit(-EINVAL);
+			return EINVAL;
 		}
 		num_inodes = 0;
 		for (i = 2; i < argc; i++) {
 			if (stat(argv[i], &tempstat) < 0) {
 				fprintf(stderr, "%s does not exist\n", argv[i]);
-				exit(-ENOENT);
+				return ENOENT;
 			} else {
 				this_inode = tempstat.st_ino;
 			}
@@ -596,5 +636,8 @@ int32_t main(int32_t argc, char **argv)
 		break;
 	}
 	close(fd);
+	if (retcode < 0)
+		return -retcode;
+
 	return 0;
 }

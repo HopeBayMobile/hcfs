@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2014-2017 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfscurl.c
 * Abstract: The c source code file for CURL operations.
@@ -1530,6 +1530,7 @@ int32_t http_is_success(int32_t code)
 
 	return FALSE;
 }
+
 int32_t _swift_http_can_retry(int32_t code)
 {
 	if (hcfs_system->system_going_down == TRUE)
@@ -1551,6 +1552,31 @@ int32_t _swift_http_can_retry(int32_t code)
 
 	return FALSE;
 }
+
+int32_t _gdrive_http_can_retry(int32_t code)
+{
+	if (hcfs_system->system_going_down == TRUE)
+		return FALSE;
+	switch (code) {
+	case 401:
+		return TRUE;
+	case 408:
+		return TRUE;
+	case 500:
+		return TRUE;
+	case 503:
+		return TRUE;
+	case 504:
+		return TRUE;
+	case -EBUSY: /* This case caused by 403 rate limit exceed */
+		return TRUE;
+	default:
+		break;
+	}
+
+	return FALSE;
+}
+
 int32_t _S3_http_can_retry(int32_t code)
 {
 	if (hcfs_system->system_going_down == TRUE)
@@ -1763,7 +1789,7 @@ int32_t hcfs_list_container(FILE *fptr,
 			    CURL_HANDLE *curl_handle,
 			    added_info_t *more)
 {
-	int32_t ret_val, num_retries;
+	int32_t ret_val, num_retries, busy_retry_times = 0;
 
 	UNUSED(more);
 	ret_val = ignore_sigpipe();
@@ -1810,12 +1836,22 @@ int32_t hcfs_list_container(FILE *fptr,
 		ret_val = hcfs_gdrive_list_container(fptr, curl_handle, more);
 
 		while ((!http_is_success(ret_val)) &&
-		       ((_swift_http_can_retry(ret_val)) &&
+		       ((_gdrive_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
-			write_log(2,
-				  "Retrying backend operation in 10 seconds");
-			sleep(RETRY_INTERVAL);
+			if (ret_val == -EBUSY) {
+				gdrive_exp_backoff_sleep(++busy_retry_times);
+				write_log(4, "When list obj, user rate limit "
+					     "exceeded. Curl "
+					     "%s retry %d times",
+					  curl_handle->id,
+					  busy_retry_times);
+			} else {
+				write_log(
+				    2,
+				    "Retrying backend operation in 10 seconds");
+				sleep(RETRY_INTERVAL);
+			}
 			if (ret_val == 401) {
 				ret_val = hcfs_gdrive_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -1859,7 +1895,7 @@ int32_t hcfs_list_container(FILE *fptr,
 int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HTTP_meta *object_meta, added_info_t *more)
 {
-	int32_t ret_val, num_retries;
+	int32_t ret_val, num_retries, busy_retry_times = 0;
 	int32_t ret, errcode;
 	GOOGLEDRIVE_OBJ_INFO *gdrive_obj_info;
 	int32_t (*gdrive_upload_action)(FILE *, char *, CURL_HANDLE *,
@@ -1927,12 +1963,22 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		ret_val = gdrive_upload_action(fptr, objname, curl_handle,
 						  gdrive_obj_info);
 		while ((!http_is_success(ret_val)) &&
-		       ((_swift_http_can_retry(ret_val)) &&
+		       ((_gdrive_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
-			num_retries++;
-			write_log(2,
-				  "Retrying backend operation in 10 seconds");
-			sleep(RETRY_INTERVAL);
+			num_retries++;	
+			if (ret_val == -EBUSY) {
+				gdrive_exp_backoff_sleep(++busy_retry_times);
+				write_log(4, "When put obj, user rate limit "
+					     "exceeded. Curl "
+					     "%s retry %d times",
+					  curl_handle->id,
+					  busy_retry_times);
+			} else {
+				write_log(
+				    2,
+				    "Retrying backend operation in 10 seconds");
+				sleep(RETRY_INTERVAL);
+			}
 			if (ret_val == 401) {
 				ret_val = hcfs_gdrive_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -1982,7 +2028,7 @@ errcode_handle:
 int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *object_meta, added_info_t *more)
 {
-	int32_t ret_val, num_retries;
+	int32_t ret_val, num_retries, busy_retry_times = 0;
 	int32_t ret, errcode;
 
 	UNUSED(more);
@@ -2031,12 +2077,22 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		ret_val = hcfs_gdrive_get_object(fptr, objname, curl_handle,
 						more);
 		while ((!http_is_success(ret_val)) &&
-		       ((_swift_http_can_retry(ret_val)) &&
+		       ((_gdrive_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
-			write_log(2,
-				  "Retrying backend operation in 10 seconds");
-			sleep(RETRY_INTERVAL);
+			if (ret_val == -EBUSY) {
+				gdrive_exp_backoff_sleep(++busy_retry_times);
+				write_log(4, "When get obj, user rate limit "
+					     "exceeded. Curl "
+					     "%s retry %d times",
+					  curl_handle->id,
+					  busy_retry_times);
+			} else {
+				write_log(
+				    2,
+				    "Retrying backend operation in 10 seconds");
+				sleep(RETRY_INTERVAL);
+			}
 			if (ret_val == 401) {
 				ret_val = hcfs_gdrive_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))
@@ -2096,7 +2152,7 @@ int32_t hcfs_delete_object(char *objname,
 			   CURL_HANDLE *curl_handle,
 			   added_info_t *more)
 {
-	int32_t ret_val, num_retries;
+	int32_t ret_val, num_retries, busy_retry_times = 0;
 
 	UNUSED(more);
 	ret_val = ignore_sigpipe();
@@ -2142,12 +2198,22 @@ int32_t hcfs_delete_object(char *objname,
 		ret_val = hcfs_gdrive_delete_object(objname, curl_handle, more);
 
 		while ((!http_is_success(ret_val)) &&
-		       ((_swift_http_can_retry(ret_val)) &&
+		       ((_gdrive_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
 			num_retries++;
-			write_log(2,
-				  "Retrying backend operation in 10 seconds");
-			sleep(RETRY_INTERVAL);
+			if (ret_val == -EBUSY) {
+				gdrive_exp_backoff_sleep(++busy_retry_times);
+				write_log(4, "When delete obj, user rate limit "
+					     "exceeded. Curl "
+					     "%s retry %d times",
+					  curl_handle->id,
+					  busy_retry_times);
+			} else {
+				write_log(
+				    2,
+				    "Retrying backend operation in 10 seconds");
+				sleep(RETRY_INTERVAL);
+			}
 			if (ret_val == 401) {
 				ret_val = hcfs_gdrive_reauth(curl_handle);
 				if ((ret_val < 200) || (ret_val > 299))

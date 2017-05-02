@@ -599,12 +599,12 @@ int32_t do_check_minimal_apk(char *largebuf, int32_t arg_len,
 	char package_name[arg_len + 10];
 	int32_t ret_code;
 	uint32_t ret_len = 0;
-	int64_t str_len = 0;
+	ssize_t str_len = 0;
 
 	write_log(8, "Check minimal apk\n");
 
-	memcpy(&str_len, largebuf, sizeof(int64_t));
-	strncpy(package_name, largebuf + sizeof(int64_t), str_len);
+	memcpy(&str_len, largebuf, sizeof(ssize_t));
+	strncpy(package_name, largebuf + sizeof(ssize_t), str_len);
 	ret_code = check_minimal_apk(package_name);
 
 	CONCAT_REPLY(&ret_len, sizeof(uint32_t));
@@ -621,12 +621,12 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 	char *package_name;
 	int32_t ret_code, blocking;
 	uint32_t ret_len = 0;
-	int64_t str_len = 0;
+	ssize_t str_len = 0;
 
 	write_log(8, "Create minimal apk\n");
 
 	memcpy(&blocking, largebuf, sizeof(int32_t));
-	memcpy(&str_len, largebuf + sizeof(int32_t), sizeof(int64_t));
+	memcpy(&str_len, largebuf + sizeof(int32_t), sizeof(ssize_t));
 
 	package_name = (char *)calloc(1, arg_len + 10);
 	if (package_name == NULL) {
@@ -634,8 +634,9 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 		return -ENOMEM;
 	}
 
-	strncpy(package_name, largebuf + sizeof(int32_t) + sizeof(int64_t),
+	strncpy(package_name, largebuf + sizeof(int32_t) + sizeof(ssize_t),
 		str_len);
+	write_log(0, "test create min: %s, %s", package_name, largebuf);
 
 	if (blocking) {
 		UNUSED(tid);

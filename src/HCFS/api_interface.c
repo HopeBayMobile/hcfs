@@ -29,6 +29,7 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <inttypes.h>
+#include <pwd.h>
 
 #include "macro.h"
 #include "global.h"
@@ -59,6 +60,8 @@
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
 struct timespec api_server_monitor_time = API_SERVER_MONITOR_TIME;
+
+int32_t get_xfer_status(void);
 
 /************************************************************************
 *
@@ -120,6 +123,19 @@ int32_t init_api_interface(void)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
+
+	/* If user is root, and "system" group exists, chgrp to "system" */
+	uid_t thisuser = geteuid();
+	if (thisuser == 0) {  /* If root */
+		struct passwd *sys_struct = getpwnam("system");
+		if (sys_struct != NULL) {  /* chgrp */
+			write_log(4, "Changing group of hcfs sock\n");
+			chown(SOCK_PATH, thisuser, sys_struct->pw_gid);
+		}
+	}
+
+	/* For allowing group to acccess */
+	chmod(SOCK_PATH, 0770);
 
 	sock_flag = fcntl(api_server->sock.fd, F_GETFL, 0);
 	sock_flag = sock_flag | O_NONBLOCK;
@@ -615,6 +631,118 @@ int32_t check_location_handle(int32_t arg_len, char *largebuf)
 	write_log(10, "Debug API: checkloc inode %" PRIu64 "\n",
 		  (uint64_t)target_inode);
 	return check_data_location(target_inode);
+}
+
+int32_t isskipdex_handle(int32_t arg_len, char *largebuf)
+{
+	char *pathname, *tmpstr, *tokptr;
+	char filename[256];
+	int32_t ret = FALSE;
+
+	pathname = malloc(arg_len + 10);
+	if (pathname == NULL)
+		return -ENOMEM;
+
+	memcpy(pathname, largebuf, arg_len);
+	pathname[arg_len] = 0;
+
+	write_log(6, "Debug API: isskipdex %s\n", pathname);
+
+	/* Return false if file is not in /data/app */
+	tmpstr = strtok_r(pathname, "/", &tokptr);
+	if (tmpstr == NULL)
+		goto end;
+	if (strcmp(tmpstr, "data") != 0)
+		goto end;
+
+	tmpstr = strtok_r(NULL, "/", &tokptr);
+	if (tmpstr == NULL)
+		goto end;
+	if (strcmp(tmpstr, "app") != 0)
+		goto end;
+
+	ino_t parent_ino;
+	DIR_ENTRY tmpentry;
+
+	tmpstr = strtok_r(NULL, "/", &tokptr);
+	if (tmpstr == NULL)
+		goto end;
+	snprintf(filename, 256, "%s", tmpstr);
+	tmpstr = strtok_r(NULL, "/", &tokptr);
+
+	if (tmpstr == NULL) {
+		/* This is a file under /data/app */
+		/* For Kitkat */
+		parent_ino = hcfs_system->data_app_root;
+	} else {
+		/* This is a file under some folder in /data/app */
+		ret = lookup_dir(hcfs_system->data_app_root,
+		                 filename, &tmpentry, FALSE);
+		if (ret < 0)
+			goto end;
+		parent_ino = tmpentry.d_ino;
+		snprintf(filename, 256, "%s", tmpstr);
+		tmpstr = strtok_r(NULL, "/", &tokptr);
+		if (tmpstr != NULL) {
+			/* This is not an apk file. */
+			goto end;
+		}
+	}
+
+	write_log(10, "Debug isskipdex: filename %s\n", filename);
+
+	/* Don't skip anything if not apk */
+	if (is_apk(filename) == FALSE)
+		goto end;
+
+	ino_t this_ino, minapk_ino;
+	/* Find inode numbers */
+	ret = lookup_dir(parent_ino, filename, &tmpentry, FALSE);
+	if (ret < 0)
+		goto end;
+	this_ino = tmpentry.d_ino;
+
+	char minapkname[256];
+	ret = convert_minapk(filename, minapkname);
+	if (ret < 0) {
+		ret = FALSE;
+		goto end;
+	}
+	ret = lookup_dir(parent_ino, minapkname, &tmpentry, FALSE);
+	if (ret < 0) {
+		ret = FALSE;
+		goto end;
+	}
+	minapk_ino = tmpentry.d_ino;
+
+	/* Return TRUE if this is actually a min apk */
+	if (minapk_ino == this_ino) {
+		ret = TRUE;
+		goto end;
+	}
+
+	/* We are not using min apk, but system wants to dexopt
+	but it would be bad if the apk cannot be pulled back
+	(or if network is slow) */
+
+	/* First check the location of this file */
+	ret = check_data_location(this_ino);
+	if (ret <= 0) {
+		/* Return if error or if apk is local */
+		goto end;
+	}
+
+	/* Check current network status. Log if need to skip */
+	if ((hcfs_system->sync_paused == TRUE) ||
+	    (get_xfer_status() == 2)) {
+		write_log(4, "Skipping dexopt of %s due to network issues\n",
+		          filename);
+		ret = TRUE;
+	}
+
+end:
+	free(pathname);
+	return ret;
 }
 
 int32_t checkpin_handle(__attribute__((unused)) int32_t arg_len, char *largebuf)
@@ -1296,6 +1424,9 @@ void api_module(void *index)
 			goto return_retcode;
 		case CHECKVOL:
 			retcode = check_FS_handle(arg_len, largebuf);
+			goto return_retcode;
+		case ISSKIPDEX:
+			retcode = isskipdex_handle(arg_len, largebuf);
 			goto return_retcode;
 		case LISTVOL:
 			/*Echos the arguments back to the caller*/

@@ -119,6 +119,7 @@
 #include "do_restoration.h"
 #include "control_smartcache.h"
 #include "apk_mgmt.h"
+#include "meta_iterator.h"
 /* Steps for allowing opened files / dirs to be accessed after deletion
  *
  *  1. in lookup_count, add a field "to_delete". rmdir, unlink will first
@@ -163,10 +164,6 @@
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
-static inline BOOL _is_apk(const char *filename);
-static inline BOOL _is_minapk(const char *filename);
-int32_t _convert_minapk(const char *apkname, char *minapk_name);
-int32_t _convert_origin_apk(char *apkname, const char *minapk_name);
 
 /*!
  * Helper function for checking permissions.
@@ -1391,16 +1388,16 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	/* Handle removal of minimal apk */
 	if ((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
-		if (_is_apk(selfname) == TRUE) {
+		if (is_apk(selfname) == TRUE) {
 			ret = remove_minapk_data(parent_inode, selfname);
 			if (ret < 0 && ret != -ENOENT) {
 				fuse_reply_err(req, -ret_val);
 				return;
 			}
-		} else if (_is_minapk(selfname) == TRUE) {
+		} else if (is_minapk(selfname) == TRUE) {
 			char origin_apk[MAX_FILENAME_LEN] = {0};
 
-			ret = _convert_origin_apk(origin_apk, selfname);
+			ret = convert_origin_apk(origin_apk, selfname);
 			if (ret < 0) {
 				fuse_reply_err(req, -ret_val);
 				return;
@@ -1608,71 +1605,6 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_err(req, -ret_val);
 }
 
-/* Helper function for checking if the file extension is .apk */
-static inline BOOL _is_apk(const char *filename)
-{
-	int32_t name_len;
-
-	name_len = strlen(filename);
-
-	/* If filename is too short to be an apk*/
-	if (name_len < 5)
-		return FALSE;
-
-	if (!strncmp(&(filename[name_len - 4]), ".apk", 4))
-		return TRUE;
-
-	return FALSE;
-}
-
-static inline BOOL _is_minapk(const char *filename)
-{
-	int32_t name_len;
-
-	name_len = strlen(filename);
-
-	/* If filename is too short to be an apk*/
-	if (name_len < 5)
-		return FALSE;
-
-	/* minapk name is ".<x>min" */
-	if (*filename == '.' &&
-		!strncmp(filename + name_len - 3, "min", 3))
-		return TRUE;
-	else
-		return FALSE;
-}
-/* Helper function for converting apk name to minimal apk name */
-int32_t _convert_minapk(const char *apkname, char *minapk_name)
-{
-	size_t name_len;
-
-	name_len = strlen(apkname);
-
-	/* The length to copy before ".apk" */
-	name_len -= 4;
-	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
-	snprintf(&(minapk_name[1 + name_len]), 4, "min");
-	write_log(10, "[App unpin] Name of minapk: %s\n", minapk_name);
-	return 0;
-}
-
-int32_t _convert_origin_apk(char *apkname, const char *minapk_name)
-{
-	size_t name_len;
-
-	name_len = strlen(minapk_name);
-
-	/* Could not be an apk */
-	if (name_len < 5)
-		return -EINVAL;
-
-	/* From .<x>min to <x>.apk */
-	memcpy(apkname, minapk_name + 1, name_len - 4);
-	memcpy(apkname + name_len - 4, ".apk", 4);
-	apkname[name_len] = '\0';
-	return 0;
-}
 /* Helper function on checking whether to use minimal apk */
 /* Returns 0 if check completed normally, and negative of error if check
 terminated abnormally. Value of "*minapk_ino" is non-zero if minimal apk
@@ -1720,10 +1652,11 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 
 	/* If parent folder is not an app folder under /data/app, do not
 	use minimal apk */
-	if (count == numparents)
+	/* For kitkat: If parent folder is /data/app, use min apk */
+	if ((count == numparents) && (parent_ino != hcfs_system->data_app_root))
 		return 0;
 
-	ret = _convert_minapk(selfname, minapk_name);
+	ret = convert_minapk(selfname, minapk_name);
 	if (ret < 0)
 		return ret;
 
@@ -1829,10 +1762,9 @@ a directory (for NFS) */
 	memset(&temp_dentry, 0, sizeof(DIR_ENTRY));
 
 	/* Proceed on checking whether to use minimal apk here */
-
 	if (((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) &&
-	    (_is_apk(selfname) == TRUE)) {
+	    (is_apk(selfname) == TRUE)) {
 		ino_t minapk_ino;
 
 		/* Query hash table for cached result */
@@ -2688,7 +2620,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				continue;
 			/* Check if it is apk file */
 			if (iter->now_entry->d_type == D_ISREG &&
-			    _is_apk(iter->now_entry->d_name)) {
+			    is_apk(iter->now_entry->d_name)) {
 				ret = remove_minapk_data(self_inode,
 						   iter->now_entry->d_name);
 				if (ret < 0 && ret != -ENOENT)
@@ -2713,17 +2645,17 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		for (i = 0; i < 2; i++) {
 			if (mode[i] != 0 && !S_ISREG(mode[i]))
 				continue;
-			if (_is_apk(selfname[i])) {
+			if (is_apk(selfname[i])) {
 				ret = remove_minapk_data(parent_inode[i],
 						selfname[i]);
 				if (ret < 0 && ret != -ENOENT) {
 					fuse_reply_err(req, -ret);
 					return;
 				}
-			} else if (_is_minapk(selfname[i])) {
+			} else if (is_minapk(selfname[i])) {
 				char origin_apk[MAX_FILENAME_LEN] = {0};
 
-				ret = _convert_origin_apk(origin_apk,
+				ret = convert_origin_apk(origin_apk,
 						selfname[i]);
 				if (ret < 0)
 					continue; /* Skip this name */
@@ -2805,6 +2737,8 @@ int32_t _check_sync_wait_full_cache(META_CACHE_ENTRY_STRUCT **body_ptr,
 
 	sleep_times = 0;
 	while (hcfs_system->system_going_down == FALSE) {
+		/* Check if this file is uploading. If so, try to copy block
+		 * if this block is not being uploaded. Otherwise do nothing. */
 		ret = meta_cache_check_uploading(*body_ptr,
 				this_inode, blockno, seq);
 		if (ret == -ENOSPC) {
@@ -3322,6 +3256,72 @@ int32_t truncate_truncate(ino_t this_inode,
 	return 0;
 }
 
+int32_t try_cancel_undone_sync(ino_t this_inode,
+			       META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	char path[METAPATHLEN];
+	char toupload_metapath[METAPATHLEN];
+	char block_path[400];
+	FILE *fptr;
+	FILE_BLOCK_ITERATOR *block_iter;
+	int32_t ret = 0;
+
+	/* Do nothing if it is uploading */
+	if (body_ptr->uploading_info.is_uploading == TRUE)
+		goto out;
+
+	/* Do nothing if no progress file */
+	fetch_progress_file_path(path, this_inode);
+	if (access(path, F_OK) < 0)
+		goto out;
+
+	/* Try to access toupload meta */
+	fetch_toupload_meta_path(toupload_metapath, this_inode);
+	if (access(toupload_metapath, F_OK) < 0)
+		goto out;
+
+	fptr = fopen(toupload_metapath, "r");
+	if (!fptr) {
+		ret = -errno;
+		goto out;
+	}
+	flock(fileno(fptr), LOCK_EX);
+
+	/* Init iterator and then traverse all blocks */
+	block_iter = init_block_iter(fptr);
+	if (!block_iter) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		ret = -errno;
+		goto out;
+	}
+
+	while (iter_next(block_iter)) {
+		fetch_toupload_block_path(block_path, this_inode,
+					  block_iter->now_block_no);
+		if (access(block_path, F_OK) == 0)
+			unlink_upload_file(block_path);
+	}
+	if (errno != ENOENT) {
+		ret = -errno;
+		goto release_resource;
+	}
+
+	/* Abandon the sync this time . Do not remove progress
+	 * file because it will be used to remove all garbage on cloud */
+	unlink(toupload_metapath);
+	write_log(
+	    6, "Remove to-upload blocks when truncating inode %" PRIu64,
+	    (uint64_t)this_inode);
+
+release_resource:
+	destroy_block_iter(block_iter);
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+out:
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_truncate
@@ -3401,6 +3401,10 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 			"Debug truncate: no size change. Nothing changed.\n");
 		return 0;
 	}
+
+	/* TODO TODO: Check if progress file and to-upload meta exist but not
+	 * syncing. If so, remove to-upload meta and all to-upload blocks */
+	try_cancel_undone_sync(this_inode, *body_ptr);
 
 	if (filestat->size < offset) {
 		int64_t pin_sizediff;
