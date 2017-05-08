@@ -13,7 +13,10 @@ LOCAL_MODULE     := hcfsapid
 LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
 LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c logger.c smart_cache.c minimal_apk.c strrchr_chk.c strchr_chk.c vsprintf_chk.c strcat_chk.c)
-LOCAL_SHARED_LIBRARIES = libsqlite libcrypto libzip
+ifeq "$(DEVICE)" "AOSP-nougat-arm64"
+LOCAL_LDFLAGS   += -L/home/jiahong/AOSP_7.1_tera/out/target/product/tera-emulator-arm/system/lib64
+endif
+LOCAL_SHARED_LIBRARIES = libsqlite libcrypto libzip libicui18n libicuuc
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)

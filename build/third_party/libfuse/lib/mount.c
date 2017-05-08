@@ -540,7 +540,7 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
 		goto out_close;
 	}
 
-	strcpy(type, mo->blkdev ? "fuseblk" : "fuse");
+	strcpy(type, mo->blkdev ? "fuseblk" : "fusenew");
 	if (mo->subtype) {
 		strcat(type, ".");
 		strcat(type, mo->subtype);
@@ -551,7 +551,7 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
 	res = mount(source, mnt, type, mo->flags, mo->kernel_opts);
 	if (res == -1 && errno == ENODEV && mo->subtype) {
 		/* Probably missing subtype support */
-		strcpy(type, mo->blkdev ? "fuseblk" : "fuse");
+		strcpy(type, mo->blkdev ? "fuseblk" : "fusenew");
 		if (mo->fsname) {
 			if (!mo->blkdev)
 				sprintf(source, "%s#%s", mo->subtype,
