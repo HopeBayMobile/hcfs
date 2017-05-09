@@ -956,6 +956,12 @@ int32_t set_googledrive_token(int32_t arg_len, char *largebuf)
 		goto out;
 	}
 
+	if (arg_len <= 0 || *largebuf == 0) {
+		write_log(0, "Null google drive token.");
+		ret = -EINVAL;
+		goto out;
+	}
+
 	str_size = arg_len;
 	/*
 	memcpy(&str_size, largebuf, sizeof(ssize_t));
