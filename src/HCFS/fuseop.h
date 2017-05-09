@@ -146,6 +146,9 @@ typedef struct {
 	/* Define whether minimal apk should be used. Default is false. */
 	bool use_minimal_apk;
 
+	/* Whether we explicitly want to use minimal apk */
+	bool set_minimal_apk;
+
 	/* Root inode # of /data/app */
 	ino_t data_app_root;
 

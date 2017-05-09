@@ -267,6 +267,7 @@ void update_sync_state(void)
 			 * all other sleeping threads up */
 			sem_check_and_release(&(hcfs_system->something_to_replace),
 					      &num_replace);
+			update_use_minimal_apk();
 		}
 
 	} else {
@@ -285,5 +286,6 @@ void update_sync_state(void)
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.cache_replace_status = 0;
 		sem_post(&(hcfs_system->access_sem));
+		update_use_minimal_apk();
 	}
 }
