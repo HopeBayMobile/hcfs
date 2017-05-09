@@ -1320,7 +1320,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr = (MOUNT_T *)fuse_req_userdata(req);
 #endif
 	ino_t parent_inode, alias_ino;
-	int32_t ret_val, ret;
+	int32_t ret_val;
 	DIR_ENTRY temp_dentry;
 	HCFS_STAT parent_stat;
 	BOOL is_external = FALSE;
@@ -1386,25 +1386,66 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	}
 
 #ifdef _ANDROID_ENV_
+
+	/* Remove minapk if delete apk */
+	if ((tmpptr->f_ino == hcfs_system->data_app_root) &&
+	    (is_apk(selfname) == TRUE)) {
+		char minapk_name[MAX_FILENAME_LEN] = {0};
+		DIR_ENTRY minapk_entry;
+		ret_val = convert_minapk(selfname, minapk_name);
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+		ret_val = lookup_dir(parent_inode, minapk_name,
+		                     &minapk_entry, is_external);
+		if (ret_val < 0 && ret_val != -ENOENT) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
+		if (ret_val == 0) {
+			ret_val = unlink_update_meta(req, parent_inode,
+			                             &minapk_entry,
+			                             is_external);
+			if (ret_val < 0 && ret_val != -ENOENT) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
+		if (ret_val == 0) {
+			ret_val = hfuse_ll_notify_delete(tmpptr->chan_ptr,
+			                                 parent_inode,
+			                                 minapk_entry.d_ino,
+			                                 minapk_name,
+			                                 strlen(minapk_name));
+			if (ret_val < 0) {
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+	}
+
 	/* Handle removal of minimal apk */
 	if ((hcfs_system->use_minimal_apk == TRUE) &&
 	    (tmpptr->f_ino == hcfs_system->data_app_root)) {
 		if (is_apk(selfname) == TRUE) {
-			ret = remove_minapk_data(parent_inode, selfname);
-			if (ret < 0 && ret != -ENOENT) {
+			ret_val = remove_minapk_data(parent_inode, selfname);
+			if (ret_val < 0 && ret_val != -ENOENT) {
 				fuse_reply_err(req, -ret_val);
 				return;
 			}
 		} else if (is_minapk(selfname) == TRUE) {
 			char origin_apk[MAX_FILENAME_LEN] = {0};
 
-			ret = convert_origin_apk(origin_apk, selfname);
-			if (ret < 0) {
+			ret_val = convert_origin_apk(origin_apk, selfname);
+			if (ret_val < 0) {
 				fuse_reply_err(req, -ret_val);
 				return;
 			}
-			ret = remove_minapk_data(parent_inode, origin_apk);
-			if (ret < 0 && ret != -ENOENT) {
+			ret_val = remove_minapk_data(parent_inode, origin_apk);
+			if (ret_val < 0 && ret_val != -ENOENT) {
 				fuse_reply_err(req, -ret_val);
 				return;
 			}
