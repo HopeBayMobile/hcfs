@@ -49,7 +49,7 @@ int32_t update_use_minimal_apk(void)
 {
 	int32_t ret = 0;
 	bool old_val = hcfs_system->use_minimal_apk;
-	bool new_val = (hcfs_system->set_minimal_apk &&
+	bool new_val = (hcfs_system->set_minimal_apk ||
 	                hcfs_system->sync_paused);
 
 	if (old_val == new_val)
