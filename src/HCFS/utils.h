@@ -165,8 +165,7 @@ BOOL is_minapk(const char *filename);
 int32_t convert_minapk(const char *apkname, char *minapk_name);
 int32_t convert_origin_apk(char *apkname, const char *minapk_name);
 
-void init_lastsync_time(ino_t thisinode);
-void set_lastsync_time(ino_t thisinode);
-int64_t get_lastsync_time(ino_t thisinode);
+int64_t init_lastsync_time(void);
+int64_t set_lastsync_time(void);
 
 #endif  /* SRC_HCFS_UTILS_H_ */

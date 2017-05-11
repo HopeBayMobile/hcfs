@@ -2539,7 +2539,7 @@ int32_t convert_origin_apk(char *apkname, const char *minapk_name)
 	return 0;
 }
 
-void init_lastsync_time(ino_t thisinode)
+int64_t init_lastsync_time(void)
 {
 	struct timespec current_time;
 	char pathname[METAPATHLEN];
@@ -2557,11 +2557,10 @@ void init_lastsync_time(ino_t thisinode)
 		else
 			timestamp = 0;
 	}
-	fetch_meta_path(pathname, thisinode);
-	setxattr(pathname, "user.lastsync", &timestamp, sizeof(int64_t), 0);
+	return timestamp;
 }
 
-void set_lastsync_time(ino_t thisinode)
+int64_t set_lastsync_time(void)
 {
 	struct timespec current_time;
 	char pathname[METAPATHLEN];
@@ -2571,19 +2570,5 @@ void set_lastsync_time(ino_t thisinode)
 	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
 	timestamp = current_time.tv_sec;
 
-	fetch_meta_path(pathname, thisinode);
-	setxattr(pathname, "user.lastsync", &timestamp, sizeof(int64_t), 0);
-}
-
-int64_t get_lastsync_time(ino_t thisinode)
-{
-	char pathname[METAPATHLEN];
-	int64_t timestamp = 0;
-	int32_t ret;
-
-	fetch_meta_path(pathname, thisinode);
-	ret = getxattr(pathname, "user.lastsync", &timestamp, sizeof(int64_t));
-	if (ret < 0)
-		timestamp = 0;
 	return timestamp;
 }

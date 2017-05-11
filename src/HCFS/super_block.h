@@ -66,6 +66,7 @@ typedef struct SUPER_BLOCK_ENTRY {
 	ino_t this_index;
 	uint64_t generation;
 	int64_t dirty_meta_size;
+	int64_t lastsync_time;
 } SUPER_BLOCK_ENTRY;
 
 /* SUPER_BLOCK_HEAD defines the structure for the head of super block */

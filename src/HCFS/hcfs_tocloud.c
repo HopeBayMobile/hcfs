@@ -2256,7 +2256,7 @@ void upload_loop(void)
 	ino_t ino_sync, ino_check, retry_inode;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 	SUPER_BLOCK_ENTRY tempentry;
-	int32_t count, sleep_count;
+	int32_t count;
 	char in_sync;
 	int32_t ret_val, ret;
 	BOOL is_start_check;
@@ -2414,6 +2414,8 @@ void upload_loop(void)
 					if (ret < 0)
 						ino_sync = 0;
 				}
+				/* Fetch the timestamp for the last sync */
+				last_synctime = tempentry.lastsync_time;
 			}
 		}
 		super_block_exclusive_release();
@@ -2431,9 +2433,6 @@ void upload_loop(void)
 		      CACHE_SOFT_LIMIT) &&
 		     (sys_super_block->sync_point_is_set == FALSE)) &&
 		    ((retry_inode == 0) && (ino_sync != 0))) {
-			/* Fetch the timestamp for the last sync of this
-			inode */
-			last_synctime = get_lastsync_time(ino_sync);
 			write_log(10, "last synctime %lld, is consecutive skip %d\n",
 			          last_synctime, consecutive_skips);
 

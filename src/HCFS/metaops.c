@@ -34,7 +34,7 @@
 #include <sys/mman.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <sys/xattr.h>
+#include <linux/xattr.h>
 
 #include "global.h"
 #include "utils.h"
@@ -2836,17 +2836,6 @@ int32_t restore_meta_structure(FILE *fptr)
 	size_t ret_size;
 	FILE_STATS_TYPE file_stats;
 	CLOUD_RELATED_DATA cloud_data;
-
-	/* Set lastsync to current time */
-	struct timespec current_time;
-	uint64_t timestamp;
-
-	memset(&current_time, 0, sizeof(struct timespec));
-	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
-	timestamp = (uint64_t) current_time.tv_sec;
-
-	fsetxattr(fileno(fptr), "user.lastsync", &timestamp,
-	          sizeof(uint64_t), 0);
 
 	/* Continue with the other meta file restoration process */
 	just_meta = FALSE;

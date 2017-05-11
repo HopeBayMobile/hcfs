@@ -540,7 +540,7 @@ int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 				((transit_incomplete != TRUE))) { /* Complete */
 			/* We are done first this upload, so update the xattr
 			"user.lastsync" */
-			set_lastsync_time(this_inode);
+			tempentry.lastsync_time = set_lastsync_time();
 			if (tempentry.mod_after_in_transit == TRUE) {
 				/* If sync point is set, relocate this inode
 				 * so that it is going to be last one. */
@@ -1357,6 +1357,7 @@ ino_t super_block_new_inode(HCFS_STAT *in_stat,
 	tempentry.generation = this_generation;
 	if (ret_generation != NULL)
 		*ret_generation = this_generation;
+	tempentry.lastsync_time = init_lastsync_time();
 
 	memcpy(&tempstat, in_stat, sizeof(HCFS_STAT));
 	tempstat.ino = this_inode;

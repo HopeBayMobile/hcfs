@@ -1108,7 +1108,6 @@ void api_module(void *index1)
 	int32_t loglevel;
 	int64_t max_pinned_size;
 	PTHREAD_T *thread_ptr;
-	UNUSED(index1);
 
 	thread_ptr = (PTHREAD_T *) pthread_getspecific(PTHREAD_status_key);
 
@@ -1333,6 +1332,7 @@ void api_module(void *index1)
 			sync_hcfs_system_data(TRUE);
 			/* Wake up potential sleeping threads */
 			sem_post(&(hcfs_system->sync_wait_sem));
+			sem_post(&(hcfs_system->sync_control_sem));
 			sem_post(&(hcfs_system->dsync_wait_sem));
 			sem_post(&(hcfs_system->something_to_replace));
 			sem_post(&(hcfs_system->fuse_sem));
@@ -1418,7 +1418,7 @@ void api_module(void *index1)
 			/* Simulate too long API call of 5 seconds */
 			sleep(5);
 			retcode = 0;
-			cur_index = *((int32_t *)index);
+			cur_index = *((int32_t *)index1);
 			write_log(10, "Index is %d\n", cur_index);
 			goto return_retcode;
 		case ECHOTEST:
