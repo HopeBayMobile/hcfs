@@ -2542,7 +2542,6 @@ int32_t convert_origin_apk(char *apkname, const char *minapk_name)
 int64_t init_lastsync_time(void)
 {
 	struct timespec current_time;
-	char pathname[METAPATHLEN];
 	int64_t timestamp;
 
 	memset(&current_time, 0, sizeof(struct timespec));
@@ -2563,7 +2562,6 @@ int64_t init_lastsync_time(void)
 int64_t set_lastsync_time(void)
 {
 	struct timespec current_time;
-	char pathname[METAPATHLEN];
 	int64_t timestamp;
 
 	memset(&current_time, 0, sizeof(struct timespec));

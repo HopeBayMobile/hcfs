@@ -22,5 +22,6 @@ $(eval $(call ADDMODULE))
 
 $(eval $(call ADDTEST, api_interface_unittest, \
   api_interface.o \
+  pthread_control.o \
   api_interface_fakeftn.o \
   api_interface_unittest.o ))

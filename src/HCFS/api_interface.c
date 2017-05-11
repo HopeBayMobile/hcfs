@@ -1109,6 +1109,8 @@ void api_module(void *index1)
 	int64_t max_pinned_size;
 	PTHREAD_T *thread_ptr;
 
+	UNUSED(index1);
+
 	thread_ptr = (PTHREAD_T *) pthread_getspecific(PTHREAD_status_key);
 
 	while (hcfs_system->system_going_down == FALSE) {
@@ -1415,11 +1417,10 @@ void api_module(void *index1)
 			    hcfs_system->systemdata.pinned_size;
 			goto return_llretval;
 		case TESTAPI:
-			/* Simulate too long API call of 5 seconds */
-			sleep(5);
+			/* Simulate long API call of 1 second */
+			sleep(1);
 			retcode = 0;
-			cur_index = *((int32_t *)index1);
-			write_log(10, "Index is %d\n", cur_index);
+			write_log(10, "TESTAPI called\n");
 			goto return_retcode;
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/

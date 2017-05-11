@@ -1559,7 +1559,6 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
 	BOOL sb_enqueue_later = FALSE;
-	int32_t sync_status;
 	int32_t pause_status;
 
 	if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {

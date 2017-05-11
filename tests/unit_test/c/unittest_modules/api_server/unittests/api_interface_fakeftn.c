@@ -16,9 +16,11 @@ int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list alist;
 
+/*
 	va_start(alist, format);
 	vprintf(format, alist);
 	va_end(alist);
+*/
 	return 0;
 }
 
@@ -243,4 +245,22 @@ int32_t check_data_location(ino_t this_inode)
 {
 	UNUSED(this_inode);
 	return 0;
+}
+int32_t lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry,
+                   BOOL is_external)
+{
+	dentry->d_ino = 1234;
+	return 0;
+}
+BOOL is_apk(const char *filename)
+{
+	return FALSE;
+}
+int32_t convert_minapk(const char *apkname, char *minapk_name)
+{
+	return 0;
+}
+void force_retry_conn(void)
+{
+	return;
 }
