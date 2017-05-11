@@ -117,9 +117,10 @@ static int32_t _get_server_conn(char *path)
 		return -errno;
 	sock_len = 1 + strlen(path) + offsetof(struct sockaddr_un, sun_path);
 	status = connect(fd, (const struct sockaddr *) &addr, sock_len);
+	int32_t errcode = errno;
 	if (status < 0) {
 		close(fd);
-		return -errno;
+		return -errcode;
 	}
 
 	return fd;

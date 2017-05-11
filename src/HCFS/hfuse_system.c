@@ -378,8 +378,12 @@ void init_download_module(void)
 
 int32_t init_event_notify_module(void)
 {
+	int32_t ret = init_event_queue();
+
+	if (ret < 0)
+		return ret;
 	pthread_create(&event_loop_thread, NULL, &event_worker_loop, NULL);
-	return init_event_queue();
+	return ret;
 }
 
 /************************************************************************
