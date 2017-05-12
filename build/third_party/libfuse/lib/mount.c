@@ -74,6 +74,7 @@ struct mount_opts {
 	int nonempty;
 	int auto_unmount;
 	int blkdev;
+	char *fstype;
 	char *fsname;
 	char *subtype;
 	char *subtype_opt;
@@ -90,6 +91,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_MOUNT_OPT("nonempty",		nonempty),
 	FUSE_MOUNT_OPT("blkdev",		blkdev),
 	FUSE_MOUNT_OPT("auto_unmount",		auto_unmount),
+	FUSE_MOUNT_OPT("fstype=%s",		fstype),
 	FUSE_MOUNT_OPT("fsname=%s",		fsname),
 	FUSE_MOUNT_OPT("subtype=%s",		subtype),
 	FUSE_OPT_KEY("allow_other",		KEY_KERN_OPT),
@@ -97,6 +99,7 @@ static const struct fuse_opt fuse_mount_opts[] = {
 	FUSE_OPT_KEY("nonempty",		KEY_FUSERMOUNT_OPT),
 	FUSE_OPT_KEY("auto_unmount",		KEY_FUSERMOUNT_OPT),
 	FUSE_OPT_KEY("blkdev",			KEY_FUSERMOUNT_OPT),
+	FUSE_OPT_KEY("fstype=",			KEY_FUSERMOUNT_OPT),
 	FUSE_OPT_KEY("fsname=",			KEY_FUSERMOUNT_OPT),
 	FUSE_OPT_KEY("subtype=",		KEY_SUBTYPE_OPT),
 	FUSE_OPT_KEY("large_read",		KEY_KERN_OPT),
@@ -134,6 +137,7 @@ static void mount_help(void)
 "    -o auto_unmount        auto unmount on process termination\n"
 "    -o nonempty            allow mounts over non-empty file/dir\n"
 "    -o default_permissions enable permission checking by kernel\n"
+"    -o fstype=NAME         set filesystem type\n"
 "    -o fsname=NAME         set filesystem name\n"
 "    -o subtype=NAME        set filesystem type\n"
 "    -o large_read          issue large read requests (2.4 only)\n"
@@ -540,7 +544,8 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
 		goto out_close;
 	}
 
-	strcpy(type, mo->blkdev ? "fuseblk" : "fusenew");
+	strcpy(type, mo->blkdev ? "fuseblk" :
+	             (mo->fstype ? mo->fstype : "fuse"));
 	if (mo->subtype) {
 		strcat(type, ".");
 		strcat(type, mo->subtype);
@@ -551,7 +556,8 @@ static int fuse_mount_sys(const char *mnt, struct mount_opts *mo,
 	res = mount(source, mnt, type, mo->flags, mo->kernel_opts);
 	if (res == -1 && errno == ENODEV && mo->subtype) {
 		/* Probably missing subtype support */
-		strcpy(type, mo->blkdev ? "fuseblk" : "fusenew");
+		strcpy(type, mo->blkdev ? "fuseblk" :
+		             (mo->fstype ? mo->fstype : "fuse"));
 		if (mo->fsname) {
 			if (!mo->blkdev)
 				sprintf(source, "%s#%s", mo->subtype,
@@ -662,6 +668,7 @@ int fuse_kern_premount(const char *mountpoint, struct fuse_args *args)
 	/* In premount, if failed, simply return */
 out:
 	free(mnt_opts);
+	free(mo.fstype);
 	free(mo.fsname);
 	free(mo.subtype);
 	free(mo.fusermount_opts);
@@ -728,6 +735,7 @@ int fuse_kern_mount(const char *mountpoint, struct fuse_args *args, int fd)
 	}
 out:
 	free(mnt_opts);
+	free(mo.fstype);
 	free(mo.fsname);
 	free(mo.subtype);
 	free(mo.fusermount_opts);

@@ -45,6 +45,7 @@ static const struct fuse_opt fuse_helper_opts[] = {
 	FUSE_HELPER_OPT("debug",	foreground),
 	FUSE_HELPER_OPT("-f",		foreground),
 	FUSE_HELPER_OPT("-s",		singlethread),
+	FUSE_HELPER_OPT("fstype=",	nodefault_subtype),
 	FUSE_HELPER_OPT("fsname=",	nodefault_subtype),
 	FUSE_HELPER_OPT("subtype=",	nodefault_subtype),
 
@@ -55,6 +56,7 @@ static const struct fuse_opt fuse_helper_opts[] = {
 	FUSE_OPT_KEY("--version",	KEY_VERSION),
 	FUSE_OPT_KEY("-d",		FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("debug",		FUSE_OPT_KEY_KEEP),
+	FUSE_OPT_KEY("fstype=",		FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("fsname=",		FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_KEY("subtype=",	FUSE_OPT_KEY_KEEP),
 	FUSE_OPT_END
