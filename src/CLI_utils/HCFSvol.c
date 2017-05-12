@@ -55,11 +55,32 @@ ino_t _parse_arg_to_ino(char *arg)
 	return tmpino;
 }
 
+#define PRINT_ERROR_INVAL_ARGUMENTS() \
+	fprintf(stderr, "Invalid number of arguments.\n");
+
+int32_t get_inode_from_arg(const char *path, ino_t *tmpino)
+{
+	int32_t ret;
+	struct stat tempstat;
+
+	ret = sscanf(path, "%"PRIu64, tmpino);
+	if (ret <= 0) {
+		/* Perhaps it is a path */
+		ret = stat(path, &tempstat);
+		if (ret < 0) {
+			printf("Returned value is %d\n", -errno);
+			return -errno;
+		}
+		*tmpino = tempstat.st_ino;
+	}
+
+	return 0;
+}
+
 int32_t main(int32_t argc, char **argv)
 {
 	int32_t fd, size_msg, status, count, retcode = 0, code, fsname_len;
 	int32_t cmd_idx, i;
-
 	uint32_t cmd_len, reply_len, total_recv, to_recv;
 	int32_t total_entries;
 	struct sockaddr_un addr;
@@ -83,7 +104,7 @@ int32_t main(int32_t argc, char **argv)
 
 	code = -1;
 	if (argc < 2) {
-		printf("Invalid number of arguments\n");
+		PRINT_ERROR_INVAL_ARGUMENTS();
 		usage();
 		return EINVAL;
 	}
@@ -170,9 +191,11 @@ int32_t main(int32_t argc, char **argv)
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
 		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
 		size_msg = recv(fd, &uint32_ret, sizeof(uint32_t), 0);
-		if (code == CLOUDSTAT)
+		if (code == CLOUDSTAT) {
 			printf("Backend is %s\n",
 			       uint32_ret ? "ONLINE" : "OFFLINE");
+			printf("Returned value is %d\n", uint32_ret ? 1 : 0);
+		}
 		else if (code == GETSYNCSWITCH)
 			printf("Sync controller is switched to %s\n",
 			       uint32_ret ? "ON" : "OFF");
@@ -300,13 +323,21 @@ int32_t main(int32_t argc, char **argv)
 		}
 		break;
 	case CHECKDIRSTAT:
+		if (argc < 3) {
+			PRINT_ERROR_INVAL_ARGUMENTS();
+			retcode = -1;
+			break;
+		}
+
 		tmpino = _parse_arg_to_ino(argv[2]);
 		if (errno != 0) {
 			retcode = -errno;
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
+			printf("Returned value is %d\n", -retcode);
 			break;
 		}
+
 		cmd_len = sizeof(ino_t);
 		size_msg = send(fd, &code, sizeof(uint32_t), 0);
 		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
@@ -323,6 +354,7 @@ int32_t main(int32_t argc, char **argv)
 			size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
+			printf("Returned value is %d", retcode);
 		}
 		break;
 	case GETXFERSTAT:
@@ -338,9 +370,15 @@ int32_t main(int32_t argc, char **argv)
 		break;
 	case CHECKLOC:
 	case CHECKPIN:
+		if (argc < 3) {
+			PRINT_ERROR_INVAL_ARGUMENTS();
+			retcode = -1;
+			break;
+		}
 		tmpino = _parse_arg_to_ino(argv[2]);
 		if (errno != 0) {
 			retcode = -errno;
+			printf("Returned value is %d\n", -retcode);
 			break;
 		}
 		cmd_len = sizeof(ino_t);
