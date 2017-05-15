@@ -112,7 +112,6 @@ int32_t fetch_last_recover_progress(ino_t *start_inode, ino_t *end_inode)
 	FILE *fptr;
 	ino_t inodes[2];
 
-	rsize = 0;
 	*start_inode = *end_inode = 0;
 
 	fetch_recover_progressf_path(progressf_path);
