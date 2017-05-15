@@ -69,7 +69,9 @@ int32_t super_block_reclaim(void)
 	return 0;
 }
 
-int32_t hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int32_t hcfs_delete_object(char *objname,
+                           CURL_HANDLE *curl_handle,
+                           added_info_t *more)
 {
 	MOCK();
 	sem_wait(&objname_counter_sem);

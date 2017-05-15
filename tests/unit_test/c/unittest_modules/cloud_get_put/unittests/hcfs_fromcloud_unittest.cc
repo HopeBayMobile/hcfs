@@ -122,7 +122,7 @@ protected:
 		sprintf(objname, "data_1_%ld", block_no);
 		sprintf(tmp_filename, "/tmp/testHCFS/local_space%ld", block_no);
 		fptr = fopen(tmp_filename, "w+");
-		fetch_from_cloud(fptr, READ_BLOCK, objname);
+		fetch_from_cloud(fptr, READ_BLOCK, objname, NULL);
 		fclose(fptr);
 		unlink(tmp_filename);
 		return NULL;
@@ -149,7 +149,7 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_paused = TRUE;
 
-	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, NULL));
+	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, NULL, NULL));
 }
 
 TEST_F(fetch_from_cloudTest, FetchOneFile)
@@ -165,7 +165,7 @@ TEST_F(fetch_from_cloudTest, FetchOneFile)
 	unlink(tmp_filename);
 	fptr = fopen(tmp_filename, "w+");
 	setbuf(fptr, NULL);
-	fetch_from_cloud(fptr, READ_BLOCK, objname);
+	fetch_from_cloud(fptr, READ_BLOCK, objname, NULL);
 	fseek(fptr, 0, SEEK_SET);
 	fgets(buffer, 100, fptr);
 	fclose(fptr);

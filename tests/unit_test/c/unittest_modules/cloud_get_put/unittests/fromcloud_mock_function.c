@@ -33,7 +33,11 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 	return 0;
 }
 
-int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
+int32_t hcfs_get_object(FILE *fptr,
+                        char *objname,
+                        CURL_HANDLE *curl_handle,
+                        HCFS_encode_object_meta *object_meta,
+                        added_info_t *more)
 {
 	MOCK();
 	int32_t inode, block_no;

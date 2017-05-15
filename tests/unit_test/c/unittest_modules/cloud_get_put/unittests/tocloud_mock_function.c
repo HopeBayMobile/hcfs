@@ -75,7 +75,8 @@ int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 	return 0;
 }
 
-int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
+int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+                    HTTP_meta *object_meta, added_info_t *more)
 {
 	MOCK();
 	char objectpath[40];
@@ -99,12 +100,12 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTT
 	return 200;
 }
 
-#if ENABLE(DEDUP)
-int32_t do_block_delete(ino_t this_inode, int64_t block_no, uint8_t *obj_id,
-		    CURL_HANDLE *curl_handle)
-#else
 int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
-		    CURL_HANDLE *curl_handle)
+#if ENABLE(DEDUP)
+                                uint8_t *obj_id, CURL_HANDLE *curl_handle)
+#else
+                                CURL_HANDLE *curl_handle,
+                                GOOGLEDRIVE_OBJ_INFO *gdrive_info)
 #endif
 {
 	MOCK();
@@ -194,7 +195,8 @@ int32_t write_log(int32_t level, const char *format, ...)
 	return 0;
 }
 
-int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
+int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+                    HCFS_encode_object_meta *object_meta, added_info_t *more)
 {
 	MOCK();
 	FS_CLOUD_STAT_T fs_cloud_stat;
@@ -260,8 +262,9 @@ void fetch_backend_block_objname(char *objname, ino_t inode,
 	return;
 }
 
-int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
-		int64_t block_no, int64_t seq)
+int32_t fetch_toupload_block_path(char *pathname,
+                                  ino_t inode,
+                                  int64_t block_no)
 {
 	MOCK();
 	sprintf(pathname,
@@ -297,9 +300,10 @@ int del_progress_file(int fd, ino_t inode)
 }
 
 int32_t set_progress_info(int32_t fd, int64_t block_index,
-	const char *toupload_exist, const char *backend_exist,
-	const int64_t *toupload_seq, const int64_t *backend_seq,
-	const char *finish)
+        const char *toupload_exist, const char *backend_exist,
+        const int64_t *toupload_seq, const int64_t *backend_seq,
+        const char *toupload_gdrive_id, const char *backend_gdrive_id,
+        const char *finish)
 {
 	MOCK();
 	BLOCK_UPLOADING_STATUS block_entry;
@@ -328,8 +332,11 @@ int64_t query_status_page(int32_t fd, int64_t block_index)
 }
 
 int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
-		int64_t *backend_size, int64_t *total_backend_blocks,
-		int64_t upload_seq, uint8_t *last_pin_status)
+                               int64_t *backend_size,
+                               int64_t *total_backend_blocks,
+                               int64_t upload_seq,
+                               uint8_t *last_pin_status,
+                               char *metaID)
 {
 	MOCK();
 	return 0;
@@ -428,7 +435,7 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 }
 
 int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
-		int64_t page_pos, int64_t toupload_seq)
+                int64_t page_pos, int64_t toupload_seq, char *blockid)
 {
 	FILE *fptr;
 	BLOCK_ENTRY_PAGE tmppage;
@@ -586,3 +593,16 @@ int64_t get_lastsync_time(ino_t thisinode)
 {
 	return fake_access_time;
 }
+
+int32_t get_parent_id(char *id, const char *objname)
+{
+	MOCK();
+	return 0;
+}
+void fetch_backend_meta_objname(char *objname, ino_t inode)
+{
+	sprintf(objname, "meta_%"PRIu64, (uint64_t)inode);
+
+	return;
+}
+
