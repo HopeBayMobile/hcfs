@@ -14,7 +14,6 @@ extern "C" {
 extern SYSTEM_DATA_HEAD *hcfs_system;
 extern int32_t hcfs_test_backend_register;
 extern int32_t hcfs_test_backend_sleep_nsec;
-extern int32_t backoff_exponent;
 
 class monitorTest : public ::testing::Test {
 	protected:
@@ -47,7 +46,6 @@ TEST_F(monitorTest, Backend_Status_Changed) {
 	wait_monitor_time.tv_nsec = 10000000;
 
 	// Prepare flag to let mock hcfs_test_backend return 200
-	backoff_exponent = 1;
 	hcfs_test_backend_register = 200;
 
 	// create thread to run monitor loop
@@ -66,37 +64,6 @@ TEST_F(monitorTest, Backend_Status_Changed) {
 	nanosleep(&wait_monitor_time, NULL);
 	sem_post(&(hcfs_system->monitor_sem));
 	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
-
-	// let system shut down
-	hcfs_system->system_going_down = TRUE;
-	sem_post(&(hcfs_system->monitor_sem));
-	// join thread
-	pthread_join(monitor_loop_thread, NULL);
-}
-
-TEST_F(monitorTest, Max_Collisions_Number) {
-	pthread_t monitor_loop_thread;
-	struct timespec wait_monitor_time;
-	wait_monitor_time.tv_sec = 0;
-	wait_monitor_time.tv_nsec = 10000000;
-
-	// Prepare flag to let mock hcfs_test_backend return 200
-	hcfs_test_backend_register = 200;
-
-	// create thread to run monitor loop
-	pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
-	ASSERT_EQ(TRUE, hcfs_system->backend_is_online);
-
-	hcfs_test_backend_register = 400;
-	update_backend_status(FALSE, NULL);
-	for (int32_t i =0; i<15;i++)
-		sem_post(&(hcfs_system->monitor_sem));
-	for (int32_t i =0; i<100;i++) {
-		nanosleep(&wait_monitor_time, NULL);
-		if(MONITOR_MAX_BACKOFF_EXPONENT == backoff_exponent)
-			break;
-	}
-	ASSERT_EQ(MONITOR_MAX_BACKOFF_EXPONENT, backoff_exponent);
 
 	// let system shut down
 	hcfs_system->system_going_down = TRUE;
