@@ -123,7 +123,11 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 
 	return 0;
 }
-void set_lastsync_time(ino_t thisinode)
+int64_t set_lastsync_time(void)
 {
-	UNUSED(thisinode);
+	return 0;
+}
+int64_t init_lastsync_time(void)
+{
+	return 0;
 }

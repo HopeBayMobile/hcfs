@@ -298,3 +298,7 @@ int32_t read_system_max_inode(ino_t *ino_num)
 	*ino_num = 1;
 	return 0;
 }
+int64_t set_lastsync_time(void)
+{
+	return 0;
+}
