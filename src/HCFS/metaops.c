@@ -193,7 +193,7 @@ int32_t dir_add_entry(ino_t parent_inode,
 	ret = insert_dir_entry_btree(&temp_entry, &tpage,
 			fileno(body_ptr->fptr), &overflow_entry,
 			&overflow_new_page, &parent_meta, temp_dir_entries,
-			temp_child_page_pos, is_external);
+			temp_child_page_pos, is_external, sizeof(HCFS_STAT));
 
 	/* An error occured and the routine will terminate now */
 	/* TODO: Consider error recovering here */
@@ -454,7 +454,7 @@ int32_t dir_remove_entry(ino_t parent_inode,
 	/* Recursive B-tree deletion routine*/
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
 			fileno(body_ptr->fptr), &parent_meta, temp_dir_entries,
-			temp_child_page_pos, is_external);
+			temp_child_page_pos, is_external, sizeof(HCFS_STAT));
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

@@ -1315,7 +1315,8 @@ int32_t _prune_missing_entries(ino_t thisinode,
 		/* Recursive B-tree deletion routine*/
 		ret = delete_dir_entry_btree(&tmpentry, &tpage, fileno(fptr),
 					     &parent_meta, temp_dir_entries,
-					     temp_child_page_pos, FALSE);
+					     temp_child_page_pos, FALSE,
+		                             sizeof(HCFS_STAT));
 		write_log(10, "Delete dir entry returns %d\n", ret);
 		if (ret < 0) {
 			errcode = ret;
@@ -1647,7 +1648,8 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 		ret = delete_dir_entry_btree(&(removed_list[idx]),
 			&dir_page, fileno(fptr), &dirmeta,
-			temp_dir_entries, temp_child_page_pos, FALSE);
+			temp_dir_entries, temp_child_page_pos, FALSE,
+			sizeof(HCFS_STAT));
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;

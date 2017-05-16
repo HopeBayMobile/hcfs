@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <stddef.h>
 
 #include "macro.h"
 #include "fuseop.h"
@@ -40,6 +41,9 @@
 #include "path_reconstruct.h"
 #include "params.h"
 #include "rebuild_super_block.h"
+
+int64_t meta_pos = offsetof(FS_MANAGER_HEADER_LAYOUT, fs_dir_meta);
+int64_t clouddata_pos = offsetof(FS_MANAGER_HEADER_LAYOUT, fs_clouddata);
 
 /************************************************************************
 *
@@ -57,6 +61,7 @@ int32_t init_fs_manager(void)
 	CLOUD_RELATED_DATA tmp_clouddata;
 	ssize_t ret_ssize;
 	struct timeval tmptime;
+	FS_MANAGER_HEADER_LAYOUT fs_mgr_header;
 
 	fs_mgr_path = malloc(sizeof(char) * (strlen(METAPATH) + 100));
 	if (fs_mgr_path == NULL) {
@@ -122,11 +127,15 @@ int32_t init_fs_manager(void)
 		}
 		close(fd);
 
-		PWRITE(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid, 16, 0);
-		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-		       sizeof(DIR_META_TYPE), 16);
-		PWRITE(fs_mgr_head->FS_list_fh, &tmp_clouddata,
-		       sizeof(CLOUD_RELATED_DATA), 16 + sizeof(DIR_META_TYPE));
+		memcpy(fs_mgr_header.sys_uuid, fs_mgr_head->sys_uuid,
+		       sizeof(uint8_t) * 16);
+		memcpy(&(fs_mgr_header.fs_dir_meta), &tmp_head,
+		       sizeof(DIR_META_TYPE));
+		memcpy(&(fs_mgr_header.fs_clouddata), &tmp_clouddata,
+		       sizeof(CLOUD_RELATED_DATA));
+
+		PWRITE(fs_mgr_head->FS_list_fh, &fs_mgr_header,
+		       sizeof(FS_MANAGER_HEADER_LAYOUT), 0);
 
 		ret = prepare_FS_database_backup();
 		if (ret < 0) {
@@ -144,10 +153,13 @@ int32_t init_fs_manager(void)
 			goto errcode_handle;
 		}
 
-		PREAD(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid, 16, 0);
+		PREAD(fs_mgr_head->FS_list_fh, &fs_mgr_header,
+		       sizeof(FS_MANAGER_HEADER_LAYOUT), 0);
+		memcpy(fs_mgr_head->sys_uuid, fs_mgr_header.sys_uuid,
+		       sizeof(uint8_t) * 16);
+		memcpy(&tmp_head, &(fs_mgr_header.fs_dir_meta),
+		       sizeof(DIR_META_TYPE));
 
-		PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
-		      16);
 		fs_mgr_head->num_FS = tmp_head.total_children;
 	}
 
@@ -409,7 +421,8 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+	      meta_pos);
 
 	if (fs_mgr_head->num_FS <= 0) {
 		ftruncate(fs_mgr_head->FS_list_fh,
@@ -424,7 +437,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
 		tpage.this_page_pos = sizeof(FS_MANAGER_HEADER_LAYOUT);
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-		       sizeof(DIR_META_TYPE), 16);
+		       sizeof(DIR_META_TYPE), meta_pos);
 		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
 		       tpage.this_page_pos);
 	} else {
@@ -484,7 +497,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 				     fs_mgr_head->FS_list_fh, &overflow_entry,
 				     &overflow_new_page, &tmp_head,
 				     temp_dir_entries, temp_child_page_pos,
-				     FALSE);
+				     FALSE, meta_pos);
 
 	if (ret < 0) {
 		errcode = ret;
@@ -595,7 +608,8 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	/* Write head back */
 
-	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+	       meta_pos);
 
 	write_log(10, "Total filesystem is now %" PRId64 "\n",
 		  tmp_head.total_children);
@@ -658,7 +672,8 @@ int32_t delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+	      meta_pos);
 
 	/* Initialize B-tree deletion by first loading the root of
 	*  the B-tree. */
@@ -749,17 +764,19 @@ int32_t delete_filesystem(char *fsname)
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
 				     fs_mgr_head->FS_list_fh, &tmp_head,
 				     temp_dir_entries, temp_child_page_pos,
-				     FALSE);
+				     FALSE, meta_pos);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
 
 	tmp_head.total_children--;
-	write_log(10, "TOTAL CHILDREN is now %" PRId64 "\n", tmp_head.total_children);
-	/* Write head back */
+	write_log(10, "TOTAL CHILDREN is now %" PRId64 "\n",
+	          tmp_head.total_children);
 
-	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	/* Write head back */
+	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+	       meta_pos);
 
 	fs_mgr_head->num_FS--;
 	sem_post(&(fs_mgr_head->op_lock));
@@ -814,7 +831,8 @@ int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+	      meta_pos);
 
 	/* Initialize B-tree searching by first loading the root of
 	*  the B-tree. */
@@ -880,7 +898,8 @@ int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
 		return 0;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE),
+	      meta_pos);
 
 	/* Initialize B-tree walk by first loading the first node
 		of the tree walk. */
@@ -914,7 +933,7 @@ int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
 			tmp_head.total_children = num_walked;
 			write_log(0, "Rewriting FS num in database\n");
 			PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-			       sizeof(DIR_META_TYPE), 16);
+			       sizeof(DIR_META_TYPE), meta_pos);
 		}
 	}
 
@@ -1075,7 +1094,7 @@ int32_t backup_FS_database(void)
 	if (CURRENT_BACKEND == GOOGLEDRIVE) {
 		/* Read meta ID */
 		PREAD(fileno(fptr), &clouddata, sizeof(CLOUD_RELATED_DATA),
-		      16 + sizeof(DIR_META_TYPE));
+		      clouddata_pos);
 		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
 		strncpy(gdrive_info.file_title, FSMGR_BACKUP, 50);
 		get_parent_id(gdrive_info.parentID, FSMGR_BACKUP);
@@ -1106,7 +1125,7 @@ int32_t backup_FS_database(void)
 		strncpy(clouddata.metaID, gdrive_info.fileID, GDRIVE_ID_LENGTH);
 		sem_wait(&(fs_mgr_head->op_lock));
 		PWRITE(fs_mgr_head->FS_list_fh, &clouddata,
-		       sizeof(CLOUD_RELATED_DATA), 16 + sizeof(DIR_META_TYPE));
+		       sizeof(CLOUD_RELATED_DATA), clouddata_pos);
 		sem_post(&(fs_mgr_head->op_lock));
 	}
 
