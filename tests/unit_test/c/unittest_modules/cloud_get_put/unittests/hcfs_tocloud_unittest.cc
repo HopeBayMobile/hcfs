@@ -87,6 +87,8 @@ public:
 		system_config = (SYSTEM_CONF_STRUCT *)
 		                calloc(1, sizeof(SYSTEM_CONF_STRUCT));
 		system_config->max_block_size = 1000;
+		system_config->first_upload_delay = 5;
+		system_config->normal_upload_delay = 10;
 		if (!system_config)
 			printf("Fail to allocate memory\n");
 

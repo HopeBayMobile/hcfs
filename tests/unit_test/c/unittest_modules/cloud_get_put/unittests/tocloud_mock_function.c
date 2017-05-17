@@ -135,6 +135,7 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
+	inode_ptr->lastsync_time = fake_access_time;
 	(inode_ptr->inode_stat).mode = S_IFDIR;
 	/* Should add this counter first to avoid checking the first inode twice */
 	shm_test_data->tohandle_counter++;

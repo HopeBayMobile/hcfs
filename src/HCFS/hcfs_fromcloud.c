@@ -1044,6 +1044,10 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 		} else if (status == 404) {
 			write_log(0, "Error: Usermeta is not found"
 					" on cloud.\n");
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			unlink(download_path);
+			fptr = NULL;
 			goto errcode_handle;
 		} else { /* Retry, Perhaps disconnect */
 			flock(fileno(fptr), LOCK_UN);

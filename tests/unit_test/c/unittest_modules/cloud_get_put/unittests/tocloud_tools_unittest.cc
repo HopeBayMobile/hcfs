@@ -107,10 +107,13 @@ protected:
 		if (!access("tocloud_tools_test_folder", F_OK))
 			system("rm -rf tocloud_tools_test_folder");
 		mkdir("tocloud_tools_test_folder", 0700);
+		system_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->current_backend = SWIFT;
 	}
 
 	void TearDown() {
 		free(hcfs_system);
+		free(system_config);
 		if (!access("tocloud_tools_test_folder", F_OK))
 			system("rm -rf tocloud_tools_test_folder");
 	}
@@ -148,7 +151,7 @@ TEST_F(change_block_status_to_BOTHTest, ChangeStatusSuccess)
 
 	/* Run */
 	EXPECT_EQ(0, change_block_status_to_BOTH(inode, blockno,
-			pagepos, seqnum));
+			pagepos, seqnum, NULL));
 
 	/* Verify */
 	fptr = fopen(path, "r");
@@ -196,7 +199,7 @@ TEST_F(change_block_status_to_BOTHTest, StatusIsNot_LtoC)
 
 	/* Run */
 	EXPECT_EQ(0, change_block_status_to_BOTH(inode, blockno,
-			pagepos, seqnum));
+			pagepos, seqnum, NULL));
 
 	/* Verify */
 	fptr = fopen(path, "r");
@@ -245,7 +248,7 @@ TEST_F(change_block_status_to_BOTHTest, StatusIs_NONE)
 
 	/* Run */
 	EXPECT_EQ(0, change_block_status_to_BOTH(inode, blockno,
-			pagepos, seqnum));
+			pagepos, seqnum, NULL));
 
 	/* Verify */
 	fptr = fopen(path, "r");

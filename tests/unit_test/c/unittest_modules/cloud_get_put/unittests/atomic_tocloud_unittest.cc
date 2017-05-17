@@ -173,6 +173,8 @@ protected:
 			unlink(mock_progress_path);
 		if (access("/tmp/file_meta_init_progress_info", F_OK) == 0)
 			unlink("/tmp/file_meta_init_progress_info");
+		system_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->current_backend = SWIFT;
 	}
 
 	void TearDown()
@@ -181,6 +183,7 @@ protected:
 			unlink(mock_progress_path);
 		if (access("/tmp/file_meta_init_progress_info", F_OK) == 0)
 			unlink("/tmp/file_meta_init_progress_info");
+		free(system_config);
 	}
 };
 
@@ -442,12 +445,15 @@ protected:
 		strcpy(mock_progress_path, "/tmp/mock_progress_file");
 		if (access(mock_progress_path, F_OK) == 0)
 			unlink(mock_progress_path);
+		system_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->current_backend = SWIFT;
 	}
 
 	void TearDown()
 	{
 		if (access(mock_progress_path, F_OK) == 0)
 			unlink(mock_progress_path);
+		free(system_config);
 	}
 };
 
@@ -492,7 +498,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 			&backend_exist, toupload_objid, backend_objid, &finish);
 #else
 		ret = set_progress_info(fd, i, &toupload_exist,
-			&backend_exist, &toupload_seq, &backend_seq, &finish);
+			&backend_exist, &toupload_seq, &backend_seq, NULL, NULL, &finish);
 #endif
 		ASSERT_EQ(0, ret);
 	}
@@ -590,7 +596,7 @@ TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
 			&backend_exist, toupload_objid, backend_objid, &finish);
 #else
 		ret = set_progress_info(fd, block_index[i], &toupload_exist,
-			&backend_exist, &toupload_seq, &backend_seq, &finish);
+			&backend_exist, &toupload_seq, &backend_seq, NULL, NULL, &finish);
 #endif
 		ASSERT_EQ(0, ret);
 	}
@@ -638,12 +644,15 @@ protected:
 		strcpy(mock_progress_path, "/tmp/mock_progress_file");
 		if (access(mock_progress_path, F_OK) == 0)
 			unlink(mock_progress_path);
+		system_config = malloc(sizeof(SYSTEM_CONF_STRUCT));
+		system_config->current_backend = SWIFT;
 	}
 
 	void TearDown()
 	{
 		if (access(mock_progress_path, F_OK) == 0)
 			unlink(mock_progress_path);
+		free(system_config);
 	}
 };
 
@@ -699,6 +708,8 @@ protected:
 
 		if (!access(upload_bullpen_path, F_OK))
 			nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
+		system_config->current_backend = SWIFT;
+
 	}
 
 	void TearDown()
@@ -780,6 +791,7 @@ protected:
 
 		if (!access(upload_bullpen_path, F_OK))
 			nftw(upload_bullpen_path, do_delete, 20, FTW_DEPTH);
+		system_config->current_backend = SWIFT;
 	}
 
 	void TearDown()
@@ -838,6 +850,7 @@ protected:
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		if (!access(mock_target, F_OK))
 			unlink(mock_target);
+		system_config->current_backend = SWIFT;
 	}
 
 	virtual void TearDown()
@@ -987,6 +1000,7 @@ protected:
 
 		fetch_meta_path(localmetapath, 0);
 		mknod(localmetapath, 0700, 0);
+		system_config->current_backend = SWIFT;
 	}
 
 	virtual void TearDown()
@@ -1334,6 +1348,7 @@ protected:
 		if (!access(bullpen_path, F_OK))
 			nftw(bullpen_path, do_delete, 20, FTW_DEPTH);
 		mkdir(bullpen_path, 0700);
+		system_config->current_backend = SWIFT;
 	}
 
 	void TearDown()
@@ -1388,7 +1403,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FirstUpload)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 0, &last_pin_status);
+			&total_backend_blocks, 0, &last_pin_status, NULL);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1425,7 +1440,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_FailToFetchFromCloud)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1, &last_pin_status);
+			&total_backend_blocks, 1, &last_pin_status, NULL);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1460,7 +1475,7 @@ TEST_F(init_backend_file_infoTest, NotRevert_NotFirstUpload)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1, &last_pin_status);
+			&total_backend_blocks, 1, &last_pin_status, NULL);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1500,7 +1515,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_FinishInit)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1, &last_pin_status);
+			&total_backend_blocks, 1, &last_pin_status, NULL);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
@@ -1538,7 +1553,7 @@ TEST_F(init_backend_file_infoTest, RevertMode_NotFinishInit)
 
 	/* Run */
 	ret = init_backend_file_info(&sync_type, &backend_size,
-			&total_backend_blocks, 1, &last_pin_status);
+			&total_backend_blocks, 1, &last_pin_status, NULL);
 
 	/* Verify */
 	fetch_backend_meta_path(backend_metapath, inode);
