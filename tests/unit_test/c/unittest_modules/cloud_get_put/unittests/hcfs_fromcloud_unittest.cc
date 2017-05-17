@@ -63,10 +63,14 @@ public:
 			unlink("/tmp/testHCFS");
 		}
 		symlink(tmppath, "/tmp/testHCFS");
+		system_config = (SYSTEM_CONF_STRUCT *)
+		                calloc(1, sizeof(SYSTEM_CONF_STRUCT));
+		system_config->current_backend = SWIFT;
 	}
 
 	virtual void TearDown() {
 		free(hcfs_system);
+		free(system_config);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		unlink("/tmp/testHCFS");
 		if (workpath != NULL)

@@ -601,7 +601,10 @@ void* fetch_backend_block(void *ptr)
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
 
-	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, blockID);
+	if (CURRENT_BACKEND == GOOGLEDRIVE)
+		ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, blockID);
+	else
+		ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, NULL);
 	if (ret < 0) {
 		/* When file is removed, unlink this empty block directly
 		because status of this block is st_cloud */
