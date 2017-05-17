@@ -10,6 +10,7 @@
 *
 **************************************************************************/
 #include "hcfscurl.h"
+#include "meta.h"
 #include "mock_function.h"
 #include <openssl/hmac.h>
 
@@ -69,7 +70,7 @@ void curl_slist_free_all(struct curl_slist * list)
 	MOCK();
 }
 
-int32_t write_log(int32_t level, char *format, ...)
+int32_t write_log(int32_t level, const char *format, ...)
 {
 	va_list args;
 	va_start (args, format);
@@ -173,3 +174,74 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 	MOCK();
 	return 0;
 }
+int32_t hcfs_init_gdrive_backend(CURL_HANDLE *curl_handle)
+{
+	return 0;
+}
+void hcfs_destroy_gdrive_backend(CURL *curl)
+{
+	return;
+}
+
+int32_t init_gdrive_token_control(void)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_reauth(CURL_HANDLE *curl_handle)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_test_backend(CURL_HANDLE *curl_handle)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
+				   GOOGLEDRIVE_OBJ_INFO *more)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_get_object(FILE *fptr,
+			       char *objname,
+			       CURL_HANDLE *curl_handle,
+			       GOOGLEDRIVE_OBJ_INFO *obj_info)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_delete_object(char *objname,
+				  CURL_HANDLE *curl_handle,
+				  GOOGLEDRIVE_OBJ_INFO *obj_info)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_put_object(FILE *fptr,
+			       char *objname,
+			       CURL_HANDLE *curl_handle,
+			       GOOGLEDRIVE_OBJ_INFO *obj_info)
+{
+	return 0;
+}
+int32_t hcfs_gdrive_post_object(FILE *fptr,
+			       char *objname,
+			       CURL_HANDLE *curl_handle,
+			       GOOGLEDRIVE_OBJ_INFO *obj_info)
+{
+	return 0;
+}
+
+int32_t get_gdrive_fileID(const char *file_name,
+			  char *parentid,
+			  char *fileid)
+{
+	return 0;
+}
+
+int32_t get_parent_id(char *id, const char *objname)
+{
+	return 0;
+}
+
+void gdrive_exp_backoff_sleep(int32_t busy_retry_times)
+{
+	return;
+}
+
