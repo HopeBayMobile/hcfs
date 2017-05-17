@@ -528,7 +528,7 @@ end:
 *  		 Otherwise returns negation of error code.
 *
 *************************************************************************/
-int32_t list_file_blocks(const char *meta_path,
+int32_t list_file_blocks_v1(const char *meta_path,
 			 PORTABLE_BLOCK_NAME **block_list_ptr,
 			 int64_t *ret_num, int64_t *inode_num)
 {

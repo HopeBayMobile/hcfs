@@ -51,7 +51,7 @@ int32_t list_dir_inorder(const char *meta_path, const int64_t page_pos,
 			 int32_t *num_children, PORTABLE_DIR_ENTRY *file_list);
 
 int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage);
-int32_t list_file_blocks(const char *meta_path,
+int32_t list_file_blocks_v1(const char *meta_path,
 			 PORTABLE_BLOCK_NAME **block_list_ptr,
 			 int64_t *ret_num, int64_t *inode_num);
 

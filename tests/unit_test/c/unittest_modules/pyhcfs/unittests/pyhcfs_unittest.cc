@@ -434,7 +434,7 @@ TEST_P(list_file_blocksTest, OPSuccessful)
 
 	CONCAT_TEST_META_PATH("meta_isreg");
 	ret_val =
-	    list_file_blocks(meta_path, &block_list, &ret_num, &inode_num);
+	    list_file_blocks_v1(meta_path, &block_list, &ret_num, &inode_num);
 
 	FILE *fp = fopen(meta_path, "rb");
 	if (fp == NULL) {
@@ -459,7 +459,7 @@ TEST_P(list_file_blocksTest, NotISREG)
 
 	CONCAT_TEST_META_PATH("meta_isdir");
 	ret_val =
-	    list_file_blocks(meta_path, &block_list, &ret_num, &inode_num);
+	    list_file_blocks_v1(meta_path, &block_list, &ret_num, &inode_num);
 
 	EXPECT_EQ(ret_val, -1);
 }
@@ -470,7 +470,7 @@ TEST_F(list_file_blocksTest, MetaNotExisted)
 	HCFS_STAT_v1 meta_stat;
 
 	ret_val =
-	    list_file_blocks(meta_path, &block_list, &ret_num, &inode_num);
+	    list_file_blocks_v1(meta_path, &block_list, &ret_num, &inode_num);
 
 	EXPECT_EQ(ret_val, -1);
 }
@@ -481,7 +481,7 @@ TEST_F(list_file_blocksTest, MetaVersionNotSupport)
 	HCFS_STAT_v1 meta_stat;
 
 	ret_val =
-	    list_file_blocks(meta_path, &block_list, &ret_num, &inode_num);
+	    list_file_blocks_v1(meta_path, &block_list, &ret_num, &inode_num);
 
 	EXPECT_EQ(ret_val, -2);
 }
