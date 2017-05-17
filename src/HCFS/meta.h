@@ -149,6 +149,12 @@ typedef struct {
 	NAMESPACE_PAGE namespace_page[4];
 } _PACKED XATTR_PAGE, XATTR_PAGE_v1;
 
+typedef struct {
+	int64_t size_last_upload; /* Record data + meta */
+	int64_t meta_last_upload; /* Record meta only */
+	int64_t upload_seq;
+	uint8_t padding[64];
+} _PACKED CLOUD_RELATED_DATA_v1;
 
 typedef struct {
 	int64_t size_last_upload; /* Record data + meta */
@@ -217,14 +223,29 @@ typedef struct {
 #endif
 	uint32_t paged_out_count;
 	int64_t seqnum;
+} _PACKED BLOCK_ENTRY_v1;
+
+typedef struct {
+	uint8_t status;
+	uint8_t uploaded;
+#if ENABLE(DEDUP)
+	uint8_t obj_id[OBJID_LENGTH];
+#endif
+	uint32_t paged_out_count;
+	int64_t seqnum;
 	char blockID[GDRIVE_ID_LENGTH + 1]; /* Record block ID */
 } _PACKED BLOCK_ENTRY, BLOCK_ENTRY_v2;
 
 /* Defining the structure of one page of block status page */
 typedef struct {
 	int32_t num_entries;
-	BLOCK_ENTRY block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
-} _PACKED BLOCK_ENTRY_PAGE, BLOCK_ENTRY_PAGE_v1;
+	BLOCK_ENTRY_v1 block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
+} _PACKED BLOCK_ENTRY_PAGE_v1;
+
+typedef struct {
+	int32_t num_entries;
+	BLOCK_ENTRY_v2 block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
+} _PACKED BLOCK_ENTRY_PAGE, BLOCK_ENTRY_PAGE_v2;
 
 /* Defining the structure of pointer page (pointers to other pages) */
 typedef struct {

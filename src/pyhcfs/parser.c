@@ -549,7 +549,7 @@ int32_t list_file_blocks(const char *meta_path,
 	int64_t total_blocks;
         int64_t e_index, which_page;
 	int64_t page_pos;
-        BLOCK_ENTRY_PAGE tmppage;
+        BLOCK_ENTRY_PAGE_v1 tmppage;
 	int64_t ret_idx;
 	uint8_t status;
 
@@ -600,8 +600,8 @@ int32_t list_file_blocks(const char *meta_path,
 			}
 			current_page = which_page;
 			FSEEK(metafptr, page_pos, SEEK_SET);
-			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE));
-			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
+			memset(&tmppage, 0, sizeof(BLOCK_ENTRY_PAGE_v1));
+			FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE_v1), 1, metafptr);
 		}
 		status = tmppage.block_entries[e_index].status;
 		if ((status == ST_NONE) || (status == ST_TODELETE))
