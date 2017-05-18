@@ -254,8 +254,8 @@
 			if ((res == CURLE_OPERATION_TIMEDOUT) &&\
 			    (hcfs_system->backend_is_online == TRUE)) {\
 				num_retries++;\
-				if (num_retries < MAX_RETRIES)\
-					continue;\
+				if (hcfs_system->system_going_down == TRUE)\
+					break;\
 			} else {\
 				break;\
 			} \
