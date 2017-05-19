@@ -315,7 +315,7 @@ int32_t main(int32_t argc, char **argv)
 			retcode = -errno;
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
-			printf("Returned value is %d\n", -retcode);
+			printf("Returned value is %d\n", retcode);
 			break;
 		}
 
@@ -359,7 +359,7 @@ int32_t main(int32_t argc, char **argv)
 		tmpino = _parse_arg_to_ino(argv[2]);
 		if (errno != 0) {
 			retcode = -errno;
-			printf("Returned value is %d\n", -retcode);
+			printf("Returned value is %d\n", retcode);
 			break;
 		}
 		cmd_len = sizeof(ino_t);
