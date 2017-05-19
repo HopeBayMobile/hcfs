@@ -3851,7 +3851,7 @@ int32_t read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 /* Helper function for read operation. Will wait on cache full and wait
 *  until cache is not full. */
 int32_t read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
-		FH_ENTRY *fh_ptr, off_t this_page_fpos)
+		FH_ENTRY *fh_ptr, off_t this_page_fpos, uint8_t pin_s)
 {
 	int32_t ret;
 
@@ -3861,7 +3861,7 @@ int32_t read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, int64_t entry_index,
 		if (hcfs_system->sync_paused)
 			return -EIO;
 
-		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+		if (hcfs_system->systemdata.cache_size > CACHE_LIMITS(pin_s)) {
 			if (hcfs_system->system_going_down == TRUE)
 				return -EBUSY;
 			/*Sleep if cache already full*/
@@ -4172,8 +4172,9 @@ error_handling:
 
 /* Function for reading from a single block for read operation. Will fetch
 *  block from backend if needed. */
-size_t _read_block(char *buf, size_t size, int64_t bindex,
-		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int32_t *reterr)
+size_t _read_block(char *buf, size_t size, int64_t bindex, off_t offset,
+                   FH_ENTRY *fh_ptr, ino_t this_inode, int32_t *reterr,
+                   uint8_t pin_s)
 {
 	int64_t current_page;
 	char thisblockpath[400];
@@ -4279,7 +4280,7 @@ size_t _read_block(char *buf, size_t size, int64_t bindex,
 		}
 
 		ret = read_wait_full_cache(&temppage, entry_index, fh_ptr,
-			this_page_fpos);
+			this_page_fpos, pin_s);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
 			*reterr = ret;
@@ -4465,9 +4466,11 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
+	FILE_META_TYPE tempmeta;
+
 	fh_ptr->meta_cache_locked = TRUE;
-	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL,
-			NULL, 0, fh_ptr->meta_cache_ptr);
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
+			&tempmeta, NULL, 0, fh_ptr->meta_cache_ptr);
 	if (ret < 0) {
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -4475,6 +4478,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, -ret);
 		return;
 	}
+	uint8_t pin_s = tempmeta.local_pin;
 
 	/* Decide the true maximum bytes to read */
 	/* If read request will exceed the size of the file, need to
@@ -4524,7 +4528,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 
 		this_bytes_read = _read_block(&buf[total_bytes_read],
 				target_bytes_read, block_index, current_offset,
-				fh_ptr, fh_ptr->thisinode, &errcode);
+				fh_ptr, fh_ptr->thisinode, &errcode, pin_s);
 		if ((this_bytes_read == 0) && (errcode < 0)) {
 			fuse_reply_err(req, -errcode);
 			free(buf);

@@ -2285,7 +2285,7 @@ static int32_t _check_shrink_size(ino_t **ptr, int64_t num_elem,
 int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 		ino_t **dir_node_list, int64_t *num_dir_node,
 		ino_t **nondir_node_list, int64_t *num_nondir_node,
-		char **nondir_type_list)
+		char **nondir_type_list, BOOL ignore_minapk)
 {
 	int32_t ret, errcode;
 	int32_t count;
@@ -2335,6 +2335,13 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 			tmpentry = &(dir_page.dir_entries[count]);
 			if (!strcmp(tmpentry->d_name, ".") || /* Ignore */
 				!strcmp(tmpentry->d_name, ".."))
+				continue;
+
+			/* Skip if need to check minapk and the name is
+			minapk */
+			if ((ignore_minapk == TRUE) &&
+			    ((tmpentry->d_type == D_ISREG) &&
+			     (is_minapk(tmpentry->d_name))))
 				continue;
 
 			if (tmpentry->d_type == D_ISDIR) {
@@ -2546,7 +2553,7 @@ int32_t update_block_seq(META_CACHE_ENTRY_STRUCT *bptr, off_t page_fpos,
 int32_t collect_dir_children(ino_t this_inode,
 	ino_t **dir_node_list, int64_t *num_dir_node,
 	ino_t **nondir_node_list, int64_t *num_nondir_node,
-	char **nondir_type_list)
+	char **nondir_type_list, BOOL ignore_minapk)
 {
 	int32_t ret, errcode;
 	int64_t ret_size;
@@ -2577,9 +2584,15 @@ int32_t collect_dir_children(ino_t this_inode,
 
 	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
+
+	BOOL ignore_minapk1 = FALSE;
+	if ((ignore_minapk == TRUE) &&
+	    (dir_meta.root_inode == hcfs_system->data_app_root))
+		ignore_minapk1 = TRUE;
+
 	ret = collect_dirmeta_children(&dir_meta, fptr, dir_node_list,
 			num_dir_node, nondir_node_list, num_nondir_node,
-			nondir_type_list);
+			nondir_type_list, ignore_minapk1);
 	if (ret < 0) {
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);

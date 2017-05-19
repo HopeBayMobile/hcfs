@@ -72,6 +72,46 @@ int32_t _walk_folder(char *pathname, int64_t *total_size)
 	return 0;
 }
 
+BOOL _is_minapk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	/* minapk name is ".<x>min" */
+	if (*filename == '.' &&
+		!strncmp(filename + name_len - 3, "min", 3))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+int32_t _check_minapk(char *pathname)
+{
+	int32_t ret_code = -ENOENT;
+	char *resolved_path = NULL;
+
+	resolved_path = realpath(pathname, NULL);
+
+	if (resolved_path == NULL)
+		return ret_code;
+
+	if (!strncmp(resolved_path, APP_PREFIX, sizeof(APP_PREFIX) - 1)) {
+		/* Check if filename is a minapk */
+		char *filename = rindex(resolved_path, '/');
+		if (filename == NULL)
+			return 0;
+		if (_is_minapk(&(filename[1])) == TRUE) /* If this is minapk */
+			return 1;
+	}
+
+	return 0;
+}
+
 /************************************************************************
  * *
  * * Function name: _validate_hcfs_path
@@ -309,6 +349,13 @@ int32_t unpin_by_path(char *buf, uint32_t arg_len)
 
 		memcpy(path, &(buf[msg_len]), path_len);
 		msg_len += path_len;
+
+		ret_code = _check_minapk(path);
+		if (ret_code == 1)  /* Skip if this is minapk */
+			continue;
+
+		if (ret_code < 0)
+			return ret_code;
 
 		ret_code = _get_path_stat(path, &tmp_inode, NULL);
 		if (ret_code < 0)

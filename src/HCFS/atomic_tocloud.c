@@ -895,6 +895,8 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	}
 
 	/* Do not copy when no space */
+	/* Do not work on upload if cache exceeds hard limit, even for
+	high-priority pins */
 	if (reject_if_nospc == TRUE) {
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
 			flock(fileno(tar_ptr), LOCK_UN);
