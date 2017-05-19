@@ -90,6 +90,20 @@ BOOL _is_minapk(const char *filename)
 		return FALSE;
 }
 
+char* _rindex(const char *path, const char key)
+{
+	char *ptr;
+	int32_t path_len = strlen(path);
+	int32_t count;
+
+	for (count = path_len; count >= 0; count--) {
+		ptr = &(path[count]);
+		if (((char) *ptr) == key)
+			return ptr;
+	}
+	return NULL;
+}
+
 int32_t _check_minapk(char *pathname)
 {
 	int32_t ret_code = -ENOENT;
@@ -102,7 +116,7 @@ int32_t _check_minapk(char *pathname)
 
 	if (!strncmp(resolved_path, APP_PREFIX, sizeof(APP_PREFIX) - 1)) {
 		/* Check if filename is a minapk */
-		char *filename = rindex(resolved_path, '/');
+		char *filename = _rindex(resolved_path, '/');
 		if (filename == NULL)
 			return 0;
 		if (_is_minapk(&(filename[1])) == TRUE) /* If this is minapk */
