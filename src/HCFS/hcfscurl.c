@@ -76,8 +76,8 @@ errcode_handle:
 	return 0;
 }
 
-int cancelfn(void *clientp, curl_off_t dltotal, curl_off_t dlnow,
-             curl_off_t ultotal, curl_off_t ulnow)
+int cancelfn(void *clientp, double dltotal, double dlnow,
+             double ultotal, double ulnow)
 {
 	UNUSED(clientp);
 	UNUSED(dltotal);
