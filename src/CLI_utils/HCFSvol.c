@@ -26,6 +26,9 @@
 
 #include "meta.h"
 
+#define PRINT_ERROR_INVAL_ARGUMENTS() \
+	fprintf(stderr, "Invalid number of arguments.\n");
+
 void usage(void){
 	int32_t i;
 	printf("\nSupported Commands: ");
@@ -53,28 +56,6 @@ ino_t _parse_arg_to_ino(char *arg)
 	}
 
 	return tmpino;
-}
-
-#define PRINT_ERROR_INVAL_ARGUMENTS() \
-	fprintf(stderr, "Invalid number of arguments.\n");
-
-int32_t get_inode_from_arg(const char *path, ino_t *tmpino)
-{
-	int32_t ret;
-	struct stat tempstat;
-
-	ret = sscanf(path, "%"PRIu64, tmpino);
-	if (ret <= 0) {
-		/* Perhaps it is a path */
-		ret = stat(path, &tempstat);
-		if (ret < 0) {
-			printf("Returned value is %d\n", -errno);
-			return -errno;
-		}
-		*tmpino = tempstat.st_ino;
-	}
-
-	return 0;
 }
 
 int32_t main(int32_t argc, char **argv)
