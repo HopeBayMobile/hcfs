@@ -1,7 +1,7 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_MODULE		:= liblz4
+LOCAL_MODULE		:= liblz4-tera
 LOCAL_SRC_FILES		:= lz4.c
 LOCAL_C_INCLUDES	:= $(LOCAL_PATH)
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)
