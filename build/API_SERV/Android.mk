@@ -5,6 +5,7 @@ include $(CLEAR_VARS)
 LOCAL_ARM_MODE := arm
 LOCAL_MODULE    := libhcfsapi
 LOCAL_SRC_FILES := $(addprefix ../../src/API/, HCFS_api.c)
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 LOCAL_SHARED_LIBRARIES = libjansson
 include $(BUILD_SHARED_LIBRARY)
 
