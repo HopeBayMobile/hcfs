@@ -23,8 +23,8 @@ include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE     := hcfsconf
-LOCAL_CFLAGS     := -pie -fPIE
-LOCAL_LDFLAGS    := -pie -fPIE
+LOCAL_CFLAGS     := -pie -fPIE -O0
+LOCAL_LDFLAGS   := -pie -fPIE -O0
 LOCAL_SRC_FILES  := $(addprefix ../../src/API/, hcfsconf.c enc.c logger.c strrchr_chk.c strchr_chk.c vsprintf_chk.c strcat_chk.c strlen_chk.c)
 LOCAL_SHARED_LIBRARIES = libcrypto
 include $(BUILD_EXECUTABLE)
