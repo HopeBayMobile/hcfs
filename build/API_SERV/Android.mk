@@ -3,7 +3,7 @@ BUILD_PATH := $(abspath $(LOCAL_PATH)/..)
 
 include $(CLEAR_VARS)
 LOCAL_ARM_MODE := arm
-LOCAL_MODULE    := HCFS_api
+LOCAL_MODULE    := libhcfsapi
 LOCAL_SRC_FILES := $(addprefix ../../src/API/, HCFS_api.c)
 LOCAL_SHARED_LIBRARIES = libjansson
 include $(BUILD_SHARED_LIBRARY)
