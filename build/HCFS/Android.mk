@@ -40,6 +40,8 @@ LOCAL_SHARED_LIBRARIES += libssl \
 			  libfuse \
 			  libjansson
 
+LOCAL_C_INCLUDES += $(BUILD_PATH)/../src/include
+
 ## Compression feature
 COMPRESS_ENABLE := 0
 ifeq "$(COMPRESS_ENABLE)" "0"

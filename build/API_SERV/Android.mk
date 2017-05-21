@@ -17,6 +17,7 @@ ifeq "$(DEVICE)" "AOSP-nougat-arm64"
 LOCAL_LDFLAGS   += -L/home/jiahong/AOSP_7.1_tera/out/target/product/tera-emulator-arm/system/lib64
 endif
 LOCAL_SHARED_LIBRARIES = libsqlite libcrypto libzip libicui18n libicuuc
+LOCAL_C_INCLUDES += $(BUILD_PATH)/../src/include
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
