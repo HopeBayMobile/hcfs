@@ -136,6 +136,8 @@ int32_t hcfs_delete_object(char *objname,
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);                  \
 		curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);                    \
 		curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);                   \
+		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);                \
+		curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, cancelfn);    \
 	} while (0)
 
 int32_t http_is_success(int32_t code);
@@ -146,6 +148,8 @@ int32_t parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  const char *, const char *);
 size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 			  void *put_control1);
+int cancelfn(void *clientp, double dltotal, double dlnow,
+             double ultotal, double ulnow);
 /*
  * Marco to compute data transfer throughput.  If object size < 32KB, for
  * this computation the size is rounded up to 32KB.

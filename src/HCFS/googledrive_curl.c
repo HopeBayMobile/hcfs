@@ -235,7 +235,9 @@ int32_t hcfs_gdrive_test_backend(CURL_HANDLE *curl_handle)
 	if (res == CURLE_OK)
 		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &ret_val);
 	else
-		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
+		if (res != CURLE_ABORTED_BY_CALLBACK)
+			write_log(4, "Curl op failed %s\n",
+			          curl_easy_strerror(res));
 
 	fclose(gdrive_header_fptr);
 	unlink(header_filename);
@@ -441,7 +443,9 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	FREE(url);
 
 	if (res != CURLE_OK) {
-		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
+		if (res != CURLE_ABORTED_BY_CALLBACK)
+			write_log(4, "Curl op failed %s\n",
+			          curl_easy_strerror(res));
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
 		goto errcode_handle;
@@ -581,7 +585,9 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	FREE(url);
 
 	if (res != CURLE_OK) {
-		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
+		if (res != CURLE_ABORTED_BY_CALLBACK)
+			write_log(4, "Curl op failed %s\n",
+			          curl_easy_strerror(res));
 		fclose(gdrive_header_fptr);
 		fclose(gdrive_body_fptr);
 		unlink(header_filename);
@@ -714,7 +720,9 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 	FREE(url);
 
 	if (res != CURLE_OK) {
-		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
+		if (res != CURLE_ABORTED_BY_CALLBACK)
+			write_log(4, "Curl op failed %s\n",
+			          curl_easy_strerror(res));
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
 		goto errcode_handle;
@@ -907,7 +915,9 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	FREE(url);
 
 	if (res != CURLE_OK) {
-		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
+		if (res != CURLE_ABORTED_BY_CALLBACK)
+			write_log(4, "Curl op failed %s\n",
+			          curl_easy_strerror(res));
 		/* We still need to record this failure for xfer throughput */
 		change_xfer_meta(0, 0, 0, 1);
 		goto errcode_handle;
@@ -1073,7 +1083,9 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 	curl_slist_free_all(chunk);
 
 	if (res != CURLE_OK) {
-		write_log(4, "Curl op failed %s\n", curl_easy_strerror(res));
+		if (res != CURLE_ABORTED_BY_CALLBACK)
+			write_log(4, "Curl op failed %s\n",
+			          curl_easy_strerror(res));
 		fclose(gdrive_header_fptr);
 		unlink(header_filename);
 		/* We still need to record this failure for xfer throughput */
