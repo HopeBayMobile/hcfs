@@ -1184,6 +1184,16 @@ int32_t change_system_meta(int64_t system_size_delta,
 	if (hcfs_system->systemdata.unpin_dirty_data_size < 0)
 		hcfs_system->systemdata.unpin_dirty_data_size = 0;
 
+	/* Cache might have something to be replaced if unpin dirty is
+	decreasing */
+	if (unpin_dirty_delta < 0) {
+		int32_t semval = 0;
+		ret = sem_getvalue(&(hcfs_system->something_to_replace),
+				   &semval);
+		if ((ret == 0) && (semval == 0))
+			sem_post(&(hcfs_system->something_to_replace));
+	}
+
 	ret = 0;
 	if (need_sync) {
 		ret = sync_hcfs_system_data(FALSE);
