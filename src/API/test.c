@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <jansson.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "HCFS_api.h"
 #include "pin_ops.h"

@@ -3,10 +3,11 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_CFLAGS := -DHAVE_CONFIG_H
 LOCAL_MODULE    := libzip
-LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)/lib/zip_*.c)
+LOCAL_SRC_FILES := $(patsubst $(LOCAL_PATH)/%, %, $(wildcard $(LOCAL_PATH)/lib/zip_*.c))
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/lib
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/lib
 LOCAL_EXPORT_C_INCLUDE_DIRS :=$(LOCAL_PATH)/lib
+LOCAL_SHARED_LIBRARIES = libz
 LOCAL_LDLIBS := -lz
 include $(BUILD_SHARED_LIBRARY)
 
