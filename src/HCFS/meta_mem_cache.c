@@ -1869,6 +1869,13 @@ errcode_handle:
 int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	BOOL is_now_uploading, int32_t new_fd, int64_t toupload_blocks)
 {
+	int32_t ret;
+	HCFS_STAT tmpstat;
+	int64_t seqnum = -1;
+	FILE_META_TYPE tmpfilemeta;
+	DIR_META_TYPE tmpdirmeta;
+	SYMLINK_META_TYPE tmplnkmeta;
+
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (body_ptr->uploading_info.is_uploading == is_now_uploading) {
@@ -1877,9 +1884,44 @@ int32_t meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 		return -EINVAL;
 	}
 
+	ret = meta_cache_lookup_file_data(body_ptr->inode_num, &tmpstat,
+	                                  NULL, NULL, 0, body_ptr);
+	if (ret < 0)
+		return ret;
+
+	if (S_ISFILE(tmpstat.mode)) {
+		ret = meta_cache_lookup_file_data(body_ptr->inode_num, NULL,
+	                                  &tmpfilemeta, NULL, 0, body_ptr);
+		if (ret < 0)
+			return ret;
+
+		seqnum = tmpfilemeta.finished_seq;
+	} else if (S_ISDIR(tmpstat.mode)) {
+		ret = meta_cache_lookup_dir_data(body_ptr->inode_num, NULL,
+	                                  &tmpdirmeta, NULL, body_ptr);
+		if (ret < 0)
+			return ret;
+
+		seqnum = tmpdirmeta.finished_seq;
+	} else if (S_ISLNK(tmpstat.mode)) {
+		ret = meta_cache_lookup_symlink_data(body_ptr->inode_num, NULL,
+	                                  &tmplnkmeta, body_ptr);
+		if (ret < 0)
+			return ret;
+
+		seqnum = tmplnkmeta.finished_seq;
+	}
+
+	if (seqnum == -1) {
+		write_log(2, "Warn: Error reading seq number for inode %"
+		          PRIu64 ".\n", (uint64_t) body_ptr->inode_num);
+		return -EINVAL;
+	}
+
 	body_ptr->uploading_info.is_uploading = is_now_uploading;
 	body_ptr->uploading_info.progress_list_fd = new_fd;
 	body_ptr->uploading_info.toupload_blocks = toupload_blocks;
+	body_ptr->uploading_info.current_seqnum = seqnum;
 	if (is_now_uploading == TRUE)
 		body_ptr->need_inc_seq = TRUE;
 
@@ -1943,7 +1985,14 @@ int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr,
 		return 0;
 
 	} else {
-
+		/* Do nothing if the seq number of this block is greater
+		than the one being uploaded */
+		if (seq > body_ptr->uploading_info.current_seqnum) {
+			write_log(10, "Skipping check_and_copy as this seq %lld"
+			          " is greater than uploading seq %lld\n",
+			          seq, body_ptr->uploading_info.current_seqnum);
+			return 0;
+		}
 		/* Do nothing when block index + 1 more than # of blocks
 		 * of to-upload data */
 		if (bindex + 1 > body_ptr->uploading_info.toupload_blocks) {
@@ -1968,6 +2017,7 @@ int32_t meta_cache_check_uploading(META_CACHE_ENTRY_STRUCT *body_ptr,
 		fetch_toupload_block_path(toupload_bpath, inode, bindex);
 		fetch_backend_block_objname(objname, inode, bindex, seq);
 		write_log(10, "Debug: begin to copy block, obj is %s", objname);
+
 		ret = check_and_copy_file(local_bpath, toupload_bpath,
 				TRUE, TRUE);
 		if (ret < 0) {
