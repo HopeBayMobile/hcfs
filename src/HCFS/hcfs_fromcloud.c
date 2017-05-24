@@ -881,6 +881,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	blocks that existing before setting local_pin = true.*/
 	FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
+	uint8_t pin_state = this_meta.local_pin;
 
 	total_size = tempstat.size;
 	total_blocks = BLOCKS_OF_SIZE(total_size, MAX_BLOCK_SIZE);
@@ -903,7 +904,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 		}
 
 		get_system_size(&cache_size, NULL);
-		if (cache_size >= CACHE_HARD_LIMIT) {
+		if (cache_size >= CACHE_LIMITS(pin_state)) {
 			write_log(0, "Error: Cache space is full.\n");
 			ret_code = -ENOSPC;
 			break;
@@ -956,7 +957,7 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	/* Check cache size again */
 	if (ret_code == 0) {
 		get_system_size(&cache_size, NULL);
-		if (cache_size > CACHE_HARD_LIMIT) {
+		if (cache_size > CACHE_LIMITS(pin_state)) {
 			write_log(0, "Error: Cache space is full.\n");
 			ret_code = -ENOSPC;
 		}

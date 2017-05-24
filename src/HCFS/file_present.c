@@ -1380,7 +1380,7 @@ int32_t pin_inode(ino_t this_inode,
 		nondir_node_list = NULL;
 		ret = collect_dir_children(this_inode, &dir_node_list,
 			&num_dir_node, &nondir_node_list,
-			&num_nondir_node, NULL);
+			&num_nondir_node, NULL, FALSE);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(4, "Folder is removed? Skip pinning"
@@ -1530,9 +1530,10 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 		num_nondir_node = 0;
 		dir_node_list = NULL;
 		nondir_node_list = NULL;
+
 		ret = collect_dir_children(this_inode, &dir_node_list,
 			&num_dir_node, &nondir_node_list,
-			&num_nondir_node, NULL);
+			&num_nondir_node, NULL, TRUE);
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(4, "Folder is removed? Skip pinning"

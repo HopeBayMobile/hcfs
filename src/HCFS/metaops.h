@@ -82,7 +82,7 @@ int32_t change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 
 int32_t collect_dir_children(ino_t this_inode, ino_t **dir_node_list,
 	int64_t *num_dir_node, ino_t **nondir_node_list,
-	int64_t *num_nondir_node, char **nondir_type_list);
+	int64_t *num_nondir_node, char **nondir_type_list, BOOL ignore_minapk);
 
 int32_t update_meta_seq(META_CACHE_ENTRY_STRUCT *bptr);
 
@@ -96,7 +96,7 @@ int32_t change_unpin_dirty_size(ino_t this_inode, PIN_t pin);
 int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 		ino_t **dir_node_list, int64_t *num_dir_node,
 		ino_t **nondir_node_list, int64_t *num_nondir_node,
-		char **nondir_type_list);
+		char **nondir_type_list, BOOL ignore_minapk);
 
 int32_t restore_meta_file(ino_t this_inode);
 int32_t restore_meta_structure(FILE *fptr);

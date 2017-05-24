@@ -79,7 +79,7 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	flock(fileno(fsmgr_fptr), LOCK_EX);
 	PREAD(fileno(fsmgr_fptr), &dirmeta, sizeof(DIR_META_TYPE), 16);
 	ret = collect_dirmeta_children(&dirmeta, fsmgr_fptr, &dir_nodes,
-			&num_dir, &nondir_nodes, &num_nondir, NULL);
+			&num_dir, &nondir_nodes, &num_nondir, NULL, FALSE);
 	if (ret < 0)
 		return ret;
 	flock(fileno(fsmgr_fptr), LOCK_UN);
@@ -738,7 +738,7 @@ void rebuild_sb_worker(void *t_idx)
 
 			ret = collect_dir_children(inode_job.inode,
 				&dir_list, &num_dir, &nondir_list, &num_nondir,
-				&nondir_type_list);
+				&nondir_type_list, FALSE);
 			if (ret < 0) {
 				push_inode_job(&(inode_job.inode), 1);
 				erase_inode_job(&inode_job);
