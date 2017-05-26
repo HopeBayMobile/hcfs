@@ -41,3 +41,7 @@ void wake_sb_rebuilder(void)
 	return;
 }
 
+int32_t update_use_minimal_apk(void)
+{
+	return 0;
+}

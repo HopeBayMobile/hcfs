@@ -141,7 +141,7 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 int32_t collect_dir_children(ino_t this_inode,
 	ino_t **dir_node_list, int64_t *num_dir_node,
 	ino_t **nondir_node_list, int64_t *num_nondir_node,
-	char **nondir_type_list)
+	char **nondir_type_list, BOOL ignore_minapk)
 {
 	if (this_inode > 80000) {
 		*num_dir_node = 0;

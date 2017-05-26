@@ -1942,7 +1942,7 @@ TEST_F(collect_dir_childrenTest, MetaNotExist)
 	inode = 5;
 	EXPECT_EQ(-ENOENT, collect_dir_children(inode, &dir_node_list,
 		&num_dir_node, &nondir_node_list, &num_nondir_node,
-	        &nondir_type_list));
+	        &nondir_type_list, FALSE));
 }
 
 TEST_F(collect_dir_childrenTest, NoChildren)
@@ -1964,7 +1964,7 @@ TEST_F(collect_dir_childrenTest, NoChildren)
 
 	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
 		&num_dir_node, &nondir_node_list, &num_nondir_node,
-		&nondir_type_list));
+		&nondir_type_list, FALSE));
 
 	/* Verify */
 	EXPECT_EQ(0, num_dir_node);
@@ -2026,7 +2026,7 @@ TEST_F(collect_dir_childrenTest, CollectManyChildrenSuccess)
 	/* Run */
 	EXPECT_EQ(0, collect_dir_children(inode, &dir_node_list,
 		&num_dir_node, &nondir_node_list, &num_nondir_node,
-		&nondir_type_list));
+		&nondir_type_list, FALSE));
 
 	/* Verify */
 	EXPECT_EQ(10, num_dir_node);

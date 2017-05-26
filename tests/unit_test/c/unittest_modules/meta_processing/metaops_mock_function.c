@@ -620,4 +620,7 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 {
 	return 0;
 }
-
+BOOL is_minapk(const char *filename)
+{
+	return FALSE;
+}
