@@ -28,6 +28,7 @@
 #include "event_notification.h"
 #include "event_filter.h"
 #include "hcfs_fromcloud.h"
+#include "fuseop.h"
 
 /**
  * Fetch path of sync point data.
@@ -74,6 +75,11 @@ int32_t init_syncpoint_resource()
 		FREE(sys_super_block->sync_point_info);
 		return -ENOMEM;
 	}
+
+	/* Check if sync is paused, and wake it up if needed */
+	int32_t sem_val;
+	sem_check_and_release(&(hcfs_system->sync_control_sem), &sem_val);
+
 	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
 	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;
 	sem_init(&(sys_super_block->sync_point_info->ctl_sem), 0, 1);

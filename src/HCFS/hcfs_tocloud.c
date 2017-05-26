@@ -72,6 +72,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "rebuild_super_block.h"
 #include "do_restoration.h"
 #include "recover_super_block.h"
+#include "pthread_control.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -250,11 +251,13 @@ static inline void _sync_terminate_thread(int32_t index)
 	char toupload_metapath[300], local_metapath[400];
 	char finish_sync;
 	mode_t this_mode;
+	int32_t sync_status;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    ((sync_ctl.threads_finished[index] == TRUE) &&
 	     (sync_ctl.threads_created[index] == TRUE))) {
-		ret = pthread_join(sync_ctl.inode_sync_thread[index], NULL);
+		ret = 0;
+		PTHREAD_REUSE_join(&(sync_ctl.inode_sync_thread[index]));
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
 			this_mode = 0;
@@ -333,6 +336,8 @@ static inline void _sync_terminate_thread(int32_t index)
 			sync_ctl.threads_error[index] = FALSE;
 			sync_ctl.is_revert[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &sync_status);
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
 	}
@@ -341,11 +346,8 @@ static inline void _sync_terminate_thread(int32_t index)
 void collect_finished_sync_threads(void *ptr)
 {
 	int32_t count;
-	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 	       (sync_ctl.total_active_sync_threads > 0)) {
@@ -360,8 +362,11 @@ void collect_finished_sync_threads(void *ptr)
 				write_log(10, "Set upload in progress to FALSE\n");
 			}
 			sem_post(&(sync_ctl.sync_op_sem));
-			nanosleep(&time_to_sleep, NULL);
-			continue;
+			sem_wait(&(sync_ctl.sync_finished_sem));
+			if ((sync_ctl.total_active_sync_threads <= 0) &&
+			       (hcfs_system->system_going_down == TRUE))
+				break;
+			sem_wait(&(sync_ctl.sync_op_sem));
 		}
 
 		/* Some upload threads are working */
@@ -376,9 +381,9 @@ void collect_finished_sync_threads(void *ptr)
 			_sync_terminate_thread(count);
 
 		sem_post(&(sync_ctl.sync_op_sem));
-		nanosleep(&time_to_sleep, NULL);
-		continue;
 	}
+	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(sync_ctl.inode_sync_thread[count]));
 }
 
 /* On error, need to alert thread that dispatch the block upload
@@ -417,20 +422,7 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	if (upload_ctl.threads_finished[index] != TRUE)
 		return 0;
 
-	ret = pthread_join(upload_ctl.upload_threads_no[index], NULL);
-
-	/* TODO: If thread join failed but not EBUSY, perhaps should try to
-	terminate the thread and mark fail? */
-	if (ret != 0) {
-		if (ret != EBUSY) {
-			/* Perhaps can't join. Mark the thread as not in use */
-			write_log(0, "Error in upload thread. Code %d, %s\n",
-				  ret, strerror(ret));
-			return -ret;
-		}
-		/* Thread is busy. Wait some more */
-		return ret;
-	}
+	PTHREAD_REUSE_join(&(upload_ctl.upload_threads_no[index]));
 
 	this_inode = upload_ctl.upload_threads[index].inode;
 	//is_delete = upload_ctl.upload_threads[index].is_delete;
@@ -607,21 +599,18 @@ errcode_handle:
 void collect_finished_upload_threads(void *ptr)
 {
 	int32_t count, ret;
-	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 	       (upload_ctl.total_active_upload_threads > 0)) {
+		sem_wait(&(upload_ctl.upload_finished_sem));
+		if ((upload_ctl.total_active_upload_threads <= 0) &&
+			       (hcfs_system->system_going_down == TRUE))
+			break;
+
 		sem_wait(&(upload_ctl.upload_op_sem));
 
-		if (upload_ctl.total_active_upload_threads <= 0) {
-			sem_post(&(upload_ctl.upload_op_sem));
-			nanosleep(&time_to_sleep, NULL);
-			continue;
-		}
 		for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
 			ret = _upload_terminate_thread(count);
 			/* Return code could be due to thread joining,
@@ -646,16 +635,19 @@ void collect_finished_upload_threads(void *ptr)
 		}
 
 		sem_post(&(upload_ctl.upload_op_sem));
-		nanosleep(&time_to_sleep, NULL);
-		continue;
 	}
+	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(upload_ctl.upload_threads_no[count]));
 }
 
 void init_sync_control(void)
 {
+	int count;
+
 	memset(&sync_ctl, 0, sizeof(SYNC_THREAD_CONTROL));
 	sem_init(&(sync_ctl.sync_op_sem), 0, 1);
 	sem_init(&(sync_ctl.sync_queue_sem), 0, MAX_SYNC_CONCURRENCY);
+	sem_init(&(sync_ctl.sync_finished_sem), 0, 0);
 	memset(&(sync_ctl.threads_in_use), 0,
 	       sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
 	memset(&(sync_ctl.threads_created), 0,
@@ -667,9 +659,22 @@ void init_sync_control(void)
 	sync_ctl.retry_list.num_retry = 0;
 	sync_ctl.retry_list.retry_inode = (ino_t *)
 			calloc(MAX_SYNC_CONCURRENCY, sizeof(ino_t));
-
+	PTHREAD_REUSE_set_exithandler();
+	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
+		sync_ctl.progress_fd[count] = -1;
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
 		       (void *)&collect_finished_sync_threads, NULL);
+
+	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(sync_ctl.inode_sync_thread[count]),
+		                     NULL);
+}
+
+static inline void destroy_sync_control(void)
+{
+	sem_post(&(sync_ctl.sync_finished_sem));
+	pthread_join(sync_ctl.sync_handler_thread, NULL);
+	free(sync_ctl.retry_list.retry_inode);
 }
 
 void init_upload_control(void)
@@ -696,6 +701,7 @@ void init_upload_control(void)
 
 	sem_init(&(upload_ctl.upload_op_sem), 0, 1);
 	sem_init(&(upload_ctl.upload_queue_sem), 0, MAX_UPLOAD_CONCURRENCY);
+	sem_init(&(upload_ctl.upload_finished_sem), 0, 0);
 	memset(&(upload_ctl.threads_in_use), 0,
 	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	memset(&(upload_ctl.threads_created), 0,
@@ -703,9 +709,14 @@ void init_upload_control(void)
 	memset(&(upload_ctl.threads_finished), 0,
 	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	upload_ctl.total_active_upload_threads = 0;
+	PTHREAD_REUSE_set_exithandler();
 
 	pthread_create(&(upload_ctl.upload_handler_thread), NULL,
 		       (void *)&collect_finished_upload_threads, NULL);
+
+	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(upload_ctl.upload_threads_no[count]),
+	                     NULL);
 }
 
 void init_sync_stat_control(void)
@@ -1128,6 +1139,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1138,6 +1150,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (ret < 0) {
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1149,6 +1162,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			__func__, errcode, strerror(errcode));
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1165,6 +1179,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		to sync this object anymore. */
 		fclose(toupload_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	setbuf(local_metafptr, NULL);
@@ -1191,6 +1206,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			fclose(local_metafptr);
 			sync_ctl.threads_error[ptr->which_index] = TRUE;
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1293,6 +1309,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 
@@ -1310,6 +1327,7 @@ store in some other file */
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			sem_post(&(sync_ctl.sync_finished_sem));
 			return;
 		}
 	}
@@ -1322,6 +1340,7 @@ store in some other file */
 		fclose(local_metafptr);
 		sync_ctl.threads_error[ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1465,7 +1484,7 @@ store in some other file */
 			}
 		}
 		schedule_sync_meta(toupload_metapath, which_curl);
-		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
+		PTHREAD_REUSE_join(&(upload_ctl.upload_threads_no[which_curl]));
 		if (CURRENT_BACKEND == GOOGLEDRIVE &&
 		    cloud_related_data.metaID[0] == 0) {
 			/* Write file id to cloud related data */
@@ -1508,6 +1527,7 @@ store in some other file */
 					ptr->inode, DEL_TOUPLOAD_BLOCKS);
 
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1527,6 +1547,7 @@ store in some other file */
 		fclose(toupload_metafptr);
 		fclose(local_metafptr);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 	fclose(toupload_metafptr);
@@ -1588,6 +1609,7 @@ store in some other file */
 				ptr->inode, DEL_BACKEND_BLOCKS);
 	}
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 
 errcode_handle:
@@ -1609,6 +1631,7 @@ errcode_handle:
 			ptr->inode, DEL_TOUPLOAD_BLOCKS);
 	sync_ctl.threads_error[ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	UNUSED(errcode);
 	return;
 }
@@ -1897,6 +1920,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	UNLINK(thread_ptr->tempfilename);
 	change_system_meta(0, 0, -filesize, 0, 0, 0, FALSE);
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 
 errcode_handle:
@@ -1920,6 +1944,7 @@ errcode_handle:
 					0, 0, 0, FALSE);
 	}
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 }
 
@@ -1954,6 +1979,7 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 			goto errcode_handle;
 
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 
 errcode_handle:
@@ -1968,6 +1994,7 @@ errcode_handle:
 	}
 
 	upload_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	return;
 }
 
@@ -1976,7 +2003,7 @@ int32_t schedule_sync_meta(char *toupload_metapath, int32_t which_curl)
 	strncpy(upload_ctl.upload_threads[which_curl].tempfilename,
 		toupload_metapath,
 		sizeof(((UPLOAD_THREAD_TYPE *)0)->tempfilename));
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
+	PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[which_curl]),
 		       (void *)&con_object_sync,
 		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
@@ -2034,8 +2061,8 @@ int32_t dispatch_upload_block(int32_t which_curl)
 	}
 
 	strcpy(upload_ptr->tempfilename, toupload_blockpath);
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]),
-		NULL, (void *)&con_object_sync,	(void *)upload_ptr);
+	PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[which_curl]),
+		(void *)&con_object_sync, (void *)upload_ptr);
 
 	upload_ctl.threads_created[which_curl] = TRUE;
 	return 0;
@@ -2056,7 +2083,7 @@ errcode_handle:
 
 void dispatch_delete_block(int32_t which_curl)
 {
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
+	PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[which_curl]),
 		       (void *)&delete_object_sync,
 		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
@@ -2133,14 +2160,14 @@ static inline int32_t _sync_mark(ino_t this_inode, mode_t this_mode,
 				  sync_threads[count].this_mode);
 
 			if (sync_ctl.is_revert[count] == TRUE)
-				pthread_create(
+				PTHREAD_REUSE_run(
 					&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&continue_inode_sync,
+					(void *)&continue_inode_sync,
 					(void *)&(sync_threads[count]));
 			else
-				pthread_create(
+				PTHREAD_REUSE_run(
 					&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&sync_single_inode,
+					(void *)&sync_single_inode,
 					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
@@ -2204,6 +2231,25 @@ errcode_handle:
 	fclose(to_sync_fptr);
 	unlink(restore_tosync_list);
 }
+
+static inline void _upload_sleep(int64_t shortest_wait, BOOL skip_everyone)
+{
+	struct timespec nonbusy_pause_time;
+
+	if (((hcfs_system->systemdata.unpin_dirty_data_size +
+	      hcfs_system->systemdata.pinned_size) < CACHE_SOFT_LIMIT) &&
+	    (sys_super_block->sync_point_is_set == FALSE)) {
+		clock_gettime(CLOCK_REALTIME_COARSE, &nonbusy_pause_time);
+		if ((skip_everyone == TRUE) &&
+		    (shortest_wait > SYNC_NONBUSY_PAUSE_TIME))
+			nonbusy_pause_time.tv_sec += shortest_wait;
+		else
+			nonbusy_pause_time.tv_sec += SYNC_NONBUSY_PAUSE_TIME;
+		sem_timedwait(&(hcfs_system->sync_control_sem),
+		              &nonbusy_pause_time);
+	}
+}
+
 #ifdef _ANDROID_ENV_
 void *upload_loop(void *ptr)
 #else
@@ -2213,17 +2259,30 @@ void upload_loop(void)
 	ino_t ino_sync, ino_check, retry_inode;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 	SUPER_BLOCK_ENTRY tempentry;
-	int32_t count, sleep_count;
+	int32_t count;
 	char in_sync;
 	int32_t ret_val, ret;
 	BOOL is_start_check;
 	char sync_paused_status = FALSE;
 	char need_retry_backup;
-	struct timeval last_retry_time, current_time;
+	struct timespec last_retry_time, current_time;
+	int64_t last_synctime, this_waittime;
+	int64_t shortest_wait = NORMAL_UPLOAD_DELAY;
+	/* consecutive_skips is for determining if we should find the
+	current time or could use previously cached value. */
+	/* skip_everyone is for finding out if we should sleep longer
+	if every inode in the queue has been uploaded recently */
+	BOOL consecutive_skips, skip_everyone;
+	
+	struct timespec nonbusy_pause_time;
 
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 #endif
+	/* Initializing time structures */
+	nonbusy_pause_time.tv_sec = SYNC_NONBUSY_PAUSE_TIME;
+	nonbusy_pause_time.tv_nsec = 0;
+
 	init_upload_control();
 	init_sync_control();
 	/*	init_sync_stat_control(); */
@@ -2235,6 +2294,8 @@ void upload_loop(void)
 	_update_restore_dirty_list();
 
 	need_retry_backup = FALSE;
+	consecutive_skips = FALSE;
+	skip_everyone = FALSE;
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			/* Backup FS db if needed at the beginning of a round
@@ -2242,37 +2303,53 @@ void upload_loop(void)
 			ret = backup_FS_database();
 			if (ret < 0) {
 				need_retry_backup = TRUE;
-				gettimeofday(&last_retry_time, NULL);
+				clock_gettime(CLOCK_REALTIME_COARSE,
+				              &last_retry_time);
 			}
 
 			/* Start to recovery dirty queue if needed */
 			if (need_recover_sb())
 				start_sb_recovery();
+			/* Sleep for SYNC_NONBUSY_PAUSE_TIME seconds if not
+			in a hurry */
+			/* If need to delay upload further, sleep until
+			the next sync could be successful */
+			/* Will not sleep if sync all is in progress, or
+			cache cannot be replaced if nothing is uploaded */
+			/* Sleep will be interrupted if system is going down
+			or cache is full */
+			_upload_sleep(shortest_wait, skip_everyone);
 
-			for (sleep_count = 0; sleep_count < 10; sleep_count++) {
-				/* Break if system going down */
+			/* Break immediately if system going down */
+			if (hcfs_system->system_going_down == TRUE)
+				break;
+
+			/* Avoid busy polling */
+			if (sys_super_block->head.num_dirty <=
+			    sync_ctl.total_active_sync_threads) {
+				sem_wait(&(hcfs_system->sync_wait_sem));
 				if (hcfs_system->system_going_down == TRUE)
-					break;
-
-				/* Avoid busy polling */
-				if (sys_super_block->head.num_dirty <=
-				    sync_ctl.total_active_sync_threads) {
-					sleep(1);
-					continue;
-				}
-
-				/*Sleep for a while if we are not really
-				in a hurry*/
-				if ((hcfs_system->systemdata.cache_size <
-				    CACHE_SOFT_LIMIT) ||
-				    (hcfs_system->systemdata.dirty_cache_size
-				    <= 0))
-					sleep(1);
-				else
 					break;
 			}
 
+			
+			/* Sleep for SYNC_NONBUSY_PAUSE_TIME seconds if not
+			in a hurry */
+			/* Will not sleep if sync all is in progress, or
+			cache cannot be replaced if nothing is uploaded */
+			/* Sleep will be interrupted if system is going down
+			or cache is full */
+			if (((hcfs_system->systemdata.unpin_dirty_data_size +
+			      hcfs_system->systemdata.pinned_size) <
+			     CACHE_SOFT_LIMIT) &&
+			    (sys_super_block->sync_point_is_set == FALSE))
+				sem_timedwait(&(hcfs_system->sync_control_sem),
+				              &nonbusy_pause_time);
+
 			ino_check = 0;
+			consecutive_skips = FALSE;
+			skip_everyone = TRUE;
+			shortest_wait = NORMAL_UPLOAD_DELAY;
 		}
 		/* Break immediately if system going down */
 		if (hcfs_system->system_going_down == TRUE)
@@ -2285,15 +2362,15 @@ void upload_loop(void)
 
 		/* sleep until backend is back */
 		if (hcfs_system->sync_paused) {
-			sleep(1);
+			sem_wait(&(hcfs_system->sync_wait_sem));
 			continue;
 		}
 
 		/* If FSmgr backup failed, retry if network
 		connection is on with at least 5 seconds
-		if between */
+		in between */
 		if (need_retry_backup == TRUE) {
-			gettimeofday(&current_time, NULL);
+			clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
 			if (current_time.tv_sec >
 			    (last_retry_time.tv_sec + 5)) {
 				ret = backup_FS_database();
@@ -2361,9 +2438,66 @@ void upload_loop(void)
 					if (ret < 0)
 						ino_sync = 0;
 				}
+				/* Fetch the timestamp for the last sync */
+				last_synctime = tempentry.lastsync_time;
 			}
 		}
 		super_block_exclusive_release();
+		write_log(10, "%lld, %lld, %d, %llu, %llu\n",
+		          hcfs_system->systemdata.unpin_dirty_data_size,
+			hcfs_system->systemdata.pinned_size,
+			sys_super_block->sync_point_is_set,
+			retry_inode, ino_sync);
+
+		/* If should not upload immediately for any case, check if
+		we should delay upload for this inode */
+		/* Skip this check if this is an inode in retry list */
+		if ((((hcfs_system->systemdata.unpin_dirty_data_size +
+		       hcfs_system->systemdata.pinned_size) <
+		      CACHE_SOFT_LIMIT) &&
+		     (sys_super_block->sync_point_is_set == FALSE)) &&
+		    ((retry_inode == 0) && (ino_sync != 0))) {
+			write_log(10, "last synctime %lld, is consecutive skip %d\n",
+			          last_synctime, consecutive_skips);
+
+			if (consecutive_skips == FALSE) {
+				/* Fetch the current time if not skipping
+				consecutively */
+				clock_gettime(CLOCK_REALTIME_COARSE,
+				              &current_time);
+				consecutive_skips = TRUE;
+			}
+			/* Otherwise just reuse the previous clock value */
+
+			if (current_time.tv_sec >= last_synctime) {
+				if ((current_time.tv_sec - last_synctime) <
+				    NORMAL_UPLOAD_DELAY) {
+					ino_sync = 0;
+					/* If can wait less, reset sleep time */
+					this_waittime = NORMAL_UPLOAD_DELAY -
+					                (current_time.tv_sec -
+					                 last_synctime);
+					if (this_waittime < shortest_wait)
+						shortest_wait = this_waittime;
+				} else {
+					consecutive_skips = FALSE;
+					skip_everyone = FALSE;
+				}
+			} else {
+				/* If difference within NORMAL_UPLOAD_DELAY,
+				still skip */
+				/* Won't recompute time to sleep here, as time
+				may be inaccurate */
+				if ((last_synctime - current_time.tv_sec) <
+				    NORMAL_UPLOAD_DELAY) {
+					ino_sync = 0;
+				} else {
+					consecutive_skips = FALSE;
+					skip_everyone = FALSE;
+				}
+			}
+		}
+
 		write_log(6, "Inode to sync is %" PRIu64 "\n",
 			  (uint64_t)ino_sync);
 		/* Begin to sync the inode */
@@ -2403,12 +2537,15 @@ void upload_loop(void)
 		} else {
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
+		write_log(10, "Next inode to check is %" PRIu64 "\n",
+		          (uint64_t) ino_check);
 		if (ino_check == 0)
 			is_start_check = TRUE;
 	}
 
+	sem_post(&(upload_ctl.upload_finished_sem));
 	pthread_join(upload_ctl.upload_handler_thread, NULL);
-	pthread_join(sync_ctl.sync_handler_thread, NULL);
+	destroy_sync_control();
 
 #ifdef _ANDROID_ENV_
 	return NULL;

@@ -15,6 +15,7 @@ extern "C" {
 #include "meta_mem_cache.h"
 #include "utils.h"
 #include "ut_global.h"
+#include "pthread_control.h"
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;
@@ -62,10 +63,14 @@ public:
 			unlink("/tmp/testHCFS");
 		}
 		symlink(tmppath, "/tmp/testHCFS");
+		system_config = (SYSTEM_CONF_STRUCT *)
+		                calloc(1, sizeof(SYSTEM_CONF_STRUCT));
+		system_config->current_backend = SWIFT;
 	}
 
 	virtual void TearDown() {
 		free(hcfs_system);
+		free(system_config);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		unlink("/tmp/testHCFS");
 		if (workpath != NULL)
@@ -121,7 +126,7 @@ protected:
 		sprintf(objname, "data_1_%ld", block_no);
 		sprintf(tmp_filename, "/tmp/testHCFS/local_space%ld", block_no);
 		fptr = fopen(tmp_filename, "w+");
-		fetch_from_cloud(fptr, READ_BLOCK, objname);
+		fetch_from_cloud(fptr, READ_BLOCK, objname, NULL);
 		fclose(fptr);
 		unlink(tmp_filename);
 		return NULL;
@@ -148,7 +153,7 @@ TEST_F(fetch_from_cloudTest, BackendOffline)
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->sync_paused = TRUE;
 
-	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, NULL));
+	EXPECT_EQ(-EIO, fetch_from_cloud(NULL, 0, NULL, NULL));
 }
 
 TEST_F(fetch_from_cloudTest, FetchOneFile)
@@ -164,7 +169,7 @@ TEST_F(fetch_from_cloudTest, FetchOneFile)
 	unlink(tmp_filename);
 	fptr = fopen(tmp_filename, "w+");
 	setbuf(fptr, NULL);
-	fetch_from_cloud(fptr, READ_BLOCK, objname);
+	fetch_from_cloud(fptr, READ_BLOCK, objname, NULL);
 	fseek(fptr, 0, SEEK_SET);
 	fgets(buffer, 100, fptr);
 	fclose(fptr);
@@ -315,6 +320,8 @@ protected:
 		sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
 		sem_init(&(download_thread_ctl.dl_th_sem), 0,
 		         MAX_PIN_DL_CONCURRENCY);
+		PTHREAD_REUSE_set_exithandler();
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown() {
@@ -323,6 +330,7 @@ protected:
 
 void* mock_thread_fn(void *arg)
 {
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	return NULL;
 }
 
@@ -337,19 +345,24 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 	               &download_block_manager, NULL);
 
-	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY / 2; i++) {
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[count]),
+		               NULL);
+
+	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].dl_error = FALSE;
 		download_thread_ctl.block_info[i].active = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		pthread_create(&(download_thread_ctl.download_thread[i]),
-		               NULL, mock_thread_fn, NULL);
+		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[i]),
+		               mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
 
 	hcfs_system->system_going_down = TRUE;
-	sleep(1);
 
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 
 	/* Verify */
@@ -371,20 +384,24 @@ TEST_F(download_block_managerTest, CollectThreadsSuccess_With_ThreadError)
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 	               &download_block_manager, NULL);
 
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[count]),
+		               NULL);
 	for (int32_t i = 0; i < MAX_PIN_DL_CONCURRENCY; i++) {
 		download_thread_ctl.block_info[i].active = TRUE;
 		download_thread_ctl.block_info[i].dl_error = TRUE;
 		download_thread_ctl.block_info[i].this_inode = i;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
-		pthread_create(&(download_thread_ctl.download_thread[i]),
-		               NULL, &mock_thread_fn, NULL);
+		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[i]),
+		               &mock_thread_fn, NULL);
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 	}
 
 	hcfs_system->system_going_down = TRUE;
-	sleep(1);
 
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 
 	/* Verify */

@@ -4,6 +4,7 @@ extern "C" {
 #include "global.h"
 #include "super_block.h"
 #include "mock_param.h"
+#include "pthread_control.h"
 }
 
 #include <pthread.h>
@@ -94,9 +95,11 @@ protected:
 		sem_init(&(pinning_scheduler.ctl_op_sem), 0, 1);
 		sem_init(&(pinning_scheduler.pinning_sem), 0,
 				MAX_PINNING_FILE_CONCURRENCY);
+		sem_init(&(pinning_scheduler.pin_active_sem), 0, 0);
 
 		verified_inodes_counter = 0;
 		sem_init(&verified_inodes_sem, 0, 1);
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
@@ -109,7 +112,9 @@ void* mock_thread_fctnl(void *ptr)
 {
 	PINNING_INFO *info = (PINNING_INFO *)ptr;
 
+	pinning_scheduler.pinfile_tid[info->t_idx].cancelable = FALSE;
 	pinning_scheduler.thread_finish[info->t_idx] = TRUE;
+	sem_post(&(pinning_scheduler.pin_active_sem));
 	return NULL;
 }
 
@@ -122,6 +127,10 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 	pthread_create(&pinning_scheduler.pinning_collector, NULL,
 			pinning_collect, NULL);
 
+	PTHREAD_REUSE_set_exithandler();
+	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++)
+		PTHREAD_REUSE_create(&pinning_scheduler.pinfile_tid[idx], NULL);
+
 	/* Create 100 threads */
 	for (int32_t i = 0; i < 100 ; i++) {
 		sem_wait(&pinning_scheduler.pinning_sem);
@@ -132,15 +141,16 @@ TEST_F(pinning_collectTest, CollectAllTerminatedThreadsSuccess)
 			}
 		}
 		pinning_scheduler.pinning_info[idx].t_idx = idx;
-		pthread_create(&pinning_scheduler.pinning_file_tid[idx], NULL,
-				&mock_thread_fctnl,
-				(void *)&(pinning_scheduler.pinning_info[idx]));
 		pinning_scheduler.thread_active[idx] = TRUE;
 		pinning_scheduler.total_active_pinning++;
+		PTHREAD_REUSE_run(&pinning_scheduler.pinfile_tid[idx],
+				&mock_thread_fctnl,
+				(void *)&(pinning_scheduler.pinning_info[idx]));
 		sem_post(&pinning_scheduler.ctl_op_sem);
 	}
 
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(pinning_scheduler.pin_active_sem));
         pthread_join(pinning_scheduler.pinning_collector, NULL);
 	hcfs_system->system_going_down = FALSE;
 

@@ -19,6 +19,7 @@ extern "C" {
 #include "atomic_tocloud.h"
 #include "mount_manager.h"
 #include "do_restoration.h"
+#include "pthread_control.h"
 }
 
 #include "../../fff.h"
@@ -86,6 +87,8 @@ public:
 		system_config = (SYSTEM_CONF_STRUCT *)
 		                calloc(1, sizeof(SYSTEM_CONF_STRUCT));
 		system_config->max_block_size = 1000;
+		system_config->first_upload_delay = 5;
+		system_config->normal_upload_delay = 10;
 		if (!system_config)
 			printf("Fail to allocate memory\n");
 
@@ -93,11 +96,11 @@ public:
 		snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
 		if (access(METAPATH, F_OK) < 0)
 			mkdir(METAPATH, 0744);
+		test_upload_delay = FALSE;
 
 	}
 
 	virtual void TearDown() {
-		//    free(hcfs_system);
 		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		unlink("/tmp/testHCFS");
 		if (tmppath != NULL)
@@ -108,6 +111,7 @@ public:
 			free(tmppath);
 		free(METAPATH);
 		free(system_config);
+		free(hcfs_system);
 	}
 };
 
@@ -122,6 +126,7 @@ protected:
 	char tmpmgrpath[100];
 	char tmppath[200];
 	virtual void SetUp() {
+		hcfs_system->system_going_down = FALSE;
 		no_backend_stat = TRUE;
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
@@ -198,7 +203,7 @@ TEST_F(init_sync_stat_controlTest, InitCleanup)
 
 class InitUploadControlTool {
 public:
-	int fd;
+	int fd = -1;
 	char progress_path[100];
 
 	static InitUploadControlTool *Tool() {
@@ -213,6 +218,7 @@ public:
 		ptr1 = (UPLOAD_THREAD_TYPE *) ptr;
 		usleep(100000);
 		upload_ctl.threads_finished[ptr1->which_index] = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
 		return NULL;
 	}
 
@@ -246,7 +252,7 @@ public:
 		BLOCK_ENTRY_PAGE mock_block_page;
 		FILE *mock_file_meta;
 
-		init_sync_control();
+		memset(&mock_block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int32_t i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
@@ -261,7 +267,7 @@ public:
 		fclose(mock_file_meta);
 
 		strcpy(progress_path, "/tmp/mock_progress_file");
-		fd = open(progress_path, O_CREAT | O_RDWR);
+		fd = open(progress_path, O_CREAT | O_RDWR, 0600);
 
 		for (int32_t i = 0 ; i < num_block_entry ; i++) {
 			ino_t inode = 1;
@@ -291,10 +297,10 @@ public:
 			upload_ctl.threads_in_use[index] = TRUE;
 			upload_ctl.threads_created[index] = TRUE;
 			upload_ctl.threads_finished[index] = TRUE;
+			sem_post(&(upload_ctl.upload_finished_sem));
 			upload_ctl.total_active_upload_threads++;
 
-			pthread_create(&(upload_ctl.upload_threads_no[index]),
-			               NULL,
+			PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[index]),
 			               InitUploadControlTool::upload_thread_function,
 			               (void *) & (upload_ctl.upload_threads[index]));
 			// create thread
@@ -304,6 +310,7 @@ public:
 
 private:
 	InitUploadControlTool() {
+		memset(progress_path, 0, 100);
 	}
 
 	static InitUploadControlTool *tool;
@@ -321,12 +328,13 @@ InitUploadControlTool *InitUploadControlTool::tool = NULL;
 class init_upload_controlTest : public ::testing::Test {
 protected:
 	void SetUp() {
+		hcfs_system->system_going_down = FALSE;
 		no_backend_stat = TRUE;
 		init_sync_stat_control();
 		init_sync_control(); /* Add this init so that upload thread will not hang up */
 		sem_init(&upload_ctl.upload_queue_sem, 0, 1);
 		sem_init(&upload_ctl.upload_op_sem, 0, 1);
-		hcfs_system->system_going_down = FALSE;
+		PTHREAD_REUSE_set_exithandler();
 	}
 
 	void TearDown() {
@@ -335,14 +343,26 @@ protected:
 
 		/* Join the sync_control thread */
 		hcfs_system->system_going_down = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
+		pthread_join(upload_ctl.upload_handler_thread, NULL);
+		sem_destroy(&(upload_ctl.upload_finished_sem));
+
+		sem_post(&(sync_ctl.sync_finished_sem));
 		pthread_join(sync_ctl.sync_handler_thread, NULL);
+		free(sync_ctl.retry_list.retry_inode);
+		sem_destroy(&(sync_ctl.sync_finished_sem));
+		sem_destroy(&upload_ctl.upload_queue_sem);
+		sem_destroy(&upload_ctl.upload_op_sem);
 
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
-		close(InitUploadControlTool::Tool()->fd);
-		unlink(InitUploadControlTool::Tool()->progress_path);
+		if (InitUploadControlTool::Tool() != NULL) {
+			if (InitUploadControlTool::Tool()->fd >= 0)
+				close(InitUploadControlTool::Tool()->fd);
+			unlink(InitUploadControlTool::Tool()->progress_path);
+		}
 
 		InitUploadControlTool::Destruct();
 
@@ -367,7 +387,9 @@ TEST_F(init_upload_controlTest, DoNothing_JustRun)
 
 	/* Free resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	sem_destroy(&(upload_ctl.upload_finished_sem));
 }
 
 TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
@@ -389,8 +411,8 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	/* Verify */
 	ASSERT_EQ(0, upload_ctl.total_active_upload_threads);
 	for (int32_t i = 0 ; i < MAX_UPLOAD_CONCURRENCY ; i++) {
-		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
-		ASSERT_EQ(FALSE, upload_ctl.threads_created[i]) << "thread " << i << " is in use";
+		EXPECT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
+		EXPECT_EQ(FALSE, upload_ctl.threads_created[i]) << "thread " << i << " is in use";
 	}
 
 	/* Make sure that block upload will trigger cache replacement */
@@ -401,22 +423,25 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		char path[50];
 		BLOCK_UPLOADING_STATUS block_entry;
 
-		ASSERT_EQ(ST_LtoC, mock_block_page.block_entries[i].status); // Check status
+		EXPECT_EQ(ST_LtoC, mock_block_page.block_entries[i].status); // Check status
 		sprintf(path, "/tmp/testHCFS/data_1_%d", i);
 		getxattr(path, "user.dirty", xattr_val, 1);
-		ASSERT_STREQ("T", xattr_val);
+		EXPECT_STREQ("T", xattr_val);
 
 		pread(InitUploadControlTool::Tool()->fd, &block_entry,
 		      sizeof(BLOCK_UPLOADING_STATUS),
 		      i * sizeof(BLOCK_UPLOADING_STATUS));
-		ASSERT_EQ(TRUE, block_entry.finish_uploading);
-		ASSERT_EQ(i, block_entry.to_upload_seq);
+		EXPECT_EQ(TRUE, block_entry.finish_uploading);
+		EXPECT_EQ(i, block_entry.to_upload_seq);
 		unlink(path);
 	}
 
 	/* Reclaim resource */
+	fclose(mock_file_meta);
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	sem_destroy(&(upload_ctl.upload_finished_sem));
 	unlink(MOCK_META_PATH);
 }
 
@@ -448,9 +473,10 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 		upload_ctl.threads_in_use[index] = TRUE;
 		upload_ctl.threads_created[index] = TRUE;
 		upload_ctl.threads_finished[index] = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
 		upload_ctl.total_active_upload_threads++;
-		pthread_create(&(upload_ctl.upload_threads_no[index]),
-		               NULL, InitUploadControlTool::upload_thread_function,
+		PTHREAD_REUSE_run(&(upload_ctl.upload_threads_no[index]),
+		               InitUploadControlTool::upload_thread_function,
 		               (void *) & (upload_ctl.upload_threads[index]));
 		// create thread
 		sem_post(&(upload_ctl.upload_op_sem));
@@ -466,7 +492,9 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(upload_ctl.upload_finished_sem));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	sem_destroy(&(upload_ctl.upload_finished_sem));
 }
 
 /*
@@ -485,6 +513,7 @@ protected:
 	char metapath[100];
 
 	void SetUp() {
+		hcfs_system->system_going_down = FALSE;
 		mkdir("/tmp/testHCFS", 0700);
 		mkdir("mock_meta_folder", 0700);
 		num_inode = 100;
@@ -527,6 +556,7 @@ void *sync_thread_function(void *ptr)
 	ptr1 = (SYNC_THREAD_TYPE *) ptr;
 	usleep(100000); // Let thread busy
 	sync_ctl.threads_finished[ptr1->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return NULL;
 }
 
@@ -558,7 +588,9 @@ TEST_F(init_sync_controlTest, DoNothing_ControlSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	free(sync_ctl.retry_list.retry_inode);
 
 	free(retry_list.retry_inode);
 }
@@ -587,12 +619,13 @@ TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
 		sync_ctl.threads_in_use[idle_thread] = i + 1;
 		sync_ctl.threads_created[idle_thread] = TRUE;
 		sync_ctl.threads_finished[idle_thread] = FALSE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		sync_ctl.is_revert[idle_thread] = FALSE;
 		sync_ctl.continue_nexttime[idle_thread] = FALSE;
 		sync_ctl.threads_error[idle_thread] = FALSE;
 
 		sync_threads[idle_thread].which_index = idle_thread;
-		pthread_create(&sync_ctl.inode_sync_thread[idle_thread], NULL,
+		PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[idle_thread],
 		               sync_thread_function,
 		               (void *) & (sync_threads[idle_thread]));
 		sync_ctl.total_active_sync_threads++;
@@ -607,7 +640,9 @@ TEST_F(init_sync_controlTest, Multithread_ControlSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	free(sync_ctl.retry_list.retry_inode);
 }
 
 TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
@@ -619,29 +654,33 @@ TEST_F(init_sync_controlTest, LocalMetaNotExist_DoNotUpdateSB)
 	/* Run tested function */
 	init_sync_control();
 
-	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR, 0600);
 
 	sem_wait(&sync_ctl.sync_queue_sem);
 	sem_wait(&sync_ctl.sync_op_sem);
 	sync_ctl.threads_in_use[0] = 2;
 	sync_ctl.threads_created[0] = TRUE;
 	sync_ctl.threads_finished[0] = FALSE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	sync_ctl.is_revert[0] = FALSE;
 	sync_ctl.continue_nexttime[0] = FALSE;
 	sync_ctl.threads_error[0] = TRUE; /* Set upload error */
 	sync_ctl.progress_fd[0] = fd;
 
 	sync_threads[0].which_index = 0;
-	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+	PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[0],
 	               sync_thread_function,
 	               (void *) & (sync_threads[0]));
+
 	sync_ctl.total_active_sync_threads++;
 	sem_post(&sync_ctl.sync_op_sem);
 	sleep(1);
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	free(sync_ctl.retry_list.retry_inode);
 
 	/* Verify */
 	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
@@ -663,6 +702,8 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 
 	/* Run tested function */
 	init_sync_control();
+	memset(&tmpstat, 0, sizeof(HCFS_STAT));
+	memset(&filemeta, 0, sizeof(FILE_META_TYPE));
 
 	/* The same as fetch_meta_path */
 	fetch_toupload_meta_path(metapath, 2);
@@ -683,13 +724,15 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 	sync_ctl.threads_in_use[0] = 2;
 	sync_ctl.threads_created[0] = TRUE;
 	sync_ctl.threads_finished[0] = FALSE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	sync_ctl.is_revert[0] = FALSE;
 	sync_ctl.continue_nexttime[0] = TRUE; /* Set continue_nexttime */
 	sync_ctl.threads_error[0] = TRUE; /* Set upload error */
 	sync_ctl.progress_fd[0] = fd;
 
 	sync_threads[0].which_index = 0;
-	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+
+	PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[0],
 	               sync_thread_function,
 	               (void *) & (sync_threads[0]));
 	sync_ctl.total_active_sync_threads++;
@@ -698,7 +741,9 @@ TEST_F(init_sync_controlTest, SyncFail_ContinueNextTime)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	free(sync_ctl.retry_list.retry_inode);
 
 	/* Verify */
 	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
@@ -724,20 +769,21 @@ TEST_F(init_sync_controlTest, SyncSuccess)
 	/* The same as fetch_meta_path */
 	sprintf(metapath, "/tmp/testHCFS/mock_file_meta");
 	mknod(metapath, 0700, 0);
-	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR);
+	fd = open("/tmp/mock_progress_file", O_CREAT | O_RDWR, 0600);
 
 	sem_wait(&sync_ctl.sync_queue_sem);
 	sem_wait(&sync_ctl.sync_op_sem);
 	sync_ctl.threads_in_use[0] = 2;
 	sync_ctl.threads_created[0] = TRUE;
 	sync_ctl.threads_finished[0] = FALSE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	sync_ctl.is_revert[0] = FALSE;
 	sync_ctl.continue_nexttime[0] = FALSE; /* No error */
 	sync_ctl.threads_error[0] = FALSE; /* No error */
 	sync_ctl.progress_fd[0] = fd;
 
 	sync_threads[0].which_index = 0;
-	pthread_create(&sync_ctl.inode_sync_thread[0], NULL,
+	PTHREAD_REUSE_run(&sync_ctl.inode_sync_thread[0],
 	               sync_thread_function,
 	               (void *) & (sync_threads[0]));
 	sync_ctl.total_active_sync_threads++;
@@ -746,7 +792,9 @@ TEST_F(init_sync_controlTest, SyncSuccess)
 
 	/* Reclaim resource */
 	hcfs_system->system_going_down = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	free(sync_ctl.retry_list.retry_inode);
 
 	/* Verify */
 	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
@@ -777,9 +825,10 @@ public:
 protected:
 	void SetUp() {
 		/* First remove garbage if exists */
+		hcfs_system->system_going_down = FALSE;
 		unlink(MOCK_META_PATH);
+		strcpy(progress_file, "mock_meta_folder/progress_file");
 		unlink(progress_file);
-		unlink(toupload_meta);
 		nftw("mock_meta_folder", do_delete, 20, FTW_DEPTH);
 
 		mkdir("mock_meta_folder", 0700);
@@ -787,12 +836,12 @@ protected:
 		fetch_toupload_meta_path(toupload_meta, 1);
 		mknod(toupload_meta, 0700, 0);
 
-		strcpy(progress_file, "mock_meta_folder/progress_file");
 		fd = open(progress_file, O_CREAT | O_RDWR);
 
 		no_backend_stat = TRUE;
 		init_sync_control(); /* Add this init so that upload thread will not hang up */
 		init_sync_stat_control();
+		init_upload_control();
 		max_objname_num = 4000;
 		sem_init(&objname_counter_sem, 0, 1);
 		sem_init(&backup_pkg_sem, 0, 1);
@@ -804,7 +853,6 @@ protected:
 	}
 
 	void TearDown() {
-		void *res;
 		char tmppath[200];
 		char tmppath2[200];
 
@@ -820,12 +868,14 @@ protected:
 
 		unlink(MOCK_META_PATH);
 
-		hcfs_system->system_going_down = TRUE;
-		pthread_join(sync_ctl.sync_handler_thread, &res);
-
 		/* Join the sync_control thread */
 		hcfs_system->system_going_down = TRUE;
+		sem_post(&(upload_ctl.upload_finished_sem));
+		pthread_join(upload_ctl.upload_handler_thread, NULL);
+
+		sem_post(&(sync_ctl.sync_finished_sem));
 		pthread_join(sync_ctl.sync_handler_thread, NULL);
+		free(sync_ctl.retry_list.retry_inode);
 		close(fd);
 		unlink(progress_file);
 		unlink(toupload_meta);
@@ -844,6 +894,8 @@ protected:
 		char buf[5000];
 		size_t size;
 
+		memset(buf, 0, sizeof(char) * 5000);
+		memset(&mock_block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 		memset(&block_uploading_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
@@ -912,6 +964,7 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
+	mock_thread_type.progress_fd = fd;
 
 	/* Run tested function */
 	sync_single_inode(&mock_thread_type);
@@ -944,8 +997,6 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessNoPin)
 	hcfs_system->sync_paused = OFF;
 
 	/* Run tested function */
-	init_upload_control();
-	init_sync_stat_control();
 	sync_single_inode(&mock_thread_type);
 	sleep(2);
 
@@ -1000,6 +1051,8 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
+	mock_thread_type.is_revert = FALSE;
+	mock_thread_type.progress_fd = fd;
 
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = TRUE;
@@ -1007,8 +1060,6 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccessPin)
 	hcfs_system->sync_paused = OFF;
 
 	/* Run tested function */
-	init_upload_control();
-	init_sync_stat_control();
 	sync_single_inode(&mock_thread_type);
 	sleep(2);
 
@@ -1076,9 +1127,9 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	mock_thread_type.this_mode = S_IFREG;
 	mock_thread_type.which_index = 0;
 	mock_thread_type.is_revert = FALSE;
+	mock_thread_type.progress_fd = fd;
 
 	/* Run tested function */
-	init_upload_control();
 	sync_single_inode(&mock_thread_type);
 	sleep(1);
 
@@ -1135,6 +1186,12 @@ protected:
 	int ret, errcode;
 
 	void SetUp() {
+		test_upload_delay = FALSE;
+		if (!access("mock_meta_folder", F_OK))
+			nftw("mock_meta_folder", do_delete, 20, FTW_DEPTH);
+
+		hcfs_system->system_going_down = FALSE;
+		sys_super_block = NULL;
 		mkdir("mock_meta_folder", 0700);
 
 		no_backend_stat = TRUE;
@@ -1177,13 +1234,17 @@ protected:
 			fclose(fptr);
 		}
 
+		sync();
 		sem_init(&objname_counter_sem, 0, 1);
 		sem_init(&backup_pkg_sem, 0, 1);
+		sem_init(&(hcfs_system->sync_control_sem), 1, 0);
 
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_paused = FALSE;
 		CACHE_SOFT_LIMIT = 100000;
 		hcfs_system->systemdata.cache_size = 0;
+		hcfs_system->systemdata.unpin_dirty_data_size = 100;
+		hcfs_system->systemdata.pinned_size = 0;
 
 		/* Generate mock data and allocate space to check answer */
 		shm_test_data = (LoopTestData *)malloc(sizeof(LoopTestData));
@@ -1199,6 +1260,8 @@ protected:
 		shm_verified_data = (LoopToVerifiedData *)malloc(sizeof(LoopToVerifiedData));
 		shm_verified_data->record_handle_inode = (int *)
 		        malloc(sizeof(int) * shm_test_data->num_inode);
+		memset(shm_verified_data->record_handle_inode, 0,
+		        sizeof(int) * shm_test_data->num_inode);
 		shm_verified_data->record_inode_counter = 0;
 		sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 	}
@@ -1206,6 +1269,13 @@ protected:
 	void TearDown() {
 		char tmppath[200];
 		char tmppath2[200];
+		int count;
+
+		test_upload_delay = FALSE;
+		sem_destroy(&(hcfs_system->sync_control_sem));
+
+		unlink("mock_meta_folder/tmpfile");
+
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
@@ -1227,10 +1297,145 @@ protected:
 		free(shm_test_data);
 		free(shm_verified_data->record_handle_inode);
 		free(shm_verified_data);
+		free(sys_super_block);
 	}
 };
 
-TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
+TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase_SyncSet)
+{
+	pthread_t thread_id;
+	int32_t shm_key, shm_key2;
+	HCFS_STAT empty_stat;
+	DIR_META_TYPE empty_meta;
+	BLOCK_ENTRY_PAGE mock_block_page;
+	CLOUD_RELATED_DATA mock_cloud_data;
+	int32_t sleep_max;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
+
+	/* Write something into meta, int32_t the unittest, only test
+	   the case that upload dir meta because regfile case has
+	   been tested in sync_single_inodeTest(). */
+	memset(&empty_stat, 0, sizeof(HCFS_STAT));
+	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+	empty_stat.mode = S_IFDIR;
+	empty_meta.root_inode = 10;
+	fseek(mock_file_meta, 0, SEEK_SET);
+	fwrite(&empty_stat, sizeof(HCFS_STAT), 1, mock_file_meta);
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
+	fclose(mock_file_meta);
+
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
+	hcfs_system->systemdata.dirty_cache_size = 100;
+
+	/* Set first_dirty_inode to be uploaded */
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
+	sys_super_block->head.num_dirty = max_objname_num;
+	sys_super_block->sync_point_is_set = TRUE;
+
+	/* Create a thread to run upload_loop() */
+	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
+
+	/* Sleep until dirty inodes are processed, or after 1 minutes */
+	sleep_max = 60;
+	while (sleep_max > 0) {
+		if (sys_super_block->head.num_dirty == 0)
+			break;
+		sleep(1);
+		sleep_max--;
+	}
+	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
+	sem_post(&(hcfs_system->sync_wait_sem));
+	pthread_join(thread_id, NULL);
+
+	/* Verify */
+	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);
+	qsort(shm_verified_data->record_handle_inode, shm_verified_data->record_inode_counter,
+	      sizeof(int), inode_cmp);
+	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
+		ASSERT_EQ(shm_test_data->to_handle_inode[i],
+		          shm_verified_data->record_handle_inode[i]);
+		fetch_toupload_meta_path(toupload_meta,
+		                         shm_verified_data->record_handle_inode[i]);
+		ASSERT_EQ(-1, access(toupload_meta, F_OK));
+	}
+}
+
+TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase_DirtyFull)
+{
+	pthread_t thread_id;
+	int32_t shm_key, shm_key2;
+	HCFS_STAT empty_stat;
+	DIR_META_TYPE empty_meta;
+	BLOCK_ENTRY_PAGE mock_block_page;
+	CLOUD_RELATED_DATA mock_cloud_data;
+	int32_t sleep_max;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
+
+	/* Write something into meta, int32_t the unittest, only test
+	   the case that upload dir meta because regfile case has
+	   been tested in sync_single_inodeTest(). */
+	memset(&empty_stat, 0, sizeof(HCFS_STAT));
+	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+	empty_stat.mode = S_IFDIR;
+	empty_meta.root_inode = 10;
+	fseek(mock_file_meta, 0, SEEK_SET);
+	fwrite(&empty_stat, sizeof(HCFS_STAT), 1, mock_file_meta);
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
+	fclose(mock_file_meta);
+
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
+	hcfs_system->systemdata.dirty_cache_size = 100;
+	hcfs_system->systemdata.unpin_dirty_data_size = 100;
+	hcfs_system->systemdata.pinned_size = CACHE_SOFT_LIMIT - 100;
+
+	/* Set first_dirty_inode to be uploaded */
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
+	sys_super_block->head.num_dirty = max_objname_num;
+	sys_super_block->sync_point_is_set = FALSE;
+
+	/* Create a thread to run upload_loop() */
+	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
+
+	/* Sleep until dirty inodes are processed, or after 1 minutes */
+	sleep_max = 60;
+	while (sleep_max > 0) {
+		if (sys_super_block->head.num_dirty == 0)
+			break;
+		sleep(1);
+		sleep_max--;
+	}
+	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
+	sem_post(&(hcfs_system->sync_wait_sem));
+	pthread_join(thread_id, NULL);
+
+	/* Verify */
+	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);
+	qsort(shm_verified_data->record_handle_inode, shm_verified_data->record_inode_counter,
+	      sizeof(int), inode_cmp);
+	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
+		ASSERT_EQ(shm_test_data->to_handle_inode[i],
+		          shm_verified_data->record_handle_inode[i]);
+		fetch_toupload_meta_path(toupload_meta,
+		                         shm_verified_data->record_handle_inode[i]);
+		ASSERT_EQ(-1, access(toupload_meta, F_OK));
+	}
+}
+
+TEST_F(upload_loopTest, UploadLoopTerminateImmediatelySyncSet)
 {
 	pthread_t thread_id;
 	int32_t shm_key, shm_key2;
@@ -1265,12 +1470,76 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
 	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
 	sys_super_block->head.num_dirty = max_objname_num;
+	sys_super_block->sync_point_is_set = TRUE;
 
 	/* Create a thread to run upload_loop() */
 	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
 
-	sleep(3);
+	sleep(1);
 	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
+	sem_post(&(hcfs_system->sync_wait_sem));
+	pthread_join(thread_id, NULL);
+
+}
+
+TEST_F(upload_loopTest, UploadLoopWorkSuccess_ContinueSyncSet)
+{
+	pthread_t thread_id;
+	int32_t shm_key, shm_key2;
+	HCFS_STAT empty_stat;
+	DIR_META_TYPE empty_meta;
+	BLOCK_ENTRY_PAGE mock_block_page;
+	CLOUD_RELATED_DATA mock_cloud_data;
+	int32_t sleep_max;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
+
+	for (int32_t count = 0; count < max_objname_num; count++) {
+		char tmppath[100];
+		snprintf(tmppath, 100, "mock_meta_folder/tmpfile_%"
+		         PRIu64, (count + 1) * 5);
+		mknod(tmppath, 0600, 0);
+	}
+
+	/* Write something into meta, int32_t the unittest, only test
+	   the case that upload dir meta because regfile case has
+	   been tested in sync_single_inodeTest(). */
+	memset(&empty_stat, 0, sizeof(HCFS_STAT));
+	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+	empty_stat.mode = S_IFDIR;
+	empty_meta.root_inode = 10;
+	fseek(mock_file_meta, 0, SEEK_SET);
+	fwrite(&empty_stat, sizeof(HCFS_STAT), 1, mock_file_meta);
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
+	fclose(mock_file_meta);
+
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
+	hcfs_system->systemdata.dirty_cache_size = 100;
+
+	/* Set first_dirty_inode to be uploaded */
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
+	sys_super_block->head.num_dirty = max_objname_num;
+	sys_super_block->sync_point_is_set = TRUE;
+
+	/* Create a thread to run upload_loop() */
+	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
+
+	/* Sleep until dirty inodes are processed, or after 1 minutes */
+	sleep_max = 60;
+	while (sleep_max > 0) {
+		if (sys_super_block->head.num_dirty == 0)
+			break;
+		sleep(1);
+		sleep_max--;
+	}
+	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
+	sem_post(&(hcfs_system->sync_wait_sem));
 	pthread_join(thread_id, NULL);
 
 	/* Verify */
@@ -1285,6 +1554,154 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 		ASSERT_EQ(-1, access(toupload_meta, F_OK));
 	}
 }
+
+TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase_SyncNotSet_SkipNone)
+{
+	pthread_t thread_id;
+	int32_t shm_key, shm_key2;
+	HCFS_STAT empty_stat;
+	DIR_META_TYPE empty_meta;
+	BLOCK_ENTRY_PAGE mock_block_page;
+	CLOUD_RELATED_DATA mock_cloud_data;
+	int32_t sleep_max;
+
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
+
+	/* Write something into meta, int32_t the unittest, only test
+	   the case that upload dir meta because regfile case has
+	   been tested in sync_single_inodeTest(). */
+	memset(&empty_stat, 0, sizeof(HCFS_STAT));
+	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+	empty_stat.mode = S_IFDIR;
+	empty_meta.root_inode = 10;
+	fseek(mock_file_meta, 0, SEEK_SET);
+	fwrite(&empty_stat, sizeof(HCFS_STAT), 1, mock_file_meta);
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
+	fclose(mock_file_meta);
+
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
+	hcfs_system->systemdata.dirty_cache_size = 100;
+
+	/* Set first_dirty_inode to be uploaded */
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
+	sys_super_block->head.num_dirty = max_objname_num;
+	sys_super_block->sync_point_is_set = FALSE;
+	fake_access_time = 0;
+
+	/* Create a thread to run upload_loop() */
+	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
+
+	/* Sleep until dirty inodes are processed, or after 1 minutes */
+	sleep_max = 60;
+	while (sleep_max > 0) {
+		if (sys_super_block->head.num_dirty == 0)
+			break;
+		sleep(1);
+		sleep_max--;
+	}
+	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
+	sem_post(&(hcfs_system->sync_control_sem));
+	sem_post(&(hcfs_system->sync_wait_sem));
+	pthread_join(thread_id, NULL);
+
+	/* Verify */
+	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);
+	qsort(shm_verified_data->record_handle_inode, shm_verified_data->record_inode_counter,
+	      sizeof(int), inode_cmp);
+	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
+		ASSERT_EQ(shm_test_data->to_handle_inode[i],
+		          shm_verified_data->record_handle_inode[i]);
+		fetch_toupload_meta_path(toupload_meta,
+		                         shm_verified_data->record_handle_inode[i]);
+		ASSERT_EQ(-1, access(toupload_meta, F_OK));
+	}
+}
+
+TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase_SyncNotSet_SkipAll)
+{
+	pthread_t thread_id;
+	int32_t shm_key, shm_key2;
+	HCFS_STAT empty_stat;
+	DIR_META_TYPE empty_meta;
+	BLOCK_ENTRY_PAGE mock_block_page;
+	CLOUD_RELATED_DATA mock_cloud_data;
+	int32_t sleep_max;
+
+	test_upload_delay = TRUE;
+	hcfs_system->system_going_down = FALSE;
+	hcfs_system->backend_is_online = TRUE;
+	hcfs_system->sync_manual_switch = ON;
+	hcfs_system->sync_paused = OFF;
+
+	/* Write something into meta, int32_t the unittest, only test
+	   the case that upload dir meta because regfile case has
+	   been tested in sync_single_inodeTest(). */
+	memset(&empty_stat, 0, sizeof(HCFS_STAT));
+	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&mock_cloud_data, 0, sizeof(CLOUD_RELATED_DATA));
+	empty_stat.mode = S_IFDIR;
+	empty_meta.root_inode = 10;
+	fseek(mock_file_meta, 0, SEEK_SET);
+	fwrite(&empty_stat, sizeof(HCFS_STAT), 1, mock_file_meta);
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	fwrite(&mock_cloud_data, sizeof(CLOUD_RELATED_DATA), 1, mock_file_meta);
+	fclose(mock_file_meta);
+
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; // Let system upload
+	hcfs_system->systemdata.dirty_cache_size = 100;
+
+	/* Set first_dirty_inode to be uploaded */
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
+	sys_super_block->head.num_dirty = max_objname_num;
+	sys_super_block->sync_point_is_set = FALSE;
+
+	struct timespec current_time;
+
+	memset(&current_time, 0, sizeof(struct timespec));
+	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
+	fake_access_time = current_time.tv_sec;
+
+	/* Create a thread to run upload_loop() */
+	pthread_create(&thread_id, NULL, upload_loop_thread_function, NULL);
+
+	/* Sleep until dirty inodes are processed, or after 1 minutes plus
+	NORMAL_UPLOAD_DELAY */
+	sleep_max = 60 + NORMAL_UPLOAD_DELAY;
+	while (sleep_max > 0) {
+		if (sys_super_block->head.num_dirty == 0)
+			break;
+		sleep(1);
+		sleep_max--;
+	}
+
+	/* We expect that the process should sleep for at least
+	NORMAL_UPLOAD_DELAY seconds */
+	EXPECT_GE(60, sleep_max);
+	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
+	sem_post(&(hcfs_system->sync_control_sem));
+	sem_post(&(hcfs_system->sync_wait_sem));
+	pthread_join(thread_id, NULL);
+
+	/* Verify */
+	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);
+	qsort(shm_verified_data->record_handle_inode, shm_verified_data->record_inode_counter,
+	      sizeof(int), inode_cmp);
+	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
+		ASSERT_EQ(shm_test_data->to_handle_inode[i],
+		          shm_verified_data->record_handle_inode[i]);
+		fetch_toupload_meta_path(toupload_meta,
+		                         shm_verified_data->record_handle_inode[i]);
+		ASSERT_EQ(-1, access(toupload_meta, F_OK));
+	}
+}
+
 
 /*
 	End of unittest of upload_loop()
@@ -1380,13 +1797,16 @@ TEST_F(update_backend_statTest, UpdateExistingStat)
 	ret = access(tmppath2, F_OK);
 	ASSERT_NE(0, ret);
 
+	memset(&fs_cloud_stat, 0, sizeof(FS_CLOUD_STAT_T));
 	fs_cloud_stat.backend_system_size = 7687483;
 	fs_cloud_stat.backend_meta_size = 5566;
 	fs_cloud_stat.backend_num_inodes = 34334;
 	fptr = fopen(tmppath2, "w");
+	ASSERT_NE(0, (fptr != NULL));
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	fclose(fptr);
 	fptr = fopen(tmppath3, "w");
+	ASSERT_NE(0, (fptr != NULL));
 	fwrite(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 	fclose(fptr);
 

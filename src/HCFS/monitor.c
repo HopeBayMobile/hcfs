@@ -230,7 +230,7 @@ void update_backend_status(BOOL status_in, struct timespec *status_time)
 
 	hcfs_system->backend_is_online = status;
 	update_sync_state();
-	if(status_changed)
+	if (status_changed)
 		sem_post(&(hcfs_system->monitor_sem));
 
 /* TODO FIXME: status_time is not used actually */
@@ -255,6 +255,8 @@ void force_retry_conn(void)
 void update_sync_state(void)
 {
 	int32_t num_replace;
+	int32_t pause_status;
+	BOOL old_status;
 
 	if (hcfs_system->backend_is_online == FALSE ||
 	    hcfs_system->sync_manual_switch == OFF) {
@@ -263,14 +265,22 @@ void update_sync_state(void)
 			hcfs_system->sync_paused = TRUE;
 			/* Wake up cache manager so that it will wake
 			 * all other sleeping threads up */
-			sem_getvalue(&(hcfs_system->something_to_replace),
-					&num_replace);
-			if (num_replace == 0)
-				sem_post(&(hcfs_system->something_to_replace));
+			sem_check_and_release(&(hcfs_system->something_to_replace),
+					      &num_replace);
 		}
 
 	} else {
+		old_status = hcfs_system->sync_paused;
 		hcfs_system->sync_paused = FALSE;
+
+		if (old_status == TRUE) {
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &pause_status);
+			sem_check_and_release(&(hcfs_system->pin_wait_sem),
+			                      &pause_status);
+			sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+			                      &pause_status);
+		}
 		/* Threads can sleep on cache full now */
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.cache_replace_status = 0;

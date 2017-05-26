@@ -28,6 +28,7 @@
 #include "dedup_table.h"
 #include "tocloud_tools.h"
 #include "googledrive_curl.h"
+#include "pthread_control.h"
 
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 8
@@ -68,9 +69,10 @@ typedef struct {
 	finished and is joined by the handler thread*/
 	sem_t upload_queue_sem;
 	sem_t upload_op_sem;
+	sem_t upload_finished_sem;
 	pthread_t upload_handler_thread;
 	UPLOAD_THREAD_TYPE upload_threads[MAX_UPLOAD_CONCURRENCY];
-	pthread_t upload_threads_no[MAX_UPLOAD_CONCURRENCY];
+	PTHREAD_REUSE_T upload_threads_no[MAX_UPLOAD_CONCURRENCY];
 	char threads_in_use[MAX_UPLOAD_CONCURRENCY];
 	char threads_created[MAX_UPLOAD_CONCURRENCY];
 	char threads_finished[MAX_UPLOAD_CONCURRENCY];
@@ -81,9 +83,10 @@ typedef struct {
 typedef struct {
 	sem_t sync_op_sem;
 	sem_t sync_queue_sem; /*similar to upload_queue_sem*/
+	sem_t sync_finished_sem;
 	IMMEDIATELY_RETRY_LIST retry_list;
 	pthread_t sync_handler_thread;
-	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
+	PTHREAD_REUSE_T inode_sync_thread[MAX_SYNC_CONCURRENCY];
 
 	ino_t threads_in_use[MAX_SYNC_CONCURRENCY]; /* Now syncing inode */
 

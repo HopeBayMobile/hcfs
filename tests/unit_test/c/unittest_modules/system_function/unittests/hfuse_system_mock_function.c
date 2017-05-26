@@ -87,7 +87,9 @@ int32_t init_system_config_settings(const char *config_path,
 	return 0;
 }
 
-int32_t hcfs_list_container(CURL_HANDLE *curl_handle)
+int32_t hcfs_list_container(FILE *fptr,
+                            CURL_HANDLE *curl_handle,
+                            added_info_t *more)
 {
 	if (hcfs_list_container_success == TRUE)
 		return 200;

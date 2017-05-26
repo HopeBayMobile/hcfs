@@ -10,6 +10,7 @@ extern "C" {
 #include "fuseop.h"
 #include "super_block.h"
 #include "atomic_tocloud.h"
+#include "pthread_control.h"
 }
 
 static int do_delete(const char *fpath, const struct stat *sb,
@@ -41,6 +42,7 @@ public:
 		hcfs_system->backend_is_online = TRUE;
 		hcfs_system->sync_manual_switch = ON;
 		hcfs_system->sync_paused = OFF;
+		sem_init(&(hcfs_system->dsync_wait_sem), 0, 0);
 
 		tmppath = get_current_dir_name();
 		workpath = (char *)malloc(strlen(tmppath) + 20);
@@ -65,6 +67,7 @@ public:
 void *dsync_test_thread_fn(void *data)
 {
 	usleep(10000 * *(int32_t *)data);
+	sem_post(&(dsync_ctl.pause_sem));
 	return NULL;
 }
 
@@ -72,8 +75,10 @@ extern DSYNC_THREAD_CONTROL dsync_ctl;
 
 TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 {
-	void *res;
 	int32_t num_threads = 40;
+
+	hcfs_system->system_going_down = FALSE;
+	sem_init(&(hcfs_system->dsync_wait_sem), 0, 0);
 
 	/* Run the function to check whether it will terminate threads */
 	init_dsync_control();
@@ -98,14 +103,14 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		dsync_ctl.threads_finished[t_index] = TRUE;
 		dsync_ctl.retry_right_now[t_index] = FALSE;
 		dsync_ctl.total_active_dsync_threads++;
-		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL,
+		EXPECT_EQ(0, PTHREAD_REUSE_run(&(dsync_ctl.inode_dsync_thread[t_index]),
 		                            dsync_test_thread_fn, (void *)&i));
 		sem_post(&dsync_ctl.dsync_op_sem);
 	}
-	sleep(1);
-	EXPECT_EQ(0, pthread_cancel(dsync_ctl.dsync_handler_thread));
-	EXPECT_EQ(0, pthread_join(dsync_ctl.dsync_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
+	hcfs_system->system_going_down = TRUE;
+	sem_post(&(dsync_ctl.pause_sem));
+
+	EXPECT_EQ(0, pthread_join(dsync_ctl.dsync_handler_thread, NULL));
 
 	/* Check answer */
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);
@@ -113,6 +118,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		ASSERT_EQ(0, dsync_ctl.threads_in_use[i]) << "thread_no = " << i;
 		ASSERT_EQ(FALSE, dsync_ctl.threads_created[i]) << "thread_no = " << i;
 	}
+	hcfs_system->system_going_down = FALSE;
 }
 // End of unittest init_dsync_control() & collect_finished_dsync_threads()
 
@@ -120,6 +126,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 void *delete_test_thread_fn(void *data)
 {
 	usleep(10000 * *(int32_t *)data);
+	sem_post(&(delete_ctl.pause_sem));
 	return NULL;
 }
 
@@ -127,9 +134,10 @@ extern DELETE_THREAD_CONTROL delete_ctl;
 
 TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 {
-	void *res;
 	int32_t num_threads = 40;
 
+	hcfs_system->system_going_down = FALSE;
+	sem_init(&(hcfs_system->dsync_wait_sem), 0, 0);
 	/* Run the function to check whether it will terminate threads */
 	init_delete_control();
 
@@ -152,15 +160,13 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 		delete_ctl.threads_finished[t_index] = TRUE;
 		delete_ctl.delete_threads[t_index].is_block = TRUE;
 		delete_ctl.total_active_delete_threads++;
-		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[t_index]),
-		                            NULL,
+		EXPECT_EQ(0, PTHREAD_REUSE_run(&(delete_ctl.threads_no[t_index]),
 		                            delete_test_thread_fn, (void *)&i));
 		sem_post(&delete_ctl.delete_op_sem);
 	}
-	sleep(1);
-	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
-	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
+	sem_post(&(delete_ctl.pause_sem));
+	hcfs_system->system_going_down = TRUE;
+	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, NULL));
 
 	/* Check answer */
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads);
@@ -168,6 +174,7 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 		ASSERT_EQ(FALSE, delete_ctl.threads_in_use[i]) << "thread_no = " << i;
 		ASSERT_EQ(FALSE, delete_ctl.threads_created[i]) << "thread_no = " << i;
 	}
+	hcfs_system->system_going_down = FALSE;
 }
 
 // End of unittest init_delete_control() & collect_finished_delete_threads()
@@ -189,6 +196,8 @@ public:
 		backend_meta[0] = 0;
 		objname_list = NULL;
 		expected_num_objname = 0;
+		hcfs_system->system_going_down = FALSE;
+		sem_init(&(hcfs_system->dsync_wait_sem), 0, 0);
 	}
 
 	virtual void TearDown() {
@@ -201,6 +210,7 @@ public:
 			unlink(backend_meta);
 		free(dsync_ctl.retry_list.retry_inode);
 		dsync_ctl.retry_list.retry_inode = NULL;
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void init_objname_buffer(uint32_t num_objname) {
@@ -257,7 +267,6 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	CLOUD_RELATED_DATA cloud_related = {0};
 	FILE_STATS_TYPE file_stst = {0};
 	int total_page = 3;
-	void *res;
 	FILE *backend_meta_fptr;
 	size_t size;
 	char buf[5000];
@@ -314,9 +323,11 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	sprintf(expected_objname, "meta_%" PRIu64, (uint64_t)mock_thread_info->inode);
 	ASSERT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
 
-	ASSERT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
-	ASSERT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
-	ASSERT_EQ(PTHREAD_CANCELED, res);
+	hcfs_system->system_going_down = TRUE;
+
+	sem_post(&(delete_ctl.pause_sem));
+	sem_post(&(dsync_ctl.pause_sem));
+	ASSERT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, NULL));
 	ASSERT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
 }
 
@@ -324,7 +335,6 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 {
 	FILE *meta;
 	HCFS_STAT meta_stat;
-	void *res;
 	DIR_META_TYPE dirmeta = {0};
 	CLOUD_RELATED_DATA cloud_related = {0};
 
@@ -353,10 +363,12 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	sprintf(expected_objname, "meta_%" PRIu64, (uint64_t) mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[0]); // Check meta was recorded.
 
-	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
-	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
-	EXPECT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
+	hcfs_system->system_going_down = TRUE;
+
+	sem_post(&(delete_ctl.pause_sem));
+	sem_post(&(dsync_ctl.pause_sem));
+	ASSERT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, NULL));
+	ASSERT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
 }
 // End of unittest of dsync_single_inode()
 
@@ -371,6 +383,9 @@ TEST(delete_loopTest, DeleteSuccess)
 	pthread_t thread;
 	void *res;
 	int32_t size_objname;
+
+	sem_init(&(hcfs_system->dsync_wait_sem), 0, 0);
+	hcfs_system->system_going_down = FALSE;
 
 	system_config = (SYSTEM_CONF_STRUCT *)
 	                malloc(sizeof(SYSTEM_CONF_STRUCT));
@@ -394,7 +409,9 @@ TEST(delete_loopTest, DeleteSuccess)
 	for (int32_t i = 0 ; i < test_data.num_inode ; i++)
 		test_data.to_handle_inode[i] = (i + 1) * 5; // mock inode
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
 	sys_super_block->head.first_to_delete_inode = test_data.to_handle_inode[0];
+	sys_super_block->head.num_to_be_deleted = 40;
 
 	/* Create a thread to run delete_loop() */
 	ASSERT_EQ(0, pthread_create(&thread, NULL, delete_loop, NULL));
@@ -409,9 +426,13 @@ TEST(delete_loopTest, DeleteSuccess)
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads);
 
 	/* Free resource */
-	EXPECT_EQ(0, pthread_cancel(thread));
+	hcfs_system->system_going_down = TRUE;
+	for (int32_t i = 0 ; i < 100 ; i++)
+		free(objname_list[i]);
+	free(objname_list);
+
+	sem_post(&(hcfs_system->dsync_wait_sem));
 	EXPECT_EQ(0, pthread_join(thread, &res));
-	EXPECT_EQ(PTHREAD_CANCELED, res);
 	free(test_data.to_handle_inode);
 	free(to_verified_data.record_handle_inode);
 	free(sys_super_block);

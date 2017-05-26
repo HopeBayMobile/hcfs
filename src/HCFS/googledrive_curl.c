@@ -116,7 +116,6 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 		post_control->tail_string += actual_to_read; /* Move pointer */
 		post_control->tail_remaining -= actual_to_read;
 		post_control->total_remaining -= actual_to_read;
-		expect_read -= actual_to_read;
 		total_read += actual_to_read;
 	}
 
@@ -1053,6 +1052,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 		}
 	} else {
 		filter_string = title_string;
+		title_string = NULL;
 	}
 
 	/* Create URL */
@@ -1120,8 +1120,6 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 	return ret_val;
 
 errcode_handle:
-	FREE(title_string);
-	FREE(filter_string);
 	FREE(url);
 	if (gdrive_header_fptr != NULL) {
 		fclose(gdrive_header_fptr);

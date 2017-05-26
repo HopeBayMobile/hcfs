@@ -35,6 +35,7 @@
 #endif
 #include "rebuild_super_block.h"
 #include "metaops.h"
+#include "hfuse_system.h"
 
 MOUNT_T_GLOBAL mount_global = {{0}};
 
@@ -554,6 +555,10 @@ errcode_handle:
 /* Helper for unmounting */
 int32_t do_unmount_FS(MOUNT_T *mount_info)
 {
+	if (mount_info->write_volstat_thread != NULL) {
+		PTHREAD_REUSE_terminate(mount_info->write_volstat_thread);
+		free(mount_info->write_volstat_thread);
+	}
 	sem_wait((mount_info->stat_lock));
 	update_FS_statistics(mount_info);
 	sem_post((mount_info->stat_lock));
@@ -655,6 +660,7 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		new_info->stat_fptr = tmp_info->stat_fptr;
 		new_info->stat_lock = tmp_info->stat_lock;
 		new_info->vol_path_cache = tmp_info->vol_path_cache;
+		new_info->write_volstat_thread = tmp_info->write_volstat_thread;
 
 		/* Self data */
 		new_info->mp_mode = mp_mode;
@@ -772,6 +778,15 @@ int32_t mount_FS(char *fsname, char *mp, char mp_mode)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
+	/* Open thread for writing volume statistics */
+	PTHREAD_REUSE_set_exithandler();
+	new_info->write_volstat_thread = malloc(sizeof(PTHREAD_REUSE_T));
+	if (new_info->write_volstat_thread == NULL) {
+		errcode = -ENOMEM;
+		goto errcode_handle;
+	}
+	PTHREAD_REUSE_create(new_info->write_volstat_thread,
+	                     &prefetch_thread_attr);
 
 	/* read stat */
 	ret = read_FS_statistics(new_info);
@@ -1084,10 +1099,18 @@ int32_t unmount_all(void)
 void _write_volstat(void *mptr1)
 {
 	MOUNT_T *mptr;
+	PTHREAD_REUSE_T *this_thread;
 
 	mptr = (MOUNT_T *) mptr1;
 
-	sleep(2);
+	this_thread =
+		(PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
+
+	this_thread->cancelable = 1;
+	if (this_thread->terminating == TRUE)
+		pthread_exit(0);
+	sleep(WRITE_SYS_INTERVAL);
+	this_thread->cancelable = 0;
 	sem_wait((mptr->stat_lock));
 	update_FS_statistics(mptr);
 	mptr->writing_stat = FALSE;
@@ -1109,9 +1132,6 @@ void _write_volstat(void *mptr1)
 int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 		int64_t meta_size_delta, int64_t num_inodes_delta)
 {
-	//int32_t ret;
-	pthread_t write_volstat_thread;
-
 	sem_wait((mptr->stat_lock));
 	(mptr->FS_stat)->system_size += (system_size_delta + meta_size_delta);
 	if ((mptr->FS_stat)->system_size < 0)
@@ -1126,12 +1146,10 @@ int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 		(mptr->FS_stat)->num_inodes = 0;
 	if (mptr->writing_stat == FALSE) {
 		mptr->writing_stat = TRUE;
-		pthread_create(&(write_volstat_thread),
-			&prefetch_thread_attr, (void *)&_write_volstat,
-			(void *)mptr);
+		PTHREAD_REUSE_run(mptr->write_volstat_thread,
+			(void *)&_write_volstat, (void *)mptr);
 	}
 
-	//ret = update_FS_statistics(mptr);
 	sem_post((mptr->stat_lock));
 
 	return 0;

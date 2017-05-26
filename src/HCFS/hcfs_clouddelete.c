@@ -70,16 +70,13 @@ the error handling for sync-for-deletion for this inode will be handled in
 dsync_single_inode. */
 static inline void _dsync_terminate_thread(int32_t index)
 {
-	int32_t ret;
 	int32_t retry_inode;
+	int32_t pause_status;
 
 	if ((dsync_ctl.threads_in_use[index] != 0) &&
 			((dsync_ctl.threads_finished[index] == TRUE) &&
 			(dsync_ctl.threads_created[index] == TRUE))) {
-		ret = pthread_join(dsync_ctl.inode_dsync_thread[index],
-					NULL);
-		if (ret < 0)
-			return;
+		PTHREAD_REUSE_join(&(dsync_ctl.inode_dsync_thread[index]));
 
 		if (dsync_ctl.retry_right_now[index] == TRUE)
 			retry_inode = dsync_ctl.threads_in_use[index];
@@ -92,6 +89,8 @@ static inline void _dsync_terminate_thread(int32_t index)
 		dsync_ctl.retry_right_now[index] = FALSE;
 		dsync_ctl.threads_error[index] = FALSE;
 		dsync_ctl.total_active_dsync_threads--;
+		sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+		                      &pause_status);
 		sem_post(&(dsync_ctl.dsync_queue_sem));
 
 		if (retry_inode > 0) {
@@ -115,56 +114,50 @@ static inline void _dsync_terminate_thread(int32_t index)
 void collect_finished_dsync_threads(void *ptr)
 {
 	int32_t count;
-	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 		(dsync_ctl.total_active_dsync_threads > 0)) {
+		sem_wait(&(dsync_ctl.pause_sem));
+		if ((hcfs_system->system_going_down == TRUE) &&
+		    (dsync_ctl.total_active_dsync_threads <= 0))
+			break;
 		sem_wait(&(dsync_ctl.dsync_op_sem));
 
-		if (dsync_ctl.total_active_dsync_threads <= 0) {
-			sem_post(&(dsync_ctl.dsync_op_sem));
-			nanosleep(&time_to_sleep, NULL);
-			continue;
-		}
 		for (count = 0; count < MAX_DSYNC_CONCURRENCY; count++)
 			_dsync_terminate_thread(count);
 
 		sem_post(&(dsync_ctl.dsync_op_sem));
-		nanosleep(&time_to_sleep, NULL);
 		continue;
 	}
+	for (count = 0; count < MAX_DSYNC_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(dsync_ctl.inode_dsync_thread[count]));
 }
 
 /* Helper function for terminating threads in deleting backend objects */
 /* Delete threads are the ones that delete a single backend object. */
 static inline void _delete_terminate_thread(int32_t index)
 {
-	int32_t ret;
 	int32_t dsync_index;
 
 	if (((delete_ctl.threads_in_use[index] != 0) &&
 		(delete_ctl.delete_threads[index].is_block == TRUE)) &&
 		((delete_ctl.threads_finished[index] == TRUE) &&
 			(delete_ctl.threads_created[index] == TRUE))) {
-		ret = pthread_join(delete_ctl.threads_no[index], NULL);
-		if (ret == 0) {
-			/* Mark error on dsync_ctl.threads_error when failed */
-			if (delete_ctl.threads_error[index] == TRUE) {
-				dsync_index =
-					delete_ctl.delete_threads[index].dsync_index;
-				dsync_ctl.threads_error[dsync_index] = TRUE;
-			}
-			delete_ctl.threads_in_use[index] = FALSE;
-			delete_ctl.threads_created[index] = FALSE;
-			delete_ctl.threads_finished[index] = FALSE;
-			delete_ctl.threads_error[index] = FALSE;
-			delete_ctl.total_active_delete_threads--;
-			sem_post(&(delete_ctl.delete_queue_sem));
+		PTHREAD_REUSE_join(&(delete_ctl.threads_no[index]));
+		/* Mark error on dsync_ctl.threads_error when failed */
+		if (delete_ctl.threads_error[index] == TRUE) {
+			dsync_index =
+				delete_ctl.delete_threads[index].dsync_index;
+			dsync_ctl.threads_error[dsync_index] = TRUE;
 		}
+		delete_ctl.threads_in_use[index] = FALSE;
+		delete_ctl.threads_created[index] = FALSE;
+		delete_ctl.threads_finished[index] = FALSE;
+		delete_ctl.threads_error[index] = FALSE;
+		delete_ctl.total_active_delete_threads--;
+		sem_post(&(delete_ctl.delete_queue_sem));
 	}
 }
 
@@ -181,28 +174,26 @@ static inline void _delete_terminate_thread(int32_t index)
 void collect_finished_delete_threads(void *ptr)
 {
 	int32_t count;
-	struct timespec time_to_sleep;
 
 	UNUSED(ptr);
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
 		(delete_ctl.total_active_delete_threads > 0)) {
+		sem_wait(&(delete_ctl.pause_sem));
+		if ((hcfs_system->system_going_down == TRUE) &&
+			(delete_ctl.total_active_delete_threads <= 0))
+			break;
+
 		sem_wait(&(delete_ctl.delete_op_sem));
 
-		if (delete_ctl.total_active_delete_threads <= 0) {
-			sem_post(&(delete_ctl.delete_op_sem));
-			nanosleep(&time_to_sleep, NULL);
-			continue;
-		}
 		for (count = 0; count < MAX_DELETE_CONCURRENCY; count++)
 			_delete_terminate_thread(count);
 
 		sem_post(&(delete_ctl.delete_op_sem));
-		nanosleep(&time_to_sleep, NULL);
 		continue;
 	}
+	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(delete_ctl.threads_no[count]));
 }
 
 /************************************************************************
@@ -220,6 +211,7 @@ void init_dsync_control(void)
 	memset(&dsync_ctl, 0, sizeof(DSYNC_THREAD_CONTROL));
 	sem_init(&(dsync_ctl.dsync_op_sem), 0, 1);
 	sem_init(&(dsync_ctl.dsync_queue_sem), 0, MAX_DSYNC_CONCURRENCY);
+	sem_init(&(dsync_ctl.pause_sem), 0, 0);
 	memset(&(dsync_ctl.threads_in_use), 0,
 					sizeof(ino_t) * MAX_DSYNC_CONCURRENCY);
 	memset(&(dsync_ctl.threads_created), 0,
@@ -234,8 +226,22 @@ void init_dsync_control(void)
 
 	pthread_create(&(dsync_ctl.dsync_handler_thread), NULL,
 				(void *)&collect_finished_dsync_threads, NULL);
+	/* Set reusable threads */
+	PTHREAD_REUSE_set_exithandler();
+	int32_t count;
+	for (count = 0; count < MAX_DSYNC_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(dsync_ctl.inode_dsync_thread[count]),
+		                     NULL);
 }
 
+static inline void _destroy_delete_controls(void)
+{
+	sem_post(&(delete_ctl.pause_sem));
+	sem_post(&(dsync_ctl.pause_sem));
+	pthread_join(dsync_ctl.dsync_handler_thread, NULL);
+	pthread_join(delete_ctl.delete_handler_thread, NULL);
+	free(dsync_ctl.retry_list.retry_inode);
+}
 /* Helper for initializing curl handles for deleting backend objects */
 static inline int32_t _init_delete_handle(int32_t index)
 {
@@ -282,6 +288,7 @@ void init_delete_control(void)
 
 	sem_init(&(delete_ctl.delete_op_sem), 0, 1);
 	sem_init(&(delete_ctl.delete_queue_sem), 0, MAX_DELETE_CONCURRENCY);
+	sem_init(&(delete_ctl.pause_sem), 0, 0);
 	memset(&(delete_ctl.threads_in_use), 0,
 					sizeof(char) * MAX_DELETE_CONCURRENCY);
 	memset(&(delete_ctl.threads_created), 0,
@@ -292,6 +299,12 @@ void init_delete_control(void)
 
 	pthread_create(&(delete_ctl.delete_handler_thread), NULL,
 			(void *)&collect_finished_delete_threads, NULL);
+
+	/* Set reusable threads */
+	PTHREAD_REUSE_set_exithandler();
+	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(delete_ctl.threads_no[count]),
+		                     NULL);
 }
 
 /* Helper function for marking a delete thread as in use */
@@ -469,7 +482,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int32_t ret_val, errcode, ret;
 	size_t ret_size;
 	struct timespec time_to_sleep;
-	pthread_t *tmp_tn;
+	PTHREAD_REUSE_T *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char backend_mlock;
@@ -479,6 +492,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t block_seq;
 	ino_t root_inode;
 	char metaID[GDRIVE_ID_LENGTH];
+	int32_t pause_status;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -493,6 +507,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	ret = fetch_todelete_path(todel_metapath, this_inode);
 	if (ret < 0) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -502,6 +517,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_metafptr = fopen(backend_metapath, "w+");
 	if (backend_metafptr == NULL) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_check_and_release(&(dsync_ctl.pause_sem), &pause_status);
 		return;
 	}
 	setbuf(backend_metafptr, NULL);
@@ -576,6 +592,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		fclose(backend_metafptr);
 		unlink(backend_metapath);
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -593,6 +610,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		super_block_delete(this_inode);
 		super_block_reclaim();
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -688,7 +706,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 						.blockID,
 					    GDRIVE_ID_LENGTH);
 				}
-				pthread_create(tmp_tn, NULL,
+				PTHREAD_REUSE_run(tmp_tn,
 						(void *)&con_object_dsync,
 							(void *)tmp_dt);
 				delete_ctl.threads_created[curl_id] = TRUE;
@@ -738,11 +756,13 @@ errcode_handle:
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
 	if (hcfs_system->system_going_down == TRUE) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -768,7 +788,7 @@ errcode_handle:
 		memset(&(tmp_dt->gdrive_info), 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
 		strncpy(tmp_dt->gdrive_info.fileID, metaID, GDRIVE_ID_LENGTH);
 	}
-	pthread_create(&(delete_ctl.threads_no[curl_id]), NULL,
+	PTHREAD_REUSE_run(&(delete_ctl.threads_no[curl_id]),
 		(void *)&con_object_dsync,
 		(void *)&(delete_ctl.delete_threads[curl_id]));
 
@@ -776,7 +796,7 @@ errcode_handle:
 	delete_ctl.threads_finished[curl_id] = FALSE;
 	sem_post(&(delete_ctl.delete_op_sem));
 
-	pthread_join(delete_ctl.threads_no[curl_id], NULL);
+	PTHREAD_REUSE_join(&(delete_ctl.threads_no[curl_id]));
 
 	sem_wait(&(delete_ctl.delete_op_sem));
 	delete_ctl.threads_in_use[curl_id] = FALSE;
@@ -791,6 +811,7 @@ errcode_handle:
 	/* Check threads error */
 	if (dsync_ctl.threads_error[which_dsync_index] == TRUE) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+		sem_post(&(dsync_ctl.pause_sem));
 		return;
 	}
 
@@ -807,6 +828,7 @@ errcode_handle:
 	super_block_delete(this_inode);
 	super_block_reclaim();
 	dsync_ctl.threads_finished[which_dsync_index] = TRUE;
+	sem_post(&(dsync_ctl.pause_sem));
 	return;
 }
 
@@ -972,6 +994,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	}
 
 	delete_ctl.threads_finished[which_index] = TRUE;
+	sem_post(&(delete_ctl.pause_sem));
 }
 
 /* Helper for creating threads for deletion */
@@ -985,7 +1008,7 @@ int32_t _dsync_use_thread(int32_t index, ino_t this_inode, mode_t this_mode)
 	dsync_thread_info[index].inode = this_inode;
 	dsync_thread_info[index].this_mode = this_mode;
 	dsync_thread_info[index].which_index = index;
-	pthread_create(&(dsync_ctl.inode_dsync_thread[index]), NULL,
+	PTHREAD_REUSE_run(&(dsync_ctl.inode_dsync_thread[index]),
 		(void *)&dsync_single_inode,
 				(void *)&(dsync_thread_info[index]));
 	dsync_ctl.threads_created[index] = TRUE;
@@ -1002,15 +1025,6 @@ int32_t _dsync_use_thread(int32_t index, ino_t this_inode, mode_t this_mode)
 *  Return value: None
 *
 *************************************************************************/
-
-static BOOL _sleep_wakeup(void)
-{
-	if ((hcfs_system->sync_paused == TRUE) ||
-		(hcfs_system->system_going_down == TRUE))
-		return TRUE;
-	else
-		return FALSE;
-}
 
 void *delete_loop(void *ptr)
 {
@@ -1030,13 +1044,19 @@ void *delete_loop(void *ptr)
 	while (hcfs_system->system_going_down == FALSE) {
 		/* sleep and continue if backend is offline */
 		if (hcfs_system->sync_paused == TRUE) {
-			sleep(1);
+			sem_wait(&(hcfs_system->dsync_wait_sem));
 			continue;
 		}
 
-		/* Sleep 5 secs if backend is online and system is running */
-		if (inode_to_check == 0)
-			nonblock_sleep(5, _sleep_wakeup);
+		write_log(10, "Debug statistics %d, %d\n",
+		          sys_super_block->head.num_to_be_deleted,
+		          dsync_ctl.total_active_dsync_threads);
+		/* Sleep if backend is online and system is running */
+		if (sys_super_block->head.num_to_be_deleted <=
+		    dsync_ctl.total_active_dsync_threads) {
+			sem_wait(&(hcfs_system->dsync_wait_sem));
+			continue;
+		}
 
 		/* Get the first to-delete inode if inode_to_check is none. */
 		sem_wait(&(dsync_ctl.dsync_queue_sem));
@@ -1123,5 +1143,6 @@ anything can be deleted */
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		}
 	}
+	_destroy_delete_controls();
 	return NULL;
 }

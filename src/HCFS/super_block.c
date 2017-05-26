@@ -50,6 +50,10 @@
 #include "rebuild_super_block.h"
 #include "hcfs_fromcloud.h"
 #include "recover_super_block.h"
+#include "pin_scheduling.h"
+
+#define SB_ENTRY_SIZE ((int32_t)sizeof(SUPER_BLOCK_ENTRY))
+#define SB_HEAD_SIZE ((int32_t)sizeof(SUPER_BLOCK_HEAD))
 
 /************************************************************************
 *
@@ -534,6 +538,9 @@ int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 		if (((is_start_transit == FALSE) && /* End of transit */
 				(tempentry.status == IS_DIRTY)) &&
 				((transit_incomplete != TRUE))) { /* Complete */
+			/* We are done first this upload, so update the xattr
+			"user.lastsync" */
+			tempentry.lastsync_time = get_current_sectime();
 			if (tempentry.mod_after_in_transit == TRUE) {
 				/* If sync point is set, relocate this inode
 				 * so that it is going to be last one. */
@@ -1350,6 +1357,7 @@ ino_t super_block_new_inode(HCFS_STAT *in_stat,
 	tempentry.generation = this_generation;
 	if (ret_generation != NULL)
 		*ret_generation = this_generation;
+	tempentry.lastsync_time = init_lastsync_time();
 
 	memcpy(&tempstat, in_stat, sizeof(HCFS_STAT));
 	tempstat.ino = this_inode;
@@ -1407,6 +1415,7 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 	SUPER_BLOCK_ENTRY entry1, entry2;
 	ino_t first_dirty, last_dirty;
 	BOOL is_missing;
+	int32_t sync_status;
 
 	write_log(0, "Start to rebuild dirty inode linked list.\n");
 	if (missing_inode != 0)
@@ -1447,6 +1456,8 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 			return ret;
 
 		sys_super_block->head.num_dirty = 1;
+		sem_check_and_release(&(hcfs_system->sync_wait_sem),
+		                      &sync_status);
 		ret = write_super_block_head();
 		if (ret < 0)
 			return ret;
@@ -1511,6 +1522,8 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 
 		sys_super_block->head.last_dirty_inode = tempentry.this_index;
 		sys_super_block->head.num_dirty += 1;
+		sem_check_and_release(&(hcfs_system->sync_wait_sem),
+		                      &sync_status);
 		ret = write_super_block_head();
 		if (ret < 0)
 			return ret;
@@ -1551,6 +1564,7 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 	int64_t now_meta_size, dirty_delta_meta_size;
 	int32_t need_rebuild;
 	BOOL sb_enqueue_later = FALSE;
+	int32_t pause_status, sync_status;
 
 	if (IS_SBENTRY_BEING_RECOVER_LATER(thisinode)) {
 		sb_enqueue_later = TRUE;
@@ -1602,6 +1616,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &sync_status);
 		} else {
 			ret = read_super_block_entry(
 			    sys_super_block->head.last_dirty_inode, &tempentry);
@@ -1641,6 +1657,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			sys_super_block->head.last_dirty_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_dirty++;
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &sync_status);
 			retsize = pread(sys_super_block->iofptr, &tempentry,
 				SB_ENTRY_SIZE, SB_HEAD_SIZE +
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
@@ -1675,12 +1693,18 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_to_be_deleted++;
+			/* Continue dsync thread if stopped */
+			sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+			                      &pause_status);
 		} else {
 			this_entry->util_ll_prev =
 				sys_super_block->head.last_to_delete_inode;
 			sys_super_block->head.last_to_delete_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_to_be_deleted++;
+			/* Continue dsync thread if stopped */
+			sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+			                      &pause_status);
 			retsize = pread(sys_super_block->iofptr, &tempentry,
 				SB_ENTRY_SIZE, SB_HEAD_SIZE +
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
@@ -2121,6 +2145,7 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY last_entry;
 	int32_t ret;
+	int32_t pause_status;
 
 	/* Return pin-status if this status is not UNPIN */
 	if (this_entry->pin_status != ST_UNPIN) {
@@ -2160,6 +2185,8 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 	}
 
 	sys_super_block->head.num_pinning_inodes++;
+	sem_check_and_release(&(hcfs_system->pin_wait_sem), &pause_status);
+
 	ret = write_super_block_head();
 	if (ret < 0)
 		goto error_handling;

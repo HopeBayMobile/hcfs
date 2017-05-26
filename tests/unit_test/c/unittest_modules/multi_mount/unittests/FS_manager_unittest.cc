@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <ftw.h>
+#include <stddef.h>
 
 #include <unistd.h>
 #include <string.h>
@@ -112,7 +113,7 @@ TEST_F(init_fs_managerTest, InitFSManager) {
   EXPECT_EQ(0, ret);
   ASSERT_GE(fs_mgr_head->FS_list_fh, -1);
   testlen = lseek(fs_mgr_head->FS_list_fh, 0, SEEK_END);
-  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, testlen);
+  EXPECT_EQ(sizeof(FS_MANAGER_HEADER_LAYOUT), testlen);
  }
 
 TEST_F(init_fs_managerTest, OpenFSManager) {
@@ -274,17 +275,20 @@ TEST_F(add_filesystemTest, AddOneFS) {
   ret = access(tmppath, F_OK);
   ASSERT_EQ(0, ret);
 
+  int64_t header_size = sizeof(FS_MANAGER_HEADER_LAYOUT);
+
   EXPECT_EQ(1, fs_mgr_head->num_FS);
   EXPECT_EQ(2, tmp_entry.d_ino);
   EXPECT_STREQ("testFS", tmp_entry.d_name);
-  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE), 16);
+  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE),
+                  offsetof(FS_MANAGER_HEADER_LAYOUT, fs_dir_meta));
   EXPECT_EQ(sizeof(DIR_META_TYPE), retsize);
-  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, tmpmeta.root_entry_page);
-  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, tmpmeta.tree_walk_list_head);
+  EXPECT_EQ(header_size, tmpmeta.root_entry_page);
+  EXPECT_EQ(header_size, tmpmeta.tree_walk_list_head);
   EXPECT_EQ(1, tmpmeta.total_children);
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
-			sizeof(DIR_ENTRY_PAGE), sizeof(DIR_META_TYPE) + 16);
+			sizeof(DIR_ENTRY_PAGE), header_size);
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(2, tmppage.dir_entries[0].d_ino);
@@ -355,18 +359,20 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   ASSERT_EQ(0, ret);
   unlink(tmppath);
 
+  int64_t header_size = sizeof(FS_MANAGER_HEADER_LAYOUT);
 
   EXPECT_EQ(3, fs_mgr_head->num_FS);
-  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE), 16);
+  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE),
+                  offsetof(FS_MANAGER_HEADER_LAYOUT, fs_dir_meta));
   EXPECT_EQ(sizeof(DIR_META_TYPE), retsize);
-  EXPECT_EQ(sizeof(DIR_META_TYPE)+2*sizeof(DIR_ENTRY_PAGE) + 16,
+  EXPECT_EQ(header_size+2*sizeof(DIR_ENTRY_PAGE),
       tmpmeta.root_entry_page);
-  EXPECT_EQ(sizeof(DIR_META_TYPE)+2*sizeof(DIR_ENTRY_PAGE) + 16,
+  EXPECT_EQ(header_size+2*sizeof(DIR_ENTRY_PAGE),
       tmpmeta.tree_walk_list_head);
   EXPECT_EQ(3, tmpmeta.total_children);
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
-			sizeof(DIR_ENTRY_PAGE), sizeof(DIR_META_TYPE) + 16);
+			sizeof(DIR_ENTRY_PAGE), header_size);
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(2, tmppage.dir_entries[0].d_ino);
@@ -374,7 +380,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
 			sizeof(DIR_ENTRY_PAGE),
-			sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE) + 16);
+			header_size+sizeof(DIR_ENTRY_PAGE));
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(4, tmppage.dir_entries[0].d_ino);
@@ -382,7 +388,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
 			sizeof(DIR_ENTRY_PAGE),
-			sizeof(DIR_META_TYPE)+ 2*sizeof(DIR_ENTRY_PAGE) + 16);
+			header_size+ 2*sizeof(DIR_ENTRY_PAGE));
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(3, tmppage.dir_entries[0].d_ino);

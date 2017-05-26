@@ -26,6 +26,10 @@
 #include <pthread.h>
 #endif
 
+#include "hcfscurl.h"
+#include "global.h"
+#include "pthread_control.h"
+
 #define MAX_PIN_DL_CONCURRENCY ((MAX_DOWNLOAD_CURL_HANDLE) / 2)
 
 /* Download action type */
@@ -54,7 +58,8 @@ typedef struct {
 typedef struct {
 	sem_t ctl_op_sem;
 	sem_t dl_th_sem;
-	pthread_t download_thread[MAX_PIN_DL_CONCURRENCY];
+	sem_t th_wait_sem;
+	PTHREAD_REUSE_T dthread[MAX_PIN_DL_CONCURRENCY];
 	pthread_t manager_thread;
 	DOWNLOAD_BLOCK_INFO block_info[MAX_PIN_DL_CONCURRENCY];
 	int32_t active_th;

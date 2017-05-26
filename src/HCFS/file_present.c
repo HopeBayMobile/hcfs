@@ -1515,11 +1515,8 @@ int32_t unpin_inode(ino_t this_inode, int64_t *reserved_release_size)
 	if (S_ISFILE(tempstat.mode)) {
 		/* First post the control for cache mangement */
 		semval = 0;
-		ret = sem_getvalue(&(hcfs_system->something_to_replace),
-		                   &semval);
-		if ((ret == 0) && (semval == 0))
-			sem_post(&(hcfs_system->something_to_replace));
-
+		ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+		                            &semval);
 		return ret;
 
 	} else if (S_ISLNK(tempstat.mode)) {

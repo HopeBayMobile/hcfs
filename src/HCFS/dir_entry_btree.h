@@ -26,18 +26,19 @@ int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	int32_t fh, DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	int64_t *temp_child_page_pos, BOOL is_external);
+	int64_t *temp_child_page_pos, BOOL is_external, int64_t meta_pos);
 
 int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 	int32_t fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	int64_t *temp_child_page_pos, BOOL is_external);
+	int64_t *temp_child_page_pos, BOOL is_external, int64_t meta_pos);
 
 int32_t rebalance_btree(DIR_ENTRY_PAGE *tnode, int32_t fh, DIR_META_TYPE *this_meta,
 	int32_t selected_child, DIR_ENTRY *tmp_entries,
-	int64_t *temp_child_page_pos);
+	int64_t *temp_child_page_pos, int64_t meta_pos);
 
 int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *extracted_child,
-	DIR_ENTRY *tmp_entries, int64_t *temp_child_page_pos);
+	DIR_ENTRY *tmp_entries, int64_t *temp_child_page_pos,
+	int64_t meta_pos);
 
 #endif  /* GW20_HCFS_DIR_ENTRY_BTREE_H_ */

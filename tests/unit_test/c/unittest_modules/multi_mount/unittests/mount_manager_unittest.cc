@@ -608,6 +608,9 @@ TEST_F(mount_FSTest, MountedFS) {
   if (mount_mgr.root->mt_entry->stat_fptr != NULL)
     fclose(mount_mgr.root->mt_entry->stat_fptr);
 
+  PTHREAD_REUSE_terminate(mount_mgr.root->mt_entry->write_volstat_thread);
+  free(mount_mgr.root->mt_entry->write_volstat_thread);
+
   free(mount_mgr.root->mt_entry->lookup_table);
   free(mount_mgr.root->mt_entry->FS_stat);
   sem_destroy(mount_mgr.root->mt_entry->stat_lock);
@@ -917,6 +920,7 @@ TEST_F(unmount_allTest, UnmountAll) {
 class change_mount_statTest : public ::testing::Test {
  protected:
   MOUNT_T tmp_mount;
+  pthread_attr_t prefetch_thread_attr;
   virtual void SetUp() {
     memset(&tmp_mount, 0, sizeof(MOUNT_T));
     tmp_mount.FS_stat = (FS_STAT_T *)malloc(sizeof(FS_STAT_T));
@@ -929,9 +933,18 @@ class change_mount_statTest : public ::testing::Test {
     if (access(METAPATH, F_OK) != 0)
       mkdir(METAPATH, 0700);
     tmp_mount.stat_fptr = fopen("/tmp/testHCFS/metapath/tmpstat", "a+");
+    pthread_attr_init(&prefetch_thread_attr);
+    pthread_attr_setdetachstate(&prefetch_thread_attr,
+						PTHREAD_CREATE_DETACHED);
+    PTHREAD_REUSE_set_exithandler();
+    tmp_mount.write_volstat_thread = malloc(sizeof(PTHREAD_REUSE_T));
+    PTHREAD_REUSE_create(tmp_mount.write_volstat_thread, NULL);
+
    }
 
   virtual void TearDown() {
+    PTHREAD_REUSE_terminate(tmp_mount.write_volstat_thread);
+    free(tmp_mount.write_volstat_thread);
     fclose(tmp_mount.stat_fptr);
     unlink("/tmp/testHCFS/metapath/tmpstat");
     nftw(METAPATH, do_delete, 20, FTW_DEPTH);

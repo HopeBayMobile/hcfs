@@ -54,10 +54,13 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	return HTTP_OK;
 }
 
+int counter = 0;
 int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 	char transit_incomplete)
 {
 	MOCK();
+	counter++;
+	printf("Counter is now %d, dirty %d\n", counter, sys_super_block->head.num_dirty);
 	if (this_inode > 1 && transit_incomplete == FALSE) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
 		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
@@ -66,12 +69,14 @@ int32_t super_block_update_transit(ino_t this_inode, BOOL is_start_transit,
 		sem_post(&shm_verified_data->record_inode_sem);
 
 		sys_super_block->head.num_dirty--;
+		printf("Counter is now %d, dirty %d\n", counter, sys_super_block->head.num_dirty);
 		printf("Test: inode %zu is updated\n", this_inode);
 	}
 	return 0;
 }
 
-int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
+int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+                    HTTP_meta *object_meta, added_info_t *more)
 {
 	MOCK();
 	char objectpath[40];
@@ -95,12 +100,12 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTT
 	return 200;
 }
 
-#if ENABLE(DEDUP)
-int32_t do_block_delete(ino_t this_inode, int64_t block_no, uint8_t *obj_id,
-		    CURL_HANDLE *curl_handle)
-#else
 int32_t do_block_delete(ino_t this_inode, int64_t block_no, int64_t seq,
-		    CURL_HANDLE *curl_handle)
+#if ENABLE(DEDUP)
+                                uint8_t *obj_id, CURL_HANDLE *curl_handle)
+#else
+                                CURL_HANDLE *curl_handle,
+                                GOOGLEDRIVE_OBJ_INFO *gdrive_info)
 #endif
 {
 	MOCK();
@@ -130,15 +135,23 @@ int32_t read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
+	inode_ptr->lastsync_time = fake_access_time;
 	(inode_ptr->inode_stat).mode = S_IFDIR;
+	/* Should add this counter first to avoid checking the first inode twice */
+	shm_test_data->tohandle_counter++;
 
 	if (shm_test_data->tohandle_counter == shm_test_data->num_inode) {
+		printf("Last inode. test_upload_delay is %d\n", test_upload_delay);
 		inode_ptr->util_ll_next = 0;
-		sys_super_block->head.first_dirty_inode = 0;
+		if (test_upload_delay == FALSE) {
+			sys_super_block->head.first_dirty_inode = 0;
+		} else {
+			shm_test_data->tohandle_counter = 0;
+			test_upload_delay = FALSE;
+		}
 	} else {
 		inode_ptr->util_ll_next = 
 			shm_test_data->to_handle_inode[shm_test_data->tohandle_counter];
-		shm_test_data->tohandle_counter++;
 	}
 	return 0;
 }
@@ -183,7 +196,8 @@ int32_t write_log(int32_t level, const char *format, ...)
 	return 0;
 }
 
-int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
+int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+                    HCFS_encode_object_meta *object_meta, added_info_t *more)
 {
 	MOCK();
 	FS_CLOUD_STAT_T fs_cloud_stat;
@@ -249,8 +263,9 @@ void fetch_backend_block_objname(char *objname, ino_t inode,
 	return;
 }
 
-int32_t fetch_toupload_block_path(char *pathname, ino_t inode,
-		int64_t block_no, int64_t seq)
+int32_t fetch_toupload_block_path(char *pathname,
+                                  ino_t inode,
+                                  int64_t block_no)
 {
 	MOCK();
 	sprintf(pathname,
@@ -278,18 +293,23 @@ int comm2fuseproc(ino_t this_inode, BOOL is_uploading,
 int del_progress_file(int fd, ino_t inode)
 {
 	MOCK();
+	if (fd == 0)
+		printf("fd 0 is closed here!!!!!!!!!!!\n");
 	close(fd);
 	unlink("/tmp/mock_progress_file");
 	return 0;
 }
 
 int32_t set_progress_info(int32_t fd, int64_t block_index,
-	const char *toupload_exist, const char *backend_exist,
-	const int64_t *toupload_seq, const int64_t *backend_seq,
-	const char *finish)
+        const char *toupload_exist, const char *backend_exist,
+        const int64_t *toupload_seq, const int64_t *backend_seq,
+        const char *toupload_gdrive_id, const char *backend_gdrive_id,
+        const char *finish)
 {
 	MOCK();
 	BLOCK_UPLOADING_STATUS block_entry;
+
+	memset(&block_entry, 0, sizeof(BLOCK_UPLOADING_STATUS));
 
 	if (toupload_seq)
 		block_entry.to_upload_seq = *toupload_seq;
@@ -313,8 +333,11 @@ int64_t query_status_page(int32_t fd, int64_t block_index)
 }
 
 int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
-		int64_t *backend_size, int64_t *total_backend_blocks,
-		int64_t upload_seq, uint8_t *last_pin_status)
+                               int64_t *backend_size,
+                               int64_t *total_backend_blocks,
+                               int64_t upload_seq,
+                               uint8_t *last_pin_status,
+                               char *metaID)
 {
 	MOCK();
 	return 0;
@@ -330,8 +353,10 @@ int check_and_copy_file(const char *srcpath, const char *tarpath,
 
 void fetch_progress_file_path(char *pathname, ino_t inode)
 {
+
 	MOCK();
-	pathname[0] = 0;
+	snprintf(pathname, 100, "mock_meta_folder/tmpfile_%"
+	         PRIu64, (uint64_t) inode);
 	return;
 }
 
@@ -343,13 +368,22 @@ char block_finish_uploading(int32_t fd, int64_t blockno)
 
 int create_progress_file(ino_t inode)
 {
+	char tmppath[100];
+	int32_t fd;
+
 	MOCK();
-	return 0;
+	snprintf(tmppath, 100, "mock_meta_folder/tmpfile_%"
+	         PRIu64, (uint64_t) inode);
+	fd = open(tmppath, O_CREAT | O_RDWR, 0600);
+	return fd;
 }
 
 void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 {
 	MOCK();
+	sync_ctl.threads_error[data_ptr->which_index] = FALSE;
+	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 }
 
@@ -402,7 +436,7 @@ int change_status_to_BOTH(ino_t inode, int progress_fd,
 }
 
 int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
-		int64_t page_pos, int64_t toupload_seq)
+                int64_t page_pos, int64_t toupload_seq, char *blockid)
 {
 	FILE *fptr;
 	BLOCK_ENTRY_PAGE tmppage;
@@ -555,3 +589,21 @@ int32_t super_block_mark_dirty(ino_t this_inode)
 	MOCK();
 	return 0;
 }
+
+int64_t get_lastsync_time(ino_t thisinode)
+{
+	return fake_access_time;
+}
+
+int32_t get_parent_id(char *id, const char *objname)
+{
+	MOCK();
+	return 0;
+}
+void fetch_backend_meta_objname(char *objname, ino_t inode)
+{
+	sprintf(objname, "meta_%"PRIu64, (uint64_t)inode);
+
+	return;
+}
+

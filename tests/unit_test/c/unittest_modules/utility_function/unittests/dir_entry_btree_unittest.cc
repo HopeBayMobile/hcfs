@@ -333,7 +333,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
 		entry->d_type = D_ISDIR;
 		ASSERT_EQ(0, insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos, FALSE));
+			tmp_child_pos, FALSE, sizeof(HCFS_STAT)));
 		ASSERT_TRUE(overflow_median == NULL);
 		ASSERT_TRUE(overflow_new_pos == NULL);
 		ASSERT_EQ(times + 2 + 1, root_node.num_entries);
@@ -361,7 +361,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos, FALSE);
+			tmp_child_pos, FALSE, sizeof(HCFS_STAT));
 		ASSERT_TRUE(ret >= 0);
 		if ( ret == 1 ) {
 			generate_new_root();
@@ -401,14 +401,14 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Entries_Cannot_Split_Since_NoSpace)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos, FALSE);
+			tmp_child_pos, FALSE, sizeof(HCFS_STAT));
 		ASSERT_TRUE(ret >= 0) << "times = " << times << "ret = "<< ret;
 		free(entry);
 	}
 	sprintf(entry.d_name, "test%d", num_entries_insert);
 	ret = insert_dir_entry_btree(&entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos, FALSE);
+			tmp_child_pos, FALSE, sizeof(HCFS_STAT));
 	ASSERT_EQ(-ENOSPC, ret);
 
 	/* Check those entry in the b-tree */
@@ -438,7 +438,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos, FALSE);
+			tmp_child_pos, FALSE, sizeof(HCFS_STAT));
 		ASSERT_NE(-1, ret);
 		if ( ret == 1 ) {
 			generate_new_root();
@@ -456,7 +456,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		sprintf(entry->d_name, "test%d", times);
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
-			tmp_child_pos, FALSE);
+			tmp_child_pos, FALSE, sizeof(HCFS_STAT));
 		ASSERT_EQ(-EEXIST, ret);
 		free(entry);
 	}
@@ -495,7 +495,7 @@ class BaseClassInsertBtreeEntryIsUsable : public insert_dir_entry_btreeTest {
 				sprintf(entry->d_name, "%s%d", filename_prefix, times);
 				ret = insert_dir_entry_btree(entry, &root_node, fh, 
 					overflow_median, overflow_new_pos, &meta, tmp_entries, 
-					tmp_child_pos, FALSE);
+					tmp_child_pos, FALSE, sizeof(HCFS_STAT));
 				ASSERT_NE(-1, ret);
 				if ( ret == 1 ) {
 					generate_new_root();
@@ -607,7 +607,7 @@ TEST_F(rebalance_btreeTest, ChildIndexOutofBound)
 	for (int32_t child_index = root_node.num_entries+1 ; 
 		child_index < root_node.num_entries+1000 ; child_index++) {
 		ASSERT_EQ(-1, rebalance_btree(&root_node, fh, &meta,
-			child_index, tmp_entries, tmp_child_pos));
+			child_index, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 	}
 }
 
@@ -623,7 +623,7 @@ TEST_F(rebalance_btreeTest, RebalanceBtreeWithOnlyRootPage)
 
 	for (int32_t child_index = 0 ; child_index < root_node.num_entries+1 ; child_index++) {
 		ASSERT_EQ(-1, rebalance_btree(&root_node, fh, &meta,
-			child_index, tmp_entries, tmp_child_pos));
+			child_index, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 	}
 }
 
@@ -641,7 +641,7 @@ TEST_F(rebalance_btreeTest, CheckCase_NoRebalanceNeeded)
 	
 	for (int32_t child_index = 0 ; child_index < root_node.num_entries+1 ; child_index++) {
 		ASSERT_EQ(0, rebalance_btree(&root_node, fh, &meta,
-			child_index, tmp_entries, tmp_child_pos));
+			child_index, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 	}
 }
 
@@ -692,7 +692,7 @@ TEST_F(rebalance_btreeTest, Merge_Without_NewRoot)
 	child_index = 0;
 	while (child_index < root_node.num_entries + 1) {
 		int32_t ret = rebalance_btree(&root_node, fh, &meta, 
-			child_index, tmp_entries, tmp_child_pos);
+			child_index, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT));
 		ASSERT_TRUE(ret == 1 || ret == 0);
 		if (ret == 1) { // Merging 
 			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
@@ -768,7 +768,7 @@ TEST_F(rebalance_btreeTest, Merge_With_NewRoot)
 	
 	/* Run rebalancing function */
 	ASSERT_EQ(2, rebalance_btree(&root_node, fh, &meta, 
-		0, tmp_entries, tmp_child_pos));
+		0, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 
 	/* Check answer */	
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
@@ -814,7 +814,7 @@ TEST_F(rebalance_btreeTest, NoMerge_SplitInto2Pages)
 
 	/* Run rebalancing function */
 	ASSERT_EQ(1, rebalance_btree(&root_node, fh, &meta, 
-		0, tmp_entries, tmp_child_pos));
+		0, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 
 	/* Check answer */
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
@@ -855,7 +855,7 @@ TEST_F(extract_largest_childTest, ExtractEmptyDirectory)
 
 	/* Run function */
 	ASSERT_EQ(0, extract_largest_child(&root_node, fh, &meta, 
-			&largest_child, tmp_entries, tmp_child_pos));
+			&largest_child, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 }
 
 TEST_F(extract_largest_childTest, ExtractStartFromRootNode)
@@ -871,7 +871,7 @@ TEST_F(extract_largest_childTest, ExtractStartFromRootNode)
 	
 	/* Run function */
 	ASSERT_EQ(0, extract_largest_child(&root_node, fh, &meta, 
-			&largest_child, tmp_entries, tmp_child_pos));
+			&largest_child, tmp_entries, tmp_child_pos, sizeof(HCFS_STAT)));
 
 	/* Check answer */
 	EXPECT_STREQ("test_file9999", largest_child.d_name) 
@@ -907,7 +907,8 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree_EntryNotFound)
 		DIR_ENTRY tmp_entry;
 		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
 		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
-			fh, &meta, tmp_entries, tmp_child_pos, FALSE);
+			fh, &meta, tmp_entries, tmp_child_pos, FALSE,
+			sizeof(HCFS_STAT));
 	}
 	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 	for (int32_t i = 0 ; i < num_tests ; i++)
@@ -933,7 +934,8 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree_EntryNotFound)
 		DIR_ENTRY tmp_entry;
 		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
 		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
-			fh, &meta, tmp_entries, tmp_child_pos, FALSE);
+			fh, &meta, tmp_entries, tmp_child_pos, FALSE,
+			sizeof(HCFS_STAT));
 		pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
 	}
@@ -958,7 +960,8 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_1)
 		sprintf(tmp_entry.d_name, "test_file%d", i);
 		if (i % 2) // Just delete 50% nodes
 			ASSERT_EQ(0, delete_dir_entry_btree(&tmp_entry, &root_node, 
-				fh, &meta, tmp_entries, tmp_child_pos, FALSE));
+				fh, &meta, tmp_entries, tmp_child_pos, FALSE,
+				sizeof(HCFS_STAT)));
 	}
 
 	/* Check answer */
@@ -992,7 +995,8 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_2)
 		sprintf(tmp_entry.d_name, "test_file%d", i);
 		if (i % 5) { // Just delete 80% nodes
 			int32_t ret = delete_dir_entry_btree(&tmp_entry, &root_node, 
-				fh, &meta, tmp_entries, tmp_child_pos, FALSE);
+				fh, &meta, tmp_entries, tmp_child_pos, FALSE,
+				sizeof(HCFS_STAT));
 			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
 			// Reload root
 			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
@@ -1031,7 +1035,8 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_exceed_2)
 		sprintf(tmp_entry.d_name, "test_file%d", i);
 		if (i % 10) { // Just delete 90% nodes
 			int32_t ret = delete_dir_entry_btree(&tmp_entry, &root_node, 
-				fh, &meta, tmp_entries, tmp_child_pos, FALSE);
+				fh, &meta, tmp_entries, tmp_child_pos, FALSE,
+				sizeof(HCFS_STAT));
 			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
 			// Reload root
 			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));

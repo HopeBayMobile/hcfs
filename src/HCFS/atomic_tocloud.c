@@ -1239,6 +1239,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 			UNLINK(backend_meta_path);
 		sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 		sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+		sem_post(&(sync_ctl.sync_finished_sem));
 		return;
 	}
 
@@ -1291,6 +1292,7 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	/* Sync again so that ensure data consistency */
 	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 
 errcode_handle:
@@ -1302,6 +1304,7 @@ errcode_handle:
 		unlink(backend_meta_path);
 	sync_ctl.threads_error[data_ptr->which_index] = TRUE;
 	sync_ctl.threads_finished[data_ptr->which_index] = TRUE;
+	sem_post(&(sync_ctl.sync_finished_sem));
 	return;
 }
 

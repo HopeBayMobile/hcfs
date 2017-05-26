@@ -287,5 +287,4 @@
 			goto errcode_handle;                                   \
 		}                                                              \
 	} while (0)
-
 #endif  /* SRC_HCFS_MACRO_H_ */

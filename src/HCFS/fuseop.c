@@ -1298,6 +1298,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 #endif
 
 	fuse_reply_entry(req, &(tmp_param));
+
 	gettimeofday(&tmp_time2, NULL);
 	write_log(10, "mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
@@ -4130,10 +4131,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			/* Signal cache management that something can be paged
 			out */
 			semval = 0;
-			ret = sem_getvalue(&(hcfs_system->something_to_replace),
-					   &semval);
-			if ((ret == 0) && (semval == 0))
-				sem_post(&(hcfs_system->something_to_replace));
+			ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+					            &semval);
 
 			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);
@@ -8201,9 +8200,6 @@ int32_t hook_fuse(int32_t argc, char **argv)
 	data_smart_root = (ino_t) 0;
 	mgmt_app_is_created = FALSE;
 
-	pthread_attr_init(&prefetch_thread_attr);
-	pthread_attr_setdetachstate(&prefetch_thread_attr,
-						PTHREAD_CREATE_DETACHED);
 #ifndef _ANDROID_ENV_ /* Not in Android */
 	init_fuse_proc_communication(communicate_tid, &socket_fd);
 #endif

@@ -123,3 +123,11 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 
 	return 0;
 }
+int64_t get_current_sectime(void)
+{
+	return 0;
+}
+int64_t init_lastsync_time(void)
+{
+	return 0;
+}

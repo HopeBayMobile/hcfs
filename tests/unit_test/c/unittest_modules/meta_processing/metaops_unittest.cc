@@ -2563,27 +2563,6 @@ TEST_F(check_meta_on_cloudTest, BackendIsNone)
 	EXPECT_EQ(metalocalsize, round_size(meta_file_size));
 }
 
-TEST_F(check_meta_on_cloudTest, ProgressFileExisted)
-{
-	char progressf_path[100] = "testpatterns/mock_progress_file";
-
-	d_type = D_ISDIR;
-
-	fetch_meta_path(meta_path, this_inode);
-	_gen_meta_file(meta_path, d_type, 0);
-
-	/* Generate mock progress file */
-	FILE *progressfptr = fopen(progressf_path, "w");
-	fclose(progressfptr);
-
-	ret = check_meta_on_cloud(this_inode, d_type, &meta_on_cloud,
-			&metasize, &metalocalsize);
-	EXPECT_EQ(ret, 0);
-	EXPECT_EQ(meta_on_cloud, TRUE);
-
-	unlink(progressf_path);
-}
-
 TEST_F(check_meta_on_cloudTest, DTypeIsDirMetaNotOnCloud)
 {
 	d_type = D_ISDIR;

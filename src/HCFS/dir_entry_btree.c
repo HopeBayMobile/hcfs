@@ -185,7 +185,7 @@ errcode_handle:
 int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	int32_t fh, DIR_ENTRY *overflow_median, int64_t *overflow_new_page,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-	int64_t *temp_child_page_pos, BOOL is_external)
+	int64_t *temp_child_page_pos, BOOL is_external, int64_t meta_pos)
 {
 	int32_t s_index, ret_val, median_entry;
 	DIR_ENTRY_PAGE newpage, temppage, temp_page2;
@@ -295,8 +295,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 							tnode->this_page_pos);
 
 		this_meta->tree_walk_list_head = newpage.this_page_pos;
-		PWRITE(fh, this_meta, sizeof(DIR_META_TYPE),
-							sizeof(HCFS_STAT));
+		PWRITE(fh, this_meta, sizeof(DIR_META_TYPE), meta_pos);
 
 		/* Parent of new node is the same as the parent of the old
 			node */
@@ -324,7 +323,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	ret_val = insert_dir_entry_btree(new_entry, &temppage, fh,
 				&tmp_overflow_median, &tmp_overflow_new_page,
 				this_meta, tmp_entries, temp_child_page_pos,
-				is_external);
+				is_external, meta_pos);
 
 	/*If finished. Just return*/
 	if (ret_val < 1)
@@ -439,7 +438,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	PWRITE(fh, tnode, sizeof(DIR_ENTRY_PAGE), tnode->this_page_pos);
 
 	this_meta->tree_walk_list_head = newpage.this_page_pos;
-	PWRITE(fh, this_meta, sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
+	PWRITE(fh, this_meta, sizeof(DIR_META_TYPE), meta_pos);
 
 	/* Parent of new node is the same as the parent of the old node*/
 	newpage.parent_page_pos = tnode->parent_page_pos;
@@ -485,7 +484,8 @@ errcode_handle:
 *************************************************************************/
 int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 		int32_t fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
-		int64_t *temp_child_page_pos, BOOL is_external)
+		int64_t *temp_child_page_pos, BOOL is_external,
+		int64_t meta_pos)
 {
 	int32_t s_index, ret_val, entry_to_delete;
 	DIR_ENTRY_PAGE temppage;
@@ -526,7 +526,7 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 
 		ret_val = rebalance_btree(tnode, fh, this_meta,
 					entry_to_delete, tmp_entries,
-							temp_child_page_pos);
+					temp_child_page_pos, meta_pos);
 
 		/* If rebalanced, recheck by calling this function with
 			the same parameters, else read the child node
@@ -541,14 +541,14 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 			return delete_dir_entry_btree(to_delete_entry,
 				&temppage, fh, this_meta, tmp_entries,
 						temp_child_page_pos,
-						is_external);
+						is_external, meta_pos);
 		}
 
 		if (ret_val > 0)
 			return delete_dir_entry_btree(to_delete_entry, tnode,
 					fh, this_meta, tmp_entries,
 					temp_child_page_pos,
-					is_external);
+					is_external, meta_pos);
 
 		if (ret_val < 0) {
 			write_log(5,
@@ -560,7 +560,8 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 					tnode->child_page_pos[entry_to_delete]);
 
 		ret_val = extract_largest_child(&temppage, fh, this_meta,
-			&extracted_child, tmp_entries, temp_child_page_pos);
+			&extracted_child, tmp_entries, temp_child_page_pos,
+			meta_pos);
 
 		/* Replace the entry_to_delete with the largest element
 			from the left subtree */
@@ -586,7 +587,7 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 	/* Rebalance the selected child with its right sibling
 		(or left if the rightmost) if needed */
 	ret_val = rebalance_btree(tnode, fh, this_meta, s_index,
-					tmp_entries, temp_child_page_pos);
+				tmp_entries, temp_child_page_pos, meta_pos);
 
 	/* If rebalanced, recheck by calling this function with the same
 		parameters, else read the child node and go down the tree */
@@ -595,13 +596,13 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 			this_meta->root_entry_page);
 		return delete_dir_entry_btree(to_delete_entry, &temppage, fh,
 				this_meta, tmp_entries, temp_child_page_pos,
-				is_external);
+				is_external, meta_pos);
 	}
 
 	if (ret_val > 0)
 		return delete_dir_entry_btree(to_delete_entry, tnode, fh,
 				this_meta, tmp_entries, temp_child_page_pos,
-				is_external);
+				is_external, meta_pos);
 
 	if (ret_val < 0) {
 		write_log(5, "debug dtree error in/after rebalancing\n");
@@ -613,7 +614,7 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 
 	return delete_dir_entry_btree(to_delete_entry, &temppage, fh,
 				this_meta, tmp_entries, temp_child_page_pos,
-				is_external);
+				is_external, meta_pos);
 
 errcode_handle:
 	return errcode;
@@ -636,6 +637,7 @@ errcode_handle:
 *                To conserve space, caller to this function has to reserve
 *                temp space for processing, pointed by "tmp_entries" and
 *                "temp_child_page_pos".
+*                "meta_pos" points to file offset of meta
 *
 *  Return value: 1 if rebalancing is conducted, and no new root is created.
 *                2 if rebalancing is conducted, and there is a new root. The
@@ -645,9 +647,10 @@ errcode_handle:
 *                Negation of error code if an error occurred.
 *
 *************************************************************************/
-int32_t rebalance_btree(DIR_ENTRY_PAGE *tnode, int32_t fh, DIR_META_TYPE *this_meta,
-			int32_t selected_child, DIR_ENTRY *tmp_entries,
-						int64_t *temp_child_page_pos)
+int32_t rebalance_btree(DIR_ENTRY_PAGE *tnode, int32_t fh,
+                        DIR_META_TYPE *this_meta, int32_t selected_child,
+                        DIR_ENTRY *tmp_entries, int64_t *temp_child_page_pos,
+                        int64_t meta_pos)
 {
 /* How to rebalance: if num_entries of child <= MIN_DIR_ENTRIES_PER_PAGE,
 check if its right (or left) sibling contains child <
@@ -862,22 +865,21 @@ elements into two, using the median as the new parent item. */
 			tmp_size = sizeof(int64_t) *
 					(tnode->num_entries - (left_node + 1));
 			memcpy(&(temp_child_page_pos[0]),
-					&(tnode->child_page_pos[left_node+2]),
-								tmp_size);
+			       &(tnode->child_page_pos[left_node+2]),
+			       tmp_size);
 			memcpy(&(tnode->child_page_pos[left_node+1]),
-					&(temp_child_page_pos[0]), tmp_size);
+			       &(temp_child_page_pos[0]), tmp_size);
 			tnode->num_entries--;
 
 			PWRITE(fh, tnode, sizeof(DIR_ENTRY_PAGE),
-							tnode->this_page_pos);
+			       tnode->this_page_pos);
 		}
 
 		/* Write changes to left node and meta to disk and return */
-		PWRITE(fh, this_meta, sizeof(DIR_META_TYPE),
-							sizeof(HCFS_STAT));
+		PWRITE(fh, this_meta, sizeof(DIR_META_TYPE), meta_pos);
 
 		PWRITE(fh, &left_page, sizeof(DIR_ENTRY_PAGE),
-						left_page.this_page_pos);
+		       left_page.this_page_pos);
 
 		return to_return;
 	}
@@ -945,7 +947,8 @@ errcode_handle:
 *************************************************************************/
 int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 			DIR_META_TYPE *this_meta, DIR_ENTRY *extracted_child,
-			DIR_ENTRY *tmp_entries, int64_t *temp_child_page_pos)
+			DIR_ENTRY *tmp_entries, int64_t *temp_child_page_pos,
+			int64_t meta_pos)
 {
 	/*Select and remove the largest element from the left subtree of
 		entry_to_delete*/
@@ -975,7 +978,7 @@ int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 	/* Conduct rebalancing all the way down */
 
 	ret_val = rebalance_btree(tnode, fh, this_meta, s_index, tmp_entries,
-			temp_child_page_pos);
+			temp_child_page_pos, meta_pos);
 
 	/* If rebalanced, recheck by calling this function with the same
 		parameters, else read the child node and go down the tree */
@@ -986,11 +989,11 @@ int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 						this_meta->root_entry_page);
 			return extract_largest_child(&temppage, fh, this_meta,
 						extracted_child, tmp_entries,
-						temp_child_page_pos);
+						temp_child_page_pos, meta_pos);
 		} else {
 			return extract_largest_child(tnode, fh, this_meta,
 						extracted_child, tmp_entries,
-						temp_child_page_pos);
+						temp_child_page_pos, meta_pos);
 		}
 	}
 
@@ -1001,7 +1004,8 @@ int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 						tnode->child_page_pos[s_index]);
 
 	return extract_largest_child(&temppage, fh, this_meta,
-			extracted_child, tmp_entries, temp_child_page_pos);
+			extracted_child, tmp_entries, temp_child_page_pos,
+			meta_pos);
 
 errcode_handle:
 	return errcode;

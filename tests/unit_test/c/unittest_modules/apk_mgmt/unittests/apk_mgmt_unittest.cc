@@ -172,6 +172,7 @@ TEST(ToggleMinimalApkTest, ToggleOffFailedOnSearchMount)
 
 	minapk_lookup_table = (HASH_LIST *)1;
 	init_hashlist_iter_success = 1;
+	search_mount_success = 0;
 	EXPECT_EQ(-1, toggle_use_minimal_apk(0));
 	EXPECT_EQ(false, hcfs_system->use_minimal_apk);
 }

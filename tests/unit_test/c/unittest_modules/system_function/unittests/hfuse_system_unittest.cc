@@ -12,7 +12,7 @@ extern "C" {
 #include "hfuse_system.c"
 }
 
-SWIFTTOKEN_CONTROL swifttoken_control = {
+BACKEND_TOKEN_CONTROL swifttoken_control = {
 	PTHREAD_MUTEX_INITIALIZER,
 	PTHREAD_MUTEX_INITIALIZER,
 	PTHREAD_COND_INITIALIZER
@@ -135,7 +135,7 @@ TEST_F(sync_hcfs_system_dataTest, NotNeedLock_SyncSuccess)
 	/* Run function */
 	ASSERT_EQ(0, sync_hcfs_system_data(FALSE));
 	/* Wait for the update thread to actually write */
-	sleep(3);
+	sleep(WRITE_SYS_INTERVAL+1);
 	/* Check answer */
 	fseek(hcfs_system->system_val_fptr, 0, SEEK_SET);
 	fread(&test_answer, sizeof(SYSTEM_DATA_TYPE), 1, hcfs_system->system_val_fptr);

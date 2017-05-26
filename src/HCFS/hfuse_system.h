@@ -17,7 +17,7 @@
 #include "params.h"
 #include "pthread.h"
 #include "inttypes.h"
-
+#include "pthread_control.h"
 #include "global.h"
 
 int32_t init_hfuse(int8_t is_restoring);
@@ -29,11 +29,13 @@ void init_download_module(void);
 
 #define CHILD_NUM 2
 #define BATTERY_LOW_LEVEL 3
+#define WRITE_SYS_INTERVAL 10
 
 pthread_t delete_loop_thread;
 pthread_t monitor_loop_thread;
 pthread_t event_loop_thread;
 pthread_t fuse_nofify_thread;
+PTHREAD_REUSE_T write_sys_thread;
 #ifdef _ANDROID_ENV_
 pthread_t upload_loop_thread;
 pthread_t cache_loop_thread;

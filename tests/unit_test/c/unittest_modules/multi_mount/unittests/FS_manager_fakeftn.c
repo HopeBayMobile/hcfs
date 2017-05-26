@@ -105,7 +105,7 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 }
 int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HTTP_meta *meta)
+                    HTTP_meta *object_meta, added_info_t *more)
 {
 	if (failedput == TRUE)
 		return 404;
@@ -114,7 +114,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	return 200;
 }
 int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HCFS_encode_object_meta *object_meta)
+                    HCFS_encode_object_meta *object_meta, added_info_t *more)
 {
 	if (failedget == TRUE)
 		return 404;
@@ -189,3 +189,7 @@ int32_t restore_meta_super_block_entry(ino_t this_inode,
 	return 0;
 }
 
+int32_t get_parent_id(char *id, const char *objname)
+{
+	return 0;
+}

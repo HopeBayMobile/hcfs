@@ -326,10 +326,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			/* Signal cache management that something can be paged
 			out */
 			semval = 0;
-			ret = sem_getvalue(&(hcfs_system->something_to_replace),
-			                   &semval);
-			if ((ret == 0) && (semval == 0))
-				sem_post(&(hcfs_system->something_to_replace));
+			ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+			                            &semval);
 
 			/* Do not sync block status changes due to download */
 			/*
@@ -367,9 +365,15 @@ int32_t init_download_control()
 	memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 	sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
 	sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_PIN_DL_CONCURRENCY);
+	sem_init(&(download_thread_ctl.th_wait_sem), 0, 0);
 
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 		(void *)&download_block_manager, NULL);
+	PTHREAD_REUSE_set_exithandler();
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_create(&(download_thread_ctl.dthread[count]),
+		                     NULL);
 
 	write_log(5, "Init download thread control\n");
 	return 0;
@@ -377,6 +381,8 @@ int32_t init_download_control()
 
 int32_t destroy_download_control()
 {
+	sem_post(&(download_thread_ctl.th_wait_sem));
+
 	pthread_join(download_thread_ctl.manager_thread, NULL);
 	sem_destroy(&(download_thread_ctl.ctl_op_sem));
 	sem_destroy(&(download_thread_ctl.dl_th_sem));
@@ -398,18 +404,15 @@ int32_t destroy_download_control()
 void* download_block_manager(void *arg)
 {
 	int32_t t_idx;
-	int32_t ret;
-	pthread_t *tid;
+	PTHREAD_REUSE_T *tid;
 	DOWNLOAD_BLOCK_INFO *block_info;
-	struct timespec time_to_sleep;
 	char error_path[200];
 	FILE *fptr;
 	UNUSED(arg);
 
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
-
-	while(TRUE) {
+	while ((hcfs_system->system_going_down == FALSE) ||
+	       (download_thread_ctl.active_th > 0)) {
+		sem_wait(&(download_thread_ctl.th_wait_sem));
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 
 		/* Wait all threads when system going down */
@@ -420,32 +423,17 @@ void* download_block_manager(void *arg)
 			}
 		}
 
-		/* Sleep when number of active threads <= 0 */
-		if (download_thread_ctl.active_th <= 0) {
-			sem_post(&(download_thread_ctl.ctl_op_sem));
-			sleep(1);
-			continue;
-		}
-
 		for (t_idx = 0; t_idx < MAX_PIN_DL_CONCURRENCY; t_idx++) {
 			/* Skip if non-active */
 			if (download_thread_ctl.block_info[t_idx].active ==
 								FALSE)
 				continue;
 			/* Try to terminate thread */
-			tid = &(download_thread_ctl.download_thread[t_idx]);
+			tid = &(download_thread_ctl.dthread[t_idx]);
 			/* Do not lock download-control */
 			sem_post(&(download_thread_ctl.ctl_op_sem));
-			ret = pthread_join(*tid, NULL);
+			PTHREAD_REUSE_join(tid);
 			sem_wait(&(download_thread_ctl.ctl_op_sem));
-			if (ret < 0) {
-				if (ret == EBUSY)
-					continue;
-				else
-					write_log(0, "Error: Join thread "
-						"error in %s. Code %d.\n",
-						__func__, ret);
-			}
 			block_info = &(download_thread_ctl.block_info[t_idx]);
 
 			/* Create empty file to record failure */
@@ -471,9 +459,10 @@ void* download_block_manager(void *arg)
 			sem_post(&(download_thread_ctl.dl_th_sem));
 		}
 		sem_post(&(download_thread_ctl.ctl_op_sem));
-
-		nanosleep(&time_to_sleep, NULL);
 	}
+	int32_t count;
+	for (count = 0; count < MAX_PIN_DL_CONCURRENCY; count++)
+		PTHREAD_REUSE_terminate(&(download_thread_ctl.dthread[count]));
 
 	return NULL;
 }
@@ -588,6 +577,7 @@ void* fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
+		sem_post(&(download_thread_ctl.th_wait_sem));
 		return NULL;
 	}
 	fclose(block_fptr);
@@ -597,6 +587,7 @@ void* fetch_backend_block(void *ptr)
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
 		block_info->dl_error = TRUE;
+		sem_post(&(download_thread_ctl.th_wait_sem));
 		return NULL;
 	}
 
@@ -608,7 +599,10 @@ void* fetch_backend_block(void *ptr)
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
 
-	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, blockID);
+	if (CURRENT_BACKEND == GOOGLEDRIVE)
+		ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, blockID);
+	else
+		ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0, NULL);
 	if (ret < 0) {
 		/* When file is removed, unlink this empty block directly
 		because status of this block is st_cloud */
@@ -628,6 +622,7 @@ void* fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
+			sem_post(&(download_thread_ctl.th_wait_sem));
 			return NULL;
 		}
 	}
@@ -654,11 +649,8 @@ void* fetch_backend_block(void *ptr)
 		/* Signal cache management that something can be paged
 		out */
 		semval = 0;
-		ret = sem_getvalue(&(hcfs_system->something_to_replace),
-	              	     &semval);
-		if ((ret == 0) && (semval == 0))
-			sem_post(&(hcfs_system->something_to_replace));
-
+		ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+		                            &semval);
 	} else {
 		ret = errno;
 		if (ret != ENOENT) {
@@ -686,6 +678,7 @@ void* fetch_backend_block(void *ptr)
 				block_info->block_no, __func__);
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
+			sem_post(&(download_thread_ctl.th_wait_sem));
 			return NULL;
 
 		} else { /* Strange.. */
@@ -719,6 +712,7 @@ void* fetch_backend_block(void *ptr)
 		} else {
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
+			sem_post(&(download_thread_ctl.th_wait_sem));
 			return NULL;
 		}
 	}
@@ -732,13 +726,14 @@ void* fetch_backend_block(void *ptr)
 	if (ret < 0)
 		block_info->dl_error = TRUE;
 	*/
-
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	return NULL;
 
 thread_error:
 	block_info->dl_error = TRUE;
 	flock(fileno(block_fptr), LOCK_UN);
 	fclose(block_fptr);
+	sem_post(&(download_thread_ctl.th_wait_sem));
 	return NULL;
 }
 
@@ -800,8 +795,8 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 		download_thread_ctl.block_info[which_th].page_pos = page_pos;
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;
-		pthread_create(&(download_thread_ctl.download_thread[which_th]),
-				NULL, (void *)&fetch_backend_block,
+		PTHREAD_REUSE_run(&(download_thread_ctl.dthread[which_th]),
+				(void *)&fetch_backend_block,
 				(void *)&(download_thread_ctl.block_info[which_th]));
 
 		download_thread_ctl.active_th++;
@@ -1048,6 +1043,10 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 		} else if (status == 404) {
 			write_log(0, "Error: Usermeta is not found"
 					" on cloud.\n");
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr);
+			unlink(download_path);
+			fptr = NULL;
 			goto errcode_handle;
 		} else { /* Retry, Perhaps disconnect */
 			flock(fileno(fptr), LOCK_UN);

@@ -20,8 +20,7 @@ $(eval $(call ADDMODULE))
 
 # All tests produced by this Makefile.
 
-$(eval $(call ADDTEST, api_interface_unittest, \
-  api_interface.o \
+$(eval $(call ADDTEST, pthread_control_unittest, \
   pthread_control.o \
-  api_interface_fakeftn.o \
-  api_interface_unittest.o ))
+  pthread_control.fakeftn.o \
+  pthread_control_unittest.o ))

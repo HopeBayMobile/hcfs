@@ -73,7 +73,8 @@ int32_t main(int32_t argc, char **argv)
 	uint32_t uint32_ret;
 	int64_t downxfersize, upxfersize;
 	const char *shm_hcfs_reporter = "/dev/shm/hcfs_reporter";
-	int32_t first_size, rest_size, loglevel;
+	int32_t first_size, rest_size, loglevel, first_upload_interval;
+	int32_t normal_upload_interval, sync_nonbusy_pause_time;
 	ssize_t str_size;
 	char vol_mode;
 	struct stat tempstat;
@@ -374,7 +375,44 @@ int32_t main(int32_t argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-
+	case SET_UPLOAD_INTERVAL:
+		if (argc != 5) {
+			printf("Invalid number of inputs\n");
+			printf("Usage: HCFSvol set_upload_interval <first upload interval> <normal upload interval> <nonbusy wait time>\n");
+			break;
+		}
+		errno = 0;
+		first_upload_interval = (int32_t) strtol(argv[2], NULL, 10);
+		if ((errno != 0) || (first_upload_interval < 0)) {
+			printf("Invalid input to first upload interval\n");
+			break;
+		}
+		normal_upload_interval = (int32_t) strtol(argv[3], NULL, 10);
+		if ((errno != 0) || (normal_upload_interval < 0)) {
+			printf("Invalid input to normal upload interval\n");
+			break;
+		}
+		sync_nonbusy_pause_time = (int32_t) strtol(argv[4], NULL, 10);
+		if ((errno != 0) || (sync_nonbusy_pause_time < 0)) {
+			printf("Invalid input to nonbusy upload wait time\n");
+			break;
+		}
+		cmd_len = sizeof(int32_t) * 3;
+		size_msg = send(fd, &code, sizeof(uint32_t), 0);
+		size_msg = send(fd, &cmd_len, sizeof(uint32_t), 0);
+		size_msg = send(fd, &first_upload_interval, sizeof(int32_t), 0);
+		size_msg = send(fd, &normal_upload_interval,
+		                sizeof(int32_t), 0);
+		size_msg = send(fd, &sync_nonbusy_pause_time,
+		                sizeof(int32_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(uint32_t), 0);
+		size_msg = recv(fd, &retcode, sizeof(int32_t), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
 	case MOUNTVOL:
 		if (argc == 5) {
 			if (!strcmp("default", argv[4]))

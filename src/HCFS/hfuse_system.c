@@ -109,6 +109,10 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_replace_status_sem), 1, 0);
 	sem_init(&(hcfs_system->monitor_sem), 1, 0);
+	sem_init(&(hcfs_system->sync_wait_sem), 1, 0);
+	sem_init(&(hcfs_system->dsync_wait_sem), 1, 0);
+	sem_init(&(hcfs_system->sync_control_sem), 1, 0);
+	sem_init(&(hcfs_system->pin_wait_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
@@ -153,6 +157,12 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	FREAD(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
 	      hcfs_system->system_val_fptr);
 
+	pthread_attr_init(&prefetch_thread_attr);
+	pthread_attr_setdetachstate(&prefetch_thread_attr,
+						PTHREAD_CREATE_DETACHED);
+	PTHREAD_REUSE_set_exithandler();
+	PTHREAD_REUSE_create(&(write_sys_thread), &prefetch_thread_attr);
+
 	/* Use backup quota temporarily. It will be updated later. */
 	ret = get_quota_from_backup(&quota);
 	if (ret < 0) {
@@ -189,8 +199,16 @@ void *_write_sys(__attribute__((unused)) void *fakeptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
+	PTHREAD_REUSE_T *this_thread;
 
-	sleep(2);
+	this_thread =
+		(PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
+
+	this_thread->cancelable = 1;
+	if (this_thread->terminating == TRUE)
+		pthread_exit(0);
+	sleep(WRITE_SYS_INTERVAL);
+	this_thread->cancelable = 0;
 	sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
 	FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
@@ -217,7 +235,6 @@ int32_t sync_hcfs_system_data(char need_lock)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
-	pthread_t write_sys_thread;
 
 	if (need_lock == TRUE) {
 		sem_wait(&(hcfs_system->access_sem));
@@ -228,9 +245,8 @@ int32_t sync_hcfs_system_data(char need_lock)
 	} else {
 		if (hcfs_system->writing_sys_data == FALSE) {
 			hcfs_system->writing_sys_data = TRUE;
-			pthread_create(&(write_sys_thread),
-				&prefetch_thread_attr, &_write_sys,
-				NULL);
+			PTHREAD_REUSE_run(&(write_sys_thread),
+			                  &_write_sys, NULL);
 		}
 	}
 	return 0;
@@ -330,8 +346,6 @@ void init_backend_related_module(void)
 	}
 
 	if (CURRENT_BACKEND != NONE) {
-		/*pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);*/
-		/*pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);*/
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
 	}
@@ -755,6 +769,7 @@ int32_t main(int32_t argc, char **argv)
 
 	wait_sb_recovery_terminate();
 
+	PTHREAD_REUSE_terminate(&(write_sys_thread));
 	sync_hcfs_system_data(TRUE);
 	super_block_destroy();
 	destroy_dirstat_lookup();

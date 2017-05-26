@@ -16,6 +16,7 @@ extern "C" {
 #include "fuseop.h"
 #include "mount_manager.h"
 #include "super_block.h"
+#include "hcfs_tocloud.h"
 }
 #include "gtest/gtest.h"
 #include "mock_params.h"
@@ -1538,3 +1539,94 @@ TEST(round_sizeTest, Change4KSuccess)
 	EXPECT_EQ(-4096, round_size(-1));
 	EXPECT_EQ(-8192, round_size(-4097));
 }
+
+/* Unittest of init_lastsync_time() */
+class init_lastsync_timeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+
+		METAPATH = (char *)malloc(METAPATHLEN);
+		strcpy(METAPATH, "test_lastsync");
+		mkdir(METAPATH, 0700);
+		mkdir("test_lastsync/sub_10", 0700);
+		mknod("test_lastsync/sub_10/meta10", 0700, 0);
+	}
+
+	void TearDown()
+	{
+		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
+
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(init_lastsync_timeTest, TestInit)
+{
+	struct timespec current_time;
+	int64_t timestamp1, timestamp2, timediff;
+	ssize_t ret;
+
+	memset(&current_time, 0, sizeof(struct timespec));
+	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
+	timestamp1 = current_time.tv_sec;
+
+	timestamp2 = init_lastsync_time();
+
+	/* Verify if the current time is set */
+	printf("%lld, %lld\n", timestamp1, timestamp2);
+	timediff = NORMAL_UPLOAD_DELAY - FIRST_UPLOAD_DELAY;
+
+	/* Allow a time difference of 1 second in result */
+	if (timediff > 0)
+		EXPECT_GE(1, llabs(timestamp1 - (timestamp2 + timediff)));
+	else
+		EXPECT_GE(1, llabs(timestamp1 - timestamp2));
+	EXPECT_GE(timestamp1, timestamp2);
+}
+
+/* Unittest of get_current_sectime() */
+class get_current_sectimeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+
+		METAPATH = (char *)malloc(METAPATHLEN);
+		strcpy(METAPATH, "test_lastsync");
+		mkdir(METAPATH, 0700);
+		mkdir("test_lastsync/sub_10", 0700);
+		mknod("test_lastsync/sub_10/meta10", 0700, 0);
+	}
+
+	void TearDown()
+	{
+		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
+
+		free(METAPATH);
+		free(system_config);
+	}
+};
+
+TEST_F(get_current_sectimeTest, TestSet)
+{
+	struct timespec current_time;
+	int64_t timestamp1, timestamp2;
+	ssize_t ret;
+
+	memset(&current_time, 0, sizeof(struct timespec));
+	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
+	timestamp1 = current_time.tv_sec;
+
+	timestamp2 = get_current_sectime();
+
+	/* Verify if the current time is set */
+	printf("%lld, %lld\n", timestamp1, timestamp2);
+
+	/* Allow a time difference of 1 second in result */
+	EXPECT_GE(1, llabs(timestamp1 - timestamp2));
+	EXPECT_GE(timestamp1, timestamp2);
+}
+

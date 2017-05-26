@@ -268,7 +268,7 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	FILE *fptr;
 	int64_t ret_ssize;
 	uint64_t generation;
-	int64_t count, total_blocks;
+	int64_t count, total_blocks = 0;
 	int32_t ret, errcode;
 	BOOL meta_open = FALSE;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -616,7 +616,7 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino,
 	FILE_META_HEADER tmp_header;
 	FILE *fptr;
 	int64_t ret_ssize;
-	int64_t count, total_blocks;
+	int64_t count, total_blocks = 0;
 	BOOL meta_open = FALSE;
 	struct stat tempstat;
 	int64_t blocksize, datasize_est, blocknum_est, restored_smartcache_size;

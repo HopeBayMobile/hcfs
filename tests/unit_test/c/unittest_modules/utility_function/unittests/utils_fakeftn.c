@@ -110,4 +110,7 @@ void start_download_minimal(void)
 {
 	return;
 }
-
+int32_t init_gdrive_token_control(void)
+{
+	return 0;
+}

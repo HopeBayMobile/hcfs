@@ -23,6 +23,7 @@ $(eval $(call ADDMODULE))
 $(eval $(call ADDTEST, hfuse_system_unittest, \
   hfuse_system_mock_function.o \
   hfuse_system_unittest.o \
+  pthread_control.o \
   fake_fuse_notify.o ))
 
 $(eval $(call ADDTEST, filetable_unittest, \

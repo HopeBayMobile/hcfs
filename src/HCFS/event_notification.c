@@ -397,8 +397,7 @@ void *event_worker_loop(void *ptr)
 	UNUSED(ptr);
 
 	/* Loop for sending event notify */
-	while (hcfs_system->system_going_down == FALSE)
-	{
+	while (hcfs_system->system_going_down == FALSE) {
 		/* Wait for active */
 		pthread_mutex_lock(&(event_queue->worker_active_lock));
 		pthread_cond_wait(&(event_queue->worker_active_cond),

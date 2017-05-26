@@ -28,11 +28,14 @@ public:
 	{
 		system_config = (SYSTEM_CONF_STRUCT *)
 			calloc(sizeof(SYSTEM_CONF_STRUCT), 1);
+		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->sync_control_sem), 1, 0);
 		METAPATH = "syncpoint_control_folder";
 	}
 	void TearDown()
 	{
 		free(system_config);
+		free(hcfs_system);
 	}
 };
 

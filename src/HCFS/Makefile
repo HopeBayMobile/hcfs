@@ -84,6 +84,7 @@ OBJS_F := \
 	apk_mgmt.o \
 	hash_list_struct.o \
 	googledrive_curl.o \
+	pthread_control.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

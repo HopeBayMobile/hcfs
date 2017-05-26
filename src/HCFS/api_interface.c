@@ -75,7 +75,6 @@ int32_t get_xfer_status(void);
 int32_t init_api_interface(void)
 {
 	int32_t ret, errcode, count;
-	int32_t *val;
 	int32_t sock_flag;
 
 	write_log(10, "Starting API interface");
@@ -138,7 +137,6 @@ int32_t init_api_interface(void)
 	chmod(SOCK_PATH, 0770);
 
 	sock_flag = fcntl(api_server->sock.fd, F_GETFL, 0);
-	sock_flag = sock_flag | O_NONBLOCK;
 	fcntl(api_server->sock.fd, F_SETFL, sock_flag);
 
 	ret = listen(api_server->sock.fd, 16);
@@ -151,12 +149,11 @@ int32_t init_api_interface(void)
 		goto errcode_handle;
 	}
 
+	PTHREAD_set_exithandler();
 	for (count = 0; count < INIT_API_THREADS; count++) {
 		write_log(10, "Starting up API thread %d\n", count);
-		val = malloc(sizeof(int32_t));
-		*val = count;
-		ret = pthread_create(&(api_server->local_thread[count]), NULL,
-			(void *)api_module, (void *)val);
+		ret = PTHREAD_create(&(api_server->local_thread[count]), NULL,
+			(void *)api_module, NULL);
 		if (ret != 0) {
 			errcode = ret;
 			write_log(0, "Thread create error in %s. Code %d, %s\n",
@@ -164,11 +161,10 @@ int32_t init_api_interface(void)
 			errcode = -errcode;
 			goto errcode_handle;
 		}
-		val = NULL;
 	}
 
-	/* TODO: fork a thread that monitor usage and control extra threads */
-	ret = pthread_create(&(api_server->monitor_thread), NULL,
+	/* Fork a thread that monitor usage and control extra threads */
+	ret = PTHREAD_create(&(api_server->monitor_thread), NULL,
 			(void *)api_server_monitor, NULL);
 	if (ret != 0) {
 		errcode = ret;
@@ -200,11 +196,16 @@ int32_t destroy_api_interface(void)
 	thread changes */
 	sem_wait(&(api_server->job_lock));
 	api_server->api_shutting_down = TRUE;
-	sem_post(&(api_server->job_lock));
+
+	/* Signal child threads */
+ 	for (count = 0; count < api_server->num_threads; count++)
+ 		PTHREAD_kill(&(api_server->local_thread[count]), SIGUSR2);
+ 	PTHREAD_kill(&(api_server->monitor_thread), SIGUSR2);
 
 	for (count = 0; count < api_server->num_threads; count++)
-		pthread_join(api_server->local_thread[count], NULL);
-	pthread_join(api_server->monitor_thread, NULL);
+		PTHREAD_join(&(api_server->local_thread[count]), NULL);
+	PTHREAD_join(&(api_server->monitor_thread), NULL);
+	sem_post(&(api_server->job_lock));
 	sem_destroy(&(api_server->job_lock));
 	UNLINK(api_server->sock.addr.sun_path);
 	free(api_server);
@@ -1083,11 +1084,10 @@ int32_t send_notify_event(int32_t arg_len __attribute__((unused)),
 *************************************************************************/
 /* TODO: Better error handling so that broken pipe arising from clients
 not following protocol won't crash the system */
-void api_module(void *index)
+void api_module(void *index1)
 {
 	int32_t fd1;
 	ssize_t size_msg, msg_len;
-	struct timespec wait100ms;
 	struct timeval start_time, end_time;
 	float elapsed_time;
 	int32_t retcode, sel_index, count, cur_index;
@@ -1113,18 +1113,21 @@ void api_module(void *index)
 	ino_t *pinned_list, *unpinned_list;
 	int32_t loglevel;
 	int64_t max_pinned_size;
+	PTHREAD_T *thread_ptr;
 
-	wait100ms.tv_sec = 0;
-	wait100ms.tv_nsec = 100000000;
+	UNUSED(index1);
 
-	write_log(10, "Startup index %d\n", *((int32_t *)index));
+	thread_ptr = (PTHREAD_T *) pthread_getspecific(PTHREAD_status_key);
 
 	while (hcfs_system->system_going_down == FALSE) {
+		thread_ptr->cancelable = 1;
+		if (thread_ptr->terminating == 1)
+			pthread_exit(0);
 		fd1 = accept(api_server->sock.fd, NULL, NULL);
+		thread_ptr->cancelable = 0;
 		if (fd1 < 0) {
 			if (hcfs_system->system_going_down == TRUE)
 				break;
-			nanosleep(&wait100ms, NULL); /* Sleep for 0.1 sec */
 			continue;
 		}
 		write_log(10, "Processing API request\n");
@@ -1314,6 +1317,21 @@ void api_module(void *index)
 		case CHECKPIN:
 			retcode = checkpin_handle(arg_len, largebuf);
 			goto return_retcode;
+		case SET_UPLOAD_INTERVAL:
+			memcpy(&(system_config->first_upload_delay),
+			       &(largebuf[0]),sizeof(int32_t));
+			memcpy(&(system_config->normal_upload_delay),
+			       &(largebuf[sizeof(int32_t)]), sizeof(int32_t));
+			memcpy(&(system_config->sync_nonbusy_pause_time),
+			       &(largebuf[sizeof(int32_t)*2]), sizeof(int32_t));
+			write_log(4, "Upload interval now set at %d seconds"
+			          " for first upload.\n", FIRST_UPLOAD_DELAY);
+			write_log(4, "Upload interval now set at %d seconds"
+			          " for normal upload.\n", NORMAL_UPLOAD_DELAY);
+			write_log(4, "Nonbusy upload wait now set at %d seconds"
+			          ".\n", SYNC_NONBUSY_PAUSE_TIME);
+			retcode = 0;
+			goto return_retcode;
 		case TERMINATE:
 			/* Terminate the system */
 			/* Moving system_going_down flag earlier */
@@ -1321,6 +1339,9 @@ void api_module(void *index)
 			unmount_all();
 			sync_hcfs_system_data(TRUE);
 			/* Wake up potential sleeping threads */
+			sem_post(&(hcfs_system->sync_wait_sem));
+			sem_post(&(hcfs_system->sync_control_sem));
+			sem_post(&(hcfs_system->dsync_wait_sem));
 			sem_post(&(hcfs_system->something_to_replace));
 			sem_post(&(hcfs_system->fuse_sem));
 			/* First wait for system shutdown to finish */
@@ -1402,10 +1423,10 @@ void api_module(void *index)
 			    hcfs_system->systemdata.pinned_size;
 			goto return_llretval;
 		case TESTAPI:
-			/* Simulate too long API call of 5 seconds */
-			nanosleep(&wait100ms, NULL); /* Sleep for 0.1 sec */
-			cur_index = *((int32_t *)index);
-			write_log(10, "Index is %d\n", cur_index);
+			/* Simulate long API call of 1 second */
+			sleep(1);
+			retcode = 0;
+			write_log(10, "TESTAPI called\n");
 			goto return_retcode;
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/
@@ -1583,6 +1604,9 @@ no_return:
 		    (start_time.tv_sec + start_time.tv_usec * 0.000001);
 		if (elapsed_time < 0)
 			elapsed_time = 0;
+		thread_ptr->cancelable = 1;
+		if (thread_ptr->terminating == 1)
+			pthread_exit(0);
 		sem_wait(&(api_server->job_lock));
 		sel_index = end_time.tv_sec % PROCESS_WINDOW;
 		if (api_server->last_update < end_time.tv_sec) {
@@ -1610,7 +1634,6 @@ no_return:
 		write_log(10, "Updated API server process time, %f sec\n",
 			  elapsed_time);
 	}
-	free(index);
 }
 
 /************************************************************************
@@ -1626,18 +1649,19 @@ void api_server_monitor(void)
 {
 	int32_t count, totalrefs, index, ret;
 	float totaltime, ratio;
-	int32_t *val;
 	struct timeval cur_time;
 	int32_t sel_index, cur_index;
-	struct timespec wait1s;
+	PTHREAD_T *thread_ptr;
 
-	wait1s.tv_sec = 1;
-	wait1s.tv_nsec = 0;
+	thread_ptr = (PTHREAD_T *) pthread_getspecific(PTHREAD_status_key);
 
 	while (hcfs_system->system_going_down == FALSE) {
+		thread_ptr->cancelable = 1;
+		if (thread_ptr->terminating == 1)
+			pthread_exit(0);
 		nanosleep(&api_server_monitor_time, NULL);
-		/* Using timed wait to handle system shutdown event */
-		ret = sem_timedwait(&(api_server->job_lock), &wait1s);
+		ret = sem_wait(&(api_server->job_lock));
+		thread_ptr->cancelable = 0;
 		if (ret < 0)
 			continue;
 		gettimeofday(&cur_time, NULL);
@@ -1696,13 +1720,10 @@ void api_server_monitor(void)
 
 		if (totalrefs > (INCREASE_RATIO * ratio)) {
 			/* Add one more thread */
-			val = malloc(sizeof(int32_t));
 			index = api_server->num_threads;
-			*val = index;
 			api_server->num_threads++;
-			pthread_create(&(api_server->local_thread[index]), NULL,
-				(void *)api_module, (void *)val);
-			val = NULL;
+			PTHREAD_create(&(api_server->local_thread[index]), NULL,
+				(void *)api_module, NULL);
 			write_log(10, "Added one more thread to %d\n", index+1);
 		}
 

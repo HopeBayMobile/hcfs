@@ -619,6 +619,10 @@ int32_t sleep_on_cache_full(void)
 			sem_post(&(hcfs_system->something_to_replace));
 	}
 
+	/* Check if sync is paused, and wake it up if needed */
+	int32_t sem_val = 0;
+	sem_check_and_release(&(hcfs_system->sync_control_sem), &sem_val);
+
 	sem_post(&(hcfs_system->num_cache_sleep_sem)); /* Count++ */
 	sem_wait(&(hcfs_system->check_cache_sem)); /* Sleep a while */
 	sem_wait(&(hcfs_system->num_cache_sleep_sem)); /* Count-- */

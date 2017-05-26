@@ -432,7 +432,10 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 {
 	MOCK();
 }
-int fetch_from_cloud(FILE *fptr, char action_from, char *objname)
+int32_t fetch_from_cloud(FILE *fptr,
+			 char action_from,
+			 char *objname,
+			 char *fileID)
 {
 	MOCK();
 	char tempbuf[1024];
@@ -1319,4 +1322,154 @@ void destroy_dir_iter(DIR_ENTRY_ITERATOR *iter)
 		}
 		free(iter);
 	}
+}
+int64_t init_lastsync_time(void)
+{
+	return 0;
+}
+/* Helper function for checking if the file extension is .apk */
+BOOL is_apk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	if (!strncmp(&(filename[name_len - 4]), ".apk", 4))
+		return TRUE;
+
+	return FALSE;
+}
+
+BOOL is_minapk(const char *filename)
+{
+	int32_t name_len;
+
+	name_len = strlen(filename);
+
+	/* If filename is too short to be an apk*/
+	if (name_len < 5)
+		return FALSE;
+
+	/* minapk name is ".<x>min" */
+	if (*filename == '.' &&
+		!strncmp(filename + name_len - 3, "min", 3))
+		return TRUE;
+	else
+		return FALSE;
+}
+/* Helper function for converting apk name to minimal apk name */
+int32_t convert_minapk(const char *apkname, char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(apkname);
+
+	/* The length to copy before ".apk" */
+	name_len -= 4;
+	snprintf(minapk_name, (name_len + 2), ".%s", apkname);
+	snprintf(&(minapk_name[1 + name_len]), 4, "min");
+	write_log(10, "[App unpin] Name of minapk: %s\n", minapk_name);
+	return 0;
+}
+
+int32_t convert_origin_apk(char *apkname, const char *minapk_name)
+{
+	size_t name_len;
+
+	name_len = strlen(minapk_name);
+
+	/* Could not be an apk */
+	if (name_len < 5)
+		return -EINVAL;
+
+	/* From .<x>min to <x>.apk */
+	memcpy(apkname, minapk_name + 1, name_len - 4);
+	memcpy(apkname + name_len - 4, ".apk", 4);
+	apkname[name_len] = '\0';
+	return 0;
+}
+void fetch_progress_file_path(char *pathname, ino_t inode)
+{
+	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%"PRIu64,
+		METAPATH, (uint64_t)inode);
+
+	return;
+}
+int32_t fetch_toupload_meta_path(char *pathname, ino_t inode)
+{
+	int32_t errcode, ret;
+	char path[200];
+
+	sprintf(path, "%s/upload_bullpen", METAPATH);
+
+	if (access(path, F_OK) == -1)
+		MKDIR(path, 0700);
+
+	sprintf(pathname, "%s/hcfs_local_meta_%"PRIu64".tmp",
+			path, (uint64_t)inode);
+
+	return 0;
+
+errcode_handle:
+	if (errcode == -EEXIST) {
+		sprintf(pathname, "%s/hcfs_local_meta_%"PRIu64".tmp",
+				path, (uint64_t)inode);
+		return 0;
+	}
+	return errcode;
+}
+
+int32_t fetch_toupload_block_path(char *pathname,
+				  ino_t inode,
+				  int64_t block_no)
+{
+	char path[200];
+	int32_t errcode;
+	int32_t ret;
+
+	sprintf(path, "%s/upload_temp_block", BLOCKPATH);
+
+	if (access(path, F_OK) == -1)
+		MKDIR(path, 0700);
+
+	sprintf(pathname, "%s/hcfs_sync_block_%"PRIu64"_%"PRId64".tmp",
+		path, (uint64_t)inode, block_no);
+
+	return 0;
+
+errcode_handle:
+	if (errcode == -EEXIST) {
+		sprintf(pathname, "%s/hcfs_sync_block_%"PRIu64"_%"PRId64".tmp",
+				path, (uint64_t)inode, block_no);
+		return 0;
+	}
+	return errcode;
+
+}
+FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
+{
+	FILE_BLOCK_ITERATOR *iter;
+	int64_t ret_size;
+	int32_t ret, errcode;
+
+	iter = (FILE_BLOCK_ITERATOR *) calloc(sizeof(FILE_BLOCK_ITERATOR), 1);
+	return iter;
+
+errcode_handle:
+	errno = -errcode;
+	destroy_block_iter(iter);
+	return NULL;
+}
+void destroy_block_iter(FILE_BLOCK_ITERATOR *iter)
+{
+	free(iter);
+}
+int32_t unlink_upload_file(char *filename)
+{
+	unlink(filename);
+	return 0;
 }
