@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <semaphore.h>
 #include "params.h"
 
 #include "dir_statistics.h"
@@ -168,4 +169,16 @@ int32_t convert_origin_apk(char *apkname, const char *minapk_name);
 int64_t init_lastsync_time(void);
 int64_t get_current_sectime(void);
 
+/* Checks if value of *sem is zero or less, and pos *sem if so */
+static inline int32_t sem_check_and_release(sem_t *sem, int *val)
+{
+	int32_t ret;
+
+	*val = 0;
+	ret = sem_getvalue(sem, val);
+	if ((ret == 0) && (*val <= 0))
+		sem_post(sem);
+
+	return ret;
+}
 #endif  /* SRC_HCFS_UTILS_H_ */

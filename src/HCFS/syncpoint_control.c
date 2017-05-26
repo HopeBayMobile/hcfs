@@ -77,10 +77,8 @@ int32_t init_syncpoint_resource()
 	}
 
 	/* Check if sync is paused, and wake it up if needed */
-	int32_t sem_val = 0;
-	sem_getvalue(&(hcfs_system->sync_control_sem), &sem_val);
-	if (sem_val <= 0)
-		sem_post(&(hcfs_system->sync_control_sem));
+	int32_t sem_val;
+	sem_check_and_release(&(hcfs_system->sync_control_sem), &sem_val);
 
 	memset(sys_super_block->sync_point_info, 0, sizeof(SYNC_POINT_INFO));
 	sys_super_block->sync_point_info->sync_retry_times = SYNC_RETRY_TIMES;

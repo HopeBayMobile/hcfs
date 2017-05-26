@@ -336,10 +336,8 @@ static inline void _sync_terminate_thread(int32_t index)
 			sync_ctl.threads_error[index] = FALSE;
 			sync_ctl.is_revert[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
-			sem_getvalue(&(hcfs_system->sync_wait_sem),
-			             &sync_status);
-			if (sync_status == 0)
-				sem_post(&(hcfs_system->sync_wait_sem));
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &sync_status);
 			sem_post(&(sync_ctl.sync_queue_sem));
 		}
 	}

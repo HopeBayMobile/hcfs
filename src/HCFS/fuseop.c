@@ -4131,10 +4131,8 @@ int32_t read_fetch_backend(ino_t this_inode, int64_t bindex, FH_ENTRY *fh_ptr,
 			/* Signal cache management that something can be paged
 			out */
 			semval = 0;
-			ret = sem_getvalue(&(hcfs_system->something_to_replace),
-					   &semval);
-			if ((ret == 0) && (semval == 0))
-				sem_post(&(hcfs_system->something_to_replace));
+			ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+					            &semval);
 
 			tmpptr = fh_ptr->meta_cache_ptr;
 			ret = meta_cache_open_file(tmpptr);

@@ -326,10 +326,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			/* Signal cache management that something can be paged
 			out */
 			semval = 0;
-			ret = sem_getvalue(&(hcfs_system->something_to_replace),
-			                   &semval);
-			if ((ret == 0) && (semval == 0))
-				sem_post(&(hcfs_system->something_to_replace));
+			ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+			                            &semval);
 
 			/* Do not sync block status changes due to download */
 			/*
@@ -651,11 +649,8 @@ void* fetch_backend_block(void *ptr)
 		/* Signal cache management that something can be paged
 		out */
 		semval = 0;
-		ret = sem_getvalue(&(hcfs_system->something_to_replace),
-	              	     &semval);
-		if ((ret == 0) && (semval == 0))
-			sem_post(&(hcfs_system->something_to_replace));
-
+		ret = sem_check_and_release(&(hcfs_system->something_to_replace),
+		                            &semval);
 	} else {
 		ret = errno;
 		if (ret != ENOENT) {

@@ -120,12 +120,8 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 				sizeof(BLOCK_ENTRY_PAGE), page_pos);
 		/* If unpin, post cache management
 		 * control */
-		if (P_IS_UNPIN(tempfilemeta.local_pin)) {
-			semval = 0;
-			ret = sem_getvalue(semptr, &semval);
-			if ((ret == 0) && (semval == 0))
-				sem_post(semptr);
-		}
+		if (P_IS_UNPIN(tempfilemeta.local_pin))
+			ret = sem_check_and_release(semptr, &semval);
 		write_log(10, "Debug sync: block_%"PRIu64"_%lld"
 				" is changed to ST_BOTH\n",
 				(uint64_t)inode, blockno);

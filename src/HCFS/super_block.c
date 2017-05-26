@@ -1456,9 +1456,8 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 			return ret;
 
 		sys_super_block->head.num_dirty = 1;
-		sem_getvalue(&(hcfs_system->sync_wait_sem), &sync_status);
-		if (sync_status == 0)
-			sem_post(&(hcfs_system->sync_wait_sem));
+		sem_check_and_release(&(hcfs_system->sync_wait_sem),
+		                      &sync_status);
 		ret = write_super_block_head();
 		if (ret < 0)
 			return ret;
@@ -1523,9 +1522,8 @@ int32_t ll_rebuild_dirty(ino_t missing_inode)
 
 		sys_super_block->head.last_dirty_inode = tempentry.this_index;
 		sys_super_block->head.num_dirty += 1;
-		sem_getvalue(&(hcfs_system->sync_wait_sem), &sync_status);
-		if (sync_status == 0)
-			sem_post(&(hcfs_system->sync_wait_sem));
+		sem_check_and_release(&(hcfs_system->sync_wait_sem),
+		                      &sync_status);
 		ret = write_super_block_head();
 		if (ret < 0)
 			return ret;
@@ -1618,10 +1616,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_next = 0;
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_dirty++;
-			sem_getvalue(&(hcfs_system->sync_wait_sem),
-			             &sync_status);
-			if (sync_status == 0)
-				sem_post(&(hcfs_system->sync_wait_sem));
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &sync_status);
 		} else {
 			ret = read_super_block_entry(
 			    sys_super_block->head.last_dirty_inode, &tempentry);
@@ -1661,10 +1657,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			sys_super_block->head.last_dirty_inode = thisinode;
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_dirty++;
-			sem_getvalue(&(hcfs_system->sync_wait_sem),
-			             &sync_status);
-			if (sync_status == 0)
-				sem_post(&(hcfs_system->sync_wait_sem));
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &sync_status);
 			retsize = pread(sys_super_block->iofptr, &tempentry,
 				SB_ENTRY_SIZE, SB_HEAD_SIZE +
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
@@ -1700,10 +1694,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_prev = 0;
 			sys_super_block->head.num_to_be_deleted++;
 			/* Continue dsync thread if stopped */
-			sem_getvalue(&(hcfs_system->dsync_wait_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(hcfs_system->dsync_wait_sem));
+			sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+			                      &pause_status);
 		} else {
 			this_entry->util_ll_prev =
 				sys_super_block->head.last_to_delete_inode;
@@ -1711,10 +1703,8 @@ int32_t ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry
 			this_entry->util_ll_next = 0;
 			sys_super_block->head.num_to_be_deleted++;
 			/* Continue dsync thread if stopped */
-			sem_getvalue(&(hcfs_system->dsync_wait_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(hcfs_system->dsync_wait_sem));
+			sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+			                      &pause_status);
 			retsize = pread(sys_super_block->iofptr, &tempentry,
 				SB_ENTRY_SIZE, SB_HEAD_SIZE +
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
@@ -2195,9 +2185,7 @@ int32_t pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 	}
 
 	sys_super_block->head.num_pinning_inodes++;
-	sem_getvalue(&(hcfs_system->pin_wait_sem), &pause_status);
-	if (pause_status == 0)
-		sem_post(&(hcfs_system->pin_wait_sem));
+	sem_check_and_release(&(hcfs_system->pin_wait_sem), &pause_status);
 
 	ret = write_super_block_head();
 	if (ret < 0)

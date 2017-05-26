@@ -265,10 +265,8 @@ void update_sync_state(void)
 			hcfs_system->sync_paused = TRUE;
 			/* Wake up cache manager so that it will wake
 			 * all other sleeping threads up */
-			sem_getvalue(&(hcfs_system->something_to_replace),
-					&num_replace);
-			if (num_replace == 0)
-				sem_post(&(hcfs_system->something_to_replace));
+			sem_check_and_release(&(hcfs_system->something_to_replace),
+					      &num_replace);
 		}
 
 	} else {
@@ -276,18 +274,12 @@ void update_sync_state(void)
 		hcfs_system->sync_paused = FALSE;
 
 		if (old_status == TRUE) {
-			sem_getvalue(&(hcfs_system->sync_wait_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(hcfs_system->sync_wait_sem));
-			sem_getvalue(&(hcfs_system->pin_wait_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(hcfs_system->pin_wait_sem));
-			sem_getvalue(&(hcfs_system->dsync_wait_sem),
-			             &pause_status);
-			if (pause_status == 0)
-				sem_post(&(hcfs_system->dsync_wait_sem));
+			sem_check_and_release(&(hcfs_system->sync_wait_sem),
+			                      &pause_status);
+			sem_check_and_release(&(hcfs_system->pin_wait_sem),
+			                      &pause_status);
+			sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+			                      &pause_status);
 		}
 		/* Threads can sleep on cache full now */
 		sem_wait(&(hcfs_system->access_sem));

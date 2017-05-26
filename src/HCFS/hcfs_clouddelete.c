@@ -89,10 +89,8 @@ static inline void _dsync_terminate_thread(int32_t index)
 		dsync_ctl.retry_right_now[index] = FALSE;
 		dsync_ctl.threads_error[index] = FALSE;
 		dsync_ctl.total_active_dsync_threads--;
-		sem_getvalue(&(hcfs_system->dsync_wait_sem),
-		             &pause_status);
-		if (pause_status == 0)
-			sem_post(&(hcfs_system->dsync_wait_sem));
+		sem_check_and_release(&(hcfs_system->dsync_wait_sem),
+		                      &pause_status);
 		sem_post(&(dsync_ctl.dsync_queue_sem));
 
 		if (retry_inode > 0) {
@@ -519,9 +517,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_metafptr = fopen(backend_metapath, "w+");
 	if (backend_metafptr == NULL) {
 		dsync_ctl.threads_finished[which_dsync_index] = TRUE;
-		sem_getvalue(&(dsync_ctl.pause_sem), &pause_status);
-		if (pause_status == 0)
-			sem_post(&(dsync_ctl.pause_sem));
+		sem_check_and_release(&(dsync_ctl.pause_sem), &pause_status);
 		return;
 	}
 	setbuf(backend_metafptr, NULL);
