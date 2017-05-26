@@ -1473,3 +1473,11 @@ int32_t unlink_upload_file(char *filename)
 	unlink(filename);
 	return 0;
 }
+int32_t hfuse_ll_notify_delete(struct fuse_chan *ch,
+                            fuse_ino_t parent,
+                            fuse_ino_t child,
+                            const char *name,
+                            size_t namelen)
+{
+	return 0;
+}

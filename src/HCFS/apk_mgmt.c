@@ -32,7 +32,25 @@
 int32_t toggle_use_minimal_apk(bool new_val)
 {
 	int32_t ret = 0;
+	bool old_val = hcfs_system->set_minimal_apk;
+
+	if (old_val == new_val)
+		return 0;
+
+	hcfs_system->set_minimal_apk = new_val;
+	ret = update_use_minimal_apk();
+
+	return ret;
+}
+
+/* Take set_minimal_apk and sync_paused, and consider
+whether to use minimal apk */
+int32_t update_use_minimal_apk(void)
+{
+	int32_t ret = 0;
 	bool old_val = hcfs_system->use_minimal_apk;
+	bool new_val = (hcfs_system->set_minimal_apk ||
+	                hcfs_system->sync_paused);
 
 	if (old_val == new_val)
 		return 0;

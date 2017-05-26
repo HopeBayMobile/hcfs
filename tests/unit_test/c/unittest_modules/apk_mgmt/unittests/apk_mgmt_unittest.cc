@@ -57,6 +57,7 @@ class UnittestEnvironment : public ::testing::Environment
 #undef CUSTOM_FAKE
 		reset_unittest_env();
 		reset_ut_helper();
+		hcfs_system->sync_paused = 0;
 	}
 
 	virtual void TearDown() {}
@@ -82,6 +83,7 @@ TEST(ToggleMinimalApkTest, ToggleOnSucceed)
 	create_hash_list_success = 1;
 	minapk_lookup_table = NULL;
 	hcfs_system->use_minimal_apk = 0;
+	hcfs_system->set_minimal_apk = 0;
 
 	ASSERT_EQ(toggle_use_minimal_apk(1), 0);
 	EXPECT_EQ(hcfs_system->use_minimal_apk, 1);
@@ -92,6 +94,7 @@ TEST(ToggleMinimalApkTest, ToggleOnTwiceSucceed)
 	create_hash_list_success = 1;
 	minapk_lookup_table = NULL;
 	hcfs_system->use_minimal_apk = 0;
+	hcfs_system->set_minimal_apk = 0;
 
 	ASSERT_EQ(toggle_use_minimal_apk(1), 0);
 	ASSERT_EQ(toggle_use_minimal_apk(1), 0);
@@ -103,6 +106,7 @@ TEST(ToggleMinimalApkTest, ToggleOnFailed)
 	create_hash_list_success = 0;
 	minapk_lookup_table = NULL;
 	hcfs_system->use_minimal_apk = 0;
+	hcfs_system->set_minimal_apk = 0;
 
 	ASSERT_EQ(toggle_use_minimal_apk(1), -ENOMEM);
 	EXPECT_EQ(hcfs_system->use_minimal_apk, 0);
@@ -110,8 +114,9 @@ TEST(ToggleMinimalApkTest, ToggleOnFailed)
 
 TEST(ToggleMinimalApkTest, ToggleOffSucceed)
 {
-	hcfs_system->use_minimal_apk = 1;
+	hcfs_system->set_minimal_apk = 1;
 	search_mount_success = 1;
+	hcfs_system->use_minimal_apk = 1;
 
 	/* table */
 	create_hash_list_success = 1;
@@ -124,15 +129,16 @@ TEST(ToggleMinimalApkTest, ToggleOffSucceed)
 
 	/* Test */
 	EXPECT_EQ(0, toggle_use_minimal_apk(0));
-	EXPECT_EQ(hcfs_system->use_minimal_apk, false);
+	EXPECT_EQ(false, hcfs_system->use_minimal_apk);
 
 	free(init_hashlist_iter_ret);
 }
 
 TEST(ToggleMinimalApkTest, ToggleOffEmptylist)
 {
-	hcfs_system->use_minimal_apk = 1;
+	hcfs_system->set_minimal_apk = 1;
 	search_mount_success = 1;
+	hcfs_system->use_minimal_apk = 1;
 
 	/* table */
 	create_hash_list_success = 1;

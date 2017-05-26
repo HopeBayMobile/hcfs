@@ -117,6 +117,7 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
 	hcfs_system->use_minimal_apk = FALSE;
+	hcfs_system->set_minimal_apk = FALSE;
 	hcfs_system->system_restoring = restoring_status;
 
 	/* Flags from monitor.h */
@@ -377,8 +378,12 @@ void init_download_module(void)
 
 int32_t init_event_notify_module(void)
 {
+	int32_t ret = init_event_queue();
+
+	if (ret < 0)
+		return ret;
 	pthread_create(&event_loop_thread, NULL, &event_worker_loop, NULL);
-	return init_event_queue();
+	return ret;
 }
 
 /************************************************************************

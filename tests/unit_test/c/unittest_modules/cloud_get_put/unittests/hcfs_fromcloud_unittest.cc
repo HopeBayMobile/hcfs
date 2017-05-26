@@ -66,10 +66,17 @@ public:
 		system_config = (SYSTEM_CONF_STRUCT *)
 		                calloc(1, sizeof(SYSTEM_CONF_STRUCT));
 		system_config->current_backend = SWIFT;
+		system_config->metapath = (char *)malloc(100);
+		system_config->max_cache_limit = (int64_t) malloc(sizeof(int64_t) * NUM_PIN_TYPES);
+		system_config->max_cache_limit[0] = 10000000;
+		system_config->max_cache_limit[1] = 10000000;
+		system_config->max_cache_limit[2] = 10000000;
 	}
 
 	virtual void TearDown() {
 		free(hcfs_system);
+		free(system_config->max_cache_limit);
+		free(system_config->metapath);
 		free(system_config);
 		nftw(tmppath, do_delete, 20, FTW_DEPTH);
 		unlink("/tmp/testHCFS");
@@ -425,9 +432,6 @@ protected:
 	char metapath[200];
 
 	void SetUp() {
-		system_config = (SYSTEM_CONF_STRUCT *)
-		                malloc(sizeof(SYSTEM_CONF_STRUCT));
-		memset(system_config, 0, sizeof(SYSTEM_CONF_STRUCT));
 		MAX_BLOCK_SIZE = 100;
 		CACHE_FULL = FALSE;
 
@@ -451,7 +455,6 @@ protected:
 
 		hcfs_system->system_going_down = TRUE;
 		destroy_download_control();
-		free(system_config);
 	}
 };
 
@@ -657,9 +660,6 @@ class fetch_quota_from_cloudTest : public ::testing::Test
 protected:
 	char download_path[200];
 	void SetUp() {
-		system_config = (SYSTEM_CONF_STRUCT *)
-		                malloc(sizeof(SYSTEM_CONF_STRUCT));
-		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
 		if (!access(METAPATH, F_OK))
 			nftw(METAPATH, do_delete, 20, FTW_DEPTH);
@@ -684,7 +684,6 @@ protected:
 			unlink(download_path);
 		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		free(METAPATH);
-		free(system_config);
 	}
 };
 
@@ -726,9 +725,6 @@ TEST_F(fetch_quota_from_cloudTest, SystemGoingDown)
 class update_quotaTest : public ::testing::Test {
 protected:
 	void SetUp() {
-		system_config = (SYSTEM_CONF_STRUCT *)
-		                malloc(sizeof(SYSTEM_CONF_STRUCT));
-		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_quota_from_cloud_folder");
 		if (!access(METAPATH, F_OK))
 			nftw(METAPATH, do_delete, 20, FTW_DEPTH);
@@ -747,7 +743,6 @@ protected:
 	void TearDown() {
 		nftw(METAPATH, do_delete, 20, FTW_DEPTH);
 		free(METAPATH);
-		free(system_config);
 	}
 };
 
@@ -807,9 +802,6 @@ protected:
 	pthread_t tid;
 
 	void SetUp() {
-		system_config = (SYSTEM_CONF_STRUCT *)
-		                malloc(sizeof(SYSTEM_CONF_STRUCT));
-		system_config->metapath = (char *)malloc(100);
 		strcpy(METAPATH, "fetch_object_busywait_connTest");
 		if (!access(METAPATH, F_OK))
 			rmdir(METAPATH);
@@ -831,7 +823,6 @@ protected:
 	void TearDown() {
 		rmdir(METAPATH);
 		free(METAPATH);
-		free(system_config);
 	}
 };
 
