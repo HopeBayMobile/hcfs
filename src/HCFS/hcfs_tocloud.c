@@ -2268,7 +2268,8 @@ void upload_loop(void)
 	char sync_paused_status = FALSE;
 	char need_retry_backup;
 	struct timespec last_retry_time, current_time;
-	int64_t last_synctime, this_waittime, shortest_wait;
+	int64_t last_synctime, this_waittime;
+	int64_t shortest_wait = NORMAL_UPLOAD_DELAY;
 	/* consecutive_skips is for determining if we should find the
 	current time or could use previously cached value. */
 	/* skip_everyone is for finding out if we should sleep longer

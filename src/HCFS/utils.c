@@ -2559,7 +2559,7 @@ int64_t init_lastsync_time(void)
 	return timestamp;
 }
 
-int64_t set_lastsync_time(void)
+int64_t get_current_sectime(void)
 {
 	struct timespec current_time;
 	int64_t timestamp;

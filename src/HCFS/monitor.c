@@ -272,10 +272,7 @@ void update_sync_state(void)
 		}
 
 	} else {
-		if (hcfs_system->sync_paused == TRUE)
-			old_status = TRUE;
-		else
-			old_status = FALSE;
+		old_status = hcfs_system->sync_paused;
 		hcfs_system->sync_paused = FALSE;
 
 		if (old_status == TRUE) {

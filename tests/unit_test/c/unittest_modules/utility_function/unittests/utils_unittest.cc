@@ -1587,8 +1587,8 @@ TEST_F(init_lastsync_timeTest, TestInit)
 	EXPECT_GE(timestamp1, timestamp2);
 }
 
-/* Unittest of set_lastsync_time() */
-class set_lastsync_timeTest : public ::testing::Test {
+/* Unittest of get_current_sectime() */
+class get_current_sectimeTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
@@ -1610,7 +1610,7 @@ protected:
 	}
 };
 
-TEST_F(set_lastsync_timeTest, TestSet)
+TEST_F(get_current_sectimeTest, TestSet)
 {
 	struct timespec current_time;
 	int64_t timestamp1, timestamp2;
@@ -1620,7 +1620,7 @@ TEST_F(set_lastsync_timeTest, TestSet)
 	clock_gettime(CLOCK_REALTIME_COARSE, &current_time);
 	timestamp1 = current_time.tv_sec;
 
-	timestamp2 = set_lastsync_time();
+	timestamp2 = get_current_sectime();
 
 	/* Verify if the current time is set */
 	printf("%lld, %lld\n", timestamp1, timestamp2);

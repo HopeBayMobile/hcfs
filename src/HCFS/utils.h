@@ -166,6 +166,6 @@ int32_t convert_minapk(const char *apkname, char *minapk_name);
 int32_t convert_origin_apk(char *apkname, const char *minapk_name);
 
 int64_t init_lastsync_time(void);
-int64_t set_lastsync_time(void);
+int64_t get_current_sectime(void);
 
 #endif  /* SRC_HCFS_UTILS_H_ */

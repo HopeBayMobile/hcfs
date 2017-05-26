@@ -916,7 +916,7 @@ int32_t rebuild_super_block_entry(ino_t this_inode,
 	sb_entry.generation = 1;
 	sb_entry.status = NO_LL;
 	sb_entry.pin_status = ST_UNPIN;
-	sb_entry.lastsync_time = set_lastsync_time();
+	sb_entry.lastsync_time = get_current_sectime();
 
 	super_block_exclusive_locking();
 	/* Check again */
