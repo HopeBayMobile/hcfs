@@ -23,9 +23,19 @@ LOCAL_CFLAGS    += -pie -fPIE -O0 -Wall -Wextra \
 		   -DVERSION_NUM=\"$(VERSION_NUM)\"
 LOCAL_LDFLAGS   += -pie -fPIE -O0
 LOCAL_SRC_FILES := $(patsubst $(LOCAL_PATH)/%, %, $(wildcard $(LOCAL_PATH)/../../src/HCFS/*.c))
-LOCAL_SHARED_LIBRARIES += libcurl \
-			  libssl \
+
+ifeq "$(DEVICE)" "AOSP-nougat-arm64"
+LOCAL_LDFLAGS   += -L/home/jiahong/AOSP_7.1_tera/out/target/product/tera-emulator-arm/system/lib64
+LOCAL_STATIC_LIBRARIES += libcurl
+LOCAL_SHARED_LIBRARIES += libz
+else
+LOCAL_SHARED_LIBRARIES += libcurl
+endif
+
+LOCAL_SHARED_LIBRARIES += libssl \
 			  libcrypto \
+			  libicuuc \
+			  libicui18n \
 			  libsqlite \
 			  libfuse \
 			  libjansson

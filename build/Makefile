@@ -15,6 +15,7 @@ NDK_PROJECT_PATH := $(abspath .)
 TARGETS32       += nexus-7
 TARGETS32       += AOSP-kitkat-arm
 TARGETS64       += nexus-5x
+TARGETS64	+= AOSP-nougat-arm64
 TARGETS         += $(TARGETS32)
 TARGETS         += $(TARGETS64)
 #   Add target list grouping by gdb or not
@@ -61,7 +62,7 @@ $(ALL_OUTS32):      LIBPATH = lib
 #####
 
 # Some devices use BoringSSL instead of OpenSSL
-TARGETS_USING_BORINGSSL := $(nexus-7) $(nexus-5x)
+TARGETS_USING_BORINGSSL := $(nexus-7) $(nexus-5x) $(AOSP-nougat-arm64)
 $(TARGETS_USING_BORINGSSL): NDK_ARG += OPENSSL_IS_BORINGSSL=1
 
 #####
