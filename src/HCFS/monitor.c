@@ -30,6 +30,7 @@
 #include "hcfs_cacheops.h"
 #include "utils.h"
 #include "rebuild_super_block.h"
+#include "apk_mgmt.h"
 
 CURL_HANDLE monitor_curl_handle;
 
