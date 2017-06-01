@@ -76,6 +76,7 @@ typedef struct {
 	BOOL is_uploading; /* TRUE or FALSE */
 	int32_t progress_list_fd;
 	int64_t toupload_blocks;
+	int64_t current_seqnum;
 } UPLOADING_INFO;
 
 typedef struct {

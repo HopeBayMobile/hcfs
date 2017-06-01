@@ -2884,14 +2884,10 @@ int32_t truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int32_t start_index,
 			case ST_TODELETE:
 				break;
 			case ST_LDISK:
-				ret_val = _check_sync_wait_full_cache(&body_ptr,
-					inode_index, block_count,
-					tmpentry->seqnum,
-					temppage, page_pos);
-				if (ret_val < 0)
-					return ret_val;
-				else if (ret_val > 0) /* Check status again */
-					continue;
+				/* Now will just delete block if not uploaded.
+				If the file is being uploaded, the upload
+				processs will be canceled if some block is not
+				uploaded but deleted */
 
 				ret_val = fetch_block_path(thisblockpath,
 					inode_index, tmp_blk_index);

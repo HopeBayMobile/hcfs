@@ -79,7 +79,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
 /**
- * When remove a temp file used to uplaod to backend, the file size
+ * When remove a temp file used to upload to backend, the file size
  * should be considered in system size and cache size after unlink it.
  *
  * @param filename File path to be remove.
