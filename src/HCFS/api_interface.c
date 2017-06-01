@@ -1368,7 +1368,9 @@ void api_module(void *index1)
 			goto return_llretval;
 		case GETCACHESIZE:
 			sem_wait(&(hcfs_system->access_sem));
-			llretval = hcfs_system->systemdata.cache_size;
+			/* Include meta to cache usage computation */
+			llretval = hcfs_system->systemdata.cache_size +
+			           hcfs_system->systemdata.system_meta_size;
 			sem_post(&(hcfs_system->access_sem));
 			goto return_llretval;
 		case GETMETASIZE:
@@ -1402,7 +1404,9 @@ void api_module(void *index1)
 			llretval = MAX_PINNED_LIMIT;
 			goto return_llretval;
 		case GETMAXCACHESIZE:
-			llretval = CACHE_HARD_LIMIT;
+			/* Add meta space consumption to overall
+			cache size computation */
+			llretval = CACHE_HARD_LIMIT + META_SPACE_LIMIT;
 			goto return_llretval;
 		case GETVOLSIZE:
 			llretval = get_vol_size(arg_len, largebuf);
