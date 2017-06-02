@@ -3,8 +3,9 @@ BUILD_PATH := $(abspath $(LOCAL_PATH)/..)
 
 include $(CLEAR_VARS)
 LOCAL_ARM_MODE := arm
-LOCAL_MODULE    := HCFS_api
+LOCAL_MODULE    := libhcfsapi
 LOCAL_SRC_FILES := $(addprefix ../../src/API/, HCFS_api.c)
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 LOCAL_SHARED_LIBRARIES = libjansson
 include $(BUILD_SHARED_LIBRARY)
 
@@ -17,12 +18,13 @@ ifeq "$(DEVICE)" "AOSP-nougat-arm64"
 LOCAL_LDFLAGS   += -L/home/jiahong/AOSP_7.1_tera/out/target/product/tera-emulator-arm/system/lib64
 endif
 LOCAL_SHARED_LIBRARIES = libsqlite libcrypto libzip libicui18n libicuuc
+LOCAL_C_INCLUDES += $(BUILD_PATH)/../src/include
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE     := hcfsconf
-LOCAL_CFLAGS     := -pie -fPIE
-LOCAL_LDFLAGS    := -pie -fPIE
+LOCAL_CFLAGS     := -pie -fPIE -O0
+LOCAL_LDFLAGS   := -pie -fPIE -O0
 LOCAL_SRC_FILES  := $(addprefix ../../src/API/, hcfsconf.c enc.c logger.c strrchr_chk.c strchr_chk.c vsprintf_chk.c strcat_chk.c strlen_chk.c)
 LOCAL_SHARED_LIBRARIES = libcrypto
 include $(BUILD_EXECUTABLE)

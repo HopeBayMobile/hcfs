@@ -40,13 +40,15 @@ LOCAL_SHARED_LIBRARIES += libssl \
 			  libfuse \
 			  libjansson
 
+LOCAL_C_INCLUDES += $(BUILD_PATH)/../src/include
+
 ## Compression feature
 COMPRESS_ENABLE := 0
 ifeq "$(COMPRESS_ENABLE)" "0"
     LOCAL_CFLAGS += -DENABLE_COMPRESS=0
 else
     LOCAL_CFLAGS += -DENABLE_COMPRESS=1
-    LOCAL_SHARED_LIBRARIES += liblz4
+    LOCAL_SHARED_LIBRARIES += liblz4-tera
 endif
 include $(BUILD_EXECUTABLE)
 
