@@ -6,7 +6,6 @@
 *.bak
 
 # C extensions
-*.a
 *.o
 *.o.d
 
