@@ -9,6 +9,10 @@
 *.o
 *.o.d
 
+# Gtest related libs
+gtest_main.a
+libgtest*
+
 # Distribution / packaging
 /*.egg
 /*.eggs

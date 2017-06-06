@@ -2117,6 +2117,7 @@ TEST_F(meta_cache_check_uploadingTest, FileIsUploading_BadProgressfd)
 	body.uploading_info.is_uploading = TRUE;
 	body.uploading_info.toupload_blocks = blockno + 10;
 	body.uploading_info.progress_list_fd = 0;
+	body.uploading_info.current_seqnum = 1234;
 
 	ret = meta_cache_check_uploading(&body, inode, blockno, seq);
 
