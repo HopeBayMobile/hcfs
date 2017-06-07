@@ -1,3 +1,4 @@
 [submodule "build/third_party/jansson"]
-	path = build/third_party/jansson
-	url = git@gitlab.hopebaytech.com:gateway-2-0/jansson.git
+    path = build/third_party/jansson
+    url = git@gitlab.hopebaytech.com:gateway-2-0/jansson.git
+    branch = master
