@@ -1652,7 +1652,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 terminated abnormally. Value of "*minapk_ino" is non-zero if minimal apk
 is found and we will use it, otherwise the value is zero. */
 static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
-                                        ino_t *minapk_ino, ino_t apk_ino)
+                                        MIN_APK_LOOKUP_DATA *minapk_data,
+                                        ino_t apk_ino)
 {
 	/* TODO: 4. Check if minimal apk exists */
 	/* TODO: 5. Check if apk is local */
@@ -1662,7 +1663,7 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	int32_t numparents, count;
 	DIR_ENTRY temp_dentry;
 
-	*minapk_ino = 0;
+	memset(minapk_data, 0, sizeof(MIN_APK_LOOKUP_DATA));
 
 	/* First check if the parent is an app folder under the root
 	of /data/app */
@@ -1719,11 +1720,16 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	ret = check_data_location(apk_ino);
 	/* Don't use the minimal apk if the check failed or the apk is
 	"local" */
-	if (ret <= 0)
+	if (ret < 0)
 		return ret;
 
-	/* Found the minimal apk, and should use it */
-	*minapk_ino = temp_dentry.d_ino;
+	/* Found the minimal apk */
+
+	if (ret == 0)
+		minapk_data->is_complete_apk = true;
+	else
+		minapk_data->is_complete_apk = false;
+	minapk_data->min_apk_ino = temp_dentry.d_ino;
 	return 0;
 }
 
@@ -1843,8 +1849,13 @@ a directory (for NFS) */
 			}
 			/* temp_dentry now points to the apk entry */
 			/* Check whether to use minimal apk */
+
+			MIN_APK_LOOKUP_DATA minapk_data;
 			ret_val = _check_use_minapk(parent_ino, selfname,
-			                        &minapk_ino, temp_dentry.d_ino);
+			                        &minapk_data, temp_dentry.d_ino);
+			minapk_ino = minapk_data.min_apk_ino;
+			if (minapk_data.is_complete_apk == TRUE)
+				minapk_ino = 0;
 			write_log(6, "[App unpin] check_use_minapk: %d, %"
 			          PRIu64 "\n", ret_val, (uint64_t) minapk_ino);
 
@@ -1858,7 +1869,7 @@ a directory (for NFS) */
 			}
 
 			/* Insert the result to hash table */
-			insert_minapk_data(parent_ino, selfname, minapk_ino);
+			insert_minapk_data(parent_ino, selfname, &minapk_data);
 		}
 	} else {
 		ret_val = lookup_dir(parent_ino, selfname, &temp_dentry,
