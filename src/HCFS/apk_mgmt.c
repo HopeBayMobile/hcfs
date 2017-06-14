@@ -269,6 +269,24 @@ int32_t query_minapk_data(ino_t parent_ino,
 	if ((temp_data.is_complete_apk == true) &&
 	    (temp_data.min_apk_ino > 0)) {
 		/* Check if apk is still local */
+		ret = check_data_location(temp_data.org_apk_ino);
+
+		if (ret < 0) {
+			/* Cannot query location. Remove from table */
+			remove_hash_list_entry(minapk_lookup_table, &temp_key);
+			write_log(0, "Error checking apk location. Code %d\n",
+			          -ret);
+			goto out;
+		}
+		if (ret > 0) {
+			/* Apk no longer local. Update table */
+			ret = 0;
+			temp_data.is_complete_apk = false;
+			update_hash_list_entry(minapk_lookup_table, &temp_key,
+			                       NULL, &temp_data);
+		}
+	}
+
 	if (temp_data.is_complete_apk == true)
 		*minapk_ino = 0;
 	else

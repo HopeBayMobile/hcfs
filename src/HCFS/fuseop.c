@@ -1730,6 +1730,7 @@ static inline int32_t _check_use_minapk(ino_t parent_ino, const char *selfname,
 	else
 		minapk_data->is_complete_apk = false;
 	minapk_data->min_apk_ino = temp_dentry.d_ino;
+	minapk_data->org_apk_ino = apk_ino;
 	return 0;
 }
 

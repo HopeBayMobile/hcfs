@@ -35,6 +35,7 @@ typedef struct MIN_APK_LOOKUP_KEY {
 
 typedef struct MIN_APK_LOOKUP_DATA {
 	ino_t min_apk_ino;
+	ino_t org_apk_ino;
 	bool is_complete_apk;
 } MIN_APK_LOOKUP_DATA;
 
