@@ -28,6 +28,7 @@
 #include "params.h"
 #include "utils.h"
 #include "FS_manager.h"
+#include "metaops.h"
 
 int32_t toggle_use_minimal_apk(bool new_val)
 {
@@ -157,7 +158,7 @@ static int32_t _minapk_cmp(const void *key1, const void *key2)
 		return -1;
 }
 
-static int32_t _minapk_update(const void *target, const void *update)
+static int32_t _minapk_update(void *target, void *update)
 {
 	MIN_APK_LOOKUP_DATA *t1 = (MIN_APK_LOOKUP_DATA *)target;
 	MIN_APK_LOOKUP_DATA *u1 = (MIN_APK_LOOKUP_DATA *)update;
