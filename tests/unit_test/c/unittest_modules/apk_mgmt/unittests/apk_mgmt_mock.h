@@ -66,12 +66,23 @@ int32_t custom_insert_hash_list_entry(HASH_LIST *hash_list,
 }
 
 FAKE_VALUE_FUNC(
+    int32_t, update_hash_list_entry, HASH_LIST *, const hash_key_t *,
+    hash_data_t *, data_update_t *);
+
+int32_t custom_update_hash_list_entry(HASH_LIST *hash_list,
+    const hash_key_t *key, hash_data_t *data, data_update_t *update_data)
+{
+	return 0;
+}
+
+FAKE_VALUE_FUNC(
     int32_t, lookup_hash_list_entry, HASH_LIST *, const void *, void *);
 int32_t query_minapk_data_success = 0;
 int32_t custom_lookup_hash_list_entry(HASH_LIST *hash_list,
 				      const void *key,
 				      void *data)
 {
+	((MIN_APK_LOOKUP_DATA *)data)->is_complete_apk = false;
 	if (query_minapk_data_success) {
 		((MIN_APK_LOOKUP_DATA *)data)->min_apk_ino = 5566;
 		return 0;
@@ -112,6 +123,13 @@ HASH_LIST_ITERATOR *custom_init_hashlist_iter(HASH_LIST *hash_list)
 
 FAKE_VOID_FUNC(destroy_hashlist_iter, HASH_LIST_ITERATOR *);
 FAKE_VOID_FUNC(hash_list_global_unlock, HASH_LIST *);
+
+FAKE_VALUE_FUNC(int32_t, check_data_location, ino_t);
+
+int32_t custom_check_data_location(ino_t thisinode)
+{
+	return 0;
+}
 
 /*
  * Helper functions
