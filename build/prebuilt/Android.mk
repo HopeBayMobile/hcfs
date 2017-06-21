@@ -19,6 +19,18 @@ include $(PREBUILT_SHARED_LIBRARY)
 
 ifeq "$(DEVICE)" "AOSP-nougat-arm64"
 include $(CLEAR_VARS)
+LOCAL_MODULE    := libc
+LOCAL_SRC_FILES := $(LOCAL_PATH)/$(DEVICE)/system/libc.so
+LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/include
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE    := libdl
+LOCAL_SRC_FILES := $(LOCAL_PATH)/$(DEVICE)/system/libdl.so
+LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/include
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
 LOCAL_MODULE    := libz
 LOCAL_SRC_FILES := $(LOCAL_PATH)/$(DEVICE)/system/libz.so
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/include

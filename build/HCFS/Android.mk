@@ -25,9 +25,8 @@ LOCAL_LDFLAGS   += -pie -fPIE -O0
 LOCAL_SRC_FILES := $(patsubst $(LOCAL_PATH)/%, %, $(wildcard $(LOCAL_PATH)/../../src/HCFS/*.c))
 
 ifeq "$(DEVICE)" "AOSP-nougat-arm64"
-LOCAL_LDFLAGS   += -L/home/jiahong/AOSP_7.1_tera/out/target/product/tera-emulator-arm/system/lib64
+LOCAL_SHARED_LIBRARIES += libz libc libdl
 LOCAL_STATIC_LIBRARIES += libcurl
-LOCAL_SHARED_LIBRARIES += libz
 else
 LOCAL_SHARED_LIBRARIES += libcurl
 endif

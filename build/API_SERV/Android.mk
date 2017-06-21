@@ -15,9 +15,9 @@ LOCAL_CFLAGS     := -pie -fPIE
 LOCAL_LDFLAGS    := -pie -fPIE
 LOCAL_SRC_FILES  := $(addprefix ../../src/API/, socket_serv.c pin_ops.c hcfs_stat.c hcfs_sys.c enc.c socket_util.c logger.c smart_cache.c minimal_apk.c strrchr_chk.c strchr_chk.c vsprintf_chk.c strcat_chk.c)
 ifeq "$(DEVICE)" "AOSP-nougat-arm64"
-LOCAL_LDFLAGS   += -L/home/jiahong/AOSP_7.1_tera/out/target/product/tera-emulator-arm/system/lib64
+LOCAL_SHARED_LIBRARIES += libz libc libdl
 endif
-LOCAL_SHARED_LIBRARIES = libsqlite libcrypto libzip libicui18n libicuuc
+LOCAL_SHARED_LIBRARIES += libsqlite libcrypto libzip libicui18n libicuuc
 LOCAL_C_INCLUDES += $(BUILD_PATH)/../src/include
 include $(BUILD_EXECUTABLE)
 
