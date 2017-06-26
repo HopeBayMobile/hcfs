@@ -967,7 +967,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	int32_t which_curl;
 	int32_t which_index;
 	int32_t dsync_index;
-	int32_t ret;
+	int32_t ret, pause_status;
 
 	which_curl = delete_thread_ptr->which_curl;
 	which_index = delete_thread_ptr->which_index;
@@ -994,7 +994,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	}
 
 	delete_ctl.threads_finished[which_index] = TRUE;
-	sem_post(&(delete_ctl.pause_sem));
+	sem_check_and_release(&(delete_ctl.pause_sem), &pause_status);
 }
 
 /* Helper for creating threads for deletion */

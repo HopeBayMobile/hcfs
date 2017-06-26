@@ -33,16 +33,18 @@ int32_t init_pin_scheduler()
 			MAX_PINNING_FILE_CONCURRENCY);
 	sem_init(&(pinning_scheduler.pin_active_sem), 0, 0);
 
-	pthread_create(&pinning_scheduler.pinning_collector, NULL,
-			(void *)pinning_collect, NULL);
-	pthread_create(&pinning_scheduler.pinning_manager, NULL,
-			(void *)pinning_loop, NULL);
 	PTHREAD_REUSE_set_exithandler();
+
 	int32_t idx;
 	for (idx = 0; idx < MAX_PINNING_FILE_CONCURRENCY; idx++)
 		PTHREAD_REUSE_create(&(pinning_scheduler.pinfile_tid[idx]),
 		                     NULL);
 	write_log(10, "Debug: Create pinning scheduler\n");
+
+	pthread_create(&pinning_scheduler.pinning_collector, NULL,
+			(void *)pinning_collect, NULL);
+	pthread_create(&pinning_scheduler.pinning_manager, NULL,
+			(void *)pinning_loop, NULL);
 
 	return 0;
 }
@@ -79,7 +81,7 @@ static BOOL _pinning_wakeup_fn(void)
  */
 void* pinning_collect(void *arg)
 {
-	int32_t idx;
+	int32_t idx, pause_status;
 	PTHREAD_REUSE_T *tid;
 
 	UNUSED(arg);
@@ -114,6 +116,8 @@ void* pinning_collect(void *arg)
 			memset(&(pinning_scheduler.pinning_info[idx]), 0,
 				sizeof(PINNING_INFO));
 			pinning_scheduler.total_active_pinning--;
+			sem_check_and_release(&(hcfs_system->pin_wait_sem),
+			                      &pause_status);
 
 			/* Post a semaphore */
 			sem_post(&(pinning_scheduler.pinning_sem));

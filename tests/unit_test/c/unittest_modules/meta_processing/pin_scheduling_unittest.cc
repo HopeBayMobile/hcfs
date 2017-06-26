@@ -5,6 +5,7 @@ extern "C" {
 #include "super_block.h"
 #include "mock_param.h"
 #include "pthread_control.h"
+#include "utils.h"
 }
 
 #include <pthread.h>
@@ -35,6 +36,7 @@ protected:
 		memset(mock_inodes, 0, sizeof(ino_t) * TOTAL_MOCK_INODES);
 		memset(verified_inodes, 0, sizeof(ino_t) * TOTAL_MOCK_INODES);
 		sem_init(&verified_inodes_sem, 0, 1);
+		sem_init(&(hcfs_system->pin_wait_sem), 1, 0);
 		
 	}
 

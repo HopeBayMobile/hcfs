@@ -28,6 +28,7 @@
 #include "params.h"
 #include "utils.h"
 #include "FS_manager.h"
+#include "metaops.h"
 
 int32_t toggle_use_minimal_apk(bool new_val)
 {
@@ -157,6 +158,15 @@ static int32_t _minapk_cmp(const void *key1, const void *key2)
 		return -1;
 }
 
+static int32_t _minapk_update(void *target, void *update)
+{
+	MIN_APK_LOOKUP_DATA *t1 = (MIN_APK_LOOKUP_DATA *)target;
+	MIN_APK_LOOKUP_DATA *u1 = (MIN_APK_LOOKUP_DATA *)update;
+
+	memcpy(t1, u1, sizeof(MIN_APK_LOOKUP_DATA));
+	return 0;
+}
+
 /**
  * Create structure of minimal apk lookup table.
  *
@@ -167,7 +177,7 @@ int32_t create_minapk_table(void)
 	int32_t ret = 0;
 
 	minapk_lookup_table = create_hash_list(
-	    _minapk_hash, _minapk_cmp, NULL, MINAPK_TABLE_SIZE,
+	    _minapk_hash, _minapk_cmp, _minapk_update, MINAPK_TABLE_SIZE,
 	    sizeof(MIN_APK_LOOKUP_KEY), sizeof(MIN_APK_LOOKUP_DATA));
 	if (!minapk_lookup_table) {
 		ret = -errno;
@@ -191,20 +201,19 @@ void destroy_minapk_table(void)
 }
 
 /**
- * Insert triple (parent inode, apk name, miminal apk inode) into lookup table.
+ * Insert triple (parent inode, apk name, miminal apk data) into lookup table.
  *
  * @param parent_ino Parent inode number.
  * @param apk_name Apk file name.
- * @param minapk_ino Inode number of the minimal apk file.
+ * @param minapk_data Lookup data of the minimal apk file.
  *
  * @return 0 on success, -EEXIST if key pair (parent inode, apk name) exists.
  */
 int32_t insert_minapk_data(ino_t parent_ino,
 			   const char *apk_name,
-			   ino_t minapk_ino)
+			   MIN_APK_LOOKUP_DATA *minapk_data)
 {
 	MIN_APK_LOOKUP_KEY temp_key;
-	MIN_APK_LOOKUP_DATA temp_data = {.min_apk_ino = minapk_ino };
 	int32_t ret;
 
 	if (!minapk_lookup_table)
@@ -213,7 +222,7 @@ int32_t insert_minapk_data(ino_t parent_ino,
 	temp_key.parent_ino = parent_ino;
 	strncpy(temp_key.apk_name, apk_name, MAX_FILENAME_LEN);
 	ret =
-	    insert_hash_list_entry(minapk_lookup_table, &temp_key, &temp_data);
+	    insert_hash_list_entry(minapk_lookup_table, &temp_key, minapk_data);
 	if (ret < 0 && ret != -EEXIST)
 		write_log(2, "Fail to insert min apk data. Code %d\n", -ret);
 
@@ -254,7 +263,35 @@ int32_t query_minapk_data(ino_t parent_ino,
 		goto out;
 	}
 
-	*minapk_ino = temp_data.min_apk_ino;
+	/* TODO: might want to move this update to cache replacement if
+	we can easily determine whether the inode to be swapped out is an
+	apk */
+	/* Should check if need to update value of is_complete_apk here */
+	if ((temp_data.is_complete_apk == true) &&
+	    (temp_data.min_apk_ino > 0)) {
+		/* Check if apk is still local */
+		ret = check_data_location(temp_data.org_apk_ino);
+
+		if (ret < 0) {
+			/* Cannot query location. Remove from table */
+			remove_hash_list_entry(minapk_lookup_table, &temp_key);
+			write_log(0, "Error checking apk location. Code %d\n",
+			          -ret);
+			goto out;
+		}
+		if (ret > 0) {
+			/* Apk no longer local. Update table */
+			ret = 0;
+			temp_data.is_complete_apk = false;
+			update_hash_list_entry(minapk_lookup_table, &temp_key,
+			                       NULL, &temp_data);
+		}
+	}
+
+	if (temp_data.is_complete_apk == true)
+		*minapk_ino = 0;
+	else
+		*minapk_ino = temp_data.min_apk_ino;
 out:
 	return ret;
 }

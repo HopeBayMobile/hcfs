@@ -35,6 +35,8 @@ typedef struct MIN_APK_LOOKUP_KEY {
 
 typedef struct MIN_APK_LOOKUP_DATA {
 	ino_t min_apk_ino;
+	ino_t org_apk_ino;
+	bool is_complete_apk;
 } MIN_APK_LOOKUP_DATA;
 
 HASH_LIST *minapk_lookup_table;
@@ -44,7 +46,7 @@ int32_t create_minapk_table(void);
 void destroy_minapk_table(void);
 int32_t insert_minapk_data(ino_t parent_ino,
 			   const char *apk_name,
-			   ino_t minapk_ino);
+			   MIN_APK_LOOKUP_DATA *minapk_data);
 int32_t query_minapk_data(ino_t parent_ino,
 			  const char *apk_name,
 			  ino_t *minapk_ino);
