@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <fuse/fuse_opt.h>
+#include <sys/ioctl.h>
 
 #include "FS_manager.h"
 #include "global.h"
@@ -183,5 +184,8 @@ bool mgmt_app_is_created;
 
 /* FUSE op parameters */
 #define REPLY_ATTR_TIMEOUT 0.1 /* Timeout for cached getattr results */
+
+#define FUSE_HCFS_AVAIL_SPACE_NOTIFY	_IOW(0xff, 0x01, long)
+#define WRITEBACK_CACHE_RESERVE_SPACE (1 * 1024 * 1024)
 
 #endif  /* GW20_HCFS_FUSEOP_H_ */

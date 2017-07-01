@@ -803,6 +803,33 @@ errcode_handle:
 }
 #endif /* _ANDROID_ENV_ */
 
+static int notify_avail_space(long avail_space)
+{
+	static int fd = -1;
+
+	if (fd == -1) {
+		fd = open("/dev/fuse", O_RDONLY);
+		if (fd == -1)
+			return errno;
+	}
+
+	if (avail_space < 0)
+		avail_space = 0;
+
+	if (ioctl(fd, FUSE_HCFS_AVAIL_SPACE_NOTIFY, avail_space) == -1)
+		return errno;
+
+	return 0;
+}
+
+static int test_and_notify_no_space(int error)
+{
+	if (error != ENOSPC)
+		return 0;
+
+	return notify_avail_space(0);
+}
+
 /************************************************************************
 *
 * Function name: hfuse_ll_getattr
@@ -5406,6 +5433,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	sem_wait(&(fh_ptr->block_sem));
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	if (fh_ptr->meta_cache_ptr == NULL) {
+		test_and_notify_no_space(errno);
 		fuse_reply_err(req, errno);
 		return;
 	}
@@ -5422,6 +5450,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 		sem_post(&(fh_ptr->block_sem));
+		test_and_notify_no_space(-ret);
 		fuse_reply_err(req, -ret);
 		return;
 	}
@@ -5435,6 +5464,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 		sem_post(&(fh_ptr->block_sem));
+		test_and_notify_no_space(-ret);
 		fuse_reply_err(req, -ret);
 		return;
 	}
@@ -5476,6 +5506,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			sem_post(&(fh_ptr->block_sem));
+			notify_avail_space(0);
 			fuse_reply_err(req, ENOSPC);
 			return;
 		}
@@ -5571,6 +5602,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			sem_post(&(fh_ptr->block_sem));
+			test_and_notify_no_space(-ret);
 			fuse_reply_err(req, -ret);
 			return;
 		}
@@ -5587,6 +5619,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 				meta_cache_close_file(fh_ptr->meta_cache_ptr);
 				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 				sem_post(&(fh_ptr->block_sem));
+				test_and_notify_no_space(-ret);
 				fuse_reply_err(req, -ret);
 				return;
 			}
@@ -5603,6 +5636,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 		sem_post(&(fh_ptr->block_sem));
+		test_and_notify_no_space(-ret);
 		fuse_reply_err(req, -ret);
 		return;
 	}
@@ -5611,6 +5645,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 	sem_post(&(fh_ptr->block_sem));
 
+	notify_avail_space(max_pinned_size -
+			   hcfs_system->systemdata.pinned_size -
+			   WRITEBACK_CACHE_RESERVE_SPACE);
 	fuse_reply_write(req, total_bytes_written);
 	return;
 errcode_handle:
@@ -5625,6 +5662,7 @@ errcode_handle:
 	}
 
 	sem_post(&(fh_ptr->block_sem));
+	test_and_notify_no_space(-errcode);
 	fuse_reply_err(req, -errcode);
 }
 
