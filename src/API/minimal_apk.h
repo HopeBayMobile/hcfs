@@ -60,6 +60,12 @@ typedef struct ll_ongoing_mini_apk {
 	struct ll_ongoing_mini_apk *next;
 } LL_ONGOING_MINI_APK;
 
+typedef struct mini_apk_needed {
+	char *pkg_name;
+	char **reserved_icon_names;
+	int32_t num_icon;
+} MINI_APK_NEEDED;
+
 extern LL_ONGOING_MINI_APK *ongoing_mini_apk_list;
 extern sem_t mini_apk_list_sem;
 
@@ -67,10 +73,12 @@ void init_minimal_apk_list();
 
 void destroy_minimal_apk_list();
 
-int32_t create_minimal_apk(char *pkg_name);
+int32_t create_minimal_apk(MINI_APK_NEEDED *min_apk_needed);
 
 void *create_minimal_apk_async(void *ptr);
 
 int32_t check_minimal_apk(char *pkg_name);
 
+MINI_APK_NEEDED *create_min_apk_needed_data(char *buf);
+void destroy_min_apk_needed_data(MINI_APK_NEEDED *min_apk_needed);
 #endif  /* GW20_HCFSAPI_MINI_APK_H_ */

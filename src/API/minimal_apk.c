@@ -205,7 +205,7 @@ char *_get_dir_name(const char *file_name)
 
 /* To add lib dirs to the archive of minimal apk.
  */
-int32_t add_lib_dirs(zip_t *base_apk, zip_t *mini_apk)
+int32_t add_lib_dirs_and_icon(zip_t *base_apk, zip_t *mini_apk)
 {
 	char *file_name;
 	char *dir_name;
@@ -301,7 +301,9 @@ int32_t add_apk_files(zip_t *base_apk, zip_t *mini_apk)
  *
  * @return Return 0 if successful. Otherwise, return -1.
  */
-int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
+int32_t create_zip_file(char *base_apk_path,
+			char *mini_apk_path,
+			MINI_APK_NEEDED *min_apk_needed)
 {
 	int32_t ret_code;
 	int32_t zip_errcode = 0;
@@ -332,7 +334,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 		return -1;
 	}
 
-	ret_code = add_lib_dirs(base_apk_zip, mini_apk_zip);
+	ret_code = add_lib_dirs_and_icon(base_apk_zip, mini_apk_zip);
 	if (ret_code < 0) {
 		WRITE_LOG(0, "Failed to add lib dirs to minimal apk.");
 		zip_close(mini_apk_zip);
@@ -340,7 +342,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 		return -1;
 	}
 
-	add_apk_files(base_apk_zip, mini_apk_zip);
+	ret_code = add_apk_files(base_apk_zip, mini_apk_zip);
 	if (ret_code < 0) {
 		WRITE_LOG(0, "Failed to add apk files to minimal apk.");
 		zip_close(mini_apk_zip);
@@ -359,7 +361,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
  *
  * @return Return 0 if successful. Otherwise, return -1.
  */
-int32_t create_minimal_apk(char *pkg_name)
+int32_t create_minimal_apk(MINI_APK_NEEDED *min_apk_needed)
 {
 	char *base_apk_path, *mini_apk_path, *app_dir_path;
 	int32_t ret_code;
@@ -367,6 +369,7 @@ int32_t create_minimal_apk(char *pkg_name)
 	struct utimbuf base_apk_timbuf, app_dir_timbuf;
 	struct group *grp_t;
 	struct passwd *passwd_t;
+	char *pkg_name = min_apk_needed->pkg_name;
 
 	ret_code = 0;
 	base_apk_path = mini_apk_path = app_dir_path = NULL;
@@ -448,7 +451,8 @@ int32_t create_minimal_apk(char *pkg_name)
 	}
 
 	/* create minimal apk file */
-	ret_code = create_zip_file(base_apk_path, mini_apk_path);
+	ret_code =
+	    create_zip_file(base_apk_path, mini_apk_path, min_apk_needed);
 	if (ret_code < 0) {
 		WRITE_LOG(0, "Failed to create minimal apk file of %s (%s).",
 			  pkg_name, mini_apk_path);
@@ -485,11 +489,10 @@ end:
  */
 void *create_minimal_apk_async(void *ptr)
 {
-	char *package_name;
+	MINI_APK_NEEDED *min_apk_needed = (MINI_APK_NEEDED *)ptr;
 
-	package_name = (char *)ptr;
-	create_minimal_apk(package_name);
-	free(package_name);
+	create_minimal_apk(min_apk_needed);
+	destroy_minimal_apk_list(min_apk_needed);
 
 	pthread_exit(&(int){ 0 });
 }
@@ -556,4 +559,60 @@ int32_t check_minimal_apk(char *pkg_name)
 	free(mini_apk_path);
 	free(app_dir_path);
 	return apk_status;
+}
+
+MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
+{
+	ssize_t str_len;
+	char *package_name;
+	MINI_APK_NEEDED *min_apk_needed = NULL;
+	char **icon_name_list;
+	int32_t idx, now_pos, num_icon;
+
+	memcpy(&str_len, buf, sizeof(ssize_t));
+
+	package_name = (char *)calloc(1, str_len + 10);
+	if (package_name == NULL) {
+		write_log(0, "Failed to alloc memory for package name.");
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	strncpy(package_name, buf + sizeof(ssize_t), str_len);
+	write_log(0, "test create min: %s, %s", package_name, buf);
+
+	/* Copy icon name */
+	now_pos = sizeof(ssize_t) + str_len;
+	memcpy(&num_icon, buf + now_pos, sizeof(int32_t));
+	if (num_icon < 0) {
+		write_log(0, "Error on invalid icon number %d\n", num_icon);
+		free(package_name);
+		errno = EINVAL;
+		return NULL;
+	}
+	now_pos += sizeof(int32_t);
+	icon_name_list = (char **)calloc(sizeof(char *) * num_icon, 1);
+	for (idx = 0; idx < num_icon; idx++) {
+		int32_t icon_name_len = strlen(buf + now_pos);
+		icon_name_list[idx] = (char *)calloc(icon_name_len + 10, 1);
+		strncpy(icon_name_list[idx], buf + now_pos, icon_name_len + 1);
+		now_pos += (icon_name_len + 1);
+	}
+
+	min_apk_needed = (MINI_APK_NEEDED *)calloc(sizeof(MINI_APK_NEEDED), 1);
+	min_apk_needed->pkg_name = package_name;
+	min_apk_needed->reserved_icon_names = icon_name_list;
+	min_apk_needed->num_icon = num_icon;
+	return min_apk_needed;
+}
+
+void destroy_min_apk_needed_data(MINI_APK_NEEDED *min_apk_needed)
+{
+	int32_t i;
+
+	free(min_apk_needed->pkg_name);
+	for (i = 0; i < min_apk_needed->num_icon; i++)
+		free(min_apk_needed->reserved_icon_names[i]);
+	free(min_apk_needed->reserved_icon_names);
+	free(min_apk_needed);
 }

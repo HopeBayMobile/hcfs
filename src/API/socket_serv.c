@@ -619,6 +619,7 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 			      pthread_t *tid)
 {
 	char *package_name;
+	MINI_APK_NEEDED *min_apk_needed = NULL;
 	int32_t ret_code, blocking;
 	uint32_t ret_len = 0;
 	ssize_t str_len = 0;
@@ -626,23 +627,14 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 	write_log(8, "Create minimal apk\n");
 
 	memcpy(&blocking, largebuf, sizeof(int32_t));
-	memcpy(&str_len, largebuf + sizeof(int32_t), sizeof(ssize_t));
-
-	package_name = (char *)calloc(1, arg_len + 10);
-	if (package_name == NULL) {
-		write_log(0, "Failed to alloc memory for package name.");
-		return -ENOMEM;
-	}
-
-	strncpy(package_name, largebuf + sizeof(int32_t) + sizeof(ssize_t),
-		str_len);
-	write_log(0, "test create min: %s, %s", package_name, largebuf);
+	min_apk_needed = create_min_apk_needed_data(largebuf + sizeof(int32_t));
+	package_name = min_apk_needed->pkg_name;
 
 	if (blocking) {
 		UNUSED(tid);
 		write_log(8, "Blocking create minimal apk of %s", package_name);
-		ret_code = create_minimal_apk(package_name);
-		free(package_name);
+		ret_code = create_minimal_apk(min_apk_needed);
+		destroy_minimal_apk_list(min_apk_needed);
 	} else {
 		write_log(8, "Non-blocking create minimal apk of %s",
 			  package_name);
