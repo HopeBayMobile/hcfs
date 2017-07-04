@@ -622,7 +622,8 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 	MINI_APK_NEEDED *min_apk_needed = NULL;
 	int32_t ret_code, blocking;
 	uint32_t ret_len = 0;
-	ssize_t str_len = 0;
+
+	UNUSED(arg_len);
 
 	write_log(8, "Create minimal apk\n");
 

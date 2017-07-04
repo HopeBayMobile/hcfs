@@ -530,7 +530,11 @@ void HCFS_umount_smart_cache(char **json_res);
  *   | True          | 0 if success   |
  *   | False         | Linux errors.  |
  */
-void HCFS_create_minimal_apk(char **json_res, char *package_name, int32_t blocking);
+void HCFS_create_minimal_apk(char **json_res,
+			     char *package_name,
+			     int32_t blocking,
+			     int num_icon,
+			     char *icon_name_list);
 
 /*Check minimal apk
  * @json_res result string in json format.
