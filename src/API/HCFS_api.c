@@ -1042,6 +1042,8 @@ void HCFS_create_minimal_apk(char **json_res,
 	CONCAT_ARGS(package_name);
 
 	/* Concat icon name array */
+	memcpy(buf + cmd_len, &num_icon, sizeof(int32_t));
+	cmd_len += sizeof(int32_t);
 	now_pos = 0;
 	for (i = 0; i < num_icon; i++) {
 		// icon_name_list is a icon name array that each element is

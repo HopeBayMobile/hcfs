@@ -283,7 +283,6 @@ int32_t add_lib_dirs_and_icon(zip_t *base_apk,
 				zip_source_free(tmp_zs_t);
 				return -1;
 			}
-			zip_source_free(tmp_zs_t);
 		}
 	}
 	return 0;
@@ -616,7 +615,7 @@ MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
 	}
 
 	strncpy(package_name, buf + sizeof(ssize_t), str_len);
-	write_log(0, "test create min: %s, %s", package_name, buf);
+	write_log(0, "test create min: %s", package_name);
 
 	/* Copy icon names */
 	now_pos = sizeof(ssize_t) + str_len;
@@ -627,6 +626,7 @@ MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
 		errno = EINVAL;
 		return NULL;
 	}
+	write_log(0, "num of icon name %d", num_icon);
 	now_pos += sizeof(int32_t);
 	icon_name_list = (char **)calloc(sizeof(char *) * num_icon, 1);
 	for (idx = 0; idx < num_icon; idx++) {

@@ -640,7 +640,7 @@ int32_t do_create_minimal_apk(char *largebuf, int32_t arg_len,
 		write_log(8, "Non-blocking create minimal apk of %s",
 			  package_name);
 		pthread_create(tid, NULL, &create_minimal_apk_async,
-			       (void *)package_name);
+			       (void *)min_apk_needed);
 		ret_code = 0;
 	}
 

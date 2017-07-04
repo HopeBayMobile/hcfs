@@ -35,8 +35,18 @@
 
 #define CHOWN(PATH, OWNER, GROUP)                                              \
 	do {                                                                   \
+		errno = 0;                                                     \
 		grp_t = getgrnam(OWNER);                                       \
+		if (!grp_t) {                                                  \
+			write_log(0, "Error on getting gr. Code %d", errno);   \
+			break;                                                 \
+		}                                                              \
+		errno = 0;                                                     \
 		passwd_t = getpwnam(GROUP);                                    \
+		if (!passwd_t) {                                               \
+			write_log(0, "Error on getting pw. Code %d", errno);   \
+			break;                                                 \
+		}                                                              \
 		chown(PATH, passwd_t->pw_uid, grp_t->gr_gid);                  \
 	} while (0)
 

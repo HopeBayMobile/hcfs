@@ -22,12 +22,12 @@
 #include <jansson.h>
 #include <time.h>
 #include <unistd.h>
+#include <semaphore.h>
 
 #include "HCFS_api.h"
 #include "pin_ops.h"
 #include "hcfs_stat.h"
 #include "global.h"
-
 int32_t main(void)
 {
 	char pin_path[100] = "/home/yuxun/mp/test1";
@@ -166,16 +166,20 @@ int32_t main(void)
 	//free(res25);
 
 	char *res26;
-	HCFS_create_minimal_apk(&res26, "com.braveknight.quiz01-1", 0, 1, "kewei");
+	char buf[500] = {0};
+	char *icon_name = "abc_ic_menu_paste_mtrl_am_alpha";
+	strcpy(buf, icon_name);
+	strcpy(buf + strlen(icon_name) + 1, "xxxhdpi");
+	HCFS_create_minimal_apk(&res26, "com.tera.haha", 0, 1, buf);
 	printf("Create minimal apk - %s\n", res26);
 	free(res26);
 
 	char *res27;
-	HCFS_check_minimal_apk(&res27, "com.braveknight.quiz01-1");
+	HCFS_check_minimal_apk(&res27, "com.tera.haha");
 	printf("Check minimal apk - %s\n", res27);
 	free(res27);
 	sleep(2);
-	HCFS_check_minimal_apk(&res27, "com.braveknight.quiz01-1");
+	HCFS_check_minimal_apk(&res27, "com.tera.haha");
 	printf("Check minimal apk - %s\n", res27);
 	free(res27);
 }
