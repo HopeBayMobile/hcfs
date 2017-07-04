@@ -166,7 +166,7 @@ int32_t main(void)
 	//free(res25);
 
 	char *res26;
-	HCFS_create_minimal_apk(&res26, "com.braveknight.quiz01-1", 0);
+	HCFS_create_minimal_apk(&res26, "com.braveknight.quiz01-1", 0, 1, "kewei");
 	printf("Create minimal apk - %s\n", res26);
 	free(res26);
 
