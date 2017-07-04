@@ -5449,7 +5449,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 		sem_post(&(fh_ptr->block_sem));
-		fuse_reply_err(req, -EIO);
+		fuse_reply_err(req, EIO);
 		return;
 	}
 
