@@ -615,7 +615,7 @@ MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
 		return NULL;
 	}
 
-	strncpy(package_name, buf + sizeof(ssize_t), str_len + 1);
+	strncpy(package_name, buf + sizeof(ssize_t), str_len);
 	write_log(0, "test create min: %s, %s", package_name, buf);
 
 	/* Copy icon names */
@@ -635,14 +635,15 @@ MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
 		/* [ssize_t] [icon name 1] [ssize_t] [icon_name 2] .... */
 		memcpy(&icon_name_len, buf + now_pos, sizeof(ssize_t));
 		now_pos += sizeof(ssize_t);
-		if (*(buf + now_pos + icon_name_len) != '\0') {
-			write_log(0, "Error: Invalid length of icon name");
+		if (*(buf + now_pos + icon_name_len - 1) != '\0') {
+			write_log(0, "Error: Invalid length of icon name %s",
+				  buf + now_pos);
 			errno = EINVAL;
 			return NULL;
 		}
 		icon_name_list[idx] = (char *)calloc(icon_name_len + 10, 1);
-		strncpy(icon_name_list[idx], buf + now_pos, icon_name_len + 1);
-		now_pos += (icon_name_len + 1);
+		strncpy(icon_name_list[idx], buf + now_pos, icon_name_len);
+		now_pos += icon_name_len;
 		write_log(0, "DEBUG: parse icon name %s", icon_name_list[idx]);
 	}
 
