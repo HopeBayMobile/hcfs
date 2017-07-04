@@ -50,8 +50,16 @@ int32_t update_use_minimal_apk(void)
 {
 	int32_t ret = 0;
 	bool old_val = hcfs_system->use_minimal_apk;
+	/* Consider the condition on whether backend content
+	can be fetched */
+	bool can_download =
+		(hcfs_system->system_restoring == RESTORING_STAGE2) ?
+		(hcfs_system->backend_is_online == TRUE) :
+		(hcfs_system->sync_paused == FALSE);
+	/* Have to use minimal apk if we are told to do so, or if
+	we cannot fetch content from backend */
 	bool new_val = (hcfs_system->set_minimal_apk ||
-	                hcfs_system->sync_paused);
+	                can_download == false);
 
 	if (old_val == new_val)
 		return 0;
