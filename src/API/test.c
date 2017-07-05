@@ -167,10 +167,14 @@ int32_t main(void)
 
 	char *res26;
 	char buf[500] = {0};
-	char *icon_name = "abc_ic_menu_paste_mtrl_am_alpha";
-	strcpy(buf, icon_name);
-	strcpy(buf + strlen(icon_name) + 1, "xxxhdpi");
-	HCFS_create_minimal_apk(&res26, "com.tera.haha", 0, 1, buf);
+	char *icon_name[] = { "abc_ic_menu_paste_mtrl_am_alpha",
+			      "abc_ic_menu_selectall_mtrl_alpha",
+			      "abc_btn_switch_to_on_mtrl_00001.9" };
+	strcpy(buf, icon_name[0]);
+	strcpy(buf + strlen(icon_name[0]) + 1, icon_name[1]);
+	strcpy(buf + strlen(icon_name[0]) + 1 + strlen(icon_name[1]) + 1,
+	       icon_name[2]);
+	HCFS_create_minimal_apk(&res26, "com.tera.haha", 0, 3, buf);
 	printf("Create minimal apk - %s\n", res26);
 	free(res26);
 

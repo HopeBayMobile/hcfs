@@ -205,7 +205,7 @@ char *_get_dir_name(const char *file_name)
 
 /* To add lib dirs to the archive of minimal apk.
  */
-BOOL _is_possible_icon_name(const char *file_name,
+BOOL _is_possible_icon_name_substr(const char *file_name,
 			    const MINI_APK_NEEDED *min_apk_needed)
 {
 	BOOL result = FALSE;
@@ -213,6 +213,45 @@ BOOL _is_possible_icon_name(const char *file_name,
 
 	for (i = 0; i < min_apk_needed->num_icon; i++) {
 		if (strstr(file_name, min_apk_needed->reserved_icon_names[i])) {
+			WRITE_LOG(0, "TEST: %s is valid icon name\n",
+				  file_name);
+			result = TRUE;
+			break;
+		}
+	}
+	return result;
+}
+
+BOOL _is_possible_icon_name(const char *file_name,
+			    const MINI_APK_NEEDED *min_apk_needed)
+{
+	BOOL result = FALSE;
+	char icon_name[500] = {0};
+	int slash_idx = -1, dot_idx = -1, file_name_len = -1;
+	int i;
+
+	// E.g: fetch string "icon" from string "/xxx/yyy/icon.png"
+	for (i = strlen(file_name) - 1; i >= 0; i--) {
+		if (file_name[i] == '.' && dot_idx == -1)
+			dot_idx = i;
+		if (file_name[i] == '/' && slash_idx == -1)
+			slash_idx = i;
+		if (dot_idx > 0 && slash_idx > 0) {
+			if (dot_idx > slash_idx) {
+				file_name_len = dot_idx - slash_idx - 1;
+				memcpy(icon_name, file_name + slash_idx + 1,
+				       file_name_len);
+			} else {
+				break;
+			}
+		}
+	}
+	if (icon_name[0] == 0)
+		return FALSE;
+
+	for (i = 0; i < min_apk_needed->num_icon; i++) {
+		if (strcmp(icon_name, min_apk_needed->reserved_icon_names[i]) ==
+		    0) {
 			WRITE_LOG(0, "TEST: %s is valid icon name\n",
 				  file_name);
 			result = TRUE;
