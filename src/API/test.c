@@ -167,7 +167,7 @@ int32_t main(void)
 
 	char *res26;
 	char buf[500] = {0};
-	char *icon_name[] = { "abc_ic_menu_paste_mtrl_am_alpha",
+	char *icon_name[] = { "icon",
 			      "abc_ic_menu_selectall_mtrl_alpha",
 			      "abc_btn_switch_to_on_mtrl_00001.9" };
 	strcpy(buf, icon_name[0]);

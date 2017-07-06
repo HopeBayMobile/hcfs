@@ -1026,7 +1026,7 @@ void HCFS_create_minimal_apk(char **json_res,
 	int32_t fd, ret_code, i;
 	uint32_t code, cmd_len, reply_len, now_pos = 0;
 	ssize_t str_len;
-	char buf[5000];
+	char buf[5000] = {0};
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
