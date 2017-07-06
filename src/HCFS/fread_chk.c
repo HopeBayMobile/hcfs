@@ -28,8 +28,11 @@
 
 #include <stdio.h>
 
+#include "macro.h"
+
 size_t __fread_chk(void * buf, size_t size, size_t count,
                               FILE * stream, size_t buf_size) {
+  UNUSED(buf_size);
 /*
   size_t total;
   if (__predict_false(__size_mul_overflow(size, count, &total))) {

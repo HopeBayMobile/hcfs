@@ -97,7 +97,7 @@ char* _rindex(const char *path, const char key)
 	int32_t count;
 
 	for (count = path_len; count >= 0; count--) {
-		ptr = &(path[count]);
+		ptr = (char *) &(path[count]);
 		if (((char) *ptr) == key)
 			return ptr;
 	}
