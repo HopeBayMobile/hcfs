@@ -40,7 +40,7 @@ int32_t list_volume(const char *fs_mgr_path,
 			     uint64_t *ret_num)
 {
 	DIR_ENTRY_PAGE tpage;
-	DIR_META_TYPE tmp_head;
+	DIR_META_TYPE *tmp_head;
 	int64_t num_walked;
 	int64_t next_node_pos;
 	int32_t count;
@@ -50,17 +50,29 @@ int32_t list_volume(const char *fs_mgr_path,
 	struct stat st;
 	off_t remain_size;
 	PORTABLE_DIR_ENTRY *ret_entry;
+	FS_MANAGER_HEADER_LAYOUT fs_mgr_header;
 
 	ret_val = 0;
 	meta_fd = open(fs_mgr_path, O_RDONLY);
 	if (meta_fd == -1)
 		return ERROR_SYSCALL;
 
+	ret_val =
+	    pread(meta_fd, &fs_mgr_header, sizeof(FS_MANAGER_HEADER_LAYOUT), 0);
+	if (ret_val == -1 || ret_val < sizeof(DIR_META_TYPE)) {
+		errno = (ret_val == -1)?errno:EINVAL;
+		goto errcode_handle;
+	}
+
+	tmp_head = &(fs_mgr_header.fs_dir_meta);
+	/* Note: old version of fs_mgr is not supported */
+	/*
 	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
 	if (ret_val == -1 || ret_val < sizeof(DIR_META_TYPE)) {
 		errno = (ret_val == -1)?errno:EINVAL;
 		goto errcode_handle;
 	}
+	*/
 
 	/* check remain size of fsmgr file is mutiple of
 	 *  sizeof(DIR_ENTRY_PAGE)
@@ -68,7 +80,7 @@ int32_t list_volume(const char *fs_mgr_path,
 	ret_val = fstat(meta_fd, &st);
 	if (ret_val == -1)
 		goto errcode_handle;
-	remain_size = st.st_size - sizeof(DIR_META_TYPE) - 16;
+	remain_size = st.st_size - sizeof(FS_MANAGER_HEADER_LAYOUT);
 	if (remain_size % sizeof(DIR_ENTRY_PAGE) != 0) {
 		errno = EINVAL;
 		goto errcode_handle;
@@ -77,7 +89,7 @@ int32_t list_volume(const char *fs_mgr_path,
 	/* Initialize B-tree walk by first loading the first node of the
 	 * tree walk.
 	 */
-	next_node_pos = tmp_head.tree_walk_list_head;
+	next_node_pos = tmp_head->tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
@@ -96,7 +108,7 @@ int32_t list_volume(const char *fs_mgr_path,
 	*entry_array_ptr = ret_entry;
 
 	/* load dir_entries */
-	next_node_pos = tmp_head.tree_walk_list_head;
+	next_node_pos = tmp_head->tree_walk_list_head;
 	num_walked = 0;
 	while (next_node_pos != 0) {
 		ret_val = pread(meta_fd, &tpage, sizeof(DIR_ENTRY_PAGE),
