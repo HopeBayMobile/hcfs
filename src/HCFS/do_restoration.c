@@ -826,44 +826,47 @@ int32_t _check_expand(ino_t thisinode, char *nowpath, int32_t depth)
 	*/
 	if (strncmp(nowpath, SMART_CACHE_ROOT_MP,
 				strlen(SMART_CACHE_ROOT_MP)) == 0)
-		return 1;
+		return NEED_FETCH;
+
+/* TODO: If apk unpin, should not pull everything in /data/app */
+/* TODO: Need to handle /data/app-lib and /data/dalvik-cache */
 
 	/* If in /data/app, need to pull down everything now */
 	/* App could be installed but not pinned by management app */
 	if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
-		return 5;
+		return IS_APP_BIN;
 
 	if (strcmp(nowpath, "/data/data") == 0)
-		return 1;
+		return NEED_FETCH;
 
 	/* Expand /storage/emulated/Android */
 	/* Expand /storage/emulated/<x>/Android, where x is a natural number */
 	if (strcmp(nowpath, "/storage/emulated") == 0)
-		return 2;
+		return EMULATED_ROOT;
 
 	/* If not high-priority pin, in /data/data only keep the lib symlinks */
 	if ((strncmp(nowpath, "/data/data", strlen("/data/data")) == 0) &&
 	    (depth == 1))
-		return 3;
+		return APP_DATA_FOLDER;
 
 	if ((strncmp(nowpath, "/storage/emulated/Android",
 		     strlen("/storage/emulated/Android")) == 0) &&
 	    ((depth == 1) || (depth == 2)))
-		return 1;
+		return NEED_FETCH;
 
 	/* If this is /storage/emulated/<x>/Android */
 	if ((strncmp(nowpath, "/storage/emulated",
 		     strlen("/storage/emulated")) == 0) &&
 	    ((depth == 2) || (depth == 3)))
-		return 1;
+		return NEED_FETCH;
 
 	/* If this is /storage/emulated/<x> */
 	if ((strncmp(nowpath, "/storage/emulated",
 		     strlen("/storage/emulated")) == 0) &&
 	    (depth == 1))
-		return 4;
+		return EMULATED_USER_ROOT;
 
-	return 0;
+	return NO_FETCH;
 }
 
 /*
@@ -1908,19 +1911,20 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	FSEEK(fptr, sizeof(HCFS_STAT), SEEK_SET);
 	FREAD(&dirmeta, sizeof(DIR_META_TYPE), 1, fptr);
 
-	/* Do not expand if not high priority pin and not needed */
-	expand_val = 1; /* The default */
+	/* Do not expand and fetch if not high priority pin and not needed */
+	expand_val = NEED_FETCH; /* The default */
 	if (!strncmp(nowpath, SMART_CACHE_ROOT_MP, strlen(SMART_CACHE_ROOT_MP)))
 			can_prune = TRUE;
 	if (dirmeta.local_pin != P_HIGH_PRI_PIN) {
 		expand_val = _check_expand(thisinode, nowpath, depth);
-		if (expand_val == 0) {
+		if (expand_val == NO_FETCH) {
 			fclose(fptr);
 			return 0;
 		}
-		if (expand_val == 5)
+		if (expand_val == IS_APP_BIN)
 			can_prune = TRUE;
 	} else {
+		/* Fetch content and expand deeper if high-priority pinned */
 		if (strncmp(nowpath, "/data/app", strlen("/data/app")) == 0)
 			can_prune = TRUE;
 	}
@@ -1953,18 +1957,18 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 
 			skip_this = FALSE;
 			switch (expand_val) {
-			case 2:
+			case EMULATED_ROOT:
 				if (strcmp(tmpptr->d_name, "Android") == 0)
 					break;
 				if (is_natural_number(tmpptr->d_name) == TRUE)
 					break;
 				skip_this = TRUE;
 				break;
-			case 4:
+			case EMULATED_USER_ROOT:
 				if (strcmp(tmpptr->d_name, "Android") != 0)
 					skip_this = TRUE;
 				break;
-			case 3:
+			case APP_DATA_FOLDER:
 				if (strcmp(tmpptr->d_name, "lib") != 0)
 					skip_this = TRUE;
 				else /* Remove lib if no entry */
@@ -2015,7 +2019,7 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				 */
 				if (((depth != 1) ||
 				    (strcmp("base.apk", tmpptr->d_name) != 0))
-				    || (expand_val == 3)) {
+				    || (expand_val == APP_DATA_FOLDER)) {
 					/* Just remove the element */
 					ret = _add_to_prunelist(&prune_list,
 						&prune_index, &max_prunes,
@@ -2038,7 +2042,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 			}
 			if (ret < 0) {
 				can_prune = FALSE;
-				if (((ret == -ENOENT) && (expand_val == 1)) &&
+				if (((ret == -ENOENT) &&
+				     (expand_val == NEED_FETCH)) &&
 				    (strncmp(nowpath, "/data/data",
 					     strlen("/data/data")) == 0)) {
 					/* If meta is missing, either create
@@ -2119,7 +2124,8 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 				}
 				can_prune = FALSE;
 				ret = _fetch_pinned(tmpino, is_smartcache);
-				if (((ret == -ENOENT) && (expand_val == 1)) &&
+				if (((ret == -ENOENT) &&
+				     (expand_val == NEED_FETCH)) &&
 				    ((tmpptr->d_type == D_ISREG) &&
 				     (strncmp(nowpath, "/data/data",
 					      strlen("/data/data")) == 0))) {
@@ -2740,6 +2746,7 @@ int32_t run_download_minimal(void)
 	sys_max_inode = 0;
 	for (count = 0; count < tmppage.num_entries; count++) {
 		tmpentry = &(tmppage.dir_entries[count]);
+/* TODO: Add app-lib / dalvik-cache, or do not depend on specific names */
 		if (!strcmp("hcfs_app", tmpentry->d_name) ||
 		    !strcmp("hcfs_data", tmpentry->d_name) ||
 		    !strcmp("hcfs_external", tmpentry->d_name) ||
@@ -2852,6 +2859,8 @@ int32_t run_download_minimal(void)
 		if (!strcmp(SMART_CACHE_VOL_NAME, tmpentry->d_name))
 			continue;
 
+/* TODO: Merge overlapping processes for different volumes. Also need to
+add app-lib and dalvik-cache */
 		write_log(4, "Processing minimal for %s\n", tmpentry->d_name);
 		if (!strcmp("hcfs_app", tmpentry->d_name)) {
 			rootino = tmpentry->d_ino;

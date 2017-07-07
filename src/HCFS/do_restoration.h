@@ -23,6 +23,13 @@
 #include "fuseop.h"
 #include "meta.h"
 
+#define NO_FETCH 0
+#define NEED_FETCH 1
+#define EMULATED_ROOT 2
+#define APP_DATA_FOLDER 3
+#define EMULATED_USER_ROOT 4
+#define IS_APP_BIN 5
+
 #define RESERVED_META_MARGIN 20971520 /* 20M */
 
 typedef struct {
