@@ -1019,12 +1019,14 @@ void HCFS_umount_smart_cache(char **json_res)
 
 void HCFS_create_minimal_apk(char **json_res,
 			     char *package_name,
-			     int32_t blocking)
+			     int32_t blocking,
+			     int num_icon,
+			     char *icon_name_list)
 {
-	int32_t fd, ret_code;
-	uint32_t code, cmd_len, reply_len;
+	int32_t fd, ret_code, i;
+	uint32_t code, cmd_len, reply_len, now_pos = 0;
 	ssize_t str_len;
-	char buf[1000];
+	char buf[5000] = {0};
 
 	fd = _api_socket_conn();
 	if (fd < 0) {
@@ -1038,6 +1040,17 @@ void HCFS_create_minimal_apk(char **json_res,
 	memcpy(buf, &blocking, sizeof(int32_t));
 	cmd_len += sizeof(int32_t);
 	CONCAT_ARGS(package_name);
+
+	/* Concat icon name array */
+	memcpy(buf + cmd_len, &num_icon, sizeof(int32_t));
+	cmd_len += sizeof(int32_t);
+	now_pos = 0;
+	for (i = 0; i < num_icon; i++) {
+		// icon_name_list is a icon name array that each element is
+		// separated by null character.
+		CONCAT_ARGS(icon_name_list + now_pos);
+		now_pos += (strlen(icon_name_list + now_pos) + 1);
+	}
 
 	send(fd, &code, sizeof(uint32_t), 0);
 	send(fd, &cmd_len, sizeof(uint32_t), 0);

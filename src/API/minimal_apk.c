@@ -205,7 +205,65 @@ char *_get_dir_name(const char *file_name)
 
 /* To add lib dirs to the archive of minimal apk.
  */
-int32_t add_lib_dirs(zip_t *base_apk, zip_t *mini_apk)
+BOOL _is_possible_icon_name_substr(const char *file_name,
+			    const MINI_APK_NEEDED *min_apk_needed)
+{
+	BOOL result = FALSE;
+	int i;
+
+	for (i = 0; i < min_apk_needed->num_icon; i++) {
+		if (strstr(file_name, min_apk_needed->reserved_icon_names[i])) {
+			WRITE_LOG(0, "TEST: %s is valid icon name\n",
+				  file_name);
+			result = TRUE;
+			break;
+		}
+	}
+	return result;
+}
+
+BOOL _is_possible_icon_name(const char *file_name,
+			    const MINI_APK_NEEDED *min_apk_needed)
+{
+	BOOL result = FALSE;
+	char icon_name[500] = {0};
+	int slash_idx = -1, dot_idx = -1, file_name_len = -1;
+	int i;
+
+	// E.g: fetch string "icon" from string "/xxx/yyy/icon.png"
+	for (i = strlen(file_name) - 1; i >= 0; i--) {
+		if (file_name[i] == '.' && dot_idx == -1)
+			dot_idx = i;
+		if (file_name[i] == '/' && slash_idx == -1)
+			slash_idx = i;
+		if (dot_idx > 0 && slash_idx > 0) {
+			if (dot_idx > slash_idx) {
+				file_name_len = dot_idx - slash_idx - 1;
+				memcpy(icon_name, file_name + slash_idx + 1,
+				       file_name_len);
+			} else {
+				break;
+			}
+		}
+	}
+	if (icon_name[0] == 0)
+		return FALSE;
+
+	for (i = 0; i < min_apk_needed->num_icon; i++) {
+		if (strcmp(icon_name, min_apk_needed->reserved_icon_names[i]) ==
+		    0) {
+			WRITE_LOG(0, "TEST: %s is valid icon name\n",
+				  file_name);
+			result = TRUE;
+			break;
+		}
+	}
+	return result;
+}
+
+int32_t add_lib_dirs_and_icon(zip_t *base_apk,
+			      zip_t *mini_apk,
+			      const MINI_APK_NEEDED *min_apk_needed)
 {
 	char *file_name;
 	char *dir_name;
@@ -228,27 +286,43 @@ int32_t add_lib_dirs(zip_t *base_apk, zip_t *mini_apk)
 		}
 
 		/* To find lib folders */
-		if (strncmp(file_name, "lib/", 4) != 0)
-			continue;
-
-		dir_name = _get_dir_name(file_name);
-		if (dir_name == NULL) {
-			WRITE_LOG(0, "Failed to allocate mem");
-			return -1;
-		}
-		ret_code = zip_dir_add(mini_apk, dir_name, 0);
-		if (ret_code < 0) {
-			zip_error = zip_get_error(mini_apk);
-			if (zip_error_code_zip(zip_error) != ZIP_ER_EXISTS) {
-				WRITE_LOG(0, "Failed to add lib dirs "
-					     "to mini apk. "
+		if (strncmp(file_name, "lib/", 4) == 0) {
+			dir_name = _get_dir_name(file_name);
+			if (dir_name == NULL) {
+				WRITE_LOG(0, "Failed to allocate mem");
+				return -1;
+			}
+			ret_code = zip_dir_add(mini_apk, dir_name, 0);
+			if (ret_code < 0) {
+				zip_error = zip_get_error(mini_apk);
+				if (zip_error_code_zip(zip_error) !=
+				    ZIP_ER_EXISTS) {
+					WRITE_LOG(0, "Failed to add lib dirs "
+						     "to mini apk. "
+						     "Error msg - %s",
+						  zip_strerror(mini_apk));
+					free(dir_name);
+					return -1;
+				}
+			}
+			free(dir_name);
+		} else if (_is_possible_icon_name(file_name, min_apk_needed)) {
+			zip_source_t *tmp_zs_t =
+			    zip_source_zip(mini_apk, base_apk, idx, 0, 0, 0);
+			if (!tmp_zs_t) {
+				WRITE_LOG(0, "Failed to get %s source. "
 					     "Error msg - %s",
-					  zip_strerror(mini_apk));
-				free(dir_name);
+					  file_name, zip_strerror(mini_apk));
+				return -1;
+			}
+			if (zip_add(mini_apk, file_name, tmp_zs_t) == -1) {
+				WRITE_LOG(0, "Failed to add %s to mini apk. "
+					     "Error msg - %s",
+					  file_name, zip_strerror(mini_apk));
+				zip_source_free(tmp_zs_t);
 				return -1;
 			}
 		}
-		free(dir_name);
 	}
 	return 0;
 }
@@ -301,7 +375,9 @@ int32_t add_apk_files(zip_t *base_apk, zip_t *mini_apk)
  *
  * @return Return 0 if successful. Otherwise, return -1.
  */
-int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
+int32_t create_zip_file(char *base_apk_path,
+			char *mini_apk_path,
+			const MINI_APK_NEEDED *min_apk_needed)
 {
 	int32_t ret_code;
 	int32_t zip_errcode = 0;
@@ -332,7 +408,8 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 		return -1;
 	}
 
-	ret_code = add_lib_dirs(base_apk_zip, mini_apk_zip);
+	ret_code =
+	    add_lib_dirs_and_icon(base_apk_zip, mini_apk_zip, min_apk_needed);
 	if (ret_code < 0) {
 		WRITE_LOG(0, "Failed to add lib dirs to minimal apk.");
 		zip_close(mini_apk_zip);
@@ -340,7 +417,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
 		return -1;
 	}
 
-	add_apk_files(base_apk_zip, mini_apk_zip);
+	ret_code = add_apk_files(base_apk_zip, mini_apk_zip);
 	if (ret_code < 0) {
 		WRITE_LOG(0, "Failed to add apk files to minimal apk.");
 		zip_close(mini_apk_zip);
@@ -359,7 +436,7 @@ int32_t create_zip_file(char *base_apk_path, char *mini_apk_path)
  *
  * @return Return 0 if successful. Otherwise, return -1.
  */
-int32_t create_minimal_apk(char *pkg_name)
+int32_t create_minimal_apk(MINI_APK_NEEDED *min_apk_needed)
 {
 	char *base_apk_path, *mini_apk_path, *app_dir_path;
 	int32_t ret_code;
@@ -367,6 +444,7 @@ int32_t create_minimal_apk(char *pkg_name)
 	struct utimbuf base_apk_timbuf, app_dir_timbuf;
 	struct group *grp_t;
 	struct passwd *passwd_t;
+	char *pkg_name = min_apk_needed->pkg_name;
 
 	ret_code = 0;
 	base_apk_path = mini_apk_path = app_dir_path = NULL;
@@ -448,7 +526,8 @@ int32_t create_minimal_apk(char *pkg_name)
 	}
 
 	/* create minimal apk file */
-	ret_code = create_zip_file(base_apk_path, mini_apk_path);
+	ret_code =
+	    create_zip_file(base_apk_path, mini_apk_path, min_apk_needed);
 	if (ret_code < 0) {
 		WRITE_LOG(0, "Failed to create minimal apk file of %s (%s).",
 			  pkg_name, mini_apk_path);
@@ -485,11 +564,10 @@ end:
  */
 void *create_minimal_apk_async(void *ptr)
 {
-	char *package_name;
+	MINI_APK_NEEDED *min_apk_needed = (MINI_APK_NEEDED *)ptr;
 
-	package_name = (char *)ptr;
-	create_minimal_apk(package_name);
-	free(package_name);
+	create_minimal_apk(min_apk_needed);
+	destroy_minimal_apk_list(min_apk_needed);
 
 	pthread_exit(&(int){ 0 });
 }
@@ -556,4 +634,72 @@ int32_t check_minimal_apk(char *pkg_name)
 	free(mini_apk_path);
 	free(app_dir_path);
 	return apk_status;
+}
+
+MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
+{
+	ssize_t str_len;
+	char *package_name;
+	MINI_APK_NEEDED *min_apk_needed = NULL;
+	char **icon_name_list;
+	int32_t idx, now_pos, num_icon;
+
+	memcpy(&str_len, buf, sizeof(ssize_t));
+
+	package_name = (char *)calloc(1, str_len + 10);
+	if (package_name == NULL) {
+		write_log(0, "Failed to alloc memory for package name.");
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	strncpy(package_name, buf + sizeof(ssize_t), str_len);
+	write_log(0, "test create min: %s", package_name);
+
+	/* Copy icon names */
+	now_pos = sizeof(ssize_t) + str_len;
+	memcpy(&num_icon, buf + now_pos, sizeof(int32_t));
+	if (num_icon < 0) {
+		write_log(0, "Error on invalid icon number %d\n", num_icon);
+		free(package_name);
+		errno = EINVAL;
+		return NULL;
+	}
+	write_log(0, "num of icon name %d", num_icon);
+	now_pos += sizeof(int32_t);
+	icon_name_list = (char **)calloc(sizeof(char *) * num_icon, 1);
+	for (idx = 0; idx < num_icon; idx++) {
+		ssize_t icon_name_len;
+
+		/* [ssize_t] [icon name 1] [ssize_t] [icon_name 2] .... */
+		memcpy(&icon_name_len, buf + now_pos, sizeof(ssize_t));
+		now_pos += sizeof(ssize_t);
+		if (*(buf + now_pos + icon_name_len - 1) != '\0') {
+			write_log(0, "Error: Invalid length of icon name %s",
+				  buf + now_pos);
+			errno = EINVAL;
+			return NULL;
+		}
+		icon_name_list[idx] = (char *)calloc(icon_name_len + 10, 1);
+		strncpy(icon_name_list[idx], buf + now_pos, icon_name_len);
+		now_pos += icon_name_len;
+		write_log(0, "DEBUG: parse icon name %s", icon_name_list[idx]);
+	}
+
+	min_apk_needed = (MINI_APK_NEEDED *)calloc(sizeof(MINI_APK_NEEDED), 1);
+	min_apk_needed->pkg_name = package_name;
+	min_apk_needed->reserved_icon_names = icon_name_list;
+	min_apk_needed->num_icon = num_icon;
+	return min_apk_needed;
+}
+
+void destroy_min_apk_needed_data(MINI_APK_NEEDED *min_apk_needed)
+{
+	int32_t i;
+
+	free(min_apk_needed->pkg_name);
+	for (i = 0; i < min_apk_needed->num_icon; i++)
+		free(min_apk_needed->reserved_icon_names[i]);
+	free(min_apk_needed->reserved_icon_names);
+	free(min_apk_needed);
 }
