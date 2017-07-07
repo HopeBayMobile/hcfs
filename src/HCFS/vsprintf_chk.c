@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+#include "macro.h"
+
 /*
  * Runtime implementation of __builtin____vsprintf_chk.
  *
@@ -48,6 +50,7 @@ int __vsprintf_chk(
         const char *format,
         va_list va)
 {
+    UNUSED(flags);
     int ret = vsnprintf(dest, dest_len_from_compiler, format, va);
 
     return ret;

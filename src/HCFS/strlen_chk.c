@@ -29,6 +29,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "macro.h"
+
 /*
  * Runtime implementation of __strlen_chk.
  *
@@ -53,6 +55,7 @@
  * or anytime strlen reads beyond an object boundary.
  */
 size_t __strlen_chk(const char *s, size_t s_len) {
+    UNUSED(s_len);
     size_t ret = strlen(s);
 
     return ret;
