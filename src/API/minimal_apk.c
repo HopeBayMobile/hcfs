@@ -213,7 +213,7 @@ BOOL _is_possible_icon_name_substr(const char *file_name,
 
 	for (i = 0; i < min_apk_needed->num_icon; i++) {
 		if (strstr(file_name, min_apk_needed->reserved_icon_names[i])) {
-			WRITE_LOG(0, "TEST: %s is valid icon name\n",
+			WRITE_LOG(8, "Debug: %s is valid icon name\n",
 				  file_name);
 			result = TRUE;
 			break;
@@ -252,7 +252,7 @@ BOOL _is_possible_icon_name(const char *file_name,
 	for (i = 0; i < min_apk_needed->num_icon; i++) {
 		if (strcmp(icon_name, min_apk_needed->reserved_icon_names[i]) ==
 		    0) {
-			WRITE_LOG(0, "TEST: %s is valid icon name\n",
+			WRITE_LOG(8, "Debug: %s is valid icon name\n",
 				  file_name);
 			result = TRUE;
 			break;
@@ -683,7 +683,7 @@ MINI_APK_NEEDED *create_min_apk_needed_data(char *buf)
 		icon_name_list[idx] = (char *)calloc(icon_name_len + 10, 1);
 		strncpy(icon_name_list[idx], buf + now_pos, icon_name_len);
 		now_pos += icon_name_len;
-		write_log(0, "DEBUG: parse icon name %s", icon_name_list[idx]);
+		write_log(8, "Debug: parse icon name %s", icon_name_list[idx]);
 	}
 
 	min_apk_needed = (MINI_APK_NEEDED *)calloc(sizeof(MINI_APK_NEEDED), 1);
