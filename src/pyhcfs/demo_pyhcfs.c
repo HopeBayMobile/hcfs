@@ -24,9 +24,9 @@
 #include <sys/types.h>
 #include <time.h>
 
-#define TEST_FILE(file) "test_data/v1/android/" #file
+#define TEST_FILE(file) "test_data/v2/android/" #file
 
-#define test_target "test_data/v1/android"
+#define test_target "test_data/v2/android"
 void test_list_file_blocks()
 {
 	int32_t ret_val = 0;

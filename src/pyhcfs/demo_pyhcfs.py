@@ -15,7 +15,7 @@ def demo(cmd):
     print("\n" + prefix + cmd + "\n")
     exec('print(textwrap.indent(pp.pformat('+cmd+'), prefix))')
 
-test_target='test_data/v1/android'
+test_target='test_data/v2/android'
 
 demo_title("list_volume")
 demo('list_volume(b"'+test_target+'/fsmgr")')
