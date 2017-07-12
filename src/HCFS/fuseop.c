@@ -803,7 +803,7 @@ errcode_handle:
 }
 #endif /* _ANDROID_ENV_ */
 
-static int notify_avail_space(long avail_space)
+int notify_avail_space(long avail_space)
 {
 	static int fd = -1;
 
@@ -822,7 +822,7 @@ static int notify_avail_space(long avail_space)
 	return 0;
 }
 
-static int test_and_notify_no_space(int error)
+int test_and_notify_no_space(int error)
 {
 	if (error != ENOSPC)
 		return 0;
@@ -5368,6 +5368,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	int64_t old_metasize_blk, new_metasize_blk, delta_meta_size_blk;
 	int64_t now_seq;
 	int64_t max_pinned_size;
+	long avail_space, avail_space1, avail_space2;
 
 	write_log(10, "Debug write: size %zu, offset %lld\n", size, offset);
 
@@ -5645,9 +5646,13 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 	sem_post(&(fh_ptr->block_sem));
 
-	notify_avail_space(max_pinned_size -
-			   hcfs_system->systemdata.pinned_size -
-			   WRITEBACK_CACHE_RESERVE_SPACE);
+	avail_space1 = max_pinned_size - hcfs_system->systemdata.pinned_size;
+	avail_space2 =
+	    hcfs_system->systemdata.system_quota -
+	    hcfs_system->systemdata.system_size;
+	avail_space = avail_space1 < avail_space2 ? avail_space1 : avail_space2;
+	notify_avail_space(avail_space - WRITEBACK_CACHE_RESERVE_SPACE);
+
 	fuse_reply_write(req, total_bytes_written);
 	return;
 errcode_handle:

@@ -188,4 +188,7 @@ bool mgmt_app_is_created;
 #define FUSE_HCFS_AVAIL_SPACE_NOTIFY	_IOW(0xff, 0x01, long)
 #define WRITEBACK_CACHE_RESERVE_SPACE (1 * 1024 * 1024)
 
+int notify_avail_space(long avail_space);
+int test_and_notify_no_space(int error);
+
 #endif  /* GW20_HCFS_FUSEOP_H_ */
