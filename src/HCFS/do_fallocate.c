@@ -38,8 +38,9 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 	FILE_META_TYPE tempfilemeta;
 	int32_t ret;
 	int64_t sizediff, pin_sizediff;
-	int64_t max_pinned_size;
+	int64_t max_pinned_size = 0;
 	MOUNT_T *tmpptr;
+	long avail_space, avail_space1 = __LONG_MAX__, avail_space2;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -74,6 +75,7 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 		if (hcfs_system->systemdata.system_size + sizediff >
 				hcfs_system->systemdata.system_quota) {
 			sem_post(&(hcfs_system->access_sem));
+			notify_avail_space(0);
 			return -ENOSPC;
 		}
 		/* If this is a pinned file and we want to extend the file,
@@ -91,6 +93,7 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 			if ((hcfs_system->systemdata.pinned_size + pin_sizediff)
 					> max_pinned_size) {
 				sem_post(&(hcfs_system->access_sem));
+				notify_avail_space(0);
 				return -ENOSPC;
 			}
 			hcfs_system->systemdata.pinned_size += pin_sizediff;
@@ -110,6 +113,15 @@ static int32_t do_fallocate_extend(ino_t this_inode,
 	filestat->size = offset;
 	filestat->blocks = (filestat->size + 511) / 512;
 	filestat->mtime = time(NULL);
+
+	if (max_pinned_size)
+		avail_space1 =
+		    max_pinned_size - hcfs_system->systemdata.pinned_size;
+	avail_space2 =
+	    hcfs_system->systemdata.system_quota -
+	    hcfs_system->systemdata.system_size;
+	avail_space = avail_space1 < avail_space2 ? avail_space1 : avail_space2;
+	notify_avail_space(avail_space - WRITEBACK_CACHE_RESERVE_SPACE);
 
 	return 0;
 }
