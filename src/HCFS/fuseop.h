@@ -132,7 +132,6 @@ typedef struct {
 	sem_t sync_control_sem;
 	sem_t pin_wait_sem;
 	sem_t dsync_wait_sem;
-	sem_t deletion_sem;
 
 	/* Semaphore for controlling cache management */
 	sem_t something_to_replace;
