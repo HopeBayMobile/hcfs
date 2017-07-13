@@ -6722,8 +6722,6 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	org_ino = org_real_ino(req, ino);
 	thisinode = real_ino(req, ino);
 
-	sem_wait(&(hcfs_system->deletion_sem));
-
 #ifdef _ANDROID_ENV_
 	if (IS_ALIAS_INODE(org_ino)) {
 		delete_in_alias_group(org_ino);
@@ -6737,14 +6735,12 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 
 	if (current_val < 0) {
 		write_log(0, "Error in lookup count decreasing\n");
-		sem_post(&(hcfs_system->deletion_sem));
 		fuse_reply_none(req);
 		return;
 	}
 
 	if (current_val > 0) {
 		write_log(10, "Debug forget: lookup count greater than zero\n");
-		sem_post(&(hcfs_system->deletion_sem));
 		fuse_reply_none(req);
 		return;
 	}
@@ -6756,7 +6752,6 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		actual_delete_inode(thisinode, d_type, tmpptr->f_ino, tmpptr);
 	}
 
-	sem_post(&(hcfs_system->deletion_sem));
 	fuse_reply_none(req);
 }
 
