@@ -113,6 +113,12 @@ int32_t init_hcfs_system_data(int8_t restoring_status)
 	sem_init(&(hcfs_system->dsync_wait_sem), 1, 0);
 	sem_init(&(hcfs_system->sync_control_sem), 1, 0);
 	sem_init(&(hcfs_system->pin_wait_sem), 1, 0);
+
+	pthread_mutex_init(&(hcfs_system->immediate_sync_meta_mutex), NULL);
+	pthread_cond_init(&(hcfs_system->immediate_sync_meta_cond), NULL);
+	memset(&(hcfs_system->last_umount_time), 0,
+	       sizeof(hcfs_system->last_umount_time));
+
 	hcfs_system->system_going_down = FALSE;
 	hcfs_system->backend_is_online = FALSE;
 	hcfs_system->writing_sys_data = FALSE;
@@ -196,11 +202,15 @@ errcode_handle:
 	return errcode;
 }
 
-void *_write_sys(__attribute__((unused)) void *fakeptr)
+void *_write_sys(__attribute__((unused)) void *ptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
 	PTHREAD_REUSE_T *this_thread;
+	struct timeval now;
+	struct timespec sleep;
+
+	last_forget_time = *(struct timeval *)ptr;
 
 	this_thread =
 		(PTHREAD_REUSE_T *) pthread_getspecific(PTHREAD_status_key);
@@ -208,7 +218,18 @@ void *_write_sys(__attribute__((unused)) void *fakeptr)
 	this_thread->cancelable = 1;
 	if (this_thread->terminating == TRUE)
 		pthread_exit(0);
-	sleep(WRITE_SYS_INTERVAL);
+
+	gettimeofday(&now, NULL);
+	sleep.tv_sec = now.tv_sec + WRITE_SYS_INTERVAL;
+	sleep.tv_nsec = now.tv_usec * 1000L;
+	pthread_mutex_lock(&(hcfs_system->immediate_sync_meta_mutex));
+	if (timercmp(&last_forget_time, &hcfs_system->last_umount_time, >=)) {
+		pthread_cond_timedwait(&(hcfs_system->immediate_sync_meta_cond),
+				       &(hcfs_system->
+					 immediate_sync_meta_mutex), &sleep);
+	}
+	pthread_mutex_unlock(&(hcfs_system->immediate_sync_meta_mutex));
+
 	this_thread->cancelable = 0;
 	sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
@@ -247,7 +268,7 @@ int32_t sync_hcfs_system_data(char need_lock)
 		if (hcfs_system->writing_sys_data == FALSE) {
 			hcfs_system->writing_sys_data = TRUE;
 			PTHREAD_REUSE_run(&(write_sys_thread),
-			                  &_write_sys, NULL);
+			                  &_write_sys, &last_forget_time);
 		}
 	}
 	return 0;
