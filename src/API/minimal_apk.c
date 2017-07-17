@@ -266,7 +266,6 @@ int32_t add_lib_dirs_and_icon(zip_t *base_apk,
 			      const MINI_APK_NEEDED *min_apk_needed)
 {
 	char *file_name;
-	char *dir_name;
 	int32_t ret_code, num_entries, idx;
 	zip_error_t *zip_error;
 
@@ -287,25 +286,50 @@ int32_t add_lib_dirs_and_icon(zip_t *base_apk,
 
 		/* To find lib folders */
 		if (strncmp(file_name, "lib/", 4) == 0) {
-			dir_name = _get_dir_name(file_name);
-			if (dir_name == NULL) {
-				WRITE_LOG(0, "Failed to allocate mem");
-				return -1;
-			}
-			ret_code = zip_dir_add(mini_apk, dir_name, 0);
-			if (ret_code < 0) {
-				zip_error = zip_get_error(mini_apk);
-				if (zip_error_code_zip(zip_error) !=
-				    ZIP_ER_EXISTS) {
-					WRITE_LOG(0, "Failed to add lib dirs "
-						     "to mini apk. "
+			/* Add directory */
+			if (file_name[strlen(file_name) - 1] == '/') {
+				char dir_name[500] = {0};
+
+				strncpy(dir_name, file_name,
+				       strlen(file_name) - 1);
+				ret_code = zip_dir_add(mini_apk, dir_name, 0);
+				if (ret_code < 0) {
+					zip_error = zip_get_error(mini_apk);
+					if (zip_error_code_zip(zip_error) !=
+					    ZIP_ER_EXISTS) {
+						WRITE_LOG(
+						    0, "Failed to add lib dirs "
+						       "to mini apk. "
+						       "Error msg - %s",
+						    zip_strerror(mini_apk));
+						return -1;
+					}
+				}
+
+			/* Add empty file */
+			} else {
+				char buf[10] = {0};
+				zip_source_t *tmp_zs_t =
+				    zip_source_buffer(mini_apk, buf, 0, 0);
+				if (!tmp_zs_t) {
+					WRITE_LOG(0, "Failed to get %s source. "
 						     "Error msg - %s",
+						  file_name,
 						  zip_strerror(mini_apk));
-					free(dir_name);
+					return -1;
+				}
+
+				if (zip_add(mini_apk, file_name, tmp_zs_t) ==
+				    -1) {
+					WRITE_LOG(
+					    0, "Failed to add %s to mini apk. "
+					       "Error msg - %s",
+					    file_name, zip_strerror(mini_apk));
+					zip_source_free(tmp_zs_t);
 					return -1;
 				}
 			}
-			free(dir_name);
+
 		} else if (_is_possible_icon_name(file_name, min_apk_needed)) {
 			zip_source_t *tmp_zs_t =
 			    zip_source_zip(mini_apk, base_apk, idx, 0, 0, 0);
