@@ -161,6 +161,8 @@
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
 	changes */
 
+__thread struct timeval last_forget_time;
+
 BOOL _check_capability(pid_t thispid, int32_t cap_to_check);
 static int32_t symlink_internal(fuse_req_t req, const char *link,
 	fuse_ino_t parent, const char *name, struct fuse_entry_param *tmp_param);
@@ -6722,6 +6724,8 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	org_ino = org_real_ino(req, ino);
 	thisinode = real_ino(req, ino);
 
+	gettimeofday(&last_forget_time, NULL);
+
 #ifdef _ANDROID_ENV_
 	if (IS_ALIAS_INODE(org_ino)) {
 		delete_in_alias_group(org_ino);
@@ -6750,6 +6754,14 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		delete_in_alias_group(thisinode);
 #endif
 		actual_delete_inode(thisinode, d_type, tmpptr->f_ino, tmpptr);
+	}
+
+	// umount
+	if (ino == 1) {
+		hcfs_system->last_umount_time = last_forget_time;
+		pthread_mutex_lock(&(hcfs_system->immediate_sync_meta_mutex));
+		pthread_cond_broadcast(&(hcfs_system->immediate_sync_meta_cond));
+		pthread_mutex_unlock(&(hcfs_system->immediate_sync_meta_mutex));
 	}
 
 	fuse_reply_none(req);

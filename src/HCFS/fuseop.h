@@ -136,6 +136,10 @@ typedef struct {
 	/* Semaphore for controlling cache management */
 	sem_t something_to_replace;
 
+	pthread_mutex_t immediate_sync_meta_mutex;
+	pthread_cond_t immediate_sync_meta_cond;
+	struct timeval last_umount_time;
+
 	/* system state controllers */
 	bool system_going_down;
 	bool backend_is_online;
@@ -190,5 +194,7 @@ bool mgmt_app_is_created;
 
 int notify_avail_space(long avail_space);
 int test_and_notify_no_space(int error);
+
+extern __thread struct timeval last_forget_time;
 
 #endif  /* GW20_HCFS_FUSEOP_H_ */
