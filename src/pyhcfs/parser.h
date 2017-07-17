@@ -11,6 +11,7 @@
 #define ERROR_SYSCALL       -1
 #define ERROR_UNSUPPORT_VER -2
 
+#define list_file_blocks_v1 list_file_blocks
 
 typedef struct {
 	char is_walk_end;

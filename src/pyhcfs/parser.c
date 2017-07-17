@@ -50,17 +50,13 @@ int32_t list_volume(const char *fs_mgr_path,
 	struct stat st;
 	off_t remain_size;
 	PORTABLE_DIR_ENTRY *ret_entry;
+	FS_MANAGER_HEADER_LAYOUT fs_mgr_header;
+	ssize_t header_size;
 
 	ret_val = 0;
 	meta_fd = open(fs_mgr_path, O_RDONLY);
 	if (meta_fd == -1)
 		return ERROR_SYSCALL;
-
-	ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
-	if (ret_val == -1 || ret_val < sizeof(DIR_META_TYPE)) {
-		errno = (ret_val == -1)?errno:EINVAL;
-		goto errcode_handle;
-	}
 
 	/* check remain size of fsmgr file is mutiple of
 	 *  sizeof(DIR_ENTRY_PAGE)
@@ -68,9 +64,30 @@ int32_t list_volume(const char *fs_mgr_path,
 	ret_val = fstat(meta_fd, &st);
 	if (ret_val == -1)
 		goto errcode_handle;
-	remain_size = st.st_size - sizeof(DIR_META_TYPE) - 16;
-	if (remain_size % sizeof(DIR_ENTRY_PAGE) != 0) {
+
+	/* Check version and read header */
+	remain_size = st.st_size % sizeof(DIR_ENTRY_PAGE);
+	switch (remain_size) {
+	case 16 + sizeof(DIR_META_TYPE):
+		// v1, old version without google drive ID in data structure
+		header_size = sizeof(DIR_META_TYPE);
+		ret_val = pread(meta_fd, &tmp_head, sizeof(DIR_META_TYPE), 16);
+		break;
+	case sizeof(FS_MANAGER_HEADER_LAYOUT):
+		// v2, new version
+		header_size = sizeof(FS_MANAGER_HEADER_LAYOUT);
+		ret_val = pread(meta_fd, &fs_mgr_header,
+				sizeof(FS_MANAGER_HEADER_LAYOUT), 0);
+		memcpy(&tmp_head, &(fs_mgr_header.fs_dir_meta),
+		       sizeof(DIR_META_TYPE));
+		break;
+	default:
 		errno = EINVAL;
+		goto errcode_handle;
+	}
+
+	if (ret_val == -1 || ret_val < header_size) {
+		errno = (ret_val == -1)?errno:EINVAL;
 		goto errcode_handle;
 	}
 
@@ -488,7 +505,7 @@ int32_t get_vol_usage(const char *meta_path, int64_t *vol_usage)
                 errno = EINVAL;
                 goto errcode_handle;
 	}
-	
+
         if (ret_ssize < 0) {
                 ret_val = ERROR_SYSCALL;
                 goto errcode_handle;
@@ -584,7 +601,7 @@ int32_t list_file_blocks_v1(const char *meta_path,
 	/* loop over all meta blocks */
 	current_page = -1;
 	ret_idx = 0;
-	
+
 	total_blocks = BLOCKS_OF_SIZE(meta_stat.size, MAX_BLOCK_SIZE);
 
 	for (count = 0; count < total_blocks; count++) {
