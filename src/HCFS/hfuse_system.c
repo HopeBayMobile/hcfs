@@ -202,7 +202,7 @@ errcode_handle:
 	return errcode;
 }
 
-void *_write_sys(__attribute__((unused)) void *ptr)
+void *_write_sys(void *ptr)
 {
 	int32_t ret, errcode;
 	size_t ret_size;
