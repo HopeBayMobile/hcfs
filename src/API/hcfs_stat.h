@@ -28,6 +28,8 @@ typedef struct {
 	int64_t xfer_down;
 	int32_t cloud_stat;
 	int32_t data_transfer;
+	int64_t max_meta_size;
+	int64_t meta_used_size;
 } HCFS_STAT_TYPE;
 
 int32_t get_hcfs_stat(HCFS_STAT_TYPE *hcfs_stats);

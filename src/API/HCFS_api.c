@@ -248,6 +248,10 @@ void HCFS_stat(char **json_res)
 				 json_integer(hcfs_stats.cloud_stat));
 		JSON_OBJ_SET_NEW(data, "data_transfer",
 				 json_integer(hcfs_stats.data_transfer));
+		JSON_OBJ_SET_NEW(data, "max_meta_size",
+				 json_integer(hcfs_stats.max_meta_size));
+		JSON_OBJ_SET_NEW(data, "meta_used_size",
+				 json_integer(hcfs_stats.meta_used_size));
 
 		_json_response(json_res, TRUE, 0, data);
 	}
