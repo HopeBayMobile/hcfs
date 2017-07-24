@@ -221,7 +221,7 @@ void reset_queue_and_stat()
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.dirty_cache_size = 0;
 	hcfs_system->systemdata.unpin_dirty_data_size = 0;
-	sync_hcfs_system_data(FALSE);
+	sync_hcfs_system_data(TRUE);
 	sem_post(&(hcfs_system->access_sem));
 
 	return;

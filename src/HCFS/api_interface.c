@@ -1337,7 +1337,9 @@ void api_module(void *index1)
 			/* Moving system_going_down flag earlier */
 			hcfs_system->system_going_down = TRUE;
 			unmount_all();
+			sem_wait(&(hcfs_system->access_sem));
 			sync_hcfs_system_data(TRUE);
+			sem_post(&(hcfs_system->access_sem));
 			/* Wake up potential sleeping threads */
 			sem_post(&(hcfs_system->sync_wait_sem));
 			sem_post(&(hcfs_system->sync_control_sem));

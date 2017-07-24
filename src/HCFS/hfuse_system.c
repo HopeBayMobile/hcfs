@@ -259,11 +259,9 @@ int32_t sync_hcfs_system_data(char need_lock)
 	size_t ret_size;
 
 	if (need_lock == TRUE) {
-		sem_wait(&(hcfs_system->access_sem));
 		FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
 		FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
 		       hcfs_system->system_val_fptr);
-		sem_post(&(hcfs_system->access_sem));
 	} else {
 		if (hcfs_system->writing_sys_data == FALSE) {
 			hcfs_system->writing_sys_data = TRUE;
@@ -796,7 +794,9 @@ int32_t main(int32_t argc, char **argv)
 	wait_sb_recovery_terminate();
 
 	PTHREAD_REUSE_terminate(&(write_sys_thread));
+	sem_wait(&(hcfs_system->access_sem));
 	sync_hcfs_system_data(TRUE);
+	sem_post(&(hcfs_system->access_sem));
 	super_block_destroy();
 	destroy_dirstat_lookup();
 	destroy_pathlookup();
