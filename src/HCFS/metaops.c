@@ -1457,6 +1457,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	int64_t metasize = 0, metasize_blk = 0, dirty_delta, unpin_dirty_delta;
 	int64_t truncate_size = 0;
 	BOOL meta_on_cloud;
+	int64_t i;
+	int64_t total_to_delete = 0;
+	char (*to_delete)[400] = NULL;
 
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
@@ -1615,6 +1618,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		total_blocks =
 		    BLOCKS_OF_SIZE(this_inode_stat.size, MAX_BLOCK_SIZE);
 
+		total_to_delete = 0;
+		to_delete = malloc(total_blocks * sizeof(thisblockpath));
+
 		current_page = -1;
 		for (count = 0; count < total_blocks; count++) {
 			e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -1655,7 +1661,8 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			if (access(thisblockpath, F_OK) == 0) {
 				cache_block_size =
 						check_file_size(thisblockpath);
-				UNLINK(thisblockpath);
+				//UNLINK(thisblockpath);
+				strcpy(to_delete[total_to_delete++], thisblockpath);
 				if ((block_status == ST_LDISK) ||
 				    (block_status == ST_LtoC))
 					dirty_delta = -cache_block_size;
@@ -1671,19 +1678,6 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				    dirty_delta, unpin_dirty_delta, FALSE);
 			}
 		}
-		sem_wait(&(hcfs_system->access_sem));
-		if (P_IS_PIN(file_meta.local_pin)) {
-			hcfs_system->systemdata.pinned_size -=
-					round_size(this_inode_stat.size);
-			if (hcfs_system->systemdata.pinned_size < 0)
-				hcfs_system->systemdata.pinned_size = 0;
-		}
-
-		hcfs_system->systemdata.system_size -= this_inode_stat.size;
-		if (hcfs_system->systemdata.system_size < 0)
-			hcfs_system->systemdata.system_size = 0;
-		sync_hcfs_system_data(TRUE);
-		sem_post(&(hcfs_system->access_sem));
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 
@@ -1693,6 +1687,11 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		 */
 		ret = check_meta_on_cloud(this_inode, d_type,
 				&meta_on_cloud, &metasize, &metasize_blk);
+		if (ret < 0 || meta_on_cloud) {
+			for (i = 0 ; i < total_to_delete ; i++)
+				UNLINK(to_delete[i]);
+			free(to_delete);
+		}
 		if (ret < 0) {
 			if (ret == -ENOENT) {
 				write_log(0, "Inode %"PRIu64"%s. %s",
@@ -1711,6 +1710,9 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 						PRIu64". Code %d\n",
 						(uint64_t)this_inode, errcode);
 			}
+			for (i = 0 ; i < total_to_delete ; i++)
+				UNLINK(to_delete[i]);
+			free(to_delete);
 			super_block_delete(this_inode);
 			super_block_reclaim();
 		} else {
@@ -1760,6 +1762,20 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FWRITE(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 		fclose(fptr);
 	}
+
+	sem_wait(&(hcfs_system->access_sem));
+	if (P_IS_PIN(file_meta.local_pin)) {
+		hcfs_system->systemdata.pinned_size -=
+				round_size(this_inode_stat.size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+	}
+
+	hcfs_system->systemdata.system_size -= this_inode_stat.size;
+	if (hcfs_system->systemdata.system_size < 0)
+		hcfs_system->systemdata.system_size = 0;
+	sync_hcfs_system_data(TRUE);
+	sem_post(&(hcfs_system->access_sem));
 
 	/* unlink markdelete tag because it has been deleted */
 	ret = disk_cleardelete(this_inode, root_inode);
