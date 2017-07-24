@@ -1378,6 +1378,9 @@ void api_module(void *index1)
 			llretval = hcfs_system->systemdata.system_meta_size;
 			sem_post(&(hcfs_system->access_sem));
 			goto return_llretval;
+		case GETMAXMETASIZE:
+			llretval = META_SPACE_LIMIT;
+			goto return_llretval;
 		case GETDIRTYCACHESIZE:
 			sem_wait(&(hcfs_system->access_sem));
 			llretval = hcfs_system->systemdata.dirty_cache_size;

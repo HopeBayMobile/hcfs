@@ -168,6 +168,42 @@ int32_t get_cloud_usage(int64_t *cloud_usage)
 	return 0;
 }
 
+int32_t get_max_meta_size(int64_t *max_meta)
+{
+	int32_t fd, ret_code;
+	uint32_t code, cmd_len, reply_len;
+	int64_t ll_ret_code;
+	char buf[1];
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = GETMAXMETASIZE;
+	cmd_len = 1;
+	buf[0] = 0;
+
+	send(fd, &code, sizeof(uint32_t), 0);
+	send(fd, &cmd_len, sizeof(uint32_t), 0);
+	send(fd, buf, cmd_len, 0);
+
+	recv(fd, &reply_len, sizeof(uint32_t), 0);
+	recv(fd, &ll_ret_code, sizeof(int64_t), 0);
+
+	if (ll_ret_code < 0) {
+		*max_meta = 0;
+		ret_code = (int32_t)ll_ret_code;
+		close(fd);
+		return ret_code;
+	}
+
+	*max_meta = ll_ret_code;
+	close(fd);
+	return 0;
+}
+
+
+
 /************************************************************************
  * *
  * * Function name: get_cache_usage
@@ -179,7 +215,7 @@ int32_t get_cloud_usage(int64_t *cloud_usage)
  * *
  * *************************************************************************/
 int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
-		        int64_t *cache_dirty)
+		        int64_t *cache_dirty, int64_t *meta_used)
 {
 	int32_t ret_code;
 
@@ -192,6 +228,10 @@ int32_t get_cache_usage(int64_t *cache_total, int64_t *cache_used,
 		return ret_code;
 
 	ret_code = _get_usage_val(GETDIRTYCACHESIZE, cache_dirty);
+	if (ret_code < 0)
+		return ret_code;
+
+	ret_code = _get_usage_val(GETMETASIZE, meta_used);
 	if (ret_code < 0)
 		return ret_code;
 
@@ -352,7 +392,8 @@ int32_t get_hcfs_stat(HCFS_STAT_TYPE *hcfs_stats)
 
 	ret_code = get_cache_usage(&(hcfs_stats->cache_total),
 				   &(hcfs_stats->cache_used),
-				   &(hcfs_stats->cache_dirty));
+				   &(hcfs_stats->cache_dirty),
+				   &(hcfs_stats->meta_used_size));
 	if (ret_code < 0)
 		return ret_code;
 
@@ -367,6 +408,10 @@ int32_t get_hcfs_stat(HCFS_STAT_TYPE *hcfs_stats)
 		return ret_code;
 
 	ret_code = get_cloud_stat(&(hcfs_stats->cloud_stat));
+	if (ret_code < 0)
+		return ret_code;
+
+	ret_code = get_max_meta_size(&(hcfs_stats->max_meta_size));
 	if (ret_code < 0)
 		return ret_code;
 
