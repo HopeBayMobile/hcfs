@@ -1232,7 +1232,7 @@ int32_t change_system_meta(int64_t system_size_delta,
 
 	ret = 0;
 	if (need_sync) {
-		ret = sync_hcfs_system_data(FALSE);
+		ret = sync_hcfs_system_data(TRUE);
 		if (ret < 0)
 			write_log(0, "Error: Fail to sync hcfs system data."
 				" Code %d\n", -ret);
@@ -1460,7 +1460,7 @@ int32_t update_backend_usage(int64_t total_backend_size_delta,
 	hcfs_system->systemdata.backend_inodes += num_inodes_delta;
 	if (hcfs_system->systemdata.backend_inodes < 0)
 		hcfs_system->systemdata.backend_inodes = 0;
-	sync_hcfs_system_data(FALSE);
+	sync_hcfs_system_data(TRUE);
 	sem_post(&(hcfs_system->access_sem));
 
 	write_log(10, "Debug cloud usage: total size %lld, meta size %lld",

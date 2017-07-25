@@ -1682,7 +1682,7 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		hcfs_system->systemdata.system_size -= this_inode_stat.size;
 		if (hcfs_system->systemdata.system_size < 0)
 			hcfs_system->systemdata.system_size = 0;
-		sync_hcfs_system_data(FALSE);
+		sync_hcfs_system_data(TRUE);
 		sem_post(&(hcfs_system->access_sem));
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
