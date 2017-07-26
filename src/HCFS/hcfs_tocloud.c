@@ -2628,9 +2628,10 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 {
 	int32_t ret, errcode, put_ret;
 	char fname[METAPATHLEN];
+	char upload_fname[METAPATHLEN];
 	char objname[METAPATHLEN];
 	FILE *fptr;
-	BOOL is_fopen;
+	BOOL is_fopen = FALSE;
 	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
@@ -2644,14 +2645,41 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	/* Change statistics for summary statistics */
 	update_backend_usage(system_size_delta, meta_size_delta,
 			num_inodes_delta);
-
-	is_fopen = FALSE;
-	sem_wait(&(sync_stat_ctl.stat_op_sem));
-
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 METAPATH, (uint64_t)root_inode);
+	snprintf(upload_fname, METAPATHLEN - 1, "/tmp/FSstat%" PRIu64 "",
+		(uint64_t)root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "",
 		 (uint64_t)root_inode);
+
+	/* Update FS backend usage */
+	fptr = fopen(fname, "r+");
+	if (fptr == NULL) {
+		errcode = -errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			  -errcode, strerror(errcode));
+		goto errcode_handle_without_lock_release;
+	}
+	is_fopen = TRUE;
+	setbuf(fptr, NULL);
+	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
+			num_inodes_delta, pin_size_delta, disk_pin_size_delta,
+			disk_meta_size_delta);
+	if (ret < 0) {
+		errcode = ret;
+		fclose(fptr);
+		goto errcode_handle_without_lock_release;
+	}
+	fclose(fptr);
+	is_fopen = FALSE;
+
+	/* Try to upload the statistics file. Skip to upload if sem is being
+	 * used. */
+	ret = sem_trywait(&(sync_stat_ctl.stat_op_sem));
+	if (ret < 0) {
+		write_log(6, "Skip to upload FSstat file. Code %d", errno);
+		goto errcode_handle_without_lock_release;
+	}
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
@@ -2690,7 +2718,13 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 			
 	}
 
-	fptr = fopen(fname, "r+");
+	ret = copy_file(fname, upload_fname);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	fptr = fopen(upload_fname, "r+");
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
@@ -2699,16 +2733,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		goto errcode_handle;
 	}
 	is_fopen = TRUE;
-	setbuf(fptr, NULL);
 	/* File lock is in update_fs_backend_usage() */
-	ret = update_fs_backend_usage(fptr, system_size_delta, meta_size_delta,
-			num_inodes_delta, pin_size_delta, disk_pin_size_delta,
-			disk_meta_size_delta);
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
-	}
-
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
 
@@ -2747,21 +2772,23 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		goto errcode_handle;
 	}
 	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	UNLINK(upload_fname);
 
 	/* Also backup package list if any */
 	_try_backup_package_list(&(sync_stat_ctl.statcurl));
 
 	sem_post(&(sync_stat_ctl.stat_op_sem));
-	fclose(fptr);
 
 	return 0;
 
 errcode_handle:
+	sem_post(&(sync_stat_ctl.stat_op_sem));
+errcode_handle_without_lock_release:
 	if (is_fopen == TRUE) {
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 	}
-	sem_post(&(sync_stat_ctl.stat_op_sem));
 	return errcode;
 }
 
