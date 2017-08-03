@@ -20,7 +20,7 @@ CPPFLAGS = -DENABLE_DEDUP=0 \
 	   -D_BSD_SOURCE \
 	   -DFUSE_NOXATTR \
 
-CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra -Werror
+CFLAGS = -std=gnu11 -g -pthread -Wall -Wextra #-Werror
 LDFLAGS = -lcurl -lfuse -lssl -lcrypto -lm -lsqlite3 -ljansson
 GCC_VERSION_GE_49 := $(shell expr `gcc -dumpversion | cut -f1-2 -d.` \>= 4.9)
 ifeq "$(GCC_VERSION_GE_49)" "1"
@@ -86,6 +86,7 @@ OBJS_F := \
 	googledrive_curl.o \
 	pthread_control.o \
 	errcode.o \
+	backend_generic.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

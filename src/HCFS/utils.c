@@ -51,6 +51,7 @@
 #include "super_block.h"
 #include "do_restoration.h"
 #include "recover_super_block.h"
+#include "backend_generic.h"
 #include "googledrive_curl.h"
 
 int32_t meta_nospc_log(const char *func_name, int32_t lines)
@@ -2069,6 +2070,14 @@ int32_t reload_system_config(const char *config_path)
 
 	/* Compare old config and new config*/
 	ret = _check_config(new_config);
+	if (ret < 0) {
+		FREE_SYSTEM_CONFIG_MEMBER(new_config)
+		free(new_config);
+		return ret;
+	}
+
+	/* Dynamically load backend operations */
+	ret = init_backend_ops(new_config->current_backend);
 	if (ret < 0) {
 		FREE_SYSTEM_CONFIG_MEMBER(new_config)
 		free(new_config);
