@@ -1124,6 +1124,52 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
+int32_t fetch_id_from_list_body(FILE *fptr, char *id)
+{
+	json_error_t jerror;
+	json_t *json_data, *json_id;
+	char *temp_id = NULL;
+
+	fseek(fptr, 0, SEEK_SET);
+	json_data =
+	    json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
+	if (!json_data) {
+		write_log(0, "Error: Fail to read json file. Error %s. Code %d",
+			  jerror.text, ret_val);
+		goto errcode_handle;
+	}
+	json_id = json_object_get(json_data, "id");
+	if (!json_id) {
+		json_delete(json_data);
+		write_log(0, "Error: Fail to parse json file. id not found\n");
+		goto errcode_handle;
+	}
+	temp_id = json_string_value(json_id);
+	if (!temp_id) {
+		json_delete(json_data);
+		write_log(0, "Error: Json file is corrupt\n");
+		goto errcode_handle;
+	}
+	strcpy(id, temp_id);
+	json_delete(json_data);
+
+	char buffer[8192] = {0};
+	fseek(fptr, 0, SEEK_SET);
+	fread(buffer, 8190, 1, fptr);
+	write_log(0, "success to parse root folder id. Dump content:\n %s\n",
+		  buffer);
+	return 0;
+
+errcode_handle:
+	char buffer[8192] = {0};
+	fseek(fptr, 0, SEEK_SET);
+	fread(buffer, 8190, 1, fptr);
+	write_log(0, "Fail to parse root folder id. Dump content:\n %s\n",
+		  buffer);
+	return -1;
+}
+
+
 /**
  * Get object parent ID
  *
@@ -1136,12 +1182,12 @@ void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 int32_t get_parent_id(char *id, const char *objname)
 {
 	char hcfs_root_id_filename[200];
-	CURL_HANDLE upload_handle;
+	CURL_HANDLE root_handle;
 	GOOGLEDRIVE_OBJ_INFO gdrive_info;
 	int32_t ret = 0;
 	FILE *fptr;
 
-	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+	memset(&root_handle, 0, sizeof(CURL_HANDLE));
 
 	/* Now data/meta/fsmgr-backup are put under folder "teradata" */
 	if (strncmp(objname, "data", 4) != 0 &&
@@ -1193,16 +1239,53 @@ int32_t get_parent_id(char *id, const char *objname)
 		}
 	}
 
+	/* Find the id of tera folder */
+	if (hcfs_system->system_restoring == RESTORING_STAGE1 ||
+	    hcfs_system->system_restoring == RESTORING_STAGE2) {
+		FILE *fptr;
+		char *list_path = "/tmp/list_root_folder_and_fetch_id";
+
+		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
+		gdrive_info.type = GDRIVE_FOLDER;
+		snprintf(root_handle.id, sizeof(root_handle.id),
+			 "create_folder_curl");
+		root_handle.curl_backend = CURRENT_BACKEND;
+		root_handle.curl = NULL;
+
+		fptr = fopen(list_path, "w+");
+		if (!fptr) {
+			ret = -errno;
+			goto unlock_sem_out;
+		}
+		ret = hcfs_list_object(fptr, &root_handle, &gdrive_info);
+		if ((ret < 200) || (ret > 299)) {
+			write_log(0, "Error in list %s. Http code %d\n",
+				  GOOGLEDRIVE_FOLDER_NAME, ret);
+			ret = -EIO;
+			fclose(fptr);
+			goto unlock_sem_out;
+		}
+		ret = fetch_id_from_list_body(fptr, id);
+		if (ret < 0) {
+			ret = -EIO;
+			fclose(fptr);
+			goto unlock_sem_out;
+		}
+		unlink(list_path);
+		return 0;
+	}
+
 	/* Create folder */
 	memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
 	strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
 	gdrive_info.type = GDRIVE_FOLDER;
 
-	snprintf(upload_handle.id, sizeof(upload_handle.id),
+	snprintf(root_handle.id, sizeof(root_handle.id),
 		 "create_folder_curl");
-	upload_handle.curl_backend = NONE;
-	upload_handle.curl = NULL;
-	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &upload_handle,
+	root_handle.curl_backend = NONE;
+	root_handle.curl = NULL;
+	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &root_handle,
 			      NULL, &gdrive_info);
 	if ((ret < 200) || (ret > 299)) {
 		ret = -EIO;
@@ -1227,8 +1310,8 @@ unlock_sem_out:
 	sem_post(&(gdrive_folder_id_cache->op_lock));
 
 out:
-	if (upload_handle.curl != NULL)
-		hcfs_destroy_backend(&upload_handle);
+	if (root_handle.curl != NULL)
+		hcfs_destroy_backend(&root_handle);
 	if (ret < 0)
 		write_log(0, "Error in fetching parent id. Code %d", -ret);
 	return ret;
