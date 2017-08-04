@@ -1129,13 +1129,14 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id)
 	json_error_t jerror;
 	json_t *json_data, *json_id;
 	char *temp_id = NULL;
+	char buffer[8192] = {0};
 
 	fseek(fptr, 0, SEEK_SET);
 	json_data =
 	    json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
 	if (!json_data) {
-		write_log(0, "Error: Fail to read json file. Error %s. Code %d",
-			  jerror.text, ret_val);
+		write_log(0, "Error: Fail to read json file. Error %s.",
+			  jerror.text);
 		goto errcode_handle;
 	}
 	json_id = json_object_get(json_data, "id");
@@ -1153,7 +1154,6 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id)
 	strcpy(id, temp_id);
 	json_delete(json_data);
 
-	char buffer[8192] = {0};
 	fseek(fptr, 0, SEEK_SET);
 	fread(buffer, 8190, 1, fptr);
 	write_log(0, "success to parse root folder id. Dump content:\n %s\n",
@@ -1161,7 +1161,6 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id)
 	return 0;
 
 errcode_handle:
-	char buffer[8192] = {0};
 	fseek(fptr, 0, SEEK_SET);
 	fread(buffer, 8190, 1, fptr);
 	write_log(0, "Fail to parse root folder id. Dump content:\n %s\n",
@@ -1258,7 +1257,7 @@ int32_t get_parent_id(char *id, const char *objname)
 			ret = -errno;
 			goto unlock_sem_out;
 		}
-		ret = hcfs_list_object(fptr, &root_handle, &gdrive_info);
+		ret = hcfs_list_container(fptr, &root_handle, &gdrive_info);
 		if ((ret < 200) || (ret > 299)) {
 			write_log(0, "Error in list %s. Http code %d\n",
 				  GOOGLEDRIVE_FOLDER_NAME, ret);

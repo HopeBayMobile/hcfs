@@ -99,9 +99,7 @@ int32_t hcfs_get_auth_token(void);
 int32_t hcfs_init_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle);
 int32_t hcfs_test_backend(CURL_HANDLE *curl_handle);
-int32_t hcfs_list_container(FILE *fptr,
-			    CURL_HANDLE *curl_handle,
-			    added_info_t *);
+
 int32_t hcfs_put_object(FILE *fptr,
 			char *objname,
 			CURL_HANDLE *curl_handle,
@@ -115,6 +113,9 @@ int32_t hcfs_get_object(FILE *fptr,
 int32_t hcfs_delete_object(char *objname,
 			   CURL_HANDLE *curl_handle,
 			   added_info_t *);
+int32_t hcfs_list_container(FILE *fptr,
+			    CURL_HANDLE *curl_handle,
+			    added_info_t *more);
 /* Tools */
 #define MAX_RETRIES 5
 #ifdef UNITTEST
