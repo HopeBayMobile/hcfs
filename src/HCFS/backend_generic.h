@@ -7,6 +7,9 @@ typedef struct {
 	int32_t (*fill_object_info)(GOOGLEDRIVE_OBJ_INFO *obj_info,
 				    char *objname,
 				    char *objectID);
+	int32_t (*download_fill_object_info)(GOOGLEDRIVE_OBJ_INFO *obj_info,
+					  char *objname,
+					  char *objectID);
 } BACKEND_OPERATION;
 
 BACKEND_OPERATION backend_ops;

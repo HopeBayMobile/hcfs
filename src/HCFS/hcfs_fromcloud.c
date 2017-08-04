@@ -42,6 +42,7 @@
 #include "super_block.h"
 #include "rebuild_super_block.h"
 #include "do_restoration.h"
+#include "backend_generic.h"
 
 /************************************************************************
 *
@@ -121,11 +122,16 @@ int32_t fetch_from_cloud(FILE *fptr,
         HCFS_encode_object_meta *object_meta =
             calloc(1, sizeof(HCFS_encode_object_meta));
 
-	if (fileID) {
-		memset(&obj_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-		strncpy(obj_info.fileID, fileID, GDRIVE_ID_LENGTH);
+	/* Fill object info if needed */
+	ret = backend_ops.download_fill_object_info(&obj_info, objname, fileID);
+	if (ret < 0) {
+		write_log(
+		    0, "Error: Fail to fill downloading object info, Object %s",
+		    objname);
+		return ret;
 	}
-        status = hcfs_get_object(get_fptr, objname,
+
+	status = hcfs_get_object(get_fptr, objname,
                                  &(download_curl_handles[which_curl_handle]),
                                  object_meta, &obj_info);
 
@@ -1214,8 +1220,7 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 			retries_since_last_notify = 0;
 			flock(fileno(fptr), LOCK_EX);
 			FTRUNCATE(fileno(fptr), 0);
-			/* TODO: Query id before download. */
-			ret =
+			ret = 
 			    fetch_from_cloud(fptr, action_from, objname, NULL);
 			flock(fileno(fptr), LOCK_UN);
 			if (ret < 0) {

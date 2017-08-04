@@ -1124,11 +1124,11 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
-int32_t fetch_id_from_list_body(FILE *fptr, char *id)
+int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 {
 	json_error_t jerror;
-	json_t *json_data, *json_id;
-	char *temp_id = NULL;
+	json_t *json_data, *json_items, *json_title, *json_id;
+	const char *temp_id = NULL, *title = NULL;
 	char buffer[8192] = {0};
 
 	fseek(fptr, 0, SEEK_SET);
@@ -1139,20 +1139,58 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id)
 			  jerror.text);
 		goto errcode_handle;
 	}
-	json_id = json_object_get(json_data, "id");
-	if (!json_id) {
-		json_delete(json_data);
-		write_log(0, "Error: Fail to parse json file. id not found\n");
-		goto errcode_handle;
+	/* Get list with key "items" */
+	json_items = json_object_get(json_data, "items");
+	if (!json_items) {
+		write_log(0,
+			  "Error: Fail to parse json file. items not found\n");
+		goto errcode_handle_json_del;
 	}
-	temp_id = json_string_value(json_id);
-	if (!temp_id) {
-		json_delete(json_data);
-		write_log(0, "Error: Json file is corrupt\n");
-		goto errcode_handle;
+
+	/* Fetch "id" of given file title "objname" */
+	size_t index;
+	json_t *json_value;
+	bool found = false;
+
+	json_array_foreach(json_items, index, json_value) {
+		/* Skip if not a json dict */
+		if (json_is_object(json_value) < 0)
+			continue;
+
+		json_title = json_object_get(json_value, "title");
+		if (!json_title) {
+			write_log(0, "Error: Fail to parse json file. title "
+				     "not found\n");
+			goto errcode_handle_json_del;
+		}
+		title = json_string_value(json_title);
+		if (!title) {
+			write_log(0, "Error: Json file is corrupt\n");
+			goto errcode_handle_json_del;
+		}
+		/* Fetch id if title matches objname */
+		if (!strcmp(title, objname)) {
+			found = true;
+			json_id = json_object_get(json_value, "id");
+			if (!json_id) {
+				write_log(0, "Error: Fail to parse json file. "
+					     "id not found\n");
+				goto errcode_handle_json_del;
+			}
+			temp_id = json_string_value(json_id);
+			if (!temp_id) {
+				write_log(0, "Error: Json file is corrupt\n");
+				goto errcode_handle_json_del;
+			}
+			strcpy(id, temp_id);
+			break;
+		}
 	}
-	strcpy(id, temp_id);
 	json_delete(json_data);
+	if (found == false) {
+		write_log(0, "Object %s is not found.", objname);
+		goto errcode_handle;
+	}
 
 	fseek(fptr, 0, SEEK_SET);
 	fread(buffer, 8190, 1, fptr);
@@ -1160,6 +1198,8 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id)
 		  buffer);
 	return 0;
 
+errcode_handle_json_del:
+	json_delete(json_data);
 errcode_handle:
 	fseek(fptr, 0, SEEK_SET);
 	fread(buffer, 8190, 1, fptr);
@@ -1223,7 +1263,7 @@ int32_t get_parent_id(char *id, const char *objname)
 		id_len = ftell(fptr);
 		fseek(fptr, 0, SEEK_SET);
 		ret_size = fread(id, id_len, 1, fptr);
-		if (ret_size == 1) {
+		if (ret_size == 1) { /* Read id sucessfully */
 			id[id_len] = 0;
 			strncpy(gdrive_folder_id_cache->hcfs_folder_id, id,
 				GDRIVE_ID_LENGTH);
@@ -1265,45 +1305,48 @@ int32_t get_parent_id(char *id, const char *objname)
 			fclose(fptr);
 			goto unlock_sem_out;
 		}
-		ret = fetch_id_from_list_body(fptr, id);
+		ret =
+		    fetch_id_from_list_body(fptr, id, GOOGLEDRIVE_FOLDER_NAME);
 		if (ret < 0) {
+			/* TODO: error handling when folder not found */
 			ret = -EIO;
 			fclose(fptr);
 			goto unlock_sem_out;
 		}
 		unlink(list_path);
-		return 0;
+
+	} else {
+		/* Create folder */
+		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
+		gdrive_info.type = GDRIVE_FOLDER;
+
+		snprintf(root_handle.id, sizeof(root_handle.id),
+				"create_folder_curl");
+		root_handle.curl_backend = NONE;
+		root_handle.curl = NULL;
+		ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME,
+				      &root_handle, NULL, &gdrive_info);
+		if ((ret < 200) || (ret > 299)) {
+			ret = -EIO;
+			write_log(0, "Error in creating %s\n",
+				  GOOGLEDRIVE_FOLDER_NAME);
+			goto unlock_sem_out;
+		}
+		strncpy(id, gdrive_info.fileID, GDRIVE_ID_LENGTH);
 	}
 
-	/* Create folder */
-	memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-	strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
-	gdrive_info.type = GDRIVE_FOLDER;
-
-	snprintf(root_handle.id, sizeof(root_handle.id),
-		 "create_folder_curl");
-	root_handle.curl_backend = NONE;
-	root_handle.curl = NULL;
-	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &root_handle,
-			      NULL, &gdrive_info);
-	if ((ret < 200) || (ret > 299)) {
-		ret = -EIO;
-		write_log(0, "Error in creating %s\n", GOOGLEDRIVE_FOLDER_NAME);
-		goto unlock_sem_out;
-	}
-
+	/* Write to file */
 	fptr = fopen(hcfs_root_id_filename, "w+");
 	if (!fptr) {
 		ret = -errno;
 		goto unlock_sem_out;
 	}
-	fwrite(gdrive_info.fileID, strlen(gdrive_info.fileID), 1, fptr);
+	fwrite(id, strlen(id), 1, fptr);
 	fclose(fptr);
 	/* Copy to cache */
-	strncpy(gdrive_folder_id_cache->hcfs_folder_id, gdrive_info.fileID,
+	strncpy(gdrive_folder_id_cache->hcfs_folder_id, id,
 		GDRIVE_ID_LENGTH);
-	/* Copy to target */
-	strncpy(id, gdrive_folder_id_cache->hcfs_folder_id, GDRIVE_ID_LENGTH);
 
 unlock_sem_out:
 	sem_post(&(gdrive_folder_id_cache->op_lock));
@@ -1313,6 +1356,47 @@ out:
 		hcfs_destroy_backend(&root_handle);
 	if (ret < 0)
 		write_log(0, "Error in fetching parent id. Code %d", -ret);
+	return ret;
+}
+
+int32_t query_object_id(GOOGLEDRIVE_OBJ_INFO *obj_info)
+{
+	CURL_HANDLE list_handle;
+	char list_path[400] = {0};
+	FILE *fptr;
+	int32_t ret = 0;
+
+	snprintf(list_handle.id, sizeof(list_handle.id), "list_object_%s",
+		 obj_info->file_title);
+	list_handle.curl_backend = CURRENT_BACKEND;
+	list_handle.curl = NULL;
+
+	snprintf(list_path, sizeof(list_path), "/tmp/list_obj_content_%s",
+		 obj_info->file_title);
+	fptr = fopen(list_path, "w+");
+	if (!fptr) {
+		ret = -errno;
+		goto out;
+	}
+	ret = hcfs_list_container(fptr, &list_handle, &obj_info);
+	if ((ret < 200) || (ret > 299)) {
+		write_log(0, "Error in list %s. Http code %d\n",
+			  GOOGLEDRIVE_FOLDER_NAME, ret);
+		ret = -EIO;
+		fclose(fptr);
+		goto out;
+	}
+	ret = fetch_id_from_list_body(fptr, obj_info->fileID,
+				      obj_info->file_title);
+	if (ret < 0) {
+		fclose(fptr);
+		goto out;
+	}
+	unlink(list_path);
+
+out:
+	if (list_handle.curl != NULL)
+		hcfs_destroy_backend(&list_handle);
 	return ret;
 }
 
@@ -1340,10 +1424,10 @@ void test()
 	int32_t ret = hcfs_gdrive_put_object(fptr, "test.jpg", &curl_handle, &info);
 	printf("ret = %d, %s\n", ret, info.fileID);
 	fclose(fptr);
-	
+
 	printf("-----download test-----\n");
 	if (!(fptr = fopen("testdownload.jpg", "w+")))
-		exit(-1);	
+		exit(-1);
 	ret = hcfs_gdrive_get_object(fptr, "test.jpg", &curl_handle, &info);
 	printf("ret = %d, %s", ret, info.fileID);
 	fclose(fptr);
