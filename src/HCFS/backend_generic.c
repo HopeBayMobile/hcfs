@@ -74,10 +74,12 @@ int32_t init_backend_ops(int32_t backend_type)
 		backend_ops.fill_object_info = gdrive_fill_object_info;
 		backend_ops.download_fill_object_info =
 		    gdrive_download_fill_object_info;
+		break;
 	default:
 		backend_ops.fill_object_info = swift_fill_object_info;
 		backend_ops.download_fill_object_info =
 		    swift_download_fill_object_info;
+		break;
 	}
 	return 0;
 }
