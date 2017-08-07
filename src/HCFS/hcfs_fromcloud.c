@@ -632,10 +632,7 @@ void* fetch_backend_block(void *ptr)
 		}
 	}
 
-	if (CURRENT_BACKEND == GOOGLEDRIVE)
-		ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, blockID);
-	else
-		ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, NULL);
+	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, blockID);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;

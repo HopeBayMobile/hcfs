@@ -3248,7 +3248,6 @@ int32_t restore_meta_file(ino_t this_inode)
 
 	/* Fetch meta from cloud */
 	sprintf(objname, "meta_%"PRIu64, (uint64_t)this_inode);
-	/* TODO: When restoring, querying object id and then download */
 	ret = fetch_from_cloud(fptr, RESTORE_FETCH_OBJ, objname, NULL);
 	if (ret < 0) {
 		write_log(0,
