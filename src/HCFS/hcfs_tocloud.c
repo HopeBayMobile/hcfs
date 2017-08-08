@@ -2755,6 +2755,20 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 		put_ret = hcfs_put_object(
 		    fptr, objname, &(sync_stat_ctl.statcurl), NULL, &obj_info);
 		if (need_record_id && obj_info.fileID[0] != 0) {
+			/* Record id */
+			flock(fileno(fptr), LOCK_UN);
+			fclose(fptr); /* Close temp file */
+			fptr = fopen(fname, "r+"); /* Open original file */
+			if (fptr == NULL) {
+				errcode = -errno;
+				write_log(0, "IO error in %s. Code %d, %s\n",
+					  __func__, -errcode,
+					  strerror(errcode));
+				goto errcode_handle;
+			}
+			flock(fileno(fptr), LOCK_EX);
+			FSEEK(fptr, 0, SEEK_SET);
+			FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
 			strncpy(fs_cloud_stat.fileID, obj_info.fileID,
 				GDRIVE_ID_LENGTH);
 			FSEEK(fptr, 0, SEEK_SET);
