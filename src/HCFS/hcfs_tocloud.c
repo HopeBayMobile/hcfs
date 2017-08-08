@@ -2766,6 +2766,7 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 					  strerror(errcode));
 				goto errcode_handle;
 			}
+			setbuf(fptr, NULL);
 			flock(fileno(fptr), LOCK_EX);
 			FSEEK(fptr, 0, SEEK_SET);
 			FREAD(&fs_cloud_stat, sizeof(FS_CLOUD_STAT_T), 1, fptr);
