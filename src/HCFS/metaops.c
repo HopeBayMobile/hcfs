@@ -1455,12 +1455,13 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FS_STAT_T tmpstat;
 	char meta_deleted;
 	int64_t metasize = 0, metasize_blk = 0, dirty_delta, unpin_dirty_delta;
-	int64_t truncate_size = 0;
+	int64_t truncate_size = 0, pinsize_delta = 0;
 	BOOL meta_on_cloud;
 	int64_t i;
 	int64_t total_to_delete = 0;
 	char (*to_delete)[400] = NULL;
 
+	memset(&this_inode_stat, 0, sizeof(this_inode_stat));
 	meta_deleted = FALSE;
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
@@ -1594,7 +1595,6 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
-		memset(&this_inode_stat, 0, sizeof(this_inode_stat));
 		memset(&file_meta, 0, sizeof(file_meta));
 		FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
 		if (ret_size < 1) {
@@ -1749,6 +1749,13 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			tmpstat.meta_size -= metasize;
 			tmpstat.num_inodes -= 1;
 		}
+
+		/* Update system statistics */
+		pinsize_delta = P_IS_PIN(file_meta.local_pin)
+				    ? -round_size(this_inode_stat.size)
+				    : 0;
+		change_pin_size(pinsize_delta);
+		change_system_meta(-this_inode_stat.size, 0, 0, 0, 0, 0, FALSE);
 		break;
 
 	default:
@@ -1762,20 +1769,6 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		FWRITE(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 		fclose(fptr);
 	}
-
-	sem_wait(&(hcfs_system->access_sem));
-	if (P_IS_PIN(file_meta.local_pin)) {
-		hcfs_system->systemdata.pinned_size -=
-				round_size(this_inode_stat.size);
-		if (hcfs_system->systemdata.pinned_size < 0)
-			hcfs_system->systemdata.pinned_size = 0;
-	}
-
-	hcfs_system->systemdata.system_size -= this_inode_stat.size;
-	if (hcfs_system->systemdata.system_size < 0)
-		hcfs_system->systemdata.system_size = 0;
-	sync_hcfs_system_data(TRUE);
-	sem_post(&(hcfs_system->access_sem));
 
 	/* unlink markdelete tag because it has been deleted */
 	ret = disk_cleardelete(this_inode, root_inode);

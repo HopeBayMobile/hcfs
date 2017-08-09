@@ -17,7 +17,6 @@
 #include "utils.h"
 #include "params.h"
 
-
 #if defined(__GNUC__)
 #define _PACKED __attribute__((packed))
 #define _UNUSED __attribute__((unused))
