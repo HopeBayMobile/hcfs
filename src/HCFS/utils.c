@@ -1385,12 +1385,6 @@ int32_t change_xfer_meta(int64_t xfer_size_upload, int64_t xfer_size_download,
 int32_t change_pin_size(int64_t delta_pin_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
-/*	if (hcfs_system->systemdata.pinned_size + delta_pin_size >
-			MAX_PINNED_LIMIT) {
-		sem_post(&(hcfs_system->access_sem));
-		return -ENOSPC;
-	}
-*/
 	hcfs_system->systemdata.pinned_size += delta_pin_size;
 	if (hcfs_system->systemdata.pinned_size < 0)
 		hcfs_system->systemdata.pinned_size = 0;
