@@ -308,13 +308,14 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		goto error_handling;
 	}
 	memset(&file_stats, 0, sizeof(FILE_STATS_TYPE));
-	MWRITE(body_ptr, &file_stats, sizeof(FILE_STATS_TYPE),
-	       sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
+	FSEEK(body_ptr->fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
 	
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	MWRITE(body_ptr, &cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-	       sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
-	       sizeof(FILE_STATS_TYPE));
+	FSEEK(body_ptr->fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE) +
+			sizeof(FILE_STATS_TYPE), SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, body_ptr->fptr);
 #ifdef _ANDROID_ENV_
 	/* Inherit xattr from parent */
 	if (S_ISFILE(this_stat->mode)) {
@@ -506,8 +507,10 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	}
 
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	MWRITE(body_ptr, &cloud_related_data, sizeof(CLOUD_RELATED_DATA),
-	       sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE));
+	FSEEK(body_ptr->fptr, sizeof(HCFS_STAT) + sizeof(DIR_META_TYPE),
+			SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1,
+			body_ptr->fptr);
 
 	ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
 			&temppage, body_ptr);
@@ -942,9 +945,10 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	}
 
 	memset(&cloud_related_data, 0, sizeof(CLOUD_RELATED_DATA));
-	MWRITE(self_meta_cache_entry, &cloud_related_data,
-	       sizeof(CLOUD_RELATED_DATA),
-	       sizeof(HCFS_STAT) + sizeof(SYMLINK_META_TYPE));
+	FSEEK(self_meta_cache_entry->fptr, sizeof(HCFS_STAT) +
+			sizeof(SYMLINK_META_TYPE), SEEK_SET);
+	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA),
+			1, self_meta_cache_entry->fptr);
 
 #ifdef _ANDROID_ENV_
 	meta_cache_unlock_entry(parent_meta_cache_entry);
@@ -1088,8 +1092,8 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
 		FTELL(meta_cache_entry->fptr);
 		*xattr_pos = ret_pos;
-		MWRITE(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE),
-			*xattr_pos);
+		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1,
+			meta_cache_entry->fptr);
 
 		/* Update xattr filepos in meta cache */
 #ifdef _ANDROID_ENV_
@@ -1123,8 +1127,9 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 				" meta\n");
 		}
 	} else { /* xattr existed. Just read it. */
-		MREAD(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE),
-		      *xattr_pos);
+		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
+		FREAD(xattr_page, sizeof(XATTR_PAGE), 1,
+			meta_cache_entry->fptr);
 	}
 
 	return 0;
