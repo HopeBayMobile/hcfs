@@ -17,8 +17,6 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <semaphore.h>
-#include <sys/mman.h>
-#include <fcntl.h>
 #include "params.h"
 
 #include "dir_statistics.h"

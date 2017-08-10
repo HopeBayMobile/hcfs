@@ -28,10 +28,7 @@
 
 #include <unistd.h>
 
-#include "macro.h"
-
 ssize_t __write_chk(int fd, const void* buf, size_t count, size_t buf_size) {
-  UNUSED(buf_size);
 /*
   if (__predict_false(count > buf_size)) {
     __fortify_chk_fail("write: prevented read past end of buffer", 0);
