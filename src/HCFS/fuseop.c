@@ -5928,7 +5928,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	int32_t count;
 	off_t thisfile_pos;
 	DIR_META_TYPE tempmeta;
-	DIR_ENTRY_PAGE temp_page;
+	DIR_ENTRY_PAGE _temp_page, *temp_page;
 	struct stat tempstat; /* fuse reply sys stat */
 	HCFS_STAT thisstat;
 	struct timeval tmp_time1, tmp_time2;
@@ -6072,17 +6072,18 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	while (thisfile_pos != 0) {
 		write_log(10, "Now %ldth iteration\n", countn);
 		countn++;
-		memset(&temp_page, 0, sizeof(DIR_ENTRY_PAGE));
-		temp_page.this_page_pos = thisfile_pos;
+		temp_page = &_temp_page;
+		memset(temp_page, 0, sizeof(DIR_ENTRY_PAGE));
+		temp_page->this_page_pos = thisfile_pos;
 		if (use_snap == TRUE) {
 			FSEEK(dirh_ptr->snapshot_ptr, thisfile_pos, SEEK_SET);
-			FREAD(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
+			FREAD(temp_page, sizeof(DIR_ENTRY_PAGE), 1,
 			      dirh_ptr->snapshot_ptr);
 		} else if ((tempmeta.total_children <=
 			    (MAX_DIR_ENTRIES_PER_PAGE - 2)) &&
 			   (page_start == 0)) {
 			ret = meta_cache_lookup_dir_data(this_inode, NULL,
-						NULL, &temp_page, body_ptr);
+						NULL, temp_page, body_ptr);
 			if (ret < 0) {
 				meta_cache_close_file(body_ptr);
 				meta_cache_unlock_entry(body_ptr);
@@ -6091,19 +6092,17 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				return;
 			}
 		} else {
-			FSEEK(body_ptr->fptr, thisfile_pos, SEEK_SET);
-
-			FREAD(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+			temp_page = MREAD(body_ptr, NULL, sizeof(DIR_ENTRY_PAGE),
+			      thisfile_pos);
 		}
 
 		write_log(10, "Debug readdir page start %d %d\n", page_start,
-			temp_page.num_entries);
-		for (count = page_start; count < temp_page.num_entries;
+			temp_page->num_entries);
+		for (count = page_start; count < temp_page->num_entries;
 								count++) {
 			memset(&tempstat, 0, sizeof(tempstat));
-			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
-			this_type = temp_page.dir_entries[count].d_type;
+			tempstat.st_ino = temp_page->dir_entries[count].d_ino;
+			this_type = temp_page->dir_entries[count].d_type;
 			if (this_type == D_ISREG)
 				tempstat.st_mode = S_IFREG;
 			else if (this_type == D_ISDIR)
@@ -6120,21 +6119,21 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			discovered here */
 			if (hcfs_system->system_restoring
 			    == RESTORING_STAGE2) {
-				tmpstrptr = temp_page.dir_entries[count].d_name;
+				tmpstrptr = temp_page->dir_entries[count].d_name;
 				if ((strcmp(tmpstrptr, ".") != 0) &&
 				    (strcmp(tmpstrptr, "..") != 0))
 					rebuild_parent_stat(tempstat.st_ino,
 						this_inode, this_type);
 			}
 
-			nextentry_pos = temp_page.this_page_pos *
+			nextentry_pos = temp_page->this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(
 			    req, &buf[buf_pos], (size - buf_pos),
-			    temp_page.dir_entries[count].d_name, &tempstat,
+			    temp_page->dir_entries[count].d_name, &tempstat,
 			    nextentry_pos);
 			write_log(10, "Debug readdir entry %s, %" PRIu64 "\n",
-				temp_page.dir_entries[count].d_name,
+				temp_page->dir_entries[count].d_name,
 				(uint64_t)tempstat.st_ino);
 			write_log(10, "Debug readdir entry size %ld\n",
 				entry_size);
@@ -6144,7 +6143,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					"Readdir breaks, next offset %ld, ",
 					nextentry_pos);
 				write_log(10, "file pos %lld, entry %d\n",
-					temp_page.this_page_pos, (count+1));
+					temp_page->this_page_pos, (count+1));
 				fuse_reply_buf(req, buf, buf_pos);
 				free(buf);
 				return;
@@ -6152,7 +6151,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			buf_pos += entry_size;
 		}
 		page_start = 0;
-		thisfile_pos = temp_page.tree_walk_next;
+		thisfile_pos = temp_page->tree_walk_next;
 	}
 
 	ret = 0;

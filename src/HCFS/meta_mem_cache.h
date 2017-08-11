@@ -112,6 +112,10 @@ typedef struct {
 	 * in flush_single_entry().  */
 	BOOL can_be_synced_cloud_later;
 	BOOL need_inc_seq;
+
+	void *mmap_addr;
+	size_t mmap_len;
+	size_t mmap_file_len;
 } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {
