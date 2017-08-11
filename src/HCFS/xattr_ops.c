@@ -130,7 +130,7 @@ int32_t get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *usable_pos)
 {
 	int64_t ret_pos;
-	KEY_LIST_PAGE key_list_page;
+	KEY_LIST_PAGE *key_list_page;
 	int32_t errcode;
 	int32_t ret;
 	int32_t ret_size;
@@ -140,12 +140,11 @@ int32_t get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if (xattr_page->reclaimed_key_list_page != 0) {
 		ret_pos = xattr_page->reclaimed_key_list_page;
 
-		FSEEK(meta_cache_entry->fptr, ret_pos, SEEK_SET);
-		FREAD(&key_list_page, sizeof(KEY_LIST_PAGE), 1,
-			meta_cache_entry->fptr);
+		key_list_page = MREAD(meta_cache_entry, NULL, sizeof(KEY_LIST_PAGE),
+		      ret_pos);
 		/* Reclaimed_list point to next key_list_page */
 		xattr_page->reclaimed_key_list_page =
-				key_list_page.next_list_pos;
+				key_list_page->next_list_pos;
 		write_log(5, "Get reclaimed key page, pointing to %lld\n",
 			ret_pos);
 
@@ -154,8 +153,8 @@ int32_t get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
 
 		memset(&empty_page, 0, sizeof(KEY_LIST_PAGE));
-		FWRITE(&empty_page, sizeof(KEY_LIST_PAGE), 1,
-			meta_cache_entry->fptr);
+		MWRITE(meta_cache_entry, &empty_page, sizeof(KEY_LIST_PAGE),
+		       ret_pos);
 		write_log(5, "Allocate a new key page, pointing to %lld\n",
 			ret_pos);
 	}
@@ -256,7 +255,8 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	KEY_LIST_PAGE *prev_page, int64_t *prev_pos)
 {
 	int64_t key_list_pos, prev_key_list_pos;
-	KEY_LIST_PAGE now_key_page, prev_key_page;
+	KEY_LIST_PAGE _now_key_page, prev_key_page;
+	KEY_LIST_PAGE *now_key_page = &_now_key_page;
 	int32_t ret;
 	int32_t index;
 	char find_first_insert;
@@ -270,7 +270,7 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return 1;
 	}
 
-	memset(&now_key_page, 0, sizeof(KEY_LIST_PAGE));
+	memset(now_key_page, 0, sizeof(KEY_LIST_PAGE));
 	memset(&prev_key_page, 0, sizeof(KEY_LIST_PAGE));
 	prev_key_list_pos = 0;
 	key_list_pos = first_key_list_pos;
@@ -278,17 +278,16 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	hit_key_entry = FALSE;
 
 	do {
-		memcpy(&prev_key_page, &now_key_page, sizeof(KEY_LIST_PAGE));
+		memcpy(&prev_key_page, now_key_page, sizeof(KEY_LIST_PAGE));
 
-		FSEEK(meta_cache_entry->fptr, key_list_pos, SEEK_SET);
-		FREAD(&now_key_page, sizeof(KEY_LIST_PAGE), 1,
-			meta_cache_entry->fptr);
+		now_key_page = MREAD(meta_cache_entry, NULL, sizeof(KEY_LIST_PAGE),
+		      key_list_pos);
 		write_log(10, "Debug xattr: now in find_key_entry(), "
 			"key_list_pos = %lld, num_xattr = %d\n",
-			key_list_pos, now_key_page.num_xattr);
+			key_list_pos, now_key_page->num_xattr);
 
-		ret = key_binary_search(now_key_page.key_list,
-			now_key_page.num_xattr,
+		ret = key_binary_search(now_key_page->key_list,
+			now_key_page->num_xattr,
 			key, &index);
 		if (ret == 0) { /* Hit the key */
 			hit_key_entry = TRUE;
@@ -297,8 +296,8 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 		/* Record first page which can be inserted */
 		if ((find_first_insert == FALSE) &&
-			(now_key_page.num_xattr < MAX_KEY_ENTRY_PER_LIST)) {
-			memcpy(target_key_list_page, &now_key_page,
+			(now_key_page->num_xattr < MAX_KEY_ENTRY_PER_LIST)) {
+			memcpy(target_key_list_page, now_key_page,
 				sizeof(KEY_LIST_PAGE));
 			*key_index = index;
 			*target_key_list_pos = key_list_pos;
@@ -306,14 +305,14 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		}
 
 		prev_key_list_pos = key_list_pos;
-		key_list_pos = now_key_page.next_list_pos; /* Go to next page */
+		key_list_pos = now_key_page->next_list_pos; /* Go to next page */
 
 	} while (key_list_pos);
 
 	/* Key existed, return 0 */
 	if (hit_key_entry == TRUE) {
 		write_log(10, "Debug: key is found.\n");
-		memcpy(target_key_list_page, &now_key_page,
+		memcpy(target_key_list_page, now_key_page,
 			sizeof(KEY_LIST_PAGE));
 		*key_index = index;
 		*target_key_list_pos = key_list_pos;
@@ -327,7 +326,7 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if ((hit_key_entry == FALSE) && (find_first_insert == FALSE)) {
 		write_log(10,
 			"Debug: Key is NOT found and all key pages are full.\n");
-		memcpy(target_key_list_page, &now_key_page,
+		memcpy(target_key_list_page, now_key_page,
 			sizeof(KEY_LIST_PAGE));
 		*key_index = -1;
 		*target_key_list_pos = prev_key_list_pos;
@@ -363,7 +362,7 @@ int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, int64_t *replace_value_block_pos,
 	int64_t *usable_value_pos)
 {
-	VALUE_BLOCK value_block;
+	VALUE_BLOCK *value_block;
 	VALUE_BLOCK empty_block;
 	int32_t errcode;
 	int32_t ret;
@@ -374,11 +373,9 @@ int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if (*replace_value_block_pos > 0) {
 		*usable_value_pos = *replace_value_block_pos;
 		/* Point to next replace block */
-		FSEEK(meta_cache_entry->fptr, *replace_value_block_pos,
-				SEEK_SET);
-		FREAD(&value_block, sizeof(VALUE_BLOCK), 1,
-				meta_cache_entry->fptr);
-		*replace_value_block_pos = value_block.next_block_pos;
+		value_block = MREAD(meta_cache_entry, NULL, sizeof(VALUE_BLOCK),
+		      *replace_value_block_pos);
+		*replace_value_block_pos = value_block->next_block_pos;
 		write_log(5, "Get original value block, pointing to %lld\n",
 			*usable_value_pos);
 		return 0;
@@ -388,11 +385,9 @@ int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if (xattr_page->reclaimed_value_block > 0) {
 		*usable_value_pos = xattr_page->reclaimed_value_block;
 		/* Point to next reclaimed block */
-		FSEEK(meta_cache_entry->fptr, xattr_page->reclaimed_value_block,
-			SEEK_SET);
-		FREAD(&value_block, sizeof(VALUE_BLOCK), 1,
-			meta_cache_entry->fptr);
-		xattr_page->reclaimed_value_block = value_block.next_block_pos;
+		value_block = MREAD(meta_cache_entry, NULL, sizeof(VALUE_BLOCK),
+		      xattr_page->reclaimed_value_block);
+		xattr_page->reclaimed_value_block = value_block->next_block_pos;
 		write_log(5, "Get reclaimed value block, pointing to %lld\n",
 			*usable_value_pos);
 		return 0;
@@ -403,7 +398,7 @@ int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
 
 	memset(&empty_block, 0, sizeof(VALUE_BLOCK));
-	FWRITE(&empty_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
+	MWRITE(meta_cache_entry, &empty_block, sizeof(VALUE_BLOCK), ret_pos);
 
 	*usable_value_pos = ret_pos;
 	write_log(5, "Allocate a new value block, pointing to %lld\n",
@@ -462,9 +457,8 @@ int32_t write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *
 			next_pos = 0;
 		}
 
-		FSEEK(meta_cache_entry->fptr, now_pos, SEEK_SET);
-		FWRITE(&tmp_value_block, sizeof(VALUE_BLOCK), 1,
-			meta_cache_entry->fptr);
+		MWRITE(meta_cache_entry, &tmp_value_block, sizeof(VALUE_BLOCK),
+		       now_pos);
 		now_pos = next_pos;
 
 		index += MAX_VALUE_BLOCK_SIZE; /* Go to next content */
@@ -487,7 +481,7 @@ errcode_handle:
 int32_t read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	KEY_ENTRY *key_entry, char *value_buf)
 {
-	VALUE_BLOCK tmp_value_block;
+	VALUE_BLOCK *tmp_value_block;
 	size_t value_size;
 	size_t index;
 	int64_t now_pos;
@@ -499,20 +493,19 @@ int32_t read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	now_pos = key_entry->first_value_block_pos;
 
 	while (index < value_size) {
-		FSEEK(meta_cache_entry->fptr, now_pos, SEEK_SET);
-		FREAD(&tmp_value_block, sizeof(VALUE_BLOCK), 1,
-			meta_cache_entry->fptr);
+		tmp_value_block = MREAD(meta_cache_entry, NULL, sizeof(VALUE_BLOCK),
+		      now_pos);
 
 		if (value_size - index > MAX_VALUE_BLOCK_SIZE) {
 			/* Not last block */
-			memcpy(&value_buf[index], tmp_value_block.content,
+			memcpy(&value_buf[index], tmp_value_block->content,
 				sizeof(char) * MAX_VALUE_BLOCK_SIZE);
 		} else { /* Last one */
-			memcpy(&value_buf[index], tmp_value_block.content,
+			memcpy(&value_buf[index], tmp_value_block->content,
 				sizeof(char) * (value_size - index));
 		}
 
-		now_pos = tmp_value_block.next_block_pos;
+		now_pos = tmp_value_block->next_block_pos;
 		index += MAX_VALUE_BLOCK_SIZE; /* Go to next content */
 	}
 
@@ -548,9 +541,8 @@ int32_t reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	head_pos = *replace_value_block_pos;
 	tail_pos = head_pos;
 	while (TRUE) {
-		FSEEK(meta_cache_entry->fptr, tail_pos, SEEK_SET);
-		FREAD(&tmp_value_block, sizeof(VALUE_BLOCK), 1,
-			meta_cache_entry->fptr);
+		MREAD(meta_cache_entry, &tmp_value_block, sizeof(VALUE_BLOCK),
+		      tail_pos);
 		if (tmp_value_block.next_block_pos == 0)
 			break;
 		tail_pos = tmp_value_block.next_block_pos;
@@ -558,9 +550,8 @@ int32_t reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	/* Link tail block to first reclaimed block */
 	tmp_value_block.next_block_pos = xattr_page->reclaimed_value_block;
-	FSEEK(meta_cache_entry->fptr, tail_pos, SEEK_SET);
-	FWRITE(&tmp_value_block, sizeof(VALUE_BLOCK), 1,
-			meta_cache_entry->fptr);
+	MWRITE(meta_cache_entry, &tmp_value_block, sizeof(VALUE_BLOCK),
+	       tail_pos);
 
 	/* Link first reclaimed block to head block */
 	xattr_page->reclaimed_value_block = head_pos;
@@ -666,9 +657,8 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 
 		(target_key_list_page.num_xattr)++; /* # of xattr += 1 */
 
-		FSEEK(meta_cache_entry->fptr, target_key_list_pos, SEEK_SET);
-		FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,
-			meta_cache_entry->fptr);
+		MWRITE(meta_cache_entry, &target_key_list_page,
+		       sizeof(KEY_LIST_PAGE), target_key_list_pos);
 
 		/* In namespace, # of xattr += 1 */
 		(xattr_page->namespace_page[name_space].num_xattr)++;
@@ -701,11 +691,9 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 				/* Link to end of key_list  */
 				target_key_list_page.next_list_pos = usable_pos;
 
-				FSEEK(meta_cache_entry->fptr,
-					target_key_list_pos, SEEK_SET);
-				FWRITE(&target_key_list_page,
-					sizeof(KEY_LIST_PAGE),
-					1, meta_cache_entry->fptr);
+				MWRITE(meta_cache_entry, &target_key_list_page,
+				       sizeof(KEY_LIST_PAGE),
+				       target_key_list_pos);
 
 				/* New page at end of the linked-key_list */
 				memset(&target_key_list_page, 0,
@@ -752,10 +740,8 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 			copy_key_entry(now_key_entry, key, value_pos, size);
 			(target_key_list_page.num_xattr)++;
 
-			FSEEK(meta_cache_entry->fptr, target_key_list_pos,
-				SEEK_SET);
-			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,
-				meta_cache_entry->fptr);
+			MWRITE(meta_cache_entry, &target_key_list_page,
+			       sizeof(KEY_LIST_PAGE), target_key_list_pos);
 
 			/* In namespace, # of xattr += 1 */
 			(xattr_page->namespace_page[name_space].num_xattr)++;
@@ -782,10 +768,8 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 			if (ret_code < 0)
 				return ret_code;
 
-			FSEEK(meta_cache_entry->fptr, target_key_list_pos,
-				SEEK_SET);
-			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,
-				meta_cache_entry->fptr);
+			MWRITE(meta_cache_entry, &target_key_list_page,
+			       sizeof(KEY_LIST_PAGE), target_key_list_pos);
 			write_log(10, "Debug setxattr: Hit the key. Replacing value success\n");
 
 		} else { /* Error */
@@ -806,8 +790,7 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 		return ret_code;
 
 	/* Step 3: Finally write xattr header(xattr_page) */
-	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
-	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+	MWRITE(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE), xattr_filepos);
 
 	ret_code = super_block_mark_dirty(meta_cache_entry->inode_num);
 	if (ret_code < 0)
@@ -958,7 +941,7 @@ int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_
 	char *key_buf, const size_t size, size_t *actual_size)
 {
 	NAMESPACE_PAGE *namespace_page;
-	KEY_LIST_PAGE key_page;
+	KEY_LIST_PAGE *key_page;
 	int32_t ns_count;
 	int32_t hash_count;
 	int32_t ret, ret_size, errcode;
@@ -996,17 +979,16 @@ int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_
 			first_pos = namespace_page->key_hash_table[hash_count];
 			pos = first_pos;
 			while (pos) {
-				FSEEK(meta_cache_entry->fptr, pos, SEEK_SET);
-				FREAD(&key_page, sizeof(KEY_LIST_PAGE), 1,
-					meta_cache_entry->fptr);
-				ret = fill_buffer_with_key(&key_page, key_buf,
+				key_page = MREAD(meta_cache_entry, NULL,
+				      sizeof(KEY_LIST_PAGE), pos);
+				ret = fill_buffer_with_key(key_page, key_buf,
 					size, actual_size, namespace_prefix);
 				if (ret < 0) {
 					write_log(8, "Error: Size of buffer is "
 						"too small in list_xattr()\n");
 					return -ERANGE;
 				}
-				pos = key_page.next_list_pos;
+				pos = key_page->next_list_pos;
 			}
 		}
 	}
@@ -1078,9 +1060,8 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			sizeof(KEY_ENTRY) * num_remaining);
 		(target_key_list_page.num_xattr)--;
 
-		FSEEK(meta_cache_entry->fptr, target_key_list_pos, SEEK_SET);
-		FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,
-			meta_cache_entry->fptr);
+		MWRITE(meta_cache_entry, &target_key_list_page,
+		       sizeof(KEY_LIST_PAGE), target_key_list_pos);
 
 		print_keys_to_log(&target_key_list_page);
 
@@ -1093,10 +1074,8 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 			namespace_page->key_hash_table[hash_index] =
 				target_key_list_page.next_list_pos;
-			FSEEK(meta_cache_entry->fptr, xattr_filepos,
-					SEEK_SET);
-			FWRITE(xattr_page, sizeof(XATTR_PAGE),
-					1, meta_cache_entry->fptr);
+			MWRITE(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE),
+			       xattr_filepos);
 
 			/* Reclaimed page is current page. */
 			reclaim_key_list_pos = target_key_list_pos;
@@ -1106,10 +1085,8 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			prev_key_list_page.next_list_pos =
 				target_key_list_page.next_list_pos;
 
-			FSEEK(meta_cache_entry->fptr, prev_key_list_pos,
-				SEEK_SET);
-			FWRITE(&prev_key_list_page, sizeof(KEY_LIST_PAGE),
-				1, meta_cache_entry->fptr);
+			MWRITE(meta_cache_entry, &prev_key_list_page,
+			       sizeof(KEY_LIST_PAGE), prev_key_list_pos);
 
 			/* Reclaim current page */
 			reclaim_key_list_pos = target_key_list_pos;
@@ -1120,14 +1097,12 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		tmp_list_page.next_list_pos =
 			xattr_page->reclaimed_key_list_page;
 
-		FSEEK(meta_cache_entry->fptr, reclaim_key_list_pos, SEEK_SET);
-		FWRITE(&tmp_list_page, sizeof(KEY_LIST_PAGE), 1,
-			meta_cache_entry->fptr);
+		MWRITE(meta_cache_entry, &tmp_list_page, sizeof(KEY_LIST_PAGE),
+		       reclaim_key_list_pos);
 
 		xattr_page->reclaimed_key_list_page = reclaim_key_list_pos;
-		FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
-		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1,
-			meta_cache_entry->fptr);
+		MWRITE(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE),
+		       xattr_filepos);
 	}
 
 	/* Recalim value block */
@@ -1137,8 +1112,7 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return ret_code;
 
 	(xattr_page->namespace_page[name_space].num_xattr)--;
-	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
-	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+	MWRITE(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE), xattr_filepos);
 
 	ret_code = super_block_mark_dirty(meta_cache_entry->inode_num);
 	if (ret_code < 0)

@@ -173,9 +173,8 @@ int32_t dir_add_entry(ino_t parent_inode,
 		goto errcode_handle;
 	}
 
-	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-
-	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	MREAD(body_ptr, &tpage, sizeof(DIR_ENTRY_PAGE),
+	      parent_meta.root_entry_page);
 
 	/* Drop all cached pages first before inserting */
 	/*
@@ -210,21 +209,16 @@ int32_t dir_add_entry(ino_t parent_inode,
 	 */
 	if (ret == 1) {
 		/* Reload old root */
-		FSEEK(body_ptr->fptr, parent_meta.root_entry_page,
-				SEEK_SET);
-
-		FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+		MREAD(body_ptr, &tpage, sizeof(DIR_ENTRY_PAGE),
+		      parent_meta.root_entry_page);
 
 		/* tpage contains the old root node now */
 
 		/*Need to create a new root node and write to disk*/
 		if (parent_meta.entry_page_gc_list != 0) {
 			/*Reclaim node from gc list first*/
-			FSEEK(body_ptr->fptr,
-				parent_meta.entry_page_gc_list, SEEK_SET);
-
-			FREAD(&new_root, sizeof(DIR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+			MREAD(body_ptr, &new_root, sizeof(DIR_ENTRY_PAGE),
+			      parent_meta.entry_page_gc_list);
 
 			new_root.this_page_pos = parent_meta.entry_page_gc_list;
 			parent_meta.entry_page_gc_list = new_root.gc_list_next;
@@ -256,22 +250,16 @@ int32_t dir_add_entry(ino_t parent_inode,
 		if (parent_meta.tree_walk_list_head == tpage.this_page_pos) {
 			tpage.tree_walk_prev = new_root.this_page_pos;
 		} else {
-			FSEEK(body_ptr->fptr,
-				parent_meta.tree_walk_list_head, SEEK_SET);
-
-			FREAD(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-							body_ptr->fptr);
+			MREAD(body_ptr, &tpage2, sizeof(DIR_ENTRY_PAGE),
+			      parent_meta.tree_walk_list_head);
 
 			tpage2.tree_walk_prev = new_root.this_page_pos;
 			if (tpage2.this_page_pos == overflow_new_page) {
 				tpage2.parent_page_pos = new_root.this_page_pos;
 				no_need_rewrite = TRUE;
 			}
-			FSEEK(body_ptr->fptr,
-				parent_meta.tree_walk_list_head, SEEK_SET);
-
-			FWRITE(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-							body_ptr->fptr);
+			MWRITE(body_ptr, &tpage2, sizeof(DIR_ENTRY_PAGE),
+			       parent_meta.tree_walk_list_head);
 		}
 
 
@@ -296,19 +284,16 @@ int32_t dir_add_entry(ino_t parent_inode,
 		 * content of the new root the the meta file.
 		 */
 		parent_meta.root_entry_page = new_root.this_page_pos;
-		FSEEK(body_ptr->fptr, new_root.this_page_pos, SEEK_SET);
-
-		FWRITE(&new_root, sizeof(DIR_ENTRY_PAGE), 1,
-				body_ptr->fptr);
+		MWRITE(body_ptr, &new_root, sizeof(DIR_ENTRY_PAGE),
+		       new_root.this_page_pos);
 
 		/*
 		 * Change the parent of the old root to point to the new
 		 * root.  Write to the meta file afterward.
 		 */
 		tpage.parent_page_pos = new_root.this_page_pos;
-		FSEEK(body_ptr->fptr, tpage.this_page_pos, SEEK_SET);
-		FWRITE(&tpage, sizeof(DIR_ENTRY_PAGE), 1,
-				body_ptr->fptr);
+		MWRITE(body_ptr, &tpage, sizeof(DIR_ENTRY_PAGE),
+		       tpage.this_page_pos);
 
 		/*
 		 * If no_need_rewrite is true, we have already write
@@ -316,29 +301,24 @@ int32_t dir_add_entry(ino_t parent_inode,
 		 * Otherwise we need to write it to the meta file here.
 		 */
 		if (no_need_rewrite == FALSE) {
-			FSEEK(body_ptr->fptr, overflow_new_page,
-					SEEK_SET);
-			FREAD(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-							body_ptr->fptr);
+			MREAD(body_ptr, &tpage2, sizeof(DIR_ENTRY_PAGE),
+			      overflow_new_page);
 			if (errcode < 0) {
 				meta_cache_close_file(body_ptr);
 				return errcode;
 			}
 
 			tpage2.parent_page_pos = new_root.this_page_pos;
-			FSEEK(body_ptr->fptr, overflow_new_page,
-					SEEK_SET);
-			FWRITE(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-							body_ptr->fptr);
+			MWRITE(body_ptr, &tpage2, sizeof(DIR_ENTRY_PAGE),
+			       overflow_new_page);
 		}
 
 		/*
 		 * Complete the splitting by updating the meta of the
 		 * directory.
 		 */
-		FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
-		FWRITE(&parent_meta, sizeof(DIR_META_TYPE), 1,
-					body_ptr->fptr);
+		MWRITE(body_ptr, &parent_meta, sizeof(DIR_META_TYPE),
+		       sizeof(HCFS_STAT));
 	}
 
 	/*If the new entry is a subdir, increase the hard link of the parent*/
@@ -448,8 +428,8 @@ int32_t dir_remove_entry(ino_t parent_inode,
 	}
 
 	/* Read root node */
-	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	MREAD(body_ptr, &tpage, sizeof(DIR_ENTRY_PAGE),
+	      parent_meta.root_entry_page);
 
 	/* Recursive B-tree deletion routine*/
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
@@ -1057,8 +1037,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			temp_meta->single_indirect = ret_pos;
 			tmp_target_pos = temp_meta->single_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
-			FWRITE(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+			MWRITE(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+			       tmp_target_pos);
 			ret = meta_cache_update_file_data(body_ptr->inode_num,
 					NULL, temp_meta, NULL, 0, body_ptr);
 			if (ret < 0)
@@ -1075,8 +1055,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			temp_meta->double_indirect = ret_pos;
 			tmp_target_pos = temp_meta->double_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
-			FWRITE(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+			MWRITE(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+			       tmp_target_pos);
 			ret = meta_cache_update_file_data(body_ptr->inode_num,
 					NULL, temp_meta, NULL, 0, body_ptr);
 			if (ret < 0)
@@ -1093,8 +1073,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			temp_meta->triple_indirect = ret_pos;
 			tmp_target_pos = temp_meta->triple_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
-			FWRITE(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+			MWRITE(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+			       tmp_target_pos);
 			ret = meta_cache_update_file_data(body_ptr->inode_num,
 					NULL, temp_meta, NULL, 0, body_ptr);
 			if (ret < 0)
@@ -1111,8 +1091,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			temp_meta->quadruple_indirect = ret_pos;
 			tmp_target_pos = temp_meta->quadruple_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
-			FWRITE(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-				body_ptr->fptr);
+			MWRITE(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+			       tmp_target_pos);
 			ret = meta_cache_update_file_data(body_ptr->inode_num,
 					NULL, temp_meta, NULL, 0, body_ptr);
 			if (ret < 0)
@@ -1131,7 +1111,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 		tmp_pos = ret_pos;
 		if (tmp_pos != tmp_target_pos)
 			return 0;
-		FREAD(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
+		MREAD(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+		      tmp_target_pos);
 
 		if (count == 0)
 			break;
@@ -1147,11 +1128,11 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			FTELL(body_ptr->fptr);
 			tmp_ptr_page.ptr[tmp_ptr_page_index] = ret_pos;
 			memset(&empty_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
-			FWRITE(&empty_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-				body_ptr->fptr);
-			FSEEK(body_ptr->fptr, tmp_target_pos, SEEK_SET);
-			FWRITE(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+			MWRITE(body_ptr, &empty_ptr_page,
+			       sizeof(PTR_ENTRY_PAGE),
+			       tmp_ptr_page.ptr[tmp_ptr_page_index]);
+			MWRITE(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+			       tmp_target_pos);
 		}
 		tmp_target_pos = tmp_ptr_page.ptr[tmp_ptr_page_index];
 	}
@@ -1169,9 +1150,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 				tmp_ptr_page.ptr[tmp_ptr_index], body_ptr);
 		if (ret < 0)
 			return ret;
-		FSEEK(body_ptr->fptr, tmp_target_pos, SEEK_SET);
-		FWRITE(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+		MWRITE(body_ptr, &tmp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+		       tmp_target_pos);
 
 	}
 
@@ -2071,7 +2051,7 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
 {
 	int32_t ret, errcode;
 	size_t ret_size;
-	FILE_STATS_TYPE filestats;
+	FILE_STATS_TYPE *filestats;
 
 	ret = meta_cache_open_file(ptr);
 	if (ret < 0) {
@@ -2079,9 +2059,8 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
 		goto errcode_handle;
 	}
 
-	FSEEK(ptr->fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE),
-		SEEK_SET);
-	FREAD(&filestats, sizeof(FILE_STATS_TYPE), 1, ptr->fptr);
+	filestats = MREAD(ptr, NULL, sizeof(FILE_STATS_TYPE),
+	      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
 
 	/*
 	 * when from unpin to pin, decrease unpin-dirty size, otherwise
@@ -2089,11 +2068,11 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
 	 */
 	if (P_IS_PIN(pin))
 		change_system_meta_ignore_dirty(ptr->inode_num, 0, 0, 0, 0, 0,
-						-filestats.dirty_data_size,
+						-filestats->dirty_data_size,
 						FALSE);
 	else
 		change_system_meta_ignore_dirty(ptr->inode_num, 0, 0, 0, 0, 0,
-						filestats.dirty_data_size,
+						filestats->dirty_data_size,
 						FALSE);
 
 	return 0;
@@ -3322,13 +3301,13 @@ errcode_handle:
  */
 int32_t check_data_location(ino_t this_inode)
 {
-	int32_t errcode;
+	int32_t errcode, ret;
 	char metapath[METAPATHLEN];
 	HCFS_STAT thisstat;
 	META_CACHE_ENTRY_STRUCT *thisptr;
 	char inode_loc;
-	FILE_STATS_TYPE tmpstats;
-	ssize_t ret_ssize;
+	FILE_STATS_TYPE *tmpstats;
+	size_t ret_size;
 
 	write_log(10, "Debug checkloc inode %" PRIu64 "\n",
 		  (uint64_t)this_inode);
@@ -3352,12 +3331,12 @@ int32_t check_data_location(ino_t this_inode)
 		errcode = meta_cache_open_file(thisptr);
 		if (errcode < 0)
 			goto errcode_handle;
-		PREAD(fileno(thisptr->fptr), &tmpstats, sizeof(FILE_STATS_TYPE),
+		tmpstats = MREAD(thisptr, NULL, sizeof(FILE_STATS_TYPE),
 		      sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE));
-		if ((tmpstats.num_blocks == 0) ||
-		    (tmpstats.num_blocks == tmpstats.num_cached_blocks))
+		if ((tmpstats->num_blocks == 0) ||
+		    (tmpstats->num_blocks == tmpstats->num_cached_blocks))
 			inode_loc = 0;  /* If the location is "local" */
-		else if (tmpstats.num_cached_blocks == 0)
+		else if (tmpstats->num_cached_blocks == 0)
 			inode_loc = 1;  /* If the location is "cloud" */
 		else
 			inode_loc = 2;  /* If the location is "hybrid" */

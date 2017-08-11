@@ -67,8 +67,8 @@ static inline int32_t _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
 	int32_t ret, errcode;
 	size_t ret_size;
 
-	FSEEK(ptr->fptr, dir_page->this_page_pos, SEEK_SET);
-	FREAD((ptr->dir_entry_cache[0]), sizeof(DIR_ENTRY_PAGE), 1, ptr->fptr);
+	MREAD(ptr, (ptr->dir_entry_cache[0]), sizeof(DIR_ENTRY_PAGE),
+	      dir_page->this_page_pos);
 
 	memcpy(dir_page, (ptr->dir_entry_cache[0]), sizeof(DIR_ENTRY_PAGE));
 
@@ -171,11 +171,16 @@ int32_t meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 			}
 		}
 
+		MMAP(body_ptr);
+
 		setbuf(body_ptr->fptr, NULL);
 		flock(fileno(body_ptr->fptr), LOCK_EX);
 		body_ptr->meta_opened = TRUE;
 	}
 	return 0;
+
+errcode_handle:
+	return -errcode;
 }
 
 /************************************************************************
@@ -336,10 +341,9 @@ int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t ei
 	if (ret < 0)
 		return ret;
 
-	FSEEK(body_ptr->fptr,
-		(body_ptr->dir_entry_cache[eindex])->this_page_pos, SEEK_SET);
-	FWRITE(body_ptr->dir_entry_cache[eindex], sizeof(DIR_ENTRY_PAGE),
-							1, body_ptr->fptr);
+	MWRITE(body_ptr, body_ptr->dir_entry_cache[eindex],
+	       sizeof(DIR_ENTRY_PAGE),
+	       (body_ptr->dir_entry_cache[eindex])->this_page_pos);
 
 	if (body_ptr->can_be_synced_cloud_later == FALSE)
 		ret = super_block_mark_dirty((body_ptr->this_stat).ino);
@@ -360,11 +364,9 @@ static inline int32_t _cache_sync(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t ind
 
 	if ((body_ptr->dir_entry_cache_dirty[index] == TRUE) &&
 				(body_ptr->dir_entry_cache[index] != NULL)) {
-		FSEEK(body_ptr->fptr,
-			(body_ptr->dir_entry_cache[index])->this_page_pos,
-								SEEK_SET);
-		FWRITE(body_ptr->dir_entry_cache[index], sizeof(DIR_ENTRY_PAGE),
-							1, body_ptr->fptr);
+		MWRITE(body_ptr, body_ptr->dir_entry_cache[index],
+		       sizeof(DIR_ENTRY_PAGE),
+		       (body_ptr->dir_entry_cache[index])->this_page_pos);
 		body_ptr->dir_entry_cache_dirty[index] = FALSE;
 	}
 	return 0;
@@ -399,9 +401,7 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 	/* Sync HCFS_STAT */
 	if (body_ptr->stat_dirty == TRUE) {
-		FSEEK(body_ptr->fptr, 0, SEEK_SET);
-		FWRITE(&(body_ptr->this_stat), sizeof(HCFS_STAT), 1,
-							body_ptr->fptr);
+		MWRITE(body_ptr, &(body_ptr->this_stat), sizeof(HCFS_STAT), 0);
 		body_ptr->stat_dirty = FALSE;
 	}
 
@@ -410,23 +410,18 @@ int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 			pages */
 	if (body_ptr->meta_dirty == TRUE) {
 		if (S_ISFILE(body_ptr->this_stat.mode)) {
-			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
-			FWRITE((body_ptr->file_meta), sizeof(FILE_META_TYPE),
-							1, body_ptr->fptr);
+			MWRITE(body_ptr, (body_ptr->file_meta),
+			       sizeof(FILE_META_TYPE), sizeof(HCFS_STAT));
 		} else {
 			if (S_ISDIR(body_ptr->this_stat.mode)) {
-				FSEEK(body_ptr->fptr, sizeof(HCFS_STAT),
-							SEEK_SET);
-				FWRITE((body_ptr->dir_meta),
-						sizeof(DIR_META_TYPE),
-							1, body_ptr->fptr);
+				MWRITE(body_ptr, (body_ptr->dir_meta),
+				       sizeof(DIR_META_TYPE),
+				       sizeof(HCFS_STAT));
 			}
 			if (S_ISLNK(body_ptr->this_stat.mode)) {
-				FSEEK(body_ptr->fptr, sizeof(HCFS_STAT),
-					SEEK_SET);
-				FWRITE((body_ptr->symlink_meta),
-					sizeof(SYMLINK_META_TYPE), 1,
-					body_ptr->fptr);
+				MWRITE(body_ptr, body_ptr->symlink_meta,
+				       sizeof(SYMLINK_META_TYPE),
+				       sizeof(HCFS_STAT));
 			}
 		}
 
@@ -498,6 +493,7 @@ int32_t flush_clean_all_meta_cache(void)
 			if ((this_ptr->body).something_dirty == TRUE)
 				flush_single_entry(&(this_ptr->body));
 			if ((this_ptr->body).meta_opened == TRUE) {
+				MUNMAP((&this_ptr->body));
 				flock(fileno((this_ptr->body).fptr),
 							LOCK_UN);
 				fclose((this_ptr->body).fptr);
@@ -547,8 +543,10 @@ int32_t free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 	if (entry_body->dir_entry_cache[1] != NULL)
 		free(entry_body->dir_entry_cache[1]);
 	if (entry_body->meta_opened) {
-		if (entry_body->fptr != NULL)
+		if (entry_body->fptr != NULL) {
+			MUNMAP(entry_body);
 			fclose(entry_body->fptr);
+		}
 		entry_body->meta_opened = FALSE;
 	}
 
@@ -618,8 +616,8 @@ processing the new one */
 		if (ret < 0)
 			return ret;
 
-		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
-		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+		MWRITE(body_ptr, block_page, sizeof(BLOCK_ENTRY_PAGE),
+		       page_pos);
 
 		/* If not syncing HCFS_STAT or meta, need to sync
 		block page */
@@ -712,8 +710,8 @@ processing the new one */
 		if (ret < 0)
 			return ret;
 
-		FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
-		FWRITE(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+		MWRITE(body_ptr, block_page, sizeof(BLOCK_ENTRY_PAGE),
+		       page_pos);
 	}
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);
@@ -820,7 +818,6 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode,
 {
 	int32_t ret, errcode;
 	size_t ret_size;
-	ssize_t ret_ssize;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -838,9 +835,8 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode,
 			if (ret < 0)
 				return ret;
 
-			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
-			FREAD(body_ptr->file_meta, sizeof(FILE_META_TYPE),
-							1, body_ptr->fptr);
+			MREAD(body_ptr, body_ptr->file_meta,
+			      sizeof(FILE_META_TYPE), sizeof(HCFS_STAT));
 		}
 		memcpy(file_meta_ptr, body_ptr->file_meta,
 						sizeof(FILE_META_TYPE));
@@ -853,8 +849,7 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode,
 			errcode = ret;
 			goto errcode_handle;
 		}
-		PREAD(fileno(body_ptr->fptr), block_page,
-		      sizeof(BLOCK_ENTRY_PAGE), page_pos);
+		MREAD(body_ptr, block_page, sizeof(BLOCK_ENTRY_PAGE), page_pos);
 		//FSEEK(body_ptr->fptr, page_pos, SEEK_SET);
 		//FREAD(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 	}
@@ -902,9 +897,8 @@ static inline int32_t _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
 	if (ptr->dir_entry_cache_dirty[1] == TRUE) {
 		tmp_fpos = (ptr->dir_entry_cache[1])->
 						this_page_pos;
-		FSEEK(ptr->fptr, tmp_fpos, SEEK_SET);
-		FWRITE(ptr->dir_entry_cache[1],
-			sizeof(DIR_ENTRY_PAGE), 1, ptr->fptr);
+		MWRITE(ptr, ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE),
+		       tmp_fpos);
 		if (ptr->can_be_synced_cloud_later == FALSE) {
 			ret = super_block_mark_dirty((ptr->this_stat).ino);
 			if (ret < 0)
@@ -965,9 +959,8 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 			if (ret < 0)
 				return ret;
 
-			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
-			FREAD(body_ptr->dir_meta, sizeof(DIR_META_TYPE),
-							1, body_ptr->fptr);
+			MREAD(body_ptr, body_ptr->dir_meta,
+			      sizeof(DIR_META_TYPE), sizeof(HCFS_STAT));
 		}
 
 		memcpy(dir_meta_ptr, body_ptr->dir_meta, sizeof(DIR_META_TYPE));
@@ -1124,7 +1117,7 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 {
 	char thismetapath[METAPATHLEN];
 	DIR_META_TYPE dir_meta;
-	DIR_ENTRY_PAGE temppage, rootpage, tmp_resultpage;
+	DIR_ENTRY_PAGE temppage, *rootpage, tmp_resultpage;
 	DIR_ENTRY_PAGE *tmp_page_ptr;
 	int32_t ret, errcode;
 	size_t ret_size;
@@ -1195,13 +1188,14 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 				goto errcode_handle;
 			}
 
+			MMAP(body_ptr);
+
 			setbuf(body_ptr->fptr, NULL);
 			flock(fileno(body_ptr->fptr), LOCK_EX);
 			body_ptr->meta_opened = TRUE;
 		}
-		FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
-		FREAD(body_ptr->dir_meta, sizeof(DIR_META_TYPE), 1,
-							body_ptr->fptr);
+		MREAD(body_ptr, body_ptr->dir_meta, sizeof(DIR_META_TYPE),
+		      sizeof(HCFS_STAT));
 	 }
 
 	memcpy(&(dir_meta), body_ptr->dir_meta, sizeof(DIR_META_TYPE));
@@ -1214,7 +1208,6 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 		return 0;
 
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
-	memset(&rootpage, 0, sizeof(DIR_ENTRY_PAGE));
 
 	if (body_ptr->meta_opened == FALSE) {
 		ret = fetch_meta_path(thismetapath, body_ptr->inode_num);
@@ -1229,16 +1222,17 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			goto errcode_handle;
 		}
 
+		MMAP(body_ptr);
+
 		setbuf(body_ptr->fptr, NULL);
 		flock(fileno(body_ptr->fptr), LOCK_EX);
 		body_ptr->meta_opened = TRUE;
 	}
 
 	/*Read the root node*/
-	FSEEK(body_ptr->fptr, nextfilepos, SEEK_SET);
-	FREAD(&rootpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	rootpage = MREAD(body_ptr, NULL, sizeof(DIR_ENTRY_PAGE), nextfilepos);
 
-	ret = search_dir_entry_btree(childname, &rootpage,
+	ret = search_dir_entry_btree(childname, rootpage,
 			fileno(body_ptr->fptr), &tmp_index, &tmp_resultpage,
 			is_external);
 	if ((ret < 0) && (ret != -ENOENT)) {
@@ -1699,6 +1693,8 @@ int32_t meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 	if (META_CACHE_FLUSH_NOW == TRUE)
 		ret_val = flush_single_entry(target_ptr);
 
+	MUNMAP(target_ptr);
+
 	flock(fileno(target_ptr->fptr), LOCK_UN);
 	fclose(target_ptr->fptr);
 	target_ptr->meta_opened = FALSE;
@@ -1839,9 +1835,8 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode,
 			if (ret < 0)
 				return ret;
 
-			FSEEK(body_ptr->fptr, sizeof(HCFS_STAT), SEEK_SET);
-			FREAD(body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE),
-							1, body_ptr->fptr);
+			MREAD(body_ptr, body_ptr->symlink_meta,
+			      sizeof(SYMLINK_META_TYPE), sizeof(HCFS_STAT));
 		}
 
 		memcpy(symlink_meta_ptr, body_ptr->symlink_meta,
