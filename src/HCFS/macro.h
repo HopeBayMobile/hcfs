@@ -330,15 +330,29 @@
 		UNUSED(ret_size);\
 		errcode = 0;\
 		ret_size = 0;\
+		errno = 0;\
 		void *b = (B);\
 		if ((D)+(C) > (A)->mmap_len)\
 			MMAP((A));\
+		if ((A)->mmap_addr == NULL) {\
+			errno = EFAULT;\
+			break;\
+		}\
 		void *p = (A)->mmap_addr+(D);\
 		if (b)\
 			memcpy(b, p, (C));\
 		read_ptr = p;\
 		ret_size = (C);\
 	} while (0);\
+	if (errno)\
+	{\
+		ret = -1;\
+		errcode = errno;\
+		write_log(0, "IO error in %s. Code %d, %s, %d\n", __func__,\
+			errcode, strerror(errcode), __LINE__);\
+		errcode = -errcode;\
+		goto errcode_handle;\
+	}\
 	read_ptr;\
 	})
 
@@ -360,6 +374,10 @@
 			if (fallocate(fd, 0, 0, file_len) == -1)\
 				break;\
 			(A)->mmap_file_len = file_len;\
+		}\
+		if ((A)->mmap_addr == NULL) {\
+			errno = EFAULT;\
+			break;\
 		}\
 		void *p = (A)->mmap_addr+(D);\
 		memcpy(p, (B), (C));\
