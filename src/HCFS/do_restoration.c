@@ -35,6 +35,7 @@
 #include "utils.h"
 #include "restoration_utils.h"
 #include "hcfs_cacheops.h"
+#include "hcfs_tocloud.h"
 #include "control_smartcache.h"
 #include "FS_manager.h"
 
@@ -45,8 +46,8 @@ void init_restore_path(void)
 	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore", METAPATH);
 	snprintf(RESTORE_BLOCKPATH, BLOCKPATHLEN, "%s_restore", BLOCKPATH);
 	sem_init(&(restore_sem), 0, 1);
-	sem_init(&(backup_pkg_sem), 0, 1);
-	have_new_pkgbackup = TRUE;
+	sem_init(&(pkg_backup_data.backup_pkg_sem), 0, 1);
+	pkg_backup_data.have_new_pkgbackup = TRUE;
 	use_old_cloud_stat = FALSE;
 }
 
@@ -3071,9 +3072,9 @@ void cleanup_stage1_data(void)
 /* Function for backing up package list (packages.xml) */
 int32_t backup_package_list(void)
 {
-	sem_wait(&backup_pkg_sem);
-	have_new_pkgbackup = TRUE;
-	sem_post(&backup_pkg_sem);
+	LOCK_PKG_BACKUP_SEM();
+	pkg_backup_data.have_new_pkgbackup = TRUE;
+	UNLOCK_PKG_BACKUP_SEM();
 	return 0;
 }
 

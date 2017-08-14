@@ -10,6 +10,8 @@ typedef struct {
 	int32_t (*download_fill_object_info)(GOOGLEDRIVE_OBJ_INFO *obj_info,
 					  char *objname,
 					  char *objectID);
+	int32_t (*get_pkglist_id)(char *id);
+	int32_t (*record_pkglist_id)(const char *id);
 } BACKEND_OPERATION;
 
 BACKEND_OPERATION backend_ops;

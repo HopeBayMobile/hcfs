@@ -2531,18 +2531,33 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 	int32_t ret;
 	char backup_xml[METAPATHLEN];
 	FILE *fptr = NULL;
+	char object_cloud_id[GDRIVE_ID_LENGTH] = {0};
+	GOOGLEDRIVE_OBJ_INFO obj_info;
+	bool need_record_id = false;
 
-	sem_wait(&backup_pkg_sem);
+	LOCK_PKG_BACKUP_SEM();
 
 	/* Return immediately if no new package list */
-	if (have_new_pkgbackup == FALSE) {
-		sem_post(&backup_pkg_sem);
+	if (pkg_backup_data.have_new_pkgbackup == FALSE) {
+		UNLOCK_PKG_BACKUP_SEM();
 		return;
 	}
-	have_new_pkgbackup = FALSE;
-	sem_post(&backup_pkg_sem);
-
+	pkg_backup_data.have_new_pkgbackup = FALSE;
+	UNLOCK_PKG_BACKUP_SEM();
 	write_log(4, "Backing up package list\n");
+
+	/* Fetch object id */
+	ret = backend_ops.get_pkglist_id(object_cloud_id);
+	if (ret < 0) {
+		if (ret == -ENOENT) {
+			need_record_id = true;
+		} else {
+			write_log(0, "Unable to fetch id of package list\n");
+			return;
+		}
+	}
+	backend_ops.fill_object_info(&obj_info, "backup_pkg", object_cloud_id);
+
 	snprintf(backup_xml, METAPATHLEN, "%s/backup_pkg", METAPATH);
 
 	if (access(PACKAGE_XML, F_OK) != 0) {
@@ -2562,17 +2577,19 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 		write_log(0, "Unable to open backed-up pkg list\n");
 		return;
 	}
-
 	setbuf(fptr, NULL);
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL, NULL);
+	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL, &obj_info);
 	if ((ret < 200) || (ret > 299))
 		goto errcode_handle;
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 	fptr = NULL;
+
+	if (need_record_id)
+		backend_ops.record_pkglist_id(obj_info.fileID);
 
 	return;
 errcode_handle:

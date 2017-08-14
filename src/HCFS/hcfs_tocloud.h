@@ -34,6 +34,17 @@
 #define MAX_SYNC_CONCURRENCY 8
 
 typedef struct {
+	BOOL have_new_pkgbackup;
+	char pkglist_id[400];
+	sem_t backup_pkg_sem;
+} PKG_BACKUP_STRUCT;
+
+PKG_BACKUP_STRUCT pkg_backup_data;
+
+#define LOCK_PKG_BACKUP_SEM() sem_wait(&(pkg_backup_data.backup_pkg_sem))
+#define UNLOCK_PKG_BACKUP_SEM() sem_post(&(pkg_backup_data.backup_pkg_sem))
+
+typedef struct {
 	off_t page_filepos;
 	int64_t page_entry_index;
 	ino_t inode;
