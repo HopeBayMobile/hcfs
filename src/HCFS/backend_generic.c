@@ -1,5 +1,6 @@
 #include "backend_generic.h"
 #include "googledrive_curl.h"
+#include "do_restoration.h"
 
 int32_t swift_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
 			       char *objname,
@@ -95,8 +96,13 @@ int32_t gdrive_get_pkglist_id(char *id)
 	}
 
 	/* Try to fetch from file */
-	snprintf(pkglist_id_filename, sizeof(pkglist_id_filename) - 1, "%s/pkglist_id",
-		 METAPATH);
+	if (hcfs_system->system_restoring == RESTORING_STAGE1)
+		snprintf(pkglist_id_filename, sizeof(pkglist_id_filename) - 1,
+			 "%s/pkglist_id", RESTORE_METAPATH);
+	else
+		snprintf(pkglist_id_filename, sizeof(pkglist_id_filename) - 1,
+			 "%s/pkglist_id", METAPATH);
+
 	fptr = fopen(pkglist_id_filename, "r");
 	if (!fptr) {
 		ret = -errno;
@@ -137,8 +143,12 @@ int32_t gdrive_record_pkglist_id(const char *id)
 	FILE *fptr;
 
 	LOCK_PKG_BACKUP_SEM();
-	snprintf(pkglist_id_filename, sizeof(pkglist_id_filename) - 1, "%s/pkglist_id",
-		 METAPATH);
+	if (hcfs_system->system_restoring == RESTORING_STAGE1)
+		snprintf(pkglist_id_filename, sizeof(pkglist_id_filename) - 1,
+			 "%s/pkglist_id", RESTORE_METAPATH);
+	else
+		snprintf(pkglist_id_filename, sizeof(pkglist_id_filename) - 1,
+			 "%s/pkglist_id", METAPATH);
 	id_len = strlen(id);
 	fptr = fopen(pkglist_id_filename, "w+");
 	if (!fptr) {

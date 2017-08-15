@@ -20,6 +20,7 @@
 #include "macro.h"
 #include "monitor.h"
 #include "fuseop.h"
+#include "do_restoration.h"
 
 #define MAX_BACKOFF_EXP 3
 
@@ -1028,7 +1029,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 
 	/* Create filter string */
 	if (obj_info->file_title[0]) {
-		ASPRINTF(&title_string, "q=title+contains+'%s'",
+		ASPRINTF(&title_string, "q=title+=+'%s'",
 			obj_info->file_title);
 		title_exist = TRUE;
 	}
@@ -1130,11 +1131,13 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 	json_t *json_data, *json_items, *json_title, *json_id;
 	const char *temp_id = NULL, *title = NULL;
 	char buffer[8192] = {0};
+	int32_t ret = 0;
 
 	fseek(fptr, 0, SEEK_SET);
 	json_data =
 	    json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
 	if (!json_data) {
+		ret = -EIO;
 		write_log(0, "Error: Fail to read json file. Error %s.",
 			  jerror.text);
 		goto errcode_handle;
@@ -1142,6 +1145,7 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 	/* Get list with key "items" */
 	json_items = json_object_get(json_data, "items");
 	if (!json_items) {
+		ret = -ENOENT;
 		write_log(0,
 			  "Error: Fail to parse json file. items not found\n");
 		goto errcode_handle_json_del;
@@ -1159,12 +1163,14 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 
 		json_title = json_object_get(json_value, "title");
 		if (!json_title) {
+			ret = -ENOENT;
 			write_log(0, "Error: Fail to parse json file. title "
 				     "not found\n");
 			goto errcode_handle_json_del;
 		}
 		title = json_string_value(json_title);
 		if (!title) {
+			ret = -EINVAL;
 			write_log(0, "Error: Json file is corrupt\n");
 			goto errcode_handle_json_del;
 		}
@@ -1173,12 +1179,14 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 			found = true;
 			json_id = json_object_get(json_value, "id");
 			if (!json_id) {
+				ret = -ENOENT;
 				write_log(0, "Error: Fail to parse json file. "
 					     "id not found\n");
 				goto errcode_handle_json_del;
 			}
 			temp_id = json_string_value(json_id);
 			if (!temp_id) {
+				ret = -EINVAL;
 				write_log(0, "Error: Json file is corrupt\n");
 				goto errcode_handle_json_del;
 			}
@@ -1188,14 +1196,11 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 	}
 	json_delete(json_data);
 	if (found == false) {
+		ret = -ENOENT;
 		write_log(0, "Object %s is not found.", objname);
 		goto errcode_handle;
 	}
 
-//	fseek(fptr, 0, SEEK_SET);
-//	fread(buffer, 8190, 1, fptr);
-//	write_log(0, "success to parse root folder id. Dump content:\n %s\n",
-//		  buffer);
 	return 0;
 
 errcode_handle_json_del:
@@ -1205,7 +1210,7 @@ errcode_handle:
 	fread(buffer, 8190, 1, fptr);
 	write_log(0, "Fail to parse root folder id. Dump content:\n %s\n",
 		  buffer);
-	return -1;
+	return ret;
 }
 
 
@@ -1245,8 +1250,12 @@ int32_t get_parent_id(char *id, const char *objname)
 		goto out;
 	}
 
-	snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
-		 "%s/hcfs_root_id", METAPATH);
+	if (hcfs_system->system_restoring == RESTORING_STAGE1)
+		snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
+			 "%s/hcfs_root_id", RESTORE_METAPATH);
+	else
+		snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
+			 "%s/hcfs_root_id", METAPATH);
 
 	/* Create folder */
 	sem_wait(&(gdrive_folder_id_cache->op_lock));
@@ -1309,8 +1318,6 @@ int32_t get_parent_id(char *id, const char *objname)
 		ret =
 		    fetch_id_from_list_body(fptr, id, GOOGLEDRIVE_FOLDER_NAME);
 		if (ret < 0) {
-			/* TODO: error handling when folder not found */
-			ret = -EIO;
 			fclose(fptr);
 			goto unlock_sem_out;
 		}

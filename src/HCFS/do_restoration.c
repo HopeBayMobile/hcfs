@@ -38,6 +38,7 @@
 #include "hcfs_tocloud.h"
 #include "control_smartcache.h"
 #include "FS_manager.h"
+#include "backend_generic.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -2652,6 +2653,7 @@ int32_t run_download_minimal(void)
 	ino_t vol_max_inode, sys_max_inode;
 	INODE_PAIR_LIST *hardln_mapping;
 	BOOL smartcache_already_in_hcfs = FALSE;
+	GOOGLEDRIVE_OBJ_INFO obj_info;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -2682,6 +2684,8 @@ int32_t run_download_minimal(void)
 	}
 
 	write_log(4, "Downloading package list backup\n");
+	backend_ops.download_fill_object_info(&obj_info, "backup_pkg", NULL);
+	backend_ops.record_pkglist_id(obj_info.fileID);
 	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
 	ret = restore_fetch_obj("backup_pkg", despath, FALSE);
 	if (ret < 0) {

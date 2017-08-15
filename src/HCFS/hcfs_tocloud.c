@@ -2556,7 +2556,12 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 			return;
 		}
 	}
-	backend_ops.fill_object_info(&obj_info, "backup_pkg", object_cloud_id);
+	ret = backend_ops.fill_object_info(&obj_info, "backup_pkg",
+					   object_cloud_id);
+	if (ret < 0) {
+		write_log(0, "Unable to fill object info of package list\n");
+		return;
+	}
 
 	snprintf(backup_xml, METAPATHLEN, "%s/backup_pkg", METAPATH);
 
