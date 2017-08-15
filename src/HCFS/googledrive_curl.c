@@ -1049,7 +1049,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 
 	/* Create URL */
 	if (filter_string) {
-		printf("%s\n", filter_string);
+		write_log(0, "TEST: %s\n", filter_string);
 		ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files?%s",
 			 filter_string);
 		FREE(filter_string);
@@ -1226,12 +1226,14 @@ int32_t get_parent_id(char *id, const char *objname)
 	int32_t ret = 0;
 	FILE *fptr;
 
+	write_log(0, "TEST: Enter in fetch parent id. obj %s", objname);
 	memset(&root_handle, 0, sizeof(CURL_HANDLE));
 
 	/* Now data/meta/fsmgr-backup are put under folder "teradata" */
 	if (strncmp(objname, "data", 4) != 0 &&
 	    strncmp(objname, "meta", 4) != 0 &&
 	    strncmp(objname, "FSstat", 6) != 0 &&
+	    strncmp(objname, "backup_pkg", 10) != 0 &&
 	    strncmp(objname, FSMGR_BACKUP, strlen(FSMGR_BACKUP)) != 0) {
 		id[0] = 0;
 		goto out;
@@ -1378,7 +1380,9 @@ int32_t query_object_id(GOOGLEDRIVE_OBJ_INFO *obj_info)
 		ret = -errno;
 		goto out;
 	}
-	ret = hcfs_list_container(fptr, &list_handle, &obj_info);
+	write_log(0, "TEST: query file: %s, parent: %s", obj_info->file_title,
+		  obj_info->parentID);
+	ret = hcfs_list_container(fptr, &list_handle, obj_info);
 	if ((ret < 200) || (ret > 299)) {
 		write_log(0, "Error in list %s. Http code %d\n",
 			  GOOGLEDRIVE_FOLDER_NAME, ret);

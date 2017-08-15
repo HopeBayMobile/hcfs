@@ -1795,7 +1795,6 @@ int32_t hcfs_list_container(FILE *fptr,
 {
 	int32_t ret_val, num_retries, busy_retry_times = 0;
 
-	UNUSED(more);
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
