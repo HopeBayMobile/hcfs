@@ -2384,7 +2384,7 @@ int32_t check_init_super_block()
 			}
 			setbuf(fsmgr_fptr, NULL);
 			ret = fetch_object_busywait_conn(fsmgr_fptr,
-					RESTORE_FETCH_OBJ, objname);
+					RESTORE_FETCH_OBJ, objname, NULL);
 			fclose(fsmgr_fptr);
 			if (ret < 0) {
 				unlink(fsmgr_path);

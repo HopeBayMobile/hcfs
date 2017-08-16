@@ -1192,7 +1192,10 @@ int32_t update_quota()
  * @return 0 on success, -ENOENT if object not found, -ESHUTDOWN if
  *           system shutdown, or other negative error code.
  */
-int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
+int32_t fetch_object_busywait_conn(FILE *fptr,
+				   char action_from,
+				   char *objname,
+				   char *objid)
 {
 	int32_t ret;
 	struct timespec time_to_sleep;
@@ -1218,7 +1221,7 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 			flock(fileno(fptr), LOCK_EX);
 			FTRUNCATE(fileno(fptr), 0);
 			ret = 
-			    fetch_from_cloud(fptr, action_from, objname, NULL);
+			    fetch_from_cloud(fptr, action_from, objname, objid);
 			flock(fileno(fptr), LOCK_UN);
 			if (ret < 0) {
 				if (ret == -ENOENT)

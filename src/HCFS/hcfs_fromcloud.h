@@ -80,7 +80,10 @@ int32_t fetch_from_cloud(FILE *fptr,
 			 char action_from,
 			 char *objname,
 			 char *fileID);
-int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname);
+int32_t fetch_object_busywait_conn(FILE *fptr,
+				   char action_from,
+				   char *objname,
+				   char *objid);
 
 void* download_block_manager(void *arg);
 int32_t init_download_control(void);

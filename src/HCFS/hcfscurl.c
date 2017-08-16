@@ -496,15 +496,18 @@ int32_t hcfs_get_auth_token(void)
 	struct timespec timeout;
 	BACKEND_TOKEN_CONTROL *token_controller = NULL;
 
-	/* Token is already set */
-	if (swift_auth_string[0] != 0)
-		return 200;
-
 	switch (CURRENT_BACKEND) {
 	case SWIFTTOKEN:
+	case SWIFT:
+		if (swift_auth_string[0] != 0)
+			return 200;
+
 		token_controller = &swifttoken_control;
 		break;
 	case GOOGLEDRIVE:
+		if (googledrive_token[0] != 0)
+			return 200;
+
 		token_controller = googledrive_token_control;
 		break;
 	default:
@@ -1640,7 +1643,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	case SWIFT:
 	case SWIFTTOKEN:
 	case GOOGLEDRIVE:
-		write_log(2, "Connecting to %s backend\n",
+		write_log(5, "Connecting to %s backend\n",
 			  CURRENT_BACKEND == GOOGLEDRIVE ? "google drive"
 							 : "swift");
 		num_retries = 0;

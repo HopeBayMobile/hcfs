@@ -482,7 +482,10 @@ int32_t fetch_restore_block_path(char *pathname,
 /* FEATURE TODO: How to retry stage 1 without downloading the same
  * files again, but also need to ensure the correctness of downloaded files
  */
-int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
+int32_t restore_fetch_obj(char *objname,
+			  char *objid,
+			  char *despath,
+			  BOOL is_meta)
 {
 	FILE *fptr;
 	int32_t ret;
@@ -494,7 +497,8 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 	}
 	setbuf(fptr, NULL);
 
-	ret = fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname);
+	ret =
+	    fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname, objid);
 	if (ret < 0) {
 		if (ret == -ENOENT) {
 			write_log(0,
@@ -525,11 +529,11 @@ int32_t _fetch_meta(ino_t thisinode)
 		 (uint64_t)thisinode);
 	fetch_restore_meta_path(despath, thisinode);
 
-	ret = restore_fetch_obj(objname, despath, TRUE);
+	ret = restore_fetch_obj(objname, NULL, despath, TRUE);
 	return ret;
 }
 
-int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq)
+int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq, char *id)
 {
 	char objname[BLOCKPATHLEN];
 	char despath[BLOCKPATHLEN];
@@ -539,7 +543,7 @@ int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq)
 		(uint64_t)thisinode, blockno, seq);
 	fetch_restore_block_path(despath, thisinode, blockno);
 
-	ret = restore_fetch_obj(objname, despath, FALSE);
+	ret = restore_fetch_obj(objname, id, despath, FALSE);
 	return ret;
 }
 
@@ -557,7 +561,7 @@ int32_t _fetch_FSstat(ino_t rootinode)
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 RESTORE_METAPATH, (uint64_t)rootinode);
 
-	ret = restore_fetch_obj(objname, despath, FALSE);
+	ret = restore_fetch_obj(objname, NULL, despath, FALSE);
 	return ret;
 
 errcode_handle:
@@ -741,8 +745,9 @@ int32_t _fetch_pinned(ino_t thisinode, BOOL is_smartcache)
 
 		/* Skip if block does not exist */
 		if (temppage.block_entries[nowindex].status == ST_CLOUD) {
+			char *id = temppage.block_entries[nowindex].blockID;
 			seq = temppage.block_entries[nowindex].seqnum;
-			ret = _fetch_block(thisinode, count, seq);
+			ret = _fetch_block(thisinode, count, seq, id);
 			if (ret < 0) {
 				if (ret == -ENOENT && is_smartcache == TRUE) {
 					/* Remove missing block when restoring
@@ -2687,7 +2692,7 @@ int32_t run_download_minimal(void)
 	backend_ops.download_fill_object_info(&obj_info, "backup_pkg", NULL);
 	backend_ops.record_pkglist_id(obj_info.fileID);
 	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
-	ret = restore_fetch_obj("backup_pkg", despath, FALSE);
+	ret = restore_fetch_obj("backup_pkg", NULL, despath, FALSE);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -2708,7 +2713,7 @@ int32_t run_download_minimal(void)
 	}
 
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
-	ret = restore_fetch_obj(FSMGR_BACKUP, despath, FALSE);
+	ret = restore_fetch_obj(FSMGR_BACKUP, NULL, despath, FALSE);
 
 	if (ret < 0) {
 		errcode = ret;

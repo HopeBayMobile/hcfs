@@ -1208,8 +1208,8 @@ errcode_handle_json_del:
 errcode_handle:
 	fseek(fptr, 0, SEEK_SET);
 	fread(buffer, 8190, 1, fptr);
-	write_log(0, "Fail to parse root folder id. Dump content:\n %s\n",
-		  buffer);
+	write_log(0, "Fail to parse id of %s. Dump content:\n %s\n",
+		  objname, buffer);
 	return ret;
 }
 
@@ -1307,6 +1307,9 @@ int32_t get_parent_id(char *id, const char *objname)
 			ret = -errno;
 			goto unlock_sem_out;
 		}
+		setbuf(fptr, NULL);
+		fseek(fptr, 0, SEEK_SET);
+
 		ret = hcfs_list_container(fptr, &root_handle, &gdrive_info);
 		if ((ret < 200) || (ret > 299)) {
 			write_log(0, "Error in list %s. Http code %d\n",
