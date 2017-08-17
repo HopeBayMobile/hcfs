@@ -27,8 +27,8 @@
 #include "googledrive_curl.h"
 #include "pthread_control.h"
 
-#define MAX_DELETE_CONCURRENCY 4
-#define MAX_DSYNC_CONCURRENCY 2
+#define MAX_DELETE_CONCURRENCY 8
+#define MAX_DSYNC_CONCURRENCY 4
 
 typedef struct {
 	ino_t inode;

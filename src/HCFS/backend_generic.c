@@ -52,7 +52,7 @@ int32_t gdrive_download_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
 		return -EINVAL;
 
 	memset(obj_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-	if (objectID) {
+	if (objectID && objectID[0]) {
 		strncpy(obj_info->fileID, objectID, GDRIVE_ID_LENGTH);
 		return 0;
 	}

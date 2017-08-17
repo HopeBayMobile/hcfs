@@ -3063,11 +3063,23 @@ errcode_handle:
 
 void cleanup_stage1_data(void)
 {
-//	char todelete_metapath[METAPATHLEN];
-//	char todelete_blockpath[BLOCKPATHLEN];
-//
-//	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete", METAPATH);
-//	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete", BLOCKPATH);
+	char todelete_metapath[METAPATHLEN];
+	char todelete_blockpath[BLOCKPATHLEN];
+	char cmd[METAPATHLEN + 512];
+
+	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete", METAPATH);
+	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete", BLOCKPATH);
+	if (access(todelete_metapath, F_OK) == 0) {
+		snprintf(cmd, METAPATHLEN + 500, "rm -rf %s",
+			 todelete_metapath);
+		system(cmd);
+	}
+
+	if (access(todelete_blockpath, F_OK) == 0) {
+		snprintf(cmd, METAPATHLEN + 500, "rm -rf %s",
+			 todelete_blockpath);
+		system(cmd);
+	}
 //
 //	if (access(todelete_metapath, F_OK) == 0)
 //		nftw(todelete_metapath, _delete_node, 10,
