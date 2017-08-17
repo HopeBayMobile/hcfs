@@ -1403,9 +1403,9 @@ int32_t query_object_id(GOOGLEDRIVE_OBJ_INFO *obj_info)
 		fclose(fptr);
 		goto out;
 	}
-	unlink(list_path);
 
 out:
+	unlink(list_path);
 	if (list_handle.curl != NULL)
 		hcfs_destroy_backend(&list_handle);
 	return ret;
