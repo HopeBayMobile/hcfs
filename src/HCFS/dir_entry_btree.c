@@ -123,8 +123,6 @@ int32_t search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 	DIR_ENTRY temp_entry;
 	int32_t s_index, ret_val;
 	DIR_ENTRY_PAGE temp_page;
-	int32_t errcode;
-	ssize_t ret_ssize;
 
 	strcpy(temp_entry.d_name, target_name);
 
@@ -193,8 +191,6 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	int32_t temp_total;
 	int64_t tmp_overflow_new_page;
 	size_t tmp_size;
-	int32_t errcode;
-	ssize_t ret_ssize;
 	off_t ret_pos;
 
 	/*First search for the index to insert or traverse*/
@@ -273,7 +269,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 				return -ENOSPC;
 
 			memset(&newpage, 0, sizeof(DIR_ENTRY_PAGE));
-			LSEEK(fh, 0, SEEK_END);
+			ret_pos = LSEEK(fh, 0, SEEK_END);
 			newpage.this_page_pos = ret_pos;
 		}
 		newpage.gc_list_next = 0;
@@ -417,7 +413,7 @@ int32_t insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 		this_meta->entry_page_gc_list = newpage.gc_list_next;
 	} else {
 		memset(&newpage, 0, sizeof(DIR_ENTRY_PAGE));
-		LSEEK(fh, 0, SEEK_END);
+		ret_pos = LSEEK(fh, 0, SEEK_END);
 		newpage.this_page_pos = ret_pos;
 	}
 	newpage.gc_list_next = 0;
@@ -491,8 +487,6 @@ int32_t delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode
 	DIR_ENTRY_PAGE temppage;
 	DIR_ENTRY extracted_child;
 	size_t tmp_size;
-	int32_t errcode;
-	ssize_t ret_ssize;
 
 	/* First search for the index to insert or traverse */
 	entry_to_delete = dentry_binary_search(tnode->dir_entries,
@@ -671,8 +665,6 @@ elements into two, using the median as the new parent item. */
 	int32_t temp_total, median_entry;
 	char merging;
 	size_t tmp_size;
-	int32_t errcode;
-	ssize_t ret_ssize;
 
 	/* Index out of bound */
 	if (selected_child > tnode->num_entries || selected_child < 0)
@@ -958,8 +950,6 @@ int32_t extract_largest_child(DIR_ENTRY_PAGE *tnode, int32_t fh,
 
 	int32_t s_index, ret_val;
 	DIR_ENTRY_PAGE temppage;
-	int32_t errcode;
-	ssize_t ret_ssize;
 
 	s_index = tnode->num_entries;
 	if (tnode->child_page_pos[s_index] == 0) {

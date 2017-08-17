@@ -647,10 +647,10 @@ int32_t enc_backup_usermeta(char *json_str)
 	uint8_t enc_data_tmp[strlen(json_str) + TAG_SIZE];
 	uint8_t enc_data[strlen(json_str) + IV_SIZE + TAG_SIZE];
 	uint8_t iv[IV_SIZE] = {0};
-	int32_t len, ret, errcode;
+	int32_t len, ret;
 	char path[200];
 	FILE *fptr;
-	size_t ret_size;
+	int32_t errcode;
 
 	write_log(10, "Debug: enc usermeta, json str is %s\n", json_str);
 	len = strlen(json_str);
@@ -709,7 +709,6 @@ char *dec_backup_usermeta(char *path)
 	FILE *fptr = NULL;
 	int32_t ret, errcode;
 	int64_t ret_pos;
-	size_t ret_size;
 
 	if (access(path, F_OK) < 0)
 		return NULL;
@@ -720,7 +719,7 @@ char *dec_backup_usermeta(char *path)
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_END);
-	FTELL(fptr);
+	ret_pos = FTELL(fptr);
 	rewind(fptr);
 
 	enc_size = ret_pos - IV_SIZE;

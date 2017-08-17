@@ -151,8 +151,6 @@ int64_t query_status_page(int32_t fd, int64_t block_index)
 	int32_t which_indirect;
 	int64_t ret_pos;
 	int32_t level, i;
-	int32_t errcode;
-	ssize_t ret_ssize;
 	int64_t ptr_index, ptr_page_index;
 	PROGRESS_META progress_meta;
 	PTR_ENTRY_PAGE temp_ptr_page;
@@ -220,8 +218,6 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 	PTR_ENTRY_PAGE temp_ptr_page, zero_ptr_page;
 	int64_t tmp_pos;
 	int64_t ptr_page_index, ptr_index;
-	int32_t errcode;
-	ssize_t ret_ssize;
 	int64_t ret_pos;
 	int32_t level, i;
 
@@ -233,7 +229,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 	switch(which_indirect) {
 	case 0:
 		if (progress_meta.direct == 0) {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			memset(&temp_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 			PWRITE(fd, &temp_page, sizeof(BLOCK_UPLOADING_PAGE),
 				ret_pos);
@@ -243,7 +239,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 		return progress_meta.direct;
 	case 1:
 		if (progress_meta.single_indirect == 0) {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
 				ret_pos);
@@ -254,7 +250,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 		break;
 	case 2:
 		if (progress_meta.double_indirect == 0) {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
 				ret_pos);
@@ -265,7 +261,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 		break;
 	case 3:
 		if (progress_meta.triple_indirect == 0) {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
 				ret_pos);
@@ -276,7 +272,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 		break;
 	case 4:
 		if (progress_meta.quadruple_indirect == 0) {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
 				ret_pos);
@@ -303,7 +299,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 		ptr_index = ptr_index % longpow(POINTERS_PER_PAGE, level);
 
 		if (temp_ptr_page.ptr[ptr_page_index] == 0) {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			PWRITE(fd, &zero_ptr_page, sizeof(PTR_ENTRY_PAGE),
 				ret_pos);
 			temp_ptr_page.ptr[ptr_page_index] = ret_pos;
@@ -315,7 +311,7 @@ int64_t create_status_page(int32_t fd, int64_t block_index)
 
 	/* Create status page */
 	if (temp_ptr_page.ptr[ptr_index] == 0) {
-		LSEEK(fd, 0, SEEK_END);
+		ret_pos = LSEEK(fd, 0, SEEK_END);
 		memset(&temp_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
 		PWRITE(fd, &temp_page, sizeof(BLOCK_UPLOADING_PAGE),
 				ret_pos);
@@ -348,8 +344,6 @@ int32_t get_progress_info(int32_t fd, int64_t block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
 	int64_t offset;
-	int32_t errcode;
-	int64_t ret_ssize;
 	int32_t entry_index;
 	BLOCK_UPLOADING_PAGE block_page;
 
@@ -407,7 +401,6 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 {
 	int32_t errcode;
 	int64_t offset;
-	ssize_t ret_ssize;
 	int32_t entry_index;
 	BLOCK_UPLOADING_STATUS *block_uploading_status;
 	BLOCK_UPLOADING_PAGE status_page;
@@ -464,9 +457,7 @@ int32_t set_progress_info(int32_t fd, int64_t block_index,
 	const char *toupload_gdrive_id, const char *backend_gdrive_id,
 	const char *finish)
 {
-	int32_t errcode;
 	int64_t offset;
-	ssize_t ret_ssize;
 	int32_t entry_index;
 	BLOCK_UPLOADING_STATUS *block_uploading_status;
 	BLOCK_UPLOADING_PAGE status_page;
@@ -539,11 +530,10 @@ errcode_handle:
 int32_t create_progress_file(ino_t inode)
 {
 	int32_t ret_fd;
-	int32_t errcode, ret;
 	char filename[200];
 	char pathname[200];
 	PROGRESS_META progress_meta;
-	ssize_t ret_ssize;
+	int32_t errcode;
 
 	sprintf(pathname, "%s/upload_bullpen", METAPATH);
 
@@ -601,7 +591,7 @@ int32_t init_progress_info(int32_t fd, int64_t backend_blocks,
 		uint8_t *last_pin_status)
 {
 	int32_t errcode;
-	int64_t offset, ret_ssize;
+	int64_t offset;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 	int64_t e_index, which_page, current_page, page_pos;
 	int64_t block;
@@ -734,7 +724,6 @@ errcode_handle:
 int32_t del_progress_file(int32_t fd, ino_t inode)
 {
 	char filename[200];
-	int32_t ret, errcode;
 
 	fetch_progress_file_path(filename, inode);
 
@@ -752,7 +741,6 @@ errcode_handle:
 
 int32_t fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
-	int32_t errcode, ret;
 	char path[200];
 
 	sprintf(path, "%s/upload_bullpen", METAPATH);
@@ -779,8 +767,6 @@ int32_t fetch_toupload_block_path(char *pathname,
 				  int64_t block_no)
 {
 	char path[200];
-	int32_t errcode;
-	int32_t ret;
 
 	sprintf(path, "%s/upload_temp_block", BLOCKPATH);
 
@@ -805,8 +791,6 @@ errcode_handle:
 int32_t fetch_backend_meta_path(char *pathname, ino_t inode)
 {
 	char path[200];
-	int32_t errcode;
-	int32_t ret;
 
 	sprintf(path, "%s/upload_bullpen", METAPATH);
 
@@ -887,7 +871,7 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	/* After locking target file, check file size. If size > 0,
 	 * then do NOT need to copy it again. Just do nothing and return. */
 	FSEEK(tar_ptr, 0, SEEK_END);
-	FTELL(tar_ptr);
+	ret_pos = FTELL(tar_ptr);
 	if (ret_pos > 0) {
 		flock(fileno(tar_ptr), LOCK_UN);
 		fclose(tar_ptr);
@@ -942,7 +926,7 @@ int32_t check_and_copy_file(const char *srcpath, const char *tarpath,
 	FSEEK(tar_ptr, 0, SEEK_SET);
 	total_size = 0;
 	while (!feof(src_ptr)) {
-		FREAD(filebuf, 1, 4096, src_ptr);
+		ret_size = FREAD(filebuf, 1, 4096, src_ptr);
 		read_size = ret_size;
 		if (read_size > 0) {
 			FWRITE(filebuf, 1, read_size, tar_ptr);
@@ -995,8 +979,7 @@ errcode_handle:
 
 char block_finish_uploading(int32_t fd, int64_t blockno)
 {
-	int32_t ret, errcode;
-	ssize_t ret_ssize;
+	int32_t ret;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 	PROGRESS_META progress_meta;
 
@@ -1050,9 +1033,9 @@ int32_t init_backend_file_info(const SYNC_THREAD_TYPE *ptr,
 	char backend_metapath[400];
 	char objname[400];
 	HCFS_STAT tempfilestat;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
 	BOOL first_upload;
+	int32_t errcode;
 
 	if (!S_ISREG(ptr->this_mode))
 		return 0;
@@ -1187,8 +1170,6 @@ void continue_inode_sync(SYNC_THREAD_TYPE *data_ptr)
 	mode_t this_mode;
 	ino_t inode;
 	int32_t progress_fd;
-	ssize_t ret_ssize;
-	int32_t ret;
 	char now_action;
 	PROGRESS_META progress_meta;
 
@@ -1320,8 +1301,6 @@ errcode_handle:
  */ 
 int32_t change_action(int32_t fd, char new_action)
 {
-	int32_t errcode;
-	ssize_t ret_ssize;
 	PROGRESS_META progress_meta;
 
 	flock(fd, LOCK_EX);

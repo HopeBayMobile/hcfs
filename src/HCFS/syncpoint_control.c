@@ -49,8 +49,6 @@ int32_t init_syncpoint_resource()
 {
 	char path[METAPATHLEN];
 	FILE *temp_fptr;
-	int32_t errcode;
-	int64_t ret_ssize;
 
 	if (!sys_super_block) {
 		write_log(0, "Error: Superblock should be initialized"
@@ -152,9 +150,6 @@ void free_syncpoint_resource(BOOL remove_file)
  */
 int32_t write_syncpoint_data()
 {
-	int32_t errcode;
-	int64_t ret_ssize;
-
 	sem_wait(&(sys_super_block->sync_point_info->ctl_sem));
 	PWRITE(fileno(sys_super_block->sync_point_info->fptr),
 			&(sys_super_block->sync_point_info->data),

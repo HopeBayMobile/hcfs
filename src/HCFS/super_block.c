@@ -721,10 +721,11 @@ error_handle:
 *************************************************************************/
 int32_t super_block_delete(ino_t this_inode)
 {
-	int32_t ret_val, errcode, ret;
+	int32_t ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
 	ino_t temp;
 	size_t ret_size;
+	int32_t errcode;
 
 	super_block_exclusive_locking();
 
@@ -1079,7 +1080,7 @@ static int32_t _handle_temp_unclaimed_file()
 	total_inode = 0;
 	while (!feof(sys_super_block->temp_unclaimed_fptr)) {
 		/* Read some inodes */
-		PREAD(fileno(sys_super_block->temp_unclaimed_fptr),
+		ret_ssize = PREAD(fileno(sys_super_block->temp_unclaimed_fptr),
 			unclaimed_inodes, sizeof(ino_t) * 4096, now_pos);
 		if (ret_ssize == 0)
 			break;
@@ -1112,7 +1113,7 @@ static int32_t _handle_temp_unclaimed_file()
 				goto errcode_handle;
 			}
 		}
-		PWRITE(fileno(sys_super_block->unclaimed_list_fptr),
+		ret_ssize = PWRITE(fileno(sys_super_block->unclaimed_list_fptr),
 			unclaimed_inodes, num_inodes * sizeof(ino_t), now_pos);
 		now_pos += ret_ssize;
 		total_inode += num_inodes;

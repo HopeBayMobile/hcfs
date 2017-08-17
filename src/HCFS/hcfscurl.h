@@ -125,6 +125,7 @@ int32_t hcfs_delete_object(char *objname,
 
 #define HCFS_SET_DEFAULT_CURL()                                                \
 	do {                                                                   \
+		CURL *curl = NULL;\
 		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
 		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
 		curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);                   \
@@ -154,11 +155,11 @@ int cancelfn(void *clientp, double dltotal, double dlnow,
  * Marco to compute data transfer throughput.  If object size < 32KB, for
  * this computation the size is rounded up to 32KB.
  */
-#define COMPUTE_THROUGHPUT()                                                   \
+#define COMPUTE_THROUGHPUT(xfer_thpt, time_spent, objsize)                     \
 	do {                                                                   \
 		int64_t objsize_kb = (objsize <= 32768) ? 32 : objsize / 1024; \
-		time_spent = (time_spent <= 0) ? 0.001 : time_spent;           \
-		xfer_thpt = (int64_t)(objsize_kb / time_spent);                \
+		*time_spent = (*time_spent <= 0) ? 0.001 : *time_spent;        \
+		*xfer_thpt = (int64_t)(objsize_kb / *time_spent);              \
 	} while (0)
 
 #endif /* GW20_HCFS_HCFSCURL_H_ */

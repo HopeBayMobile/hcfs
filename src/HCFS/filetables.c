@@ -231,7 +231,7 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 	BOOL snap_created;
 	char snap_name[METAPATHLEN + 1];
 	int64_t ret_pos;
-	int32_t errcode, ret;
+	int32_t errcode;
 	FILE *snapfptr = NULL;
 	size_t ret_size;
 	uint8_t buf[4096];
@@ -259,7 +259,7 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 				/* Create snapshot */
 				if (access(snap_name, F_OK) == 0)
 					UNLINK(snap_name);
-				FTELL(metafptr);
+				ret_pos = FTELL(metafptr);
 				snapfptr = fopen(snap_name, "w");
 				if (snapfptr == NULL) {
 					errcode = -errno;
@@ -270,7 +270,7 @@ int32_t handle_dirmeta_snapshot(ino_t thisinode, FILE *metafptr)
 				}
 				FSEEK(metafptr, 0, SEEK_SET);
 				while (!feof(metafptr)) {
-					FREAD(buf, 1, sizeof(buf), metafptr);
+					ret_size = FREAD(buf, 1, sizeof(buf), metafptr);
 					if (ret_size == 0)
 						break;
 					FWRITE(buf, 1, ret_size, snapfptr);

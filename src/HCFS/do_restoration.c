@@ -112,7 +112,6 @@ int32_t tag_restoration(char *content)
 	char restore_stat_path2[METAPATHLEN];
 	FILE *fptr = NULL;
 	int32_t ret, errcode;
-	size_t ret_size;
 	BOOL is_open = FALSE;
 
 	fetch_restore_stat_path(restore_stat_path);
@@ -234,7 +233,6 @@ int32_t check_restoration_status(void)
 	char restore_stat[100];
 	FILE *fptr;
 	int32_t errcode, retval;
-	size_t ret_size;
 	BOOL is_open;
 
 	sem_wait(&restore_sem);
@@ -372,7 +370,6 @@ int32_t _check_and_create_restorepaths(void)
 {
 	char tempname[METAPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	for (sub_dir = 0; sub_dir < NUMSUBDIR; sub_dir++) {
 		snprintf(tempname, METAPATHLEN, "%s/sub_%d", RESTORE_METAPATH,
@@ -548,7 +545,7 @@ int32_t _fetch_FSstat(ino_t rootinode)
 {
 	char objname[METAPATHLEN];
 	char despath[METAPATHLEN];
-	int32_t ret, errcode;
+	int32_t ret;
 
 	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "",
 		 (uint64_t)rootinode);
@@ -571,7 +568,6 @@ int32_t _update_FS_stat(ino_t rootinode, ino_t *max_inode)
 	int32_t errcode;
 	FILE *fptr;
 	FS_CLOUD_STAT_T tmpFSstat;
-	size_t ret_size;
 	int64_t after_add_pinsize, delta_pin_size;
 	int64_t restored_meta_limit, after_add_metasize, delta_meta_size;
 	SYSTEM_DATA_TYPE *restored_system_meta, *rectified_system_meta;
@@ -677,7 +673,6 @@ int32_t _fetch_pinned(ino_t thisinode, BOOL is_smartcache)
 	int64_t nowpage, lastpage, filepos, nowindex;
 	int64_t num_cached_block = 0, cached_size = 0;
 	int32_t errcode, ret;
-	size_t ret_size;
 	struct stat blockstat;
 	BLOCK_ENTRY_PAGE temppage;
 	FILE_STATS_TYPE file_stats_type;
@@ -878,8 +873,7 @@ int32_t _mark_delete(ino_t thisinode)
 {
 	char oldpath[METAPATHLEN];
 	char newpath[METAPATHLEN];
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 
 	ret = fetch_restore_meta_path(oldpath, thisinode);
 	if (ret < 0)
@@ -991,14 +985,14 @@ int32_t delete_meta_blocks(ino_t thisinode, BOOL delete_block)
 		return errcode;
 	}
 
-	FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
+	ret_size = FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
 	if (ret_size < 1) {
 		write_log(2, "Skipping block deletion (meta gone)\n");
 		fclose(metafptr);
 		return -EIO;
 	}
 
-	FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
+	ret_size = FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
 	if (ret_size < 1) {
 		write_log(2, "Skipping block deletion (meta gone)\n");
 		fclose(metafptr);
@@ -1134,7 +1128,6 @@ int32_t _recursive_prune(ino_t thisinode)
 	ino_t tmpino;
 	DIR_ENTRY *tmpptr;
 	int32_t ret, errcode;
-	size_t ret_size;
 
 	fetch_restore_meta_path(fetchedmeta, thisinode);
 	if (access(fetchedmeta, F_OK) != 0)
@@ -1232,7 +1225,6 @@ int32_t _prune_missing_entries(ino_t thisinode,
 	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
 	int64_t temp_child_page_pos[2 * (MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	FILE *fptr = NULL;
-	size_t ret_size;
 	struct stat tmpmeta_struct;
 	int64_t old_metasize, new_metasize;
 	int64_t old_metasize_blk, new_metasize_blk;
@@ -1395,10 +1387,10 @@ int32_t _check_hardlink(ino_t src_inode, ino_t *target_inode,
 		BOOL *need_copy, INODE_PAIR_LIST *hardln_mapping)
 {
 	char srcpath[METAPATHLEN], targetpath[METAPATHLEN];
-	int32_t ret, errcode;
+	int32_t ret;
 	HCFS_STAT tmpstat;
-	int64_t ret_size;
 	FILE *fptr;
+	int32_t errcode;
 
 	if (hardln_mapping == NULL)
 		return -ENOMEM;
@@ -1488,7 +1480,6 @@ int32_t replace_missing_object(ino_t src_inode, ino_t target_inode, char type,
 	int32_t ret, errcode, idx;
 	int32_t list_counter, list_size;
 	int64_t now_page_pos;
-	int64_t ret_size;
 	ino_t child_src_inode, child_target_inode;
 	DIR_META_TYPE dirmeta;
 	DIR_ENTRY_PAGE dir_page;
@@ -1702,11 +1693,11 @@ int32_t replace_missing_meta(const char *nowpath, DIR_ENTRY *tmpptr,
 {
 	char pkg[MAX_FILENAME_LEN + 1];
 	char tmppath[PATH_MAX];
-	int32_t uid, ret, errcode;
+	int32_t uid, ret;
 	ino_t src_inode;
 	HCFS_STAT tmpstat;
 	FILE *fptr;
-	int64_t ret_size;
+	int32_t errcode;
 
 	/* Skip to copy socket and fifo */
 	if (tmpptr->d_type == D_ISSOCK || tmpptr->d_type == D_ISFIFO)
@@ -1894,7 +1885,6 @@ int32_t _expand_and_fetch(ino_t thisinode, char *nowpath, int32_t depth,
 	int32_t expand_val;
 	BOOL skip_this, can_prune = FALSE;
 	int32_t ret, errcode;
-	size_t ret_size;
 	PRUNE_T *prune_list = NULL;
 	int32_t prune_index = 0, max_prunes = 0;
 	BOOL object_replace, is_smartcache;
@@ -2204,8 +2194,7 @@ int32_t _rebuild_system_meta(void)
 {
 	char restored_sysmeta[METAPATHLEN];
 	FILE *fptr;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t errcode;
 
 	LOCK_RESTORED_SYSMETA();
 	snprintf(restored_sysmeta, METAPATHLEN, "%s/hcfssystemfile",
@@ -2483,8 +2472,6 @@ int32_t read_system_max_inode(ino_t *ino_num)
 {
 	char despath[METAPATHLEN];
 	FILE *fptr;
-	int32_t errcode;
-	int64_t ret_ssize;
 
 	snprintf(despath, METAPATHLEN, "%s/system_max_inode", METAPATH);
 	fptr = fopen(despath, "r");
@@ -2508,8 +2495,6 @@ int32_t write_system_max_inode(ino_t ino_num)
 {
 	char despath[METAPATHLEN];
 	FILE *fptr;
-	int32_t errcode;
-	int64_t ret_ssize;
 
 	/* Write to file */
 	snprintf(despath, METAPATHLEN, "%s/system_max_inode", RESTORE_METAPATH);
@@ -2661,7 +2646,6 @@ int32_t run_download_minimal(void)
 	DIR_ENTRY tarentry;
 	int32_t dummy_index;
 	int64_t hcfs_smartcache_vol_ino;
-	ssize_t ret_ssize;
 	DIR_ENTRY *tmpentry;
 	BOOL is_fopen = FALSE;
 	ino_t vol_max_inode, sys_max_inode;
@@ -3134,8 +3118,6 @@ void update_restored_system_meta(DELTA_SYSTEM_META delta_system_meta)
 void update_rectified_system_meta(DELTA_SYSTEM_META delta_system_meta)
 {
 	SYSTEM_DATA_TYPE *rectified_system_meta;
-	int64_t ret_ssize;
-	int32_t errcode;
 
 	rectified_system_meta =
 	    &(hcfs_restored_system_meta->rectified_system_meta);
@@ -3217,7 +3199,6 @@ int32_t update_restored_cache_usage(int64_t delta_cache_size,
 int32_t rectify_space_usage(void)
 {
 	SYSTEM_DATA_TYPE *rectified_system_meta;
-	int32_t ret, errcode;
 	char rectified_usage_path[METAPATHLEN];
 
 	rectified_system_meta =
@@ -3280,7 +3261,6 @@ int32_t init_rectified_system_meta(char restoration_stage)
 {
 	char rectified_usage_path[METAPATHLEN];
 	int32_t errcode;
-	int64_t ret_ssize;
 	BOOL open = FALSE;
 
 	hcfs_restored_system_meta = (HCFS_RESTORED_SYSTEM_META *)malloc(

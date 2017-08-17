@@ -62,7 +62,7 @@ int32_t fetch_all_parents(ino_t self_inode, int32_t *parentnum, ino_t **parentli
 
 	filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
 	memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
-	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
+	ret_ssize = PREAD(fileno(pathlookup_data_fptr), &tmpparent,
 	      sizeof(PRIMARY_PARENT_T), filepos);
 
 	if (ret_ssize != sizeof(PRIMARY_PARENT_T)) {
@@ -149,8 +149,6 @@ static inline int64_t _alloc_new_page(int32_t *reterr)
 {
 	int64_t ret_pos, tmppos;
 	PLOOKUP_PAGE_T tmppage;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
 
 	if (parent_lookup_head.gc_head != 0) {
 		tmppos = parent_lookup_head.gc_head;
@@ -161,7 +159,7 @@ static inline int64_t _alloc_new_page(int32_t *reterr)
 		       sizeof(PLOOKUP_HEAD_T), 0);
 	} else {
 		FSEEK(plookup2_fptr, 0, SEEK_END);
-		FTELL(plookup2_fptr);
+		ret_pos = FTELL(plookup2_fptr);
 		tmppos = ret_pos;
 	}
 	*reterr = 0;
@@ -176,7 +174,6 @@ static inline int32_t _add_to_head(ino_t self_inode, ino_t parent_inode)
 	int32_t hashval;
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
-	ssize_t ret_ssize;
 	int32_t errcode;
 
 	hashval = self_inode % PLOOKUP_HASH_NUM_ENTRIES;
@@ -207,7 +204,6 @@ static inline int32_t _add_to_tail(ino_t self_inode, ino_t parent_inode,
 {
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
-	ssize_t ret_ssize;
 	int32_t errcode;
 
 	tmppos = _alloc_new_page(&errcode);
@@ -243,7 +239,6 @@ static inline int32_t _add_new_page(ino_t self_inode, ino_t parent_inode,
 {
 	PLOOKUP_PAGE_T tmppage;
 	int64_t tmppos;
-	ssize_t ret_ssize;
 	int32_t errcode;
 
 	tmppos = _alloc_new_page(&errcode);
@@ -285,8 +280,7 @@ errcode_handle:
 int32_t lookup_add_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
 	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
 	int32_t hashval;
@@ -383,8 +377,7 @@ errcode_handle:
 int32_t lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
 	int32_t sem_val;
 	int64_t prevllpos, prevpagepos, tmppos, tmpnextpos;
 	PRIMARY_PARENT_T tmpparent;
@@ -572,8 +565,7 @@ int32_t lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
 			  ino_t parent_inode2)
 {
 	off_t filepos;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
 	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
 	int32_t hashval;

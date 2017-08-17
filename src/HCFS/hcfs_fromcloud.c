@@ -63,7 +63,7 @@ int32_t fetch_from_cloud(FILE *fptr,
 #endif
 	int32_t status;
 	int32_t which_curl_handle;
-	int32_t ret, errcode;
+	int32_t errcode;
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	int64_t tmplen;
 #endif
@@ -215,7 +215,6 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	int32_t entry_index;
 	struct stat blockstat; /* block ops */
 	int32_t ret, errcode, semval;
-	size_t ret_size;
 	char block, mlock, bopen, mopen;
 	int64_t block_size_blk;
 
@@ -756,8 +755,6 @@ static int32_t _check_fetch_block(const char *metapath, FILE *fptr,
 	BLOCK_ENTRY *temp_entry;
 	int32_t e_index;
 	int32_t which_th;
-	int32_t ret, errcode;
-	size_t ret_size;
 
 	e_index = blkno % MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -829,9 +826,8 @@ int32_t fetch_pinned_blocks(ino_t inode)
 	int64_t total_blocks, blkno;
 	int64_t which_page, current_page, page_pos;
 	int64_t cache_size;
-	size_t ret_size;
 	FILE_META_TYPE this_meta;
-	int32_t ret, ret_code, errcode, t_idx;
+	int32_t ret, ret_code, t_idx;
 	char all_thread_terminate;
 	struct timespec time_to_sleep;
 	char error_path[200];
@@ -1005,7 +1001,6 @@ void fetch_quota_from_cloud(void *ptr, BOOL enable_quota)
 	char download_path[256];
 	FILE *fptr;
 	char *buf;
-	int32_t ret, errcode;
 	int64_t quota;
 	json_error_t jerror;
 	json_t *json_data, *json_quota;
@@ -1196,7 +1191,7 @@ int32_t update_quota()
  */
 int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 {
-	int32_t ret, errcode;
+	int32_t ret;
 	struct timespec time_to_sleep;
 	int32_t retries_since_last_notify = 0;
 	int8_t flag;

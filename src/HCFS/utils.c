@@ -65,7 +65,6 @@ int32_t check_and_create_metapaths(void)
 {
 	char tempname[METAPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -1;
@@ -119,7 +118,6 @@ int32_t fetch_meta_path(char *pathname, ino_t this_inode)
 void fetch_temp_restored_meta_path(char *pathname, ino_t this_inode)
 {
 	char restoring_meta_path[200];
-	int32_t errcode, ret;
 
 	sprintf(restoring_meta_path, "%s/restoring_meta", METAPATH);
 	if (access(restoring_meta_path, F_OK) < 0)
@@ -194,7 +192,6 @@ int32_t check_and_create_blockpaths(void)
 {
 	char tempname[BLOCKPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (BLOCKPATH == NULL)
 		return -EPERM;
@@ -253,7 +250,6 @@ int32_t fetch_block_path(char *pathname, ino_t this_inode, int64_t block_num)
 int32_t fetch_ddt_path(char *pathname, uint8_t last_char)
 {
 	char tempname[METAPATHLEN];
-	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -1;
@@ -1482,8 +1478,6 @@ int32_t update_fs_backend_usage(FILE *fptr, int64_t fs_total_size_delta,
 		int64_t fs_pin_size_delta, int64_t disk_pin_size_delta,
 		int64_t disk_meta_size_delta)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	flock(fileno(fptr), LOCK_EX);
@@ -1755,7 +1749,6 @@ int32_t fetch_stat_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -EPERM;
@@ -1796,7 +1789,6 @@ int32_t fetch_trunc_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
 	int32_t sub_dir;
-	int32_t errcode, ret;
 
 	if (METAPATH == NULL)
 		return -EPERM;
@@ -1902,7 +1894,6 @@ int32_t update_file_stats(FILE *metafptr, int64_t num_blocks_delta,
 			ino_t thisinode)
 {
 	int32_t ret, errcode;
-	ssize_t ret_ssize;
 	FILE_STATS_TYPE meta_stats;
 	DIR_STATS_TYPE olddirstats, newdirstats, diffstats;
 
@@ -1950,8 +1941,6 @@ errcode_handle:
 
 int32_t check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
 	FILE_STATS_TYPE meta_stats;
 
 	FSEEK(fptr, sizeof(HCFS_STAT) + sizeof(FILE_META_TYPE), SEEK_SET);
@@ -2360,12 +2349,11 @@ int64_t round_size(int64_t size)
  */
 int32_t copy_file(const char *srcpath, const char *tarpath)
 {
-	int32_t errcode;
-	int32_t ret;
 	size_t read_size, total_size;
 	size_t ret_size;
 	FILE *src_ptr = NULL, *tar_ptr = NULL;
 	char filebuf[4100];
+	int32_t errcode;
 
 	src_ptr = fopen(srcpath, "r");
 	if (src_ptr == NULL) {
@@ -2393,7 +2381,7 @@ int32_t copy_file(const char *srcpath, const char *tarpath)
 	FSEEK(tar_ptr, 0, SEEK_SET);
 	total_size = 0;
 	while (!feof(src_ptr)) {
-		FREAD(filebuf, 1, 4096, src_ptr);
+		ret_size = FREAD(filebuf, 1, 4096, src_ptr);
 		read_size = ret_size;
 		if (read_size > 0) {
 			FWRITE(filebuf, 1, read_size, tar_ptr);
@@ -2429,8 +2417,7 @@ int32_t convert_cloud_stat_struct(char *path)
 	FS_CLOUD_STAT_T newstruct;
 	struct stat tmpstruct;
 	FILE *fptr;
-	int32_t errcode, ret;
-	size_t ret_size;
+	int32_t errcode;
 
 	if (stat(path, &tmpstruct) != 0) {
 		errcode = -errno;

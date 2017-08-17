@@ -387,9 +387,9 @@ static inline int32_t _read_backend_meta(char *backend_metapath,
 	DIR_META_TYPE tempdirmeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	HCFS_STAT temphcfsstat;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 	struct stat tempstat;
+	int32_t errcode;
 
 	ret = stat(backend_metapath, &tempstat);
 	if (ret < 0) {
@@ -479,8 +479,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t total_blocks;
 	uint8_t block_status;
 	char delete_done;
-	int32_t ret_val, errcode, ret;
-	size_t ret_size;
+	int32_t ret_val, ret;
 	struct timespec time_to_sleep;
 	PTHREAD_REUSE_T *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;

@@ -514,7 +514,7 @@ int32_t construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 			}
 			fptr = fopen(pathname, "r");
 			FSEEK(fptr, 0, SEEK_END);
-			FTELL(fptr);
+			ret_pos = FTELL(fptr);
 			if (ret_pos == 0) {
 				errcode = -ENOENT;
 				fclose(fptr);
@@ -618,7 +618,6 @@ int32_t init_pathlookup()
 	int32_t ret, errcode;
 	char pathname[METAPATHLEN+10];
 	BOOL need_init;
-	ssize_t ret_ssize;
 
 	ret = sem_init(&(pathlookup_data_lock), 0, 1);
 	if (ret < 0) {
@@ -704,8 +703,8 @@ int32_t pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
 	PRIMARY_PARENT_T tmpparent;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = sem_wait(&(pathlookup_data_lock));
 	if (ret < 0) {
@@ -742,8 +741,8 @@ int32_t pathlookup_read_parent(ino_t self_inode, ino_t *parentptr)
 {
 	off_t filepos;
 	PRIMARY_PARENT_T tmpparent;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
+	int32_t errcode;
 
 	ret = sem_wait(&(pathlookup_data_lock));
 	if (ret < 0) {

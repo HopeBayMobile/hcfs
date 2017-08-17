@@ -131,9 +131,6 @@ int32_t get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 {
 	int64_t ret_pos;
 	KEY_LIST_PAGE *key_list_page;
-	int32_t errcode;
-	int32_t ret;
-	int32_t ret_size;
 	KEY_LIST_PAGE empty_page;
 
 	/* First get reclaimed page if exist */
@@ -150,7 +147,7 @@ int32_t get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	} else { /* No reclaimed page, return file pos of EOF */
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
-		FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
+		ret_pos = FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
 
 		memset(&empty_page, 0, sizeof(KEY_LIST_PAGE));
 		MWRITE(meta_cache_entry, &empty_page, sizeof(KEY_LIST_PAGE),
@@ -261,8 +258,6 @@ int32_t find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int32_t index;
 	char find_first_insert;
 	char hit_key_entry;
-	int32_t errcode;
-	int32_t ret_size;
 
 	if (first_key_list_pos == 0) { /* Never happen in insert_xattr */
 		write_log(10, "Debug xattr: first_key_list_pos is 0\n");
@@ -364,9 +359,6 @@ int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 {
 	VALUE_BLOCK *value_block;
 	VALUE_BLOCK empty_block;
-	int32_t errcode;
-	int32_t ret;
-	int32_t ret_size;
 	int32_t ret_pos;
 
 	/* Priority 1: reuse the replace_value_block_pos when replacing */
@@ -395,7 +387,7 @@ int32_t get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	/* Priority 3: Allocate a new value_block at EOF */
 	FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
-	FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
+	ret_pos = FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
 
 	memset(&empty_block, 0, sizeof(VALUE_BLOCK));
 	MWRITE(meta_cache_entry, &empty_block, sizeof(VALUE_BLOCK), ret_pos);
@@ -429,8 +421,6 @@ int32_t write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *
 	VALUE_BLOCK tmp_value_block;
 	int64_t now_pos, next_pos = 0;
 	int32_t ret_code;
-	int32_t errcode;
-	int32_t ret, ret_size;
 
 
 	index = 0;
@@ -485,8 +475,6 @@ int32_t read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	size_t value_size;
 	size_t index;
 	int64_t now_pos;
-	int32_t errcode;
-	int32_t ret, ret_size;
 
 	index = 0;
 	value_size = key_entry->value_size;
@@ -533,7 +521,6 @@ int32_t reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int64_t head_pos;
 	int64_t tail_pos;
 	VALUE_BLOCK tmp_value_block;
-	int32_t errcode, ret, ret_size;
 
 	if (*replace_value_block_pos == 0) /* Nothing has to be reclaimed */
 		return 0;
@@ -617,9 +604,6 @@ int32_t insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 	int64_t first_key_list_pos;
 	int64_t target_key_list_pos = 0;
 	int64_t value_pos = 0; /* Record position of first value block */
-	int32_t errcode;
-	int32_t ret;
-	int32_t ret_size;
 	int32_t name_space = name_space_c;
 
 	/* Used to record value block pos when replacing */
@@ -944,7 +928,7 @@ int32_t list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_
 	KEY_LIST_PAGE *key_page;
 	int32_t ns_count;
 	int32_t hash_count;
-	int32_t ret, ret_size, errcode;
+	int32_t ret;
 	char namespace_prefix[30];
 
 	*actual_size = 0;
@@ -1026,7 +1010,6 @@ int32_t remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int32_t hash_index;
 	int32_t ret_code;
 	int32_t num_remaining;
-	int32_t errcode, ret, ret_size;
 	int32_t name_space = name_space_c;
 
 	memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE));

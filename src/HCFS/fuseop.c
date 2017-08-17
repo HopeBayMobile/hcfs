@@ -3441,7 +3441,6 @@ int32_t hfuse_ll_truncate(ino_t this_inode,
 	int64_t now_seq;
 	int64_t max_pinned_size;
 #ifdef _ANDROID_ENV_
-	size_t ret_size;
 	FILE *truncfptr;
 	char truncpath[METAPATHLEN];
 #else
@@ -4261,7 +4260,7 @@ size_t _read_block(char *buf, size_t size, int64_t bindex, off_t offset,
 	int64_t entry_index;
 	char fill_zeros;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
-	int32_t ret, errnum, errcode;
+	int32_t ret, errnum;
 	ssize_t ret_ssize;
 
 	/* Decide the page index for block "bindex" */
@@ -4448,7 +4447,7 @@ size_t _read_block(char *buf, size_t size, int64_t bindex, off_t offset,
 			*reterr = -EIO;
 			return 0;
 		}
-		PREAD(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size,
+		ret_ssize = PREAD(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size,
 		      offset);
 
 		this_bytes_read = (size_t) ret_ssize;
@@ -5289,7 +5288,7 @@ size_t _write_block(const char *buf, size_t size, int64_t bindex,
 	pwrite can extend beyond the current size. This also seems
 	to cause data corruption when writeback cache is enabled */
 
-	PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
+	ret_ssize = PWRITE(fileno(fh_ptr->blockfptr), buf, sizeof(char) * size, offset);
 
 	this_bytes_written = (size_t) ret_ssize;
 	new_cache_size = check_file_size(thisblockpath);
@@ -5938,14 +5937,13 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	int32_t page_start;
 	char *buf, *tmpstrptr;;
 	off_t buf_pos;
-	size_t entry_size, ret_size;
-	int32_t ret, errcode;
+	size_t entry_size;
+	int32_t ret;
 	char this_type;
 	DIRH_ENTRY *dirh_ptr;
 	int32_t snap_access_val;
 	struct timespec snap_sleep;
 	BOOL use_snap;
-	ssize_t ret_ssize;
 
 	snap_sleep.tv_sec = 0;
 	snap_sleep.tv_nsec = 100000000;

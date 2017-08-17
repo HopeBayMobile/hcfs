@@ -38,8 +38,6 @@
 FILE_BLOCK_ITERATOR *init_block_iter(FILE *fptr)
 {
 	FILE_BLOCK_ITERATOR *iter;
-	int64_t ret_size;
-	int32_t ret, errcode;
 
 	iter = (FILE_BLOCK_ITERATOR *) calloc(sizeof(FILE_BLOCK_ITERATOR), 1);
 	if (!iter) {
@@ -80,8 +78,8 @@ errcode_handle:
  */
 FILE_BLOCK_ITERATOR *next_block(FILE_BLOCK_ITERATOR *iter)
 {
-	int64_t count, which_page, ret_size, page_pos;
-	int32_t e_index, ret, errcode;
+	int64_t count, which_page, page_pos;
+	int32_t e_index;
 
 	for (count = iter->now_block_no + 1; count < iter->total_blocks; count++) {
 		e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -127,8 +125,8 @@ errcode_handle:
  */
 FILE_BLOCK_ITERATOR *goto_block(FILE_BLOCK_ITERATOR *iter, int64_t block_no)
 {
-	int64_t which_page, ret_size, page_pos;
-	int32_t e_index, errcode, ret;
+	int64_t which_page, page_pos;
+	int32_t e_index;
 
 	if (block_no < 0 || block_no >= iter->total_blocks) {
 		errno = ENOENT;
@@ -325,8 +323,6 @@ void destroy_hashlist_iter(HASH_LIST_ITERATOR *iter)
 DIR_ENTRY_ITERATOR *init_dir_iter(FILE *fptr)
 {
 	DIR_ENTRY_ITERATOR *iter;
-	int64_t ret_size;
-	int32_t ret, errcode;
 
 	iter = (DIR_ENTRY_ITERATOR *) calloc(sizeof(DIR_ENTRY_ITERATOR), 1);
 	if (!iter) {
@@ -365,8 +361,6 @@ errcode_handle:
 DIR_ENTRY_ITERATOR *next_dir_entry(DIR_ENTRY_ITERATOR *iter)
 {
 	int64_t now_page_pos;
-	int32_t ret, errcode;
-	size_t ret_size;
 	FILE *fptr = iter->fptr;
 
 	/* Check now page pos */

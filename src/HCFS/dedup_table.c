@@ -37,7 +37,6 @@ int32_t initialize_ddt_meta(char *meta_path)
 	int32_t fd;
 	DDT_BTREE_META ddt_meta;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	fptr = fopen(meta_path, "wb");
 	if (fptr == NULL) {
@@ -89,7 +88,6 @@ FILE *get_ddt_btree_meta(uint8_t key[], DDT_BTREE_NODE *root,
 	int32_t fd;
 	int32_t ret;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	/* Get metafile name by the first char of hash key */
 	ret = fetch_ddt_path(meta_path, key[0]);
@@ -154,7 +152,6 @@ int32_t search_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
 	DDT_BTREE_NODE temp_node;
 	DDT_BTREE_EL temp_el;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	if (tnode->num_el == 0) {
 		/* Search on empty node */
@@ -208,7 +205,6 @@ int32_t traverse_ddt_btree(DDT_BTREE_NODE *tnode, int32_t fd)
 	int32_t search_idx, tmp_idx;
 	DDT_BTREE_NODE temp_node;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	if (tnode->is_leaf) {
 		for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
@@ -280,7 +276,6 @@ int32_t insert_ddt_btree(uint8_t key[], const off_t obj_size,
 	DDT_BTREE_NODE temp_node;
 	int32_t errcode;
 	off_t ret_pos;
-	ssize_t ret_ssize;
 
 	/* Init new elements */
 	memset(&new_el, 0, sizeof(DDT_BTREE_EL));
@@ -298,7 +293,7 @@ int32_t insert_ddt_btree(uint8_t key[], const off_t obj_size,
 		new_root.gc_list_next = 0;
 		new_root.ddt_btree_el[0] = new_el;
 
-		LSEEK(fd, 0, SEEK_END);
+		ret_pos = LSEEK(fd, 0, SEEK_END);
 		new_root.this_node_pos = ret_pos;
 		/* Write new node to disk */
 		PWRITE(fd, &new_root, sizeof(DDT_BTREE_NODE),
@@ -330,7 +325,7 @@ int32_t insert_ddt_btree(uint8_t key[], const off_t obj_size,
 			new_root.gc_list_next = this_meta->node_gc_list;
 			this_meta->node_gc_list = new_root.gc_list_next;
 		} else {
-			LSEEK(fd, 0, SEEK_END);
+			ret_pos = LSEEK(fd, 0, SEEK_END);
 			new_root.this_node_pos = ret_pos;
 		}
 
@@ -387,7 +382,6 @@ static int32_t _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
 	int32_t compare_result;
 	DDT_BTREE_NODE temp_node;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	/* To find which index we should insert or go deeper */
 	search_idx = 0;
@@ -468,7 +462,6 @@ static int32_t _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int32_t s_idx,
 	int32_t el_left_child, el_right_child, median;
 	DDT_BTREE_NODE new_node;
 	int32_t errcode;
-	ssize_t ret_ssize;
 	off_t ret_pos;
 
 	median = cnode->num_el / 2;
@@ -484,7 +477,7 @@ static int32_t _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int32_t s_idx,
 		this_meta->node_gc_list = new_node.gc_list_next;
 	} else {
 		memset(&new_node, 0, sizeof(DDT_BTREE_NODE));
-		LSEEK(fd, 0, SEEK_END);
+		ret_pos = LSEEK(fd, 0, SEEK_END);
 		new_node.this_node_pos = ret_pos;
 	}
 	new_node.num_el = el_right_child;
@@ -575,7 +568,6 @@ int32_t delete_ddt_btree(uint8_t key[], DDT_BTREE_NODE *tnode, int32_t fd,
 	DDT_BTREE_EL largest_child_el;
 	int32_t ret_val;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	/* Init status */
 	match = FALSE;
@@ -698,7 +690,6 @@ static int32_t _extract_largest_child(DDT_BTREE_NODE *tnode, int32_t fd,
 	int32_t max_child;
 	DDT_BTREE_NODE temp_node;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	max_child = tnode->num_el;
 
@@ -755,7 +746,6 @@ static int32_t _rebalance_btree(DDT_BTREE_NODE *tnode, int32_t selected_child, i
 	int32_t change_root;
 	DDT_BTREE_NODE child_node, sibling_node;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	/* Initialize */
 	finish_rotate = FALSE;
@@ -1029,7 +1019,6 @@ int32_t increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int32_t s_idx, int32_t f
 {
 
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	if (s_idx < 0 || s_idx >= tnode->num_el) {
 		printf("Search index out of bound\n");
@@ -1080,7 +1069,6 @@ int32_t get_obj_id(char *path, uint8_t hash[], uint8_t start_bytes[],
 	SHA256_CTX ctx;
 	int32_t fd;
 	int32_t errcode;
-	ssize_t ret_ssize;
 
 	if (access(path, R_OK) == -1)
 		return -1;

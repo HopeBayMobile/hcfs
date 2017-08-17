@@ -90,7 +90,7 @@ int32_t unlink_upload_file(char *filename)
 {
 	struct stat filestat; /* raw file ops */
 	int64_t filesize;
-	int32_t ret, errcode;
+	int32_t ret;
 	int64_t old_cachesize, new_cachesize, threshold;
 
 	ret = stat(filename, &filestat);
@@ -182,8 +182,7 @@ static inline int32_t _del_toupload_blocks(const char *toupload_metapath,
 	int64_t num_blocks, bcount;
 	char block_path[300];
 	HCFS_STAT tmpstat;
-	int32_t ret, errcode;
-	ssize_t ret_ssize;
+	int32_t ret;
 	FILE_META_TYPE tmpmeta;
 	int64_t current_page, which_page, page_pos;
 
@@ -393,7 +392,6 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	int32_t count1;
 	int32_t ret;
 	char toupload_blockpath[400];
-	int32_t errcode;
 #if ENABLE(DEDUP)
 	uint8_t blk_obj_id[OBJID_LENGTH];
 #endif
@@ -406,9 +404,9 @@ static inline int32_t _upload_terminate_thread(int32_t index)
 	char toupload_exist, finish_uploading;
 	char *blockid;
 	BOOL is_toupload_meta_lock;
-	size_t ret_size;
 	BLOCK_ENTRY_PAGE temppage;
 	FILE *toupload_metafptr;
+	int32_t errcode;
 
 	if (upload_ctl.threads_in_use[index] == FALSE)
 		return 0;
@@ -724,7 +722,7 @@ void init_sync_stat_control(void)
 	char *FS_stat_path, *fname;
 	DIR *dirp;
 	struct dirent *de;
-	int32_t ret, errcode;
+	int32_t errcode;
 
 	FS_stat_path = (char *)malloc(METAPATHLEN);
 	fname = (char *)malloc(METAPATHLEN);
@@ -860,8 +858,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	BLOCK_ENTRY_PAGE local_temppage;
 	int32_t e_index;
 	char toupload_bpath[400];
-	size_t ret_size;
-	int32_t ret, errcode;
+	int32_t ret;
 	int32_t which_curl;
 	BOOL llock, ulock;
 	char finish_uploading, toupload_exist;
@@ -1104,7 +1101,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t block_count;
 	int32_t ret, errcode;
 	off_t toupload_size;
-	size_t ret_size;
 	BOOL sync_error;
 	ino_t root_inode = 0;
 	int64_t backend_size;
@@ -2197,8 +2193,7 @@ void _update_restore_dirty_list()
 	char restore_tosync_list[METAPATHLEN];
 	FILE *to_sync_fptr = NULL;
 	struct stat tmpstat;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 
 	snprintf(restore_tosync_list, METAPATHLEN, "%s/tosync_list",
 	         METAPATH);
@@ -2555,7 +2550,7 @@ void upload_loop(void)
 /* Helper function for backing up package list if needed */
 void _try_backup_package_list(CURL_HANDLE *thiscurl)
 {
-	int32_t errcode, ret;
+	int32_t ret;
 	char backup_xml[METAPATHLEN];
 	FILE *fptr = NULL;
 
@@ -2632,7 +2627,6 @@ int32_t update_backend_stat(ino_t root_inode, int64_t system_size_delta,
 	char objname[METAPATHLEN];
 	FILE *fptr;
 	BOOL is_fopen = FALSE;
-	size_t ret_size;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	write_log(10, "Debug: entering update backend stat\n");

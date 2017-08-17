@@ -104,9 +104,9 @@ void *fuse_communication_contact_window(void *data)
 int32_t init_fuse_proc_communication(pthread_t *communicate_tid, int32_t *socket_fd)
 {
 	int32_t ret, i;
-	int32_t errcode;
 	int32_t socket_flag;
 	struct sockaddr_un sock_addr;
+	int32_t errcode;
 
 	if (!access(FUSE_SOCK_PATH, F_OK))
 		UNLINK(FUSE_SOCK_PATH);
@@ -156,7 +156,6 @@ errcode_handle:
 
 int32_t destroy_fuse_proc_communication(pthread_t *communicate_tid, int32_t socket_fd)
 {
-	int32_t ret, errcode;
 	int32_t i;
 
 	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {

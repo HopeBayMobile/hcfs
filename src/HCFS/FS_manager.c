@@ -59,7 +59,6 @@ int32_t init_fs_manager(void)
 	int32_t errcode, fd, ret;
 	DIR_META_TYPE tmp_head;
 	CLOUD_RELATED_DATA tmp_clouddata;
-	ssize_t ret_ssize;
 	struct timeval tmptime;
 	FS_MANAGER_HEADER_LAYOUT fs_mgr_header;
 
@@ -192,10 +191,9 @@ void destroy_fs_manager(void)
 data stored at backend */
 int32_t _init_backend_stat(ino_t root_inode)
 {
-	int32_t ret, errcode;
+	int32_t errcode;
 	char fname[METAPATHLEN];
 	FILE *fptr;
-	size_t ret_size;
 	BOOL is_fopen = FALSE;
 	FS_CLOUD_STAT_T cloud_fs_stat;
 
@@ -241,7 +239,6 @@ ino_t _create_root_inode()
 	char metapath[METAPATHLEN];
 	char temppath[METAPATHLEN];
 	int32_t ret, errcode;
-	size_t ret_size;
 	int64_t ret_pos;
 	uint64_t this_gen;
 	FS_STAT_T tmp_stat;
@@ -300,7 +297,7 @@ ino_t _create_root_inode()
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 	FWRITE(&cloud_related_data, sizeof(CLOUD_RELATED_DATA), 1, metafptr);
 
-	FTELL(metafptr);
+	ret_pos = FTELL(metafptr);
 	this_meta.generation = this_gen;
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
@@ -408,7 +405,6 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE + 2)];
 	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE + 3)];
 	ino_t new_FS_ino;
-	ssize_t ret_ssize;
 	int64_t metasize, metasize_blk;
 
 	sem_wait(&(fs_mgr_head->op_lock));
@@ -527,7 +523,7 @@ int32_t add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		} else {
 			/* If cannot reclaim, extend the meta file */
 			memset(&new_root, 0, sizeof(DIR_ENTRY_PAGE));
-			LSEEK(fs_mgr_head->FS_list_fh, 0, SEEK_END);
+			ret_pos = LSEEK(fs_mgr_head->FS_list_fh, 0, SEEK_END);
 
 			new_root.this_page_pos = ret_pos;
 			if (new_root.this_page_pos == -1) {
@@ -646,8 +642,6 @@ int32_t delete_filesystem(char *fsname)
 	DIR_META_TYPE tmp_head, roothead;
 	int32_t ret, errcode, ret_index;
 	ino_t FS_root;
-	ssize_t ret_ssize;
-	size_t ret_size;
 	char thismetapath[400];
 	FILE *metafptr;
 	DIR_ENTRY temp_dir_entries[2 * (MAX_DIR_ENTRIES_PER_PAGE + 2)];
@@ -815,7 +809,6 @@ int32_t check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 	DIR_ENTRY_PAGE tpage, tpage2;
 	DIR_META_TYPE tmp_head;
 	int32_t ret, errcode, ret_index;
-	ssize_t ret_ssize;
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
@@ -877,8 +870,6 @@ int32_t list_filesystem(uint64_t buf_num, DIR_ENTRY *ret_entry,
 {
 	DIR_ENTRY_PAGE tpage;
 	DIR_META_TYPE tmp_head;
-	int32_t errcode;
-	ssize_t ret_ssize;
 	int64_t num_walked;
 	int64_t next_node_pos;
 	int32_t count;
@@ -961,9 +952,8 @@ int32_t prepare_FS_database_backup(void)
 {
 	char tmppath[METAPATHLEN];
 	FILE *fptr;
-	int32_t ret, errcode;
+	int32_t errcode;
 	char buf[4096];
-	size_t ret_size;
 	ssize_t ret_ssize;
 	off_t curpos;
 
@@ -989,7 +979,7 @@ int32_t prepare_FS_database_backup(void)
 
 	curpos = 0;
 	while (!feof(fptr)) {
-		PREAD(fs_mgr_head->FS_list_fh, buf, 4096, curpos);
+		ret_ssize = PREAD(fs_mgr_head->FS_list_fh, buf, 4096, curpos);
 		if (ret_ssize <= 0)
 			break;
 		curpos += ret_ssize;
@@ -1025,7 +1015,6 @@ int32_t backup_FS_database(void)
 	CURL_HANDLE upload_handle;
 	char buf[4096];
 	size_t ret_size;
-	ssize_t ret_ssize;
 	off_t ret_pos;
 	GOOGLEDRIVE_OBJ_INFO gdrive_info;
 	CLOUD_RELATED_DATA clouddata;
@@ -1052,7 +1041,7 @@ int32_t backup_FS_database(void)
 	flock(fileno(tmpdbfptr), LOCK_EX);
 	/* Check if file size is zero. If so, do nothing */
 	FSEEK(tmpdbfptr, 0, SEEK_END);
-	FTELL(tmpdbfptr);
+	ret_pos = FTELL(tmpdbfptr);
 	if (ret_pos == 0) {
 		/* Empty file, do nothing */
 		flock(fileno(tmpdbfptr), LOCK_UN);
@@ -1070,7 +1059,7 @@ int32_t backup_FS_database(void)
 		goto errcode_handle;
 	}
 	while (!feof(fptr)) {
-		FREAD(buf, 1, 4096, tmpdbfptr);
+		ret_size = FREAD(buf, 1, 4096, tmpdbfptr);
 		if (ret_size == 0)
 			break;
 		FWRITE(buf, 1, ret_size, fptr);

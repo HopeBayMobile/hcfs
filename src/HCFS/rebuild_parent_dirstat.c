@@ -30,8 +30,6 @@ static inline int32_t _update_stats(ino_t p_inode, DIR_STATS_TYPE *tmpstat_in)
 {
 	off_t filepos;
 	ino_t current_inode;
-	int32_t errcode;
-	ssize_t ret_ssize;
 	PRIMARY_PARENT_T tmpparent;
 	DIR_STATS_TYPE tmpstat;
 
@@ -83,8 +81,6 @@ int32_t rebuild_parent_stat(ino_t this_inode, ino_t p_inode, int8_t d_type)
 	FILE *metafptr;
 	FILE_STATS_TYPE meta_stats;
 	DIR_STATS_TYPE tmp_dirstat;
-	ssize_t ret_ssize;
-	size_t ret_size;
 
 	metafptr = NULL;
 	if ((this_inode <= 0) || (p_inode <= 0))

@@ -57,7 +57,6 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 {
 	FILE *fptr;
 	size_t actual_to_read;
-	int32_t errcode;
 	size_t ret_size;
 	size_t expect_read, total_read = 0;
 	object_post_control *post_control;
@@ -96,7 +95,7 @@ size_t read_post_file_function(void *ptr, size_t size, size_t nmemb,
 			actual_to_read = post_control->object_remaining_size;
 		else
 			actual_to_read = expect_read;
-		FREAD((char *)ptr + total_read, 1, actual_to_read, fptr);
+		ret_size = FREAD((char *)ptr + total_read, 1, actual_to_read, fptr);
 		post_control->object_remaining_size -= ret_size;
 		post_control->total_remaining -= ret_size;
 		expect_read -= ret_size;
@@ -382,11 +381,9 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	FILE *gdrive_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int32_t ret_val, ret, errcode;
-	int32_t num_retries;
+	int32_t ret_val, errcode;
 	int64_t ret_pos;
 	int64_t objsize;
-	struct timeval stop, start, diff;
 	double time_spent;
 	int64_t xfer_thpt;
 	BOOL fetch_quota;
@@ -437,7 +434,7 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
-	TIMEIT(HTTP_PERFORM_RETRY(curl));
+	time_spent = TIMEIT(res = HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 	FREE(url);
 
@@ -482,10 +479,10 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 			  header);
 		/* Record xfer throughput */
 		FSEEK(fptr, 0, SEEK_END);
-		FTELL(fptr);
+		ret_pos = FTELL(fptr);
 		objsize = ret_pos;
 		FSEEK(fptr, 0, SEEK_SET);
-		COMPUTE_THROUGHPUT();
+		COMPUTE_THROUGHPUT(&xfer_thpt, &time_spent, objsize);
 		/* Update xfer statistics if successful */
 		change_xfer_meta(0, objsize, xfer_thpt, 1);
 		write_log(
@@ -523,8 +520,7 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	FILE *gdrive_header_fptr, *gdrive_body_fptr;
 	CURL *curl;
 	char header_filename[200], body_filename[200];
-	int32_t ret_val, errcode, ret;
-	int32_t num_retries;
+	int32_t ret_val, errcode;
 
 	UNUSED(objname);
 	/* For GOOGLEDRIVE backend - token not set situation */
@@ -579,7 +575,7 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_body_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
-	HTTP_PERFORM_RETRY(curl);
+	res = HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
 	FREE(url);
 
@@ -634,10 +630,8 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 	FILE *gdrive_header_fptr, *gdrive_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	int32_t ret_val, ret, errcode;
-	int32_t num_retries;
+	int32_t ret_val, errcode;
 	int64_t ret_pos;
-	struct timeval stop, start, diff;
 	double time_spent;
 	int64_t xfer_thpt;
 
@@ -678,7 +672,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 	chunk = curl_slist_append(chunk, "Expect:");
 
 	FSEEK(fptr, 0, SEEK_END);
-	FTELL(fptr);
+	ret_pos = FTELL(fptr);
 	objsize = ret_pos;
 	FSEEK(fptr, 0, SEEK_SET);
 	/* write_log(10, "object size: %d, objname: %s\n", objsize, objname); */
@@ -714,7 +708,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_body_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
-	TIMEIT(HTTP_PERFORM_RETRY(curl));
+	time_spent = TIMEIT(res = HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 	FREE(url);
 
@@ -752,7 +746,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 
 	if (http_is_success(ret_val)) {
 		/* Record xfer throughput */
-		COMPUTE_THROUGHPUT();
+		COMPUTE_THROUGHPUT(&xfer_thpt, &time_spent, objsize);
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
 		write_log(10, "Upload obj %s, size %" PRId64
@@ -793,10 +787,8 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	FILE *gdrive_header_fptr, *gdrive_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	int32_t ret_val, ret, errcode;
-	int32_t num_retries;
+	int32_t ret_val, errcode;
 	int64_t ret_pos;
-	struct timeval stop, start, diff;
 	double time_spent;
 	int64_t xfer_thpt;
 	int64_t total_size;
@@ -870,7 +862,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	/* Fetch object size */
 	if (fptr) {
 		FSEEK(fptr, 0, SEEK_END);
-		FTELL(fptr);
+		ret_pos = FTELL(fptr);
 		objsize = ret_pos;
 		FSEEK(fptr, 0, SEEK_SET);
 	} else {
@@ -909,7 +901,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_body_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
-	TIMEIT(HTTP_PERFORM_RETRY(curl));
+	time_spent = TIMEIT(res = HTTP_PERFORM_RETRY(curl));
 	update_backend_status((res == CURLE_OK), NULL);
 	FREE(url);
 
@@ -971,7 +963,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 
 	if (http_is_success(ret_val)) {
 		/* Record xfer throughput */
-		COMPUTE_THROUGHPUT();
+		COMPUTE_THROUGHPUT(&xfer_thpt, &time_spent, objsize);
 		/* Update xfer statistics if successful */
 		change_xfer_meta(objsize, 0, xfer_thpt, 1);
 		write_log(10, "Upload obj %s, size %" PRId64
@@ -1010,7 +1002,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 	FILE *gdrive_header_fptr, *gdrive_list_body_fptr;
 	CURL *curl;
 	char header_filename[200];
-	int32_t ret_val, ret, num_retries, errcode;
+	int32_t ret_val, errcode;
 	BOOL title_exist = FALSE;
 
 	if (googledrive_token[0] == 0)
@@ -1077,7 +1069,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_list_body_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
-	HTTP_PERFORM_RETRY(curl);
+	res = HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
 	FREE(url);
 	curl_slist_free_all(chunk);

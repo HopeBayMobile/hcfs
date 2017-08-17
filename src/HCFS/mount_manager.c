@@ -1165,9 +1165,7 @@ int32_t change_mount_stat(MOUNT_T *mptr, int64_t system_size_delta,
 *************************************************************************/
 int32_t update_FS_statistics(MOUNT_T *mptr)
 {
-	int32_t errcode;
 	int32_t tmpfd;
-	ssize_t ret_ssize;
 
 	tmpfd = fileno(mptr->stat_fptr);
 
@@ -1195,9 +1193,7 @@ errcode_handle:
 *************************************************************************/
 int32_t read_FS_statistics(MOUNT_T *mptr)
 {
-	int32_t errcode;
 	int32_t tmpfd;
-	ssize_t ret_ssize;
 
 	tmpfd = fileno(mptr->stat_fptr);
 
