@@ -42,7 +42,6 @@ int32_t _get_root_inodes(ino_t **roots, int64_t *num_inodes)
 	FILE *fsmgr_fptr;
 	DIR_META_TYPE dirmeta;
 	int32_t errcode, ret;
-	int64_t ret_ssize;
 	int64_t num_dir, num_nondir;
 	ino_t *dir_nodes, *nondir_nodes;
 
@@ -117,9 +116,8 @@ errcode_handle:
 int32_t _init_rebuild_queue_file(ino_t *roots, int64_t num_roots)
 {
 	char queue_filepath[200];
-	int32_t errcode;
 	int32_t fh;
-	ssize_t ret_ssize;
+	int32_t errcode;
 
 	sprintf(queue_filepath, "%s/rebuild_sb_queue", METAPATH);
 	fh = open(queue_filepath, O_CREAT | O_RDWR, 0600);
@@ -149,8 +147,7 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 {
 	ino_t root_inode, max_inode, tmp_ino;
 	int64_t idx;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 	char fstatpath[400], fs_sync_path[400];
 	char sb_path[300];
 	char restore_todelete_list[METAPATHLEN];
@@ -158,6 +155,7 @@ int32_t _init_sb_head(ino_t *roots, int64_t num_roots)
 	FS_CLOUD_STAT_T fs_cloud_stat;
 	SUPER_BLOCK_HEAD head;
 	struct stat tmpstat;
+	int32_t errcode;
 
 	sprintf(fs_sync_path, "%s/FS_sync", METAPATH);
 	if (access(fs_sync_path, F_OK) < 0)
@@ -526,8 +524,6 @@ int32_t pull_inode_job(INODE_JOB_HANDLE *inode_job)
 int32_t push_inode_job(ino_t *inode_jobs, int64_t num_inodes)
 {
 	int64_t total_jobs;
-	ssize_t ret_ssize;
-	int32_t errcode;
 
 	if (inode_jobs == NULL || num_inodes <= 0)
 		return 0;
@@ -561,8 +557,6 @@ errcode_handle:
 int32_t erase_inode_job(INODE_JOB_HANDLE *inode_job)
 {
 	int64_t empty_inode;
-	ssize_t ret_ssize;
-	int32_t errcode;
 
 	empty_inode = 0;
 	LOCK_QUEUE_FILE();
@@ -1144,13 +1138,13 @@ int32_t prune_this_entry(ino_t this_inode)
 int32_t restore_meta_super_block_entry(ino_t this_inode, HCFS_STAT *ret_stat)
 {
 	char metapath[300];
-	int32_t errcode, ret;
-	size_t ret_size;
+	int32_t ret;
 	char pin_status;
 	HCFS_STAT this_stat;
 	FILE_META_TYPE this_meta;
 	FILE *fptr;
 	SUPER_BLOCK_ENTRY sb_entry;
+	int32_t errcode;
 
 	/* Check whether this entry had been rebuilded */
 	ret = super_block_read(this_inode, &sb_entry);

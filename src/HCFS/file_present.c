@@ -59,7 +59,7 @@
 int32_t meta_forget_inode(ino_t self_inode)
 {
 	char thismetapath[METAPATHLEN];
-	int32_t ret, errcode;
+	int32_t ret;
 
 	ret = fetch_meta_path(thismetapath, self_inode);
 	if (ret < 0)
@@ -212,8 +212,7 @@ int32_t mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			MOUNT_T *mountptr, int64_t *delta_meta_size,
 			PIN_t pin, BOOL is_external)
 {
-	int32_t ret_val, ret, errcode;
-	size_t ret_size;
+	int32_t ret_val;
 	FILE_META_TYPE this_meta;
 	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -405,8 +404,6 @@ int32_t mkdir_update_meta(ino_t self_inode,
 	int64_t metasize, old_metasize, new_metasize;
 	int64_t metasize_blk, old_metasize_blk = 0, new_metasize_blk = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
-	int32_t ret, errcode;
-	size_t ret_size;
 	ino_t root_ino;
 
 	root_ino = mountptr->f_ino;
@@ -851,8 +848,6 @@ int32_t symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	int64_t metasize, old_metasize, new_metasize;
 	int64_t metasize_blk, old_metasize_blk = 0, new_metasize_blk = 0;
 	CLOUD_RELATED_DATA cloud_related_data;
-	int32_t ret, errcode;
-	size_t ret_size;
 	ino_t root_ino;
 
 	root_ino = mountptr->f_ino;
@@ -1024,9 +1019,7 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
 	SYMLINK_META_TYPE symlinkmeta;
-	int32_t errcode;
-	int32_t ret;
-	int64_t ret_pos, ret_size;
+	int64_t ret_pos;
 
 	this_inode = meta_cache_entry->inode_num;
 	if (this_inode <= 0) {
@@ -1086,7 +1079,7 @@ int32_t fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if (*xattr_pos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
 		memset(xattr_page, 0, sizeof(XATTR_PAGE));
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
-		FTELL(meta_cache_entry->fptr);
+		ret_pos = FTELL(meta_cache_entry->fptr);
 		*xattr_pos = ret_pos;
 		MWRITE(meta_cache_entry, xattr_page, sizeof(XATTR_PAGE),
 			*xattr_pos);
@@ -1592,7 +1585,6 @@ int32_t fuseproc_set_uploading_info(const UPLOADING_COMMUNICATION_DATA *data)
 	PROGRESS_META progress_meta;
 	HCFS_STAT tmpstat;
 	int32_t errcode;
-	ssize_t ret_ssize;
 	int64_t toupload_blocks;
 
 	meta_cache_entry = meta_cache_lock_entry(data->inode);

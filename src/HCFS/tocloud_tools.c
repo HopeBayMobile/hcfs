@@ -48,7 +48,6 @@ int32_t change_block_status_to_BOTH(ino_t inode, int64_t blockno,
 	int32_t e_index;
 	int32_t ret, errcode;
 	int32_t semval;
-	ssize_t ret_ssize;
 	int64_t delta_unpin_dirty_size;
 	char blockpath[300], local_metapath[300];
 	off_t cache_block_size;
@@ -291,11 +290,10 @@ static int _revert_block_status(FILE *local_metafptr,
 				char *blockID)
 {
 	char status;
-	int ret, errcode;
+	int ret;
 	BLOCK_ENTRY_PAGE bentry_page;
 	FILE_META_TYPE filemeta;
 	char blockpath[300];
-	ssize_t ret_ssize;
 	long long cache_block_size, unpin_dirty_delta;
 
 	flock(fileno(local_metafptr), LOCK_EX);
@@ -380,7 +378,6 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 	int ret, errcode;
 	int which_curl;
 	int e_index;
-	ssize_t ret_ssize;
 	char local_metapath[300];
 	FILE *local_metafptr;
 	ssize_t ret_size;

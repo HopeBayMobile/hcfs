@@ -210,13 +210,12 @@ int _compare_pkg_entry_ptr(const void *a, const void *b)
 int32_t init_package_uid_list(char *plistpath)
 {
 	FILE *src = NULL;
-	int32_t errcode = 0, ret_num;
+	int32_t errcode = 0;
 	char fbuf[4100], *sptr;
 	regex_t re = {.re_nsub = 0};
 	regmatch_t pm[10];
 	const size_t nmatch = 10;
 	char ebuff[1024];
-	char *endptr;
 	PKG_NODE *last_node = NULL, *tmp_pkg = NULL, *tmp_cur;
 	size_t pkg_cnt = 0;
 	size_t i;
@@ -279,8 +278,7 @@ int32_t init_package_uid_list(char *plistpath)
 		tmp_pkg->name[pm[1].rm_eo - pm[1].rm_so] = '\0';
 		/* Set uid */
 		sptr[pm[3].rm_eo] = '\0';
-		ATOL(&sptr[pm[3].rm_so]);
-		tmp_pkg->uid = ret_num;
+		tmp_pkg->uid = ATOL(&sptr[pm[3].rm_so]);
 
 	}
 	if (ferror(src) && !feof(src)) {
@@ -369,7 +367,6 @@ int32_t create_smartcache_symlink(ino_t this_inode, ino_t root_ino,
 	char metapath[METAPATHLEN];
 	char link_target[MAX_LINK_PATH];
 	SYMLINK_META_HEADER symlink_header;
-	int64_t ret_ssize, errcode, ret_size;
 	struct stat tmpstat;
 	int64_t uid, metasize, metasize_blk;
 	FILE *fptr;

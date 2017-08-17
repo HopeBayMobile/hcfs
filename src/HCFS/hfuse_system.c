@@ -77,7 +77,6 @@
 int32_t init_hcfs_system_data(int8_t restoring_status)
 {
 	int32_t errcode, ret;
-	size_t ret_size;
 	int64_t quota;
 
 #ifdef _ANDROID_ENV_
@@ -204,8 +203,6 @@ errcode_handle:
 
 void *_write_sys(void *ptr)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
 	PTHREAD_REUSE_T *this_thread;
 	struct timeval now;
 	struct timespec sleep;
@@ -255,8 +252,6 @@ errcode_handle:
 *************************************************************************/
 int32_t sync_hcfs_system_data(char need_lock)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
 
 	if (need_lock == TRUE) {
 		FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
@@ -508,8 +503,7 @@ void _mark_sb_to_delete(void)
 	char todelete_metapath[METAPATHLEN];
 	FILE *to_delete_fptr = NULL, *metafptr = NULL;
 	struct stat tmpstat;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 	HCFS_STAT tmphcfsstat;
 
 	if (ROOT_INFO.num_roots <= 0)

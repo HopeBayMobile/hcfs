@@ -36,7 +36,7 @@
 *************************************************************************/
 int32_t init_dirstat_lookup()
 {
-	int32_t ret, errcode;
+	int32_t errcode;
 	char pathname[METAPATHLEN+10];
 
 	/* If system is being restored, also need to init a lookup db */
@@ -83,8 +83,8 @@ int32_t reset_dirstat_lookup(ino_t thisinode)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
+	int32_t errcode;
 
 	if (thisinode <= 0)
 		return -EINVAL;
@@ -128,7 +128,6 @@ int32_t update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 	ino_t *parentlist;
 	int32_t errcode, ret;
 	int32_t numparents, count;
-	ssize_t ret_ssize;
 	PRIMARY_PARENT_T tmpparent;
 
 	if (!thisinode)
@@ -201,8 +200,7 @@ int32_t update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
 	ino_t current_inode;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
 	int32_t sem_val;
 	PRIMARY_PARENT_T tmpparent;
 
@@ -250,8 +248,8 @@ int32_t read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
-	int32_t errcode, ret;
-	ssize_t ret_ssize;
+	int32_t ret;
+	int32_t errcode;
 
 	if (!thisinode)
 		return -EINVAL;

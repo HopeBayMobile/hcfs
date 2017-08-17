@@ -168,7 +168,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					continue;
 				}
 				FSEEK(metafptr, pagepos, SEEK_SET);
-				FREAD(&temppage,
+				ret_size = FREAD(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 				if (ret_size < 1)
 					break;
@@ -192,7 +192,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					"Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
 						current_block, this_inode);
 				FSEEK(metafptr, pagepos, SEEK_SET);
-				FWRITE(&temppage,
+				ret_size = FWRITE(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 				if (ret_size < 1)
 					break;
@@ -311,7 +311,7 @@ int32_t _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					break;
 
 				FSEEK(metafptr, pagepos, SEEK_SET);
-				FREAD(&temppage,
+				ret_size = FREAD(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 				if (ret_size < 1)
 					break;

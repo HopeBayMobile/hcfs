@@ -190,7 +190,7 @@ errcode_handle:
 *************************************************************************/
 int32_t destroy_api_interface(void)
 {
-	int32_t ret, errcode, count;
+	int32_t count;
 
 	/* Adding lock wait before terminating to prevent last sec
 	thread changes */
@@ -332,12 +332,11 @@ int64_t get_vol_size(int32_t arg_len, char *largebuf)
 	DIR_ENTRY temp_entry;
 	MOUNT_T *tmp_info;
 	char *buf;
-	int32_t ret, errcode;
+	int32_t ret;
 	int64_t llretval;
 	char temppath[METAPATHLEN];
 	FILE *statfptr;
 	FS_STAT_T tmpvolstat;
-	ssize_t ret_ssize;
 
 	statfptr = NULL;
 	buf = malloc(arg_len + 10);
@@ -421,11 +420,10 @@ int64_t get_cloud_size(int32_t arg_len, char *largebuf)
 {
 	DIR_ENTRY temp_entry;
 	char *buf;
-	int32_t ret, errcode;
+	int32_t ret;
 	int64_t llretval;
 	char temppath[METAPATHLEN];
 	FILE *statfptr;
-	ssize_t ret_ssize;
 	FS_CLOUD_STAT_T fs_cloud_stat;
 
 	statfptr = NULL;

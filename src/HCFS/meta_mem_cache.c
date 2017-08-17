@@ -64,9 +64,6 @@ static inline int32_t _open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 static inline int32_t _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
 					DIR_ENTRY_PAGE *dir_page)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
-
 	MREAD(ptr, (ptr->dir_entry_cache[0]), sizeof(DIR_ENTRY_PAGE),
 	      dir_page->this_page_pos);
 
@@ -332,8 +329,7 @@ int32_t meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 *************************************************************************/
 int32_t meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t eindex)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 	/*Assume meta cache entry access sem is already locked*/
 
 	ret = _open_file(body_ptr);
@@ -359,9 +355,6 @@ errcode_handle:
 	if it is dirty. */
 static inline int32_t _cache_sync(META_CACHE_ENTRY_STRUCT *body_ptr, int32_t index)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
-
 	if ((body_ptr->dir_entry_cache_dirty[index] == TRUE) &&
 				(body_ptr->dir_entry_cache[index] != NULL)) {
 		MWRITE(body_ptr, body_ptr->dir_entry_cache[index],
@@ -387,7 +380,6 @@ errcode_handle:
 int32_t flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
-	size_t ret_size;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -588,7 +580,6 @@ If does not match any of the two, flush the older page entry first before
 processing the new one */
 
 	int32_t ret, errcode;
-	size_t ret_size;
 	ino_t tmpino;
 
 	UNUSED(this_inode);
@@ -683,7 +674,6 @@ If does not match any of the two, flush the older page entry first before
 processing the new one */
 
 	int32_t ret, errcode;
-	size_t ret_size;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -817,7 +807,6 @@ int32_t meta_cache_lookup_file_data(ino_t this_inode,
 				    META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
-	size_t ret_size;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -869,8 +858,7 @@ static inline int32_t _lookup_dir_load_page(META_CACHE_ENTRY_STRUCT *ptr,
 					DIR_ENTRY_PAGE *dir_page)
 {
 	off_t tmp_fpos;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 
 	if (ptr->dir_entry_cache[0] == NULL) {
 		ptr->dir_entry_cache[0] =
@@ -940,7 +928,6 @@ int32_t meta_cache_lookup_dir_data(ino_t this_inode,
 				   META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int32_t ret, errcode;
-	size_t ret_size;
 
 	UNUSED(this_inode);
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
@@ -1120,7 +1107,6 @@ int32_t meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	DIR_ENTRY_PAGE temppage, *rootpage, tmp_resultpage;
 	DIR_ENTRY_PAGE *tmp_page_ptr;
 	int32_t ret, errcode;
-	size_t ret_size;
 	int64_t nextfilepos;
 	DIR_ENTRY tmp_entry;
 	int32_t tmp_index;
@@ -1812,8 +1798,7 @@ int32_t meta_cache_lookup_symlink_data(ino_t this_inode,
 				       SYMLINK_META_TYPE *symlink_meta_ptr,
 				       META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 
 	UNUSED(this_inode);
 	write_log(10, "Debug meta cache lookup symbolic link data\n");

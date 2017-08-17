@@ -117,8 +117,6 @@ static int32_t _run_command(char *command)
 int32_t write_restored_smartcache_info(void)
 {
 	FILE *fptr;
-	int32_t errcode;
-	int64_t ret_size;
 	char path[METAPATHLEN];
 
 	sprintf(path, "%s/restored_smartcache_info", METAPATH);
@@ -145,8 +143,6 @@ errcode_handle:
 int32_t read_restored_smartcache_info(void)
 {
 	FILE *fptr;
-	int32_t errcode;
-	int64_t ret_size;
 	char path[METAPATHLEN];
 
 	sprintf(path, "%s/restored_smartcache_info", METAPATH);
@@ -172,7 +168,6 @@ errcode_handle:
  */
 int32_t destroy_restored_smartcacahe_info(void)
 {
-	int32_t ret, errcode;
 	char path[METAPATHLEN];
 
 	FREE(sc_data);
@@ -266,7 +261,6 @@ int32_t inject_restored_smartcache(ino_t smartcache_ino)
 	ino_t tmp_ino;
 	FILE_META_HEADER origin_header, tmp_header;
 	FILE *fptr;
-	int64_t ret_ssize;
 	uint64_t generation;
 	int64_t count, total_blocks = 0;
 	int32_t ret, errcode;
@@ -615,7 +609,6 @@ int32_t extract_restored_smartcache(ino_t smartcache_ino,
 	char block_status;
 	FILE_META_HEADER tmp_header;
 	FILE *fptr;
-	int64_t ret_ssize;
 	int64_t count, total_blocks = 0;
 	BOOL meta_open = FALSE;
 	struct stat tempstat;

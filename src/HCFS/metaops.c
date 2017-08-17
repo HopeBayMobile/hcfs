@@ -119,13 +119,13 @@ int32_t dir_add_entry(ino_t parent_inode,
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
 	int64_t overflow_new_page;
-	int32_t ret, errcode;
-	size_t ret_size;
+	int32_t ret;
 	int32_t sem_val;
 	char no_need_rewrite;
 	int64_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	int64_t temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+	int32_t errcode;
 
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
 	if (sem_val > 0) {
@@ -227,7 +227,7 @@ int32_t dir_add_entry(ino_t parent_inode,
 			memset(&new_root, 0, sizeof(DIR_ENTRY_PAGE));
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
 
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			new_root.this_page_pos = ret_pos;
 			if (new_root.this_page_pos == -1) {
 				errcode = errno;
@@ -371,7 +371,6 @@ int32_t dir_remove_entry(ino_t parent_inode,
 	int32_t sem_val;
 	DIR_ENTRY temp_entry;
 	int32_t ret, errcode;
-	size_t ret_size;
 
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	int64_t temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
@@ -727,8 +726,8 @@ int32_t delete_inode_meta(ino_t this_inode)
 		setbuf(todeletefptr, NULL);
 		FSEEK(metafptr, 0, SEEK_SET);
 		while (!feof(metafptr)) {
-			FREAD(filebuf, 1, 4096, metafptr);
-			if (ret > 0) {
+			ret_size = FREAD(filebuf, 1, 4096, metafptr);
+			if (ret_size > 0) {
 				write_size = ret_size;
 				FWRITE(filebuf, 1, write_size, todeletefptr);
 			} else {
@@ -740,6 +739,8 @@ int32_t delete_inode_meta(ino_t this_inode)
 		unlink(thismetapath);
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
+
+		ret = 0;
 	}
 	return ret;
 
@@ -854,8 +855,7 @@ int64_t _load_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	int64_t tmp_pos, tmp_target_pos;
 	int64_t tmp_ptr_page_index, tmp_ptr_index;
 	PTR_ENTRY_PAGE tmp_ptr_page;
-	int32_t count, ret, errcode;
-	size_t ret_size;
+	int32_t count;
 	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
@@ -884,7 +884,7 @@ int64_t _load_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 
 	for (count = level - 1; count >= 0; count--) {
 		FSEEK(fptr, tmp_target_pos, SEEK_SET);
-		FTELL(fptr);
+		ret_pos = FTELL(fptr);
 		tmp_pos = ret_pos;
 		if (tmp_pos != tmp_target_pos)
 			return 0;
@@ -1016,9 +1016,8 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 	int64_t tmp_pos, tmp_target_pos;
 	int64_t tmp_ptr_page_index, tmp_ptr_index;
 	PTR_ENTRY_PAGE tmp_ptr_page, empty_ptr_page;
-	int32_t count, ret, errcode;
+	int32_t count, ret;
 	BLOCK_ENTRY_PAGE temppage;
-	size_t ret_size;
 	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
@@ -1033,7 +1032,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			if (NO_META_SPACE())
 				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			temp_meta->single_indirect = ret_pos;
 			tmp_target_pos = temp_meta->single_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
@@ -1051,7 +1050,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			if (NO_META_SPACE())
 				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			temp_meta->double_indirect = ret_pos;
 			tmp_target_pos = temp_meta->double_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
@@ -1069,7 +1068,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			if (NO_META_SPACE())
 				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			temp_meta->triple_indirect = ret_pos;
 			tmp_target_pos = temp_meta->triple_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
@@ -1087,7 +1086,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			if (NO_META_SPACE())
 				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			temp_meta->quadruple_indirect = ret_pos;
 			tmp_target_pos = temp_meta->quadruple_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
@@ -1107,7 +1106,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 
 	for (count = level - 1; count >= 0; count--) {
 		FSEEK(body_ptr->fptr, tmp_target_pos, SEEK_SET);
-		FTELL(body_ptr->fptr);
+		ret_pos = FTELL(body_ptr->fptr);
 		tmp_pos = ret_pos;
 		if (tmp_pos != tmp_target_pos)
 			return 0;
@@ -1125,7 +1124,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 			if (NO_META_SPACE())
 				return -ENOSPC;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			tmp_ptr_page.ptr[tmp_ptr_page_index] = ret_pos;
 			memset(&empty_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			MWRITE(body_ptr, &empty_ptr_page,
@@ -1141,7 +1140,7 @@ int64_t _create_indirect(int64_t target_page, FILE_META_TYPE *temp_meta,
 		if (NO_META_SPACE())
 			return -ENOSPC;
 		FSEEK(body_ptr->fptr, 0, SEEK_END);
-		FTELL(body_ptr->fptr);
+		ret_pos = FTELL(body_ptr->fptr);
 		tmp_ptr_page.ptr[tmp_ptr_index] = ret_pos;
 
 		memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
@@ -1179,7 +1178,7 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 	int32_t sem_val;
 	FILE_META_TYPE temp_meta;
 	int32_t which_indirect;
-	int32_t ret, errcode;
+	int32_t ret;
 	int64_t ret_pos;
 
 	/* First check if meta cache is locked */
@@ -1207,7 +1206,7 @@ int64_t create_page(META_CACHE_ENTRY_STRUCT *body_ptr, int64_t target_page)
 			if (ret < 0)
 				return ret;
 			FSEEK(body_ptr->fptr, 0, SEEK_END);
-			FTELL(body_ptr->fptr);
+			ret_pos = FTELL(body_ptr->fptr);
 			temp_meta.direct = ret_pos;
 			filepos = temp_meta.direct;
 			memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
@@ -1342,7 +1341,6 @@ int32_t check_meta_on_cloud(ino_t this_inode,
 	FILE *metafptr = NULL;
 	CLOUD_RELATED_DATA this_clouddata;
 	off_t offset;
-	ssize_t ret_ssize;
 	struct stat tmpstat;
 
 	if (d_type == D_ISREG)
@@ -1596,14 +1594,14 @@ int32_t actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
 		memset(&file_meta, 0, sizeof(file_meta));
-		FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
+		ret_size = FREAD(&this_inode_stat, sizeof(HCFS_STAT), 1, metafptr);
 		if (ret_size < 1) {
 			write_log(2, "Skipping block deletion (meta gone)\n");
 			fclose(metafptr);
 			break;
 		}
 
-		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
+		ret_size = FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
 		if (ret_size < 1) {
 			write_log(2, "Skipping block deletion (meta gone)\n");
 			fclose(metafptr);
@@ -1875,7 +1873,7 @@ errcode_handle:
 int32_t disk_cleardelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
-	int32_t ret, errcode;
+	int32_t errcode;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
@@ -2050,7 +2048,6 @@ static int32_t _change_unpin_dirty_size(META_CACHE_ENTRY_STRUCT *ptr,
 					PIN_t pin)
 {
 	int32_t ret, errcode;
-	size_t ret_size;
 	FILE_STATS_TYPE *filestats;
 
 	ret = meta_cache_open_file(ptr);
@@ -2278,7 +2275,7 @@ int32_t collect_dirmeta_children(DIR_META_TYPE *dir_meta, FILE *fptr,
 {
 	int32_t ret, errcode;
 	int32_t count;
-	int64_t ret_size, now_page_pos;
+	int64_t now_page_pos;
 	int64_t total_children, half, now_nondir_size, now_dir_size;
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *tmpentry;
@@ -2544,8 +2541,7 @@ int32_t collect_dir_children(ino_t this_inode,
 	ino_t **nondir_node_list, int64_t *num_nondir_node,
 	char **nondir_type_list, BOOL ignore_minapk)
 {
-	int32_t ret, errcode;
-	int64_t ret_size;
+	int32_t ret;
 	char metapath[300];
 	FILE *fptr;
 	DIR_META_TYPE dir_meta;
@@ -2822,7 +2818,6 @@ errcode_handle:
  */
 int32_t restore_meta_structure(FILE *fptr)
 {
-	int32_t errcode, ret;
 	HCFS_STAT this_stat;
 	struct stat meta_stat; /* Meta file system stat */
 	FILE_META_TYPE file_meta;
@@ -2834,7 +2829,6 @@ int32_t restore_meta_structure(FILE *fptr)
 	uint8_t block_status;
 	BOOL write_page;
 	BOOL just_meta;
-	size_t ret_size;
 	FILE_STATS_TYPE file_stats;
 	CLOUD_RELATED_DATA cloud_data;
 
@@ -2993,7 +2987,6 @@ int32_t restore_borrowed_meta_structure(FILE *fptr, int32_t uid, ino_t src_ino,
 	int64_t total_blocks, current_page, page_pos;
 	int64_t cached_size, num_cached_block, count, e_index, which_page;
 	int64_t blkcount, pin_size;
-	size_t ret_size;
 	CLOUD_RELATED_DATA cloud_data;
 	FILE_META_TYPE filemeta;
 	FILE_STATS_TYPE file_stats_type;
@@ -3301,13 +3294,12 @@ errcode_handle:
  */
 int32_t check_data_location(ino_t this_inode)
 {
-	int32_t errcode, ret;
+	int32_t errcode;
 	char metapath[METAPATHLEN];
 	HCFS_STAT thisstat;
 	META_CACHE_ENTRY_STRUCT *thisptr;
 	char inode_loc;
 	FILE_STATS_TYPE *tmpstats;
-	size_t ret_size;
 
 	write_log(10, "Debug checkloc inode %" PRIu64 "\n",
 		  (uint64_t)this_inode);
