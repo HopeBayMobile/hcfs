@@ -2,17 +2,16 @@
 #include "googledrive_curl.h"
 #include "do_restoration.h"
 
+/**
+ * Following function is used to fill required info when upload to cloud. Swift
+ * backend needs nothing of additional data, but google drive needs either file
+ * ID or object name to PUT and POST, respectively.
+ *
+ * @param obj_info Pointer of additional info to be filled.
+ * @param objname Object name.
+ * @param objectID Object ID. It can be NULL.
+ */
 int32_t swift_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
-			       char *objname,
-			       char *objectID)
-{
-	UNUSED(obj_info);
-	UNUSED(objname);
-	UNUSED(objectID);
-	return 0;
-}
-
-int32_t swift_download_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
 			       char *objname,
 			       char *objectID)
 {
@@ -36,10 +35,32 @@ int32_t gdrive_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
 	} else {
 		/* Otherwise fill obj name and parent id, then it will POST
 		 * object */
+		if (!objname)
+			return -EINVAL;
 		strcpy(obj_info->file_title, objname);
 		ret = get_parent_id(obj_info->parentID, objname);
 	}
 	return ret;
+}
+
+/**
+ * download_fill_object_info aims to fill object ID as well as parent ID so that
+ * caller can utilize the information to download data.
+ *
+ * @param obj_info Pointer of additional info to be filled.
+ * @param objname Object name.
+ * @param objectID Object ID. If this paramter is null, then it performs
+ *                 "list container" operation to fetch object ID from
+ *                 response content.
+ */
+int32_t swift_download_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
+			       char *objname,
+			       char *objectID)
+{
+	UNUSED(obj_info);
+	UNUSED(objname);
+	UNUSED(objectID);
+	return 0;
 }
 
 int32_t gdrive_download_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
@@ -68,6 +89,12 @@ int32_t gdrive_download_fill_object_info(GOOGLEDRIVE_OBJ_INFO *obj_info,
 	return ret;
 }
 
+/**
+ * Get pkg list ID from pkglist id cache and file. Return -ENOENT if id not
+ * found or not exist.
+ *
+ * @param id Pointer to ID to be filled.
+ */
 int32_t swift_get_pkglist_id(char *id)
 {
 	UNUSED(id);
@@ -129,6 +156,11 @@ out:
 	return ret;
 }
 
+/**
+ * Given pkglist id, record it in file and cache in memory.
+ *
+ * @param id Pointer to ID to be filled.
+ */
 int32_t swift_record_pkglist_id(const char *id)
 {
 	UNUSED(id);
@@ -166,6 +198,11 @@ out:
 	return ret;
 }
 
+/**
+ * Initialize backeand operations.
+ *
+ * @param backend_type Backend type.
+ */
 int32_t init_backend_ops(int32_t backend_type)
 {
 	switch (backend_type) {

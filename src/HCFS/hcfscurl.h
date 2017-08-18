@@ -26,7 +26,7 @@
 
 #define MAX_DOWNLOAD_CURL_HANDLE 16
 /* For swift token control */
-#define MAX_WAIT_TIME 60
+#define MAX_WAIT_TIME 15
 
 typedef void added_info_t; /* Additional data curl ops needed. */
 

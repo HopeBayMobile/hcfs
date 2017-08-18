@@ -498,7 +498,6 @@ int32_t hcfs_get_auth_token(void)
 
 	switch (CURRENT_BACKEND) {
 	case SWIFTTOKEN:
-	case SWIFT:
 		if (swift_auth_string[0] != 0)
 			return 200;
 
@@ -522,6 +521,10 @@ int32_t hcfs_get_auth_token(void)
 			(hcfs_system->system_going_down == FALSE)) {
 		/* Wait for new token being set */
 		pthread_mutex_lock(&(token_controller->waiting_lock));
+		if (googledrive_token[0]) {
+			pthread_mutex_unlock(&(token_controller->waiting_lock));
+			return 200;
+		}
 		clock_gettime(CLOCK_REALTIME, &timeout);
 		timeout.tv_sec += MAX_WAIT_TIME;
 		pthread_cond_timedwait(&(token_controller->waiting_cond),
