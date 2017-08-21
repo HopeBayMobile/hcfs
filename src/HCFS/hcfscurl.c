@@ -1814,6 +1814,8 @@ int32_t hcfs_list_container(FILE *fptr,
 		}
 	}
 
+	setbuf(fptr, NULL);
+
 	num_retries = 0;
 	write_log(10, "Debug start listing container\n");
 	switch (CURRENT_BACKEND) {
@@ -1842,6 +1844,7 @@ int32_t hcfs_list_container(FILE *fptr,
 			ret_val = -EINVAL;
 			break;
 		}
+		fseek(fptr, 0, SEEK_SET);
 		ret_val = hcfs_gdrive_list_container(fptr, curl_handle, more);
 
 		while ((!http_is_success(ret_val)) &&
@@ -1866,6 +1869,7 @@ int32_t hcfs_list_container(FILE *fptr,
 				if ((ret_val < 200) || (ret_val > 299))
 					continue;
 			}
+			fseek(fptr, 0, SEEK_SET);
 			ret_val =
 			    hcfs_gdrive_list_container(fptr, curl_handle, more);
 		}
@@ -1968,6 +1972,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			}
 		}
 		/* Run it */
+		FSEEK(fptr, 0, SEEK_SET);
 		ret_val = gdrive_upload_action(fptr, objname, curl_handle,
 						  gdrive_obj_info);
 		while ((!http_is_success(ret_val)) &&
@@ -1998,6 +2003,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		}
 		break;
 	case S3:
+		FSEEK(fptr, 0, SEEK_SET);
 		ret_val =
 		    hcfs_S3_put_object(fptr, objname, curl_handle, object_meta);
 		while ((!http_is_success(ret_val)) &&
@@ -2081,6 +2087,8 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			ret_val = -EINVAL;
 			break;
 		}
+		FSEEK(fptr, 0, SEEK_SET);
+		FTRUNCATE(fileno(fptr), 0);
 		ret_val = hcfs_gdrive_get_object(fptr, objname, curl_handle,
 						more);
 		while ((!http_is_success(ret_val)) &&
