@@ -426,6 +426,8 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 		    "https://www.googleapis.com/drive/v3/files/%s?alt=media",
 		    obj_info->fileID);
 
+	fseek(fptr, 0, SEEK_SET);
+	ftruncate(fileno(fptr), 0);
 	HCFS_SET_DEFAULT_CURL();
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
@@ -1056,6 +1058,8 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 		ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files");
 	}
 
+	fseek(fptr, 0, SEEK_SET);
+	ftruncate(fileno(fptr), 0);
 	chunk = NULL;
 	chunk = curl_slist_append(chunk, googledrive_token);
 	chunk = curl_slist_append(chunk, "Expect:");
