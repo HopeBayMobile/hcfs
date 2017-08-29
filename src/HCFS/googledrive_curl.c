@@ -1162,7 +1162,7 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 
 	json_array_foreach(json_items, index, json_value) {
 		/* Skip if not a json dict */
-		if (json_is_object(json_value) < 0)
+		if (json_value == NULL || json_is_object(json_value) < 0)
 			continue;
 
 		json_title = json_object_get(json_value, "title");
@@ -1194,7 +1194,11 @@ int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
 				write_log(0, "Error: Json file is corrupt\n");
 				goto errcode_handle_json_del;
 			}
-			strcpy(id, temp_id);
+			if (strlen(temp_id) > GDRIVE_ID_LENGTH)
+				write_log(4, "Warn: id len of object %s is %d, "
+					     "which is %s",
+					  objname, strlen(temp_id), temp_id);
+			strncpy(id, temp_id, GDRIVE_ID_LENGTH);
 			break;
 		}
 	}
