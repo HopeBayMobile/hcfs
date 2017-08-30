@@ -436,7 +436,7 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	chunk = curl_slist_append(chunk, user_string);
 	chunk = curl_slist_append(chunk, pass_string);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, fptr);
@@ -781,7 +781,7 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -861,7 +861,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	ASPRINTF(&url, "%s/%s", swift_url_string, SWIFT_CONTAINER);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -986,7 +986,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 
 	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1112,7 +1112,7 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 		ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
 			 objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1245,7 +1245,7 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1474,7 +1474,7 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, S3_BUCKET_URL);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
@@ -2348,7 +2348,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
@@ -2479,7 +2479,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
@@ -2618,7 +2618,7 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);

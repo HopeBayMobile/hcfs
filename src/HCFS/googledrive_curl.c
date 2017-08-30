@@ -221,7 +221,7 @@ int32_t hcfs_gdrive_test_backend(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, googledrive_token);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, googledrive_test_url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -428,7 +428,7 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 
 	fseek(fptr, 0, SEEK_SET);
 	ftruncate(fileno(fptr), 0);
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -569,7 +569,7 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files/%s",
 		 obj_info->fileID);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -698,7 +698,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 		       "%s?uploadType=media",
 		 obj_info->fileID);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -891,7 +891,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	post_control.total_remaining = total_size;
 	post_control.objname = obj_info->file_title;
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -1064,7 +1064,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 	chunk = curl_slist_append(chunk, googledrive_token);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);

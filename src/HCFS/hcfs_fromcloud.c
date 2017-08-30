@@ -123,12 +123,13 @@ int32_t fetch_from_cloud(FILE *fptr,
             calloc(1, sizeof(HCFS_encode_object_meta));
 
 	/* Fill object info if needed */
-	ret = backend_ops.download_fill_object_info(&obj_info, objname, fileID);
-	if (ret < 0) {
+	errcode =
+	    backend_ops.download_fill_object_info(&obj_info, objname, fileID);
+	if (errcode < 0) {
 		write_log(
 		    0, "Error: Fail to fill downloading object info, Object %s",
 		    objname);
-		return ret;
+		return errcode;
 	}
 
 	status = hcfs_get_object(get_fptr, objname,

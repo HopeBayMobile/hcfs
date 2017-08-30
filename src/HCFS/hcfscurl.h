@@ -124,24 +124,6 @@ int32_t hcfs_list_container(FILE *fptr,
 #define RETRY_INTERVAL 10
 #endif
 
-#define HCFS_SET_DEFAULT_CURL()                                                \
-	do {                                                                   \
-		CURL *curl = NULL;\
-		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);           \
-		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn); \
-		curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);                   \
-		curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);                    \
-		curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);                  \
-		curl_easy_setopt(curl, CURLOPT_PUT, 0L);                       \
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);            \
-		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);            \
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);                  \
-		curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);                    \
-		curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);                   \
-		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);                \
-		curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, cancelfn);    \
-	} while (0)
-
 int32_t http_is_success(int32_t code);
 size_t write_file_fn(void *ptr, size_t size, size_t nmemb, void *fstream);
 int32_t parse_http_header_retcode(FILE *fptr);
@@ -152,6 +134,25 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 			  void *put_control1);
 int cancelfn(void *clientp, double dltotal, double dlnow,
              double ultotal, double ulnow);
+
+static inline
+void set_default_curl(CURL *curl)
+{
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
+	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_fn);
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+	curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, cancelfn);
+}
+
 /*
  * Marco to compute data transfer throughput.  If object size < 32KB, for
  * this computation the size is rounded up to 32KB.
