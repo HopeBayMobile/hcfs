@@ -44,8 +44,7 @@ typedef struct {
 char restore_metapath[METAPATHLEN];
 char restore_blockpath[BLOCKPATHLEN];
 
-sem_t restore_sem, backup_pkg_sem;
-BOOL have_new_pkgbackup;
+sem_t restore_sem;
 BOOL use_old_cloud_stat;
 pthread_attr_t download_minimal_attr;
 pthread_t download_minimal_thread;

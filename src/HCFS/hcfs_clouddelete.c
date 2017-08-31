@@ -55,6 +55,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "utils.h"
 #include "hcfs_fromcloud.h"
 #include "atomic_tocloud.h"
+#include "backend_generic.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -490,7 +491,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	int64_t pin_size_delta_blk;
 	int64_t block_seq;
 	ino_t root_inode;
-	char metaID[GDRIVE_ID_LENGTH];
+	char metaID[GDRIVE_ID_LENGTH + 1];
 	int32_t pause_status;
 
 	time_to_sleep.tv_sec = 0;
@@ -560,9 +561,28 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&cloud_data, sizeof(CLOUD_RELATED_DATA), 1, todel_fptr);
 		fclose(todel_fptr);
 
-		strncpy(metaID, cloud_data.metaID, GDRIVE_ID_LENGTH);
-		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,
-				       objname, metaID);
+		if (cloud_data.metaID[0]) {
+			strncpy(metaID, cloud_data.metaID, GDRIVE_ID_LENGTH);
+			ret = 0;
+		} else {
+			/* if value of ID is empty, fetch it using list
+			 * operation. This case may occur after restoration
+			 */
+			GOOGLEDRIVE_OBJ_INFO obj_info;
+
+			write_log(4,
+				  "ID of Object %s not found, try to list it",
+				  objname);
+			ret = backend_ops.download_fill_object_info(
+			    &obj_info, objname, NULL);
+			if (ret == 0)
+				strncpy(metaID, obj_info.fileID,
+					GDRIVE_ID_LENGTH);
+		}
+
+		if (ret == 0)
+			ret = fetch_from_cloud(
+			    backend_metafptr, FETCH_FILE_META, objname, metaID);
 
 	} else {
 		ret = fetch_from_cloud(backend_metafptr, FETCH_FILE_META,

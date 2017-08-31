@@ -35,8 +35,10 @@
 #include "utils.h"
 #include "restoration_utils.h"
 #include "hcfs_cacheops.h"
+#include "hcfs_tocloud.h"
 #include "control_smartcache.h"
 #include "FS_manager.h"
+#include "backend_generic.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -45,8 +47,8 @@ void init_restore_path(void)
 	snprintf(RESTORE_METAPATH, METAPATHLEN, "%s_restore", METAPATH);
 	snprintf(RESTORE_BLOCKPATH, BLOCKPATHLEN, "%s_restore", BLOCKPATH);
 	sem_init(&(restore_sem), 0, 1);
-	sem_init(&(backup_pkg_sem), 0, 1);
-	have_new_pkgbackup = TRUE;
+	sem_init(&(pkg_backup_data.backup_pkg_sem), 0, 1);
+	pkg_backup_data.have_new_pkgbackup = TRUE;
 	use_old_cloud_stat = FALSE;
 }
 
@@ -480,7 +482,10 @@ int32_t fetch_restore_block_path(char *pathname,
 /* FEATURE TODO: How to retry stage 1 without downloading the same
  * files again, but also need to ensure the correctness of downloaded files
  */
-int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
+int32_t restore_fetch_obj(char *objname,
+			  char *objid,
+			  char *despath,
+			  BOOL is_meta)
 {
 	FILE *fptr;
 	int32_t ret;
@@ -492,7 +497,8 @@ int32_t restore_fetch_obj(char *objname, char *despath, BOOL is_meta)
 	}
 	setbuf(fptr, NULL);
 
-	ret = fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname);
+	ret =
+	    fetch_object_busywait_conn(fptr, RESTORE_FETCH_OBJ, objname, objid);
 	if (ret < 0) {
 		if (ret == -ENOENT) {
 			write_log(0,
@@ -523,11 +529,11 @@ int32_t _fetch_meta(ino_t thisinode)
 		 (uint64_t)thisinode);
 	fetch_restore_meta_path(despath, thisinode);
 
-	ret = restore_fetch_obj(objname, despath, TRUE);
+	ret = restore_fetch_obj(objname, NULL, despath, TRUE);
 	return ret;
 }
 
-int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq)
+int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq, char *id)
 {
 	char objname[BLOCKPATHLEN];
 	char despath[BLOCKPATHLEN];
@@ -537,7 +543,7 @@ int32_t _fetch_block(ino_t thisinode, int64_t blockno, int64_t seq)
 		(uint64_t)thisinode, blockno, seq);
 	fetch_restore_block_path(despath, thisinode, blockno);
 
-	ret = restore_fetch_obj(objname, despath, FALSE);
+	ret = restore_fetch_obj(objname, id, despath, FALSE);
 	return ret;
 }
 
@@ -555,7 +561,7 @@ int32_t _fetch_FSstat(ino_t rootinode)
 	snprintf(despath, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
 		 RESTORE_METAPATH, (uint64_t)rootinode);
 
-	ret = restore_fetch_obj(objname, despath, FALSE);
+	ret = restore_fetch_obj(objname, NULL, despath, FALSE);
 	return ret;
 
 errcode_handle:
@@ -739,8 +745,9 @@ int32_t _fetch_pinned(ino_t thisinode, BOOL is_smartcache)
 
 		/* Skip if block does not exist */
 		if (temppage.block_entries[nowindex].status == ST_CLOUD) {
+			char *id = temppage.block_entries[nowindex].blockID;
 			seq = temppage.block_entries[nowindex].seqnum;
-			ret = _fetch_block(thisinode, count, seq);
+			ret = _fetch_block(thisinode, count, seq, id);
 			if (ret < 0) {
 				if (ret == -ENOENT && is_smartcache == TRUE) {
 					/* Remove missing block when restoring
@@ -2651,6 +2658,7 @@ int32_t run_download_minimal(void)
 	ino_t vol_max_inode, sys_max_inode;
 	INODE_PAIR_LIST *hardln_mapping;
 	BOOL smartcache_already_in_hcfs = FALSE;
+	GOOGLEDRIVE_OBJ_INFO obj_info;
 
 	/* Fetch quota value from backend and store in the restoration path */
 
@@ -2681,8 +2689,10 @@ int32_t run_download_minimal(void)
 	}
 
 	write_log(4, "Downloading package list backup\n");
+	backend_ops.download_fill_object_info(&obj_info, "backup_pkg", NULL);
+	backend_ops.record_pkglist_id(obj_info.fileID);
 	snprintf(despath, METAPATHLEN, "%s/backup_pkg", RESTORE_METAPATH);
-	ret = restore_fetch_obj("backup_pkg", despath, FALSE);
+	ret = restore_fetch_obj("backup_pkg", NULL, despath, FALSE);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -2703,7 +2713,7 @@ int32_t run_download_minimal(void)
 	}
 
 	snprintf(despath, METAPATHLEN, "%s/fsmgr", RESTORE_METAPATH);
-	ret = restore_fetch_obj(FSMGR_BACKUP, despath, FALSE);
+	ret = restore_fetch_obj(FSMGR_BACKUP, NULL, despath, FALSE);
 
 	if (ret < 0) {
 		errcode = ret;
@@ -3053,11 +3063,23 @@ errcode_handle:
 
 void cleanup_stage1_data(void)
 {
-//	char todelete_metapath[METAPATHLEN];
-//	char todelete_blockpath[BLOCKPATHLEN];
-//
-//	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete", METAPATH);
-//	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete", BLOCKPATH);
+	char todelete_metapath[METAPATHLEN];
+	char todelete_blockpath[BLOCKPATHLEN];
+	char cmd[METAPATHLEN + 512];
+
+	snprintf(todelete_metapath, METAPATHLEN, "%s_todelete", METAPATH);
+	snprintf(todelete_blockpath, BLOCKPATHLEN, "%s_todelete", BLOCKPATH);
+	if (access(todelete_metapath, F_OK) == 0) {
+		snprintf(cmd, METAPATHLEN + 500, "rm -rf %s",
+			 todelete_metapath);
+		system(cmd);
+	}
+
+	if (access(todelete_blockpath, F_OK) == 0) {
+		snprintf(cmd, METAPATHLEN + 500, "rm -rf %s",
+			 todelete_blockpath);
+		system(cmd);
+	}
 //
 //	if (access(todelete_metapath, F_OK) == 0)
 //		nftw(todelete_metapath, _delete_node, 10,
@@ -3071,9 +3093,9 @@ void cleanup_stage1_data(void)
 /* Function for backing up package list (packages.xml) */
 int32_t backup_package_list(void)
 {
-	sem_wait(&backup_pkg_sem);
-	have_new_pkgbackup = TRUE;
-	sem_post(&backup_pkg_sem);
+	LOCK_PKG_BACKUP_SEM();
+	pkg_backup_data.have_new_pkgbackup = TRUE;
+	UNLOCK_PKG_BACKUP_SEM();
 	return 0;
 }
 

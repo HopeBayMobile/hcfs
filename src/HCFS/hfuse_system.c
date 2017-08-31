@@ -61,6 +61,7 @@
 #include "rebuild_super_block.h"
 #include "recover_super_block.h"
 #include "apk_mgmt.h"
+#include "backend_generic.h"
 
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
@@ -620,6 +621,10 @@ int32_t main(int32_t argc, char **argv)
 	}
 	ret_val = init_system_config_settings(DEFAULT_CONFIG_PATH,
 					      system_config);
+	if (ret_val < 0)
+		exit(-1);
+
+	ret_val = init_backend_ops(system_config->current_backend);
 	if (ret_val < 0)
 		exit(-1);
 

@@ -73,6 +73,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "do_restoration.h"
 #include "recover_super_block.h"
 #include "pthread_control.h"
+#include "backend_generic.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -863,6 +864,7 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 	BOOL llock, ulock;
 	char finish_uploading, toupload_exist;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
+	char objname[300];
 
 	llock = FALSE;
 	ulock = FALSE;
@@ -961,23 +963,14 @@ static int32_t _check_block_sync(FILE *toupload_metafptr, FILE *local_metafptr,
 		sem_post(&(upload_ctl.upload_op_sem));
 
 		/* Set file title and parent ID if backend is google drive */
-		if (CURRENT_BACKEND == GOOGLEDRIVE) {
-			char objname[100];
-			UPLOAD_THREAD_TYPE *upload_ptr =
-			    &(upload_ctl.upload_threads[which_curl]);
-			memset(&(upload_ptr->gdrive_obj_info), 0,
-			       sizeof(GOOGLEDRIVE_OBJ_INFO));
-			fetch_backend_block_objname(objname, ptr->inode,
-						    block_count,
-						    toupload_block_seq);
-			strcpy(upload_ptr->gdrive_obj_info.file_title,
-			       objname);
-			ret = get_parent_id(
-			    upload_ptr->gdrive_obj_info.parentID, objname);
-			if (ret < 0) {
-				sync_ctl.threads_error[ptr->which_index] = TRUE;
-				return ret;
-			}
+		fetch_backend_block_objname(objname, ptr->inode, block_count,
+					    toupload_block_seq);
+		ret = backend_ops.fill_object_info(
+		    &(upload_ctl.upload_threads[which_curl].gdrive_obj_info),
+		    objname, NULL);
+		if (ret < 0) {
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
+			return ret;
 		}
 		ret = dispatch_upload_block(which_curl);
 		if (ret < 0) {
@@ -1125,6 +1118,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int64_t size_diff_blk = 0, meta_size_diff_blk = 0;
 	int64_t disk_pin_size_delta = 0;
 	BOOL cleanup_meta = FALSE;
+	char objname[300];
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1453,32 +1447,16 @@ store in some other file */
 		flock(fileno(local_metafptr), LOCK_UN);
 		cleanup_meta = FALSE;
 		/* Prepare google drive data */
-		if (CURRENT_BACKEND == GOOGLEDRIVE) {
-			UPLOAD_THREAD_TYPE *upload_ptr =
-			    &(upload_ctl.upload_threads[which_curl]);
-			memset(&(upload_ptr->gdrive_obj_info), 0,
-			       sizeof(GOOGLEDRIVE_OBJ_INFO));
-			if (cloud_related_data.metaID[0]) {
-				strcpy(upload_ptr->gdrive_obj_info.fileID,
-				       cloud_related_data.metaID);
-			} else {
-				char objname[300];
-				fetch_backend_meta_objname(objname, ptr->inode);
-				strcpy(upload_ptr->gdrive_obj_info.file_title,
-				       objname);
-				ret = get_parent_id(
-				    upload_ptr->gdrive_obj_info.parentID,
-				    objname);
-				if (ret < 0) {
-					sync_ctl
-					    .threads_error[ptr->which_index] =
-					    TRUE;
-					sync_ctl.threads_finished
-					    [ptr->which_index] = TRUE;
-					return;
-				}
-			}
+		fetch_backend_meta_objname(objname, ptr->inode);
+		ret = backend_ops.fill_object_info(
+		    &(upload_ctl.upload_threads[which_curl].gdrive_obj_info),
+		    objname, cloud_related_data.metaID);
+		if (ret < 0) {
+			sync_ctl.threads_error[ptr->which_index] = TRUE;
+			sync_ctl.threads_finished[ptr->which_index] = TRUE;
+			return;
 		}
+
 		schedule_sync_meta(toupload_metapath, which_curl);
 		PTHREAD_REUSE_join(&(upload_ctl.upload_threads_no[which_curl]));
 		if (CURRENT_BACKEND == GOOGLEDRIVE &&
@@ -2553,18 +2531,38 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 	int32_t ret;
 	char backup_xml[METAPATHLEN];
 	FILE *fptr = NULL;
+	char object_cloud_id[GDRIVE_ID_LENGTH] = {0};
+	GOOGLEDRIVE_OBJ_INFO obj_info;
+	bool need_record_id = false;
 
-	sem_wait(&backup_pkg_sem);
+	LOCK_PKG_BACKUP_SEM();
 
 	/* Return immediately if no new package list */
-	if (have_new_pkgbackup == FALSE) {
-		sem_post(&backup_pkg_sem);
+	if (pkg_backup_data.have_new_pkgbackup == FALSE) {
+		UNLOCK_PKG_BACKUP_SEM();
 		return;
 	}
-	have_new_pkgbackup = FALSE;
-	sem_post(&backup_pkg_sem);
-
+	pkg_backup_data.have_new_pkgbackup = FALSE;
+	UNLOCK_PKG_BACKUP_SEM();
 	write_log(4, "Backing up package list\n");
+
+	/* Fetch object id */
+	ret = backend_ops.get_pkglist_id(object_cloud_id);
+	if (ret < 0) {
+		if (ret == -ENOENT) {
+			need_record_id = true;
+		} else {
+			write_log(0, "Unable to fetch id of package list\n");
+			return;
+		}
+	}
+	ret = backend_ops.fill_object_info(&obj_info, "backup_pkg",
+					   object_cloud_id);
+	if (ret < 0) {
+		write_log(0, "Unable to fill object info of package list\n");
+		return;
+	}
+
 	snprintf(backup_xml, METAPATHLEN, "%s/backup_pkg", METAPATH);
 
 	if (access(PACKAGE_XML, F_OK) != 0) {
@@ -2584,17 +2582,19 @@ void _try_backup_package_list(CURL_HANDLE *thiscurl)
 		write_log(0, "Unable to open backed-up pkg list\n");
 		return;
 	}
-
 	setbuf(fptr, NULL);
 
 	flock(fileno(fptr), LOCK_EX);
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL, NULL);
+	ret = hcfs_put_object(fptr, "backup_pkg", thiscurl, NULL, &obj_info);
 	if ((ret < 200) || (ret > 299))
 		goto errcode_handle;
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 	fptr = NULL;
+
+	if (need_record_id)
+		backend_ops.record_pkglist_id(obj_info.fileID);
 
 	return;
 errcode_handle:

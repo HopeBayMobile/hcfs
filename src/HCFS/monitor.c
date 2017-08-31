@@ -67,6 +67,24 @@ void _write_monitor_loop_status_log(double duration)
 			  sync_paused ? "paused" : "syncing");
 	}
 }
+
+int32_t monitor_sem_timedwait(void)
+{
+	int32_t min, max;
+	int32_t wait_sec = 0;
+	struct timespec ts;
+
+	max = MONITOR_MAX_TIMEOUT;
+	min = MONITOR_MIN_TIMEOUT;
+	wait_sec = MONITOR_BACKOFF_SLOT;
+	wait_sec *= (min + (rand() % (max - min + 1)));
+	write_log(5, "[Monitor] wait %d seconds before retransmit\n", wait_sec);
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	ts.tv_sec += wait_sec;
+	return sem_timedwait(&(hcfs_system->monitor_sem), &ts);
+}
+
 /**************************************************************************
  *
  * Function name: monitor_loop
@@ -84,8 +102,6 @@ void *monitor_loop(void *ptr)
 {
 	struct timespec ts;
 	int32_t ret_val;
-	int32_t wait_sec = 0;
-	int32_t min, max;
 #ifdef _ANDROID_ENV_
 	prctl(PR_SET_NAME, "monitor_loop");
 #endif /* _ANDROID_ENV_ */
@@ -111,20 +127,14 @@ void *monitor_loop(void *ptr)
 		}
 		if (hcfs_system->sync_manual_switch == OFF) {
 			write_log(6, "Sleeping monitor thread: manual switch off\n");
-			sem_wait(&(hcfs_system->monitor_sem));
+			monitor_sem_timedwait();
+			//sem_wait(&(hcfs_system->monitor_sem));
+			if (hcfs_system->system_restoring == RESTORING_STAGE2)
+				hcfs_system->sync_manual_switch = ON;
 			continue;
 		}
 		/* Change exponential backoff to fixed random interval */
-		max = MONITOR_MAX_TIMEOUT;
-		min = MONITOR_MIN_TIMEOUT;
-		wait_sec = MONITOR_BACKOFF_SLOT;
-		wait_sec *= (min + (rand() % (max - min + 1)));
-		write_log(5, "[Monitor] wait %d seconds before retransmit\n",
-			  wait_sec);
-
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += wait_sec;
-		ret_val = sem_timedwait(&(hcfs_system->monitor_sem), &ts);
+		ret_val = monitor_sem_timedwait();
 
 		BOOL will_retry = FALSE;
 		if ((ret_val == 0) && (manual_retry_conn == TRUE))

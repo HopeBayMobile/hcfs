@@ -436,7 +436,7 @@ int32_t hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	chunk = curl_slist_append(chunk, user_string);
 	chunk = curl_slist_append(chunk, pass_string);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, fptr);
@@ -496,15 +496,17 @@ int32_t hcfs_get_auth_token(void)
 	struct timespec timeout;
 	BACKEND_TOKEN_CONTROL *token_controller = NULL;
 
-	/* Token is already set */
-	if (swift_auth_string[0] != 0)
-		return 200;
-
 	switch (CURRENT_BACKEND) {
 	case SWIFTTOKEN:
+		if (swift_auth_string[0] != 0)
+			return 200;
+
 		token_controller = &swifttoken_control;
 		break;
 	case GOOGLEDRIVE:
+		if (googledrive_token[0] != 0)
+			return 200;
+
 		token_controller = googledrive_token_control;
 		break;
 	default:
@@ -519,6 +521,10 @@ int32_t hcfs_get_auth_token(void)
 			(hcfs_system->system_going_down == FALSE)) {
 		/* Wait for new token being set */
 		pthread_mutex_lock(&(token_controller->waiting_lock));
+		if (googledrive_token[0]) {
+			pthread_mutex_unlock(&(token_controller->waiting_lock));
+			return 200;
+		}
 		clock_gettime(CLOCK_REALTIME, &timeout);
 		timeout.tv_sec += MAX_WAIT_TIME;
 		pthread_cond_timedwait(&(token_controller->waiting_cond),
@@ -775,7 +781,7 @@ int32_t hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -855,7 +861,7 @@ int32_t hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	ASPRINTF(&url, "%s/%s", swift_url_string, SWIFT_CONTAINER);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -980,7 +986,7 @@ int32_t hcfs_swift_put_object(FILE *fptr,
 
 	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1106,7 +1112,7 @@ int32_t hcfs_swift_get_object(FILE *fptr,
 		ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
 			 objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1239,7 +1245,7 @@ int32_t hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	ASPRINTF(&url, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
@@ -1468,7 +1474,7 @@ int32_t hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, S3_BUCKET_URL);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
@@ -1640,7 +1646,7 @@ int32_t hcfs_init_backend(CURL_HANDLE *curl_handle)
 	case SWIFT:
 	case SWIFTTOKEN:
 	case GOOGLEDRIVE:
-		write_log(2, "Connecting to %s backend\n",
+		write_log(5, "Connecting to %s backend\n",
 			  CURRENT_BACKEND == GOOGLEDRIVE ? "google drive"
 							 : "swift");
 		num_retries = 0;
@@ -1795,7 +1801,6 @@ int32_t hcfs_list_container(FILE *fptr,
 {
 	int32_t ret_val, num_retries, busy_retry_times = 0;
 
-	UNUSED(more);
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
@@ -1808,6 +1813,8 @@ int32_t hcfs_list_container(FILE *fptr,
 			return ret_val;
 		}
 	}
+
+	setbuf(fptr, NULL);
 
 	num_retries = 0;
 	write_log(10, "Debug start listing container\n");
@@ -1924,6 +1931,7 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	case SWIFTTOKEN:
 		if (!fptr)
 			return -ENOMEM;
+
 		ret_val = hcfs_swift_put_object(fptr, objname, curl_handle,
 						object_meta);
 		while ((!http_is_success(ret_val)) &&
@@ -1987,12 +1995,12 @@ int32_t hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 				if ((ret_val < 200) || (ret_val > 299))
 					continue;
 			}
-			FSEEK(fptr, 0, SEEK_SET);
 			ret_val = gdrive_upload_action(
 			    fptr, objname, curl_handle, gdrive_obj_info);
 		}
 		break;
 	case S3:
+		FSEEK(fptr, 0, SEEK_SET);
 		ret_val =
 		    hcfs_S3_put_object(fptr, objname, curl_handle, object_meta);
 		while ((!http_is_success(ret_val)) &&
@@ -2037,6 +2045,8 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	ret_val = ignore_sigpipe();
 	if (ret_val < 0)
 		return ret_val;
+	if (!fptr)
+		return -ENOMEM;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -2076,6 +2086,8 @@ int32_t hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			ret_val = -EINVAL;
 			break;
 		}
+		FSEEK(fptr, 0, SEEK_SET);
+		FTRUNCATE(fileno(fptr), 0);
 		ret_val = hcfs_gdrive_get_object(fptr, objname, curl_handle,
 						more);
 		while ((!http_is_success(ret_val)) &&
@@ -2336,7 +2348,7 @@ int32_t hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
@@ -2467,7 +2479,7 @@ int32_t hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
@@ -2606,7 +2618,7 @@ int32_t hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	ASPRINTF(&url, "%s/%s", S3_BUCKET_URL, objname);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);

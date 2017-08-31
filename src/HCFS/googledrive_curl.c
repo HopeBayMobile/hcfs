@@ -20,6 +20,7 @@
 #include "macro.h"
 #include "monitor.h"
 #include "fuseop.h"
+#include "do_restoration.h"
 
 #define MAX_BACKOFF_EXP 3
 
@@ -220,7 +221,7 @@ int32_t hcfs_gdrive_test_backend(CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, googledrive_token);
 	chunk = curl_slist_append(chunk, "Expect:");
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, googledrive_test_url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -425,7 +426,9 @@ int32_t hcfs_gdrive_get_object(FILE *fptr,
 		    "https://www.googleapis.com/drive/v3/files/%s?alt=media",
 		    obj_info->fileID);
 
-	HCFS_SET_DEFAULT_CURL();
+	fseek(fptr, 0, SEEK_SET);
+	ftruncate(fileno(fptr), 0);
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -566,7 +569,7 @@ int32_t hcfs_gdrive_delete_object(char *objname,
 	ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files/%s",
 		 obj_info->fileID);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -695,7 +698,7 @@ int32_t hcfs_gdrive_put_object(FILE *fptr,
 		       "%s?uploadType=media",
 		 obj_info->fileID);
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -888,7 +891,7 @@ int32_t hcfs_gdrive_post_object(FILE *fptr,
 	post_control.total_remaining = total_size;
 	post_control.objname = obj_info->file_title;
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
@@ -999,7 +1002,7 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 	CURLcode res;
 	char *url = NULL;
 	char *filter_string = NULL, *title_string = NULL;
-	FILE *gdrive_header_fptr, *gdrive_list_body_fptr;
+	FILE *gdrive_header_fptr;
 	CURL *curl;
 	char header_filename[200];
 	int32_t ret_val, errcode;
@@ -1025,11 +1028,10 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 		return -1;
 	}
 	setbuf(gdrive_header_fptr, NULL);
-	gdrive_list_body_fptr = fptr;
 
 	/* Create filter string */
 	if (obj_info->file_title[0]) {
-		ASPRINTF(&title_string, "q=title+contains+'%s'",
+		ASPRINTF(&title_string, "q=title+=+'%s'",
 			obj_info->file_title);
 		title_exist = TRUE;
 	}
@@ -1049,7 +1051,6 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 
 	/* Create URL */
 	if (filter_string) {
-		printf("%s\n", filter_string);
 		ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files?%s",
 			 filter_string);
 		FREE(filter_string);
@@ -1057,22 +1058,24 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 		ASPRINTF(&url, "https://www.googleapis.com/drive/v2/files");
 	}
 
+	fseek(fptr, 0, SEEK_SET);
+	ftruncate(fileno(fptr), 0);
 	chunk = NULL;
 	chunk = curl_slist_append(chunk, googledrive_token);
+	chunk = curl_slist_append(chunk, "Expect:");
 
-	HCFS_SET_DEFAULT_CURL();
+	set_default_curl(curl);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, gdrive_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, gdrive_list_body_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_fn);
 
 	res = HTTP_PERFORM_RETRY(curl);
 	update_backend_status((res == CURLE_OK), NULL);
 	FREE(url);
-	curl_slist_free_all(chunk);
 
 	if (res != CURLE_OK) {
 		if (res != CURLE_ABORTED_BY_CALLBACK)
@@ -1084,6 +1087,8 @@ int32_t hcfs_gdrive_list_container(FILE *fptr, CURL_HANDLE *curl_handle,
 		change_xfer_meta(0, 0, 0, 1);
 		return -1;
 	}
+	curl_slist_free_all(chunk);
+	chunk = NULL;
 
 	/* Parse header */
 	ret_val = parse_http_header_retcode(gdrive_header_fptr);
@@ -1124,6 +1129,99 @@ errcode_handle:
 
 void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 
+int32_t fetch_id_from_list_body(FILE *fptr, char *id, const char *objname)
+{
+	json_error_t jerror;
+	json_t *json_data, *json_items, *json_title, *json_id;
+	const char *temp_id = NULL, *title = NULL;
+	char buffer[8192] = {0};
+	int32_t ret = 0;
+
+	fseek(fptr, 0, SEEK_SET);
+	json_data =
+	    json_loadf(fptr, JSON_DISABLE_EOF_CHECK, &jerror);
+	if (!json_data) {
+		ret = -EIO;
+		write_log(0, "Error: Fail to read json file. Error %s.",
+			  jerror.text);
+		goto errcode_handle;
+	}
+	/* Get list with key "items" */
+	json_items = json_object_get(json_data, "items");
+	if (!json_items) {
+		ret = -ENOENT;
+		write_log(0,
+			  "Error: Fail to parse json file. items not found\n");
+		goto errcode_handle_json_del;
+	}
+
+	/* Fetch "id" of given file title "objname" */
+	size_t index;
+	json_t *json_value;
+	bool found = false;
+
+	json_array_foreach(json_items, index, json_value) {
+		/* Skip if not a json dict */
+		if (json_value == NULL || json_is_object(json_value) < 0)
+			continue;
+
+		json_title = json_object_get(json_value, "title");
+		if (!json_title) {
+			ret = -ENOENT;
+			write_log(0, "Error: Fail to parse json file. title "
+				     "not found\n");
+			goto errcode_handle_json_del;
+		}
+		title = json_string_value(json_title);
+		if (!title) {
+			ret = -EINVAL;
+			write_log(0, "Error: Json file is corrupt\n");
+			goto errcode_handle_json_del;
+		}
+		/* Fetch id if title matches objname */
+		if (!strcmp(title, objname)) {
+			found = true;
+			json_id = json_object_get(json_value, "id");
+			if (!json_id) {
+				ret = -ENOENT;
+				write_log(0, "Error: Fail to parse json file. "
+					     "id not found\n");
+				goto errcode_handle_json_del;
+			}
+			temp_id = json_string_value(json_id);
+			if (!temp_id) {
+				ret = -EINVAL;
+				write_log(0, "Error: Json file is corrupt\n");
+				goto errcode_handle_json_del;
+			}
+			if (strlen(temp_id) > GDRIVE_ID_LENGTH)
+				write_log(4, "Warn: id len of object %s is %d, "
+					     "which is %s",
+					  objname, strlen(temp_id), temp_id);
+			strncpy(id, temp_id, GDRIVE_ID_LENGTH);
+			break;
+		}
+	}
+	json_delete(json_data);
+	if (found == false) {
+		ret = -ENOENT;
+		write_log(0, "Object %s is not found.", objname);
+		goto errcode_handle;
+	}
+
+	return 0;
+
+errcode_handle_json_del:
+	json_delete(json_data);
+errcode_handle:
+	fseek(fptr, 0, SEEK_SET);
+	fread(buffer, 8190, 1, fptr);
+	write_log(0, "Fail to parse id of %s. Dump content:\n %s\n",
+		  objname, buffer);
+	return ret;
+}
+
+
 /**
  * Get object parent ID
  *
@@ -1136,17 +1234,18 @@ void hcfs_destroy_gdrive_backend(CURL *curl) { curl_easy_cleanup(curl); }
 int32_t get_parent_id(char *id, const char *objname)
 {
 	char hcfs_root_id_filename[200];
-	CURL_HANDLE upload_handle;
+	CURL_HANDLE root_handle;
 	GOOGLEDRIVE_OBJ_INFO gdrive_info;
 	int32_t ret = 0;
 	FILE *fptr;
 
-	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+	memset(&root_handle, 0, sizeof(CURL_HANDLE));
 
 	/* Now data/meta/fsmgr-backup are put under folder "teradata" */
 	if (strncmp(objname, "data", 4) != 0 &&
 	    strncmp(objname, "meta", 4) != 0 &&
 	    strncmp(objname, "FSstat", 6) != 0 &&
+	    strncmp(objname, "backup_pkg", 10) != 0 &&
 	    strncmp(objname, FSMGR_BACKUP, strlen(FSMGR_BACKUP)) != 0) {
 		id[0] = 0;
 		goto out;
@@ -1159,8 +1258,12 @@ int32_t get_parent_id(char *id, const char *objname)
 		goto out;
 	}
 
-	snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
-		 "%s/hcfs_root_id", METAPATH);
+	if (hcfs_system->system_restoring == RESTORING_STAGE1)
+		snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
+			 "%s/hcfs_root_id", RESTORE_METAPATH);
+	else
+		snprintf(hcfs_root_id_filename, sizeof(hcfs_root_id_filename),
+			 "%s/hcfs_root_id", METAPATH);
 
 	/* Create folder */
 	sem_wait(&(gdrive_folder_id_cache->op_lock));
@@ -1178,7 +1281,7 @@ int32_t get_parent_id(char *id, const char *objname)
 		id_len = ftell(fptr);
 		fseek(fptr, 0, SEEK_SET);
 		ret_size = fread(id, id_len, 1, fptr);
-		if (ret_size == 1) {
+		if (ret_size == 1) { /* Read id sucessfully */
 			id[id_len] = 0;
 			strncpy(gdrive_folder_id_cache->hcfs_folder_id, id,
 				GDRIVE_ID_LENGTH);
@@ -1193,44 +1296,126 @@ int32_t get_parent_id(char *id, const char *objname)
 		}
 	}
 
-	/* Create folder */
-	memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-	strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
-	gdrive_info.type = GDRIVE_FOLDER;
+	/* Find the id of tera folder */
+	if (hcfs_system->system_restoring == RESTORING_STAGE1 ||
+	    hcfs_system->system_restoring == RESTORING_STAGE2) {
+		FILE *fptr;
+		char *list_path = "/tmp/list_root_folder_and_fetch_id";
 
-	snprintf(upload_handle.id, sizeof(upload_handle.id),
-		 "create_folder_curl");
-	upload_handle.curl_backend = NONE;
-	upload_handle.curl = NULL;
-	ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME, &upload_handle,
-			      NULL, &gdrive_info);
-	if ((ret < 200) || (ret > 299)) {
-		ret = -EIO;
-		write_log(0, "Error in creating %s\n", GOOGLEDRIVE_FOLDER_NAME);
-		goto unlock_sem_out;
+		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
+		gdrive_info.type = GDRIVE_FOLDER;
+		snprintf(root_handle.id, sizeof(root_handle.id),
+			 "create_folder_curl");
+		root_handle.curl_backend = NONE;
+		root_handle.curl = NULL;
+
+		fptr = fopen(list_path, "w+");
+		if (!fptr) {
+			ret = -errno;
+			goto unlock_sem_out;
+		}
+		setbuf(fptr, NULL);
+		fseek(fptr, 0, SEEK_SET);
+
+		ret = hcfs_list_container(fptr, &root_handle, &gdrive_info);
+		if ((ret < 200) || (ret > 299)) {
+			write_log(0, "Error in list %s. Http code %d\n",
+				  GOOGLEDRIVE_FOLDER_NAME, ret);
+			ret = -EIO;
+			fclose(fptr);
+			goto unlock_sem_out;
+		}
+		ret =
+		    fetch_id_from_list_body(fptr, id, GOOGLEDRIVE_FOLDER_NAME);
+		if (ret < 0) {
+			fclose(fptr);
+			goto unlock_sem_out;
+		}
+		unlink(list_path);
+
+	} else {
+		/* Create folder */
+		memset(&gdrive_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
+		strcpy(gdrive_info.file_title, GOOGLEDRIVE_FOLDER_NAME);
+		gdrive_info.type = GDRIVE_FOLDER;
+
+		snprintf(root_handle.id, sizeof(root_handle.id),
+				"create_folder_curl");
+		root_handle.curl_backend = NONE;
+		root_handle.curl = NULL;
+		ret = hcfs_put_object(NULL, GOOGLEDRIVE_FOLDER_NAME,
+				      &root_handle, NULL, &gdrive_info);
+		if ((ret < 200) || (ret > 299)) {
+			ret = -EIO;
+			write_log(0, "Error in creating %s\n",
+				  GOOGLEDRIVE_FOLDER_NAME);
+			goto unlock_sem_out;
+		}
+		strncpy(id, gdrive_info.fileID, GDRIVE_ID_LENGTH);
 	}
 
+	/* Write to file */
 	fptr = fopen(hcfs_root_id_filename, "w+");
 	if (!fptr) {
 		ret = -errno;
 		goto unlock_sem_out;
 	}
-	fwrite(gdrive_info.fileID, strlen(gdrive_info.fileID), 1, fptr);
+	fwrite(id, strlen(id), 1, fptr);
 	fclose(fptr);
 	/* Copy to cache */
-	strncpy(gdrive_folder_id_cache->hcfs_folder_id, gdrive_info.fileID,
+	strncpy(gdrive_folder_id_cache->hcfs_folder_id, id,
 		GDRIVE_ID_LENGTH);
-	/* Copy to target */
-	strncpy(id, gdrive_folder_id_cache->hcfs_folder_id, GDRIVE_ID_LENGTH);
 
 unlock_sem_out:
 	sem_post(&(gdrive_folder_id_cache->op_lock));
 
 out:
-	if (upload_handle.curl != NULL)
-		hcfs_destroy_backend(&upload_handle);
+	if (root_handle.curl != NULL)
+		hcfs_destroy_backend(&root_handle);
 	if (ret < 0)
 		write_log(0, "Error in fetching parent id. Code %d", -ret);
+	return ret;
+}
+
+int32_t query_object_id(GOOGLEDRIVE_OBJ_INFO *obj_info)
+{
+	CURL_HANDLE list_handle;
+	char list_path[400] = {0};
+	FILE *fptr;
+	int32_t ret = 0;
+
+	snprintf(list_handle.id, sizeof(list_handle.id), "list_object_%s",
+		 obj_info->file_title);
+	list_handle.curl_backend = NONE;
+	list_handle.curl = NULL;
+
+	snprintf(list_path, sizeof(list_path), "/tmp/list_obj_content_%s",
+		 obj_info->file_title);
+	fptr = fopen(list_path, "w+");
+	if (!fptr) {
+		ret = -errno;
+		goto out;
+	}
+	ret = hcfs_list_container(fptr, &list_handle, obj_info);
+	if ((ret < 200) || (ret > 299)) {
+		write_log(0, "Error in list %s. Http code %d\n",
+			  GOOGLEDRIVE_FOLDER_NAME, ret);
+		ret = -EIO;
+		fclose(fptr);
+		goto out;
+	}
+	ret = fetch_id_from_list_body(fptr, obj_info->fileID,
+				      obj_info->file_title);
+	if (ret < 0) {
+		fclose(fptr);
+		goto out;
+	}
+
+out:
+	unlink(list_path);
+	if (list_handle.curl != NULL)
+		hcfs_destroy_backend(&list_handle);
 	return ret;
 }
 
@@ -1239,38 +1424,48 @@ __attribute__((constructor))
 void test()
 {
 	CURL_HANDLE curl_handle;
-	//GOOGLEDRIVE_OBJ_INFO info;
-	//FILE *fptr;
+	GOOGLEDRIVE_OBJ_INFO info;
+	FILE *fptr;
 	int32_t ret;
+
+	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+	hcfs_system->system_going_down = false;
+	system_config = (SYSTEM_CONF_STRUCT *) malloc(sizeof(SYSTEM_CONF_STRUCT));
+	system_config->current_backend = GOOGLEDRIVE;
+
 
 	curl_handle.curl = curl_easy_init();
 	curl_handle.curl_backend = GOOGLEDRIVE;
 	strcpy(curl_handle.id, "test");
-	strcpy(googledrive_token, "Authorization:Bearer ya29.CjDPAyAA2KGRGsp7Wd6TJ6rzo7HAcp4BRXevOENeJnKcKZGxJmIzpKcnoDugnQEplB4");
+	strcpy(googledrive_token, "Authorization:Bearer ya29.GlyoBJyQ4dxiwoZ3j6n_WXkNuLDEIffuzeoKoC15jTkjtFFcYGbcLyXVogR3-eH9FQSkfbdrsxmb1T8JDTmd2CN4zhiN41reiXH3V5ohIIDemg8r8TkkNSFnqsd-3Q");
 
 	info.fileID[0] = 0;
 	info.parentID[0] = 0;
-	//strcpy(info.file_title, "test.jpg");
-	//strcpy(info.parentID, "0B9tmNFTdZf0beEo0MW5MQXNtTXM");
-	strcpy(info.fileID, "0B9tmNFTdZf0bWnZMa3N2T2ZvZWM");
+	strcpy(info.file_title, "tera.353627076173098");
+	//strcpy(info.parentID, "0Bzme02HmoI78dnNrLV8xTTJnQ1U");
+	//strcpy(info.fileID, "0B9tmNFTdZf0bWnZMa3N2T2ZvZWM");
 
-	fptr = fopen("testfile.jpg", "r");
-	int32_t ret = hcfs_gdrive_put_object(fptr, "test.jpg", &curl_handle, &info);
-	printf("ret = %d, %s\n", ret, info.fileID);
-	fclose(fptr);
-	
+//	fptr = fopen("testfile.jpg", "r");
+//	int32_t ret = hcfs_gdrive_put_object(fptr, "test.jpg", &curl_handle, &info);
+//	printf("ret = %d, %s\n", ret, info.fileID);
+//	fclose(fptr);
+//
 	printf("-----download test-----\n");
-	if (!(fptr = fopen("testdownload.jpg", "w+")))
-		exit(-1);	
-	ret = hcfs_gdrive_get_object(fptr, "test.jpg", &curl_handle, &info);
+	if (!(fptr = fopen("/tmp/testlist", "w+")))
+		exit(-1);
+	ret = hcfs_list_container(fptr, &curl_handle, &info);
+	printf("ret = %d, %s", ret, info.fileID);
+	ret = fetch_id_from_list_body(fptr, info.fileID,
+				      info.file_title);
 	printf("ret = %d, %s", ret, info.fileID);
 	fclose(fptr);
 
-	printf("-----delete test-----\n");
-	ret = hcfs_gdrive_delete_object("test.jpg", &curl_handle, &info);
-	printf("ret = %d, %s", ret, info.fileID);
-	ret = hcfs_gdrive_test_backend(&curl_handle);
-	printf("ret = %d", ret);
+//	printf("-----delete test-----\n");
+//	ret = hcfs_gdrive_delete_object("test.jpg", &curl_handle, &info);
+//	printf("ret = %d, %s", ret, info.fileID);
+//	ret = hcfs_gdrive_test_backend(&curl_handle);
+//	printf("ret = %d", ret);
+//
 	exit(0);
 }
 */

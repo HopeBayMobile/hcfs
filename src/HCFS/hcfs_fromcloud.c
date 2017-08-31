@@ -42,6 +42,7 @@
 #include "super_block.h"
 #include "rebuild_super_block.h"
 #include "do_restoration.h"
+#include "backend_generic.h"
 
 /************************************************************************
 *
@@ -121,11 +122,17 @@ int32_t fetch_from_cloud(FILE *fptr,
         HCFS_encode_object_meta *object_meta =
             calloc(1, sizeof(HCFS_encode_object_meta));
 
-	if (fileID) {
-		memset(&obj_info, 0, sizeof(GOOGLEDRIVE_OBJ_INFO));
-		strncpy(obj_info.fileID, fileID, GDRIVE_ID_LENGTH);
+	/* Fill object info if needed */
+	errcode =
+	    backend_ops.download_fill_object_info(&obj_info, objname, fileID);
+	if (errcode < 0) {
+		write_log(
+		    0, "Error: Fail to fill downloading object info, Object %s",
+		    objname);
+		return errcode;
 	}
-        status = hcfs_get_object(get_fptr, objname,
+
+	status = hcfs_get_object(get_fptr, objname,
                                  &(download_curl_handles[which_curl_handle]),
                                  object_meta, &obj_info);
 
@@ -626,10 +633,7 @@ void* fetch_backend_block(void *ptr)
 		}
 	}
 
-	if (CURRENT_BACKEND == GOOGLEDRIVE)
-		ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, blockID);
-	else
-		ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, NULL);
+	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, objname, blockID);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;
@@ -1189,7 +1193,10 @@ int32_t update_quota()
  * @return 0 on success, -ENOENT if object not found, -ESHUTDOWN if
  *           system shutdown, or other negative error code.
  */
-int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
+int32_t fetch_object_busywait_conn(FILE *fptr,
+				   char action_from,
+				   char *objname,
+				   char *objid)
 {
 	int32_t ret;
 	struct timespec time_to_sleep;
@@ -1214,9 +1221,8 @@ int32_t fetch_object_busywait_conn(FILE *fptr, char action_from, char *objname)
 			retries_since_last_notify = 0;
 			flock(fileno(fptr), LOCK_EX);
 			FTRUNCATE(fileno(fptr), 0);
-			/* TODO: Query id before download. */
-			ret =
-			    fetch_from_cloud(fptr, action_from, objname, NULL);
+			ret = 
+			    fetch_from_cloud(fptr, action_from, objname, objid);
 			flock(fileno(fptr), LOCK_UN);
 			if (ret < 0) {
 				if (ret == -ENOENT)

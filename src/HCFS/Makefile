@@ -86,6 +86,7 @@ OBJS_F := \
 	googledrive_curl.o \
 	pthread_control.o \
 	errcode.o \
+	backend_generic.o \
 
 # obj file used in android env
 ifeq "$(findstring -D_ANDROID_ENV_, $(CPPFLAGS))" "-D_ANDROID_ENV_"

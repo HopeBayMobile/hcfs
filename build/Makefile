@@ -16,7 +16,7 @@ TARGETS32       += nexus-7
 TARGETS32       += AOSP-kitkat-arm
 TARGETS64       += nexus-5x
 TARGETS64	+= AOSP-nougat-arm64
-TARGETS         += $(TARGETS32)
+#TARGETS         += $(TARGETS32)
 TARGETS         += $(TARGETS64)
 #   Add target list grouping by gdb or not
 HCFS_OUTS32     := $(TARGETS32:%=out/%-hcfs)

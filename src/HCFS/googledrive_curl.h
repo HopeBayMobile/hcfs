@@ -86,6 +86,7 @@ int32_t get_gdrive_fileID(const char *file_name,
 			  char *fileid);
 
 int32_t get_parent_id(char *id, const char *objname);
+int32_t query_object_id(GOOGLEDRIVE_OBJ_INFO *obj_info);
 
 void gdrive_exp_backoff_sleep(int32_t busy_retry_times);
 
