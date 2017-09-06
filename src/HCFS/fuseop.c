@@ -182,6 +182,9 @@ int32_t check_permission(fuse_req_t req, const HCFS_STAT *thisstat,
 	int32_t num_groups, count;
 	BOOL is_in_group;
 
+	// root-tera: dirty code
+	return 0;
+
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
 	if (temp_context == NULL)
 		return -ENOMEM;
@@ -891,6 +894,24 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 		convert_hcfsstat_to_sysstat(&ret_stat, &tmp_stat);
+
+		// root-tera: dirty code
+		{
+			static int get_sdcard_attr_ok = 0;
+			static struct stat s;
+			if (!get_sdcard_attr_ok) {
+				get_sdcard_attr_ok = !stat("/sdcard/", &s);
+			}
+			if (get_sdcard_attr_ok) {
+				ret_stat.st_uid = s.st_uid;
+				ret_stat.st_gid = s.st_gid;
+				if (ret_stat.st_mode & S_IFDIR)
+					ret_stat.st_mode |= 0777;
+				else
+					ret_stat.st_mode = (ret_stat.st_mode & ~0777) | 0666;
+			}
+		}
+
 		fuse_reply_attr(req, &ret_stat, REPLY_ATTR_TIMEOUT);
 	} else {
 		gettimeofday(&tmp_time2, NULL);
