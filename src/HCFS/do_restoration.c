@@ -2918,7 +2918,7 @@ add app-lib and dalvik-cache */
 					goto errcode_handle;
 				}
 				ret = _expand_and_fetch(rootino,
-					"/data/data", 0, hardln_mapping);
+					"/dev/MY-TERA", 0, hardln_mapping);
 				destroy_inode_pair_list(hardln_mapping);
 			}
 			if (ret < 0) {
