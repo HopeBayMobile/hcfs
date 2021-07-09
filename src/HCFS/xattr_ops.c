@@ -1,22 +1,21 @@
-/*************************************************************************
-*
-* Copyright © 2015-2016 Hope Bay Technologies, Inc. All rights reserved.
-*
-* File Name: xattr_ops.c
-* Abstract: The c source code file for xattr operations. The file includes
-*           operation of insert, remove, get, and list xattr corresponding
-*           to fuse operaion about xattr.
-*
-* Revision History
-* 2015/6/15 Kewei created the file and add function parse_xattr_namespace().
-* 2015/6/16 Kewei added some functions about xattr_insert operation.
-* 2015/6/18 Kewei fixed bugs about insert_xattr(). It works now.
-* 2015/6/22 Kewei added function get_xattr().
-* 2015/6/23 Kewei added function list_xattr().
-* 2015/6/24 Kewei added function remove_xattr().
-* 2015/8/10 Jiahong revised the file for coding style.
-*
-**************************************************************************/
+/*
+ * Copyright (c) 2021 HopeBayTech.
+ *
+ * This file is part of Tera.
+ * See https://github.com/HopeBayMobile for further info.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 
 #include "xattr_ops.h"

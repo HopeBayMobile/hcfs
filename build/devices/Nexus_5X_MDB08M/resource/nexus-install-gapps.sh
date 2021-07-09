@@ -1,79 +1,22 @@
 #!/bin/bash
-# vim:set tabstop=2 shiftwidth=2 softtabstop=0 expandtab:
-#
-# Description: # This is to apply opengapps into Nexus devices with AOSP ROM
-#
-# Authors: William W.-Y. Liang, Can Yu, Jethro Yu, etc
-#          from Hope Bay Tech, Copyright (C) 2016-
-# Contact: william.liang@hopebaytech.com
-#          can.yu@hopebaytech.com
-#          jethro.yu@hopebaytech.com
-#
-# Date: $Date: 2016/07/21 11:56:00 $
-# Version: $Revision: 1.14 $
-#
-# History:
-#
-# $Log: nexus-install-gapps.sh,v $
-# Revision 1.19  2016/11/29 10:30:00  Jethro
-# update image and use sideload again.
-# On windows, ADB is much stable within VMware player rather than Virtualbox.
-#
-# Revision 1.18  2016/08/24 14:11:00  wyliang
-# Add missed "-s $TARGET_DEVICE" in FlashImages()
-#
-# Revision 1.17  2016/08/22 19:45:00  wyliang
-# Fix some bugs for the -gp options; Minor code and messages refinement
-#
-# Revision 1.16  2016/08/19 17:17:00  wyliang
-# Support -keepdata to keep the data partition; Support -rom-only for debug purpose; 
-# Improve -boot4perm to avoid flashing twice for the first-time unlocked device
-#
-# Revision 1.15  2016/07/21 11:56:00  chingyi
-# Foolproof against flashing unexpected device when multiple devices are attached
-#
-# Revision 1.14  2016/07/20 11:48:35  jethro
-# Make script independent from CI env and reduece platform related code
-#
-# Revision 1.13  2016/07/13 17:17:00  jethro
-# Support Ubuntu VM in virtualbox, use local cache fro gapps
-#
-# Revision 1.12  2016/07/13 07:24:15  wyliang
-# Support Apple MacOS
-#
-# Revision 1.11  2016/07/11 12:11:00  wyliang
-# Add the '-boot4perm' option to support permission grant by a userdebug boot.img; Partial code refactoring
-#
-# Revision 1.10  2016/06/23 11:27:29  wyliang
-# Support '-gp' to grant permissions (only); Refine message and sideload check time
-#
-# Revision 1.9  2016/06/21 09:06:57  wyliang
-# Let -rom and -rom-zip imply -fr, and -factory and -factory-url imply -ff; Detect 'adb-disabled' on reflashing images; Minor refactoring on messages
-#
-# Revision 1.8  2016/06/17 07:24:14  wyliang
-# Support '-rom-zip' to flash a full zipped image; Improve the adb mode checking mechanism; Partial message refactoring
-#
-# Revision 1.7  2016/06/14 11:49:15  wyliang
-# Reduce the chance to be blocked at sideload stage
-#
-# Revision 1.6  2016/06/14 09:55:40  wyliang
-# Refine messages
-#
-# Revision 1.5  2016/06/09 07:51:10  wyliang
-# Add version option '-v'
-#
-# Revision 1.4  2016/06/09 07:40:07  wyliang
-# Add tool checking; Refine message; Refind code; Support twrp sideload command and checkings; Grant gapps with more permissions
-#
-# Revision 1.3  2016/06/08 11:56:28  wyliang
-# Fix minor bugs; Add some checks; Re-org a portion of the source code
-#
-# Revision 1.2  2016/06/08 09:32:29  wyliang
-# Support the feature to download and cache files from the original servers
-#
-# Revision 1.1  2016/06/07 06:04:50  wyliang
-# Create the nexus gapps installation script
-#
+##
+## Copyright (c) 2021 HopeBayTech.
+##
+## This file is part of Tera.
+## See https://github.com/HopeBayMobile for further info.
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+##
 
 # Android SDK path
 

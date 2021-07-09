@@ -1,20 +1,22 @@
 #!/bin/bash
-#########################################################################
-#
-# Copyright © 2016 Hope Bay Technologies, Inc. All rights reserved.
-#
-# Abstract:
-#
-# Required Env Variable:
-#     PUBLISH_DIR  Absolute path for current branch on nas, start with
-#                     /mnt/CloudDataSolution/TeraFonn_CI_build.
-#
-#     LIB_DIR         Absolute path for from previous jenkins job in pipeline.
-#
-# Revision History
-#   2016/2/8 Jethro Add ci script for s58a image
-#
-##########################################################################
+##
+## Copyright (c) 2021 HopeBayTech.
+##
+## This file is part of Tera.
+## See https://github.com/HopeBayMobile for further info.
+##
+## Licensed under the Apache License, Version 2.0 (the "License");
+## you may not use this file except in compliance with the License.
+## You may obtain a copy of the License at
+##
+##     http://www.apache.org/licenses/LICENSE-2.0
+##
+## Unless required by applicable law or agreed to in writing, software
+## distributed under the License is distributed on an "AS IS" BASIS,
+## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+## See the License for the specific language governing permissions and
+## limitations under the License.
+##
 [ $EUID -eq 0 ] || exec sudo -s -E $0
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
 repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && while [ ! -d .git ] ; do cd ..; done; pwd )"

@@ -1,44 +1,21 @@
-/*************************************************************************
-*
-* Copyright © 2014-2016 Hope Bay Technologies, Inc. All rights reserved.
-*
-* File Name: fuseop.c
-* Abstract: The c source code file for the main FUSE operations for HCFS.
-*           All fuse functions now use fuse_reply_xxxx to pass back data
-*           and returned status, and the functions themselves do not
-*           return anything (void return type).
-*
-* Revision History
-* 2015/2/2 Jiahong added header for this file, and revising coding style.
-*          File is renamed from hfuseops.c to fuseop.c
-* 2015/2/3~2/5 (Jiahong) Restructure hfuse_truncate, hfuse_write, hfuse_read
-*              functions
-* 2015/2/11 Jiahong added inclusion of hcfs_cacheops.h
-* 2015/2/12 Jiahong added inclusion of hcfs_fromcloud.h
-* 2015/3/2~3 Jiahong revised rename function to allow existing file as target.
-* 2015/3/12 Jiahong restructure hfuse_read
-* 2015/4/30 ~  Jiahong changing to FUSE low-level interface
-* 2015/5/20 Jiahong Adding permission checking for operations
-* 2015/5/25, 5/26  Jiahong adding error handling
-* 2015/6/29 Kewei finished xattr operations.
-* 2015/7/7 Kewei began to add ops about symbolic link
-* 2015/11/5 Jiahong adding changes for per-file statistics
-* 2015/11/24 Jethro adding
-* 2016/1/19 Jiahong modified path reconstruct routine
-* 2016/2/4 Jiahong adding fallocate
-* 2016/2/23 Jiahong moved fallocate to another file
-* 2016/3/17 Jiahong modified permission checking to add capability check
-* 2016/3/22 Jiahong lifted truncate permission check in Android
-*           Let SELinux do the work here.
-* 2016/4/20 Jiahong adding dir handle operations to opendir / closedir
-* 2016/6/27 Jiahong adding file size limitation
-* 2016/8/1  Jethro moved init_hcfs_stat to meta.c
-*                  moved convert_hcfsstat_to_sysstat to meta.c
-* 2016/8/24 Ripley add rename feature for external volume.
-* 2016/10/6 Ripley Support concurrent access on the alias inodes.
-* 2016/12/6 Jiahong adding routines for using minimal apks
-*
-**************************************************************************/
+/*
+ * Copyright (c) 2021 HopeBayTech.
+ *
+ * This file is part of Tera.
+ * See https://github.com/HopeBayMobile for further info.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #define FUSE_USE_VERSION 29
 #ifndef _GNU_SOURCE
